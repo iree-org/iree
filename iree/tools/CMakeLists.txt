@@ -302,6 +302,10 @@ if(${IREE_BUILD_COMPILER})
     PUBLIC
   )
 
+  if(${IREE_BUILD_TORCH_MLIR_SUPPORT})
+    set(_OPTIONAL_INIT_TORCH_MLIR_DIALECT_LIB ::init_torch_mlir_dialects)
+  endif()
+
   iree_cc_library(
     NAME
       init_passes_and_dialects
@@ -312,7 +316,7 @@ if(${IREE_BUILD_COMPILER})
       ::init_compiler_modules
       ::init_iree_passes_and_dialects
       ::init_mlir_passes_and_dialects
-      ::init_torch_mlir_dialects
+      ${_OPTIONAL_INIT_TORCH_MLIR_DIALECT_LIB}
       ::init_xla_dialects
       iree::compiler::Codegen::Codegen
       iree::compiler::Dialect::HAL::Conversion::Passes
@@ -365,15 +369,19 @@ if(${IREE_BUILD_COMPILER})
     PUBLIC
   )
 
-  iree_cc_library(
-    NAME
-      init_torch_mlir_dialects
-    HDRS
-      "init_torch_mlir_dialects.h"
-    DEPS
-      TorchMLIRTMTensorDialect
-    PUBLIC
-  )
+  if(${IREE_BUILD_TORCH_MLIR_SUPPORT})
+    iree_cc_library(
+      NAME
+        init_torch_mlir_dialects
+      HDRS
+        "init_torch_mlir_dialects.h"
+      DEPS
+        TorchMLIRTMTensorDialect
+      DEFINES
+        "IREE_HAVE_TORCH_MLIR_DIALECTS"
+      PUBLIC
+    )
+  endif()
 
   iree_cc_library(
     NAME

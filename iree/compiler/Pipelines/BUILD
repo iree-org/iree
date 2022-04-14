@@ -15,6 +15,7 @@ cc_library(
     srcs = ["Options.cpp"],
     hdrs = ["Options.h"],
     deps = [
+        "//iree/compiler/InputConversion/TMTensor",
         "//iree/compiler/Utils",
     ],
 )

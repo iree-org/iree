@@ -8,10 +8,10 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
-#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
@@ -175,38 +175,6 @@ static void populateTilingToInvocationPatterns(
 static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
   Operation *copyOp = b.create<memref::CopyOp>(src.getLoc(), src, dst);
   setMarker(copyOp, getCopyToWorkgroupMemoryMarker());
-  return success();
-}
-
-static Optional<Value> allocateWorkgroupMemory(
-    OpBuilder &b, memref::SubViewOp subview,
-    ArrayRef<Value> boundingSubViewSize, DataLayout &layout) {
-  OpBuilder::InsertionGuard guard(b);
-  func::FuncOp funcOp = subview->getParentOfType<func::FuncOp>();
-  if (!funcOp) {
-    subview.emitError("expected op to be within std.func");
-    return llvm::None;
-  }
-
-  // The bounding subview size is expected to be constant. This specified the
-  // shape of the allocation.
-  SmallVector<int64_t, 2> shape = llvm::to_vector<2>(
-      llvm::map_range(boundingSubViewSize, [](Value v) -> int64_t {
-        APInt value;
-        if (matchPattern(v, m_ConstantInt(&value))) return value.getSExtValue();
-        return -1;
-      }));
-  if (llvm::any_of(shape, [](int64_t v) { return v == -1; })) return {};
-  MemRefType allocType =
-      MemRefType::get(shape, subview.getType().getElementType(), {},
-                      gpu::GPUDialect::getWorkgroupAddressSpace());
-  b.setInsertionPoint(&funcOp.front(), funcOp.front().begin());
-  Value buffer = b.create<memref::AllocOp>(funcOp.getLoc(), allocType);
-  return buffer;
-}
-
-static LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
-  // Nothing to do.
   return success();
 }
 

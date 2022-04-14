@@ -15,7 +15,9 @@
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
+#ifdef IREE_HAVE_TORCH_MLIR_DIALECTS
 #include "iree/compiler/InputConversion/TMTensor/Passes.h"
+#endif
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 
 namespace mlir {
@@ -41,10 +43,12 @@ void buildIREEVMTransformPassPipeline(
     case InputDialectOptions::Type::mhlo:
       MHLO::buildMHLOInputConversionPassPipeline(passManager);
       break;
+#ifdef IREE_HAVE_TORCH_MLIR_DIALECTS
     case InputDialectOptions::Type::tm_tensor:
       passManager.addNestedPass<func::FuncOp>(
           TMTensor::createConvertTMTensorToLinalgExtPass());
       break;
+#endif
     case InputDialectOptions::Type::xla:
       MHLO::buildXLACleanupPassPipeline(passManager);
       MHLO::buildMHLOInputConversionPassPipeline(passManager);

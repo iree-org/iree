@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
   // Register assembly printer command-line options like
   // -mlir-print-op-generic.
   mlir::registerAsmPrinterCLOptions();
-  // Register pass manager command-line options like -print-ir-*.
+  // Register pass manager command-line options like -mlir-print-ir-*.
   mlir::registerPassManagerCLOptions();
 
   // Add flags for all the registered translations.

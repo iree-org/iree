@@ -38,8 +38,10 @@ struct InputDialectOptions {
     tosa,
     // Legalizes input defined over MHLO ops.
     mhlo,
+#ifdef IREE_HAVE_TORCH_MLIR_DIALECTS
     // Legalizes input defined over TMTensor ops.
     tm_tensor,
+#endif
     // Special case of 'mhlo' legalization which also performs some XLA
     // cleanup activities.
     xla,

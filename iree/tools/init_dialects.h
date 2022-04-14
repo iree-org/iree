@@ -15,7 +15,9 @@
 #include "iree/tools/init_compiler_modules.h"
 #include "iree/tools/init_iree_dialects.h"
 #include "iree/tools/init_mlir_dialects.h"
+#ifdef IREE_HAVE_TORCH_MLIR_DIALECTS
 #include "iree/tools/init_torch_mlir_dialects.h"
+#endif
 #include "iree/tools/init_xla_dialects.h"
 
 namespace mlir {
@@ -24,7 +26,9 @@ namespace iree_compiler {
 inline void registerAllDialects(DialectRegistry &registry) {
   registerMlirDialects(registry);
   registerIreeDialects(registry);
+#ifdef IREE_HAVE_TORCH_MLIR_DIALECTS
   registerTorchMLIRDialects(registry);
+#endif
   mlir::registerXLADialects(registry);
   mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
 }

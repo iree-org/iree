@@ -189,6 +189,8 @@ setup(
     long_description="",
     license="Apache-2.0",
     classifiers=[
+        "Development Status :: 3 - Alpha",
+        "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",

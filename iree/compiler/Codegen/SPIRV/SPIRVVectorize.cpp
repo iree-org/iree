@@ -225,6 +225,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
     // tensors and hoist them out of loop nests. So after it we have
     // loop-carried vectors, not loop-carried tensors anymore.
     linalg::hoistRedundantVectorTransfersOnTensor(funcOp);
+    linalg::hoistRedundantVectorTransfers(funcOp);
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After hoisting vector transfers ---\n";

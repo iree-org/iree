@@ -4,6 +4,14 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+if(IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER)
+  set(EXECUTABLE_FORMAT_PREFIX "system")
+else()
+  set (EXECUTABLE_FORMAT_PREFIX "embedded")
+endif()
+
+set(EXECUTABLE_FORMAT "\"${EXECUTABLE_FORMAT_PREFIX}-elf-\" IREE_ARCH")
+
 iree_hal_cts_test_suite(
   DRIVER_NAME
     dylib
@@ -14,7 +22,7 @@ iree_hal_cts_test_suite(
   COMPILER_TARGET_BACKEND
     "dylib-llvm-aot"
   EXECUTABLE_FORMAT
-    "\"embedded-elf-\" IREE_ARCH"
+    "${EXECUTABLE_FORMAT}"
   DEPS
     iree::hal::dylib::registration
 )
@@ -29,7 +37,7 @@ iree_hal_cts_test_suite(
   COMPILER_TARGET_BACKEND
     "dylib-llvm-aot"
   EXECUTABLE_FORMAT
-    "\"embedded-elf-\" IREE_ARCH"
+    "${EXECUTABLE_FORMAT}"
   DEPS
     iree::hal::dylib::registration::sync
   EXCLUDED_TESTS

@@ -107,8 +107,8 @@ class CompilerOptions:
       the option. Typically used for debugging Defaults to
       `OutputFormat.FLATBUFFER_BINARY`.
     extra_args: Optional list of additional arguments to pass to the compiler.
-      Example: ["--print-ir-after-all", "-some-other-arg"]. Individual arguments
-      must be separate items in the list.
+      Example: ["--mlir-print-ir-after-all", "-some-other-arg"]. Individual
+      arguments must be separate items in the list.
     optimize: Whether to apply some default high level optimizations (default
       True).
     output_mlir_debuginfo: Include debuginfo (including paths) in any saved or

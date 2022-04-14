@@ -35,9 +35,10 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
 
 /// Sets CodeGen configurations via attributes to the given matmul `linalgOp`
 /// with the given best workgroup size and tile size hints.
-LogicalResult setMatmulOpConfig(linalg::LinalgOp linalgOp,
+LogicalResult setMatmulOpConfig(linalg::LinalgOp linalgOp, int64_t subgroupSize,
                                 std::array<int64_t, 2> bestWorkgroupSizeXY,
-                                std::array<int64_t, 3> bestThreadTileSizeMNK);
+                                std::array<int64_t, 3> bestThreadTileSizeMNK,
+                                bool useWorkgroupMemory = false);
 
 /// Sets CodeGen configuration for GPUs from a specific vendor.
 ///
@@ -51,6 +52,8 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp linalgOp,
 
 LogicalResult setAdrenoCodeGenConfig(const spirv::TargetEnv &targetEnv,
                                      Operation *rootOp);
+LogicalResult setAMDCodeGenConfig(const spirv::TargetEnv &targetEnv,
+                                  Operation *rootOp);
 LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
                                    Operation *rootOp);
 LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,

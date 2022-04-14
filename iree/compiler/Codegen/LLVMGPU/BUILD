@@ -17,14 +17,11 @@ cc_library(
         "ConvertToNVVM.cpp",
         "ConvertToROCDL.cpp",
         "KernelConfig.cpp",
-        "LLVMGPUDistributeSharedMemoryCopy.cpp",
         "LLVMGPULowerExecutableTarget.cpp",
         "LLVMGPUMultiBuffering.cpp",
-        "LLVMGPUPipelining.cpp",
         "LLVMGPUReduceBankConflicts.cpp",
         "LLVMGPUTensorCoreVectorization.cpp",
         "LLVMGPUTileAndDistribute.cpp",
-        "LLVMGPUUtils.cpp",
         "LLVMGPUVectorLowering.cpp",
         "LLVMGPUVectorToGPU.cpp",
         "LLVMGPUVectorization.cpp",
@@ -34,7 +31,6 @@ cc_library(
     hdrs = [
         "ConvertToLLVM.h",
         "KernelConfig.h",
-        "LLVMGPUUtils.h",
     ],
     deps = [
         "//iree/compiler/Codegen:PassHeaders",

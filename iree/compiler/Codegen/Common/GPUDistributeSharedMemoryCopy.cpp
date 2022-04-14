@@ -8,12 +8,12 @@
 #include <numeric>
 
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
-#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "mlir/Dialect/GPU/Passes.h"
+#include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"
@@ -195,9 +195,9 @@ static void distributeTransferRead(func::FuncOp funcOp, Value flatThreadId,
 
 namespace {
 
-class LLVMGPUDistributeSharedMemoryCopyPass
-    : public LLVMGPUDistributeSharedMemoryCopyBase<
-          LLVMGPUDistributeSharedMemoryCopyPass> {
+class GPUDistributeSharedMemoryCopyPass
+    : public GPUDistributeSharedMemoryCopyBase<
+          GPUDistributeSharedMemoryCopyPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect, scf::SCFDialect>();
   }
@@ -220,20 +220,8 @@ class LLVMGPUDistributeSharedMemoryCopyPass
         copiesToWorkgroupMem, [flatWorkgroupSize](linalg::GenericOp copyOp) {
           auto shape =
               copyOp.getOperand(0).getType().cast<MemRefType>().getShape();
-          // Verify that each dimension of the shape can be distributed on the
-          // threads
-          int64_t threadsAvailable = flatWorkgroupSize;
-          for (auto &dim : llvm::enumerate(llvm::reverse(shape))) {
-            int64_t numElementPerThread =
-                dim.index() == 0 ? targetVectorSize : 1;
-            int64_t numThreads = dim.value() / numElementPerThread;
-            if (numThreads == 0) return false;
-            numThreads = std::min(numThreads, threadsAvailable);
-            if (threadsAvailable % numThreads != 0) return false;
-            threadsAvailable = threadsAvailable / numThreads;
-            if (threadsAvailable == 1) break;
-          }
-          return threadsAvailable == 1;
+          return canPerformVectorAccessUsingAllThreads(shape, flatWorkgroupSize,
+                                                       targetVectorSize);
         });
     if (isAligned) {
       // Step 1. Vectorize the shared memory copy.
@@ -292,8 +280,8 @@ class LLVMGPUDistributeSharedMemoryCopyPass
 }  // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMGPUDistributeSharedMemoryCopy() {
-  return std::make_unique<LLVMGPUDistributeSharedMemoryCopyPass>();
+createGPUDistributeSharedMemoryCopy() {
+  return std::make_unique<GPUDistributeSharedMemoryCopyPass>();
 }
 
 }  // namespace iree_compiler
