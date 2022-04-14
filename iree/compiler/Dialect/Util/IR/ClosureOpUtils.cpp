@@ -250,13 +250,9 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
   SmallVector<Value, 4> preservedResults;
   SmallVector<unsigned, 4> elidedResults;
   for (auto result : llvm::enumerate(closureOp.getClosureResults())) {
-    // You can drop a result if the use is empty and not read via a tie.
-    auto access = closureOp.getResultAccess(result.index());
-    if (result.value().use_empty() && !access.isRead) {
-      elidedResults.push_back(result.index());
-    } else {
-      preservedResults.push_back(result.value());
-    }
+    // TODO(#8899): It should be possible to add results that are not used
+    // to `elidedResults`. For now `elidedResults` is just left empty.
+    preservedResults.push_back(result.value());
   }
 
   if (elidedOperands.empty() && elidedResults.empty()) {
