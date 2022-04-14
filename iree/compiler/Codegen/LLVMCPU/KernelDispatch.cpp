@@ -21,6 +21,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -110,6 +111,11 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
   unsigned numLoops = op.getNumLoops();
   SmallVector<int64_t> minTileSizes(numLoops, 1);
   auto inputOutputOpOperands = op.getInputAndOutputOperands();
+
+  DenseSet<int64_t> fvds;
+  int64_t smallestTypeBitw = std::numeric_limits<int64_t>::max();
+  int64_t largestTypeBitw = std::numeric_limits<int64_t>::min();
+
   for (auto map : llvm::enumerate(op.getIndexingMaps())) {
     // Check the fastest varying dimension of the operand. Set the vector size
     // of the corresponding loop to the vector size.
@@ -118,15 +124,29 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
         map.value().getResults().back().dyn_cast<AffineDimExpr>();
     if (!fastestVaryingDimExpr) continue;
     unsigned fastestVaryingDim = fastestVaryingDimExpr.getPosition();
+    fvds.insert(fastestVaryingDim);
 
     // If the indexing map has result it has to be a shaped type.
-    auto operandType =
-        inputOutputOpOperands[map.index()]->get().getType().cast<ShapedType>();
-    int64_t opVecSize = getVectorSize(entryPointFn, operandType);
-    int64_t currMinSize = minTileSizes[fastestVaryingDim];
-    minTileSizes[fastestVaryingDim] =
-        currMinSize > 1 ? std::min<int64_t>(currMinSize, opVecSize) : opVecSize;
+    auto opOperand = inputOutputOpOperands[map.index()]->get();
+    int64_t elementSize =
+        opOperand.getType().cast<ShapedType>().getElementTypeBitWidth();
+    smallestTypeBitw = std::min(smallestTypeBitw, elementSize);
+    largestTypeBitw = std::max(largestTypeBitw, elementSize);
   }
+
+  // Compute the minimum tile size based on the largest and smallest types
+  // found. We choose the largest vector size if the smallest vector is two
+  // times smaller, at most. Otherwise, we choose half the largest vector to
+  // prevent excessive register pressure/unrolling.
+  int64_t smallestVectorSize = getVectorSize(entryPointFn, largestTypeBitw / 8);
+  int64_t largestVectorSize = getVectorSize(entryPointFn, smallestTypeBitw / 8);
+  int64_t sizeFactor = largestVectorSize / smallestVectorSize;
+  assert(std::ispow2(sizeFactor) && "Expected a power of two factor");
+  int64_t minTileSize =
+      sizeFactor <= 2 ? largestVectorSize : largestVectorSize / 2;
+
+  for (int64_t fvd : fvds) minTileSizes[fvd] = minTileSize;
+
   return minTileSizes;
 }
 
