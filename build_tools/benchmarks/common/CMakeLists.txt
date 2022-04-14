@@ -38,6 +38,13 @@ iree_py_test(
     "benchmark_suite_test.py"
 )
 
+iree_py_test(
+  NAME
+    benchmark_driver_test
+  SRCS
+    "benchmark_driver_test.py"
+)
+
 # TODO(#8708): Temporary solution to fix python path for tests.
 set_property(TEST "build_tools/benchmarks/common/linux_device_utils_test"
     APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${BENCHMARKS_TOOL_PYTHON_DIR}:$ENV{PYTHONPATH}")
@@ -46,6 +53,8 @@ set_property(TEST "build_tools/benchmarks/common/common_arguments_test"
 set_property(TEST "build_tools/benchmarks/common/benchmark_config_test"
     APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${BENCHMARKS_TOOL_PYTHON_DIR}:$ENV{PYTHONPATH}")
 set_property(TEST "build_tools/benchmarks/common/benchmark_suite_test"
+    APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${BENCHMARKS_TOOL_PYTHON_DIR}:$ENV{PYTHONPATH}")
+set_property(TEST "build_tools/benchmarks/common/benchmark_driver_test"
     APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${BENCHMARKS_TOOL_PYTHON_DIR}:$ENV{PYTHONPATH}")
 
 endif()

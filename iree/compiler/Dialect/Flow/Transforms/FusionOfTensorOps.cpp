@@ -46,67 +46,69 @@ struct FusionOfTensorOpsPass
     // Only fuse operations where all uses of the producer are generic
     // operations. If an operation is used in a named op, it will be computed
     // anyway, so the consumers can just use that value.
-    linalg::ControlElementwiseOpsFusionFn controlFn =
-        [](const OpResult &producerResult, OpOperand &consumerOperand) {
-          Operation *producer = producerResult.getOwner();
-          Operation *consumer = consumerOperand.getOwner();
+    linalg::ControlFusionFn controlFn = [](const OpResult &producerResult,
+                                           OpOperand &consumerOperand) {
+      Operation *producer = producerResult.getOwner();
+      Operation *consumer = consumerOperand.getOwner();
 
-          // Limit the number of operands. We have hard limit (32) of bindings
-          // passing down to HAL. Set the number to be as same as the limit --
-          // IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT.
-          constexpr int64_t kIreeMaxOperandCount = 32;
-          DenseSet<Value> operands;
-          operands.insert(producer->operand_begin(), producer->operand_end());
-          operands.insert(consumer->operand_begin(),
-                          std::next(consumer->operand_begin(),
-                                    consumerOperand.getOperandNumber()));
-          operands.insert(std::next(consumer->operand_begin(),
-                                    consumerOperand.getOperandNumber() + 1),
-                          consumer->operand_end());
-          if (operands.size() >= kIreeMaxOperandCount) return false;
+      // Limit the number of operands. We have hard limit (32) of bindings
+      // passing down to HAL. Set the number to be as same as the limit --
+      // IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT.
+      constexpr int64_t kIreeMaxOperandCount = 32;
+      DenseSet<Value> operands;
+      operands.insert(producer->operand_begin(), producer->operand_end());
+      operands.insert(consumer->operand_begin(),
+                      std::next(consumer->operand_begin(),
+                                consumerOperand.getOperandNumber()));
+      operands.insert(std::next(consumer->operand_begin(),
+                                consumerOperand.getOperandNumber() + 1),
+                      consumer->operand_end());
+      if (operands.size() >= kIreeMaxOperandCount) return false;
 
-          bool isBroadcast = false;
-          if (auto genericOp = dyn_cast<linalg::GenericOp>(producer)) {
-            // Detect op that only broadcast input as fusing them makes the new
-            // op cheaper.
-            if (genericOp.getNumParallelLoops() == genericOp.getNumLoops() &&
-                isa<linalg::YieldOp>(genericOp.getBody()->front())) {
-              for (OpOperand *opOperand : genericOp.getInputOperands()) {
-                AffineMap indexingMap = genericOp.getTiedIndexingMap(opOperand);
-                if (indexingMap.isProjectedPermutation() &&
-                    indexingMap.getNumDims() != indexingMap.getNumResults()) {
-                  isBroadcast = true;
-                  break;
-                }
-              }
+      bool isBroadcast = false;
+      if (auto genericOp = dyn_cast<linalg::GenericOp>(producer)) {
+        // Detect op that only broadcast input as fusing them makes the new
+        // op cheaper.
+        if (genericOp.getNumParallelLoops() == genericOp.getNumLoops() &&
+            isa<linalg::YieldOp>(genericOp.getBody()->front())) {
+          for (OpOperand *opOperand : genericOp.getInputOperands()) {
+            AffineMap indexingMap = genericOp.getTiedIndexingMap(opOperand);
+            if (indexingMap.isProjectedPermutation() &&
+                indexingMap.getNumDims() != indexingMap.getNumResults()) {
+              isBroadcast = true;
+              break;
             }
           }
-          // Only fuse if it has a single linalg generic user. It is a
-          // simplistic heuristic to avoid duplicating ops that may be
-          // expensive.
-          // TODO: Add a cost model to allow ops to be duplicated.
-          bool hasI1ReturnType =
-              llvm::any_of(producer->getResultTypes(), [](Type t) {
-                if (t.isInteger(1)) return true;
-                if (auto shapedType = t.dyn_cast<ShapedType>()) {
-                  if (shapedType.getElementType().isInteger(1)) return true;
-                }
-                return false;
-              });
-          if (!isBroadcast && !isa<arith::ConstantOp>(producer) &&
-              !hasI1ReturnType &&
-              !llvm::hasSingleElement(producerResult.getUsers())) {
+        }
+      }
+      // Only fuse if it has a single linalg generic user. It is a
+      // simplistic heuristic to avoid duplicating ops that may be
+      // expensive.
+      // TODO: Add a cost model to allow ops to be duplicated.
+      bool hasI1ReturnType =
+          llvm::any_of(producer->getResultTypes(), [](Type t) {
+            if (t.isInteger(1)) return true;
+            if (auto shapedType = t.dyn_cast<ShapedType>()) {
+              if (shapedType.getElementType().isInteger(1)) return true;
+            }
             return false;
-          }
-          return llvm::all_of(producerResult.getUsers(), [](Operation *user) {
-            return isa<linalg::GenericOp>(user);
           });
-        };
+      if (!isBroadcast && !isa<arith::ConstantOp>(producer) &&
+          !hasI1ReturnType &&
+          !llvm::hasSingleElement(producerResult.getUsers())) {
+        return false;
+      }
+      return llvm::all_of(producerResult.getUsers(), [](Operation *user) {
+        return isa<linalg::GenericOp>(user);
+      });
+    };
+    linalg::populateElementwiseOpsFusionPatterns(fusionPatterns, controlFn);
+
     // Simple heuristic to decide if reshaope should be folded in the linalg.
     // If the source of the reshape is a linalg op fold to potentially allow the
     // two linalg ops to be fused. Otherwise leave it to avoid adding dimensions
     // to the consumer linalg op.
-    linalg::ControlElementwiseOpsFusionFn foldReshapeBetweenLinalgFn =
+    linalg::ControlFusionFn foldReshapeBetweenLinalgFn =
         [](const OpResult &producer, const OpOperand &consumer) {
           auto collapseOp = producer.getDefiningOp<tensor::CollapseShapeOp>();
           if (collapseOp) {
@@ -118,11 +120,24 @@ struct FusionOfTensorOpsPass
           }
           return false;
         };
-    linalg::populateElementwiseOpsFusionPatterns(
-        fusionPatterns,
-        linalg::LinalgElementwiseFusionOptions()
-            .setControlFoldingReshapes(foldReshapeBetweenLinalgFn)
-            .setControlElementwiseOpsFusionFn(controlFn));
+    linalg::populateFoldReshapeOpsByExpansionPatterns(
+        fusionPatterns, foldReshapeBetweenLinalgFn);
+
+    // Constant fold Linalg operations.
+    auto constantFoldControlFn = [](const OpResult &producer,
+                                    OpOperand &consumer) {
+      return producer.getOwner()->hasOneUse();
+    };
+    linalg::populateConstantFoldLinalgOperations(fusionPatterns,
+                                                 constantFoldControlFn);
+
+    AffineApplyOp::getCanonicalizationPatterns(fusionPatterns, context);
+    linalg::GenericOp::getCanonicalizationPatterns(fusionPatterns, context);
+    tensor::ExpandShapeOp::getCanonicalizationPatterns(fusionPatterns, context);
+    tensor::CollapseShapeOp::getCanonicalizationPatterns(fusionPatterns,
+                                                         context);
+    context->getLoadedDialect<linalg::LinalgDialect>()
+        ->getCanonicalizationPatterns(fusionPatterns);
     memref::populateResolveRankedShapeTypeResultDimsPatterns(fusionPatterns);
 
     if (failed(applyPatternsAndFoldGreedily(op->getRegions(),

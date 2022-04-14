@@ -43,13 +43,13 @@ INSTALL_ROOT="${1:-${ROOT_DIR}/build-host/install}"
 # Compile from .mlir input to static C source files using host tools          #
 ###############################################################################
 
-TRANSLATE_TOOL="${INSTALL_ROOT?}/bin/iree-compile"
+COMPILE_TOOL="${INSTALL_ROOT?}/bin/iree-compile"
 EMBED_DATA_TOOL="${INSTALL_ROOT?}/bin/generate_embed_data"
 INPUT_NAME="mnist"
 INPUT_PATH="${ROOT_DIR?}/iree/samples/models/mnist.mlir"
 
-echo "=== Translating MLIR to static library output (.vmfb, .h, .o) ==="
-${TRANSLATE_TOOL?} ${INPUT_PATH} \
+echo "=== Compiling MLIR to static library output (.vmfb, .h, .o) ==="
+${COMPILE_TOOL?} ${INPUT_PATH} \
   --iree-mlir-to-vm-bytecode-module \
   --iree-input-type=mhlo \
   --iree-hal-target-backends=llvm \

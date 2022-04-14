@@ -223,7 +223,7 @@ int main(int argc, char **argv) {
         return 1;
       }
       sourceMgr.AddNewSourceBuffer(std::move(file), SMLoc());
-      module = parseSourceFile(sourceMgr, &context);
+      module = parseSourceFile<ModuleOp>(sourceMgr, &context);
       if (!module) return 2;
       break;
     }

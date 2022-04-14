@@ -192,6 +192,40 @@ LogicalResult LoweringConfigAttr::verify(
 // iree.compilation_info
 //===----------------------------------------------------------------------===//
 
+/// These builders are externally for auto-tuner to generate the attribute.
+CompilationInfoAttr CompilationInfoAttr::get(MLIRContext *context,
+                                             TileSizesListTypeRef tileSizes,
+                                             TileSizesListTypeRef interchange,
+                                             ArrayRef<int64_t> nativeVectorSize,
+                                             ArrayRef<int64_t> workgroupSize) {
+  LoweringConfigAttr configAttr = LoweringConfigAttr::get(
+      context, tileSizes, interchange, nativeVectorSize);
+  TranslationInfoAttr translationInfo =
+      TranslationInfoAttr::get(context, DispatchLoweringPassPipeline::None);
+  ArrayAttr workgroupSizeAttr = getI64IntegerArrayAttr(context, workgroupSize);
+  return get(context, configAttr, translationInfo, workgroupSizeAttr);
+}
+
+CompilationInfoAttr CompilationInfoAttr::get(
+    MLIRContext *context, TileSizesListTypeRef tileSizes,
+    TileSizesListTypeRef interchange, ArrayRef<int64_t> nativeVectorSize,
+    DispatchLoweringPassPipeline passPipeline,
+    ArrayRef<int64_t> workloadPerWorkgroup, ArrayRef<int64_t> workgroupSize) {
+  LoweringConfigAttr configAttr = LoweringConfigAttr::get(
+      context, tileSizes, interchange, nativeVectorSize);
+  TranslationInfoAttr translationInfoAttr =
+      TranslationInfoAttr::get(context, passPipeline, workloadPerWorkgroup);
+  ArrayAttr workgroupSizeAttr = getI64IntegerArrayAttr(context, workgroupSize);
+  return get(context, configAttr, translationInfoAttr, workgroupSizeAttr);
+}
+
+CompilationInfoAttr CompilationInfoAttr::get(
+    MLIRContext *context, LoweringConfigAttr configAttr,
+    TranslationInfoAttr translationInfo, ArrayRef<int64_t> workgroupSize) {
+  ArrayAttr workgroupSizeAttr = getI64IntegerArrayAttr(context, workgroupSize);
+  return get(context, configAttr, translationInfo, workgroupSizeAttr);
+}
+
 LogicalResult CompilationInfoAttr::verify(
     function_ref<InFlightDiagnostic()> emitError,
     LoweringConfigAttr loweringConfig, TranslationInfoAttr translationInfo,

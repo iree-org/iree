@@ -91,7 +91,7 @@ class ExportBenchmarkFuncsPass
     funcOp.setPublic();
     funcOp->setAttr("iree.abi.stub", moduleBuilder.getUnitAttr());
     SmallVector<NamedAttribute> reflectionAttrs = {
-        moduleBuilder.getNamedAttr("benchmark",
+        moduleBuilder.getNamedAttr("iree.benchmark",
                                    moduleBuilder.getStringAttr("entry")),
     };
     funcOp->setAttr("iree.reflection",

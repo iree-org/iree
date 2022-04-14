@@ -17,6 +17,21 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, Sequence
 
+# A map from CPU ABI to IREE's benchmark target architecture.
+CPU_ABI_TO_TARGET_ARCH_MAP = {
+    "arm64-v8a": "cpu-arm64-v8a",
+}
+
+# A map from GPU name to IREE's benchmark target architecture.
+GPU_NAME_TO_TARGET_ARCH_MAP = {
+    "adreno-640": "gpu-adreno",
+    "adreno-650": "gpu-adreno",
+    "adreno-660": "gpu-adreno",
+    "adreno-730": "gpu-adreno",
+    "mali-g77": "gpu-mali-valhall",
+    "mali-g78": "gpu-mali-valhall",
+}
+
 
 @dataclass
 class DriverInfo:
@@ -89,7 +104,7 @@ class PlatformType(Enum):
   LINUX = "Linux"
 
 
-@dataclass
+@dataclass(frozen=True)
 class DeviceInfo:
   """An object describing a device.
 
@@ -117,6 +132,20 @@ class DeviceInfo:
     ]
     params = ", ".join(params)
     return f"{self.platform_type.value} device <{params}>"
+
+  def get_iree_cpu_arch_name(self) -> str:
+    arch = CPU_ABI_TO_TARGET_ARCH_MAP.get(self.cpu_abi.lower())
+    if not arch:
+      raise ValueError(f"Unrecognized CPU ABI: '{self.cpu_abi}'; "
+                       "need to update the map")
+    return arch
+
+  def get_iree_gpu_arch_name(self) -> str:
+    arch = GPU_NAME_TO_TARGET_ARCH_MAP.get(self.gpu_name.lower())
+    if not arch:
+      raise ValueError(f"Unrecognized GPU name: '{self.gpu_name}'; "
+                       "need to update the map")
+    return arch
 
   def get_cpu_arch_revision(self) -> str:
     if self.cpu_abi == "arm64-v8a":
@@ -156,7 +185,7 @@ class DeviceInfo:
     return rev
 
 
-@dataclass
+@dataclass(frozen=True)
 class BenchmarkInfo:
   """An object describing the current benchmark.
 

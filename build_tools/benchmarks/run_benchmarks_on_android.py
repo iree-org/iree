@@ -41,7 +41,9 @@ import sys
 
 from typing import List, Optional, Sequence, Tuple, Set
 
-from common.benchmark_definition import (DeviceInfo, BenchmarkInfo,
+from common.benchmark_definition import (CPU_ABI_TO_TARGET_ARCH_MAP,
+                                         GPU_NAME_TO_TARGET_ARCH_MAP,
+                                         DeviceInfo, BenchmarkInfo,
                                          BenchmarkResults, BenchmarkRun,
                                          execute_cmd,
                                          execute_cmd_and_get_output)
@@ -62,21 +64,6 @@ ANDROID_TMP_DIR = "/data/local/tmp/iree-benchmarks"
 
 NORMAL_TOOL_REL_DIR = "normal-tools"
 TRACED_TOOL_REL_DIR = "traced-tools"
-
-# A map from Android CPU ABI to IREE's benchmark target architecture.
-CPU_ABI_TO_TARGET_ARCH_MAP = {
-    "arm64-v8a": "cpu-arm64-v8a",
-}
-
-# A map from Android GPU name to IREE's benchmark target architecture.
-GPU_NAME_TO_TARGET_ARCH_MAP = {
-    "adreno-640": "gpu-adreno",
-    "adreno-650": "gpu-adreno",
-    "adreno-660": "gpu-adreno",
-    "adreno-730": "gpu-adreno",
-    "mali-g77": "gpu-mali-valhall",
-    "mali-g78": "gpu-mali-valhall",
-}
 
 
 def get_benchmark_repetition_count(runner: str) -> int:

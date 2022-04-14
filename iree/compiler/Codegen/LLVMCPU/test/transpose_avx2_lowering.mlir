@@ -16,11 +16,11 @@
   }>
 
 
-hal.executable private @test_8x8_avx2_pattern {
+hal.executable private @transpose_10_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.entry_point @test_8x8_avx2_pattern layout(#executable_layout)
+    hal.executable.entry_point @transpose_10_8x8_pattern layout(#executable_layout)
     builtin.module {
-      func @test_8x8_avx2_pattern() {
+      func @transpose_10_8x8_pattern() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:512x1024xf32>
@@ -41,36 +41,279 @@ hal.executable private @test_8x8_avx2_pattern {
   }
 }
 
-// CHECK: func @test_8x8_avx2_pattern
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-// CHECK: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-// CHECK: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-// CHECK: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-// CHECK: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-// CHECK: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-// CHECK: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-// CHECK: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-// CHECK: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-// CHECK: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-LABEL: func @transpose_10_8x8_pattern
+//  CHECK-COUNT-8: vector.load
+//      CHECK-NOT: vector.extract
+//      CHECK-NOT: vector.insert
+// CHECK-COUNT-12: vector.shuffle {{.*}} : vector<8xf32>, vector<8xf32>
+//  CHECK-COUNT-8: llvm.inline_asm asm_dialect {{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//  CHECK-COUNT-8: vector.shuffle {{.*}} : vector<8xf32>, vector<8xf32>
+//      CHECK-NOT: vector.extract
+//      CHECK-NOT: vector.insert
+//  CHECK-COUNT-8: vector.store
 
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<
+  "llvm",
+  "embedded-elf-x86_64", {
+    cpu_features = "+avx2",
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 32 : index,
+    target_triple = "x86_64-unknown-unknown-eabi-elf"
+  }>
+
+
+hal.executable private @transpose_021_8x8_pattern {
+  hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+    hal.executable.entry_point @transpose_021_8x8_pattern layout(#executable_layout)
+    builtin.module {
+      func @transpose_021_8x8_pattern() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:64x96x128xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:64x128x96xf32>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [64, 96, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:64x96x128xf32> -> tensor<64x96x128xf32>
+        %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [64, 128, 96], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:64x128x96xf32> -> tensor<64x128x96xf32>
+        %6 = linalg.generic {
+          indexing_maps = [ affine_map<(d0, d1, d2) -> (d0, d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+          iterator_types = ["parallel", "parallel", "parallel"]}
+          ins(%3 : tensor<64x96x128xf32>) outs(%5 : tensor<64x128x96xf32>) {
+          ^bb0(%arg1: f32, %arg2: f32):
+            linalg.yield %arg1 : f32
+          } -> tensor<64x128x96xf32>
+        flow.dispatch.tensor.store %6, %2, offsets = [0, 0, 0], sizes = [64, 128, 96], strides = [1, 1, 1] : tensor<64x128x96xf32> -> !flow.dispatch.tensor<writeonly:64x128x96xf32>
+        return
+      }
+    }
+  }
+}
+
+//    CHECK-LABEL: func @transpose_021_8x8_pattern
+//  CHECK-COUNT-8: vector.load
+//      CHECK-NOT: vector.extract
+//      CHECK-NOT: vector.insert
+// CHECK-COUNT-12: vector.shuffle {{.*}} : vector<8xf32>, vector<8xf32>
+//  CHECK-COUNT-8: llvm.inline_asm asm_dialect {{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//  CHECK-COUNT-8: vector.shuffle {{.*}} : vector<8xf32>, vector<8xf32>
+//      CHECK-NOT: vector.extract
+//      CHECK-NOT: vector.insert
+//  CHECK-COUNT-8: vector.store
+
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<
+  "llvm",
+  "embedded-elf-x86_64", {
+    cpu_features = "+avx2",
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 32 : index,
+    target_triple = "x86_64-unknown-unknown-eabi-elf"
+  }>
+
+
+hal.executable private @transpose_201_8x8_pattern {
+  hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+    hal.executable.entry_point @transpose_201_8x8_pattern layout(#executable_layout)
+    builtin.module {
+      func @transpose_201_8x8_pattern() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:64x96x128xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:128x64x96xf32>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [64, 96, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:64x96x128xf32> -> tensor<64x96x128xf32>
+        %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [128, 64, 96], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:128x64x96xf32> -> tensor<128x64x96xf32>
+        %6 = linalg.generic {
+          indexing_maps = [ affine_map<(d0, d1, d2) -> (d1, d2, d0)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+          iterator_types = ["parallel", "parallel", "parallel"]}
+          ins(%3 : tensor<64x96x128xf32>) outs(%5 : tensor<128x64x96xf32>) {
+          ^bb0(%arg1: f32, %arg2: f32):
+            linalg.yield %arg1 : f32
+          } -> tensor<128x64x96xf32>
+        flow.dispatch.tensor.store %6, %2, offsets = [0, 0, 0], sizes = [128, 64, 96], strides = [1, 1, 1] : tensor<128x64x96xf32> -> !flow.dispatch.tensor<writeonly:128x64x96xf32>
+        return
+      }
+    }
+  }
+}
+
+//   CHECK-LABEL: func @transpose_201_8x8_pattern
+//  CHECK-COUNT-8: vector.load
+//      CHECK-NOT: vector.extract
+//      CHECK-NOT: vector.insert
+// CHECK-COUNT-12: vector.shuffle {{.*}} : vector<8xf32>, vector<8xf32>
+//  CHECK-COUNT-8: llvm.inline_asm asm_dialect {{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//  CHECK-COUNT-8: vector.shuffle {{.*}} : vector<8xf32>, vector<8xf32>
+//      CHECK-NOT: vector.extract
+//      CHECK-NOT: vector.insert
+//  CHECK-COUNT-8: vector.store
+
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<
+  "llvm",
+  "embedded-elf-x86_64", {
+    cpu_features = "+avx2",
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 32 : index,
+    target_triple = "x86_64-unknown-unknown-eabi-elf"
+  }>
+
+
+hal.executable private @transpose_210_8x8_pattern {
+  hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+    hal.executable.entry_point @transpose_210_8x8_pattern layout(#executable_layout)
+    builtin.module {
+      func @transpose_210_8x8_pattern() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:64x96x128xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:128x96x64xf32>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [64, 96, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:64x96x128xf32> -> tensor<64x96x128xf32>
+        %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [128, 96, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:128x96x64xf32> -> tensor<128x96x64xf32>
+        %6 = linalg.generic {
+          indexing_maps = [ affine_map<(d0, d1, d2) -> (d2, d1, d0)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+          iterator_types = ["parallel", "parallel", "parallel"]}
+          ins(%3 : tensor<64x96x128xf32>) outs(%5 : tensor<128x96x64xf32>) {
+          ^bb0(%arg1: f32, %arg2: f32):
+            linalg.yield %arg1 : f32
+          } -> tensor<128x96x64xf32>
+        flow.dispatch.tensor.store %6, %2, offsets = [0, 0, 0], sizes = [128, 96, 64], strides = [1, 1, 1] : tensor<128x96x64xf32> -> !flow.dispatch.tensor<writeonly:128x96x64xf32>
+        return
+      }
+    }
+  }
+}
+
+//   CHECK-LABEL: func @transpose_210_8x8_pattern
+//  CHECK-COUNT-8: vector.load
+//      CHECK-NOT: vector.extract
+//      CHECK-NOT: vector.insert
+// CHECK-COUNT-12: vector.shuffle {{.*}} : vector<8xf32>, vector<8xf32>
+//  CHECK-COUNT-8: llvm.inline_asm asm_dialect {{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//  CHECK-COUNT-8: vector.shuffle {{.*}} : vector<8xf32>, vector<8xf32>
+//      CHECK-NOT: vector.extract
+//      CHECK-NOT: vector.insert
+//  CHECK-COUNT-8: vector.store
+
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<
+  "llvm",
+  "embedded-elf-x86_64", {
+    cpu_features = "+avx2",
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 32 : index,
+    target_triple = "x86_64-unknown-unknown-eabi-elf"
+  }>
+
+
+hal.executable private @transpose_120_8x8_pattern {
+  hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+    hal.executable.entry_point @transpose_120_8x8_pattern layout(#executable_layout)
+    builtin.module {
+      func @transpose_120_8x8_pattern() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:64x96x128xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:96x128x64xf32>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [64, 96, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:64x96x128xf32> -> tensor<64x96x128xf32>
+        %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [96, 128, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:96x128x64xf32> -> tensor<96x128x64xf32>
+        %6 = linalg.generic {
+          indexing_maps = [ affine_map<(d0, d1, d2) -> (d2, d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+          iterator_types = ["parallel", "parallel", "parallel"]}
+          ins(%3 : tensor<64x96x128xf32>) outs(%5 : tensor<96x128x64xf32>) {
+          ^bb0(%arg1: f32, %arg2: f32):
+            linalg.yield %arg1 : f32
+          } -> tensor<96x128x64xf32>
+        flow.dispatch.tensor.store %6, %2, offsets = [0, 0, 0], sizes = [96, 128, 64], strides = [1, 1, 1] : tensor<96x128x64xf32> -> !flow.dispatch.tensor<writeonly:96x128x64xf32>
+        return
+      }
+    }
+  }
+}
+
+//   CHECK-LABEL: func @transpose_120_8x8_pattern
+//  CHECK-COUNT-8: vector.load
+//      CHECK-NOT: vector.extract
+//      CHECK-NOT: vector.insert
+// CHECK-COUNT-12: vector.shuffle {{.*}} : vector<8xf32>, vector<8xf32>
+//  CHECK-COUNT-8: llvm.inline_asm asm_dialect {{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//  CHECK-COUNT-8: vector.shuffle {{.*}} : vector<8xf32>, vector<8xf32>
+//      CHECK-NOT: vector.extract
+//      CHECK-NOT: vector.insert
+//  CHECK-COUNT-8: vector.store
+
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<
+  "llvm",
+  "embedded-elf-x86_64", {
+    cpu_features = "+avx2",
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 32 : index,
+    target_triple = "x86_64-unknown-unknown-eabi-elf"
+  }>
+
+
+hal.executable private @transpose_102 {
+  hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+    hal.executable.entry_point @transpose_102 layout(#executable_layout)
+    builtin.module {
+      func @transpose_102() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:64x96x128xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:96x64x128xf32>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [64, 96, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:64x96x128xf32> -> tensor<64x96x128xf32>
+        %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [96, 64, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:96x64x128xf32> -> tensor<96x64x128xf32>
+        %6 = linalg.generic {
+          indexing_maps = [ affine_map<(d0, d1, d2) -> (d1, d0, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+          iterator_types = ["parallel", "parallel", "parallel"]}
+          ins(%3 : tensor<64x96x128xf32>) outs(%5 : tensor<96x64x128xf32>) {
+          ^bb0(%arg1: f32, %arg2: f32):
+            linalg.yield %arg1 : f32
+          } -> tensor<96x64x128xf32>
+        flow.dispatch.tensor.store %6, %2, offsets = [0, 0, 0], sizes = [96, 64, 128], strides = [1, 1, 1] : tensor<96x64x128xf32> -> !flow.dispatch.tensor<writeonly:96x64x128xf32>
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: func @transpose_102
+//   CHECK-NOT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//   CHECK-NOT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
 // -----
 
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
@@ -114,6 +357,6 @@ hal.executable private @test_no_avx2_feature {
   }
 }
 
-//     CHECK: func @test_no_avx2_feature
-// CHECK-NOT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-// CHECK-NOT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+// CHECK-LABEL: func @test_no_avx2_feature
+//   CHECK-NOT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//   CHECK-NOT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>

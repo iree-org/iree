@@ -19,6 +19,8 @@ struct LinalgFusePassOptions {
   SmallVector<int64_t> tileSizes = {};
   SmallVector<int64_t> tileInterchange = {};
   bool pad = false;
+  SmallVector<std::string> paddingValues = {};
+  SmallVector<int64_t> paddingDimensions = {};
   SmallVector<int64_t> packPaddings = {};
   SmallVector<int64_t> hoistPaddings = {};
   SmallVector<std::string> transposePaddings = {};
@@ -41,6 +43,7 @@ struct LinalgSingleTilingExpertPassOptions {
   SmallVector<int64_t> tileInterchange = {};
   SmallVector<int64_t> peeledLoops = {};
   bool pad = false;
+  SmallVector<std::string> paddingValues = {};
   SmallVector<int64_t> packPaddings = {};
   SmallVector<int64_t> hoistPaddings = {};
   SmallVector<std::string> transposePaddings = {};

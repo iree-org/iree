@@ -6,6 +6,7 @@
 
 #include <utility>
 
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTraits.h"
@@ -207,6 +208,10 @@ class Verifier {
   DenseMap<TypeID, TypeVerifierFn> typeVerifiers;
 };
 
+static void setupDefaultOpLegality(Verifier &verifier) {
+  verifier.addRecursivelyLegalOp<IREE::HAL::ExecutableOp>();
+}
+
 static void markStreamTensorOpsIllegal(Verifier &verifier) {
   verifier.addOpVerifier([](Operation *op) -> Optional<Verifier::Legality> {
     if (op->hasTrait<OpTrait::IREE::Stream::TensorPhaseOp>()) {
@@ -246,6 +251,7 @@ class VerifyInputPass : public VerifyInputBase<VerifyInputPass> {
 
   void runOnOperation() override {
     Verifier verifier;
+    setupDefaultOpLegality(verifier);
 
     // TODO(#7432): add indirect global expansion support to streams.
     verifier.addIllegalOp<IREE::Util::GlobalAddressOp>();
@@ -297,6 +303,7 @@ class VerifyLoweringToTensorsPass
     // We cannot have stream.cmd.* ops mixed with stream.tensor/async.* ops
     // as they use different memory models.
     Verifier verifier;
+    setupDefaultOpLegality(verifier);
     markTensorInputsIllegal(verifier);
     markStreamCmdOpsIllegal(verifier);
     if (failed(verifier.run(getOperation()))) {
@@ -332,6 +339,7 @@ class VerifyLoweringToAsyncPass
     // We cannot have stream.cmd.* ops mixed with stream.tensor/async.* ops
     // as they use different memory models.
     Verifier verifier;
+    setupDefaultOpLegality(verifier);
     markTensorInputsIllegal(verifier);
     markStreamTensorOpsIllegal(verifier);
     markStreamCmdOpsIllegal(verifier);
@@ -390,6 +398,7 @@ class VerifyLoweringToCmdPass
 
   void runOnOperation() override {
     Verifier verifier;
+    setupDefaultOpLegality(verifier);
     markTensorInputsIllegal(verifier);
     markStreamTensorOpsIllegal(verifier);
     markStreamAsyncOpsIllegal(verifier);
