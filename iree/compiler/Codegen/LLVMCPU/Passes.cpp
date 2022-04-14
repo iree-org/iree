@@ -251,23 +251,27 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
                                        bool lowerToAVX2) {
   // Run preprocessing and verification before starting Linalg transforms.
-  passManager.addNestedPass<func::FuncOp>(
-      createConvertToDestinationPassingStylePass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createVerifyLinalgTransformLegalityPass());
 
   // Do first level of tiling and distribution.
   passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
   {
+    /// NOTE: In this list, CSE needs to be run after conversion to destination
+    /// passing style. If not that causes the conversion to fail, which leads
+    /// to upstream bufferization issues.
     LinalgFusePassOptions options;
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::WorkGroupTiles);
     options.doIREEDistribution = true;
     passManager.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
     passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    passManager.addNestedPass<func::FuncOp>(createCSEPass());
     passManager.addNestedPass<func::FuncOp>(
         createRewriteLinalgDestructiveUpdatesPass());
+    passManager.addNestedPass<func::FuncOp>(
+        createConvertToDestinationPassingStylePass());
+    passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
   // Run LinalgFusePass firstly in case that we have fill + matmul + generic
@@ -328,23 +332,27 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
 
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
   // Run preprocessing and verification before starting Linalg transforms.
-  passManager.addNestedPass<func::FuncOp>(
-      createConvertToDestinationPassingStylePass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createVerifyLinalgTransformLegalityPass());
 
   // Do first level of tiling and distribution.
   passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
   {
+    /// NOTE: In this list, CSE needs to be run after conversion to destination
+    /// passing style. If not that causes the conversion to fail, which leads
+    /// to upstream bufferization issues.
     LinalgFusePassOptions options;
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::WorkGroupTiles);
     options.doIREEDistribution = true;
     passManager.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
     passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    passManager.addNestedPass<func::FuncOp>(createCSEPass());
     passManager.addNestedPass<func::FuncOp>(
         createRewriteLinalgDestructiveUpdatesPass());
+    passManager.addNestedPass<func::FuncOp>(
+        createConvertToDestinationPassingStylePass());
+    passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
   // Run LinalgFusePass firstly in case that we have fill + conv + generic

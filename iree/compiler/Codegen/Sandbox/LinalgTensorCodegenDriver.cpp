@@ -256,7 +256,7 @@ void LinalgFusePass::runOnOperation() {
 
   // Created a nested OpPassManager and run.
   OpPassManager dynamicPM(func::FuncOp::getOperationName());
-  strategy.configurePassPipeline(dynamicPM, funcOp.getContext());
+  strategy.configurePassPipeline(dynamicPM, funcOp.getContext(), false);
 
   if (failed(runPipeline(dynamicPM, funcOp))) {
     return signalPassFailure();

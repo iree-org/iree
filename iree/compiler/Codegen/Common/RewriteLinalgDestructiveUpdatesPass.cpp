@@ -52,6 +52,7 @@ void RewriteLinalgDestructiveUpdatesPass::runOnOperation() {
   // After rewriting destructive updates, there might be uses of compute
   // operations only in `tensor.dim` ops. Resolve these.
   RewritePatternSet resolveDimOps(context);
+  linalg::InitTensorOp::getCanonicalizationPatterns(resolveDimOps, context);
   memref::populateResolveRankedShapeTypeResultDimsPatterns(resolveDimOps);
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(resolveDimOps)))) {
     return signalPassFailure();
