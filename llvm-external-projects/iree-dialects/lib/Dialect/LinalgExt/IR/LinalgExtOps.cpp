@@ -1180,6 +1180,82 @@ Operation *ReverseOp::getTiledImplementation(OpBuilder &builder,
   return tiledRevOp;
 }
 
+//===----------------------------------------------------------------------===//
+// TopkOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult TopkOp::verify() {
+  Operation *op = getOperation();
+  if (getNumInputs() != 2) {
+    return op->emitOpError("expected two input operands");
+  }
+  if (getNumOutputs() != 2) {
+    return op->emitOpError("expected two output operands");
+  }
+  if (!inputValues().getType().isa<ShapedType>() ||
+      !inputIndices().getType().isa<ShapedType>()) {
+    return op->emitOpError("expected input element types to be shaped");
+  }
+  if (!outputValues().getType().isa<ShapedType>() ||
+      !outputIndices().getType().isa<ShapedType>()) {
+    return op->emitOpError("expected output element types to be shaped");
+  }
+  // Ensure input/output values types match
+  ShapedType inputValuesType = inputValues().getType().cast<ShapedType>();
+  ShapedType outputValuesType = outputValues().getType().cast<ShapedType>();
+  if (inputValuesType.getElementType() != outputValuesType.getElementType()) {
+    return op->emitOpError("expected input/output value types to be identical");
+  }
+  // Indices must be index or float
+  ShapedType inputIndicesType = inputIndices().getType().cast<ShapedType>();
+  ShapedType outputIndicesType = outputIndices().getType().cast<ShapedType>();
+  if (!inputIndicesType.getElementType().isIntOrIndex() ||
+      !outputIndicesType.getElementType().isIntOrIndex()) {
+    return op->emitOpError(
+        "expected input/output indices types to be int or index");
+  }
+  // Ranks must match
+  if (inputValuesType.getRank() != outputValuesType.getRank() ||
+      inputIndicesType.getRank() != outputIndicesType.getRank()) {
+    return op->emitOpError("expected input/output to have the same rank");
+  }
+  // Input indicies/values and output indices/values should have the same shape
+  if (llvm::any_of(
+          llvm::zip(inputValuesType.getShape(), inputIndicesType.getShape()),
+          [](std::tuple<int64_t, int64_t> s) {
+            return std::get<0>(s) != ShapedType::kDynamicSize &&
+                   std::get<1>(s) != ShapedType::kDynamicSize &&
+                   std::get<0>(s) != std::get<1>(s);
+          })) {
+    return op->emitOpError("input indicies/values shape must match");
+  }
+  if (llvm::any_of(
+          llvm::zip(outputValuesType.getShape(), outputIndicesType.getShape()),
+          [](std::tuple<int64_t, int64_t> s) {
+            return std::get<0>(s) != ShapedType::kDynamicSize &&
+                   std::get<1>(s) != ShapedType::kDynamicSize &&
+                   std::get<0>(s) != std::get<1>(s);
+          })) {
+    return op->emitOpError("output indicies/values shape must match");
+  }
+  // Input shape must match the output shape except for the dimension()
+  uint64_t dim = dimension();
+  if (llvm::any_of(llvm::enumerate(llvm::zip(inputValuesType.getShape(),
+                                             outputValuesType.getShape())),
+                   [dim](auto e) {
+                     if (e.index() == dim) {
+                       return false;
+                     }
+                     std::tuple<int64_t, int64_t> s = e.value();
+                     return std::get<0>(s) != ShapedType::kDynamicSize &&
+                            std::get<1>(s) != ShapedType::kDynamicSize &&
+                            std::get<0>(s) != std::get<1>(s);
+                   })) {
+    return op->emitOpError("incompatible input/output shapes");
+  }
+  return success();
+}
+
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
@@ -1195,6 +1271,7 @@ DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ReverseOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)
+DEFINE_OP_GET_EFFECTS(TopkOp)
 
 namespace {
 /// This is derived from mlir/lib/Dialect/Linalg/IR/LinalgOps.cpp without any
