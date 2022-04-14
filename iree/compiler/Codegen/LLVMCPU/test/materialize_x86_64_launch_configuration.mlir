@@ -563,15 +563,15 @@ hal.executable private @outs_fusion {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-hal.executable private @conv {
+hal.executable private @conv_dynamic {
   hal.executable.variant public @system_elf_x86_64, target = <"llvm", "system-elf-x86_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.entry_point public @conv layout(#executable_layout)
+    hal.executable.entry_point public @conv_dynamic layout(#executable_layout)
     builtin.module {
-      func.func @conv() {
+      func.func @conv_dynamic() {
         %N = hal.interface.constant.load[0] : index
         %H = hal.interface.constant.load[1] : index
         %W = hal.interface.constant.load[2] : index
@@ -606,7 +606,7 @@ hal.executable private @conv {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 64, 64, 64, 0, 0, 0], [1, 1, 1, 1, 0, 0, 0], [0, 0, 0, 0, 1, 1, 1]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
-//      CHECK: hal.executable.entry_point public @conv
+//      CHECK: hal.executable.entry_point public @conv_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.conv_2d_nhwc_hwcf
 //      CHECK:         lowering_config = #[[CONFIG]]
