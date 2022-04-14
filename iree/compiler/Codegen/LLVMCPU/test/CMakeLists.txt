@@ -23,6 +23,7 @@ iree_lit_test_suite(
     "materialize_aarch64_launch_configuration.mlir"
     "materialize_riscv_launch_configuration.mlir"
     "materialize_x86_64_launch_configuration.mlir"
+    "pipeline_tests.mlir"
     "synchronize_symbol_visibility.mlir"
     "test_config_mmt4d.mlir"
     "tile_fuse_and_vectorize.mlir"
