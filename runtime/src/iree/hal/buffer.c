@@ -611,7 +611,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_fill(
   if (iree_status_is_ok(status) &&
       !iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
                          IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
-    status = iree_hal_buffer_flush_range(&target_mapping, 0, IREE_WHOLE_BUFFER);
+    status = iree_hal_buffer_mapping_flush_range(&target_mapping, 0,
+                                                 IREE_WHOLE_BUFFER);
   }
 
   status =
@@ -667,7 +668,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_write(
   iree_status_t status = iree_ok_status();
   if (!iree_all_bits_set(iree_hal_buffer_memory_type(target_buffer),
                          IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
-    status = iree_hal_buffer_flush_range(&target_mapping, 0, IREE_WHOLE_BUFFER);
+    status = iree_hal_buffer_mapping_flush_range(&target_mapping, 0,
+                                                 IREE_WHOLE_BUFFER);
   }
 
   iree_hal_buffer_unmap_range(&target_mapping);
@@ -743,8 +745,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_copy(
 
   if (!iree_all_bits_set(iree_hal_buffer_memory_type(target_buffer),
                          IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
-    status =
-        iree_hal_buffer_flush_range(&target_mapping, 0, adjusted_data_length);
+    status = iree_hal_buffer_mapping_flush_range(&target_mapping, 0,
+                                                 adjusted_data_length);
   }
 
   iree_hal_buffer_unmap_range(&source_mapping);
@@ -833,7 +835,7 @@ iree_hal_buffer_unmap_range(iree_hal_buffer_mapping_t* buffer_mapping) {
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_buffer_invalidate_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_mapping_invalidate_range(
     iree_hal_buffer_mapping_t* buffer_mapping, iree_device_size_t byte_offset,
     iree_device_size_t byte_length) {
   IREE_ASSERT_ARGUMENT(buffer_mapping);
@@ -847,7 +849,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_invalidate_range(
                                                     byte_length);
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_buffer_flush_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_mapping_flush_range(
     iree_hal_buffer_mapping_t* buffer_mapping, iree_device_size_t byte_offset,
     iree_device_size_t byte_length) {
   IREE_ASSERT_ARGUMENT(buffer_mapping);

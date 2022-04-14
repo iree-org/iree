@@ -47,9 +47,10 @@ enum iree_hal_memory_type_bits_t {
   // iree_hal_buffer_map_range.
   IREE_HAL_MEMORY_TYPE_HOST_VISIBLE = 1u << 1,
 
-  // The host cache management commands MappedMemory::Flush and
-  // MappedMemory::Invalidate are not needed to flush host writes
-  // to the device or make device writes visible to the host, respectively.
+  // The host cache management commands iree_hal_buffer_mapping_flush_range and
+  // iree_hal_buffer_mapping_invalidate_range are not needed to flush host
+  // writes to the device or make device writes visible to the host,
+  // respectively.
   IREE_HAL_MEMORY_TYPE_HOST_COHERENT = 1u << 2,
 
   // Memory allocated with this type is cached on the host. Host memory
@@ -473,7 +474,7 @@ iree_hal_buffer_unmap_range(iree_hal_buffer_mapping_t* buffer_mapping);
 // visible on the host. Use before reading from non-coherent memory.
 //
 // Only required for memory types without IREE_HAL_MEMORY_TYPE_HOST_COHERENT.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_invalidate_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_mapping_invalidate_range(
     iree_hal_buffer_mapping_t* buffer_mapping, iree_device_size_t byte_offset,
     iree_device_size_t byte_length);
 
@@ -482,7 +483,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_invalidate_range(
 // for device access. Use after writing to non-coherent memory.
 //
 // Only required for memory types without IREE_HAL_MEMORY_TYPE_HOST_COHERENT.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_flush_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_mapping_flush_range(
     iree_hal_buffer_mapping_t* buffer_mapping, iree_device_size_t byte_offset,
     iree_device_size_t byte_length);
 
@@ -492,8 +493,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_flush_range(
 //
 // Note that the access requirements of the mapping still hold: if the memory is
 // not host coherent and writeable then the caller must use the
-// iree_hal_buffer_invalidate_range and iree_hal_buffer_flush_range methods to
-// ensure memory is in the expected state.
+// iree_hal_buffer_mapping_invalidate_range and
+// iree_hal_buffer_mapping_flush_range methods to ensure memory is in the
+// expected state.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_mapping_subspan(
     iree_hal_buffer_mapping_t* buffer_mapping,
     iree_hal_memory_access_t memory_access, iree_device_size_t byte_offset,
