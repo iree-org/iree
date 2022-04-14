@@ -42,6 +42,8 @@ def SPIRV_Vectorize
     : I32EnumAttrCase<"SPIRVVectorize", 12>;
 def SPIRV_VectorizeToCooperativeOps
     : I32EnumAttrCase<"SPIRVVectorizeToCooperativeOps", 13>;
+def SPIRV_VectorizeWithWorkgroupMemory
+    : I32EnumAttrCase<"SPIRVVectorizeWithWorkgroupMemory", 14>;
 
 def None
     : I32EnumAttrCase<"None", 0xff>;
@@ -56,7 +58,8 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
      CPU_BufferOpsTileAndVectorize, Linalg_TransformInterpCodegen,
      LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize, LLVMGPU_MatmulSimt,
      LLVMGPU_MatmulTensorCore, SPIRV_Distribute, SPIRV_Vectorize,
-     SPIRV_VectorizeToCooperativeOps, None]> {
+     SPIRV_VectorizeToCooperativeOps, SPIRV_VectorizeWithWorkgroupMemory,
+     None]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   // Don't generate a C++ class! We want to use the AttrDef
   let genSpecializedAttr = 0;

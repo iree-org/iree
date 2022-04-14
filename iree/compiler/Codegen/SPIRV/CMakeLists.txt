@@ -18,6 +18,7 @@ iree_cc_library(
     "MemorySpace.h"
     "Utils.h"
   SRCS
+    "AMDConfig.cpp"
     "AdrenoConfig.cpp"
     "ConvertToSPIRVPass.cpp"
     "KernelConfig.cpp"
@@ -30,6 +31,7 @@ iree_cc_library(
     "SPIRVLowerExecutableTargetPass.cpp"
     "SPIRVTile.cpp"
     "SPIRVTileAndDistribute.cpp"
+    "SPIRVTileAndPromote.cpp"
     "SPIRVTileAndVectorizeToCooperativeOps.cpp"
     "SPIRVVectorToCooperativeOps.cpp"
     "SPIRVVectorize.cpp"

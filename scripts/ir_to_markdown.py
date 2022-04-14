@@ -13,8 +13,8 @@ Example usage:
     -iree-transformation-pipeline \
     -iree-hal-target-backends=vmvx \
     -mlir-disable-threading \
-    -print-ir-after-all \
-    -print-ir-after-change \
+    -mlir-print-ir-after-all \
+    -mlir-print-ir-after-change \
     -mlir-elide-elementsattrs-if-larger=8 \
     $PWD/iree/samples/models/simple_abs.mlir \
     2> /tmp/simple_abs_vmvx_pipeline.mlir
@@ -37,11 +37,12 @@ def parse_arguments():
   """Parses command line arguments."""
 
   parser = argparse.ArgumentParser()
-  parser.add_argument('input_file_path',
-                      type=str,
-                      nargs='?',
-                      metavar="<input_file_path>",
-                      help='Input IR dump (.mlir from -print-ir-after-all)')
+  parser.add_argument(
+      'input_file_path',
+      type=str,
+      nargs='?',
+      metavar="<input_file_path>",
+      help='Input IR dump (.mlir from -mlir-print-ir-after-all)')
   parser.add_argument('-o,',
                       '--output',
                       type=str,

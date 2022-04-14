@@ -36,6 +36,8 @@ iree_cc_library(
     "FoldAffineMinInDistributedLoops.cpp"
     "FoldTensorExtractOpPass.cpp"
     "ForOpCanonicalizationPass.cpp"
+    "GPUDistributeSharedMemoryCopy.cpp"
+    "GPUPipelining.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "InsertDistributionInfoPass.cpp"
     "LinalgBufferizePass.cpp"

@@ -6,6 +6,7 @@
 
 import json
 import os
+import time
 from typing import Dict, Optional, Sequence, Tuple
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.benchmark_config import BENCHMARK_RESULTS_REL_PATH, CAPTURES_REL_PATH, BenchmarkConfig
@@ -17,12 +18,14 @@ class BenchmarkDriver(object):
 
   def __init__(self,
                device_info: DeviceInfo,
-               config: BenchmarkConfig,
+               benchmark_config: BenchmarkConfig,
                benchmark_suite: BenchmarkSuite,
+               benchmark_grace_time: float = 0.0,
                verbose: bool = False):
     self.device_info = device_info
-    self.config = config
+    self.config = benchmark_config
     self.benchmark_suite = benchmark_suite
+    self.benchmark_grace_time = benchmark_grace_time
     self.verbose = verbose
     self.finished_benchmarks: Dict[str, Tuple[BenchmarkInfo, str]] = {}
     self.finished_captures: Dict[str, Tuple[BenchmarkInfo, str]] = {}
@@ -113,6 +116,14 @@ class BenchmarkDriver(object):
         (benchmark_info, benchmark_results_filename,
          capture_filename) = self.__get_benchmark_info_and_output_paths(
              category, benchmark_case)
+
+        # Skip if no need to benchmark and capture.
+        if not benchmark_results_filename and not capture_filename:
+          continue
+
+        benchmark_key = str(benchmark_info)
+        print(f"--> Benchmark started: {benchmark_key} <--")
+
         try:
           self.run_benchmark_case(benchmark_case, benchmark_results_filename,
                                   capture_filename)
@@ -123,8 +134,12 @@ class BenchmarkDriver(object):
           print(f"Processing of benchmark failed with: {e}")
           self.benchmark_errors.append(e)
           continue
+        finally:
+          # Some grace time.
+          time.sleep(self.benchmark_grace_time)
 
-        benchmark_key = str(benchmark_info)
+        print("Benchmark completed")
+
         if benchmark_results_filename:
           self.finished_benchmarks[benchmark_key] = (benchmark_info,
                                                      benchmark_results_filename)
@@ -200,7 +215,7 @@ class BenchmarkDriver(object):
     return BenchmarkInfo(model_name=model_name,
                          model_tags=model_tags,
                          model_source=category,
-                         bench_mode=benchmark_case.bench_mode.split(","),
+                         bench_mode=benchmark_case.bench_mode,
                          runner=benchmark_case.driver,
                          device_info=self.device_info)
 

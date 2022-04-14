@@ -14,14 +14,17 @@ iree_cc_library(
   NAME
     Utils
   HDRS
+    "GPUUtils.h"
     "MarkerUtils.h"
     "Utils.h"
   SRCS
+    "GPUUtils.cpp"
     "MarkerUtils.cpp"
     "Utils.cpp"
   DEPS
     IREELinalgExtDialect
     LLVMSupport
+    MLIRGPUOps
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms

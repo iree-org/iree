@@ -82,7 +82,7 @@ Here's an example of a small compiler pass running on a
 ```shell
 $ ../iree-build/iree/tools/iree-opt \
   -split-input-file \
-  -print-ir-before-all \
+  -mlir-print-ir-before-all \
   -iree-drop-compiler-hints \
   $PWD/iree/compiler/Dialect/Util/Transforms/test/drop_compiler_hints.mlir
 ```
