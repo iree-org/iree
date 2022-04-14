@@ -509,7 +509,7 @@ extern "C" int main(int argc, char** argv) {
   // Register assembly printer command-line options like
   // -mlir-print-op-generic.
   mlir::registerAsmPrinterCLOptions();
-  // Register pass manager command-line options like -print-ir-*.
+  // Register pass manager command-line options like -mlir-print-ir-*.
   mlir::registerPassManagerCLOptions();
 
   llvm::InitLLVM init_llvm(argc_llvm, argv_llvm);
