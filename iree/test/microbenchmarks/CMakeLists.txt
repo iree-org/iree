@@ -14,7 +14,12 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "linalg_mmt4d.mlir"
     "linalg_transpose.mlir"
+    "mhlo_conv.mlir"
+    "mhlo_dot.mlir"
+    "mhlo_dot_general.mlir"
+    "mhlo_fft_abs.mlir"
   TOOLS
     iree::tools::iree-run-mlir
   LABELS

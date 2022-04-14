@@ -20,17 +20,14 @@ iree_lit_test_suite(
     size = "medium",
     srcs = enforce_glob(
         [
+            "linalg_mmt4d.mlir",
             "linalg_transpose.mlir",
+            "mhlo_conv.mlir",
+            "mhlo_dot.mlir",
+            "mhlo_dot_general.mlir",
+            "mhlo_fft_abs.mlir",
         ],
         include = ["*.mlir"],
-        exclude =
-            [
-                "linalg_mmt4d.mlir",
-                "mhlo_conv.mlir",
-                "mhlo_dot_general.mlir",
-                "mhlo_dot.mlir",
-                "mhlo_fft_abs.mlir",
-            ],
     ),
     tags = [
         "hostonly",
