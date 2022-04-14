@@ -10,7 +10,7 @@
 // See custom_modules/dialect/custom_ops.td for the op definitions and
 // custom_modules/dialect/custom.imports.mlir for the import definitions.
 func.func @reverseAndPrint(%message : !custom.message, %count : i32) -> !custom.message
-    attributes { iree.module.export, iree.abi.none } {
+    attributes { iree.abi = {} } {
   %c1 = arith.constant 1 : i32
   %0 = "custom.get_unique_message"() : () -> !custom.message
   "custom.print"(%0, %c1) : (!custom.message, i32) -> ()
@@ -20,14 +20,15 @@ func.func @reverseAndPrint(%message : !custom.message, %count : i32) -> !custom.
 }
 
 // Reverses a message. Just an example to show intra-module calls.
-func.func @reverse(%message : !custom.message) -> !custom.message {
+func.func @reverse(%message : !custom.message) -> !custom.message
+    attributes { iree.abi = {} } {
   %0 = "custom.reverse"(%message) : (!custom.message) -> !custom.message
   return %0 : !custom.message
 }
 
 // Prints the provided tensor to by first converting it to a message.
 func.func @printTensor(%tensor : tensor<2x4xf32>) -> !custom.message
-    attributes { iree.module.export, iree.abi.none } {
+    attributes { iree.abi = {} } {
   %0 = "custom.tensor_to_message"(%tensor) : (tensor<2x4xf32>) -> !custom.message
   %c1 = arith.constant 1 : i32
   "custom.print"(%0, %c1) : (!custom.message, i32) -> ()
@@ -36,7 +37,7 @@ func.func @printTensor(%tensor : tensor<2x4xf32>) -> !custom.message
 
 // Round-trips a tensor through a message.
 func.func @roundTripTensor(%tensor : tensor<2x4xf32>) -> !custom.message
-    attributes { iree.module.export, iree.abi.none } {
+    attributes { iree.abi = {} } {
   %0 = "custom.tensor_to_message"(%tensor) : (tensor<2x4xf32>) -> !custom.message
   %1 = "custom.message_to_tensor"(%0) : (!custom.message) -> tensor<2x4xf32>
   %2 = "custom.tensor_to_message"(%1) : (tensor<2x4xf32>) -> !custom.message

@@ -270,11 +270,6 @@ int main(int argc, char **argv) {
 
   iree_integrations::MHLO::buildMHLOImportPassPipeline(pm);
 
-  // Note that we emit the ABI last since any needed function-level
-  // transformations (i.e. de-tupling, etc) should have been done.
-  pm.addNestedPass<FuncOp>(
-      iree_integrations::MHLO::createEmitDefaultIREEABIPass());
-
   if (failed(pm.run(*module))) {
     llvm::errs() << "Running iree-xla-import MHLO import pass pipeline failed "
                     "(see diagnostics)\n";

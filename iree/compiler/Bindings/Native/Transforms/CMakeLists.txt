@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "EmitDefaultABI.cpp"
     "Passes.cpp"
     "WrapEntryPoints.cpp"
   DEPS

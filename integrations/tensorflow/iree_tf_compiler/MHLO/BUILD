@@ -13,7 +13,6 @@ package(
 cc_library(
     name = "MHLO",
     srcs = [
-        "EmitDefaultIREEABI.cpp",
         "Passes.cpp",
     ],
     hdrs = [

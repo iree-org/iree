@@ -65,7 +65,8 @@ class SystemApiTest(absltest.TestCase):
     f = ctx.modules.arithmetic["simple_mul"]
     f_repr = repr(f)
     logging.info("f_repr: %s", f_repr)
-    self.assertEqual(f_repr, "<VmFunction simple_mul(0rr_r), reflection = {}>")
+    self.assertRegex(f_repr,
+                     r"^<VmFunction simple_mul\(0rr_r\), reflection = .*>$")
 
   def test_duplicate_module(self):
     ctx = iree.runtime.SystemContext()

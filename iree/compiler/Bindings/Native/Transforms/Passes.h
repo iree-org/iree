@@ -35,11 +35,17 @@ void registerTransformPassPipeline();
 // expected invocation semantics of bindings following the native IREE ABI.
 std::unique_ptr<OperationPass<ModuleOp>> createWrapEntryPointsPass();
 
+// Generates default ABI metadata for entry points.
+std::unique_ptr<OperationPass<ModuleOp>> createEmitDefaultABIPass();
+
 //===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//
 
-inline void registerPasses() { createWrapEntryPointsPass(); }
+inline void registerPasses() {
+  createWrapEntryPointsPass();
+  createEmitDefaultABIPass();
+}
 
 }  // namespace ABI
 }  // namespace IREE

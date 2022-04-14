@@ -17,7 +17,6 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "emit_default_iree_abi.mlir",
         ],
         include = ["*.mlir"],
     ),

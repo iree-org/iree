@@ -19,6 +19,8 @@ namespace IREE {
 namespace ABI {
 
 void buildTransformPassPipeline(OpPassManager &passManager) {
+  passManager.addPass(createEmitDefaultABIPass());
+
   // Wraps the entry points in an export function.
   passManager.addPass(createWrapEntryPointsPass());
 

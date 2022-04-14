@@ -13,6 +13,7 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
+        "EmitDefaultABI.cpp",
         "Passes.cpp",
         "WrapEntryPoints.cpp",
     ],

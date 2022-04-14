@@ -22,23 +22,10 @@ void buildMHLOImportPassPipeline(OpPassManager &pm);
 void registerMHLOImportPassPipeline();
 
 //===----------------------------------------------------------------------===//
-// IREE-specific Passes For MHLO Import
-//===----------------------------------------------------------------------===//
-
-// Annotates an appropriate iree.abi attribute on public functions that
-// operate exclusively on tensor types. This corresponds to the expectations
-// of MHLO and is suitable for such programs.
-std::unique_ptr<OperationPass<func::FuncOp>> createEmitDefaultIREEABIPass();
-
-//===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//
 
-inline void registerAllPasses() {
-  registerMHLOImportPassPipeline();
-
-  createEmitDefaultIREEABIPass();
-}
+inline void registerAllPasses() { registerMHLOImportPassPipeline(); }
 
 }  // namespace MHLO
 }  // namespace iree_integrations
