@@ -302,7 +302,7 @@ if(${IREE_BUILD_COMPILER})
     PUBLIC
   )
 
-  if(${IREE_BUILD_TORCH_MLIR_SUPPORT})
+  if(IREE_BUILD_TORCH_MLIR_SUPPORT)
     set(_OPTIONAL_INIT_TORCH_MLIR_DIALECT_LIB ::init_torch_mlir_dialects)
   endif()
 
@@ -369,7 +369,7 @@ if(${IREE_BUILD_COMPILER})
     PUBLIC
   )
 
-  if(${IREE_BUILD_TORCH_MLIR_SUPPORT})
+  if(IREE_BUILD_TORCH_MLIR_SUPPORT)
     iree_cc_library(
       NAME
         init_torch_mlir_dialects
