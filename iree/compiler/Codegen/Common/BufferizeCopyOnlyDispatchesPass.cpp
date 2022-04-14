@@ -64,8 +64,9 @@ struct FoldTensorLoadWithExtractSlice
     // `tensor.extract_slice` (i.e. the producer) folds **into**
     // `flow.dispatch.tensor.load1 (i.e. the consumer).
     if (failed(foldOffsetsSizesAndStrides(
-            rewriter, dispatchTensorLoadOp->getLoc(), extractSliceOp,
-            dispatchTensorLoadOp, offsets, sizes, strides))) {
+            rewriter, dispatchTensorLoadOp->getLoc(), dispatchTensorLoadOp,
+            extractSliceOp, dispatchTensorLoadOp.getDroppedDims(), offsets,
+            sizes, strides))) {
       return failure();
     }
 
@@ -106,8 +107,9 @@ struct FoldInsertSliceWithTensorStoreOp
     // `tensor.insert_slice` (i.e. the producer) folds **into**
     // `flow.dispatch.tensor.store` (i.e. the consumer).
     if (failed(foldOffsetsSizesAndStrides(
-            rewriter, dispatchTensorStoreOp->getLoc(), insertSliceOp,
-            dispatchTensorStoreOp, offsets, sizes, strides))) {
+            rewriter, dispatchTensorStoreOp->getLoc(), dispatchTensorStoreOp,
+            insertSliceOp, dispatchTensorStoreOp.getDroppedDims(), offsets,
+            sizes, strides))) {
       return failure();
     }
 

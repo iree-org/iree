@@ -49,10 +49,10 @@ class VK_IsKnownStrEnumCaseFor<string name> :
     CPred<"::mlir::iree_compiler::IREE::Vulkan::symbolize" # name # "("
           "$_self.cast<StringAttr>().getValue()).hasValue()">;
 
-// Wrapper over base BitEnumAttr to set common fields.
+// Wrapper over base I32BitEnumAttr to set common fields.
 class VK_BitEnumAttr<string name, string description,
-                      list<BitEnumAttrCase> cases> :
-    BitEnumAttr<name, description, cases> {
+                      list<I32BitEnumAttrCase> cases> :
+    I32BitEnumAttr<name, description, cases> {
   let predicate = And<[I32Attr.predicate, VK_IsKnownBitEnumCaseFor<name>]>;
   let cppNamespace = "::mlir::iree_compiler::IREE::Vulkan";
 }
@@ -159,15 +159,15 @@ def VK_TargetOSAttr : VK_I32EnumAttr<
 // Subgroup features
 //===----------------------------------------------------------------------===//
 
-def VK_SF_Basic           : BitEnumAttrCase<"Basic", 0x001>;
-def VK_SF_Vote            : BitEnumAttrCase<"Vote", 0x002>;
-def VK_SF_Arithmetic      : BitEnumAttrCase<"Arithmetic", 0x004>;
-def VK_SF_Ballot          : BitEnumAttrCase<"Ballot", 0x008>;
-def VK_SF_Shuffle         : BitEnumAttrCase<"Shuffle", 0x010>;
-def VK_SF_ShuffleRelative : BitEnumAttrCase<"ShuffleRelative", 0x020>;
-def VK_SF_Clustered       : BitEnumAttrCase<"Clustered", 0x040>;
-def VK_SF_Quad            : BitEnumAttrCase<"Quad", 0x080>;
-def VK_SF_PartitionedNV   : BitEnumAttrCase<"PartitionedNV", 0x100>;
+def VK_SF_Basic           : I32BitEnumAttrCase<"Basic", 0x001>;
+def VK_SF_Vote            : I32BitEnumAttrCase<"Vote", 0x002>;
+def VK_SF_Arithmetic      : I32BitEnumAttrCase<"Arithmetic", 0x004>;
+def VK_SF_Ballot          : I32BitEnumAttrCase<"Ballot", 0x008>;
+def VK_SF_Shuffle         : I32BitEnumAttrCase<"Shuffle", 0x010>;
+def VK_SF_ShuffleRelative : I32BitEnumAttrCase<"ShuffleRelative", 0x020>;
+def VK_SF_Clustered       : I32BitEnumAttrCase<"Clustered", 0x040>;
+def VK_SF_Quad            : I32BitEnumAttrCase<"Quad", 0x080>;
+def VK_SF_PartitionedNV   : I32BitEnumAttrCase<"PartitionedNV", 0x100>;
 
 def VK_SubgroupFeatureAttr : VK_BitEnumAttr<
   "SubgroupFeature", "supported Vulkan subgroup feature", [

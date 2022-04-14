@@ -1023,10 +1023,9 @@ void BranchOp::eraseOperand(unsigned index) {
   getOperation()->eraseOperand(index);
 }
 
-Optional<MutableOperandRange> BranchOp::getMutableSuccessorOperands(
-    unsigned index) {
+SuccessorOperands BranchOp::getSuccessorOperands(unsigned index) {
   assert(index == 0 && "invalid successor index");
-  return destOperandsMutable();
+  return SuccessorOperands(destOperandsMutable());
 }
 
 void CallOp::getEffects(
@@ -1257,11 +1256,10 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
   }
 }
 
-Optional<MutableOperandRange> CondBranchOp::getMutableSuccessorOperands(
-    unsigned index) {
+SuccessorOperands CondBranchOp::getSuccessorOperands(unsigned index) {
   assert(index < getNumSuccessors() && "invalid successor index");
-  return index == trueIndex ? trueDestOperandsMutable()
-                            : falseDestOperandsMutable();
+  return index == trueIndex ? SuccessorOperands(trueDestOperandsMutable())
+                            : SuccessorOperands(falseDestOperandsMutable());
 }
 
 LogicalResult verifyFailOp(Operation *op, Value statusVal) {
@@ -1333,10 +1331,9 @@ void YieldOp::eraseOperand(unsigned index) {
   getOperation()->eraseOperand(index);
 }
 
-Optional<MutableOperandRange> YieldOp::getMutableSuccessorOperands(
-    unsigned index) {
+SuccessorOperands YieldOp::getSuccessorOperands(unsigned index) {
   assert(index == 0 && "invalid successor index");
-  return destOperandsMutable();
+  return SuccessorOperands(destOperandsMutable());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1353,10 +1350,9 @@ void BreakOp::eraseOperand(unsigned index) {
   getOperation()->eraseOperand(index);
 }
 
-Optional<MutableOperandRange> BreakOp::getMutableSuccessorOperands(
-    unsigned index) {
+SuccessorOperands BreakOp::getSuccessorOperands(unsigned index) {
   assert(index == 0 && "invalid successor index");
-  return destOperandsMutable();
+  return SuccessorOperands(destOperandsMutable());
 }
 
 Block *CondBreakOp::getDest() { return getOperation()->getSuccessor(0); }
@@ -1369,10 +1365,9 @@ void CondBreakOp::eraseOperand(unsigned index) {
   getOperation()->eraseOperand(index);
 }
 
-Optional<MutableOperandRange> CondBreakOp::getMutableSuccessorOperands(
-    unsigned index) {
+SuccessorOperands CondBreakOp::getSuccessorOperands(unsigned index) {
   assert(index == 0 && "invalid successor index");
-  return destOperandsMutable();
+  return SuccessorOperands(destOperandsMutable());
 }
 
 }  // namespace VM

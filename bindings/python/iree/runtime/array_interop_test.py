@@ -137,6 +137,13 @@ class DeviceHalTest(unittest.TestCase):
     self.assertEqual(f32_copy.dtype, np.float32)
     np.testing.assert_array_equal(orig_ary.astype(np.float32), f32_copy)
 
+  def testBool(self):
+    init_ary = np.zeros([3, 4], dtype=np.bool_)
+    init_ary[1] = True  # Set some non-zero value.
+    ary = iree.runtime.asdevicearray(self.device, init_ary)
+    self.assertEqual(repr(ary), "<IREE DeviceArray: shape=[3, 4], dtype=bool>")
+    np.testing.assert_array_equal(ary.to_host(), init_ary)
+
 
 if __name__ == "__main__":
   unittest.main()

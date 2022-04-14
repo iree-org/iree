@@ -505,9 +505,10 @@ RegisterAllocation::remapSuccessorRegisters(Operation *op, int successorIndex) {
   // possible to evaluate as a direct remapping.
   SmallVector<std::pair<Register, Register>, 8> srcDstRegs;
   auto *targetBlock = op->getSuccessor(successorIndex);
-  auto operands =
-      cast<BranchOpInterface>(op).getSuccessorOperands(successorIndex);
-  for (auto it : llvm::enumerate(*operands)) {
+  auto operands = cast<BranchOpInterface>(op)
+                      .getSuccessorOperands(successorIndex)
+                      .getForwardedOperands();
+  for (auto it : llvm::enumerate(operands)) {
     auto srcReg = mapToRegister(it.value());
     BlockArgument targetArg = targetBlock->getArgument(it.index());
     auto dstReg = mapToRegister(targetArg);

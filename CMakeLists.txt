@@ -63,6 +63,7 @@ option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
 option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
 option(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM "Builds the experimental ROCm Backend." OFF)
+option(IREE_BUILD_TORCH_MLIR_SUPPORT "Builds support for compiling torch-mlir programs." ON)
 
 #-------------------------------------------------------------------------------
 # Derived flags based on primary options
@@ -362,6 +363,15 @@ set(IREE_CUDA_LIBDEVICE_PATH "" CACHE STRING "Absolute path to an appropriate li
 # back to this as needed for specific features.
 if(IREE_TARGET_BACKEND_CUDA OR IREE_HAL_DRIVER_CUDA)
   find_package(CUDAToolkit)
+
+  # We define the magic IREE_CUDA_DEPS_DIR env var in our CI docker images if we
+  # have a stripped down CUDA toolkit suitable for compiling available. We
+  # trigger on this below as a fallback for locating headers and libdevice
+  # files.
+  if(NOT CUDAToolkit_FOUND AND DEFINED ENV{IREE_CUDA_DEPS_DIR})
+    set(CUDAToolkit_ROOT "$ENV{IREE_CUDA_DEPS_DIR}")
+    message(STATUS "CUDA SDK not found by CMake but using IREE_CUDA_DEPS = ${CUDAToolkit_ROOT}")
+  endif()
 endif()
 
 # If an explicit libdevice file was not specified, and the compiler backend
@@ -441,7 +451,9 @@ else()
   # Add default external projects.
   iree_add_llvm_external_project(mlir-iree-dialects MLIR_IREE_DIALECTS ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
   iree_add_llvm_external_project(mlir-hlo MLIR_HLO ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-hlo)
-  iree_add_llvm_external_project(torch-mlir-dialects TORCH_MLIR_DIALECTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/torch-mlir-dialects)
+  if(${IREE_BUILD_TORCH_MLIR_SUPPORT})
+    iree_add_llvm_external_project(torch-mlir-dialects TORCH_MLIR_DIALECTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/torch-mlir-dialects)
+  endif()
 
   add_subdirectory("third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
 
@@ -549,7 +561,16 @@ endif()
 #-------------------------------------------------------------------------------
 
 if(${IREE_BUILD_BENCHMARKS})
-  # Add a top-level custom target to drive generating benchmark suites.
+  # Add top-level custom targets to drive generating benchmark suites.
+
+  # iree-benchmark-import-models imports benchmark models from their source
+  # formats, such as .tflite flatbuffers, to IREE-compatible .mlir files.
+  add_custom_target(iree-benchmark-import-models)
+
+  # iree-benchmark-suites fully prepares benchmark models for benchmarking:
+  #   * importing from source formats to IREE-compatible .mlir files
+  #   * compiling from .mlir files to benchmark-ready .vmfb files
+  #   * generating flagfiles for executing the benchmark .vmfb files
   add_custom_target(iree-benchmark-suites)
 endif()
 

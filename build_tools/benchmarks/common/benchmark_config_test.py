@@ -55,6 +55,7 @@ class BenchmarkConfigTest(unittest.TestCase):
                                                         "benchmark_suites"),
                         benchmark_results_dir=os.path.join(
                             per_commit_tmp_dir, "benchmark-results"),
+                        git_commit_hash="abcd",
                         normal_benchmark_tool_dir=self.normal_tool_dir,
                         trace_capture_config=expected_trace_capture_config,
                         driver_filter="a",

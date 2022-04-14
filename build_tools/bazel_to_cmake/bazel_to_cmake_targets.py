@@ -13,35 +13,9 @@ EXPLICIT_TARGET_MAPPING = {
     "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
 
     # IREE llvm-external-projects
-    "//llvm-external-projects/iree-dialects:IREEDialectsTransforms": [
-        "IREEDialectsTransforms"
-    ],
-    "//llvm-external-projects/iree-dialects:IREEInputDialect": [
-        "IREEInputDialect"
-    ],
-    "//llvm-external-projects/iree-dialects:IREELinalgExtDialect": [
-        "IREELinalgExtDialect"
-    ],
-    "//llvm-external-projects/iree-dialects:IREELinalgExtPasses": [
-        "IREELinalgExtPasses"
-    ],
-    "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms": [
-        "IREELinalgExtTransforms"
-    ],
-    "@torch-mlir-dialects//:TorchMLIRTMTensorDialect": [
-        "TorchMLIRTMTensorDialect"
-    ],
-    "//llvm-external-projects/iree-dialects:IREEPyDMDialect": [
-        "IREEPyDMDialect"
-    ],
     "//llvm-external-projects/iree-dialects:IREEPyDMTransforms": [
         "IREEPyDMPasses"
     ],
-    "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect": [
-        "IREELinalgTransformDialect"
-    ],
-    "//llvm-external-projects/iree-dialects:IREELinalgTransformDialectTransforms":
-        ["IREELinalgTransformDialectTransforms"],
 
     # Disable all hard-coded codegen targets (they are expanded dynamically
     # in CMake).
@@ -175,6 +149,11 @@ EXPLICIT_TARGET_MAPPING = {
         "MhloPasses",
     ],
 
+    # Torch-MLIR.
+    "@torch-mlir-dialects//:TorchMLIRTMTensorDialect": [
+        "TorchMLIRTMTensorDialect"
+    ],
+
     # Vulkan
     "@vulkan_headers": ["Vulkan::Headers"],
     # The Bazel target maps to the IMPORTED target defined by FindVulkan().
@@ -208,6 +187,11 @@ def _convert_llvm_target(target):
   return ["LLVM" + target.rsplit(":")[-1]]
 
 
+def _convert_iree_dialects_target(target):
+  # Just take the target name as-is.
+  return [target.rsplit(":")[-1]]
+
+
 def convert_target(target):
   """Converts a Bazel target to a list of CMake targets.
 
@@ -226,6 +210,12 @@ def convert_target(target):
   """
   if target in EXPLICIT_TARGET_MAPPING:
     return EXPLICIT_TARGET_MAPPING[target]
+  if target.startswith("@llvm-project//llvm"):
+    return _convert_llvm_target(target)
+  if target.startswith("@llvm-project//mlir"):
+    return _convert_mlir_target(target)
+  if target.startswith("//llvm-external-projects/iree-dialects"):
+    return _convert_iree_dialects_target(target)
   if not target.startswith("@"):
     # Bazel `:api`            -> CMake `::api`
     # Bazel `//iree/base`     -> CMake `iree::base`
@@ -235,9 +225,5 @@ def convert_target(target):
     target = target.replace(":", "::")  # iree/base::foo or ::foo
     target = target.replace("/", "::")  # iree::base
     return [target]
-  if target.startswith("@llvm-project//llvm"):
-    return _convert_llvm_target(target)
-  if target.startswith("@llvm-project//mlir"):
-    return _convert_mlir_target(target)
 
   raise KeyError(f"No conversion found for target '{target}'")

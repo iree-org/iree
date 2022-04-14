@@ -25,16 +25,16 @@ def HAL_MemoryModelAttr :
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_MemoryType_None           : BitEnumAttrCase<"None",           0x0000>;  // ?
-def HAL_MemoryType_Transient      : BitEnumAttrCase<"Transient",      0x0001>;  // T
-def HAL_MemoryType_HostVisible    : BitEnumAttrCase<"HostVisible",    0x0002>;  // h
-def HAL_MemoryType_HostCoherent   : BitEnumAttrCase<"HostCoherent",   0x0004>;  // c
-def HAL_MemoryType_HostCached     : BitEnumAttrCase<"HostCached",     0x0008>;  // C
-def HAL_MemoryType_HostLocal      : BitEnumAttrCase<"HostLocal",      0x0006>;  // H
-def HAL_MemoryType_DeviceVisible  : BitEnumAttrCase<"DeviceVisible",  0x0010>;  // d
-def HAL_MemoryType_DeviceLocal    : BitEnumAttrCase<"DeviceLocal",    0x0030>;  // D
+def HAL_MemoryType_None           : I32BitEnumAttrCase<"None",           0x0000>;  // ?
+def HAL_MemoryType_Transient      : I32BitEnumAttrCase<"Transient",      0x0001>;  // T
+def HAL_MemoryType_HostVisible    : I32BitEnumAttrCase<"HostVisible",    0x0002>;  // h
+def HAL_MemoryType_HostCoherent   : I32BitEnumAttrCase<"HostCoherent",   0x0004>;  // c
+def HAL_MemoryType_HostCached     : I32BitEnumAttrCase<"HostCached",     0x0008>;  // C
+def HAL_MemoryType_HostLocal      : I32BitEnumAttrCase<"HostLocal",      0x0006>;  // H
+def HAL_MemoryType_DeviceVisible  : I32BitEnumAttrCase<"DeviceVisible",  0x0010>;  // d
+def HAL_MemoryType_DeviceLocal    : I32BitEnumAttrCase<"DeviceLocal",    0x0030>;  // D
 def HAL_MemoryTypeBitfieldAttr :
-    BitEnumAttr<"MemoryTypeBitfield", "valid MemoryType", [
+    I32BitEnumAttr<"MemoryTypeBitfield", "valid MemoryType", [
       HAL_MemoryType_None,
       HAL_MemoryType_Transient,
       HAL_MemoryType_HostVisible,
@@ -47,13 +47,13 @@ def HAL_MemoryTypeBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_BufferUsage_None      : BitEnumAttrCase<"None",     0x0000>;  // ?
-def HAL_BufferUsage_Constant  : BitEnumAttrCase<"Constant", 0x0001>;  // C
-def HAL_BufferUsage_Transfer  : BitEnumAttrCase<"Transfer", 0x0002>;  // T
-def HAL_BufferUsage_Mapping   : BitEnumAttrCase<"Mapping",  0x0004>;  // M
-def HAL_BufferUsage_Dispatch  : BitEnumAttrCase<"Dispatch", 0x0008>;  // D
+def HAL_BufferUsage_None      : I32BitEnumAttrCase<"None",     0x0000>;  // ?
+def HAL_BufferUsage_Constant  : I32BitEnumAttrCase<"Constant", 0x0001>;  // C
+def HAL_BufferUsage_Transfer  : I32BitEnumAttrCase<"Transfer", 0x0002>;  // T
+def HAL_BufferUsage_Mapping   : I32BitEnumAttrCase<"Mapping",  0x0004>;  // M
+def HAL_BufferUsage_Dispatch  : I32BitEnumAttrCase<"Dispatch", 0x0008>;  // D
 def HAL_BufferUsageBitfieldAttr :
-    BitEnumAttr<"BufferUsageBitfield", "valid BufferUsage", [
+    I32BitEnumAttr<"BufferUsageBitfield", "valid BufferUsage", [
       HAL_BufferUsage_None,
       HAL_BufferUsage_Constant,
       HAL_BufferUsage_Transfer,
@@ -63,11 +63,11 @@ def HAL_BufferUsageBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_CommandBufferMode_None : BitEnumAttrCase<"None", 0x0000>;
-def HAL_CommandBufferMode_OneShot : BitEnumAttrCase<"OneShot", 0x0001>;
-def HAL_CommandBufferMode_AllowInlineExecution : BitEnumAttrCase<"AllowInlineExecution", 0x0010>;
+def HAL_CommandBufferMode_None : I32BitEnumAttrCase<"None", 0x0000>;
+def HAL_CommandBufferMode_OneShot : I32BitEnumAttrCase<"OneShot", 0x0001>;
+def HAL_CommandBufferMode_AllowInlineExecution : I32BitEnumAttrCase<"AllowInlineExecution", 0x0010>;
 def HAL_CommandBufferModeBitfieldAttr :
-    BitEnumAttr<"CommandBufferModeBitfield", "valid CommandBufferMode", [
+    I32BitEnumAttr<"CommandBufferModeBitfield", "valid CommandBufferMode", [
       HAL_CommandBufferMode_None,
       HAL_CommandBufferMode_OneShot,
       HAL_CommandBufferMode_AllowInlineExecution,
@@ -75,11 +75,11 @@ def HAL_CommandBufferModeBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_CommandCategory_None : BitEnumAttrCase<"None", 0x0000>;
-def HAL_CommandCategory_Transfer : BitEnumAttrCase<"Transfer", 0x0001>;
-def HAL_CommandCategory_Dispatch : BitEnumAttrCase<"Dispatch", 0x0002>;
+def HAL_CommandCategory_None : I32BitEnumAttrCase<"None", 0x0000>;
+def HAL_CommandCategory_Transfer : I32BitEnumAttrCase<"Transfer", 0x0001>;
+def HAL_CommandCategory_Dispatch : I32BitEnumAttrCase<"Dispatch", 0x0002>;
 def HAL_CommandCategoryBitfieldAttr :
-    BitEnumAttr<"CommandCategoryBitfield", "valid CommandCategory", [
+    I32BitEnumAttr<"CommandCategoryBitfield", "valid CommandCategory", [
       HAL_CommandCategory_None,
       HAL_CommandCategory_Transfer,
       HAL_CommandCategory_Dispatch,
@@ -111,15 +111,15 @@ def HAL_DescriptorSetLayoutUsageTypeAttr :
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_ExecutionStage_None : BitEnumAttrCase<"None", 0x0000>;
-def HAL_ExecutionStage_CommandIssue : BitEnumAttrCase<"CommandIssue", 0x0001>;
-def HAL_ExecutionStage_CommandProcess : BitEnumAttrCase<"CommandProcess", 0x0002>;
-def HAL_ExecutionStage_Dispatch : BitEnumAttrCase<"Dispatch", 0x0004>;
-def HAL_ExecutionStage_Transfer : BitEnumAttrCase<"Transfer", 0x0008>;
-def HAL_ExecutionStage_CommandRetire : BitEnumAttrCase<"CommandRetire", 0x0010>;
-def HAL_ExecutionStage_Host : BitEnumAttrCase<"Host", 0x0020>;
+def HAL_ExecutionStage_None : I32BitEnumAttrCase<"None", 0x0000>;
+def HAL_ExecutionStage_CommandIssue : I32BitEnumAttrCase<"CommandIssue", 0x0001>;
+def HAL_ExecutionStage_CommandProcess : I32BitEnumAttrCase<"CommandProcess", 0x0002>;
+def HAL_ExecutionStage_Dispatch : I32BitEnumAttrCase<"Dispatch", 0x0004>;
+def HAL_ExecutionStage_Transfer : I32BitEnumAttrCase<"Transfer", 0x0008>;
+def HAL_ExecutionStage_CommandRetire : I32BitEnumAttrCase<"CommandRetire", 0x0010>;
+def HAL_ExecutionStage_Host : I32BitEnumAttrCase<"Host", 0x0020>;
 def HAL_ExecutionStageBitfieldAttr :
-    BitEnumAttr<"ExecutionStageBitfield", "valid ExecutionStage", [
+    I32BitEnumAttr<"ExecutionStageBitfield", "valid ExecutionStage", [
       HAL_ExecutionStage_None,
       HAL_ExecutionStage_CommandIssue,
       HAL_ExecutionStage_CommandProcess,
@@ -131,29 +131,29 @@ def HAL_ExecutionStageBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_ExecutionBarrierFlag_None : BitEnumAttrCase<"None", 0x0000>;
-def HAL_ExecutionBarrierFlag_Reserved : BitEnumAttrCase<"Reserved", 0x0001>;
+def HAL_ExecutionBarrierFlag_None : I32BitEnumAttrCase<"None", 0x0000>;
+def HAL_ExecutionBarrierFlag_Reserved : I32BitEnumAttrCase<"Reserved", 0x0001>;
 def HAL_ExecutionBarrierFlagBitfieldAttr :
-    BitEnumAttr<"ExecutionBarrierFlagBitfield", "valid ExecutionBarrierFlag", [
+    I32BitEnumAttr<"ExecutionBarrierFlagBitfield", "valid ExecutionBarrierFlag", [
       HAL_ExecutionBarrierFlag_None,
       HAL_ExecutionBarrierFlag_Reserved,
     ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_AccessScope_None : BitEnumAttrCase<"None", 0x0000>;
-def HAL_AccessScope_IndirectCommandRead : BitEnumAttrCase<"IndirectCommandRead", 0x0001>;
-def HAL_AccessScope_ConstantRead : BitEnumAttrCase<"ConstantRead", 0x0002>;
-def HAL_AccessScope_DispatchRead : BitEnumAttrCase<"DispatchRead", 0x0004>;
-def HAL_AccessScope_DispatchWrite : BitEnumAttrCase<"DispatchWrite", 0x0008>;
-def HAL_AccessScope_TransferRead : BitEnumAttrCase<"TransferRead", 0x0010>;
-def HAL_AccessScope_TransferWrite : BitEnumAttrCase<"TransferWrite", 0x0020>;
-def HAL_AccessScope_HostRead : BitEnumAttrCase<"HostRead", 0x0040>;
-def HAL_AccessScope_HostWrite : BitEnumAttrCase<"HostWrite", 0x0080>;
-def HAL_AccessScope_MemoryRead : BitEnumAttrCase<"MemoryRead", 0x0100>;
-def HAL_AccessScope_MemoryWrite : BitEnumAttrCase<"MemoryWrite", 0x0200>;
+def HAL_AccessScope_None : I32BitEnumAttrCase<"None", 0x0000>;
+def HAL_AccessScope_IndirectCommandRead : I32BitEnumAttrCase<"IndirectCommandRead", 0x0001>;
+def HAL_AccessScope_ConstantRead : I32BitEnumAttrCase<"ConstantRead", 0x0002>;
+def HAL_AccessScope_DispatchRead : I32BitEnumAttrCase<"DispatchRead", 0x0004>;
+def HAL_AccessScope_DispatchWrite : I32BitEnumAttrCase<"DispatchWrite", 0x0008>;
+def HAL_AccessScope_TransferRead : I32BitEnumAttrCase<"TransferRead", 0x0010>;
+def HAL_AccessScope_TransferWrite : I32BitEnumAttrCase<"TransferWrite", 0x0020>;
+def HAL_AccessScope_HostRead : I32BitEnumAttrCase<"HostRead", 0x0040>;
+def HAL_AccessScope_HostWrite : I32BitEnumAttrCase<"HostWrite", 0x0080>;
+def HAL_AccessScope_MemoryRead : I32BitEnumAttrCase<"MemoryRead", 0x0100>;
+def HAL_AccessScope_MemoryWrite : I32BitEnumAttrCase<"MemoryWrite", 0x0200>;
 def HAL_AccessScopeBitfieldAttr :
-    BitEnumAttr<"AccessScopeBitfield", "valid AccessScope", [
+    I32BitEnumAttr<"AccessScopeBitfield", "valid AccessScope", [
       HAL_AccessScope_None,
       HAL_AccessScope_IndirectCommandRead,
       HAL_AccessScope_ConstantRead,

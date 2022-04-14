@@ -20,6 +20,7 @@ iree_lit_test_suite(
             "assign_target_devices.mlir",
             "benchmark_batch_dispatches.mlir",
             "convert_to_hal.mlir",
+            "dump_executable_benchmarks.mlir",
             "dump_executable_sources.mlir",
             "elide_redundant_commands.mlir",
             "inline_device_switches.mlir",

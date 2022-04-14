@@ -503,6 +503,25 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_mapping_subspan(
 // iree_hal_subspan_buffer_t
 //===----------------------------------------------------------------------===//
 
+// Initializes in-place a subspan buffer stored in |out_buffer|.
+// The reference count of the buffer will be set to 1.
+//
+// This is intended to be used for provably on-stack transient subspans or
+// buffer wrapping where ownership is controlled externally. If the lifetime of
+// the subspan may extend beyond the lifetime of the |out_buffer| storage then
+// iree_hal_subspan_buffer_create must be used instead.
+//
+// iree_hal_subspan_buffer_deinitialize must be used to deinitialize the buffer.
+IREE_API_EXPORT void iree_hal_subspan_buffer_initialize(
+    iree_hal_buffer_t* allocated_buffer, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length, iree_hal_allocator_t* device_allocator,
+    iree_allocator_t host_allocator, iree_hal_buffer_t* out_buffer);
+
+// Deinitializes a subspan buffer that was initialized with
+// iree_hal_subspan_buffer_initialize.
+IREE_API_EXPORT void iree_hal_subspan_buffer_deinitialize(
+    iree_hal_buffer_t* buffer);
+
 // Creates a buffer referencing a subspan of some base allocation.
 // Optionally |device_allocator| can be provided if this subspan references
 // managed buffers that need deallocation callbacks.

@@ -5,11 +5,23 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library")
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+iree_cmake_extra_content(
+    content = """
+if(NOT "${IREE_BUILD_TORCH_MLIR_SUPPORT}")
+  iree_cc_library(
+    NAME TMTensor
+  )
+  return()
+endif()
+""",
 )
 
 gentbl_cc_library(
@@ -49,6 +61,9 @@ cc_library(
     ],
     hdrs = [
         "Passes.h",
+    ],
+    defines = [
+        "IREE_HAVE_TORCH_MLIR_DIALECTS",
     ],
     deps = [
         ":PassHeaders",

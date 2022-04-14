@@ -41,7 +41,9 @@ import sys
 
 from typing import List, Optional, Sequence, Tuple, Set
 
-from common.benchmark_definition import (DeviceInfo, BenchmarkInfo,
+from common.benchmark_definition import (CPU_ABI_TO_TARGET_ARCH_MAP,
+                                         GPU_NAME_TO_TARGET_ARCH_MAP,
+                                         DeviceInfo, BenchmarkInfo,
                                          BenchmarkResults, BenchmarkRun,
                                          execute_cmd,
                                          execute_cmd_and_get_output)
@@ -62,21 +64,6 @@ ANDROID_TMP_DIR = "/data/local/tmp/iree-benchmarks"
 
 NORMAL_TOOL_REL_DIR = "normal-tools"
 TRACED_TOOL_REL_DIR = "traced-tools"
-
-# A map from Android CPU ABI to IREE's benchmark target architecture.
-CPU_ABI_TO_TARGET_ARCH_MAP = {
-    "arm64-v8a": "cpu-arm64-v8a",
-}
-
-# A map from Android GPU name to IREE's benchmark target architecture.
-GPU_NAME_TO_TARGET_ARCH_MAP = {
-    "adreno-640": "gpu-adreno",
-    "adreno-650": "gpu-adreno",
-    "adreno-660": "gpu-adreno",
-    "adreno-730": "gpu-adreno",
-    "mali-g77": "gpu-mali-valhall",
-    "mali-g78": "gpu-mali-valhall",
-}
 
 
 def get_benchmark_repetition_count(runner: str) -> int:
@@ -108,9 +95,13 @@ def adb_push_to_tmp_dir(content: str,
   """
   filename = os.path.basename(content)
   android_path = os.path.join(ANDROID_TMP_DIR, relative_dir, filename)
-  execute_cmd(["adb", "push", "-p",
-               os.path.abspath(content), android_path],
-              verbose=verbose)
+  # When the output is a TTY, keep the default progress info output.
+  # In other cases, redirect progress info to null to avoid bloating log files.
+  stdout_redirect = None if sys.stdout.isatty() else subprocess.DEVNULL
+  execute_cmd(
+      ["adb", "push", os.path.abspath(content), android_path],
+      verbose=verbose,
+      stdout=stdout_redirect)
   return android_path
 
 
@@ -402,9 +393,12 @@ def run_benchmarks_for_category(
         # complete.
         capture_filename = os.path.join(captures_dir, f"{benchmark_key}.tracy")
         capture_cmd = [trace_capture_tool, "-f", "-o", capture_filename]
-        capture_log = execute_cmd_and_get_output(capture_cmd, verbose=verbose)
-        if verbose:
-          print(capture_log)
+        # If verbose, just let the subprocess print its output. The subprocess
+        # may need to detect if the output is a TTY to decide whether to log
+        # verbose progress info and use ANSI colors, so it's better to use
+        # stdout redirection than to capture the output in a string.
+        stdout_redirect = None if verbose else subprocess.DEVNULL
+        execute_cmd(capture_cmd, verbose=verbose, stdout=stdout_redirect)
 
       print("...benchmark completed")
 

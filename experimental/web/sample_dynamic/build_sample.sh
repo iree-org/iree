@@ -43,12 +43,11 @@ INSTALL_ROOT="${1:-${ROOT_DIR}/build-host/install}"
 # Compile from .mlir input to portable .vmfb file using host tools            #
 ###############################################################################
 
-TRANSLATE_TOOL="${INSTALL_ROOT?}/bin/iree-compile"
-EMBED_DATA_TOOL="${INSTALL_ROOT?}/bin/generate_embed_data"
+COMPILE_TOOL="${INSTALL_ROOT?}/bin/iree-compile"
 
-translate_sample() {
-  echo "  Translating '$1' sample..."
-  ${TRANSLATE_TOOL?} $2 \
+compile_sample() {
+  echo "  Compiling '$1' sample..."
+  ${COMPILE_TOOL?} $2 \
     --iree-mlir-to-vm-bytecode-module \
     --iree-input-type=mhlo \
     --iree-hal-target-backends=llvm \
@@ -57,10 +56,10 @@ translate_sample() {
     --o ${BINARY_DIR}/$1.vmfb
 }
 
-echo "=== Translating sample MLIR files to VM flatbuffer outputs (.vmfb) ==="
-translate_sample "simple_abs"     "${ROOT_DIR?}/iree/samples/models/simple_abs.mlir"
-translate_sample "fullyconnected" "${ROOT_DIR?}/iree/test/e2e/models/fullyconnected.mlir"
-translate_sample "collatz"        "${ROOT_DIR?}/iree/test/e2e/models/collatz.mlir"
+echo "=== Compiling sample MLIR files to VM flatbuffer outputs (.vmfb) ==="
+compile_sample "simple_abs"     "${ROOT_DIR?}/iree/samples/models/simple_abs.mlir"
+compile_sample "fullyconnected" "${ROOT_DIR?}/iree/test/e2e/models/fullyconnected.mlir"
+compile_sample "collatz"        "${ROOT_DIR?}/iree/test/e2e/models/collatz.mlir"
 
 ###############################################################################
 # Build the web artifacts using Emscripten                                    #
