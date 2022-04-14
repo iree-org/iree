@@ -550,10 +550,12 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([limits](auto op) {
-        // Try to tile and vectorize first.
+        // Try to tile and vectorize first. It's common to see 32 threads
+        // per subgroup for GPUs.
         std::array<int64_t, 2> workgroupXY = {32, 2};
         std::array<int64_t, 3> threadMNK = {8, 8, 4};
-        auto result = detail::setMatmulOpConfig(op, 32, workgroupXY, threadMNK);
+        auto result = detail::setMatmulOpConfig(op, /*subgroupSize=*/32,
+                                                workgroupXY, threadMNK);
         if (failed(result)) return result;
         if (getLoweringConfig(op)) return result;
 
