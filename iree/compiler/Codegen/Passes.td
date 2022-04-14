@@ -164,12 +164,12 @@ def MemrefCopyToLinalgPass :
 }
 
 def GPUDistributeSharedMemoryCopy :
-    Pass<"iree-codegen-gpu-distribute-shared-memory-copy", "func::FuncOp"> {
+    Pass<"iree-gpu-distribute-shared-memory-copy", "func::FuncOp"> {
   let summary = "Pass to distribute shared memory copies to threads.";
   let constructor = "mlir::iree_compiler::createGPUDistributeSharedMemoryCopy()";
 }
 
-def GPUPipelining : Pass<"iree-codegen-gpu-pipelining", "func::FuncOp"> {
+def GPUPipelining : Pass<"iree-gpu-pipelining", "func::FuncOp"> {
   let summary = "Pass to do software pipelining.";
   let constructor = "mlir::iree_compiler::createGPUPipeliningPass()";
 }

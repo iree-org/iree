@@ -12,6 +12,7 @@
 
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -21,8 +22,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-static constexpr int kNumGPUDims = 3;
 
 const char *getSPIRVDistributeAttrName() { return "iree.spirv.distribute_dim"; }
 
