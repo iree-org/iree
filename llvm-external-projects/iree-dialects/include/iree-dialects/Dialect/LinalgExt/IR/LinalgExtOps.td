@@ -475,39 +475,43 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 ]> {
   let summary = "Top-K operator";
   let description = [{
-   A Top-K operation for N-D tensors.
+   A Top-K operation for N-D tensors. Reduces the taret dimension from the input
+   size N down to K elements based on the supplied binary region.
 
-   Accepts two N-D tensor inputs consisting of values (f32) and indices of those
+   Accepts two N-D tensor inputs consisting of values and indices of those
    values (i32 type). Both input values/indices tensors and output
    values/indicies tensors must have the same shape. Top-K is computed along the
-   specified dimension. Returns two output tensors of values and the indicies of
-   Top-K results. The output dimensions must match the input save for the
-   dimension that is reduced to K results.
+   target dimension (from dimension()). Returns two output tensors of values and
+   the indicies of Top-K results. The output dimensions must match the input
+   save for the dimension that is reduced to K results.
 
-   Setting "min_k" to true computes min K elements instead.
+   Region accepts lhs=[next N input] and rhs=[exiting K output] and yeilds an
+   i1. If true, the two values are swapped:
+     - For Top-K compoarision: >
+     - For Min-K comparision: <
+   Note: when the two values are equal, the first occurence is always selected.
   }];
 
   let arguments = (ins Variadic<AnyShaped>:$inputs,
                        Variadic<AnyShaped>:$outputs,
-                       I64Attr:$dimension,
-                       BoolAttr:$min_k
+                       I64Attr:$dimension
   );
 
   let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region AnyRegion:$region);
   let assemblyFormat = [{
     attr-dict
     `dimension` `(` $dimension `)`
-    `min_k` `(` $min_k `)`
     `ins` `(` $inputs `:` type($inputs) `)`
     `outs` `(` $outputs `:` type($outputs) `)`
-    (`:` type($results)^)?
+    $region (`->` type($results)^)?
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value inputValues() {
+    Value values() {
       return getInputOperand(0)->get();
     }
-    Value inputIndices() {
+    Value indices() {
       return getInputOperand(1)->get();
     }
     Value outputValues() {
@@ -516,11 +520,11 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
     Value outputIndices() {
       return getOutputOperand(1)->get();
     }
-    ShapedType getOperandType() {
-      return inputValues().getType().cast<ShapedType>();
+    ShapedType getInputType() {
+      return values().getType().cast<ShapedType>();
     }
-    int64_t getOperandRank() {
-      return getOperandType().getRank();
+    int64_t getInputRank() {
+      return getInputType().getRank();
     }
   }];
 }

@@ -80,6 +80,12 @@ static Value getSlice(OpBuilder &b, Location loc, Value source,
       .Default([&](Type t) { return nullptr; });
 }
 
+// Returns true if two dimensions of a ShapedType are equal.
+static bool compareDim(int64_t lhs, int64_t rhs) {
+  return lhs != ShapedType::kDynamicSize && rhs != ShapedType::kDynamicSize &&
+         lhs != rhs;
+}
+
 Value IREE::LinalgExt::getDimValue(OpBuilder &builder, Location loc, Value v,
                                    int64_t dim) {
   return TypeSwitch<Type, Value>(v.getType())
@@ -1192,51 +1198,50 @@ LogicalResult TopkOp::verify() {
   if (getNumOutputs() != 2) {
     return op->emitOpError("expected two output operands");
   }
-  if (!inputValues().getType().isa<ShapedType>() ||
-      !inputIndices().getType().isa<ShapedType>()) {
+  if (!values().getType().isa<ShapedType>() ||
+      !indices().getType().isa<ShapedType>()) {
     return op->emitOpError("expected input element types to be shaped");
   }
-  if (!outputValues().getType().isa<ShapedType>() ||
+  if (!values().getType().isa<ShapedType>() ||
       !outputIndices().getType().isa<ShapedType>()) {
     return op->emitOpError("expected output element types to be shaped");
   }
-  // Ensure input/output values types match
-  ShapedType inputValuesType = inputValues().getType().cast<ShapedType>();
-  ShapedType outputValuesType = outputValues().getType().cast<ShapedType>();
+  if (dimension() >= getInputRank()) {
+    return op->emitOpError("dimension exceeds rank");
+  }
+  // Ensure input/output element types match
+  auto inputValuesType = values().getType().cast<ShapedType>();
+  auto outputValuesType = outputValues().getType().cast<ShapedType>();
   if (inputValuesType.getElementType() != outputValuesType.getElementType()) {
     return op->emitOpError("expected input/output value types to be identical");
   }
-  // Indices must be index or float
-  ShapedType inputIndicesType = inputIndices().getType().cast<ShapedType>();
-  ShapedType outputIndicesType = outputIndices().getType().cast<ShapedType>();
-  if (!inputIndicesType.getElementType().isIntOrIndex() ||
-      !outputIndicesType.getElementType().isIntOrIndex()) {
-    return op->emitOpError(
-        "expected input/output indices types to be int or index");
+  // Indices must be int
+  auto inputIndicesType = indices().getType().cast<ShapedType>();
+  auto outputIndicesType = outputIndices().getType().cast<ShapedType>();
+  if (!inputIndicesType.getElementType().isInteger(32) ||
+      !outputIndicesType.getElementType().isInteger(32)) {
+    return op->emitOpError("expected input/output indices types to be int");
   }
   // Ranks must match
   if (inputValuesType.getRank() != outputValuesType.getRank() ||
       inputIndicesType.getRank() != outputIndicesType.getRank()) {
     return op->emitOpError("expected input/output to have the same rank");
   }
-  // Input indicies/values and output indices/values should have the same shape
+  // Input indicies and values must have the same shape.
   if (llvm::any_of(
           llvm::zip(inputValuesType.getShape(), inputIndicesType.getShape()),
           [](std::tuple<int64_t, int64_t> s) {
-            return std::get<0>(s) != ShapedType::kDynamicSize &&
-                   std::get<1>(s) != ShapedType::kDynamicSize &&
-                   std::get<0>(s) != std::get<1>(s);
+            return compareDim(std::get<0>(s), std::get<1>(s));
           })) {
-    return op->emitOpError("input indicies/values shape must match");
+    return op->emitOpError("input indices/values shape must match");
   }
+  // Output indicies and values must have the same shape.
   if (llvm::any_of(
           llvm::zip(outputValuesType.getShape(), outputIndicesType.getShape()),
           [](std::tuple<int64_t, int64_t> s) {
-            return std::get<0>(s) != ShapedType::kDynamicSize &&
-                   std::get<1>(s) != ShapedType::kDynamicSize &&
-                   std::get<0>(s) != std::get<1>(s);
+            return compareDim(std::get<0>(s), std::get<1>(s));
           })) {
-    return op->emitOpError("output indicies/values shape must match");
+    return op->emitOpError("output indices/values shape must match");
   }
   // Input shape must match the output shape except for the dimension()
   uint64_t dim = dimension();
@@ -1247,11 +1252,14 @@ LogicalResult TopkOp::verify() {
                        return false;
                      }
                      std::tuple<int64_t, int64_t> s = e.value();
-                     return std::get<0>(s) != ShapedType::kDynamicSize &&
-                            std::get<1>(s) != ShapedType::kDynamicSize &&
-                            std::get<0>(s) != std::get<1>(s);
+                     return compareDim(std::get<0>(s), std::get<1>(s));
                    })) {
     return op->emitOpError("incompatible input/output shapes");
+  }
+  // Check region compatibility
+  Block &block = region().front();
+  if (block.getNumArguments() != 2) {
+    return op->emitOpError("region block should have 2 arguments");
   }
   return success();
 }
