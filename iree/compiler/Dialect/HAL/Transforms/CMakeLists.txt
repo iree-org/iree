@@ -19,6 +19,7 @@ iree_cc_library(
     "AssignTargetDevices.cpp"
     "BenchmarkBatchDispatches.cpp"
     "ConvertToHAL.cpp"
+    "DumpExecutableBenchmarks.cpp"
     "DumpExecutableSources.cpp"
     "ElideRedundantCommands.cpp"
     "InlineDeviceSwitches.cpp"
@@ -41,6 +42,7 @@ iree_cc_library(
     MLIRFunc
     MLIRIR
     MLIRPass
+    MLIRSCF
     MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
@@ -58,6 +60,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::Conversion
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
+    iree::compiler::Utils
   PUBLIC
 )
 

@@ -35,6 +35,12 @@ void TargetOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc("Path to write individual hal.executable input "
                      "source listings into (- for stdout)."),
       llvm::cl::cat(halTargetOptionsCategory));
+
+  binder.opt<std::string>(
+      "iree-hal-dump-executable-benchmarks-to", executableBenchmarksPath,
+      llvm::cl::desc("Path to write standalone hal.executable benchmarks into "
+                     "(- for stdout)."),
+      llvm::cl::cat(halTargetOptionsCategory));
 }
 
 // Renames |op| within |moduleOp| with a new name that is unique within both

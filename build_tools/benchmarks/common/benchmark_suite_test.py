@@ -26,14 +26,14 @@ class BenchmarkSuiteTest(unittest.TestCase):
   def test_filter_benchmarks_for_category(self):
     case1 = BenchmarkCase(model_name_with_tags="deepnet",
                           bench_mode="1-thread,full-inference",
-                          target_arch="ARMv8",
-                          driver="dylib",
+                          target_arch="CPU-ARMv8",
+                          driver="iree-dylib",
                           benchmark_case_dir="case1",
                           benchmark_tool_name="tool")
     case2 = BenchmarkCase(model_name_with_tags="deepnetv2-f32",
                           bench_mode="full-inference",
-                          target_arch="Mali",
-                          driver="vulkan",
+                          target_arch="GPU-Mali",
+                          driver="iree-vulkan",
                           benchmark_case_dir="case2",
                           benchmark_tool_name="tool")
     suite = BenchmarkSuite({
@@ -43,16 +43,16 @@ class BenchmarkSuiteTest(unittest.TestCase):
     both_benchmarks = suite.filter_benchmarks_for_category(
         category="TFLite",
         available_drivers=["dylib", "vulkan"],
-        cpu_target_arch_filter="ARMv8",
-        gpu_target_arch_filter="Mali",
+        cpu_target_arch_filter="cpu-armv8",
+        gpu_target_arch_filter="gpu-mali",
         driver_filter=None,
         mode_filter=".*full-inference.*",
         model_name_filter="deepnet.*")
     gpu_benchmarks = suite.filter_benchmarks_for_category(
         category="TFLite",
         available_drivers=["dylib", "vulkan"],
-        cpu_target_arch_filter="Unknown",
-        gpu_target_arch_filter="Mali",
+        cpu_target_arch_filter="cpu-unknown",
+        gpu_target_arch_filter="gpu-mali",
         driver_filter="vulkan",
         mode_filter=".*full-inference.*",
         model_name_filter="deepnet.*/case2")
@@ -77,17 +77,17 @@ class BenchmarkSuiteTest(unittest.TestCase):
     with tempfile.TemporaryDirectory() as tmp_dir:
       tflite_dir = os.path.join(tmp_dir, "TFLite")
       pytorch_dir = os.path.join(tmp_dir, "PyTorch")
-      case1 = BenchmarkSuiteTest.__create_bench(tflite_dir,
-                                                model="deepnet",
-                                                bench_mode="4-thread,full",
-                                                target_arch="cpu-armv8",
-                                                driver="dylib",
-                                                tool="run-cpu-bench")
+      BenchmarkSuiteTest.__create_bench(tflite_dir,
+                                        model="DeepNet",
+                                        bench_mode="4-thread,full",
+                                        target_arch="CPU-ARMv8",
+                                        driver="iree-dylib",
+                                        tool="run-cpu-bench")
       case2 = BenchmarkSuiteTest.__create_bench(pytorch_dir,
-                                                model="deepnetv2",
+                                                model="DeepNetv2",
                                                 bench_mode="full-inference",
-                                                target_arch="gpu-mali",
-                                                driver="vulkan",
+                                                target_arch="GPU-Mali",
+                                                driver="iree-vulkan",
                                                 tool="run-gpu-bench")
 
       suite = BenchmarkSuite.load_from_benchmark_suite_dir(tmp_dir)
@@ -104,7 +104,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
   @staticmethod
   def __create_bench(dir_path: str, model: str, bench_mode: str,
                      target_arch: str, driver: str, tool: str):
-    case_name = f"iree-{driver}__{target_arch}__{bench_mode}"
+    case_name = f"{driver}__{target_arch}__{bench_mode}"
     bench_path = os.path.join(dir_path, model, case_name)
     os.makedirs(bench_path)
     with open(os.path.join(bench_path, "tool"), "w") as f:

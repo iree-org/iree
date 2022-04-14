@@ -59,6 +59,7 @@ iree_cc_library(
     MLIRTransforms
     MLIRVector
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Stream::Analysis
     iree::compiler::Dialect::Stream::Conversion
     iree::compiler::Dialect::Stream::Conversion::FlowToStream

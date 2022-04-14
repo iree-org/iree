@@ -68,9 +68,7 @@ struct FoldBlockArgumentsPattern
       for (unsigned successorIndex = 0;
            successorIndex < branchOp->getNumSuccessors(); ++successorIndex) {
         auto *block = branchOp->getSuccessor(successorIndex);
-        auto operandsOr = branchOp.getSuccessorOperands(successorIndex);
-        if (!operandsOr.hasValue()) continue;
-        auto operands = operandsOr.getValue();
+        auto operands = branchOp.getSuccessorOperands(successorIndex);
         BlockSource blockSource;
         blockSource.branchOp = branchOp;
         blockSource.successorIndex = successorIndex;
@@ -140,10 +138,11 @@ struct FoldBlockArgumentsPattern
 
       // Erase all the block arguments we've deduplicated.
       for (auto &blockSource : blockSources) {
+        auto successorOperands = blockSource.branchOp.getSuccessorOperands(
+            blockSource.successorIndex);
         auto operands =
-            blockSource.branchOp
-                .getMutableSuccessorOperands(blockSource.successorIndex)
-                .getValue();
+            successorOperands.slice(successorOperands.getProducedOperandCount(),
+                                    successorOperands.size());
         rewriter.updateRootInPlace(blockSource.branchOp, [&]() {
           eraseOperands(operands, elidedArgs);
         });
@@ -195,8 +194,7 @@ struct ElideBranchOperandsPattern
       for (unsigned successorIndex = 0;
            successorIndex < branchOp->getNumSuccessors(); ++successorIndex) {
         auto *block = branchOp->getSuccessor(successorIndex);
-        auto operandsOr = branchOp.getSuccessorOperands(successorIndex);
-        if (!operandsOr.hasValue()) continue;
+        auto operands = branchOp.getSuccessorOperands(successorIndex);
         BlockSource blockSource;
         blockSource.branchOp = branchOp;
         blockSource.successorIndex = successorIndex;
@@ -226,9 +224,8 @@ struct ElideBranchOperandsPattern
         // Find the uniform value passed for the operand of all branches.
         Value uniformValue = nullptr;
         for (auto &blockSource : blockSources) {
-          auto operands = blockSource.branchOp
-                              .getSuccessorOperands(blockSource.successorIndex)
-                              .getValue();
+          auto operands = blockSource.branchOp.getSuccessorOperands(
+              blockSource.successorIndex);
           auto operand = operands[argIndex];
           if (!uniformValue) {
             // First usage.
@@ -269,10 +266,11 @@ struct ElideBranchOperandsPattern
 
       // Erase all the block arguments we remapped.
       for (auto &blockSource : blockSources) {
+        auto successorOperands = blockSource.branchOp.getSuccessorOperands(
+            blockSource.successorIndex);
         auto operands =
-            blockSource.branchOp
-                .getMutableSuccessorOperands(blockSource.successorIndex)
-                .getValue();
+            successorOperands.slice(successorOperands.getProducedOperandCount(),
+                                    successorOperands.size());
         rewriter.updateRootInPlace(blockSource.branchOp, [&]() {
           eraseOperands(operands, elidedArgs);
         });

@@ -85,7 +85,6 @@ class TestGenerator:
 class CompilationInfo:
   # Lowering Config
   tile_sizes: typing.List[int]
-  native_vector_size: typing.List[int]
   # Translation Info
   dispatch_lowering_pass_pipeline: str
   workload_per_wg: typing.List[int]
@@ -245,7 +244,6 @@ def get_test_compilation_infos(
     compilation_infos.append(
         CompilationInfo(
             tile_sizes=tile_workgroup_size_pair.tile_size,
-            native_vector_size=[],
             dispatch_lowering_pass_pipeline=compilation_info_id.value,
             workload_per_wg=[
                 a for a in reversed(tile_workgroup_size_pair.tile_size[0:2])
@@ -415,7 +413,7 @@ def generate_function(
   if compilation_info:
     compilation_info_string = (
         f"#compilation{generate_function.compilation_index} = #iree_codegen.compilation_info<\n"
-        f"  lowering_config = <tile_sizes = [{compilation_info.tile_sizes}], native_vector_size = {compilation_info.native_vector_size}>,\n"
+        f"  lowering_config = <tile_sizes = [{compilation_info.tile_sizes}]>,\n"
         f"  translation_info = <{compilation_info.dispatch_lowering_pass_pipeline}>,\n"
         f"  workgroup_size = {compilation_info.workgroup_size_str()}>\n")
     compilation_info_attr = f"{{compilation_info = #compilation{generate_function.compilation_index}}} "

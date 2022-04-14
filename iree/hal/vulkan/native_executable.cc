@@ -286,6 +286,7 @@ iree_status_t iree_hal_vulkan_native_executable_create(
           flatbuffers_string_vec_at(entry_points_vec, i);
       executable->entry_points[i].name =
           iree_make_string_view(name, flatbuffers_string_len(name));
+      IREE_TRACE_ZONE_APPEND_TEXT(z0, name);
     }
   }
 

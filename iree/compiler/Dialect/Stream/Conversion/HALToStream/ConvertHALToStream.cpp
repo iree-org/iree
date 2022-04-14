@@ -208,6 +208,10 @@ void populateHALToStreamConversionPatterns(MLIRContext *context,
                                            ConversionTarget &conversionTarget,
                                            TypeConverter &typeConverter,
                                            RewritePatternSet &patterns) {
+  // Allow executables through without modification.
+  conversionTarget.addLegalOp<IREE::HAL::ExecutableOp>();
+  conversionTarget.markOpRecursivelyLegal<IREE::HAL::ExecutableOp>();
+
   conversionTarget.addDynamicallyLegalOp<IREE::HAL::TensorImportOp>(
       [&](IREE::HAL::TensorImportOp op) {
         return typeConverter.isLegal(op.source().getType()) &&

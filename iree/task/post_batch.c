@@ -36,7 +36,7 @@ static iree_host_size_t iree_task_post_batch_select_random_worker(
     iree_task_post_batch_t* post_batch, iree_task_affinity_set_t affinity_set) {
   iree_task_affinity_set_t worker_live_mask =
       iree_atomic_task_affinity_set_load(
-          &post_batch->executor->worker_live_mask, iree_memory_order_relaxed);
+          &post_batch->executor->worker_live_mask, iree_memory_order_acquire);
   iree_task_affinity_set_t valid_worker_mask = affinity_set & worker_live_mask;
   if (!valid_worker_mask) {
     // No valid workers as desired; for now just bail to worker 0.

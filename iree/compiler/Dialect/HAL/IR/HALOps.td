@@ -1569,6 +1569,14 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
       if (workgroup_count_region().empty()) return nullptr;
       return &workgroup_count_region().front();
     }
+
+    // Calculates an XYZ workgroup count based on the given |workload|.
+    std::array<Value, 3> calculateWorkgroupCount(
+        Location loc, ValueRange workload, OpBuilder &builder);
+
+    // Calculates an XYZ workgroup size based on the given |workload|.
+    std::array<Value, 3> calculateWorkgroupSize(
+        Location loc, ValueRange workload, OpBuilder &builder);
   }];
 }
 
