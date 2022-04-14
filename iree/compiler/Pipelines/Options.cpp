@@ -38,8 +38,10 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
                      "Legalize from TOSA ops."),
           clEnumValN(InputDialectOptions::Type::mhlo, "mhlo",
                      "Legalize from MHLO ops."),
+#ifdef IREE_HAVE_TORCH_MLIR_DIALECTS
           clEnumValN(InputDialectOptions::Type::tm_tensor, "tm_tensor",
                      "Legalize from TMTensor ops."),
+#endif
           clEnumValN(
               InputDialectOptions::Type::xla, "xla",
               "Legalize from MHLO ops (with XLA cleanup preprocessing).")),
