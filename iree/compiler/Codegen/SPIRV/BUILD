@@ -13,6 +13,7 @@ package(
 cc_library(
     name = "SPIRV",
     srcs = [
+        "AMDConfig.cpp",
         "AdrenoConfig.cpp",
         "ConvertToSPIRVPass.cpp",
         "KernelConfig.cpp",
@@ -25,6 +26,7 @@ cc_library(
         "SPIRVLowerExecutableTargetPass.cpp",
         "SPIRVTile.cpp",
         "SPIRVTileAndDistribute.cpp",
+        "SPIRVTileAndPromote.cpp",
         "SPIRVTileAndVectorizeToCooperativeOps.cpp",
         "SPIRVVectorToCooperativeOps.cpp",
         "SPIRVVectorize.cpp",

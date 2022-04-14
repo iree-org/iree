@@ -6,6 +6,9 @@
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 
+#include <functional>
+#include <numeric>
+
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
@@ -169,9 +172,10 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
 
 namespace detail {
 
-LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
+LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
                                 std::array<int64_t, 2> bestWorkgroupSizeXY,
-                                std::array<int64_t, 3> bestThreadTileSizeMNK) {
+                                std::array<int64_t, 3> bestThreadTileSizeMNK,
+                                bool useWorkgroupMemory) {
   auto lhsType = op.inputs()[0].getType().cast<ShapedType>();
   auto elementBits = lhsType.getElementType().getIntOrFloatBitWidth();
   if (elementBits != 16 && elementBits != 32) return success();
@@ -261,11 +265,20 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
   }
   if (reductionTileSizes[2 + isBM] == 0) return success();
 
-  auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize;
+  auto totalThreads =
+      std::accumulate(workgroupSize.begin(), workgroupSize.end(), 1,
+                      std::multiplies<int64_t>());
+  auto pipeline =
+      (useWorkgroupMemory && totalThreads > subgroupSize)
+          ? IREE::Codegen::DispatchLoweringPassPipeline::
+                SPIRVVectorizeWithWorkgroupMemory
+          : IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize;
+
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
   tileSizes.push_back(invocationTileSizes);
   tileSizes.push_back(reductionTileSizes);
+
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
       workgroupSize);
@@ -512,6 +525,9 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
   // First try to find a proper CodeGen configuration to tile and vectorize for
   // the current target architecture.
   switch (targetEnv.getVendorID()) {
+    case spirv::Vendor::AMD:
+      result = detail::setAMDCodeGenConfig(targetEnv, rootOp);
+      break;
     case spirv::Vendor::ARM:
       result = detail::setMaliCodeGenConfig(targetEnv, rootOp);
       break;
@@ -534,10 +550,12 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([limits](auto op) {
-        // Try to tile and vectorize first.
+        // Try to tile and vectorize first. It's common to see 32 threads
+        // per subgroup for GPUs.
         std::array<int64_t, 2> workgroupXY = {32, 2};
         std::array<int64_t, 3> threadMNK = {8, 8, 4};
-        auto result = detail::setMatmulOpConfig(op, workgroupXY, threadMNK);
+        auto result = detail::setMatmulOpConfig(op, /*subgroupSize=*/32,
+                                                workgroupXY, threadMNK);
         if (failed(result)) return result;
         if (getLoweringConfig(op)) return result;
 

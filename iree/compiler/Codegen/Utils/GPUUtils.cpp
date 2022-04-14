@@ -4,9 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUUtils.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 
-#include "mlir/Dialect/GPU/Passes.h"
+#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/IR/Matchers.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -63,6 +65,53 @@ std::array<int64_t, 3> getWorkgroupSize(mlir::func::FuncOp funcOp) {
         it.value().cast<mlir::IntegerAttr>().getValue().getZExtValue();
   }
   return workgroupSize;
+}
+
+bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
+                                           int64_t threadCount,
+                                           int64_t vectorSize) {
+  // Verify that each dimension of the shape can be distributed on the
+  // threads
+  int64_t threadsAvailable = threadCount;
+  for (auto &dim : llvm::enumerate(llvm::reverse(shape))) {
+    int64_t numElementPerThread = dim.index() == 0 ? vectorSize : 1;
+    int64_t numThreads = dim.value() / numElementPerThread;
+    if (numThreads == 0) return false;
+    numThreads = std::min(numThreads, threadsAvailable);
+    if (threadsAvailable % numThreads != 0) return false;
+    threadsAvailable = threadsAvailable / numThreads;
+    if (threadsAvailable == 1) break;
+  }
+  return threadsAvailable == 1;
+}
+
+Optional<Value> allocateWorkgroupMemory(OpBuilder &builder,
+                                        memref::SubViewOp subview,
+                                        ArrayRef<Value> sizeBounds,
+                                        DataLayout &) {
+  OpBuilder::InsertionGuard guard(builder);
+
+  func::FuncOp funcOp = subview->getParentOfType<func::FuncOp>();
+  if (!funcOp) return llvm::None;
+
+  // The subview size bounds are expected to be constant; they specify the shape
+  // of the allocation.
+  SmallVector<int64_t, 2> shape;
+  for (Value bound : sizeBounds) {
+    APInt value;
+    if (!matchPattern(bound, m_ConstantInt(&value))) return llvm::None;
+    shape.push_back(value.getSExtValue());
+  }
+
+  builder.setInsertionPoint(&funcOp.front(), funcOp.front().begin());
+  auto type = MemRefType::get(shape, subview.getType().getElementType(), {},
+                              gpu::GPUDialect::getWorkgroupAddressSpace());
+  Value buffer = builder.create<memref::AllocOp>(funcOp.getLoc(), type);
+  return buffer;
+}
+
+LogicalResult deallocateWorkgroupMemory(OpBuilder &, Value /*buffer*/) {
+  return success();
 }
 
 }  // namespace iree_compiler

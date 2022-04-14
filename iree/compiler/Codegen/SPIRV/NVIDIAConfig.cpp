@@ -109,10 +109,48 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
       workgroupSize);
 }
 
+// Volta architecture:
+// https://docs.nvidia.com/cuda/volta-tuning-guide/index.html#sm-occupancy
+//
+// * 64K 32-bit registers per SM
+// * 96KB shared memory per SM
+// * Max 32 thread blocks per SM
+// * Max 64 concurrent warps per SM
+// * Max 255 registers per thread
+
+// Turing architecture:
+// https://docs.nvidia.com/cuda/turing-tuning-guide/index.html#sm-occupancy
+//
+// * 64K 32-bit registers per SM
+// * 64KB shared memory per SM
+// * Max 16 thread blocks per SM
+// * Max 32 concurrent warps per SM
+// * Max 255 registers per thread
+
+// Ampere architecture:
+// https://docs.nvidia.com/cuda/ampere-tuning-guide/index.html#sm-occupancy
+//
+// * 64K 32-bit registers per SM
+// * 164KB/96KB shared memory for compute capability 8.0/8.6
+// * Max 32/16 thread blocks per SM for compute capability 8.0/8.6
+// * Max 64 concurrent warps per SM
+// * Max 255 registers per thread
+
+// Note that the above numbers are from CUDA docs; for Vulkan the drivder can
+// expose slightly different numbers, e.g., max shared memory size is smaller.
+
 LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
                                      Operation *rootOp) {
+  int64_t subgroupSize = targetEnv.getResourceLimits().subgroup_size().getInt();
   if (auto matmulOp = dyn_cast<linalg::MatmulOp>(rootOp)) {
-    return setOpConfig(targetEnv, matmulOp);
+    // First try to see if we can use tensor cores.
+    if (failed(setOpConfig(targetEnv, matmulOp))) return failure();
+    if (getLoweringConfig(rootOp)) return success();
+
+    std::array<int64_t, 2> workgroupXY = {subgroupSize, 8};
+    std::array<int64_t, 3> threadMNK = {16, 4, 32};
+    return setMatmulOpConfig(matmulOp, subgroupSize, workgroupXY, threadMNK,
+                             /*useWorkgroupMemory=*/true);
   }
   return success();
 }
