@@ -45,7 +45,6 @@ cc_library(
         "ForOpCanonicalizationPass.cpp",
         "GPUDistributeSharedMemoryCopy.cpp",
         "GPUPipelining.cpp",
-        "GPUUtils.cpp",
         "IREEComprehensiveBufferizePass.cpp",
         "InsertDistributionInfoPass.cpp",
         "LinalgBufferizePass.cpp",
@@ -64,7 +63,6 @@ cc_library(
     hdrs = [
         "BufferizationAnalysis.h",
         "DestructiveUpdateUtils.h",
-        "GPUUtils.h",
         "Transforms.h",
     ],
     deps = [

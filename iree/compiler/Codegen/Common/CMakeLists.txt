@@ -25,7 +25,6 @@ iree_cc_library(
   HDRS
     "BufferizationAnalysis.h"
     "DestructiveUpdateUtils.h"
-    "GPUUtils.h"
     "Transforms.h"
   SRCS
     "BufferizationAnalysis.cpp"
@@ -39,7 +38,6 @@ iree_cc_library(
     "ForOpCanonicalizationPass.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUPipelining.cpp"
-    "GPUUtils.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "InsertDistributionInfoPass.cpp"
     "LinalgBufferizePass.cpp"

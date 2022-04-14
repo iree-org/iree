@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
