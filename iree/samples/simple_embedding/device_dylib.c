@@ -12,6 +12,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/local/executable_loader.h"
 #include "iree/hal/local/loaders/embedded_library_loader.h"
+#include "iree/hal/local/loaders/system_library_loader.h"
 #include "iree/hal/local/task_device.h"
 #include "iree/task/api.h"
 
@@ -22,13 +23,22 @@
 
 iree_status_t create_sample_device(iree_allocator_t host_allocator,
                                    iree_hal_device_t** out_device) {
-  // Set paramters for the device created in the next step.
+  // Set parameters for the device created in the next step.
   iree_hal_task_device_params_t params;
   iree_hal_task_device_params_initialize(&params);
 
-  iree_hal_executable_loader_t* loader = NULL;
+  // Create both an embedded library loaded and a system library loader.
+  // Embedded libraries are the default/generic case, so many applications would
+  // only create that single loader. System libraries are enabled by
+  // -iree-llvm-link-embedded=false, useful with external tools (e.g. Tracy).
+  iree_hal_executable_loader_t* loaders[2] = {NULL, NULL};
+  iree_host_size_t loader_count = 0;
   IREE_RETURN_IF_ERROR(iree_hal_embedded_library_loader_create(
-      iree_hal_executable_import_provider_null(), host_allocator, &loader));
+      iree_hal_executable_import_provider_null(), host_allocator,
+      &loaders[loader_count++]));
+  IREE_RETURN_IF_ERROR(iree_hal_system_library_loader_create(
+      iree_hal_executable_import_provider_null(), host_allocator,
+      &loaders[loader_count++]));
 
   iree_task_executor_t* executor = NULL;
   iree_status_t status =
@@ -44,15 +54,16 @@ iree_status_t create_sample_device(iree_allocator_t host_allocator,
 
   // Create the device.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_task_device_create(identifier, &params, executor,
-                                         /*loader_count=*/1, &loader,
-                                         device_allocator, host_allocator,
-                                         out_device);
+    status = iree_hal_task_device_create(
+        identifier, &params, executor, loader_count, loaders, device_allocator,
+        host_allocator, out_device);
   }
 
   iree_hal_allocator_release(device_allocator);
   iree_task_executor_release(executor);
-  iree_hal_executable_loader_release(loader);
+  for (iree_host_size_t i = 0; i < loader_count; ++i) {
+    iree_hal_executable_loader_release(loaders[i]);
+  }
   return status;
 }
 
