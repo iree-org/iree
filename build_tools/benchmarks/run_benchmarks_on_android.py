@@ -30,26 +30,19 @@ Example usages:
 """
 
 import atexit
-import json
 import os
 import re
 import subprocess
 import tarfile
-import time
 import shutil
 import sys
 
-from typing import List, Optional, Sequence, Tuple, Set
-
-from common.benchmark_definition import (CPU_ABI_TO_TARGET_ARCH_MAP,
-                                         GPU_NAME_TO_TARGET_ARCH_MAP,
-                                         DeviceInfo, BenchmarkInfo,
-                                         BenchmarkResults, BenchmarkRun,
-                                         execute_cmd,
+from typing import Optional, Sequence
+from common.benchmark_config import BenchmarkConfig
+from common.benchmark_driver import BenchmarkDriver
+from common.benchmark_definition import (execute_cmd,
                                          execute_cmd_and_get_output)
-from common.benchmark_suite import (BENCHMARK_SUITE_REL_PATH,
-                                    compose_info_object,
-                                    filter_benchmarks_for_category)
+from common.benchmark_suite import (BenchmarkCase, BenchmarkSuite)
 from common.android_device_utils import (get_android_device_model,
                                          get_android_device_info,
                                          get_android_gpu_name)
@@ -203,347 +196,150 @@ def get_vmfb_full_path_for_benchmark_case(benchmark_case_dir: str) -> str:
   raise ValueError(f"{flagfile_path} does not contain a --module_file flag")
 
 
-def push_vmfb_files(benchmark_case_dirs: Sequence[str], root_benchmark_dir: str,
-                    verbose: bool):
-  vmfb_files_already_pushed = set()
-  for case_dir in benchmark_case_dirs:
-    vmfb_path = get_vmfb_full_path_for_benchmark_case(case_dir)
-    if vmfb_path in vmfb_files_already_pushed:
-      continue
+class AndroidBenchmarkDriver(BenchmarkDriver):
+  """Android benchmark driver."""
+
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.already_pushed_files = {}
+
+  def run_benchmark_case(self, benchmark_case: BenchmarkCase,
+                         benchmark_results_filename: Optional[str],
+                         capture_filename: Optional[str]) -> None:
+    benchmark_case_dir = benchmark_case.benchmark_case_dir
+    android_case_dir = os.path.relpath(benchmark_case_dir,
+                                       self.config.root_benchmark_dir)
+
+    self.__push_vmfb_file(benchmark_case_dir)
+    self.__check_and_push_file(
+        os.path.join(benchmark_case_dir, MODEL_FLAGFILE_NAME), android_case_dir)
+
+    taskset = self.__deduce_taskset(benchmark_case.bench_mode)
+
+    if benchmark_results_filename is not None:
+      self.__run_benchmark(android_case_dir=android_case_dir,
+                           tool_name=benchmark_case.benchmark_tool_name,
+                           driver=benchmark_case.driver,
+                           results_filename=benchmark_results_filename,
+                           taskset=taskset)
+
+    if capture_filename is not None:
+      self.__run_capture(android_case_dir=android_case_dir,
+                         tool_name=benchmark_case.benchmark_tool_name,
+                         capture_filename=capture_filename,
+                         taskset=taskset)
+
+  def __run_benchmark(self, android_case_dir: str, tool_name: str, driver: str,
+                      results_filename: str, taskset: str):
+    host_tool_path = os.path.join(self.config.normal_benchmark_tool_dir,
+                                  tool_name)
+    android_tool = self.__check_and_push_file(host_tool_path,
+                                              NORMAL_TOOL_REL_DIR)
+    cmd = [
+        "taskset", taskset, android_tool, f"--flagfile={MODEL_FLAGFILE_NAME}"
+    ]
+    if tool_name == "iree-benchmark-module":
+      cmd.extend([
+          "--benchmark_format=json",
+          "--benchmark_out_format=json",
+          f"--benchmark_out='{os.path.basename(results_filename)}'",
+      ])
+      if self.config.benchmark_min_time:
+        cmd.extend([
+            f"--benchmark_min_time={self.config.benchmark_min_time}",
+        ])
+      else:
+        repetitions = get_benchmark_repetition_count(driver)
+        cmd.extend([
+            f"--benchmark_repetitions={repetitions}",
+        ])
+
+    result_json = adb_execute_and_get_output(cmd,
+                                             android_case_dir,
+                                             verbose=self.verbose)
+
+    # Pull the result file back onto the host and set the filename for later
+    # return.
+    pull_cmd = [
+        "adb", "pull",
+        os.path.join(ANDROID_TMP_DIR, android_case_dir,
+                     os.path.basename(results_filename)), results_filename
+    ]
+    execute_cmd_and_get_output(pull_cmd, verbose=self.verbose)
+
+    if self.verbose:
+      print(result_json)
+
+  def __run_capture(self, android_case_dir: str, tool_name: str,
+                    capture_filename: str, taskset: str):
+    capture_config = self.config.trace_capture_config
+    host_tool_path = os.path.join(capture_config.traced_benchmark_tool_dir,
+                                  tool_name)
+    android_tool = self.__check_and_push_file(host_tool_path,
+                                              TRACED_TOOL_REL_DIR)
+    run_cmd = [
+        "TRACY_NO_EXIT=1", f"IREE_PRESERVE_DYLIB_TEMP_FILES={ANDROID_TMP_DIR}",
+        "taskset", taskset, android_tool, f"--flagfile={MODEL_FLAGFILE_NAME}"
+    ]
+
+    # Just launch the traced benchmark tool with TRACY_NO_EXIT=1 without
+    # waiting for the adb command to complete as that won't happen.
+    process = adb_start_cmd(run_cmd, android_case_dir, verbose=self.verbose)
+    # But we do need to wait for its start; otherwise will see connection
+    # failure when opening the catpure tool. Here we cannot just sleep a
+    # certain amount of seconds---Pixel 4 seems to have an issue that will
+    # make the trace collection step get stuck. Instead wait for the
+    # benchmark result to be available.
+    while True:
+      line = process.stdout.readline()  # pytype: disable=attribute-error
+      if line == "" and process.poll() is not None:  # Process completed
+        raise ValueError("Cannot find benchmark result line in the log!")
+      if self.verbose:
+        print(line.strip())
+      # Result available
+      if re.match(r"^BM_.+/real_time", line) is not None:
+        break
+
+    # Now it's okay to collect the trace via the capture tool. This will
+    # send the signal to let the previously waiting benchmark tool to
+    # complete.
+    capture_cmd = [
+        capture_config.trace_capture_tool, "-f", "-o", capture_filename
+    ]
+    # If verbose, just let the subprocess print its output. The subprocess
+    # may need to detect if the output is a TTY to decide whether to log
+    # verbose progress info and use ANSI colors, so it's better to use
+    # stdout redirection than to capture the output in a string.
+    stdout_redirect = None if self.verbose else subprocess.DEVNULL
+    execute_cmd(capture_cmd, verbose=self.verbose, stdout=stdout_redirect)
+
+  def __deduce_taskset(self, bench_mode: Sequence[str]) -> str:
+    """Deduces the CPU affinity taskset mask according to benchmark modes."""
+    # TODO: we actually should check the number of cores the phone have.
+    if "big-core" in bench_mode:
+      return "80" if "1-thread" in bench_mode else "f0"
+    if "little-core" in bench_mode:
+      return "08" if "1-thread" in bench_mode else "0f"
+    # Not specified: use the 7th core.
+    return "80"
+
+  def __push_vmfb_file(self, benchmark_case_dir: str):
+    vmfb_path = get_vmfb_full_path_for_benchmark_case(benchmark_case_dir)
     vmfb_dir = os.path.dirname(vmfb_path)
-    vmfb_rel_dir = os.path.relpath(vmfb_dir, root_benchmark_dir)
-    adb_push_to_tmp_dir(vmfb_path, relative_dir=vmfb_rel_dir, verbose=verbose)
-    vmfb_files_already_pushed.add(vmfb_path)
+    vmfb_rel_dir = os.path.relpath(vmfb_dir, self.config.root_benchmark_dir)
+    self.__check_and_push_file(vmfb_path, vmfb_rel_dir)
 
+  def __check_and_push_file(self, host_path: str, relative_dir: str):
+    """Checks if the file has been pushed and pushes it if not."""
+    android_path = self.already_pushed_files.get(host_path)
+    if android_path is not None:
+      return android_path
 
-def run_benchmarks_for_category(
-    device_info: DeviceInfo,
-    root_benchmark_dir: str,
-    benchmark_category_dir: str,
-    benchmark_case_dirs: Sequence[str],
-    tmp_dir: str,
-    normal_benchmark_tool_dir: Optional[str] = None,
-    traced_benchmark_tool_dir: Optional[str] = None,
-    trace_capture_tool: Optional[str] = None,
-    skip_benchmarks: Optional[Set[str]] = None,
-    skip_captures: Optional[Set[str]] = None,
-    do_capture: bool = False,
-    keep_going: bool = False,
-    benchmark_min_time: float = 0,
-    verbose: bool = False,
-) -> Tuple[Sequence[Tuple[Optional[str], Optional[str]]], Sequence[Exception]]:
-  """Runs all benchmarks on the Android device and reports results and captures.
-
-  Args:
-    device_info: an DeviceInfo object.
-    root_benchmark_dir: path to the benchmark suite within the root build dir
-    benchmark_category_dir: the directory to a specific benchmark category.
-    benchmark_case_dirs: a list of benchmark case directories.
-    tmp_dir: path to temporary directory to which intermediate outputs should be
-      stored. Separate "benchmark-results" and "captures" subdirectories will be
-      created as necessary.
-    normal_benchmark_tool_dir: the path to the normal benchmark tool directory.
-    traced_benchmark_tool_dir: the path to the tracing-enabled benchmark tool
-      directory.
-    trace_capture_tool: the path to the tool for collecting captured traces.
-    skip_benchmarks: names of benchmarks that should be skipped. Note that
-      captures will still be run for these benchmarks if do_capture is true and
-      they are not also in skip_captures.
-    skip_captures: names of benchmark captures that should be skipped.
-    do_capture: whether captures should be collected.
-    keep_going: whether to proceed if an individual run fails. Exceptions will
-      logged and returned.
-    benchmark_min_time: min number of seconds to run the benchmark for, if
-      specified. Otherwise, the benchmark will be repeated a fixed number of
-      times.
-    verbose: whether to print additional debug information.
-
-  Returns:
-    A tuple with a list containing (benchmark-filename, capture-filename) tuples
-    and a list containing raised exceptions (only if keep_going is true)
-  """
-  push_vmfb_files(
-      benchmark_case_dirs=benchmark_case_dirs,
-      root_benchmark_dir=root_benchmark_dir,
-      verbose=verbose,
-  )
-
-  # Create directories on the host to store results from each benchmark run.
-  benchmark_results_dir = os.path.join(tmp_dir, "benchmark-results")
-  os.makedirs(benchmark_results_dir, exist_ok=True)
-
-  # And the same for captures, if we are collecting them.
-  captures_dir = os.path.join(tmp_dir, "captures")
-  if do_capture:
-    os.makedirs(captures_dir, exist_ok=True)
-
-  results = []
-  errors = []
-  skip_benchmarks = skip_benchmarks if skip_benchmarks else set()
-  skip_captures = skip_captures if skip_captures else set()
-
-  # Push all model artifacts to the device and run them.
-  root_benchmark_dir = os.path.dirname(benchmark_category_dir)
-  for benchmark_case_dir in benchmark_case_dirs:
-    # Read the file specifying which tool should be used for benchmarking
-    with open(os.path.join(benchmark_case_dir, MODEL_TOOLFILE_NAME)) as f:
-      tool = f.read().strip()
-      if normal_benchmark_tool_dir:
-        adb_push_to_tmp_dir(os.path.join(normal_benchmark_tool_dir, tool),
-                            relative_dir=NORMAL_TOOL_REL_DIR,
-                            verbose=verbose)
-      if do_capture:
-        adb_push_to_tmp_dir(os.path.join(traced_benchmark_tool_dir, tool),
-                            relative_dir=TRACED_TOOL_REL_DIR,
-                            verbose=verbose)
-
-    benchmark_info = compose_info_object(device_info, benchmark_category_dir,
-                                         benchmark_case_dir)
-    benchmark_key = str(benchmark_info)
-    # If we're not running the benchmark or the capture, just skip ahead.
-    # No need to push files.
-    if (benchmark_key in skip_benchmarks) and (not do_capture or
-                                               benchmark_key in skip_captures):
-      continue
-
-    print(f"--> benchmark: {benchmark_info} <--")
-    # Now try to actually run benchmarks and collect captures. If keep_going is
-    # True then errors in the underlying commands will be logged and returned.
-    try:
-      android_relative_dir = os.path.relpath(benchmark_case_dir,
-                                             root_benchmark_dir)
-      adb_push_to_tmp_dir(os.path.join(benchmark_case_dir, MODEL_FLAGFILE_NAME),
-                          android_relative_dir,
-                          verbose=verbose)
-
-      benchmark_result_filename = None
-      if normal_benchmark_tool_dir and benchmark_key not in skip_benchmarks:
-        benchmark_results_basename = f"{benchmark_key}.json"
-
-        cmd = [
-            "taskset",
-            benchmark_info.deduce_taskset(),
-            os.path.join(ANDROID_TMP_DIR, NORMAL_TOOL_REL_DIR, tool),
-            f"--flagfile={MODEL_FLAGFILE_NAME}"
-        ]
-        if tool == "iree-benchmark-module":
-          cmd.extend([
-              "--benchmark_format=json",
-              "--benchmark_out_format=json",
-              f"--benchmark_out='{benchmark_results_basename}'",
-          ])
-          if benchmark_min_time:
-            cmd.extend([
-                f"--benchmark_min_time={benchmark_min_time}",
-            ])
-          else:
-            repetitions = get_benchmark_repetition_count(benchmark_info.runner)
-            cmd.extend([
-                f"--benchmark_repetitions={repetitions}",
-            ])
-
-        result_json = adb_execute_and_get_output(cmd,
-                                                 android_relative_dir,
-                                                 verbose=verbose)
-
-        # Pull the result file back onto the host and set the filename for later
-        # return.
-        benchmark_result_filename = os.path.join(benchmark_results_dir,
-                                                 benchmark_results_basename)
-        pull_cmd = [
-            "adb", "pull",
-            os.path.join(ANDROID_TMP_DIR, android_relative_dir,
-                         benchmark_results_basename), benchmark_result_filename
-        ]
-        execute_cmd_and_get_output(pull_cmd, verbose=verbose)
-
-        if verbose:
-          print(result_json)
-
-      capture_filename = None
-      if do_capture and benchmark_key not in skip_captures:
-        run_cmd = [
-            "TRACY_NO_EXIT=1",
-            f"IREE_PRESERVE_DYLIB_TEMP_FILES={ANDROID_TMP_DIR}", "taskset",
-            benchmark_info.deduce_taskset(),
-            os.path.join(ANDROID_TMP_DIR, TRACED_TOOL_REL_DIR,
-                         tool), f"--flagfile={MODEL_FLAGFILE_NAME}"
-        ]
-
-        # Just launch the traced benchmark tool with TRACY_NO_EXIT=1 without
-        # waiting for the adb command to complete as that won't happen.
-        process = adb_start_cmd(run_cmd, android_relative_dir, verbose=verbose)
-        # But we do need to wait for its start; otherwise will see connection
-        # failure when opening the catpure tool. Here we cannot just sleep a
-        # certain amount of seconds---Pixel 4 seems to have an issue that will
-        # make the trace collection step get stuck. Instead wait for the
-        # benchmark result to be available.
-        while True:
-          line = process.stdout.readline()  # pytype: disable=attribute-error
-          if line == "" and process.poll() is not None:  # Process completed
-            raise ValueError("Cannot find benchmark result line in the log!")
-          if verbose:
-            print(line.strip())
-          # Result available
-          if re.match(r"^BM_.+/real_time", line) is not None:
-            break
-
-        # Now it's okay to collect the trace via the capture tool. This will
-        # send the signal to let the previously waiting benchmark tool to
-        # complete.
-        capture_filename = os.path.join(captures_dir, f"{benchmark_key}.tracy")
-        capture_cmd = [trace_capture_tool, "-f", "-o", capture_filename]
-        # If verbose, just let the subprocess print its output. The subprocess
-        # may need to detect if the output is a TTY to decide whether to log
-        # verbose progress info and use ANSI colors, so it's better to use
-        # stdout redirection than to capture the output in a string.
-        stdout_redirect = None if verbose else subprocess.DEVNULL
-        execute_cmd(capture_cmd, verbose=verbose, stdout=stdout_redirect)
-
-      print("...benchmark completed")
-
-      results.append((benchmark_result_filename, capture_filename))
-      time.sleep(1)  # Some grace time.
-
-    except subprocess.CalledProcessError as e:
-      if keep_going:
-        print(f"Processing of benchmark failed with: {e}")
-        errors.append(e)
-        continue
-      raise e
-
-  return (results, errors)
-
-
-def get_available_drivers(tool_dir: str, verbose: bool) -> Sequence[str]:
-  config_txt_file_path = os.path.join(tool_dir, "build_config.txt")
-  config_txt_file = open(config_txt_file_path, "r")
-  config_txt_file_lines = config_txt_file.readlines()
-  available_drivers = []
-  for line in config_txt_file_lines:
-    name, value = line.strip().split("=")
-    if value != "ON":
-      continue
-    if name == "IREE_HAL_DRIVER_CUDA":
-      available_drivers.append("cuda")
-    elif name == "IREE_HAL_DRIVER_DYLIB":
-      available_drivers.append("dylib")
-    elif name == "IREE_HAL_DRIVER_DYLIB_SYNC":
-      available_drivers.append("dylib-sync")
-    elif name == "IREE_HAL_DRIVER_EXPERIMENTAL_ROCM":
-      available_drivers.append("rocm")
-    elif name == "IREE_HAL_DRIVER_VMVX":
-      available_drivers.append("vmvx")
-    elif name == "IREE_HAL_DRIVER_VMVX_SYNC":
-      available_drivers.append("vmvx-sync")
-    elif name == "IREE_HAL_DRIVER_VULKAN":
-      available_drivers.append("vulkan")
-    else:
-      continue
-  if verbose:
-    available_drivers_str = ', '.join(available_drivers)
-    print(f"Available drivers: {available_drivers_str}")
-  return available_drivers
-
-
-def filter_and_run_benchmarks(
-    device_info: DeviceInfo,
-    root_build_dir: str,
-    driver_filter: Optional[str],
-    model_name_filter: Optional[str],
-    mode_filter: Optional[str],
-    tmp_dir: str,
-    normal_benchmark_tool_dir: Optional[str],
-    traced_benchmark_tool_dir: Optional[str],
-    trace_capture_tool: Optional[str],
-    skip_benchmarks: Optional[Set[str]],
-    skip_captures: Optional[Set[str]],
-    do_capture: bool = False,
-    keep_going: bool = False,
-    benchmark_min_time: float = 0,
-    verbose: bool = False) -> Tuple[List[str], List[str], List[Exception]]:
-  """Filters and runs benchmarks in all categories for the given device.
-
-  Args:
-    device_info: an DeviceInfo object.
-    root_build_dir: the root build directory containing the built benchmark
-      suites.
-    driver_filter: filter benchmarks to those whose driver matches this regex
-      (or all if this is None).
-    model_name_filter: filter benchmarks to those whose model name matches this
-      regex (or all if this is None).
-    mode_filter: filter benchmarks to those whose benchmarking mode matches this
-      regex (or all if this is None).
-    tmp_dir: path to temporary directory to which intermediate outputs should be
-      stored. Separate "benchmark-results" and "captures" subdirectories will be
-      created as necessary.
-    normal_benchmark_tool_dir: the path to the normal benchmark tool directory.
-    traced_benchmark_tool_dir: the path to the tracing-enabled benchmark tool
-      directory.
-    trace_capture_tool: the path to the tool for collecting captured traces.
-    skip_benchmarks: names of benchmarks that should be skipped. Note that
-      captures will still be run for these benchmarks if do_capture is true and
-      they are not also in skip_captures.
-    skip_captures: names of benchmark captures that should be skipped.
-    do_capture: whether captures should be collected.
-    keep_going: whether to proceed if an individual run fails. Exceptions will
-      logged and returned.
-    benchmark_min_time: min number of seconds to run the benchmark for, if
-      specified. Otherwise, the benchmark will be repeated a fixed number of
-      times.
-    verbose: whether to print additional debug information.
-
-  Returns:
-    Lists of benchmark file paths, capture file paths, and exceptions raise
-    (only if keep_going is True).
-  """
-  cpu_target_arch = CPU_ABI_TO_TARGET_ARCH_MAP[device_info.cpu_abi.lower()]
-  gpu_target_arch = GPU_NAME_TO_TARGET_ARCH_MAP[device_info.gpu_name.lower()]
-
-  root_benchmark_dir = os.path.join(root_build_dir, BENCHMARK_SUITE_REL_PATH)
-
-  benchmark_files = []
-  captures = []
-  errors = []
-
-  skip_benchmarks = skip_benchmarks if skip_benchmarks else set()
-
-  for directory in sorted(os.listdir(root_benchmark_dir)):
-    benchmark_category_dir = os.path.join(root_benchmark_dir, directory)
-    any_tool_dir = normal_benchmark_tool_dir if normal_benchmark_tool_dir else traced_benchmark_tool_dir
-    available_drivers = get_available_drivers(tool_dir=any_tool_dir,
-                                              verbose=verbose)
-    matched_benchmarks = filter_benchmarks_for_category(
-        benchmark_category_dir=benchmark_category_dir,
-        cpu_target_arch_filter=cpu_target_arch,
-        gpu_target_arch_filter=gpu_target_arch,
-        driver_filter=driver_filter,
-        model_name_filter=model_name_filter,
-        mode_filter=mode_filter,
-        available_drivers=available_drivers,
-        verbose=verbose)
-    run_results, run_errors = run_benchmarks_for_category(
-        device_info=device_info,
-        root_benchmark_dir=root_benchmark_dir,
-        benchmark_category_dir=benchmark_category_dir,
-        benchmark_case_dirs=matched_benchmarks,
-        tmp_dir=tmp_dir,
-        normal_benchmark_tool_dir=normal_benchmark_tool_dir,
-        traced_benchmark_tool_dir=traced_benchmark_tool_dir,
-        skip_benchmarks=skip_benchmarks,
-        trace_capture_tool=trace_capture_tool,
-        do_capture=do_capture,
-        keep_going=keep_going,
-        benchmark_min_time=benchmark_min_time,
-        verbose=verbose)
-    errors.extend(run_errors)
-    for benchmark_filename, capture_filename in run_results:
-      if benchmark_filename is not None:
-        benchmark_files.append(benchmark_filename)
-      if capture_filename is not None:
-        captures.append(capture_filename)
-
-  return (benchmark_files, captures, errors)
+    android_path = adb_push_to_tmp_dir(host_path,
+                                       relative_dir=relative_dir,
+                                       verbose=self.verbose)
+    self.already_pushed_files[host_path] = android_path
+    return android_path
 
 
 def set_cpu_frequency_scaling_governor(governor: str):
@@ -571,34 +367,25 @@ def set_gpu_frequency_scaling_policy(policy: str):
   adb_execute_as_root([android_path, policy])
 
 
-def real_path_or_none(path: str) -> Optional[str]:
-  return os.path.realpath(path) if path else None
-
-
 def main(args):
   device_info = get_android_device_info(args.verbose)
   if args.verbose:
     print(device_info)
 
-  if not args.normal_benchmark_tool_dir and not args.traced_benchmark_tool_dir:
-    raise ValueError(
-        "At least one of --normal_benchmark_tool_dir or --traced_benchmark_tool_dir should be specified."
-    )
+  commit = get_git_commit_hash("HEAD")
+  benchmark_config = BenchmarkConfig.build_from_args(args, commit)
+  benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
+      benchmark_config.root_benchmark_dir)
+  benchmark_driver = AndroidBenchmarkDriver(device_info=device_info,
+                                            benchmark_config=benchmark_config,
+                                            benchmark_suite=benchmark_suite,
+                                            benchmark_grace_time=1.0,
+                                            verbose=args.verbose)
 
-  do_capture = args.traced_benchmark_tool_dir is not None
-  if ((args.traced_benchmark_tool_dir is not None) != do_capture) or (
-      (args.trace_capture_tool is not None) != do_capture) or (
-          (args.capture_tarball is not None) != do_capture):
-    raise ValueError(
-        "The following 3 flags should be simultaneously all specified or all unspecified: --traced_benchmark_tool_dir, --trace_capture_tool, --capture_tarball"
-    )
-
-  if device_info.cpu_abi.lower() not in CPU_ABI_TO_TARGET_ARCH_MAP:
-    raise ValueError(f"Unrecognized CPU ABI: '{device_info.cpu_abi}'; "
-                     "need to update the map")
-  if device_info.gpu_name.lower() not in GPU_NAME_TO_TARGET_ARCH_MAP:
-    raise ValueError(f"Unrecognized GPU name: '{device_info.gpu_name}'; "
-                     "need to update the map")
+  if args.continue_from_directory:
+    # Merge in previous benchmarks and captures.
+    benchmark_driver.add_previous_benchmarks_and_captures(
+        args.continue_from_directory)
 
   if args.pin_cpu_freq:
     set_cpu_frequency_scaling_governor("performance")
@@ -606,26 +393,6 @@ def main(args):
   if args.pin_gpu_freq:
     set_gpu_frequency_scaling_policy("performance")
     atexit.register(set_gpu_frequency_scaling_policy, "default")
-
-  previous_benchmarks = None
-  previous_captures = None
-
-  # Collect names of previous benchmarks and captures that should be skipped and
-  # merged into the results.
-  if args.continue_from_directory is not None:
-    previous_benchmarks_dir = os.path.join(args.continue_from_directory,
-                                           "benchmark-results")
-    if os.path.isdir(previous_benchmarks_dir):
-      previous_benchmarks = set(
-          os.path.splitext(os.path.basename(p))[0]
-          for p in os.listdir(previous_benchmarks_dir))
-    if do_capture:
-      previous_captures_dir = os.path.join(args.continue_from_directory,
-                                           "captures")
-      if os.path.isdir(previous_captures_dir):
-        previous_captures = set(
-            os.path.splitext(os.path.basename(p))[0]
-            for p in os.listdir(previous_captures_dir))
 
   # Clear the benchmark directory on the Android device first just in case
   # there are leftovers from manual or failed runs.
@@ -642,74 +409,35 @@ def main(args):
 
   # Tracy client and server communicate over port 8086 by default. If we want
   # to capture traces along the way, forward port via adb.
-  if do_capture:
+  trace_capture_config = benchmark_config.trace_capture_config
+  if trace_capture_config:
     execute_cmd_and_get_output(["adb", "forward", "tcp:8086", "tcp:8086"],
                                verbose=args.verbose)
     atexit.register(execute_cmd_and_get_output,
                     ["adb", "forward", "--remove", "tcp:8086"],
                     verbose=args.verbose)
 
-  results = BenchmarkResults()
-  commit = get_git_commit_hash("HEAD")
-  results.set_commit(commit)
+  benchmark_driver.run()
 
-  args.tmp_dir = os.path.join(args.tmp_dir, commit)
-  os.makedirs(args.tmp_dir, exist_ok=True)
-
-  benchmarks, captures, errors = filter_and_run_benchmarks(
-      device_info=device_info,
-      root_build_dir=args.build_dir,
-      driver_filter=args.driver_filter_regex,
-      model_name_filter=args.model_name_regex,
-      mode_filter=args.mode_regex,
-      tmp_dir=args.tmp_dir,
-      normal_benchmark_tool_dir=real_path_or_none(
-          args.normal_benchmark_tool_dir),
-      traced_benchmark_tool_dir=real_path_or_none(
-          args.traced_benchmark_tool_dir),
-      trace_capture_tool=real_path_or_none(args.trace_capture_tool),
-      skip_benchmarks=previous_benchmarks,
-      skip_captures=previous_captures,
-      do_capture=do_capture,
-      keep_going=args.keep_going,
-      benchmark_min_time=args.benchmark_min_time,
-      verbose=args.verbose)
-
-  # Merge in previous benchmarks and captures.
-  if previous_benchmarks:
-    benchmarks.extend(f"{os.path.join(previous_benchmarks_dir, b)}.json"
-                      for b in previous_benchmarks)
-  if do_capture and previous_captures:
-    captures.extend(f"{os.path.join(previous_captures_dir, c)}.tracy"
-                    for c in previous_captures)
-
-  for b in benchmarks:
-    with open(b) as f:
-      result_json_object = json.loads(f.read())
-    benchmark_info = BenchmarkInfo.from_device_info_and_name(
-        device_info,
-        os.path.splitext(os.path.basename(b))[0])
-    benchmark_run = BenchmarkRun(benchmark_info, result_json_object["context"],
-                                 result_json_object["benchmarks"])
-    results.benchmarks.append(benchmark_run)
-
+  benchmark_results = benchmark_driver.get_benchmark_results()
   if args.output is not None:
     with open(args.output, "w") as f:
-      f.write(results.to_json_str())
+      f.write(benchmark_results.to_json_str())
 
   if args.verbose:
-    print(results.commit)
-    print(results.benchmarks)
+    print(benchmark_results.commit)
+    print(benchmark_results.benchmarks)
 
-  if captures:
+  if trace_capture_config:
     # Put all captures in a tarball and remove the origial files.
-    with tarfile.open(args.capture_tarball, "w:gz") as tar:
-      for capture_filename in captures:
+    with tarfile.open(trace_capture_config.capture_tarball, "w:gz") as tar:
+      for capture_filename in benchmark_driver.get_capture_filenames():
         tar.add(capture_filename)
 
-  if errors:
+  benchmark_errors = benchmark_driver.get_benchmark_errors()
+  if benchmark_errors:
     print("Benchmarking completed with errors", file=sys.stderr)
-    raise RuntimeError(errors)
+    raise RuntimeError(benchmark_errors)
 
 
 if __name__ == "__main__":

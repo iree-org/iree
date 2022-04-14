@@ -69,13 +69,13 @@ class BenchmarkDriverTest(unittest.TestCase):
                                   ["sha2"], "Mali-G78")
 
     case1 = BenchmarkCase(model_name_with_tags="DeepNet",
-                          bench_mode="1-thread,full-inference",
+                          bench_mode=["1-thread", "full-inference"],
                           target_arch="CPU-ARM64-v8A",
                           driver="iree-dylib",
                           benchmark_case_dir="case1",
                           benchmark_tool_name="tool")
     case2 = BenchmarkCase(model_name_with_tags="DeepNetv2-f32",
-                          bench_mode="full-inference",
+                          bench_mode=["full-inference"],
                           target_arch="CPU-ARM64-v8A",
                           driver="iree-dylib-sync",
                           benchmark_case_dir="case2",
