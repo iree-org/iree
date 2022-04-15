@@ -436,7 +436,6 @@ class BuildFileFunctions(object):
                            flags=None,
                            translate_tool=None,
                            c_identifier=None,
-                           opt_flags=None,
                            testonly=None):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     src_block = _convert_string_arg_block("SRC", src)
@@ -444,7 +443,6 @@ class BuildFileFunctions(object):
     translate_tool_block = _convert_target_block("TRANSLATE_TOOL",
                                                  translate_tool)
     flags_block = _convert_string_list_block("FLAGS", flags)
-    opt_flags_block = _convert_string_list_block("OPT_FLAGS", opt_flags)
     testonly_block = _convert_option_block("TESTONLY", testonly)
 
     self.converter.body += (f"iree_bytecode_module(\n"
@@ -453,7 +451,6 @@ class BuildFileFunctions(object):
                             f"{c_identifier_block}"
                             f"{translate_tool_block}"
                             f"{flags_block}"
-                            f"{opt_flags_block}"
                             f"{testonly_block}"
                             f"  PUBLIC\n)\n\n")
 
@@ -541,7 +538,6 @@ class BuildFileFunctions(object):
                                            target_backends_and_drivers=None,
                                            runner_args=None,
                                            tags=None,
-                                           opt_flags=None,
                                            target_cpu_features=None,
                                            **kwargs):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
@@ -553,7 +549,6 @@ class BuildFileFunctions(object):
                                                       compiler_flags)
     runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
     labels_block = _convert_string_list_block("LABELS", tags)
-    opt_flags_block = _convert_string_list_block("OPT_FLAGS", opt_flags)
     target_cpu_features_block = _convert_string_arg_block(
         "TARGET_CPU_FEATURES", target_cpu_features)
 
@@ -565,7 +560,6 @@ class BuildFileFunctions(object):
                             f"{compiler_flags_block}"
                             f"{runner_args_block}"
                             f"{labels_block}"
-                            f"{opt_flags_block}"
                             f"{target_cpu_features_block}"
                             f")\n\n")
 
@@ -576,7 +570,6 @@ class BuildFileFunctions(object):
                             compiler_flags=None,
                             runner_args=None,
                             tags=None,
-                            opt_flags=None,
                             target_cpu_features_variants=None,
                             **kwargs):
     target_backends = None
@@ -594,7 +587,6 @@ class BuildFileFunctions(object):
                                                       compiler_flags)
     runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
     labels_block = _convert_string_list_block("LABELS", tags)
-    opt_flags_block = _convert_string_list_block("OPT_FLAGS", opt_flags)
     target_cpu_features_variants_block = _convert_string_list_block(
         "TARGET_CPU_FEATURES_VARIANTS", target_cpu_features_variants)
 
@@ -606,7 +598,6 @@ class BuildFileFunctions(object):
                             f"{compiler_flags_block}"
                             f"{runner_args_block}"
                             f"{labels_block}"
-                            f"{opt_flags_block}"
                             f"{target_cpu_features_variants_block}"
                             f")\n\n")
 
@@ -619,8 +610,6 @@ class BuildFileFunctions(object):
                                        compiler_flags=None,
                                        runner_args=None,
                                        tags=None,
-                                       opt_tool=None,
-                                       opt_flags=None,
                                        target_cpu_features_variants=None,
                                        **kwargs):
     target_backends = None
@@ -646,7 +635,6 @@ class BuildFileFunctions(object):
                                                       compiler_flags)
     runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
     labels_block = _convert_string_list_block("LABELS", tags)
-    opt_flags_block = _convert_string_list_block("OPT_FLAGS", opt_flags)
     target_cpu_features_variants_block = _convert_string_list_block(
         "TARGET_CPU_FEATURES_VARIANTS", target_cpu_features_variants)
 
@@ -660,7 +648,6 @@ class BuildFileFunctions(object):
                             f"{compiler_flags_block}"
                             f"{runner_args_block}"
                             f"{labels_block}"
-                            f"{opt_flags_block}"
                             f"{target_cpu_features_variants_block}"
                             f")\n\n")
 

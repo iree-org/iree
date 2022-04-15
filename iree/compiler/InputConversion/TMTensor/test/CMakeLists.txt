@@ -8,7 +8,7 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
-if(NOT "${IREE_BUILD_TORCH_MLIR_SUPPORT}")
+if(NOT IREE_BUILD_TORCH_MLIR_SUPPORT)
   return()
 endif()
 
