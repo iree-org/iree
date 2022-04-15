@@ -112,40 +112,45 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
   SmallVector<int64_t> minTileSizes(numLoops, 1);
   auto inputOutputOpOperands = op.getInputAndOutputOperands();
 
-  DenseSet<int64_t> fvds;
-  int64_t smallestTypeBitw = std::numeric_limits<int64_t>::max();
-  int64_t largestTypeBitw = std::numeric_limits<int64_t>::min();
-
+  SmallVector<int64_t, 8> smallestTyBW(minTileSizes.size(),
+                                       std::numeric_limits<int64_t>::max());
+  SmallVector<int64_t, 8> largestTyBW(minTileSizes.size(),
+                                      std::numeric_limits<int64_t>::min());
   for (auto map : llvm::enumerate(op.getIndexingMaps())) {
     // Check the fastest varying dimension of the operand. Set the vector size
     // of the corresponding loop to the vector size.
     if (map.value().getNumResults() == 0) continue;
-    auto fastestVaryingDimExpr =
+    auto fastVarDimExpr =
         map.value().getResults().back().dyn_cast<AffineDimExpr>();
-    if (!fastestVaryingDimExpr) continue;
-    unsigned fastestVaryingDim = fastestVaryingDimExpr.getPosition();
-    fvds.insert(fastestVaryingDim);
+    if (!fastVarDimExpr) continue;
+    unsigned fastVarDim = fastVarDimExpr.getPosition();
 
     // If the indexing map has result it has to be a shaped type.
     auto opOperand = inputOutputOpOperands[map.index()]->get();
-    int64_t elementSize =
+    int64_t elemSize =
         opOperand.getType().cast<ShapedType>().getElementTypeBitWidth();
-    smallestTypeBitw = std::min(smallestTypeBitw, elementSize);
-    largestTypeBitw = std::max(largestTypeBitw, elementSize);
+    smallestTyBW[fastVarDim] = std::min(smallestTyBW[fastVarDim], elemSize);
+    largestTyBW[fastVarDim] = std::max(largestTyBW[fastVarDim], elemSize);
   }
 
   // Compute the minimum tile size based on the largest and smallest types
-  // found. We choose the largest vector size if the smallest vector is two
-  // times smaller, at most. Otherwise, we choose half the largest vector to
-  // prevent excessive register pressure/unrolling.
-  int64_t smallestVectorSize = getVectorSize(entryPointFn, largestTypeBitw / 8);
-  int64_t largestVectorSize = getVectorSize(entryPointFn, smallestTypeBitw / 8);
-  int64_t sizeFactor = largestVectorSize / smallestVectorSize;
-  assert(std::ispow2(sizeFactor) && "Expected a power of two factor");
-  int64_t minTileSize =
-      sizeFactor <= 2 ? largestVectorSize : largestVectorSize / 2;
+  // found. We choose the largest vector size if the number of ops within the
+  // generic op is below a threshold. Otherwise, we choose the smallest vector
+  // size to prevent excessive register pressure/unrolling.
+  constexpr unsigned nestedOpsThreshold = 6;
+  unsigned numNestedOps = 0;
+  op.walk([&](Operation *) { ++numNestedOps; });
 
-  for (int64_t fvd : fvds) minTileSizes[fvd] = minTileSize;
+  for (auto i : llvm::seq<size_t>(0, minTileSizes.size())) {
+    if (smallestTyBW[i] == std::numeric_limits<int64_t>::max()) {
+      continue;
+    }
+
+    int64_t smallestVecSize = getVectorSize(entryPointFn, largestTyBW[i] / 8);
+    int64_t largestVecSize = getVectorSize(entryPointFn, smallestTyBW[i] / 8);
+    minTileSizes[i] =
+        numNestedOps <= nestedOpsThreshold ? largestVecSize : smallestVecSize;
+  }
 
   return minTileSizes;
 }
