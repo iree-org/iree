@@ -37,6 +37,9 @@ CMAKE_ARGS=(
   "-DIREE_ENABLE_ASAN=ON"
   "-B" "${CMAKE_BUILD_DIR?}"
 
+  # Also check if microbenchmarks are buildable.
+  "-DIREE_BUILD_MICROBENCHMARKS=ON"
+
   # Enable CUDA compiler and runtime builds unconditionally. Our CI images all
   # have enough deps to at least build CUDA support and compile CUDA binaries
   # (but not necessarily test on real hardware).

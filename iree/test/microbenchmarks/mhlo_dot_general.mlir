@@ -1,5 +1,3 @@
-// RUN: iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=dylib-llvm-aot %s
-
 // The following ops are sampled from mobile_bert
 // https://github.com/google/iree/blob/main/integrations/tensorflow/e2e/mobile_bert_squad_test.py
 

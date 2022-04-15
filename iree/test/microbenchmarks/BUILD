@@ -15,6 +15,12 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+iree_bytecode_module(
+  name = "mhlo_conv_module",
+  src = "mhlo_conv.mlir",
+  flags = ["-iree-mlir-to-vm-bytecode-module", "-iree-input-type=mhlo"]
+)
+
 iree_lit_test_suite(
     name = "lit",
     size = "medium",

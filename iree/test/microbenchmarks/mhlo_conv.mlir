@@ -1,5 +1,3 @@
-// RUN: iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=dylib-llvm-aot %s
-
 //===----------------------------------------------------------------------===//
 // Pointwise convolution ops.
 // Naming convention: '_'.join(

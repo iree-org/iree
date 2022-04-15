@@ -10,9 +10,9 @@
 
 iree_add_all_subdirs()
 
-iree_lit_test_suite(
+iree_microbenchmark_suite(
   NAME
-    lit
+   "microbenchmark"
   SRCS
     "linalg_mmt4d.mlir"
     "linalg_transpose.mlir"
@@ -20,10 +20,10 @@ iree_lit_test_suite(
     "mhlo_dot.mlir"
     "mhlo_dot_general.mlir"
     "mhlo_fft_abs.mlir"
-  TOOLS
-    iree::tools::iree-run-mlir
-  LABELS
-    "hostonly"
+  FLAGS
+    "--iree-hal-target-backends=dylib-llvm-aot"
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-cpu-features=host"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
