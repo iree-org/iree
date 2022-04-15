@@ -37,6 +37,9 @@ CMAKE_ARGS=(
   "-DIREE_ENABLE_ASAN=ON"
   "-B" "${CMAKE_BUILD_DIR?}"
 
+  # Also check if microbenchmarks are buildable.
+  "-DIREE_BUILD_MICROBENCHMARKS=ON"
+
   # Enable CUDA compiler and runtime builds unconditionally. Our CI images all
   # have enough deps to at least build CUDA support and compile CUDA binaries
   # (but not necessarily test on real hardware).
@@ -54,6 +57,10 @@ echo "------------"
 echo "Building test deps"
 echo "------------------"
 "${CMAKE_BIN?}" --build "${CMAKE_BUILD_DIR?}" --target iree-test-deps -- -k 0
+
+echo "Building microbenchmark suites"
+echo "------------------"
+"${CMAKE_BIN?}" --build "${CMAKE_BUILD_DIR?}" --target iree-microbenchmark-suites -- -k 0
 
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
