@@ -80,8 +80,8 @@ static Value getSlice(OpBuilder &b, Location loc, Value source,
       .Default([&](Type t) { return nullptr; });
 }
 
-// Returns true if two dimensions of a ShapedType are equal.
-static bool compareDim(int64_t lhs, int64_t rhs) {
+/// Returns true the dimensions of ShapedType are dynamic or equal.
+static bool isShapedTypeDimEqual(int64_t lhs, int64_t rhs) {
   return lhs != ShapedType::kDynamicSize && rhs != ShapedType::kDynamicSize &&
          lhs != rhs;
 }
@@ -1198,14 +1198,6 @@ LogicalResult TopkOp::verify() {
   if (getNumOutputs() != 2) {
     return op->emitOpError("expected two output operands");
   }
-  if (!values().getType().isa<ShapedType>() ||
-      !indices().getType().isa<ShapedType>()) {
-    return op->emitOpError("expected input element types to be shaped");
-  }
-  if (!values().getType().isa<ShapedType>() ||
-      !outputIndices().getType().isa<ShapedType>()) {
-    return op->emitOpError("expected output element types to be shaped");
-  }
   if (dimension() >= getInputRank()) {
     return op->emitOpError("dimension exceeds rank");
   }
@@ -1231,7 +1223,7 @@ LogicalResult TopkOp::verify() {
   if (llvm::any_of(
           llvm::zip(inputValuesType.getShape(), inputIndicesType.getShape()),
           [](std::tuple<int64_t, int64_t> s) {
-            return compareDim(std::get<0>(s), std::get<1>(s));
+            return isShapedTypeDimEqual(std::get<0>(s), std::get<1>(s));
           })) {
     return op->emitOpError("input indices/values shape must match");
   }
@@ -1239,7 +1231,7 @@ LogicalResult TopkOp::verify() {
   if (llvm::any_of(
           llvm::zip(outputValuesType.getShape(), outputIndicesType.getShape()),
           [](std::tuple<int64_t, int64_t> s) {
-            return compareDim(std::get<0>(s), std::get<1>(s));
+            return isShapedTypeDimEqual(std::get<0>(s), std::get<1>(s));
           })) {
     return op->emitOpError("output indices/values shape must match");
   }
@@ -1252,7 +1244,8 @@ LogicalResult TopkOp::verify() {
                        return false;
                      }
                      std::tuple<int64_t, int64_t> s = e.value();
-                     return compareDim(std::get<0>(s), std::get<1>(s));
+                     return isShapedTypeDimEqual(std::get<0>(s),
+                                                 std::get<1>(s));
                    })) {
     return op->emitOpError("incompatible input/output shapes");
   }
@@ -1260,6 +1253,11 @@ LogicalResult TopkOp::verify() {
   Block &block = region().front();
   if (block.getNumArguments() != 2) {
     return op->emitOpError("region block should have 2 arguments");
+  }
+  if (block.getArgument(0).getType() != inputValuesType.getElementType() ||
+
+      block.getArgument(1).getType() != inputValuesType.getElementType()) {
+    return op->emitOpError("region block types must match input");
   }
   return success();
 }
