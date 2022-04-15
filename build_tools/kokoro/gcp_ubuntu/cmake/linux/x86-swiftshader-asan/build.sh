@@ -58,6 +58,10 @@ echo "Building test deps"
 echo "------------------"
 "${CMAKE_BIN?}" --build "${CMAKE_BUILD_DIR?}" --target iree-test-deps -- -k 0
 
+echo "Building microbenchmark suites"
+echo "------------------"
+"${CMAKE_BIN?}" --build "${CMAKE_BUILD_DIR?}" --target iree-microbenchmark-suites -- -k 0
+
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
