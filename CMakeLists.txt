@@ -578,7 +578,7 @@ endif()
 
 if(${IREE_BUILD_MICROBENCHMARKS})
   # Add top-level custom targets to drive generating microbenchmark suites.
-  add_custom_target(iree-microbenchmark-suite)
+  add_custom_target(iree-microbenchmark-suites)
 endif()
 
 if(${IREE_BUILD_DOCS})
