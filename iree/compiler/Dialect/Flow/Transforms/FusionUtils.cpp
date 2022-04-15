@@ -4,13 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===--- FusionUtils.cpp - Utilities that are useful for fusion
-//-------------===//
+//===--- FusionUtils.cpp - Utilities that are useful for fusion ----------===//
 //
-// Defines utility function and analyses that are useful across passes
+// Defines utility functions and analyses that are useful across passes
 // to help with fusion before dispatch region formation.
 //
-//===----------------------------------------------------------------------===//
+//===---------------------------------------------------------------------===//
 #include "iree/compiler/Dialect/Flow/Transforms/FusionUtils.h"
 
 namespace mlir {

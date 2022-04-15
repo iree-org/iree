@@ -6,7 +6,7 @@
 
 //===--- FusionUtils.h - Utilities that are useful for fusion -------------===//
 //
-// Declares utility function and analyses that are useful across passes
+// Declares utility functions and analyses that are useful across passes
 // to help with fusion before dispatch region formation.
 //
 //===----------------------------------------------------------------------===//
