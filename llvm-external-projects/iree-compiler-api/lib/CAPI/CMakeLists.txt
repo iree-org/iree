@@ -45,10 +45,10 @@ add_mlir_public_c_api_library(IREECompilerAPICompilerCAPI
     ${_OPTIONAL_LINK_LIBS}
 )
 
-if(${IREE_BUILD_TORCH_MLIR_SUPPORT})
+if(IREE_BUILD_TORCH_MLIR_SUPPORT)
   target_compile_definitions(obj.IREECompilerAPICompilerCAPI
     PUBLIC
-    -DIREE_HAVE_TORCH_MLIR_DIALECTS=1
+    IREE_HAVE_TORCH_MLIR_DIALECTS
   )
 endif()
 

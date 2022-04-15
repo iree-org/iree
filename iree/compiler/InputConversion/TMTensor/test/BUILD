@@ -18,7 +18,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT "${IREE_BUILD_TORCH_MLIR_SUPPORT}")
+if(NOT IREE_BUILD_TORCH_MLIR_SUPPORT)
   return()
 endif()
 """,
