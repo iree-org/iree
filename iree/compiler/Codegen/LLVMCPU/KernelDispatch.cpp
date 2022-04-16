@@ -239,6 +239,7 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
       return i;
     }
   }
+
   // If it can't be a multiple of vectorSizeVal, let's choose a factor of dim
   // sizes heuristically.
   int64_t start = std::min(maxSize, dim);
@@ -303,6 +304,7 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
     distributedLevelTileSizes[loopID.value()] =
         distributedTileSizes[loopID.index()];
   }
+
   // Final fix up of the tile sizes to make sure that they divide the problem
   // size to make it vectorizable.
   for (auto i : llvm::seq<unsigned>(0, distributedLevelTileSizes.size())) {
@@ -384,6 +386,31 @@ static LogicalResult setDefaultRootConfig(
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, partitionableLoopsInterfaceOp, tileSizes,
       DispatchLoweringPassPipeline::CPUDefault);
+}
+
+static LogicalResult setMatmulPadConfig(func::FuncOp entryPointFn,
+                                        linalg::ContractionOpInterface op,
+                                        ArrayRef<int64_t> flowTileSizes,
+                                        ArrayRef<int64_t> target2ndTileSizes,
+                                        int64_t vectorSize) {
+  SmallVector<int64_t> parallelTileSizes, reductionTileSizes;
+  parallelTileSizes.assign(target2ndTileSizes.begin(),
+                           target2ndTileSizes.end());
+  auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
+  int64_t K = lhsShapedType.getShape().back();
+  parallelTileSizes.back() =
+      getMaxTileSize(0, K, target2ndTileSizes[2], vectorSize);
+  splitParallelAndReductionTiles(cast<linalg::LinalgOp>(op.getOperation()),
+                                 parallelTileSizes, reductionTileSizes);
+
+  TileSizesListType tileSizes;
+  tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
+  tileSizes.push_back(parallelTileSizes);
+  tileSizes.push_back(reductionTileSizes);
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, op, tileSizes,
+      DispatchLoweringPassPipeline::CPUMatmulDoubleTilingExpert);
 }
 
 static LogicalResult setSandboxRootConfig(func::FuncOp entryPointFn,
@@ -511,8 +538,18 @@ static LogicalResult setRootConfig(
           contractionOp.getOperation()),
       minTileSizes, maxTileSizes);
 
+  if (isX86(entryPointFn)) {
+    SmallVector<int64_t> tileSizes = {8, 32, 16};
+    if (numLoops == 3) {
+      return setMatmulPadConfig(entryPointFn, contractionOp, flowTileSizes,
+                                tileSizes, vectorSize);
+    }
+    return setSandboxRootConfig(entryPointFn, contractionOp, flowTileSizes,
+                                tileSizes, vectorSize);
+  }
+
   // TODO(dcaballe): Find better configurations for RISC-V backends.
-  if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
+  if (isRISCV(entryPointFn)) {
     SmallVector<int64_t> tileSizes = {8, 32, 16};
     return setSandboxRootConfig(entryPointFn, contractionOp, flowTileSizes,
                                 tileSizes, vectorSize);

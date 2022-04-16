@@ -252,6 +252,101 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
   }
 }
 
+void addMatmulDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
+  passManager.addPass(createVerifyLinalgTransformLegalityPass());
+
+  // Do first level of tiling and distribution.
+  passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createTileAndDistributeToWorkgroupsPass());
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createFoldAffineMinInDistributedLoopsPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createConvertToDestinationPassingStylePass());
+
+  {
+    LinalgFusePassOptions options;
+    options.tilingLevel =
+        static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
+    passManager.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
+    passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<func::FuncOp>(createCSEPass());
+  }
+
+  auto pad = [&](std::string anchorOpName, ArrayRef<int64_t> paddingDims) {
+    LinalgFusePassOptions options;
+    options.pad = true;
+    options.anchorOpName = anchorOpName;
+    options.paddingDimensions.assign(paddingDims.begin(), paddingDims.end());
+    passManager.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
+  };
+
+  SmallVector<int64_t> paddingDims = {0, 1};
+  pad("linalg.fill", paddingDims);
+  pad("linalg.matmul", paddingDims);
+  // TODO(hanchung): pack and hoist padding for linalg.generic op.
+  pad("linalg.generic", paddingDims);
+
+  // Add the sandbox single tiling expert to tile and vectorize.
+  {
+    LinalgSingleTilingExpertPassOptions options;
+    options.tilingLevel =
+        static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
+    passManager.addNestedPass<func::FuncOp>(
+        createLinalgSingleTilingExpertPass(options));
+    passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<func::FuncOp>(createCSEPass());
+  }
+
+  paddingDims = {2};
+  pad("linalg.matmul", paddingDims);
+  // options.packPaddings = SmallVector<int64_t>{1, 1, 0};
+
+  //{
+  // LinalgFusePassOptions options;
+  // options.pad = true;
+  // options.anchorOpName = "linalg.matmul";
+  // options.hoistPaddings = SmallVector<int64_t>{2, 3, 0};
+  // options.transposePaddings = SmallVector<std::string>{"0:1", "0:1",
+  // "0:1"};
+  // passManager.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
+  // passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  // passManager.addNestedPass<func::FuncOp>(createCSEPass());
+  //}
+
+  {
+    LinalgSingleTilingExpertPassOptions options;
+    options.vectorize = true;
+    options.vectorizePadding = true;
+    passManager.addNestedPass<func::FuncOp>(
+        createLinalgSingleTilingExpertPass(options));
+    passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<func::FuncOp>(createCSEPass());
+  }
+
+  BufferizationOptions::AllocationFn allocationFn =
+      cpuComprehensiveBufferizeAllocationFn;
+  BufferizationOptions::DeallocationFn deallocationFn =
+      cpuComprehensiveBufferizeDeallocationFn;
+  BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
+                                      memcpyFn);
+
+  // Run IREE specific passes before vector lowering expert.
+  passManager.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+
+  // Add the vector lowering expert.
+  {
+    OpPassManager &nestedFuncPassManager = passManager.nest<func::FuncOp>();
+    LinalgVectorLoweringPassOptions options;
+    options.splitVectorTransfersTo = "linalg-copy";
+    addLowerToVectorTransforms(nestedFuncPassManager, options);
+  }
+}
+
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
                                        bool lowerToAVX2) {
   passManager.addPass(createVerifyLinalgTransformLegalityPass());

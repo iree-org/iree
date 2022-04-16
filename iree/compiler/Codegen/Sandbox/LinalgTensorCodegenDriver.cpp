@@ -52,6 +52,34 @@ static bool getTilingOptionsFromConfig(int64_t tilingLevel,
 
 /// Default method to initialize the tiling options for fusion in IREE. These
 /// could be ovveridden by the command line options if specified.
+static LogicalResult getPaddingAttrs(func::FuncOp funcOp,
+                                     StringRef anchorOpName,
+                                     SmallVectorImpl<Attribute> &attrs) {
+  SmallVector<Operation *> computeOps;
+  SmallVector<mlir::iree_compiler::LoopTilingAndDistributionInfo> tiledLoops;
+  if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
+    return failure();
+  }
+  linalg::LinalgOp linalgOp;
+  for (auto op : computeOps) {
+    if (op->getName().getStringRef() != anchorOpName) continue;
+    if (!isa<linalg::LinalgOp>(op)) continue;
+    //if (linalgOp) return funcOp.emitOpError("have more than one anchor op");
+    if (linalgOp) return failure();
+    linalgOp = cast<linalg::LinalgOp>(op);
+  }
+  // No need to set padding attributes.
+  if (!linalgOp) return success();
+
+  OpBuilder builder(funcOp.getContext());
+  for (auto operand : linalgOp.getInputAndOutputOperands()) {
+    auto elemType = getElementTypeOrSelf(operand->get().getType());
+    attrs.push_back(builder.getZeroAttr(elemType));
+  }
+
+  return success();
+}
+
 static FailureOr<LinalgTilingAndFusionOptions> getTileAndFuseOptionsFromConfig(
     func::FuncOp funcOp, int64_t tilingLevel) {
   SmallVector<Operation *> computeOps;
@@ -221,11 +249,22 @@ void LinalgFusePass::runOnOperation() {
         ::mlir::iree_compiler::getIREELinalgLoopDistributionOptions());
   }
 
-  // Parse the padding values.
+  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! //
+  // This is different from sandbox because we don't want to hardcode padding
+  // values. Instead, they are set by looking into anchor op.
+  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! //
   SmallVector<Attribute> paddingValueAttributes;
-  for (const std::string &paddingValue : paddingValues) {
-    paddingValueAttributes.push_back(
-        parseAttribute(paddingValue, &getContext()));
+  if (!paddingValues.empty()) {
+    for (const std::string &paddingValue : paddingValues) {
+      paddingValueAttributes.push_back(
+          parseAttribute(paddingValue, &getContext()));
+    }
+  } else if (pad && !anchorOpName.empty()) {
+    // If there are failures to get padding attributes, fallback to not pad the
+    // operation.
+    if (failed(getPaddingAttrs(funcOp, anchorOpName, paddingValueAttributes))) {
+      pad = false;
+    }
   }
 
   // Set up padding options.
@@ -251,7 +290,7 @@ void LinalgFusePass::runOnOperation() {
 
   CodegenStrategy strategy;
   strategy.tileAndFuseIf(doTiling, anchorOpName, tilingOptions)
-      .padIf(pad, "", paddingOptions)
+      .padIf(pad, anchorOpName, paddingOptions)
       .vectorizeIf(vectorize, "", nullptr, vectorizePadding);
 
   // Created a nested OpPassManager and run.

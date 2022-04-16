@@ -281,6 +281,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     ArrayRef<int64_t> workgroupSize = {});
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
                                        bool lowerToAVX2 = false);
+void addMatmulDoubleTilingExpertPassPipeline(OpPassManager &passManager);
 
 // Populates the passes needed to do tiling, decomposing, and vectorizing the
 // convolution ops using the Codegen drivers from sandbox.
