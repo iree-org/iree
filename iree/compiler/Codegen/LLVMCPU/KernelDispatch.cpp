@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
+#include <iree/compiler/Codegen/Dialect/LoweringConfig.h>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -620,19 +621,19 @@ static void setX86WorkgroupTileSizes(
     linalg::GenericOp genericOp, unsigned numLoops,
     ArrayRef<int64_t> flowTileSizes, ArrayRef<int64_t> minTileSizes,
     ArrayRef<int64_t> maxTileSizes,
-    SmallVectorImpl<int64_t> &parallelTileSizes) {
-  parallelTileSizes.append(numLoops, 0);
+    SmallVectorImpl<int64_t> &workgroupTileSizes) {
+  workgroupTileSizes.append(numLoops, 0);
   Optional<SmallVector<int64_t, 4>> staticLoopRanges =
       genericOp.getStaticLoopRanges();
   for (auto loopNum : llvm::seq<unsigned>(0, numLoops)) {
     if (flowTileSizes[loopNum]) {
-      parallelTileSizes[loopNum] =
+      workgroupTileSizes[loopNum] =
           getMaxTileSize(0, flowTileSizes[loopNum], minTileSizes[loopNum],
                          minTileSizes[loopNum]);
     } else {
       // If the flow level tile size is zero, and static loop range is 0 as
       // well, set the tile sizes here to zero as well.
-      parallelTileSizes[loopNum] =
+      workgroupTileSizes[loopNum] =
           (staticLoopRanges && staticLoopRanges.getValue()[loopNum] == 1)
               ? 0
               : minTileSizes[loopNum];
@@ -733,16 +734,11 @@ static LogicalResult setTransposeLikeOpRootConfig(
     return success();
   }
 
-  // If there are no loops, there is nothing to do.
-  unsigned numLoops = genericOp.getNumLoops();
-  if (numLoops == 0) {
-    return success();
-  }
-
   if (!hasAVX2Features(genericOp) || !isSupportedTransposeOp(genericOp)) {
     return success();
   }
 
+  unsigned numLoops = genericOp.getNumLoops();
   SmallVector<int64_t> minTileSizes =
       getMinTilingSizesForEachDim(entryPointFn, genericOp);
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
@@ -786,22 +782,18 @@ static LogicalResult setTransposeLikeOpRootConfig(
 
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
-  SmallVector<int64_t> reductionTileSizes(numLoops, 0);
   setX86WorkgroupTileSizes(genericOp, numLoops, flowTileSizes, minTileSizes,
                            maxTileSizes, parallelTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
   tileSizes.push_back(parallelTileSizes);
-  tileSizes.push_back(reductionTileSizes);
+  tileSizes.push_back(/*reduction tile sizes*/ {});
 
   // For non-tensor based ops use the Buffer ops pipeline.
-  auto passPipeline =
-      genericOp.hasTensorSemantics()
-          ? DispatchLoweringPassPipeline::CPUDoubleTilingExpert
-          : DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
-  return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
-                                               tileSizes, passPipeline);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, genericOp, tileSizes,
+      DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
 }
 
 /// Sets the lowering configuration for a generic op to use
