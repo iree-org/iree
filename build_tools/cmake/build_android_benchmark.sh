@@ -64,11 +64,13 @@ cd build-host
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_BENCHMARKS=ON \
+  -DIREE_BUILD_MICROBENCHMARKS=ON \
   -DIREE_BUILD_SAMPLES=OFF
 
 "${CMAKE_BIN}" --build . --target install -- -k 0
 # Also generate artifacts for benchmarking on Android.
 "${CMAKE_BIN}" --build . --target iree-benchmark-suites -- -k 0
+"${CMAKE_BIN}" --build . --target iree-microbenchmark-suites -- -k 0
 # --------------------------------------------------------------------------- #
 
 # --------------------------------------------------------------------------- #
