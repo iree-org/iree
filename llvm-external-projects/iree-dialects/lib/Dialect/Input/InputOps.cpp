@@ -177,7 +177,6 @@ GlobalStoreOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 }
 
 LogicalResult GlobalStoreIndirectOp::verify() {
-  Operation *op = getOperation();
   auto globalType = global().getType().cast<PtrType>().getTargetType();
   auto storeType = value().getType();
   if (!isGlobalTypeCompatible(globalType, storeType)) {
