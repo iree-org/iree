@@ -159,19 +159,6 @@ Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
 /// ID/Count operations.
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions();
 
-/// Returns the `combinedOffsets`, `combinedSizes` and `combinedStrides` to use
-/// when folding a "producer" **into** a "consumer" op that implement
-/// `OffsetSizeAndStrideOpInterface`.
-/// The following computations are performed:
-///   - offsets = producer_offsets * consumer_strides + consumer_offsets,
-///   - strides = producer_strides * consumer_strides.
-LogicalResult foldOffsetsSizesAndStrides(
-    OpBuilder &builder, Location loc, OffsetSizeAndStrideOpInterface producer,
-    OffsetSizeAndStrideOpInterface consumer,
-    const llvm::SmallBitVector &droppedProducerDims,
-    SmallVector<OpFoldResult> &combinedOffsets,
-    SmallVector<OpFoldResult> &combinedSizes,
-    SmallVector<OpFoldResult> &combinedStrides);
 }  // namespace iree_compiler
 }  // namespace mlir
 
