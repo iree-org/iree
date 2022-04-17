@@ -4,30 +4,30 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-iree_compiler_api_py_test(
+iree_py_test(
   NAME
     compiler_core_test
-  MAIN
+  SRCS
     "compiler_core_test.py"
 )
 
-iree_compiler_api_py_test(
+iree_py_test(
   NAME
     compiler_tf_test
-  MAIN
+  SRCS
     "compiler_tf_test.py"
 )
 
-iree_compiler_api_py_test(
+iree_py_test(
   NAME
     compiler_tflite_test
-  MAIN
+  SRCS
     "compiler_tflite_test.py"
 )
 
-iree_compiler_api_py_test(
+iree_py_test(
   NAME
     compiler_xla_test
-  MAIN
+  SRCS
     "compiler_xla_test.py"
 )
