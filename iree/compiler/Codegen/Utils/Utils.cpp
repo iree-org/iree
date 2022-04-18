@@ -90,7 +90,11 @@ bool isX86(IREE::HAL::ExecutableVariantOp variantOp) {
 // TODO(dcaballe): If we have to check for a significantly large number of
 // features in the future, we may want to consider keeping the TTI instance
 // alive and query subtarget features data structure.
-bool hasAVX2Features(IREE::HAL::ExecutableVariantOp variantOp) {
+bool hasAVX2Features(Operation *op) {
+  auto variantOp = isa<IREE::HAL::ExecutableVariantOp>(op)
+                       ? cast<IREE::HAL::ExecutableVariantOp>(op)
+                       : op->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  if (!variantOp) return false;
   Optional<StringRef> features = getCpuFeatures(variantOp);
   if (!features) return false;
   return features->contains("+avx2");
