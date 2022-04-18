@@ -8,7 +8,7 @@ Paths of particular interest include:
 ```
 └── compiler/
     ├── setup.py     (builds/installs the compiler Python API)
-    ├── Api/         (C and Python APIs)
+    ├── API/         (C and Python APIs)
     ├── Bindings/    (used to generate different ABI bindings)
     ├── Codegen/     (device code generation for assorted APIs)
     ├── Dialect/

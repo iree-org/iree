@@ -12,7 +12,7 @@
 #include <cstdlib>
 #include <vector>
 
-#include "iree/compiler/Api/Tools.h"
+#include "iree/compiler/API/Tools.h"
 #include "lld/Common/Driver.h"
 #include "lld/Common/ErrorHandler.h"
 #include "lld/Common/Memory.h"

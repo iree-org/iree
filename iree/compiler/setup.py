@@ -190,13 +190,13 @@ def prepare_installation():
 
     # Build.
     subprocess.check_call(
-        ["cmake", "--build", ".", "--target", "iree/compiler/Api/python/all"],
+        ["cmake", "--build", ".", "--target", "iree/compiler/API/python/all"],
         cwd=IREE_BINARY_DIR)
     print("Build complete.", file=sys.stderr)
 
   # Install the directory we care about.
   install_subdirectory = os.path.join(IREE_BINARY_DIR, "iree", "compiler",
-                                      "Api", "python")
+                                      "API", "python")
   install_args = [
       "-DCMAKE_INSTALL_DO_STRIP=ON",
       f"-DCMAKE_INSTALL_PREFIX={CMAKE_INSTALL_DIR_ABS}",
