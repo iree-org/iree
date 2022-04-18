@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
-#include <iree/compiler/Codegen/Dialect/LoweringConfig.h>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -791,9 +790,12 @@ static LogicalResult setTransposeLikeOpRootConfig(
   tileSizes.push_back(/*reduction tile sizes*/ {});
 
   // For non-tensor based ops use the Buffer ops pipeline.
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, genericOp, tileSizes,
-      DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
+  auto passPipeline =
+      genericOp.hasTensorSemantics()
+          ? DispatchLoweringPassPipeline::CPUDoubleTilingExpert
+          : DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
+                                               tileSizes, passPipeline);
 }
 
 /// Sets the lowering configuration for a generic op to use
