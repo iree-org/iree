@@ -16,10 +16,12 @@ iree_lit_test_suite(
   SRCS
     "failure.mlir"
     "success.mlir"
+    "unavailable.mlir"
   TOOLS
     FileCheck
     iree::tools::iree-check-module
     iree::tools::iree-compile
+    iree::tools::iree-run-module
   LABELS
     "hostonly"
 )

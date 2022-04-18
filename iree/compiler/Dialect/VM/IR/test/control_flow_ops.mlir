@@ -223,3 +223,15 @@ vm.module @my_module {
     vm.return
   }
 }
+
+// -----
+
+vm.module @my_module {
+  // CHECK: vm.import optional @optional_import_fn(%arg0 : i32) -> i32
+  vm.import optional @optional_import_fn(%arg0 : i32) -> i32
+  vm.func @call_fn() -> i32 {
+    // CHECK: %has_optional_import_fn = vm.import.resolved @optional_import_fn : i32
+    %has_optional_import_fn = vm.import.resolved @optional_import_fn : i32
+    vm.return %has_optional_import_fn : i32
+  }
+}

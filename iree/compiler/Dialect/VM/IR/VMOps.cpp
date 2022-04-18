@@ -203,6 +203,9 @@ void ExportOp::build(OpBuilder &builder, OperationState &result,
 
 ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
   auto builder = parser.getBuilder();
+  if (succeeded(parser.parseOptionalKeyword("optional"))) {
+    result.addAttribute("is_optional", builder.getUnitAttr());
+  }
   StringAttr nameAttr;
   if (failed(parser.parseSymbolName(nameAttr,
                                     mlir::SymbolTable::getSymbolAttrName(),
@@ -261,6 +264,9 @@ ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
 void ImportOp::print(OpAsmPrinter &p) {
   Operation *op = getOperation();
   p << ' ';
+  if (is_optional()) {
+    p << "optional ";
+  }
   p.printSymbolName(getName());
   p << "(";
   for (int i = 0; i < getArgumentTypes().size(); ++i) {
@@ -287,6 +293,7 @@ void ImportOp::print(OpAsmPrinter &p) {
       /*elided=*/
       {
           "is_variadic",
+          "is_optional",
       });
 }
 
@@ -1315,6 +1322,12 @@ void CondFailOp::print(OpAsmPrinter &p) {
   }
   p.printOptionalAttrDict(getOperation()->getAttrs(),
                           /*elidedAttrs=*/{"message"});
+}
+
+void ImportResolvedOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  std::string name = ("has_" + import()).str();
+  std::replace(name.begin(), name.end(), '.', '_');
+  setResultName(setNameFn, getResult(), name);
 }
 
 //===----------------------------------------------------------------------===//

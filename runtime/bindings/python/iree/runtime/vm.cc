@@ -490,6 +490,7 @@ void SetupVmBindings(pybind11::module m) {
   py::enum_<enum iree_vm_function_linkage_e>(m, "Linkage")
       .value("INTERNAL", IREE_VM_FUNCTION_LINKAGE_INTERNAL)
       .value("IMPORT", IREE_VM_FUNCTION_LINKAGE_IMPORT)
+      .value("IMPORT_OPTIONAL", IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL)
       .value("EXPORT", IREE_VM_FUNCTION_LINKAGE_EXPORT)
       .export_values();
 

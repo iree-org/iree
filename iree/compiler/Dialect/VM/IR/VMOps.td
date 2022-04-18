@@ -181,7 +181,8 @@ def VM_ImportOp : VM_Op<"import", [
   }];
 
   let arguments = (ins
-    OptionalAttr<VM_Ordinal>:$ordinal
+    OptionalAttr<VM_Ordinal>:$ordinal,
+    OptionalAttr<UnitAttr>:$is_optional
   );
 
   let regions = (region AnyRegion:$body);
@@ -3829,6 +3830,37 @@ def VM_CheckNEOp : VM_BinaryCheckOp<"check.ne", [Commutative]> {
 }
 
 def VM_CheckNZOp : VM_UnaryCheckOp<"check.nz"> {
+  let hasCanonicalizer = 1;
+}
+
+def VM_ImportResolvedOp : VM_PureOp<"import.resolved", [
+  DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+]> {
+  let summary = [{returns true if an optional import was resolved at runtime}];
+  let description = [{
+    Allows for checking whether a optional import was resolved at runtime. If
+    this returns false then attempting to call the imported function will result
+    in a failure at runtime.
+  }];
+
+  let arguments = (ins
+    VM_FuncRefAttr:$import
+  );
+  let results = (outs
+    VM_CondValue:$result
+  );
+
+  let assemblyFormat = [{
+    $import attr-dict `:` type($result)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_ImportResolved>,
+    VM_EncFuncAttr<"import">,
+    VM_EncResult<"result">,
+  ];
+
   let hasCanonicalizer = 1;
 }
 

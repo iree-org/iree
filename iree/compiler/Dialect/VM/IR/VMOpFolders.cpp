@@ -63,7 +63,6 @@ namespace {
 // Deletes empty vm.initializer ops.
 struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
   using OpRewritePattern::OpRewritePattern;
-
   LogicalResult matchAndRewrite(InitializerOp op,
                                 PatternRewriter &rewriter) const override {
     if (op.body().getBlocks().size() != 1) return failure();
@@ -2450,6 +2449,10 @@ OpFoldResult CmpNZRefOp::fold(ArrayRef<Attribute> operands) {
 static LogicalResult collapseBranch(Block *&successor,
                                     ValueRange &successorOperands,
                                     SmallVectorImpl<Value> &argStorage) {
+  // Check that the successor does not have multiple predecessors.
+  if (std::distance(successor->pred_begin(), successor->pred_end()) > 1) {
+    return failure();
+  }
   // Check that the successor only contains a unconditional branch.
   if (std::next(successor->begin()) != successor->end()) return failure();
   // Check that the terminator is an unconditional branch.
@@ -2804,6 +2807,28 @@ void CheckNZOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<RewriteCheckToCondFail<CheckNZOp, CmpNZI32Op, CmpNZI64Op,
                                         CmpNZF32OOp, CmpNZF64OOp, CmpNZRefOp>>(
       context);
+}
+
+namespace {
+
+// Folds vm.import.resolved ops referencing required imports.
+struct RequiredImportResolver : public OpRewritePattern<ImportResolvedOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ImportResolvedOp op,
+                                PatternRewriter &rewriter) const override {
+    auto importOp = SymbolTable::lookupNearestSymbolFrom<IREE::VM::ImportOp>(
+        op, op.importAttr());
+    if (!importOp || importOp.is_optional()) return failure();
+    rewriter.replaceOpWithNewOp<IREE::VM::ConstI32Op>(op, 1);
+    return success();
+  }
+};
+
+}  // namespace
+
+void ImportResolvedOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                   MLIRContext *context) {
+  results.insert<RequiredImportResolver>(context);
 }
 
 //===----------------------------------------------------------------------===//

@@ -316,7 +316,8 @@ static iree_status_t iree_vm_bytecode_module_get_function(
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
   flatbuffers_string_t name = NULL;
   iree_vm_FunctionSignatureDef_table_t signature = NULL;
-  if (linkage == IREE_VM_FUNCTION_LINKAGE_IMPORT) {
+  if (linkage == IREE_VM_FUNCTION_LINKAGE_IMPORT ||
+      linkage == IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL) {
     iree_vm_ImportFunctionDef_vec_t imported_functions =
         iree_vm_BytecodeModuleDef_imported_functions(module->def);
     if (ordinal >= iree_vm_ImportFunctionDef_vec_len(imported_functions)) {
@@ -329,6 +330,10 @@ static iree_status_t iree_vm_bytecode_module_get_function(
         iree_vm_ImportFunctionDef_vec_at(imported_functions, ordinal);
     name = iree_vm_ImportFunctionDef_full_name(import_def);
     signature = iree_vm_ImportFunctionDef_signature(import_def);
+    if (iree_all_bits_set(iree_vm_ImportFunctionDef_flags(import_def),
+                          iree_vm_ImportFlagBits_OPTIONAL)) {
+      linkage = IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL;
+    }
   } else if (linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT) {
     iree_vm_ExportFunctionDef_vec_t exported_functions =
         iree_vm_BytecodeModuleDef_exported_functions(module->def);
@@ -437,11 +442,12 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
   out_function->linkage = linkage;
   out_function->module = &module->interface;
 
-  // NOTE: we could organize imports/exports alphabetically so we could bsearch.
-  if (linkage == IREE_VM_FUNCTION_LINKAGE_IMPORT) {
+  // NOTE: we could organize exports alphabetically so we could bsearch.
+  if (linkage == IREE_VM_FUNCTION_LINKAGE_IMPORT ||
+      linkage == IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL) {
     iree_vm_ImportFunctionDef_vec_t imported_functions =
         iree_vm_BytecodeModuleDef_imported_functions(module->def);
-    for (size_t ordinal = 0;
+    for (iree_host_size_t ordinal = 0;
          ordinal < iree_vm_ImportFunctionDef_vec_len(imported_functions);
          ++ordinal) {
       iree_vm_ImportFunctionDef_table_t import_def =
@@ -449,13 +455,17 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
       if (iree_vm_flatbuffer_strcmp(
               iree_vm_ImportFunctionDef_full_name(import_def), name) == 0) {
         out_function->ordinal = ordinal;
+        if (iree_all_bits_set(iree_vm_ImportFunctionDef_flags(import_def),
+                              iree_vm_ImportFlagBits_OPTIONAL)) {
+          out_function->linkage = IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL;
+        }
         return iree_ok_status();
       }
     }
   } else if (linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT) {
     iree_vm_ExportFunctionDef_vec_t exported_functions =
         iree_vm_BytecodeModuleDef_exported_functions(module->def);
-    for (size_t ordinal = 0;
+    for (iree_host_size_t ordinal = 0;
          ordinal < iree_vm_ExportFunctionDef_vec_len(exported_functions);
          ++ordinal) {
       iree_vm_ExportFunctionDef_table_t export_def =
@@ -467,6 +477,7 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
       }
     }
   }
+
   return iree_make_status(IREE_STATUS_NOT_FOUND,
                           "function with the given name not found");
 }
