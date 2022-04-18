@@ -53,9 +53,13 @@ python -m pip install iree-compiler
 ```
 
 !!! tip
-    `iree-compile` is installed as `/path/to/python/site-packages/iree/tools/core/iree-compile`.
-    You can find out the full path to the `site-packages` directory via the
-    `python -m site` command.
+    `iree-compile` is installed to your python module installation path. If you
+    pip install with the user mode, it is under `${HOME}/.local/bin`, or
+    `%APPDATA%Python` on Windows. You may want to include the path in your
+    system's `PATH` environment variable.
+    ``` shell
+    export PATH=${HOME}/.local/bin:${PATH}
+    ```
 
 #### Build compiler from source
 
@@ -67,6 +71,10 @@ compiled in by default on all platforms.
 
 Ensure that the `IREE_TARGET_BACKEND_DYLIB_LLVM_AOT` CMake option is `ON` when
 configuring for the host.
+
+!!! tip
+    `iree-compile` is under `iree-build/iree/tools/` directory. You may want to
+    include this path in your system's `PATH` environment variable.
 
 ## Compile and run the model
 
@@ -86,10 +94,11 @@ weights from [TensorFlow Hub][tf-hub-mobilenetv2] and convert it using IREE's
 
 #### Compile using the command-line
 
-In the build directory, run the following command:
+Run the following command (assuming the path to `iree-compile` is in your
+system's `PATH`):
 
 ``` shell hl_lines="3"
-iree/tools/iree-compile \
+iree-compile \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=dylib-llvm-aot \
     iree_input.mlir -o mobilenet-dylib.vmfb

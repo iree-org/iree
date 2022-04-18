@@ -31,9 +31,29 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
+// Returns the `combinedOffsets`, `combinedSizes` and `combinedStrides` to use
+// when folding a "producer" **into** a "consumer" op that implement
+// `OffsetSizeAndStrideOpInterface`.
+// The following computations are performed:
+//   - offsets = producer_offsets * consumer_strides + consumer_offsets,
+//   - strides = producer_strides * consumer_strides.
+LogicalResult foldOffsetsSizesAndStrides(
+    OpBuilder &builder, Location loc, OffsetSizeAndStrideOpInterface producer,
+    OffsetSizeAndStrideOpInterface consumer,
+    const llvm::SmallBitVector &droppedProducerDims,
+    SmallVector<OpFoldResult> &combinedOffsets,
+    SmallVector<OpFoldResult> &combinedSizes,
+    SmallVector<OpFoldResult> &combinedStrides);
+
 // Populates flow.dispatch.* canonicalization patterns.
 void populateFlowDispatchCanonicalizationPatterns(
     ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context);
+
+// Patterns to fold tensor.extract_slice/insert_slice with
+// flow.dispatch.tensor.load/store. These patterns may not be canonicalizers,
+// since they might change the parallelism semantics in non-obvious ways.
+void populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
+    mlir::RewritePatternSet &results, MLIRContext *context);
 
 // Verifies the flow.dispatch.workgroup.size/id/count operations.
 LogicalResult verifyDispatchWorkgroupInfoOp(Operation *op, uint64_t dimension);

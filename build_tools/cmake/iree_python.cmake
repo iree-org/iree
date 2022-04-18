@@ -336,7 +336,7 @@ function(iree_py_test)
 
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
-      "PYTHONPATH=${IREE_BINARY_DIR}/compiler-api/python_package:${IREE_BINARY_DIR}/bindings/python:$ENV{PYTHONPATH}"
+      "PYTHONPATH=${IREE_BINARY_DIR}/bindings/python:$ENV{PYTHONPATH}"
       "TEST_TMPDIR=${IREE_BINARY_DIR}/tmp/${_NAME}_test_tmpdir"
   )
   iree_add_test_environment_properties(${_NAME_PATH})

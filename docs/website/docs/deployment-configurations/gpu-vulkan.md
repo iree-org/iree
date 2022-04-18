@@ -105,9 +105,13 @@ python -m pip install iree-compiler
 ```
 
 !!! tip
-    `iree-compile` is installed as `/path/to/python/site-packages/iree/tools/core/iree-compile`.
-    You can find out the full path to the `site-packages` directory via the
-    `python -m site` command.
+    `iree-compile` is installed to your python module installation path. If you
+    pip install with the user mode, it is under `${HOME}/.local/bin`, or
+    `%APPDATA%Python` on Windows. You may want to include the path in your
+    system's `PATH` environment variable.
+    ``` shell
+    export PATH=${HOME}/.local/bin:${PATH}
+    ```
 
 #### Build compiler from source
 
@@ -137,10 +141,11 @@ weights from [TensorFlow Hub][tf-hub-mobilenetv2] and convert it using IREE's
 
 #### Compile using the command-line
 
-In the build directory, run the following command:
+Run the following command (assuming the path to `iree-compile` is in your
+system's `PATH`):
 
 ``` shell hl_lines="3 4"
-iree/tools/iree-compile \
+iree-compile \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=vulkan-spirv \
     -iree-vulkan-target-triple=<...> \

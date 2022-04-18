@@ -476,12 +476,23 @@ else()
     ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
   )
 
+  # TODO: It should be possible to fix upstream targets so as to not require
+  # any of these. Remove as they become unnecessary.
   function(_hack_llvm_include_paths)
     set(_common_include_dirs
+      # LLVM
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include>
       $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include>
+
+      # MLIR
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include>
       $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include>
+
+      # LLD
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/lld/include>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/lld/include>
+
+      # MHLO
       $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir-hlo/include>
     )
     # Avoid globally modifying paths by instead adding the include paths to the
@@ -645,6 +656,16 @@ endif()
 # and tracy, and must come after it.
 if(${IREE_BUILD_PYTHON_BINDINGS})
   add_subdirectory(bindings/python)
+  # Write out a .env file to make IDEs and developers happy.
+  # Yes, we are writing this to the source dir. It is only for IDEs and if
+  # it gets clobbered, it is fine.
+  set(_pythonpath_env "PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}/bindings/python\n")
+  file(GENERATE OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/.env"
+    CONTENT "${_pythonpath_env}"
+  )
+  file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env"
+    CONTENT "${_pythonpath_env}"
+  )
 endif()
 
 if(${IREE_BUILD_BINDINGS_TFLITE})
@@ -672,36 +693,6 @@ endif()
 
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"
     CACHE INTERNAL "IREE: Include Directories" FORCE)
-
-# Include the iree-compiler-api sub-project. We do this for development
-# and CI so that developers have access to the API and tools it provides
-# (otherwise, they would need to build multiple top-level projects).
-# However, logically, iree-compiler-api depends on iree, and for deployment
-# is always built standalone, taking responsibility to include iree and LLVM
-# as sub-projects.
-# The dependency mode is controlled by the variables
-# IREE_COMPILER_API_STANDALONE, which will be set if iree-compiler-api is
-# top-level. Otherwise, we set IREE_COMPILER_API_SUB_PROJECT, indicating it
-# is being embedded as a sub project.
-if(IREE_BUILD_COMPILER AND IREE_BUILD_PYTHON_BINDINGS)
-  if(NOT IREE_COMPILER_API_STANDALONE)
-    message(STATUS "Including iree-compiler-api as a sub-project")
-    set(IREE_COMPILER_API_SUB_PROJECT ON)
-    add_subdirectory(llvm-external-projects/iree-compiler-api
-        "${CMAKE_CURRENT_BINARY_DIR}/compiler-api")
-
-    # Write out a .env file to make IDEs and developers happy.
-    # Yes, we are writing this to the source dir. It is only for IDEs and if
-    # it gets clobbered, it is fine.
-    set(_pythonpath_env "PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler-api/python_package;${CMAKE_CURRENT_BINARY_DIR}/bindings/python>\n")
-    file(GENERATE OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/.env"
-      CONTENT "${_pythonpath_env}"
-    )
-    file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env"
-      CONTENT "${_pythonpath_env}"
-    )
-  endif()
-endif()
 
 #-------------------------------------------------------------------------------
 # IREE benchmark tools

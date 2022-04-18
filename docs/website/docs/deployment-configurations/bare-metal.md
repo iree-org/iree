@@ -24,11 +24,11 @@ to retrieve the IREE compiler.
 
 ## Compile the model for bare-metal
 
-The model can be compiled with the following command from the IREE compiler
-build directory
+The model can be compiled with the following command (assuming the path to
+`iree-compile` is in your system's `PATH`):
 
 ```shell
-iree/tools/iree-compile \
+iree-compile \
     -iree-mlir-to-vm-bytecode-module \
     -iree-stream-partitioning-favor=min-peak-memory \
     -iree-hal-target-backends=dylib-llvm-aot \

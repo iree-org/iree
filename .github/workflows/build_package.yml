@@ -194,7 +194,7 @@ jobs:
           # In pip 21.3, in-tree builds became the default and only way to
           # build. We require that and make sure to be past that threshold.
           export CIBW_BEFORE_BUILD="python -m pip install --upgrade pip>=21.3"
-          python -m cibuildwheel --output-dir bindist ./main_checkout/llvm-external-projects/iree-compiler-api
+          python -m cibuildwheel --output-dir bindist ./main_checkout/iree/compiler
 
       # Compiler tools wheels are not python version specific, so just build
       # for one examplar python version.

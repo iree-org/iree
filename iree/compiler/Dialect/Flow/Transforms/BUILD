@@ -42,6 +42,7 @@ cc_library(
         "ExpandTensorShapes.cpp",
         "ExportBenchmarkFuncs.cpp",
         "FusionOfTensorOps.cpp",
+        "FusionUtils.cpp",
         "InferNumericNarrowing.cpp",
         "InitializeEmptyTensors.cpp",
         "InjectDispatchTracing.cpp",
@@ -59,6 +60,7 @@ cc_library(
         "VerifyInputLegality.cpp",
     ],
     hdrs = [
+        "FusionUtils.h",
         "Passes.h",
         "Passes.h.inc",
     ],

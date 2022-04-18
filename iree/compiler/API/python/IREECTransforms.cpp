@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-compiler-c/Compiler.h"
+#include "iree/compiler/API/Compiler.h"
 #include "mlir-c/Bindings/Python/Interop.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
 
@@ -141,6 +141,9 @@ binary data written to it.
 PYBIND11_MODULE(_ireecTransforms, m) {
   m.doc() = "ireec transforms API";
   ireeCompilerRegisterTargetBackends();
+
+  m.def("register_all_dialects",
+        [](MlirContext context) { ireeCompilerRegisterAllDialects(context); });
 
   py::class_<PyCompilerOptions>(m, "CompilerOptions",
                                 "Options for the IREE backend compiler.")
