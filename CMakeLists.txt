@@ -613,6 +613,7 @@ add_subdirectory(iree/base)
 add_subdirectory(iree/builtins)
 add_subdirectory(iree/hal)
 add_subdirectory(iree/modules)
+add_subdirectory(iree/runtime)
 add_subdirectory(iree/schemas)
 add_subdirectory(iree/task)
 add_subdirectory(iree/testing)
@@ -657,7 +658,7 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # Write out a .env file to make IDEs and developers happy.
   # Yes, we are writing this to the source dir. It is only for IDEs and if
   # it gets clobbered, it is fine.
-  set(_pythonpath_env "PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/iree/compiler/python;${CMAKE_CURRENT_BINARY_DIR}/iree/runtime/python>\n")
+  set(_pythonpath_env "PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/iree/compiler/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>\n")
   file(GENERATE OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/.env"
     CONTENT "${_pythonpath_env}"
   )
@@ -699,10 +700,11 @@ set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"
 add_subdirectory(build_tools/benchmarks)
 
 #-------------------------------------------------------------------------------
-# Sub-directories with order dependence
+# Transitional directories.
 #-------------------------------------------------------------------------------
 
 # The runtime uses tools and targets from elsewhere in the tree in a way
 # that is not supported by CMake, so we include it last (it aggregates
-# many things into top-level APIs).
-add_subdirectory(iree/runtime)
+# many things into top-level APIs). This should resolve once we finish
+# relayering everything.
+add_subdirectory(runtime)

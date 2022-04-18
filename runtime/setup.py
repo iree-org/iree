@@ -19,6 +19,7 @@
 #
 # Select CMake options are available from environment variables:
 #   IREE_HAL_DRIVER_CUDA
+#   IREE_HAL_DRIVER_VULKAN
 #   IREE_ENABLE_RUNTIME_TRACING
 #   IREE_BUILD_TRACY
 
@@ -87,7 +88,7 @@ if IS_CONFIGURED:
       f"BINARY_DIR = {IREE_BINARY_DIR}",
       file=sys.stderr)
 else:
-  IREE_SOURCE_DIR = os.path.join(SETUPPY_DIR, "..", "..")
+  IREE_SOURCE_DIR = os.path.join(SETUPPY_DIR, "..")
   IREE_BINARY_DIR = os.getenv("IREE_RUNTIME_API_CMAKE_BUILD_DIR")
   if not IREE_BINARY_DIR:
     # Note that setuptools always builds into a "build" directory that
@@ -185,6 +186,7 @@ def prepare_installation():
         "-DPython3_EXECUTABLE={}".format(sys.executable),
         "-DCMAKE_BUILD_TYPE={}".format(cfg),
         get_env_cmake_option("IREE_HAL_DRIVER_CUDA"),
+        get_env_cmake_option("IREE_HAL_DRIVER_VULKAN"),
         get_env_cmake_option("IREE_ENABLE_RUNTIME_TRACING"),
         get_env_cmake_option("IREE_BUILD_TRACY"),
     ]
@@ -199,13 +201,15 @@ def prepare_installation():
       print(f"Not re-configuring (already configured)", file=sys.stderr)
 
     # Build.
-    subprocess.check_call(
-        ["cmake", "--build", ".", "--target", "iree/runtime/python/all"],
-        cwd=IREE_BINARY_DIR)
+    subprocess.check_call([
+        "cmake", "--build", ".", "--target",
+        "runtime/bindings/python/iree/runtime/all"
+    ],
+                          cwd=IREE_BINARY_DIR)
     print("Build complete.", file=sys.stderr)
 
   # Install the directory we care about.
-  install_subdirectory = os.path.join(IREE_BINARY_DIR, "iree", "runtime",
+  install_subdirectory = os.path.join(IREE_BINARY_DIR, "runtime", "bindings",
                                       "python", "iree", "runtime")
   install_args = [
       "-DCMAKE_INSTALL_DO_STRIP=ON",
@@ -316,7 +320,7 @@ packages = find_namespace_packages(where=os.path.join(CMAKE_INSTALL_DIR_ABS,
 print(f"Found runtime packages: {packages}")
 
 with open(
-    os.path.join(IREE_SOURCE_DIR, "iree", "runtime", "python", "iree",
+    os.path.join(IREE_SOURCE_DIR, "runtime", "bindings", "python", "iree",
                  "runtime", "README.md"), "rt") as f:
   README = f.read()
 

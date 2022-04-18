@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/runtime/python/iree/runtime/vm.h"
+#include "./vm.h"
 
+#include "./status_utils.h"
 #include "iree/base/api.h"
 #include "iree/base/status_cc.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
-#include "iree/runtime/python/iree/runtime/status_utils.h"
 #include "iree/vm/api.h"
 #include "pybind11/numpy.h"
 

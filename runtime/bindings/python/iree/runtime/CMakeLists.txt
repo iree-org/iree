@@ -155,7 +155,9 @@ iree_py_install_package(
   PACKAGE_NAME iree_runtime
   MODULE_PATH iree/runtime
   DEPS
-    iree_runtime_python_iree_runtime_PyExtRt
+    # TODO: Update CMake target/path mangling rules to make this syntactically
+    # rooted on "iree" in some way.
+    runtime_binding_python_iree_runtime_PyExtRt
     iree_tools_iree-benchmark-trace
     iree_tools_iree-run-module
     iree_tools_iree-run-trace
@@ -165,7 +167,9 @@ iree_py_install_package(
 )
 
 install(
-  TARGETS iree_runtime_python_iree_runtime_PyExtRt
+  # TODO: Update CMake target/path mangling rules to make this syntactically
+  # rooted on "iree" in some way.
+  TARGETS runtime_bindings_python_iree_runtime_PyExtRt
   COMPONENT ${PY_INSTALL_COMPONENT}
   DESTINATION "${PY_INSTALL_MODULE_DIR}"
 )

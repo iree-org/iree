@@ -7,7 +7,7 @@
 #ifndef IREE_BINDINGS_PYTHON_IREE_RT_INVOKE_H_
 #define IREE_BINDINGS_PYTHON_IREE_RT_INVOKE_H_
 
-#include "iree/runtime/python/iree/runtime/binding.h"
+#include "./binding.h"
 
 namespace iree {
 namespace python {

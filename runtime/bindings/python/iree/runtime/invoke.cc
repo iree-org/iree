@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/runtime/python/iree/runtime/invoke.h"
+#include "./invoke.h"
 
+#include "./hal.h"
+#include "./vm.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
-#include "iree/runtime/python/iree/runtime/hal.h"
-#include "iree/runtime/python/iree/runtime/vm.h"
 #include "iree/vm/api.h"
 
 namespace iree {

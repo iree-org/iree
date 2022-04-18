@@ -168,7 +168,7 @@ jobs:
         shell: bash
         run: |
           export CIBW_BEFORE_BUILD="python -m pip install --upgrade pip>=21.3"
-          python -m cibuildwheel --output-dir bindist iree/runtime
+          python -m cibuildwheel --output-dir bindist ./runtime/
 
       - name: Build runtime wheels (instrumented)
         if: "matrix.build_package == 'instrumented-py-runtime-pkg'"
@@ -181,7 +181,7 @@ jobs:
           export CIBW_ENVIRONMENT_LINUX="$CIBW_ENVIRONMENT_LINUX IREE_ENABLE_RUNTIME_TRACING=ON"
           export CIBW_ENVIRONMENT_MACOS="$CIBW_ENVIRONMENT_LINUX IREE_ENABLE_RUNTIME_TRACING=ON"
           export CIBW_ENVIRONMENT_WINDOWS="$CIBW_ENVIRONMENT_LINUX IREE_ENABLE_RUNTIME_TRACING=ON"
-          python -m cibuildwheel --output-dir bindist iree/runtime
+          python -m cibuildwheel --output-dir bindist ./runtime/
 
       # Experimental iree.compiler package.
       - name: Build compiler wheels
