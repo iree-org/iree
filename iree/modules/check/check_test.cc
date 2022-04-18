@@ -162,11 +162,10 @@ class CheckTest : public ::testing::Test {
 
   iree_status_t Invoke(const char* function_name) {
     iree_vm_function_t function;
-    IREE_RETURN_IF_ERROR(
-        check_module_->lookup_function(
-            check_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-            iree_make_cstring_view(function_name), &function),
-        "exported function '%s' not found", function_name);
+    IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_name(
+                             check_module_, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+                             iree_make_cstring_view(function_name), &function),
+                         "exported function '%s' not found", function_name);
     // TODO(#2075): don't directly invoke native functions like this.
     return iree_vm_invoke(context_, function, IREE_VM_INVOCATION_FLAG_NONE,
                           /*policy=*/nullptr, inputs_.get(),

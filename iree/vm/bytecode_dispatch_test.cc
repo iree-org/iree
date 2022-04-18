@@ -94,8 +94,8 @@ class VMBytecodeDispatchTest
 
   iree_status_t RunFunction(const char* function_name) {
     iree_vm_function_t function;
-    IREE_CHECK_OK(bytecode_module_->lookup_function(
-        bytecode_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+    IREE_CHECK_OK(iree_vm_module_lookup_function_by_name(
+        bytecode_module_, IREE_VM_FUNCTION_LINKAGE_EXPORT,
         iree_make_cstring_view(function_name), &function));
 
     return iree_vm_invoke(context_, function, IREE_VM_INVOCATION_FLAG_NONE,
