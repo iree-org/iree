@@ -23,6 +23,7 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
+    "FusionUtils.h"
     "Passes.h"
     "Passes.h.inc"
   SRCS
@@ -37,6 +38,7 @@ iree_cc_library(
     "ExpandTensorShapes.cpp"
     "ExportBenchmarkFuncs.cpp"
     "FusionOfTensorOps.cpp"
+    "FusionUtils.cpp"
     "InferNumericNarrowing.cpp"
     "InitializeEmptyTensors.cpp"
     "InjectDispatchTracing.cpp"

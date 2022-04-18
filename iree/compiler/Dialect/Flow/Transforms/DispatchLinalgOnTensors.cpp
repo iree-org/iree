@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.h"
+#include "iree/compiler/Dialect/Flow/Transforms/FusionUtils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"
@@ -827,57 +828,9 @@ struct CreateDispatchRegionOp : Base<OpType> {
 // Heuristics for fusing dispatchble ops with root ops using tile + fuse.
 //===----------------------------------------------------------------------===//
 
-/// For the fusion of root op -> elementwise operation to be bufferized
-/// in-place without use of extra memory, the result of the root operation
-/// must be able to reuse the buffer for the result of the elementwise
-/// operation. This is possible if input and output are accessed using the same
-/// indexing map.
-// TODO: This restriction can go away if we can vectorize always, but that has
-// a long tail of tasks.
-static bool canInsOperandTieWithOutsOperand(OpOperand *insOperand) {
-  auto linalgOp = dyn_cast<linalg::LinalgOp>(insOperand->getOwner());
-  if (!linalgOp) return false;
-  AffineMap insOperandIndexingMap = linalgOp.getTiedIndexingMap(insOperand);
-  auto canTieWithOutsOperand = [&](OpOperand *outsOperand) {
-    if (linalgOp.getTiedIndexingMap(outsOperand) != insOperandIndexingMap) {
-      return false;
-    }
-    // TODO(#8411): Until ops are vectorized (always), we need
-    // to check that the elementtype matches for the operands to be tied.
-    // For now just doing this check for convolution ops since we expect
-    // contraction ops to be vectorized.
-    auto producerOp = insOperand->get().getDefiningOp();
-    if (isa<linalg::GenericOp, linalg::ConvolutionOpInterface>(producerOp) &&
-        insOperand->get().getType().cast<ShapedType>().getElementType() !=
-            outsOperand->get().getType().cast<ShapedType>().getElementType()) {
-      return false;
-    }
-    return true;
-  };
-  return llvm::any_of(linalgOp.getOutputOperands(), canTieWithOutsOperand);
-}
-
 /// Checks if the producer and consumer LinalgOps can be fused.
 static bool areFusableLinalgOps(OpOperand &use) {
-  auto producerOp = use.get().getDefiningOp<linalg::LinalgOp>();
-  auto consumerOp = dyn_cast<linalg::LinalgOp>(use.getOwner());
-  if (!producerOp || !consumerOp) return false;
-
-  // 1. Producer has a single result.
-  if (producerOp->getNumResults() != 1) return false;
-
-  // 2. Consumer is elementwise parallel.
-  if (consumerOp.getNumLoops() != consumerOp.getNumParallelLoops())
-    return false;
-
-  // 3. In consumer the result of producer is accessed using identity indexing.
-  AffineMap consumerIndexingMap = consumerOp.getTiedIndexingMap(&use);
-  if (!consumerIndexingMap.isIdentity()) return false;
-
-  // 4. In-place bufferization requirements (for now) require that the use in
-  // the consumer
-  //    can re-use the buffer for a result.
-  return canInsOperandTieWithOutsOperand(&use);
+  return areLinalgOpsFusableUsingTileAndFuse(use);
 }
 
 /// Returns true if this is a fusable use.
