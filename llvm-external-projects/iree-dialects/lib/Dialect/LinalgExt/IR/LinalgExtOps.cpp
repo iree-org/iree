@@ -80,7 +80,7 @@ static Value getSlice(OpBuilder &b, Location loc, Value source,
       .Default([&](Type t) { return nullptr; });
 }
 
-/// Returns true the dimensions of ShapedType are dynamic or equal.
+/// Returns true if the dimensions of ShapedType are dynamic or equal.
 static bool isShapedTypeDimEqual(int64_t lhs, int64_t rhs) {
   return lhs != ShapedType::kDynamicSize && rhs != ShapedType::kDynamicSize &&
          lhs != rhs;
@@ -1255,9 +1255,12 @@ LogicalResult TopkOp::verify() {
     return op->emitOpError("region block should have 2 arguments");
   }
   if (block.getArgument(0).getType() != inputValuesType.getElementType() ||
-
       block.getArgument(1).getType() != inputValuesType.getElementType()) {
     return op->emitOpError("region block types must match input");
+  }
+  auto terminatorOp = llvm::cast<YieldOp>(block.getTerminator());
+  if (!terminatorOp || !terminatorOp.getOperand(0).getType().isInteger(1)) {
+    return op->emitOpError("region block must end with a Yield i1!");
   }
   return success();
 }

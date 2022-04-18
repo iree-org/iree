@@ -475,7 +475,7 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 ]> {
   let summary = "Top-K operator";
   let description = [{
-   A Top-K operation for N-D tensors. Reduces the taret dimension from the input
+   A Top-K operation for N-D tensors. Reduces the target dimension from the input
    size N down to K elements based on the supplied binary region.
 
    Accepts two N-D tensor inputs consisting of values and indices of those
