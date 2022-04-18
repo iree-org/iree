@@ -54,3 +54,12 @@ iree_cc_unified_library(
   ROOT
     ::impl
 )
+
+if(IREE_BUILD_PYTHON_BINDINGS)
+  # Copy Python packaging files to the build dir so that we can install from
+  # there.
+  configure_file(pyproject.toml pyproject.toml COPYONLY)
+  configure_file(setup.py setup.py @ONLY)
+
+  add_subdirectory(python/iree/runtime)
+endif()

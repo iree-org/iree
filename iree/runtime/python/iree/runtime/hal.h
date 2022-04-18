@@ -9,9 +9,9 @@
 
 #include <vector>
 
-#include "bindings/python/iree/runtime/binding.h"
-#include "bindings/python/iree/runtime/status_utils.h"
 #include "iree/hal/api.h"
+#include "iree/runtime/python/iree/runtime/binding.h"
+#include "iree/runtime/python/iree/runtime/status_utils.h"
 
 namespace iree {
 namespace python {

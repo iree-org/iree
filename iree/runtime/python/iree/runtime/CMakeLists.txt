@@ -4,6 +4,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+set(NUMPY_DEPS "")
+set(PYBIND_COPTS "-fexceptions")
+set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
+
 set(_python_extra_srcs)
 set(_extra_install_tool_targets)
 set(_tracy_enabled OFF)
@@ -151,7 +155,7 @@ iree_py_install_package(
   PACKAGE_NAME iree_runtime
   MODULE_PATH iree/runtime
   DEPS
-    bindings_python_iree_runtime_PyExtRt
+    iree_runtime_python_iree_runtime_PyExtRt
     iree_tools_iree-benchmark-trace
     iree_tools_iree-run-module
     iree_tools_iree-run-trace
@@ -161,7 +165,7 @@ iree_py_install_package(
 )
 
 install(
-  TARGETS bindings_python_iree_runtime_PyExtRt
+  TARGETS iree_runtime_python_iree_runtime_PyExtRt
   COMPONENT ${PY_INSTALL_COMPONENT}
   DESTINATION "${PY_INSTALL_MODULE_DIR}"
 )
