@@ -299,6 +299,15 @@ def find_git_submodule_revision(submodule_path):
 
 prepare_installation()
 
+packages = find_namespace_packages(where=os.path.join(CMAKE_INSTALL_DIR_ABS,
+                                                      "python_packages",
+                                                      "iree-compiler"),
+                                   include=[
+                                       "iree.compiler",
+                                       "iree.compiler.*",
+                                   ])
+print(f"Found compiler packages: {packages}")
+
 setup(
     name=f"iree-compiler{PACKAGE_SUFFIX}",
     version=f"{PACKAGE_VERSION}",
@@ -332,26 +341,7 @@ setup(
         # path built above. Note that this must exist prior to the call.
         "": f"{CMAKE_INSTALL_DIR_REL}/python_packages/iree-compiler",
     },
-    packages=[
-        "iree.compiler",
-        "iree.compiler._mlir_libs",
-        "iree.compiler._mlir_libs._mlir",  # For .pyi files.
-        "iree.compiler.conversions",
-        "iree.compiler.dialects",
-        "iree.compiler.dialects.iree_pydm",
-        "iree.compiler.dialects.iree_pydm.importer",
-        "iree.compiler.dialects.iree_pydm.rtl",
-        "iree.compiler.dialects.iree_pydm.rtl.modules",
-        "iree.compiler.dialects.linalg",
-        "iree.compiler.dialects.linalg.opdsl",
-        "iree.compiler.dialects.linalg.opdsl.lang",
-        "iree.compiler.dialects.linalg.opdsl.ops",
-        "iree.compiler.dialects.linalg.passes",
-        "iree.compiler.tools",
-        "iree.compiler.tools.scripts",
-        "iree.compiler.tools.scripts.ireec",
-        "iree.compiler.transforms",
-    ],
+    packages=packages,
     entry_points={
         "console_scripts": [
             "iree-compile = iree.compiler.tools.scripts.ireec.__main__:main",
