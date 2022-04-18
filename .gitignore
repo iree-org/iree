@@ -49,6 +49,9 @@ compile_commands.json
 *.venv
 .venv
 
+# Python deployment artifacts
+*.whl
+
 # Android Studio / Gradle files
 .cxx
 .gradle

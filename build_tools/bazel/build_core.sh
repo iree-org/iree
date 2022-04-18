@@ -84,7 +84,6 @@ bazel \
   query \
     --config=non_darwin \
     //iree/... + //build_tools/... + \
-    //llvm-external-projects/iree-compiler-api/... + \
     //llvm-external-projects/iree-dialects/... | \
       xargs --max-args 1000000 --max-chars 1000000 --exit \
         bazel \

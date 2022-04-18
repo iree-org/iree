@@ -10,7 +10,7 @@ add_executable(
 )
 target_link_libraries(iree-compiler-api-compile-mhlo-test
   PRIVATE
-    IREECompilerAPICompilerCAPI
+    IREECompilerCAPILib
     MLIRCAPIIR
 )
 

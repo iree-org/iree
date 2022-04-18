@@ -37,13 +37,13 @@ filegroup(
 
 filegroup(
     name = "python_compiler_api",
-    srcs = glob(["python/iree/compiler/api/*.py"]),
+    srcs = glob(["python/iree/compiler/transforms/*.py"]),
 )
 
 filegroup(
     name = "unittests_tools_testdata",
     srcs = glob([
-        "unittests/tools/testdata/*",
+        "python/test/tools/testdata/*",
     ]),
 )
 
@@ -54,15 +54,14 @@ filegroup(
 cc_library(
     name = "CAPI",
     srcs = [
-        "lib/CAPI/Compiler.cpp",
-        "lib/CAPI/Lld.cpp",
-        "lib/CAPI/Tools.cpp",
+        "Compiler.cpp",
+        "Lld.cpp",
+        "Tools.cpp",
     ],
     hdrs = [
-        "include/iree-compiler-c/Compiler.h",
-        "include/iree-compiler-c/Tools.h",
+        "Compiler.h",
+        "Tools.h",
     ],
-    includes = ["include"],
     deps = [
         "//iree/compiler/ConstEval",
         "//iree/compiler/Dialect/VM/IR",

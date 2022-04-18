@@ -1,8 +1,36 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 include(AddMLIRPython)
 
 # Specifies that all MLIR packages are co-located under npcomp.
 # TODO: Add an upstream cmake param for this vs having a global here.
 add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=iree.compiler.")
+
+set(_PYTHON_BUILD_PREFIX "${IREE_BINARY_DIR}/bindings/python")
+set(_PYTHON_INSTALL_PREFIX "python_packages/iree-compiler")
+
+# HACK: This should not be necessary, but add_mlir_python_extension is
+# accidentally closing over an errant include_directories from up-tree, so
+# when built in-tree it is somehow working based on that. This will need
+# to be fixed to capture the correct include directories in that macro.
+include_directories(
+  "${IREE_SOURCE_DIR}"
+  "${IREE_SOURCE_DIR}/llvm-external-projects/iree-dialects/include"
+  "${IREE_SOURCE_DIR}/third_party/llvm-project/mlir/include"
+  "${IREE_SOURCE_DIR}/third_party/mlir-hlo/include"
+)
+
+# On Unixes, disable the creation of versioned/symlinked `.so` files. With
+# this set, we just generate libIREECompilerAggregateCAPI.so vs making that
+# a symlink to a versioned file right next to it. When packaging for Python,
+# symlinks are duplicated, so this is pretty important. It is usually set at
+# a toolchain level for dedicated Python builds, but is nice to override since
+# it makes the build directory suitable for directly packaging.
+set(CMAKE_PLATFORM_NO_VERSIONED_SONAME 1)
 
 ################################################################################
 # Sources
@@ -36,7 +64,7 @@ declare_mlir_python_extension(IREECompilerAPIPythonExtensions.IREECTransforms
   SOURCES
     IREECTransforms.cpp
   EMBED_CAPI_LINK_LIBS
-    IREECompilerAPICompilerCAPI
+    IREECompilerCAPILib
   PRIVATE_LINK_LIBS
     LLVMSupport
 )
@@ -82,15 +110,15 @@ set(_source_components
 
 add_mlir_python_common_capi_library(IREECompilerAggregateCAPI
   INSTALL_COMPONENT IREECompilerPythonModules
-  INSTALL_DESTINATION python_package/iree/compiler/_mlir_libs
-  OUTPUT_DIRECTORY "${IREE_COMPILER_API_BINARY_DIR}/python_package/iree/compiler/_mlir_libs"
+  INSTALL_DESTINATION ${_PYTHON_INSTALL_PREFIX}/iree/compiler/_mlir_libs
+  OUTPUT_DIRECTORY "${_PYTHON_BUILD_PREFIX}/iree/compiler/_mlir_libs"
   RELATIVE_INSTALL_ROOT "../../../.."
   DECLARED_SOURCES ${_source_components}
 )
 
 add_mlir_python_modules(IREECompilerPythonModules
-  ROOT_PREFIX "${IREE_COMPILER_API_BINARY_DIR}/python_package/iree/compiler"
-  INSTALL_PREFIX "python_package/iree/compiler"
+  ROOT_PREFIX "${_PYTHON_BUILD_PREFIX}/iree/compiler"
+  INSTALL_PREFIX "${_PYTHON_INSTALL_PREFIX}/iree/compiler"
   DECLARED_SOURCES ${_source_components}
   COMMON_CAPI_LINK_LIBS
     IREECompilerAggregateCAPI
@@ -116,12 +144,12 @@ function(add_iree_compiler_busybox_tool target)
   set_target_properties(${target}
     PROPERTIES
       OUTPUT_NAME "${ARG_OUTPUT_NAME}"
-      RUNTIME_OUTPUT_DIRECTORY "${IREE_COMPILER_API_BINARY_DIR}/python_package/iree/compiler/_mlir_libs"
+      RUNTIME_OUTPUT_DIRECTORY "${_PYTHON_BUILD_PREFIX}/iree/compiler/_mlir_libs"
   )
   mlir_python_setup_extension_rpath(${target})
   add_dependencies(IREECompilerPythonModules ${target})
   install(TARGETS ${target}
-    DESTINATION "python_package/iree/compiler/_mlir_libs"
+    DESTINATION "${_PYTHON_INSTALL_PREFIX}/iree/compiler/_mlir_libs"
   )
 endfunction()
 
@@ -140,3 +168,9 @@ if(TARGET lld)
       LldTool.c
   )
 endif()
+
+################################################################################
+# Subdirectories
+################################################################################
+
+add_subdirectory(test)
