@@ -64,7 +64,7 @@ struct TargetEnvAttributeStorage : public AttributeStorage {
 }  // namespace detail
 
 TargetEnvAttr TargetEnvAttr::get(Vulkan::Version version, uint32_t revision,
-                                 ArrayRef<Vulkan::Extension> extensions,
+                                 ArrayRef<Extension> extensions,
                                  spirv::Vendor vendorID,
                                  spirv::DeviceType deviceType,
                                  uint32_t deviceID,
@@ -73,7 +73,7 @@ TargetEnvAttr TargetEnvAttr::get(Vulkan::Version version, uint32_t revision,
   llvm::SmallVector<Attribute, 0> extAttrs;
   extAttrs.reserve(extensions.size());
   for (auto ext : extensions) {
-    extAttrs.push_back(builder.getStringAttr(Vulkan::stringifyExtension(ext)));
+    extAttrs.push_back(ExtensionAttr::get(builder.getContext(), ext));
   }
   return get(builder.getI32IntegerAttr(static_cast<uint32_t>(version)),
              builder.getI32IntegerAttr(revision),
