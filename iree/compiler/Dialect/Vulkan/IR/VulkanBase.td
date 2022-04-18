@@ -8,6 +8,7 @@
 #define IREE_DIALECT_VULKAN_BASE
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/EnumAttr.td"
 
 //===----------------------------------------------------------------------===//
 // Vulkan dialect definition
