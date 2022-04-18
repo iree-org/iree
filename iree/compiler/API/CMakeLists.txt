@@ -71,12 +71,12 @@ if(IREE_BUILD_TORCH_MLIR_SUPPORT)
   )
 endif()
 
+add_subdirectory(test)
+
 ################################################################################
-# Language specific bindings and tests.
+# Language specific bindings.
 # These have an ordering dependency on the backing CAPI being defined.
 ################################################################################
-
-add_subdirectory(test)
 
 if(IREE_BUILD_PYTHON_BINDINGS)
   add_subdirectory(python)

@@ -40,7 +40,7 @@ with ir.Context() as ctx:
     }
   """)
 
-  options = ireec.CompilerOptions("--iree-hal-target-backends=vmvx")
+  options = ireec.CompilerOptions("--iree-hal-target-backends=cpu")
   print(options)
   pm = passmanager.PassManager()
   ireec.build_mhlo_import_pass_pipeline(pm)

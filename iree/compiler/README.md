@@ -84,7 +84,7 @@ Read more:
 
 The included `setup.py` file can be used to build Python binaries or directly
 install the IREE compiler API. Do note that the compiler is quite heavy and
-unless if you are developing it and on a significant machine, you will want to
+unless you are developing it and on a significant machine, you will want to
 use released binaries.
 
 There are two ways to build/install Python packages:
