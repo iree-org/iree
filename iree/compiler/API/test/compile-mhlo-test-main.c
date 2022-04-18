@@ -13,7 +13,7 @@
 // https://github.com/google/iree/pull/8582
 
 #include <iree/base/string_builder.h>
-#include <iree/compiler/Api/Compiler.h>
+#include <iree/compiler/API/Compiler.h>
 #include <stdio.h>
 
 static void bytecode_builder_callback(MlirStringRef str, void* userdata) {
