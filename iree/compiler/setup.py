@@ -18,6 +18,11 @@
 #
 # On CIs, it is often advantageous to re-use/control the CMake build directory.
 # This can be set with the IREE_COMPILER_API_CMAKE_BUILD_DIR env var.
+#
+# Select CMake options are available from environment variables:
+#   IREE_TARGET_BACKEND_CUDA
+#   IREE_ENABLE_CPUINFO
+
 from gettext import install
 import json
 from multiprocessing.spawn import prepare
@@ -226,6 +231,7 @@ def prepare_installation():
         "-DPython3_EXECUTABLE={}".format(sys.executable),
         "-DCMAKE_BUILD_TYPE={}".format(cfg),
         get_env_cmake_option("IREE_TARGET_BACKEND_CUDA"),
+        get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
     ]
 
     # These usually flow through the environment, but we add them explicitly

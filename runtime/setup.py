@@ -25,6 +25,7 @@
 #   IREE_HAL_DRIVER_VULKAN
 #   IREE_ENABLE_RUNTIME_TRACING
 #   IREE_BUILD_TRACY
+#   IREE_ENABLE_CPUINFO
 
 from gettext import install
 import json
@@ -239,6 +240,7 @@ def prepare_installation():
                              "OFF" if platform.system() == "Darwin" else "ON"),
         get_env_cmake_option("IREE_ENABLE_RUNTIME_TRACING"),
         get_env_cmake_option("IREE_BUILD_TRACY"),
+        get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
     ]
 
     # These usually flow through the environment, but we add them explicitly
