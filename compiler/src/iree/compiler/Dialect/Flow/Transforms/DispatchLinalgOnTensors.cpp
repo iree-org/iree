@@ -32,6 +32,7 @@
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
@@ -46,16 +47,20 @@
 
 #define DEBUG_TYPE "iree-flow-dispatch-linalg-on-tensors"
 
-// TODO(ravishankarm): Prune this list.
+// NOTE: These flags are added for experimental purposes only
+// for developer control. These should be treated as internal
+// compiler implementation details.
 static llvm::cl::opt<int> clInlineConstantByteLength(
     "iree-flow-inline-constants-max-byte-length",
     llvm::cl::desc("Maximum byte-length of constant that can be inlined into a "
                    "dispatch region"),
     llvm::cl::init(256));
 
-static llvm::cl::list<int64_t> clLinalgOnTensorsTileSizes(
-    "iree-flow-dispatch-linalg-on-tensors-tile-sizes",
-    llvm::cl::desc("Comma-separated list of tile sizes for tiling on tensors"));
+static llvm::cl::opt<bool> clEnableMultiResultDispatches(
+    "iree-flow-enable-multi-result-dispatches",
+    llvm::cl::desc(
+        "Enable dispatch region formation to enable multi-result dispatches"),
+    llvm::cl::init(false));
 
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
@@ -899,17 +904,38 @@ static bool isFusableWithConsumer(OpOperand &use) {
   return areFusableLinalgOps(use);
 }
 
+/// For all uses of an operation, finds the use that dominates all other uses.
+static Optional<OpOperand *> getFusableUse(Operation *op,
+                                           DominanceInfo const &dominanceInfo) {
+  if (!clEnableMultiResultDispatches) {
+    if (op->hasOneUse()) {
+      OpOperand &use = *(op->use_begin());
+      return &use;
+    }
+    return llvm::None;
+  }
+  for (auto &use : op->getUses()) {
+    Operation *user = use.getOwner();
+    if (llvm::all_of(op->getUsers(), [&](Operation *c) {
+          return dominanceInfo.dominates(user, c);
+        })) {
+      return &use;
+    }
+  }
+  return llvm::None;
+}
+
 /// Fuses roots with its consumers. If a root is fused with its consumer, it is
 /// no more tagged as a root to aid with the dispatch region formation.
 static void fuseRootsWithConsumers(MLIRContext *context,
-                                   ArrayRef<Operation *> roots) {
+                                   ArrayRef<Operation *> roots,
+                                   DominanceInfo const &dominanceInfo) {
   SmallVector<Operation *> workList(roots.begin(), roots.end());
   // Fuse with consumers where possible.
   while (!workList.empty()) {
     Operation *currRoot = workList.pop_back_val();
     assert(hasRootOpAttribute(currRoot) &&
            "unexpected non-root op in worklist");
-    if (!currRoot->hasOneUse()) continue;
 
     // Helper function to make the consumer the root instead of the producer
     // when they are to be fused.
@@ -920,16 +946,19 @@ static void fuseRootsWithConsumers(MLIRContext *context,
       appendToFusionGroup(currRoot, rootNumber);
     };
 
+    Optional<OpOperand *> fusableUse = getFusableUse(currRoot, dominanceInfo);
+    if (!fusableUse) continue;
+
     // Analyse the use to see if it is fusable.
-    OpOperand &use = *currRoot->use_begin();
-    Operation *user = use.getOwner();
-    if (hasRootOpAttribute(user) || hasFusionGroupsAttribute(user)) {
+    Operation *consumerOp = fusableUse.getValue()->getOwner();
+    if (hasRootOpAttribute(consumerOp) ||
+        hasFusionGroupsAttribute(consumerOp)) {
       continue;
     }
 
-    if (isFusableWithConsumer(use)) {
-      updateRootTo(user);
-      workList.push_back(user);
+    if (isFusableWithConsumer(*(fusableUse.getValue()))) {
+      updateRootTo(consumerOp);
+      workList.push_back(consumerOp);
     }
   }
 }
@@ -942,7 +971,8 @@ static void fuseRootsWithConsumers(MLIRContext *context,
 /// fuse with multiple root operations (i.e. replicated). For now a very simple
 /// heuristic is used below, but the mechanism should be general enough to
 /// capture any heuristic.
-static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp) {
+static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
+                                       DominanceInfo const &dominanceInfo) {
   unsigned numRootOps = 0;
   MLIRContext *context = funcOp->getContext();
   OpBuilder builder(context);
@@ -971,19 +1001,20 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp) {
         auto producer = operand->get().getDefiningOp<linalg::LinalgOp>();
         if (!producer) continue;
 
-        // For now only fuse producers that have a single use.
-        // TODO(ravishankarm): Producer can be fused if all users are dominated
-        // by the consumer. But that requires changing the dispatch region
-        // formation in this pass. Do that as a follow up.
-        if (!producer->hasOneUse()) continue;
+        // Fuse with the consumer if all uses of producer are dominated by it.
+        Optional<OpOperand *> fusableUse =
+            getFusableUse(producer, dominanceInfo);
+        if (!fusableUse || fusableUse.getValue() != operand) continue;
 
-        if (producer.getNumLoops() != producer.getNumParallelLoops()) continue;
+        if (producer.getNumLoops() != producer.getNumParallelLoops()) {
+          continue;
+        }
         appendToFusionGroup(producer, newGroup);
       }
       roots.push_back(&op);
     }
     roots = llvm::to_vector(llvm::reverse(roots));
-    fuseRootsWithConsumers(context, roots);
+    fuseRootsWithConsumers(context, roots, dominanceInfo);
   }
 
   // Once all root linalg ops have been tagged, put all remaining generic ops
@@ -1003,7 +1034,7 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp) {
       roots.push_back(&op);
     }
     roots = llvm::to_vector(llvm::reverse(roots));
-    fuseRootsWithConsumers(context, roots);
+    fuseRootsWithConsumers(context, roots, dominanceInfo);
   }
 
   return numRootOps;
@@ -1123,7 +1154,8 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp,
 void DispatchLinalgOnTensorsPass::runOnOperation() {
   auto funcOp = getOperation();
   MLIRContext *context = &getContext();
-  decideFusableLinalgOps(funcOp);
+  DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
+  decideFusableLinalgOps(funcOp, dominanceInfo);
 
   LLVM_DEBUG({
     llvm::dbgs() << "\n--- After annotating linalg op fusion scheme ---\n";
