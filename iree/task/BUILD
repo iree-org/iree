@@ -18,6 +18,13 @@ iree_cmake_extra_content(
 if(NOT ${IREE_ENABLE_THREADING})
   return()
 endif()
+
+# cpuinfo can be conditionally disabled when it is not supported.
+# If disabled then by default the task system will use 1 thread.
+set(IREE_CPUINFO_TARGET)
+if(IREE_ENABLE_CPUINFO)
+  set(IREE_CPUINFO_TARGET cpuinfo)
+endif()
 """,
     inline = True,
 )

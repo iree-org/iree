@@ -166,7 +166,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_github_yaml_libyaml//:yaml": ["yaml"],
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
-    "@cpuinfo": ["cpuinfo"],
+    "@cpuinfo": ["${IREE_CPUINFO_TARGET}"],
     "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
 }
 
