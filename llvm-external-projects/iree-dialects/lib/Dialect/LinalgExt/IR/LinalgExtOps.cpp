@@ -1273,16 +1273,16 @@ SmallVector<Range> TopkOp::getIterationDomain(OpBuilder &builder) {
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   Value source = values();
 
-  ArrayRef<int64_t> inputShape = getInputType().getShape();
-  for (auto dim : llvm::seq<int64_t>(0, operandRank)) {
-    loopBounds[dim].offset = zero;
-    if (inputShape[dim] == ShapedType::kDynamicSize) {
-      loopBounds[dim].size = getDimValue(builder, loc, source, dim);
+  for (auto dim : llvm::enumerate(getInputType().getShape())) {
+    loopBounds[dim.index()].offset = zero;
+    if (dim.value() == ShapedType::kDynamicSize) {
+      loopBounds[dim.index()].size =
+          getDimValue(builder, loc, source, dim.value());
     } else {
-      loopBounds[dim].size =
-          builder.create<arith::ConstantIndexOp>(loc, inputShape[dim]);
+      loopBounds[dim.index()].size =
+          builder.create<arith::ConstantIndexOp>(loc, dim.value());
     }
-    loopBounds[dim].stride = one;
+    loopBounds[dim.index()].stride = one;
   }
   return loopBounds;
 }
