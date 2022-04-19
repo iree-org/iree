@@ -125,6 +125,7 @@ jobs:
         shell: bash
         run: |
           packages="iree-runtime iree-runtime-instrumented" \
+          output_dir="./bindist" \
           ./main_checkout/build_tools/python_deploy/build_linux_packages.sh
 
       - name: Build runtime wheels (MacOS)
@@ -132,6 +133,7 @@ jobs:
         shell: bash
         run: |
           packages="iree-runtime iree-runtime-instrumented" \
+          output_dir="./bindist" \
           ./main_checkout/build_tools/python_deploy/build_macos_packages.sh
 
       ##########################################################################
@@ -144,6 +146,7 @@ jobs:
         shell: bash
         run: |
           packages="iree-compiler" \
+          output_dir="./bindist" \
           ./main_checkout/build_tools/python_deploy/build_linux_packages.sh
 
       - name: Build compiler wheels (MacOS)
@@ -151,6 +154,7 @@ jobs:
         shell: bash
         run: |
           packages="iree-compiler" \
+          output_dir="./bindist" \
           ./main_checkout/build_tools/python_deploy/build_macos_packages.sh
 
       ##########################################################################
