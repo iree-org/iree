@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/task/topology_cpuinfo.h"
-
 #include <cpuinfo.h>
 #include <stdio.h>
 
@@ -13,16 +11,7 @@
 #include "iree/base/internal/math.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
-
-// Runs the cpuinfo initializer which caches its result on the first call.
-// Returns a failure if cpuinfo does not support the CPU/platform.
-static iree_status_t iree_task_topology_ensure_cpuinfo_available() {
-  if (!cpuinfo_initialize()) {
-    return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "cpuinfo failed to initialize");
-  }
-  return iree_ok_status();
-}
+#include "iree/task/topology.h"
 
 static bool iree_task_topology_is_cpuinfo_available() {
   return cpuinfo_initialize() && cpuinfo_get_cores_count() > 0;
@@ -193,27 +182,16 @@ static bool iree_task_topology_core_filter_all(const struct cpuinfo_core* core,
   return true;
 }
 
-void iree_task_topology_initialize_from_physical_cores(
-    iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
-  iree_task_topology_initialize_from_physical_cores_with_filter(
-      iree_task_topology_core_filter_all, 0, max_core_count, out_topology);
-}
+// Returns true if the given |core| passes the filter and should be included.
+// |user_data| is the value passed alongside the filter function.
+typedef bool (*iree_task_topology_core_filter_t)(
+    const struct cpuinfo_core* core, uintptr_t user_data);
 
-// Matches only cores with the uarch as specified in |user_data|.
-static bool iree_task_topology_core_filter_uarch(
-    const struct cpuinfo_core* core, uintptr_t user_data) {
-  return core->uarch == user_data;
-}
-
-void iree_task_topology_initialize_from_physical_cores_with_uarch(
-    uint32_t cpuinfo_uarch, iree_host_size_t max_core_count,
-    iree_task_topology_t* out_topology) {
-  iree_task_topology_initialize_from_physical_cores_with_filter(
-      iree_task_topology_core_filter_uarch, cpuinfo_uarch, max_core_count,
-      out_topology);
-}
-
-void iree_task_topology_initialize_from_physical_cores_with_filter(
+// Initializes a topology with one group for each core that matches |filter_fn|.
+//
+// If cpuinfo is not available this falls back to the same behavior as
+// iree_task_topology_initialize_from_physical_cores.
+static void iree_task_topology_initialize_from_physical_cores_with_filter(
     iree_task_topology_core_filter_t filter_fn, uintptr_t filter_fn_data,
     iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
   max_core_count = iree_min(max_core_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
@@ -259,42 +237,8 @@ void iree_task_topology_initialize_from_physical_cores_with_filter(
   IREE_TRACE_ZONE_END(z0);
 }
 
-void iree_task_topology_initialize_from_unique_l2_cache_groups(
-    iree_host_size_t max_group_count, iree_task_topology_t* out_topology) {
-  if (!iree_task_topology_is_cpuinfo_available() ||
-      !cpuinfo_get_l2_caches_count()) {
-    iree_task_topology_initialize_from_physical_cores(max_group_count,
-                                                      out_topology);
-    return;
-  }
-
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, max_group_count);
-
-  iree_host_size_t cache_count = cpuinfo_get_l2_caches_count();
-  cache_count = iree_min(cache_count, max_group_count);
-
-  iree_task_topology_initialize(out_topology);
-
-  // TODO(benvanik): iree_task_topology_rotate_from_base_core to offset all of
-  // the selection here (while still preserving the cache groups). May need to
-  // rework this to instead walk the core list and skip until a new cache is
-  // found instead of starting with the cache list.
-
-  // TODO(benvanik): if our group_count <= cache_count/2 then distribute better;
-  // we could use l3 cache in addition to ensure we are selecting cores that do
-  // (or do not) share.
-  out_topology->group_count = cache_count;
-  for (uint32_t cache_i = 0, group_i = 0; group_i < out_topology->group_count;
-       ++cache_i) {
-    const struct cpuinfo_cache* cache = cpuinfo_get_l2_cache(cache_i);
-    const struct cpuinfo_core* core =
-        cpuinfo_get_processor(cache->processor_start)->core;
-    iree_task_topology_group_initialize_from_core(
-        group_i, core, &out_topology->groups[group_i]);
-    ++group_i;
-  }
-
-  iree_task_topology_fixup_constructive_sharing_masks(out_topology);
-  IREE_TRACE_ZONE_END(z0);
+void iree_task_topology_initialize_from_physical_cores(
+    iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
+  iree_task_topology_initialize_from_physical_cores_with_filter(
+      iree_task_topology_core_filter_all, 0, max_core_count, out_topology);
 }

@@ -122,6 +122,10 @@ iree_status_t iree_task_topology_push_group(
 void iree_task_topology_initialize_from_group_count(
     iree_host_size_t group_count, iree_task_topology_t* out_topology);
 
+// Initializes a topology with one group for each physical core in the machine.
+void iree_task_topology_initialize_from_physical_cores(
+    iree_host_size_t max_core_count, iree_task_topology_t* out_topology);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

@@ -8,9 +8,8 @@
 #define IREE_TASK_API_H_
 
 #include "iree/base/api.h"
-#include "iree/task/executor.h"          // IWYU pragma: export
-#include "iree/task/topology.h"          // IWYU pragma: export
-#include "iree/task/topology_cpuinfo.h"  // IWYU pragma: export
+#include "iree/task/executor.h"  // IWYU pragma: export
+#include "iree/task/topology.h"  // IWYU pragma: export
 
 #ifdef __cplusplus
 extern "C" {

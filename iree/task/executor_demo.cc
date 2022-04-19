@@ -9,7 +9,6 @@
 #include "iree/base/internal/prng.h"
 #include "iree/base/tracing.h"
 #include "iree/task/executor.h"
-#include "iree/task/topology_cpuinfo.h"
 
 // TODO(benvanik): clean this up into a reasonable demo; it's currently staging
 // area for testing executor behavior across different platforms and topologies.
@@ -48,9 +47,6 @@ extern "C" int main(int argc, char* argv) {
 #if 1
   iree_task_topology_initialize_from_physical_cores(
       /*max_core_count=*/6, &topology);
-#elif 0
-  iree_task_topology_initialize_from_unique_l2_cache_groups(
-      /*max_group_count=*/6, &topology);
 #else
   iree_task_topology_initialize_from_group_count(/*group_count=*/6, &topology);
 #endif

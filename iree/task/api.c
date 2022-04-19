@@ -12,7 +12,6 @@
 #include "iree/base/internal/flags.h"
 #include "iree/base/tracing.h"
 #include "iree/task/topology.h"
-#include "iree/task/topology_cpuinfo.h"
 
 //===----------------------------------------------------------------------===//
 // Executor configuration
@@ -46,13 +45,7 @@ IREE_FLAG(
     "   Uses whatever the specified group count is and ignores the set mode.\n"
     " 'physical_cores':\n"
     "   Creates one group per physical core in the machine up to\n"
-    "   the value specified by --task_topology_max_group_count.\n"
-    " 'unique_l2_cache_groups':\n"
-    "   Creates one group for each unique L2 cache group across all available\n"
-    "   cores up to the value specified by --task_topology_max_group_count.\n"
-    "   This optimizes for temporal and spatial cache locality but may suffer\n"
-    "   from oversubscription if there are other processes trying to use the\n"
-    "   same cores.\n");
+    "   the value specified by --task_topology_max_group_count.\n");
 
 IREE_FLAG(
     int32_t, task_topology_group_count, 0,
@@ -98,9 +91,6 @@ iree_status_t iree_task_executor_create_from_flags(
         FLAG_task_topology_group_count, &topology);
   } else if (strcmp(FLAG_task_topology_mode, "physical_cores") == 0) {
     iree_task_topology_initialize_from_physical_cores(
-        FLAG_task_topology_max_group_count, &topology);
-  } else if (strcmp(FLAG_task_topology_mode, "unique_l2_cache_groups") == 0) {
-    iree_task_topology_initialize_from_unique_l2_cache_groups(
         FLAG_task_topology_max_group_count, &topology);
   } else {
     status = iree_make_status(
