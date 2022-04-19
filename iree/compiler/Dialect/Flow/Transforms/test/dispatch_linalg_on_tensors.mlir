@@ -430,8 +430,8 @@ func.func @subtensor_insert(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>,
 //  CHECK-DAG:   %[[ARG1_D0:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[ARG1_D1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //      CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups[%[[ARG0_D1]], %[[ARG0_D0]], %[[C1]]]
-// CHECK-SAME:       (%[[ARG0]], %[[ARG0_D0]], %[[ARG0_D1]], %[[ARG1]],
-// CHECK-SAME:        %[[ARG2]], %[[ARG3]], %[[ARG4]], %[[ARG5]], %[[ARG1_D0]], %[[ARG1_D1]])
+// CHECK-SAME:       (%[[ARG0]], %[[ARG0_D0]], %[[ARG0_D1]], %[[ARG1]], %[[ARG1_D0]], %[[ARG1_D1]],
+// CHECK-SAME:        %[[ARG2]], %[[ARG3]], %[[ARG4]], %[[ARG5]])
 // CHECK-SAME:       tensor<?x?xf32>{%[[ARG0_D0]], %[[ARG0_D1]]}
 // CHECK-SAME:       tensor<?x?xf32>{%[[ARG1_D0]], %[[ARG1_D1]]}
 // CHECK-SAME:       -> %[[ARG1]]{%[[ARG1_D0]], %[[ARG1_D1]]}
@@ -439,18 +439,16 @@ func.func @subtensor_insert(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>,
 // CHECK-SAME:     %[[ARG0_D0_CAPTURE:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG0_D1_CAPTURE:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG1_CAPTURE:.+]]: !flow.dispatch.tensor<readwrite:?x?xf32>
+// CHECK-SAME:     %[[ARG1_D0_CAPTURE:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[ARG1_D1_CAPTURE:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG2_CAPTURE:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG3_CAPTURE:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG4_CAPTURE:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG5_CAPTURE:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG1_D0_CAPTURE:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG1_D1_CAPTURE:[a-zA-Z0-9]+]]: index
 //      CHECK:     %[[SRC:.+]] = flow.dispatch.tensor.load %[[ARG0_CAPTURE]]
-// CHECK-SAME:         offsets = [0, 0], sizes = [%[[ARG0_D0_CAPTURE]], %[[ARG0_D1_CAPTURE]]]
-//      CHECK:     flow.dispatch.tensor.store %[[SRC]], %[[ARG1_CAPTURE]]
-// CHECK-SAME:         offsets = [%[[ARG2_CAPTURE]], %[[ARG3_CAPTURE]]]
-// CHECK-SAME:         sizes = [%[[ARG4_CAPTURE]], %[[ARG5_CAPTURE]]]
-// CHECK-SAME:         !flow.dispatch.tensor<readwrite:?x?xf32>{%[[ARG1_D0_CAPTURE]], %[[ARG1_D1_CAPTURE]]}
+//      CHECK:     %[[DEST:.+]] = flow.dispatch.tensor.load %[[ARG1_CAPTURE]]
+//      CHECK:     %[[INSERT:.+]] = tensor.insert_slice %[[SRC]] into %[[DEST]]
+//      CHECK:     flow.dispatch.tensor.store %[[INSERT]], %[[ARG1_CAPTURE]]
 //      CHECK:   return %[[RESULT]]
 
 // -----
@@ -646,6 +644,7 @@ func.func @inline_dag_3(%240 : tensor<9xi32>, %244 : tensor<18xi32>, %247 : tens
 //   CHECK-DAG:     %[[C5:.+]] = arith.constant 5 : i32
 //   CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : i32
 //   CHECK-DAG:     %[[C9:.+]] = arith.constant 9 : i32
+//   CHECK-DAG:     %[[ARG3T:.+]] = flow.dispatch.tensor.load %[[ARG3]]
 //   CHECK-DAG:     %[[ARG4V:.+]] = flow.dispatch.tensor.load %[[ARG4]]
 //   CHECK-DAG:     %[[EXTRACT:.+]] = tensor.extract %[[ARG4V]]
 //   CHECK-DAG:     %[[CMP1:.+]] = arith.cmpi slt, %[[EXTRACT]]
@@ -653,7 +652,7 @@ func.func @inline_dag_3(%240 : tensor<9xi32>, %244 : tensor<18xi32>, %247 : tens
 //   CHECK-DAG:     %[[CMP2:.+]] = arith.cmpi sgt, %[[SELECT1]], %[[C0]]
 //   CHECK-DAG:     %[[SELECT2:.+]] = arith.select %[[CMP2]], %[[SELECT1]], %[[C0]]
 //   CHECK-DAG:     %[[INDEX_CAST:.+]] = arith.index_cast %[[SELECT2]]
-//   CHECK-DAG:     %[[SLICE:.+]] = flow.dispatch.tensor.load %[[ARG3]], offsets = [%[[INDEX_CAST]]]
+//   CHECK-DAG:     %[[SLICE:.+]] = tensor.extract_slice %[[ARG3T]][%[[INDEX_CAST]]]
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[SLICE]] : tensor<9xi32>)
 //       CHECK:     flow.dispatch.tensor.store %[[GENERIC]], %[[ARG5]]
@@ -692,7 +691,8 @@ func.func @inline_dag_4(%arg0: tensor<4xi32>, %arg1: tensor<i32>) -> tensor<i16>
 //  CHECK-SAME:      %[[ARG4:.+]]: !flow.dispatch.tensor<writeonly:i16>
 //   CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : i32
 //   CHECK-DAG:     %[[C3:.+]] = arith.constant 3 : i32
-//       CHECK:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG3]]
+//       CHECK:     %[[LEAF1:.+]] = flow.dispatch.tensor.load %[[ARG2]], {{.*}}
+//       CHECK:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG3]], {{.*}}
 //       CHECK:     %[[INIT:.+]] = linalg.init_tensor [] : tensor<i16>
 //       CHECK:     %[[OP1:.+]] = tensor.extract %[[LEAF2]][] : tensor<i32>
 //       CHECK:     %[[OP2:.+]] = arith.cmpi slt, %[[OP1]], %[[C3]] : i32
@@ -700,8 +700,8 @@ func.func @inline_dag_4(%arg0: tensor<4xi32>, %arg1: tensor<i32>) -> tensor<i16>
 //       CHECK:     %[[OP4:.+]] = arith.cmpi sgt, %[[OP3]], %[[C0]] : i32
 //       CHECK:     %[[OP5:.+]] = arith.select %[[OP4]], %[[OP3]], %[[C0]] : i32
 //       CHECK:     %[[OP6:.+]] = arith.index_cast %[[OP5]] : i32 to index
-//       CHECK:     %[[OP7:.+]] = flow.dispatch.tensor.load %[[ARG2]], offsets = [%[[OP6]]]
-//       CHECK:     %[[RES:.+]] = linalg.generic
+//       CHECK:     %[[OP7:.+]] = tensor.extract_slice %[[LEAF1]][%[[OP6]]] [1] [1] : tensor<4xi32> to tensor<i32>
+//       CHECK:     %[[RES:.+]] = linalg.generi
 //  CHECK-SAME:       ins(%[[OP7]] : tensor<i32>)
 //  CHECK-SAME:       outs(%[[INIT]] : tensor<i16>) {
 //       CHECK:     ^bb0(%[[ARG5:.+]]: i32, %{{.+}}: i16):
@@ -1024,35 +1024,12 @@ func.func @extract_slice(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
       tensor<?x?xf32> to tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
-//      CHECK: func @extract_slice
-// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
-// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG4:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG5:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG6:[a-zA-Z0-9]+]]: index
-//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
-//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
-//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
-//  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
-//      CHECK:   flow.dispatch.workgroups
-// CHECK-SAME:       [%[[ARG4]], %[[ARG3]], %[[C1]]]
-// CHECK-SAME:       (%[[ARG0]], %[[D0]], %[[D1]], %[[ARG1]], %[[ARG2]], %[[ARG3]], %[[ARG4]], %[[ARG5]], %[[ARG6]])
-// CHECK-NEXT:     %[[INPUT:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
-// CHECK-SAME:     %[[ARG8:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG9:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG10:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG11:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG12:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG13:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG14:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG15:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[OUTPUT:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
-//      CHECK:     %[[SLICE:.+]] = flow.dispatch.tensor.load %[[INPUT]]
-// CHECK-SAME:         offsets = [%[[ARG10]], %[[ARG11]]], sizes = [%[[ARG12]], %[[ARG13]]], strides = [%[[ARG14]], %[[ARG15]]]
-//      CHECK:     flow.dispatch.tensor.store %[[SLICE]], %[[OUTPUT]],
-// CHECK-SAME:         %[[ARG12]], %[[ARG13]]
+//      CHECK: flow.dispatch.workgroups
+// CHECK-NEXT:   %[[INPUT:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
+// CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
+//      CHECK:   %[[SLICE:.+]] = flow.dispatch.tensor.load %[[INPUT]]
+//      CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[SLICE]]
+//      CHECK:   flow.dispatch.tensor.store %[[EXTRACT]], %[[OUTPUT]]
 
 // -----
 
@@ -1241,6 +1218,8 @@ func.func @dont_fuse_tensor_insert_dest_producer(%arg0 : tensor<2x2xf32>) -> ten
 //      CHECK:       flow.return
 //      CHECK:   %[[DISPATCH2:.+]] = flow.dispatch.workgroups
 // CHECK-SAME:       (%[[DISPATCH1]], %[[CST]])
+//      CHECK:     tensor.insert_slice
+//      CHECK:     flow.return
 //      CHECK:   return %[[DISPATCH2]]
 
 // -----
@@ -1316,62 +1295,3 @@ func.func @concat_pattern(%src1 : tensor<2x40xf32>, %src2 : tensor<3x40xf32>,
 //      CHECK:   %[[UPDATE1:.+]] = flow.tensor.update %[[SRC1]], %[[DEST]]
 //      CHECK:   %[[UPDATE2:.+]] = flow.tensor.update %[[SRC2]], %[[UPDATE1]]
 //      CHECK:   return %[[UPDATE2]]
-
-// -----
-
-func.func @generic_tensor_insert(%arg0 : tensor<?x?xf32>,
-    %arg1 : index, %arg2 : index, %arg3 : index, %arg4 : index,
-    %arg5 : index, %arg6 : index, %arg7 : index, %arg8 : index,
-    %arg9 : index, %arg10 : tensor<?x?xf32>) -> tensor<?x?xf32> {
-  %0 = tensor.extract_slice %arg0[%arg1, %arg2] [1, %arg3] [%arg4, %arg5] : tensor<?x?xf32> to tensor<?xf32>
-  %1 = tensor.insert_slice %0 into %arg10[%arg6, %arg7] [%arg3, 1] [%arg8, %arg9] : tensor<?xf32> into tensor<?x?xf32>
-  return %1 : tensor<?x?xf32>
-}
-//      CHECK: func @generic_tensor_insert(
-// CHECK-SAME:     %[[SOURCE:[a-zA-Z0-9]+]]: tensor<?x?xf32>
-// CHECK-SAME:     %[[SOURCE_OFFSET_Y:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[SOURCE_OFFSET_X:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[SLICE_SIZE:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[SOURCE_STRIDE_Y:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[SOURCE_STRIDE_X:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[DEST_OFFSET_Y:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[DEST_OFFSET_X:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[DEST_STRIDE_Y:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[DEST_STRIDE_X:[a-zA-Z0-9]+]]: index,
-// CHECK-SAME:     %[[DEST:[a-zA-Z0-9]+]]: tensor<?x?xf32>)
-//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[DEST_D0:.+]] = tensor.dim %[[DEST]], %[[C0]]
-//  CHECK-DAG:   %[[DEST_D1:.+]] = tensor.dim %[[DEST]], %[[C1]]
-//  CHECK-DAG:   %[[SOURCE_D0:.+]] = tensor.dim %[[SOURCE]], %[[C0]]
-//  CHECK-DAG:   %[[SOURCE_D1:.+]] = tensor.dim %[[SOURCE]], %[[C1]]
-//      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
-// CHECK-SAME:       [%[[SLICE_SIZE]], %[[C1]], %[[C1]]]
-// CHECK-SAME:       (%[[SOURCE]], %[[SOURCE_D0]], %[[SOURCE_D1]],
-// CHECK-SAME:        %[[SOURCE_OFFSET_Y]], %[[SOURCE_OFFSET_X]]
-// CHECK-SAME:        %[[SOURCE_STRIDE_Y]], %[[SOURCE_STRIDE_X]], %[[DEST]]
-// CHECK-SAME:        %[[DEST_OFFSET_Y]], %[[DEST_OFFSET_X]], %[[SLICE_SIZE]]
-// CHECK-SAME:        %[[DEST_STRIDE_Y]], %[[DEST_STRIDE_X]], %[[DEST_D0]], %[[DEST_D1]])
-// CHECK-NEXT:       (%[[SOURCE_CAPTURE:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:?x?xf32>,
-// CHECK-SAME:        %[[SOURCE_D0_CAPTURE:[a-zA-Z0-9]+]]: index,
-// CHECK-SAME:        %[[SOURCE_D1_CAPTURE:[a-zA-Z0-9]+]]: index,
-// CHECK-SAME:        %[[SOURCE_OFFSET_Y_CAPTURE:[a-zA-Z0-9]+]]: index,
-// CHECK-SAME:        %[[SOURCE_OFFSET_X_CAPTURE:[a-zA-Z0-9]+]]: index,
-// CHECK-SAME:        %[[SOURCE_STRIDE_Y_CAPTURE:[a-zA-Z0-9]+]]: index,
-// CHECK-SAME:        %[[SOURCE_STRIDE_X_CAPTURE:[a-zA-Z0-9]+]]: index,
-// CHECK-SAME:        %[[DEST_CAPTURE:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readwrite:?x?xf32>,
-// CHECK-SAME:        %[[DEST_OFFSET_Y_CAPTURE:[a-zA-Z0-9]+]]: index,
-// CHECK-SAME:        %[[DEST_OFFSET_X_CAPTURE:[a-zA-Z0-9]+]]: index,
-// CHECK-SAME:        %[[SLICE_SIZE_CAPTURE:[a-zA-Z0-9]+]]: index,
-// CHECK-SAME:        %[[DEST_STRIDE_Y_CAPTURE:[a-zA-Z0-9]+]]: index,
-// CHECK-SAME:        %[[DEST_STRIDE_X_CAPTURE:[a-zA-Z0-9]+]]: index,
-// CHECK-SAME:        %[[DEST_D0_CAPTURE:[a-zA-Z0-9]+]]: index,
-// CHECK-SAME:        %[[DEST_D1_CAPTURE:[a-zA-Z0-9]+]]: index)
-//      CHECK:     %[[SLICE:.+]] = flow.dispatch.tensor.load %[[SOURCE_CAPTURE]]
-// CHECK-SAME:         offsets = [%[[SOURCE_OFFSET_Y_CAPTURE]], %[[SOURCE_OFFSET_X_CAPTURE]]]
-// CHECK-SAME:         sizes = [1, %[[SLICE_SIZE_CAPTURE]]]
-// CHECK-SAME:         strides = [%[[SOURCE_STRIDE_Y_CAPTURE]], %[[SOURCE_STRIDE_X_CAPTURE]]]
-//      CHECK:     flow.dispatch.tensor.store %[[SLICE]], %[[DEST_CAPTURE]]
-// CHECK-SAME:         offsets = [%[[DEST_OFFSET_Y_CAPTURE]], %[[DEST_OFFSET_X_CAPTURE]]]
-// CHECK-SAME:         sizes = [%[[SLICE_SIZE_CAPTURE]], 1]
-// CHECK-SAME:         strides = [%[[DEST_STRIDE_Y_CAPTURE]], %[[DEST_STRIDE_X_CAPTURE]]]
