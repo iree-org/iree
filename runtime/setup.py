@@ -25,6 +25,7 @@
 #   IREE_HAL_DRIVER_VULKAN
 #   IREE_ENABLE_RUNTIME_TRACING
 #   IREE_BUILD_TRACY
+#   IREE_ENABLE_CPUINFO
 
 from gettext import install
 import json
@@ -113,14 +114,42 @@ def load_version_info():
     return json.load(f)
 
 
+def find_git_versions():
+  revisions = {}
+  try:
+    revisions["IREE"] = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"],
+        cwd=IREE_SOURCE_DIR).decode("utf-8").strip()
+  except subprocess.SubprocessError as e:
+    print(f"ERROR: Could not get IREE revision: {e}", file=sys.stderr)
+  return revisions
+
+
+def find_git_submodule_revision(submodule_path):
+  try:
+    data = subprocess.check_output(["git", "ls-tree", "HEAD", submodule_path],
+                                   cwd=IREE_SOURCE_DIR).decode("utf-8").strip()
+    columns = re.split("\\s+", data)
+    return columns[2]
+  except Exception as e:
+    print(
+        f"ERROR: Could not get submodule revision for {submodule_path}"
+        f" ({e})",
+        file=sys.stderr)
+    return ""
+
+
 try:
   version_info = load_version_info()
 except FileNotFoundError:
   print("version_info.json not found. Using defaults", file=sys.stderr)
   version_info = {}
+git_versions = find_git_versions()
 
 PACKAGE_SUFFIX = version_info.get("package-suffix") or ""
-PACKAGE_VERSION = version_info.get("package-version") or "0.1dev1"
+PACKAGE_VERSION = version_info.get("package-version")
+if not PACKAGE_VERSION:
+  PACKAGE_VERSION = f"0.dev0+{git_versions.get('IREE') or '0'}"
 
 
 def maybe_nuke_cmake_cache():
@@ -170,11 +199,19 @@ def maybe_nuke_cmake_cache():
     f.write(expected_stamp_contents)
 
 
-def get_env_cmake_option(name: str, default_value: bool = False) -> bool:
+def get_env_cmake_option(name: str, default_value: bool = False) -> str:
   svalue = os.getenv(name)
   if not svalue:
     svalue = "ON" if default_value else "OFF"
   return f"-D{name}={svalue}"
+
+
+def add_env_cmake_setting(args, env_name: str, cmake_name=None) -> str:
+  svalue = os.getenv(env_name)
+  if svalue is not None:
+    if not cmake_name:
+      cmake_name = env_name
+    args.append(f"-D{cmake_name}={svalue}")
 
 
 def prepare_installation():
@@ -203,7 +240,15 @@ def prepare_installation():
                              "OFF" if platform.system() == "Darwin" else "ON"),
         get_env_cmake_option("IREE_ENABLE_RUNTIME_TRACING"),
         get_env_cmake_option("IREE_BUILD_TRACY"),
+        get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
     ]
+
+    # These usually flow through the environment, but we add them explicitly
+    # so that they show clearly in logs (getting them wrong can have bad
+    # outcomes).
+    add_env_cmake_setting(cmake_args, "CMAKE_OSX_ARCHITECTURES")
+    add_env_cmake_setting(cmake_args, "MACOSX_DEPLOYMENT_TARGET",
+                          "CMAKE_OSX_DEPLOYMENT_TARGET")
 
     # Only do a from-scratch configure if not already configured.
     cmake_cache_file = os.path.join(IREE_BINARY_DIR, "CMakeCache.txt")
@@ -293,33 +338,8 @@ def generate_version_py():
   return f"""# Auto-generated version info.
 PACKAGE_SUFFIX = "{PACKAGE_SUFFIX}"
 VERSION = "{PACKAGE_VERSION}"
-REVISIONS = {json.dumps(find_git_versions())}
+REVISIONS = {json.dumps(git_versions)}
 """
-
-
-def find_git_versions():
-  revisions = {}
-  try:
-    revisions["IREE"] = subprocess.check_output(
-        ["git", "rev-parse", "HEAD"],
-        cwd=IREE_SOURCE_DIR).decode("utf-8").strip()
-  except subprocess.SubprocessError as e:
-    print(f"ERROR: Could not get IREE revision: {e}", file=sys.stderr)
-  return revisions
-
-
-def find_git_submodule_revision(submodule_path):
-  try:
-    data = subprocess.check_output(["git", "ls-tree", "HEAD", submodule_path],
-                                   cwd=IREE_SOURCE_DIR).decode("utf-8").strip()
-    columns = re.split("\\s+", data)
-    return columns[2]
-  except Exception as e:
-    print(
-        f"ERROR: Could not get submodule revision for {submodule_path}"
-        f" ({e})",
-        file=sys.stderr)
-    return ""
 
 
 prepare_installation()
