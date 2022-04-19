@@ -58,7 +58,7 @@ jobs:
             build_family: macos
             build_package: py-runtime-pkg
             experimental: true
-            
+
     steps:
       - uses: actions/checkout@v2
         with:
@@ -119,14 +119,14 @@ jobs:
       ##########################################################################
 
       - name: Build runtime wheels
-        if: "matrix.build_package == 'py-runtime-pkg' and matrix.build_family == 'linux'"
+        if: "matrix.build_package == 'py-runtime-pkg' && matrix.build_family == 'linux'"
         shell: bash
         run: |
           packages="iree-runtime iree-runtime-instrumented" \
           ./main_checkout/build_tools/python_deploy/build_linux_packages.sh
 
       - name: Build runtime wheels
-        if: "matrix.build_package == 'py-runtime-pkg' and matrix.build_family == 'macos'"
+        if: "matrix.build_package == 'py-runtime-pkg' && matrix.build_family == 'macos'"
         shell: bash
         run: |
           packages="iree-runtime iree-runtime-instrumented" \
@@ -138,14 +138,14 @@ jobs:
       # One step per OS.
       ##########################################################################
       - name: Build compiler wheels
-        if: "matrix.build_package == 'py-compiler-pkg' and matrix.build_family == 'linux'"
+        if: "matrix.build_package == 'py-compiler-pkg' && matrix.build_family == 'linux'"
         shell: bash
         run: |
           packages="iree-compiler" \
           ./main_checkout/build_tools/python_deploy/build_linux_packages.sh
 
       - name: Build compiler wheels
-        if: "matrix.build_package == 'py-compiler-pkg' and matrix.build_family == 'macos'"
+        if: "matrix.build_package == 'py-compiler-pkg' && matrix.build_family == 'macos'"
         shell: bash
         run: |
           packages="iree-compiler" \
