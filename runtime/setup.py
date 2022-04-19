@@ -1,12 +1,10 @@
-# Copyright 2021 The IREE Authors
+# Copyright 2022 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build/install the iree-compiler-backend python package.
-# Note that this includes a relatively large build of LLVM (~2400 C++ files)
-# and can take a considerable amount of time, especially with defaults.
+# This builds just the runtime API and is relatively quick to build.
 # To install:
 #   pip install .
 # To build a wheel:
@@ -17,7 +15,17 @@
 #   CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache
 #
 # On CIs, it is often advantageous to re-use/control the CMake build directory.
-# This can be set with the IREE_COMPILER_API_CMAKE_BUILD_DIR env var.
+# This can be set with the IREE_RUNTIME_API_CMAKE_BUILD_DIR env var.
+#
+# A custom package suffix can be specified with the environment variable:
+#   IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX
+#
+# Select CMake options are available from environment variables:
+#   IREE_HAL_DRIVER_CUDA
+#   IREE_HAL_DRIVER_VULKAN
+#   IREE_ENABLE_RUNTIME_TRACING
+#   IREE_BUILD_TRACY
+
 from gettext import install
 import json
 from multiprocessing.spawn import prepare
@@ -83,8 +91,8 @@ if IS_CONFIGURED:
       f"BINARY_DIR = {IREE_BINARY_DIR}",
       file=sys.stderr)
 else:
-  IREE_SOURCE_DIR = os.path.join(SETUPPY_DIR, "..", "..")
-  IREE_BINARY_DIR = os.getenv("IREE_COMPILER_API_CMAKE_BUILD_DIR")
+  IREE_SOURCE_DIR = os.path.join(SETUPPY_DIR, "..")
+  IREE_BINARY_DIR = os.getenv("IREE_RUNTIME_API_CMAKE_BUILD_DIR")
   if not IREE_BINARY_DIR:
     # Note that setuptools always builds into a "build" directory that
     # is a sibling of setup.py, so we just colonize a sub-directory of that
@@ -132,8 +140,6 @@ def maybe_nuke_cmake_cache():
   # the CMakeCache.txt file if the path to the Python interpreter changed.
   # Ideally, CMake would let us reconfigure this dynamically... but it does
   # not (and gets very confused).
-  # We only do this because the compiler is so expensive to build and very
-  # little of it depends on the Python version. This is a hack.
   PYTHON_STAMP_FILE = os.path.join(IREE_BINARY_DIR, "python_stamp.txt")
   if os.path.exists(PYTHON_STAMP_FILE):
     with open(PYTHON_STAMP_FILE, "rt") as f:
@@ -154,13 +160,20 @@ def maybe_nuke_cmake_cache():
     f.write(expected_stamp_contents)
 
 
+def get_env_cmake_option(name: str, default_value: bool = False) -> bool:
+  svalue = os.getenv(name)
+  if not svalue:
+    svalue = "ON" if default_value else "OFF"
+  return f"-D{name}={svalue}"
+
+
 def prepare_installation():
+  subprocess.check_call(["cmake", "--version"])
   version_py_content = generate_version_py()
   print(f"Generating version.py:\n{version_py_content}", file=sys.stderr)
 
   if not IS_CONFIGURED:
     # Build from source tree.
-    subprocess.check_call(["cmake", "--version"])
     os.makedirs(IREE_BINARY_DIR, exist_ok=True)
     maybe_nuke_cmake_cache()
     print(f"CMake build dir: {IREE_BINARY_DIR}", file=sys.stderr)
@@ -170,14 +183,17 @@ def prepare_installation():
         "-GNinja",
         "--log-level=VERBOSE",
         "-DIREE_BUILD_PYTHON_BINDINGS=ON",
+        "-DIREE_BUILD_COMPILER=OFF",
+        "-DIREE_BUILD_SAMPLES=OFF",
+        "-DIREE_BUILD_TESTS=OFF",
         "-DPython3_EXECUTABLE={}".format(sys.executable),
         "-DCMAKE_BUILD_TYPE={}".format(cfg),
+        get_env_cmake_option("IREE_HAL_DRIVER_CUDA"),
+        get_env_cmake_option("IREE_HAL_DRIVER_VULKAN",
+                             "OFF" if platform.system() == "Darwin" else "ON"),
+        get_env_cmake_option("IREE_ENABLE_RUNTIME_TRACING"),
+        get_env_cmake_option("IREE_BUILD_TRACY"),
     ]
-
-    # Enable CUDA if specified.
-    cuda_target_option = os.getenv("IREE_TARGET_BACKEND_CUDA")
-    if cuda_target_option:
-      cmake_args.append(f"-DIREE_TARGET_BACKEND_CUDA={cuda_target_option}")
 
     # Only do a from-scratch configure if not already configured.
     cmake_cache_file = os.path.join(IREE_BINARY_DIR, "CMakeCache.txt")
@@ -189,17 +205,19 @@ def prepare_installation():
       print(f"Not re-configuring (already configured)", file=sys.stderr)
 
     # Build.
-    subprocess.check_call(
-        ["cmake", "--build", ".", "--target", "iree/compiler/API/python/all"],
-        cwd=IREE_BINARY_DIR)
+    subprocess.check_call([
+        "cmake", "--build", ".", "--target",
+        "runtime/bindings/python/iree/runtime/all"
+    ],
+                          cwd=IREE_BINARY_DIR)
     print("Build complete.", file=sys.stderr)
 
   # Install the directory we care about.
-  install_subdirectory = os.path.join(IREE_BINARY_DIR, "iree", "compiler",
-                                      "API", "python")
+  install_subdirectory = os.path.join(IREE_BINARY_DIR, "runtime", "bindings",
+                                      "python", "iree", "runtime")
   install_args = [
       "-DCMAKE_INSTALL_DO_STRIP=ON",
-      f"-DCMAKE_INSTALL_PREFIX={CMAKE_INSTALL_DIR_ABS}",
+      f"-DCMAKE_INSTALL_PREFIX={CMAKE_INSTALL_DIR_ABS}/",
       "-P",
       os.path.join(install_subdirectory, "cmake_install.cmake"),
   ]
@@ -208,7 +226,7 @@ def prepare_installation():
 
   # Write version.py directly into install dir.
   version_py_file = os.path.join(CMAKE_INSTALL_DIR_ABS, "python_packages",
-                                 "iree_compiler", "iree", "compiler",
+                                 "iree_runtime", "iree", "runtime",
                                  "version.py")
   os.makedirs(os.path.dirname(version_py_file), exist_ok=True)
   with open(version_py_file, "wt") as f:
@@ -231,7 +249,7 @@ class CMakeBuildPy(_build_py):
     if os.path.exists(target_dir):
       shutil.rmtree(target_dir)
     shutil.copytree(os.path.join(CMAKE_INSTALL_DIR_ABS, "python_packages",
-                                 "iree_compiler"),
+                                 "iree_runtime"),
                     target_dir,
                     symlinks=False)
     print("Target populated.", file=sys.stderr)
@@ -277,9 +295,6 @@ def find_git_versions():
         cwd=IREE_SOURCE_DIR).decode("utf-8").strip()
   except subprocess.SubprocessError as e:
     print(f"ERROR: Could not get IREE revision: {e}", file=sys.stderr)
-  revisions["LLVM_PROJECT"] = find_git_submodule_revision(
-      "third_party/llvm-project")
-  revisions["MLIR_HLO"] = find_git_submodule_revision("third_party/mlir-hlo")
   return revisions
 
 
@@ -301,20 +316,30 @@ prepare_installation()
 
 packages = find_namespace_packages(where=os.path.join(CMAKE_INSTALL_DIR_ABS,
                                                       "python_packages",
-                                                      "iree_compiler"),
+                                                      "iree_runtime"),
                                    include=[
-                                       "iree.compiler",
-                                       "iree.compiler.*",
+                                       "iree.runtime",
+                                       "iree.runtime.*",
                                    ])
-print(f"Found compiler packages: {packages}")
+print(f"Found runtime packages: {packages}")
+
+with open(
+    os.path.join(IREE_SOURCE_DIR, "runtime", "bindings", "python", "iree",
+                 "runtime", "README.md"), "rt") as f:
+  README = f.read()
+
+custom_package_suffix = os.getenv("IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX")
+if not custom_package_suffix:
+  custom_package_suffix = ""
 
 setup(
-    name=f"iree-compiler{PACKAGE_SUFFIX}",
+    name=f"iree-runtime{PACKAGE_SUFFIX}{custom_package_suffix}",
     version=f"{PACKAGE_VERSION}",
     author="IREE Authors",
     author_email="iree-discuss@googlegroups.com",
-    description="IREE Compiler API",
-    long_description="",
+    description="IREE Python Runtime Components",
+    long_description=README,
+    long_description_content_type="text/markdown",
     license="Apache-2.0",
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -323,12 +348,10 @@ setup(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
     ],
+    url="https://github.com/google/iree",
+    python_requires=">=3.7",
     ext_modules=[
-        CMakeExtension("iree.compiler._mlir_libs._mlir"),
-        CMakeExtension("iree.compiler._mlir_libs._ireeDialects"),
-        CMakeExtension("iree.compiler._mlir_libs._ireecTransforms"),
-        CMakeExtension("iree.compiler._mlir_libs._mlirHlo"),
-        CMakeExtension("iree.compiler._mlir_libs._mlirLinalgPasses"),
+        CMakeExtension("iree.runtime.binding"),
     ],
     cmdclass={
         "build": CustomBuild,
@@ -339,15 +362,26 @@ setup(
     package_dir={
         # Note: Must be relative path, so we line this up with the absolute
         # path built above. Note that this must exist prior to the call.
-        "": f"{CMAKE_INSTALL_DIR_REL}/python_packages/iree_compiler",
+        "": f"{CMAKE_INSTALL_DIR_REL}/python_packages/iree_runtime",
     },
     packages=packages,
+    # Matching the native extension as a data file keeps setuptools from
+    # "building" it (i.e. turning it into a static binary).
+    package_data={
+        "": [
+            f"*{sysconfig.get_config_var('EXT_SUFFIX')}",
+            "iree-run-module*",
+            "iree-run-trace*",
+            "iree-benchmark-trace*",
+            "iree-tracy-capture*",
+        ],
+    },
     entry_points={
         "console_scripts": [
-            "iree-compile = iree.compiler.tools.scripts.ireec.__main__:main",
-            # TODO: We have renamed to iree-compile on 2022-03-18. Remove
-            # this alias once no longer needed.
-            "ireec = iree.compiler.tools.scripts.ireec.__main__:main",
+            "iree-run-module = iree.runtime.scripts.iree_run_module.__main__:main",
+            "iree-run-trace = iree.runtime.scripts.iree_run_trace.__main__:main",
+            "iree-benchmark-trace = iree.runtime.scripts.iree_benchmark_trace.__main__:main",
+            "iree-tracy-capture = iree.runtime.scripts.iree_tracy_capture.__main__:main",
         ],
     },
     install_requires=[

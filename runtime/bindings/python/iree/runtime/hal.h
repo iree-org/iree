@@ -9,8 +9,8 @@
 
 #include <vector>
 
-#include "bindings/python/iree/runtime/binding.h"
-#include "bindings/python/iree/runtime/status_utils.h"
+#include "./binding.h"
+#include "./status_utils.h"
 #include "iree/hal/api.h"
 
 namespace iree {
@@ -143,7 +143,6 @@ class HalMappedMemory {
   }
   ~HalMappedMemory() {
     if (bv_) {
-      iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(bv_);
       iree_hal_buffer_unmap_range(&mapped_memory_);
       iree_hal_buffer_view_release(bv_);
     }

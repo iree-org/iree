@@ -76,7 +76,7 @@ tests_passed=true
 
 echo "***** Testing with CTest *****"
 if ! ctest --timeout 900 --output-on-failure \
-   --tests-regex "^integrations/tensorflow/|^bindings/python/" \
+   --tests-regex "^integrations/tensorflow/|^runtime/bindings/python/" \
    --label-exclude "^nokokoro$|^vulkan_uses_vk_khr_shader_float16_int8$"
 then
    tests_passed=false

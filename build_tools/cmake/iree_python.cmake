@@ -39,8 +39,6 @@ endfunction()
 #     scoped)
 #   - Be installed under python_packages/PACKAGE_NAME
 #   - Have a local path of MODULE_PATH (i.e. namespace package path)
-#   - Process a setup.py.in from the current directory (if NOT AUGMENT_EXISTING_PACKAGE)
-#   - Process a version.py.in from the current directory (if NOT AUGMENT_EXISTING_PACKAGE)
 # Will set parent scope variables:
 #   - PY_INSTALL_COMPONENT: Install component. Echoed back from the argument
 #     for easier addition after this call.
@@ -73,7 +71,7 @@ function(iree_py_install_package)
     "DEPS;ADDL_PACKAGE_FILES;FILES_MATCHING"
     ${ARGN})
   set(_install_component ${ARG_COMPONENT})
-  set(_install_packages_dir "${CMAKE_INSTALL_PREFIX}/python_packages/${ARG_PACKAGE_NAME}")
+  set(_install_packages_dir "python_packages/${ARG_PACKAGE_NAME}")
   set(_install_module_dir "${_install_packages_dir}/${ARG_MODULE_PATH}")
   set(_target_name install-${_install_component})
 
@@ -81,44 +79,6 @@ function(iree_py_install_package)
     set(_files_matching PATTERN "*.py")
   else()
     set(_files_matching ${ARG_FILES_MATCHING})
-  endif()
-
-  if(NOT ARG_AUGMENT_EXISTING_PACKAGE)
-    configure_file(setup.py.in setup.py)
-    install(
-      FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/setup.py
-        ${ARG_ADDL_PACKAGE_FILES}
-      COMPONENT ${_install_component}
-      DESTINATION "${_install_packages_dir}"
-    )
-    configure_file(version.py.in version.py)
-    install(
-      FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/version.py
-      COMPONENT ${_install_component}
-      DESTINATION "${_install_module_dir}"
-    )
-
-    set(_component_option -DCMAKE_INSTALL_COMPONENT="${ARG_COMPONENT}")
-    add_custom_target(${_target_name}
-      COMMAND "${CMAKE_COMMAND}"
-              ${_component_option}
-              -P "${CMAKE_BINARY_DIR}/cmake_install.cmake"
-      USES_TERMINAL)
-    add_custom_target(${_target_name}-stripped
-      COMMAND "${CMAKE_COMMAND}"
-              ${_component_option}
-              -DCMAKE_INSTALL_DO_STRIP=1
-              -P "${CMAKE_BINARY_DIR}/cmake_install.cmake"
-      USES_TERMINAL)
-  endif()
-
-  # Explicit add dependencies in case if we are just extending a package
-  # vs adding the targets.
-  if(ARG_DEPS)
-    add_dependencies(${_target_name} ${ARG_DEPS})
-    add_dependencies(${_target_name}-stripped ${ARG_DEPS})
   endif()
 
   install(
@@ -336,7 +296,7 @@ function(iree_py_test)
 
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
-      "PYTHONPATH=${IREE_BINARY_DIR}/bindings/python:$ENV{PYTHONPATH}"
+      "PYTHONPATH=${IREE_BINARY_DIR}/iree/compiler/python:${IREE_BINARY_DIR}/runtime/bindings/python:$ENV{PYTHONPATH}"
       "TEST_TMPDIR=${IREE_BINARY_DIR}/tmp/${_NAME}_test_tmpdir"
   )
   iree_add_test_environment_properties(${_NAME_PATH})
