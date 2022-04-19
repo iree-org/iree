@@ -19,10 +19,18 @@
 extern "C" {
 #endif  // __cplusplus
 
+enum iree_vm_native_import_flag_bits_e {
+  IREE_VM_NATIVE_IMPORT_REQUIRED = 1u << 0,
+  IREE_VM_NATIVE_IMPORT_OPTIONAL = 1u << 1,
+};
+typedef uint32_t iree_vm_native_import_flags_t;
+
 // Describes an imported native function in a native module.
 // All of this information is assumed read-only and will be referenced for the
 // lifetime of any module created with the descriptor.
 typedef struct iree_vm_native_import_descriptor_t {
+  // Flags controlling import resolution.
+  iree_vm_native_import_flags_t flags;
   // Fully-qualified function name (for example, 'other_module.foo').
   iree_string_view_t full_name;
 } iree_vm_native_import_descriptor_t;

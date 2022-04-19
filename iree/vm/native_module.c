@@ -116,7 +116,10 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_get_import_function(
       &module->descriptor->imports[ordinal];
   if (out_function) {
     out_function->module = &module->base_interface;
-    out_function->linkage = IREE_VM_FUNCTION_LINKAGE_IMPORT;
+    out_function->linkage = iree_all_bits_set(import_descriptor->flags,
+                                              IREE_VM_NATIVE_IMPORT_OPTIONAL)
+                                ? IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL
+                                : IREE_VM_FUNCTION_LINKAGE_IMPORT;
     out_function->ordinal = (uint16_t)ordinal;
   }
   if (out_name) {
@@ -165,6 +168,7 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_get_function(
   }
   switch (linkage) {
     case IREE_VM_FUNCTION_LINKAGE_IMPORT:
+    case IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL:
       return iree_vm_native_module_get_import_function(
           module, ordinal, out_function, out_name, out_signature);
     case IREE_VM_FUNCTION_LINKAGE_EXPORT:

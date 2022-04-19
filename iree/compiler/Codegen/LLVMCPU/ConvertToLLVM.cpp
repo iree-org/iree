@@ -510,8 +510,8 @@ class HALDispatchABI {
     return builder.createOrFold<LLVM::LoadOp>(loc, elementPtrValue);
   }
 
-  // Returns an i1 indicating whether the weak import with |ordinal| is defined.
-  // Equivalent to:
+  // Returns an i1 indicating whether the optional import with |ordinal| is
+  // defined. Equivalent to:
   //   state->imports[ordinal] != NULL
   Value isImportFuncAvailable(Location loc, int64_t ordinal,
                               OpBuilder &builder) {

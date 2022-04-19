@@ -6,24 +6,24 @@
 
 vm.module @check {
 
-vm.import @expect_true(
+vm.import optional @expect_true(
   %operand : i32
 )
 
-vm.import @expect_false(
+vm.import optional @expect_false(
   %operand : i32
 )
 
-vm.import @expect_all_true(
+vm.import optional @expect_all_true(
   %operand : !vm.ref<!hal.buffer_view>,
 )
 
-vm.import @expect_eq(
+vm.import optional @expect_eq(
   %lhs : !vm.ref<!hal.buffer_view>,
   %rhs : !vm.ref<!hal.buffer_view>
 )
 
-vm.import @expect_almost_eq(
+vm.import optional @expect_almost_eq(
   %lhs : !vm.ref<!hal.buffer_view>,
   %rhs : !vm.ref<!hal.buffer_view>
 )

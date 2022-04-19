@@ -2078,6 +2078,73 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
     return success();
   }
 
+  void failIfImportUnresolved(OpBuilder &builder, Location location,
+                              Value import) const {
+    auto *ctx = builder.getContext();
+    Type boolType = builder.getIntegerType(1);
+
+    // (iree_vm_function_t*)->module
+    auto importModule =
+        builder
+            .create<emitc::CallOp>(
+                /*location=*/location,
+                /*type=*/
+                emitc::PointerType::get(
+                    emitc::OpaqueType::get(ctx, "iree_vm_module_t")),
+                /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER"),
+                /*args=*/
+                ArrayAttr::get(ctx, {builder.getIndexAttr(0),
+                                     emitc::OpaqueAttr::get(ctx, "module")}),
+                /*templateArgs=*/ArrayAttr{},
+                /*operands=*/ArrayRef<Value>{import})
+            .getResult(0);
+
+    auto conditionI1 = builder.create<emitc::CallOp>(
+        /*location=*/location,
+        /*type=*/boolType,
+        /*callee=*/StringAttr::get(ctx, "EMITC_NOT"),
+        /*args=*/
+        ArrayAttr::get(ctx, {builder.getIndexAttr(0)}),
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{importModule});
+
+    // Start by splitting the block into two. The part before will contain the
+    // condition, and the part after will contain the continuation point.
+    Block *condBlock = builder.getInsertionBlock();
+    Block::iterator opPosition = builder.getInsertionPoint();
+    Block *continuationBlock = condBlock->splitBlock(opPosition);
+
+    // Create a new block for the target of the failure.
+    Block *failureBlock;
+    {
+      OpBuilder::InsertionGuard guard(builder);
+      Region *parentRegion = condBlock->getParent();
+      failureBlock = builder.createBlock(parentRegion, parentRegion->end());
+
+      mlir::func::FuncOp funcOp =
+          cast<mlir::func::FuncOp>(failureBlock->getParentOp());
+      releaseRefs(builder, location, funcOp,
+                  *getTypeConverter<IREE::VM::EmitCTypeConverter>());
+
+      auto statusOp = builder.create<emitc::CallOp>(
+          /*location=*/location,
+          /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
+          /*callee=*/StringAttr::get(ctx, "iree_make_status"),
+          /*args=*/
+          ArrayAttr::get(
+              ctx, {emitc::OpaqueAttr::get(ctx, "IREE_STATUS_NOT_FOUND")}),
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>{});
+      builder.create<mlir::func::ReturnOp>(location, statusOp.getResult(0));
+    }
+
+    builder.setInsertionPointToEnd(condBlock);
+    builder.create<IREE::VM::CondBranchOp>(location, conditionI1.getResult(0),
+                                           failureBlock, continuationBlock);
+
+    builder.setInsertionPointToStart(continuationBlock);
+  }
+
   LogicalResult createImportShim(FunctionType functionType,
                                  IREE::VM::ImportOp &importOp, int64_t numSpans,
                                  ConversionPatternRewriter &rewriter) const {
@@ -2093,7 +2160,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
             : buildFunctionName(moduleOp, importOp);
 
     if (!newFuncName.hasValue()) {
-      importOp.emitError() << "failed to build import shim name.";
+      return importOp.emitError() << "failed to build import shim name.";
     }
 
     auto newFuncType = buildFuncType(functionType, numSpans, rewriter, loc);
@@ -2135,6 +2202,8 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
       }
 
       auto importArg = newFuncOp.getArgument(1);
+      failIfImportUnresolved(rewriter, loc, importArg);
+
       auto call =
           buildIreeVmFunctionCallStruct(importArg, argumentSize.getValue(),
                                         resultSize.getValue(), rewriter, loc);
@@ -3740,6 +3809,107 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
   }
 };
 
+class ImportResolvedOpConversion
+    : public OpConversionPattern<IREE::VM::ImportResolvedOp> {
+  using OpConversionPattern<IREE::VM::ImportResolvedOp>::OpConversionPattern;
+
+ public:
+  ImportResolvedOpConversion(TypeConverter &typeConverter, MLIRContext *context)
+      : OpConversionPattern(typeConverter, context) {}
+
+ private:
+  LogicalResult matchAndRewrite(
+      IREE::VM::ImportResolvedOp op, IREE::VM::ImportResolvedOpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto ctx = op.getContext();
+    auto loc = op.getLoc();
+
+    IREE::VM::ImportOp importOp =
+        lookupSymbolRef<IREE::VM::ImportOp>(op.getOperation(), "import");
+    int importOrdinal = importOp.ordinal().getValue().getZExtValue();
+
+    auto funcOp = op->getParentOfType<mlir::func::FuncOp>();
+    BlockArgument stateArg = funcOp.getArgument(2);
+
+    auto imports = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/
+        emitc::PointerType::get(
+            emitc::OpaqueType::get(ctx, "iree_vm_function_t")),
+        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER"),
+        /*args=*/
+        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
+                             emitc::OpaqueAttr::get(ctx, "imports")}),
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{stateArg});
+
+    auto import = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/
+        emitc::PointerType::get(
+            emitc::OpaqueType::get(ctx, "iree_vm_function_t")),
+        /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
+        /*args=*/
+        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
+                             rewriter.getUI32IntegerAttr(importOrdinal)}),
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{imports.getResult(0)});
+
+    // (iree_vm_function_t*)->module
+    auto importModule =
+        rewriter
+            .create<emitc::CallOp>(
+                /*location=*/loc,
+                /*type=*/
+                emitc::PointerType::get(
+                    emitc::OpaqueType::get(ctx, "iree_vm_module_t")),
+                /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER"),
+                /*args=*/
+                ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
+                                     emitc::OpaqueAttr::get(ctx, "module")}),
+                /*templateArgs=*/ArrayAttr{},
+                /*operands=*/ArrayRef<Value>{import.getResult(0)})
+            .getResult(0);
+
+    Type boolType = rewriter.getIntegerType(1);
+    auto conditionI1 = rewriter
+                           .create<emitc::CallOp>(
+                               /*location=*/loc,
+                               /*type=*/boolType,
+                               /*callee=*/StringAttr::get(ctx, "EMITC_NOT"),
+                               /*args=*/
+                               ArrayAttr::get(ctx, {rewriter.getIndexAttr(0)}),
+                               /*templateArgs=*/ArrayAttr{},
+                               /*operands=*/ArrayRef<Value>{importModule})
+                           .getResult(0);
+    auto invConditionI1 =
+        rewriter
+            .create<emitc::CallOp>(
+                /*location=*/loc,
+                /*type=*/boolType,
+                /*callee=*/StringAttr::get(ctx, "EMITC_NOT"),
+                /*args=*/
+                ArrayAttr::get(ctx, {rewriter.getIndexAttr(0)}),
+                /*templateArgs=*/ArrayAttr{},
+                /*operands=*/ArrayRef<Value>{conditionI1})
+            .getResult(0);
+
+    auto i32Type = rewriter.getIntegerType(32);
+    auto conditionI32 = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/i32Type,
+        /*callee=*/StringAttr::get(ctx, "EMITC_CAST"),
+        /*args=*/
+        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0), TypeAttr::get(i32Type)}),
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{invConditionI1});
+
+    rewriter.replaceOp(op, {conditionI32.getResult(0)});
+
+    return success();
+  }
+};
+
 class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
   using OpConversionPattern<IREE::VM::FailOp>::OpConversionPattern;
 
@@ -4725,6 +4895,7 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
   patterns.add<ExportOpConversion>(typeConverter, context, visitedExports);
   patterns.add<ImportOpConversion>(typeConverter, context, importShims);
   patterns.add<ReturnOpConversion>(typeConverter, context);
+  patterns.add<ImportResolvedOpConversion>(typeConverter, context);
 
   // Globals
   patterns.add<

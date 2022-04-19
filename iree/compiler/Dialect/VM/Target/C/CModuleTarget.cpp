@@ -202,7 +202,10 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
              rhs.ordinal().getValue().getZExtValue();
     });
     for (auto importOp : importOps) {
-      output << "{" << printStringView(importOp.getName()) << "},\n";
+      output << "{"
+             << (importOp.is_optional() ? "IREE_VM_NATIVE_IMPORT_OPTIONAL"
+                                        : "IREE_VM_NATIVE_IMPORT_REQUIRED")
+             << ", " << printStringView(importOp.getName()) << "},\n";
     }
   }
   output << "};\n";

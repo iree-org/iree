@@ -42,6 +42,8 @@ typedef enum iree_vm_function_linkage_e {
   IREE_VM_FUNCTION_LINKAGE_IMPORT = 1,
   // Function is an export from the module.
   IREE_VM_FUNCTION_LINKAGE_EXPORT = 2,
+  // Function is an import from another module that may be unavailable.
+  IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL = 3,
   // TODO(#1979): add linkage types for well-known functions like __init.
 } iree_vm_function_linkage_t;
 

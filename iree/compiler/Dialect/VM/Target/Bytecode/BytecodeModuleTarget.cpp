@@ -704,9 +704,13 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
         auto fullNameRef = fbb.createString(importOp.getName());
         auto signatureRef =
             makeImportFunctionSignatureDef(importOp, typeOrdinalMap, fbb);
+        iree_vm_ImportFlagBits_enum_t flags =
+            importOp.is_optional() ? iree_vm_ImportFlagBits_OPTIONAL
+                                   : iree_vm_ImportFlagBits_REQUIRED;
         iree_vm_ImportFunctionDef_start(fbb);
         iree_vm_ImportFunctionDef_full_name_add(fbb, fullNameRef);
         iree_vm_ImportFunctionDef_signature_add(fbb, signatureRef);
+        iree_vm_ImportFunctionDef_flags_add(fbb, flags);
         return iree_vm_ImportFunctionDef_end(fbb);
       }));
   auto exportFuncRefs =

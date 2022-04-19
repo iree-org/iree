@@ -20,6 +20,7 @@ iree_lit_test_suite(
         [
             "failure.mlir",
             "success.mlir",
+            "unavailable.mlir",
         ],
         include = ["*.mlir"],
     ),
@@ -27,6 +28,7 @@ iree_lit_test_suite(
     tools = [
         "//iree/tools:iree-check-module",
         "//iree/tools:iree-compile",
+        "//iree/tools:iree-run-module",
         "@llvm-project//llvm:FileCheck",
     ],
 )

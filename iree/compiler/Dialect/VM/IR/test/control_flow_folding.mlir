@@ -140,3 +140,19 @@ vm.module @check_folds {
     // CHECK-NEXT: vm.fail %[[STATUS]], "expected nz"
   }
 }
+
+// -----
+
+// CHECK-LABEL: @check_imports
+vm.module @check_imports {
+  vm.import @required_import_fn(%arg0 : i32) -> i32
+  vm.import optional @optional_import_fn(%arg0 : i32) -> i32
+  vm.func @call_fn() -> (i32, i32) {
+    // CHECK-NOT: vm.import.resolved @required_import_fn
+    // CHECK-DAG: %[[HAS_STRONG:.+]] = vm.const.i32 1
+    %has_required_import_fn = vm.import.resolved @required_import_fn : i32
+    // CHECK-DAG: %[[HAS_WEAK:.+]] = vm.import.resolved @optional_import_fn : i32
+    %has_optional_import_fn = vm.import.resolved @optional_import_fn : i32
+    vm.return %has_required_import_fn, %has_optional_import_fn : i32, i32
+  }
+}
