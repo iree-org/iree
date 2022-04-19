@@ -78,7 +78,8 @@ static iree_status_t run_test() {
           query_fn_ptr, IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST,
           &environment);
   if (library.header == NULL) {
-    return iree_make_status(IREE_STATUS_NOT_FOUND, "library header is empty");
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "library header is empty (version mismatch?)");
   }
 
   const iree_hal_executable_library_header_t* header = *library.header;
@@ -120,6 +121,7 @@ static iree_status_t run_test() {
       .workgroup_count_x = 1,
       .workgroup_count_y = 1,
       .workgroup_count_z = 1,
+      .max_concurrency = 1,
       .binding_count = 1,
       .binding_lengths = binding_lengths,
       .binding_ptrs = binding_ptrs,

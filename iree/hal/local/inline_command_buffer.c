@@ -430,6 +430,9 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
   dispatch_state->workgroup_count_y = workgroup_y;
   dispatch_state->workgroup_count_z = workgroup_z;
 
+  // Single-threaded.
+  dispatch_state->max_concurrency = 1;
+
   // Push constants are pulled directly from the command buffer state, but we
   // only allow the dispatch to read what we know is initialized based on the
   // layout.

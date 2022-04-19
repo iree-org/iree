@@ -282,7 +282,7 @@ llvm::Function *LibraryBuilder::build(StringRef queryFuncName) {
   builder.CreateRet(builder.CreateSelect(
       builder.CreateICmpEQ(func->getArg(0),
                            llvm::ConstantInt::get(
-                               i32Type, static_cast<int64_t>(Version::V_0_1))),
+                               i32Type, static_cast<int64_t>(Version::LATEST))),
       builder.CreatePointerCast(v0, libraryHeaderType->getPointerTo()),
       llvm::ConstantPointerNull::get(libraryHeaderType->getPointerTo())));
 

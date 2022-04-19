@@ -46,6 +46,9 @@ IREE_FLAG(int32_t, workgroup_size_y, 1,
 IREE_FLAG(int32_t, workgroup_size_z, 1,
           "Z dimension of the workgroup size passed to the executable.");
 
+IREE_FLAG(int32_t, max_concurrency, 1,
+          "Maximum available concurrency exposed to the dispatch.");
+
 // Total number of bindings we (currently) allow any executable to have.
 #define IREE_HAL_LOCAL_MAX_TOTAL_BINDING_COUNT \
   (IREE_HAL_LOCAL_MAX_DESCRIPTOR_SET_COUNT *   \
@@ -240,6 +243,7 @@ static iree_status_t iree_hal_executable_library_run(
       .workgroup_size_x = FLAG_workgroup_size_x,
       .workgroup_size_y = FLAG_workgroup_size_y,
       .workgroup_size_z = FLAG_workgroup_size_z,
+      .max_concurrency = FLAG_max_concurrency,
       .push_constant_count = dispatch_params.push_constant_count,
       .push_constants = &dispatch_params.push_constants[0].ui32,
       .binding_count = dispatch_params.binding_count,

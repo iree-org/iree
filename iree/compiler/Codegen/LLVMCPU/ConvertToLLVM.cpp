@@ -150,7 +150,8 @@ class HALDispatchABI {
     /*uint32_t*/ workgroup_count_x,
     /*uint32_t*/ workgroup_count_y,
     /*uint16_t*/ workgroup_count_z,
-    /*uint16_t*/ binding_count,
+    /*uint8_t*/ max_concurrency,
+    /*uint8_t*/ binding_count,
     /*intptr_t*/ push_constants,
     /*intptr_t*/ binding_ptrs,
     /*intptr_t*/ binding_lengths,
@@ -169,6 +170,7 @@ class HALDispatchABI {
 
     auto indexType = typeConverter->convertType(IndexType::get(context));
     auto int8Type = IntegerType::get(context, 8);
+    auto uint8Type = IntegerType::get(context, 8);
     auto uint16Type = IntegerType::get(context, 16);
     auto uint32Type = IntegerType::get(context, 32);
     auto int8PtrType = LLVM::LLVMPointerType::get(int8Type);
@@ -192,8 +194,11 @@ class HALDispatchABI {
     fieldTypes.push_back(uint32Type);
     fieldTypes.push_back(uint16Type);
 
-    // uint16_t binding_count;
-    fieldTypes.push_back(uint16Type);
+    // uint8_t max_concurrency;
+    fieldTypes.push_back(uint8Type);
+
+    // uint8_t binding_count;
+    fieldTypes.push_back(uint8Type);
 
     // const uint32_t * push_constants;
     fieldTypes.push_back(uint32PtrType);
@@ -329,6 +334,15 @@ class HALDispatchABI {
     auto dimValue = loadFieldValue(
         loc, DispatchStateField::workgroup_size_x + dim, builder);
     return castValueToType(loc, dimValue, resultType, builder);
+  }
+
+  // Returns the estimated maximum concurrency as an index-converted type.
+  Value loadMaxConcurrency(Location loc, OpBuilder &builder) {
+    auto value =
+        loadFieldValue(loc, DispatchStateField::max_concurrency, builder);
+    return castValueToType(loc, value,
+                           typeConverter->convertType(builder.getIndexType()),
+                           builder);
   }
 
   // Returns the total number of bytes available in workgroup local memory.

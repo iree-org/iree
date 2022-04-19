@@ -8,7 +8,7 @@ func.func @binding_ptrs() {
   %c72 = arith.constant 72 : index
 
   // CHECK: %[[STATE:.+]] = llvm.load %arg1 : !llvm.ptr<struct<[[DISPATCH_STATE_TYPE:.+]]>>
-  // CHECK: %[[PC:.+]] = llvm.extractvalue %[[STATE]][8]
+  // CHECK: %[[PC:.+]] = llvm.extractvalue %[[STATE]][9]
   // CHECK: %[[C2:.+]] = llvm.mlir.constant(2 : i64) : i64
   // CHECK: %[[DIM_PTR:.+]] = llvm.getelementptr %[[PC]][%[[C2]]] : (!llvm.ptr<i32>, i64) -> !llvm.ptr<i32>
   // CHECK: %[[DIM_I32:.+]] = llvm.load %[[DIM_PTR]] : !llvm.ptr<i32>
@@ -16,7 +16,7 @@ func.func @binding_ptrs() {
   %dim = hal.interface.constant.load[2] : index
 
   // CHECK: %[[STATE:.+]] = llvm.load %arg1 : !llvm.ptr<struct<[[DISPATCH_STATE_TYPE]]>>
-  // CHECK: %[[BINDING_PTRS:.+]] = llvm.extractvalue %[[STATE]][9]
+  // CHECK: %[[BINDING_PTRS:.+]] = llvm.extractvalue %[[STATE]][10]
   // CHECK: %[[C1:.+]] = llvm.mlir.constant(1 : i64) : i64
   // CHECK: %[[ARRAY_PTR:.+]] = llvm.getelementptr %[[BINDING_PTRS]][%[[C1]]] : (!llvm.ptr<ptr<i8>>, i64) -> !llvm.ptr<ptr<i8>>
   // CHECK: %[[BASE_PTR_I8:.+]] = llvm.load %[[ARRAY_PTR]] : !llvm.ptr<ptr<i8>>
