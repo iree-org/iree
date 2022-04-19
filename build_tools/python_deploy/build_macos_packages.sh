@@ -51,17 +51,14 @@ function run() {
         iree-runtime)
           clean_wheels iree_runtime $python_version
           build_iree_runtime
-          run_audit_wheel iree_runtime $python_version
           ;;
         iree-runtime-instrumented)
           clean_wheels iree_runtime_instrumented $python_version
           build_iree_runtime_instrumented
-          run_audit_wheel iree_runtime_instrumented $python_version
           ;;
         iree-compiler)
           clean_wheels iree_compiler $python_version
           build_iree_compiler
-          run_audit_wheel iree_compiler $python_version
           ;;
         *)
           echo "Unrecognized package '$package'"
@@ -87,16 +84,6 @@ function build_iree_runtime_instrumented() {
 
 function build_iree_compiler() {
   python3 -m pip wheel -v -w $output_dir $repo_root/iree/compiler/
-}
-
-function run_audit_wheel() {
-  local wheel_basename="$1"
-  local python_version="$2"
-  return
-  generic_wheel="/wheelhouse/${wheel_basename}-*-${python_version}-linux_x86_64.whl"
-  echo ":::: Auditwheel $generic_wheel"
-  auditwheel repair -w $output_dir $generic_wheel
-  rm $generic_wheel
 }
 
 function clean_wheels() {
