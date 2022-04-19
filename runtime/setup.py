@@ -155,6 +155,16 @@ def maybe_nuke_cmake_cache():
           file=sys.stderr)
     os.remove(cmake_cache_file)
 
+  # Also clean the install directory. This avoids version specific pileups
+  # of binaries that can occur with repeated builds against different
+  # Python versions.
+  if os.path.exists(CMAKE_INSTALL_DIR_ABS):
+    print(
+        f"Removing CMake install dir because Python version changed: "
+        f"{CMAKE_INSTALL_DIR_ABS}",
+        file=sys.stderr)
+    shutil.rmtree(CMAKE_INSTALL_DIR_ABS)
+
   # And write.
   with open(PYTHON_STAMP_FILE, "wt") as f:
     f.write(expected_stamp_contents)
