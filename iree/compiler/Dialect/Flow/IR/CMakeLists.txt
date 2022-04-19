@@ -38,7 +38,6 @@ iree_cc_library(
     ::FlowOpsGen
     ::FlowTypesGen
     LLVMSupport
-    MLIRAffine
     MLIRAnalysis
     MLIRArithmeticUtils
     MLIRControlFlowInterfaces

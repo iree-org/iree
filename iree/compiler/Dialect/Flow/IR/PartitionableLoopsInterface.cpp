@@ -128,66 +128,6 @@ struct TiledOpInterfacePartitionableLoops
   }
 };
 
-/// Partitionable loop interface for `tensor.extract_slice` operation. Needed
-/// only to build the workload during dispatch region formation.
-/// TODO(ravishankarm): Drop this ExternalModel once the use of
-/// PartitionableLoopsInterface is dropped from Flow.
-struct TensorExtractOpPartitionableLoops
-    : public PartitionableLoopsInterface::ExternalModel<
-          TensorExtractOpPartitionableLoops, tensor::ExtractSliceOp> {
-  unsigned getNumLoops(Operation *op) const {
-    return cast<tensor::ExtractSliceOp>(op).getType().getRank();
-  }
-
-  llvm::SmallVector<unsigned> getPartitionableLoops(
-      Operation *op, unsigned maxNumPartitionedLoops) const {
-    auto sliceOp = cast<tensor::ExtractSliceOp>(op);
-    auto partitionableLoops =
-        llvm::to_vector(llvm::seq<unsigned>(0, sliceOp.getType().getRank()));
-    if (partitionableLoops.size() > maxNumPartitionedLoops) {
-      return llvm::to_vector(ArrayRef<unsigned>(partitionableLoops)
-                                 .take_back(maxNumPartitionedLoops));
-    }
-    return partitionableLoops;
-  }
-
-  llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
-    auto sliceOp = cast<tensor::ExtractSliceOp>(op);
-    return llvm::SmallVector<StringRef>(sliceOp.getType().getRank(),
-                                        getParallelIteratorTypeName());
-  }
-};
-
-/// Partitionable loop interface for `tensor.insert_slice` operation. Needed
-/// only to build the workload during dispatch region formation.
-/// TODO(ravishankarm): Drop this ExternalModel once the use of
-/// PartitionableLoopsInterface is dropped from Flow.
-struct TensorInsertOpPartitionableLoops
-    : public PartitionableLoopsInterface::ExternalModel<
-          TensorInsertOpPartitionableLoops, tensor::InsertSliceOp> {
-  unsigned getNumLoops(Operation *op) const {
-    return cast<tensor::InsertSliceOp>(op).getSourceType().getRank();
-  }
-
-  llvm::SmallVector<unsigned> getPartitionableLoops(
-      Operation *op, unsigned maxNumPartitionedLoops) const {
-    auto sliceOp = cast<tensor::InsertSliceOp>(op);
-    auto partitionableLoops = llvm::to_vector(
-        llvm::seq<unsigned>(0, sliceOp.getSourceType().getRank()));
-    if (partitionableLoops.size() > maxNumPartitionedLoops) {
-      return llvm::to_vector(ArrayRef<unsigned>(partitionableLoops)
-                                 .take_back(maxNumPartitionedLoops));
-    }
-    return partitionableLoops;
-  }
-
-  llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
-    auto sliceOp = cast<tensor::InsertSliceOp>(op);
-    return llvm::SmallVector<StringRef>(sliceOp.getType().getRank(),
-                                        getParallelIteratorTypeName());
-  }
-};
-
 /// Registers the `LinalgOpPartitionableLoops` model for all Linalg ops. This
 /// needs to be done on a op-by-op basis since registration is on an op-by-op
 /// basis.
@@ -283,10 +223,8 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
             LinalgExt::ScatterOp, LinalgExt::SortOp>(ctx);
       });
   registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
-    tensor::ExtractSliceOp::attachInterface<TensorExtractOpPartitionableLoops>(
-        *ctx);
-    tensor::InsertSliceOp::attachInterface<TensorInsertOpPartitionableLoops>(
-        *ctx);
+    registerInterfaceForTiledOpInterfaceOps<tensor::ExtractSliceOp,
+                                            tensor::InsertSliceOp>(ctx);
   });
 }
 

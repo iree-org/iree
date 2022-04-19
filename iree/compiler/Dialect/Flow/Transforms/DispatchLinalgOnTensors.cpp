@@ -1047,16 +1047,6 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp,
     llvm::dbgs() << "\n\n";
   });
 
-  // Finally fold `tensor.insert_slice/extract_slice` operations with
-  // `flow.dispatch.tensor.load/store`.
-  RewritePatternSet foldExtractInsertSliceOps(context);
-  populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
-      foldExtractInsertSliceOps, context);
-  if (failed(applyPatternsAndFoldGreedily(
-          funcOp, std::move(foldExtractInsertSliceOps)))) {
-    return failure();
-  }
-
   return success();
 }
 
