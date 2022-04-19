@@ -1278,16 +1278,21 @@ iree_status_t iree_vm_bytecode_disasm_op(
         function.linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
         function.ordinal = function_ordinal;
       }
-      iree_string_view_t module_name = iree_vm_module_name(function.module);
-      iree_string_view_t func_name = iree_vm_function_name(&function);
-      if (iree_string_view_is_empty(func_name)) {
-        IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-            b, "%.*s:%u", (int)module_name.size, module_name.data,
-            function.ordinal));
+      if (function.module) {
+        iree_string_view_t module_name = iree_vm_module_name(function.module);
+        iree_string_view_t func_name = iree_vm_function_name(&function);
+        if (iree_string_view_is_empty(func_name)) {
+          IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+              b, "%.*s:%u", (int)module_name.size, module_name.data,
+              function.ordinal));
+        } else {
+          IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+              b, "%.*s.%.*s", (int)module_name.size, module_name.data,
+              (int)func_name.size, func_name.data));
+        }
       } else {
-        IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-            b, "%.*s.%.*s", (int)module_name.size, module_name.data,
-            (int)func_name.size, func_name.data));
+        IREE_RETURN_IF_ERROR(
+            iree_string_builder_append_cstring(b, "{{UNRESOLVED}}"));
       }
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
       EMIT_OPERAND_REG_LIST(src_reg_list);
@@ -1355,6 +1360,38 @@ iree_status_t iree_vm_bytecode_disasm_op(
       EMIT_OPTIONAL_VALUE_I32(regs->i32[status_code_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, ", \"%.*s\"", (int)message.size, message.data));
+      break;
+    }
+
+    DISASM_OP(CORE, ImportResolved) {
+      int32_t function_ordinal = VM_ParseFuncAttr("import");
+      uint16_t result_reg = VM_ParseResultRegI32("result");
+      EMIT_I32_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, "= vm.import.exists @"));
+      int is_import = (function_ordinal & 0x80000000u) != 0;
+      if (IREE_UNLIKELY(!is_import)) {
+        IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+            b, "{{INVALID ORDINAL %d}}", function_ordinal));
+        break;
+      }
+      uint32_t import_ordinal = function_ordinal & 0x7FFFFFFFu;
+      if (IREE_UNLIKELY(import_ordinal >= module_state->import_count)) {
+        IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+            b, "{{OUT OF RANGE ORDINAL %u}}", import_ordinal));
+        break;
+      }
+      iree_vm_function_t decl_function;
+      IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
+          &module->interface, IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL,
+          import_ordinal, &decl_function));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_string(
+          b, iree_vm_function_name(&decl_function)));
+      const iree_vm_bytecode_import_t* import =
+          &module_state->import_table[import_ordinal];
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
+          b, import->function.module != NULL ? " // (resolved)"
+                                             : " // (unresolved)"));
       break;
     }
 

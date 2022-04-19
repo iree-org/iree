@@ -38,7 +38,6 @@ a directory and:
   source .venv/bin/activate
 
   python ./main_checkout/build_tools/github_actions/build_dist.py main-dist
-  python ./main_checkout/build_tools/github_actions/build_dist.py py-runtime-pkg
   python ./main_checkout/build_tools/github_actions/build_dist.py py-xla-compiler-tools-pkg
   python ./main_checkout/build_tools/github_actions/build_dist.py py-tflite-compiler-tools-pkg
   python ./main_checkout/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg
@@ -178,67 +177,6 @@ def build_main_dist():
       tf.add(os.path.join(INSTALL_DIR, entry), arcname=entry, recursive=True)
 
 
-def build_py_runtime_pkg(instrumented: bool = False):
-  """Builds the iree-install/python_packages/iree_runtime package.
-
-  This includes native, python-version dependent code and is designed to
-  be built multiple times.
-
-  Note that an instrumented build may require additional dependencies.
-  See: install_tracy_cli_deps_manylinux2014.sh for how to set up on that
-  container.
-  """
-  install_python_requirements()
-
-  # Clean up install and build trees.
-  shutil.rmtree(INSTALL_DIR, ignore_errors=True)
-  remove_cmake_cache()
-  extra_cmake_flags = []
-
-  # Extra options for instrumentation.
-  if instrumented:
-    print("*** Enabling options for instrumented build ***")
-    extra_cmake_flags.extend([
-        f"-DIREE_ENABLE_RUNTIME_TRACING=ON",
-        f"-DIREE_BUILD_TRACY=ON",
-    ])
-
-  # Enable CUDA if on platforms where we expect to have the deps and produce
-  # such binaries.
-  if platform.system() == "Linux":
-    print("*** Enabling CUDA runtime ***")
-    extra_cmake_flags.extend([
-        "-DIREE_HAL_DRIVER_CUDA=ON",
-    ])
-
-  # CMake configure.
-  print("*** Configuring ***")
-  subprocess.run([
-      sys.executable,
-      CMAKE_CI_SCRIPT,
-      f"-B{BUILD_DIR}",
-      "--log-level=VERBOSE",
-      f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
-      f"-DCMAKE_BUILD_TYPE=Release",
-      f"-DIREE_BUILD_COMPILER=OFF",
-      f"-DIREE_BUILD_PYTHON_BINDINGS=ON",
-      f"-DIREE_BUILD_SAMPLES=OFF",
-      f"-DIREE_BUILD_TESTS=OFF",
-  ] + extra_cmake_flags,
-                 check=True)
-
-  print("*** Building ***")
-  subprocess.run([
-      sys.executable,
-      CMAKE_CI_SCRIPT,
-      "--build",
-      BUILD_DIR,
-      "--target",
-      "install-IreePythonPackage-runtime-stripped",
-  ],
-                 check=True)
-
-
 def build_py_tf_compiler_tools_pkg():
   """Builds the iree-install/python_packages/iree_tools_tf package."""
   install_python_requirements()
@@ -279,10 +217,6 @@ def build_py_tf_compiler_tools_pkg():
 command = sys.argv[1]
 if command == "main-dist":
   build_main_dist()
-elif command == "py-runtime-pkg":
-  build_py_runtime_pkg()
-elif command == "instrumented-py-runtime-pkg":
-  build_py_runtime_pkg(instrumented=True)
 elif command == "py-tf-compiler-tools-pkg":
   build_py_tf_compiler_tools_pkg()
 else:

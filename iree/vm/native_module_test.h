@@ -242,8 +242,8 @@ static const iree_vm_native_function_ptr_t module_b_funcs_[] = {
 };
 
 static const iree_vm_native_import_descriptor_t module_b_imports_[] = {
-    {iree_make_cstring_view("module_a.add_1")},
-    {iree_make_cstring_view("module_a.sub_1")},
+    {IREE_VM_NATIVE_IMPORT_REQUIRED, iree_make_cstring_view("module_a.add_1")},
+    {IREE_VM_NATIVE_IMPORT_REQUIRED, iree_make_cstring_view("module_a.sub_1")},
 };
 static_assert(IREE_ARRAYSIZE(module_b_state_t::imports) ==
                   IREE_ARRAYSIZE(module_b_imports_),

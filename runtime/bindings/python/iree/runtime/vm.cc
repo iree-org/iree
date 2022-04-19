@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "bindings/python/iree/runtime/vm.h"
+#include "./vm.h"
 
-#include "bindings/python/iree/runtime/status_utils.h"
+#include "./status_utils.h"
 #include "iree/base/api.h"
 #include "iree/base/status_cc.h"
 #include "iree/base/tracing.h"
@@ -490,6 +490,7 @@ void SetupVmBindings(pybind11::module m) {
   py::enum_<enum iree_vm_function_linkage_e>(m, "Linkage")
       .value("INTERNAL", IREE_VM_FUNCTION_LINKAGE_INTERNAL)
       .value("IMPORT", IREE_VM_FUNCTION_LINKAGE_IMPORT)
+      .value("IMPORT_OPTIONAL", IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL)
       .value("EXPORT", IREE_VM_FUNCTION_LINKAGE_EXPORT)
       .export_values();
 

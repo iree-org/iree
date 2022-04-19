@@ -46,6 +46,11 @@ table FunctionSignatureDef {
   reflection_attrs:[ReflectionAttrDef];
 }
 
+enum ImportFlagBits:uint32 (bit_flags) {
+  REQUIRED = 0,  // 1u << 0
+  OPTIONAL = 1,  // 1u << 1
+}
+
 // Defines a runtime-resolved import function.
 table ImportFunctionDef {
   // Fully-qualified name of the function (including the module namespace).
@@ -53,6 +58,9 @@ table ImportFunctionDef {
 
   // Signature of the function expected used for verifying that imports match.
   signature:FunctionSignatureDef;
+
+  // Version flags controlling the behavior of import resolution.
+  flags:ImportFlagBits = REQUIRED;
 }
 
 // Defines a runtime-resolved export function.

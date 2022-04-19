@@ -9,8 +9,8 @@
 
 #include <optional>
 
-#include "bindings/python/iree/runtime/binding.h"
-#include "bindings/python/iree/runtime/hal.h"
+#include "./binding.h"
+#include "./hal.h"
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"

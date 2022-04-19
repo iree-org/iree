@@ -10,8 +10,8 @@ include(AddMLIRPython)
 # TODO: Add an upstream cmake param for this vs having a global here.
 add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=iree.compiler.")
 
-set(_PYTHON_BUILD_PREFIX "${IREE_BINARY_DIR}/bindings/python")
-set(_PYTHON_INSTALL_PREFIX "python_packages/iree-compiler")
+set(_PYTHON_BUILD_PREFIX "${IREE_BINARY_DIR}/iree/compiler/python")
+set(_PYTHON_INSTALL_PREFIX "python_packages/iree_compiler")
 
 # HACK: This should not be necessary, but add_mlir_python_extension is
 # accidentally closing over an errant include_directories from up-tree, so

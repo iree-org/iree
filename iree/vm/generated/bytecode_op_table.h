@@ -93,7 +93,7 @@ typedef enum {
   IREE_VM_OP_CORE_CallVariadic = 0x53,
   IREE_VM_OP_CORE_Return = 0x54,
   IREE_VM_OP_CORE_Fail = 0x55,
-  IREE_VM_OP_CORE_RSV_0x56,
+  IREE_VM_OP_CORE_ImportResolved = 0x56,
   IREE_VM_OP_CORE_RSV_0x57,
   IREE_VM_OP_CORE_RSV_0x58,
   IREE_VM_OP_CORE_RSV_0x59,
@@ -352,7 +352,7 @@ typedef enum {
     OPC(0x53, CallVariadic) \
     OPC(0x54, Return) \
     OPC(0x55, Fail) \
-    RSV(0x56) \
+    OPC(0x56, ImportResolved) \
     RSV(0x57) \
     RSV(0x58) \
     RSV(0x59) \

@@ -83,7 +83,7 @@ tests_passed=true
 # as well.
 echo "***** Testing with CTest *****"
 if ! ctest --timeout 900 --output-on-failure \
-   --tests-regex "^integrations/tensorflow/|^bindings/python/" \
+   --tests-regex "^integrations/tensorflow/|^runtime/bindings/python/" \
    --label-regex "^driver=vulkan$|^driver=cuda$" \
    --label-exclude "^nokokoro$"
 then

@@ -118,8 +118,8 @@ Status RunModule(const IreeModuleInvocation& invocation) {
   const std::string& function_name = invocation.entry_function;
   iree_vm_function_t function;
   IREE_RETURN_IF_ERROR(
-      input_module->lookup_function(
-          input_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+      iree_vm_module_lookup_function_by_name(
+          input_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
           iree_string_view_t{function_name.data(), function_name.size()},
           &function),
       "looking up function '%s'", function_name.c_str());

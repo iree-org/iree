@@ -519,6 +519,38 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
   return iree_ok_status();
 }
 
+// Verifies that the requested import is valid and returns its table entry.
+static iree_status_t iree_vm_bytecode_verify_import(
+    iree_vm_stack_t* stack, const iree_vm_bytecode_module_state_t* module_state,
+    uint32_t import_ordinal, const iree_vm_bytecode_import_t** out_import) {
+  *out_import = NULL;
+
+  import_ordinal &= 0x7FFFFFFFu;
+  if (IREE_UNLIKELY(import_ordinal >= module_state->import_count)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "import ordinal %u out of range", import_ordinal);
+  }
+
+  const iree_vm_bytecode_import_t* import =
+      &module_state->import_table[import_ordinal];
+  if (!import->function.module) {
+    iree_vm_function_t decl_function;
+    IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
+        iree_vm_stack_current_frame(stack)->function.module,
+        IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL, import_ordinal,
+        &decl_function));
+    iree_string_view_t import_name = iree_vm_function_name(&decl_function);
+    (void)import_name;
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "optional import `%.*s` (ordinal %u) not resolved",
+                            (int)import_name.size, import_name.data,
+                            import_ordinal);
+  }
+
+  *out_import = import;
+  return iree_ok_status();
+}
+
 // Calls an imported function from another module.
 // Marshals the |src_reg_list| registers into ABI storage and results into
 // |dst_reg_list|.
@@ -531,13 +563,10 @@ static iree_status_t iree_vm_bytecode_call_import(
     iree_vm_registers_t* out_caller_registers,
     iree_vm_execution_result_t* out_result) {
   // Prepare |call| by looking up the import information.
-  import_ordinal &= 0x7FFFFFFFu;
-  if (IREE_UNLIKELY(import_ordinal >= module_state->import_count)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "import ordinal out of range");
-  }
-  const iree_vm_bytecode_import_t* import =
-      &module_state->import_table[import_ordinal];
+  const iree_vm_bytecode_import_t* import = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_verify_import(stack, module_state,
+                                                      import_ordinal, &import));
+
   iree_vm_function_call_t call;
   memset(&call, 0, sizeof(call));
   call.function = import->function;
@@ -572,13 +601,10 @@ static iree_status_t iree_vm_bytecode_call_import_variadic(
     iree_vm_registers_t* out_caller_registers,
     iree_vm_execution_result_t* out_result) {
   // Prepare |call| by looking up the import information.
-  import_ordinal &= 0x7FFFFFFFu;
-  if (IREE_UNLIKELY(import_ordinal >= module_state->import_count)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "import ordinal out of range");
-  }
-  const iree_vm_bytecode_import_t* import =
-      &module_state->import_table[import_ordinal];
+  const iree_vm_bytecode_import_t* import = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_verify_import(stack, module_state,
+                                                      import_ordinal, &import));
+
   iree_vm_function_call_t call;
   memset(&call, 0, sizeof(call));
   call.function = import->function;
@@ -1479,6 +1505,19 @@ iree_status_t iree_vm_bytecode_dispatch(
         return iree_status_allocate_f(status_code, "<vm>", 0, "%.*s",
                                       (int)message.size, message.data);
       }
+    });
+
+    DISPATCH_OP(CORE, ImportResolved, {
+      uint32_t function_ordinal = VM_DecFuncAttr("import");
+      int32_t* result = VM_DecResultRegI32("result");
+      uint32_t import_ordinal = function_ordinal & 0x7FFFFFFFu;
+      if (IREE_UNLIKELY(import_ordinal >= module_state->import_count)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "import ordinal out of range");
+      }
+      const iree_vm_bytecode_import_t* import =
+          &module_state->import_table[import_ordinal];
+      *result = import->function.module != NULL ? 1 : 0;
     });
 
     //===------------------------------------------------------------------===//

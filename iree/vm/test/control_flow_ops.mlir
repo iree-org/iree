@@ -42,6 +42,30 @@ vm.module @control_flow_ops {
   }
 
   //===--------------------------------------------------------------------===//
+  // vm.import.resolved
+  //===--------------------------------------------------------------------===//
+
+  vm.import optional @reserved.optional(%arg0: i32) -> i32
+
+  // The optional import should not be found.
+  vm.export @test_optional_import_resolved
+  vm.func @test_optional_import_resolved() {
+    %c1 = vm.const.i32 1
+    %has_reserved_optional = vm.import.resolved @reserved.optional : i32
+    vm.check.ne %has_reserved_optional, %c1, "missing optional import found" : i32
+    vm.return
+  }
+
+  // The call should fail at runtime because the optional import is not resolved.
+  vm.export @fail_optional_import_call
+  vm.func @fail_optional_import_call() {
+    %c1 = vm.const.i32 1
+    %0 = vm.call @reserved.optional(%c1) : (i32) -> i32
+    %code = vm.const.i32 4
+    vm.fail %code, "unreachable!"
+  }
+
+  //===--------------------------------------------------------------------===//
   // vm.cond_br
   //===--------------------------------------------------------------------===//
 

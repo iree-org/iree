@@ -98,21 +98,35 @@ static iree_status_t iree_vm_context_resolve_module_imports(
   // of exported functions for particular modules is large).
   iree_vm_module_signature_t module_signature = module->signature(module->self);
   for (int i = 0; i < module_signature.import_function_count; ++i) {
+    iree_vm_function_t decl_function;
     iree_string_view_t full_name;
     iree_vm_function_signature_t expected_signature;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0,
         module->get_function(module->self, IREE_VM_FUNCTION_LINKAGE_IMPORT, i,
-                             /*out_function=*/NULL,
+                             /*out_function=*/&decl_function,
                              /*out_name=*/&full_name,
                              /*out_signature=*/&expected_signature));
 
     // Resolve the function to the module that contains it and return the
     // information.
     iree_vm_function_t import_function;
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0,
-        iree_vm_context_resolve_function(context, full_name, &import_function));
+    iree_status_t resolve_status =
+        iree_vm_context_resolve_function(context, full_name, &import_function);
+    if (!iree_status_is_ok(resolve_status)) {
+      if (iree_status_is_not_found(resolve_status) &&
+          decl_function.linkage == IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL) {
+        // Failed to find the function but it was optionally imported and that's
+        // ok. We'll just continue the resolution process and leave the import
+        // unspecified on the target module.
+        iree_status_ignore(resolve_status);
+        continue;
+      } else {
+        // Failed to find the function.
+        IREE_TRACE_ZONE_END(z0);
+        return resolve_status;
+      }
+    }
 
     // Query the function signature from the module that contains it; we don't
     // use the signature from the module requesting the import as we want a

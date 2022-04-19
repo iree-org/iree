@@ -46,7 +46,11 @@ inline bool isX86(func::FuncOp entryPointFn) {
       entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   return isX86(variantOp);
 }
-bool hasAVX2Features(IREE::HAL::ExecutableVariantOp variantOp);
+
+/// Returns true if the 'op' is or is enclosed in a HAL::ExecutableVarianOp that
+/// contains '+avx2' in its cpu features.
+bool hasAVX2Features(Operation *op);
+
 bool isRISCV(IREE::HAL::ExecutableVariantOp variantOp);
 inline bool isRISCV(func::FuncOp entryPointFn) {
   auto variantOp =
@@ -159,6 +163,19 @@ Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
 /// ID/Count operations.
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions();
 
+/// Returns the `combinedOffsets`, `combinedSizes` and `combinedStrides` to use
+/// when folding a "producer" **into** a "consumer" op that implement
+/// `OffsetSizeAndStrideOpInterface`.
+/// The following computations are performed:
+///   - offsets = producer_offsets * consumer_strides + consumer_offsets,
+///   - strides = producer_strides * consumer_strides.
+LogicalResult foldOffsetsSizesAndStrides(
+    OpBuilder &builder, Location loc, OffsetSizeAndStrideOpInterface producer,
+    OffsetSizeAndStrideOpInterface consumer,
+    const llvm::SmallBitVector &droppedProducerDims,
+    SmallVector<OpFoldResult> &combinedOffsets,
+    SmallVector<OpFoldResult> &combinedSizes,
+    SmallVector<OpFoldResult> &combinedStrides);
 }  // namespace iree_compiler
 }  // namespace mlir
 

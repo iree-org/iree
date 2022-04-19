@@ -1224,3 +1224,49 @@ hal.executable private @scalar {
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable.entry_point public @scalar
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
+
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<
+  "llvm",
+  "embedded-elf-x86_64", {
+    cpu_features = "+avx2",
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 64 : index,
+    target_triple = "x86_64-unknown-unknown-eabi-elf"
+  }>
+
+
+hal.executable private @transpose_8x8 {
+  hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+    hal.executable.entry_point @transpose_8x8 layout(#executable_layout)
+    builtin.module {
+      func @transpose_8x8() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:512x1024xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:1024x512xf32>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [512, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:512x1024xf32> -> tensor<512x1024xf32>
+        %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1] : !flow.dispatch.tensor<writeonly:1024x512xf32> -> tensor<1024x512xf32>
+        %6 = linalg.generic {
+          indexing_maps = [ affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>],
+          iterator_types = ["parallel", "parallel"]}
+          ins(%3 : tensor<512x1024xf32>) outs(%5 : tensor<1024x512xf32>) {
+          ^bb0(%arg1: f32, %arg2: f32):
+            linalg.yield %arg1 : f32
+          } -> tensor<1024x512xf32>
+        flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1] : tensor<1024x512xf32> -> !flow.dispatch.tensor<writeonly:1024x512xf32>
+        return
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [8, 8], []{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
