@@ -126,6 +126,7 @@ function build_iree_runtime_instrumented() {
 }
 
 function build_iree_compiler() {
+  IREE_TARGET_BACKEND_CUDA=ON \
   python -m pip wheel -v -w /wheelhouse /main_checkout/iree/iree/compiler/
 }
 
