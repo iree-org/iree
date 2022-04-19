@@ -17,6 +17,9 @@
 # On CIs, it is often advantageous to re-use/control the CMake build directory.
 # This can be set with the IREE_RUNTIME_API_CMAKE_BUILD_DIR env var.
 #
+# A custom package suffix can be specified with the environment variable:
+#   IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX
+#
 # Select CMake options are available from environment variables:
 #   IREE_HAL_DRIVER_CUDA
 #   IREE_HAL_DRIVER_VULKAN
@@ -186,7 +189,8 @@ def prepare_installation():
         "-DPython3_EXECUTABLE={}".format(sys.executable),
         "-DCMAKE_BUILD_TYPE={}".format(cfg),
         get_env_cmake_option("IREE_HAL_DRIVER_CUDA"),
-        get_env_cmake_option("IREE_HAL_DRIVER_VULKAN"),
+        get_env_cmake_option("IREE_HAL_DRIVER_VULKAN",
+                             "OFF" if platform.system() == "Darwin" else "ON"),
         get_env_cmake_option("IREE_ENABLE_RUNTIME_TRACING"),
         get_env_cmake_option("IREE_BUILD_TRACY"),
     ]
@@ -324,8 +328,11 @@ with open(
                  "runtime", "README.md"), "rt") as f:
   README = f.read()
 
+custom_package_suffix = os.getenv("IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX")
+if not custom_package_suffix: custom_package_suffix = ""
+
 setup(
-    name=f"iree-runtime{PACKAGE_SUFFIX}",
+    name=f"iree-runtime{PACKAGE_SUFFIX}{custom_package_suffix}",
     version=f"{PACKAGE_VERSION}",
     author="IREE Authors",
     author_email="iree-discuss@googlegroups.com",

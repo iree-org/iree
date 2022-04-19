@@ -157,7 +157,7 @@ iree_py_install_package(
   DEPS
     # TODO: Update CMake target/path mangling rules to make this syntactically
     # rooted on "iree" in some way.
-    runtime_binding_python_iree_runtime_PyExtRt
+    runtime_bindings_python_iree_runtime_PyExtRt
     iree_tools_iree-benchmark-trace
     iree_tools_iree-run-module
     iree_tools_iree-run-trace
