@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanTypes.h"
 #include "mlir/IR/AttributeSupport.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
@@ -106,7 +107,7 @@ unsigned TargetEnvAttr::getRevision() {
 TargetEnvAttr::ext_iterator::ext_iterator(ArrayAttr::iterator it)
     : llvm::mapped_iterator<ArrayAttr::iterator, Extension (*)(Attribute)>(
           it, [](Attribute attr) {
-            return *symbolizeExtension(attr.cast<StringAttr>().getValue());
+            return *symbolizeExtension(attr.cast<IntegerAttr>().getInt());
           }) {}
 
 TargetEnvAttr::ext_range TargetEnvAttr::getExtensions() {
@@ -142,8 +143,10 @@ LogicalResult TargetEnvAttr::verify(
     return emitError() << "expected 32-bit integer for revision";
 
   if (!llvm::all_of(extensions.getValue(), [](Attribute attr) {
-        if (auto strAttr = attr.dyn_cast<StringAttr>())
-          if (symbolizeExtension(strAttr.getValue())) return true;
+        if (auto intAttr = attr.dyn_cast<IntegerAttr>()) {
+          if (!intAttr.getType().isSignlessInteger()) return false;
+          return symbolizeExtension(intAttr.getInt()).hasValue();
+        }
         return false;
       }))
     return emitError() << "unknown extension in extension list";
