@@ -47,11 +47,11 @@ class LibraryBuilder {
     // NOTE: until we hit v1 the versioning scheme here is not set in stone.
     // We may want to make this major release number, date codes (0x20220307),
     // or some semantic versioning we track in whatever spec we end up having.
-    V_0_1 = 0x0000'0001u,  // v0.1 - ~2022-03-07
+    V_0_2 = 0x0000'0002u,  // v0.2 - ~2022-04-19
 
     // Pinned to the latest version.
     // Requires that the runtime be compiled with the same version.
-    LATEST = V_0_1,
+    LATEST = V_0_2,
   };
 
   // iree_hal_executable_library_features_t

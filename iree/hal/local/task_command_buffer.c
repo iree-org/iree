@@ -833,6 +833,8 @@ static iree_status_t iree_hal_cmd_dispatch_tile(
       .workgroup_count_x = tile_context->workgroup_count[0],
       .workgroup_count_y = tile_context->workgroup_count[1],
       .workgroup_count_z = tile_context->workgroup_count[2],
+      .max_concurrency =
+          iree_task_affinity_set_count_ones(cmd->task.header.affinity_set),
       .binding_count = cmd->binding_count,
   };
   uint8_t* cmd_ptr = (uint8_t*)cmd + sizeof(*cmd);
