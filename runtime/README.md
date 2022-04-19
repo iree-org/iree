@@ -18,7 +18,7 @@ There are two ways to build/install Python packages:
 * From the build directory while developing.
 
 It is recommended to use your favorite method for managing
-[virtual environemnts](https://docs.python.org/3/library/venv.html) instead
+[virtual environments](https://docs.python.org/3/library/venv.html) instead
 of modifying the system installation.
 
 Only relatively recent versions of `pip` are supported. Always use the latest
