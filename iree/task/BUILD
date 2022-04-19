@@ -64,7 +64,6 @@ cc_library(
         "submission.h",
         "task.h",
         "topology.h",
-        "topology_cpuinfo.h",
         "tuning.h",
     ],
     deps = [
@@ -181,19 +180,8 @@ cc_test(
 cc_test(
     name = "topology_test",
     srcs = ["topology_test.cc"],
-    deps = [
-        ":task",
-        "//iree/base",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_test(
-    name = "topology_cpuinfo_test",
-    srcs = ["topology_cpuinfo_test.cc"],
     tags = [
-        "noasan",  # TODO(benvanik): Does not work on machines with large numbers of cores.
+        "noasan",  # TODO(8469): Does not work on machines with large numbers of cores.
     ],
     deps = [
         ":task",
