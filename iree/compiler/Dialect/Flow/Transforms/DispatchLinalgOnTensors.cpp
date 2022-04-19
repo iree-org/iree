@@ -968,8 +968,11 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp) {
                   [&](Operation *) -> linalg::OpOperandVector { return {}; });
       for (OpOperand *operand : outOperands) {
         // Currently only fuse with producer ops that are `LinalgOp`s.
-        auto producer = operand->get().getDefiningOp<linalg::LinalgOp>();
-        if (!producer) continue;
+        auto producer = operand->get().getDefiningOp();
+        // TODO(ravishankarm): Drop the special carve out for `tensor.pad`
+        // operations.
+        if (!isa_and_nonnull<linalg::LinalgOp, tensor::PadOp>(producer))
+          continue;
 
         // For now only fuse producers that have a single use.
         // TODO(ravishankarm): Producer can be fused if all users are dominated
@@ -977,7 +980,11 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp) {
         // formation in this pass. Do that as a follow up.
         if (!producer->hasOneUse()) continue;
 
-        if (producer.getNumLoops() != producer.getNumParallelLoops()) continue;
+        auto producerLinalgOp = dyn_cast<linalg::LinalgOp>(producer);
+        if (producerLinalgOp && producerLinalgOp.getNumLoops() !=
+                                    producerLinalgOp.getNumParallelLoops()) {
+          continue;
+        }
         appendToFusionGroup(producer, newGroup);
       }
       roots.push_back(&op);
