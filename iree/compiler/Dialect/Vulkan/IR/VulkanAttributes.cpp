@@ -142,14 +142,17 @@ LogicalResult TargetEnvAttr::verify(
   if (!revision.getType().isInteger(32))
     return emitError() << "expected 32-bit integer for revision";
 
-  if (!llvm::all_of(extensions.getValue(), [](Attribute attr) {
-        if (auto intAttr = attr.dyn_cast<IntegerAttr>()) {
-          if (!intAttr.getType().isSignlessInteger()) return false;
-          return symbolizeExtension(intAttr.getInt()).hasValue();
-        }
-        return false;
-      }))
-    return emitError() << "unknown extension in extension list";
+  for (Attribute attr : extensions.getValue()) {
+    auto intAttr = attr.dyn_cast<IntegerAttr>();
+    if (!intAttr || !intAttr.getType().isSignlessInteger()) {
+      return emitError() << "extension attribute '" << attr
+                         << "' should be 32-bit signless integer";
+    }
+    if (!symbolizeExtension(intAttr.getInt())) {
+      return emitError() << "unknown extension '" << attr
+                         << "' in extension list";
+    }
+  }
 
   if (!capabilities.isa<CapabilitiesAttr>()) {
     return emitError() << "expected vulkan::CapabilitiesAttr for capabilities";
