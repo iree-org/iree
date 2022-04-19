@@ -26,9 +26,9 @@ stream.executable private @convert_store_i1 {
   builtin.module {
     func.func @dispatch(%arg0: !stream.binding) {
       %c0 = arith.constant 0 : index
+      // CHECK-DAG: %[[TILE_I8:.+]] = arith.constant dense<[0, 0, 1, 1]> : tensor<4xi8>
       // CHECK-DAG: %[[BINDING:.+]] = stream.binding.subspan {{.+}} -> !flow.dispatch.tensor<writeonly:4xi8>
       %binding = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:4xi1>
-      // CHECK-DAG: %[[TILE_I8:.+]] = arith.extui %cst : tensor<4xi1> to tensor<4xi8>
       %cst = arith.constant dense<[false, false, true, true]> : tensor<4xi1>
       // CHECK-NEXT: flow.dispatch.tensor.store %[[TILE_I8]], %[[BINDING]], {{.+}} : tensor<4xi8> -> !flow.dispatch.tensor<writeonly:4xi8>
       flow.dispatch.tensor.store %cst, %binding, offsets = [0], sizes = [4], strides = [1] : tensor<4xi1> -> !flow.dispatch.tensor<writeonly:4xi1>
