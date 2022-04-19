@@ -153,6 +153,18 @@ static iree_status_t iree_hal_sync_device_query_i32(
             ? 1
             : 0;
     return iree_ok_status();
+  } else if (iree_string_view_equal(category,
+                                    iree_make_cstring_view("hal.device"))) {
+    if (iree_string_view_equal(key, iree_make_cstring_view("concurrency"))) {
+      *out_value = 1;
+      return iree_ok_status();
+    }
+  } else if (iree_string_view_equal(category,
+                                    iree_make_cstring_view("hal.dispatch"))) {
+    if (iree_string_view_equal(key, iree_make_cstring_view("concurrency"))) {
+      *out_value = 1;
+      return iree_ok_status();
+    }
   }
 
   return iree_make_status(

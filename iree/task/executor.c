@@ -234,6 +234,11 @@ void iree_task_executor_trim(iree_task_executor_t* executor) {
   // iree_task_pool_trim(&executor->transient_task_pool);
 }
 
+iree_host_size_t iree_task_executor_worker_count(
+    iree_task_executor_t* executor) {
+  return executor->worker_count;
+}
+
 iree_event_pool_t* iree_task_executor_event_pool(
     iree_task_executor_t* executor) {
   return executor->event_pool;

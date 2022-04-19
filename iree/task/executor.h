@@ -313,6 +313,11 @@ void iree_task_executor_release(iree_task_executor_t* executor);
 // Trims pools and caches used by the executor and its workers.
 void iree_task_executor_trim(iree_task_executor_t* executor);
 
+// Returns the number of live workers usable by the executor.
+// The actual number used for any particular operation is dynamic.
+iree_host_size_t iree_task_executor_worker_count(
+    iree_task_executor_t* executor);
+
 // Returns an iree_event_t pool managed by the executor.
 // Users of the task system should acquire their transient events from this.
 // Long-lived events should be allocated on their own in order to avoid
