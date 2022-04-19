@@ -1386,6 +1386,21 @@ def HAL_DeviceQueryOp :
     much care as a binary file format change. Keys should be prefixed with `ex.`
     when experimental indicating that they are not expected to be present
     forever; all non-experimental keys should be vetted.
+
+    Well-known keys:
+
+    * hal.executable.format :: {some format}
+      Returns 1 if the given format is supported by the device loader.
+
+    * hal.device :: concurrency
+      The maximum concurrently executable submissions, mapping roughly to the
+      queue count. The actual concurrency available may be less than this based
+      on dynamic runtime parameters such as power/thermal modes, quota limits,
+      or user choice.
+
+    * hal.dispatch :: concurrency
+      The maximum concurrently executable workgroups for a particular dispatch.
+      The actual concurrency available may be less depending on device state.
   }];
 
   let arguments = (ins

@@ -201,6 +201,18 @@ static iree_status_t iree_hal_task_device_query_i32(
             ? 1
             : 0;
     return iree_ok_status();
+  } else if (iree_string_view_equal(category,
+                                    iree_make_cstring_view("hal.device"))) {
+    if (iree_string_view_equal(key, iree_make_cstring_view("concurrency"))) {
+      *out_value = (int32_t)device->queue_count;
+      return iree_ok_status();
+    }
+  } else if (iree_string_view_equal(category,
+                                    iree_make_cstring_view("hal.dispatch"))) {
+    if (iree_string_view_equal(key, iree_make_cstring_view("concurrency"))) {
+      *out_value = (int32_t)iree_task_executor_worker_count(device->executor);
+      return iree_ok_status();
+    }
   }
 
   return iree_make_status(
