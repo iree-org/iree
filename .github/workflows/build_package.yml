@@ -58,6 +58,8 @@ jobs:
             build_family: macos
             build_package: py-runtime-pkg
             experimental: true
+    env:
+      MANYLINUX_X86_64_IMAGE: stellaraccident/manylinux2014_x86_64-bazel-5.1.0:latest
 
     steps:
       - uses: actions/checkout@v2
@@ -72,7 +74,7 @@ jobs:
         if: "matrix.build_family == 'macos'"
         shell: bash
         run: |
-          ./main_checkout/build_tools/python_deploy/install_macos_deps.sh
+          sudo ./main_checkout/build_tools/python_deploy/install_macos_deps.sh
 
 
       ##########################################################################
@@ -109,7 +111,7 @@ jobs:
         run: |
           docker run --rm -w=/work \
             -v $PWD:/work \
-            "${CIBW_MANYLINUX_X86_64_IMAGE}" \
+            "${MANYLINUX_X86_64_IMAGE}" \
             bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./main_checkout/build_tools/github_actions/build_dist.py main-dist'
 
       ##########################################################################
@@ -118,14 +120,14 @@ jobs:
       # One step per OS.
       ##########################################################################
 
-      - name: Build runtime wheels
+      - name: Build runtime wheels (Linux)
         if: "matrix.build_package == 'py-runtime-pkg' && matrix.build_family == 'linux'"
         shell: bash
         run: |
           packages="iree-runtime iree-runtime-instrumented" \
           ./main_checkout/build_tools/python_deploy/build_linux_packages.sh
 
-      - name: Build runtime wheels
+      - name: Build runtime wheels (MacOS)
         if: "matrix.build_package == 'py-runtime-pkg' && matrix.build_family == 'macos'"
         shell: bash
         run: |
@@ -137,14 +139,14 @@ jobs:
       # Builds the iree-compielr wheel.
       # One step per OS.
       ##########################################################################
-      - name: Build compiler wheels
+      - name: Build compiler wheels (Linux)
         if: "matrix.build_package == 'py-compiler-pkg' && matrix.build_family == 'linux'"
         shell: bash
         run: |
           packages="iree-compiler" \
           ./main_checkout/build_tools/python_deploy/build_linux_packages.sh
 
-      - name: Build compiler wheels
+      - name: Build compiler wheels (MacOS)
         if: "matrix.build_package == 'py-compiler-pkg' && matrix.build_family == 'macos'"
         shell: bash
         run: |
@@ -164,7 +166,7 @@ jobs:
         run: |
           docker run --rm -w=/work \
             -v $PWD:/work \
-            "${CIBW_MANYLINUX_X86_64_IMAGE}" \
+            "${MANYLINUX_X86_64_IMAGE}" \
             bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./main_checkout/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
 
       - uses: actions/upload-artifact@v2
