@@ -51,6 +51,10 @@ packages="${packages:-iree-runtime iree-runtime-instrumented iree-compiler}"
 function run_on_host() {
   echo "Running on host"
   echo "Launching docker image ${manylinux_docker_image}"
+
+  # Canonicalize paths.
+  mkdir -p "$output_dir"
+  output_dir="$(cd $output_dir && pwd)"
   echo "Outputting to ${output_dir}"
   mkdir -p "${output_dir}"
   docker run --rm \
