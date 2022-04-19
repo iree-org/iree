@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <cpuinfo.h>
 #include <stdio.h>
 
 #include "iree/base/api.h"
@@ -12,6 +11,32 @@
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/task/topology.h"
+
+// Initializes |out_topology| with a standardized behavior when cpuinfo is not
+// available (unsupported arch, failed to query, etc).
+static void iree_task_topology_initialize_fallback(
+    iree_host_size_t max_group_count, iree_task_topology_t* out_topology) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, max_group_count);
+  // TODO(benvanik): implement our own query... but that seems not so great.
+  // For now we default to a single group: if a user wants more then they can
+  // either get cpuinfo working for their platform or manually construct the
+  // topology themselves.
+  iree_host_size_t group_count = 1;
+  iree_task_topology_initialize_from_group_count(group_count, out_topology);
+  IREE_TRACE_ZONE_END(z0);
+}
+
+#if defined(IREE_TASK_CPUINFO_DISABLED)
+
+void iree_task_topology_initialize_from_physical_cores(
+    iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
+  iree_task_topology_initialize_fallback(max_core_count, out_topology);
+}
+
+#else
+
+#include <cpuinfo.h>
 
 static bool iree_task_topology_is_cpuinfo_available() {
   return cpuinfo_initialize() && cpuinfo_get_cores_count() > 0;
@@ -161,21 +186,6 @@ static void iree_task_topology_fixup_constructive_sharing_masks(
   }
 }
 
-// Initializes |out_topology| with a standardized behavior when cpuinfo is not
-// available (unsupported arch, failed to query, etc).
-static void iree_task_topology_initialize_fallback(
-    iree_host_size_t max_group_count, iree_task_topology_t* out_topology) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, max_group_count);
-  // TODO(benvanik): implement our own query... but that seems not so great.
-  // For now we default to a single group: if a user wants more then they can
-  // either get cpuinfo working for their platform or manually construct the
-  // topology themselves.
-  iree_host_size_t group_count = 1;
-  iree_task_topology_initialize_from_group_count(group_count, out_topology);
-  IREE_TRACE_ZONE_END(z0);
-}
-
 // Matches all cores.
 static bool iree_task_topology_core_filter_all(const struct cpuinfo_core* core,
                                                uintptr_t user_data) {
@@ -242,3 +252,5 @@ void iree_task_topology_initialize_from_physical_cores(
   iree_task_topology_initialize_from_physical_cores_with_filter(
       iree_task_topology_core_filter_all, 0, max_core_count, out_topology);
 }
+
+#endif  // IREE_TASK_CPUINFO_DISABLED

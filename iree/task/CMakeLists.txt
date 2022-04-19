@@ -15,6 +15,13 @@ if(NOT ${IREE_ENABLE_THREADING})
   return()
 endif()
 
+# cpuinfo can be conditionally disabled when it is not supported.
+# If disabled then by default the task system will use 1 thread.
+set(IREE_CPUINFO_TARGET)
+if(IREE_ENABLE_CPUINFO)
+  set(IREE_CPUINFO_TARGET cpuinfo)
+endif()
+
 iree_cc_library(
   NAME
     api
@@ -62,7 +69,7 @@ iree_cc_library(
     "worker.c"
     "worker.h"
   DEPS
-    cpuinfo
+    ${IREE_CPUINFO_TARGET}
     iree::base
     iree::base::core_headers
     iree::base::internal
@@ -190,3 +197,10 @@ iree_cc_test(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+if(NOT IREE_ENABLE_CPUINFO)
+  target_compile_definitions(iree_task_task
+    PUBLIC
+      "IREE_TASK_CPUINFO_DISABLED=1"
+  )
+endif()
