@@ -329,7 +329,8 @@ with open(
   README = f.read()
 
 custom_package_suffix = os.getenv("IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX")
-if not custom_package_suffix: custom_package_suffix = ""
+if not custom_package_suffix:
+  custom_package_suffix = ""
 
 setup(
     name=f"iree-runtime{PACKAGE_SUFFIX}{custom_package_suffix}",
