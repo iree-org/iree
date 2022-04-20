@@ -43,6 +43,7 @@ DOCKER_DIR = 'build_tools/docker/'.replace('/', os.sep)
 # Map from image names to images that they depend on.
 IMAGES_TO_DEPENDENCIES = {
     'base': [],
+    'manylinux2014_x86_64-release': [],
     'android': ['base'],
     'emscripten': ['base'],
     'nvidia': ['base'],
