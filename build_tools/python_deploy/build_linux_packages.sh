@@ -43,7 +43,7 @@ this_dir="$(cd $(dirname $0) && pwd)"
 script_name="$(basename $0)"
 repo_root="$(cd $this_dir/../../ && pwd)"
 script_name="$(basename $0)"
-manylinux_docker_image="${manylinux_docker_image:-stellaraccident/manylinux2014_x86_64-bazel-5.1.0:latest}"
+manylinux_docker_image="${manylinux_docker_image:-gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:3e7ac081b69bdc54650a98725b793f072f3c3beb229f8886dbcd6f23bc1eb9ca}"
 python_versions="${override_python_versions:-cp37-cp37m cp38-cp38 cp39-cp39 cp310-cp310}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 packages="${packages:-iree-runtime iree-runtime-instrumented iree-compiler}"
@@ -119,15 +119,6 @@ function build_iree_runtime() {
 }
 
 function build_iree_runtime_instrumented() {
-  tracy_installed_touch="/.tracy_installed"
-  if ! [ -f "$tracy_installed_touch" ]; then
-    echo "Installing tracy deps..."
-    bash /main_checkout/iree/build_tools/github_actions/install_tracy_cli_deps_manylinux2014.sh
-    touch "$tracy_installed_touch"
-  else
-    echo "Tracy deps already installed..."
-  fi
-
   IREE_HAL_DRIVER_CUDA=ON IREE_BUILD_TRACY=ON IREE_ENABLE_RUNTIME_TRACING=ON \
   IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX="-instrumented" \
   python -m pip wheel -v -w /wheelhouse /main_checkout/iree/runtime/

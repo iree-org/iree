@@ -59,7 +59,7 @@ jobs:
             build_package: py-runtime-pkg
             experimental: true
     env:
-      MANYLINUX_X86_64_IMAGE: stellaraccident/manylinux2014_x86_64-bazel-5.1.0:latest
+      MANYLINUX_X86_64_IMAGE: gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:3e7ac081b69bdc54650a98725b793f072f3c3beb229f8886dbcd6f23bc1eb9ca
 
     steps:
       - uses: actions/checkout@v2

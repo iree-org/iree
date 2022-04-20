@@ -9,3 +9,4 @@ gcr.io/iree-oss/riscv@sha256:ab4e0558bcc57f24f1bd10b8d365b120a82d4b2abdb6fd5d288
 gcr.io/iree-oss/nvidia@sha256:44c61c9db49792a1bf6bb6337b602f78c867f6ff136ddb25e71ef323d5b19c95
 gcr.io/iree-oss/emscripten@sha256:eaf9d11499f5763a4e5ea85260a2b03e4494ecef68abe71dbf06b7e3a1e5f5ba
 gcr.io/iree-oss/android@sha256:64492d86ba72328fdf21e462244e52edd54b960c125c37a21960baf65ee4c654
+gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:3e7ac081b69bdc54650a98725b793f072f3c3beb229f8886dbcd6f23bc1eb9ca
