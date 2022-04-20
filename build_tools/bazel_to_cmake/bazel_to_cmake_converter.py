@@ -325,6 +325,9 @@ class BuildFileFunctions(object):
                             f"{testonly_block}"
                             f"  PUBLIC\n)\n\n")
 
+  def iree_runtime_cc_library(self, deps=[], **kwargs):
+    self.cc_library(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
+
   def cc_test(self,
               name,
               hdrs=None,
@@ -357,6 +360,9 @@ class BuildFileFunctions(object):
                             f"{args_block}"
                             f"{labels_block}"
                             f")\n\n")
+
+  def iree_runtime_cc_test(self, deps=[], **kwargs):
+    self.cc_library(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
 
   def cc_binary(self,
                 name,

@@ -39,7 +39,7 @@ iree_cc_library(
     iree::compiler::Dialect::Vulkan::IR
     iree::compiler::Dialect::Vulkan::Utils
     iree::compiler::Utils
-    iree::schemas::spirv_executable_def_c_fbs
+    iree::runtime::schemas::spirv_executable_def_c_fbs
   PUBLIC
 )
 

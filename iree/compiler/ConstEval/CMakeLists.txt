@@ -64,13 +64,13 @@ iree_cc_library(
   DEPS
     MLIRIR
     iree::compiler::Dialect::VM::Target::Bytecode
-    iree::hal
-    iree::hal::vmvx::registration
-    iree::modules::hal
+    iree::runtime::hal
+    iree::runtime::hal::vmvx::registration
+    iree::runtime::modules::hal
+    iree::runtime::vm
+    iree::runtime::vm::bytecode_module
+    iree::runtime::vm::cc
     iree::tools::utils::vm_util
-    iree::vm
-    iree::vm::bytecode_module
-    iree::vm::cc
   PUBLIC
 )
 

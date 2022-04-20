@@ -36,7 +36,7 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Transforms
     iree::compiler::Dialect::VM::Utils::CallingConvention
     iree::compiler::Utils
-    iree::schemas::bytecode_module_def_c_fbs
+    iree::runtime::schemas::bytecode_module_def_c_fbs
   PUBLIC
 )
 
