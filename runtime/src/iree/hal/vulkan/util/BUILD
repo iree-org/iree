@@ -15,8 +15,8 @@ iree_runtime_cc_library(
     srcs = ["arena.cc"],
     hdrs = ["arena.h"],
     deps = [
-        "//iree/base:core_headers",
-        "//iree/base:logging",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:logging",
     ],
 )
 
@@ -25,8 +25,8 @@ iree_runtime_cc_test(
     srcs = ["arena_test.cc"],
     deps = [
         ":arena",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -37,7 +37,7 @@ iree_runtime_cc_library(
         "intrusive_list_unique_ptr.inc",
     ],
     deps = [
-        "//iree/base:logging",
+        "//runtime/src/iree/base:logging",
     ],
 )
 
@@ -49,8 +49,8 @@ iree_runtime_cc_test(
     ],
     deps = [
         ":intrusive_list",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -58,9 +58,9 @@ iree_runtime_cc_library(
     name = "ref_ptr",
     hdrs = ["ref_ptr.h"],
     deps = [
-        "//iree/base:core_headers",
-        "//iree/base:logging",
-        "//iree/base/internal",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:logging",
+        "//runtime/src/iree/base/internal",
     ],
 )
 
@@ -70,7 +70,7 @@ iree_runtime_cc_test(
     srcs = ["ref_ptr_test.cc"],
     deps = [
         ":ref_ptr",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )

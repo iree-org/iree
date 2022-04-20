@@ -18,9 +18,9 @@ iree_runtime_cc_library(
     hdrs = ["buffer_transfer.h"],
     visibility = ["//visibility:public"],
     deps = [
-        "//iree/base",
-        "//iree/base:tracing",
-        "//iree/hal",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/hal",
     ],
 )
 
@@ -31,10 +31,10 @@ iree_runtime_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":resource_set",
-        "//iree/base",
-        "//iree/base:tracing",
-        "//iree/base/internal:arena",
-        "//iree/hal",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/hal",
     ],
 )
 
@@ -44,10 +44,10 @@ iree_runtime_cc_library(
     hdrs = ["resource_set.h"],
     visibility = ["//visibility:public"],
     deps = [
-        "//iree/base",
-        "//iree/base:tracing",
-        "//iree/base/internal:arena",
-        "//iree/hal",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/hal",
     ],
 )
 
@@ -56,10 +56,10 @@ cc_binary_benchmark(
     srcs = ["resource_set_benchmark.c"],
     deps = [
         ":resource_set",
-        "//iree/base",
-        "//iree/base/internal:prng",
-        "//iree/hal",
-        "//iree/testing:benchmark",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:prng",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:benchmark",
     ],
 )
 
@@ -68,9 +68,9 @@ iree_runtime_cc_test(
     srcs = ["resource_set_test.cc"],
     deps = [
         ":resource_set",
-        "//iree/base",
-        "//iree/hal",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )

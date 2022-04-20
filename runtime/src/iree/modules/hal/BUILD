@@ -22,9 +22,9 @@ iree_runtime_cc_library(
         "exports.inl",
     ],
     deps = [
-        "//iree/base",
-        "//iree/base:tracing",
-        "//iree/hal",
-        "//iree/vm",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/vm",
     ],
 )

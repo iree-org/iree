@@ -23,13 +23,13 @@ iree_runtime_cc_library(
         "IREE_HAL_HAVE_EMBEDDED_LIBRARY_LOADER=1",
     ],
     deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
-        "//iree/hal",
-        "//iree/hal/local",
-        "//iree/hal/local:executable_library",
-        "//iree/hal/local/elf:elf_module",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/local",
+        "//runtime/src/iree/hal/local:executable_library",
+        "//runtime/src/iree/hal/local/elf:elf_module",
     ],
 )
 
@@ -41,12 +41,12 @@ iree_runtime_cc_library(
         "IREE_HAL_HAVE_STATIC_LIBRARY_LOADER=1",
     ],
     deps = [
-        "//iree/base",
-        "//iree/base:tracing",
-        "//iree/hal",
-        "//iree/hal/local",
-        "//iree/hal/local:executable_environment",
-        "//iree/hal/local:executable_library",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/local",
+        "//runtime/src/iree/hal/local:executable_environment",
+        "//runtime/src/iree/hal/local:executable_library",
     ],
 )
 
@@ -58,13 +58,13 @@ iree_runtime_cc_library(
         "IREE_HAL_HAVE_SYSTEM_LIBRARY_LOADER=1",
     ],
     deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
-        "//iree/base/internal:dynamic_library",
-        "//iree/hal",
-        "//iree/hal/local",
-        "//iree/hal/local:executable_library",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:dynamic_library",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/local",
+        "//runtime/src/iree/hal/local:executable_library",
     ],
 )
 
@@ -83,14 +83,14 @@ iree_runtime_cc_library(
         "IREE_HAL_HAVE_VMVX_MODULE_LOADER=1",
     ],
     deps = [
-        "//iree/base",
-        "//iree/base:tracing",
-        "//iree/hal",
-        "//iree/hal/local",
-        "//iree/hal/local:executable_library",
-        "//iree/modules/vmvx",
-        "//iree/vm",
-        "//iree/vm:bytecode_module",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/local",
+        "//runtime/src/iree/hal/local:executable_library",
+        "//runtime/src/iree/modules/vmvx",
+        "//runtime/src/iree/vm",
+        "//runtime/src/iree/vm:bytecode_module",
     ],
 )
 

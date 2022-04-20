@@ -27,13 +27,13 @@ iree_runtime_cc_library(
         "IREE_HAL_HAVE_VULKAN_DRIVER_MODULE=1",
     ],
     deps = [
-        "//iree/base",
-        "//iree/base:cc",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
-        "//iree/base/internal:flags",
-        "//iree/hal",
-        "//iree/hal/vulkan",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:cc",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/vulkan",
     ],
 )
 

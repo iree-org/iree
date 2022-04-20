@@ -39,7 +39,7 @@ iree_runtime_cc_library(
         "math.h",
     ],
     deps = [
-        "//iree/base:core_headers",
+        "//runtime/src/iree/base:core_headers",
     ],
 )
 
@@ -48,9 +48,9 @@ iree_runtime_cc_test(
     srcs = ["atomics_test.cc"],
     deps = [
         ":internal",
-        "//iree/base:core_headers",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -59,8 +59,8 @@ iree_runtime_cc_test(
     srcs = ["math_test.cc"],
     deps = [
         ":internal",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -75,9 +75,9 @@ iree_runtime_cc_library(
     deps = [
         ":atomic_slist",
         ":synchronization",
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
     ],
 )
 
@@ -88,7 +88,7 @@ iree_runtime_cc_library(
     deps = [
         ":internal",
         ":synchronization",
-        "//iree/base:core_headers",
+        "//runtime/src/iree/base:core_headers",
     ],
 )
 
@@ -97,8 +97,8 @@ iree_runtime_cc_test(
     srcs = ["atomic_slist_test.cc"],
     deps = [
         ":atomic_slist",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -107,8 +107,8 @@ iree_runtime_cc_library(
     srcs = ["cpu.c"],
     hdrs = ["cpu.h"],
     deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
     ],
 )
 
@@ -125,8 +125,8 @@ iree_runtime_cc_library(
         ":synchronization",
         "//build_tools:default_linkopts",
         "//build_tools:dl",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
     ],
 )
 
@@ -135,9 +135,9 @@ iree_runtime_cc_library(
     srcs = ["file_io.c"],
     hdrs = ["file_io.h"],
     deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
     ],
 )
 
@@ -146,11 +146,11 @@ iree_runtime_cc_test(
     srcs = ["file_io_test.cc"],
     deps = [
         ":file_io",
-        "//iree/base:cc",
-        "//iree/base:core_headers",
-        "//iree/base:logging",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/base:cc",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:logging",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -159,8 +159,8 @@ iree_runtime_cc_library(
     srcs = ["file_path.c"],
     hdrs = ["file_path.h"],
     deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
     ],
 )
 
@@ -171,9 +171,9 @@ iree_runtime_cc_test(
     ],
     deps = [
         ":file_path",
-        "//iree/base:core_headers",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -184,8 +184,8 @@ iree_runtime_cc_library(
     deps = [
         ":file_io",
         ":internal",
-        "//iree/base",
-        "//iree/base:tracing",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
     ],
 )
 
@@ -194,7 +194,7 @@ cc_binary(
     srcs = ["flags_demo.c"],
     deps = [
         ":flags",
-        "//iree/base",
+        "//runtime/src/iree/base",
     ],
 )
 
@@ -214,8 +214,8 @@ iree_runtime_cc_library(
     hdrs = ["fpu_state.h"],
     deps = [
         ":internal",
-        "//iree/base",
-        "//iree/base:core_headers",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
     ],
 )
 
@@ -224,8 +224,8 @@ cc_binary_benchmark(
     srcs = ["fpu_state_benchmark.cc"],
     deps = [
         ":fpu_state",
-        "//iree/base",
-        "//iree/testing:benchmark_main",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:benchmark_main",
         "@com_google_benchmark//:benchmark",
     ],
 )
@@ -235,8 +235,8 @@ iree_runtime_cc_test(
     srcs = ["fpu_state_test.cc"],
     deps = [
         ":fpu_state",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -248,7 +248,7 @@ iree_runtime_cc_library(
     ],
     hdrs = ["main.h"],
     deps = [
-        "//iree/base:core_headers",
+        "//runtime/src/iree/base:core_headers",
     ],
 )
 
@@ -257,7 +257,7 @@ iree_runtime_cc_library(
     hdrs = ["prng.h"],
     deps = [
         ":internal",
-        "//iree/base:core_headers",
+        "//runtime/src/iree/base:core_headers",
     ],
 )
 
@@ -266,8 +266,8 @@ iree_runtime_cc_test(
     srcs = ["prng_test.cc"],
     deps = [
         ":prng",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -288,9 +288,9 @@ iree_runtime_cc_library(
     deps = [
         ":internal",
         "//build_tools:default_linkopts",
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
     ],
 )
 
@@ -300,7 +300,7 @@ cc_binary_benchmark(
     srcs = ["synchronization_benchmark.cc"],
     deps = [
         ":synchronization",
-        "//iree/testing:benchmark_main",
+        "//runtime/src/iree/testing:benchmark_main",
         "@com_google_benchmark//:benchmark",
     ],
 )
@@ -310,8 +310,8 @@ iree_runtime_cc_test(
     srcs = ["synchronization_test.cc"],
     deps = [
         ":synchronization",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -332,9 +332,9 @@ iree_runtime_cc_library(
     hdrs = ["wait_handle.h"],
     deps = [
         ":synchronization",
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
     ],
 )
 
@@ -343,8 +343,8 @@ iree_runtime_cc_test(
     srcs = ["wait_handle_test.cc"],
     deps = [
         ":wait_handle",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -369,9 +369,9 @@ iree_runtime_cc_library(
         ":internal",
         ":synchronization",
         ":wait_handle",
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
     ],
 )
 
@@ -390,9 +390,9 @@ iree_runtime_cc_library(
         ":synchronization",
         "//build_tools:default_linkopts",
         "//build_tools:dl",
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
     ],
 )
 
@@ -406,8 +406,8 @@ iree_runtime_cc_test(
         ":internal",
         ":synchronization",
         ":threading",
-        "//iree/base:cc",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/base:cc",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )

@@ -66,11 +66,11 @@ iree_runtime_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
-        "//iree/base/internal",
-        "//iree/base/internal:synchronization",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:synchronization",
     ],
 )
 
@@ -79,10 +79,10 @@ iree_runtime_cc_test(
     srcs = ["string_util_test.cc"],
     deps = [
         ":hal",
-        "//iree/base",
-        "//iree/base:cc",
-        "//iree/base/internal:span",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:cc",
+        "//runtime/src/iree/base/internal:span",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )

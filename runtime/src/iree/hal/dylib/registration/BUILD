@@ -27,14 +27,14 @@ iree_runtime_cc_library(
         "IREE_HAL_HAVE_DYLIB_DRIVER_MODULE=1",
     ],
     deps = [
-        "//iree/base",
-        "//iree/base/internal:flags",
-        "//iree/hal",
-        "//iree/hal/local",
-        "//iree/hal/local:task_driver",
-        "//iree/hal/local/loaders:embedded_library_loader",
-        "//iree/hal/local/loaders:system_library_loader",
-        "//iree/task:api",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/local",
+        "//runtime/src/iree/hal/local:task_driver",
+        "//runtime/src/iree/hal/local/loaders:embedded_library_loader",
+        "//runtime/src/iree/hal/local/loaders:system_library_loader",
+        "//runtime/src/iree/task:api",
     ],
 )
 
@@ -55,11 +55,11 @@ iree_runtime_cc_library(
         "IREE_HAL_HAVE_DYLIB_SYNC_DRIVER_MODULE=1",
     ],
     deps = [
-        "//iree/base",
-        "//iree/hal",
-        "//iree/hal/local",
-        "//iree/hal/local:sync_driver",
-        "//iree/hal/local/loaders:embedded_library_loader",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/local",
+        "//runtime/src/iree/hal/local:sync_driver",
+        "//runtime/src/iree/hal/local/loaders:embedded_library_loader",
     ],
 )
 

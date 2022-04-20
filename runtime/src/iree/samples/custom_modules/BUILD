@@ -18,12 +18,12 @@ iree_runtime_cc_library(
     srcs = ["module.cc"],
     hdrs = ["module.h"],
     deps = [
-        "//iree/base",
-        "//iree/base:cc",
-        "//iree/hal",
-        "//iree/modules/hal",
-        "//iree/vm",
-        "//iree/vm:cc",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:cc",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/modules/hal",
+        "//runtime/src/iree/vm",
+        "//runtime/src/iree/vm:cc",
     ],
 )
 
@@ -44,7 +44,7 @@ iree_bytecode_module(
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=vmvx",
     ],
-    translate_tool = "//iree/samples/custom_modules/dialect:custom-translate",
+    translate_tool = "//runtime/src/iree/samples/custom_modules/dialect:custom-translate",
 )
 
 iree_runtime_cc_test(
@@ -53,15 +53,15 @@ iree_runtime_cc_test(
     deps = [
         ":custom_modules_test_module_c",
         ":module",
-        "//iree/base",
-        "//iree/base:logging",
-        "//iree/hal",
-        "//iree/hal/vmvx/registration",
-        "//iree/modules/hal",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-        "//iree/vm",
-        "//iree/vm:bytecode_module",
-        "//iree/vm:cc",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:logging",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/vmvx/registration",
+        "//runtime/src/iree/modules/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/vm",
+        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm:cc",
     ],
 )

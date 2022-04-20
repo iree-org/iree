@@ -15,8 +15,8 @@ iree_runtime_cc_library(
     testonly = 1,
     hdrs = ["task_test.h"],
     deps = [
-        "//iree/task",
-        "//iree/testing:gtest",
+        "//runtime/src/iree/task",
+        "//runtime/src/iree/testing:gtest",
     ],
 )
 
@@ -25,7 +25,7 @@ iree_runtime_cc_library(
     testonly = 1,
     hdrs = ["test_util.h"],
     deps = [
-        "//iree/task",
-        "//iree/testing:gtest",
+        "//runtime/src/iree/task",
+        "//runtime/src/iree/testing:gtest",
     ],
 )

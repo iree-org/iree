@@ -27,13 +27,13 @@ iree_runtime_cc_library(
         "IREE_HAL_HAVE_VMVX_DRIVER_MODULE=1",
     ],
     deps = [
-        "//iree/base",
-        "//iree/hal",
-        "//iree/hal/local",
-        "//iree/hal/local:task_driver",
-        "//iree/hal/local/loaders:vmvx_module_loader",
-        "//iree/task:api",
-        "//iree/vm",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/local",
+        "//runtime/src/iree/hal/local:task_driver",
+        "//runtime/src/iree/hal/local/loaders:vmvx_module_loader",
+        "//runtime/src/iree/task:api",
+        "//runtime/src/iree/vm",
     ],
 )
 
@@ -54,12 +54,12 @@ iree_runtime_cc_library(
         "IREE_HAL_HAVE_VMVX_SYNC_DRIVER_MODULE=1",
     ],
     deps = [
-        "//iree/base",
-        "//iree/hal",
-        "//iree/hal/local",
-        "//iree/hal/local:sync_driver",
-        "//iree/hal/local/loaders:vmvx_module_loader",
-        "//iree/vm",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/local",
+        "//runtime/src/iree/hal/local:sync_driver",
+        "//runtime/src/iree/hal/local/loaders:vmvx_module_loader",
+        "//runtime/src/iree/vm",
     ],
 )
 

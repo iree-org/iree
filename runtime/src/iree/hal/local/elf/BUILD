@@ -28,9 +28,9 @@ iree_runtime_cc_library(
     deps = [
         ":arch",
         ":platform",
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
     ],
 )
 
@@ -39,11 +39,11 @@ cc_binary(
     srcs = ["elf_module_test_main.c"],
     deps = [
         ":elf_module",
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/hal/local:executable_environment",
-        "//iree/hal/local:executable_library",
-        "//iree/hal/local/elf/testdata:elementwise_mul",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/hal/local:executable_environment",
+        "//runtime/src/iree/hal/local:executable_library",
+        "//runtime/src/iree/hal/local/elf/testdata:elementwise_mul",
     ],
 )
 
@@ -70,9 +70,9 @@ iree_runtime_cc_library(
         "arch.h",
     ],
     deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
     ],
 )
 
@@ -88,8 +88,8 @@ iree_runtime_cc_library(
         "platform.h",
     ],
     deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
     ],
 )

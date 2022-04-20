@@ -25,7 +25,7 @@ cc_binary(
         "IREE_RUNTIME_DEMO_LOAD_FILE_FROM_COMMAND_LINE_ARG",
     ],
     deps = [
-        "//iree/runtime",
+        "//runtime/src/iree/runtime",
     ],
 )
 
@@ -50,8 +50,8 @@ cc_binary(
         "IREE_RUNTIME_DEMO_LOAD_FILE_FROM_EMBEDDED_DATA",
     ],
     deps = [
-        "//iree/runtime",
-        "//iree/runtime/testdata:simple_mul_module_c",
+        "//runtime/src/iree/runtime",
+        "//runtime/src/iree/runtime/testdata:simple_mul_module_c",
     ],
 )
 
@@ -64,8 +64,8 @@ cc_binary(
     name = "hello_world_terse",
     srcs = ["hello_world_terse.c"],
     deps = [
-        "//iree/runtime",
-        "//iree/runtime/testdata:simple_mul_module_c",
+        "//runtime/src/iree/runtime",
+        "//runtime/src/iree/runtime/testdata:simple_mul_module_c",
     ],
 )
 

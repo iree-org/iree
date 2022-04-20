@@ -21,8 +21,8 @@ iree_runtime_cc_library(
         "benchmark.h",
     ],
     deps = [
-        "//iree/base",
-        "//iree/base:tracing",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
         "@com_google_benchmark//:benchmark",
     ],
 )
@@ -33,7 +33,7 @@ iree_runtime_cc_library(
     srcs = ["benchmark_main.c"],
     deps = [
         ":benchmark",
-        "//iree/base/internal:flags",
+        "//runtime/src/iree/base/internal:flags",
     ],
 )
 
@@ -45,7 +45,7 @@ iree_runtime_cc_library(
         "status_matchers.h",
     ],
     deps = [
-        "//iree/base:cc",
+        "//runtime/src/iree/base:cc",
         "@com_google_googletest//:gtest",
     ],
 )
@@ -57,7 +57,7 @@ iree_runtime_cc_library(
     tags = ["keep_dep"],
     deps = [
         ":gtest",
-        "//iree/base/internal:flags",
+        "//runtime/src/iree/base/internal:flags",
         "@com_google_googletest//:gtest",
     ],
 )

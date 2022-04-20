@@ -33,11 +33,11 @@ iree_runtime_cc_test(
     srcs = ["dynamic_library_test.cc"],
     deps = [
         ":dynamic_library_test_library",
-        "//iree/base",
-        "//iree/base:logging",
-        "//iree/base/internal:dynamic_library",
-        "//iree/base/internal:file_io",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:logging",
+        "//runtime/src/iree/base/internal:dynamic_library",
+        "//runtime/src/iree/base/internal:file_io",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )

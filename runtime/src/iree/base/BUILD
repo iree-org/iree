@@ -69,8 +69,8 @@ iree_runtime_cc_test(
     srcs = ["bitfield_test.cc"],
     deps = [
         ":base",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -83,8 +83,8 @@ iree_runtime_cc_test(
         ":base",
         ":cc",
         ":loop_test_hdrs",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -97,8 +97,8 @@ iree_runtime_cc_library(
     deps = [
         ":base",
         ":tracing",
-        "//iree/base/internal:wait_handle",
-        "//iree/testing:gtest",
+        "//runtime/src/iree/base/internal:wait_handle",
+        "//runtime/src/iree/testing:gtest",
     ],
 )
 
@@ -108,8 +108,8 @@ iree_runtime_cc_test(
     deps = [
         ":base",
         ":cc",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -118,8 +118,8 @@ iree_runtime_cc_test(
     srcs = ["string_builder_test.cc"],
     deps = [
         ":base",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -128,8 +128,8 @@ iree_runtime_cc_test(
     srcs = ["string_view_test.cc"],
     deps = [
         ":base",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -169,7 +169,7 @@ iree_runtime_cc_library(
     deps = [
         ":core_headers",
         ":tracing",
-        "//iree/base/internal:flags",
+        "//runtime/src/iree/base/internal:flags",
     ],
 )
 
@@ -180,8 +180,8 @@ iree_runtime_cc_library(
     deps = [
         ":base",
         ":tracing",
-        "//iree/base/internal",
-        "//iree/base/internal:wait_handle",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:wait_handle",
     ],
 )
 
@@ -195,8 +195,8 @@ iree_runtime_cc_test(
         ":cc",
         ":loop_sync",
         ":loop_test_hdrs",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 

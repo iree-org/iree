@@ -47,30 +47,30 @@ iree_runtime_cc_library(
     srcs = ["init.c"],
     hdrs = ["init.h"],
     deps = [
-               "//iree/base",
-               "//iree/base:tracing",
+               "//runtime/src/iree/base",
+               "//runtime/src/iree/base:tracing",
            ] + select({
-               ":dylib_enabled": ["//iree/hal/dylib/registration"],
+               ":dylib_enabled": ["//runtime/src/iree/hal/dylib/registration"],
                "//conditions:default": [],
            }) +
            select({
-               ":dylib-sync_enabled": ["//iree/hal/dylib/registration:sync"],
+               ":dylib-sync_enabled": ["//runtime/src/iree/hal/dylib/registration:sync"],
                "//conditions:default": [],
            }) +
            select({
-               ":vmvx_enabled": ["//iree/hal/vmvx/registration"],
+               ":vmvx_enabled": ["//runtime/src/iree/hal/vmvx/registration"],
                "//conditions:default": [],
            }) +
            select({
-               ":vmvx-sync_enabled": ["//iree/hal/vmvx/registration:sync"],
+               ":vmvx-sync_enabled": ["//runtime/src/iree/hal/vmvx/registration:sync"],
                "//conditions:default": [],
            }) +
            select({
-               ":vulkan_enabled": ["//iree/hal/vulkan/registration"],
+               ":vulkan_enabled": ["//runtime/src/iree/hal/vulkan/registration"],
                "//conditions:default": [],
            }) +
            select({
-               ":cuda_enabled": ["//iree/hal/cuda/registration"],
+               ":cuda_enabled": ["//runtime/src/iree/hal/cuda/registration"],
                "//conditions:default": [],
            }),
 )
