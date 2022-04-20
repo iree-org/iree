@@ -44,7 +44,7 @@ hal.executable @ex_with_workgroup_count_region {
     ]>) {
       workgroup_size = [4 : index, 1 : index, 1 : index]
     } {
-    ^bb0(%arg0: index, %arg1: index, %arg2: index):
+    ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):
       hal.return %arg0, %arg1, %arg2 : index, index, index
     }
   }

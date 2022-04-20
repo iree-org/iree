@@ -265,7 +265,7 @@ static void appendDispatchBenchmark(
 
   // Compute the workgroup parameters.
   auto workgroupCount = entryPointOp.calculateWorkgroupCount(
-      loc,
+      loc, device,
       {
           indexSet.get(std::get<0>(dispatchParams.workload)),
           indexSet.get(std::get<1>(dispatchParams.workload)),

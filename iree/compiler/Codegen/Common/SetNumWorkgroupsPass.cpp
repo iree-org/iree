@@ -114,7 +114,7 @@ LogicalResult setNumWorkgroupsImpl(IREE::HAL::ExecutableVariantOp variantOp,
     if (currWorkloadPerWorkgroup.empty()) {
       // If no workgroup size is specified, leave the workgroup size as is, just
       // set the number of workgroups to be 1, 1, 1 to have a single invocation.
-      regionBuilder = [](OpBuilder &b, Location loc,
+      regionBuilder = [](OpBuilder &b, Location loc, Value device,
                          std::array<Value, 3> workload) {
         Value one = b.create<arith::ConstantIndexOp>(loc, 1);
         return std::array<Value, 3>{one, one, one};
@@ -123,7 +123,7 @@ LogicalResult setNumWorkgroupsImpl(IREE::HAL::ExecutableVariantOp variantOp,
       assert(currWorkloadPerWorkgroup.size() <= kNumMaxParallelDims &&
              "workloadPerWorkgroup size greater than max num parallel dims");
       regionBuilder = [&currWorkloadPerWorkgroup](
-                          OpBuilder &b, Location loc,
+                          OpBuilder &b, Location loc, Value device,
                           std::array<Value, 3> workload) {
         Value one = b.create<arith::ConstantIndexOp>(loc, 1);
         std::array<Value, 3> returnValues = {one, one, one};
