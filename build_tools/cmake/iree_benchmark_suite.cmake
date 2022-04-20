@@ -97,6 +97,7 @@ function(iree_benchmark_suite)
     get_filename_component(_CATEGORY "${CMAKE_CURRENT_SOURCE_DIR}" NAME)
     set(_ROOT_ARTIFACTS_DIR "${IREE_BINARY_DIR}/benchmark_suites/${_CATEGORY}")
     set(_VMFB_ARTIFACTS_DIR "${_ROOT_ARTIFACTS_DIR}/vmfb")
+    file(MAKE_DIRECTORY ${_VMFB_ARTIFACTS_DIR})
 
     # The name of any custom target that drives creation of the final source
     # MLIR file. Depending on the format of the source, this will get updated.
@@ -159,6 +160,7 @@ function(iree_benchmark_suite)
           COMMENT
             "Importing ${_TFLITE_FILE_BASENAME} into MLIR"
         )
+        add_dependencies(iree-benchmark-import-models "${_TFLITE_IMPORT_TARGET}")
       endif()
       set(_MODULE_SOURCE_TARGET "${_TFLITE_IMPORT_TARGET}")
     endif()
@@ -181,6 +183,11 @@ function(iree_benchmark_suite)
       # The full list of translation flags.
       set(_TRANSLATION_ARGS "--iree-mlir-to-vm-bytecode-module")
       list(APPEND _TRANSLATION_ARGS "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}")
+      if (IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER)
+        # Honor this option here --- it's only an accident that we're not
+        # currently using iree_bytecode_module here.
+        list(APPEND _TRANSLATION_ARGS "-iree-llvm-link-embedded=false")
+      endif()
       list(SORT _RULE_TRANSLATION_FLAGS)
       list(APPEND _TRANSLATION_ARGS ${_RULE_TRANSLATION_FLAGS})
 
@@ -200,17 +207,18 @@ function(iree_benchmark_suite)
         "${PACKAGE_NAME}_iree-generate-benchmark-artifact-${_MODULE_SOURCE_BASENAME}-${_VMFB_HASH}"
       )
       if(NOT TARGET "${_TRANSLATION_TARGET_NAME}")
+        iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE "iree-compile")
         add_custom_command(
           OUTPUT "${_VMFB_FILE}"
           COMMAND
-            "$<TARGET_FILE:iree::tools::iree-translate>"
+            ${_COMPILE_TOOL_EXECUTABLE}
               ${_TRANSLATION_ARGS}
               "--mlir-print-op-on-diagnostic=false"
               "${_MODULE_SOURCE}"
               -o "${_VMFB_FILE}"
           WORKING_DIRECTORY "${_VMFB_ARTIFACTS_DIR}"
           DEPENDS
-            iree::tools::iree-translate
+            ${_COMPILE_TOOL_EXECUTABLE}
             "${_MODULE_SOURCE_TARGET}"
             COMMENT "Generating VMFB for ${_COMMON_NAME_SEGMENTS}"
         )

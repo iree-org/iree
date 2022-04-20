@@ -59,7 +59,6 @@ IREE_API_EXPORT iree_string_view_t iree_hal_buffer_usage_format(
     iree_hal_buffer_usage_t value, iree_bitfield_string_temp_t* out_temp) {
   static const iree_bitfield_string_mapping_t mappings[] = {
       // Combined:
-      {IREE_HAL_BUFFER_USAGE_ALL, IREE_SVL("ALL")},
       // Separate:
       {IREE_HAL_BUFFER_USAGE_CONSTANT, IREE_SVL("CONSTANT")},
       {IREE_HAL_BUFFER_USAGE_TRANSFER, IREE_SVL("TRANSFER")},
@@ -75,6 +74,27 @@ IREE_API_EXPORT iree_string_view_t iree_hal_buffer_usage_format(
 //===----------------------------------------------------------------------===//
 
 static const iree_hal_buffer_vtable_t iree_hal_subspan_buffer_vtable;
+
+IREE_API_EXPORT void iree_hal_subspan_buffer_initialize(
+    iree_hal_buffer_t* allocated_buffer, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length, iree_hal_allocator_t* device_allocator,
+    iree_allocator_t host_allocator, iree_hal_buffer_t* out_buffer) {
+  IREE_ASSERT_ARGUMENT(allocated_buffer);
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  iree_hal_buffer_initialize(host_allocator, device_allocator, allocated_buffer,
+                             allocated_buffer->allocation_size, byte_offset,
+                             byte_length, allocated_buffer->memory_type,
+                             allocated_buffer->allowed_access,
+                             allocated_buffer->allowed_usage,
+                             &iree_hal_subspan_buffer_vtable, out_buffer);
+}
+
+IREE_API_EXPORT void iree_hal_subspan_buffer_deinitialize(
+    iree_hal_buffer_t* buffer) {
+  IREE_ASSERT_ARGUMENT(buffer);
+  iree_hal_buffer_release(buffer->allocated_buffer);
+  buffer->allocated_buffer = NULL;
+}
 
 IREE_API_EXPORT iree_status_t iree_hal_subspan_buffer_create(
     iree_hal_buffer_t* allocated_buffer, iree_device_size_t byte_offset,
@@ -503,17 +523,17 @@ iree_hal_buffer_usage_t iree_hal_buffer_allowed_usage(
 // Transfer
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t
-iree_hal_buffer_zero(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
-                     iree_device_size_t byte_length) {
+IREE_API_EXPORT iree_status_t iree_hal_buffer_map_zero(
+    iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length) {
   const uint8_t zero = 0;
-  return iree_hal_buffer_fill(buffer, byte_offset, byte_length, &zero, 1);
+  return iree_hal_buffer_map_fill(buffer, byte_offset, byte_length, &zero, 1);
 }
 
-IREE_API_EXPORT iree_status_t
-iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
-                     iree_device_size_t byte_length, const void* pattern,
-                     iree_host_size_t pattern_length) {
+IREE_API_EXPORT iree_status_t iree_hal_buffer_map_fill(
+    iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length, const void* pattern,
+    iree_host_size_t pattern_length) {
   IREE_ASSERT_ARGUMENT(buffer);
   IREE_ASSERT_ARGUMENT(pattern);
 
@@ -600,7 +620,7 @@ iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_buffer_read_data(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_map_read(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     void* target_buffer, iree_device_size_t data_length) {
   if (data_length == 0) {
@@ -624,7 +644,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_read_data(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_buffer_write_data(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_map_write(
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     const void* source_buffer, iree_device_size_t data_length) {
   if (data_length == 0) {
@@ -655,7 +675,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_write_data(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_buffer_copy_data(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_map_copy(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t data_length) {

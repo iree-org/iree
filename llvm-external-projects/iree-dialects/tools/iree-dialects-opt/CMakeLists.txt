@@ -1,20 +1,31 @@
 set(LIBS
+  # Local dialects.
+  IREEInputDialect
+  IREELinalgExtDialect
+  IREELinalgExtOpInterfaceImpl
+  IREELinalgExtPasses
+  IREELinalgExtTransforms
+  IREELinalgTransformDialect
+  IREELinalgTransformDialectTransforms
+  IREELinalgTransformTestPasses
+  IREETransformsTestPasses
+  IREEPyDMDialect
+  IREEPyDMPasses
+  # Core dialects.
   MLIRArithmetic
+  MLIRAsync
   MLIRControlFlow
   MLIRDialect
+  MLIRFunc
   MLIRLinalg
   MLIRMemRef
   MLIROptLib
+  MLIRPDL
+  MLIRPDLInterp
   MLIRSCF
   MLIRSCFTransforms
-  MLIRFunc
   MLIRTensor
   MLIRTransforms
-  IREEInputDialect
-  IREELinalgExtDialect
-  IREELinalgExtPasses
-  IREEPyDMDialect
-  IREEPyDMPasses
 )
 
 add_llvm_tool(iree-dialects-opt

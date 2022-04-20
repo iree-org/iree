@@ -12,7 +12,7 @@
 # happens every few months as we are not yet binary-stable but in the future
 # will be a bigger issue.
 #
-# To use, ensure iree-translate and your compiled ld.lld are on your PATH and
+# To use, ensure iree-compile and your compiled ld.lld are on your PATH and
 # run the script:
 #   $ ./iree/hal/local/elf/testdata/generate.sh
 

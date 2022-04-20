@@ -42,7 +42,7 @@ hal.executable.source public @ex {
   // private functions and only those with declared entry points will be
   // exported.
   builtin.module {
-    func @elementwise_mul() {
+    func.func @elementwise_mul() {
       %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:4xf32>
       %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:4xf32>
       %dst = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<writeonly:4xf32>

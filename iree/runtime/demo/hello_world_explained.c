@@ -166,7 +166,8 @@ static iree_status_t iree_runtime_demo_run_session(
 // per-call and throws them away.
 
 // Sets up and calls the simple_mul function and dumps the results:
-// func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
+// func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) ->
+// tensor<4xf32>
 //
 // NOTE: this is a demo and as such this performs no memoization; a real
 // application could reuse a lot of these structures and cache lookups of
@@ -192,7 +193,7 @@ static iree_status_t iree_runtime_demo_perform_mul(
     if (iree_status_is_ok(status)) {
       static const iree_hal_dim_t arg0_shape[1] = {4};
       static const float arg0_data[4] = {1.0f, 1.1f, 1.2f, 1.3f};
-      status = iree_hal_buffer_view_wrap_or_clone_heap_buffer(
+      status = iree_hal_buffer_view_allocate_buffer(
           device_allocator,
           // Shape dimensions and rank:
           arg0_shape, IREE_ARRAYSIZE(arg0_shape),
@@ -202,16 +203,15 @@ static iree_status_t iree_runtime_demo_perform_mul(
           IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
           (iree_hal_buffer_params_t){
               // Where to allocate (host or device):
-              .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                      IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+              .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
               // Access to allow to this memory (this is .rodata so READ only):
               .access = IREE_HAL_MEMORY_ACCESS_READ,
               // Intended usage of the buffer (transfers, dispatches, etc):
-              .usage = IREE_HAL_BUFFER_USAGE_ALL,
+              .usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                       IREE_HAL_BUFFER_USAGE_TRANSFER,
           },
           // The actual heap buffer to wrap or clone and its allocator:
-          iree_make_byte_span((void*)arg0_data, sizeof(arg0_data)),
-          iree_allocator_null(),
+          iree_make_const_byte_span(arg0_data, sizeof(arg0_data)),
           // Buffer view + storage are returned and owned by the caller:
           &arg0);
     }
@@ -231,18 +231,17 @@ static iree_status_t iree_runtime_demo_perform_mul(
     if (iree_status_is_ok(status)) {
       static const iree_hal_dim_t arg1_shape[1] = {4};
       static const float arg1_data[4] = {10.0f, 100.0f, 1000.0f, 10000.0f};
-      status = iree_hal_buffer_view_wrap_or_clone_heap_buffer(
+      status = iree_hal_buffer_view_allocate_buffer(
           device_allocator, arg1_shape, IREE_ARRAYSIZE(arg1_shape),
           IREE_HAL_ELEMENT_TYPE_FLOAT_32,
           IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
           (iree_hal_buffer_params_t){
-              .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                      IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+              .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
               .access = IREE_HAL_MEMORY_ACCESS_READ,
-              .usage = IREE_HAL_BUFFER_USAGE_ALL,
+              .usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                       IREE_HAL_BUFFER_USAGE_TRANSFER,
           },
-          iree_make_byte_span((void*)arg1_data, sizeof(arg1_data)),
-          iree_allocator_null(), &arg1);
+          iree_make_const_byte_span(arg1_data, sizeof(arg1_data)), &arg1);
     }
     if (iree_status_is_ok(status)) {
       IREE_IGNORE_ERROR(iree_hal_buffer_view_fprint(

@@ -15,7 +15,7 @@ include(CMakeParseArguments)
 # SRC: Source file to compile into a bytecode module.
 # FLAGS: Flags to pass to the translation tool (list of strings).
 # TRANSLATE_TOOL: Translation tool to invoke (CMake target). The default
-#     tool is "iree-translate".
+#     tool is "iree-compile".
 # C_IDENTIFIER: Identifier to use for generate c embed code.
 #     If omitted then no C embed code will be generated.
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
@@ -32,8 +32,8 @@ function(iree_bytecode_module)
   cmake_parse_arguments(
     _RULE
     "PUBLIC;TESTONLY"
-    "NAME;SRC;TRANSLATE_TOOL;C_IDENTIFIER;OPT_TOOL;MODULE_FILE_NAME"
-    "FLAGS;OPT_FLAGS"
+    "NAME;SRC;TRANSLATE_TOOL;C_IDENTIFIER;MODULE_FILE_NAME"
+    "FLAGS"
     ${ARGN}
   )
 
@@ -45,7 +45,7 @@ function(iree_bytecode_module)
   if(DEFINED _RULE_TRANSLATE_TOOL)
     set(_TRANSLATE_TOOL ${_RULE_TRANSLATE_TOOL})
   else()
-    set(_TRANSLATE_TOOL "iree-translate")
+    set(_TRANSLATE_TOOL "iree-compile")
   endif()
 
   if(DEFINED _RULE_MODULE_FILE_NAME)
@@ -54,64 +54,32 @@ function(iree_bytecode_module)
     set(_MODULE_FILE_NAME "${_RULE_NAME}.vmfb")
   endif()
 
-  # If OPT_FLAGS was specified, preprocess the source file with the OPT_TOOL
-  if(_RULE_OPT_FLAGS)
-    # Create the filename for the output of OPT_TOOL, which
-    # will relace _RULE_SRC as the input to iree_bytecode_module.
-    set(_TRANSLATE_SRC_BASENAME "${_RULE_NAME}.opt.mlir")
-    set(_TRANSLATE_SRC "${CMAKE_CURRENT_BINARY_DIR}/${_TRANSLATE_SRC_BASENAME}")
-
-    # Set default for OPT_TOOL.
-    if(_RULE_OPT_TOOL)
-      set(_OPT_TOOL ${_RULE_OPT_TOOL})
-    else()
-      set(_OPT_TOOL "iree-opt")
-    endif()
-
-    # Prepare the OPT_TOOL command line.
-    iree_get_executable_path(_OPT_TOOL_EXECUTABLE ${_OPT_TOOL})
-
-    set(_ARGS "${_RULE_OPT_FLAGS}")
-    get_filename_component(_SRC_PATH "${_RULE_SRC}" REALPATH)
-    list(APPEND _ARGS "${_SRC_PATH}")
-    list(APPEND _ARGS "-o")
-    list(APPEND _ARGS "${_TRANSLATE_SRC}")
-
-    add_custom_command(
-      OUTPUT
-        "${_TRANSLATE_SRC_BASENAME}"
-      COMMAND
-        ${_OPT_TOOL_EXECUTABLE}
-        ${_ARGS}
-      # Changes to the opt tool should trigger rebuilding.
-      # Using {_OPT_TOOL} as the dependency would only work when the tools
-      # are built in the same cmake build directory as the tests, that is,
-      # when NOT cross-compiling. Using {_OPT_TOOL_EXECUTABLE} works
-      # uniformly regardless of that.
-      DEPENDS
-        ${_OPT_TOOL_EXECUTABLE}
-        ${_RULE_SRC}
-      VERBATIM
-    )
-  else()
-    # OPT_FLAGS was not specified, so are not using the OPT_TOOL.
-    # Just pass the source file directly as the source for the bytecode module.
-    set(_TRANSLATE_SRC "${_RULE_SRC}")
-  endif()
-
   iree_get_executable_path(_TRANSLATE_TOOL_EXECUTABLE ${_TRANSLATE_TOOL})
 
   set(_ARGS "${_RULE_FLAGS}")
 
-  get_filename_component(_TRANSLATE_SRC_PATH "${_TRANSLATE_SRC}" REALPATH)
-  list(APPEND _ARGS "${_TRANSLATE_SRC_PATH}")
+  get_filename_component(_SRC_PATH "${_RULE_SRC}" REALPATH)
+  list(APPEND _ARGS "${_SRC_PATH}")
   list(APPEND _ARGS "-o")
   list(APPEND _ARGS "${_MODULE_FILE_NAME}")
 
   # If an LLVM CPU backend is enabled, supply the linker tool.
   if(IREE_LLD_TARGET)
-    iree_get_executable_path(_EMBEDDED_LINKER_TOOL_EXECUTABLE "lld")
-    list(APPEND _ARGS "-iree-llvm-embedded-linker-path=\"${_EMBEDDED_LINKER_TOOL_EXECUTABLE}\"")
+    iree_get_executable_path(_LINKER_TOOL_EXECUTABLE "lld")
+    list(APPEND _ARGS "-iree-llvm-embedded-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
+    list(APPEND _ARGS "-iree-llvm-wasm-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
+    # Note: -iree-llvm-system-linker-path is left unspecified.
+  endif()
+
+  if(IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER)
+    list(APPEND _ARGS "-iree-llvm-link-embedded=false")
+  endif()
+
+  # Support testing in TSan build dirs. Unlike other sanitizers, TSan is an
+  # ABI break: when the host code is built with TSan, the module must be too,
+  # otherwise we get crashes calling module code.
+  if(IREE_BYTECODE_MODULE_ENABLE_TSAN)
+    list(APPEND _ARGS "-iree-llvm-sanitize=thread")
   endif()
 
   # Depending on the binary instead of the target here given we might not have
@@ -126,8 +94,8 @@ function(iree_bytecode_module)
     # trigger rebuilding.
     DEPENDS
       ${_TRANSLATE_TOOL_EXECUTABLE}
-      ${_EMBEDDED_LINKER_TOOL_EXECUTABLE}
-      ${_TRANSLATE_SRC}
+      ${_LINKER_TOOL_EXECUTABLE}
+      ${_RULE_SRC}
     VERBATIM
   )
 

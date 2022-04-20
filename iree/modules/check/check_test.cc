@@ -83,7 +83,9 @@ class CheckTest : public ::testing::Test {
     iree_hal_buffer_params_t params = {0};
     params.type =
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-    params.usage = IREE_HAL_BUFFER_USAGE_ALL;
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                   IREE_HAL_BUFFER_USAGE_TRANSFER |
+                   IREE_HAL_BUFFER_USAGE_MAPPING;
     IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
         allocator_, shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_INT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
@@ -103,7 +105,9 @@ class CheckTest : public ::testing::Test {
     iree_hal_buffer_params_t params = {0};
     params.type =
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-    params.usage = IREE_HAL_BUFFER_USAGE_ALL;
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                   IREE_HAL_BUFFER_USAGE_TRANSFER |
+                   IREE_HAL_BUFFER_USAGE_MAPPING;
     IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
         allocator_, shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_FLOAT_16,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
@@ -123,7 +127,9 @@ class CheckTest : public ::testing::Test {
     iree_hal_buffer_params_t params = {0};
     params.type =
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-    params.usage = IREE_HAL_BUFFER_USAGE_ALL;
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                   IREE_HAL_BUFFER_USAGE_TRANSFER |
+                   IREE_HAL_BUFFER_USAGE_MAPPING;
     IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
         allocator_, shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
@@ -143,7 +149,9 @@ class CheckTest : public ::testing::Test {
     iree_hal_buffer_params_t params = {0};
     params.type =
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-    params.usage = IREE_HAL_BUFFER_USAGE_ALL;
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                   IREE_HAL_BUFFER_USAGE_TRANSFER |
+                   IREE_HAL_BUFFER_USAGE_MAPPING;
     IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
         allocator_, shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_FLOAT_64,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
@@ -154,11 +162,10 @@ class CheckTest : public ::testing::Test {
 
   iree_status_t Invoke(const char* function_name) {
     iree_vm_function_t function;
-    IREE_RETURN_IF_ERROR(
-        check_module_->lookup_function(
-            check_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-            iree_make_cstring_view(function_name), &function),
-        "exported function '%s' not found", function_name);
+    IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_name(
+                             check_module_, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+                             iree_make_cstring_view(function_name), &function),
+                         "exported function '%s' not found", function_name);
     // TODO(#2075): don't directly invoke native functions like this.
     return iree_vm_invoke(context_, function, IREE_VM_INVOCATION_FLAG_NONE,
                           /*policy=*/nullptr, inputs_.get(),

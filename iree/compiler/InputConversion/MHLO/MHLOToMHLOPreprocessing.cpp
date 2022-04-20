@@ -79,71 +79,6 @@ static Value getF32Const(ImplicitLocOpBuilder b, ArrayRef<int64_t> shapes,
       .getResult();
 }
 
-class ExtractConvOpPaddingAttributes : public OpRewritePattern<mhlo::ConvOp> {
- public:
-  using OpRewritePattern<mhlo::ConvOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(mhlo::ConvOp op,
-                                PatternRewriter &rewriter) const override {
-    if (!hasPadding(op)) return failure();
-    auto inputType = op.lhs().getType().cast<ShapedType>();
-    int rank = inputType.getRank();
-
-    // TODO(suderman): Add proper support for padding + dilation for codegen.
-    // We can't extract padding if the left hand side has dilation.
-    if (op.lhs_dilation().hasValue()) {
-      for (auto val : op.lhs_dilation().getValue().getValues<APInt>()) {
-        if (val != 1) {
-          return failure();
-        }
-      }
-    }
-
-    SmallVector<int64_t, 4> paddingLow, paddingHigh, interiorPadding, shape;
-    paddingLow.append(rank, 0);
-    paddingHigh.append(rank, 0);
-    interiorPadding.append(rank, 0);
-    for (auto iter :
-         llvm::enumerate(op.dimension_numbers().getInputSpatialDimensions())) {
-      unsigned idx = iter.index();
-      unsigned dim = iter.value();
-      paddingLow[dim] = op.paddingAttr().getValues<int64_t>()[{idx, 0}];
-      paddingHigh[dim] = op.paddingAttr().getValues<int64_t>()[{idx, 1}];
-    }
-    for (unsigned i = 0; i < rank; ++i) {
-      // mhlo.pad doesn't support dynamic shape.
-      if (inputType.isDynamicDim(i)) return failure();
-      int size = inputType.getShape()[i];
-      shape.push_back(size + paddingLow[i] + paddingHigh[i]);
-    }
-
-    auto toDenseAttr = [&rewriter](ArrayRef<int64_t> elements) {
-      return DenseIntElementsAttr::get(
-          RankedTensorType::get(elements.size(), rewriter.getIntegerType(64)),
-          elements);
-    };
-
-    auto loc = op.getLoc();
-    auto padResultType =
-        RankedTensorType::get(shape, inputType.getElementType());
-    Attribute zeroAttr = rewriter.getZeroAttr(
-        RankedTensorType::get({}, inputType.getElementType()));
-    auto zero = rewriter.create<arith::ConstantOp>(loc, zeroAttr);
-    auto padOp = rewriter.create<mhlo::PadOp>(
-        loc, padResultType, op.lhs(), zero, toDenseAttr(paddingLow),
-        toDenseAttr(paddingHigh), toDenseAttr(interiorPadding));
-    auto resultType = op.getResult().getType();
-    auto newOp = rewriter.create<mhlo::ConvOp>(
-        op.getLoc(), resultType, padOp.getResult(), op.rhs(),
-        op.window_stridesAttr(), /*padding=*/nullptr, op.lhs_dilationAttr(),
-        op.rhs_dilationAttr(), /*window_reversal=*/nullptr,
-        op.dimension_numbersAttr(), op.feature_group_countAttr(),
-        op.batch_group_countAttr(), op.precision_configAttr());
-    rewriter.replaceOp(op, newOp.getResult());
-    return success();
-  }
-};
-
 // Guarantee that the input dimensions are ordered batch, spatial_dims, feature
 // dim.
 class ReorderConvOpInputDimensions : public OpRewritePattern<mhlo::ConvOp> {
@@ -333,70 +268,6 @@ class ReorderConvOpOutputDimensions : public OpRewritePattern<mhlo::ConvOp> {
         rewriter.getI64TensorAttr(invertPermutation));
 
     rewriter.replaceOp(op, transposed.getResult());
-    return success();
-  }
-};
-
-class ExtractReduceWindowOpPaddingAttributes
-    : public OpRewritePattern<mhlo::ReduceWindowOp> {
- public:
-  using OpRewritePattern<mhlo::ReduceWindowOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(mhlo::ReduceWindowOp op,
-                                PatternRewriter &rewriter) const override {
-    if (!op.padding()) return failure();
-
-    if ((op.base_dilations() && !isSplatValue(*op.base_dilations(), 1)) ||
-        (op.window_dilations() && !isSplatValue(*op.window_dilations(), 1))) {
-      return failure();
-    }
-    if (isAllZero(op.paddingAttr())) return failure();
-
-    // All inputs must be of the same static shape, since
-    // mhlo.pad doesn't support dynamic shape.
-    for (Type inputType : op.inputs().getType()) {
-      if (!inputType.cast<ShapedType>().hasStaticShape()) return failure();
-    }
-    ArrayRef<int64_t> inputShape =
-        op.inputs()[0].getType().cast<ShapedType>().getShape();
-
-    int rank = inputShape.size();
-    SmallVector<int64_t, 4> paddingLow, paddingHigh, interiorPadding, shape;
-    for (unsigned i = 0; i < rank; ++i) {
-      interiorPadding.push_back(0);
-      paddingLow.push_back(op.paddingAttr().getValues<int64_t>()[{i, 0}]);
-      paddingHigh.push_back(op.paddingAttr().getValues<int64_t>()[{i, 1}]);
-      int size = inputShape[i];
-      shape.push_back(size + paddingLow.back() + paddingHigh.back());
-    }
-
-    auto toDenseAttr = [&rewriter](ArrayRef<int64_t> elements) {
-      return DenseIntElementsAttr::get(
-          RankedTensorType::get(elements.size(), rewriter.getIntegerType(64)),
-          elements);
-    };
-
-    SmallVector<Value> padOps;
-    padOps.reserve(op.inputs().size());
-    auto loc = op.getLoc();
-    for (auto it : llvm::zip(op.inputs(), op.init_values())) {
-      Value input = std::get<0>(it);
-      Value initValue = std::get<1>(it);
-      auto inputType = input.getType().cast<ShapedType>();
-      auto padResultType =
-          RankedTensorType::get(shape, inputType.getElementType());
-      auto padOp = rewriter.create<mhlo::PadOp>(
-          loc, padResultType, input, initValue, toDenseAttr(paddingLow),
-          toDenseAttr(paddingHigh), toDenseAttr(interiorPadding));
-      padOps.push_back(padOp);
-    }
-    auto newOp = rewriter.create<mhlo::ReduceWindowOp>(
-        loc, op.getResultTypes(), padOps, op.init_values(),
-        op.window_dimensions(), op.window_stridesAttr(),
-        op.base_dilationsAttr(), op.window_dilationsAttr(),
-        /*padding=*/nullptr);
-    rewriter.inlineRegionBefore(op.body(), newOp.body(), newOp.body().begin());
-    rewriter.replaceOp(op, newOp.getResults());
     return success();
   }
 };
@@ -936,8 +807,7 @@ struct MHLOToMHLOPreprocessingPass
     mhlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
     mhlo::PopulateComplexLoweringPatterns(context, &patterns);
     mhlo::PopulateGatherToTorchIndexSelectPatterns(context, &patterns);
-    patterns.insert<ExtractReduceWindowOpPaddingAttributes,
-                    AdjustDepthwiseFilterShape, ScatterRank0Value,
+    patterns.insert<AdjustDepthwiseFilterShape, ScatterRank0Value,
                     ExpandRngNormal, MulCastOfBool>(context);
 
     // dot_general canoncalization patterns.
@@ -987,9 +857,6 @@ struct MHLOToMHLOPreprocessingPass
         ReorderBroadcastInDimOpAndElementwiseOp<mhlo::AndOp>,
         ReorderBroadcastInDimOpAndElementwiseOp<mhlo::OrOp>,
         ReorderBroadcastInDimOpAndElementwiseOp<mhlo::XorOp>>(context);
-    if (extractPadFromConv) {
-      patterns.insert<ExtractConvOpPaddingAttributes>(context);
-    }
     if (orderConvFeatures) {
       patterns.insert<ReorderConvOpInputDimensions>(context);
       patterns.insert<ReorderConvOpKernelDimensions>(context);
@@ -1004,7 +871,8 @@ struct MHLOToMHLOPreprocessingPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createMHLOToMHLOPreprocessingPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createMHLOToMHLOPreprocessingPass() {
   return std::make_unique<MHLOToMHLOPreprocessingPass>();
 }
 

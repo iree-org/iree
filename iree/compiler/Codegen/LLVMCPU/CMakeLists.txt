@@ -25,9 +25,12 @@ iree_cc_library(
     "LLVMCPUUnfuseFMAOps.cpp"
     "Passes.cpp"
     "VectorContractCustomKernels.cpp"
+    "VerifyLinalgTransformLegality.cpp"
   DEPS
     IREELinalgExtDialect
     IREELinalgExtPasses
+    IREELinalgTransformDialect
+    IREELinalgTransformDialectTransforms
     LLVMSupport
     MLIRAffineToStandard
     MLIRAnalysis
@@ -35,6 +38,7 @@ iree_cc_library(
     MLIRArithmeticTransforms
     MLIRArmNeon
     MLIRArmNeon2dToIntr
+    MLIRBufferization
     MLIRControlFlowToLLVM
     MLIRFunc
     MLIRFuncToLLVM
@@ -51,6 +55,8 @@ iree_cc_library(
     MLIRMemRef
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
+    MLIRPDL
+    MLIRPDLInterp
     MLIRPass
     MLIRReconcileUnrealizedCasts
     MLIRSCF
@@ -58,7 +64,7 @@ iree_cc_library(
     MLIRSCFTransforms
     MLIRTensor
     MLIRTosa
-    MLIRTosaToStandard
+    MLIRTosaToArith
     MLIRTransforms
     MLIRVector
     MLIRVectorToLLVM

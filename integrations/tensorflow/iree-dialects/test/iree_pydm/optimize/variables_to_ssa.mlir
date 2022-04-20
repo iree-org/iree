@@ -59,8 +59,8 @@ iree_pydm.func @free_var_non_local_load_hoists(%arg0 : !iree_pydm.object) -> (!i
   // CHECK-NOT: store_var
   %a = alloc_free_var "a" -> !iree_pydm.free_var_ref
   store_var %a = %arg0 : !iree_pydm.free_var_ref, !iree_pydm.object
-  // CHECK: std.br ^bb1(%arg0 : !iree_pydm.object)
-  std.br ^bb1
+  // CHECK: cf.br ^bb1(%arg0 : !iree_pydm.object)
+  cf.br ^bb1
   // CHECK: ^bb1(%[[PHI:.*]]: !iree_pydm.object): // pred: ^bb0
 ^bb1:
   // CHECK-NOT: load_var

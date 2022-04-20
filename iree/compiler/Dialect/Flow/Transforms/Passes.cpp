@@ -10,6 +10,7 @@
 
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
@@ -26,16 +27,31 @@ static llvm::cl::opt<bool> clExportBenchmarkFuncs(
 
 // TODO(ravishankarm): Change to a pipeline option.
 static llvm::cl::opt<bool> clTraceDispatchTensors(
-    "iree-flow-trace-dispatch-tensors2",
+    "iree-flow-trace-dispatch-tensors",
     llvm::cl::desc(
         "Trace runtime input/output tensors for each dispatch function."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clDemoteI64ToI32(
+    "iree-flow-demote-i64-to-i32",
+    llvm::cl::desc("Converts all i64 ops and values into i32 counterparts "
+                   "unconditionally before main flow conversions."),
+    llvm::cl::init(false));
 static llvm::cl::opt<bool> clDemoteF32ToF16(
     "iree-flow-demote-f32-to-f16",
-    llvm::cl::desc("Convert all f32 ops and values into f16 counterparts "
-                   "unconditionally before main flow conversions"),
+    llvm::cl::desc("Converts all f32 ops and values into f16 counterparts "
+                   "unconditionally before main flow conversions."),
     llvm::cl::init(false));
+static llvm::cl::opt<bool> clPromoteF16ToF32(
+    "iree-flow-promote-f16-to-f32",
+    llvm::cl::desc("Converts all f16 ops and values into f32 counterparts "
+                   "unconditionally before main flow conversions."),
+    llvm::cl::init(false));
+static llvm::cl::opt<bool> clDemoteF64ToF32(
+    "iree-flow-demote-f64-to-f32",
+    llvm::cl::desc("Converts all f64 ops and values into f32 counterparts "
+                   "unconditionally before main flow conversions."),
+    llvm::cl::init(true));
 
 static llvm::cl::opt<bool> clEnableConvToImg2Col(
     "iree-flow-enable-conv-img2col-transform",
@@ -79,7 +95,7 @@ namespace Flow {
 
 namespace {
 
-using FunctionLikeNest = MultiOpNest<FuncOp, IREE::Util::InitializerOp>;
+using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
 
 // Subset of the overall pass pipeline for optimizing globals and numerics.
 // We may ultimately break this out separately so creating a syntactic
@@ -125,6 +141,25 @@ void buildGlobalOptimizationPassPipeline(
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                     const TransformOptions &transformOptions) {
+  // ML frontends have very uneven support for user-controlled types _and_ users
+  // tend to use types not well suited for the work they are doing. These
+  // demotions/promotions allow users to change the types after lowering out of
+  // the frontends. It'll always be better to do this higher up in the stack
+  // as these kind of blanket conversions have corner cases and potential
+  // accuracy/precision losses beyond what the user may expect.
+  if (clDemoteF64ToF32) {
+    passManager.addPass(IREE::Util::createDemoteF64ToF32Pass());
+  }
+  if (clDemoteF32ToF16) {
+    passManager.addPass(IREE::Util::createDemoteF32ToF16Pass());
+  }
+  if (clPromoteF16ToF32) {
+    passManager.addPass(IREE::Util::createPromoteF16ToF32Pass());
+  }
+  if (clDemoteI64ToI32) {
+    passManager.addPass(IREE::Util::createDemoteI64ToI32Pass());
+  }
+
   // Special case peephole optimizations.
   FunctionLikeNest(passManager)
       .addPass(IREE::Flow::createConvertConv2D1x1ToMatmulPass)
@@ -172,26 +207,23 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(createFusionOfTensorOpsPass)
       .addPredicatedPass(clEnableLinalgDetensorize,
                          mlir::createLinalgDetensorizePass)
-
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
+
+      // Split reduction operations into parallel and reduction.
+      .addPass(createSplitReductionPass)
+      // SplitReductionPass may create reduction dimension that are not the last
+      // dimension.
+      .addPass(createInterchangeGenericOpsPass)
 
       // Dispatch region formation.
-      // TODO(ravishankarm): Fold ConvertToFlowBefore/ConvertToFlowAfter into
-      // dispatch region formation pass.
-      .addPass(createConvertToFlowBeforeDispatchFormation)
-      .addPass(mlir::createCanonicalizerPass)
-      .addPass(mlir::createCSEPass)
       .addPass(createDispatchLinalgOnTensorsPass)
       .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(mlir::createCanonicalizerPass)
-      .addPass(createCSEPass)
+      .addPass(createCSEPass);
 
-      // Convert remaining ops to Flow ops, after this stage no Linalg ops
-      // should remain.
-      .addPass(createConvertToFlowAfterDispatchFormation)
-      .addPass(mlir::createCanonicalizerPass)
-      .addPass(mlir::createCSEPass);
+  // Initialize any empty tensors to zero.
+  passManager.addPass(createInitializeEmptyTensorsPass());
 
   // Module pass to outline the dispatch regions into their own functions
   // wrapped in executables.

@@ -14,7 +14,7 @@ namespace mlir {
 namespace iree_compiler {
 
 LogicalResult InferCustomKernelsTargetInfoFromParent(
-    FuncOp entryPointFn, CustomKernelsTargetInfo &targetInfo) {
+    func::FuncOp entryPointFn, CustomKernelsTargetInfo &targetInfo) {
   // Set the out-value to defaults early so that early returns produce
   // consistent results and so that we can write simpler code below
   // (for loop OR-ing booleans, assuming initial 'false' value).

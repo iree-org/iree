@@ -36,7 +36,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
 
   // CHECK-LABEL: func @simpleDispatch
   //  CHECK-SAME: (%[[ARG0:.+]]: !hal.buffer_view, %[[ARG1:.+]]: !hal.buffer_view) -> !hal.buffer_view
-  func @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
+  func.func @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
     %c1 = arith.constant 1 : index
     %c4 = arith.constant 4 : index
     %c16 = arith.constant 16 : index
@@ -67,7 +67,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
 
     // CHECK: %[[RESULT_BUFFER:.+]] = hal.allocator.allocate<%[[ALLOCATOR]] : !hal.allocator>
     // CHECK-SAME: type("HostVisible|DeviceVisible|DeviceLocal")
-    // CHECK-SAME: usage("Transfer|Mapping|Dispatch|All")
+    // CHECK-SAME: usage("Transfer|Mapping|Dispatch")
     // CHECK-SAME: : !hal.buffer{%c16}
     %result_resource = stream.resource.alloc uninitialized : !stream.resource<external>{%c16}
 

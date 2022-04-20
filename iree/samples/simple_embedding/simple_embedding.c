@@ -83,22 +83,18 @@ iree_status_t Run() {
       iree_hal_device_allocator(device), shape, IREE_ARRAYSIZE(shape),
       IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
       (iree_hal_buffer_params_t){
-          .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
-                  IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-          .usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
-                   IREE_HAL_BUFFER_USAGE_TRANSFER |
-                   IREE_HAL_BUFFER_USAGE_MAPPING,
+          .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+          .usage =
+              IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
       },
       iree_make_const_byte_span(kFloat4, sizeof(kFloat4)), &arg0_buffer_view));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_view_allocate_buffer(
       iree_hal_device_allocator(device), shape, IREE_ARRAYSIZE(shape),
       IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
       (iree_hal_buffer_params_t){
-          .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
-                  IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-          .usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
-                   IREE_HAL_BUFFER_USAGE_TRANSFER |
-                   IREE_HAL_BUFFER_USAGE_MAPPING,
+          .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+          .usage =
+              IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
       },
       iree_make_const_byte_span(kFloat2, sizeof(kFloat2)), &arg1_buffer_view));
 
@@ -142,9 +138,10 @@ iree_status_t Run() {
 
   // Read back the results and ensure we got the right values.
   float results[] = {0.0f, 0.0f, 0.0f, 0.0f};
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_read_data(iree_hal_buffer_view_buffer(ret_buffer_view), 0,
-                                results, sizeof(results)));
+  IREE_RETURN_IF_ERROR(iree_hal_device_transfer_d2h(
+      device, iree_hal_buffer_view_buffer(ret_buffer_view), 0, results,
+      sizeof(results), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+      iree_infinite_timeout()));
   for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(results); ++i) {
     if (results[i] != 8.0f) {
       return iree_make_status(IREE_STATUS_UNKNOWN, "result mismatches");

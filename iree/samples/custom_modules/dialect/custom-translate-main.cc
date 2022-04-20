@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // Custom translation main entry function.
-// Based on the iree-translate main entry function (iree-translate-main.cc).
+// Based on the iree-compile main entry function (iree-compile-main.cc).
 //
 // We need this entry function because we want to register the custom
 // dialect, which is missing in IREE's translation main entry function.
@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
   // Register assembly printer command-line options like
   // -mlir-print-op-generic.
   mlir::registerAsmPrinterCLOptions();
-  // Register pass manager command-line options like -print-ir-*.
+  // Register pass manager command-line options like -mlir-print-ir-*.
   mlir::registerPassManagerCLOptions();
 
   // Add flags for all the registered translations.

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-tile,iree-spirv-vectorize))))' %s | FileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(func.func(iree-spirv-tile,iree-spirv-vectorize))))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]]>
 #translation = #iree_codegen.translation_info<SPIRVVectorize, workload_per_wg = [64, 8]>
@@ -16,7 +16,7 @@ hal.executable private @matmul_static_shape_f16 {
       translation_info = #translation
     }
     builtin.module  {
-      func @matmul_static_shape_f16() {
+      func.func @matmul_static_shape_f16() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f16
         %c4096 = arith.constant 4096 : index
@@ -42,7 +42,7 @@ hal.executable private @matmul_static_shape_f16 {
             %11 = affine.min affine_map<(d0)[s0] -> (-d0 + 4096, s0)>(%arg0)[%workgroup_size_y]
             %12 = affine.min affine_map<(d0)[s0] -> (-d0 + 4096, s0)>(%arg1)[%workgroup_size_x]
             %13 = linalg.init_tensor [%11, %12] : tensor<?x?xf16>
-            %14 = linalg.fill(%cst, %13) : f16, tensor<?x?xf16> -> tensor<?x?xf16>
+            %14 = linalg.fill ins(%cst : f16) outs(%13 : tensor<?x?xf16>) -> tensor<?x?xf16>
             %15 = linalg.matmul {lowering_config = #config} ins(%8, %10 : tensor<?x4096xf16>, tensor<4096x?xf16>) outs(%14 : tensor<?x?xf16>) -> tensor<?x?xf16>
             flow.dispatch.tensor.store %15, %2, offsets = [%arg0, %arg1], sizes = [%7, %9], strides = [1, 1] : tensor<?x?xf16> -> !flow.dispatch.tensor<writeonly:4096x4096xf16>
           }
@@ -80,7 +80,7 @@ hal.executable private @matmul_static_shape_f32 {
       translation_info = #translation
     }
     builtin.module  {
-      func @matmul_static_shape_f32() {
+      func.func @matmul_static_shape_f32() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
         %c4096 = arith.constant 4096 : index
@@ -106,7 +106,7 @@ hal.executable private @matmul_static_shape_f32 {
             %11 = affine.min affine_map<(d0)[s0] -> (-d0 + 4096, s0)>(%arg0)[%workgroup_size_y]
             %12 = affine.min affine_map<(d0)[s0] -> (-d0 + 4096, s0)>(%arg1)[%workgroup_size_x]
             %13 = linalg.init_tensor [%11, %12] : tensor<?x?xf32>
-            %14 = linalg.fill(%cst, %13) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+            %14 = linalg.fill ins(%cst : f32) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
             %15 = linalg.matmul {lowering_config = #config} ins(%8, %10 : tensor<?x4096xf32>, tensor<4096x?xf32>) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
             flow.dispatch.tensor.store %15, %2, offsets = [%arg0, %arg1], sizes = [%7, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:4096x4096xf32>
           }

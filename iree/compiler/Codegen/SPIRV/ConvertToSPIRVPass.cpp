@@ -34,7 +34,7 @@
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
 #include "mlir/Conversion/SCFToSPIRV/SCFToSPIRV.h"
 #include "mlir/Conversion/TensorToSPIRV/TensorToSPIRV.h"
-#include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
+#include "mlir/Conversion/TosaToArith/TosaToArith.h"
 #include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -94,8 +94,8 @@ InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
   SymbolTable symbolTable(module);
   InterfaceResourceMap interfaceToResourceVars;
 
-  auto fns = llvm::to_vector<1>(module.getOps<FuncOp>());
-  for (FuncOp func : llvm::reverse(fns)) {
+  auto fns = llvm::to_vector<1>(module.getOps<func::FuncOp>());
+  for (func::FuncOp func : llvm::reverse(fns)) {
     // Collect all interface ops and their (set, binding) pairs in this
     // function. Use SmallVector here for a deterministic order.
     SmallVector<IREE::HAL::InterfaceBindingSubspanOp, 8> subspanOps;
@@ -305,7 +305,7 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
       getAllEntryPoints(moduleOp);
-  for (auto funcOp : moduleOp.getOps<FuncOp>()) {
+  for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
     auto entryPointOp = entryPoints.lookup(funcOp.getName());
     if (!entryPointOp) continue;
     // TODO(ravishankarm): This needs to be removed after ConvertToGPU is
@@ -343,7 +343,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   //   multiply or add.
   //
   // TODO(antiagainst): Use a lowering that uses specific SPIRV intrinsics.
-  tosa::populateTosaRescaleToStandardConversionPatterns(&patterns);
+  tosa::populateTosaRescaleToArithConversionPatterns(&patterns);
 
   // Pull in MemRef patterns to convert load/store ops.
   populateMemRefToSPIRVPatterns(typeConverter, patterns);
@@ -400,14 +400,14 @@ void ConvertToSPIRVPass::runOnOperation() {
   // Disallow all other ops.
   target->markUnknownOpDynamicallyLegal([](Operation *) { return false; });
 
-  SmallVector<FuncOp, 1> functions;
-  for (FuncOp fn : moduleOp.getOps<FuncOp>()) {
+  SmallVector<func::FuncOp, 1> functions;
+  for (func::FuncOp fn : moduleOp.getOps<func::FuncOp>()) {
     if (!fn.isPublic()) continue;
     functions.push_back(fn);
   }
 
   FrozenRewritePatternSet frozenPatterns(std::move(patterns));
-  for (FuncOp fn : functions) {
+  for (func::FuncOp fn : functions) {
     if (failed(applyFullConversion(fn, *target, frozenPatterns))) {
       return signalPassFailure();
     }

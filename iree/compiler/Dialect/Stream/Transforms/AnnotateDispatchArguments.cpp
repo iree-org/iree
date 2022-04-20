@@ -324,7 +324,7 @@ class ArgumentAnalysis {
       : explorer(rootOp, TraversalAction::SHALLOW),
         solver(explorer, allocator) {
     explorer.setOpAction<IREE::Util::InitializerOp>(TraversalAction::RECURSE);
-    explorer.setOpAction<mlir::FuncOp>(TraversalAction::RECURSE);
+    explorer.setOpAction<mlir::func::FuncOp>(TraversalAction::RECURSE);
     explorer.setDialectAction<IREE::Stream::StreamDialect>(
         TraversalAction::RECURSE);
     // Ignore the contents of executables (linalg goo, etc).
@@ -540,7 +540,7 @@ class AnnotateDispatchArgumentsPass
 
     // Annotate the exported dispatch functions.
     for (auto executableOp :
-         getOperation().body().getOps<IREE::Stream::ExecutableOp>()) {
+         getOperation().getBodyRegion().getOps<IREE::Stream::ExecutableOp>()) {
       for (auto exportOp :
            executableOp.getOps<IREE::Stream::ExecutableExportOp>()) {
         annotateExport(executableOp, exportOp, analysis);

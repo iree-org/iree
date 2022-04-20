@@ -172,7 +172,7 @@ static SmallVector<Binding> findCorrelatedBindings(
 // Updates an executable function to use the new bindings.
 static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
                                       IREE::Stream::ExecutableExportOp exportOp,
-                                      mlir::FuncOp funcOp,
+                                      mlir::func::FuncOp funcOp,
                                       ArrayRef<Binding> bindings) {
   auto &entryBlock = funcOp.front();
 
@@ -438,7 +438,7 @@ class FuseDispatchBindingsPass
     // as source material.
     MemoizedCmdZeros memoizedZeros;
     for (auto executableOp :
-         getOperation().body().getOps<IREE::Stream::ExecutableOp>()) {
+         getOperation().getBodyRegion().getOps<IREE::Stream::ExecutableOp>()) {
       for (auto exportOp :
            executableOp.getOps<IREE::Stream::ExecutableExportOp>()) {
         fuseDispatchBindings(executableOp, exportOp, entryDispatchMap[exportOp],

@@ -29,9 +29,9 @@ namespace iree_compiler {
 // Utility functions to get entry points
 //===----------------------------------------------------------------------===//
 
-bool isEntryPoint(FuncOp func) { return func.isPublic(); }
+bool isEntryPoint(func::FuncOp func) { return func.isPublic(); }
 
-IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp) {
+IREE::HAL::ExecutableEntryPointOp getEntryPoint(func::FuncOp funcOp) {
   auto variantOp = funcOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   for (auto op : variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
     if (op.sym_name() == funcOp.getName()) {
@@ -51,22 +51,78 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
   return entryPointOps;
 }
 
-/// Returns the LLVM Target triple associated with the `hal.executable.variant`
-/// operation if set.
-static Optional<llvm::Triple> getTargetTriple(
-    IREE::HAL::ExecutableVariantOp variantOp) {
+/// Returns the StringAttr with the name `stringAttr` in the configuration of
+/// `variantOp`, in found.
+static Optional<StringAttr> getConfigStringAttr(
+    IREE::HAL::ExecutableVariantOp variantOp, StringRef stringAttr) {
   IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
   if (!targetAttr) return llvm::None;
   auto config = targetAttr.getConfiguration();
   if (!config) return llvm::None;
-  auto triple = config.getAs<StringAttr>("target_triple");
+  auto attr = config.getAs<StringAttr>(stringAttr);
+  if (!attr) return llvm::None;
+  return attr;
+}
+
+/// Returns the LLVM Target triple associated with the `hal.executable.variant`
+/// operation if set.
+static Optional<llvm::Triple> getTargetTriple(
+    IREE::HAL::ExecutableVariantOp variantOp) {
+  auto triple = getConfigStringAttr(variantOp, "target_triple");
   if (!triple) return llvm::None;
   return llvm::Triple(triple.getValue().str());
+}
+
+/// Returns the CPU target features associated with the `hal.executable.variant`
+/// operation, if set.
+static Optional<StringRef> getCpuFeatures(
+    IREE::HAL::ExecutableVariantOp variantOp) {
+  auto cpuFeatures = getConfigStringAttr(variantOp, "cpu_features");
+  if (!cpuFeatures) return llvm::None;
+  return cpuFeatures->getValue();
 }
 
 bool isX86(IREE::HAL::ExecutableVariantOp variantOp) {
   Optional<llvm::Triple> triple = getTargetTriple(variantOp);
   return triple && triple.getValue().isX86();
+}
+
+// TODO(dcaballe): If we have to check for a significantly large number of
+// features in the future, we may want to consider keeping the TTI instance
+// alive and query subtarget features data structure.
+bool hasAVX2Features(Operation *op) {
+  auto variantOp = isa<IREE::HAL::ExecutableVariantOp>(op)
+                       ? cast<IREE::HAL::ExecutableVariantOp>(op)
+                       : op->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  if (!variantOp) return false;
+  Optional<StringRef> features = getCpuFeatures(variantOp);
+  if (!features) return false;
+  return features->contains("+avx2");
+}
+
+bool isRISCV(IREE::HAL::ExecutableVariantOp variantOp) {
+  Optional<llvm::Triple> triple = getTargetTriple(variantOp);
+  return triple && triple.getValue().isRISCV();
+}
+
+bool isReadOnly(Value v) {
+  Operation *definingOp = v.getDefiningOp();
+  if (!definingOp) return false;
+  return TypeSwitch<Operation *, bool>(definingOp)
+      .Case<arith::ConstantOp>(
+          [&](arith::ConstantOp constantOp) { return true; })
+      .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
+          [&](auto op) { return isReadOnly(op.src()); })
+      .Case<tensor::CastOp, tensor::ExtractSliceOp>(
+          [&](auto op) { return isReadOnly(op.source()); })
+      .Case<IREE::Flow::DispatchTensorLoadOp>(
+          [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
+            return loadOp.source()
+                       .getType()
+                       .cast<IREE::Flow::DispatchTensorType>()
+                       .getAccess() == IREE::Flow::TensorAccess::ReadOnly;
+          })
+      .Default([&](Operation *op) { return false; });
 }
 
 //===----------------------------------------------------------------------===//
@@ -431,10 +487,10 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
 }
 
 LogicalResult getFilteredOps(
-    FuncOp funcOp, RootOpFilteringFn filteringFn,
+    func::FuncOp funcOp, RootOpFilteringFn filteringFn,
     SmallVectorImpl<Operation *> &filteredOps,
     SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops) {
-  Region &region = funcOp.body();
+  Region &region = funcOp.getBody();
   if (!llvm::hasSingleElement(region)) {
     return funcOp.emitError("unable dispatch function with multiple blocks");
   }
@@ -458,7 +514,7 @@ LogicalResult getFilteredOps(
 }
 
 LogicalResult getComputeOps(
-    FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
+    func::FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
     SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops) {
   if (failed(getFilteredOps(
           funcOp,
@@ -472,7 +528,7 @@ LogicalResult getComputeOps(
 }
 
 SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
-    FuncOp funcOp) {
+    func::FuncOp funcOp) {
   SmallVector<LoopTilingAndDistributionInfo> info;
   funcOp.walk([&](scf::ForOp forOp) {
     if (auto tiledLoopInfo = isTiledAndDistributedLoop(forOp)) {
@@ -487,11 +543,15 @@ SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
 /// memref::CopyOp.
 Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
                               ArrayRef<NamedAttribute> attributes) {
-  auto memrefTypeFrom = from.getType().cast<MemRefType>();
-  auto memrefTypeTo = to.getType().cast<MemRefType>();
-  (void)memrefTypeFrom;
-  assert(memrefTypeFrom && memrefTypeTo &&
-         memrefTypeFrom.getRank() == memrefTypeTo.getRank());
+  auto memrefTypeFrom = from.getType().dyn_cast<MemRefType>();
+  auto memrefTypeTo = to.getType().dyn_cast<MemRefType>();
+  if (!memrefTypeFrom || !memrefTypeTo ||
+      memrefTypeFrom.getRank() != memrefTypeTo.getRank()) {
+    mlir::emitError(
+        loc, "unable to generate copy op within bufferization from type ")
+        << memrefTypeFrom << " to " << memrefTypeTo;
+    return nullptr;
+  }
   AffineMap id =
       AffineMap::getMultiDimIdentityMap(memrefTypeTo.getRank(), b.getContext());
   SmallVector<StringRef> iteratorTypes(memrefTypeTo.getRank(),
@@ -506,6 +566,32 @@ Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
         b.create<linalg::YieldOp>(loc, args.front());
       },
       attributes);
+}
+
+template <typename OpTy>
+static Value buildHALWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
+  return b.template create<OpTy>(b.getInsertionPoint()->getLoc(), dim);
+}
+
+linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions() {
+  return {
+      [](OpBuilder &builder, Location loc, ArrayRef<Range> parallelLoopRanges) {
+        auto numParallelDims = parallelLoopRanges.size();
+
+        SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
+        for (size_t dim = 0; dim < numParallelDims; ++dim) {
+          procInfo[numParallelDims - dim - 1] = {
+              buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupIDOp>(
+                  builder, dim),
+              buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupCountOp>(
+                  builder, dim)};
+        }
+        return procInfo;
+      },
+      {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
+       linalg::DistributionMethod::Cyclic},
+      DenseMap<StringRef,
+               std::function<linalg::ProcInfo(OpBuilder &, Location)>>()};
 }
 
 }  // namespace iree_compiler

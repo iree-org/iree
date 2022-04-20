@@ -39,12 +39,13 @@ static void printModuleComment(IREE::VM::ModuleOp &moduleOp,
 }
 
 static LogicalResult printFunctionDeclaration(
-    mlir::FuncOp funcOp, llvm::raw_ostream &output,
+    mlir::func::FuncOp funcOp, llvm::raw_ostream &output,
     mlir::emitc::CppEmitter &emitter) {
   Operation *op = funcOp.getOperation();
   if (op->hasAttr("emitc.static")) output << "static ";
 
-  if (failed(emitter.emitTypes(funcOp.getLoc(), funcOp.getType().getResults())))
+  if (failed(emitter.emitTypes(funcOp.getLoc(),
+                               funcOp.getFunctionType().getResults())))
     return failure();
   output << " " << funcOp.getName();
 
@@ -165,7 +166,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
     });
     for (auto exportOp : exportOps) {
       StringRef funcName = exportOp.function_ref();
-      auto funcOp = symbolTable.lookup<mlir::FuncOp>(funcName);
+      auto funcOp = symbolTable.lookup<mlir::func::FuncOp>(funcName);
       if (!funcOp) {
         return exportOp.emitError("Couldn't find referenced FuncOp");
       }
@@ -201,7 +202,10 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
              rhs.ordinal().getValue().getZExtValue();
     });
     for (auto importOp : importOps) {
-      output << "{" << printStringView(importOp.getName()) << "},\n";
+      output << "{"
+             << (importOp.is_optional() ? "IREE_VM_NATIVE_IMPORT_OPTIONAL"
+                                        : "IREE_VM_NATIVE_IMPORT_REQUIRED")
+             << ", " << printStringView(importOp.getName()) << "},\n";
     }
   }
   output << "};\n";
@@ -220,7 +224,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
     // implementation.
     for (auto exportOp : exportOps) {
       StringRef funcName = exportOp.function_ref();
-      auto funcOp = symbolTable.lookup<mlir::FuncOp>(funcName);
+      auto funcOp = symbolTable.lookup<mlir::func::FuncOp>(funcName);
       if (!funcOp) {
         return exportOp.emitError("Couldn't find referenced FuncOp");
       }
@@ -362,7 +366,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   output << "\n";
 
   mlir::emitc::CppEmitter emitter(output, /*declareVariablesAtTop=*/true);
-  for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
+  for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
     Operation *op = funcOp.getOperation();
     if (!op->hasAttr("vm.module.constructor")) continue;
     if (failed(printFunctionDeclaration(funcOp, output, emitter)))
@@ -403,7 +407,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   // translate functions
   output << "// DECLARE FUNCTIONS\n";
 
-  for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
+  for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
     Operation *op = funcOp.getOperation();
     if (op->hasAttr("vm.module.constructor")) continue;
     if (failed(printFunctionDeclaration(funcOp, output, emitter)))
@@ -417,7 +421,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
     // TODO(simon-camp): Clean up. We generate calls to a macro that defines a
     // struct. As we declare all variables at the start of the function, the
     // macro call cannot be inlined into the function.
-    if (!isa<mlir::FuncOp, emitc::CallOp>(op)) continue;
+    if (!isa<mlir::func::FuncOp, emitc::CallOp>(op)) continue;
     if (op.hasAttr("vm.emit_at_end")) continue;
     if (op.hasAttr("emitc.static")) output << "static ";
     if (failed(emitter.emitOperation(op,
@@ -433,7 +437,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   }
 
   // Emit code for functions marked with `vm.emit_at_end`.
-  for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
+  for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
     Operation *op = funcOp.getOperation();
     if (!op->hasAttr("vm.emit_at_end")) continue;
     if (op->hasAttr("emitc.static")) output << "static ";

@@ -362,26 +362,26 @@ struct LinearizeTransferReadIndices final
   LogicalResult matchAndRewrite(
       vector::TransferReadOp transferReadOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!transferReadOp.permutation_map().isMinorIdentity()) {
+    if (!transferReadOp.getPermutationMap().isMinorIdentity()) {
       return rewriter.notifyMatchFailure(
           transferReadOp, "cannot convert op with non-minor identity map");
     }
-    if (!isRankOneMemRef(adaptor.source().getType())) {
+    if (!isRankOneMemRef(adaptor.getSource().getType())) {
       return rewriter.notifyMatchFailure(
           transferReadOp, "expected converted memref of rank == 1");
     }
-    Value linearIndex =
-        linearizeIndices(transferReadOp.source(), transferReadOp.indices(),
-                         transferReadOp.getLoc(), rewriter);
+    Value linearIndex = linearizeIndices(transferReadOp.getSource(),
+                                         transferReadOp.getIndices(),
+                                         transferReadOp.getLoc(), rewriter);
     if (!linearIndex) {
       return transferReadOp.emitOpError() << "failed to linearize index";
     }
 
     rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
-        transferReadOp, transferReadOp.getVectorType(), adaptor.source(),
+        transferReadOp, transferReadOp.getVectorType(), adaptor.getSource(),
         linearIndex, AffineMapAttr::get(rewriter.getDimIdentityMap()),
-        transferReadOp.padding(), /*mask=*/Value(),
-        transferReadOp.in_boundsAttr());
+        transferReadOp.getPadding(), /*mask=*/Value(),
+        transferReadOp.getInBoundsAttr());
     return success();
   }
 };
@@ -394,25 +394,25 @@ struct LinearizeTransferWriteIndices final
   LogicalResult matchAndRewrite(
       vector::TransferWriteOp transferWriteOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!transferWriteOp.permutation_map().isMinorIdentity()) {
+    if (!transferWriteOp.getPermutationMap().isMinorIdentity()) {
       return rewriter.notifyMatchFailure(
           transferWriteOp, "cannot convert op with non-minor identity map");
     }
-    if (!isRankOneMemRef(adaptor.source().getType())) {
+    if (!isRankOneMemRef(adaptor.getSource().getType())) {
       return rewriter.notifyMatchFailure(
           transferWriteOp, "expected converted memref of rank == 1");
     }
-    Value linearIndex =
-        linearizeIndices(transferWriteOp.source(), transferWriteOp.indices(),
-                         transferWriteOp.getLoc(), rewriter);
+    Value linearIndex = linearizeIndices(transferWriteOp.getSource(),
+                                         transferWriteOp.getIndices(),
+                                         transferWriteOp.getLoc(), rewriter);
     if (!linearIndex) {
       return transferWriteOp.emitOpError() << "failed to linearize index";
     }
 
     rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
-        transferWriteOp, adaptor.vector(), adaptor.source(), linearIndex,
+        transferWriteOp, adaptor.getVector(), adaptor.getSource(), linearIndex,
         AffineMapAttr::get(rewriter.getDimIdentityMap()),
-        transferWriteOp.in_boundsAttr());
+        transferWriteOp.getInBoundsAttr());
     return success();
   }
 };
@@ -534,7 +534,7 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
 
     // Get the new index by adding the old index with the offset.
     Value newIndex = rewriter.create<AffineApplyOp>(
-        op.getLoc(), addMap, ValueRange{op.indices().front(), offset});
+        op.getLoc(), addMap, ValueRange{op.getIndices().front(), offset});
 
     if (std::is_same<OpType, memref::LoadOp>::value) {
       rewriter.replaceOpWithNewOp<memref::LoadOp>(
@@ -635,11 +635,13 @@ struct FlattenMemRefSubspanPass
     });
     target.addDynamicallyLegalOp<vector::TransferReadOp>(
         [](vector::TransferReadOp readOp) {
-          return isRankOneMemRef(readOp.source().getType().cast<MemRefType>());
+          return isRankOneMemRef(
+              readOp.getSource().getType().cast<MemRefType>());
         });
     target.addDynamicallyLegalOp<vector::TransferWriteOp>(
         [](vector::TransferWriteOp writeOp) {
-          return isRankOneMemRef(writeOp.source().getType().cast<MemRefType>());
+          return isRankOneMemRef(
+              writeOp.getSource().getType().cast<MemRefType>());
         });
     target.addDynamicallyLegalOp<UnrealizedConversionCastOp>(
         [](UnrealizedConversionCastOp castOp) {

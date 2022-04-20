@@ -4,13 +4,19 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/PDL/IR/PDL.h"
+#include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -33,9 +39,20 @@ class LLVMCPULowerExecutableTargetPass
   LLVMCPULowerExecutableTargetPass(
       const LLVMCPULowerExecutableTargetPass &pass) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Codegen::IREECodegenDialect, IREE::HAL::HALDialect,
-                    linalg::LinalgDialect, LLVM::LLVMDialect, scf::SCFDialect,
+    // clang-format off
+    registry.insert<IREE::Codegen::IREECodegenDialect,
+                    IREE::HAL::HALDialect,
+                    IREE::LinalgExt::IREELinalgExtDialect,
+                    bufferization::BufferizationDialect,
+                    linalg::LinalgDialect,
+                    linalg::transform::LinalgTransformDialect,
+                    LLVM::LLVMDialect,
+                    pdl::PDLDialect,
+                    pdl_interp::PDLInterpDialect,
+                    scf::SCFDialect,
+                    tensor::TensorDialect,
                     vector::VectorDialect>();
+    // clang-format on
   }
 
   void runOnOperation() override;
@@ -61,7 +78,7 @@ class LLVMCPULowerExecutableTargetPass
           "hal.executable.variant operation")};
 
   ListOption<int> workloadPerWorkgroup{
-      *this, "workload-per-workgroup", llvm::cl::MiscFlags::CommaSeparated,
+      *this, "workload-per-workgroup",
       llvm::cl::desc(
           "Specifies the workload per workgroup to use in x, y, z order. Is "
           "expected for use only with use-lowering-pipeline option")};
@@ -101,6 +118,11 @@ static LogicalResult verifyLoweringConfiguration(
 void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   ModuleOp moduleOp = variantOp.getInnerModule();
+  if (!variantOp || !moduleOp) {
+    getOperation()->emitError(
+        "Expected a variantOp root with an inner ModuleOp");
+    return signalPassFailure();
+  }
 
   OpPassManager executableLoweringPipeline(
       IREE::HAL::ExecutableVariantOp::getOperationName());
@@ -165,6 +187,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       }
 
       bool lowerToVectors = !isVMVXBackend(variantOp);
+      bool lowerToAVX2 = hasAVX2Features(variantOp);
       if (!testLoweringConfiguration) {
         OpPassManager &nestedModulePM =
             executableLoweringPipeline.nest<ModuleOp>();
@@ -174,23 +197,32 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             addCPUDefaultPassPipeline(nestedModulePM);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
+              CPUBufferOpsTileAndVectorize:
+            addCPUBufferOpsTileAndVectorizePipeline(nestedModulePM);
+            break;
+          case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUSingleTilingExpert:
             addSingleTilingExpertPassPipeline(nestedModulePM);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingExpert:
-            addDoubleTilingExpertPassPipeline(nestedModulePM);
+            addDoubleTilingExpertPassPipeline(nestedModulePM, lowerToAVX2);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUConvTileAndDecomposeExpert:
             addConvTileAndDecomposeExpertPassPipeline(nestedModulePM);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
+              LinalgTransformInterpCodegen:
+            addLinalgTransformInterpPasses(executableLoweringPipeline);
+            break;
+          case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUTileFuseAndVectorize:
             addTileFuseAndVectorizePassPipeline(nestedModulePM, lowerToVectors);
             break;
           default:
-            llvm_unreachable("Unsupported pipeline on CPU target.");
+            variantOp.emitOpError("Unsupported pipeline on CPU target.");
+            return signalPassFailure();
         }
       }
     }

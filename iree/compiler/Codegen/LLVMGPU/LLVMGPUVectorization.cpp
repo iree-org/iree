@@ -62,10 +62,10 @@ static Optional<SmallVector<int64_t, 4>> getGPUNativeVectorSize(Operation *op) {
     return nativeSize;
   } else if (auto contract = dyn_cast<vector::ContractionOp>(op)) {
     unsigned lastParalleldim = 0;
-    for (auto it : llvm::enumerate(contract.iterator_types())) {
+    for (auto it : llvm::enumerate(contract.getIteratorTypes())) {
       if (isParallelIterator(it.value())) lastParalleldim = it.index();
     }
-    SmallVector<int64_t, 4> nativeSize(contract.iterator_types().size(), 1);
+    SmallVector<int64_t, 4> nativeSize(contract.getIteratorTypes().size(), 1);
     nativeSize[lastParalleldim] = 4;
     return nativeSize;
   }
@@ -182,7 +182,7 @@ struct LLVMGPUVectorizationPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorizationPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorizationPass() {
   return std::make_unique<LLVMGPUVectorizationPass>();
 }
 

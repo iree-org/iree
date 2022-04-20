@@ -113,15 +113,14 @@ inspect the IR to find the proper way to call their kernels.
 1. Build your module with the flags you want for your target architecture:
 
 ```
-iree-translate \
-    -iree-mlir-to-vm-bytecode-module \
+iree-compile \
     -iree-input-type=mhlo \
     iree/samples/simple_embedding/simple_embedding_test.mlir \
     -o=module.vmfb \
     -iree-hal-target-backends=dylib-llvm-aot \
     -iree-llvm-debug-symbols=false \
     -iree-llvm-target-triple=x86_64-pc-linux-elf \
-    -print-ir-after-all \
+    -mlir-print-ir-after-all \
     >module_dump.mlir 2>&1
 ```
 
@@ -182,7 +181,7 @@ If you want to provide real data then you can look for the `flow.executable`
 with the `!flow.dispatch.tensor` operands:
 
 ```mlir
-  func @simple_mul_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:4xf32>,
+  func.func @simple_mul_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:4xf32>,
                               %arg1: !flow.dispatch.tensor<readonly:4xf32>,
                               %arg2: !flow.dispatch.tensor<writeonly:4xf32>) {
 ```

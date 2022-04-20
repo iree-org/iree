@@ -199,67 +199,6 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_heap_buffer(
-    iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_encoding_type_t encoding_type,
-    iree_hal_buffer_params_t buffer_params, iree_byte_span_t data,
-    iree_allocator_t data_allocator, iree_hal_buffer_view_t** out_buffer_view) {
-  IREE_ASSERT_ARGUMENT(allocator);
-  IREE_ASSERT_ARGUMENT(out_buffer_view);
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_hal_buffer_params_canonicalize(&buffer_params);
-
-  // NOTE: this will fail if the data cannot be imported into the allocator.
-  iree_hal_buffer_t* buffer = NULL;
-  iree_status_t status = iree_hal_allocator_wrap_buffer(
-      allocator, buffer_params, data, data_allocator, &buffer);
-
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_create(
-        buffer, shape, shape_rank, element_type, encoding_type,
-        iree_hal_allocator_host_allocator(allocator), out_buffer_view);
-  }
-
-  iree_hal_buffer_release(buffer);
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_or_clone_heap_buffer(
-    iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_encoding_type_t encoding_type,
-    iree_hal_buffer_params_t buffer_params, iree_byte_span_t data,
-    iree_allocator_t data_allocator, iree_hal_buffer_view_t** out_buffer_view) {
-  IREE_ASSERT_ARGUMENT(allocator);
-  iree_hal_buffer_params_canonicalize(&buffer_params);
-
-  // Not all HAL implementations support wrapping buffers, and of those that do
-  // some may only support it in special situations such as when the buffer is
-  // not DEVICE_VISIBLE. The user application can query whether the wrapping is
-  // possible and decide to use alternative means of upload if it is not; we
-  // make no policy (other than validity) over what's best here.
-  iree_hal_buffer_compatibility_t compatibility =
-      iree_hal_allocator_query_compatibility(
-          allocator,
-          iree_hal_buffer_params_with_usage(buffer_params,
-                                            IREE_HAL_BUFFER_USAGE_MAPPING),
-          (iree_device_size_t)data.data_length);
-  bool wrap_allowed = iree_all_bits_set(
-      compatibility, IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE);
-  if (wrap_allowed) {
-    return iree_hal_buffer_view_wrap_heap_buffer(
-        allocator, shape, shape_rank, element_type, encoding_type,
-        buffer_params, data, data_allocator, out_buffer_view);
-  } else {
-    return iree_hal_buffer_view_allocate_buffer(
-        allocator, shape, shape_rank, element_type, encoding_type,
-        buffer_params, iree_make_const_byte_span(data.data, data.data_length),
-        out_buffer_view);
-  }
-}
-
 static iree_status_t iree_hal_buffer_view_generate_buffer_in_situ(
     iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
@@ -320,13 +259,15 @@ static iree_status_t iree_hal_buffer_view_generate_buffer_on_host(
     return status;
   }
 
-  // Try to wrap the host allocation to avoid the extra allocation and copy -
-  // this call will either hang on to the memory or do the copy and immediately
-  // free it.
-  return iree_hal_buffer_view_wrap_or_clone_heap_buffer(
+  // Allocate the buffer with the data we just generated.
+  // We could try importing but that may create buffers that are slower to
+  // access and we want users to opt in to that instead.
+  status = iree_hal_buffer_view_allocate_buffer(
       allocator, shape, shape_rank, element_type, encoding_type, buffer_params,
-      iree_make_byte_span(host_ptr, allocation_size), host_allocator,
-      out_buffer_view);
+      iree_make_const_byte_span(host_ptr, allocation_size), out_buffer_view);
+
+  iree_allocator_free(host_allocator, host_ptr);
+  return status;
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_generate_buffer(
@@ -352,12 +293,12 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_generate_buffer(
   // and avoid needing to allocate the staging memory. If we can't get that
   // memory type (or the allocator doesn't want us using it) then we'll fall
   // back to allocation -> generation -> copy.
+  iree_hal_buffer_params_t mappable_params = buffer_params;
+  mappable_params.type |= IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  mappable_params.usage |= IREE_HAL_BUFFER_USAGE_MAPPING;
   iree_hal_buffer_compatibility_t compatibility =
-      iree_hal_allocator_query_compatibility(
-          allocator,
-          iree_hal_buffer_params_with_usage(buffer_params,
-                                            IREE_HAL_BUFFER_USAGE_MAPPING),
-          allocation_size);
+      iree_hal_allocator_query_compatibility(allocator, mappable_params,
+                                             allocation_size);
   bool is_mappable = iree_all_bits_set(
       compatibility, IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE);
 
@@ -366,7 +307,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_generate_buffer(
     // Compatible with allocate -> map -> generate.
     status = iree_hal_buffer_view_generate_buffer_in_situ(
         allocator, shape, shape_rank, element_type, encoding_type,
-        buffer_params, callback, user_data, out_buffer_view);
+        mappable_params, callback, user_data, out_buffer_view);
   } else {
     // Allocate host-local memory first and generate into that.
     status = iree_hal_buffer_view_generate_buffer_on_host(
@@ -456,10 +397,8 @@ static iree_status_t iree_hal_buffer_view_parse_impl(
 
   // Allocate the buffer from the provided allocator and parse directly into it.
   const iree_hal_buffer_params_t buffer_params = {
-      .type =
-          IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-      .usage = IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER |
-               IREE_HAL_BUFFER_USAGE_MAPPING,
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+      .usage = IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
   };
   iree_hal_buffer_view_parse_params_t parse_params = {
       .data_str = data_str,

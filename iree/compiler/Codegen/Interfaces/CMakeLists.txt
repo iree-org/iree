@@ -20,6 +20,7 @@ iree_cc_library(
   DEPS
     ::BufferizationInterfaces
     ::ProcessorOpInterfaces
+    iree::compiler::Codegen::TransformDialectExtensions
   PUBLIC
 )
 
@@ -31,7 +32,6 @@ iree_cc_library(
   SRCS
     "BufferizationInterfaces.cpp"
   DEPS
-    MLIRAffineBufferizableOpInterfaceImpl
     MLIRArithmeticTransforms
     MLIRBufferization
     MLIRBufferizationTransforms

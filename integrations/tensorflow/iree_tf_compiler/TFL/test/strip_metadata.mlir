@@ -1,4 +1,4 @@
-// RUN: iree-opt-tflite -split-input-file -verify-diagnostics -pass-pipeline='iree-tflite-strip-module-metadata,builtin.func(iree-tflite-strip-function-metadata)' %s | FileCheck %s
+// RUN: iree-opt-tflite -split-input-file -verify-diagnostics -pass-pipeline='iree-tflite-strip-module-metadata,func.func(iree-tflite-strip-function-metadata)' %s | FileCheck %s
 
 // CHECK-LABEL: module {
 // CHECK-NOT: tf.schema_version

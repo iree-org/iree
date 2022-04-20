@@ -385,12 +385,13 @@ struct ConvertExecutableOp
 
     // Move the original nested module body into the new executable directly.
     auto moduleOp = rewriter.cloneWithoutRegions(flowOp.getInnerModule());
-    streamOp.getInnerModule().body().takeBody(flowOp.getInnerModule().body());
+    streamOp.getInnerModule().getBodyRegion().takeBody(
+        flowOp.getInnerModule().getBodyRegion());
 
     // Update the entry point signatures in the module.
     // Dispatch tensor arguments become bindings and all others are preserved as
     // adaptor. Note that we only touch public (exported) functions.
-    for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
+    for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
       if (!funcOp.isPublic()) continue;
 
       SmallVector<Type> newTypes;

@@ -43,9 +43,8 @@ static llvm::cl::opt<unsigned> benchmarkDispatchRepeatCount{
     "iree-hal-benchmark-dispatch-repeat-count",
     llvm::cl::desc(
         "The number of times to repeat each hal.command_buffer.dispatch op. "
-        "(Not that this simply duplicates the dispatch op and inserts "
-        "barriers. It's meant for command buffers having linear dispatch "
-        "structures.)"),
+        "This simply duplicates the dispatch op and inserts barriers. It's "
+        "meant for command buffers having linear dispatch structures."),
     llvm::cl::init(1)};
 
 }  // namespace
@@ -59,7 +58,7 @@ static void addCleanupPatterns(OpPassManager &passManager) {
   // redundant store-loads are removed.
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       IREE::Util::createSimplifyGlobalAccessesPass());
-  passManager.addNestedPass<mlir::FuncOp>(
+  passManager.addNestedPass<mlir::func::FuncOp>(
       IREE::Util::createSimplifyGlobalAccessesPass());
 
   // Cleanup and canonicalization of util.global (and other util ops).
@@ -117,6 +116,23 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // device communicate across the ABI boundary.
   passManager.addPass(createMaterializeInterfacesPass());
 
+  // Dump a source listing of each hal.executable and update the source
+  // locations in the IR. This will allow us to easily inspect each executable
+  // and give downstream tools that can display source information something
+  // more useful and slim than the entire original source model.
+  if (!targetOptions.sourceListingPath.empty()) {
+    passManager.addPass(
+        createDumpExecutableSourcesPass(targetOptions.sourceListingPath));
+  }
+
+  // Dump standalone hal.executable benchmark modules.
+  // Today this only works for executables that have static dispatch parameters
+  // and is only useful for basic microbenchmarking.
+  if (!targetOptions.executableBenchmarksPath.empty()) {
+    passManager.addPass(createDumpExecutableBenchmarksPass(
+        targetOptions.executableBenchmarksPath));
+  }
+
   // TODO(benvanik): move translation after conversion; today translation
   // inserts the workgroup count logic we need to convert but we could instead
   // insert placeholder ops that are expanded after translation.
@@ -169,7 +185,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // better CSE/fold dispatch logic.
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       createInlineDeviceSwitchesPass());
-  passManager.addNestedPass<mlir::FuncOp>(createInlineDeviceSwitchesPass());
+  passManager.addNestedPass<mlir::func::FuncOp>(
+      createInlineDeviceSwitchesPass());
 
   // Memoize device queries such that we don't need to repeatedly ask the same
   // information at runtime.
@@ -180,14 +197,15 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   // HACK: repeat dispatch ops for benchmarks.
   if (benchmarkDispatchRepeatCount != 1) {
-    passManager.addNestedPass<mlir::FuncOp>(
+    passManager.addNestedPass<mlir::func::FuncOp>(
         createBenchmarkBatchDispatchesPass(benchmarkDispatchRepeatCount));
   }
 
   // Elide redundant command buffer state ops created during conversion.
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       createElideRedundantCommandsPass());
-  passManager.addNestedPass<mlir::FuncOp>(createElideRedundantCommandsPass());
+  passManager.addNestedPass<mlir::func::FuncOp>(
+      createElideRedundantCommandsPass());
 
   // Fixup workgroup count calculations that may have used the affine dialect.
   // Kind of random here but can happen if the benchmarking code does things.

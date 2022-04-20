@@ -5,10 +5,10 @@ is presented with its English name, flag to enable/disable, and default state.
 
 These flags can be passed to the:
 
-* `ireec` command line tool
+* `iree-compile` command line tool
 * `extra_args=["--flag"]` argument to `iree.compiler.tools` Python wrappers
 * In-process Python compiler API
-  `iree.compiler.transforms.ireec.CompilerOptions("--flag", "--flag2")`
+  `iree.compiler.transforms.iree-compile.CompilerOptions("--flag", "--flag2")`
   constructor
 * `ireeCompilerOptionsSetFlags()` compiler C API function
 

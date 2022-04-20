@@ -49,16 +49,7 @@ iree_cc_library(
     MLIRFunc
     MLIRIR
     MLIRPass
-    iree::compiler::Bindings::Native::Transforms
-    iree::compiler::Dialect::Flow::Transforms
-    iree::compiler::Dialect::HAL::Transforms
-    iree::compiler::Dialect::Stream::Transforms
-    iree::compiler::Dialect::Util::IR
-    iree::compiler::Dialect::Util::Transforms
-    iree::compiler::Dialect::VM::Conversion
-    iree::compiler::Dialect::VM::Conversion::StandardToVM
-    iree::compiler::Dialect::VM::Target::Bytecode
-    iree::compiler::Dialect::VM::Transforms
+    iree::compiler::Pipelines
     iree::compiler::Utils
   PUBLIC
 )

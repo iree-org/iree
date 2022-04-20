@@ -69,7 +69,6 @@ iree_sample_state_t* setup_sample() {
 
   iree_runtime_session_options_t session_options;
   iree_runtime_session_options_initialize(&session_options);
-  iree_runtime_session_t* session = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_runtime_session_create_with_device(
         state->instance, &session_options, state->device,
@@ -125,8 +124,7 @@ int run_sample(iree_sample_state_t* state, float* image_data) {
         IREE_ARRAYSIZE(buffer_shape), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
-            .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
             .usage =
                 IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
         },
@@ -154,9 +152,10 @@ int run_sample(iree_sample_state_t* state, float* image_data) {
   // confidence values for each digit in [0, 9].
   float predictions[1 * 10] = {0.0f};
   if (iree_status_is_ok(status)) {
-    status =
-        iree_hal_buffer_read_data(iree_hal_buffer_view_buffer(ret_buffer_view),
-                                  0, predictions, sizeof(predictions));
+    status = iree_hal_device_transfer_d2h(
+        state->device, iree_hal_buffer_view_buffer(ret_buffer_view), 0,
+        predictions, sizeof(predictions), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+        iree_infinite_timeout());
   }
   iree_hal_buffer_view_release(ret_buffer_view);
 

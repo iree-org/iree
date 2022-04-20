@@ -6,7 +6,7 @@ flow.executable private @executable {
   flow.dispatch.entry public @dispatch attributes {workgroup_rank = 3 : index}
   builtin.module {
     // CHECK: func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding, %[[ARG0_DIM0:.+]]: index, %[[ARG1_DIM1:.+]]: index)
-    func @dispatch(%arg0: !flow.dispatch.tensor<readonly:?x4xf32>, %arg1: !flow.dispatch.tensor<writeonly:4x?xf32>,
+    func.func @dispatch(%arg0: !flow.dispatch.tensor<readonly:?x4xf32>, %arg1: !flow.dispatch.tensor<writeonly:4x?xf32>,
                    %arg0_dim0: index, %arg1_dim1: index) {
       // CHECK: %[[ARG0_TENSOR:.+]] = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:?x4xf32>{%[[ARG0_DIM0]]}
       %arg0_tied = flow.dispatch.tie_shape %arg0 : !flow.dispatch.tensor<readonly:?x4xf32>{%arg0_dim0}
@@ -24,7 +24,7 @@ flow.executable private @executable {
 }
 
 // CHECK-LABEL: @simple_mul
-func @simple_mul(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
+func.func @simple_mul(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
   // CHECK: %[[DIM0:.+]] = hal.buffer_view.dim<%arg0 : !hal.buffer_view>[0] : index
   %dim0 = hal.buffer_view.dim<%arg0 : !hal.buffer_view>[0] : index
   // CHECK: hal.buffer_view.assert<%arg0 : !hal.buffer_view> message("tensor") shape([%0, %c4]) type(%c553648160_i32) encoding(%c1_i32)
@@ -52,7 +52,7 @@ func @simple_mul(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.a
 
 // CHECK-LABEL: @custom_ops
 // CHECK-SAME: (%[[ARG:.+]]: !stream.resource<*>, %[[ARG_SIZE:.+]]: index) -> (!stream.resource<*>, index)
-func @custom_ops(%arg0: tensor<4x8xf32>) -> tensor<8x4xf32> {
+func.func @custom_ops(%arg0: tensor<4x8xf32>) -> tensor<8x4xf32> {
   // CHECK: %[[ARG_EXTERNAL:.+]] = stream.async.transfer %[[ARG]]
   // CHECK: %[[ARG_TENSOR:.+]] = stream.tensor.export %[[ARG_EXTERNAL]]
   // CHECK: %[[RET_TENSOR:.+]] = "some.op"(%[[ARG_TENSOR]]) : (tensor<4x8xf32>) -> tensor<8x4xf32>
@@ -78,7 +78,7 @@ flow.executable private @while_test_dispatch_0 {
   // CHECK: builtin.module
   builtin.module {
     // CHECK: func @dispatch(%[[BINDING0:.+]]: !stream.binding, %[[BINDING1:.+]]: !stream.binding)
-    func @dispatch(%arg0: !flow.dispatch.tensor<readonly:i32>, %arg1: !flow.dispatch.tensor<writeonly:i1>) {
+    func.func @dispatch(%arg0: !flow.dispatch.tensor<readonly:i32>, %arg1: !flow.dispatch.tensor<writeonly:i1>) {
       %c3_i32 = arith.constant 3 : i32
       // CHECK: %[[ARG0:.+]] = stream.binding.subspan %[[BINDING0]][%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:i32>
       // CHECK: %[[ARG1:.+]] = stream.binding.subspan %[[BINDING1]][%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:i1>
@@ -102,7 +102,7 @@ flow.executable private @while_test_dispatch_0 {
 flow.executable private @while_test_dispatch_1 {
   flow.dispatch.entry public @dispatch attributes {workgroup_rank = 3 : index}
   builtin.module  {
-    func @dispatch(%arg0: !flow.dispatch.tensor<readonly:i32>, %arg1: !flow.dispatch.tensor<writeonly:i32>) {
+    func.func @dispatch(%arg0: !flow.dispatch.tensor<readonly:i32>, %arg1: !flow.dispatch.tensor<writeonly:i32>) {
       %c2_i32 = arith.constant 2 : i32
       %0 = flow.dispatch.tensor.load %arg0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:i32> -> tensor<i32>
       %1 = linalg.init_tensor [] : tensor<i32>
@@ -118,7 +118,7 @@ flow.executable private @while_test_dispatch_1 {
 }
 
 // CHECK-LABEL: func @while_test
-func @while_test() {
+func.func @while_test() {
   %c1 = arith.constant 1 : index
 
   // CHECK: %[[CONSTANT:.+]] = stream.tensor.constant : tensor<i32> in !stream.resource<constant> = dense<4> : tensor<i32>
@@ -172,7 +172,7 @@ func @while_test() {
 
 // CHECK-LABEL: unrealizedCastCleanup
 // CHECK-SAME: (%[[COND:.+]]: i1, %[[LHS:.+]]: !stream.resource<*>, %[[LHS_SIZE:.+]]: index, %[[RHS:.+]]: !stream.resource<*>, %[[RHS_SIZE:.+]]: index) -> (!stream.resource<*>, index)
-func @unrealizedCastCleanup(%cond: i1, %lhs: tensor<1024xf32>, %rhs: tensor<1024xf32>) -> tensor<1024xf32> {
+func.func @unrealizedCastCleanup(%cond: i1, %lhs: tensor<1024xf32>, %rhs: tensor<1024xf32>) -> tensor<1024xf32> {
   // CHECK-DAG: %[[RET:.+]] = arith.select %[[COND]], %[[LHS]], %[[RHS]] : !stream.resource<*>
   // CHECK-DAG: %[[RET_SIZE:.+]] = arith.select %[[COND]], %[[LHS_SIZE]], %[[RHS_SIZE]] : index
   %0 = arith.select %cond, %lhs, %rhs : tensor<1024xf32>

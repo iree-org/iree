@@ -36,12 +36,18 @@ option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF)
 option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
 
+# TODO(#8469): remove the dependency on cpuinfo entirely.
+option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topology detection." ON)
+
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." OFF)
+option(IREE_BUILD_MICROBENCHMARKS "Builds IREE microbenchmark suites." OFF)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
+
+option(IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER "Use the system linker when generating IREE modules in tests/samples/benchmarks (useful for Tracy)." OFF)
 
 # Properties controlling version and naming of release artifacts.
 set(IREE_RELEASE_PACKAGE_SUFFIX "" CACHE STRING "Suffix to append to distributed package names")
@@ -61,6 +67,7 @@ option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
 option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
 option(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM "Builds the experimental ROCm Backend." OFF)
+option(IREE_BUILD_TORCH_MLIR_SUPPORT "Builds support for compiling torch-mlir programs." ON)
 
 #-------------------------------------------------------------------------------
 # Derived flags based on primary options
@@ -124,6 +131,29 @@ option(IREE_ENABLE_LLD "Use lld when linking" OFF)
 option(IREE_ENABLE_ASAN "Enable address sanitizer" OFF)
 option(IREE_ENABLE_MSAN "Enable memory sanitizer" OFF)
 option(IREE_ENABLE_TSAN "Enable thread sanitizer" OFF)
+option(IREE_BYTECODE_MODULE_ENABLE_TSAN "Enable thread sanitizer in IREE modules in tests" OFF)
+
+# STREQUAL feels wrong here - we don't care about the exact true-value used,
+# ON or TRUE or something else. But we haven't been able to think of a less bad
+# alternative. https://github.com/google/iree/pull/8474#discussion_r840790062
+if(NOT IREE_ENABLE_TSAN STREQUAL IREE_BYTECODE_MODULE_ENABLE_TSAN)
+  message(SEND_ERROR
+      "IREE_ENABLE_TSAN and IREE_BYTECODE_MODULE_ENABLE_TSAN must be "
+      "simultaneously ON or OFF. "
+      "A discrepancy between the two would cause tests to crash as IREE "
+      "runtime code (controlled by IREE_ENABLE_TSAN) calls into test IREE "
+      "modules (controlled by IREE_BYTECODE_MODULE_ENABLE_TSAN)")
+endif()
+
+if(IREE_BYTECODE_MODULE_ENABLE_TSAN)
+  if(NOT IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER)
+    message(SEND_ERROR
+        "When IREE_BYTECODE_MODULE_ENABLE_TSAN is ON, "
+        "IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER must also be ON. "
+        "TSAN instrumentation is not currently supported in embedded modules.")
+  endif()
+endif()
+
 option(IREE_ENABLE_CCACHE "Use ccache if installed to speed up rebuilds." OFF)
 
 if(${IREE_ENABLE_CCACHE})
@@ -213,6 +243,7 @@ include(iree_trace_runner_test)
 include(iree_native_test)
 include(iree_cc_binary_benchmark)
 include(iree_benchmark_suite)
+include(iree_microbenchmark_suite)
 include(iree_hal_cts_test_suite)
 
 set(DEFAULT_CMAKE_BUILD_TYPE "Release")
@@ -337,6 +368,15 @@ set(IREE_CUDA_LIBDEVICE_PATH "" CACHE STRING "Absolute path to an appropriate li
 # back to this as needed for specific features.
 if(IREE_TARGET_BACKEND_CUDA OR IREE_HAL_DRIVER_CUDA)
   find_package(CUDAToolkit)
+
+  # We define the magic IREE_CUDA_DEPS_DIR env var in our CI docker images if we
+  # have a stripped down CUDA toolkit suitable for compiling available. We
+  # trigger on this below as a fallback for locating headers and libdevice
+  # files.
+  if(NOT CUDAToolkit_FOUND AND DEFINED ENV{IREE_CUDA_DEPS_DIR})
+    set(CUDAToolkit_ROOT "$ENV{IREE_CUDA_DEPS_DIR}")
+    message(STATUS "CUDA SDK not found by CMake but using IREE_CUDA_DEPS = ${CUDAToolkit_ROOT}")
+  endif()
 endif()
 
 # If an explicit libdevice file was not specified, and the compiler backend
@@ -416,6 +456,9 @@ else()
   # Add default external projects.
   iree_add_llvm_external_project(mlir-iree-dialects MLIR_IREE_DIALECTS ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
   iree_add_llvm_external_project(mlir-hlo MLIR_HLO ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-hlo)
+  if(IREE_BUILD_TORCH_MLIR_SUPPORT)
+    iree_add_llvm_external_project(torch-mlir-dialects TORCH_MLIR_DIALECTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/torch-mlir-dialects)
+  endif()
 
   add_subdirectory("third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
 
@@ -436,12 +479,23 @@ else()
     ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
   )
 
+  # TODO: It should be possible to fix upstream targets so as to not require
+  # any of these. Remove as they become unnecessary.
   function(_hack_llvm_include_paths)
     set(_common_include_dirs
+      # LLVM
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include>
       $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include>
+
+      # MLIR
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include>
       $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include>
+
+      # LLD
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/lld/include>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/lld/include>
+
+      # MHLO
       $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir-hlo/include>
     )
     # Avoid globally modifying paths by instead adding the include paths to the
@@ -469,8 +523,10 @@ add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 if(IREE_ENABLE_THREADING)
   iree_set_benchmark_cmake_options()
   add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
-  iree_set_cpuinfo_cmake_options()
-  add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
+  if(IREE_ENABLE_CPUINFO)
+    iree_set_cpuinfo_cmake_options()
+    add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
+  endif()
 endif()
 
 add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
@@ -523,8 +579,22 @@ endif()
 #-------------------------------------------------------------------------------
 
 if(${IREE_BUILD_BENCHMARKS})
-  # Add a top-level custom target to drive generating benchmark suites.
+  # Add top-level custom targets to drive generating benchmark suites.
+
+  # iree-benchmark-import-models imports benchmark models from their source
+  # formats, such as .tflite flatbuffers, to IREE-compatible .mlir files.
+  add_custom_target(iree-benchmark-import-models)
+
+  # iree-benchmark-suites fully prepares benchmark models for benchmarking:
+  #   * importing from source formats to IREE-compatible .mlir files
+  #   * compiling from .mlir files to benchmark-ready .vmfb files
+  #   * generating flagfiles for executing the benchmark .vmfb files
   add_custom_target(iree-benchmark-suites)
+endif()
+
+if(${IREE_BUILD_MICROBENCHMARKS})
+  # Add top-level custom targets to drive generating microbenchmark suites.
+  add_custom_target(iree-microbenchmark-suites)
 endif()
 
 if(${IREE_BUILD_DOCS})
@@ -589,8 +659,17 @@ endif()
 
 # Order constraint: The python bindings install tools targets from iree/tools
 # and tracy, and must come after it.
-if(${IREE_BUILD_PYTHON_BINDINGS})
-  add_subdirectory(bindings/python)
+if(IREE_BUILD_PYTHON_BINDINGS)
+  # Write out a .env file to make IDEs and developers happy.
+  # Yes, we are writing this to the source dir. It is only for IDEs and if
+  # it gets clobbered, it is fine.
+  set(_pythonpath_env "PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/iree/compiler/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>\n")
+  file(GENERATE OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/.env"
+    CONTENT "${_pythonpath_env}"
+  )
+  file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env"
+    CONTENT "${_pythonpath_env}"
+  )
 endif()
 
 if(${IREE_BUILD_BINDINGS_TFLITE})
@@ -619,32 +698,18 @@ endif()
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"
     CACHE INTERNAL "IREE: Include Directories" FORCE)
 
-# Include the iree-compiler-api sub-project. We do this for development
-# and CI so that developers have access to the API and tools it provides
-# (otherwise, they would need to build multiple top-level projects).
-# However, logically, iree-compiler-api depends on iree, and for deployment
-# is always built standalone, taking responsibility to include iree and LLVM
-# as sub-projects.
-# The dependency mode is controlled by the variables
-# IREE_COMPILER_API_STANDALONE, which will be set if iree-compiler-api is
-# top-level. Otherwise, we set IREE_COMPILER_API_SUB_PROJECT, indicating it
-# is being embedded as a sub project.
-if(IREE_BUILD_COMPILER AND IREE_BUILD_PYTHON_BINDINGS)
-  if(NOT IREE_COMPILER_API_STANDALONE)
-    message(STATUS "Including iree-compiler-api as a sub-project")
-    set(IREE_COMPILER_API_SUB_PROJECT ON)
-    add_subdirectory(llvm-external-projects/iree-compiler-api
-        "${CMAKE_CURRENT_BINARY_DIR}/compiler-api")
+#-------------------------------------------------------------------------------
+# IREE benchmark tools
+#-------------------------------------------------------------------------------
 
-    # Write out a .env file to make IDEs and developers happy.
-    # Yes, we are writing this to the source dir. It is only for IDEs and if
-    # it gets clobbered, it is fine.
-    set(_pythonpath_env "PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler-api/python_package;${CMAKE_CURRENT_BINARY_DIR}/bindings/python>\n")
-    file(GENERATE OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/.env"
-      CONTENT "${_pythonpath_env}"
-    )
-    file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env"
-      CONTENT "${_pythonpath_env}"
-    )
-  endif()
-endif()
+add_subdirectory(build_tools/benchmarks)
+
+#-------------------------------------------------------------------------------
+# Transitional directories.
+#-------------------------------------------------------------------------------
+
+# The runtime uses tools and targets from elsewhere in the tree in a way
+# that is not supported by CMake, so we include it last (it aggregates
+# many things into top-level APIs). This should resolve once we finish
+# relayering everything.
+add_subdirectory(runtime)

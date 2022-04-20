@@ -77,6 +77,10 @@
 // Size, in bytes, of a buffer on the local host.
 typedef IREE_HOST_SIZE_T iree_host_size_t;
 
+// Maximum representable value in iree_host_size_t.
+#define IREE_HOST_SIZE_MAX \
+  (sizeof(iree_host_size_t) == 4 ? UINT32_MAX : UINT64_MAX)
+
 #if !defined(IREE_DEVICE_SIZE_T)
 #define IREE_DEVICE_SIZE_T uint64_t
 #define PRIdsz PRIu64
@@ -84,6 +88,10 @@ typedef IREE_HOST_SIZE_T iree_host_size_t;
 
 // Size, in bytes, of a buffer on remote devices.
 typedef IREE_DEVICE_SIZE_T iree_device_size_t;
+
+// Maximum representable value in iree_device_size_t.
+#define IREE_DEVICE_SIZE_MAX \
+  (sizeof(iree_device_size_t) == 4 ? UINT32_MAX : UINT64_MAX)
 
 //===----------------------------------------------------------------------===//
 // iree_status_t configuration
@@ -154,6 +162,14 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 //===----------------------------------------------------------------------===//
 // Enables optional HAL features. Each of these may add several KB to the final
 // binary when linked dynamically.
+
+#if !defined(IREE_HAL_HEAP_BUFFER_ALIGNMENT)
+// Power of two byte alignment required on all host heap buffers.
+// Executables are compiled with alignment expectations and the runtime
+// alignment must be greater than or equal to the alignment set in the compiler.
+// External buffers wrapped by HAL buffers must meet this alignment requirement.
+#define IREE_HAL_HEAP_BUFFER_ALIGNMENT 64
+#endif  // IREE_HAL_HEAP_BUFFER_ALIGNMENT
 
 #if !defined(IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE)
 // Enables additional validation of commands issued against command buffers.

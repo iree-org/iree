@@ -1,4 +1,4 @@
-// RUN: iree-translate -split-input-file -print-ir-after=iree-hal-serialize-executables -iree-mlir-to-hal-executable -iree-hal-target-backends=vmvx %s -o=/dev/null 2>&1 | FileCheck %s
+// RUN: iree-translate -split-input-file -mlir-print-ir-after=iree-hal-serialize-executables -iree-mlir-to-hal-executable -iree-hal-target-backends=vmvx %s -o=/dev/null 2>&1 | FileCheck %s
 
 // Each entry point has a layout specification indicating the total number of
 // push constants available and the descriptor sets and their bindings.
@@ -24,7 +24,7 @@ hal.executable.source public @executable {
   // private functions and only those with declared entry points will be
   // exported.
   builtin.module {
-    func @mul() {
+    func.func @mul() {
       // Push constants are loaded by ordinal.
       %offset = hal.interface.constant.load[0] : index
       %length = hal.interface.constant.load[1] : index

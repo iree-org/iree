@@ -39,6 +39,12 @@ static llvm::cl::opt<Favor> partitioningFavor(
                    "Favor maximizing concurrency at the cost of additional "
                    "memory consumption.")));
 
+// TODO(#8506): remove the flag once the bug is fixed.
+static llvm::cl::opt<uint64_t> streamDefaultBufferAlignment(
+    "iree-stream-default-buffer-alignment",
+    llvm::cl::desc("the default value of stream alignment"),
+    llvm::cl::init(64ull));
+
 //===----------------------------------------------------------------------===//
 // #stream.resource_config<...>
 //===----------------------------------------------------------------------===//
@@ -112,9 +118,9 @@ ResourceConfigAttr ResourceConfigAttr::getDefaultHostConstraints(
   // high alignment requirements (128/256/etc) we are not picking the right
   // value here.
   uint64_t maxAllocationSize = UINT32_MAX;
-  uint64_t minBufferOffsetAlignment = 64ull;
+  uint64_t minBufferOffsetAlignment = streamDefaultBufferAlignment;
   uint64_t maxBufferRange = UINT32_MAX;
-  uint64_t minBufferRangeAlignment = 64ull;
+  uint64_t minBufferRangeAlignment = streamDefaultBufferAlignment;
   return ResourceConfigAttr::get(context, maxAllocationSize,
                                  minBufferOffsetAlignment, maxBufferRange,
                                  minBufferRangeAlignment);

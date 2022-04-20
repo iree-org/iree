@@ -4,6 +4,8 @@ add_mlir_public_c_api_library(IREEDialectsCAPI
   LINK_LIBS PUBLIC
   MLIRIR
   IREEInputDialect
+  IREELinalgExtDialect
+  IREELinalgTransformDialect
   IREEPyDMDialect
   IREEPyDMPasses
 )

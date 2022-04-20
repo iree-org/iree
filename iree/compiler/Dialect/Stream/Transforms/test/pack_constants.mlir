@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='builtin.func(iree-stream-pack-constants)' %s | FileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='func.func(iree-stream-pack-constants)' %s | FileCheck %s
 
 // This is a high level test of the structure emitted by the pass.
 // Subsequent tests focus on individual components.
@@ -12,7 +12,7 @@
 // CHECK-NEXT: ]>
 
 // CHECK-LABEL: @resourceConstants
-func @resourceConstants() -> (!stream.resource<constant>, !stream.resource<constant>, !stream.timepoint) {
+func.func @resourceConstants() -> (!stream.resource<constant>, !stream.resource<constant>, !stream.timepoint) {
   %c4 = arith.constant 4 : index
   %c8 = arith.constant 8 : index
 
@@ -73,7 +73,7 @@ func @resourceConstants() -> (!stream.resource<constant>, !stream.resource<const
 // CHECK: ]>
 
 // CHECK-LABEL: @splitResourceConstants
-func @splitResourceConstants() -> (!stream.resource<constant>, !stream.resource<constant>, !stream.timepoint)
+func.func @splitResourceConstants() -> (!stream.resource<constant>, !stream.resource<constant>, !stream.timepoint)
     attributes {stream.resources = #splitResourceConstantsConfig} {
   %c4 = arith.constant 4 : index
   %c8 = arith.constant 8 : index

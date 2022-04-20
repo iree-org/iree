@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.h"
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "llvm/ADT/SmallVector.h"
@@ -127,44 +128,107 @@ struct TiledOpInterfacePartitionableLoops
   }
 };
 
+/// Partitionable loop interface for `tensor.extract_slice` operation. Needed
+/// only to build the workload during dispatch region formation.
+/// TODO(ravishankarm): Drop this ExternalModel once the use of
+/// PartitionableLoopsInterface is dropped from Flow.
+struct TensorExtractOpPartitionableLoops
+    : public PartitionableLoopsInterface::ExternalModel<
+          TensorExtractOpPartitionableLoops, tensor::ExtractSliceOp> {
+  unsigned getNumLoops(Operation *op) const {
+    return cast<tensor::ExtractSliceOp>(op).getType().getRank();
+  }
+
+  llvm::SmallVector<unsigned> getPartitionableLoops(
+      Operation *op, unsigned maxNumPartitionedLoops) const {
+    auto sliceOp = cast<tensor::ExtractSliceOp>(op);
+    auto partitionableLoops =
+        llvm::to_vector(llvm::seq<unsigned>(0, sliceOp.getType().getRank()));
+    if (partitionableLoops.size() > maxNumPartitionedLoops) {
+      return llvm::to_vector(ArrayRef<unsigned>(partitionableLoops)
+                                 .take_back(maxNumPartitionedLoops));
+    }
+    return partitionableLoops;
+  }
+
+  llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
+    auto sliceOp = cast<tensor::ExtractSliceOp>(op);
+    return llvm::SmallVector<StringRef>(sliceOp.getType().getRank(),
+                                        getParallelIteratorTypeName());
+  }
+};
+
+/// Partitionable loop interface for `tensor.insert_slice` operation. Needed
+/// only to build the workload during dispatch region formation.
+/// TODO(ravishankarm): Drop this ExternalModel once the use of
+/// PartitionableLoopsInterface is dropped from Flow.
+struct TensorInsertOpPartitionableLoops
+    : public PartitionableLoopsInterface::ExternalModel<
+          TensorInsertOpPartitionableLoops, tensor::InsertSliceOp> {
+  unsigned getNumLoops(Operation *op) const {
+    return cast<tensor::InsertSliceOp>(op).getSourceType().getRank();
+  }
+
+  llvm::SmallVector<unsigned> getPartitionableLoops(
+      Operation *op, unsigned maxNumPartitionedLoops) const {
+    auto sliceOp = cast<tensor::InsertSliceOp>(op);
+    auto partitionableLoops = llvm::to_vector(
+        llvm::seq<unsigned>(0, sliceOp.getSourceType().getRank()));
+    if (partitionableLoops.size() > maxNumPartitionedLoops) {
+      return llvm::to_vector(ArrayRef<unsigned>(partitionableLoops)
+                                 .take_back(maxNumPartitionedLoops));
+    }
+    return partitionableLoops;
+  }
+
+  llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
+    auto sliceOp = cast<tensor::InsertSliceOp>(op);
+    return llvm::SmallVector<StringRef>(sliceOp.getType().getRank(),
+                                        getParallelIteratorTypeName());
+  }
+};
+
 /// Registers the `LinalgOpPartitionableLoops` model for all Linalg ops. This
 /// needs to be done on a op-by-op basis since registration is on an op-by-op
 /// basis.
 template <typename OpTy>
-static void registerInterfaceForLinalgOps(DialectRegistry &registry) {
-  registry.addOpInterface<OpTy, LinalgOpPartitionableLoops>();
+static void registerInterfaceForLinalgOps(MLIRContext *ctx) {
+  OpTy::template attachInterface<LinalgOpPartitionableLoops>(*ctx);
 }
 
 /// Specializations of the registration method to use a different external model
 /// instead of the generic external model for Linalg ops.
 template <>
-void registerInterfaceForLinalgOps<linalg::Mmt4DOp>(DialectRegistry &registry) {
-  registry.addOpInterface<linalg::Mmt4DOp, Mmt4DOpPartitionableLoops>();
+void registerInterfaceForLinalgOps<linalg::Mmt4DOp>(MLIRContext *ctx) {
+  linalg::Mmt4DOp::attachInterface<Mmt4DOpPartitionableLoops>(*ctx);
 }
 
 /// Registers the external models for all Linalg operations.
 template <typename OpTy1, typename OpTy2, typename... More>
-static void registerInterfaceForLinalgOps(DialectRegistry &registry) {
-  registerInterfaceForLinalgOps<OpTy1>(registry);
-  registerInterfaceForLinalgOps<OpTy2, More...>(registry);
+static void registerInterfaceForLinalgOps(MLIRContext *ctx) {
+  registerInterfaceForLinalgOps<OpTy1>(ctx);
+  registerInterfaceForLinalgOps<OpTy2, More...>(ctx);
 }
 
 /// Registers the `TiledOpInterfacePartitionableLoops` model for operations.
 template <typename OpTy>
-static void registerInterfaceForTiledOpInterfaceOps(DialectRegistry &registry) {
-  registry.addOpInterface<OpTy, TiledOpInterfacePartitionableLoops>();
+static void registerInterfaceForTiledOpInterfaceOps(MLIRContext *ctx) {
+  OpTy ::template attachInterface<TiledOpInterfacePartitionableLoops>(*ctx);
 }
 
 /// Registers the external models for all TiledOpInterface operations.
 template <typename OpTy1, typename OpTy2, typename... More>
-static void registerInterfaceForTiledOpInterfaceOps(DialectRegistry &registry) {
-  registerInterfaceForTiledOpInterfaceOps<OpTy1>(registry);
-  registerInterfaceForTiledOpInterfaceOps<OpTy2, More...>(registry);
+static void registerInterfaceForTiledOpInterfaceOps(MLIRContext *ctx) {
+  registerInterfaceForTiledOpInterfaceOps<OpTy1>(ctx);
+  registerInterfaceForTiledOpInterfaceOps<OpTy2, More...>(ctx);
 }
 
 void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
-  // clang-format off
-  registerInterfaceForLinalgOps<
+  registry.insert<linalg::LinalgDialect>();
+
+  registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
+    registerInterfaceForLinalgOps<
+        // clang-format off
   
   // This is copy-pasted from LinalgStructuredOps.cpp.inc. In theory you could
   // just include that generated file here, but that cause errors with bazel. 
@@ -205,15 +269,25 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   ::mlir::linalg::PoolingNhwcSumOp,
   ::mlir::linalg::QuantizedBatchMatmulOp,
   ::mlir::linalg::QuantizedMatmulOp,
-  ::mlir::linalg::SoftPlus2DOp,
   ::mlir::linalg::VecmatOp
-  >(registry);
-  // clang-format on
+        // clang-format on
+        >(ctx);
+  });
 
-  registerInterfaceForTiledOpInterfaceOps<
-      LinalgExt::FftOp, LinalgExt::ReverseOp, LinalgExt::ScanOp,
-      LinalgExt::ScatterOp, LinalgExt::SortOp, tensor::ExtractSliceOp,
-      tensor::InsertSliceOp>(registry);
+  registry.insert<LinalgExt::IREELinalgExtDialect>();
+
+  registry.addExtension(
+      +[](MLIRContext *ctx, LinalgExt::IREELinalgExtDialect *dialect) {
+        registerInterfaceForTiledOpInterfaceOps<
+            LinalgExt::FftOp, LinalgExt::ReverseOp, LinalgExt::ScanOp,
+            LinalgExt::ScatterOp, LinalgExt::SortOp>(ctx);
+      });
+  registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
+    tensor::ExtractSliceOp::attachInterface<TensorExtractOpPartitionableLoops>(
+        *ctx);
+    tensor::InsertSliceOp::attachInterface<TensorInsertOpPartitionableLoops>(
+        *ctx);
+  });
 }
 
 }  // namespace Flow

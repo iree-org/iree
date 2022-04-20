@@ -1,13 +1,13 @@
 // TODO(hanchung): Add other types of fft tests, e.g. fft, ifft, irfft.
 
 // TODO(#7918): Running this function by itself passes. Running this with the other function in this file fails.
-// func @rfft_1d() {
+// func.func @rfft_1d() {
 //   %input = util.unfoldable_constant dense<[
 //     9.0, 1.0, 4.5, -0.3, 10.0, -1.0, 5.5, 0.3, 299.0, 3.5, -0.777, 2.0, 1.7,
 //     3.5, -4.5, 0.0, 9.0, 1.0, 4.5, -0.3, 10.0, -1.0, 5.5, 0.3, 299.0, 3.5,
 //     -0.777, 2.0, 1.7, 3.5, -4.5, 0.0]> : tensor<32xf32>
 //   %0 = "mhlo.fft"(%input) {
-//     fft_length = dense<32> : tensor<i64>, fft_type = "RFFT"
+//     fft_length = dense<32> : tensor<i64>, fft_type = #mhlo<"fft_type RFFT">
 //   } : (tensor<32xf32>) -> tensor<17xcomplex<f32>>
 //   %1 = "mhlo.real"(%0) : (tensor<17xcomplex<f32>>) -> tensor<17xf32>
 //   %2 = "mhlo.imag"(%0) : (tensor<17xcomplex<f32>>) -> tensor<17xf32>
@@ -16,13 +16,13 @@
 //   return
 // }
 
-func @rfft_2d() {
+func.func @rfft_2d() {
   %input = util.unfoldable_constant dense<[[
     9.0, 1.0, 4.5, -0.3, 10.0, -1.0, 5.5, 0.3, 299.0, 3.5, -0.777, 2.0, 1.7,
     3.5, -4.5, 0.0, 9.0, 1.0, 4.5, -0.3, 10.0, -1.0, 5.5, 0.3, 299.0, 3.5,
     -0.777, 2.0, 1.7, 3.5, -4.5, 0.0]]> : tensor<1x32xf32>
   %0 = "mhlo.fft"(%input) {
-    fft_length = dense<32> : tensor<1xi64>, fft_type = "RFFT"
+    fft_length = dense<32> : tensor<1xi64>, fft_type = #mhlo<"fft_type RFFT">
   } : (tensor<1x32xf32>) -> tensor<1x17xcomplex<f32>>
   %1 = "mhlo.real"(%0) : (tensor<1x17xcomplex<f32>>) -> tensor<1x17xf32>
   %2 = "mhlo.imag"(%0) : (tensor<1x17xcomplex<f32>>) -> tensor<1x17xf32>

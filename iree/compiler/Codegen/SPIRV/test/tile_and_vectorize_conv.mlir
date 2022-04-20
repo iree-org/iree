@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-create-fast-slow-path,iree-spirv-tile,iree-spirv-vectorize))))' %s | FileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(func.func(iree-spirv-create-fast-slow-path,iree-spirv-tile,iree-spirv-vectorize))))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]]>
 #translation = #iree_codegen.translation_info<SPIRVVectorize, workload_per_wg = [16, 4, 4]>
@@ -16,7 +16,7 @@ hal.executable private @conv_static_shape_f32 {
       translation_info = #translation
     }
     builtin.module  {
-      func @conv_static_shape_f32() {
+      func.func @conv_static_shape_f32() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
         %c112 = arith.constant 112 : index
@@ -55,7 +55,7 @@ hal.executable private @conv_static_shape_f32 {
               %19 = affine.min affine_map<(d0)[s0] -> (-d0 + 112, s0)>(%arg1)[%workgroup_size_y]
               %20 = affine.min affine_map<(d0)[s0] -> (-d0 + 16, s0)>(%arg2)[%workgroup_size_x]
               %21 = linalg.init_tensor [1, %18, %19, %20] : tensor<1x?x?x?xf32>
-              %22 = linalg.fill(%cst, %21) : f32, tensor<1x?x?x?xf32> -> tensor<1x?x?x?xf32>
+              %22 = linalg.fill ins(%cst : f32) outs(%21 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
               %23 = linalg.conv_2d_nhwc_hwcf {lowering_config = #config, dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
                 ins(%13, %15 : tensor<1x?x?x8xf32>, tensor<3x3x8x?xf32>)
                 outs(%22 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
@@ -76,11 +76,11 @@ hal.executable private @conv_static_shape_f32 {
 
 // Check tiling loop along filter height/width and input channel
 //      CHECK: scf.for %{{.*}} = %c0 to %c3 step %c1
-// CHECK-SAME:     -> (vector<1x4xf32>, vector<1x4xf32>, vector<1x4xf32>, vector<1x4xf32>)
+// CHECK-SAME:     -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
 //      CHECK:   scf.for %{{.*}} = %c0 to %c3 step %c1
-// CHECK-SAME:       -> (vector<1x4xf32>, vector<1x4xf32>, vector<1x4xf32>, vector<1x4xf32>)
+// CHECK-SAME:       -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
 //      CHECK:     scf.for %{{.*}} = %c0 to %c8 step %c4
-// CHECK-SAME:         -> (vector<1x4xf32>, vector<1x4xf32>, vector<1x4xf32>, vector<1x4xf32>)
+// CHECK-SAME:         -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
 
 // CHECK-COUNT-16: vector.fma
 
@@ -107,7 +107,7 @@ hal.executable private @depthwise_conv_static_shape_f32 {
       translation_info = #translation
     }
     builtin.module  {
-      func @depthwise_conv_static_shape_f32() {
+      func.func @depthwise_conv_static_shape_f32() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
         %c56 = arith.constant 56 : index
@@ -146,7 +146,7 @@ hal.executable private @depthwise_conv_static_shape_f32 {
               %19 = affine.min affine_map<(d0)[s0] -> (-d0 + 56, s0)>(%arg1)[%workgroup_size_y]
               %20 = affine.min affine_map<(d0)[s0] -> (-d0 + 96, s0)>(%arg2)[%workgroup_size_x]
               %21 = linalg.init_tensor [1, %18, %19, %20] : tensor<1x?x?x?xf32>
-              %22 = linalg.fill(%cst, %21) : f32, tensor<1x?x?x?xf32> -> tensor<1x?x?x?xf32>
+              %22 = linalg.fill ins(%cst : f32) outs(%21 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
               %23 = linalg.depthwise_conv_2d_nhwc_hwc {lowering_config = #config, dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
                 ins(%14, %15 : tensor<1x?x?x?xf32>, tensor<3x3x?xf32>)
                 outs(%22 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
@@ -167,9 +167,9 @@ hal.executable private @depthwise_conv_static_shape_f32 {
 
 // check tiling loop along filter height/width and input channel
 //      CHECK:    scf.for %{{.+}} = %c0 to %c3 step %c1
-// CHECK-SAME:        -> (vector<1x1x1x4xf32>)
+// CHECK-SAME:        -> (vector<4xf32>)
 //      CHECK:      scf.for %{{.+}} = %c0 to %c3 step %c1
-// CHECK-SAME:          -> (vector<1x1x1x4xf32>)
+// CHECK-SAME:          -> (vector<4xf32>)
 
 // CHECK: vector.fma
 
@@ -198,7 +198,7 @@ hal.executable private @low_padded_conv {
       translation_info = #translation
     }
     builtin.module {
-      func @low_padded_conv() {
+      func.func @low_padded_conv() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %c112 = arith.constant 112 : index
@@ -257,7 +257,7 @@ hal.executable private @low_padded_conv {
               %36 = affine.min affine_map<(d0)[s0] -> (-d0 + 112, s0)>(%arg1)[%workgroup_size_y]
               %37 = affine.min affine_map<(d0)[s0] -> (-d0 + 32, s0)>(%arg2)[%workgroup_size_x]
               %38 = linalg.init_tensor [1, %35, %36, %37] : tensor<1x?x?x?xf32>
-              %39 = linalg.fill(%cst, %38) : f32, tensor<1x?x?x?xf32> -> tensor<1x?x?x?xf32>
+              %39 = linalg.fill ins(%cst : f32) outs(%38 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
               %40 = linalg.conv_2d_nhwc_hwcf {lowering_config = #config, dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%32, %34 : tensor<1x?x?x3xf32>, tensor<3x3x3x?xf32>) outs(%39 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
               %41 = linalg.generic {lowering_config = #config, indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%40, %16 : tensor<1x?x?x?xf32>, tensor<1x?x?x?xf32>) outs(%20 : tensor<1x?x?x?xf32>) {
               ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
@@ -319,7 +319,7 @@ hal.executable private @low_high_padded_depthwise_conv {
       translation_info = #translation
     }
     builtin.module {
-      func @low_high_padded_depthwise_conv() {
+      func.func @low_high_padded_depthwise_conv() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %c112 = arith.constant 112 : index
@@ -386,7 +386,7 @@ hal.executable private @low_high_padded_depthwise_conv {
               %44 = affine.min affine_map<(d0)[s0] -> (-d0 + 112, s0)>(%arg1)[%workgroup_size_y]
               %45 = affine.min affine_map<(d0)[s0] -> (-d0 + 32, s0)>(%arg2)[%workgroup_size_x]
               %46 = linalg.init_tensor [1, %43, %44, %45] : tensor<1x?x?x?xf32>
-              %47 = linalg.fill(%cst, %46) : f32, tensor<1x?x?x?xf32> -> tensor<1x?x?x?xf32>
+              %47 = linalg.fill ins(%cst : f32) outs(%46 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
               %48 = linalg.depthwise_conv_2d_nhwc_hwc {lowering_config = #config, dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%40, %42 : tensor<1x?x?x?xf32>, tensor<3x3x?xf32>) outs(%47 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
               %49 = linalg.generic {lowering_config = #config, indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%12, %48 : tensor<?xf32>, tensor<1x?x?x?xf32>) outs(%18 : tensor<1x?x?x?xf32>) {
               ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):

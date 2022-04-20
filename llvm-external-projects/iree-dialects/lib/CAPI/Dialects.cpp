@@ -7,6 +7,8 @@
 #include "iree-dialects-c/Dialects.h"
 
 #include "iree-dialects/Dialect/Input/InputDialect.h"
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/PyDM/IR/PyDMDialect.h"
 #include "iree-dialects/Dialect/PyDM/Transforms/Passes.h"
 #include "mlir/CAPI/IR.h"
@@ -27,6 +29,22 @@ using namespace mlir::iree_compiler::IREE;
 MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(
     IREEInput, iree_input, mlir::iree_compiler::IREE::Input::IREEInputDialect)
 
+//===--------------------------------------------------------------------===//
+// IREELinalgExt
+//===--------------------------------------------------------------------===//
+
+MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(
+    IREELinalgExt, iree_linalg_ext,
+    mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect)
+
+//===--------------------------------------------------------------------===//
+// IREELinalgTransform
+//===--------------------------------------------------------------------===//
+
+MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(
+    IREELinalgTransform, iree_linalg_transform,
+    mlir::linalg::transform::LinalgTransformDialect)
+
 //===----------------------------------------------------------------------===//
 // IREEPyDMDialect
 //===----------------------------------------------------------------------===//
@@ -43,12 +61,12 @@ bool mlirTypeIsAIREEPyDMPrimitiveType(MlirType type) {
   return unwrap(type).isa<PYDM::PrimitiveType>();
 }
 
-#define IREEPYDM_DEFINE_NULLARY_TYPE(Name)                \
-  bool mlirTypeIsAIREEPyDM##Name(MlirType type) {         \
-    return unwrap(type).isa<PYDM::Name##Type>();          \
-  }                                                       \
-  MlirType mlirIREEPyDM##Name##TypeGet(MlirContext ctx) { \
-    return wrap(PYDM::Name##Type::get(unwrap(ctx)));      \
+#define IREEPYDM_DEFINE_NULLARY_TYPE(Name)                                     \
+  bool mlirTypeIsAIREEPyDM##Name(MlirType type) {                              \
+    return unwrap(type).isa<PYDM::Name##Type>();                               \
+  }                                                                            \
+  MlirType mlirIREEPyDM##Name##TypeGet(MlirContext ctx) {                      \
+    return wrap(PYDM::Name##Type::get(unwrap(ctx)));                           \
   }
 
 IREEPYDM_DEFINE_NULLARY_TYPE(Bool)
@@ -88,8 +106,8 @@ MlirType mlirIREEPyDMObjectTypeGet(MlirContext ctx, MlirType primitive) {
   return wrap(PYDM::ObjectType::get(unwrap(ctx), cppType));
 }
 
-MLIR_CAPI_EXPORTED void mlirIREEPyDMBuildPostImportPassPipeline(
-    MlirOpPassManager passManager) {
+MLIR_CAPI_EXPORTED void
+mlirIREEPyDMBuildPostImportPassPipeline(MlirOpPassManager passManager) {
   auto *passManagerCpp = unwrap(passManager);
   PYDM::buildPostImportPassPipeline(*passManagerCpp);
 }

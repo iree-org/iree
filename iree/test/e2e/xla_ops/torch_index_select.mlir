@@ -1,4 +1,4 @@
-func @torch_select_index_0() {
+func.func @torch_select_index_0() {
   %input = util.unfoldable_constant dense<[
     [[01, 02, 03, 04, 05]],
     [[06, 07, 08, 09, 10]],
@@ -14,7 +14,7 @@ func @torch_select_index_0() {
   return
 }
 
-func @torch_select_index_1() {
+func.func @torch_select_index_1() {
   %input = util.unfoldable_constant dense<[
     [[ 1,  2],[ 3,  4]],
     [[ 5,  6],[ 7,  8]],
@@ -28,7 +28,7 @@ func @torch_select_index_1() {
   return
 }
 
-func @torch_select_index_2() {
+func.func @torch_select_index_2() {
   %input = util.unfoldable_constant dense<[
     [[01, 02, 03, 04, 05]],
     [[06, 07, 08, 09, 10]],

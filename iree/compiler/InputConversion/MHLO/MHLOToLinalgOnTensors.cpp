@@ -84,12 +84,8 @@ struct ConcatenateOpConversion
           rewriter.createOrFold<arith::AddIOp>(loc, resultDimSize, size);
     }
     sizes[dim] = resultDimSize;
-    auto initTensor = rewriter.create<linalg::InitTensorOp>(
+    Value result = rewriter.create<linalg::InitTensorOp>(
         loc, resultType.getShape(), resultType.getElementType());
-    auto zeroAttr = rewriter.getZeroAttr(resultType.getElementType());
-    Value zero = rewriter.create<arith::ConstantOp>(loc, zeroAttr);
-    Value result =
-        rewriter.create<linalg::FillOp>(loc, zero, initTensor).getResult(0);
 
     auto toOpFoldResult = [](Value v) -> OpFoldResult {
       auto op = v.getDefiningOp<arith::ConstantIndexOp>();
@@ -146,7 +142,7 @@ Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
                                   Value rhs) {
   Value zero = b.create<arith::ConstantOp>(
       loc, b.getZeroAttr(resultType.getElementType()));
-  auto initTensor = b.create<linalg::InitTensorOp>(
+  Value initTensor = b.create<linalg::InitTensorOp>(
       loc, /*dyn_size=*/ValueRange{}, resultType.getShape(),
       resultType.getElementType());
   Value zeroTensor =
@@ -166,7 +162,8 @@ Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
                                     ValueRange{zeroTensor})
           .getResult(0);
     default:
-      llvm_unreachable("unhandled matmul type");
+      assert(false && "unhandled matmul type");
+      return Value();
   }
 }
 
@@ -177,7 +174,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
   LogicalResult matchAndRewrite(
       mhlo::FftOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (op.fft_type() != "RFFT") {
+    if (op.fft_type() != mhlo::FftType::RFFT) {
       return rewriter.notifyMatchFailure(op,
                                          "non RFFT types are supported yet");
     }
@@ -216,12 +213,12 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
 };
 
 // We need to convert func ops in order to convert types.
-class BuiltinFuncOpPattern : public OpConversionPattern<FuncOp> {
-  using OpConversionPattern<FuncOp>::OpConversionPattern;
+class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
+  using OpConversionPattern<func::FuncOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      FuncOp srcOp, OpAdaptor adaptor,
+      func::FuncOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    FunctionType srcFuncType = srcOp.getType();
+    FunctionType srcFuncType = srcOp.getFunctionType();
     TypeConverter::SignatureConversion signatureConversion(
         srcOp.getNumArguments());
 
@@ -289,7 +286,7 @@ class GenericTypeConvert : public ConversionPattern {
       }
       rewriter.applySignatureConversion(newRegion, result);
     }
-    Operation *newOp = rewriter.createOperation(state);
+    Operation *newOp = rewriter.create(state);
     rewriter.replaceOp(op, newOp->getResults());
     return success();
   }
@@ -347,14 +344,14 @@ struct ConvertMHLOToLinalgOnTensorsPass
     target.addIllegalDialect<mhlo::MhloDialect>();
 
     // Functions must have legal types.
-    target.addDynamicallyLegalOp<FuncOp>([&](FuncOp funcOp) {
-      for (Type type : funcOp.getType().getInputs()) {
+    target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
+      for (Type type : funcOp.getFunctionType().getInputs()) {
         if (isIllegalType(type)) return false;
       }
-      for (Type type : funcOp.getType().getResults()) {
+      for (Type type : funcOp.getFunctionType().getResults()) {
         if (isIllegalType(type)) return false;
       }
-      for (Block &block : funcOp.body()) {
+      for (Block &block : funcOp.getBody()) {
         for (Type type : block.getArgumentTypes()) {
           if (isIllegalType(type)) return false;
         }
@@ -386,7 +383,7 @@ void populateMHLOToLinalgOnTensorsConversionPatterns(
       typeConverter, context, PatternBenefit(1000));
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createMHLOToLinalgOnTensorsPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createMHLOToLinalgOnTensorsPass() {
   return std::make_unique<ConvertMHLOToLinalgOnTensorsPass>();
 }
 

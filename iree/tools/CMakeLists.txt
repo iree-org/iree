@@ -59,11 +59,8 @@ if(IREE_TARGET_BACKEND_ROCM)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_ROCM_TARGET")
 endif()
 
-if(IREE_ENABLE_EMITC)
-  set(IREE_EMITC_CONDITIONAL_DEP
-    MLIREmitC
-  )
-endif()
+# Write some important CMake options to a file for convenient use from scripts.
+configure_file(build_config_template.txt.in build_config.txt)
 
 iree_cc_binary(
   NAME
@@ -228,6 +225,11 @@ if(${IREE_BUILD_COMPILER})
       "init_iree_passes.h"
     DEPS
       IREEInputDialect
+      IREELinalgExtDialect
+      IREELinalgExtTransforms
+      IREELinalgExtOpInterfaceImpl
+      IREELinalgTransformDialect
+      IREELinalgTransformDialectTransforms
       IREEPyDMDialect
       MLIRIR
       iree::compiler::Bindings::Native::Transforms
@@ -250,6 +252,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::Vulkan::IR
       iree::compiler::InputConversion::Common
       iree::compiler::InputConversion::MHLO
+      iree::compiler::InputConversion::TMTensor
       iree::compiler::InputConversion::TOSA
       iree::compiler::ConstEval
       iree::compiler::Translation::HALExecutable
@@ -264,6 +267,9 @@ if(${IREE_BUILD_COMPILER})
       "init_mlir_dialects.h"
       "init_mlir_passes.h"
     DEPS
+      # Sets IREE_HAVE_EMITC_DIALECT and transitively depends on MLIREmitC
+      # if enabled.
+      iree::compiler::Dialect::VM::Target::C::Enabled
       MLIRAffine
       MLIRAffineTransforms
       MLIRArmNeon
@@ -293,9 +299,12 @@ if(${IREE_BUILD_COMPILER})
       MLIRTosaTransforms
       MLIRTransforms
       MLIRVector
-      ${IREE_EMITC_CONDITIONAL_DEP}
     PUBLIC
   )
+
+  if(IREE_BUILD_TORCH_MLIR_SUPPORT)
+    set(_OPTIONAL_INIT_TORCH_MLIR_DIALECT_LIB ::init_torch_mlir_dialects)
+  endif()
 
   iree_cc_library(
     NAME
@@ -307,9 +316,21 @@ if(${IREE_BUILD_COMPILER})
       ::init_compiler_modules
       ::init_iree_passes_and_dialects
       ::init_mlir_passes_and_dialects
+      ${_OPTIONAL_INIT_TORCH_MLIR_DIALECT_LIB}
       ::init_xla_dialects
       iree::compiler::Codegen::Codegen
       iree::compiler::Dialect::HAL::Conversion::Passes
+    PUBLIC
+  )
+
+  iree_cc_library(
+    NAME
+      init_llvmir_translations
+    HDRS
+      "init_llvmir_translations.h"
+    DEPS
+      MLIRArmNeonToLLVMIRTranslation
+      MLIRLLVMToLLVMIRTranslation
     PUBLIC
   )
 
@@ -348,6 +369,20 @@ if(${IREE_BUILD_COMPILER})
     PUBLIC
   )
 
+  if(IREE_BUILD_TORCH_MLIR_SUPPORT)
+    iree_cc_library(
+      NAME
+        init_torch_mlir_dialects
+      HDRS
+        "init_torch_mlir_dialects.h"
+      DEPS
+        TorchMLIRTMTensorDialect
+      DEFINES
+        "IREE_HAVE_TORCH_MLIR_DIALECTS"
+      PUBLIC
+    )
+  endif()
+
   iree_cc_library(
     NAME
       init_translations
@@ -380,28 +415,30 @@ if(${IREE_BUILD_COMPILER})
     HDRS
       "iree_translate_lib.h"
     SRCS
+      "iree_compile_lib.cc"
       "iree_translate_lib.cc"
     DEPS
-      ::init_compiler_modules
-      ::init_iree_passes_and_dialects
-      ::init_mlir_passes_and_dialects
+      ::init_llvmir_translations
+      ::init_passes_and_dialects
       ::init_targets
       ::init_translations
-      ::init_xla_dialects
       LLVMSupport
       MLIRIR
-      MLIRArmNeonToLLVMIRTranslation
-      MLIRLLVMToLLVMIRTranslation
       MLIRSCFTransforms
+      MLIRParser
       MLIRPass
       MLIRSupport
       MLIRTargetLLVMIRExport
       MLIRTranslateLib
       iree::compiler::Codegen::Codegen
+      iree::compiler::ConstEval
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
+      iree::compiler::Dialect::VM::Target::C
+      iree::compiler::Pipelines
       iree::compiler::Translation::HALExecutable
       iree::compiler::Translation::IREEVM
+      iree::compiler::Utils
     PUBLIC
   )
 
@@ -410,6 +447,18 @@ if(${IREE_BUILD_COMPILER})
       iree-translate
     SRCS
       "iree-translate-main.cc"
+    DEPS
+      ::iree_translate_lib
+    DATA
+      ${IREE_LLD_TARGET}
+    HOSTONLY
+  )
+
+  iree_cc_binary(
+    NAME
+      iree-compile
+    SRCS
+      "iree-compile-main.cc"
     DEPS
       ::iree_translate_lib
     DATA

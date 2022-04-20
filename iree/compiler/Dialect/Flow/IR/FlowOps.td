@@ -129,8 +129,7 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     }
   }];
 
-  let verifier = [{ return verifyDispatchWorkgroupsOp(*this); }];
-
+  let hasVerifier = 1;
   let hasCanonicalizer = 1;
 }
 
@@ -184,7 +183,11 @@ def FLOW_DispatchWorkgroupIDOp : FLOW_PureOp<"dispatch.workgroup.id", [
   ];
   let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
 
-  let verifier = [{ return verifyDispatchWorkgroupInfoOp(*this); }];
+  let extraClassDeclaration = [{
+    LogicalResult verify() {
+      return verifyDispatchWorkgroupInfoOp(getOperation(), dimension().getZExtValue());
+    }
+  }];
 }
 
 def FLOW_DispatchWorkgroupCountOp : FLOW_PureOp<"dispatch.workgroup.count", [
@@ -215,7 +218,11 @@ def FLOW_DispatchWorkgroupCountOp : FLOW_PureOp<"dispatch.workgroup.count", [
   ];
   let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
 
-  let verifier = [{ return verifyDispatchWorkgroupInfoOp(*this); }];
+  let extraClassDeclaration = [{
+    LogicalResult verify() {
+      return verifyDispatchWorkgroupInfoOp(getOperation(), dimension().getZExtValue());
+    }
+  }];
 }
 
 def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
@@ -254,7 +261,11 @@ def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
 
   let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
 
-  let verifier = [{ return verifyDispatchWorkgroupInfoOp(*this); }];
+  let extraClassDeclaration = [{
+    LogicalResult verify() {
+      return verifyDispatchWorkgroupInfoOp(getOperation(), dimension().getZExtValue());
+    }
+  }];
 }
 
 def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape", [
@@ -287,7 +298,7 @@ def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape", [
     ValueRange getResultDynamicDims(unsigned idx) { return dynamic_dims(); }
   }];
 
-  let verifier = [{ return verifyDispatchTieShapeOp(*this); }];
+  let hasVerifier = 1;
 
   let hasFolder = 1;
 }
@@ -378,11 +389,20 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
         (unsigned resultRank, IREE::Flow::DispatchTensorType sourceType,
          ArrayRef<OpFoldResult> mixedSizes);
 
+    /// Returns the list of dimensions that are dropped if the
+    /// !flow.dispatch.tensor.load is rank-reducing.
+    llvm::SmallBitVector getDroppedDims();
+
+    /// Return the result type as a `RankedTensorType`.
+    RankedTensorType getType() {
+      return result().getType().cast<RankedTensorType>();
+    }
+
     ValueRange getOperandDynamicDims(unsigned idx) { return source_dims(); }
     ValueRange getResultDynamicDims(unsigned idx) { return sizes(); }
   }];
 
-  let verifier = [{ return verifyDispatchTensorLoadOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -458,9 +478,14 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
       return idx == 0 ? sizes() : target_dims();
     }
     ValueRange getResultDynamicDims(unsigned idx) { return {}; }
+
+    /// Returns the list of dimensions that are dropped if the
+    /// !flow.dispatch.tensor.load is rank-reducing.
+    llvm::SmallBitVector getDroppedDims();
+
   }];
 
-  let verifier = [{ return verifyDispatchTensorStoreOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -530,7 +555,7 @@ def FLOW_ExecutableOp : FLOW_Op<"executable", [
     }
   }];
 
-  let verifier = [{ return verifyExecutableOp(*this); }];
+  let hasVerifier = 1;
 }
 
 def FLOW_ExecutableEndOp : FLOW_Op<"executable_end", [
@@ -643,7 +668,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
                                $tied_operands)
   }];
 
-  let verifier = [{ return verifyDispatchOp(*this); }];
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -704,7 +729,7 @@ def FLOW_TensorTieShapeOp : FLOW_PureOp<"tensor.tie_shape", [
     ValueRange getResultDynamicDims(unsigned idx) { return dynamic_dims(); }
   }];
 
-  let verifier = [{ return verifyTensorTieShapeOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -762,6 +787,7 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
     ValueRange getResultDynamicDims(unsigned idx) { return result_dims(); }
   }];
 
+  let hasVerifier = 1;
   let hasFolder = 1;
   let hasCanonicalizer = 1;
 }
@@ -810,6 +836,7 @@ def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
     ValueRange getResultDynamicDims(unsigned idx) { return ValueRange{}; }
   }];
 
+  let hasVerifier = 1;
   // TODO(benvanik): canonicalize to slice+load if dims are known.
   let hasFolder = 1;
   let hasCanonicalizer = 1;
@@ -862,6 +889,7 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
     ValueRange getResultDynamicDims(unsigned idx) { return target_dims(); }
   }];
 
+  let hasVerifier = 1;
   let hasFolder = 1;
 }
 
@@ -894,6 +922,7 @@ def FLOW_TensorEmptyOp : FLOW_PureOp<"tensor.empty", [
     ValueRange getResultDynamicDims(unsigned idx) { return result_dims(); }
   }];
 
+  let hasVerifier = 1;
   let hasCanonicalizer = 1;
 }
 
@@ -930,6 +959,7 @@ def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
     ValueRange getResultDynamicDims(unsigned idx) { return result_dims(); }
   }];
 
+  let hasVerifier = 1;
   let hasCanonicalizer = 1;
 }
 
@@ -974,6 +1004,7 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
     ValueRange getResultDynamicDims(unsigned idx) { return operand_dims(); }
   }];
 
+  let hasVerifier = 1;
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
@@ -1016,6 +1047,7 @@ def FLOW_TensorSliceOp : FLOW_PureOp<"tensor.slice", [
     ValueRange getResultDynamicDims(unsigned idx) { return result_dims(); }
   }];
 
+  let hasVerifier = 1;
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
@@ -1075,7 +1107,7 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
     ValueRange getResultDynamicDims(unsigned idx) { return target_dims(); }
   }];
 
-  let verifier = [{ return verifyTensorUpdateOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;

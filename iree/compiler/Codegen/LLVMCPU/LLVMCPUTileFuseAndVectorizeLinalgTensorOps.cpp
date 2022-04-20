@@ -74,7 +74,7 @@ struct LLVMCPUTileFuseAndVectorizePass
   bool lowerToVectors;
 };
 
-LogicalResult applyTileAndFuseCanonicalizationPatterns(FuncOp funcOp) {
+LogicalResult applyTileAndFuseCanonicalizationPatterns(func::FuncOp funcOp) {
   auto context = funcOp.getContext();
   RewritePatternSet patterns(context);
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
@@ -330,10 +330,15 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     RewritePatternSet vectorUnrollPatterns(context);
     // TODO(hanchung): Set different vector sizes for different operations. Also
     // it seems that `{16, 16, 16}` is not a good config. We should tune it.
-    vector::populateVectorUnrollPatterns(
-        vectorUnrollPatterns,
-        vector::UnrollVectorOptions().setNativeShape(config.getTileSizeVals(
-            static_cast<unsigned>(TilingLevel::VectorTiles))));
+    // There are issues when unrolling 1Dx1D->0D vector.contract op. Only unroll
+    // the op when there are more than one loop.
+    auto vectorTiles =
+        config.getTileSizeVals(static_cast<unsigned>(TilingLevel::VectorTiles));
+    if (vectorTiles.size() > 1) {
+      vector::populateVectorUnrollPatterns(
+          vectorUnrollPatterns,
+          vector::UnrollVectorOptions().setNativeShape(vectorTiles));
+    }
 
     if (failed(applyPatternsAndFoldGreedily(funcOp,
                                             std::move(vectorUnrollPatterns)))) {
@@ -395,8 +400,8 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileFuseAndVectorizePass(
-    bool lowerToVectors) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUTileFuseAndVectorizePass(bool lowerToVectors) {
   return std::make_unique<LLVMCPUTileFuseAndVectorizePass>(lowerToVectors);
 }
 

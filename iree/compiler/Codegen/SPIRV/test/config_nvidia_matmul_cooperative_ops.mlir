@@ -36,7 +36,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
            subgroup_size = 32 : i32}>}> {
     hal.executable.entry_point public @matmul_256x1024x128_div_sub layout(#executable_layout)
     builtin.module {
-      func @matmul_256x1024x128_div_sub() {
+      func.func @matmul_256x1024x128_div_sub() {
         %c0 = arith.constant 0 : index
         %c1024 = arith.constant 1024 : index
         %c256 = arith.constant 256 : index
@@ -56,7 +56,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
         %21 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [128, 1024], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:128x1024xf16> -> tensor<128x1024xf16>
         %24 = linalg.init_tensor [256, 1024] : tensor<256x1024xf16>
-        %25 = linalg.fill(%cst, %24) : f16, tensor<256x1024xf16> -> tensor<256x1024xf16>
+        %25 = linalg.fill ins(%cst : f16) outs(%24 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
         %26 = linalg.matmul ins(%19, %21 : tensor<256x128xf16>, tensor<128x1024xf16>) outs(%25 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
         %27 = linalg.generic {
             indexing_maps = [#map5, #map5, #map5, #map5], iterator_types = ["parallel", "parallel"]}
@@ -122,7 +122,7 @@ hal.executable public @matmul_256x1024x8 {
            subgroup_size = 32 : i32}>}> {
     hal.executable.entry_point public @matmul_256x1024x8 layout(#executable_layout)
     builtin.module {
-      func @matmul_256x1024x8() {
+      func.func @matmul_256x1024x8() {
         %c0 = arith.constant 0 : index
         %c1024 = arith.constant 1024 : index
         %c256 = arith.constant 256 : index
@@ -133,7 +133,7 @@ hal.executable public @matmul_256x1024x8 {
         %8 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [256, 8], strides = [1, 1] : !flow.dispatch.tensor<readonly:256x8xf16> -> tensor<256x8xf16>
         %10 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [8, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:8x1024xf16> -> tensor<8x1024xf16>
         %15 = linalg.init_tensor [256, 1024] : tensor<256x1024xf16>
-        %16 = linalg.fill(%cst, %15) : f16, tensor<256x1024xf16> -> tensor<256x1024xf16>
+        %16 = linalg.fill ins(%cst : f16) outs(%15 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
         %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"}
             ins(%8, %10 : tensor<256x8xf16>, tensor<8x1024xf16>) outs(%16 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1]

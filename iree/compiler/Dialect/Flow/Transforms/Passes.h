@@ -97,23 +97,26 @@ std::unique_ptr<Pass> createFusionOfTensorOpsPass();
 // beneficial.
 std::unique_ptr<Pass> createInferNumericNarrowingPass();
 
+// Create a pass to initialize all empty tensors after dispatch formation to
+// zero.
+std::unique_ptr<Pass> createInitializeEmptyTensorsPass();
+
 // Create a pass to interchange generic ops to force the reduction loop to be
 // the most inner loops.
 std::unique_ptr<Pass> createInterchangeGenericOpsPass();
 
-// Convert operations to equivalent flow ops before dispatch region creation.
-std::unique_ptr<Pass> createConvertToFlowBeforeDispatchFormation();
-
-// Convert remaining operations that were left outside of dispatch regions to
-// equivalent flow ops.
-std::unique_ptr<Pass> createConvertToFlowAfterDispatchFormation();
+// Create a pass to convert operations to `flow` ops. This pass is currently
+// only used for testing, since the conversion to Flow ops happens within
+// dispatch region formation.
+std::unique_ptr<Pass> createConvertToFlowPass();
 
 // Optimizes numerics given annotations added via
 // iree-flow-infer-numeric-narrowing.
 std::unique_ptr<Pass> createOptimizeNumericsPass();
 
 // Strips the signed/unsigned portion off of tensors.
-std::unique_ptr<OperationPass<mlir::FuncOp>> createStripSignednessPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createStripSignednessPass();
 
 // Verifies that the input to the Flow transformation pipeline is legal.
 // This includes checking for operations from dialects that are expected
@@ -126,7 +129,8 @@ std::unique_ptr<Pass> createVerifyInputLegalityPass();
 
 // Pass to perform dispatch of Linalg on tensor ops by tiling and distribution.
 // A dispatch region is created for each tiled loop nest.
-std::unique_ptr<Pass> createDispatchLinalgOnTensorsPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createDispatchLinalgOnTensorsPass();
 
 // Captures dynamic shape dimensions required by dispatch operands.
 std::unique_ptr<Pass> createCaptureDispatchDynamicDimsPass();
@@ -136,7 +140,8 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createOutlineDispatchRegionsPass();
 
 // Injects tracing markers for dispatch operation tensor inputs and outputs.
-std::unique_ptr<Pass> createInjectDispatchTracingPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createInjectDispatchTracingPass();
 
 // Exports all functions and dispatch executables as `() -> ()` benchmark funcs.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createExportBenchmarkFuncsPass();
@@ -160,6 +165,9 @@ createOutlineLargeConstantsPass();
 // Deduplicates equivalent executables.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createDeduplicateExecutablesPass();
+
+// Create a pass to split reduction dimension.
+std::unique_ptr<Pass> createSplitReductionPass();
 
 //===----------------------------------------------------------------------===//
 // Module Analysis and Finalization

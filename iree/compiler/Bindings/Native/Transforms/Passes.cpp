@@ -8,6 +8,7 @@
 
 #include <memory>
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -23,8 +24,8 @@ void buildTransformPassPipeline(OpPassManager &passManager) {
 
   // Cleanup the IR after manipulating it.
   passManager.addPass(createInlinerPass());
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(createCSEPass());
+  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(createCSEPass());
   passManager.addPass(createSymbolDCEPass());
 }
 

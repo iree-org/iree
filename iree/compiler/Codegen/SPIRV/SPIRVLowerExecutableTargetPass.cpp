@@ -100,9 +100,6 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute:
         addSPIRVTileAndDistributePassPipeline(nestedModulePM);
         break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistributeCopy:
-        addSPIRVTileAndDistributeCopyPassPipeline(nestedModulePM);
-        break;
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize:
         addSPIRVTileAndVectorizePassPipeline(nestedModulePM);
         break;
@@ -110,8 +107,13 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
           SPIRVVectorizeToCooperativeOps:
         addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(nestedModulePM);
         break;
+      case IREE::Codegen::DispatchLoweringPassPipeline::
+          SPIRVVectorizeWithWorkgroupMemory:
+        addSPIRVTileAndVectorizeWithWorkgroupMemoryPassPipeline(nestedModulePM);
+        break;
       default:
-        llvm_unreachable("Unsupported pipeline on GPU target.");
+        variantOp.emitOpError("Unsupported pipeline on GPU target.");
+        return signalPassFailure();
     }
   }
 

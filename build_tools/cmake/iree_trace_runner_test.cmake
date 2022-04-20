@@ -22,10 +22,6 @@ include(CMakeParseArguments)
 #       and input file flags are passed automatically.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
-#   OPT_TOOL: Defaulting to iree-opt. Tool used to preprocess the source files
-#       if OPT_FLAGS is specified.
-#   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
-#       these flags.
 #   TRACE_RUNNER: trace-runner program to run.
 #   TRACE: trace file input to the trace-runner program.
 #   MODULE_FILE_NAME: specifies the absolute path to the filename to use for the
@@ -46,8 +42,8 @@ function(iree_trace_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;TRACE;TARGET_BACKEND;DRIVER;OPT_TOOL;TRACE_RUNNER;MODULE_FILE_NAME"
-    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS;TARGET_CPU_FEATURES"
+    "NAME;SRC;TRACE;TARGET_BACKEND;DRIVER;TRACE_RUNNER;MODULE_FILE_NAME"
+    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
 
@@ -67,10 +63,6 @@ function(iree_trace_runner_test)
       "${_RULE_TARGET_BACKEND}"
     FLAGS
       ${_RULE_COMPILER_FLAGS}
-    OPT_TOOL
-      ${_RULE_OPT_TOOL}
-    OPT_FLAGS
-      ${_RULE_OPT_FLAGS}
     TARGET_CPU_FEATURES
       ${_RULE_TARGET_CPU_FEATURES}
   )
@@ -142,10 +134,6 @@ endfunction()
 #       and input file flags are passed automatically.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
-#   OPT_TOOL: Defaulting to iree-opt. Tool used to preprocess the source files
-#       if OPT_FLAGS is specified.
-#   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
-#       these flags.
 #   TRACE_RUNNER: trace-runner program to run.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
 #       --iree-llvm-target-cpu-features.
@@ -169,8 +157,8 @@ function(iree_single_backend_generated_trace_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;GENERATOR;TARGET_BACKEND;DRIVER;OPT_TOOL;TRACE_RUNNER"
-    "GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS;TARGET_CPU_FEATURES"
+    "NAME;GENERATOR;TARGET_BACKEND;DRIVER;TRACE_RUNNER"
+    "GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
 
@@ -256,10 +244,6 @@ function(iree_single_backend_generated_trace_runner_test)
       ${_RULE_RUNNER_ARGS}
     LABELS
       ${_RULE_LABELS}
-    OPT_TOOL
-      ${_RULE_OPT_TOOL}
-    OPT_FLAGS
-      ${_RULE_OPT_FLAGS}
     TARGET_CPU_FEATURES
       ${_RULE_TARGET_CPU_FEATURES}
   )
@@ -302,10 +286,6 @@ endfunction()
 #       and input file flags are passed automatically.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
-#   OPT_TOOL: Defaulting to iree-opt. Tool used to preprocess the source files
-#       if OPT_FLAGS is specified.
-#   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
-#       these flags.
 #   TRACE_RUNNER: trace-runner program to run.
 #   TARGET_CPU_FEATURES_VARIANTS: list of target cpu features variants. Only used
 #       for drivers that vary based on the target CPU features. For each list
@@ -321,8 +301,8 @@ function(iree_generated_trace_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;GENERATOR;OPT_TOOL;TRACE_RUNNER"
-    "TARGET_BACKENDS;DRIVERS;GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS;TARGET_CPU_FEATURES_VARIANTS"
+    "NAME;GENERATOR;TRACE_RUNNER"
+    "TARGET_BACKENDS;DRIVERS;GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS"
     ${ARGN}
   )
 
@@ -350,7 +330,6 @@ function(iree_generated_trace_runner_test)
     endif()
     foreach(_TARGET_CPU_FEATURES_LIST_ELEM IN LISTS _TARGET_CPU_FEATURES_VARIANTS)
       process_target_cpu_features("${_TARGET_CPU_FEATURES_LIST_ELEM}" _ENABLED _TARGET_CPU_FEATURES _TARGET_CPU_FEATURES_SUFFIX _TARGET_PASS_OPTIONS)
-      string(REPLACE "#pass_options_variant#" "${_TARGET_PASS_OPTIONS}" _PROCESSED_OPT_FLAGS "${_RULE_OPT_FLAGS}")
       string(REPLACE "#pass_options_variant#" "${_TARGET_PASS_OPTIONS}" _PROCESSED_COMPILER_FLAGS "${_RULE_COMPILER_FLAGS}")
       if (NOT _ENABLED)
         # The current entry is disabled on the target CPU architecture.
@@ -375,10 +354,6 @@ function(iree_generated_trace_runner_test)
           ${_RULE_RUNNER_ARGS}
         LABELS
           ${_RULE_LABELS}
-        OPT_TOOL
-          ${_RULE_OPT_TOOL}
-        OPT_FLAGS
-          ${_PROCESSED_OPT_FLAGS}
         TARGET_CPU_FEATURES
           ${_TARGET_CPU_FEATURES}
       )

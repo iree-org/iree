@@ -97,6 +97,8 @@ static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 class FuseGlobalsPass
     : public PassWrapper<FuseGlobalsPass, OperationPass<mlir::ModuleOp>> {
  public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(FuseGlobalsPass)
+
   StringRef getArgument() const override { return "iree-util-fuse-globals"; }
 
   StringRef getDescription() const override {

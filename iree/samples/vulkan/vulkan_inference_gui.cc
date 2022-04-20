@@ -361,7 +361,9 @@ extern "C" int iree_main(int argc, char** argv) {
                 IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE);
         iree_hal_buffer_usage_t input_buffer_usage =
             static_cast<iree_hal_buffer_usage_t>(
-                IREE_HAL_BUFFER_USAGE_ALL | IREE_HAL_BUFFER_USAGE_CONSTANT);
+                IREE_HAL_BUFFER_USAGE_DISPATCH |
+                IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING |
+                IREE_HAL_BUFFER_USAGE_CONSTANT);
         iree_hal_buffer_params_t buffer_params;
         buffer_params.type = input_memory_type;
         buffer_params.usage = input_buffer_usage;
@@ -413,9 +415,10 @@ extern "C" int iree_main(int argc, char** argv) {
         auto* output_buffer_view = reinterpret_cast<iree_hal_buffer_view_t*>(
             iree_vm_list_get_ref_deref(outputs.get(), 0,
                                        iree_hal_buffer_view_get_descriptor()));
-        IREE_CHECK_OK(iree_hal_buffer_read_data(
-            iree_hal_buffer_view_buffer(output_buffer_view), 0, latest_output,
-            sizeof(latest_output)));
+        IREE_CHECK_OK(iree_hal_device_transfer_d2h(
+            iree_vk_device, iree_hal_buffer_view_buffer(output_buffer_view), 0,
+            latest_output, sizeof(latest_output),
+            IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
 
         dirty = false;
       }

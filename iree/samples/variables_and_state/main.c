@@ -24,8 +24,11 @@ iree_status_t counter_get_value(iree_runtime_session_t* session,
         iree_runtime_call_outputs_pop_front_buffer_view(&call, &buffer_view);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_read_data(iree_hal_buffer_view_buffer(buffer_view),
-                                       0, out_value, sizeof(*out_value));
+    status = iree_hal_device_transfer_d2h(
+        iree_runtime_session_device(session),
+        iree_hal_buffer_view_buffer(buffer_view), 0, out_value,
+        sizeof(*out_value), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+        iree_infinite_timeout());
   }
   iree_hal_buffer_view_release(buffer_view);
 
@@ -42,8 +45,6 @@ iree_status_t counter_set_value(iree_runtime_session_t* session,
   iree_hal_buffer_view_t* arg0 = NULL;
   int arg0_data[1] = {new_value};
 
-  // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
-  //   * debugging some apparent memory corruption with the stack-local value
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_allocate_buffer(
@@ -51,9 +52,9 @@ iree_status_t counter_set_value(iree_runtime_session_t* session,
         /*shape_rank=*/0, IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
-            .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-            .usage = IREE_HAL_BUFFER_USAGE_ALL,
+            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+            .usage =
+                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
         },
         iree_make_const_byte_span((void*)arg0_data, sizeof(arg0_data)), &arg0);
   }
@@ -77,8 +78,6 @@ iree_status_t counter_add_to_value(iree_runtime_session_t* session, int x) {
   iree_hal_buffer_view_t* arg0 = NULL;
   int arg0_data[1] = {x};
 
-  // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
-  //   * debugging some apparent memory corruption with the stack-local value
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_allocate_buffer(
@@ -86,9 +85,9 @@ iree_status_t counter_add_to_value(iree_runtime_session_t* session, int x) {
         /*shape_rank=*/0, IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
-            .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-            .usage = IREE_HAL_BUFFER_USAGE_ALL,
+            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+            .usage =
+                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
         },
         iree_make_const_byte_span((void*)arg0_data, sizeof(arg0_data)), &arg0);
   }

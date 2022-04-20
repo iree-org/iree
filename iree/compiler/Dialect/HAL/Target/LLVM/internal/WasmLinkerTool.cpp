@@ -37,13 +37,22 @@ class WasmLinkerTool : public LinkerTool {
  public:
   using LinkerTool::LinkerTool;
 
-  std::string getSystemToolPath() const override {
-    // First check for setting the linker explicitly.
-    auto toolPath = LinkerTool::getSystemToolPath();
-    if (!toolPath.empty()) return toolPath;
+  std::string getWasmToolPath() const {
+    // Always use the -iree-llvm-wasm-linker-path flag when specified as it's
+    // explicitly telling us what to use.
+    if (!targetOptions.wasmLinkerPath.empty()) {
+      return targetOptions.wasmLinkerPath;
+    }
 
-    // No explicit linker specified, search the environment for common tools.
-    toolPath = findToolInEnvironment(
+    // Allow overriding the automatic search with an environment variable.
+    char *linkerPath = std::getenv("IREE_LLVMAOT_WASM_LINKER_PATH");
+    if (linkerPath) {
+      return std::string(linkerPath);
+    }
+
+    // No explicit linker specified, search the environment (i.e. our own build
+    // or install directories) for common tools.
+    std::string toolPath = findToolFromExecutableDir(
         {"wasm-ld", "iree-lld", "lld", "ld.lld", "lld-link"});
     if (!toolPath.empty()) return toolPath;
 
@@ -79,7 +88,7 @@ class WasmLinkerTool : public LinkerTool {
     artifacts.libraryFile.close();
 
     SmallVector<std::string, 8> flags = {
-        getSystemToolPath(),
+        getWasmToolPath(),
 
         // Forces LLD to act like wasm ld and produce WebAssembly files.
         // If not specified then lld tries to figure out what it is by progname

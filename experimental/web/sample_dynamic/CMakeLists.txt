@@ -21,6 +21,8 @@ target_sources(${_NAME}
 )
 set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "web-sample-dynamic-sync")
 
+target_compile_options(${_NAME} PRIVATE ${IREE_DEFAULT_COPTS})
+
 # Note: we have to be very careful about dependencies here.
 #
 # The general purpose libraries link in multiple executable loaders and HAL
@@ -46,6 +48,6 @@ target_link_options(${_NAME} PRIVATE
   "-gseparate-dwarf"
   #
   # Dynamic linking: https://emscripten.org/docs/compiling/Dynamic-Linking.html
-  "-sMAIN_MODULE"
+  "-sMAIN_MODULE=2"
   # "-sALLOW_TABLE_GROWTH"
 )

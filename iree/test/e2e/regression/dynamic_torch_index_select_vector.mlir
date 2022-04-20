@@ -1,4 +1,4 @@
-func @torch_index_select1() {
+func.func @torch_index_select1() {
   %lhs = flow.tensor.constant
     dense<[[[1, 2],[3, 4]],[[5, 6],[7, 8]],[[9, 10],[11, 12]]]> : tensor<3x2x2xi32> -> tensor<?x?x?xi32>
   %rhs = flow.tensor.constant dense<[0, 1]> : tensor<2xi32> -> tensor<?xi32>
@@ -12,7 +12,7 @@ func @torch_index_select1() {
   return
 }
 
-func @torch_index_select2() {
+func.func @torch_index_select2() {
   %lhs = flow.tensor.constant
     dense<[[[1, 2],[3, 4]],[[5, 6],[7, 8]],[[9, 10],[11, 12]]]> : tensor<3x2x2xi32> -> tensor<?x?x?xi32>
   %rhs = flow.tensor.constant dense<[0, 1]> : tensor<2xi32> -> tensor<?xi32>

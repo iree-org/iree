@@ -13,7 +13,7 @@ include(CMakeParseArguments)
 # SRC: MLIR source file to compile into a c module.
 # H_FILE_OUTPUT: The H header file to output.
 # TRANSLATE_TOOL: Translation tool to invoke (CMake target). The default
-#     tool is "iree-translate".
+#     tool is "iree-compile".
 # FLAGS: Flags to pass to the translation tool (list of strings).
 # TESTONLY: When added, this target will only be built if user passes
 #    -DIREE_BUILD_TESTS=ON to CMake.
@@ -47,7 +47,7 @@ function(iree_c_module)
   if(DEFINED _RULE_TRANSLATE_TOOL)
     set(_TRANSLATE_TOOL ${_RULE_TRANSLATE_TOOL})
   else()
-    set(_TRANSLATE_TOOL "iree-translate")
+    set(_TRANSLATE_TOOL "iree-compile")
   endif()
 
   iree_get_executable_path(_TRANSLATE_TOOL_EXECUTABLE ${_TRANSLATE_TOOL})
@@ -80,7 +80,7 @@ function(iree_c_module)
     DEPENDS
       ${_RULE_H_FILE_OUTPUT}
   )
-  
+
   add_library(${_NAME} INTERFACE)
   add_dependencies(${_NAME} ${_GEN_TARGET})
   add_dependencies(${_NAME}

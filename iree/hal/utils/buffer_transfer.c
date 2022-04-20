@@ -70,8 +70,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_submit_transfer_range_and_wait(
   if (!source_buffer) {
     // Allocate staging memory with a copy of the host data. We only initialize
     // the portion being transferred.
-    // TODO(benvanik): use wrap_buffer if supported to avoid the
-    // allocation/copy.
+    // TODO(benvanik): use import if supported to avoid the allocation/copy.
     // TODO(benvanik): make this device-local + host-visible? can be better for
     // uploads as we know we are never going to read it back.
     const iree_hal_buffer_params_t source_params = {
@@ -92,8 +91,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_submit_transfer_range_and_wait(
   if (!target_buffer) {
     // Allocate uninitialized staging memory for the transfer target.
     // We only allocate enough for the portion we are transfering.
-    // TODO(benvanik): use wrap_buffer if supported to avoid the
-    // allocation/copy.
+    // TODO(benvanik): use import if supported to avoid the allocation/copy.
     const iree_hal_buffer_params_t target_params = {
         .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
                 IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
@@ -125,8 +123,8 @@ IREE_API_EXPORT iree_status_t iree_hal_device_submit_transfer_range_and_wait(
 
   // Read back the staging buffer into memory, if needed.
   if (iree_status_is_ok(status) && !target.device_buffer) {
-    status = iree_hal_buffer_read_data(target_buffer, 0,
-                                       target.host_buffer.data, data_length);
+    status = iree_hal_buffer_map_read(target_buffer, 0, target.host_buffer.data,
+                                      data_length);
   }
 
   // Discard staging buffers, if they were required.

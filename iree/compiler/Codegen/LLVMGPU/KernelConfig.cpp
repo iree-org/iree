@@ -55,7 +55,7 @@ static void getTensorCoreConfig(
   tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}}));
 }
 
-static std::string getTargetArch(FuncOp entryPoint) {
+static std::string getTargetArch(func::FuncOp entryPoint) {
   if (auto variantOp =
           entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
     IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
@@ -68,13 +68,28 @@ static std::string getTargetArch(FuncOp entryPoint) {
   return "";
 }
 
-static bool supportsTensorCore(FuncOp entryPoint, linalg::LinalgOp op) {
+static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op) {
   // Limit tensor core pipeline to matmul as not all combinations of transpose
   // are supported upstream.
   // TODO(thomasraoux): Enable batchMatmul and generic contraction.
-  if (getTargetArch(entryPoint) != "sm_80" ||
-      !(isa<linalg::MatmulOp>(op) || isa<linalg::BatchMatmulOp>(op))) {
-    return false;
+  if (getTargetArch(entryPoint) != "sm_80") return false;
+  if (!(isa<linalg::MatmulOp>(op) || isa<linalg::BatchMatmulOp>(op))) {
+    assert(linalg::isaContractionOpInterface(op));
+    // If this is not a named op matmul check some properties to make sure that
+    // we can map it to tensorcore ops. We should have only mulAdd in the region
+    // and the output map should have no permutation and the last dimension
+    // should be a reduce.
+    Region &body = op->getRegion(0);
+    Region::OpIterator it = body.op_begin();
+    if (it == body.op_end() || !isa<arith::MulFOp>(*(it++))) return false;
+    if (it == body.op_end() || !isa<arith::AddFOp>(*(it++))) return false;
+    if (it == body.op_end() || !isa<linalg::YieldOp>(*(it++))) return false;
+    AffineMap outputMap = op.getTiedIndexingMap(op.getOutputOperand(0));
+    if (outputMap.getNumResults() != outputMap.getNumDims() - 1) return false;
+    OpBuilder b(op);
+    for (unsigned i = 0, e = outputMap.getNumResults(); i < e - 1; i++) {
+      if (outputMap.getResult(i) != b.getAffineDimExpr(i)) return false;
+    }
   }
   // Check that we support converting any fused operation. When using the
   // tensorcore pipeline we need to be sure we can generate MMA ops otherwise
@@ -93,7 +108,8 @@ static bool supportsTensorCore(FuncOp entryPoint, linalg::LinalgOp op) {
   return true;
 }
 
-static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
+static LogicalResult setContractConfig(func::FuncOp entryPoint,
+                                       linalg::LinalgOp op) {
   auto setMatmulConfig =
       [&entryPoint, &op](int64_t tileX, int64_t tileY, int64_t tileK,
                          llvm::ArrayRef<int64_t> workgroupSize,
@@ -207,7 +223,7 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
 }
 
-static LogicalResult setFftConfig(FuncOp entryPoint,
+static LogicalResult setFftConfig(func::FuncOp entryPoint,
                                   IREE::LinalgExt::FftOp op) {
   auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
@@ -237,7 +253,7 @@ static LogicalResult setFftConfig(FuncOp entryPoint,
       workgroupSize);
 }
 
-static LogicalResult setSortConfig(FuncOp entryPoint, Operation *op) {
+static LogicalResult setSortConfig(func::FuncOp entryPoint, Operation *op) {
   TileSizesListType tileSizes;
   auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
@@ -277,7 +293,8 @@ static LogicalResult setSortConfig(FuncOp entryPoint, Operation *op) {
 }
 
 // Basic default properties for linalg ops that haven't been tuned.
-static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
+static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
+                                          Operation *op) {
   IREE::Codegen::DispatchLoweringPassPipeline passPipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute;
   TileSizesListType tileSizes;
@@ -321,6 +338,12 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
         vectorSize = 1;
         break;
       }
+      // Since we vectorize along the most inner dimension, make sure if can be
+      // dividied by number of threads * vectorSize.
+      while (vectorSize > 1 &&
+             shape.back() % (workgroupSize[0] * vectorSize) != 0) {
+        vectorSize /= 2;
+      }
       int64_t problemSize = std::accumulate(
           shape.begin(), shape.end(), 1,
           [](const int64_t &a, const int64_t &b) { return a * b; });
@@ -356,7 +379,7 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
 
 /// Propagate the configuration annotated in the incoming IR.
 static LogicalResult setUserConfig(
-    FuncOp entryPointFn, Operation *computeOp,
+    func::FuncOp entryPointFn, Operation *computeOp,
     IREE::Codegen::CompilationInfoAttr compilationInfo) {
   if (auto translationInfo = getTranslationInfo(entryPointFn)) {
     return computeOp->emitOpError(
@@ -367,12 +390,14 @@ static LogicalResult setUserConfig(
   SmallVector<int64_t> workgroupSize = compilationInfo.getWorkgroupSizeVals();
   setTranslationInfo(entryPointFn, compilationInfo.getTranslationInfo(),
                      workgroupSize);
+
   setLoweringConfig(computeOp, compilationInfo.getLoweringConfig());
   eraseCompilationInfo(computeOp);
   return success();
 }
 
-static LogicalResult setRootConfig(FuncOp entryPointFn, Operation *computeOp) {
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   Operation *computeOp) {
   if (IREE::Codegen::CompilationInfoAttr compilationInfo =
           getCompilationInfo(computeOp)) {
     // If the op already has a lowering config coming from the IR use this and
@@ -401,7 +426,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
   llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPointOps =
       getAllEntryPoints(moduleOp);
 
-  for (auto funcOp : moduleOp.getOps<FuncOp>()) {
+  for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
     auto entryPointOp = entryPointOps.lookup(funcOp.getName());
     if (!entryPointOp) continue;
     if (getTranslationInfo(entryPointOp)) continue;
@@ -434,20 +459,6 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
           rootOperation = op;
           break;
         }
-      }
-    }
-
-    if (!rootOperation) {
-      // TODO(ravishankarm): Currently you could have dispatches with a single
-      // tensor.insert_slice or a tensor.extract_slice. Those are handled by
-      // tile + distribute as well since these ops have an external model
-      // implementing the `TiledOpInterface`. This is legacy. These ops shouldnt
-      // implement this interface, and backends must be able to handle a
-      // dispatch with flow.dispatch.tensor.load -> flow.dispatch.tensor.store.
-      // Till this is cleaned up, set a configuration for this.
-      if (computeOps.size() == 1 &&
-          isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(computeOps[0])) {
-        rootOperation = computeOps[0];
       }
     }
 

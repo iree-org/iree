@@ -33,6 +33,8 @@ class CombineInitializersPass
     : public PassWrapper<CombineInitializersPass,
                          OperationPass<mlir::ModuleOp>> {
  public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CombineInitializersPass)
+
   StringRef getArgument() const override {
     return "iree-util-combine-initializers";
   }

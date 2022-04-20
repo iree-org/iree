@@ -574,7 +574,8 @@ struct ConvertMHLOToLinalgExtPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createConvertMHLOToLinalgExtPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createConvertMHLOToLinalgExtPass() {
   return std::make_unique<ConvertMHLOToLinalgExtPass>();
 }
 

@@ -14,7 +14,7 @@
 
 #include <cstdlib>
 
-#include "iree-dialects/Dialect/LinalgExt/Transforms/Passes.h"
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Bindings/Native/Transforms/Passes.h"
 #include "iree/compiler/Bindings/TFLite/Transforms/Passes.h"
 #include "iree/compiler/ConstEval/Passes.h"
@@ -27,6 +27,9 @@
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
+#ifdef IREE_HAVE_TORCH_MLIR_DIALECTS
+#include "iree/compiler/InputConversion/TMTensor/Passes.h"
+#endif
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "iree/compiler/Translation/IREEVM.h"
 
@@ -43,6 +46,9 @@ inline void registerAllIreePasses() {
 
   registerCommonInputConversionPasses();
   MHLO::registerMHLOConversionPasses();
+#ifdef IREE_HAVE_TORCH_MLIR_DIALECTS
+  TMTensor::registerTMTensorConversionPasses();
+#endif
   registerTOSAConversionPasses();
   ConstEval::registerConstEvalPasses();
 

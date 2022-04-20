@@ -19,11 +19,9 @@ def iree_check_test(
         name,
         src,
         target_backend,
-        driver,
+        driver = None,
         compiler_flags = [],
         runner_args = [],
-        opt_tool = "//iree/tools:iree-opt",
-        opt_flags = [],
         tags = [],
         target_cpu_features = None,
         timeout = None,
@@ -34,15 +32,13 @@ def iree_check_test(
       name: name of the generated test.
       src: source mlir file containing the module.
       target_backend: target backend to compile for.
-      driver: driver to run the module with.
+      driver: driver to run the module with. This can be omitted to test only
+          compilation, but consider omiting the driver as a hacky abuse of the
+          rule since compilation on its own not use iree-check-module.
       compiler_flags: additional flags to pass to the compiler. Bytecode translation and backend
           flags are passed automatically.
       runner_args: additional runner_args to pass to iree-check-module. The driver and input file
           are passed automatically.
-      opt_tool: Defaulting to iree-opt. Tool used to preprocess the source files
-          if opt_flags is specified.
-      opt_flags: If specified, source files are preprocessed with OPT_TOOL with
-          these flags.
       tags: additional tags to apply to the generated test. A tag "driver=DRIVER" is added
           automatically.
       target_cpu_features: currently unimplemented (must be empty), will eventually allow specifying target CPU features.
@@ -62,10 +58,11 @@ def iree_check_test(
             "-mlir-print-op-on-diagnostic=false",
             "-iree-hal-target-backends=%s" % target_backend,
         ] + compiler_flags,
-        opt_tool = opt_tool,
-        opt_flags = opt_flags,
         visibility = ["//visibility:private"],
     )
+
+    if not driver:
+        return
 
     native_test(
         name = name,
@@ -84,11 +81,9 @@ def iree_check_single_backend_test_suite(
         name,
         srcs,
         target_backend,
-        driver,
+        driver = None,
         compiler_flags = [],
         runner_args = [],
-        opt_tool = "//iree/tools:iree-opt",
-        opt_flags = [],
         tags = [],
         target_cpu_features = None,
         timeout = None,
@@ -101,16 +96,14 @@ def iree_check_single_backend_test_suite(
       name: name of the generated test suite.
       srcs: source mlir files containing the module.
       target_backend: target backend to compile for.
-      driver: driver to run the module with.
+      driver: driver to run the module with. This can be omitted to test only
+          compilation, but consider omiting the driver as a hacky abuse of the
+          rule since compilation on its own not use iree-check-module.
       compiler_flags: additional flags to pass to the compiler. Bytecode translation and backend
           flags are passed automatically.
       runner_args: additional runner_args to pass to the underlying iree-check-module tests. The
           driver and input file are passed automatically. To use different runner_args per test,
           create a separate suite or iree_check_test.
-      opt_tool: Defaulting to iree-opt. Tool used to preprocess the source files
-          if opt_flags is specified.
-      opt_flags: If specified, source files are preprocessed with OPT_TOOL with
-          these flags.
       target_cpu_features: currently unimplemented (must be empty), will eventually allow specifying target CPU features.
       tags: tags to apply to the generated tests. Note that as in standard test suites, manual
           is treated specially and will also apply to the test suite itself.
@@ -138,13 +131,15 @@ def iree_check_single_backend_test_suite(
             driver = driver,
             compiler_flags = compiler_flags,
             runner_args = runner_args,
-            opt_tool = opt_tool,
-            opt_flags = opt_flags,
             tags = tags,
             timeout = timeout,
             **kwargs
         )
         tests.append(test_name)
+
+    if not driver:
+        return
+
     native.test_suite(
         name = name,
         tests = tests,
@@ -163,8 +158,6 @@ def iree_check_test_suite(
         target_backends_and_drivers = ALL_TARGET_BACKENDS_AND_DRIVERS,
         compiler_flags = [],
         runner_args = [],
-        opt_tool = "//iree/tools:iree-opt",
-        opt_flags = [],
         tags = [],
         target_cpu_features_variants = [],
         **kwargs):
@@ -181,10 +174,6 @@ def iree_check_test_suite(
       runner_args: additional runner_args to pass to the underlying iree-check-module tests. The
           driver and input file are passed automatically. To use different runner_args per test,
           create a separate suite or iree_check_test.
-      opt_tool: Defaulting to iree-opt. Tool used to preprocess the source files
-          if opt_flags is specified.
-      opt_flags: If specified, source files are preprocessed with OPT_TOOL with
-          these flags.
       tags: tags to apply to the generated tests. Note that as in standard test suites, manual
           is treated specially and will also apply to the test suite itself.
       target_cpu_features_variants: list of target cpu features variants. Currently unimplemented, so each
@@ -212,8 +201,6 @@ def iree_check_test_suite(
             target_backend = backend,
             compiler_flags = compiler_flags,
             runner_args = runner_args,
-            opt_tool = opt_tool,
-            opt_flags = opt_flags,
             tags = tags,
             **kwargs
         )

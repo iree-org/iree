@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/Affine/Passes.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -23,13 +24,14 @@ namespace VM {
 
 void buildVMTransformPassPipeline(OpPassManager &passManager,
                                   TargetOptions targetOptions) {
-  passManager.addNestedPass<mlir::FuncOp>(createLoopCoalescingPass());
+  passManager.addNestedPass<mlir::func::FuncOp>(createLoopCoalescingPass());
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       createLoopInvariantCodeMotionPass());
-  passManager.addNestedPass<mlir::FuncOp>(createLoopInvariantCodeMotionPass());
+  passManager.addNestedPass<mlir::func::FuncOp>(
+      createLoopInvariantCodeMotionPass());
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       createConvertSCFToCFPass());
-  passManager.addNestedPass<mlir::FuncOp>(createConvertSCFToCFPass());
+  passManager.addNestedPass<mlir::func::FuncOp>(createConvertSCFToCFPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 

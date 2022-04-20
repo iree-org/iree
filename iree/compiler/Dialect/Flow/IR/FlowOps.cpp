@@ -14,8 +14,10 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -60,12 +62,90 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
   return success();
 }
 
+// Gets the dropped dimensions for `flow.dispatch.tensor.load/store`.
+static llvm::SmallBitVector getDroppedDimsImpl(
+    RankedTensorType slicedObjectType, ArrayRef<OpFoldResult> mixedSizes) {
+  ArrayRef<int64_t> resultShape = slicedObjectType.getShape();
+  llvm::SmallBitVector droppedDims(mixedSizes.size());
+  unsigned shapePos = 0;
+  for (const auto &size : enumerate(mixedSizes)) {
+    Optional<int64_t> sizeVal = getConstantIntValue(size.value());
+    // If the size is not 1, or if the current matched dimension of the result
+    // is the same static shape as the size value (which is 1), then the
+    // dimension is preserved.
+    if (!sizeVal || sizeVal.getValue() != 1 ||
+        (shapePos < resultShape.size() && resultShape[shapePos] == 1)) {
+      shapePos++;
+      continue;
+    }
+    droppedDims.set(size.index());
+  }
+  return droppedDims;
+}
+
+/// Helper function to create `AffineExpr` from `OpFoldResult`. If the
+/// `OpFoldResult` is a `Value`, creates a `AffineSymbolExpr` and appends it to
+/// `symbols`.
+static AffineExpr getAffineExpr(OpFoldResult ofr, SmallVector<Value> &symbols) {
+  if (auto attr = ofr.dyn_cast<Attribute>()) {
+    return getAffineConstantExpr(attr.cast<IntegerAttr>().getInt(),
+                                 attr.getContext());
+  }
+  Value v = ofr.get<Value>();
+  AffineExpr expr = getAffineSymbolExpr(symbols.size(), v.getContext());
+  symbols.push_back(v);
+  return expr;
+}
+/// Converts an `AffineExpr` to `OpFoldResult` by generating an `affine.apply`
+/// operation.
+static OpFoldResult getOpFoldResult(OpBuilder &builder, Location loc,
+                                    AffineExpr expr,
+                                    SmallVector<Value> &symbols) {
+  AffineMap m = AffineMap::get(0, symbols.size(), expr);
+  return applyMapToValues(builder, loc, m, symbols)[0];
+}
+
+/// Methods to build the Affine Expr for arithmetic operations.
+static AffineExpr add(AffineExpr expr, OpFoldResult ofr,
+                      SmallVector<Value> &symbols) {
+  return expr + getAffineExpr(ofr, symbols);
+}
+static AffineExpr add(OpFoldResult lhs, OpFoldResult rhs,
+                      SmallVector<Value> &symbols) {
+  return getAffineExpr(lhs, symbols) + getAffineExpr(rhs, symbols);
+}
+static AffineExpr mul(AffineExpr expr, OpFoldResult ofr,
+                      SmallVector<Value> &symbols) {
+  return expr * getAffineExpr(ofr, symbols);
+}
+static AffineExpr mul(OpFoldResult lhs, OpFoldResult rhs,
+                      SmallVector<Value> &symbols) {
+  return getAffineExpr(lhs, symbols) * getAffineExpr(rhs, symbols);
+}
+
+/// Returns the `hal.interface.binding` a value comes from.
+static Optional<BlockArgument> getBindingArgument(Value v) {
+  if (BlockArgument blockArg = v.dyn_cast<BlockArgument>()) {
+    if (isa<IREE::Flow::DispatchWorkgroupsOp>(
+            blockArg.getOwner()->getParentOp())) {
+      return blockArg;
+    }
+    return llvm::None;
+  }
+  Operation *definingOp = v.getDefiningOp();
+  if (auto loadOp = dyn_cast<IREE::Flow::DispatchTensorLoadOp>(definingOp)) {
+    return getBindingArgument(loadOp.source());
+  }
+  return llvm::None;
+}
+
 //===----------------------------------------------------------------------===//
 // flow.dispatch.tie_shape
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyDispatchTieShapeOp(DispatchTieShapeOp op) {
-  if (failed(verifyOpDynamicDims(op, {op.operand()}, op.dynamic_dims()))) {
+LogicalResult DispatchTieShapeOp::verify() {
+  if (failed(
+          verifyOpDynamicDims(getOperation(), {operand()}, dynamic_dims()))) {
     return failure();
   }
   return success();
@@ -91,8 +171,8 @@ LogicalResult DispatchTieShapeOp::reifyResultShapes(
 // flow.dispatch.tensor.load
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyDispatchTensorLoadOp(DispatchTensorLoadOp op) {
-  if (failed(verifyOpDynamicDims(op, {op.source()}, op.source_dims()))) {
+LogicalResult DispatchTensorLoadOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {source()}, source_dims()))) {
     return failure();
   }
   return success();
@@ -185,6 +265,10 @@ RankedTensorType DispatchTensorLoadOp::inferResultType(
   return RankedTensorType::get(shape, sourceType.getElementType());
 }
 
+llvm::SmallBitVector DispatchTensorLoadOp::getDroppedDims() {
+  return getDroppedDimsImpl(getType(), getMixedSizes());
+}
+
 void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
                                  RankedTensorType returnType, Value source,
                                  ValueRange sourceDynamicDims,
@@ -271,8 +355,8 @@ LogicalResult DispatchTensorLoadOp::reifyResultShapes(
 // flow.dispatch.tensor.store
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyDispatchTensorStoreOp(DispatchTensorStoreOp op) {
-  if (failed(verifyOpDynamicDims(op, {op.target()}, op.target_dims()))) {
+LogicalResult DispatchTensorStoreOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {target()}, target_dims()))) {
     return failure();
   }
   return success();
@@ -311,6 +395,11 @@ void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
         builder.getI64ArrayAttr(staticSizes),
         builder.getI64ArrayAttr(staticStrides));
   state.addAttributes(attributes);
+}
+
+llvm::SmallBitVector DispatchTensorStoreOp::getDroppedDims() {
+  return getDroppedDimsImpl(value().getType().cast<RankedTensorType>(),
+                            getMixedSizes());
 }
 
 //===----------------------------------------------------------------------===//
@@ -387,7 +476,7 @@ static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
                                               TypeRange operandTypes,
                                               TypeRange resultTypes,
                                               Region &body) {
-  SmallVector<OpAsmParser::OperandType> regionArgs;
+  SmallVector<OpAsmParser::UnresolvedOperand> regionArgs;
   SmallVector<Type> regionArgTypes;
   if (failed(parser.parseLParen())) {
     return failure();
@@ -425,30 +514,31 @@ static void printDispatchWorkgroupBody(OpAsmPrinter &p, Operation *op,
                 /*printBlockTerminators=*/true);
 }
 
-static LogicalResult verifyDispatchWorkgroupsOp(DispatchWorkgroupsOp op) {
-  if (op.workgroup_count().empty()) {
-    return op.emitOpError() << "at least one workgroup dimension is required";
+LogicalResult DispatchWorkgroupsOp::verify() {
+  Operation *op = getOperation();
+  if (workgroup_count().empty()) {
+    return op->emitOpError() << "at least one workgroup dimension is required";
   }
 
-  if (failed(verifyOpDynamicDims(op, op.operands(), op.operand_dims())) ||
-      failed(verifyOpDynamicDims(op, op.results(), op.result_dims()))) {
+  if (failed(verifyOpDynamicDims(getOperation(), operands(), operand_dims())) ||
+      failed(verifyOpDynamicDims(getOperation(), results(), result_dims()))) {
     return failure();
   }
 
   auto verifyIOType = [&](Type type) -> LogicalResult {
     if (auto shapedType = type.dyn_cast<ShapedType>()) {
       if (shapedType.getElementType().isIndex()) {
-        return op.emitOpError() << "I/O type " << type
-                                << " is invalid: index types must not cross "
-                                   "the dispatch boundary";
+        return op->emitOpError() << "I/O type " << type
+                                 << " is invalid: index types must not cross "
+                                    "the dispatch boundary";
       }
     }
     return success();
   };
-  for (auto type : op.getOperandTypes()) {
+  for (auto type : getOperandTypes()) {
     if (failed(verifyIOType(type))) return failure();
   }
-  for (auto type : op.getResultTypes()) {
+  for (auto type : getResultTypes()) {
     if (failed(verifyIOType(type))) return failure();
   }
 
@@ -644,15 +734,13 @@ void DispatchWorkgroupSizeOp::getAsmResultNames(
                                               result(), setNameFn);
 }
 
-template <typename T>
-static LogicalResult verifyDispatchWorkgroupInfoOp(T op) {
+LogicalResult verifyDispatchWorkgroupInfoOp(Operation *op, uint64_t dimension) {
   size_t dimCount = 0;
-  if (auto dispatchOp = op->template getParentOfType<DispatchWorkgroupsOp>()) {
+  if (auto dispatchOp = op->getParentOfType<DispatchWorkgroupsOp>()) {
     dimCount = dispatchOp.workgroup_count().size();
   }
-  uint64_t dimension = op.dimension().getZExtValue();
   if (dimCount != 0 && (dimension < 0 || dimension >= dimCount)) {
-    return op.emitOpError()
+    return op->emitOpError()
            << "dimension " << dimension
            << " out of bounds of dispatch dimensions; expected [0, "
            << (dimCount - 1) << ")";
@@ -671,7 +759,7 @@ void ExecutableOp::build(OpBuilder &builder, OperationState &state,
                      builder.getStringAttr(name));
 }
 
-static LogicalResult verifyExecutableOp(ExecutableOp op) {
+LogicalResult ExecutableOp::verify() {
   // TODO(benvanik): check export name conflicts.
   return success();
 }
@@ -778,12 +866,13 @@ FunctionType DispatchOp::getEntryPointType() {
   return FunctionType::get(getContext(), argTypes, getResultTypes());
 }
 
-static LogicalResult verifyDispatchOp(DispatchOp op) {
-  if (op.workgroup_count().empty()) {
-    return op.emitOpError() << "at least one workgroup dimension is required";
+LogicalResult DispatchOp::verify() {
+  Operation *op = getOperation();
+  if (workgroup_count().empty()) {
+    return op->emitOpError() << "at least one workgroup dimension is required";
   }
-  if (failed(verifyOpDynamicDims(op, op.operands(), op.operand_dims())) ||
-      failed(verifyOpDynamicDims(op, op.results(), op.result_dims()))) {
+  if (failed(verifyOpDynamicDims(op, operands(), operand_dims())) ||
+      failed(verifyOpDynamicDims(op, results(), result_dims()))) {
     return failure();
   }
   return success();
@@ -794,11 +883,81 @@ std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
 }
 
 //===----------------------------------------------------------------------===//
+// flow.tensor.clone
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorCloneOp::verify() {
+  if (failed(
+          verifyOpDynamicDims(getOperation(), {operand()}, operand_dims())) ||
+      failed(verifyOpDynamicDims(getOperation(), {result()}, operand_dims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.empty
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorEmptyOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {result()}, result_dims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.load
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorLoadOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {source()}, source_dims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.slice
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorSliceOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {source()}, source_dims())) ||
+      failed(verifyOpDynamicDims(getOperation(), {result()}, result_dims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.splat
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorSplatOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {result()}, result_dims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.store
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorStoreOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {target()}, target_dims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // flow.tensor.tie_shape
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyTensorTieShapeOp(TensorTieShapeOp op) {
-  if (failed(verifyOpDynamicDims(op, {op.operand()}, op.dynamic_dims()))) {
+LogicalResult TensorTieShapeOp::verify() {
+  if (failed(
+          verifyOpDynamicDims(getOperation(), {operand()}, dynamic_dims()))) {
     return failure();
   }
   return success();
@@ -823,6 +982,15 @@ LogicalResult TensorTieShapeOp::reifyResultShapes(
 //===----------------------------------------------------------------------===//
 // flow.tensor.reshape
 //===----------------------------------------------------------------------===//
+
+LogicalResult TensorReshapeOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {source()}, source_dims())) ||
+      failed(
+          verifyOpDynamicDims(getOperation(), {result()}, {result_dims()}))) {
+    return failure();
+  }
+  return success();
+}
 
 Value TensorReshapeOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(source());
@@ -852,9 +1020,9 @@ void TensorUpdateOp::build(OpBuilder &builder, OperationState &state,
         update, updateDims, builder.getIndexArrayAttr({0}));
 }
 
-static LogicalResult verifyTensorUpdateOp(TensorUpdateOp op) {
-  if (failed(verifyOpDynamicDims(op, {op.update()}, op.update_dims())) ||
-      failed(verifyOpDynamicDims(op, {op.target()}, op.target_dims()))) {
+LogicalResult TensorUpdateOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {update()}, update_dims())) ||
+      failed(verifyOpDynamicDims(getOperation(), {target()}, target_dims()))) {
     return failure();
   }
   return success();
@@ -877,9 +1045,140 @@ SmallVector<int64_t, 4> TensorUpdateOp::getTiedResultOperandIndices() {
 // Public methods
 //===----------------------------------------------------------------------===//
 
+// Returns the offsets, sizes and strides to use when combining two operations
+// that implement the `OffsetSizeAndStrideOpInterface`.
+LogicalResult foldOffsetsSizesAndStrides(
+    OpBuilder &builder, Location loc, OffsetSizeAndStrideOpInterface producer,
+    OffsetSizeAndStrideOpInterface consumer,
+    const llvm::SmallBitVector &droppedProducerDims,
+    SmallVector<OpFoldResult> &combinedOffsets,
+    SmallVector<OpFoldResult> &combinedSizes,
+    SmallVector<OpFoldResult> &combinedStrides) {
+  SmallVector<OpFoldResult> consumerOffsets = consumer.getMixedOffsets();
+  SmallVector<OpFoldResult> consumerSizes = consumer.getMixedSizes();
+  SmallVector<OpFoldResult> consumerStrides = consumer.getMixedStrides();
+  SmallVector<OpFoldResult> producerOffsets = producer.getMixedOffsets();
+  SmallVector<OpFoldResult> producerSizes = producer.getMixedSizes();
+  SmallVector<OpFoldResult> producerStrides = producer.getMixedStrides();
+
+  combinedOffsets.resize(producerOffsets.size());
+  combinedSizes.resize(producerOffsets.size());
+  combinedStrides.resize(producerOffsets.size());
+  unsigned consumerPos = 0;
+  for (auto i : llvm::seq<unsigned>(0, producerOffsets.size())) {
+    if (droppedProducerDims.test(i)) {
+      // For dropped dims, get the values from the producer.
+      combinedOffsets[i] = producerOffsets[i];
+      combinedSizes[i] = producerSizes[i];
+      combinedStrides[i] = producerStrides[i];
+      continue;
+    }
+    SmallVector<Value> offsetSymbols, strideSymbols;
+    // The combined offset is computed as
+    //    producer_offset + consumer_offset * producer_strides.
+    combinedOffsets[i] =
+        getOpFoldResult(builder, loc,
+                        add(mul(consumerOffsets[consumerPos],
+                                producerStrides[i], offsetSymbols),
+                            producerOffsets[i], offsetSymbols),
+                        offsetSymbols);
+    combinedSizes[i] = consumerSizes[consumerPos];
+    // The combined stride is computed as
+    //    consumer_stride * producer_stride.
+    combinedStrides[i] = getOpFoldResult(
+        builder, loc,
+        mul(consumerStrides[consumerPos], producerStrides[i], strideSymbols),
+        strideSymbols);
+    consumerPos++;
+  }
+  return success();
+}
+
+/// Pattern to fold `flow.dispatch.tensor.load` -> `tensor.extract_slice`.
+// TODO(ravishankarm): Eventually this should go in as a canonicalization at the
+// Flow level.
+struct FoldTensorLoadWithExtractSlice
+    : OpRewritePattern<tensor::ExtractSliceOp> {
+  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
+                                PatternRewriter &rewriter) const override {
+    auto dispatchTensorLoadOp =
+        extractSliceOp.source()
+            .getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+    if (!dispatchTensorLoadOp) return failure();
+
+    SmallVector<OpFoldResult> offsets, sizes, strides;
+    // `tensor.extract_slice` (i.e. the producer) folds **into**
+    // `flow.dispatch.tensor.load1 (i.e. the consumer).
+    if (failed(foldOffsetsSizesAndStrides(
+            rewriter, dispatchTensorLoadOp->getLoc(), dispatchTensorLoadOp,
+            extractSliceOp, dispatchTensorLoadOp.getDroppedDims(), offsets,
+            sizes, strides))) {
+      return failure();
+    }
+
+    rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
+        extractSliceOp, extractSliceOp.getType(), dispatchTensorLoadOp.source(),
+        dispatchTensorLoadOp.source_dims(), offsets, sizes, strides);
+    return success();
+  }
+};
+
+/// Pattern to fold `tensor.insert_slice` with `flow.dispatch.tensor.store`
+/// oeprations.
+// TODO(ravishankarm): Eventually this should go in as a canonicalization at the
+// Flow level.
+struct FoldInsertSliceWithTensorStoreOp
+    : OpRewritePattern<IREE::Flow::DispatchTensorStoreOp> {
+  using OpRewritePattern<IREE::Flow::DispatchTensorStoreOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(
+      IREE::Flow::DispatchTensorStoreOp dispatchTensorStoreOp,
+      PatternRewriter &rewriter) const override {
+    auto insertSliceOp =
+        dispatchTensorStoreOp.value().getDefiningOp<tensor::InsertSliceOp>();
+    if (!insertSliceOp) return failure();
+
+    // Check that the `dest` of the `tensor.insert_slice` and target of the
+    // `flow.dispatch.tensor.store` are the same interface binding.
+    Optional<BlockArgument> destBinding =
+        getBindingArgument(insertSliceOp.dest());
+    Optional<BlockArgument> targetBinding =
+        getBindingArgument(dispatchTensorStoreOp.target());
+    if (!destBinding || !targetBinding ||
+        destBinding.getValue() != targetBinding.getValue()) {
+      return failure();
+    }
+
+    SmallVector<OpFoldResult> offsets, sizes, strides;
+    // `tensor.insert_slice` (i.e. the producer) folds **into**
+    // `flow.dispatch.tensor.store` (i.e. the consumer).
+    if (failed(foldOffsetsSizesAndStrides(
+            rewriter, dispatchTensorStoreOp->getLoc(), dispatchTensorStoreOp,
+            insertSliceOp, dispatchTensorStoreOp.getDroppedDims(), offsets,
+            sizes, strides))) {
+      return failure();
+    }
+
+    rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
+        dispatchTensorStoreOp, insertSliceOp.source(),
+        dispatchTensorStoreOp.target(), dispatchTensorStoreOp.target_dims(),
+        offsets, sizes, strides);
+    return success();
+  }
+};
+
 void populateFlowDispatchCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
   DispatchTensorLoadOp::getCanonicalizationPatterns(results, context);
+}
+
+void populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
+    mlir::RewritePatternSet &patterns, MLIRContext *context) {
+  patterns
+      .insert<FoldTensorLoadWithExtractSlice, FoldInsertSliceWithTensorStoreOp>(
+          context);
 }
 
 }  // namespace Flow

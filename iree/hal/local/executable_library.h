@@ -87,12 +87,12 @@ typedef struct iree_hal_executable_environment_v0_t
 // or some semantic versioning we track in whatever spec we end up having.
 typedef uint32_t iree_hal_executable_library_version_t;
 
-#define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_1 0x00000001u
+#define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_2 0x00000002u
 
 // The latest version of the library API; can be used to populate the
 // iree_hal_executable_library_header_t::version when building libraries.
 #define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST \
-  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_1
+  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_2
 
 // A header present at the top of all versions of the library API used by the
 // runtime to ensure version compatibility.
@@ -284,10 +284,15 @@ typedef struct iree_hal_executable_dispatch_state_v0_t {
   uint32_t workgroup_count_y;
   uint16_t workgroup_count_z;
 
+  // Estimated maximum concurrent workgroups; loosely maps to the number of
+  // processors allowed to execute the dispatch. The actual number will vary
+  // based on competing dispatches and dynamic executor configuration.
+  uint8_t max_concurrency;
+
   // Total number of binding base pointers in |binding_ptrs| and
   // |binding_lengths|. The set is packed densely based on which bindings are
   // used (known at compile-time).
-  uint16_t binding_count;
+  uint8_t binding_count;
 
   // |push_constant_count| values.
   const uint32_t* push_constants;

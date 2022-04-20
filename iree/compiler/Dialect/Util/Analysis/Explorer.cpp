@@ -32,11 +32,10 @@ static llvm::Optional<unsigned> mapSuccessorOperand(BranchOpInterface branchOp,
                                                     unsigned operandIdx) {
   // I don't know if there's a better way to do this - the interface doesn't
   // help.
-  auto successorOperands = branchOp.getSuccessorOperands(successorIdx);
-  if (!successorOperands.hasValue()) return llvm::None;
-  auto &operandRange = successorOperands.getValue();
+  auto operandRange = branchOp.getSuccessorOperands(successorIdx);
   if (operandRange.empty()) return llvm::None;
-  unsigned beginIdx = operandRange.getBeginOperandIndex();
+  unsigned beginIdx =
+      operandRange.getForwardedOperands().getBeginOperandIndex();
   if (operandIdx >= beginIdx && operandIdx < beginIdx + operandRange.size()) {
     // Covered.
     return {operandIdx - beginIdx};
@@ -496,9 +495,9 @@ TraversalResult Explorer::walkIncomingBranchOperands(
     // successors and one or more may end up in our target block.
     for (unsigned i = 0; i < sourceBlock->getNumSuccessors(); ++i) {
       if (sourceBlock->getSuccessor(i) == targetBlock) {
-        auto operandRange = branchOp.getSuccessorOperands(i);
-        if (!operandRange.hasValue()) continue;
-        if (fn(sourceBlock, operandRange.getValue()).wasInterrupted()) {
+        auto operandRange =
+            branchOp.getSuccessorOperands(i).getForwardedOperands();
+        if (fn(sourceBlock, operandRange).wasInterrupted()) {
           return result;
         }
       }

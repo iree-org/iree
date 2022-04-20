@@ -93,8 +93,9 @@ Attribute parseTargetAttr(DialectAsmParser &parser) {
     StringRef errorKeyword;
 
     auto processExtension = [&](llvm::SMLoc loc, StringRef extension) {
-      if (symbolizeExtension(extension)) {
-        extensions.push_back(builder.getStringAttr(extension));
+      if (auto symbol = symbolizeExtension(extension)) {
+        extensions.push_back(builder.getI32IntegerAttr(
+            static_cast<uint32_t>(symbol.getValue())));
         return success();
       }
       return errorloc = loc, errorKeyword = extension, failure();
@@ -190,7 +191,8 @@ void print(TargetEnvAttr targetEnv, DialectAsmPrinter &printer) {
           << stringifyVersion(targetEnv.getVersion()) << ", r("
           << targetEnv.getRevision() << "), [";
   interleaveComma(targetEnv.getExtensionsAttr(), os, [&](Attribute attr) {
-    os << attr.cast<StringAttr>().getValue();
+    os << stringifyExtension(
+        *symbolizeExtension(attr.cast<IntegerAttr>().getInt()));
   });
   printer << "], " << spirv::stringifyVendor(targetEnv.getVendorID());
   printer << ":" << spirv::stringifyDeviceType(targetEnv.getDeviceType());
@@ -207,7 +209,7 @@ void VulkanDialect::printAttribute(Attribute attr,
   if (auto targetEnv = attr.dyn_cast<TargetEnvAttr>())
     print(targetEnv, printer);
   else
-    llvm_unreachable("unhandled Vulkan attribute kind");
+    assert(false && "unhandled Vulkan attribute kind");
 }
 
 }  // namespace Vulkan

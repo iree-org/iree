@@ -24,6 +24,7 @@ struct MemrefCopyOpToLinalg : public OpRewritePattern<memref::CopyOp> {
     Operation *linalgCopy =
         createLinalgCopyOp(rewriter, copyOp.getLoc(), copyOp.source(),
                            copyOp.target(), copyOp->getAttrs());
+    if (!linalgCopy) return failure();
     rewriter.replaceOp(copyOp, linalgCopy->getResults());
     return success();
   }
@@ -48,7 +49,7 @@ struct MemrefCopyToLinalgPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createMemrefCopyToLinalgPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createMemrefCopyToLinalgPass() {
   return std::make_unique<MemrefCopyToLinalgPass>();
 }
 

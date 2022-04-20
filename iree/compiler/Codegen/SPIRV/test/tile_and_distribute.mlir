@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute))))' %s | FileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-distribute))))' %s | FileCheck %s
 
 #map0 = affine_map<()[s0] -> (s0 * 8)>
 #map1 = affine_map<()[s0, s1] -> (8, s1 - s0 * 8)>
@@ -24,7 +24,7 @@ hal.executable private @matmul {
       translation_info = #translation
     }
     builtin.module {
-      func @matmul() {
+      func.func @matmul() {
         %c0 = arith.constant 0 : index
         %M = hal.interface.constant.load[0] : index
         %N = hal.interface.constant.load[1] : index
@@ -94,7 +94,7 @@ hal.executable private @conv_1d {
       translation_info = #translation
     }
     builtin.module {
-      func @conv_1d() {
+      func.func @conv_1d() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<3x6x1xf32>
@@ -102,7 +102,7 @@ hal.executable private @conv_1d {
         %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<3x1x1xf32>
         %3 = gpu.block_id x
         %4 = gpu.block_id y
-        %5 = gpu.block_id z 
+        %5 = gpu.block_id z
         %6 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%4]
         %7 = affine.min affine_map<()[s0] -> (6, s0 * -4 + 8)>()[%4]
         %8 = memref.subview %1[%5, %6, 0] [1, %7, 1] [1, 1, 1] : memref<3x8x1xf32> to memref<1x?x1xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 8 + s0 + d1 + d2)>>
@@ -174,7 +174,7 @@ hal.executable private @conv_2d {
       translation_info = #translation
     }
     builtin.module {
-      func @conv_2d() {
+      func.func @conv_2d() {
         %c0 = arith.constant 0 : index
         %n = hal.interface.constant.load[0] : index
         %oh = hal.interface.constant.load[1] : index
@@ -200,7 +200,7 @@ hal.executable private @conv_2d {
         %6 = gpu.grid_dim x
         %7 = gpu.block_id y
         %8 = gpu.grid_dim y
-        %9 = gpu.block_id z 
+        %9 = gpu.block_id z
         %10 = gpu.grid_dim z
         %11 = affine.apply #map0()[%7]
         %12 = affine.apply #map0()[%8]
@@ -289,7 +289,7 @@ hal.executable private @conv_3d {
       translation_info = #translation
     }
     builtin.module {
-      func @conv_3d() {
+      func.func @conv_3d() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<2x7x7x7x2xf32>
@@ -297,7 +297,7 @@ hal.executable private @conv_3d {
         %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<2x2x2x3x2xf32>
         %3 = gpu.block_id x
         %4 = gpu.block_id y
-        %5 = gpu.block_id z 
+        %5 = gpu.block_id z
         %6 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%4]
         %7 = affine.min affine_map<()[s0] -> (5, s0 * -4 + 8)>()[%4]
         %8 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%3]
@@ -360,7 +360,7 @@ module  {
         translation_info = #translation
       }
       builtin.module {
-        func @pooling_nhwc_max() {
+        func.func @pooling_nhwc_max() {
           %c0 = arith.constant 0 : index
           %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2x16x16x6xf32>
           %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<3x4xf32>
@@ -407,3 +407,74 @@ module  {
 //         CHECK:         linalg.pooling_nhwc_max
 //    CHECK-SAME:           ins(%[[IN]], %[[ARG1]]
 //    CHECK-SAME:           outs(%[[OUT]]
+
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[32], [1]]>
+#translation = #iree_codegen.translation_info<SPIRVDistribute, workload_per_wg = [32]>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+
+hal.executable @matvec {
+  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
+    hal.executable.entry_point public @matvec ordinal(0) layout(#executable_layout) {
+      workgroup_size = [32: index, 1: index, 1: index],
+      translation_info = #translation
+    }
+    builtin.module {
+      func.func @matvec() {
+        %c250 = arith.constant 250 : index
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<250x1024xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<1024xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : memref<250xf32>
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %3 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_x]
+        %4 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_count_x]
+        scf.for %arg0 = %3 to %c250 step %4 {
+          %5 = affine.min affine_map<(d0) -> (-d0 + 250, 32)>(%arg0)
+          %6 = memref.subview %0[%arg0, 0] [%5, 1024] [1, 1] : memref<250x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+          %7 = memref.subview %2[%arg0] [%5] [1] : memref<250xf32> to memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>
+          linalg.fill {lowering_config = #config}
+            ins(%cst : f32)
+            outs(%7 : memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>)
+          linalg.matvec {lowering_config = #config}
+            ins(%6, %1 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024xf32>)
+            outs(%7 : memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>)
+        }
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: func @matvec()
+//       CHECK:   %[[A:.+]] = hal.interface.binding.subspan {{.+}} : memref<250x1024xf32>
+//       CHECK:   %[[B:.+]] = hal.interface.binding.subspan {{.+}} : memref<1024xf32>
+//       CHECK:   %[[C:.+]] = hal.interface.binding.subspan {{.+}} : memref<250xf32>
+//       CHECK:   scf.for
+//       CHECK:     %[[UB:.+]] = affine.min
+//       CHECK:     %[[AVIEW:.+]] = memref.subview %[[A]]
+//       CHECK:     %[[CVIEW:.+]] = memref.subview %[[C]]
+//       CHECK:     %[[IDX:.+]] = gpu.thread_id  x
+//       CHECK:     %[[DIMX:.+]] = gpu.block_dim  x
+//       CHECK:     scf.for %[[IV:.+]] = %[[IDX]] to %[[UB]] step %[[DIMX]]
+//       CHECK:       %[[OUTPUT:.+]] = memref.subview %[[CVIEW]][%[[IV]]] [1] [1]
+//       CHECK:       linalg.fill
+//  CHECK-SAME:         outs(%[[OUTPUT]] : memref<1xf32, #map3>)
+//       CHECK:     %[[IDX:.+]] = gpu.thread_id  x
+//       CHECK:     %[[DIMX:.+]] = gpu.block_dim  x
+//       CHECK:     scf.for %[[IV:.+]] = %[[IDX]] to %[[UB]] step %[[DIMX]]
+//       CHECK:       %[[INPUT:.+]] = memref.subview %[[AVIEW]][%[[IV]], 0] [1, 1024] [1, 1]
+//       CHECK:       %[[OUTPUT:.+]] = memref.subview %[[CVIEW]][%[[IV]]] [1] [1]
+//       CHECK:       linalg.matvec
+//  CHECK-SAME:         ins(%[[INPUT]], %[[B]] : memref<1x1024xf32, #map2>, memref<1024xf32>
+//  CHECK-SAME:         outs(%[[OUTPUT]] : memref<1xf32, #map3>)
+

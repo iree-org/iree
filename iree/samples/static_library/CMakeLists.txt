@@ -10,29 +10,29 @@ if(NOT ${IREE_TARGET_BACKEND_DYLIB_LLVM_AOT}
   return()
 endif()
 
-# Set iree-translate binary.
-set(_TRANSLATE_TOOL_EXECUTABLE $<TARGET_FILE:iree_tools_iree-translate>)
+# Set iree-compile binary.
+set(_COMPILE_TOOL_EXECUTABLE $<TARGET_FILE:iree_tools_iree-compile>)
 
 ## Example with VM bytecode module.
-# Setup args for iree-translate.
-set(_TRANSLATE_ARGS)
-list(APPEND _TRANSLATE_ARGS "-iree-mlir-to-vm-bytecode-module")
-list(APPEND _TRANSLATE_ARGS "-iree-hal-target-backends=dylib-llvm-aot")
-list(APPEND _TRANSLATE_ARGS "-iree-llvm-link-embedded=false")
-list(APPEND _TRANSLATE_ARGS "-iree-llvm-link-static")
-list(APPEND _TRANSLATE_ARGS "-iree-llvm-static-library-output-path=simple_mul.o")
-list(APPEND _TRANSLATE_ARGS "${CMAKE_CURRENT_SOURCE_DIR}/simple_mul.mlir")
-list(APPEND _TRANSLATE_ARGS "-o")
-list(APPEND _TRANSLATE_ARGS "simple_mul.vmfb")
+# Setup args for iree-compile.
+set(_COMPILE_ARGS)
+list(APPEND _COMPILE_ARGS "-iree-mlir-to-vm-bytecode-module")
+list(APPEND _COMPILE_ARGS "-iree-hal-target-backends=dylib-llvm-aot")
+list(APPEND _COMPILE_ARGS "-iree-llvm-link-embedded=false")
+list(APPEND _COMPILE_ARGS "-iree-llvm-link-static")
+list(APPEND _COMPILE_ARGS "-iree-llvm-static-library-output-path=simple_mul.o")
+list(APPEND _COMPILE_ARGS "${CMAKE_CURRENT_SOURCE_DIR}/simple_mul.mlir")
+list(APPEND _COMPILE_ARGS "-o")
+list(APPEND _COMPILE_ARGS "simple_mul.vmfb")
 
-# Custom command for iree-translate to generate static library and bytecode.
+# Custom command for iree-compile to generate static library and bytecode.
 add_custom_command(
   OUTPUT
     ${CMAKE_CURRENT_BINARY_DIR}/simple_mul.h
     ${CMAKE_CURRENT_BINARY_DIR}/simple_mul.o
     ${CMAKE_CURRENT_BINARY_DIR}/simple_mul.vmfb
-  COMMAND ${_TRANSLATE_TOOL_EXECUTABLE} ${_TRANSLATE_ARGS}
-  DEPENDS ${_TRANSLATE_TOOL_EXECUTABLE} "simple_mul.mlir"
+  COMMAND ${_COMPILE_TOOL_EXECUTABLE} ${_COMPILE_ARGS}
+  DEPENDS ${_COMPILE_TOOL_EXECUTABLE} "simple_mul.mlir"
 )
 
 # Tell cmake about the simple_mul library so it will link it.
@@ -46,7 +46,7 @@ SET_TARGET_PROPERTIES(
   LINKER_LANGUAGE C)
 
 # Note: If you're cross compiling the simple_mul for a different backend, you'll
-# need to run iree-translate manually to produce the desired '.vmfb' and '.h/.o'
+# need to run iree-compile manually to produce the desired '.vmfb' and '.h/.o'
 # files. Substitute the 'simple_mul' dependency in iree_cc_binary() below with
 # your own static library and the `simple_mul.vmfb` in the iree_c_embed_data()
 # rule. You can use paths to files, i.e. 'path/to/generated/output.vmfb' in
@@ -100,25 +100,25 @@ if(NOT (${IREE_ENABLE_EMITC} OR DEFINED IREE_HOST_BINARY_ROOT))
 endif()
 
 ## Example with VM C module.
-# Setup args for iree-translate.
-set(_TRANSLATE_ARGS)
-list(APPEND _TRANSLATE_ARGS "-iree-mlir-to-vm-c-module")
-list(APPEND _TRANSLATE_ARGS "-iree-hal-target-backends=dylib-llvm-aot")
-list(APPEND _TRANSLATE_ARGS "-iree-llvm-link-embedded=false")
-list(APPEND _TRANSLATE_ARGS "-iree-llvm-link-static")
-list(APPEND _TRANSLATE_ARGS "-iree-llvm-static-library-output-path=simple_mul_c_module.o")
-list(APPEND _TRANSLATE_ARGS "${CMAKE_CURRENT_SOURCE_DIR}/simple_mul.mlir")
-list(APPEND _TRANSLATE_ARGS "-o")
-list(APPEND _TRANSLATE_ARGS "simple_mul_emitc.h")
+# Setup args for iree-compile.
+set(_COMPILE_ARGS)
+list(APPEND _COMPILE_ARGS "-iree-mlir-to-vm-c-module")
+list(APPEND _COMPILE_ARGS "-iree-hal-target-backends=dylib-llvm-aot")
+list(APPEND _COMPILE_ARGS "-iree-llvm-link-embedded=false")
+list(APPEND _COMPILE_ARGS "-iree-llvm-link-static")
+list(APPEND _COMPILE_ARGS "-iree-llvm-static-library-output-path=simple_mul_c_module.o")
+list(APPEND _COMPILE_ARGS "${CMAKE_CURRENT_SOURCE_DIR}/simple_mul.mlir")
+list(APPEND _COMPILE_ARGS "-o")
+list(APPEND _COMPILE_ARGS "simple_mul_emitc.h")
 
-# Custom command for iree-translate to generate static library and C module.
+# Custom command for iree-compile to generate static library and C module.
 add_custom_command(
   OUTPUT
     ${CMAKE_CURRENT_BINARY_DIR}/simple_mul_c_module.h
     ${CMAKE_CURRENT_BINARY_DIR}/simple_mul_c_module.o
     ${CMAKE_CURRENT_BINARY_DIR}/simple_mul_emitc.h
-  COMMAND ${_TRANSLATE_TOOL_EXECUTABLE} ${_TRANSLATE_ARGS}
-  DEPENDS ${_TRANSLATE_TOOL_EXECUTABLE} "simple_mul.mlir"
+  COMMAND ${_COMPILE_TOOL_EXECUTABLE} ${_COMPILE_ARGS}
+  DEPENDS ${_COMPILE_TOOL_EXECUTABLE} "simple_mul.mlir"
 )
 
 # TODO(marbre): Cleanup custom targets and libraries.

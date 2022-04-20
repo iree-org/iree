@@ -238,7 +238,7 @@ struct LinalgFillTypePropagation
     if (outputType == legalizedOutputType) {
       return rewriter.notifyMatchFailure(fillOp, "op already legal");
     }
-    Value value = adaptor.value();
+    Value value = adaptor.inputs().front();
     Optional<Type> legalizedElementType =
         getLegalizedElementType(value.getType());
     if (!legalizedElementType) {
@@ -246,8 +246,8 @@ struct LinalgFillTypePropagation
     }
     Value legalizedValue = convertElementType(
         rewriter, fillOp->getLoc(), legalizedElementType.getValue(), value);
-    rewriter.replaceOpWithNewOp<linalg::FillOp>(fillOp, legalizedValue,
-                                                adaptor.output());
+    rewriter.replaceOpWithNewOp<linalg::FillOp>(
+        fillOp, ValueRange{legalizedValue}, ValueRange{adaptor.outputs()});
     return success();
   }
 };
@@ -312,7 +312,7 @@ struct LegalizeResultElementType : public ConversionPattern {
     for (unsigned i = 0, e = op->getNumRegions(); i != e; ++i) {
       state.addRegion();
     }
-    Operation *newOp = rewriter.createOperation(state);
+    Operation *newOp = rewriter.create(state);
 
     // Move all the regions from the old op to the new op and legalize its
     // signature.
@@ -379,7 +379,7 @@ struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createTypePropagationPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass() {
   return std::make_unique<TypePropagationPass>();
 }
 

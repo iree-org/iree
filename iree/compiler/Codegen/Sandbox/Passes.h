@@ -7,6 +7,7 @@
 #ifndef IREE_CODEGEN_SANDBOX_PASSES_H_
 #define IREE_CODEGEN_SANDBOX_PASSES_H_
 
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -18,17 +19,20 @@ struct LinalgFusePassOptions {
   SmallVector<int64_t> tileSizes = {};
   SmallVector<int64_t> tileInterchange = {};
   bool pad = false;
+  SmallVector<std::string> paddingValues = {};
+  SmallVector<int64_t> paddingDimensions = {};
   SmallVector<int64_t> packPaddings = {};
   SmallVector<int64_t> hoistPaddings = {};
   SmallVector<std::string> transposePaddings = {};
   bool vectorize = false;
   bool vectorizePadding = false;
   int64_t tilingLevel = -1;
+  bool doIREEDistribution = false;
 };
 
 /// Creates a pass to drive tile + fuse transformations of `LinalgOp`s.
-std::unique_ptr<OperationPass<FuncOp>> createLinalgFusePass();
-std::unique_ptr<OperationPass<FuncOp>> createLinalgFusePass(
+std::unique_ptr<OperationPass<func::FuncOp>> createLinalgFusePass();
+std::unique_ptr<OperationPass<func::FuncOp>> createLinalgFusePass(
     const LinalgFusePassOptions &options);
 
 /// Struct to control pass options for `LinalgSingleTilingExpert` pass.
@@ -39,6 +43,7 @@ struct LinalgSingleTilingExpertPassOptions {
   SmallVector<int64_t> tileInterchange = {};
   SmallVector<int64_t> peeledLoops = {};
   bool pad = false;
+  SmallVector<std::string> paddingValues = {};
   SmallVector<int64_t> packPaddings = {};
   SmallVector<int64_t> hoistPaddings = {};
   SmallVector<std::string> transposePaddings = {};
@@ -52,8 +57,9 @@ struct LinalgSingleTilingExpertPassOptions {
 };
 
 /// Creates a pass to drive one level tiling + vectorization of `LinalgOp`s.
-std::unique_ptr<OperationPass<FuncOp>> createLinalgSingleTilingExpertPass();
-std::unique_ptr<OperationPass<FuncOp>> createLinalgSingleTilingExpertPass(
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLinalgSingleTilingExpertPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createLinalgSingleTilingExpertPass(
     const LinalgSingleTilingExpertPassOptions &passOptions);
 
 /// Struct to control pass options for `LinalgVectorLoweringPass` pass.
@@ -70,20 +76,20 @@ struct LinalgVectorLoweringPassOptions {
 
 /// Creates a pass to drive the lowering of vector operations in a staged
 /// manner.
-std::unique_ptr<OperationPass<FuncOp>> createLinalgVectorLoweringPass(
+std::unique_ptr<OperationPass<func::FuncOp>> createLinalgVectorLoweringPass(
     int64_t vectorLoweringStage = 0);
-std::unique_ptr<OperationPass<FuncOp>> createLinalgVectorLoweringPass(
+std::unique_ptr<OperationPass<func::FuncOp>> createLinalgVectorLoweringPass(
     const LinalgVectorLoweringPassOptions &options);
 
 /// Create a pass to drive the unrolling of a single vector op.
-std::unique_ptr<OperationPass<FuncOp>> createUnrollOneVectorOpPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createUnrollOneVectorOpPass();
 
 /// Create a pass to drive the unrolling of a single parent loop of an op.
-std::unique_ptr<OperationPass<FuncOp>> createUnrollOneParentLoopPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createUnrollOneParentLoopPass();
 
 /// Create a pass to drive the outlining of the region of a single parent loop
 /// of an op.
-std::unique_ptr<OperationPass<FuncOp>> createOutlineOneParentLoopPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createOutlineOneParentLoopPass();
 
 //===----------------------------------------------------------------------===//
 // Transforms that tie together individual drivers.
@@ -103,13 +109,13 @@ namespace iree_compiler {
 /// Creates a pass to drive tile + fuse transformations of `LinalgOp`s with
 /// additional parameters that allow controlling the value of the pass options
 /// when building the pipeline.
-std::unique_ptr<OperationPass<FuncOp>> createLinalgFusePass(int64_t tilingLevel,
-                                                            bool vectorize);
+std::unique_ptr<OperationPass<func::FuncOp>> createLinalgFusePass(
+    int64_t tilingLevel, bool vectorize);
 
 /// Creates a pass to drive one level tiling + vectorization of `LinalgOp`s with
 /// additional parameters that allow controlling the value of the pass options
 /// when building the pipeline.
-std::unique_ptr<OperationPass<FuncOp>> createLinalgSingleTilingExpertPass(
+std::unique_ptr<OperationPass<func::FuncOp>> createLinalgSingleTilingExpertPass(
     int64_t tilingLevel, bool vectorize);
 
 //===----------------------------------------------------------------------===//

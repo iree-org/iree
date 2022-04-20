@@ -77,7 +77,7 @@ class ExecutableCreateOpConversion
 
     auto executableFormatString = detail::rewriteAttrToOperands(
         createOp.getLoc(), executableBinaryOp.formatAttr(),
-        importOp.getType().getInput(1), rewriter);
+        importOp.getFunctionType().getInput(1), rewriter);
     assert(executableFormatString.hasValue() &&
            executableFormatString.getValue().size() == 1);
     auto executableRodata =
@@ -103,7 +103,7 @@ class ExecutableCreateOpConversion
     };
     callOperands.append(adaptor.layouts().begin(), adaptor.layouts().end());
 
-    auto importType = importOp.getType();
+    auto importType = importOp.getFunctionType();
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(
         createOp, SymbolRefAttr::get(importOp), importType.getResults(),
         segmentSizes, importType.getInputs(), callOperands);

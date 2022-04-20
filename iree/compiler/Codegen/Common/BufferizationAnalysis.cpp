@@ -14,11 +14,13 @@
 #include "iree/compiler/Codegen/Common/BufferizationAnalysis.h"
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -66,7 +68,7 @@ static bool canUsersHandleSubviews(Operation *op) {
 
 /// Walks the use-def chain and see if this value comes from a read-only tensor.
 static bool isFromReadOnlyTensor(Value v, const BufferizationPlan &plan) {
-  auto definingOp = v.getDefiningOp();
+  Operation *definingOp = v.getDefiningOp();
   if (!definingOp) {
     auto arg = v.cast<BlockArgument>();
     return TypeSwitch<Operation *, bool>(arg.getOwner()->getParentOp())
@@ -79,22 +81,7 @@ static bool isFromReadOnlyTensor(Value v, const BufferizationPlan &plan) {
         })
         .Default([&](Operation *op) { return false; });
   }
-  return TypeSwitch<Operation *, bool>(definingOp)
-      .Case<arith::ConstantOp>(
-          [&](arith::ConstantOp constantOp) { return true; })
-      .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
-          [&](auto op) { return isFromReadOnlyTensor(op.src(), plan); })
-      .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
-        return isFromReadOnlyTensor(sliceOp.source(), plan);
-      })
-      .Case<IREE::Flow::DispatchTensorLoadOp>(
-          [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
-            return loadOp.source()
-                       .getType()
-                       .cast<IREE::Flow::DispatchTensorType>()
-                       .getAccess() == IREE::Flow::TensorAccess::ReadOnly;
-          })
-      .Default([&](Operation *op) { return false; });
+  return isReadOnly(v);
 }
 
 /// Adds the result of `std.constant` to its set (there is nothing to tie to
@@ -110,7 +97,7 @@ static LogicalResult analyseConstantOp(arith::ConstantOp constantOp,
 /// equivalence class as the source.
 static LogicalResult analyseInterfaceLoadTensorOp(
     IREE::Flow::DispatchTensorLoadOp loadOp, BufferizationPlan &plan) {
-  plan.unionSets(loadOp.result(), loadOp.source());
+  plan.unionSets(loadOp.getResult(), loadOp.source());
   return success();
 }
 
@@ -201,7 +188,7 @@ static LogicalResult analyseInterfaceBindingSubspanOp(
 static LogicalResult analysePadTensorOp(tensor::PadOp padTensorOp,
                                         BufferizationPlan &plan) {
   plan.insert(padTensorOp.source());
-  plan.insert(padTensorOp.result());
+  plan.insert(padTensorOp.getResult());
   return success();
 }
 
@@ -292,11 +279,11 @@ static LogicalResult analyseSubTensorOp(tensor::ExtractSliceOp subTensorOp,
                                         BufferizationPlan &plan) {
   if (!canUsersHandleSubviews(subTensorOp)) {
     plan.insert(subTensorOp.source());
-    plan.insert(subTensorOp.result());
+    plan.insert(subTensorOp.getResult());
     return success();
   }
   return analyseSingleOperandResultOp(subTensorOp.source(),
-                                      subTensorOp.result(), plan);
+                                      subTensorOp.getResult(), plan);
 }
 
 /// Adds the `dest` and `result` tensor of a subtensor insert operation into the
@@ -379,7 +366,7 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
       return insertSliceOp.dest();
     }
     if (auto transferWriteOp = dyn_cast<vector::TransferWriteOp>(op)) {
-      return transferWriteOp.source();
+      return transferWriteOp.getSource();
     }
     return nullptr;
   };
@@ -388,7 +375,7 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
       return extractSliceOp.source();
     }
     if (auto transferReadOp = dyn_cast<vector::TransferReadOp>(op)) {
-      return transferReadOp.source();
+      return transferReadOp.getSource();
     }
     return nullptr;
   };
@@ -449,7 +436,7 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
   // - insert_slice value and dest
   for (Operation *user : source.getUsers()) {
     if (auto extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(user)) {
-      plan.unionSets(extractSliceOp.source(), extractSliceOp.result());
+      plan.unionSets(extractSliceOp.source(), extractSliceOp.getResult());
       continue;
     }
     if (auto insertSliceOp = dyn_cast<tensor::InsertSliceOp>(user)) {
@@ -513,7 +500,7 @@ void BufferizationPlan::dump() {
   }
 }
 
-LogicalResult createTensorEquivalenceClasses(FuncOp funcOp,
+LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
                                              BufferizationPlan &plan) {
   auto bufferMappingFn = [&](Operation *op) -> WalkResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
@@ -545,7 +532,7 @@ LogicalResult createTensorEquivalenceClasses(FuncOp funcOp,
         .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
             [&](auto reshapeOp) {
               return analyseSingleOperandResultOp(reshapeOp.src(),
-                                                  reshapeOp.result(), plan);
+                                                  reshapeOp.getResult(), plan);
             })
         .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
           return analyseSubTensorOp(sliceOp, plan);
@@ -554,7 +541,8 @@ LogicalResult createTensorEquivalenceClasses(FuncOp funcOp,
             [&](tensor::InsertSliceOp subTensorInsertOp) {
               return analyseDestructiveUpdateOp(
                   subTensorInsertOp, subTensorInsertOp.source(),
-                  subTensorInsertOp.dest(), subTensorInsertOp.result(), plan);
+                  subTensorInsertOp.dest(), subTensorInsertOp.getResult(),
+                  plan);
             })
         .Case<tensor::CastOp>([&](tensor::CastOp castOp) {
           return analyseSingleOperandResultOp(castOp.source(), castOp.dest(),
@@ -562,31 +550,31 @@ LogicalResult createTensorEquivalenceClasses(FuncOp funcOp,
         })
         .Case<tensor::InsertOp>([&](tensor::InsertOp insertOp) {
           return analyseDestructiveUpdateOp(insertOp, /*source =*/nullptr,
-                                            insertOp.dest(), insertOp.result(),
-                                            plan);
+                                            insertOp.dest(),
+                                            insertOp.getResult(), plan);
         })
-        .Case<vector::TransferReadOp>(
-            [&](vector::TransferReadOp transferReadOp) {
-              if (transferReadOp.source().getType().isa<RankedTensorType>()) {
-                plan.insert(transferReadOp.source());
-              }
-              return success();
-            })
-        .Case<vector::TransferWriteOp>(
-            [&](vector::TransferWriteOp transferWriteOp) {
-              if (!transferWriteOp.result().getType().isa<RankedTensorType>()) {
-                return success();
-              }
-              return analyseDestructiveUpdateOp(transferWriteOp, nullptr,
-                                                transferWriteOp.source(),
-                                                transferWriteOp.result(), plan);
-            })
+        .Case<vector::TransferReadOp>([&](vector::TransferReadOp
+                                              transferReadOp) {
+          if (transferReadOp.getSource().getType().isa<RankedTensorType>()) {
+            plan.insert(transferReadOp.getSource());
+          }
+          return success();
+        })
+        .Case<vector::TransferWriteOp>([&](vector::TransferWriteOp
+                                               transferWriteOp) {
+          if (!transferWriteOp.getSource().getType().isa<RankedTensorType>()) {
+            return success();
+          }
+          return analyseDestructiveUpdateOp(transferWriteOp, nullptr,
+                                            transferWriteOp.getSource(),
+                                            transferWriteOp.getResult(), plan);
+        })
         .Case<scf::IfOp>(
             [&](scf::IfOp ifOp) { return analyseScfIfOp(ifOp, plan); })
         .Case<scf::ForOp>(
             [&](scf::ForOp forOp) { return analyseScfForOp(forOp, plan); })
         .Case<scf::YieldOp, linalg::InitTensorOp, tensor::DimOp,
-              tensor::ExtractOp, tensor::PadOp>(
+              tensor::ExtractOp, tensor::PadOp, bufferization::ToMemrefOp>(
             [&](Operation *op) { return success(); })
         .Default([&](Operation *op) -> LogicalResult {
           if (llvm::any_of(op->getOperands(),
@@ -614,8 +602,8 @@ LogicalResult createTensorEquivalenceClasses(FuncOp funcOp,
       return;
     }
     if (auto vectorWriteOp = dyn_cast<vector::TransferWriteOp>(updateOp)) {
-      if (vectorWriteOp.source().getType().isa<RankedTensorType>()) {
-        hasDestructiveUpdatePattern(vectorWriteOp.source(), plan);
+      if (vectorWriteOp.getSource().getType().isa<RankedTensorType>()) {
+        hasDestructiveUpdatePattern(vectorWriteOp.getSource(), plan);
       }
     }
   });

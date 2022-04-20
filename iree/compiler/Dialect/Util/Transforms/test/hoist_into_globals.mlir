@@ -4,7 +4,7 @@
 module @hoist_simple_const_expr {
   // CHECK: util.global private @[[HOISTED_SYM:.*]] : i32
   // CHECK: func @main
-  builtin.func @main() -> (i32) {
+  func.func @main() -> (i32) {
     %0 = arith.constant 0 : i32
     %1 = arith.constant 1 : i32
     // CHECK-NOT: arith.constant
@@ -33,7 +33,7 @@ module @hoist_simple_const_expr {
 // CHECK: return %[[VAL]]
 // CHECK-NOT: util.initializer
 module @do_not_hoist_variable_op {
-  builtin.func @main() -> (i32) {
+  func.func @main() -> (i32) {
     %0 = arith.constant 0 : i32
     %1 = arith.constant 1 : i32
     %2 = "iree_unregistered.var_expr"(%0, %1) : (i32, i32) -> i32
@@ -46,7 +46,7 @@ module @do_not_hoist_variable_op {
 // CHECK-NOT: util.global
 // CHECK-NOT: util.initializer
 module @do_not_hoist_variable_operands {
-  builtin.func @main(%arg0 : i32) -> (i32) {
+  func.func @main(%arg0 : i32) -> (i32) {
     %0 = arith.constant 0 : i32
     %2 = "iree_unregistered.const_expr"(%0, %arg0) : (i32, i32) -> i32
     return %2 : i32
@@ -58,7 +58,7 @@ module @do_not_hoist_variable_operands {
 // CHECK-NOT: util.global
 // CHECK-NOT: util.initializer
 module @do_not_hoist_sub_byte_aligned_scalar_leaf {
-  builtin.func @main() -> (i32) {
+  func.func @main() -> (i32) {
     %0 = arith.constant 1 : i1
     %2 = "iree_unregistered.var_expr"(%0) : (i1) -> i32
     return %2 : i32
@@ -70,7 +70,7 @@ module @do_not_hoist_sub_byte_aligned_scalar_leaf {
 // CHECK-NOT: util.global
 // CHECK-NOT: util.initializer
 module @do_not_hoist_sub_byte_aligned_tensor_leaf {
-  builtin.func @main() -> (i32) {
+  func.func @main() -> (i32) {
     %0 = arith.constant dense<true> : tensor<i1>
     %2 = "iree_unregistered.var_expr"(%0) : (tensor<i1>) -> i32
     return %2 : i32
@@ -83,7 +83,7 @@ module @do_not_hoist_sub_byte_aligned_tensor_leaf {
 // Can hoist a const-expr tree that transitively includes sub-byte aligned
 // values.
 module @hoist_sub_byte_aligned_scalar_transitive {
-  builtin.func @main() -> (i32) {
+  func.func @main() -> (i32) {
     %0 = arith.constant 1 : i1
     %2 = "iree_unregistered.const_expr"(%0) : (i1) -> i32
     return %2 : i32
@@ -96,7 +96,7 @@ module @hoist_sub_byte_aligned_scalar_transitive {
 // Can hoist a const-expr tree that transitively includes sub-byte aligned
 // values.
 module @hoist_sub_byte_aligned_tensor_transitive {
-  builtin.func @main() -> (i32) {
+  func.func @main() -> (i32) {
     %0 = arith.constant dense<true> : tensor<i1>
     %2 = "iree_unregistered.const_expr"(%0) : (tensor<i1>) -> i32
     return %2 : i32
@@ -113,7 +113,7 @@ module @hoist_tree_const_expr {
   util.global private @latent_global : i32
 
   // CHECK: func @main
-  builtin.func @main() -> (i32, i32, i32) {
+  func.func @main() -> (i32, i32, i32) {
     // CHECK-DAG: %[[LOAD_HOISTED_0:.*]] = util.global.load @[[HOISTED_0]] : i32
     // CHECK-DAG: %[[LOAD_HOISTED_1:.*]] = util.global.load @[[HOISTED_1]] : i32
     // CHECK-DAG: %[[RESULT:.*]] = "iree_unregistered.var_expr"(%[[LOAD_HOISTED_1]])
@@ -150,7 +150,7 @@ module @hoist_tree_const_expr {
 module @hoist_non_leaf_const_expr {
   // CHECK: util.global private @[[HOISTED:.*]] : i32
   // CHECK: func @main
-  builtin.func @main() -> (i32) {
+  func.func @main() -> (i32) {
     // CHECK: %[[LOAD_HOISTED:.*]] = util.global.load @[[HOISTED]] : i32
     // CHECK: %[[RESULT:.*]] = "iree_unregistered.non_leaf_const_expr"(%hoisted)
     // CHECK: return %[[RESULT]]
@@ -176,7 +176,7 @@ module @hoist_non_leaf_const_expr {
 module @hoist_implicit_capture {
   // CHECK: util.global private @[[HOISTED_SYM:.*]] : i32
   // CHECK: func @main
-  builtin.func @main() -> (i32) {
+  func.func @main() -> (i32) {
     %0 = arith.constant 0 : i32
     %1 = arith.constant 1 : i32
     // CHECK-NOT: arith.constant

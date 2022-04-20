@@ -15,10 +15,9 @@ def iree_bytecode_module(
         src,
         module = None,
         flags = ["-iree-mlir-to-vm-bytecode-module"],
-        translate_tool = "//iree/tools:iree-translate",
-        embedded_linker_tool = "@llvm-project//lld:lld",
-        opt_tool = "//iree/tools:iree-opt",
-        opt_flags = [],
+        # TODO: Rename this to 'compile_tool'
+        translate_tool = "//iree/tools:iree-compile",
+        linker_tool = "@llvm-project//lld:lld",
         c_identifier = "",
         **kwargs):
     """Builds an IREE bytecode module.
@@ -29,44 +28,20 @@ def iree_bytecode_module(
         flags: additional flags to pass to the compiler. Bytecode
             translation and backend flags are passed automatically.
         translate_tool: the compiler to use to generate the module.
-            Defaults to iree-translate.
-        embedded_linker_tool: the embedded linker to use.
+            Defaults to iree-compile.
+        linker_tool: the linker to use.
             Defaults to the lld from the llvm-project directory.
-        opt_tool: Defaulting to iree-opt. Tool used to preprocess the source file
-            if opt_flags is specified.
-        opt_flags: If specified, source files are preprocessed with opt_tool with
-            these flags.
         module: Optional. Specifies the  path to use for the enerated IREE module (.vmfb).
         c_identifier: Optional. Enables embedding the module as C data.
         **kwargs: any additional attributes to pass to the underlying rules.
     """
-
-    translate_src = src
-
-    if opt_flags:
-        translate_src = "%s.opt.mlir" % (name)
-        native.genrule(
-            name = "%s_opt" % (name),
-            srcs = [src],
-            outs = [translate_src],
-            cmd = " ".join([
-                "$(location %s)" % (opt_tool),
-                " ".join([('"%s"' % flag) for flag in opt_flags]),
-                "$(location %s)" % (src),
-                "-o $(location %s)" % (translate_src),
-            ]),
-            tools = [opt_tool],
-            message = "Transforming MLIR source for IREE module %s..." % (name),
-            output_to_bindir = 1,
-            **kwargs
-        )
 
     if not module:
         module = "%s.vmfb" % (name)
 
     native.genrule(
         name = name,
-        srcs = [translate_src],
+        srcs = [src],
         outs = [
             module,
         ],
@@ -74,12 +49,14 @@ def iree_bytecode_module(
             " ".join([
                 "$(location %s)" % (translate_tool),
                 " ".join(flags),
-                "-iree-llvm-embedded-linker-path=$(location %s)" % (embedded_linker_tool),
+                "-iree-llvm-embedded-linker-path=$(location %s)" % (linker_tool),
+                "-iree-llvm-wasm-linker-path=$(location %s)" % (linker_tool),
+                # Note: -iree-llvm-system-linker-path is left unspecified.
                 "-o $(location %s)" % (module),
-                "$(location %s)" % (translate_src),
+                "$(location %s)" % (src),
             ]),
         ]),
-        tools = [translate_tool, embedded_linker_tool],
+        tools = [translate_tool, linker_tool],
         message = "Compiling IREE module %s..." % (name),
         output_to_bindir = 1,
         **kwargs

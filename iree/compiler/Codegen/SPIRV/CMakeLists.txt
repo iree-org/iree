@@ -18,6 +18,7 @@ iree_cc_library(
     "MemorySpace.h"
     "Utils.h"
   SRCS
+    "AMDConfig.cpp"
     "AdrenoConfig.cpp"
     "ConvertToSPIRVPass.cpp"
     "KernelConfig.cpp"
@@ -27,10 +28,10 @@ iree_cc_library(
     "SPIRVCreateFastSlowPath.cpp"
     "SPIRVDistribute.cpp"
     "SPIRVFuseTensorPadWithConsumer.cpp"
-    "SPIRVInitConfigPass.cpp"
     "SPIRVLowerExecutableTargetPass.cpp"
     "SPIRVTile.cpp"
     "SPIRVTileAndDistribute.cpp"
+    "SPIRVTileAndPromote.cpp"
     "SPIRVTileAndVectorizeToCooperativeOps.cpp"
     "SPIRVVectorToCooperativeOps.cpp"
     "SPIRVVectorize.cpp"
@@ -80,7 +81,7 @@ iree_cc_library(
     MLIRTensorToSPIRV
     MLIRTensorTransforms
     MLIRTosa
-    MLIRTosaToStandard
+    MLIRTosaToArith
     MLIRTransforms
     MLIRVector
     MLIRVectorInterfaces

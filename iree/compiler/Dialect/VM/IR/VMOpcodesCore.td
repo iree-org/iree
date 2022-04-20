@@ -133,6 +133,7 @@ def VM_OPC_Call                  : VM_OPC<0x52, "Call">;
 def VM_OPC_CallVariadic          : VM_OPC<0x53, "CallVariadic">;
 def VM_OPC_Return                : VM_OPC<0x54, "Return">;
 def VM_OPC_Fail                  : VM_OPC<0x55, "Fail">;
+def VM_OPC_ImportResolved        : VM_OPC<0x56, "ImportResolved">;
 
 // Async/fiber ops:
 def VM_OPC_Yield                 : VM_OPC<0x60, "Yield">;
@@ -253,6 +254,7 @@ def VM_CoreOpcodeAttr :
     VM_OPC_CallVariadic,
     VM_OPC_Return,
     VM_OPC_Fail,
+    VM_OPC_ImportResolved,
     VM_OPC_Yield,
     VM_OPC_Trace,
     VM_OPC_Print,

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-vectorize-to-cooperative-ops))))' %s | FileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-vectorize-to-cooperative-ops))))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[16, 16, 16], [16, 16, 16]]>
 #translation = #iree_codegen.translation_info<SPIRVVectorizeToCooperativeOps, workload_per_wg = [16, 16]>
@@ -41,7 +41,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
       hal.return %0, %1, %c1 : index, index, index
     }
     builtin.module  {
-      func @matmul_256x1024x128_div_sub() {
+      func.func @matmul_256x1024x128_div_sub() {
         %c0 = arith.constant 0 : index
         %c1024 = arith.constant 1024 : index
         %c256 = arith.constant 256 : index
@@ -66,7 +66,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
             %11 = memref.subview %2[%arg0, 0] [16, 128] [1, 1] : memref<256x128xf16> to memref<16x128xf16, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
             %12 = memref.subview %3[0, %arg1] [128, 16] [1, 1] : memref<128x1024xf16> to memref<128x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
             %13 = memref.subview %4[%arg0, %arg1] [16, 16] [1, 1] : memref<256x1024xf16> to memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-            linalg.fill(%cst, %13) {lowering_config = #config} : f16, memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+            linalg.fill {lowering_config = #config} ins(%cst : f16) outs(%13 : memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
             linalg.matmul {lowering_config = #config}
               ins(%11, %12 : memref<16x128xf16, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>, memref<128x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
               outs(%13 : memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)

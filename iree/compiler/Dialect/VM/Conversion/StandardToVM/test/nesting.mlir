@@ -12,7 +12,7 @@ module @outerBuiltinModule {
       // CHECK-NEXT: vm.module public @deeplyNested
       module @deeplyNested {
         // CHECK: vm.func private @foo
-        func @foo() {
+        func.func @foo() {
           return
         }
       }

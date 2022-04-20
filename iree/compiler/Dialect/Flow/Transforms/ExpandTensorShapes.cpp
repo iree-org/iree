@@ -317,13 +317,13 @@ static void expandInitializerOp(IREE::Util::InitializerOp op,
 // Requires that the ExpandCallOp/ExpandReturnOp patterns handle passing dims.
 //
 // Example:
-//  func @foo(%0: tensor<?xf32>)
+//  func.func @foo(%0: tensor<?xf32>)
 //  ->
-//  func @foo(%0: tensor<?xf32>, %d: index) {
+//  func.func @foo(%0: tensor<?xf32>, %d: index) {
 //    %1 = flow.tensor.tie_shape %0 : tensor<?xf32>{%d}
-static void expandFuncOp(mlir::FuncOp op, ExpandedGlobalMap &globalMap,
+static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
                          IndexSet &indexSet, TensorDimMap &tensorDimMap) {
-  auto oldType = op.getType();
+  auto oldType = op.getFunctionType();
   auto inputTypes = expandTypes(oldType.getInputs());
   auto resultTypes = expandTypes(oldType.getResults());
   auto newType = FunctionType::get(op.getContext(), inputTypes, resultTypes);
@@ -482,7 +482,7 @@ static void expandTensorDims(Operation *op, ExpandedGlobalMap &globalMap,
     expandGlobalStoreOp(storeOp, globalMap, indexSet, tensorDimMap);
   } else if (auto initializerOp = dyn_cast<IREE::Util::InitializerOp>(op)) {
     expandInitializerOp(initializerOp, globalMap, indexSet, tensorDimMap);
-  } else if (auto funcOp = dyn_cast<mlir::FuncOp>(op)) {
+  } else if (auto funcOp = dyn_cast<mlir::func::FuncOp>(op)) {
     expandFuncOp(funcOp, globalMap, indexSet, tensorDimMap);
   } else if (auto callOp = dyn_cast<mlir::func::CallOp>(op)) {
     expandCallOp(callOp, indexSet, tensorDimMap);

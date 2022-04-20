@@ -6,7 +6,7 @@ some of which are designed for compiler devs and are only accessible via source
 builds. User level tools are distributed via the Python packages and are also
 accessible via dedicated Python APIs, documented here.
 
-Core Compiler (`ireec`)
+Core Compiler (`iree-compile`)
 -----------------------
 
 .. automodule:: iree.compiler.tools

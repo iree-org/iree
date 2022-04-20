@@ -37,7 +37,8 @@ spirv::Version convertVersion(Vulkan::TargetEnvAttr vkTargetEnv) {
     default:
       break;
   }
-  llvm_unreachable("unhandled Vulkan version!");
+  assert(false && "unhandled Vulkan version!");
+  return spirv::Version::V_1_0;
 }
 
 /// Gets the corresponding SPIR-V extensions for the given Vulkan target

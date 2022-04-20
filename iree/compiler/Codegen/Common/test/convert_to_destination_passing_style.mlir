@@ -1,6 +1,6 @@
 // RUN: iree-opt %s -iree-codegen-convert-to-destination-passing-style -canonicalize -cse -split-input-file | FileCheck %s
 
-func @matmul() {
+func.func @matmul() {
   %m = hal.interface.constant.load[0] : index
   %n = hal.interface.constant.load[1] : index
   %k = hal.interface.constant.load[2] : index
@@ -48,7 +48,7 @@ func @matmul() {
 
 // -----
 
-func @matmul_fill() {
+func.func @matmul_fill() {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %m = hal.interface.constant.load[0] : index
@@ -74,7 +74,7 @@ func @matmul_fill() {
       %lhs_tile = flow.dispatch.tensor.load %lhs, offsets = [%iv0, 0], sizes = [%tilesize_y, %k], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k} -> tensor<?x?xf32>
       %rhs_tile = flow.dispatch.tensor.load %rhs, offsets = [0, %iv1], sizes = [%k, %tilesize_x], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n} -> tensor<?x?xf32>
       %init_tile = linalg.init_tensor [%tilesize_y, %tilesize_x] : tensor<?x?xf32>
-      %fill_tile = linalg.fill(%cst, %init_tile) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+      %fill_tile = linalg.fill ins(%cst : f32) outs(%init_tile : tensor<?x?xf32>) -> tensor<?x?xf32>
       %matmul_tile = linalg.matmul ins(%lhs_tile, %rhs_tile : tensor<?x?xf32>, tensor<?x?xf32>) outs(%fill_tile : tensor<?x?xf32>) -> tensor<?x?xf32>
       flow.dispatch.tensor.store %matmul_tile, %result, offsets = [%iv0, %iv1], sizes = [%tilesize_y, %tilesize_x], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>{%m, %n}
     }
@@ -90,7 +90,8 @@ func @matmul_fill() {
 //  CHECK-DAG:       %[[LHS_TILE:.+]] = flow.dispatch.tensor.load %[[LHS]]
 //  CHECK-DAG:       %[[RHS_TILE:.+]] = flow.dispatch.tensor.load %[[RHS]]
 //  CHECK-DAG:       %[[RESULT_TILE:.+]] = flow.dispatch.tensor.load %[[RESULT]]
-//      CHECK:       %[[FILL_TILE:.+]] = linalg.fill(%{{.+}}, %[[RESULT_TILE]])
+//      CHECK:       %[[FILL_TILE:.+]] = linalg.fill
+// CHECK-SAME:           outs(%[[RESULT_TILE]] :
 //      CHECK:       %[[MATMUL_TILE:.+]] = linalg.matmul
 // CHECK-SAME:           ins(%[[LHS_TILE]], %[[RHS_TILE]] : tensor<?x?xf32>, tensor<?x?xf32>)
 // CHECK-SAME:           outs(%[[FILL_TILE]] : tensor<?x?xf32>)
@@ -98,7 +99,7 @@ func @matmul_fill() {
 
 // -----
 
-func @matmul_inplace() {
+func.func @matmul_inplace() {
   %c0 = arith.constant 0 : index
   %m = hal.interface.constant.load[0] : index
   %n = hal.interface.constant.load[1] : index
@@ -145,7 +146,7 @@ func @matmul_inplace() {
 
 // -----
 
-func @reshape_simple() {
+func.func @reshape_simple() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
@@ -167,7 +168,7 @@ func @reshape_simple() {
 
 // -----
 
-func @reshape_fused_source() {
+func.func @reshape_fused_source() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
@@ -202,7 +203,7 @@ func @reshape_fused_source() {
 
 // -----
 
-func @reshape_fused_source_and_copyout() {
+func.func @reshape_fused_source_and_copyout() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
@@ -241,7 +242,7 @@ func @reshape_fused_source_and_copyout() {
 
 // -----
 
-func @reshape_fused_target() {
+func.func @reshape_fused_target() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
@@ -277,7 +278,7 @@ func @reshape_fused_target() {
 
 // -----
 
-func @cast_followed_by_store() {
+func.func @cast_followed_by_store() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
   %c4 = arith.constant 4 : index
@@ -303,7 +304,7 @@ func @cast_followed_by_store() {
         %7 = flow.dispatch.tensor.load %0, offsets = [%arg0, %arg1, 0], sizes = [%c1, %c32, 1024], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:4x32x1024xf32> -> tensor<?x?x1024xf32>
         %8 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0, %arg2], sizes = [%c1, 1024, %c32], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:4x1024x64xf32> -> tensor<?x1024x?xf32>
         %9 = linalg.init_tensor [1, 32, 32] : tensor<1x32x32xf32>
-        %10 = linalg.fill(%cst, %9) {__internal_linalg_transform__ = "workgroup"} : f32, tensor<1x32x32xf32> -> tensor<1x32x32xf32>
+        %10 = linalg.fill  {__internal_linalg_transform__ = "workgroup"} ins(%cst : f32) outs(%9 : tensor<1x32x32xf32>) -> tensor<1x32x32xf32>
         %11 = linalg.batch_matmul {__internal_linalg_transform__ = "workgroup", is_root_op} ins(%7, %8 : tensor<?x?x1024xf32>, tensor<?x1024x?xf32>) outs(%10 : tensor<1x32x32xf32>) -> tensor<1x32x32xf32>
         %12 = tensor.cast %11 : tensor<1x32x32xf32> to tensor<?x?x?xf32>
         flow.dispatch.tensor.store %12, %2, offsets = [%arg0, %arg1, %arg2], sizes = [%c1, %c32, %c32], strides = [1, 1, 1] : tensor<?x?x?xf32> -> !flow.dispatch.tensor<writeonly:4x32x64xf32>
@@ -321,7 +322,8 @@ func @cast_followed_by_store() {
 //  CHECK-DAG:       %[[LHS_TILE:.+]] = flow.dispatch.tensor.load %[[LHS]]
 //  CHECK-DAG:       %[[RHS_TILE:.+]] = flow.dispatch.tensor.load %[[RHS]]
 //  CHECK-DAG:       %[[RESULT_TILE:.+]] = flow.dispatch.tensor.load %[[RESULT]]
-//      CHECK:       %[[FILL_TILE:.+]] = linalg.fill(%{{.+}}, %[[RESULT_TILE]])
+//      CHECK:       %[[FILL_TILE:.+]] = linalg.fill
+//  CHECK-SAME:          outs(%[[RESULT_TILE]] :
 //      CHECK:       %[[MATMUL_TILE:.+]] = linalg.batch_matmul
 // CHECK-SAME:           ins(%[[LHS_TILE]], %[[RHS_TILE]]
 // CHECK-SAME:           outs(%[[FILL_TILE]]
@@ -330,7 +332,7 @@ func @cast_followed_by_store() {
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
-func @multi_result() {
+func.func @multi_result() {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
@@ -402,7 +404,7 @@ func @multi_result() {
 
 // -----
 
-func @unused_ins_operand() {
+func.func @unused_ins_operand() {
   %c64 = arith.constant 64 : index
   %c32 = arith.constant 32 : index
   %c0 = arith.constant 0 : index
@@ -443,7 +445,7 @@ func @unused_ins_operand() {
         %25 = flow.dispatch.tensor.load %12, offsets = [%arg0, %arg1, %arg2], sizes = [%22, %23, %24], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:?x?x?xi32>{%6, %7, %8} -> tensor<?x?x?xi32>
         %26 = linalg.init_tensor [%22, %23] : tensor<?x?xi32>
         %27 = linalg.init_tensor [%22, %23, %24] : tensor<?x?x?xi32>
-        %28 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%25, %26 : tensor<?x?x?xi32>, tensor<?x?xi32>) outs(%27 : tensor<?x?x?xi32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[], [1, 4, 4]], native_vector_size = [1, 4, 4]>} {
+        %28 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%25, %26 : tensor<?x?x?xi32>, tensor<?x?xi32>) outs(%27 : tensor<?x?x?xi32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[], [1, 4, 4]]>} {
         ^bb0(%arg3: i32, %arg4: i32, %arg5: i32):  // no predecessors
           %29 = arith.index_cast %arg3 : i32 to index
           %30 = linalg.index 0 : index
@@ -464,14 +466,13 @@ func @unused_ins_operand() {
 //   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(2)
 //   CHECK-DAG:   %[[IN_VIEW:.+]] = flow.dispatch.tensor.load %[[IN]]
 //  CHECK-DAG:    %[[OUT_VIEW:.+]] = flow.dispatch.tensor.load %[[OUT]]
-//   CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor
 //       CHECK:   linalg.generic
-//  CHECK-SAME:     ins(%[[IN_VIEW]], %[[INIT]]
-//  CHECK-SAME:     outs(%[[OUT_VIEW]]
+//  CHECK-SAME:     ins(%[[IN_VIEW]] :
+//  CHECK-SAME:     outs(%[[OUT_VIEW]] :
 
 // -----
 
-func @three_init_tensor_uses() {
+func.func @three_init_tensor_uses() {
   %c6400 = arith.constant 6400 : index
   %c64 = arith.constant 64 : index
   %c1654784 = arith.constant 1654784 : index
@@ -497,7 +498,7 @@ func @three_init_tensor_uses() {
       %8 = tensor.extract_slice %cst_0[%arg1] [64] [1] : tensor<64xf32> to tensor<64xf32>
       %9 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [64, 64], strides = [1, 1] : !flow.dispatch.tensor<readonly:6400x64xf32> -> tensor<64x64xf32>
       %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [64, 64], strides = [1, 1] : !flow.dispatch.tensor<readonly:64x64xf32> -> tensor<64x64xf32>
-      %11 = linalg.fill(%cst_1, %7) : f32, tensor<64x64xf32> -> tensor<64x64xf32>
+      %11 = linalg.fill ins(%cst_1 : f32) outs(%7 : tensor<64x64xf32>) -> tensor<64x64xf32>
       %12 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [8, 32, 0], [0, 0, 16]]>} ins(%9, %10 : tensor<64x64xf32>, tensor<64x64xf32>) outs(%11 : tensor<64x64xf32>) -> tensor<64x64xf32>
       %13 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%8, %12 : tensor<64xf32>, tensor<64x64xf32>) outs(%7 : tensor<64x64xf32>) {
       ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):
@@ -522,7 +523,8 @@ func @three_init_tensor_uses() {
 //   CHECK-NOT:   linalg.init_tensor
 //       CHECK:   %[[LOAD:.+]] = flow.dispatch.tensor.load %[[OUTPUT]]
 //   CHECK-NOT:   linalg.init_tensor
-//       CHECK:   linalg.fill(%{{.+}}, %[[LOAD]])
+//       CHECK:   linalg.fill
+//  CHECK-SAME:       outs(%[[LOAD]] :
 //       CHECK:   %[[MATMUL:.+]] = linalg.matmul
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       outs(%[[MATMUL]] :
@@ -531,7 +533,7 @@ func @three_init_tensor_uses() {
 
 // -----
 
-func @fill_matmul_exp() {
+func.func @fill_matmul_exp() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %c33 = arith.constant 33 : index
@@ -557,7 +559,7 @@ func @fill_matmul_exp() {
       %12 = affine.min affine_map<(d0) -> (-d0 + 49, 16)>(%arg1)
       %13 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [16, %12], strides = [1, 1] : !flow.dispatch.tensor<readonly:16x49xf32> -> tensor<16x?xf32>
       %14 = linalg.init_tensor [%10, %12] : tensor<?x?xf32>
-      %15 = linalg.fill(%cst, %14) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+      %15 = linalg.fill ins(%cst : f32) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
       %16 = linalg.matmul ins(%11, %13 : tensor<?x16xf32>, tensor<16x?xf32>) outs(%15 : tensor<?x?xf32>) -> tensor<?x?xf32>
       %17 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%16 : tensor<?x?xf32>) outs(%9 : tensor<?x?xf32>) {
       ^bb0(%arg2: f32, %arg3: f32):
@@ -573,3 +575,57 @@ func @fill_matmul_exp() {
 //       CHECK:   %[[MATMUL:.+]] = linalg.matmul
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       outs(%[[MATMUL]]
+
+// -----
+
+func @cumsum__2x2x2x2x2x2x2() {
+  %cst = arith.constant dense<0.000000e+00> : tensor<2x2x2x2x2x2x2xf32>
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:3x2x2x2x2x2x2xf32>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:2x2x2x2x2x2x2xf32>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [3, 2, 2, 2, 2, 2, 2], strides = [1, 1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:3x2x2x2x2x2x2xf32> -> tensor<3x2x2x2x2x2x2xf32>
+  %3 = linalg.init_tensor [2] : tensor<2xf32>
+  %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0 + d7, d1, d2, d3, d4, d5, d6)>,
+                                        affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d7)>,
+                                        affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6)>],
+                       iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "reduction"]}
+    ins(%2, %3 : tensor<3x2x2x2x2x2x2xf32>, tensor<2xf32>)
+    outs(%cst : tensor<2x2x2x2x2x2x2xf32>) {
+  ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
+    %5 = arith.addf %arg0, %arg2 : f32
+    linalg.yield %5 : f32
+  } -> tensor<2x2x2x2x2x2x2xf32>
+  flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [2, 2, 2, 2, 2, 2, 2], strides = [1, 1, 1, 1, 1, 1, 1] : tensor<2x2x2x2x2x2x2xf32> -> !flow.dispatch.tensor<writeonly:2x2x2x2x2x2x2xf32>
+  return
+}
+
+// CHECK-LABEL: func @cumsum__2x2x2x2x2x2x2()
+//   CHECK-DAG:   %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+//       CHECK:   %[[DST:.+]] = flow.dispatch.tensor.load {{.+}} !flow.dispatch.tensor<writeonly:2x2x2x2x2x2x2xf32> -> tensor<2x2x2x2x2x2x2xf32>
+//       CHECK:   %[[FILL:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[DST]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     outs(%[[FILL]]
+
+// -----
+
+func @reduce_window_max_4x6xf32() {
+  %cst = arith.constant dense<0xFF800000> : tensor<2x2xf32>
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:2x4x6xf32>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:2x2xf32>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [2, 4, 6], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:2x4x6xf32> -> tensor<2x4x6xf32>
+  %3 = linalg.init_tensor [2, 2, 3] : tensor<2x2x3xf32>
+  %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d2, d0 * 2 + d3, d1 * 3 + d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%2, %3 : tensor<2x4x6xf32>, tensor<2x2x3xf32>) outs(%cst : tensor<2x2xf32>) {
+  ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
+    %5 = arith.maxf %arg0, %arg2 : f32
+    linalg.yield %5 : f32
+  } -> tensor<2x2xf32>
+  flow.dispatch.tensor.store %4, %1, offsets = [0, 0], sizes = [2, 2], strides = [1, 1] : tensor<2x2xf32> -> !flow.dispatch.tensor<writeonly:2x2xf32>
+  return
+}
+// CHECK-LABEL: func @reduce_window_max_4x6xf32()
+//   CHECK-DAG:   %[[CST:.+]] = arith.constant 0xFF800000 : f32
+//       CHECK:   %[[DST:.+]] = flow.dispatch.tensor.load {{.+}} !flow.dispatch.tensor<writeonly:2x2xf32> -> tensor<2x2xf32>
+//       CHECK:   %[[FILL:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[DST]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     outs(%[[FILL]]

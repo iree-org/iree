@@ -19,7 +19,7 @@
 // // RUN: iree-run-mlir %s | FileCheck %s
 // // CHECK-LABEL: @foo
 // // CHECK: 1xf32: 2
-// func @foo() -> tensor<f32> {
+// func.func @foo() -> tensor<f32> {
 //   %0 = arith.constant dense<2.0> : tensor<f32>
 //   return %0 : tensor<f32>
 // }
@@ -195,7 +195,7 @@ Status PrepareModule(std::string target_backend,
   llvm::SourceMgr source_mgr;
   source_mgr.AddNewSourceBuffer(std::move(file_buffer), llvm::SMLoc());
   mlir::OwningOpRef<mlir::ModuleOp> mlir_module =
-      mlir::parseSourceFile(source_mgr, &context);
+      mlir::parseSourceFile<mlir::ModuleOp>(source_mgr, &context);
   if (!mlir_module) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "could not parse MLIR file");
@@ -509,7 +509,7 @@ extern "C" int main(int argc, char** argv) {
   // Register assembly printer command-line options like
   // -mlir-print-op-generic.
   mlir::registerAsmPrinterCLOptions();
-  // Register pass manager command-line options like -print-ir-*.
+  // Register pass manager command-line options like -mlir-print-ir-*.
   mlir::registerPassManagerCLOptions();
 
   llvm::InitLLVM init_llvm(argc_llvm, argv_llvm);

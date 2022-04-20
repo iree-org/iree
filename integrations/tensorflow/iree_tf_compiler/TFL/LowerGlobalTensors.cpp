@@ -33,11 +33,11 @@ class LowerGlobalTensorsPass
   void runOnOperation() override {
     auto* context = &getContext();
     auto moduleOp = getOperation();
-    mlir::OpBuilder builder(moduleOp.body());
+    mlir::OpBuilder builder(moduleOp.getBodyRegion());
 
     DenseMap<StringRef, FuncOp> symNameToFunction;
     for (auto func : moduleOp.getOps<FuncOp>()) {
-      symNameToFunction[func.sym_name()] = func;
+      symNameToFunction[func.getSymName()] = func;
     }
 
     DenseMap<StringRef, DenseElementsAttr> sharedNameToConstant;

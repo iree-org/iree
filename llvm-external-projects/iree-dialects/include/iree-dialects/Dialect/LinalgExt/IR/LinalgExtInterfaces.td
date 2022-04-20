@@ -421,12 +421,17 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
           $_op->getAttrs());
         for (Region &r : $_op->getRegions())
           r.cloneInto(state.addRegion(), bvm);
-        return b.createOperation(state);
+        return b.create(state);
       }]
     >
   ];
 
   let extraClassDeclaration = [{
+    /// Returns the value that expresses the shape of the output in terms of
+    /// shape of the input operands where possible.
+    LogicalResult reifyResultShapes(OpBuilder &b,
+        mlir::ReifiedRankedShapedTypeDims &reifiedReturnShapes);
+    
     //========================================================================//
     // Helper functions to mutate the `operand_segment_sizes` attribute.
     // These are useful when cloning and changing operand types.

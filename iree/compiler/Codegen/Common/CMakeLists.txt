@@ -25,33 +25,39 @@ iree_cc_library(
   HDRS
     "BufferizationAnalysis.h"
     "DestructiveUpdateUtils.h"
+    "Transforms.h"
   SRCS
     "BufferizationAnalysis.cpp"
+    "BufferizeCopyOnlyDispatchesPass.cpp"
     "CleanupBufferAllocViewPass.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
-    "DemoteF32ToF16.cpp"
     "DestructiveUpdateUtils.cpp"
     "FlattenMemRefSubspanPass.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
     "FoldTensorExtractOpPass.cpp"
     "ForOpCanonicalizationPass.cpp"
+    "GPUDistributeSharedMemoryCopy.cpp"
+    "GPUPipelining.cpp"
     "IREEComprehensiveBufferizePass.cpp"
+    "InsertDistributionInfoPass.cpp"
     "LinalgBufferizePass.cpp"
     "MemrefCopyToLinalg.cpp"
     "OptimizeVectorTransferPass.cpp"
     "PolynomialApproximationPass.cpp"
     "RemoveTrivialLoops.cpp"
+    "RewriteLinalgDestructiveUpdatesPass.cpp"
     "SetNumWorkgroupsPass.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TypePropagationPass.cpp"
     "VectorizeConv.cpp"
     "VectorizeMMT4d.cpp"
+    "WorkGroupSwizzle.cpp"
   DEPS
     IREELinalgExtDialect
     IREELinalgExtPasses
+    IREELinalgExtTransforms
     LLVMSupport
     MLIRAffine
-    MLIRAffineBufferizableOpInterfaceImpl
     MLIRAffineUtils
     MLIRAnalysis
     MLIRArithmetic
@@ -79,6 +85,7 @@ iree_cc_library(
     MLIRTransforms
     MLIRVector
     MLIRVectorTransforms
+    MLIRViewLikeInterface
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces

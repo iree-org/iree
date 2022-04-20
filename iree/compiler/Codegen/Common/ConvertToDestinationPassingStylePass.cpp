@@ -271,7 +271,7 @@ static LogicalResult modifyResultToUseStoreBuffer(
 /// Main entry point to convert dispatch region to use destination passing
 /// style.
 static LogicalResult convertToDestinationPassingStyle(OpBuilder &b,
-                                                      FuncOp funcOp) {
+                                                      func::FuncOp funcOp) {
   BufferizationPlan plan;
   if (failed(createTensorEquivalenceClasses(funcOp, plan))) {
     return failure();
@@ -323,24 +323,6 @@ static SmallVector<NamedAttribute> PruneAttributeList(linalg::GenericOp op) {
   return preservedAttrs;
 }
 
-static bool isFromReadOnlyTensor(Value v) {
-  return TypeSwitch<Operation *, bool>(v.getDefiningOp())
-      .Case<arith::ConstantOp>(
-          [&](arith::ConstantOp constantOp) { return true; })
-      .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
-          [&](auto op) { return isFromReadOnlyTensor(op.src()); })
-      .Case<tensor::CastOp, tensor::ExtractSliceOp>(
-          [&](auto op) { return isFromReadOnlyTensor(op.source()); })
-      .Case<IREE::Flow::DispatchTensorLoadOp>(
-          [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
-            return loadOp.source()
-                       .getType()
-                       .cast<IREE::Flow::DispatchTensorType>()
-                       .getAccess() == IREE::Flow::TensorAccess::ReadOnly;
-          })
-      .Default([&](Operation *op) { return false; });
-}
-
 namespace {
 /// Adapts Linalg ops input operand to output operand. This is required for not
 /// creating extra alloca ops. For more details, see
@@ -366,7 +348,7 @@ struct AdaptLinalgInputOperandToOutputOperand
     SmallVector<Value> newOperands;
     SmallVector<AffineMap> maps;
     for (auto in : op.getInputOperands()) {
-      if (!operand && !isFromReadOnlyTensor(in->get()) &&
+      if (!operand && !isReadOnly(in->get()) &&
           op.getTiedIndexingMap(in) == op.getTiedIndexingMap(outputOperand) &&
           in->get().getType() == outputOperand->get().getType()) {
         operand = in;
@@ -397,15 +379,50 @@ struct AdaptLinalgInputOperandToOutputOperand
     return success();
   }
 };
+
+struct RemoveCstOutsDependency
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+  using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::LinalgOp op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.startRootUpdate(op);
+    bool modifiedOutput = false;
+    Location loc = op.getLoc();
+    for (OpOperand *opOperand : op.getOutputOperands()) {
+      DenseElementsAttr attr;
+      if (!matchPattern(opOperand->get(), m_Constant(&attr))) continue;
+      if (!attr.isSplat()) continue;
+      auto type = attr.getType().dyn_cast<RankedTensorType>();
+      if (!type) continue;
+      Attribute scalarAttr = attr.getValues<Attribute>()[0];
+
+      modifiedOutput = true;
+      Value initTensor = rewriter.create<linalg::InitTensorOp>(
+          loc, type.getShape(), type.getElementType());
+      Value cstOp = rewriter.create<arith::ConstantOp>(loc, scalarAttr);
+      Value fillOp =
+          rewriter.create<linalg::FillOp>(loc, cstOp, initTensor).result();
+      op->setOperand(opOperand->getOperandNumber(), fillOp);
+    }
+    if (!modifiedOutput) {
+      rewriter.cancelRootUpdate(op);
+      return failure();
+    }
+    rewriter.finalizeRootUpdate(op);
+    return success();
+  }
+};
 }  // namespace
 
 void ConvertToDestinationPassingStylePass::runOnOperation() {
-  FuncOp funcOp = getOperation();
+  func::FuncOp funcOp = getOperation();
   MLIRContext *context = &getContext();
 
   {
     RewritePatternSet patterns(context);
-    patterns.insert<AdaptLinalgInputOperandToOutputOperand>(context);
+    patterns.insert<AdaptLinalgInputOperandToOutputOperand,
+                    RemoveCstOutsDependency>(context);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
@@ -427,7 +444,7 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertToDestinationPassingStylePass() {
   return std::make_unique<ConvertToDestinationPassingStylePass>();
 }

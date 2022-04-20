@@ -205,15 +205,15 @@ struct ApplyInitializerOp
 // Applies usage analysis results to an MLIR function.
 // All resource arguments and results, block arguments, and nested operations
 // will have their lifetime specified.
-struct ApplyFuncOp : public UsageRefinementPattern<mlir::FuncOp> {
-  using UsageRefinementPattern<mlir::FuncOp>::UsageRefinementPattern;
-  LogicalResult matchAndRewrite(mlir::FuncOp op,
+struct ApplyFuncOp : public UsageRefinementPattern<mlir::func::FuncOp> {
+  using UsageRefinementPattern<mlir::func::FuncOp>::UsageRefinementPattern;
+  LogicalResult matchAndRewrite(mlir::func::FuncOp op,
                                 PatternRewriter &rewriter) const override {
     bool didChange = false;
 
     // Arguments:
     SmallVector<Type> newInputs;
-    for (auto inputType : llvm::enumerate(op.getType().getInputs())) {
+    for (auto inputType : llvm::enumerate(op.getFunctionType().getInputs())) {
       auto oldType = inputType.value().dyn_cast<IREE::Stream::ResourceType>();
       if (!oldType) {
         newInputs.push_back(inputType.value());
@@ -232,7 +232,7 @@ struct ApplyFuncOp : public UsageRefinementPattern<mlir::FuncOp> {
     // Results:
     SmallVector<Type> newOutputs;
     auto anyReturnOp = *op.getOps<mlir::func::ReturnOp>().begin();
-    for (auto outputType : llvm::enumerate(op.getType().getResults())) {
+    for (auto outputType : llvm::enumerate(op.getFunctionType().getResults())) {
       auto oldType = outputType.value().dyn_cast<IREE::Stream::ResourceType>();
       if (!oldType) {
         newOutputs.push_back(outputType.value());
@@ -248,7 +248,7 @@ struct ApplyFuncOp : public UsageRefinementPattern<mlir::FuncOp> {
       }
     }
     auto newFuncType = rewriter.getFunctionType(newInputs, newOutputs);
-    if (op.getType() != newFuncType) {
+    if (op.getFunctionType() != newFuncType) {
       op.setType(newFuncType);
       didChange = true;
     }

@@ -16,7 +16,7 @@
 // See https://github.com/google/iree/issues/4717 for more details.
 
 // CHECK: vm.func private @tanh
-func @tanh(%input : tensor<f32>) -> (tensor<f32>) {
+func.func @tanh(%input : tensor<f32>) -> (tensor<f32>) {
   // May introduce llvm.intr.fma (fmaf) during lowering
   %result = math.tanh %input : tensor<f32>
   return %result : tensor<f32>
@@ -25,7 +25,7 @@ func @tanh(%input : tensor<f32>) -> (tensor<f32>) {
 // -----
 
 // CHECK: vm.func private @ceil
-func @ceil(%input : tensor<f32>) -> (tensor<f32>) {
+func.func @ceil(%input : tensor<f32>) -> (tensor<f32>) {
   // May lower to llvm.intr.ceil (ceilf)
   %result = math.ceil %input : tensor<f32>
   return %result : tensor<f32>
@@ -34,7 +34,7 @@ func @ceil(%input : tensor<f32>) -> (tensor<f32>) {
 // -----
 
 // CHECK: vm.func private @floor
-func @floor(%input : tensor<f32>) -> (tensor<f32>) {
+func.func @floor(%input : tensor<f32>) -> (tensor<f32>) {
   // May lower to llvm.intr.floor (floorf)
   %result = math.floor %input : tensor<f32>
   return %result : tensor<f32>

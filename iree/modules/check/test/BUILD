@@ -20,13 +20,15 @@ iree_lit_test_suite(
         [
             "failure.mlir",
             "success.mlir",
+            "unavailable.mlir",
         ],
         include = ["*.mlir"],
     ),
     tags = ["hostonly"],
     tools = [
         "//iree/tools:iree-check-module",
-        "//iree/tools:iree-translate",
+        "//iree/tools:iree-compile",
+        "//iree/tools:iree-run-module",
         "@llvm-project//llvm:FileCheck",
     ],
 )

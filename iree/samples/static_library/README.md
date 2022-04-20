@@ -9,7 +9,7 @@ The model compiled into the static library exports a single function
 `simple_mul` that returns the multiplication of two tensors:
 
 ```mlir
-func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
+func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
 {
   %0 = "mhlo.multiply"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>,
     tensor<4xf32>) -> tensor<4xf32>
@@ -24,7 +24,7 @@ libraries that can be resolved at runtime by name. This can be particularly
 useful on "bare metal" or embedded systems running IREE that lack operating
 systems or the ability to load shared libraries in binaries.
 
-When static library output is enabled, `iree-translate` produces a separate
+When static library output is enabled, `iree-compile` produces a separate
 static library to compile into the target program. At runtime bytecode module
 instructs the VM which static libraries to load exported functions from the
 model.
@@ -39,7 +39,7 @@ driver/backend. See
 for general instructions on building using CMake):
 
   ```shell
-  cmake -B ../iree-build/
+  cmake -B ../iree-build/ \
     -DIREE_BUILD_SAMPLES=ON \
     -DIREE_TARGET_BACKEND_DEFAULTS=OFF \
     -DIREE_TARGET_BACKEND_DYLIB_LLVM_AOT=ON \
@@ -50,7 +50,7 @@ for general instructions on building using CMake):
   ```
 
 2. Build the `static_library_demo` CMake target to create the static demo. This
-target has several dependencies that will translate `simple_mul.mlir` into a
+target has several dependencies that will compile `simple_mul.mlir` into a
 static library (`simple_mul.h` & `simple_mul.c`) as well as a bytecode module
 (`simple_mul.vmfb`) which are finally built into the demo binary:
 

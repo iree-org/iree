@@ -48,6 +48,9 @@ class ApplyPatternsPass
 
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
     if (failed(applyPatternsAndFoldGreedily(getOperation(), frozenPatterns))) {
+      getOperation()->emitError()
+          << "failed to apply patterns, likely due to a bad pattern that "
+             "causes an infinite fixed point iteration";
       return signalPassFailure();
     }
   }

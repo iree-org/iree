@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <assert.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -288,37 +289,72 @@ static bool matmul_result_elements_agree(iree_vm_value_t expected,
   }
 }
 
-// Prints |matrix| to |file|, with |label| as caption.
-// |precision| controls how many decimals are printed for float values.
-//
-// If |other_matrix| is not NULL, then any matrix entries that disagree
-// between |matrix| and |other_matrix| (according to
-// matmul_result_elements_agree) are highlighted.
-static void print_matrix(FILE* file, const char* label, precision_t precision,
-                         int row_start, int row_end, int col_start, int col_end,
-                         iree_hal_buffer_view_t* matrix,
-                         iree_hal_buffer_view_t* other_matrix) {
+static int get_max_elem_width(precision_t precision, int row_start, int row_end,
+                              int col_start, int col_end,
+                              iree_hal_buffer_view_t* matrix) {
   iree_hal_dim_t dims[2];
   get_matrix_buffer_view_shape(matrix, dims);
   int rows = dims[0];
   int cols = dims[1];
   iree_hal_element_type_t elem_type = iree_hal_buffer_view_element_type(matrix);
-  void* data = 0;
+  void* data = NULL;
   get_buffer_view_dense_row_major_data(matrix, &data);
-  void* other_data = 0;
-  if (other_matrix) {
-    get_buffer_view_dense_row_major_data(other_matrix, &other_data);
-  }
   int max_elem_width = 0;
   for (int row = row_start; row < row_end; row++) {
     for (int col = col_start; col < col_end; col++) {
       iree_vm_value_t elem =
           read_matrix_element(rows, cols, elem_type, data, row, col);
       char buf[64];
-      max_elem_width = iree_max(
-          max_elem_width, snprintf_value(buf, sizeof buf, elem, precision));
+      int this_elem_width = snprintf_value(buf, sizeof buf, elem, precision);
+      // iree_max is a macro, may evaluate its args twice. Give it plain ints.
+      max_elem_width = iree_max(max_elem_width, this_elem_width);
     }
   }
+  return max_elem_width;
+}
+
+// Prints |matrix| to |file|, with |label| as caption.
+// |precision| controls how many decimals are printed for float values.
+//
+// If |other_matrix| is not NULL, then any matrix entries that disagree
+// between |matrix| and |other_matrix| (according to
+// matmul_result_elements_agree) are highlighted.
+//
+// |highlight| is either NULL or is a UTF-8 string that will be printed next to
+// any entry of |matrix| that disagrees with the corresponding entry of
+// |other_matrix|.
+//
+// |highlight| should be NULL if and only if |other_matrix| is NULL.
+//
+// In order for matrix columns to be properly laid out, the rendering of
+// |highlight| in a fixed-width font should have the width of two regular Latin
+// characters. According to
+// https://www.unicode.org/reports/tr11/#Recommendations, a single emoji
+// character should meet that requirement.
+static void print_matrix(FILE* file, const char* label, precision_t precision,
+                         int row_start, int row_end, int col_start, int col_end,
+                         iree_hal_buffer_view_t* matrix,
+                         iree_hal_buffer_view_t* other_matrix,
+                         const char* highlight) {
+  assert((other_matrix == NULL) == (highlight == NULL));
+  iree_hal_dim_t dims[2];
+  get_matrix_buffer_view_shape(matrix, dims);
+  int rows = dims[0];
+  int cols = dims[1];
+  iree_hal_element_type_t elem_type = iree_hal_buffer_view_element_type(matrix);
+  void* data = NULL;
+  get_buffer_view_dense_row_major_data(matrix, &data);
+  int max_elem_width = get_max_elem_width(precision, row_start, row_end,
+                                          col_start, col_end, matrix);
+  void* other_data = NULL;
+  if (other_matrix) {
+    get_buffer_view_dense_row_major_data(other_matrix, &other_data);
+    int other_matrix_max_elem_width = get_max_elem_width(
+        precision, row_start, row_end, col_start, col_end, other_matrix);
+    // iree_max is a macro, may evaluate its args twice. Give it plain ints.
+    max_elem_width = iree_max(max_elem_width, other_matrix_max_elem_width);
+  }
+
   fprintf(file,
           "%s (rows %d..%d out of %d..%d, columns %d..%d out of %d..%d)\n",
           label, row_start, row_end - 1, 0, rows - 1, col_start, col_end - 1, 0,
@@ -326,22 +362,20 @@ static void print_matrix(FILE* file, const char* label, precision_t precision,
   for (int row = row_start; row < row_end; row++) {
     for (int col = col_start; col < col_end; col++) {
       iree_vm_value_t elem =
-          read_matrix_element(rows, cols, elem_type, (void*)data, row, col);
-      bool bad_elem = false;
+          read_matrix_element(rows, cols, elem_type, data, row, col);
+      bool disagree = false;
       if (other_matrix) {
-        iree_vm_value_t other_elem = read_matrix_element(
-            rows, cols, elem_type, (void*)other_data, row, col);
-        bad_elem = !matmul_result_elements_agree(elem, other_elem);
+        iree_vm_value_t other_elem =
+            read_matrix_element(rows, cols, elem_type, other_data, row, col);
+        disagree = !matmul_result_elements_agree(elem, other_elem);
       }
       char buf[64];
       snprintf_value(buf, sizeof buf, elem, precision);
       fprintf(file, "%*s", max_elem_width, buf);
-      if (bad_elem) {
-        fprintf(file, "💩");
-      } else if (col < col_end - 1) {
-        // two spaces per https://www.unicode.org/reports/tr11/#Recommendations
-        fprintf(file, "  ");
-      }
+      // See comment on |highlight| function parameter for why 2 spaces.
+      // A 3rd space is added unconditionally to make it clear that a highlight
+      // concerns the matrix entry to its left.
+      fprintf(file, "%s ", disagree ? highlight : "  ");
     }
     fprintf(file, "\n");
   }
@@ -401,19 +435,19 @@ static iree_status_t iree_check_matmul_failure(
 
   fprintf(file, "\n");
   print_matrix(file, "left-hand side", PRECISION_LOW, m_start, m_end, k_start,
-               k_end, lhs, NULL);
+               k_end, lhs, NULL, NULL);
   fprintf(file, "\n");
   print_matrix(file, "right-hand side", PRECISION_LOW, k_start, k_end, n_start,
-               n_end, rhs, NULL);
+               n_end, rhs, NULL, NULL);
   fprintf(file, "\n");
   print_matrix(file, "input accumulator", PRECISION_LOW, m_start, m_end,
-               n_start, n_end, acc, NULL);
+               n_start, n_end, acc, NULL, NULL);
   fprintf(file, "\n");
   print_matrix(file, "expected result", PRECISION_LOW, m_start, m_end, n_start,
-               n_end, expected_result, actual_result);
+               n_end, expected_result, actual_result, "🦄");
   fprintf(file, "\n");
   print_matrix(file, "actual result", PRECISION_LOW, m_start, m_end, n_start,
-               n_end, actual_result, expected_result);
+               n_end, actual_result, expected_result, "🐛");
   fprintf(file, "\n");
   return iree_make_status(IREE_STATUS_ABORTED,
                           "matmul test failure, details logged above");
@@ -481,27 +515,20 @@ static iree_status_t allocate_buffer_like(iree_hal_allocator_t* hal_allocator,
       iree_hal_buffer_view_element_type(src),
       iree_hal_buffer_view_encoding_type(src),
       (iree_hal_buffer_params_t){
-          .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                  IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-          .usage = IREE_HAL_BUFFER_USAGE_ALL,
+          .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+          .usage =
+              IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
       },
       iree_const_byte_span_empty(), dst);
 }
 
-// Performs a deep copy of |src| into |dst|. Takes care of allocating |dst|.
-static iree_status_t copy_buffer(iree_hal_allocator_t* hal_allocator,
-                                 iree_hal_buffer_view_t* src,
-                                 iree_hal_buffer_view_t** dst) {
-  // TODO(benvanik): change this to use iree_hal_buffer_copy_data. Or something.
-  // I can't understand what all this code is doing.
-  iree_hal_buffer_mapping_t src_mapping = {{0}};
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      iree_hal_buffer_view_buffer(src), IREE_HAL_MAPPING_MODE_PERSISTENT,
-      IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_WHOLE_BUFFER, &src_mapping));
-  iree_const_byte_span_t src_span;
-  src_span.data = src_mapping.contents.data;
-  src_span.data_length = src_mapping.contents.data_length;
-  return iree_hal_buffer_view_allocate_buffer(
+// Performs a deep copy of |src| into a host local |dst| buffer. Takes care of
+// allocating |dst|.
+static iree_status_t clone_buffer(iree_hal_device_t* device,
+                                  iree_hal_allocator_t* hal_allocator,
+                                  iree_hal_buffer_view_t* src,
+                                  iree_hal_buffer_view_t** dst) {
+  iree_status_t status = iree_hal_buffer_view_allocate_buffer(
       hal_allocator, iree_hal_buffer_view_shape_dims(src),
       iree_hal_buffer_view_shape_rank(src),
       iree_hal_buffer_view_element_type(src),
@@ -509,14 +536,25 @@ static iree_status_t copy_buffer(iree_hal_allocator_t* hal_allocator,
       (iree_hal_buffer_params_t){
           .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
                   IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-          .usage = IREE_HAL_BUFFER_USAGE_ALL,
+          .usage =
+              IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
       },
-      src_span, dst);
+      iree_const_byte_span_empty(), dst);
+  if (iree_status_is_ok(status)) {
+    // TODO: move to using d2h version after refactoring the code to not use
+    // `iree_hal_buffer_view_t` for host buffers.
+    status = iree_hal_device_transfer_d2d(
+        device, iree_hal_buffer_view_buffer(src), 0,
+        iree_hal_buffer_view_buffer(*dst), 0,
+        iree_hal_buffer_view_byte_length(src),
+        IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
+  }
+  return status;
 }
 
 static iree_status_t copy_list_of_buffer_views(
-    iree_hal_allocator_t* hal_allocator, iree_vm_list_t* src,
-    iree_vm_list_t** dst) {
+    iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
+    iree_vm_list_t* src, iree_vm_list_t** dst) {
   iree_vm_type_def_t elem_type;
   IREE_RETURN_IF_ERROR(iree_vm_list_element_type(src, &elem_type));
   iree_host_size_t size = iree_vm_list_size(src);
@@ -527,7 +565,8 @@ static iree_status_t copy_list_of_buffer_views(
     iree_hal_buffer_view_t* src_elem;
     IREE_RETURN_IF_ERROR(iree_get_buffer_view_list_item(src, i, &src_elem));
     iree_hal_buffer_view_t* dst_elem;
-    IREE_RETURN_IF_ERROR(copy_buffer(hal_allocator, src_elem, &dst_elem));
+    IREE_RETURN_IF_ERROR(
+        clone_buffer(device, hal_allocator, src_elem, &dst_elem));
     iree_vm_ref_t dst_elem_ref = {0};
     IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(
         dst_elem, iree_hal_buffer_view_type_id(), &dst_elem_ref));
@@ -605,14 +644,15 @@ static iree_status_t replay_event_call(iree_trace_replay_t* replay,
   IREE_RETURN_IF_ERROR(iree_trace_replay_event_call_prepare(
       replay, document, event_node, &function, &input_list));
 
-  // Perform a deep copy of the input list to pass to the test function.
+  // Perform a deep copy of the input list into a host local buffer
+  // and keep it for verification.
   // Rationale: the test function may mutate some of the input list elements,
   // e.g. input-output parameters. For instance, the accumulator input of a
   // linalg.matmul. We need to preserve the original test inputs to run the
   // reference matmul on and to use in test failure logs.
-  iree_vm_list_t* copy_of_input_list = NULL;
-  IREE_CHECK_OK(copy_list_of_buffer_views(device_allocator, input_list,
-                                          &copy_of_input_list));
+  iree_vm_list_t* host_copy_of_input_list = NULL;
+  IREE_CHECK_OK(copy_list_of_buffer_views(
+      replay->device, device_allocator, input_list, &host_copy_of_input_list));
 
   // Invoke the function to produce the actual result.
   iree_vm_list_t* output_list = NULL;
@@ -621,12 +661,17 @@ static iree_status_t replay_event_call(iree_trace_replay_t* replay,
                                     replay->host_allocator, &output_list));
   IREE_CHECK_OK(iree_vm_invoke(
       replay->context, function, IREE_VM_INVOCATION_FLAG_NONE, /*policy=*/NULL,
-      copy_of_input_list, output_list, replay->host_allocator));
+      input_list, output_list, replay->host_allocator));
 
   // Get the actual_result buffer from the output_list.
   iree_hal_buffer_view_t* actual_result;
   IREE_RETURN_IF_ERROR(
       iree_get_buffer_view_list_item(output_list, 0, &actual_result));
+
+  // Copy the results to a host local buffer to be able to map it.
+  iree_hal_buffer_view_t* host_copy_actual_result = NULL;
+  clone_buffer(replay->device, device_allocator, actual_result,
+               &host_copy_actual_result);
 
   // Allocate an expected_result buffer, with same shape as actual_result.
   iree_hal_buffer_view_t* expected_result;
@@ -634,16 +679,19 @@ static iree_status_t replay_event_call(iree_trace_replay_t* replay,
       allocate_buffer_like(device_allocator, actual_result, &expected_result));
 
   // Use the reference matmul implementation to fill expected_result
-  IREE_RETURN_IF_ERROR(reference_matmul(input_list, expected_result));
+  IREE_RETURN_IF_ERROR(
+      reference_matmul(host_copy_of_input_list, expected_result));
 
   // Check that actual_result and expected_result agree.
-  IREE_CHECK_OK(iree_check_matmul(input_list, actual_result, expected_result));
+  IREE_CHECK_OK(iree_check_matmul(host_copy_of_input_list,
+                                  host_copy_actual_result, expected_result));
 
   // Clean up.
   iree_vm_list_release(input_list);
-  iree_vm_list_release(copy_of_input_list);
+  iree_vm_list_release(host_copy_of_input_list);
   iree_vm_list_release(output_list);  // releases actual_result
   iree_hal_buffer_view_release(expected_result);
+  iree_hal_buffer_view_release(host_copy_actual_result);
 
   return iree_ok_status();
 }

@@ -45,7 +45,7 @@ class UnaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
             srcOp, adaptor.getOperand().getType(), adaptor.getOperand());
         break;
       default:
-        llvm_unreachable("invalid target type");
+        assert(false && "invalid target type");
     }
     return success();
   }
@@ -74,7 +74,7 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
             adaptor.getRhs());
         break;
       default:
-        llvm_unreachable("invalid target type");
+        assert(false && "invalid target type");
     }
     return success();
   }

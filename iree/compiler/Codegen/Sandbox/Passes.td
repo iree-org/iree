@@ -9,7 +9,7 @@
 
 include "mlir/Pass/PassBase.td"
 
-def LinalgFuse : Pass<"linalg-fuse", "FuncOp"> {
+def LinalgFuse : Pass<"linalg-fuse", "func::FuncOp"> {
   let summary = "Pass to tile and fuse linalg operations.";
   let constructor = "mlir::createLinalgFusePass()";
   let options = [
@@ -20,21 +20,27 @@ def LinalgFuse : Pass<"linalg-fuse", "FuncOp"> {
 
     // Tiling options.
     ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes",
-               "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
+               "llvm::cl::ZeroOrMore">,
     ListOption<"tileInterchange", "tile-interchange", "int64_t",
                 "Tile loop interchange",
-                "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
+                "llvm::cl::ZeroOrMore">,
     Option<"pad", "pad", "bool", /*default=*/"false",
       "Pad the anchor op operands.">,
+    ListOption<"paddingValues", "padding-values", "std::string",
+               "Operand padding values."
+               "llvm::cl::ZeroOrMore">,
+    ListOption<"paddingDimensions", "padding-dimensions", "int64_t",
+               "Operation iterator dimensions to pad."
+               "llvm::cl::ZeroOrMore">,
     ListOption<"packPaddings", "pack-paddings", "int64_t",
                "Operand packing flags.",
-               "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
+               "llvm::cl::ZeroOrMore">,
     ListOption<"hoistPaddings", "hoist-paddings", "int64_t",
                "Hoist padding depths.",
-               "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
+               "llvm::cl::ZeroOrMore">,
     ListOption<"transposePaddings", "transpose-paddings", "std::string",
                "Transpose paddings.",
-               "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
+               "llvm::cl::ZeroOrMore">,
     // Vectorization options.
     Option<"vectorize", "vectorize", "bool", /*default=*/"false",
       "Rewrite the linalg op as a vector operation.">,
@@ -43,7 +49,9 @@ def LinalgFuse : Pass<"linalg-fuse", "FuncOp"> {
 
     // IREE specific options
     Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
-      "Use default tiling level used to retrieve the configuration from lowering_config">
+      "Use default tiling level used to retrieve the configuration from lowering_config">,
+    Option<"doIREEDistribution", "do-iree-distribution", "bool", /*default=*/"false",
+      "Apply IREE distribution during tiling">,
   ];
   let dependentDialects = [
     "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",
@@ -54,7 +62,7 @@ def LinalgFuse : Pass<"linalg-fuse", "FuncOp"> {
 }
 
 def LinalgSingleTilingExpert
-    : Pass<"linalg-single-tiling-expert-driver", "FuncOp"> {
+    : Pass<"linalg-single-tiling-expert-driver", "func::FuncOp"> {
   let summary = "Pass to drive transformations on Linalg on tensors.";
   let constructor = "mlir::createLinalgSingleTilingExpertPass()";
   let options = [
@@ -66,23 +74,26 @@ def LinalgSingleTilingExpert
 
     // Tiling options.
     ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes",
-               "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
+               "llvm::cl::ZeroOrMore">,
     ListOption<"tileInterchange", "tile-interchange", "int64_t",
                 "Tile loop interchange",
-                "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
+                "llvm::cl::ZeroOrMore">,
     ListOption<"peeledLoops", "peeled-loops", "int64_t", "Peeled loops",
-               "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
+               "llvm::cl::ZeroOrMore">,
     Option<"pad", "pad", "bool", /*default=*/"false",
       "Pad the anchor op operands.">,
+    ListOption<"paddingValues", "padding-values", "std::string",
+               "Operand padding values."
+               "llvm::cl::ZeroOrMore">,
     ListOption<"packPaddings", "pack-paddings", "int64_t",
                "Operand packing flags.",
-               "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
+               "llvm::cl::ZeroOrMore">,
     ListOption<"hoistPaddings", "hoist-paddings", "int64_t",
                "Hoist padding depths.",
-               "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
+               "llvm::cl::ZeroOrMore">,
     ListOption<"transposePaddings", "transpose-paddings", "std::string",
                "Transpose paddings.",
-               "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
+               "llvm::cl::ZeroOrMore">,
     Option<"scalarizeDynamicDims", "scalarize-dynamic-dims", "bool",
       /*default=*/"false", "Tile dynamic dimensions by 1.">,
 
@@ -91,7 +102,7 @@ def LinalgSingleTilingExpert
       "Convert named operations to their generic form.">,
     ListOption<"iteratorInterchange", "iterator-interchange", "int64_t",
                "Interator interchange.",
-               "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
+               "llvm::cl::ZeroOrMore">,
 
     // Decomposition options.
     // TODO: atm this is applied to all supported ops. If/when we need finer
@@ -119,7 +130,7 @@ def LinalgSingleTilingExpert
   ];
 }
 
-def LinalgVectorLowering : Pass<"linalg-vector-lowering", "FuncOp"> {
+def LinalgVectorLowering : Pass<"linalg-vector-lowering", "func::FuncOp"> {
   let summary = "Run transformations that lower high-level vectors.";
   let constructor = "mlir::createLinalgVectorLoweringPass()";
   let options = [
@@ -174,7 +185,7 @@ def LinalgVectorLowering : Pass<"linalg-vector-lowering", "FuncOp"> {
   ];
 }
 
-def UnrollOneVectorOp : Pass<"unroll-one-vector-op", "FuncOp"> {
+def UnrollOneVectorOp : Pass<"unroll-one-vector-op", "func::FuncOp"> {
   let summary = "Pass to unroll a vector op to a target size.";
   let constructor = "mlir::createUnrollOneVectorOpPass()";
   let options = [
@@ -185,9 +196,9 @@ def UnrollOneVectorOp : Pass<"unroll-one-vector-op", "FuncOp"> {
 
     // UnrollOneVectorOp options.
     ListOption<"sourceShape", "source-shape", "int64_t", "Source vector shape",
-               "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
+               "llvm::cl::ZeroOrMore">,
     ListOption<"targetShape", "target-shape", "int64_t", "Target vector shape",
-               "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
+               "llvm::cl::ZeroOrMore">,
   ];
   let dependentDialects = [
     "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",
@@ -197,7 +208,7 @@ def UnrollOneVectorOp : Pass<"unroll-one-vector-op", "FuncOp"> {
   ];
 }
 
-def UnrollOneParentLoop : Pass<"unroll-one-parent-loop", "FuncOp"> {
+def UnrollOneParentLoop : Pass<"unroll-one-parent-loop", "func::FuncOp"> {
   let summary = "Pass to unroll the k^th parent loop of an op by some amount.";
   let constructor = "mlir::createUnrollOneParentLoopPass()";
   let options = [
@@ -220,7 +231,7 @@ def UnrollOneParentLoop : Pass<"unroll-one-parent-loop", "FuncOp"> {
   ];
 }
 
-def OutlineOneParentLoop : Pass<"outline-one-parent-loop", "FuncOp"> {
+def OutlineOneParentLoop : Pass<"outline-one-parent-loop", "func::FuncOp"> {
   let summary = "Pass to outline the k^th parent loop of an op.";
   let constructor = "mlir::createOutlineOneParentLoopPass()";
   let options = [

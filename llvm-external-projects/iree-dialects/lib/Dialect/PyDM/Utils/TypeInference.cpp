@@ -6,6 +6,7 @@
 
 #include "iree-dialects/Dialect/PyDM/Utils/TypeInference.h"
 
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/TypeRange.h"
 
@@ -49,7 +50,8 @@ Block *PermutedTypePropagator::findBlockPermutation(ParentBlockInfo *parentInfo,
                                                     FunctionType signature) {
   for (PermutedBlockInfo *info = parentInfo->permutationHead; info;
        info = info->next) {
-    if (info->signature == signature) return info->permutedBlock;
+    if (info->signature == signature)
+      return info->permutedBlock;
   }
   return nullptr;
 }
@@ -57,7 +59,8 @@ Block *PermutedTypePropagator::findBlockPermutation(ParentBlockInfo *parentInfo,
 static bool checkAllBlockArgsMapped(Block *block,
                                     BlockAndValueMapping &mapping) {
   for (Value arg : block->getArguments()) {
-    if (!mapping.contains(arg)) return false;
+    if (!mapping.contains(arg))
+      return false;
   }
   return true;
 }
@@ -95,12 +98,13 @@ PermutedTypePropagator::findMismatchedBlockPredecessors(Block *block) {
     auto branchOp = llvm::cast<BranchOpInterface>(terminator);
     unsigned successorIndex = 0;
     for (Block *successor : terminator->getSuccessors()) {
-      if (successor == block) break;
+      if (successor == block)
+        break;
       successorIndex += 1;
     }
-    auto successorOperands = branchOp.getSuccessorOperands(successorIndex);
-    assert(successorOperands && "expected branch with explicit operands");
-    TypeRange operandTypes(*successorOperands);
+    auto successorOperands =
+        branchOp.getSuccessorOperands(successorIndex).getForwardedOperands();
+    TypeRange operandTypes(successorOperands);
     if (block->getArgumentTypes() != operandTypes) {
       results.push_back(BlockPredecessor{
           branchOp, successorIndex,

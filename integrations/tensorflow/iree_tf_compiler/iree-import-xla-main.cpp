@@ -223,12 +223,12 @@ int main(int argc, char **argv) {
         return 1;
       }
       sourceMgr.AddNewSourceBuffer(std::move(file), SMLoc());
-      module = parseSourceFile(sourceMgr, &context);
+      module = parseSourceFile<ModuleOp>(sourceMgr, &context);
       if (!module) return 2;
       break;
     }
     default:
-      llvm_unreachable("illegal XlaFormat");
+      assert(false && "illegal XlaFormat");
   }
 
   // Find the entry function and annotate it as exported.

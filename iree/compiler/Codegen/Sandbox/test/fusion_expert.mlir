@@ -1,13 +1,13 @@
-// RUN: iree-opt -pass-pipeline="builtin.func(linalg-fuse{tiling-level=0 vectorize}), canonicalize, cse" -split-input-file %s | FileCheck %s
+// RUN: iree-opt -pass-pipeline="func.func(linalg-fuse{tiling-level=0 vectorize}), canonicalize, cse" -split-input-file %s | FileCheck %s
 
-func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<?xf32>) -> tensor<?x?xf32> {
+func.func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<?xf32>) -> tensor<?x?xf32> {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
   %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
   %init = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
-  %0 = linalg.fill(%cst, %init) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+  %0 = linalg.fill ins(%cst : f32) outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
   %1 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[10, 20, 30]]>}
       ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
       outs(%0 : tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -35,12 +35,12 @@ func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : 
 
 // -----
 
-func @matmul_bias_add_static(%arg0 : tensor<20x60xf32>, %arg1 : tensor<60x120xf32>, %arg2 : tensor<120xf32>) -> tensor<20x120xf32> {
+func.func @matmul_bias_add_static(%arg0 : tensor<20x60xf32>, %arg1 : tensor<60x120xf32>, %arg2 : tensor<120xf32>) -> tensor<20x120xf32> {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %init = linalg.init_tensor [20, 120] : tensor<20x120xf32>
-  %0 = linalg.fill(%cst, %init) : f32, tensor<20x120xf32> -> tensor<20x120xf32>
+  %0 = linalg.fill ins(%cst : f32) outs(%init : tensor<20x120xf32>) -> tensor<20x120xf32>
   %1 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[10, 20, 30]]>}
       ins(%arg0, %arg1 : tensor<20x60xf32>, tensor<60x120xf32>)
       outs(%0 : tensor<20x120xf32>) -> tensor<20x120xf32>

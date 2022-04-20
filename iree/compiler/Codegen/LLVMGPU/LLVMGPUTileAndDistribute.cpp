@@ -5,13 +5,13 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
-#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
@@ -167,13 +167,8 @@ static void populateTilingToInvocationPatterns(
      // FFT doesn't support second level of tiling yet.
      return success(!isa<IREE::LinalgExt::FftOp>(op));
    }).setMatchByDefault();
-  linalg::TilingPatterns<
-      linalg::MatmulOp, linalg::FillOp, linalg::BatchMatmulOp,
-      linalg::GenericOp, linalg::Conv2DNhwcHwcfOp,
-      linalg::DepthwiseConv2DNhwcHwcOp, linalg::DepthwiseConv2DNhwcHwcmOp,
-      linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMinOp,
-      linalg::PoolingNhwcSumOp>::insert(patterns, tilingOptions, f);
-  patterns.insert<IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
+  patterns.insert<linalg::LinalgTilingPattern,
+                  IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
       context, tilingOptions, f);
 }
 
@@ -183,42 +178,11 @@ static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
   return success();
 }
 
-static Optional<Value> allocateWorkgroupMemory(
-    OpBuilder &b, memref::SubViewOp subview,
-    ArrayRef<Value> boundingSubViewSize, DataLayout &layout) {
-  OpBuilder::InsertionGuard guard(b);
-  FuncOp funcOp = subview->getParentOfType<FuncOp>();
-  if (!funcOp) {
-    subview.emitError("expected op to be within std.func");
-    return llvm::None;
-  }
-
-  // The bounding subview size is expected to be constant. This specified the
-  // shape of the allocation.
-  SmallVector<int64_t, 2> shape = llvm::to_vector<2>(
-      llvm::map_range(boundingSubViewSize, [](Value v) -> int64_t {
-        APInt value;
-        if (matchPattern(v, m_ConstantInt(&value))) return value.getSExtValue();
-        return -1;
-      }));
-  if (llvm::any_of(shape, [](int64_t v) { return v == -1; })) return {};
-  MemRefType allocType =
-      MemRefType::get(shape, subview.getType().getElementType(), {},
-                      gpu::GPUDialect::getWorkgroupAddressSpace());
-  b.setInsertionPoint(&funcOp.front(), funcOp.front().begin());
-  Value buffer = b.create<memref::AllocOp>(funcOp.getLoc(), allocType);
-  return buffer;
-}
-
-static LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
-  // Nothing to do.
-  return success();
-}
-
 static void populatePromotionPatterns(MLIRContext *context,
                                       RewritePatternSet &patterns) {
   patterns.insert<linalg::LinalgPromotionPattern<linalg::MatmulOp>,
-                  linalg::LinalgPromotionPattern<linalg::BatchMatmulOp>>(
+                  linalg::LinalgPromotionPattern<linalg::BatchMatmulOp>,
+                  linalg::LinalgPromotionPattern<linalg::GenericOp>>(
       context,
       linalg::LinalgPromotionOptions()
           .setAllocationDeallocationFns(allocateWorkgroupMemory,
@@ -228,7 +192,13 @@ static void populatePromotionPatterns(MLIRContext *context,
           .setUseFullTileBuffers({false, false}),
       linalg::LinalgTransformationFilter(
           {StringAttr::get(context, getWorkgroupKTiledMarker())},
-          StringAttr::get(context, getWorkgroupMemoryMarker())));
+          StringAttr::get(context, getWorkgroupMemoryMarker()))
+          .addFilter([](Operation *op) {
+            auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+            if (!linalgOp) return failure();
+            return success(linalg::isaContractionOpInterface(op) &&
+                           linalgOp.getNumParallelLoops() >= 2);
+          }));
 }
 
 namespace {
@@ -362,7 +332,7 @@ struct LLVMGPUTileAndDistributePass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUTileAndDistribute(
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
     bool distributeToWarp) {
   return std::make_unique<LLVMGPUTileAndDistributePass>(distributeToWarp);
 }

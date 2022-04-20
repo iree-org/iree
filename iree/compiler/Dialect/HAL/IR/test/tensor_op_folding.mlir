@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -canonicalize -cse %s | iree-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @foldTensorImportExport
-func @foldTensorImportExport(%arg0: !hal.buffer_view) -> !hal.buffer_view {
+func.func @foldTensorImportExport(%arg0: !hal.buffer_view) -> !hal.buffer_view {
   // CHECK-NOT: hal.tensor.import
   %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<5xi32>
   // CHECK-NOT: hal.tensor.export
@@ -18,7 +18,7 @@ func @foldTensorImportExport(%arg0: !hal.buffer_view) -> !hal.buffer_view {
 // For now we just don't fold.
 
 // CHECK-LABEL: @foldTensorImportExportTypeMismatch
-func @foldTensorImportExportTypeMismatch(%arg0: !hal.buffer_view) -> !hal.buffer {
+func.func @foldTensorImportExportTypeMismatch(%arg0: !hal.buffer_view) -> !hal.buffer {
   // CHECK: hal.tensor.import
   %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<5xi32>
   // CHECK: hal.tensor.export
@@ -29,7 +29,7 @@ func @foldTensorImportExportTypeMismatch(%arg0: !hal.buffer_view) -> !hal.buffer
 // -----
 
 // CHECK-LABEL: @foldTensorExportImport
-func @foldTensorExportImport(%arg0: tensor<5xi32>) -> tensor<5xi32> {
+func.func @foldTensorExportImport(%arg0: tensor<5xi32>) -> tensor<5xi32> {
   // CHECK-NOT: hal.tensor.export
   %0 = hal.tensor.export %arg0 : tensor<5xi32> -> !hal.buffer_view
   // CHECK-NOT: hal.tensor.import

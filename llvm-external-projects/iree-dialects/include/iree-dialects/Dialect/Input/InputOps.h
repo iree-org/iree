@@ -19,4 +19,4 @@
 #define GET_OP_CLASSES
 #include "iree-dialects/Dialect/Input/InputOps.h.inc"
 
-#endif  // IREE_DIALECTS_DIALECT_INPUT_OPS_H
+#endif // IREE_DIALECTS_DIALECT_INPUT_OPS_H

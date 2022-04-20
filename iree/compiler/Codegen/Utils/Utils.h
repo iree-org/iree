@@ -11,9 +11,14 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/Triple.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/ViewLikeInterface.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -25,30 +30,46 @@ static constexpr unsigned kNumMaxParallelDims = 3;
 //===----------------------------------------------------------------------===//
 
 /// Returns true if the given `func` is a kernel dispatch entry point.
-bool isEntryPoint(FuncOp func);
+bool isEntryPoint(func::FuncOp func);
 
 /// Returns a map from function symbol name to corresponding entry point op.
 llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
     ModuleOp module);
 
 /// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
-IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
+IREE::HAL::ExecutableEntryPointOp getEntryPoint(func::FuncOp funcOp);
 
 /// Methods to get backend information.
 bool isX86(IREE::HAL::ExecutableVariantOp variantOp);
-inline bool isX86(FuncOp entryPointFn) {
+inline bool isX86(func::FuncOp entryPointFn) {
   auto variantOp =
       entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   return isX86(variantOp);
 }
+
+/// Returns true if the 'op' is or is enclosed in a HAL::ExecutableVarianOp that
+/// contains '+avx2' in its cpu features.
+bool hasAVX2Features(Operation *op);
+
+bool isRISCV(IREE::HAL::ExecutableVariantOp variantOp);
+inline bool isRISCV(func::FuncOp entryPointFn) {
+  auto variantOp =
+      entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  return isRISCV(variantOp);
+}
 inline bool isVMVXBackend(IREE::HAL::ExecutableVariantOp variantOp) {
   return variantOp.target().getBackend().getValue() == "vmvx";
 }
-inline bool isVMVXBackend(FuncOp entryPointFn) {
+inline bool isVMVXBackend(func::FuncOp entryPointFn) {
   auto variantOp =
       entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   return isVMVXBackend(variantOp);
 }
+
+/// Checks if a tensor value is generated from a read-only object, like
+/// and interface binding with read-only attribute or from an `arith.constant`
+/// operation.
+bool isReadOnly(Value v);
 
 //===----------------------------------------------------------------------===//
 // Utility functions to set configurations
@@ -116,14 +137,14 @@ struct LoopTilingAndDistributionInfo {
 /// other cases.
 using RootOpFilteringFn = std::function<bool(Operation *)>;
 LogicalResult getFilteredOps(
-    FuncOp funcOp, RootOpFilteringFn filteringFn,
+    func::FuncOp funcOp, RootOpFilteringFn filteringFn,
     SmallVectorImpl<Operation *> &filteredOps,
     SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops);
 
 /// Specialization of `getFilteredOps` for filtering `LinalgOp`s and
 /// `LinagExtOp`s.
 LogicalResult getComputeOps(
-    FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
+    func::FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
     SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops);
 
 /// If the given `forOp` is a tiled and distributed loop, returns its tiling and
@@ -133,10 +154,15 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
 
 /// Collects information about loops matching tiled+distribute pattern.
 SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
-    FuncOp funcOp);
+    func::FuncOp funcOp);
 
 Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
                               ArrayRef<NamedAttribute> attributes = {});
+
+/// Returns the option that distributes the ops using the flow workgroup
+/// ID/Count operations.
+linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions();
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

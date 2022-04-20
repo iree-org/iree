@@ -23,9 +23,9 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
+    "FusionUtils.h"
     "Passes.h"
     "Passes.h.inc"
-    "TypeConverter.h"
   SRCS
     "CaptureDispatchDynamicDims.cpp"
     "CleanupNumericNarrowing.cpp"
@@ -33,13 +33,14 @@ iree_cc_library(
     "ConvertConv2D1x1ToMatmulPass.cpp"
     "ConvertConv2DToImg2ColPass.cpp"
     "ConvertLinalgMatmulToMmt4D.cpp"
-    "ConvertToFlow.cpp"
     "DeduplicateExecutables.cpp"
     "DispatchLinalgOnTensors.cpp"
     "ExpandTensorShapes.cpp"
     "ExportBenchmarkFuncs.cpp"
     "FusionOfTensorOps.cpp"
+    "FusionUtils.cpp"
     "InferNumericNarrowing.cpp"
+    "InitializeEmptyTensors.cpp"
     "InjectDispatchTracing.cpp"
     "InterchangeGenericOps.cpp"
     "OptimizeNumerics.cpp"
@@ -48,10 +49,10 @@ iree_cc_library(
     "PadTensorToSubTensorInsert.cpp"
     "PassDetail.h"
     "Passes.cpp"
+    "SplitReduction.cpp"
     "StripAndSplatConstantVariables.cpp"
     "StripSignednessPass.cpp"
     "TestPartitionableLoopsInterface.cpp"
-    "TypeConverter.cpp"
     "VerifyInputLegality.cpp"
   DEPS
     ::PassesIncGen
@@ -60,6 +61,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAffine
     MLIRArithmetic
+    MLIRArithmeticUtils
     MLIRControlFlow
     MLIRFunc
     MLIRIR

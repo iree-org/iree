@@ -41,6 +41,9 @@ cc_library(
     deps = [
         ":BufferizationInterfaces",
         ":ProcessorOpInterfaces",
+        # TODO: Remove this dependency once the transform dialect extensions
+        # have a better registration mechanism.
+        "//iree/compiler/Codegen/TransformDialectExtensions",
     ],
 )
 
@@ -55,7 +58,6 @@ cc_library(
     deps = [
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
-        "@llvm-project//mlir:AffineBufferizableOpInterfaceImpl",
         "@llvm-project//mlir:ArithmeticTransforms",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:BufferizationTransforms",

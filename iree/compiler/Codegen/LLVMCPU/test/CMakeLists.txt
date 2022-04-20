@@ -19,16 +19,25 @@ iree_lit_test_suite(
     "hal_interface_constants.mlir"
     "hal_interface_workgroup_info.mlir"
     "illegal_configuration.mlir"
-    "materialize_launch_configuration.mlir"
+    "linalg_transform.mlir"
+    "materialize_aarch64_launch_configuration.mlir"
+    "materialize_riscv_launch_configuration.mlir"
+    "materialize_x86_64_launch_configuration.mlir"
+    "pipeline_tests.mlir"
     "synchronize_symbol_visibility.mlir"
     "test_config_mmt4d.mlir"
     "tile_fuse_and_vectorize.mlir"
+    "transpose_avx2_lowering.mlir"
     "unfused_fma.mlir"
     "vector_contract_to_arm_asm.mlir"
     "vector_contract_to_arm_intrinsics.mlir"
+    "verify_linalg_transform_legality.mlir"
   TOOLS
     FileCheck
+    iree::tools::iree-compile
     iree::tools::iree-opt
+  DATA
+    linalg_transform_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

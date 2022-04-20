@@ -481,7 +481,7 @@ static iree_vm_FunctionSignatureDef_ref_t makeImportFunctionSignatureDef(
   // Generate the signature calling convention string based on types.
   auto cconv = makeImportCallingConventionString(importOp);
   if (!cconv.hasValue()) return {};
-  return createFunctionSignatureDef(importOp.getType(), typeTable,
+  return createFunctionSignatureDef(importOp.getFunctionType(), typeTable,
                                     cconv.getValue(), /*reflectionAttrsRef=*/0,
                                     fbb);
 }
@@ -514,7 +514,7 @@ static iree_vm_FunctionSignatureDef_ref_t makeExportFunctionSignatureDef(
         fbb, reflectionAttrRefs.data(), reflectionAttrRefs.size());
   }
 
-  return createFunctionSignatureDef(funcOp.getType(), typeTable,
+  return createFunctionSignatureDef(funcOp.getFunctionType(), typeTable,
                                     cconv.getValue(), reflectionAttrsRef, fbb);
 }
 
@@ -525,7 +525,7 @@ static iree_vm_FunctionSignatureDef_ref_t makeInternalFunctionSignatureDef(
   // Generate the signature calling convention string based on types.
   auto cconv = makeCallingConventionString(funcOp);
   if (!cconv.hasValue()) return {};
-  return createFunctionSignatureDef(funcOp.getType(), typeTable,
+  return createFunctionSignatureDef(funcOp.getFunctionType(), typeTable,
                                     cconv.getValue(), /*reflectionAttrsRef=*/0,
                                     fbb);
 }
@@ -704,9 +704,13 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
         auto fullNameRef = fbb.createString(importOp.getName());
         auto signatureRef =
             makeImportFunctionSignatureDef(importOp, typeOrdinalMap, fbb);
+        iree_vm_ImportFlagBits_enum_t flags =
+            importOp.is_optional() ? iree_vm_ImportFlagBits_OPTIONAL
+                                   : iree_vm_ImportFlagBits_REQUIRED;
         iree_vm_ImportFunctionDef_start(fbb);
         iree_vm_ImportFunctionDef_full_name_add(fbb, fullNameRef);
         iree_vm_ImportFunctionDef_signature_add(fbb, signatureRef);
+        iree_vm_ImportFunctionDef_flags_add(fbb, flags);
         return iree_vm_ImportFunctionDef_end(fbb);
       }));
   auto exportFuncRefs =
@@ -851,7 +855,7 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
       break;
     }
     default:
-      llvm_unreachable("unimplemented output format");
+      assert(false && "unimplemented output format");
   }
   output.flush();
 

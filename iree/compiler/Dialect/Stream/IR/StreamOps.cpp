@@ -234,13 +234,14 @@ static void eraseStreamRegionResults(Region &region,
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseResourceRegion(
-    OpAsmParser &parser, SmallVectorImpl<OpAsmParser::OperandType> &operands,
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operands,
     SmallVectorImpl<Type> &operandTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &operandSizes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operandSizes,
     SmallVectorImpl<Type> &resultTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &resultSizes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultSizes,
     ArrayAttr &tiedOperands, Region &body) {
-  SmallVector<OpAsmParser::OperandType, 16> regionArgs;
+  SmallVector<OpAsmParser::UnresolvedOperand, 16> regionArgs;
   if (failed(parser.parseLParen())) {
     return failure();
   }
@@ -327,10 +328,12 @@ static void printResourceRegion(OpAsmPrinter &p, Operation *op,
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseExplicitResourceRegion(
-    OpAsmParser &parser, SmallVectorImpl<OpAsmParser::OperandType> &operands,
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operands,
     SmallVectorImpl<Type> &operandTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &operandSizes, Region &body) {
-  SmallVector<OpAsmParser::OperandType, 16> regionArgs;
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operandSizes,
+    Region &body) {
+  SmallVector<OpAsmParser::UnresolvedOperand, 16> regionArgs;
   if (failed(parser.parseLParen())) {
     return failure();
   }
@@ -399,7 +402,7 @@ static void printExplicitResourceRegion(OpAsmPrinter &p, Operation *op,
 
 static ParseResult parsePackSliceRanges(
     OpAsmParser &parser, ArrayAttr &lifetimeIntervals,
-    SmallVectorImpl<OpAsmParser::OperandType> &dynamicSliceSizes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dynamicSliceSizes,
     SmallVectorImpl<Type> &packedOffsetTypes) {
   auto indexType = parser.getBuilder().getIndexType();
   SmallVector<Attribute> lifetimeRangeValues;
@@ -407,7 +410,7 @@ static ParseResult parsePackSliceRanges(
     if (failed(parser.parseOptionalLSquare())) break;
     IntegerAttr lifetimeStart;
     IntegerAttr lifetimeEnd;
-    OpAsmParser::OperandType dynamicSliceSize;
+    OpAsmParser::UnresolvedOperand dynamicSliceSize;
     if (failed(parser.parseAttribute(lifetimeStart, indexType)) ||
         failed(parser.parseComma()) ||
         failed(parser.parseAttribute(lifetimeEnd, indexType)) ||
@@ -455,11 +458,12 @@ static void printPackSliceRanges(OpAsmPrinter &p, Operation *op,
 
 static ParseResult parseConstantValueList(
     OpAsmParser &parser, SmallVectorImpl<Type> &resultTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &resultSizes, ArrayAttr &values) {
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultSizes,
+    ArrayAttr &values) {
   SmallVector<Attribute> valueAttrs;
   do {
     Type resultType;
-    OpAsmParser::OperandType resultSize;
+    OpAsmParser::UnresolvedOperand resultSize;
     Attribute valueAttr;
     if (failed(parseSizeAwareType(parser, resultType, resultSize)) ||
         failed(parser.parseEqual()) ||
@@ -1660,11 +1664,12 @@ LogicalResult CmdDispatchOp::verify() {
 }
 
 static ParseResult parseDispatchResources(
-    OpAsmParser &parser, SmallVectorImpl<OpAsmParser::OperandType> &resources,
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resources,
     SmallVectorImpl<Type> &resourceTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &resourceSizes,
-    SmallVectorImpl<OpAsmParser::OperandType> &resourceOffsets,
-    SmallVectorImpl<OpAsmParser::OperandType> &resourceLengths,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceSizes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceOffsets,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceLengths,
     ArrayAttr &resourceAccesses) {
   SmallVector<Attribute> accessAttrs;
   do {
@@ -1748,7 +1753,8 @@ static void printDispatchResources(OpAsmPrinter &p, Operation *op,
 // This is sloppy because the function has interleaved bindings and operands;
 // if we had our own op we could just reuse the map we have for operands.
 // static
-SmallVector<unsigned> CmdDispatchOp::makeOperandToArgMap(mlir::FuncOp funcOp) {
+SmallVector<unsigned> CmdDispatchOp::makeOperandToArgMap(
+    mlir::func::FuncOp funcOp) {
   unsigned operandCount = llvm::count_if(
       funcOp.getArgumentTypes(),
       [](Type type) { return !type.isa<IREE::Stream::BindingType>(); });
@@ -1765,7 +1771,8 @@ SmallVector<unsigned> CmdDispatchOp::makeOperandToArgMap(mlir::FuncOp funcOp) {
 }
 
 // static
-SmallVector<unsigned> CmdDispatchOp::makeResourceToArgMap(mlir::FuncOp funcOp) {
+SmallVector<unsigned> CmdDispatchOp::makeResourceToArgMap(
+    mlir::func::FuncOp funcOp) {
   unsigned operandCount = llvm::count_if(
       funcOp.getArgumentTypes(),
       [](Type type) { return type.isa<IREE::Stream::BindingType>(); });
@@ -2023,11 +2030,11 @@ void ExecutableExportOp::build(OpBuilder &builder, OperationState &state,
         builder.getStringAttr(sym_name), function_ref);
 }
 
-::mlir::FuncOp ExecutableExportOp::getFunctionRef() {
+::mlir::func::FuncOp ExecutableExportOp::getFunctionRef() {
   auto executableOp =
       this->getOperation()->getParentOfType<IREE::Stream::ExecutableOp>();
   if (!executableOp) return {};
-  return executableOp.getInnerModule().lookupSymbol<::mlir::FuncOp>(
+  return executableOp.getInnerModule().lookupSymbol<::mlir::func::FuncOp>(
       function_ref());
 }
 

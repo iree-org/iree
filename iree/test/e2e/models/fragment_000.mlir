@@ -1,9 +1,9 @@
 // RUN: iree-run-mlir --iree-input-type=mhlo -iree-hal-target-backends=vmvx %s -function-input="f32=0" -function-input="5x1xf32=[1][-2][-3][4][-5]" -function-input="f32=1" -function-input="5x5xf32=[3.46499 -7.64389 -5.72249 5.98053 17.6892][2.9707 -6.20734 -4.25962 4.76055 13.8784][2.47641 -4.77079 -2.79675 3.54056 10.0675][1.98212 -3.33424 -1.33388 2.32058 6.25666][1.48783 -1.8977 0.12899 1.1006 2.4458]" -function-input="5xf32=0 0 0 0 0" | FileCheck %s
-// RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo -iree-hal-target-backends=dylib-llvm-aot %s -function-input="f32=0" -function-input="5x1xf32=[1][-2][-3][4][-5]" -function-input="f32=1" -function-input="5x5xf32=[3.46499 -7.64389 -5.72249 5.98053 17.6892][2.9707 -6.20734 -4.25962 4.76055 13.8784][2.47641 -4.77079 -2.79675 3.54056 10.0675][1.98212 -3.33424 -1.33388 2.32058 6.25666][1.48783 -1.8977 0.12899 1.1006 2.4458]" -function-input="5xf32=0 0 0 0 0" | FileCheck %s)
+// RUN: iree-run-mlir --iree-input-type=mhlo -iree-hal-target-backends=dylib-llvm-aot %s -function-input="f32=0" -function-input="5x1xf32=[1][-2][-3][4][-5]" -function-input="f32=1" -function-input="5x5xf32=[3.46499 -7.64389 -5.72249 5.98053 17.6892][2.9707 -6.20734 -4.25962 4.76055 13.8784][2.47641 -4.77079 -2.79675 3.54056 10.0675][1.98212 -3.33424 -1.33388 2.32058 6.25666][1.48783 -1.8977 0.12899 1.1006 2.4458]" -function-input="5xf32=0 0 0 0 0" | FileCheck %s
 // RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo -iree-hal-target-backends=vulkan-spirv %s -function-input="f32=0" -function-input="5x1xf32=[1][-2][-3][4][-5]" -function-input="f32=1" -function-input="5x5xf32=[3.46499 -7.64389 -5.72249 5.98053 17.6892][2.9707 -6.20734 -4.25962 4.76055 13.8784][2.47641 -4.77079 -2.79675 3.54056 10.0675][1.98212 -3.33424 -1.33388 2.32058 6.25666][1.48783 -1.8977 0.12899 1.1006 2.4458]" -function-input="5xf32=0 0 0 0 0" | FileCheck %s)
 
 // CHECK-LABEL: EXEC @main_entry_dispatch_3
-func @main_entry_dispatch_3(
+func.func @main_entry_dispatch_3(
     %0: tensor<f32>,
     %1: tensor<5x1xf32>,
     %2: tensor<f32>,
@@ -13,7 +13,7 @@ func @main_entry_dispatch_3(
   %6 = "mhlo.broadcast_in_dim"(%2) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.9"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %7 = mhlo.multiply %5, %6 : tensor<5x1x5xf32>
   %8 = "mhlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.47"} : (tensor<f32>) -> tensor<5x1x5xf32>
-  %9 = "mhlo.compare"(%7, %8) {comparison_direction = "GT"} : (tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xi1>
+  %9 = "mhlo.compare"(%7, %8) {comparison_direction = #mhlo<"comparison_direction GT">} : (tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xi1>
   %10 = "mhlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.11"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %11 = "mhlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.67"} : (tensor<f32>) -> tensor<5x5xf32>
   %12 = "mhlo.broadcast_in_dim"(%4) {broadcast_dimensions = dense<1> : tensor<1xi64>, name = "broadcast.64"} : (tensor<5xf32>) -> tensor<5x5xf32>

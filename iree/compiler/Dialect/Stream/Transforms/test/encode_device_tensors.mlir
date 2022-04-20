@@ -4,7 +4,7 @@
 stream.executable private @convert_load_i1 {
   stream.executable.export public @dispatch
   builtin.module {
-    func @dispatch(%arg0: !stream.binding) {
+    func.func @dispatch(%arg0: !stream.binding) {
       %c0 = arith.constant 0 : index
       // CHECK: %[[BINDING:.+]] = stream.binding.subspan {{.+}} -> !flow.dispatch.tensor<readonly:4xi8>
       %binding = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:4xi1>
@@ -24,11 +24,11 @@ stream.executable private @convert_load_i1 {
 stream.executable private @convert_store_i1 {
   stream.executable.export public @dispatch
   builtin.module {
-    func @dispatch(%arg0: !stream.binding) {
+    func.func @dispatch(%arg0: !stream.binding) {
       %c0 = arith.constant 0 : index
+      // CHECK-DAG: %[[TILE_I8:.+]] = arith.constant dense<[0, 0, 1, 1]> : tensor<4xi8>
       // CHECK-DAG: %[[BINDING:.+]] = stream.binding.subspan {{.+}} -> !flow.dispatch.tensor<writeonly:4xi8>
       %binding = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:4xi1>
-      // CHECK-DAG: %[[TILE_I8:.+]] = arith.extui %cst : tensor<4xi1> to tensor<4xi8>
       %cst = arith.constant dense<[false, false, true, true]> : tensor<4xi1>
       // CHECK-NEXT: flow.dispatch.tensor.store %[[TILE_I8]], %[[BINDING]], {{.+}} : tensor<4xi8> -> !flow.dispatch.tensor<writeonly:4xi8>
       flow.dispatch.tensor.store %cst, %binding, offsets = [0], sizes = [4], strides = [1] : tensor<4xi1> -> !flow.dispatch.tensor<writeonly:4xi1>
@@ -43,7 +43,7 @@ stream.executable private @convert_store_i1 {
 stream.executable private @convert_multi_i1 {
   stream.executable.export public @dispatch
   builtin.module {
-    func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding) {
+    func.func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding) {
       %c0 = arith.constant 0 : index
       // CHECK-DAG: %[[BINDING0:.+]] = stream.binding.subspan %arg0{{.+}} -> !flow.dispatch.tensor<readonly:4xi8>
       %binding0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:4xi1>
@@ -71,7 +71,7 @@ stream.executable private @convert_multi_i1 {
 stream.executable private @convert_load_i33 {
   stream.executable.export public @dispatch
   builtin.module {
-    func @dispatch(%arg0: !stream.binding) {
+    func.func @dispatch(%arg0: !stream.binding) {
       %c0 = arith.constant 0 : index
       // CHECK: %[[BINDING:.+]] = stream.binding.subspan {{.+}} -> !flow.dispatch.tensor<readonly:4xi64>
       %binding = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:4xi33>

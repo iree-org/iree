@@ -54,7 +54,7 @@ else
   SWIFTSHADER_INSTALL_DIR="${BASE_DIR?}"'\.swiftshader'
 fi
 
-SWIFTSHADER_COMMIT=755b78dc66b2362621a78b6964a9df3af94e960c
+SWIFTSHADER_COMMIT=57eca9df5dc56d290f662ace7481ed758618d559
 SWIFTSHADER_DIR="$(mktemp --directory --tmpdir swiftshader_XXXXXX)"
 
 #  Clone swiftshader and checkout the appropriate commit.
@@ -77,11 +77,6 @@ fi
 
 cmake -B "${SWIFTSHADER_INSTALL_DIR?}" \
     -GNinja \
-    -DSWIFTSHADER_BUILD_VULKAN=ON \
-    -DSWIFTSHADER_BUILD_EGL=OFF \
-    -DSWIFTSHADER_BUILD_GLESv2=OFF \
-    -DSWIFTSHADER_BUILD_GLES_CM=OFF \
-    -DSWIFTSHADER_BUILD_PVR=OFF \
     -DSWIFTSHADER_BUILD_TESTS=OFF \
     "${SWIFTSHADER_DIR?}"
 

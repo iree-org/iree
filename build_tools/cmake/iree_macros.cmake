@@ -298,10 +298,6 @@ function(iree_add_test_environment_properties TEST_NAME)
   if(NOT "${IREE_TARGET_BACKEND_VULKAN_SPIRV}" OR NOT "${IREE_HAL_DRIVER_VULKAN}")
     set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "IREE_VULKAN_DISABLE=1")
   endif()
-  if(NOT "${IREE_TARGET_BACKEND_DYLIB_LLVM_AOT}" OR NOT "${IREE_HAL_DRIVER_DYLIB}"
-     OR NOT "${IREE_HAL_DRIVER_DYLIB_SYNC}")
-    set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "IREE_LLVMAOT_DISABLE=1")
-  endif()
 endfunction()
 
 # iree_check_defined

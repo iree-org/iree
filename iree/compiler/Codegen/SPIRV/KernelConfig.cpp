@@ -6,6 +6,9 @@
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 
+#include <functional>
+#include <numeric>
+
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
@@ -151,7 +154,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
     return success();
   }
 
-  auto funcOp = linalgOp->getParentOfType<FuncOp>();
+  auto funcOp = linalgOp->getParentOfType<func::FuncOp>();
   return setOpConfigAndEntryPointFnTranslation(funcOp, linalgOp, tileSizes,
                                                pipeline, workgroupSize);
 }
@@ -164,9 +167,10 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
 
 namespace detail {
 
-LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
+LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
                                 std::array<int64_t, 2> bestWorkgroupSizeXY,
-                                std::array<int64_t, 3> bestThreadTileSizeMNK) {
+                                std::array<int64_t, 3> bestThreadTileSizeMNK,
+                                bool useWorkgroupMemory) {
   auto lhsType = op.inputs()[0].getType().cast<ShapedType>();
   auto elementBits = lhsType.getElementType().getIntOrFloatBitWidth();
   if (elementBits != 16 && elementBits != 32) return success();
@@ -265,13 +269,23 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
   }
   if (reductionTileSizes[2 + isBM] == 0) return success();
 
-  auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize;
+  auto totalThreads =
+      std::accumulate(workgroupSize.begin(), workgroupSize.end(), 1,
+                      std::multiplies<int64_t>());
+  auto pipeline =
+      (useWorkgroupMemory && totalThreads > subgroupSize)
+          ? IREE::Codegen::DispatchLoweringPassPipeline::
+                SPIRVVectorizeWithWorkgroupMemory
+          : IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize;
+
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
   tileSizes.push_back(invocationTileSizes);
   tileSizes.push_back(reductionTileSizes);
+
   return setOpConfigAndEntryPointFnTranslation(
-      op->getParentOfType<FuncOp>(), op, tileSizes, pipeline, workgroupSize);
+      op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
+      workgroupSize);
 }
 
 }  // namespace detail
@@ -310,7 +324,8 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
   }
   TileSizesListType tileSizes = {workgroupTileSize};
   return setOpConfigAndEntryPointFnTranslation(
-      op->getParentOfType<FuncOp>(), op, tileSizes, pipeline, workgroupSize);
+      op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
+      workgroupSize);
 }
 
 //===----------------------------------------------------------------------===//
@@ -320,7 +335,7 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                         Operation *op) {
   LLVM_DEBUG(llvm::dbgs() << "Using default config for op: " << *op << "\n");
-  FuncOp funcOp = op->getParentOfType<FuncOp>();
+  func::FuncOp funcOp = op->getParentOfType<func::FuncOp>();
   auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
@@ -392,7 +407,8 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   // Whether we can try to use the vectorization pipeline.
   Optional<SmallVector<int64_t, 4>> loopBounds = linalgOp.getStaticLoopRanges();
   bool vectorizable =
-      !linalgOp.hasIndexSemantics() &&
+      // The vectorization pipeline assumes tensor semantics when tiling.
+      !linalgOp.hasBufferSemantics() && !linalgOp.hasIndexSemantics() &&
       // Skip vectorization for non-minor identity inputs as it generates
       // vector.transfer_read ops with permutation maps that we currently
       // cannot lower.
@@ -513,6 +529,9 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
   // First try to find a proper CodeGen configuration to tile and vectorize for
   // the current target architecture.
   switch (targetEnv.getVendorID()) {
+    case spirv::Vendor::AMD:
+      result = detail::setAMDCodeGenConfig(targetEnv, rootOp);
+      break;
     case spirv::Vendor::ARM:
       result = detail::setMaliCodeGenConfig(targetEnv, rootOp);
       break;
@@ -535,10 +554,12 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([limits](auto op) {
-        // Try to tile and vectorize first.
+        // Try to tile and vectorize first. It's common to see 32 threads
+        // per subgroup for GPUs.
         std::array<int64_t, 2> workgroupXY = {32, 2};
         std::array<int64_t, 3> threadMNK = {8, 8, 4};
-        auto result = detail::setMatmulOpConfig(op, workgroupXY, threadMNK);
+        auto result = detail::setMatmulOpConfig(op, /*subgroupSize=*/32,
+                                                workgroupXY, threadMNK);
         if (failed(result)) return result;
         if (getLoweringConfig(op)) return result;
 
@@ -588,7 +609,7 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
   spirv::TargetEnv targetEnv(targetEnvAttr);
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
 
-  for (auto funcOp : module.getOps<FuncOp>()) {
+  for (auto funcOp : module.getOps<func::FuncOp>()) {
     auto entryPointOp = entryPointOps.lookup(funcOp.getName());
     if (!entryPointOp) continue;
 
@@ -619,37 +640,16 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       rootOperation = computeOp;
     }
 
-    // If there are still no root op, check for any linalg.generic op.
     if (!rootOperation) {
+      // If there are still no root op, check for any linalg.generic op.
       Operation *computeOp = computeOps.back();
+      if (failed(setDefaultOpConfig(limits, computeOp))) return failure();
 
-      // Handle the case of compute op being a
-      // `tensor.extract_slice`/`tensor.insert_slice`. That needs bufferization
-      // to run before configuration can be set again. Just set the translation
-      // to use the `SPIRVDistributeAndCopy` pipeline. The configuration will be
-      // set again after bufferization.
-      //
-      // TODO(ravishankarm): This is a awkward.
-      // `tensor.extract_slice`/`tensor.insert_slice` will be dropped from
-      // `TiledOpInterface` soon, and will not be compute op. At that time, they
-      // will be folded with `flow.tensor.load` and `flow.tensor.store`
-      // operations. Then this case will degenerate to having no compute ops.
-      // Rework this at that stage to run bufferization early.
-      if (isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(computeOp)) {
-        setTranslationInfo(
-            funcOp,
-            IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistributeCopy,
-            /*workloadPerWorkgroup=*/ArrayRef<int64_t>{},
-            /*workgroupSize=*/ArrayRef<int64_t>{});
-      } else {
-        if (failed(setDefaultOpConfig(limits, computeOp))) return failure();
-
-        // Check if the op configuration was set.
-        if (!getLoweringConfig(computeOp)) {
-          return computeOp->emitOpError(
-              "without known roots, the last compute operation in the tiled "
-              "loop body is expected to be set as root");
-        }
+      // Check if the op configuration was set.
+      if (!getLoweringConfig(computeOp)) {
+        return computeOp->emitOpError(
+            "without known roots, the last compute operation in the tiled "
+            "loop body is expected to be set as root");
       }
       rootOperation = computeOp;
     }

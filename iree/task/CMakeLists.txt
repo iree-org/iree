@@ -15,6 +15,13 @@ if(NOT ${IREE_ENABLE_THREADING})
   return()
 endif()
 
+# cpuinfo can be conditionally disabled when it is not supported.
+# If disabled then by default the task system will use 1 thread.
+set(IREE_CPUINFO_TARGET)
+if(IREE_ENABLE_CPUINFO)
+  set(IREE_CPUINFO_TARGET cpuinfo)
+endif()
+
 iree_cc_library(
   NAME
     api
@@ -43,7 +50,6 @@ iree_cc_library(
     "submission.h"
     "task.h"
     "topology.h"
-    "topology_cpuinfo.h"
     "tuning.h"
   SRCS
     "executor.c"
@@ -63,7 +69,7 @@ iree_cc_library(
     "worker.c"
     "worker.h"
   DEPS
-    cpuinfo
+    ${IREE_CPUINFO_TARGET}
     iree::base
     iree::base::core_headers
     iree::base::internal
@@ -81,14 +87,25 @@ iree_cc_library(
 
 iree_cc_test(
   NAME
+    executor_demo
+  SRCS
+    "executor_demo.cc"
+  DEPS
+    ::task
+    iree::base
+    iree::base::internal::prng
+    iree::base::tracing
+    iree::task::testing::test_util
+)
+
+iree_cc_test(
+  NAME
     executor_test
   SRCS
     "executor_test.cc"
   DEPS
     ::task
     iree::base
-    iree::base::internal::prng
-    iree::base::tracing
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main
@@ -175,20 +192,15 @@ iree_cc_test(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-)
-
-iree_cc_test(
-  NAME
-    topology_cpuinfo_test
-  SRCS
-    "topology_cpuinfo_test.cc"
-  DEPS
-    ::task
-    iree::base
-    iree::testing::gtest
-    iree::testing::gtest_main
   LABELS
     "noasan"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+if(NOT IREE_ENABLE_CPUINFO)
+  target_compile_definitions(iree_task_task
+    PUBLIC
+      "IREE_TASK_CPUINFO_DISABLED=1"
+  )
+endif()

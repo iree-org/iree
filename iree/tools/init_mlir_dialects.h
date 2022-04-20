@@ -22,6 +22,8 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/PDL/IR/PDL.h"
+#include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Dialect/Quant/QuantOps.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
@@ -49,6 +51,8 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   linalg::LinalgDialect,
                   math::MathDialect,
                   memref::MemRefDialect,
+                  pdl::PDLDialect,
+                  pdl_interp::PDLInterpDialect,
                   scf::SCFDialect,
                   quant::QuantizationDialect,
                   spirv::SPIRVDialect,

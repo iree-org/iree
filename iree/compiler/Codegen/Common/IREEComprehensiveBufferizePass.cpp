@@ -54,8 +54,8 @@
 
 #define DEBUG_TYPE "iree-codegen-linalg-bufferize"
 
-using mlir::bufferization::AnalysisBufferizationOptions;
 using mlir::bufferization::BufferizationOptions;
+using mlir::bufferization::OneShotBufferizationOptions;
 
 namespace mlir {
 namespace iree_compiler {
@@ -75,12 +75,20 @@ class IREEComprehensiveBufferizePass
         memCpyFn(memCpyFn) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
+    // clang-format off
     registry
-        .insert<arith::ArithmeticDialect, IREE::Util::UtilDialect,
-                linalg::LinalgDialect, memref::MemRefDialect, scf::SCFDialect,
-                func::FuncDialect, tensor::TensorDialect, vector::VectorDialect,
-                AffineDialect, IREE::Flow::FlowDialect,
-                bufferization::BufferizationDialect>();
+        .insert<AffineDialect,
+                arith::ArithmeticDialect,
+                bufferization::BufferizationDialect,
+                func::FuncDialect,
+                IREE::Flow::FlowDialect,
+                IREE::Util::UtilDialect,
+                linalg::LinalgDialect,
+                memref::MemRefDialect,
+                scf::SCFDialect,
+                tensor::TensorDialect,
+                vector::VectorDialect>();
+    // clang-format on
   }
 
   void runOnOperation() override;
@@ -97,13 +105,13 @@ static bool isaTensor(Type t) { return t.isa<TensorType>(); };
 /// Run comprehensive bufferize.
 void IREEComprehensiveBufferizePass::runOnOperation() {
   ModuleOp moduleOp = getOperation();
-  AnalysisBufferizationOptions options;
+  OneShotBufferizationOptions options;
   options.allocationFn = allocationFn;
   options.deallocationFn = deallocationFn;
   options.memCpyFn = memCpyFn;
   options.testAnalysisOnly = testAnalysisOnly;
   options.printConflicts = printConflicts;
-  options.alwaysAliasingWithDest = false;
+  options.alwaysAliasingWithDest = true;
   addPostAnalysisTransformations(options);
 
   if (failed(bufferization::runOneShotBufferize(moduleOp, options))) {
@@ -126,8 +134,8 @@ static LogicalResult defaultDeallocationFn(OpBuilder &builder, Location loc,
 }
 static LogicalResult defaultMemCpyFn(OpBuilder &builder, Location loc,
                                      Value from, Value to) {
-  createLinalgCopyOp(builder, loc, from, to);
-  return success();
+  Operation *copyOp = createLinalgCopyOp(builder, loc, from, to);
+  return success(static_cast<bool>(copyOp));
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
@@ -149,13 +157,13 @@ void addIREEComprehensiveBufferizePasses(
   passManager.addPass(createIREEComprehensiveBufferizePass(
       allocationFn, deallocationFn, memCpyFn));
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(createCSEPass());
+  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(createCSEPass());
   // There are redundant memcpy (with linalg.generic form) ops created, which
   // can be deleted by canonicalizer. We have to run it again because the
   // memrefs are unified in CSE pass, so we can truely remove redundant memcpy.
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(createCleanupBufferAllocViewPass());
+  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(createCleanupBufferAllocViewPass());
 }
 
 }  // namespace iree_compiler

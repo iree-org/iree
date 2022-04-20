@@ -88,6 +88,7 @@ int main(int argc, char** argv) {
       .workgroup_size_x = 1,
       .workgroup_size_y = 1,
       .workgroup_size_z = 1,
+      .max_concurrency = 1,
       .push_constant_count = IREE_ARRAYSIZE(push_constants.values),
       .push_constants = push_constants.values,
       .binding_count = IREE_ARRAYSIZE(binding_ptrs),

@@ -47,6 +47,7 @@ cc_library(
         "IREEImportPublic.cpp",
         "Passes.cpp",
         "QuantizedMatmulToMatmul.cpp",
+        "SanitizeModuleNames.cpp",
         "TopLevelSCFToCFG.cpp",
     ],
     hdrs = [

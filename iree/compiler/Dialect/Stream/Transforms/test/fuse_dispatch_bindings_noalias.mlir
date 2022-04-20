@@ -11,7 +11,7 @@ stream.executable private @deduplicateBindingsEx {
   builtin.module  {
     // CHECK: func @dispatch(%[[BINDING_A:.+]]: !stream.binding, %[[BINDING_C:.+]]: !stream.binding,
     // CHECK-SAME:           %[[OFFSET_A:.+]]: index, %[[OFFSET_B:.+]]: index, %[[OFFSET_C:.+]]: index, %[[OPERAND:.+]]: index)
-    func @dispatch(%binding_a: !stream.binding, %binding_b: !stream.binding, %binding_c: !stream.binding, %operand: index) {
+    func.func @dispatch(%binding_a: !stream.binding, %binding_b: !stream.binding, %binding_c: !stream.binding, %operand: index) {
       %c0 = arith.constant 0 : index
       %c20 = arith.constant 20 : index
       %c40 = arith.constant 40 : index
@@ -41,7 +41,7 @@ stream.executable private @deduplicateBindingsEx {
   }
 }
 // CHECK: func @deduplicateBindings(%[[OPERAND:.+]]: index)
-func @deduplicateBindings(%operand: index) {
+func.func @deduplicateBindings(%operand: index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index

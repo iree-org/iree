@@ -11,7 +11,7 @@ hal.executable @add_dispatch_0 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point @add_dispatch_0 layout(#executable_layout)
   builtin.module {
-    func @add_dispatch_0() {
+    func.func @add_dispatch_0() {
       %c0 = arith.constant 0 : index
       %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:16384xf32>
       %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:16384xf32>
@@ -53,7 +53,7 @@ hal.executable private @dot_dispatch_1  {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @dot_dispatch_1 layout(#executable_layout)
     builtin.module {
-      func @dot_dispatch_1() {
+      func.func @dot_dispatch_1() {
         %c0 = arith.constant 0 : index
         %c4 = arith.constant 4 : index
         %c2 = arith.constant 2 : index
@@ -61,9 +61,9 @@ hal.executable private @dot_dispatch_1  {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2x3xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<3x4xf32>
         %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<2x4xf32>
-              linalg.fill(%cst, %2) : f32, memref<2x4xf32>
-              linalg.matmul ins(%0, %1 : memref<2x3xf32>, memref<3x4xf32>) outs(%2 : memref<2x4xf32>)
-              return
+        linalg.fill ins(%cst : f32) outs(%2 : memref<2x4xf32>)
+        linalg.matmul ins(%0, %1 : memref<2x3xf32>, memref<3x4xf32>) outs(%2 : memref<2x4xf32>)
+        return
       }
     }
   }
@@ -92,13 +92,13 @@ hal.executable @reduction_dispatch {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @predict_dispatch_153 layout(#executable_layout)
     builtin.module {
-      func @predict_dispatch_153() {
+      func.func @predict_dispatch_153() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0x7FC00000 : f32
         %cst_0 = arith.constant 0xFF800000 : f32
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1000xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<f32>
-        linalg.fill(%cst_0, %1) : f32, memref<f32>
+        linalg.fill ins(%cst_0 : f32) outs(%1 : memref<f32>)
         linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%0 : memref<1000xf32>) outs(%1 : memref<f32>) {
         ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
           %2 = arith.cmpf ogt, %arg0, %arg1 : f32
@@ -123,48 +123,48 @@ hal.executable @reduction_dispatch {
 // CHECK-SAME:   lowering_config = #[[CONFIG]]
 
 // -----
-
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-hal.executable @tensor_insert_slice {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @tensor_insert_slice layout(#executable_layout)
+hal.executable private @reduction_aligned2 {
+  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb"> {
+    hal.executable.entry_point public @reduction_aligned2 ordinal(0) layout(#executable_layout)
     builtin.module {
-      builtin.func @tensor_insert_slice() {
+      func.func @reduction_aligned2() {
+        %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
-        %size_y = hal.interface.constant.load[0] : index
-        %size_x = hal.interface.constant.load[1] : index
-        %dest_size_y = hal.interface.constant.load[2] : index
-        %dest_size_x = hal.interface.constant.load[3] : index
-        %offset_y = hal.interface.constant.load[4] : index
-        %offset_x = hal.interface.constant.load[5] : index
-        %source_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-            : !flow.dispatch.tensor<readonly:?x?xi32>{%size_y, %size_x}
-        %dest_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-            : !flow.dispatch.tensor<readwrite:?x?xi32>{%dest_size_y, %dest_size_x}
-        %source = flow.dispatch.tensor.load %source_binding, offsets = [0, 0], sizes = [%size_y, %size_x], strides = [1, 1]
-            : !flow.dispatch.tensor<readonly:?x?xi32>{%size_y, %size_x} -> tensor<?x?xi32>
-        %dest = flow.dispatch.tensor.load %dest_binding, offsets = [0, 0], sizes = [%dest_size_y, %dest_size_x], strides = [1, 1]
-            : !flow.dispatch.tensor<readwrite:?x?xi32>{%dest_size_y, %dest_size_x} -> tensor<?x?xi32>
-        %result = tensor.insert_slice %source into %dest[%offset_y, %offset_x] [%size_y, %size_x] [1, 1]
-            : tensor<?x?xi32> into tensor<?x?xi32>
-        flow.dispatch.tensor.store %result, %dest_binding, offsets = [0, 0], sizes = [%dest_size_y, %dest_size_x], strides = [1, 1]
-            : tensor<?x?xi32> -> !flow.dispatch.tensor<readwrite:?x?xi32>{%dest_size_y, %dest_size_x}
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:4x128x384xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:128x384xf32>
+        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [4, 128, 384], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:4x128x384xf32> -> tensor<4x128x384xf32>
+        %3 = linalg.init_tensor [128, 384] : tensor<128x384xf32>
+        %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<128x384xf32>) -> tensor<128x384xf32>
+        %5 = linalg.generic {
+          indexing_maps = [affine_map<(d0, d1, d2) -> (d2, d0, d1)>, 
+                           affine_map<(d0, d1, d2) -> (d0, d1)>],
+          iterator_types = ["parallel", "parallel", "reduction"]}
+          ins(%2 : tensor<4x128x384xf32>) outs(%4 : tensor<128x384xf32>) {
+        ^bb0(%arg0: f32, %arg1: f32):
+          %6 = arith.addf %arg0, %arg1 : f32
+          linalg.yield %6 : f32
+        } -> tensor<128x384xf32>
+        flow.dispatch.tensor.store %5, %1, offsets = [0, 0], sizes = [128, 384], strides = [1, 1] : tensor<128x384xf32> -> !flow.dispatch.tensor<writeonly:128x384xf32>
         return
       }
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64]{{\]}}>
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 128, 4]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorize>
-//      CHECK: hal.executable.entry_point public @tensor_insert_slice
+//      CHECK: hal.executable.entry_point public @reduction_aligned2
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK: tensor.insert_slice
-// CHECK-SAME:     lowering_config = #[[CONFIG]]
+//      CHECK: linalg.fill
+// CHECK-SAME:   lowering_config = #[[CONFIG]]
+//      CHECK: linalg.generic
+// CHECK-SAME:   lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -178,7 +178,7 @@ hal.executable @copy_as_generic {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @copy_as_generic layout(#executable_layout)
     builtin.module {
-      builtin.func @copy_as_generic() {
+      func.func @copy_as_generic() {
         %c0 = arith.constant 0 : index
         %d0 = hal.interface.constant.load[0] : index
         %d1 = hal.interface.constant.load[1] : index
@@ -214,7 +214,7 @@ hal.executable private @static_1d_fft_stage2 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @static_1d_fft_stage2 layout(#executable_layout)
     builtin.module {
-      builtin.func @static_1d_fft_stage2() {
+      func.func @static_1d_fft_stage2() {
         %c0 = arith.constant 0 : index
         %c2 = arith.constant 2 : index
         %cst = arith.constant dense<[1.000000e+00, 6.12323426E-17]> : tensor<2xf32>
@@ -251,7 +251,7 @@ hal.executable private @static_3d_fft_stage3 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @static_3d_fft_stage3 layout(#executable_layout)
     builtin.module {
-      builtin.func @static_3d_fft_stage3() {
+      func.func @static_3d_fft_stage3() {
         %c0 = arith.constant 0 : index
         %c3 = arith.constant 3 : index
         %c64 = arith.constant 64 : index
@@ -296,7 +296,7 @@ hal.executable @user_config {
 hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point public @_lowering_config_test_dispatch_1 layout(#executable_layout)
   builtin.module {
-    func @_lowering_config_test_dispatch_1() {
+    func.func @_lowering_config_test_dispatch_1() {
       %cst = arith.constant 0.000000e+00 : f32
       %c128 = arith.constant 128 : index
       %c1024 = arith.constant 1024 : index
@@ -309,7 +309,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb">
       %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1]
           : !flow.dispatch.tensor<readonly:256x1024xf32> -> tensor<256x1024xf32>
       %15 = linalg.init_tensor [128, 1024] : tensor<128x1024xf32>
-      %16 = linalg.fill(%cst, %15) : f32, tensor<128x1024xf32> -> tensor<128x1024xf32>
+      %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<128x1024xf32>) -> tensor<128x1024xf32>
       %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup", compilation_info = #compilation}
           ins(%3, %4 : tensor<128x256xf32>, tensor<256x1024xf32>) outs(%16 : tensor<128x1024xf32>) -> tensor<128x1024xf32>
       flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [128, 1024], strides = [1, 1] : tensor<128x1024xf32> -> !flow.dispatch.tensor<writeonly:128x1024xf32>
@@ -343,7 +343,7 @@ hal.executable private @sort_op {
   hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
     hal.executable.entry_point public @sort_op layout(#executable_layout)
     builtin.module {
-      func @sort_op() {
+      func.func @sort_op() {
         %c1 = arith.constant 1 : index
         %c0 = arith.constant 0 : index
         %c2304000 = arith.constant 2304000 : index

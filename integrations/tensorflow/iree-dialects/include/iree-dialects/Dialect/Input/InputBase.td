@@ -8,6 +8,7 @@
 #define IREE_DIALECTS_DIALECT_INPUT_BASE_TD
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/AttrTypeBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def IREEInput_Dialect : Dialect {

@@ -57,7 +57,7 @@ struct ConstantSlice {
       return opaqueAttr.getNumElements() *
              opaqueAttr.getElementType().getIntOrFloatBitWidth();
     } else {
-      llvm_unreachable("invalid constant attr type");
+      assert(false && "invalid constant attr type");
       return 0;
     }
   }
@@ -453,7 +453,7 @@ class PackConstantsPass : public PackConstantsBase<PackConstantsPass> {
   }
 
   void runOnOperation() override {
-    auto parentOp = dyn_cast<CallableOpInterface>(getOperation());
+    auto parentOp = getOperation();
     if (!parentOp || !parentOp.getCallableRegion() ||
         parentOp.getCallableRegion()->empty()) {
       return;
@@ -543,7 +543,7 @@ class PackConstantsPass : public PackConstantsBase<PackConstantsPass> {
 
 }  // namespace
 
-std::unique_ptr<OperationPass<>> createPackConstantsPass() {
+std::unique_ptr<InterfacePass<CallableOpInterface>> createPackConstantsPass() {
   return std::make_unique<PackConstantsPass>();
 }
 

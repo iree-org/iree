@@ -17,8 +17,6 @@ iree_status_t reduce_sum_1d(iree_runtime_session_t* session, const int* values,
   iree_hal_buffer_view_t* arg0 = NULL;
   const iree_hal_dim_t arg0_shape[1] = {values_length};
 
-  // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
-  //   * debugging some apparent memory corruption with the stack-local value
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_allocate_buffer(
@@ -26,9 +24,9 @@ iree_status_t reduce_sum_1d(iree_runtime_session_t* session, const int* values,
         IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
-            .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-            .usage = IREE_HAL_BUFFER_USAGE_ALL,
+            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+            .usage =
+                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
         },
         iree_make_const_byte_span((void*)values, sizeof(int) * values_length),
         &arg0);
@@ -47,8 +45,11 @@ iree_status_t reduce_sum_1d(iree_runtime_session_t* session, const int* values,
         iree_runtime_call_outputs_pop_front_buffer_view(&call, &buffer_view);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_read_data(iree_hal_buffer_view_buffer(buffer_view),
-                                       0, out_result, sizeof(*out_result));
+    status = iree_hal_device_transfer_d2h(
+        iree_runtime_session_device(session),
+        iree_hal_buffer_view_buffer(buffer_view), 0, out_result,
+        sizeof(*out_result), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+        iree_infinite_timeout());
   }
   iree_hal_buffer_view_release(buffer_view);
 
@@ -66,8 +67,6 @@ iree_status_t reduce_sum_2d(iree_runtime_session_t* session, const int* values,
   iree_hal_buffer_view_t* arg0 = NULL;
   const iree_hal_dim_t arg0_shape[2] = {values_length / 3, 3};
 
-  // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
-  //   * debugging some apparent memory corruption with the stack-local value
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_allocate_buffer(
@@ -75,9 +74,9 @@ iree_status_t reduce_sum_2d(iree_runtime_session_t* session, const int* values,
         IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
-            .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-            .usage = IREE_HAL_BUFFER_USAGE_ALL,
+            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+            .usage =
+                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
         },
         iree_make_const_byte_span((void*)values, sizeof(int) * values_length),
         &arg0);
@@ -109,8 +108,6 @@ iree_status_t add_one(iree_runtime_session_t* session, const int* values,
   iree_hal_buffer_view_t* arg0 = NULL;
   const iree_hal_dim_t arg0_shape[1] = {values_length};
 
-  // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
-  //   * debugging some apparent memory corruption with the stack-local value
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_allocate_buffer(
@@ -118,9 +115,9 @@ iree_status_t add_one(iree_runtime_session_t* session, const int* values,
         IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
-            .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-            .usage = IREE_HAL_BUFFER_USAGE_ALL,
+            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+            .usage =
+                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
         },
         iree_make_const_byte_span((void*)values, sizeof(int) * values_length),
         &arg0);

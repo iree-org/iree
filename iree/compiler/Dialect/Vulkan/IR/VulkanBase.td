@@ -8,6 +8,7 @@
 #define IREE_DIALECT_VULKAN_BASE
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/EnumAttr.td"
 
 //===----------------------------------------------------------------------===//
 // Vulkan dialect definition
@@ -45,14 +46,11 @@ class VK_IsKnownBitEnumCaseFor<string name> :
 class VK_IsKnownIntEnumCaseFor<string name> :
     CPred<"::mlir::iree_compiler::IREE::Vulkan::symbolize" # name # "("
           "$_self.cast<IntegerAttr>().getValue().getZExtValue()).hasValue()">;
-class VK_IsKnownStrEnumCaseFor<string name> :
-    CPred<"::mlir::iree_compiler::IREE::Vulkan::symbolize" # name # "("
-          "$_self.cast<StringAttr>().getValue()).hasValue()">;
 
-// Wrapper over base BitEnumAttr to set common fields.
+// Wrapper over base I32BitEnumAttr to set common fields.
 class VK_BitEnumAttr<string name, string description,
-                      list<BitEnumAttrCase> cases> :
-    BitEnumAttr<name, description, cases> {
+                      list<I32BitEnumAttrCase> cases> :
+    I32BitEnumAttr<name, description, cases> {
   let predicate = And<[I32Attr.predicate, VK_IsKnownBitEnumCaseFor<name>]>;
   let cppNamespace = "::mlir::iree_compiler::IREE::Vulkan";
 }
@@ -65,11 +63,11 @@ class VK_I32EnumAttr<string name, string description,
   let cppNamespace = "::mlir::iree_compiler::IREE::Vulkan";
 }
 
-// Wrapper over base StrEnumAttr to set common fields.
-class VK_StrEnumAttr<string name, string description,
-                      list<StrEnumAttrCase> cases> :
-    StrEnumAttr<name, description, cases> {
-  let predicate = And<[StrAttr.predicate, VK_IsKnownStrEnumCaseFor<name>]>;
+// Wrapper over base I32EnumAttr to set common fields for mimicing StrEnumAttr.
+class VK_EnumAttr<string name, string description,
+                  list<I32EnumAttrCase> cases> :
+    EnumAttr<VK_Dialect, I32EnumAttr<name, description, cases>, name> {
+  let predicate = And<[StrAttr.predicate, VK_IsKnownIntEnumCaseFor<name>]>;
   let cppNamespace = "::mlir::iree_compiler::IREE::Vulkan";
 }
 
@@ -84,16 +82,16 @@ def VK_V_1_2 : I32EnumAttrCase<"V_1_2", 2, "v1.2">;
 def VK_VersionAttr : VK_I32EnumAttr<"Version", "valid Vulkan version", [
     VK_V_1_0, VK_V_1_1, VK_V_1_2]>;
 
-def VK_KHR_16bit_storage : StrEnumAttrCase<"VK_KHR_16bit_storage">;
-def VK_KHR_8bit_storage : StrEnumAttrCase<"VK_KHR_8bit_storage">;
-def VK_KHR_shader_float16_int8 : StrEnumAttrCase<"VK_KHR_shader_float16_int8">;
-def VK_KHR_spirv_1_4 : StrEnumAttrCase<"VK_KHR_spirv_1_4">;
-def VK_KHR_storage_buffer_storage_class : StrEnumAttrCase<"VK_KHR_storage_buffer_storage_class">;
-def VK_KHR_variable_pointers: StrEnumAttrCase<"VK_KHR_variable_pointers">;
-def VK_NV_cooperative_matrix : StrEnumAttrCase<"VK_NV_cooperative_matrix">;
+def VK_KHR_16bit_storage : I32EnumAttrCase<"VK_KHR_16bit_storage", 0>;
+def VK_KHR_8bit_storage : I32EnumAttrCase<"VK_KHR_8bit_storage", 1>;
+def VK_KHR_shader_float16_int8 : I32EnumAttrCase<"VK_KHR_shader_float16_int8", 2>;
+def VK_KHR_spirv_1_4 : I32EnumAttrCase<"VK_KHR_spirv_1_4", 3>;
+def VK_KHR_storage_buffer_storage_class : I32EnumAttrCase<"VK_KHR_storage_buffer_storage_class", 4>;
+def VK_KHR_variable_pointers: I32EnumAttrCase<"VK_KHR_variable_pointers", 5>;
+def VK_NV_cooperative_matrix : I32EnumAttrCase<"VK_NV_cooperative_matrix", 6>;
 
 def VK_ExtensionAttr :
-    VK_StrEnumAttr<"Extension", "supported Vulkan extension", [
+    VK_EnumAttr<"Extension", "supported Vulkan extension", [
       VK_KHR_16bit_storage, VK_KHR_8bit_storage, VK_KHR_shader_float16_int8,
       VK_KHR_spirv_1_4, VK_KHR_storage_buffer_storage_class,
       VK_KHR_variable_pointers, VK_NV_cooperative_matrix
@@ -109,18 +107,21 @@ def VK_TTA_CPU       : I32EnumAttrCase<"CPU", 1, "cpu">;
 // AMD GPU
 def VK_TTA_RDNAv1    : I32EnumAttrCase<"AMD_RDNAv1", 100, "rdna1">;
 def VK_TTA_RDNAv2    : I32EnumAttrCase<"AMD_RDNAv2", 101, "rdna2">;
+// Apple Silicon GPU
+def VK_TTA_M1        : I32EnumAttrCase<"Apple_M1", 200, "m1">;
 // ARM Mali GPU
-def VK_TTA_Valhall   : I32EnumAttrCase<"ARM_Valhall", 203, "valhall">;
+def VK_TTA_Valhall   : I32EnumAttrCase<"ARM_Valhall", 300, "valhall">;
 // NVIDIA GPU
-def VK_TTA_Turing    : I32EnumAttrCase<"NV_Turing", 301, "turing">;
-def VK_TTA_Ampere    : I32EnumAttrCase<"NV_Ampere", 302, "ampere">;
+def VK_TTA_Turing    : I32EnumAttrCase<"NV_Turing", 400, "turing">;
+def VK_TTA_Ampere    : I32EnumAttrCase<"NV_Ampere", 401, "ampere">;
 // Qualcomm Adreno GPU
-def VK_TTA_Adreno    : I32EnumAttrCase<"QC_Adreno", 400, "adreno">;
+def VK_TTA_Adreno    : I32EnumAttrCase<"QC_Adreno", 500, "adreno">;
 
 def VK_TargetArchAttr : VK_I32EnumAttr<
   "TargetTripleArch", "recognized target architecture", [
     VK_TTA_Unknown, VK_TTA_CPU, VK_TTA_RDNAv1, VK_TTA_RDNAv2,
-    VK_TTA_Valhall, VK_TTA_Turing, VK_TTA_Ampere, VK_TTA_Adreno,
+    VK_TTA_M1, VK_TTA_Valhall, VK_TTA_Turing, VK_TTA_Ampere,
+    VK_TTA_Adreno,
   ]>;
 
 def VK_TTP_Unknown     : I32EnumAttrCase<"Unknown", 0, "unknown">;
@@ -130,36 +131,41 @@ def VK_TTP_Adreno650   : I32EnumAttrCase<"Adreno_650", 101, "a650">;
 def VK_TTP_Adreno660   : I32EnumAttrCase<"Adreno_660", 102, "a660">;
 // Software emulated GPU
 def VK_TTP_SwiftShader : I32EnumAttrCase<"SwiftShader", 200, "swiftshader">;
+// Translation layers
+def VK_TTP_MoltenVK    : I32EnumAttrCase<"MoltenVK", 300, "moltenvk">;
 
 def VK_TargetProductAttr : VK_I32EnumAttr<
   "TargetTripleProduct", "recognized target product", [
     VK_TTP_Unknown, VK_TTP_Adreno650, VK_TTP_Adreno660, VK_TTP_SwiftShader,
+    VK_TTP_MoltenVK,
   ]>;
 
 def VK_TTOS_Unknown   : I32EnumAttrCase<"Unknown", 0, "unknown">;
 def VK_TTOS_Android11 : I32EnumAttrCase<"Android11", 2, "android11">;
-def VK_TTOS_Linux     : I32EnumAttrCase<"Linux", 3, "linux">;
-def VK_TTOS_Windows   : I32EnumAttrCase<"Windows", 4, "windows">;
+def VK_TTOS_iOS       : I32EnumAttrCase<"iOS", 3, "iOS">;
+def VK_TTOS_Linux     : I32EnumAttrCase<"Linux", 4, "linux">;
+def VK_TTOS_macOS     : I32EnumAttrCase<"macOS", 5, "macos">;
+def VK_TTOS_Windows   : I32EnumAttrCase<"Windows", 6, "windows">;
 
 def VK_TargetOSAttr : VK_I32EnumAttr<
   "TargetTripleOS", "recognized target operating system", [
-    VK_TTOS_Unknown, VK_TTOS_Android11, VK_TTOS_Linux,
-    VK_TTOS_Windows,
+    VK_TTOS_Unknown, VK_TTOS_Android11, VK_TTOS_iOS, VK_TTOS_Linux,
+    VK_TTOS_macOS, VK_TTOS_Windows,
   ]>;
 
 //===----------------------------------------------------------------------===//
 // Subgroup features
 //===----------------------------------------------------------------------===//
 
-def VK_SF_Basic           : BitEnumAttrCase<"Basic", 0x001>;
-def VK_SF_Vote            : BitEnumAttrCase<"Vote", 0x002>;
-def VK_SF_Arithmetic      : BitEnumAttrCase<"Arithmetic", 0x004>;
-def VK_SF_Ballot          : BitEnumAttrCase<"Ballot", 0x008>;
-def VK_SF_Shuffle         : BitEnumAttrCase<"Shuffle", 0x010>;
-def VK_SF_ShuffleRelative : BitEnumAttrCase<"ShuffleRelative", 0x020>;
-def VK_SF_Clustered       : BitEnumAttrCase<"Clustered", 0x040>;
-def VK_SF_Quad            : BitEnumAttrCase<"Quad", 0x080>;
-def VK_SF_PartitionedNV   : BitEnumAttrCase<"PartitionedNV", 0x100>;
+def VK_SF_Basic           : I32BitEnumAttrCase<"Basic", 0x001>;
+def VK_SF_Vote            : I32BitEnumAttrCase<"Vote", 0x002>;
+def VK_SF_Arithmetic      : I32BitEnumAttrCase<"Arithmetic", 0x004>;
+def VK_SF_Ballot          : I32BitEnumAttrCase<"Ballot", 0x008>;
+def VK_SF_Shuffle         : I32BitEnumAttrCase<"Shuffle", 0x010>;
+def VK_SF_ShuffleRelative : I32BitEnumAttrCase<"ShuffleRelative", 0x020>;
+def VK_SF_Clustered       : I32BitEnumAttrCase<"Clustered", 0x040>;
+def VK_SF_Quad            : I32BitEnumAttrCase<"Quad", 0x080>;
+def VK_SF_PartitionedNV   : I32BitEnumAttrCase<"PartitionedNV", 0x100>;
 
 def VK_SubgroupFeatureAttr : VK_BitEnumAttr<
   "SubgroupFeature", "supported Vulkan subgroup feature", [

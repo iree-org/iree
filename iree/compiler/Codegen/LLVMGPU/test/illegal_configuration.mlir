@@ -16,7 +16,7 @@ hal.executable private @matmul_tensors {
       workgroup_size = [32 : index, 8 : index, 8 : index]
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4x8xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8x16xf32>
@@ -48,7 +48,7 @@ hal.executable private @matmul_tensors {
       workgroup_size = [32 : index, 8 : index, 2 : index]
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4x8xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8x16xf32>
@@ -80,7 +80,7 @@ hal.executable private @matmul_tensors {
       workgroup_size = [64 : index, 2 : index, 10 : index]
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<32x16xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
@@ -112,7 +112,7 @@ hal.executable private @matmul_tensors {
       workgroup_size = [48 : index, 2 : index, 1 : index]
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<32x16xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
@@ -144,7 +144,7 @@ hal.executable private @matmul_tensors {
       workgroup_size = [64 : index, 2 : index, 2 : index]
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<32x16xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
@@ -176,7 +176,7 @@ hal.executable private @matmul_tensors {
       workgroup_size = [64 : index, 2 : index, 1 : index]
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<32x16xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
@@ -184,6 +184,38 @@ hal.executable private @matmul_tensors {
         // expected-error @+1 {{tensorcore size doesn't factor into second level tile size for LLVMGPUMatmulTensorCore}}
         linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<32x16xf32>, memref<16x32xf32>)
           outs(%result: memref<32x32xf32>)
+        return
+      }
+    }
+  }
+}
+
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 32, 16]]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @matmul_tensors {
+  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+    hal.executable.entry_point @illegal layout(#executable_layout) {
+      translation_info = #translation,
+      workgroup_size = [128 : index, 1 : index, 1 : index]
+    }
+    builtin.module {
+      func.func @illegal() {
+        %c0 = arith.constant 0 : index
+        %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1024x512xf32>
+        %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<512x256xf32>
+        %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<1024x256xf32>
+        // expected-error @+1 {{tensorcore size doesn't factor into second level tile size for LLVMGPUMatmulTensorCore}}
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<1024x512xf32>, memref<512x256xf32>)
+          outs(%result: memref<1024x256xf32>)
         return
       }
     }
@@ -208,7 +240,7 @@ hal.executable private @matmul_tensors {
       workgroup_size = [64 : index, 2 : index, 1 : index]
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<48x16xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
@@ -240,7 +272,7 @@ hal.executable private @matmul_tensors {
       workgroup_size = [64 : index, 2 : index, 1 : index]
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<32x16xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x48xf32>
@@ -273,7 +305,7 @@ hal.executable private @batch_matmul_func  {
       workgroup_size = [64 : index, 2 : index, 1 : index]
     }
 builtin.module {
-  func @illegal() {
+  func.func @illegal() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %c4 = arith.constant 4 : index
@@ -301,7 +333,7 @@ builtin.module {
           %7 = memref.subview %0[%arg0, %arg1, 0] [1, 8, 1024] [1, 1, 1] : memref<4x32x1024xf32> to memref<1x8x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>>
           %8 = memref.subview %1[%arg0, 0, %arg2] [1, 1024, 32] [1, 1, 1] : memref<4x1024x64xf32> to memref<1x1024x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 65536 + s0 + d1 * 64 + d2)>>
           %9 = memref.subview %2[%arg0, %arg1, %arg2] [1, 8, 32] [1, 1, 1] : memref<4x32x64xf32> to memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>
-          linalg.fill(%cst, %9) {lowering_config = #config} : f32, memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>
+          linalg.fill {lowering_config = #config} ins(%cst : f32) outs(%9 : memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>)
           // expected-error @+1 {{Received first tile dimension of 2 instead of 0 for LLVMGPUMatmulTensorCore}}
           linalg.batch_matmul {lowering_config = #config} ins(%7, %8 : memref<1x8x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>>, memref<1x1024x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 65536 + s0 + d1 * 64 + d2)>>) outs(%9 : memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>)
         }

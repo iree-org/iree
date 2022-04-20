@@ -26,6 +26,23 @@ declare_mlir_dialect_python_bindings(
 declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT IREEDialectsPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
+  TD_FILE dialects/IreeLinalgExtBinding.td
+  SOURCES dialects/iree_linalg_ext.py
+  DIALECT_NAME iree_linalg_ext
+)
+
+declare_mlir_dialect_python_bindings(
+  ADD_TO_PARENT IREEDialectsPythonSources.Dialects
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
+  TD_FILE dialects/LinalgTransformBinding.td
+  SOURCES dialects/iree_linalg_transform.py
+          dialects/_iree_linalg_transform_ops_ext.py
+  DIALECT_NAME iree_linalg_transform
+  )
+
+declare_mlir_dialect_python_bindings(
+  ADD_TO_PARENT IREEDialectsPythonSources.Dialects
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   TD_FILE dialects/IreePyDmBinding.td
   SOURCES
     dialects/_iree_pydm_ops_ext.py
@@ -62,8 +79,9 @@ set(_source_components
   # build burden by ~5x. Make it stop.
   MLIRPythonSources.Core
   MLIRPythonSources.Dialects.builtin
-  MLIRPythonSources.Dialects.func
   MLIRPythonSources.Dialects.cf
+  MLIRPythonSources.Dialects.func
+  MLIRPythonSources.Dialects.pdl
   MLIRPythonSources.Passes
   IREEDialectsPythonSources
   IREEDialectsPythonExtensions

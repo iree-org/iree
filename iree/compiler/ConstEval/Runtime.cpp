@@ -158,8 +158,11 @@ Attribute CompiledBinary::invokeNullaryAsAttribute(Location loc,
 }
 
 bool CompiledBinary::isSupportedResultType(Type type) {
-  // TODO: Not currently supported.
-  if (type.isa<Float16Type>() || type.isa<BFloat16Type>()) {
+  // TODO(laurenzo): Not currently supported. VMVX would need to support these
+  // and today it doesn't. We could use alternative backends (LLVM CPU/etc) if
+  // we wanted to handle f64, but f16 and bf16 often need special hardware.
+  if (type.isa<Float16Type>() || type.isa<BFloat16Type>() ||
+      type.isa<Float64Type>()) {
     return false;
   }
 
@@ -230,7 +233,7 @@ Attribute CompiledBinary::convertVariantToAttribute(
       iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(bufferView);
 
       // Map the memory and construct.
-      // TODO(benvanik): fallback to alloc + iree_hal_buffer_read_data if
+      // TODO(benvanik): fallback to alloc + iree_hal_device_transfer_range if
       // mapping is not available. Today with the CPU backends it's always
       // possible but would not work with accelerators.
       iree_hal_buffer_mapping_t mapping;

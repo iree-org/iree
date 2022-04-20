@@ -151,8 +151,8 @@ struct ConvertLinalgTensorOpsPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<mlir::FuncOp>> createConvertLinalgTensorOpsPass(
-    bool runBeforeDispatchRegionFormation) {
+std::unique_ptr<OperationPass<mlir::func::FuncOp>>
+createConvertLinalgTensorOpsPass(bool runBeforeDispatchRegionFormation) {
   return std::make_unique<ConvertLinalgTensorOpsPass>(
       runBeforeDispatchRegionFormation);
 }

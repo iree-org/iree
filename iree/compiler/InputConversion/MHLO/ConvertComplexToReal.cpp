@@ -36,7 +36,8 @@ Type convertComplexTensorTypeToReal(Type complexTensorType) {
   } else if (auto tt = complexTensorType.dyn_cast<UnrankedTensorType>()) {
     return UnrankedTensorType::get(newElementType);
   }
-  llvm_unreachable("unknown TensorType subclass");
+  assert(false && "unknown TensorType subclass");
+  return Type();
 }
 
 // Add and subtraction are elementwise and can be distributed across the real
@@ -226,7 +227,7 @@ struct ConvertCompareOp : public OpConversionPattern<CompareOpTy> {
   ConvertCompareOp(TypeConverter &typeConverter, MLIRContext *context,
                    mhlo::ComparisonDirection direction)
       : OpConversionPattern<CompareOpTy>(typeConverter, context),
-        direction(mhlo::stringifyEnum(direction)) {}
+        direction(direction) {}
 
   LogicalResult matchAndRewrite(
       CompareOpTy op, typename CompareOpTy::Adaptor adaptor,
@@ -261,7 +262,7 @@ struct ConvertCompareOp : public OpConversionPattern<CompareOpTy> {
     return success();
   }
 
-  StringRef direction;
+  mhlo::ComparisonDirection direction;
 };
 
 struct ElideComplexPattern : public OpConversionPattern<mhlo::ComplexOp> {
@@ -423,7 +424,7 @@ struct TestMHLOConvertComplexToRealPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createTestMHLOConvertComplexToRealPass() {
   return std::make_unique<TestMHLOConvertComplexToRealPass>();
 }

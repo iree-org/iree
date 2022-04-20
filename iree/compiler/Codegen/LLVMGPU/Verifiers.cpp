@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 
 namespace mlir {
@@ -160,15 +160,11 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
            << pipelineName << ", got " << workgroupSize[2];
   }
 
-  // The second level of tiling = first level tile size divided by the
-  // warps per workgroup size
-  SmallVector<int64_t, 3> warpsPerWorkgroup = {
-      workgroupSize[0] / kWarpSize, workgroupSize[1], workgroupSize[2]};
-  SmallVector<int64_t, 3> secondLevelTileSizes;
-  for (int i = 0; i < 3; ++i) {
-    secondLevelTileSizes.push_back(firstLevelTileSizes[i] /
-                                   warpsPerWorkgroup[i]);
-  }
+  // The second level of tiling = [M / numWarp.y, N / numWarp.x, K].
+  SmallVector<int64_t, 3> secondLevelTileSizes = {
+      firstLevelTileSizes[0] / workgroupSize[1],
+      firstLevelTileSizes[1] / (workgroupSize[0] / kWarpSize),
+      firstLevelTileSizes[2]};
 
   // Verify the TensorCore size divides the second level tile size
   SmallVector<int64_t, 3> tensorCoreSize({16, 16, 8});

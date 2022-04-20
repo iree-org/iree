@@ -18,12 +18,12 @@ function(iree_bytecode_module_for_iree_check_test_and_friends)
   cmake_parse_arguments(
     _RULE
     ""
-    "MODULE_NAME;SRC;TARGET_BACKEND;OPT_TOOL;MODULE_FILE_NAME"
-    "FLAGS;OPT_FLAGS;TARGET_CPU_FEATURES"
+    "MODULE_NAME;SRC;TARGET_BACKEND;MODULE_FILE_NAME"
+    "FLAGS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
 
-  if(ANDROID)
+  if(ANDROID AND NOT _RULE_FLAGS MATCHES "iree-llvm-target-triple")
     # Android's CMake toolchain defines some variables that we can use to infer
     # the appropriate target triple from the configured settings:
     # https://developer.android.com/ndk/guides/cmake#android_platform
@@ -59,10 +59,6 @@ TARGET_BACKEND=${_RULE_TARGET_BACKEND}.")
       "-mlir-print-op-on-diagnostic=false"
       "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
       ${_RULE_FLAGS}
-    OPT_TOOL
-      ${_RULE_OPT_TOOL}
-    OPT_FLAGS
-      ${_RULE_OPT_FLAGS}
     TESTONLY
   )
 endfunction()
@@ -77,17 +73,15 @@ endfunction()
 #   NAME: Name of the target
 #   SRC: mlir source file to be compiled to an IREE module.
 #   TARGET_BACKEND: target backend to compile for.
-#   DRIVER: driver to run the module with.
+#   DRIVER: driver to run the module with. This can be omitted to test only
+#       compilation, but consider omiting the driver as a hacky abuse of the
+#       rule since compilation on its own not use iree-check-module.
 #   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode
 #       translation and backend flags are passed automatically.
 #   RUNNER_ARGS: additional args to pass to iree-check-module. The driver
 #       and input file are passed automatically.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
-#   OPT_TOOL: Defaulting to iree-opt. Tool used to preprocess the source files
-#       if OPT_FLAGS is specified.
-#   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
-#       these flags.
 #   MODULE_FILE_NAME: Optional, specifies the absolute path to the filename
 #       to use for the generated IREE module (.vmfb).
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
@@ -120,10 +114,14 @@ function(iree_check_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;TARGET_BACKEND;DRIVER;OPT_TOOL;MODULE_FILE_NAME"
-    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS;TARGET_CPU_FEATURES"
+    "NAME;SRC;TARGET_BACKEND;DRIVER;MODULE_FILE_NAME"
+    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
+
+  if(CMAKE_CROSSCOMPILING AND "hostonly" IN_LIST _RULE_LABELS)
+    return()
+  endif()
 
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
@@ -147,10 +145,6 @@ function(iree_check_test)
       "${_RULE_TARGET_BACKEND}"
     FLAGS
       ${_RULE_COMPILER_FLAGS}
-    OPT_TOOL
-      ${_RULE_OPT_TOOL}
-    OPT_FLAGS
-      ${_RULE_OPT_FLAGS}
     TARGET_CPU_FEATURES
       ${_RULE_TARGET_CPU_FEATURES}
   )
@@ -180,6 +174,10 @@ function(iree_check_test)
 
   add_dependencies(iree-test-deps "${_NAME}")
 
+  if(NOT DEFINED _RULE_DRIVER)
+    return()
+  endif()
+
   iree_native_test(
     NAME
       "${_RULE_NAME}"
@@ -208,7 +206,9 @@ endfunction()
 #   NAME: name of the generated test suite.
 #   SRCS: source mlir files containing the module.
 #   TARGET_BACKEND: target backend to compile for.
-#   DRIVER: driver to run the module with.
+#   DRIVER: driver to run the module with. This can be omitted to test only
+#       compilation, but consider omiting the driver as a hacky abuse of the
+#       rule since compilation on its own not use iree-check-module.
 #   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode
 #       translation and backend flags are passed automatically.
 #   RUNNER_ARGS: additional args to pass to the underlying iree-check-module
@@ -216,10 +216,6 @@ endfunction()
 #       different args per test, create a separate suite or iree_check_test.
 #   LABELS: Additional labels to apply to the generated tests. The package path is
 #       added automatically.
-#   OPT_TOOL: Defaulting to iree-opt. Tool used to preprocess the source files
-#       if OPT_FLAGS is specified.
-#   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
-#       these flags.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
 #       --iree-llvm-target-cpu-features.
 function(iree_check_single_backend_test_suite)
@@ -234,20 +230,25 @@ function(iree_check_single_backend_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TARGET_BACKEND;DRIVER;OPT_TOOL"
-    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS;TARGET_CPU_FEATURES"
+    "NAME;TARGET_BACKEND;DRIVER"
+    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
 
   # Omit tests for which the specified driver or target backend is not enabled.
   # This overlaps with directory exclusions and other filtering mechanisms.
-  string(TOUPPER ${_RULE_DRIVER} _UPPERCASE_DRIVER)
-  string(REPLACE "-" "_" _NORMALIZED_DRIVER ${_UPPERCASE_DRIVER})
-  if(NOT DEFINED IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
-    message(SEND_ERROR "Unknown driver '${_RULE_DRIVER}'. Check IREE_HAL_DRIVER_* options.")
-  endif()
-  if(NOT IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
-    return()
+  #
+  # Note: omitting the DRIVER arg is allowed (though it is a hack). If it is
+  # omitted, we don't need to test for a driver being enabled.
+  if(DEFINED _RULE_DRIVER)
+    string(TOUPPER ${_RULE_DRIVER} _UPPERCASE_DRIVER)
+    string(REPLACE "-" "_" _NORMALIZED_DRIVER ${_UPPERCASE_DRIVER})
+    if(NOT DEFINED IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
+      message(SEND_ERROR "Unknown driver '${_RULE_DRIVER}'. Check IREE_HAL_DRIVER_* options.")
+    endif()
+    if(NOT IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
+      return()
+    endif()
   endif()
   string(TOUPPER ${_RULE_TARGET_BACKEND} _UPPERCASE_TARGET_BACKEND)
   string(REPLACE "-" "_" _NORMALIZED_TARGET_BACKEND ${_UPPERCASE_TARGET_BACKEND})
@@ -283,10 +284,6 @@ function(iree_check_single_backend_test_suite)
         ${_RULE_RUNNER_ARGS}
       LABELS
         ${_RULE_LABELS}
-      OPT_TOOL
-        ${_RULE_OPT_TOOL}
-      OPT_FLAGS
-        ${_RULE_OPT_FLAGS}
       TARGET_CPU_FEATURES
         ${_RULE_TARGET_CPU_FEATURES}
     )
@@ -394,10 +391,6 @@ endfunction()
 #       test, create a separate suite or iree_check_test.
 #   LABELS: Additional labels to apply to the generated tests. The package path is
 #       added automatically.
-#   OPT_TOOL: Defaulting to iree-opt. Tool used to preprocess the source files
-#       if OPT_FLAGS is specified.
-#   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
-#       these flags.
 #   TARGET_CPU_FEATURES_VARIANTS: list of target cpu features variants. Only used
 #       for drivers that vary based on the target CPU features. For each list
 #       element, a separate test is created, with the list element passed as
@@ -441,7 +434,6 @@ function(iree_check_test_suite)
     endif()
     foreach(_TARGET_CPU_FEATURES_LIST_ELEM IN LISTS _TARGET_CPU_FEATURES_VARIANTS)
       process_target_cpu_features("${_TARGET_CPU_FEATURES_LIST_ELEM}" _ENABLED _TARGET_CPU_FEATURES _TARGET_CPU_FEATURES_SUFFIX _TARGET_PASS_OPTIONS)
-      string(REPLACE "#pass_options_variant#" "${_TARGET_PASS_OPTIONS}" _PROCESSED_OPT_FLAGS "${_RULE_OPT_FLAGS}")
       string(REPLACE "#pass_options_variant#" "${_TARGET_PASS_OPTIONS}" _PROCESSED_COMPILER_FLAGS "${_RULE_COMPILER_FLAGS}")
       if (NOT _ENABLED)
         # The current entry is disabled on the target CPU architecture.
@@ -462,10 +454,6 @@ function(iree_check_test_suite)
           ${_RULE_RUNNER_ARGS}
         LABELS
           ${_RULE_LABELS}
-        OPT_TOOL
-          ${_RULE_OPT_TOOL}
-        OPT_FLAGS
-          ${_PROCESSED_OPT_FLAGS}
         TARGET_CPU_FEATURES
           ${_TARGET_CPU_FEATURES}
       )

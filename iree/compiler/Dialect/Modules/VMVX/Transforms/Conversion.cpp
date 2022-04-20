@@ -13,7 +13,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "llvm/ADT/STLExtras.h"
-#include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
+#include "mlir/Conversion/TosaToArith/TosaToArith.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -53,7 +53,7 @@ class ConversionPass
     typeConverter.addConversion([](Type type) { return type; });
 
     // Run a pre-pass that updates the entry function signature.
-    for (auto funcOp : getOperation().getOps<FuncOp>()) {
+    for (auto funcOp : getOperation().getOps<func::FuncOp>()) {
       if (funcOp.isPublic()) {
         if (failed(updateHALToVMVXEntryFuncOp(funcOp, typeConverter))) {
           return signalPassFailure();
@@ -85,7 +85,7 @@ class ConversionPass
     //
     // TODO(suderman): remove the TOSA layering violation and lower to standard/
     // math ops instead.
-    tosa::populateTosaRescaleToStandardConversionPatterns(&conversionPatterns);
+    tosa::populateTosaRescaleToArithConversionPatterns(&conversionPatterns);
 
     if (failed(applyPartialConversion(getOperation(), conversionTarget,
                                       std::move(conversionPatterns)))) {

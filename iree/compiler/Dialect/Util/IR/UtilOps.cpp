@@ -150,12 +150,13 @@ void printTypeAlias(OpAsmPrinter &p, Operation *op, TypeAttr encodingTypeAttr,
 //===----------------------------------------------------------------------===//
 // [%offset for %length], [%offset for %length], ...
 
-ParseResult parseRangeList(OpAsmParser &parser,
-                           SmallVectorImpl<OpAsmParser::OperandType> &offsets,
-                           SmallVectorImpl<OpAsmParser::OperandType> &lengths) {
+ParseResult parseRangeList(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &offsets,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &lengths) {
   do {
-    OpAsmParser::OperandType offset;
-    OpAsmParser::OperandType length;
+    OpAsmParser::UnresolvedOperand offset;
+    OpAsmParser::UnresolvedOperand length;
     if (failed(parser.parseLSquare()) || failed(parser.parseOperand(offset)) ||
         failed(parser.parseKeyword("for")) ||
         failed(parser.parseOperand(length)) || failed(parser.parseRSquare())) {
@@ -186,7 +187,7 @@ void printRangeList(OpAsmPrinter &p, Operation *op, OperandRange offsets,
 // type{%size}
 
 ParseResult parseSizeAwareType(OpAsmParser &parser, Type &type,
-                               OpAsmParser::OperandType &size) {
+                               OpAsmParser::UnresolvedOperand &size) {
   if (failed(parser.parseType(type)) || failed(parser.parseLBrace()) ||
       failed(parser.parseOperand(size)) || failed(parser.parseRBrace())) {
     return failure();
@@ -208,12 +209,12 @@ void printSizeAwareType(OpAsmPrinter &p, Operation *op, Type type, Value size) {
 
 ParseResult parseSizeAwareTypeList(
     OpAsmParser &parser, SmallVectorImpl<Type> &types,
-    SmallVectorImpl<OpAsmParser::OperandType> &sizes) {
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes) {
   do {
     Type type;
     if (failed(parser.parseType(type))) return failure();
     if (type.isa<IREE::Util::SizeAwareTypeInterface>()) {
-      OpAsmParser::OperandType size;
+      OpAsmParser::UnresolvedOperand size;
       if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
           failed(parser.parseRBrace())) {
         return failure();
@@ -241,7 +242,7 @@ void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types,
 ParseResult parseSizeAwareTypeList(
     OpAsmParser &parser, SmallVectorImpl<Type> &types0,
     SmallVectorImpl<Type> &types1,
-    SmallVectorImpl<OpAsmParser::OperandType> &sizes) {
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes) {
   if (failed(parseSizeAwareTypeList(parser, types0, sizes))) return failure();
   types1 = types0;
   return success();
@@ -260,16 +261,16 @@ void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types0,
 
 ParseResult parseShapedTiedResult(
     OpAsmParser &parser, Type &resultType,
-    SmallVectorImpl<OpAsmParser::OperandType> &resultDims) {
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultDims) {
   ArrayAttr tiedOperands;
   return parseShapedTiedResult(parser, resultType, resultDims, tiedOperands);
 }
 
 ParseResult parseShapedTiedResult(
     OpAsmParser &parser, Type &resultType,
-    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultDims,
     ArrayAttr &tiedOperands) {
-  OpAsmParser::OperandType tiedResult;
+  OpAsmParser::UnresolvedOperand tiedResult;
   auto res = parser.parseOptionalOperand(tiedResult);
   int64_t tiedOperandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
   if (res.hasValue() && succeeded(res.getValue())) {
@@ -279,7 +280,7 @@ ParseResult parseShapedTiedResult(
   if (failed(parser.parseType(resultType))) return failure();
   if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
     if (!shapedType.hasStaticShape()) {
-      SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
+      SmallVector<OpAsmParser::UnresolvedOperand, 4> dynamicDims;
       if (failed(parser.parseLBrace()) ||
           failed(parser.parseOperandList(dynamicDims,
                                          shapedType.getNumDynamicDims(),
@@ -291,7 +292,7 @@ ParseResult parseShapedTiedResult(
     }
   } else if (auto sizedType =
                  resultType.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
-    OpAsmParser::OperandType size;
+    OpAsmParser::UnresolvedOperand size;
     if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
         failed(parser.parseRBrace())) {
       return failure();
@@ -346,13 +347,13 @@ void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
 
 static ParseResult parseShapedOperandList(
     OpAsmParser &parser, SmallVectorImpl<Type> &types,
-    SmallVectorImpl<OpAsmParser::OperandType> &dims) {
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dims) {
   do {
     Type type;
     if (failed(parser.parseType(type))) return failure();
     if (auto shapedType = type.dyn_cast<ShapedType>()) {
       if (!shapedType.hasStaticShape()) {
-        SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
+        SmallVector<OpAsmParser::UnresolvedOperand, 4> dynamicDims;
         if (failed(parser.parseLBrace()) ||
             failed(parser.parseOperandList(dynamicDims,
                                            shapedType.getNumDynamicDims(),
@@ -364,7 +365,7 @@ static ParseResult parseShapedOperandList(
       }
     } else if (auto sizedType =
                    type.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
-      OpAsmParser::OperandType size;
+      OpAsmParser::UnresolvedOperand size;
       if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
           failed(parser.parseRBrace())) {
         return failure();
@@ -378,8 +379,9 @@ static ParseResult parseShapedOperandList(
 
 // Finds the operand index in |operands| that |tiedResult| references.
 // Returns TiedOpInterface::kUntiedIndex if no operand is found.
-static int64_t findTiedOperand(OpAsmParser::OperandType tiedResult,
-                               ArrayRef<OpAsmParser::OperandType> operands) {
+static int64_t findTiedOperand(
+    OpAsmParser::UnresolvedOperand tiedResult,
+    ArrayRef<OpAsmParser::UnresolvedOperand> operands) {
   int64_t operandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
   for (int64_t i = 0; i < operands.size(); ++i) {
     if (operands[i].name == tiedResult.name &&
@@ -392,14 +394,15 @@ static int64_t findTiedOperand(OpAsmParser::OperandType tiedResult,
 }
 
 ParseResult parseShapedResultList(
-    OpAsmParser &parser, ArrayRef<OpAsmParser::OperandType> operands,
-    TypeRange operandTypes, ArrayRef<OpAsmParser::OperandType> operandDims,
+    OpAsmParser &parser, ArrayRef<OpAsmParser::UnresolvedOperand> operands,
+    TypeRange operandTypes,
+    ArrayRef<OpAsmParser::UnresolvedOperand> operandDims,
     SmallVectorImpl<Type> &resultTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultDims,
     ArrayAttr &tiedOperands) {
   SmallVector<int64_t, 4> tiedOperandIndices;
   do {
-    OpAsmParser::OperandType tiedResult;
+    OpAsmParser::UnresolvedOperand tiedResult;
     auto res = parser.parseOptionalOperand(tiedResult);
     Type type;
     int64_t tiedOperandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
@@ -422,7 +425,7 @@ ParseResult parseShapedResultList(
     }
     if (auto shapedType = type.dyn_cast<ShapedType>()) {
       if (!shapedType.hasStaticShape()) {
-        SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
+        SmallVector<OpAsmParser::UnresolvedOperand, 4> dynamicDims;
         if (failed(parser.parseLBrace()) ||
             failed(parser.parseOperandList(dynamicDims,
                                            shapedType.getNumDynamicDims(),
@@ -434,7 +437,7 @@ ParseResult parseShapedResultList(
       }
     } else if (auto sizedType =
                    type.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
-      OpAsmParser::OperandType size;
+      OpAsmParser::UnresolvedOperand size;
       if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
           failed(parser.parseRBrace())) {
         return failure();
@@ -497,11 +500,11 @@ void printShapedResultList(OpAsmPrinter &p, Operation *op, ValueRange operands,
 }
 
 ParseResult parseShapedFunctionType(
-    OpAsmParser &parser, ArrayRef<OpAsmParser::OperandType> operands,
+    OpAsmParser &parser, ArrayRef<OpAsmParser::UnresolvedOperand> operands,
     SmallVectorImpl<Type> &operandTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &operandDims,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operandDims,
     SmallVectorImpl<Type> &resultTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultDims,
     ArrayAttr &tiedOperands) {
   if (failed(parser.parseLParen())) return failure();
   if (failed(parser.parseOptionalRParen())) {
@@ -579,7 +582,7 @@ void DoNotOptimizeOp::build(OpBuilder &builder, OperationState &state,
 }
 
 ParseResult DoNotOptimizeOp::parse(OpAsmParser &parser, OperationState &state) {
-  SmallVector<OpAsmParser::OperandType, 2> args;
+  SmallVector<OpAsmParser::UnresolvedOperand, 2> args;
   // Operands and results have the same types.
   auto &operandTypes = state.types;
 
@@ -608,19 +611,20 @@ void DoNotOptimizeOp::print(OpAsmPrinter &p) {
   }
 }
 
-static LogicalResult verifyDoNotOptimizeOp(DoNotOptimizeOp op) {
-  if (op.getNumOperands() != op.getNumResults()) {
-    return op.emitOpError()
+LogicalResult DoNotOptimizeOp::verify() {
+  Operation *op = getOperation();
+  if (op->getNumOperands() != op->getNumResults()) {
+    return op->emitOpError()
            << "must have same number of operands and results, but has "
-           << op.getNumOperands() << " and " << op.getNumResults()
+           << op->getNumOperands() << " and " << op->getNumResults()
            << ", respectively";
   }
 
-  for (int i = 0, e = op.getNumOperands(); i < e; ++i) {
-    if (op.getOperand(i).getType() != op.getResult(i).getType()) {
-      op.emitOpError() << "must have same operand and result types, but they "
-                          "differ at index "
-                       << i;
+  for (int i = 0, e = op->getNumOperands(); i < e; ++i) {
+    if (op->getOperand(i).getType() != op->getResult(i).getType()) {
+      op->emitOpError() << "must have same operand and result types, but they "
+                           "differ at index "
+                        << i;
     }
   }
 
@@ -687,15 +691,15 @@ NumericOptionalNarrowOp::getIntegerRange() {
 
 void InitializerOp::build(OpBuilder &builder, OperationState &result,
                           ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute(
-      "type", TypeAttr::get(FunctionType::get(builder.getContext(), {}, {})));
+  result.addAttribute("function_type", TypeAttr::get(FunctionType::get(
+                                           builder.getContext(), {}, {})));
   result.addRegion();
   result.attributes.append(attrs.begin(), attrs.end());
 }
 
 ParseResult InitializerOp::parse(OpAsmParser &parser, OperationState &result) {
-  result.addAttribute(
-      "type", TypeAttr::get(FunctionType::get(result.getContext(), {}, {})));
+  result.addAttribute("function_type", TypeAttr::get(FunctionType::get(
+                                           result.getContext(), {}, {})));
   if (parser.parseOptionalAttrDictWithKeyword(result.attributes)) {
     return failure();
   }
@@ -708,7 +712,8 @@ ParseResult InitializerOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void InitializerOp::print(OpAsmPrinter &p) {
   Operation *op = getOperation();
-  p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{"type"});
+  p.printOptionalAttrDictWithKeyword(op->getAttrs(),
+                                     /*elidedAttrs=*/{"function_type"});
   p << " ";
   p.printRegion(body());
 }
@@ -770,14 +775,15 @@ void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   build(builder, result, name, isMutable, type, llvm::None, attrs);
 }
 
-static LogicalResult verifyGlobalOp(GlobalOp op) {
-  if (op.initial_value().hasValue()) {
+LogicalResult GlobalOp::verify() {
+  Operation *op = getOperation();
+  if (initial_value().hasValue()) {
     // Ensure the value is something we can convert to a const.
-    if (!isGlobalTypeCompatible(op.type(), op.initial_valueAttr().getType())) {
+    if (!isGlobalTypeCompatible(type(), initial_valueAttr().getType())) {
       return op->emitOpError()
-             << "initial value type mismatch; global " << op.getSymbolName()
-             << " is " << op.type() << " but initial value provided is "
-             << op.initial_valueAttr().getType();
+             << "initial value type mismatch; global " << getSymbolName()
+             << " is " << type() << " but initial value provided is "
+             << initial_valueAttr().getType();
     }
   }
   return success();
@@ -795,10 +801,11 @@ void GlobalAddressOp::getAsmResultNames(
   setNameFn(result(), Twine("ptr_" + global()).str());
 }
 
-static LogicalResult verifyGlobalAddressOp(GlobalAddressOp op) {
-  auto globalOp = op.getGlobalOp();
+LogicalResult GlobalAddressOp::verify() {
+  Operation *op = getOperation();
+  auto globalOp = getGlobalOp();
   if (!globalOp) {
-    return op.emitOpError() << "undefined global: " << op.global();
+    return op->emitOpError() << "undefined global: " << global();
   }
   return success();
 }
@@ -836,27 +843,29 @@ void GlobalLoadOp::getEffects(
   }
 }
 
-static LogicalResult verifyGlobalLoadOp(GlobalLoadOp op) {
-  auto globalOp = op.getGlobalOp();
+LogicalResult GlobalLoadOp::verify() {
+  Operation *op = getOperation();
+  auto globalOp = getGlobalOp();
   if (!globalOp) {
-    return op->emitOpError() << "undefined global: " << op.global();
+    return op->emitOpError() << "undefined global: " << global();
   }
   auto loadType = op->getResult(0).getType();
   if (!isGlobalTypeCompatible(globalOp.type(), loadType)) {
     return op->emitOpError()
-           << "global type mismatch; global " << op.global() << " is "
+           << "global type mismatch; global " << global() << " is "
            << globalOp.type() << " but load is " << loadType;
   }
   return success();
 }
 
-static LogicalResult verifyGlobalLoadIndirectOp(GlobalLoadIndirectOp &op) {
+LogicalResult GlobalLoadIndirectOp::verify() {
+  Operation *op = getOperation();
   auto globalType =
-      op.global().getType().cast<IREE::Util::PtrType>().getTargetType();
-  auto loadType = op.result().getType();
+      global().getType().cast<IREE::Util::PtrType>().getTargetType();
+  auto loadType = result().getType();
   if (!isGlobalTypeCompatible(globalType, loadType)) {
-    return op.emitOpError() << "global type mismatch; global pointer is "
-                            << globalType << " but load is " << loadType;
+    return op->emitOpError() << "global type mismatch; global pointer is "
+                             << globalType << " but load is " << loadType;
   }
   return success();
 }
@@ -868,34 +877,36 @@ IREE::Util::GlobalOp GlobalStoreOp::getGlobalOp() {
 
 FlatSymbolRefAttr GlobalStoreOp::getGlobalRefAttr() { return globalAttr(); }
 
-static LogicalResult verifyGlobalStoreOp(GlobalStoreOp op) {
-  auto globalOp = op.getGlobalOp();
+LogicalResult GlobalStoreOp::verify() {
+  Operation *op = getOperation();
+  auto globalOp = getGlobalOp();
   if (!globalOp) {
-    return op->emitOpError() << "undefined global: " << op.global();
+    return op->emitOpError() << "undefined global: " << global();
   }
   auto storeType = op->getOperand(0).getType();
   if (globalOp.type() != storeType) {
     return op->emitOpError()
-           << "global type mismatch; global " << op.global() << " is "
+           << "global type mismatch; global " << global() << " is "
            << globalOp.type() << " but store is " << storeType;
   }
   if (!globalOp.isMutable()) {
     // Allow stores to immutable globals in initializers.
     if (!op->getParentOfType<InitializerOp>()) {
-      return op->emitOpError() << "global " << op.global()
+      return op->emitOpError() << "global " << global()
                                << " is not mutable and cannot be stored to";
     }
   }
   return success();
 }
 
-static LogicalResult verifyGlobalStoreIndirectOp(GlobalStoreIndirectOp &op) {
+LogicalResult GlobalStoreIndirectOp::verify() {
+  Operation *op = getOperation();
   auto globalType =
-      op.global().getType().cast<IREE::Util::PtrType>().getTargetType();
-  auto storeType = op.value().getType();
+      global().getType().cast<IREE::Util::PtrType>().getTargetType();
+  auto storeType = value().getType();
   if (!isGlobalTypeCompatible(globalType, storeType)) {
-    return op.emitOpError() << "global type mismatch; global pointer is "
-                            << globalType << " but store is " << storeType;
+    return op->emitOpError() << "global type mismatch; global pointer is "
+                             << globalType << " but store is " << storeType;
   }
   return success();
 }
@@ -975,24 +986,26 @@ static void printListTypeSet(OpAsmPrinter &printer, Operation *, Type listType,
   }
 }
 
-static LogicalResult verifyListGetOp(ListGetOp &op) {
-  auto listType = op.list().getType().cast<IREE::Util::ListType>();
+LogicalResult ListGetOp::verify() {
+  Operation *op = getOperation();
+  auto listType = list().getType().cast<IREE::Util::ListType>();
   auto elementType = listType.getElementType();
-  auto resultType = op.result().getType();
+  auto resultType = result().getType();
   if (!ListType::canImplicitlyCast(elementType, resultType)) {
-    return op.emitError() << "list contains " << elementType
-                          << " and cannot be accessed as " << resultType;
+    return op->emitError() << "list contains " << elementType
+                           << " and cannot be accessed as " << resultType;
   }
   return success();
 }
 
-static LogicalResult verifyListSetOp(ListSetOp &op) {
-  auto listType = op.list().getType().cast<IREE::Util::ListType>();
+LogicalResult ListSetOp::verify() {
+  Operation *op = getOperation();
+  auto listType = list().getType().cast<IREE::Util::ListType>();
   auto elementType = listType.getElementType();
-  auto valueType = op.value().getType();
+  auto valueType = value().getType();
   if (!ListType::canImplicitlyCast(valueType, elementType)) {
-    return op.emitError() << "list contains " << elementType
-                          << " and cannot be mutated as " << valueType;
+    return op->emitError() << "list contains " << elementType
+                           << " and cannot be mutated as " << valueType;
   }
   return success();
 }

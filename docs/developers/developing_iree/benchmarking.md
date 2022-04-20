@@ -19,7 +19,7 @@ measurements more akin to unit tests, see [Executable Benchmarks](#executable-be
 To use `iree-benchmark-module`, generate an IREE module for the target backend:
 
 ```shell
-$ bazel run //iree/tools:iree-translate -- \
+$ bazel run //iree/tools:iree-compile -- \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \
   $PWD/iree/samples/models/simple_abs.mlir \
@@ -107,7 +107,7 @@ dispatch functions, generate an IREE module with the
 `-iree-flow-export-benchmark-funcs` flag set:
 
 ```shell
-$ build/iree/tools/iree-translate \
+$ build/iree/tools/iree-compile \
   -iree-input-type=mhlo \
   -iree-mlir-to-vm-bytecode-module \
   -iree-flow-export-benchmark-funcs \

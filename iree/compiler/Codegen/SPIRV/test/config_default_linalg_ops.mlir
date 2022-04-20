@@ -16,7 +16,7 @@ hal.executable @copy_as_generic {
     }> {
     hal.executable.entry_point @copy_as_generic layout(#executable_layout)
     builtin.module {
-      builtin.func @copy_as_generic() {
+      func.func @copy_as_generic() {
         %c0 = arith.constant 0 : index
         %d0 = hal.interface.constant.load[0] : index
         %d1 = hal.interface.constant.load[1] : index
@@ -60,7 +60,7 @@ hal.executable @tensor_insert {
     }> {
     hal.executable.entry_point @copy layout(#executable_layout)
     builtin.module {
-      builtin.func @copy() {
+      func.func @copy() {
         %c0 = arith.constant 0 : index
         %c224 = arith.constant 224 : index
         %c3 = arith.constant 3 : index
@@ -106,7 +106,7 @@ hal.executable @avg_pool {
     }> {
     hal.executable.entry_point public @avg_pool layout(#executable_layout)
     builtin.module {
-      func @avg_pool() {
+      func.func @avg_pool() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
         %c2 = arith.constant 2 : index
@@ -117,7 +117,7 @@ hal.executable @avg_pool {
         %14 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 24, 24, 8], strides = [1, 1, 1, 1]
             : !flow.dispatch.tensor<readonly:1x24x24x8xf32> -> tensor<1x24x24x8xf32>
         %20 = linalg.init_tensor [1, 2, 2, 8] : tensor<1x2x2x8xf32>
-        %21 = linalg.fill(%cst, %20) : f32, tensor<1x2x2x8xf32> -> tensor<1x2x2x8xf32>
+        %21 = linalg.fill ins(%cst : f32) outs(%20 : tensor<1x2x2x8xf32>) -> tensor<1x2x2x8xf32>
         %22 = linalg.pooling_nhwc_sum {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : vector<2xi64>, strides = dense<12> : vector<2xi64>}
             ins(%14, %2 : tensor<1x24x24x8xf32>, tensor<12x12xf32>)
             outs(%21 : tensor<1x2x2x8xf32>) -> tensor<1x2x2x8xf32>
@@ -156,7 +156,7 @@ hal.executable @max_pool {
     }> {
     hal.executable.entry_point public @max_pool layout(#executable_layout)
     builtin.module  {
-      func @max_pool() {
+      func.func @max_pool() {
         %cst = arith.constant 0xFF800000 : f32
         %c38 = arith.constant 38 : index
         %c1 = arith.constant 1 : index
@@ -168,7 +168,7 @@ hal.executable @max_pool {
         %13 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 76, 1, 1], strides = [1, 1, 1, 1]
             : !flow.dispatch.tensor<readonly:1x76x1x1xf32> -> tensor<1x76x1x1xf32>
         %18 = linalg.init_tensor [1, 38, 1, 1] : tensor<1x38x1x1xf32>
-        %19 = linalg.fill(%cst, %18) : f32, tensor<1x38x1x1xf32> -> tensor<1x38x1x1xf32>
+        %19 = linalg.fill ins(%cst : f32) outs(%18 : tensor<1x38x1x1xf32>) -> tensor<1x38x1x1xf32>
         %20 = linalg.pooling_nhwc_max {dilations = dense<1> : vector<2xi64>, strides = dense<[2, 1]> : vector<2xi64>}
             ins(%13, %2 : tensor<1x76x1x1xf32>, tensor<2x1xf32>)
             outs(%19 : tensor<1x38x1x1xf32>) -> tensor<1x38x1x1xf32>
@@ -210,7 +210,7 @@ hal.executable @elementwise {
     }> {
     hal.executable.entry_point public @elementwise layout(#executable_layout)
     builtin.module {
-      func @elementwise() {
+      func.func @elementwise() {
         %c0 = arith.constant 0 : index
         %c1 = arith.constant 1 : index
         %c10 = arith.constant 10 : index
@@ -263,7 +263,7 @@ hal.executable @dwconv_elementwise {
     }> {
     hal.executable.entry_point public @dwconv_elementwise layout(#executable_layout)
     builtin.module  {
-      func @dwconv_elementwise() {
+      func.func @dwconv_elementwise() {
         %cst = arith.constant opaque<"_", "0xDEADBEEF"> : tensor<3x3x1x4xf32>
         %cst_8 = arith.constant 1.001000e+00 : f32
         %cst_9 = arith.constant 0.000000e+00 : f32
@@ -278,7 +278,7 @@ hal.executable @dwconv_elementwise {
         %14 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 21, 20, 1], strides = [1, 1, 1, 1]
             : !flow.dispatch.tensor<readonly:1x21x20x1xf32> -> tensor<1x21x20x1xf32>
         %18 = linalg.init_tensor [1, 19, 18, 1, 4] : tensor<1x19x18x1x4xf32>
-        %19 = linalg.fill(%cst_9, %18) : f32, tensor<1x19x18x1x4xf32> -> tensor<1x19x18x1x4xf32>
+        %19 = linalg.fill ins(%cst_9 : f32) outs(%18 : tensor<1x19x18x1x4xf32>) -> tensor<1x19x18x1x4xf32>
         %20 = linalg.depthwise_conv_2d_nhwc_hwcm {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
             ins(%14, %cst : tensor<1x21x20x1xf32>, tensor<3x3x1x4xf32>) outs(%19 : tensor<1x19x18x1x4xf32>) -> tensor<1x19x18x1x4xf32>
         %21 = linalg.generic {

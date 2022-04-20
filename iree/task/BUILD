@@ -18,6 +18,13 @@ iree_cmake_extra_content(
 if(NOT ${IREE_ENABLE_THREADING})
   return()
 endif()
+
+# cpuinfo can be conditionally disabled when it is not supported.
+# If disabled then by default the task system will use 1 thread.
+set(IREE_CPUINFO_TARGET)
+if(IREE_ENABLE_CPUINFO)
+  set(IREE_CPUINFO_TARGET cpuinfo)
+endif()
 """,
     inline = True,
 )
@@ -64,7 +71,6 @@ cc_library(
         "submission.h",
         "task.h",
         "topology.h",
-        "topology_cpuinfo.h",
         "tuning.h",
     ],
     deps = [
@@ -85,13 +91,23 @@ cc_library(
 )
 
 cc_test(
-    name = "executor_test",
-    srcs = ["executor_test.cc"],
+    name = "executor_demo",
+    srcs = ["executor_demo.cc"],
     deps = [
         ":task",
         "//iree/base",
         "//iree/base:tracing",
         "//iree/base/internal:prng",
+        "//iree/task/testing:test_util",
+    ],
+)
+
+cc_test(
+    name = "executor_test",
+    srcs = ["executor_test.cc"],
+    deps = [
+        ":task",
+        "//iree/base",
         "//iree/task/testing:test_util",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
@@ -171,19 +187,8 @@ cc_test(
 cc_test(
     name = "topology_test",
     srcs = ["topology_test.cc"],
-    deps = [
-        ":task",
-        "//iree/base",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_test(
-    name = "topology_cpuinfo_test",
-    srcs = ["topology_cpuinfo_test.cc"],
     tags = [
-        "noasan",  # TODO(benvanik): Does not work on machines with large numbers of cores.
+        "noasan",  # TODO(8469): Does not work on machines with large numbers of cores.
     ],
     deps = [
         ":task",

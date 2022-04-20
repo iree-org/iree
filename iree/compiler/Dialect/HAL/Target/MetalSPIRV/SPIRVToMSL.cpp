@@ -76,7 +76,7 @@ class SPIRVToMSLCompiler : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
             return;
           }
           // TODO(antiagainst): push constant
-          llvm_unreachable("unspported storage class in SPIRVToMSLCompiler");
+          assert(false && "unspported storage class in SPIRVToMSLCompiler");
         });
 
     llvm::sort(descriptors);
@@ -111,8 +111,8 @@ llvm::Optional<MetalShader> crossCompileSPIRVToMSL(
   auto descriptors = spvCrossCompiler.getBufferSetBindingPairs();
   for (const auto& descriptor : descriptors) {
     if (descriptor.set != 0) {
-      llvm_unreachable(
-          "multiple descriptor set unimplemented in SPIRVToMSLCompiler");
+      assert(false &&
+             "multiple descriptor set unimplemented in SPIRVToMSLCompiler");
     }
 
     SPIRV_CROSS_NAMESPACE::MSLResourceBinding binding = {};

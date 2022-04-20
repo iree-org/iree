@@ -85,7 +85,7 @@ class Importer:
           context=ic.context)
       f_op = d.FuncOp(
           ir.StringAttr.get(symbol),
-          type=ir.TypeAttr.get(ir_f_type),
+          function_type=ir.TypeAttr.get(ir_f_type),
           arg_names=f_arg_names,
           free_vars=f_var_names,
           cell_vars=ir.ArrayAttr.get([]),

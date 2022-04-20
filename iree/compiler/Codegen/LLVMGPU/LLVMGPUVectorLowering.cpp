@@ -26,7 +26,7 @@ struct LLVMGPUVectorLoweringPass
     registry.insert<vector::VectorDialect>();
   }
   void runOnOperation() override {
-    FuncOp funcOp = getOperation();
+    func::FuncOp funcOp = getOperation();
     RewritePatternSet vectorToLoopsPatterns(&getContext());
     VectorTransferToSCFOptions vectorToSCFOptions;
     vectorToSCFOptions.enableFullUnroll();
@@ -42,7 +42,7 @@ struct LLVMGPUVectorLoweringPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorLoweringPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorLoweringPass() {
   return std::make_unique<LLVMGPUVectorLoweringPass>();
 }
 

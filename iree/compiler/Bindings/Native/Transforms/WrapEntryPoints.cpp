@@ -46,8 +46,8 @@ class WrapEntryPointsPass
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
-    SmallVector<FuncOp, 4> entryFuncOps;
-    for (auto funcOp : moduleOp.getOps<FuncOp>()) {
+    SmallVector<func::FuncOp, 4> entryFuncOps;
+    for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
       if (funcOp.isPublic() && !funcOp->hasAttr("iree.abi.stub")) {
         entryFuncOps.push_back(funcOp);
       }
@@ -103,13 +103,13 @@ class WrapEntryPointsPass
   //
   // NOTE: today we only support a single entry point; with minor tweaks we
   // could fix this up to support multiple if we wanted.
-  FuncOp createWrapperFunc(FuncOp entryFuncOp) {
+  func::FuncOp createWrapperFunc(func::FuncOp entryFuncOp) {
     // Convert argument types to those required by the binding ABI.
     //
     // NOTE: this is where we could change our signature to provide additional
     // values from the runtime bindings as may be required - like semaphores for
     // async behavior or cancellation.
-    auto entryFuncType = entryFuncOp.getType();
+    auto entryFuncType = entryFuncOp.getFunctionType();
     SmallVector<Type> inputTypes;
     for (auto oldType : entryFuncType.getInputs()) {
       inputTypes.push_back(mapToABIType(oldType));
@@ -121,8 +121,8 @@ class WrapEntryPointsPass
     auto wrapperFuncType =
         FunctionType::get(entryFuncOp.getContext(), inputTypes, resultTypes);
 
-    auto wrapperFuncOp = FuncOp::create(entryFuncOp.getLoc(),
-                                        entryFuncOp.getName(), wrapperFuncType);
+    auto wrapperFuncOp = func::FuncOp::create(
+        entryFuncOp.getLoc(), entryFuncOp.getName(), wrapperFuncType);
 
     SmallVector<DictionaryAttr, 4> argAttrDict;
     entryFuncOp.getAllArgAttrs(argAttrDict);
@@ -195,7 +195,8 @@ class WrapEntryPointsPass
   }
 
   // Populates attributes on |wrapperFuncOp| to support runtime reflection.
-  void populateReflectionAttrs(FuncOp entryFuncOp, FuncOp wrapperFuncOp) {
+  void populateReflectionAttrs(func::FuncOp entryFuncOp,
+                               func::FuncOp wrapperFuncOp) {
     SmallVector<NamedAttribute, 4> attrs;
     auto abiAttr = entryFuncOp->getAttr("iree.abi");
     if (abiAttr) {

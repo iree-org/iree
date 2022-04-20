@@ -115,7 +115,7 @@ static void setInsertionPointToParentExecutionScope(Operation *op,
   } else if (auto parentOp = op->getParentOfType<CmdExecuteOp>()) {
     rewriter.setInsertionPoint(parentOp);
   } else {
-    llvm_unreachable("must be nested within an execution region");
+    assert(false && "must be nested within an execution region");
   }
 }
 

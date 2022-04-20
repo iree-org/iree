@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/Support/Mutex.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/DataLayoutAnalysis.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
@@ -29,7 +30,7 @@
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
-#include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
+#include "mlir/Conversion/TosaToArith/TosaToArith.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
@@ -74,6 +75,7 @@ class HALDispatchABI {
   // Returns a Type representing iree_hal_processor_v0_t.
   static LLVM::LLVMStructType getProcessorType(
       MLIRContext *context, LLVMTypeConverter *typeConverter) {
+    llvm::sys::ScopedLock lock(sMutex);
     auto structType =
         LLVM::LLVMStructType::getIdentified(context, "iree_hal_processor_v0_t");
     if (structType.isInitialized()) return structType;
@@ -105,6 +107,7 @@ class HALDispatchABI {
   static LLVM::LLVMStructType getEnvironmentType(
       MLIRContext *context, LLVMTypeConverter *typeConverter,
       LLVM::LLVMStructType processorType) {
+    llvm::sys::ScopedLock lock(sMutex);
     auto structType = LLVM::LLVMStructType::getIdentified(
         context, "iree_hal_executable_environment_v0_t");
     if (structType.isInitialized()) return structType;
@@ -147,7 +150,8 @@ class HALDispatchABI {
     /*uint32_t*/ workgroup_count_x,
     /*uint32_t*/ workgroup_count_y,
     /*uint16_t*/ workgroup_count_z,
-    /*uint16_t*/ binding_count,
+    /*uint8_t*/ max_concurrency,
+    /*uint8_t*/ binding_count,
     /*intptr_t*/ push_constants,
     /*intptr_t*/ binding_ptrs,
     /*intptr_t*/ binding_lengths,
@@ -159,12 +163,14 @@ class HALDispatchABI {
   // Returns a Type representing iree_hal_executable_dispatch_state_v0_t.
   static LLVM::LLVMStructType getDispatchStateType(
       MLIRContext *context, LLVMTypeConverter *typeConverter) {
+    llvm::sys::ScopedLock lock(sMutex);
     auto structType = LLVM::LLVMStructType::getIdentified(
         context, "iree_hal_executable_dispatch_state_v0_t");
     if (structType.isInitialized()) return structType;
 
     auto indexType = typeConverter->convertType(IndexType::get(context));
     auto int8Type = IntegerType::get(context, 8);
+    auto uint8Type = IntegerType::get(context, 8);
     auto uint16Type = IntegerType::get(context, 16);
     auto uint32Type = IntegerType::get(context, 32);
     auto int8PtrType = LLVM::LLVMPointerType::get(int8Type);
@@ -188,8 +194,11 @@ class HALDispatchABI {
     fieldTypes.push_back(uint32Type);
     fieldTypes.push_back(uint16Type);
 
-    // uint16_t binding_count;
-    fieldTypes.push_back(uint16Type);
+    // uint8_t max_concurrency;
+    fieldTypes.push_back(uint8Type);
+
+    // uint8_t binding_count;
+    fieldTypes.push_back(uint8Type);
 
     // const uint32_t * push_constants;
     fieldTypes.push_back(uint32PtrType);
@@ -222,6 +231,7 @@ class HALDispatchABI {
   // Returns a Type representing iree_hal_executable_workgroup_state_v0_t.
   static LLVM::LLVMStructType getWorkgroupStateType(
       MLIRContext *context, LLVMTypeConverter *typeConverter) {
+    llvm::sys::ScopedLock lock(sMutex);
     auto structType = LLVM::LLVMStructType::getIdentified(
         context, "iree_hal_executable_workgroup_state_v0_t");
     if (structType.isInitialized()) return structType;
@@ -324,6 +334,15 @@ class HALDispatchABI {
     auto dimValue = loadFieldValue(
         loc, DispatchStateField::workgroup_size_x + dim, builder);
     return castValueToType(loc, dimValue, resultType, builder);
+  }
+
+  // Returns the estimated maximum concurrency as an index-converted type.
+  Value loadMaxConcurrency(Location loc, OpBuilder &builder) {
+    auto value =
+        loadFieldValue(loc, DispatchStateField::max_concurrency, builder);
+    return castValueToType(loc, value,
+                           typeConverter->convertType(builder.getIndexType()),
+                           builder);
   }
 
   // Returns the total number of bytes available in workgroup local memory.
@@ -505,8 +524,8 @@ class HALDispatchABI {
     return builder.createOrFold<LLVM::LoadOp>(loc, elementPtrValue);
   }
 
-  // Returns an i1 indicating whether the weak import with |ordinal| is defined.
-  // Equivalent to:
+  // Returns an i1 indicating whether the optional import with |ordinal| is
+  // defined. Equivalent to:
   //   state->imports[ordinal] != NULL
   Value isImportFuncAvailable(Location loc, int64_t ordinal,
                               OpBuilder &builder) {
@@ -593,7 +612,13 @@ class HALDispatchABI {
   LLVM::LLVMStructType environmentType;
   LLVM::LLVMStructType dispatchStateType;
   LLVM::LLVMStructType workgroupStateType;
+
+  // Used to lock around mutations of shared LLVM type information, e.g.
+  // mlir::LLVM::LLVMStructType::getIdentified.
+  static llvm::sys::Mutex sMutex;
 };
+
+llvm::sys::Mutex HALDispatchABI::sMutex;
 
 /// Converts Standard MLIR FuncOps to LLVMFuncOps matching the IREE HAL ABI.
 /// This is an IREE-specific conversion that assumes the input function is
@@ -602,7 +627,7 @@ class HALDispatchABI {
 /// Source function:
 ///
 /// ```
-/// func @foo() {
+/// func.func @foo() {
 ///   %0 = hal.interface.binding.subspan ...
 /// }
 /// ```
@@ -624,15 +649,15 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
  public:
   explicit ConvertHALEntryPointFuncOp(MLIRContext *context,
                                       LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(mlir::FuncOp::getOperationName(), context,
+      : ConvertToLLVMPattern(mlir::func::FuncOp::getOperationName(), context,
                              converter, 100) {}
 
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto stdFuncOp = cast<FuncOp>(op);
+    auto stdFuncOp = cast<func::FuncOp>(op);
     if (!stdFuncOp.isPublic()) return failure();
-    FunctionType fnType = stdFuncOp.getType();
+    FunctionType fnType = stdFuncOp.getFunctionType();
     if (fnType.getNumInputs() != 0 || fnType.getNumResults() != 0) {
       op->emitWarning() << "public functions on executables must be () -> ()";
       return failure();
@@ -932,7 +957,7 @@ void ConvertToLLVMPass::runOnOperation() {
   //   multiply or add.
   //
   // TODO(bjacob): Use a lowering that uses specific ARM/X86 intrinsics.
-  tosa::populateTosaRescaleToStandardConversionPatterns(&patterns);
+  tosa::populateTosaRescaleToArithConversionPatterns(&patterns);
 
   populateAffineToStdConversionPatterns(patterns);
   populateSCFToControlFlowConversionPatterns(patterns);
@@ -968,7 +993,7 @@ void ConvertToLLVMPass::runOnOperation() {
   target.addIllegalOp<UnrealizedConversionCastOp>();
 
   // Don't apply patterns to private function (e.g num_workgroups func).
-  target.addDynamicallyLegalOp<FuncOp>([&](FuncOp funcOp) {
+  target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
     if (isEntryPoint(funcOp)) return false;
     return true;
   });
@@ -977,7 +1002,7 @@ void ConvertToLLVMPass::runOnOperation() {
                                     IREE::Util::UtilDialect,
                                     IREE::HAL::HALDialect, math::MathDialect>(
       [&](Operation *op) {
-        auto funcParent = op->getParentOfType<FuncOp>();
+        auto funcParent = op->getParentOfType<func::FuncOp>();
         if (!funcParent) return false;
         if (isEntryPoint(funcParent)) return false;
         return true;

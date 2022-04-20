@@ -13,18 +13,6 @@ EXPLICIT_TARGET_MAPPING = {
     "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
 
     # IREE llvm-external-projects
-    "//llvm-external-projects/iree-dialects:IREEInputDialect": [
-        "IREEInputDialect"
-    ],
-    "//llvm-external-projects/iree-dialects:IREELinalgExtDialect": [
-        "IREELinalgExtDialect"
-    ],
-    "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms": [
-        "IREELinalgExtPasses"
-    ],
-    "//llvm-external-projects/iree-dialects:IREEPyDMDialect": [
-        "IREEPyDMDialect"
-    ],
     "//llvm-external-projects/iree-dialects:IREEPyDMTransforms": [
         "IREEPyDMPasses"
     ],
@@ -82,6 +70,8 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:TensorDialect": ["MLIRTensor"],
     "@llvm-project//mlir:NVVMDialect": ["MLIRNVVMIR"],
     "@llvm-project//mlir:ROCDLDialect": ["MLIRROCDLIR"],
+    "@llvm-project//mlir:PDLDialect": ["MLIRPDL"],
+    "@llvm-project//mlir:PDLInterpDialect": ["MLIRPDLInterp"],
     # MHLO.
     # TODO: Rework this upstream so that Bazel and CMake rules match up
     # better.
@@ -96,6 +86,22 @@ EXPLICIT_TARGET_MAPPING = {
         "ChloDialect",
         "MhloDialect",
         "MLIRMhloUtils",
+    ],
+    "@mlir-hlo//:hlo_legalize_shape_ops_to_standard": [
+        "tensorflow::external_mhlo_includes",
+        "MhloShapeOpsToStandard",
+    ],
+    "@mlir-hlo//:hlo_legalize_to_arithmetic": [
+        "tensorflow::external_mhlo_includes",
+        "MhloToArithmeticConversion",
+    ],
+    "@mlir-hlo//:hlo_legalize_to_lhlo": [
+        "tensorflow::external_mhlo_includes",
+        "MhloToLhloConversion",
+    ],
+    "@mlir-hlo//:hlo_legalize_to_memref": [
+        "tensorflow::external_mhlo_includes",
+        "MhloToMemrefConversion",
     ],
     "@mlir-hlo//:legalize_control_flow": [
         "tensorflow::external_mhlo_includes",
@@ -143,6 +149,11 @@ EXPLICIT_TARGET_MAPPING = {
         "MhloPasses",
     ],
 
+    # Torch-MLIR.
+    "@torch-mlir-dialects//:TorchMLIRTMTensorDialect": [
+        "TorchMLIRTMTensorDialect"
+    ],
+
     # Vulkan
     "@vulkan_headers": ["Vulkan::Headers"],
     # The Bazel target maps to the IMPORTED target defined by FindVulkan().
@@ -155,9 +166,10 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_github_yaml_libyaml//:yaml": ["yaml"],
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
-    "@cpuinfo": ["cpuinfo"],
+    "@cpuinfo": ["${IREE_CPUINFO_TARGET}"],
     "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
 }
+
 
 def _convert_mlir_target(target):
   # Default to a pattern substitution approach.
@@ -173,6 +185,11 @@ def _convert_llvm_target(target):
   #   "@llvm-project//llvm:AsmParser" -> "LLVMAsmParser"
   #   "@llvm-project//llvm:Core" -> "LLVMCore"
   return ["LLVM" + target.rsplit(":")[-1]]
+
+
+def _convert_iree_dialects_target(target):
+  # Just take the target name as-is.
+  return [target.rsplit(":")[-1]]
 
 
 def convert_target(target):
@@ -193,6 +210,12 @@ def convert_target(target):
   """
   if target in EXPLICIT_TARGET_MAPPING:
     return EXPLICIT_TARGET_MAPPING[target]
+  if target.startswith("@llvm-project//llvm"):
+    return _convert_llvm_target(target)
+  if target.startswith("@llvm-project//mlir"):
+    return _convert_mlir_target(target)
+  if target.startswith("//llvm-external-projects/iree-dialects"):
+    return _convert_iree_dialects_target(target)
   if not target.startswith("@"):
     # Bazel `:api`            -> CMake `::api`
     # Bazel `//iree/base`     -> CMake `iree::base`
@@ -202,9 +225,5 @@ def convert_target(target):
     target = target.replace(":", "::")  # iree/base::foo or ::foo
     target = target.replace("/", "::")  # iree::base
     return [target]
-  if target.startswith("@llvm-project//llvm"):
-    return _convert_llvm_target(target)
-  if target.startswith("@llvm-project//mlir"):
-    return _convert_mlir_target(target)
 
   raise KeyError(f"No conversion found for target '{target}'")

@@ -32,10 +32,12 @@ iree_lit_test_suite(
             "create_fast_slow_path.mlir",
             "distribute_to_invocations.mlir",
             "pipeline_matmul_cooperative_ops.mlir",
+            "pipeline_matmul_promotion.mlir",
             "pipeline_matmul_vectorization.mlir",
             "tile_and_distribute.mlir",
             "tile_and_distribute_scatter.mlir",
             "tile_and_distribute_sort.mlir",
+            "tile_and_promote_matmul.mlir",
             "tile_and_vectorize_batch_matmul.mlir",
             "tile_and_vectorize_conv.mlir",
             "tile_and_vectorize_matmul.mlir",
@@ -47,10 +49,6 @@ iree_lit_test_suite(
             "vectorize_tensor_pad.mlir",
         ],
         include = ["*.mlir"],
-        # TODO(b/203528778) reenable
-        exclude = [
-            "promote_workgroup_memory.mlir",
-        ],
     ),
     tools = [
         "//iree/tools:iree-opt",

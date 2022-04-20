@@ -11,6 +11,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir {
@@ -28,14 +29,14 @@ namespace detail {
 LogicalResult verifyLinalgExtOpInterface(Operation *op);
 }
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h.inc"  // IWYU pragma: export
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h.inc" // IWYU pragma: export
 
 /// Include the generated interface declarations.
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOpInterfaces.h.inc"  // IWYU pragma: export
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOpInterfaces.h.inc" // IWYU pragma: export
 
-}  // namespace LinalgExt
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace LinalgExt
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_DIALECTS_DIALECT_LINALGEXT_IR_LINALGEXTINTERFACES_H_
+#endif // IREE_DIALECTS_DIALECT_LINALGEXT_IR_LINALGEXTINTERFACES_H_

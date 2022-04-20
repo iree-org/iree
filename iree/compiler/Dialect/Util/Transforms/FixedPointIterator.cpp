@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -25,6 +26,8 @@ namespace {
 class FixedPointIteratorPass
     : public PassWrapper<FixedPointIteratorPass, OperationPass<void>> {
  public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(FixedPointIteratorPass)
+
   FixedPointIteratorPass() = default;
   FixedPointIteratorPass(const FixedPointIteratorPass &other)
       : PassWrapper(other) {}

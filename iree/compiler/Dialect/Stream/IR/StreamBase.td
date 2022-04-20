@@ -10,6 +10,8 @@
 include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
+include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/EnumAttr.td"
 include "mlir/IR/SubElementInterfaces.td"
 
 //===----------------------------------------------------------------------===//
@@ -109,8 +111,7 @@ def Stream_Dialect : Dialect {
 
 class Stream_Op<string mnemonic, list<Trait> traits = []> :
     Op<Stream_Dialect, mnemonic, traits> {
-  let parser = [{ return parse$cppClass(parser, &result); }];
-  let printer = [{ return print$cppClass(p, *this); }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -218,6 +219,8 @@ def Stream_PartitioningConfigAttr :
     // `stream.partitioning` attribute is found.
     static PartitioningConfigAttr lookup(Operation *op);
   }];
+
+  let hasCustomAssemblyFormat = 1;
 }
 
 def Stream_ResourceConfigAttr :
@@ -269,13 +272,15 @@ def Stream_ResourceConfigAttr :
     // configuration, or as a fallback returns a conservative configuration.
     static ResourceConfigAttr lookup(Operation *op);
   }];
+
+  let hasCustomAssemblyFormat = 1;
 }
 
-def Stream_ResourceAccess_None : BitEnumAttrCase<"None", 0x0000>;
-def Stream_ResourceAccess_Read : BitEnumAttrCase<"Read", 0x0001>;
-def Stream_ResourceAccess_Write : BitEnumAttrCase<"Write", 0x0002>;
+def Stream_ResourceAccess_None : I32BitEnumAttrCase<"None", 0x0000>;
+def Stream_ResourceAccess_Read : I32BitEnumAttrCase<"Read", 0x0001>;
+def Stream_ResourceAccess_Write : I32BitEnumAttrCase<"Write", 0x0002>;
 def Stream_ResourceAccessBitfieldAttr :
-    BitEnumAttr<"ResourceAccessBitfield", "valid ResourceAccess", [
+    I32BitEnumAttr<"ResourceAccessBitfield", "valid ResourceAccess", [
       Stream_ResourceAccess_None,
       Stream_ResourceAccess_Read,
       Stream_ResourceAccess_Write,
@@ -319,6 +324,7 @@ def Stream_TimepointAttr : AttrDef<Stream_Dialect, "Timepoint", []> {
         $_builder.getContext(),
         IREE::Stream::TimepointType::get($_builder.getContext()));
   }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -399,6 +405,8 @@ def Stream_Resource : TypeDef<Stream_Dialect, "Resource", [
       return $_get(lifetime.getContext(), lifetime.getValue());
     }]>,
   ];
+
+  let hasCustomAssemblyFormat = 1;
 }
 
 def Stream_ResourceLifetimeUnknown : CPred<[{

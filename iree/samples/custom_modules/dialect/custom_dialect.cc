@@ -45,7 +45,7 @@ class CustomToVMConversionInterface : public VMConversionDialectInterface {
   using VMConversionDialectInterface::VMConversionDialectInterface;
 
   OwningOpRef<mlir::ModuleOp> parseVMImportModule() const override {
-    return mlir::parseSourceString(
+    return mlir::parseSourceString<mlir::ModuleOp>(
         StringRef(iree_custom_imports_create()->data,
                   iree_custom_imports_create()->size),
         getDialect()->getContext());
@@ -91,7 +91,7 @@ void CustomDialect::printType(Type type, DialectAsmPrinter &p) const {
   if (type.isa<MessageType>()) {
     p << "message";
   } else {
-    llvm_unreachable("unknown type");
+    assert(false && "unknown type");
   }
 }
 

@@ -12,6 +12,7 @@
 #include <cassert>
 
 #include "iree/compiler/Utils/CustomKernelsTargetInfo.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Support/LogicalResult.h"
 
@@ -19,7 +20,7 @@ namespace mlir {
 namespace iree_compiler {
 
 LogicalResult InferCustomKernelsTargetInfoFromParent(
-    FuncOp entryPointFn, CustomKernelsTargetInfo &targetInfo);
+    func::FuncOp entryPointFn, CustomKernelsTargetInfo &targetInfo);
 
 }  // namespace iree_compiler
 }  // namespace mlir

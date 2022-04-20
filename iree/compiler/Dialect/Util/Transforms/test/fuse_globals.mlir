@@ -3,7 +3,7 @@
 // CHECK: util.global private mutable @fusable0 : index
 util.global private mutable @fusable0 : index
 util.global private mutable @fusable1 : index
-builtin.func @foo(%arg0: index) -> (index, index) {
+func.func @foo(%arg0: index) -> (index, index) {
   // CHECK: util.global.store %arg0, @fusable0
   util.global.store %arg0, @fusable0 : index
   // CHECK-NOT: util.global.store %arg0, @fusable1
@@ -24,7 +24,7 @@ builtin.func @foo(%arg0: index) -> (index, index) {
 util.global private mutable @unfusable0 : index
 // CHECK: util.global private mutable @unfusable1 : index
 util.global private mutable @unfusable1 : index
-builtin.func @foo(%arg0: index) -> (index, index) {
+func.func @foo(%arg0: index) -> (index, index) {
   // CHECK: util.global.store %arg0, @unfusable0 : index
   util.global.store %arg0, @unfusable0 : index
   // CHECK: util.global.store %arg0, @unfusable1 : index
@@ -36,7 +36,7 @@ builtin.func @foo(%arg0: index) -> (index, index) {
   // CHECK: return %[[VALUE0]], %[[VALUE1]]
   return %0, %1 : index, index
 }
-builtin.func @bar(%arg0: index) {
+func.func @bar(%arg0: index) {
   util.global.store %arg0, @unfusable0 : index
   return
 }
@@ -54,7 +54,7 @@ util.initializer {
 util.global private mutable @unfusableInit0 = 5 : index
 // CHECK: util.global private mutable @unfusableInit1 = 6 : index
 util.global private mutable @unfusableInit1 = 6 : index
-builtin.func @foo(%arg0: index) -> (index, index) {
+func.func @foo(%arg0: index) -> (index, index) {
   // CHECK: util.global.store %arg0, @unfusableInit0
   util.global.store %arg0, @unfusableInit0 : index
   // CHECK: util.global.store %arg0, @unfusableInit1
@@ -73,12 +73,12 @@ builtin.func @foo(%arg0: index) -> (index, index) {
 util.global private mutable @unfusableDivergent0 : index
 // CHECK: util.global private mutable @unfusableDivergent1
 util.global private mutable @unfusableDivergent1 : index
-builtin.func @fn_a(%arg0: index) {
+func.func @fn_a(%arg0: index) {
   util.global.store %arg0, @unfusableDivergent0 : index
   util.global.store %arg0, @unfusableDivergent1 : index
   return
 }
-builtin.func @fn_b(%arg0: index) {
+func.func @fn_b(%arg0: index) {
   util.global.store %arg0, @unfusableDivergent0 : index
   return
 }

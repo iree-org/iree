@@ -5,6 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 using namespace mlir;
 namespace IREE = mlir::iree_compiler::IREE;
@@ -18,8 +20,8 @@ OpOperandVector::operator SmallVector<Value>() {
   return result;
 }
 
-LogicalResult IREE::LinalgExt::detail::verifyLinalgExtOpInterface(
-    Operation *op) {
+LogicalResult
+IREE::LinalgExt::detail::verifyLinalgExtOpInterface(Operation *op) {
   LinalgExtOp linalgExtOp = cast<LinalgExtOp>(op);
   if (op->getNumResults()) {
     if (!linalgExtOp.hasTensorSemantics()) {
@@ -48,4 +50,38 @@ LogicalResult IREE::LinalgExt::detail::verifyLinalgExtOpInterface(
   return success();
 }
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOpInterfaces.cpp.inc"  // IWYU pragma: export
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOpInterfaces.cpp.inc" // IWYU pragma: export
+
+template <typename Ty, typename DimOpTy>
+static void getDimValues(OpBuilder &b, Location loc, Value v, Ty t,
+                         SmallVector<Value> &dimVals) {
+  for (auto dim : llvm::enumerate(t.getShape())) {
+    if (ShapedType::isDynamic(dim.value())) {
+      dimVals.push_back(b.create<DimOpTy>(loc, v, dim.index()));
+    } else {
+      dimVals.push_back(b.create<arith::ConstantIndexOp>(loc, dim.value()));
+    }
+  }
+}
+
+LogicalResult LinalgExtOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  Operation *op = getOperation();
+  for (auto output : outputs()) {
+    SmallVector<Value> dims;
+    Type outputType = output.getType();
+    if (auto rankedTensorType = outputType.dyn_cast<RankedTensorType>()) {
+      getDimValues<RankedTensorType, tensor::DimOp>(b, op->getLoc(), output,
+                                                    rankedTensorType, dims);
+    } else if (auto memrefType = outputType.dyn_cast<MemRefType>()) {
+      getDimValues<MemRefType, memref::DimOp>(b, op->getLoc(), output,
+                                              memrefType, dims);
+    } else if (!outputType.isIntOrIndexOrFloat()) {
+      return op->emitOpError(
+          "invalid type for output operand, expected tensor, "
+          "memref or scalar type");
+    }
+    reifiedReturnShapes.emplace_back(std::move(dims));
+  }
+  return success();
+}

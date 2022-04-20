@@ -69,7 +69,7 @@ struct ConvertIREEPyDMToIREEPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>>
 PYDM::createConvertIREEPyDMToIREEPass() {

@@ -5,7 +5,7 @@
 //   CHECK-SAME: %[[ARG1:.+]]: i1,
 //  CHECK-SAME:  %[[ARG2:.+]]: !stream.resource<*>, %[[ARG2_SIZE:.+]]: index)
 //  CHECK-SAME: -> (!stream.resource<*>, index, i1, !stream.resource<*>, index)
-func @functionExpansion(%arg0: tensor<4x?xf32>, %arg1: i1, %arg2: tensor<i32>)
+func.func @functionExpansion(%arg0: tensor<4x?xf32>, %arg1: i1, %arg2: tensor<i32>)
     -> (tensor<4x?xf32>, i1, tensor<i32>) {
   // CHECK-NEXT: %[[RET:.+]]:5 = call @callee(%[[ARG0]], %[[ARG0_SIZE]], %[[ARG1]], %[[ARG2]], %[[ARG2_SIZE]])
   // CHECK-SAME: : (!stream.resource<*>, index, i1, !stream.resource<*>, index) -> (!stream.resource<*>, index, i1, !stream.resource<*>, index)
@@ -15,7 +15,7 @@ func @functionExpansion(%arg0: tensor<4x?xf32>, %arg1: i1, %arg2: tensor<i32>)
 }
 
 // CHECK: func private @callee
-func private @callee(%arg0: tensor<4x?xf32>, %arg1: i1, %arg2: tensor<i32>)
+func.func private @callee(%arg0: tensor<4x?xf32>, %arg1: i1, %arg2: tensor<i32>)
     -> (tensor<4x?xf32>, i1, tensor<i32>)
 
 // -----
@@ -23,7 +23,7 @@ func private @callee(%arg0: tensor<4x?xf32>, %arg1: i1, %arg2: tensor<i32>)
 // CHECK-LABEL: @brExpansion
 //  CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<*>, %[[ARG0_SIZE:.+]]: index, %arg2: i1)
 //  CHECK-SAME: -> (!stream.resource<*>, index, i1)
-func @brExpansion(%arg0: tensor<1xf32>, %arg1: i1) -> (tensor<1xf32>, i1) {
+func.func @brExpansion(%arg0: tensor<1xf32>, %arg1: i1) -> (tensor<1xf32>, i1) {
   // CHECK: cf.br ^bb1(%[[ARG0]], %[[ARG0_SIZE]], %arg2 : !stream.resource<*>, index, i1)
   cf.br ^bb1(%arg0, %arg1 : tensor<1xf32>, i1)
 // CHECK: ^bb1(%[[BB_ARG0:.+]]: !stream.resource<*>, %[[BB_ARG1:.+]]: index, %[[BB_ARG2:.+]]: i1):
@@ -38,7 +38,7 @@ func @brExpansion(%arg0: tensor<1xf32>, %arg1: i1) -> (tensor<1xf32>, i1) {
 //  CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<*>, %[[ARG0_SIZE:.+]]: index,
 //  CHECK-SAME:  %[[ARG1:.+]]: !stream.resource<*>, %[[ARG1_SIZE:.+]]: index)
 //  CHECK-SAME: -> (!stream.resource<*>, index)
-func @condBrExpansion(%arg0: tensor<1xf32>, %arg1: tensor<1xf32>) -> tensor<1xf32> {
+func.func @condBrExpansion(%arg0: tensor<1xf32>, %arg1: tensor<1xf32>) -> tensor<1xf32> {
   %true = arith.constant 1 : i1
   //      CHECK: cf.cond_br %true,
   // CHECK-SAME:   ^bb1(%[[ARG0]], %[[ARG0_SIZE]] : !stream.resource<*>, index),
@@ -55,7 +55,7 @@ func @condBrExpansion(%arg0: tensor<1xf32>, %arg1: tensor<1xf32>) -> tensor<1xf3
 //  CHECK-SAME:  %[[COND:.+]]: i1,
 //  CHECK-SAME:  %[[ARG1:.+]]: !stream.resource<*>, %[[ARG1_SIZE:.+]]: index)
 //  CHECK-SAME: -> (!stream.resource<*>, index)
-func @selectExpansion(%arg0: tensor<1xf32>, %cond: i1, %arg1: tensor<1xf32>) -> tensor<1xf32> {
+func.func @selectExpansion(%arg0: tensor<1xf32>, %cond: i1, %arg1: tensor<1xf32>) -> tensor<1xf32> {
   // CHECK-DAG: %[[RET:.+]] = arith.select %[[COND]], %[[ARG0]], %[[ARG1]] : !stream.resource<*>
   // CHECK-DAG: %[[RET_SIZE:.+]] = arith.select %[[COND]], %[[ARG0_SIZE]], %[[ARG1_SIZE]] : index
   %0 = arith.select %cond, %arg0, %arg1 : tensor<1xf32>

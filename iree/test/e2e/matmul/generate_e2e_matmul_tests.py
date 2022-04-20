@@ -85,7 +85,6 @@ class TestGenerator:
 class CompilationInfo:
   # Lowering Config
   tile_sizes: typing.List[int]
-  native_vector_size: typing.List[int]
   # Translation Info
   dispatch_lowering_pass_pipeline: str
   workload_per_wg: typing.List[int]
@@ -245,7 +244,6 @@ def get_test_compilation_infos(
     compilation_infos.append(
         CompilationInfo(
             tile_sizes=tile_workgroup_size_pair.tile_size,
-            native_vector_size=[],
             dispatch_lowering_pass_pipeline=compilation_info_id.value,
             workload_per_wg=[
                 a for a in reversed(tile_workgroup_size_pair.tile_size[0:2])
@@ -297,7 +295,7 @@ def int_or_question_mark(s: DimSize):
 
 
 # Stringification used for generating alphanumeric identifiers, e.g.
-# func @somefunction_DYNxDYNxf32, where we can't use "?" characters.
+# func.func @somefunction_DYNxDYNxf32, where we can't use "?" characters.
 def int_or_DYN(s: DimSize):
   return s.value or "DYN"
 
@@ -415,7 +413,7 @@ def generate_function(
   if compilation_info:
     compilation_info_string = (
         f"#compilation{generate_function.compilation_index} = #iree_codegen.compilation_info<\n"
-        f"  lowering_config = <tile_sizes = [{compilation_info.tile_sizes}], native_vector_size = {compilation_info.native_vector_size}>,\n"
+        f"  lowering_config = <tile_sizes = [{compilation_info.tile_sizes}]>,\n"
         f"  translation_info = <{compilation_info.dispatch_lowering_pass_pipeline}>,\n"
         f"  workgroup_size = {compilation_info.workgroup_size_str()}>\n")
     compilation_info_attr = f"{{compilation_info = #compilation{generate_function.compilation_index}}} "
@@ -572,7 +570,7 @@ def parse_arguments():
       "--module_path",
       type=str,
       help=
-      "Module path (typically .vmfb) to be referenced in the output trace. Should match the output path of the iree-translate command generating the module.",
+      "Module path (typically .vmfb) to be referenced in the output trace. Should match the output path of the iree-compile command generating the module.",
       required=True)
   parser.add_argument(
       "--requirements",

@@ -13,6 +13,7 @@
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
@@ -61,17 +62,18 @@ static LogicalResult parseEnumAttr(OpAsmParser &parser, StringRef attrName,
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseDescriptorSetBindings(
-    OpAsmParser &parser, SmallVectorImpl<OpAsmParser::OperandType> &ordinals,
-    SmallVectorImpl<OpAsmParser::OperandType> &buffers,
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &ordinals,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &buffers,
     SmallVectorImpl<Type> &bufferTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &bufferOffsets,
-    SmallVectorImpl<OpAsmParser::OperandType> &bufferLengths) {
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &bufferOffsets,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &bufferLengths) {
   do {
-    OpAsmParser::OperandType ordinal;
-    OpAsmParser::OperandType buffer;
+    OpAsmParser::UnresolvedOperand ordinal;
+    OpAsmParser::UnresolvedOperand buffer;
     Type bufferType;
-    OpAsmParser::OperandType bufferOffset;
-    OpAsmParser::OperandType bufferLength;
+    OpAsmParser::UnresolvedOperand bufferOffset;
+    OpAsmParser::UnresolvedOperand bufferLength;
     if (failed(parser.parseOperand(ordinal)) || failed(parser.parseEqual()) ||
         failed(parser.parseLParen()) || failed(parser.parseOperand(buffer)) ||
         failed(parser.parseColonType(bufferType)) ||
@@ -123,7 +125,7 @@ static void printDescriptorSetBindings(OpAsmPrinter &p, Operation *op,
 
 static ParseResult parsePackSliceRanges(
     OpAsmParser &parser, ArrayAttr &lifetimeIntervals,
-    SmallVectorImpl<OpAsmParser::OperandType> &dynamicSliceSizes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dynamicSliceSizes,
     SmallVectorImpl<Type> &packedOffsetTypes) {
   auto indexType = parser.getBuilder().getIndexType();
   SmallVector<Attribute> lifetimeRangeValues;
@@ -131,7 +133,7 @@ static ParseResult parsePackSliceRanges(
     if (failed(parser.parseOptionalLSquare())) break;
     IntegerAttr lifetimeStart;
     IntegerAttr lifetimeEnd;
-    OpAsmParser::OperandType dynamicSliceSize;
+    OpAsmParser::UnresolvedOperand dynamicSliceSize;
     if (failed(parser.parseAttribute(lifetimeStart, indexType)) ||
         failed(parser.parseComma()) ||
         failed(parser.parseAttribute(lifetimeEnd, indexType)) ||
@@ -547,7 +549,7 @@ void DeviceSwitchOp::build(OpBuilder &builder, OperationState &state,
 }
 
 ParseResult DeviceSwitchOp::parse(OpAsmParser &parser, OperationState &result) {
-  OpAsmParser::OperandType device;
+  OpAsmParser::UnresolvedOperand device;
   Type deviceType;
   if (failed(parser.parseLess()) || failed(parser.parseOperand(device)) ||
       failed(parser.parseColonType(deviceType)) ||
@@ -569,7 +571,7 @@ ParseResult DeviceSwitchOp::parse(OpAsmParser &parser, OperationState &result) {
       return failure();
     }
     conditionAttrs.push_back(conditionAttr);
-    SmallVector<OpAsmParser::OperandType> regionArgs;
+    SmallVector<OpAsmParser::UnresolvedOperand> regionArgs;
     SmallVector<Type> regionArgTypes;
     auto *regionBody = result.addRegion();
     if (failed(parser.parseRegion(*regionBody, regionArgs, regionArgTypes))) {
@@ -689,15 +691,11 @@ ParseResult ExecutableEntryPointOp::parse(OpAsmParser &parser,
   }
   result.addAttribute("layout", layoutAttr);
 
-  // For now assume that the workload is at max 3D. So arguments to the region
-  // are workload along x, y and z.
   std::unique_ptr<Region> region;
-  SmallVector<OpAsmParser::OperandType, 4> regionOperands;
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> regionOperands;
   SmallVector<Type, 4> regionTypes;
-  OptionalParseResult parseResult =
-      parser.parseOptionalRegion(region, regionOperands, regionTypes);
-  if (!parseResult.hasValue()) return success();
-  if (failed(*parseResult)) return failure();
+  // A missing optional region is materialized as an empty region.
+  (void)parser.parseOptionalRegion(region, regionOperands, regionTypes);
   result.addRegion(std::move(region));
 
   return success();
@@ -721,38 +719,134 @@ void ExecutableEntryPointOp::print(OpAsmPrinter &p) {
                           /*elidedAttrs=*/{"sym_name", "layout", "ordinal"});
   if (workgroup_count_region().empty()) return;
   p << " ";
-  p.printRegion(workgroup_count_region().front());
+  p.printRegion(workgroup_count_region());
 }
 
 LogicalResult ExecutableEntryPointOp::verify() {
   ExecutableEntryPointOp op = *this;
-  Region *region = op.getBody();
-  // When there is no region, nothing to verify.
-  if (!region) return success();
+  Block *body = getWorkgroupCountBody();
+  // When there is no body, nothing to verify.
+  if (!body) return success();
 
-  if (!llvm::hasSingleElement(*region)) {
-    return op.emitOpError() << "expected a single region";
+  if (!llvm::hasSingleElement(workgroup_count_region())) {
+    return op.emitOpError() << "expected a single region block";
   }
-  if (region->getNumArguments() != 3) {
-    return op.emitOpError(
-        "expected three arguments for workgroup_count_region for workload "
-        "along "
-        "x, y, and z");
+  if (body->getNumArguments() != getNumWorkgroupDims()) {
+    return op.emitOpError("expected ")
+           << getNumWorkgroupDims()
+           << " arguments for workgroup_count_region for workload "
+              "along "
+              "x, y, and z";
   }
-  for (BlockArgument &blockArg : region->getArguments()) {
+  for (BlockArgument &blockArg : body->getArguments()) {
     if (!blockArg.getType().isa<IndexType>()) {
       return op.emitOpError(
-          "expected arguments to workgroup_count_region be index type");
+          "expected arguments to workgroup_count_region body of index type");
     }
   }
   // Check that the last statement in the block is `hal.yield` operation.
   // TODO(ravishankarm): The SingleBlockImplicitTerminator<"HAL::ReturnOp">
   // should generate this check, but it doesnt.
-  auto returnOp = dyn_cast<ReturnOp>(region->front().getTerminator());
-  if (!returnOp || returnOp.operands().size() != 3) {
-    return op.emitOpError("expected operation to yield 3 values");
+  auto returnOp = dyn_cast<ReturnOp>(body->getTerminator());
+  if (!returnOp || returnOp.operands().size() != getNumWorkgroupDims()) {
+    return op.emitOpError("expected operation to yield ")
+           << getNumWorkgroupDims() << " values";
   }
   return success();
+}
+
+// Calculates the workgroup count (x, y, z) given the total N-dimensional
+// |workload| and specific |workgroupSize|.
+static std::array<Value, 3> calculateWorkloadWorkgroupCount(
+    Location loc, ValueRange workload,
+    const std::array<Value, 3> &workgroupSize, OpBuilder &builder) {
+  std::array<Value, 3> result;
+
+  auto constantOne = builder.createOrFold<arith::ConstantIndexOp>(loc, 1);
+  if (workload.size() <= 3) {
+    // 1-D to 3-D are easy (pad 2 to 0 dimensions) and divide by workgroup
+    // size.
+    for (int i = 0; i < 3; ++i) {
+      // Round up: (workload[i] + workgroup_size - 1) / workgroup_size;
+      Value workloadI = i < workload.size() ? workload[i] : constantOne;
+      workloadI = builder.createOrFold<arith::SubIOp>(
+          loc,
+          builder.createOrFold<arith::AddIOp>(loc, workloadI, workgroupSize[i]),
+          constantOne);
+      result[i] = builder.createOrFold<arith::DivUIOp>(loc, workloadI,
+                                                       workgroupSize[i]);
+    }
+  } else {
+    // TODO(#4140): remapping of N-D to 3-D: this is not how you do this!
+    Value flatWorkload = constantOne;
+    for (auto workloadI : workload) {
+      flatWorkload =
+          builder.createOrFold<arith::MulIOp>(loc, flatWorkload, workloadI);
+    }
+    for (int i = 0; i < 3; ++i) {
+      // Round up: (workload[i] + workgroup_size - 1) / workgroup_size;
+      auto rounded = builder.createOrFold<arith::SubIOp>(
+          loc,
+          builder.createOrFold<arith::AddIOp>(loc, flatWorkload,
+                                              workgroupSize[i]),
+          constantOne);
+      auto workgroupCountI =
+          builder.createOrFold<arith::DivUIOp>(loc, rounded, workgroupSize[i]);
+      result[i] = workgroupCountI;
+
+      // Multiply back out and subtract from invocations.
+      flatWorkload = builder.createOrFold<arith::SubIOp>(
+          loc, flatWorkload,
+          builder.createOrFold<arith::MulIOp>(loc, workgroupCountI, rounded));
+    }
+  }
+
+  return result;
+}
+
+static std::array<Value, 3> calculateWorkgroupCountFromRegion(
+    Location loc, Block *body, ValueRange workload, OpBuilder &builder) {
+  // TODO(benvanik): replace with region inlining util.
+  BlockAndValueMapping bvm;
+  for (auto args : llvm::enumerate(workload)) {
+    bvm.map(body->getArgument(args.index()), args.value());
+  }
+  for (Operation &op : body->without_terminator()) {
+    builder.clone(op, bvm);
+  }
+  auto returnOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
+  return {
+      bvm.lookup(returnOp.operands()[0]),
+      bvm.lookup(returnOp.operands()[1]),
+      bvm.lookup(returnOp.operands()[2]),
+  };
+}
+
+// Calculates the workgroup count (x, y, z) for dispatching to the entry point.
+// The provided N-dimensional |workload| is the total number of invocations
+// required as calculated by the generic workload logic (basically, number of
+// output elements in tensors).
+std::array<Value, 3> ExecutableEntryPointOp::calculateWorkgroupCount(
+    Location loc, ValueRange workload, OpBuilder &builder) {
+  Block *body = getWorkgroupCountBody();
+  if (body) {
+    return calculateWorkgroupCountFromRegion(loc, body, workload, builder);
+  }
+  auto workgroupSize = calculateWorkgroupSize(loc, workload, builder);
+  return calculateWorkloadWorkgroupCount(loc, workload, workgroupSize, builder);
+}
+
+// Calculates the workgroup size (x, y, z). These are the dimension numbers
+// for a single workgroup.
+std::array<Value, 3> ExecutableEntryPointOp::calculateWorkgroupSize(
+    Location loc, ValueRange workload, OpBuilder &builder) {
+  // When no workgroup size is specified we just assume [1,1,1].
+  // This yields a workgroup count that models the extents of the workload.
+  return {
+      builder.createOrFold<arith::ConstantIndexOp>(loc, 1),
+      builder.createOrFold<arith::ConstantIndexOp>(loc, 1),
+      builder.createOrFold<arith::ConstantIndexOp>(loc, 1),
+  };
 }
 
 //===----------------------------------------------------------------------===//

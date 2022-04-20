@@ -141,6 +141,10 @@ bindings. Defaults to
 "${CMAKE_SOURCE_DIR}/integrations/tensorflow/bazel-bin/iree_tf_compiler", which
 is where they would be placed by a `bazel build` invocation.
 
+#### `IREE_BUILD_TORCH_MLIR_SUPPORT`:BOOL
+
+Enables building of the torch-mlir-dialects to IREE compiler. Defaults to `ON`.
+
 ## MLIR-specific CMake Options and Variables
 
 #### `MLIR_DIR`:STRING

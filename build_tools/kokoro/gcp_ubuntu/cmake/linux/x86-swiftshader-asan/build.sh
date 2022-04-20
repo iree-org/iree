@@ -36,6 +36,15 @@ CMAKE_ARGS=(
   "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
   "-DIREE_ENABLE_ASAN=ON"
   "-B" "${CMAKE_BUILD_DIR?}"
+
+  # Also check if microbenchmarks are buildable.
+  "-DIREE_BUILD_MICROBENCHMARKS=ON"
+
+  # Enable CUDA compiler and runtime builds unconditionally. Our CI images all
+  # have enough deps to at least build CUDA support and compile CUDA binaries
+  # (but not necessarily test on real hardware).
+  "-DIREE_HAL_DRIVER_CUDA=ON"
+  "-DIREE_TARGET_BACKEND_CUDA=ON"
 )
 
 echo "Configuring CMake"
@@ -49,14 +58,16 @@ echo "Building test deps"
 echo "------------------"
 "${CMAKE_BIN?}" --build "${CMAKE_BUILD_DIR?}" --target iree-test-deps -- -k 0
 
+echo "Building microbenchmark suites"
+echo "------------------"
+"${CMAKE_BIN?}" --build "${CMAKE_BUILD_DIR?}" --target iree-microbenchmark-suites -- -k 0
+
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
-# Respect the user setting, but default to turning off the vulkan tests
-# and turning on the llvmaot ones.
+# Respect the user setting, but default to turning off the vulkan tests.
 # TODO(#5716): Fix and enable Vulkan tests.
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
-export IREE_LLVMAOT_DISABLE=${IREE_LLVMAOT_DISABLE:-0}
 # CUDA is off by default.
 export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
 # The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
@@ -88,9 +99,6 @@ declare -a label_exclude_args=(
 if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^driver=vulkan$")
 fi
-if [[ "${IREE_LLVMAOT_DISABLE?}" == 1 ]]; then
-  label_exclude_args+=("^driver=dylib$")
-fi
 if [[ "${IREE_CUDA_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^driver=cuda$")
   label_exclude_args+=("^uses_cuda_runtime$")
@@ -120,5 +128,5 @@ cd ${CMAKE_BUILD_DIR?}
 
 echo "Testing with ctest"
 ctest --timeout 900 --output-on-failure \
-  --label-exclude "^driver=cuda$|^driver=vulkan$" \
+  --label-exclude "${label_exclude_regex}" \
   --exclude-regex "${excluded_tests_regex?}"

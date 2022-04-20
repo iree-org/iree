@@ -70,7 +70,7 @@ void ModuleOp::build(OpBuilder &builder, OperationState &result,
       mlir::SymbolTable::getSymbolAttrName(), builder.getStringAttr(name)));
 }
 
-static LogicalResult verifyModuleOp(ModuleOp op) {
+LogicalResult ModuleOp::verify() {
   // TODO(benvanik): check export name conflicts.
   return success();
 }
@@ -86,9 +86,7 @@ ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void FuncOp::print(OpAsmPrinter &p) {
   Operation *op = getOperation();
-  FunctionType fnType = getType();
-  function_interface_impl::printFunctionOp(
-      p, op, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
+  function_interface_impl::printFunctionOp(p, op, /*isVariadic=*/false);
 }
 
 void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
@@ -97,7 +95,7 @@ void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   result.addRegion();
   result.addAttribute(SymbolTable::getSymbolAttrName(),
                       builder.getStringAttr(name));
-  result.addAttribute("type", TypeAttr::get(type));
+  result.addAttribute("function_type", TypeAttr::get(type));
   result.attributes.append(attrs.begin(), attrs.end());
   if (argAttrs.empty()) {
     return;
@@ -113,13 +111,14 @@ Block *FuncOp::addEntryBlock() {
   assert(empty() && "function already has an entry block");
   auto *entry = new Block();
   push_back(entry);
-  SmallVector<Location> locs(getType().getNumInputs(), getLoc());
-  entry->addArguments(getType().getInputs(), locs);
+  SmallVector<Location> locs(getFunctionType().getNumInputs(), getLoc());
+  entry->addArguments(getFunctionType().getInputs(), locs);
   return entry;
 }
 
 LogicalResult FuncOp::verifyType() {
-  auto type = getTypeAttr().getValue();
+  auto type =
+      getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName()).getValue();
   if (!type.isa<FunctionType>())
     return emitOpError("requires '" + getTypeAttrName() +
                        "' attribute of function type");
@@ -204,6 +203,9 @@ void ExportOp::build(OpBuilder &builder, OperationState &result,
 
 ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
   auto builder = parser.getBuilder();
+  if (succeeded(parser.parseOptionalKeyword("optional"))) {
+    result.addAttribute("is_optional", builder.getUnitAttr());
+  }
   StringAttr nameAttr;
   if (failed(parser.parseSymbolName(nameAttr,
                                     mlir::SymbolTable::getSymbolAttrName(),
@@ -214,7 +216,7 @@ ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
   SmallVector<DictionaryAttr, 8> argAttrs;
   SmallVector<Type, 8> argTypes;
   while (failed(parser.parseOptionalRParen())) {
-    OpAsmParser::OperandType operand;
+    OpAsmParser::UnresolvedOperand operand;
     Type operandType;
     auto operandLoc = parser.getCurrentLocation();
     if (failed(parser.parseOperand(operand)) ||
@@ -262,13 +264,16 @@ ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
 void ImportOp::print(OpAsmPrinter &p) {
   Operation *op = getOperation();
   p << ' ';
+  if (is_optional()) {
+    p << "optional ";
+  }
   p.printSymbolName(getName());
   p << "(";
   for (int i = 0; i < getArgumentTypes().size(); ++i) {
     if (auto name = getArgAttrOfType<StringAttr>(i, "vm.name")) {
       p << '%' << name.getValue() << " : ";
     }
-    p.printType(getType().getInput(i));
+    p.printType(getFunctionType().getInput(i));
     if (getArgAttrOfType<UnitAttr>(i, "vm.variadic")) {
       p << " ...";
     }
@@ -279,15 +284,16 @@ void ImportOp::print(OpAsmPrinter &p) {
   p << ")";
   if (getResultTypes().size() == 1) {
     p << " -> ";
-    p.printType(getType().getResult(0));
+    p.printType(getFunctionType().getResult(0));
   } else if (getResultTypes().size() > 1) {
-    p << " -> (" << getType().getResults() << ")";
+    p << " -> (" << getFunctionType().getResults() << ")";
   }
   mlir::function_interface_impl::printFunctionAttributes(
       p, op, getArgumentTypes().size(), getResultTypes().size(),
       /*elided=*/
       {
           "is_variadic",
+          "is_optional",
       });
 }
 
@@ -296,7 +302,7 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      ArrayRef<DictionaryAttr> argAttrs) {
   result.addAttribute(SymbolTable::getSymbolAttrName(),
                       builder.getStringAttr(name));
-  result.addAttribute("type", TypeAttr::get(type));
+  result.addAttribute("function_type", TypeAttr::get(type));
   result.attributes.append(attrs.begin(), attrs.end());
   if (argAttrs.empty()) {
     return;
@@ -309,7 +315,8 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 }
 
 LogicalResult ImportOp::verifyType() {
-  auto type = getTypeAttr().getValue();
+  auto type =
+      getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName()).getValue();
   if (!type.isa<FunctionType>())
     return emitOpError("requires '" + getTypeAttrName() +
                        "' attribute of function type");
@@ -318,15 +325,15 @@ LogicalResult ImportOp::verifyType() {
 
 void InitializerOp::build(OpBuilder &builder, OperationState &result,
                           ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute(
-      "type", TypeAttr::get(FunctionType::get(builder.getContext(), {}, {})));
+  result.addAttribute("function_type", TypeAttr::get(FunctionType::get(
+                                           builder.getContext(), {}, {})));
   result.addRegion();
   result.attributes.append(attrs.begin(), attrs.end());
 }
 
 ParseResult InitializerOp::parse(OpAsmParser &parser, OperationState &result) {
-  result.addAttribute(
-      "type", TypeAttr::get(FunctionType::get(result.getContext(), {}, {})));
+  result.addAttribute("function_type", TypeAttr::get(FunctionType::get(
+                                           result.getContext(), {}, {})));
   if (parser.parseOptionalAttrDictWithKeyword(result.attributes)) {
     return failure();
   }
@@ -339,7 +346,8 @@ ParseResult InitializerOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void InitializerOp::print(OpAsmPrinter &p) {
   Operation *op = getOperation();
-  p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{"type"});
+  p.printOptionalAttrDictWithKeyword(op->getAttrs(),
+                                     /*elidedAttrs=*/{"function_type"});
   p << " ";
   p.printRegion(body());
 }
@@ -361,7 +369,7 @@ Block *InitializerOp::addBlock() {
 // Globals
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyGlobalOp(Operation *op) {
+LogicalResult verifyGlobalOp(Operation *op) {
   auto globalName =
       op->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName());
   auto globalType = op->getAttrOfType<TypeAttr>("type");
@@ -378,13 +386,14 @@ static LogicalResult verifyGlobalOp(Operation *op) {
       return op->emitOpError()
              << "initializer function " << initializerAttr << " not found";
     }
-    if (initializer.getType().getNumInputs() != 0 ||
-        initializer.getType().getNumResults() != 1 ||
-        initializer.getType().getResult(0) != globalType.getValue()) {
+    if (initializer.getFunctionType().getNumInputs() != 0 ||
+        initializer.getFunctionType().getNumResults() != 1 ||
+        initializer.getFunctionType().getResult(0) != globalType.getValue()) {
       return op->emitOpError()
              << "initializer type mismatch; global " << globalName << " is "
              << globalType << " but initializer function "
-             << initializer.getName() << " is " << initializer.getType();
+             << initializer.getName() << " is "
+             << initializer.getFunctionType();
     }
   } else if (initialValueAttr) {
     // Ensure the value is something we can convert to a const.
@@ -398,11 +407,11 @@ static LogicalResult verifyGlobalOp(Operation *op) {
   return success();
 }
 
-static LogicalResult verifyGlobalAddressOp(GlobalAddressOp op) {
-  auto *globalOp =
-      op->getParentOfType<VM::ModuleOp>().lookupSymbol(op.global());
+LogicalResult GlobalAddressOp::verify() {
+  Operation *op = getOperation();
+  auto *globalOp = op->getParentOfType<VM::ModuleOp>().lookupSymbol(global());
   if (!globalOp) {
-    return op.emitOpError() << "Undefined global: " << op.global();
+    return op->emitOpError() << "Undefined global: " << global();
   }
   return success();
 }
@@ -466,7 +475,7 @@ void GlobalLoadRefOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
   setResultName(setNameFn, getResult(), global());
 }
 
-static LogicalResult verifyGlobalLoadOp(Operation *op) {
+LogicalResult verifyGlobalLoadOp(Operation *op) {
   auto globalAttr = op->getAttrOfType<FlatSymbolRefAttr>("global");
   auto *globalOp =
       op->getParentOfType<VM::ModuleOp>().lookupSymbol(globalAttr.getValue());
@@ -491,7 +500,7 @@ static bool isParentInitializer(Operation *op) {
   return funcOp.getName() == "__init" || funcOp.getName() == "__deinit";
 }
 
-static LogicalResult verifyGlobalStoreOp(Operation *op) {
+LogicalResult verifyGlobalStoreOp(Operation *op) {
   auto globalAttr = op->getAttrOfType<FlatSymbolRefAttr>("global");
   auto *globalOp =
       op->getParentOfType<VM::ModuleOp>().lookupSymbol(globalAttr.getValue());
@@ -584,7 +593,7 @@ static Attribute convertConstIntegerValue(Attribute value) {
           adjustedType, llvm::to_vector<4>(v.getValues<Attribute>()));
     }
   }
-  llvm_unreachable("unexpected attribute type");
+  assert(false && "unexpected attribute type");
   return Attribute();
 }
 
@@ -597,7 +606,7 @@ static FloatType getFloatType(int bitwidth, MLIRContext *context) {
     case 64:
       return FloatType::getF64(context);
     default:
-      llvm_unreachable("unhandled floating point type");
+      assert(false && "unhandled floating point type");
       return {};
   }
 }
@@ -621,7 +630,7 @@ static Attribute convertConstFloatValue(Attribute value) {
           adjustedType, llvm::to_vector<4>(v.getValues<Attribute>()));
     }
   }
-  llvm_unreachable("unexpected attribute type");
+  assert(false && "unexpected attribute type");
   return Attribute();
 }
 
@@ -769,11 +778,11 @@ void RodataOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   result.addAttributes(attrs);
 }
 
-static LogicalResult verifyConstRefRodataOp(ConstRefRodataOp &op) {
-  auto *rodataOp =
-      op->getParentOfType<VM::ModuleOp>().lookupSymbol(op.rodata());
+LogicalResult ConstRefRodataOp::verify() {
+  Operation *op = getOperation();
+  auto *rodataOp = op->getParentOfType<VM::ModuleOp>().lookupSymbol(rodata());
   if (!rodataOp) {
-    return op.emitOpError() << "Undefined rodata section: " << op.rodata();
+    return op->emitOpError() << "Undefined rodata section: " << rodata();
   }
   return success();
 }
@@ -803,52 +812,55 @@ void ConstRefRodataOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
 // Lists
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyListGetRefOp(ListGetRefOp &op) {
-  auto listType = op.list()
+LogicalResult ListGetRefOp::verify() {
+  Operation *op = getOperation();
+  auto listType = list()
                       .getType()
                       .cast<IREE::VM::RefType>()
                       .getObjectType()
                       .cast<IREE::VM::ListType>();
   auto elementType = listType.getElementType();
-  auto resultType = op.result().getType();
+  auto resultType = result().getType();
   if (!elementType.isa<IREE::VM::OpaqueType>()) {
     if (elementType.isa<IREE::VM::RefType>() !=
         resultType.isa<IREE::VM::RefType>()) {
       // Attempting to go between a primitive type and ref type.
-      return op.emitError() << "cannot convert between list type "
-                            << elementType << " and result type " << resultType;
+      return op->emitError()
+             << "cannot convert between list type " << elementType
+             << " and result type " << resultType;
     } else if (auto refType = elementType.dyn_cast<IREE::VM::RefType>()) {
       if (!refType.getObjectType().isa<IREE::VM::OpaqueType>() &&
           elementType != resultType) {
         // List has a concrete type, verify it matches.
-        return op.emitError() << "list contains " << elementType
-                              << " that cannot be accessed as " << resultType;
+        return op->emitError() << "list contains " << elementType
+                               << " that cannot be accessed as " << resultType;
       }
     }
   }
   return success();
 }
 
-static LogicalResult verifyListSetRefOp(ListSetRefOp &op) {
-  auto listType = op.list()
+LogicalResult ListSetRefOp::verify() {
+  Operation *op = getOperation();
+  auto listType = list()
                       .getType()
                       .cast<IREE::VM::RefType>()
                       .getObjectType()
                       .cast<IREE::VM::ListType>();
   auto elementType = listType.getElementType();
-  auto valueType = op.value().getType();
+  auto valueType = value().getType();
   if (!elementType.isa<IREE::VM::OpaqueType>()) {
     if (elementType.isa<IREE::VM::RefType>() !=
         valueType.isa<IREE::VM::RefType>()) {
       // Attempting to go between a primitive type and ref type.
-      return op.emitError() << "cannot convert between list type "
-                            << elementType << " and value type " << valueType;
+      return op->emitError() << "cannot convert between list type "
+                             << elementType << " and value type " << valueType;
     } else if (auto refType = elementType.dyn_cast<IREE::VM::RefType>()) {
       if (!refType.getObjectType().isa<IREE::VM::OpaqueType>() &&
           elementType != valueType) {
         // List has a concrete type, verify it matches.
-        return op.emitError() << "list contains " << elementType
-                              << " that cannot be mutated as " << valueType;
+        return op->emitError() << "list contains " << elementType
+                               << " that cannot be mutated as " << valueType;
       }
     }
   }
@@ -860,9 +872,9 @@ static LogicalResult verifyListSetRefOp(ListSetRefOp &op) {
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseSwitchOp(OpAsmParser &parser, OperationState &result) {
-  SmallVector<OpAsmParser::OperandType, 4> values;
-  OpAsmParser::OperandType index;
-  OpAsmParser::OperandType defaultValue;
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> values;
+  OpAsmParser::UnresolvedOperand index;
+  OpAsmParser::UnresolvedOperand defaultValue;
   Type type;
   if (failed(parser.parseOperand(index)) ||
       failed(parser.parseOperandList(values, OpAsmParser::Delimiter::Square)) ||
@@ -1018,10 +1030,9 @@ void BranchOp::eraseOperand(unsigned index) {
   getOperation()->eraseOperand(index);
 }
 
-Optional<MutableOperandRange> BranchOp::getMutableSuccessorOperands(
-    unsigned index) {
+SuccessorOperands BranchOp::getSuccessorOperands(unsigned index) {
   assert(index == 0 && "invalid successor index");
-  return destOperandsMutable();
+  return SuccessorOperands(destOperandsMutable());
 }
 
 void CallOp::getEffects(
@@ -1055,17 +1066,17 @@ ParseResult CallVariadicOp::parse(OpAsmParser &parser, OperationState &result) {
   // We'll instead parse each segment as a flat list so `[(%a, %b), (%c, %d)]`
   // parses as `[%a, %b, %c, %d]` and then do the accounting below when parsing
   // types.
-  SmallVector<OpAsmParser::OperandType, 4> flatOperands;
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> flatOperands;
   SmallVector<int16_t, 4> flatSegmentSizes;
   while (failed(parser.parseOptionalRParen())) {
     if (succeeded(parser.parseOptionalLSquare())) {
       // Variadic list.
-      SmallVector<OpAsmParser::OperandType, 4> flatSegmentOperands;
+      SmallVector<OpAsmParser::UnresolvedOperand, 4> flatSegmentOperands;
       while (failed(parser.parseOptionalRSquare())) {
         if (succeeded(parser.parseOptionalLParen())) {
           // List contains tuples, so track the () and parse inside of it.
           while (failed(parser.parseOptionalRParen())) {
-            OpAsmParser::OperandType segmentOperand;
+            OpAsmParser::UnresolvedOperand segmentOperand;
             if (failed(parser.parseOperand(segmentOperand))) {
               return parser.emitError(parser.getCurrentLocation())
                      << "invalid operand";
@@ -1081,7 +1092,7 @@ ParseResult CallVariadicOp::parse(OpAsmParser &parser, OperationState &result) {
           }
         } else {
           // Flat list of operands.
-          OpAsmParser::OperandType segmentOperand;
+          OpAsmParser::UnresolvedOperand segmentOperand;
           if (failed(parser.parseOperand(segmentOperand))) {
             return parser.emitError(parser.getCurrentLocation())
                    << "invalid operand";
@@ -1101,7 +1112,7 @@ ParseResult CallVariadicOp::parse(OpAsmParser &parser, OperationState &result) {
                           flatSegmentOperands.end());
     } else {
       // Normal single operand.
-      OpAsmParser::OperandType operand;
+      OpAsmParser::UnresolvedOperand operand;
       if (failed(parser.parseOperand(operand))) {
         return parser.emitError(parser.getCurrentLocation())
                << "malformed non-variadic operand";
@@ -1252,19 +1263,17 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
   }
 }
 
-Optional<MutableOperandRange> CondBranchOp::getMutableSuccessorOperands(
-    unsigned index) {
+SuccessorOperands CondBranchOp::getSuccessorOperands(unsigned index) {
   assert(index < getNumSuccessors() && "invalid successor index");
-  return index == trueIndex ? trueDestOperandsMutable()
-                            : falseDestOperandsMutable();
+  return index == trueIndex ? SuccessorOperands(trueDestOperandsMutable())
+                            : SuccessorOperands(falseDestOperandsMutable());
 }
 
-template <typename T>
-static LogicalResult verifyFailOp(T op) {
+LogicalResult verifyFailOp(Operation *op, Value statusVal) {
   APInt status;
-  if (matchPattern(op.status(), m_ConstantInt(&status))) {
+  if (matchPattern(statusVal, m_ConstantInt(&status))) {
     if (status == 0) {
-      return op.emitOpError() << "status is 0; expected to not be OK";
+      return op->emitOpError() << "status is 0; expected to not be OK";
     }
   }
   return success();
@@ -1272,7 +1281,7 @@ static LogicalResult verifyFailOp(T op) {
 
 ParseResult CondFailOp::parse(OpAsmParser &parser, OperationState &result) {
   // First operand is either 'condition' or 'status', both i32.
-  OpAsmParser::OperandType condition;
+  OpAsmParser::UnresolvedOperand condition;
   if (failed(parser.parseOperand(condition))) {
     return failure();
   }
@@ -1280,7 +1289,7 @@ ParseResult CondFailOp::parse(OpAsmParser &parser, OperationState &result) {
   // First try looking for an operand after a comma. If no operand, keep track
   // of the already parsed comma to avoid checking for a comma later on.
   bool trailingComma = false;
-  OpAsmParser::OperandType status = condition;
+  OpAsmParser::UnresolvedOperand status = condition;
   if (succeeded(parser.parseOptionalComma()) &&
       !parser.parseOptionalOperand(status).hasValue()) {
     trailingComma = true;
@@ -1315,6 +1324,12 @@ void CondFailOp::print(OpAsmPrinter &p) {
                           /*elidedAttrs=*/{"message"});
 }
 
+void ImportResolvedOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  std::string name = ("has_" + import()).str();
+  std::replace(name.begin(), name.end(), '.', '_');
+  setResultName(setNameFn, getResult(), name);
+}
+
 //===----------------------------------------------------------------------===//
 // Async/fiber ops
 //===----------------------------------------------------------------------===//
@@ -1329,10 +1344,9 @@ void YieldOp::eraseOperand(unsigned index) {
   getOperation()->eraseOperand(index);
 }
 
-Optional<MutableOperandRange> YieldOp::getMutableSuccessorOperands(
-    unsigned index) {
+SuccessorOperands YieldOp::getSuccessorOperands(unsigned index) {
   assert(index == 0 && "invalid successor index");
-  return destOperandsMutable();
+  return SuccessorOperands(destOperandsMutable());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1349,10 +1363,9 @@ void BreakOp::eraseOperand(unsigned index) {
   getOperation()->eraseOperand(index);
 }
 
-Optional<MutableOperandRange> BreakOp::getMutableSuccessorOperands(
-    unsigned index) {
+SuccessorOperands BreakOp::getSuccessorOperands(unsigned index) {
   assert(index == 0 && "invalid successor index");
-  return destOperandsMutable();
+  return SuccessorOperands(destOperandsMutable());
 }
 
 Block *CondBreakOp::getDest() { return getOperation()->getSuccessor(0); }
@@ -1365,10 +1378,9 @@ void CondBreakOp::eraseOperand(unsigned index) {
   getOperation()->eraseOperand(index);
 }
 
-Optional<MutableOperandRange> CondBreakOp::getMutableSuccessorOperands(
-    unsigned index) {
+SuccessorOperands CondBreakOp::getSuccessorOperands(unsigned index) {
   assert(index == 0 && "invalid successor index");
-  return destOperandsMutable();
+  return SuccessorOperands(destOperandsMutable());
 }
 
 }  // namespace VM

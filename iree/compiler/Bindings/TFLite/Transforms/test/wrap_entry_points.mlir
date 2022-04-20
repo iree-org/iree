@@ -193,7 +193,7 @@
 
 
 // CHECK-LABEL: func private @dynamicEntry(
-func @dynamicEntry(
+func.func @dynamicEntry(
   %arg0: tensor<?x8x8x3xf32> {iree.identifier = "input0"},
   %arg1: tensor<?x8x8x3xf32> {iree.identifier = "input1"}
 ) -> (
@@ -223,7 +223,7 @@ func @dynamicEntry(
 //  CHECK-SAME:   }
 //  CHECK-SAME: } {
 
-func @dynamicEntryWithoutIdentifiers(
+func.func @dynamicEntryWithoutIdentifiers(
   %arg0: tensor<?x8x8x3xf32>,
   %arg1: tensor<?x8x8x3xf32>
 ) -> (

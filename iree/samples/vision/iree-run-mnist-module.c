@@ -74,9 +74,11 @@ iree_status_t Run(const iree_string_view_t image_path) {
   // Read back the results. The output of the mnist model is a 1x10 prediction
   // confidence values for each digit in [0, 9].
   float predictions[1 * 10] = {0.0f};
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_read_data(iree_hal_buffer_view_buffer(ret_buffer_view), 0,
-                                predictions, sizeof(predictions)));
+  IREE_RETURN_IF_ERROR(iree_hal_device_transfer_d2h(
+      iree_runtime_session_device(session),
+      iree_hal_buffer_view_buffer(ret_buffer_view), 0, predictions,
+      sizeof(predictions), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+      iree_infinite_timeout()));
   iree_hal_buffer_view_release(ret_buffer_view);
 
   // Get the highest index from the output.

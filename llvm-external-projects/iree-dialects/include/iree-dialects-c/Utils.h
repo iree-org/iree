@@ -23,4 +23,4 @@ ireeLookupNearestSymbolFrom(MlirOperation fromOp, MlirAttribute symbolRefAttr);
 }
 #endif
 
-#endif  // IREE_DIALECTS_C_UTILS_H
+#endif // IREE_DIALECTS_C_UTILS_H

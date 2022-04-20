@@ -23,6 +23,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "iree/base/assert.h"
 #include "iree/base/config.h"
 #include "iree/base/target_platform.h"
 
@@ -157,6 +158,11 @@ typedef iree_atomic_int32_t iree_atomic_ref_count_t;
                                            iree_memory_order_seq_cst) != 1)) { \
     abort();                                                                   \
   }
+
+// Asserts that the given reference count value is zero.
+#define IREE_ASSERT_REF_COUNT_ZERO(count_ptr)                                  \
+  IREE_ASSERT_EQ(iree_atomic_load_int32(count_ptr, iree_memory_order_seq_cst), \
+                 0, "ref counted object still has uses")
 
 #ifdef __cplusplus
 }  // extern "C"

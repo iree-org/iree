@@ -141,7 +141,7 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
     }
     // In CUDA workgroup memory is represented by a global variable.
     MemRefType allocType = allocOp.getType();
-    auto funcOp = allocOp->getParentOfType<FuncOp>();
+    auto funcOp = allocOp->getParentOfType<func::FuncOp>();
     auto moduleOp = funcOp->getParentOfType<ModuleOp>();
     SymbolTable symbolTable(moduleOp);
     OpBuilder::InsertionGuard guard(rewriter);
@@ -210,13 +210,13 @@ static llvm::SmallDenseMap<SetBinding, size_t> getKernelArgMapping(
 class ConvertFunc : public ConvertToLLVMPattern {
  public:
   explicit ConvertFunc(MLIRContext *context, LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(mlir::FuncOp::getOperationName(), context,
+      : ConvertToLLVMPattern(mlir::func::FuncOp::getOperationName(), context,
                              converter, 100) {}
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto funcOp = cast<FuncOp>(op);
-    FunctionType fnType = funcOp.getType();
+    auto funcOp = cast<func::FuncOp>(op);
+    FunctionType fnType = funcOp.getFunctionType();
     (void)fnType;
     if (!funcOp.isPublic()) return failure();
 

@@ -15,10 +15,12 @@ package(
 cc_library(
     name = "Utils",
     srcs = [
+        "GPUUtils.cpp",
         "MarkerUtils.cpp",
         "Utils.cpp",
     ],
     hdrs = [
+        "GPUUtils.h",
         "MarkerUtils.h",
         "Utils.h",
     ],
@@ -29,6 +31,7 @@ cc_library(
         "//iree/compiler/Dialect/HAL/IR",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",

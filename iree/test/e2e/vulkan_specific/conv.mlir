@@ -1,4 +1,4 @@
-func @conv() {
+func.func @conv() {
   %0 = util.unfoldable_constant dense<
       [[[[0.5       , 0.5212766 ],
          [0.54255319, 0.56382979],

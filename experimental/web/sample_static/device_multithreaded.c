@@ -17,7 +17,7 @@ iree_status_t create_device_with_static_loader(iree_allocator_t host_allocator,
   iree_hal_task_device_params_initialize(&params);
 
   // Register the statically linked executable library.
-  const iree_hal_executable_library_query_fn_t* libraries[] = {
+  const iree_hal_executable_library_query_fn_t libraries[] = {
       mnist_linked_llvm_library_query,
   };
   iree_hal_executable_loader_t* library_loader = NULL;

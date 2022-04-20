@@ -2,7 +2,7 @@
 
 module {
   // CHECK-LABEL: vm.func private @arithmetic
-  func @arithmetic(%arg0: f32) -> f32 {
+  func.func @arithmetic(%arg0: f32) -> f32 {
 
     // CHECK: vm.atan.f32
     %0 = math.atan %arg0 : f32

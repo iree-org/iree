@@ -1,4 +1,4 @@
-func @scatter_add_slice_2D_dynamic_num_updates() {
+func.func @scatter_add_slice_2D_dynamic_num_updates() {
   %arg0 = util.unfoldable_constant dense<1> : tensor<6x3xi32>
   %arg1 = flow.tensor.constant dense<[[2], [4]]> : tensor<2x1xi32> -> tensor<?x1xi32>
   %arg2 = flow.tensor.constant dense<[[1, 2, 3],
