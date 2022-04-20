@@ -1,9 +1,12 @@
 // RUN: iree-dialects-opt -linalg-interp-transforms %s | FileCheck %s
 
-
 // CHECK-LABEL: func @fuse_unary
 func @fuse_unary(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> {
 
+  //     CHECK:   scf.for
+  //     CHECK:     scf.for
+  //     CHECK:       linalg.elemwise_unary
+  //     CHECK:       linalg.elemwise_binary
   //     CHECK:   scf.for
   //     CHECK:     scf.for
   //     CHECK:       linalg.elemwise_unary
@@ -29,4 +32,6 @@ pdl.pattern @pdl_target : benefit(1) {
 iree_linalg_transform.sequence {
   %0 = match @pdl_target
   %1, %loops:2 = fuse %0 {tile_sizes = [32, 32], tile_interchange = [0, 1]}
+
+  peel_loop %loops#0
 }

@@ -80,6 +80,12 @@ static Value getSlice(OpBuilder &b, Location loc, Value source,
       .Default([&](Type t) { return nullptr; });
 }
 
+/// Returns true if the dimensions of ShapedType are dynamic or equal.
+static bool isShapedTypeDimEqual(int64_t lhs, int64_t rhs) {
+  return lhs != ShapedType::kDynamicSize && rhs != ShapedType::kDynamicSize &&
+         lhs != rhs;
+}
+
 Value IREE::LinalgExt::getDimValue(OpBuilder &builder, Location loc, Value v,
                                    int64_t dim) {
   return TypeSwitch<Type, Value>(v.getType())
@@ -1180,6 +1186,85 @@ Operation *ReverseOp::getTiledImplementation(OpBuilder &builder,
   return tiledRevOp;
 }
 
+//===----------------------------------------------------------------------===//
+// TopkOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult TopkOp::verify() {
+  Operation *op = getOperation();
+  if (getNumInputs() != 2) {
+    return op->emitOpError("expected two input operands");
+  }
+  if (getNumOutputs() != 2) {
+    return op->emitOpError("expected two output operands");
+  }
+  if (dimension() >= getInputRank()) {
+    return op->emitOpError("dimension exceeds rank");
+  }
+  // Ensure input/output element types match
+  auto inputValuesType = values().getType().cast<ShapedType>();
+  auto outputValuesType = outputValues().getType().cast<ShapedType>();
+  if (inputValuesType.getElementType() != outputValuesType.getElementType()) {
+    return op->emitOpError("expected input/output value types to be identical");
+  }
+  // Indices must be int
+  auto inputIndicesType = indices().getType().cast<ShapedType>();
+  auto outputIndicesType = outputIndices().getType().cast<ShapedType>();
+  if (!inputIndicesType.getElementType().isInteger(32) ||
+      !outputIndicesType.getElementType().isInteger(32)) {
+    return op->emitOpError("expected input/output indices types to be int");
+  }
+  // Ranks must match
+  if (inputValuesType.getRank() != outputValuesType.getRank() ||
+      inputIndicesType.getRank() != outputIndicesType.getRank()) {
+    return op->emitOpError("expected input/output to have the same rank");
+  }
+  // Input indicies and values must have the same shape.
+  if (llvm::any_of(
+          llvm::zip(inputValuesType.getShape(), inputIndicesType.getShape()),
+          [](std::tuple<int64_t, int64_t> s) {
+            return isShapedTypeDimEqual(std::get<0>(s), std::get<1>(s));
+          })) {
+    return op->emitOpError("input indices/values shape must match");
+  }
+  // Output indicies and values must have the same shape.
+  if (llvm::any_of(
+          llvm::zip(outputValuesType.getShape(), outputIndicesType.getShape()),
+          [](std::tuple<int64_t, int64_t> s) {
+            return isShapedTypeDimEqual(std::get<0>(s), std::get<1>(s));
+          })) {
+    return op->emitOpError("output indices/values shape must match");
+  }
+  // Input shape must match the output shape except for the dimension()
+  uint64_t dim = dimension();
+  if (llvm::any_of(llvm::enumerate(llvm::zip(inputValuesType.getShape(),
+                                             outputValuesType.getShape())),
+                   [dim](auto e) {
+                     if (e.index() == dim) {
+                       return false;
+                     }
+                     std::tuple<int64_t, int64_t> s = e.value();
+                     return isShapedTypeDimEqual(std::get<0>(s),
+                                                 std::get<1>(s));
+                   })) {
+    return op->emitOpError("incompatible input/output shapes");
+  }
+  // Check region compatibility
+  Block &block = region().front();
+  if (block.getNumArguments() != 2) {
+    return op->emitOpError("region block should have 2 arguments");
+  }
+  if (block.getArgument(0).getType() != inputValuesType.getElementType() ||
+      block.getArgument(1).getType() != inputValuesType.getElementType()) {
+    return op->emitOpError("region block types must match input");
+  }
+  auto terminatorOp = llvm::cast<YieldOp>(block.getTerminator());
+  if (!terminatorOp || !terminatorOp.getOperand(0).getType().isInteger(1)) {
+    return op->emitOpError("region block must end with a Yield i1!");
+  }
+  return success();
+}
+
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
@@ -1195,6 +1280,7 @@ DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ReverseOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)
+DEFINE_OP_GET_EFFECTS(TopkOp)
 
 namespace {
 /// This is derived from mlir/lib/Dialect/Linalg/IR/LinalgOps.cpp without any

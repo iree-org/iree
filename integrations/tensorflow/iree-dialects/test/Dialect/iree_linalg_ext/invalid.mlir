@@ -446,3 +446,108 @@ func @type_mismatch(%1 : tensor<1xf32>, %out : tensor<200xf32>) -> () {
       }
   }
 }
+
+// -----
+
+func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
+  // expected-error@+1 {{expected two input operands}}
+  %0:2 = iree_linalg_ext.topk
+        dimension(1)
+        ins(%input_indices : tensor<2x10xi32>)
+        outs(%out_values, %out_indices : tensor<2x3xf32>, tensor<2x3xi32>) {
+        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        } -> tensor<2x3xf32>, tensor<2x3xi32>
+  return %0#0, %0#1 : tensor<2x3xf32>, tensor<2x3xi32>
+}
+
+// -----
+
+func @topk_invalid(%input_values: tensor<2x10xi32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
+   // expected-error@+1 {{expected input/output value types to be identical}}
+  %0:2 = iree_linalg_ext.topk
+        dimension(1)
+        ins(%input_values, %input_indices : tensor<2x10xi32> , tensor<2x10xi32>)
+        outs(%out_values, %out_indices : tensor<2x3xf32>, tensor<2x3xi32>) {
+        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        } -> tensor<2x3xf32>, tensor<2x3xi32>
+  return %0#0, %0#1 : tensor<2x3xf32>, tensor<2x3xi32>
+}
+
+// -----
+
+func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10xf32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
+   // expected-error@+1 {{expected input/output indices types to be int}}
+  %0:2 = iree_linalg_ext.topk
+        dimension(1)
+        ins(%input_values, %input_indices : tensor<2x10xf32> , tensor<2x10xf32>)
+        outs(%out_values, %out_indices : tensor<2x3xf32>, tensor<2x3xi32>) {
+        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        } -> tensor<2x3xf32>, tensor<2x3xi32>
+  return %0#0, %0#1 : tensor<2x3xf32>, tensor<2x3xi32>
+}
+
+// -----
+
+func @topk_invalid(%input_values: tensor<10x2x10xf32>, %input_indices: tensor<10x2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
+   // expected-error@+1 {{expected input/output to have the same rank}}
+  %0:2 = iree_linalg_ext.topk
+        dimension(1)
+        ins(%input_values, %input_indices : tensor<10x2x10xf32> , tensor<10x2x10xi32>)
+        outs(%out_values, %out_indices : tensor<2x3xf32>, tensor<2x3xi32>) {
+        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        } -> tensor<2x3xf32>, tensor<2x3xi32>
+  return %0#0, %0#1 : tensor<2x3xf32>, tensor<2x3xi32>
+}
+
+// -----
+
+func @topk_invalid(%input_values: tensor<3x10xf32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
+   // expected-error@+1 {{input indices/values shape must match}}
+  %0:2 = iree_linalg_ext.topk
+        dimension(1)
+        ins(%input_values, %input_indices : tensor<3x10xf32> , tensor<2x10xi32>)
+        outs(%out_values, %out_indices : tensor<2x3xf32>, tensor<2x3xi32>) {
+        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        } -> tensor<2x3xf32>, tensor<2x3xi32>
+  return %0#0, %0#1 : tensor<2x3xf32>, tensor<2x3xi32>
+}
+
+// -----
+
+func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<3x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<3x3xf32>, tensor<2x3xi32>) {
+   // expected-error@+1 {{output indices/values shape must match}}
+  %0:2 = iree_linalg_ext.topk
+        dimension(1)
+        ins(%input_values, %input_indices : tensor<2x10xf32> , tensor<2x10xi32>)
+        outs(%out_values, %out_indices : tensor<3x3xf32>, tensor<2x3xi32>) {
+        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        } -> tensor<3x3xf32>, tensor<2x3xi32>
+  return %0#0, %0#1 : tensor<3x3xf32>, tensor<2x3xi32>
+}
+
+// -----
+
+func @topk_invalid(%input_values: tensor<3x10xf32>, %input_indices: tensor<3x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
+   // expected-error@+1 {{incompatible input/output shapes}}
+  %0:2 = iree_linalg_ext.topk
+        dimension(1)
+        ins(%input_values, %input_indices  : tensor<3x10xf32> , tensor<3x10xi32>)
+        outs(%out_values, %out_indices : tensor<2x3xf32>, tensor<2x3xi32>) {
+        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        } -> tensor<2x3xf32>, tensor<2x3xi32>
+  return %0#0, %0#1 : tensor<2x3xf32>, tensor<2x3xi32>
+}
