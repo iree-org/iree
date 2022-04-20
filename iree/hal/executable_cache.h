@@ -145,8 +145,13 @@ typedef struct iree_hal_executable_cache_t iree_hal_executable_cache_t;
 // Creates an executable cache using the given identifier.
 // The identifier is provided to the backing cache API as way to partition
 // caches between different groups of executables (from different modules, etc).
+//
+// Any host-side work that needs to be performed will be scheduled on |loop|.
+// This enables JITs, device-specific translation, and verification to be
+// parallelized using a shared scheduler. The loop must remain valid for the
+// lifetime of the executable cache.
 IREE_API_EXPORT iree_status_t iree_hal_executable_cache_create(
-    iree_hal_device_t* device, iree_string_view_t identifier,
+    iree_hal_device_t* device, iree_string_view_t identifier, iree_loop_t loop,
     iree_hal_executable_cache_t** out_executable_cache);
 
 // Retains the given |executable_cache| for the caller.

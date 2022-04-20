@@ -29,15 +29,15 @@ void iree_hal_executable_params_initialize(
 IREE_HAL_API_RETAIN_RELEASE(executable_cache);
 
 IREE_API_EXPORT iree_status_t iree_hal_executable_cache_create(
-    iree_hal_device_t* device, iree_string_view_t identifier,
+    iree_hal_device_t* device, iree_string_view_t identifier, iree_loop_t loop,
     iree_hal_executable_cache_t** out_executable_cache) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_executable_cache);
   *out_executable_cache = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status = IREE_HAL_VTABLE_DISPATCH(
-      device, iree_hal_device, create_executable_cache)(device, identifier,
-                                                        out_executable_cache);
+  iree_status_t status = IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device,
+                                                  create_executable_cache)(
+      device, identifier, loop, out_executable_cache);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
