@@ -56,6 +56,7 @@ def iree_runtime_cc_library(deps = [], **kwargs):
       deps=deps + [
         "//runtime/src:runtime_defines",
       ],
+      **kwargs
     )
 
 def iree_runtime_cc_test(deps = [], **kwargs):
@@ -68,4 +69,5 @@ def iree_runtime_cc_test(deps = [], **kwargs):
       deps=deps + [
         "//runtime/src:runtime_defines",
       ],
+      **kwargs
     )

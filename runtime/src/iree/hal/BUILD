@@ -8,6 +8,8 @@
 # Subdirectories contain implementations for different hardware and
 # software backends.
 
+load("//iree:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],

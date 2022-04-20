@@ -8,6 +8,8 @@ load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
+load("//iree:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
