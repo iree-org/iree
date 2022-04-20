@@ -94,6 +94,7 @@ set(_source_components
   MLIRPythonSources.Dialects.linalg
   MLIRPythonSources.Dialects.math
   MLIRPythonSources.Dialects.memref
+  MLIRPythonSources.Dialects.pdl
   MLIRPythonSources.Dialects.shape
   MLIRPythonSources.Dialects.tensor
   MLIRPythonSources.Dialects.tosa

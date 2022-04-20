@@ -21,6 +21,7 @@ from iree.compiler.dialects import builtin
 from iree.compiler.dialects import linalg
 from iree.compiler.dialects import math
 from iree.compiler.dialects import memref
+from iree.compiler.dialects import pdl
 from iree.compiler.dialects import shape
 from iree.compiler.dialects import tensor
 from iree.compiler.dialects import tosa
