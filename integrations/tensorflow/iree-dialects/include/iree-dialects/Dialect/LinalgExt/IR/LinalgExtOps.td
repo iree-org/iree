@@ -51,7 +51,7 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
 
 //===----------------------------------------------------------------------===//
 // Temporary stripped-down copies of IREE HAL ops needed for composition.
-// These can be removed once dialects can register transformations with the 
+// These can be removed once dialects can register transformations with the
 // transform dialect.
 //===----------------------------------------------------------------------===//
 def IREELinalgExt_Dim : TypeAlias<Index>;
@@ -117,8 +117,8 @@ def IREELinalgExt_HALInterfaceWorkgroupCountOp : Op<IREELinalgExt_Dialect, "hal.
   }];
 }
 
-// Stripped-down version of the HAL::ExecutableEntryPoint op. 
-// Using a custom op in generic form is not deemed acceptable but we should not 
+// Stripped-down version of the HAL::ExecutableEntryPoint op.
+// Using a custom op in generic form is not deemed acceptable but we should not
 // either blindly take the complexity.
 def IREELinalgExt_HALExecutableEntryPointOp : Op<IREELinalgExt_Dialect, "hal.executable.entry_point", [
     IsolatedFromAbove,
@@ -129,15 +129,15 @@ def IREELinalgExt_HALExecutableEntryPointOp : Op<IREELinalgExt_Dialect, "hal.exe
     information describing the IO interface it uses and other dispatch metadata.
 
     The `workgroup_count_region` region represents the
-    computation that returns the number of workgroups to use. 
+    computation that returns the number of workgroups to use.
     It returns the number of workgroups along x, y, and z.
 
     Note: this is a stripped-down of the HAL::ExecutableEntryPoint to only keep
     the essential information needed to perform the transformation.
-    This is only used within the parent func of an IREELinalgExt_InParallelOp 
+    This is only used within the parent func of an IREELinalgExt_InParallelOp
     that is in the process of translating to the HAL abstraction.
     This goes away once transform dialect ops can be registered from different
-    dialects. 
+    dialects.
   }];
 
   // This op only propagates information to HAL, it inherits none of the design.
@@ -466,6 +466,65 @@ def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
         ret.push_back(elem.getLimitedValue());
       }
       return ret;
+    }
+  }];
+}
+
+def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
+  DeclareOpInterfaceMethods<LinalgExtInterface>
+]> {
+  let summary = "Top-K operator";
+  let description = [{
+   A Top-K operation for N-D tensors. Reduces the target dimension from the input
+   size N down to K elements based on the supplied binary region.
+
+   Accepts two N-D tensor inputs consisting of values and indices of those
+   values (i32 type). Both input values/indices tensors and output
+   values/indicies tensors must have the same shape. Top-K is computed along the
+   target dimension (from dimension()). Returns two output tensors of values and
+   the indicies of Top-K results. The output dimensions must match the input
+   save for the dimension that is reduced to K results.
+
+   Region accepts lhs=[next N input] and rhs=[exiting K output] and yeilds an
+   i1. If true, the two values are swapped:
+     - For Top-K compoarision: >
+     - For Min-K comparision: <
+   Note: when the two values are equal, the first occurence is always selected.
+  }];
+
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
+                       Variadic<AnyShaped>:$outputs,
+                       I64Attr:$dimension
+  );
+
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region AnyRegion:$region);
+  let assemblyFormat = [{
+    attr-dict
+    `dimension` `(` $dimension `)`
+    `ins` `(` $inputs `:` type($inputs) `)`
+    `outs` `(` $outputs `:` type($outputs) `)`
+    $region (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    Value values() {
+      return getInputOperand(0)->get();
+    }
+    Value indices() {
+      return getInputOperand(1)->get();
+    }
+    Value outputValues() {
+      return getOutputOperand(0)->get();
+    }
+    Value outputIndices() {
+      return getOutputOperand(1)->get();
+    }
+    ShapedType getInputType() {
+      return values().getType().cast<ShapedType>();
+    }
+    int64_t getInputRank() {
+      return getInputType().getRank();
     }
   }];
 }

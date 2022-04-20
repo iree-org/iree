@@ -39,16 +39,11 @@ namespace detail {
 LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
                               const int64_t subgroupSize,
                               const int64_t bestTilingFactor) {
-  ArrayRef<int64_t> inputShape = linalgOp.getInputOperand(0)
-                                     ->get()
-                                     .getType()
-                                     .cast<ShapedType>()
-                                     .getShape();
-  ArrayRef<int64_t> outputShape = linalgOp.getOutputOperand(0)
-                                      ->get()
-                                      .getType()
-                                      .cast<ShapedType>()
-                                      .getShape();
+  Type inputType = linalgOp.getInputOperand(0)->get().getType();
+  ArrayRef<int64_t> inputShape = inputType.cast<ShapedType>().getShape();
+  Type outputType = linalgOp.getOutputOperand(0)->get().getType();
+  ArrayRef<int64_t> outputShape = outputType.cast<ShapedType>().getShape();
+
   if (isa<linalg::Conv2DNhwcHwcfOp>(*linalgOp) &&
       ShapedType::isDynamic(inputShape[3])) {
     return success();
@@ -199,10 +194,19 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
   // and try different configurations by scaling them down until we find a
   // configuration that can perfectly tile the input matmul.
 
-  const int64_t bestX = bestWorkgroupSizeXY[0], bestY = bestWorkgroupSizeXY[1];
   const int64_t bestThreadM = bestThreadTileSizeMNK[0],
                 bestThreadN = bestThreadTileSizeMNK[1],
                 bestThreadK = bestThreadTileSizeMNK[2];
+
+  int64_t bestX = bestWorkgroupSizeXY[0], bestY = bestWorkgroupSizeXY[1];
+  // We will deduce a configuration first for x and then y. But look at y here
+  // to see if the problem size is too small; for such cases, "shift" the
+  // parallelism to x.
+  if (dimM < bestThreadM) {
+    int64_t factor = llvm::PowerOf2Ceil(llvm::divideCeil(bestThreadM, dimM));
+    bestX *= factor;
+    bestY = llvm::divideCeil(bestY, factor);
+  }
 
   int64_t residualThreads = bestX * bestY;
   int64_t residualTilingFactor = (bestThreadM + bestThreadK) * bestThreadN;
