@@ -297,7 +297,7 @@ hal.executable @matmul_1x1024x576 {
         %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [576, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:576x1024xf32> -> tensor<576x1024xf32>
         %6 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [1, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:1x1024xf32> -> tensor<1x1024xf32>
         %7 = linalg.init_tensor [1, 1024] : tensor<1x1024xf32>
-        %8 = linalg.fill(%cst, %7) : f32, tensor<1x1024xf32> -> tensor<1x1024xf32>
+        %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<1x1024xf32>) -> tensor<1x1024xf32>
         %9 = linalg.matmul ins(%4, %5 : tensor<1x576xf32>, tensor<576x1024xf32>) outs(%8 : tensor<1x1024xf32>) -> tensor<1x1024xf32>
         flow.dispatch.tensor.store %9, %3, offsets = [0, 0], sizes = [1, 1024], strides = [1, 1] : tensor<1x1024xf32> -> !flow.dispatch.tensor<writeonly:1x1024xf32>
         return
