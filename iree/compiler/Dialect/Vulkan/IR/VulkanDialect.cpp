@@ -93,8 +93,9 @@ Attribute parseTargetAttr(DialectAsmParser &parser) {
     StringRef errorKeyword;
 
     auto processExtension = [&](llvm::SMLoc loc, StringRef extension) {
-      if (symbolizeExtension(extension)) {
-        extensions.push_back(builder.getStringAttr(extension));
+      if (auto symbol = symbolizeExtension(extension)) {
+        extensions.push_back(builder.getI32IntegerAttr(
+            static_cast<uint32_t>(symbol.getValue())));
         return success();
       }
       return errorloc = loc, errorKeyword = extension, failure();
@@ -190,7 +191,8 @@ void print(TargetEnvAttr targetEnv, DialectAsmPrinter &printer) {
           << stringifyVersion(targetEnv.getVersion()) << ", r("
           << targetEnv.getRevision() << "), [";
   interleaveComma(targetEnv.getExtensionsAttr(), os, [&](Attribute attr) {
-    os << attr.cast<StringAttr>().getValue();
+    os << stringifyExtension(
+        *symbolizeExtension(attr.cast<IntegerAttr>().getInt()));
   });
   printer << "], " << spirv::stringifyVendor(targetEnv.getVendorID());
   printer << ":" << spirv::stringifyDeviceType(targetEnv.getDeviceType());

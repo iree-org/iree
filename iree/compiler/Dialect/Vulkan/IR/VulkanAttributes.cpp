@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanTypes.h"
 #include "mlir/IR/AttributeSupport.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
@@ -64,7 +65,7 @@ struct TargetEnvAttributeStorage : public AttributeStorage {
 }  // namespace detail
 
 TargetEnvAttr TargetEnvAttr::get(Vulkan::Version version, uint32_t revision,
-                                 ArrayRef<Vulkan::Extension> extensions,
+                                 ArrayRef<Extension> extensions,
                                  spirv::Vendor vendorID,
                                  spirv::DeviceType deviceType,
                                  uint32_t deviceID,
@@ -73,7 +74,7 @@ TargetEnvAttr TargetEnvAttr::get(Vulkan::Version version, uint32_t revision,
   llvm::SmallVector<Attribute, 0> extAttrs;
   extAttrs.reserve(extensions.size());
   for (auto ext : extensions) {
-    extAttrs.push_back(builder.getStringAttr(Vulkan::stringifyExtension(ext)));
+    extAttrs.push_back(ExtensionAttr::get(builder.getContext(), ext));
   }
   return get(builder.getI32IntegerAttr(static_cast<uint32_t>(version)),
              builder.getI32IntegerAttr(revision),
@@ -106,7 +107,7 @@ unsigned TargetEnvAttr::getRevision() {
 TargetEnvAttr::ext_iterator::ext_iterator(ArrayAttr::iterator it)
     : llvm::mapped_iterator<ArrayAttr::iterator, Extension (*)(Attribute)>(
           it, [](Attribute attr) {
-            return *symbolizeExtension(attr.cast<StringAttr>().getValue());
+            return *symbolizeExtension(attr.cast<IntegerAttr>().getInt());
           }) {}
 
 TargetEnvAttr::ext_range TargetEnvAttr::getExtensions() {
@@ -141,12 +142,17 @@ LogicalResult TargetEnvAttr::verify(
   if (!revision.getType().isInteger(32))
     return emitError() << "expected 32-bit integer for revision";
 
-  if (!llvm::all_of(extensions.getValue(), [](Attribute attr) {
-        if (auto strAttr = attr.dyn_cast<StringAttr>())
-          if (symbolizeExtension(strAttr.getValue())) return true;
-        return false;
-      }))
-    return emitError() << "unknown extension in extension list";
+  for (Attribute attr : extensions.getValue()) {
+    auto intAttr = attr.dyn_cast<IntegerAttr>();
+    if (!intAttr || !intAttr.getType().isSignlessInteger()) {
+      return emitError() << "extension attribute '" << attr
+                         << "' should be 32-bit signless integer";
+    }
+    if (!symbolizeExtension(intAttr.getInt())) {
+      return emitError() << "unknown extension '" << attr
+                         << "' in extension list";
+    }
+  }
 
   if (!capabilities.isa<CapabilitiesAttr>()) {
     return emitError() << "expected vulkan::CapabilitiesAttr for capabilities";

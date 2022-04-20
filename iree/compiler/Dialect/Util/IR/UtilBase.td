@@ -7,6 +7,7 @@
 #ifndef IREE_DIALECT_UTIL_IR_UTIL_BASE
 #define IREE_DIALECT_UTIL_IR_UTIL_BASE
 
+include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
 //===----------------------------------------------------------------------===//

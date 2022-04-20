@@ -10,6 +10,7 @@
 include "iree/compiler/Dialect/HAL/IR/HALDialect.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/EnumAttr.td"
 
 //===----------------------------------------------------------------------===//
 // HAL enums

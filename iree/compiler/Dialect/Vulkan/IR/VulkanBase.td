@@ -8,6 +8,7 @@
 #define IREE_DIALECT_VULKAN_BASE
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/EnumAttr.td"
 
 //===----------------------------------------------------------------------===//
 // Vulkan dialect definition
@@ -45,9 +46,6 @@ class VK_IsKnownBitEnumCaseFor<string name> :
 class VK_IsKnownIntEnumCaseFor<string name> :
     CPred<"::mlir::iree_compiler::IREE::Vulkan::symbolize" # name # "("
           "$_self.cast<IntegerAttr>().getValue().getZExtValue()).hasValue()">;
-class VK_IsKnownStrEnumCaseFor<string name> :
-    CPred<"::mlir::iree_compiler::IREE::Vulkan::symbolize" # name # "("
-          "$_self.cast<StringAttr>().getValue()).hasValue()">;
 
 // Wrapper over base I32BitEnumAttr to set common fields.
 class VK_BitEnumAttr<string name, string description,
@@ -65,11 +63,11 @@ class VK_I32EnumAttr<string name, string description,
   let cppNamespace = "::mlir::iree_compiler::IREE::Vulkan";
 }
 
-// Wrapper over base StrEnumAttr to set common fields.
-class VK_StrEnumAttr<string name, string description,
-                      list<StrEnumAttrCase> cases> :
-    StrEnumAttr<name, description, cases> {
-  let predicate = And<[StrAttr.predicate, VK_IsKnownStrEnumCaseFor<name>]>;
+// Wrapper over base I32EnumAttr to set common fields for mimicing StrEnumAttr.
+class VK_EnumAttr<string name, string description,
+                  list<I32EnumAttrCase> cases> :
+    EnumAttr<VK_Dialect, I32EnumAttr<name, description, cases>, name> {
+  let predicate = And<[StrAttr.predicate, VK_IsKnownIntEnumCaseFor<name>]>;
   let cppNamespace = "::mlir::iree_compiler::IREE::Vulkan";
 }
 
@@ -84,16 +82,16 @@ def VK_V_1_2 : I32EnumAttrCase<"V_1_2", 2, "v1.2">;
 def VK_VersionAttr : VK_I32EnumAttr<"Version", "valid Vulkan version", [
     VK_V_1_0, VK_V_1_1, VK_V_1_2]>;
 
-def VK_KHR_16bit_storage : StrEnumAttrCase<"VK_KHR_16bit_storage">;
-def VK_KHR_8bit_storage : StrEnumAttrCase<"VK_KHR_8bit_storage">;
-def VK_KHR_shader_float16_int8 : StrEnumAttrCase<"VK_KHR_shader_float16_int8">;
-def VK_KHR_spirv_1_4 : StrEnumAttrCase<"VK_KHR_spirv_1_4">;
-def VK_KHR_storage_buffer_storage_class : StrEnumAttrCase<"VK_KHR_storage_buffer_storage_class">;
-def VK_KHR_variable_pointers: StrEnumAttrCase<"VK_KHR_variable_pointers">;
-def VK_NV_cooperative_matrix : StrEnumAttrCase<"VK_NV_cooperative_matrix">;
+def VK_KHR_16bit_storage : I32EnumAttrCase<"VK_KHR_16bit_storage", 0>;
+def VK_KHR_8bit_storage : I32EnumAttrCase<"VK_KHR_8bit_storage", 1>;
+def VK_KHR_shader_float16_int8 : I32EnumAttrCase<"VK_KHR_shader_float16_int8", 2>;
+def VK_KHR_spirv_1_4 : I32EnumAttrCase<"VK_KHR_spirv_1_4", 3>;
+def VK_KHR_storage_buffer_storage_class : I32EnumAttrCase<"VK_KHR_storage_buffer_storage_class", 4>;
+def VK_KHR_variable_pointers: I32EnumAttrCase<"VK_KHR_variable_pointers", 5>;
+def VK_NV_cooperative_matrix : I32EnumAttrCase<"VK_NV_cooperative_matrix", 6>;
 
 def VK_ExtensionAttr :
-    VK_StrEnumAttr<"Extension", "supported Vulkan extension", [
+    VK_EnumAttr<"Extension", "supported Vulkan extension", [
       VK_KHR_16bit_storage, VK_KHR_8bit_storage, VK_KHR_shader_float16_int8,
       VK_KHR_spirv_1_4, VK_KHR_storage_buffer_storage_class,
       VK_KHR_variable_pointers, VK_NV_cooperative_matrix

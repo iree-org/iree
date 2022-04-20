@@ -103,7 +103,7 @@ Vulkan::Version getVersion(const TargetTriple &triple) {
 /// version. The GPU triple is a handy way to specify the target but we cannot
 /// encode all the information in the triple.
 void getExtensions(const TargetTriple &triple,
-                   llvm::SmallVectorImpl<Vulkan::Extension> &extensions) {
+                   llvm::SmallVectorImpl<Extension> &extensions) {
   // Mobile GPUs need to take Android version into consideration.
   switch (triple.getArch()) {
     case TargetTripleArch::Apple_M1: {
@@ -396,7 +396,7 @@ std::string TargetTriple::getTriple() const {
 }
 
 TargetEnvAttr TargetTriple::getTargetEnv(MLIRContext *context) const {
-  SmallVector<Vulkan::Extension> extensions;
+  SmallVector<Extension> extensions;
   getExtensions(*this, extensions);
   return TargetEnvAttr::get(getVersion(*this), /*revision=*/0, extensions,
                             getVendor(*this), getDeviceType(*this),
