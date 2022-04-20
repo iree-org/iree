@@ -1060,7 +1060,7 @@ static iree_status_t iree_hal_vulkan_device_create_event(
 
 static iree_status_t iree_hal_vulkan_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier,
-    iree_hal_executable_cache_t** out_executable_cache) {
+    iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   return iree_hal_vulkan_nop_executable_cache_create(
       device->logical_device, identifier, out_executable_cache);

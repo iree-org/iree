@@ -22,7 +22,8 @@ class command_buffer_dispatch_test : public CtsTestBase {
  protected:
   void PrepareAbsExecutable() {
     IREE_ASSERT_OK(iree_hal_executable_cache_create(
-        device_, iree_make_cstring_view("default"), &executable_cache_));
+        device_, iree_make_cstring_view("default"),
+        iree_loop_inline(&loop_status_), &executable_cache_));
 
     iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] =
         {
@@ -57,8 +58,10 @@ class command_buffer_dispatch_test : public CtsTestBase {
     iree_hal_executable_layout_release(executable_layout_);
     iree_hal_descriptor_set_layout_release(descriptor_set_layout_);
     iree_hal_executable_cache_release(executable_cache_);
+    IREE_ASSERT_OK(loop_status_);
   }
 
+  iree_status_t loop_status_ = iree_ok_status();
   iree_hal_executable_cache_t* executable_cache_ = NULL;
   iree_hal_descriptor_set_layout_t* descriptor_set_layout_ = NULL;
   iree_hal_executable_layout_t* executable_layout_ = NULL;
