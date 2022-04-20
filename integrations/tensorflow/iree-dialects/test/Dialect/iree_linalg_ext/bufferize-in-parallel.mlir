@@ -54,6 +54,8 @@ func @parallel_insert_slice_with_conflict(
 
   // The parallel_insert_slice_op bufferizes out-of-place, so we need an allocation.
   // CHECK: %[[alloc1:.*]] = memref.alloc
+  // CHECK: linalg.generic {{.*}} ins(%[[arg2]]{{.*}}outs(%[[alloc1]]
+
   // CHECK: iree_linalg_ext.in_parallel %[[idx2]]  -> ()
   %2 = iree_linalg_ext.in_parallel %idx2  -> (tensor<?xf32>) {
     ^bb0(%arg3: index):  // no predecessors
@@ -64,12 +66,8 @@ func @parallel_insert_slice_with_conflict(
       // CHECK: linalg.fill ins(%{{.*}}) outs(%[[alloc2]] : memref<?xf32
       %8 = linalg.fill ins(%cst : f32) outs(%6 : tensor<?xf32>) -> tensor<?xf32>
 
-      // parallel_insert_slice buffer was already allocated but not copied yet.
-      //
-      // CHECK: linalg.generic {{.*}} ins(%[[arg2]]{{.*}}outs(%[[alloc1]]
-
       // Now the copy of the actual insert_slice.
-      // CHECK: %[[subview1:.*]] = memref.subview %[[arg2]][5] [%[[idx]]] [1]
+      // CHECK: %[[subview1:.*]] = memref.subview %[[alloc1]][5] [%[[idx]]] [1]
       //
       // CHECK: linalg.generic {{.*}} ins(%[[alloc2]]{{.*}}outs(%[[subview1]]
       // CHECK: memref.dealloc %[[alloc2]]
