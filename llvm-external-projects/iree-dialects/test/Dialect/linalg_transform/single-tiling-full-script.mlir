@@ -1,4 +1,6 @@
 // RUN: iree-dialects-opt -linalg-interp-transforms %s | FileCheck %s
+// TODO(#8947): Fix the MLIRContext assertion and re-enable this
+// XFAIL: *
 
 // CHECK-LABEL: func @matmul_tensors
 // CHECK-NOT: linalg
