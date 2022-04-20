@@ -323,9 +323,10 @@ static LogicalResult computeDispatchResultTypeAndDynamicDims(
 }
 
 /// Returns true if the operation has only uses in `tensor.dim` ops.
-static bool hasOnlyDimUses(Operation *op) {
-  return llvm::all_of(op->getUsers(), [&](Operation *user) {
-    return isa<tensor::DimOp>(user);
+static bool hasComputeUsesOutsideDispatch(
+    Operation *op, ArrayRef<Operation *> dispatchOps = {}) {
+  return !llvm::all_of(op->getUsers(), [&](Operation *user) {
+    return isa<tensor::DimOp>(user) || llvm::is_contained(dispatchOps, user);
   });
 }
 
@@ -336,10 +337,7 @@ static FailureOr<SmallVector<Operation *>>
 buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
                                         ArrayRef<Value> workload,
                                         ArrayRef<Operation *> dispatchOps) {
-  Operation *rootOp = dispatchOps[0];
-
-  SmallVector<Value> operands, operandDims, resultDynamicDims;
-  SmallVector<int64_t> tiedOperands;
+  SmallVector<Value> resultDynamicDims;
   SmallVector<Type> resultTypes;
 
   // 1. Compute the result types for the dispatch and the dynamic dimensions
@@ -348,7 +346,7 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
   //    kept on the original op, and later patterns are expected to take care
   //    of them.
   for (auto op : dispatchOps) {
-    if (op != rootOp && hasOnlyDimUses(op)) continue;
+    if (!hasComputeUsesOutsideDispatch(op, dispatchOps)) continue;
     if (failed(computeDispatchResultTypeAndDynamicDims(
             rewriter, op, resultTypes, resultDynamicDims))) {
       return failure();
@@ -357,8 +355,9 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
 
   // 2. Create a dispatch op with just the `flow.return` terminator.
   auto dispatchOp = rewriter.create<IREE::Flow::DispatchWorkgroupsOp>(
-      loc, workload, resultTypes, resultDynamicDims, operands, operandDims,
-      tiedOperands);
+      loc, workload, resultTypes, resultDynamicDims,
+      /*operands=*/ArrayRef<Value>{}, /*operandDims=*/ArrayRef<Value>{},
+      /*tiedOperands=*/ArrayRef<int64_t>{});
   Region &region = dispatchOp.body();
   Block *block = &region.front();
   OpBuilder::InsertionGuard g(rewriter);
@@ -379,7 +378,7 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
     clonedOps.push_back(clonedOp);
     rewriter.replaceOpWithinBlock(op, clonedOp->getResults(), block);
     rewriter.setInsertionPoint(clonedOp);
-    if (op != rootOp && hasOnlyDimUses(op)) continue;
+    if (!hasComputeUsesOutsideDispatch(op, dispatchOps)) continue;
 
     // 3a. Replace all non-dim uses of the original operation with the
     //     corresponding result of the dispatch.
@@ -847,7 +846,7 @@ struct CreateDispatchRegionOp : Base<OpType> {
     // TODO(ravishankarm): It is getting strange to track when to apply this
     // pattern and when not to. Need to revisit this, with dynamic shape cases
     // in mind.
-    if (hasOnlyDimUses(rootOp)) return failure();
+    if (!hasComputeUsesOutsideDispatch(rootOp)) return failure();
     if (rootOp->template getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
