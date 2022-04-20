@@ -52,7 +52,7 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
   auto filter = linalg::LinalgTransformationFilter({marker}, llvm::None);
 
   linalg::TilingPatterns<linalg::BatchMatmulOp, linalg::Conv2DNhwcHwcfOp,
-                         linalg::DepthwiseConv2DNhwcHwcOp,
+                         linalg::DepthwiseConv2DNhwcHwcOp, linalg::GenericOp,
                          linalg::MatmulOp>::insert(patterns, tilingOptions,
                                                    filter);
 }
@@ -283,7 +283,8 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       auto marker = builder.getStringAttr(getTileReductionMarker());
       funcOp.walk([&](linalg::LinalgOp op) {
         if (isa<linalg::ContractionOpInterface>(*op) ||
-            isa<linalg::ConvolutionOpInterface>(*op)) {
+            isa<linalg::ConvolutionOpInterface>(*op) ||
+            isa<linalg::GenericOp>(*op)) {
           op->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker, marker);
         }
       });

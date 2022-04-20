@@ -410,17 +410,14 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   SmallVector<int64_t, 4> loopBounds = linalgOp.getStaticLoopRanges();
   bool vectorizable =
       allowVectorization &&
-      // The vectorization pipeline assumes tensor semantics when tiling.
-      !linalgOp.hasBufferSemantics() && !linalgOp.hasIndexSemantics() &&
-      // Skip vectorization for non-minor identity inputs as it generates
-      // vector.transfer_read ops with permutation maps that we currently
-      // cannot lower.
-      // TODO: Remove this restriction once the lowering of the permutation
-      // map is supported in core.
-      llvm::all_of(linalgOp.getIndexingMaps(),
-                   [](AffineMap &map) { return map.isMinorIdentity(); }) &&
-      // TODO: Lowering of integers other than i32 may require emulation.
-      // This is currently not supported for vector operation.
+      // The vectorization pipeline assumes tensor semantics for tiling.
+      linalgOp.hasTensorSemantics() && !linalgOp.hasIndexSemantics() &&
+      // Require all affine maps to be projected permutation so that we can
+      // generate vector transfer ops.
+      llvm::all_of(
+          linalgOp.getIndexingMaps(),
+          [](AffineMap map) { return map.isProjectedPermutation(); }) &&
+      // TODO: Fix non-32-bit element type vectorization and remove this.
       llvm::all_of(linalgOp->getOperands(), has32BitElementType) &&
       llvm::none_of(loopBounds, ShapedType::isDynamic);
 
@@ -496,7 +493,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   if (distributeToThreads(subgroupSize) != 1) {
     // Otherwise, allow larger and larger loss factor.
 
-    // Threads for distribution Use 32 at least.
+    // Threads for distribution. Use 32 at least.
     int64_t numThreads = std::max(subgroupSize, 32);
     // We can tolerate (1 / lossFactor) of threads in the workgroup to be idle.
     int64_t lossFactor = 32;
@@ -514,6 +511,21 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
   tileSizes.push_back(threadTileSizes);
+
+  if (vectorizable) {
+    // Try to tile all reductions by size 4 if possible. This gives us a chance
+    // to perform vector4 load if an input has its innnermost dimension being
+    // reduction. It also avoidss generating too many instructions when
+    // unrolling vector later.
+    SmallVector<int64_t> reductionTileSizes(linalgOp.getNumLoops(), 0);
+    for (const auto &it : llvm::enumerate(linalgOp.getIteratorTypes())) {
+      if (isReductionIterator(it.value()) && loopBounds[it.index()] % 4 == 0)
+        reductionTileSizes[it.index()] = 4;
+    }
+    if (llvm::any_of(reductionTileSizes, [](int64_t s) { return s != 0; })) {
+      tileSizes.push_back(reductionTileSizes);
+    }
+  }
 
   return setOpConfigAndEntryPointFnTranslation(funcOp, op, tileSizes, pipeline,
                                                workgroupSize);
