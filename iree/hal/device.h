@@ -393,7 +393,7 @@ typedef struct iree_hal_device_vtable_t {
 
   iree_status_t(IREE_API_PTR* create_executable_cache)(
       iree_hal_device_t* device, iree_string_view_t identifier,
-      iree_hal_executable_cache_t** out_executable_cache);
+      iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache);
 
   iree_status_t(IREE_API_PTR* create_executable_layout)(
       iree_hal_device_t* device, iree_host_size_t push_constants,

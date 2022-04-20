@@ -126,6 +126,7 @@ typedef struct iree_hal_module_t {
 typedef struct iree_hal_module_state_t {
   iree_allocator_t host_allocator;
   iree_hal_device_t* shared_device;
+  iree_status_t loop_status;
   iree_hal_executable_cache_t* executable_cache;
 
   iree_hal_semaphore_t* submit_semaphore;
@@ -152,10 +153,11 @@ iree_hal_module_alloc_state(void* self, iree_allocator_t host_allocator,
   state->shared_device = module->shared_device;
   iree_hal_device_retain(state->shared_device);
 
+  state->loop_status = iree_ok_status();
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_executable_cache_create(state->shared_device,
-                                           iree_string_view_empty(),
-                                           &state->executable_cache));
+      z0, iree_hal_executable_cache_create(
+              state->shared_device, iree_string_view_empty(),
+              iree_loop_inline(&state->loop_status), &state->executable_cache));
 
   state->submit_value = 0ull;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -174,6 +176,7 @@ iree_hal_module_free_state(void* self, iree_vm_module_state_t* module_state) {
   iree_hal_module_state_t* state = (iree_hal_module_state_t*)module_state;
   iree_hal_semaphore_release(state->submit_semaphore);
   iree_hal_executable_cache_release(state->executable_cache);
+  iree_status_ignore(state->loop_status);
   iree_hal_device_release(state->shared_device);
   iree_allocator_free(state->host_allocator, state);
 
