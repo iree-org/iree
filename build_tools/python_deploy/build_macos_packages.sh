@@ -74,6 +74,10 @@ function run() {
       esac
     done
   done
+
+  echo "******************** BUILD COMPLETE ********************"
+  echo "Generated binaries:"
+  ls -l $output_dir
 }
 
 function build_iree_runtime() {
@@ -97,7 +101,7 @@ function clean_wheels() {
   local wheel_basename="$1"
   local python_version="$2"
   echo ":::: Clean wheels $wheel_basename $python_version"
-  rm -f /wheelhouse/${wheel_basename}-*-${python_version}-*.whl
+  rm -f -v /wheelhouse/${wheel_basename}-*-${python_version}-*.whl
 }
 
 run

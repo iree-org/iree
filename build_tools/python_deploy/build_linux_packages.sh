@@ -65,6 +65,10 @@ function run_on_host() {
     -e "packages=${packages}" \
     ${manylinux_docker_image} \
     -- bash /main_checkout/iree/build_tools/python_deploy/build_linux_packages.sh
+
+  echo "******************** BUILD COMPLETE ********************"
+  echo "Generated binaries:"
+  ls -l $output_dir
 }
 
 function run_in_docker() {
@@ -140,14 +144,14 @@ function run_audit_wheel() {
   generic_wheel="/wheelhouse/${wheel_basename}-*-${python_version}-linux_x86_64.whl"
   echo ":::: Auditwheel $generic_wheel"
   auditwheel repair -w /wheelhouse $generic_wheel
-  rm $generic_wheel
+  rm -v $generic_wheel
 }
 
 function clean_wheels() {
   local wheel_basename="$1"
   local python_version="$2"
   echo ":::: Clean wheels $wheel_basename $python_version"
-  rm -f /wheelhouse/${wheel_basename}-*-${python_version}-*.whl
+  rm -f -v /wheelhouse/${wheel_basename}-*-${python_version}-*.whl
 }
 
 # Trampoline to the docker container if running on the host.
