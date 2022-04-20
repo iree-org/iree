@@ -246,28 +246,29 @@ function(iree_py_library)
   endif()
 endfunction()
 
-# iree_py_test()
+# iree_local_py_test()
 #
-# CMake function to imitate Bazel's iree_py_test rule.
+# CMake function to run python test with provided python package paths.
 #
 # Parameters:
 # NAME: name of test
-# SRCS: Test source file (single file only, despite name)
+# SRC: Test source file
 # ARGS: Command line arguments to the Python source file.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
 # GENERATED_IN_BINARY_DIR: If present, indicates that the srcs have been
 #   in the CMAKE_CURRENT_BINARY_DIR.
-function(iree_py_test)
-  if(NOT IREE_BUILD_TESTS)
+# PACKAGE_DIRS: Python package paths to be added to PYTHONPATH.
+function(iree_local_py_test)
+  if(NOT IREE_BUILD_TESTS OR ANDROID)
     return()
   endif()
 
   cmake_parse_arguments(
     _RULE
     "GENERATED_IN_BINARY_DIR"
-    "NAME;SRCS"
-    "ARGS;LABELS"
+    "NAME;SRC"
+    "ARGS;LABELS;PACKAGE_DIRS"
     ${ARGN}
   )
 
@@ -290,17 +291,58 @@ function(iree_py_test)
     COMMAND
       "${IREE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
       "${Python3_EXECUTABLE}"
-      "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRCS}"
+      "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}"
       ${_RULE_ARGS}
   )
 
+  list(APPEND _RULE_PACKAGE_DIRS "$ENV{PYTHONPATH}")
+  string(JOIN ":" _PYTHONPATH ${_RULE_PACKAGE_DIRS})
+
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
-      "PYTHONPATH=${IREE_BINARY_DIR}/iree/compiler/python:${IREE_BINARY_DIR}/runtime/bindings/python:$ENV{PYTHONPATH}"
+      "PYTHONPATH=${_PYTHONPATH}"
       "TEST_TMPDIR=${IREE_BINARY_DIR}/tmp/${_NAME}_test_tmpdir"
   )
   iree_add_test_environment_properties(${_NAME_PATH})
 
   # TODO(marbre): Find out how to add deps to tests.
   #               Similar to _RULE_DATA in iree_lit_test().
+endfunction()
+
+# iree_py_test()
+#
+# CMake function to imitate Bazel's iree_py_test rule.
+#
+# Parameters:
+# NAME: name of test
+# SRCS: Test source file (single file only, despite name)
+# ARGS: Command line arguments to the Python source file.
+# LABELS: Additional labels to apply to the test. The package path is added
+#     automatically.
+# GENERATED_IN_BINARY_DIR: If present, indicates that the srcs have been
+#   in the CMAKE_CURRENT_BINARY_DIR.
+function(iree_py_test)
+  cmake_parse_arguments(
+    _RULE
+    "GENERATED_IN_BINARY_DIR"
+    "NAME;SRCS"
+    "ARGS;LABELS"
+    ${ARGN}
+  )
+
+  iree_local_py_test(
+    NAME
+      "${_RULE_NAME}"
+    SRC
+      "${_RULE_SRCS}"
+    ARGS
+      ${_RULE_ARGS}
+    LABELS
+      ${_RULE_LABELS}
+    PACKAGE_DIRS
+      "${IREE_BINARY_DIR}/iree/compiler/python"
+      "${IREE_BINARY_DIR}/runtime/bindings/python"
+    GENERATED_IN_BINARY_DIR
+      "${_RULE_GENERATED_IN_BINARY_DIR}"
+  )
 endfunction()

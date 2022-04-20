@@ -8,53 +8,37 @@
 # Tests
 ################################################################################
 
-if(IREE_BUILD_TESTS AND NOT ANDROID)
-
-iree_py_test(
+benchmark_tool_py_test(
   NAME
     linux_device_utils_test
-  SRCS
+  SRC
     "linux_device_utils_test.py"
 )
 
-iree_py_test(
+benchmark_tool_py_test(
   NAME
     common_arguments_test
-  SRCS
+  SRC
     "common_arguments_test.py"
 )
 
-iree_py_test(
+benchmark_tool_py_test(
   NAME
     benchmark_config_test
-  SRCS
+  SRC
     "benchmark_config_test.py"
 )
 
-iree_py_test(
+benchmark_tool_py_test(
   NAME
     benchmark_suite_test
-  SRCS
+  SRC
     "benchmark_suite_test.py"
 )
 
-iree_py_test(
+benchmark_tool_py_test(
   NAME
     benchmark_driver_test
-  SRCS
+  SRC
     "benchmark_driver_test.py"
 )
-
-# TODO(#8708): Temporary solution to fix python path for tests.
-set_property(TEST "build_tools/benchmarks/common/linux_device_utils_test"
-    APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${BENCHMARKS_TOOL_PYTHON_DIR}:$ENV{PYTHONPATH}")
-set_property(TEST "build_tools/benchmarks/common/common_arguments_test"
-    APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${BENCHMARKS_TOOL_PYTHON_DIR}:$ENV{PYTHONPATH}")
-set_property(TEST "build_tools/benchmarks/common/benchmark_config_test"
-    APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${BENCHMARKS_TOOL_PYTHON_DIR}:$ENV{PYTHONPATH}")
-set_property(TEST "build_tools/benchmarks/common/benchmark_suite_test"
-    APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${BENCHMARKS_TOOL_PYTHON_DIR}:$ENV{PYTHONPATH}")
-set_property(TEST "build_tools/benchmarks/common/benchmark_driver_test"
-    APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${BENCHMARKS_TOOL_PYTHON_DIR}:$ENV{PYTHONPATH}")
-
-endif()
