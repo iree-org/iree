@@ -29,7 +29,7 @@ struct VerifyCompilerMHLOInputLegalityPass
     // However, it is so common to sneak input-level ops into the pipeline
     // that we explicitly deny the dialects we know about.
     conversionTarget.addIllegalDialect<mhlo::MhloDialect>();
-    conversionTarget.addIllegalDialect<chlo::HloClientDialect>();
+    conversionTarget.addIllegalDialect<chlo::ChloDialect>();
     conversionTarget.addIllegalDialect<mlir::shape::ShapeDialect>();
 
     // NOTE: It is not fully illegal to tunnel input dialect ops through to

@@ -19,7 +19,7 @@ namespace mlir {
 // Add all the XLA dialects to the provided registry.
 inline void registerXLADialects(DialectRegistry &registry) {
   // clang-format off
-  registry.insert<mlir::chlo::HloClientDialect,
+  registry.insert<mlir::chlo::ChloDialect,
                   mlir::mhlo::MhloDialect>();
   // clang-format on
 }
