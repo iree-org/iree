@@ -260,6 +260,63 @@ hal.executable @matmul_49x160x576 {
 
 // -----
 
+// Small matmul M to "shift" parallelism to N.
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+
+hal.executable @matmul_1x1024x576 {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
+        max_compute_shared_memory_size = 32768 : i32,
+        max_compute_workgroup_invocations = 512 : i32,
+        max_compute_workgroup_size = dense<512> : vector<3xi32>,
+       subgroup_size = 16 : i32}>
+    }> {
+    hal.executable.entry_point @matmul_1x1024x576 layout(#executable_layout)
+    builtin.module {
+      func @matmul_1x1024x576() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %cst_0 = arith.constant 3.000000e+00 : f32
+        %cst_1 = arith.constant 6.000000e+00 : f32
+        %cst_2 = arith.constant 0.166666672 : f32
+        %c0 = arith.constant 0 : index
+        %c3436864 = arith.constant 3436864 : index
+        %c10141312 = arith.constant 10141312 : index
+        %c2304 = arith.constant 2304 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:1x576xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c3436864) alignment(64) : !flow.dispatch.tensor<readonly:576x1024xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c10141312) alignment(64) : !flow.dispatch.tensor<readonly:1x1024xf32>
+        %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:1x1024xf32>
+        %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 576], strides = [1, 1] : !flow.dispatch.tensor<readonly:1x576xf32> -> tensor<1x576xf32>
+        %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [576, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:576x1024xf32> -> tensor<576x1024xf32>
+        %6 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [1, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:1x1024xf32> -> tensor<1x1024xf32>
+        %7 = linalg.init_tensor [1, 1024] : tensor<1x1024xf32>
+        %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<1x1024xf32>) -> tensor<1x1024xf32>
+        %9 = linalg.matmul ins(%4, %5 : tensor<1x576xf32>, tensor<576x1024xf32>) outs(%8 : tensor<1x1024xf32>) -> tensor<1x1024xf32>
+        flow.dispatch.tensor.store %9, %3, offsets = [0, 0], sizes = [1, 1024], strides = [1, 1] : tensor<1x1024xf32> -> !flow.dispatch.tensor<writeonly:1x1024xf32>
+        return
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 256], [1, 4], [0, 0, 8]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
+//      CHECK: hal.executable.entry_point public @matmul_1x1024x576
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
+//      CHECK: func @matmul_1x1024x576()
+//      CHECK:   linalg.matmul
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
 // Large batch matmul.
 
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
