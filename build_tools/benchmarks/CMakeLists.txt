@@ -6,4 +6,37 @@
 
 set(BENCHMARKS_TOOL_PYTHON_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
+# benchmark_tool_py_test()
+#
+# CMake function to test benchmark python tools.
+#
+# Parameters:
+# NAME: name of test
+# SRC: Test source file
+# ARGS: Command line arguments to the Python source file.
+# LABELS: Additional labels to apply to the test. The package path is added
+#     automatically.
+function(benchmark_tool_py_test)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "NAME;SRC"
+    "ARGS;LABELS"
+    ${ARGN}
+  )
+
+  iree_local_py_test(
+    NAME
+      "${_RULE_NAME}"
+    SRC
+      "${_RULE_SRC}"
+    ARGS
+      ${_RULE_ARGS}
+    LABELS
+      ${_RULE_LABELS}
+    PACKAGE_DIRS
+      ${BENCHMARKS_TOOL_PYTHON_DIR}
+  )
+endfunction()
+
 add_subdirectory(common)
