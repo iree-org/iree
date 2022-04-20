@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
 
   mlir::DialectRegistry registry;
   registry.insert<mlir::iree_compiler::IREE::Input::IREEInputDialect>();
-  registry.insert<mlir::chlo::HloClientDialect, mlir::mhlo::MhloDialect>();
+  registry.insert<mlir::chlo::ChloDialect, mlir::mhlo::MhloDialect>();
 
   // TensorFlow integration passes.
   mlir::RegisterAllTensorFlowDialects(registry);
