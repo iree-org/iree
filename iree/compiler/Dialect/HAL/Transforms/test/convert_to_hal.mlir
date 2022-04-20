@@ -23,7 +23,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
       hal.executable.entry_point public @dispatch ordinal(0) layout(#executable_layout) {
         translation_info = #iree_codegen.translation_info<CPUDefault, workload_per_wg = [4]>
       } {
-      ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
+      ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
         %c1 = arith.constant 1 : index
         %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%arg0]
         hal.return %0, %c1, %c1 : index, index, index

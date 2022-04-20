@@ -34,7 +34,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
       translation_info = #translation,
       workgroup_size = [32 : index, 1 : index, 1 : index]
     } {
-    ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
+    ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
       %c1 = arith.constant 1 : index
       %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 16)>()[%arg0]
       %1 = affine.apply affine_map<()[s0] -> (s0 ceildiv 16)>()[%arg1]

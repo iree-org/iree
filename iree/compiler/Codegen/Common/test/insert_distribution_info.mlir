@@ -50,12 +50,13 @@ hal.executable private @matmul_tensors {
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize, workload_per_wg = [64, 64]>
 //      CHECK: hal.executable.entry_point public @matmul_tensors
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]: index)
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
 //  CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:    %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
-//  CHECK-DAG:    %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
+//  CHECK-DAG:    %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
+//  CHECK-DAG:    %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_Y]]]
 //      CHECK:    hal.return %[[D0]], %[[D1]], %[[C1]] : index, index, index
 //      CHECK: func @matmul_tensors()
 
@@ -115,12 +116,13 @@ hal.executable private @add {
 //      CHECK: hal.executable private @add
 //      CHECK: hal.executable.entry_point public @add
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:  (%[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index)
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
-//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP]]()[%[[ARG1]]]
+//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_X]]]
+//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_Y]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[C1]] : index, index, index
 //      CHECK: func @add()
 
@@ -179,12 +181,13 @@ hal.executable private @add4D {
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, workload_per_wg = [64, 64, 64]>
 //      CHECK: hal.executable.entry_point public @add4D
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]: index)
-//  CHECK-DAG:    %[[D0:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
-//  CHECK-DAG:    %[[D1:.+]] = affine.apply #[[MAP]]()[%[[ARG1]]]
-//  CHECK-DAG:    %[[D2:.+]] = affine.apply #[[MAP]]()[%[[ARG2]]]
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
+//  CHECK-DAG:    %[[D0:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_X]]]
+//  CHECK-DAG:    %[[D1:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_Y]]]
+//  CHECK-DAG:    %[[D2:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_Z]]]
 //      CHECK:    hal.return %[[D0]], %[[D1]], %[[D2]] : index, index, index
 //      CHECK: func @add4D()
 
@@ -237,12 +240,13 @@ hal.executable private @batch_matmul_tensors {
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize, workload_per_wg = [64, 64, 1]>
 //      CHECK: hal.executable.entry_point public @batch_matmul_tensors
-// CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]: index)
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
-//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
-//      CHECK:   hal.return %[[D0]], %[[D1]], %[[ARG2]]
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
+//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
+//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_Y]]]
+//      CHECK:   hal.return %[[D0]], %[[D1]], %[[WORKLOAD_Z]]
 //      CHECK: func @batch_matmul_tensors()
 
 // -----
@@ -288,12 +292,13 @@ hal.executable private @preset_config_matmul_tensors {
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, workload_per_wg = [16, 32]>
 //      CHECK: hal.executable.entry_point public @preset_config
-// CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]: index)
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
-//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[ARG1]]]
+//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
+//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[WORKLOAD_Y]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[C1]]
 //      CHECK: func @preset_config()
 
@@ -345,12 +350,13 @@ hal.executable public @copy_op {
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize, workload_per_wg = [64, 64]>
 //      CHECK: hal.executable.entry_point public @copy_op
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]: index)
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
-//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
+//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
+//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_Y]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[C1]]
 
 // -----
@@ -396,11 +402,12 @@ hal.executable private @static_1d_fft_stage2 {
 //      CHECK: hal.executable private @static_1d_fft_stage2
 //      CHECK: hal.executable.entry_point public @static_1d_fft_stage2
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:  (%[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index)
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
+//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_X]]]
 //      CHECK:   hal.return %[[D0]], %[[C1]], %[[C1]] : index, index, index
 //      CHECK: func @static_1d_fft_stage2()
 
@@ -439,12 +446,13 @@ hal.executable private @static_3d_fft_stage3 {
 //      CHECK: hal.executable private @static_3d_fft_stage3
 //      CHECK: hal.executable.entry_point public @static_3d_fft_stage3
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:  (%[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index)
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
-//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP]]()[%[[ARG1]]]
-//  CHECK-DAG:   %[[D2:.+]] = affine.apply #[[MAP]]()[%[[ARG2]]]
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
+//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_X]]]
+//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_Y]]]
+//  CHECK-DAG:   %[[D2:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_Z]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[D2]] : index, index, index
 //      CHECK: func @static_3d_fft_stage3()
 
@@ -508,12 +516,13 @@ hal.executable private @outs_fusion {
 //      CHECK: hal.executable private @outs_fusion
 //      CHECK: hal.executable.entry_point public @outs_fusion_fn
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:  (%[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index)
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
-//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP]]()[%[[ARG1]]]
+//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_X]]]
+//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_Y]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[C1]] : index, index, index
 //      CHECK: func @outs_fusion_fn()
 
@@ -572,12 +581,13 @@ hal.executable private @conv {
 //      CHECK: hal.executable private @conv
 //      CHECK: hal.executable.entry_point public @conv
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:  (%[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index)
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
-//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP]]()[%[[ARG1]]]
-//  CHECK-DAG:   %[[D2:.+]] = affine.apply #[[MAP]]()[%[[ARG2]]]
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
+//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_X]]]
+//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_Y]]]
+//  CHECK-DAG:   %[[D2:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_Z]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[D2]] : index, index, index
 //      CHECK: func @conv()
 
@@ -630,12 +640,13 @@ hal.executable private @conv_static {
 //      CHECK: hal.executable private @conv_static
 //      CHECK: hal.executable.entry_point public @conv_static
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:  (%[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index)
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
-//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[ARG1]]]
-//  CHECK-DAG:   %[[D2:.+]] = affine.apply #[[MAP2]]()[%[[ARG2]]]
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
+//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
+//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[WORKLOAD_Y]]]
+//  CHECK-DAG:   %[[D2:.+]] = affine.apply #[[MAP2]]()[%[[WORKLOAD_Z]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[D2]] : index, index, index
 //      CHECK: func @conv_static()
 
@@ -686,12 +697,13 @@ hal.executable private @generic_static {
 //      CHECK: hal.executable private @generic_static
 //      CHECK: hal.executable.entry_point public @generic_static
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:  (%[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index)
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
-//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[ARG1]]]
+//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
+//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[WORKLOAD_Y]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[C1]] : index, index, index
 //      CHECK: func @generic_static()
 
@@ -743,12 +755,13 @@ hal.executable private @matmul_static {
 //      CHECK: hal.executable private @matmul_static
 //      CHECK: hal.executable.entry_point public @matmul_static
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:  (%[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index)
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
-//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[ARG1]]]
+//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
+//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[WORKLOAD_Y]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[C1]] : index, index, index
 
 // -----
@@ -799,12 +812,13 @@ hal.executable private @restrict_num_workgroups {
 //      CHECK: hal.executable private @restrict_num_workgroups
 //      CHECK: hal.executable.entry_point public @restrict_num_workgroups
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:  (%[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index)
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
-//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[ARG1]]]
-//      CHECK:   hal.return %[[D0]], %[[D1]], %[[ARG2]] : index, index, index
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
+//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
+//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[WORKLOAD_Y]]]
+//      CHECK:   hal.return %[[D0]], %[[D1]], %[[WORKLOAD_Z]] : index, index, index
 
 // -----
 
@@ -862,11 +876,12 @@ hal.executable private @reduction {
 //      CHECK: hal.executable private @reduction
 //      CHECK: hal.executable.entry_point public @reduction
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:  (%[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index)
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
+//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
 //      CHECK:   hal.return %[[D0]], %[[C1]], %[[C1]] : index, index, index
 //      CHECK: func @reduction
 
@@ -919,11 +934,12 @@ hal.executable private @gemm_unit_N {
 //      CHECK: hal.executable private @gemm_unit_N
 //      CHECK: hal.executable.entry_point public @gemm_unit_N
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:  (%[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index)
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
+//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
 //      CHECK:   hal.return %[[D0]], %[[C1]], %[[C1]] : index, index, index
 //      CHECK: func @gemm_unit_N()
 
@@ -974,9 +990,10 @@ hal.executable private @gemm_unit_M_unit_N {
 //      CHECK: hal.executable private @gemm_unit_M_unit_N
 //      CHECK: hal.executable.entry_point public @gemm_unit_M_unit_N
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:  (%[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index)
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //      CHECK:   hal.return %[[C1]], %[[C1]], %[[C1]] : index, index, index
 //      CHECK: func @gemm_unit_M_unit_N()
@@ -1032,12 +1049,13 @@ hal.executable private @generic_unit_dims {
 //      CHECK: hal.executable private @generic_unit_dims
 //      CHECK: hal.executable.entry_point public @generic_unit_dims
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:  (%[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index)
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
-//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
-//  CHECK-DAG:   %[[D2:.+]] = affine.apply #[[MAP0]]()[%[[ARG2]]]
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
+//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
+//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_Y]]]
+//  CHECK-DAG:   %[[D2:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_Z]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[D2]] : index, index, index
 //      CHECK: func @generic_unit_dims()
 
@@ -1090,9 +1108,10 @@ hal.executable private @reduce_to_scalar {
 //      CHECK: hal.executable private @reduce_to_scalar
 //      CHECK: hal.executable.entry_point public @reduce_to_scalar
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:  (%[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index)
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
 //      CHECK:   %[[C1:.+]] = arith.constant 1 : index
 //      CHECK:   hal.return %[[C1]], %[[C1]], %[[C1]] : index, index, index
 //      CHECK: func @reduce_to_scalar()
@@ -1143,9 +1162,10 @@ hal.executable private @scalar {
 //      CHECK: hal.executable private @scalar
 //      CHECK: hal.executable.entry_point public @scalar
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:  (%[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index)
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
 //      CHECK:   %[[C1:.+]] = arith.constant 1 : index
 //      CHECK:   hal.return %[[C1]], %[[C1]], %[[C1]] : index, index, index
 //      CHECK: func @scalar()
@@ -1202,11 +1222,12 @@ hal.executable private @matmul_interchange {
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, workload_per_wg = [64, 32]>
 //      CHECK: hal.executable.entry_point public @matmul_interchange
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-// CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]: index)
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Y:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
 //  CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:    %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
-//  CHECK-DAG:    %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[ARG1]]]
+//  CHECK-DAG:    %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
+//  CHECK-DAG:    %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[WORKLOAD_Y]]]
 //      CHECK:    hal.return %[[D1]], %[[D0]], %[[C1]] : index, index, index
 //      CHECK: func @matmul_interchange()
