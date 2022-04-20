@@ -340,7 +340,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
       return true;
     };
 
-    target.addIllegalDialect<chlo::HloClientDialect>();
+    target.addIllegalDialect<chlo::ChloDialect>();
     target.addIllegalDialect<mhlo::MhloDialect>();
 
     // Functions must have legal types.
