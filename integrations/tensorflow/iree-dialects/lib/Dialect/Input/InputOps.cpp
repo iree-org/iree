@@ -117,5 +117,74 @@ void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   build(builder, result, name, isMutable, type, llvm::None, attrs);
 }
 
+// Returns true if the given |accessType| is compatible with the |globalType|.
+// For example, this will return true if the global type is a tensor<?xf32>
+// and the access is tensor<4xf32>.
+static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
+  // If one is a shaped type, then they both must be and have compatible
+  // shapes.
+  if (globalType.isa<ShapedType>() && accessType.isa<ShapedType>()) {
+    return succeeded(mlir::verifyCompatibleShape(globalType, accessType)) &&
+           globalType.cast<ShapedType>().getElementType() ==
+               accessType.cast<ShapedType>().getElementType();
+  }
+
+  // Permissively allow any other types to be marked compatible as long as
+  // neither are shaped type.
+  return !globalType.isa<ShapedType>() && !accessType.isa<ShapedType>();
+}
+
+LogicalResult
+GlobalLoadOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+  auto globalOp =
+      symbolTable.lookupNearestSymbolFrom<GlobalOp>(*this, globalAttr());
+  if (!globalOp) {
+    return emitOpError() << "undefined global: " << global();
+  }
+  auto loadType = getResult().getType();
+  if (!isGlobalTypeCompatible(globalOp.type(), loadType)) {
+    return emitOpError() << "global type mismatch; global " << global()
+                         << " is " << globalOp.type() << " but load is "
+                         << loadType;
+  }
+  return success();
+}
+
+LogicalResult GlobalLoadIndirectOp::verify() {
+  auto globalType = global().getType().cast<PtrType>().getTargetType();
+  auto loadType = getResult().getType();
+  if (!isGlobalTypeCompatible(globalType, loadType)) {
+    return emitOpError() << "global type mismatch; global pointer is "
+                         << globalType << " but load is " << loadType;
+  }
+  return success();
+}
+
+LogicalResult
+GlobalStoreOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+  auto globalOp =
+      symbolTable.lookupNearestSymbolFrom<GlobalOp>(*this, globalAttr());
+  if (!globalOp) {
+    return emitOpError() << "undefined global: " << global();
+  }
+  auto storeType = value().getType();
+  if (!isGlobalTypeCompatible(globalOp.type(), storeType)) {
+    return emitOpError() << "global type mismatch; global " << global()
+                         << " is " << globalOp.type() << " but store is "
+                         << storeType;
+  }
+  return success();
+}
+
+LogicalResult GlobalStoreIndirectOp::verify() {
+  auto globalType = global().getType().cast<PtrType>().getTargetType();
+  auto storeType = value().getType();
+  if (!isGlobalTypeCompatible(globalType, storeType)) {
+    return emitOpError() << "global type mismatch; global pointer is "
+                         << globalType << " but store is " << storeType;
+  }
+  return success();
+}
+
 #define GET_OP_CLASSES
 #include "iree-dialects/Dialect/Input/InputOps.cpp.inc"

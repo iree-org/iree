@@ -51,7 +51,8 @@ private:
 
     if (localSource.asmBlob) {
       // Parse from inline asm.
-      auto owningOp = parseSourceString(*localSource.asmBlob, context);
+      auto owningOp =
+          parseSourceString<ModuleOp>(*localSource.asmBlob, context);
       if (!owningOp)
         return failure();
       rtlModule = std::make_shared<mlir::OwningOpRef<mlir::ModuleOp>>(

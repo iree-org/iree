@@ -6,6 +6,7 @@
 
 #include "iree-dialects/Dialect/PyDM/Utils/TypeInference.h"
 
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/TypeRange.h"
 
@@ -101,9 +102,9 @@ PermutedTypePropagator::findMismatchedBlockPredecessors(Block *block) {
         break;
       successorIndex += 1;
     }
-    auto successorOperands = branchOp.getSuccessorOperands(successorIndex);
-    assert(successorOperands && "expected branch with explicit operands");
-    TypeRange operandTypes(*successorOperands);
+    auto successorOperands =
+        branchOp.getSuccessorOperands(successorIndex).getForwardedOperands();
+    TypeRange operandTypes(successorOperands);
     if (block->getArgumentTypes() != operandTypes) {
       results.push_back(BlockPredecessor{
           branchOp, successorIndex,
