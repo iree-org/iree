@@ -22,7 +22,7 @@ set -eu -o errtrace
 
 this_dir="$(cd $(dirname $0) && pwd)"
 repo_root="$(cd $this_dir/../../ && pwd)"
-python_versions="${python_versions:3.9 3.10}"
+python_versions="${override_python_versions:-3.9 3.10}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 packages="${packages:-iree-runtime iree-runtime-instrumented iree-compiler}"
 
@@ -33,6 +33,10 @@ export CMAKE_OSX_ARCHITECTURES="arm64;x86_64"
 
 # cpuinfo is incompatible with universal builds.
 export IREE_ENABLE_CPUINFO=OFF
+
+# Canonicalize paths.
+mkdir -p "$output_dir"
+output_dir="$(cd $output_dir && pwd)"
 
 function run() {
   echo "Using python versions: ${python_versions}"
@@ -70,6 +74,10 @@ function run() {
       esac
     done
   done
+
+  echo "******************** BUILD COMPLETE ********************"
+  echo "Generated binaries:"
+  ls -l $output_dir
 }
 
 function build_iree_runtime() {
@@ -93,7 +101,7 @@ function clean_wheels() {
   local wheel_basename="$1"
   local python_version="$2"
   echo ":::: Clean wheels $wheel_basename $python_version"
-  rm -f /wheelhouse/${wheel_basename}-*-${python_version}-*.whl
+  rm -f -v /wheelhouse/${wheel_basename}-*-${python_version}-*.whl
 }
 
 run

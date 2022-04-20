@@ -32,55 +32,34 @@ jobs:
       matrix:
         include:
           # Ubuntu packages.
-          - os: ubuntu-18.04
+          - os: ubuntu-20.04
+            build_family: linux
             build_package: main-dist-linux
             experimental: false
-          - os: ubuntu-18.04
+          - os: ubuntu-20.04
+            build_family: linux
             build_package: py-compiler-pkg
             experimental: false
-          - os: ubuntu-18.04
+          - os: ubuntu-20.04
+            build_family: linux
             build_package: py-runtime-pkg
             experimental: false
-          - os: ubuntu-18.04
-            build_package: instrumented-py-runtime-pkg
-            experimental: true
-          - os: ubuntu-18.04
+          - os: ubuntu-20.04
+            build_family: linux
             build_package: py-tf-compiler-tools-pkg
             experimental: false
 
-          # Windows packages.
-          - os: windows-2019
-            build_package: py-compiler-pkg
-            experimental: true
-          - os: windows-2019
-            build_package: py-runtime-pkg
-            experimental: true
-
           # Macos packages.
           - os: macos-latest
+            build_family: macos
             build_package: py-compiler-pkg
             experimental: true
           - os: macos-latest
+            build_family: macos
             build_package: py-runtime-pkg
             experimental: true
     env:
-      CIBW_BUILD_VERBOSITY: 1
-
-      # Note that on Linux, we run under docker with an altered path.
-      # Note that on Windows, we need to configure the compiler api project to
-      # but its CMake build directory on a short path to avoid path overflow.
-      CIBW_ENVIRONMENT_LINUX: "REPO_DIR=/project/main_checkout BINDIST_DIR=/output CMAKE_GENERATOR=Ninja IREE_TARGET_BACKEND_CUDA=ON IREE_HAL_DRIVER_CUDA=ON"
-      CIBW_ENVIRONMENT_MACOS: "REPO_DIR=${{ github.workspace }}/main_checkout CMAKE_GENERATOR=Ninja"
-      CIBW_ENVIRONMENT_WINDOWS: "REPO_DIR='${{ github.workspace }}\\main_checkout' CMAKE_GENERATOR=Ninja IREE_COMPILER_API_CMAKE_BUILD_DIR=D:/b"
-
-      # Needs the bazel manylinux image.
-      # TODO: Move this to our repo and pin.
-      # TODO: update to Bazel 5.1.0
-      CIBW_MANYLINUX_X86_64_IMAGE: stellaraccident/manylinux2014_x86_64-bazel-5.1.0:latest
-      # CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
-
-      CIBW_BUILD: "cp37-* cp38-* cp39-* cp310-*"
-      CIBW_SKIP: "*-win32 *-manylinux_i686"
+      MANYLINUX_X86_64_IMAGE: stellaraccident/manylinux2014_x86_64-bazel-5.1.0:latest
 
     steps:
       - uses: actions/checkout@v2
@@ -88,35 +67,21 @@ jobs:
           path: 'main_checkout'
           submodules: true
 
-      # Make sure we have a system python before setting up the dev path.
-      - uses: actions/setup-python@v2
-        name: Install Python
-        with:
-          python-version: '3.8'
-
-      # It is 2021. And the Windows Path is still a mess.
-      - name: Set up visual studio environment
-        if: "contains(matrix.os, 'windows')"
-        shell: powershell
-        run: |
-          ${{ github.workspace }}\main_checkout\build_tools\github_actions\configure_dev_environment.ps1 -bashExePath C:\msys64\usr\bin\bash.exe
-      - name: Report windows environment
-        if: "contains(matrix.os, 'windows')"
+      ##########################################################################
+      # OS specific setup
+      ##########################################################################
+      - name: Install MacOS Deps
+        if: "matrix.build_family == 'macos'"
         shell: bash
         run: |
-          # Should display either an msys mount table or an "install from the windows store" banner
-          echo "--- System path:"
-          echo "$PATH"
-          echo "--- Result of asking bash to run 'mount' (should show msys mounts):"
-          mount
+          sudo ./main_checkout/build_tools/python_deploy/install_macos_deps.sh
 
-      - name: Install cibuildwheel
-        shell: bash
-        run: |
-          python -m pip install cibuildwheel==1.7.2
 
+      ##########################################################################
+      # Write version_info.json
+      # Various tools will read this in order to embed release information.
+      ##########################################################################
       - name: Write version info (release)
-        if: "!startsWith(matrix.build_package, 'instrumented-')"
         shell: bash
         run: |
           cat << EOF > ./main_checkout/version_info.json
@@ -128,19 +93,8 @@ jobs:
           EOF
           cat ./main_checkout/version_info.json
 
-      - name: Write version info (instrumented)
-        if: "startsWith(matrix.build_package, 'instrumented-')"
-        shell: bash
-        run: |
-          cat << EOF > ./main_checkout/version_info.json
-          {
-            "package-suffix": "-instrumented${{ github.event.inputs.package_suffix }}",
-            "package-version": "${{ github.event.inputs.package_version }}",
-            "iree-revision": "$(cd ./main_checkout && git rev-parse HEAD)"
-          }
-          EOF
-          cat ./main_checkout/version_info.json
-
+      ##########################################################################
+      # Build the main distribution tarball.
       # The main distribution consists of the project being built, installed
       # and archived. We have to split it per operating system, and Linux
       # is special because we build under a manylinux container which gives
@@ -150,62 +104,79 @@ jobs:
       # python versions under /opt/python (need to add one to the path). It
       # is not enough to just invoke it directly because then pip managed
       # console scripts (like cmake, ninja) will not be on the path.
+      ##########################################################################
       - name: Main distribution (Linux)
         if: "matrix.build_package == 'main-dist-linux'"
         shell: bash
         run: |
           docker run --rm -w=/work \
             -v $PWD:/work \
-            "${CIBW_MANYLINUX_X86_64_IMAGE}" \
+            "${MANYLINUX_X86_64_IMAGE}" \
             bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./main_checkout/build_tools/github_actions/build_dist.py main-dist'
 
-      # Runtime wheels are version specific, so we build one for each python
-      # version. We do this serially by deleting the CMakeCache and install
-      # directory between runs. Most of the build will be incremental.
-      # We save a lot of time by disabling the compiler build.
-      - name: Build runtime wheels
-        if: "matrix.build_package == 'py-runtime-pkg'"
+      ##########################################################################
+      # py-runtime-pkg
+      # Builds the iree-runtime and iree-runtime-instrumented wheels.
+      # One step per OS.
+      ##########################################################################
+
+      - name: Build runtime wheels (Linux)
+        if: "matrix.build_package == 'py-runtime-pkg' && matrix.build_family == 'linux'"
         shell: bash
         run: |
-          export CIBW_BEFORE_BUILD="python -m pip install --upgrade pip>=21.3"
-          python -m cibuildwheel --output-dir bindist ./runtime/
+          packages="iree-runtime iree-runtime-instrumented" \
+          output_dir="$PWD/bindist" \
+          ./main_checkout/build_tools/python_deploy/build_linux_packages.sh
 
-      - name: Build runtime wheels (instrumented)
-        if: "matrix.build_package == 'instrumented-py-runtime-pkg'"
+      - name: Build runtime wheels (MacOS)
+        if: "matrix.build_package == 'py-runtime-pkg' && matrix.build_family == 'macos'"
         shell: bash
         run: |
-          export CIBW_BEFORE_ALL_LINUX="./main_checkout/build_tools/github_actions/install_tracy_cli_deps_manylinux2014.sh"
-          export CIBW_BEFORE_BUILD="python -m pip install --upgrade pip>=21.3"
-          # I really dislike how cibuildwheel and GitHub actions make tunneling
-          # environment variables so obtuse. Burn this all with fire.
-          export CIBW_ENVIRONMENT_LINUX="$CIBW_ENVIRONMENT_LINUX IREE_BUILD_TRACY=ON IREE_ENABLE_RUNTIME_TRACING=ON"
-          export CIBW_ENVIRONMENT_MACOS="$CIBW_ENVIRONMENT_LINUX IREE_BUILD_TRACY=ON IREE_ENABLE_RUNTIME_TRACING=ON"
-          export CIBW_ENVIRONMENT_WINDOWS="$CIBW_ENVIRONMENT_LINUX IREE_BUILD_TRACY=ON IREE_ENABLE_RUNTIME_TRACING=ON"
-          python -m cibuildwheel --output-dir bindist ./runtime/
+          packages="iree-runtime iree-runtime-instrumented" \
+          output_dir="$PWD/bindist" \
+          ./main_checkout/build_tools/python_deploy/build_macos_packages.sh
 
-      # Experimental iree.compiler package.
-      - name: Build compiler wheels
-        if: "matrix.build_package == 'py-compiler-pkg'"
+      ##########################################################################
+      # py-compiler-pkg
+      # Builds the iree-compielr wheel.
+      # One step per OS.
+      ##########################################################################
+      - name: Build compiler wheels (Linux)
+        if: "matrix.build_package == 'py-compiler-pkg' && matrix.build_family == 'linux'"
         shell: bash
         run: |
-          # In pip 21.3, in-tree builds became the default and only way to
-          # build. We require that and make sure to be past that threshold.
-          export CIBW_BEFORE_BUILD="python -m pip install --upgrade pip>=21.3"
-          python -m cibuildwheel --output-dir bindist ./main_checkout/iree/compiler
+          packages="iree-compiler" \
+          output_dir="$PWD/bindist" \
+          ./main_checkout/build_tools/python_deploy/build_linux_packages.sh
 
+      - name: Build compiler wheels (MacOS)
+        if: "matrix.build_package == 'py-compiler-pkg' && matrix.build_family == 'macos'"
+        shell: bash
+        run: |
+          packages="iree-compiler" \
+          output_dir="$PWD/bindist" \
+          ./main_checkout/build_tools/python_deploy/build_macos_packages.sh
+
+      ##########################################################################
+      # TF Compiler Tools
       # Compiler tools wheels are not python version specific, so just build
       # for one examplar python version.
+      # TODO: This currently only builds on Linux and is hardcoded to do so.
+      ##########################################################################
+
       - name: Build TF Compiler Tools wheels
         if: "matrix.build_package == 'py-tf-compiler-tools-pkg'"
         shell: bash
         run: |
           docker run --rm -w=/work \
             -v $PWD:/work \
-            "${CIBW_MANYLINUX_X86_64_IMAGE}" \
+            "${MANYLINUX_X86_64_IMAGE}" \
             bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./main_checkout/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
 
       - uses: actions/upload-artifact@v2
         with:
+          # We upload all wheels (which includes deps so that subsequent
+          # steps can run without further fetching).
           path: ./bindist/*
           retention-days: 5
 
@@ -218,12 +189,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
           release_id: ${{ github.event.inputs.release_id }}
-          assets_path: ./bindist/*
+          # Only upload iree wheels.
+          assets_path: ./bindist/iree*.whl
 
   validate_and_publish:
     name: "Invoke workflow to validate and publish release"
     needs: build_core
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: "Invoke workflow :: Validate and Publish Release"
         uses: benc-uk/workflow-dispatch@v1

@@ -16,7 +16,7 @@
 #   ./build_tools/python_deploy/build_linux_packages.sh
 #
 # Build specific Python versions and packages to custom directory:
-#   python_versions="cp38-cp38 cp39-cp39" \
+#   override_python_versions="cp38-cp38 cp39-cp39" \
 #   packages="iree-runtime iree-runtime-instrumented" \
 #   output_dir="/tmp/wheelhouse" \
 #   ./build_tools/python_deploy/build_linux_packages.sh
@@ -44,13 +44,17 @@ script_name="$(basename $0)"
 repo_root="$(cd $this_dir/../../ && pwd)"
 script_name="$(basename $0)"
 manylinux_docker_image="${manylinux_docker_image:-stellaraccident/manylinux2014_x86_64-bazel-5.1.0:latest}"
-python_versions="${python_versions:-cp37-cp37m cp38-cp38 cp39-cp39 cp310-cp310}"
+python_versions="${override_python_versions:-cp37-cp37m cp38-cp38 cp39-cp39 cp310-cp310}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 packages="${packages:-iree-runtime iree-runtime-instrumented iree-compiler}"
 
 function run_on_host() {
   echo "Running on host"
   echo "Launching docker image ${manylinux_docker_image}"
+
+  # Canonicalize paths.
+  mkdir -p "$output_dir"
+  output_dir="$(cd $output_dir && pwd)"
   echo "Outputting to ${output_dir}"
   mkdir -p "${output_dir}"
   docker run --rm \
@@ -61,6 +65,10 @@ function run_on_host() {
     -e "packages=${packages}" \
     ${manylinux_docker_image} \
     -- bash /main_checkout/iree/build_tools/python_deploy/build_linux_packages.sh
+
+  echo "******************** BUILD COMPLETE ********************"
+  echo "Generated binaries:"
+  ls -l $output_dir
 }
 
 function run_in_docker() {
@@ -136,14 +144,14 @@ function run_audit_wheel() {
   generic_wheel="/wheelhouse/${wheel_basename}-*-${python_version}-linux_x86_64.whl"
   echo ":::: Auditwheel $generic_wheel"
   auditwheel repair -w /wheelhouse $generic_wheel
-  rm $generic_wheel
+  rm -v $generic_wheel
 }
 
 function clean_wheels() {
   local wheel_basename="$1"
   local python_version="$2"
   echo ":::: Clean wheels $wheel_basename $python_version"
-  rm -f /wheelhouse/${wheel_basename}-*-${python_version}-*.whl
+  rm -f -v /wheelhouse/${wheel_basename}-*-${python_version}-*.whl
 }
 
 # Trampoline to the docker container if running on the host.
