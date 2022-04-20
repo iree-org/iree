@@ -32,10 +32,7 @@ static const char* emoji(bool good) { return good ? "🦄" : "🐞"; }
  *
  * Part 1:
  *
- * Generic helper functions to deal with buffer_view's, etc.
- *
- * Nothing here specific to matrix multiplications, though some things already
- * are specific to matrices i.e. 2D shapes.
+ * Generic helper functions to deal with buffer_view's.
  *
  *****************************************************************************/
 
