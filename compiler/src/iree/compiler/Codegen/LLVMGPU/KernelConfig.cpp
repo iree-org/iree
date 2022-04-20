@@ -50,10 +50,14 @@ static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
 /// Return the best combination of tile size and wg size when using tensorcore
 /// operations.
 static void getTensorCoreConfig(
-    SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
+    SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, bool isFp16) {
   // Tile sizes are skewed towards small matmul for now. Long term the plan is
   // to not rely on hardcoded configurations.
-  tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}}));
+  if (isFp16) {
+    tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 32}, {64, 2, 1}}));
+  } else {
+    tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}}));
+  }
 }
 
 static std::string getTargetArch(func::FuncOp entryPoint) {
@@ -179,7 +183,13 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
     /// Try tensorcore config first.
     if (supportsTensorCore(entryPoint, op)) {
       SmallVector<TileWorkgroupSizePair> TCtileSizeConfig;
-      getTensorCoreConfig(TCtileSizeConfig);
+
+      getTensorCoreConfig(TCtileSizeConfig, op.getInputOperand(0)
+                                                ->get()
+                                                .getType()
+                                                .cast<RankedTensorType>()
+                                                .getElementType()
+                                                .isF16());
       // Pick the best configuration where the original shape is aligned on the
       // tile size.
       for (TileWorkgroupSizePair &config : TCtileSizeConfig) {
