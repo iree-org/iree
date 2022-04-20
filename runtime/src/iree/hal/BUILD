@@ -18,7 +18,7 @@ package(
 # Public API
 #===------------------------------------------------------------------------===#
 
-cc_library(
+iree_runtime_cc_library(
     name = "hal",
     srcs = [
         "allocator.c",
@@ -74,7 +74,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "string_util_test",
     srcs = ["string_util_test.cc"],
     deps = [

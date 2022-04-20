@@ -12,7 +12,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "building",
     hdrs = ["building.h"],
     deps = [
@@ -22,7 +22,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "debugging",
     hdrs = ["debugging.h"],
     deps = [
@@ -31,7 +31,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "parsing",
     hdrs = ["parsing.h"],
     deps = [

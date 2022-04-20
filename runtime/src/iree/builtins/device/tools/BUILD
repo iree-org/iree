@@ -23,7 +23,7 @@ cc_binary_benchmark(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "libdevice_test",
     srcs = ["libdevice_test.cc"],
     deps = [

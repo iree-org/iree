@@ -57,3 +57,15 @@ def iree_runtime_cc_library(deps = [], **kwargs):
         "//runtime/src:runtime_defines",
       ],
     )
+
+def iree_runtime_cc_test(deps = [], **kwargs):
+    """Used for cc_test targets within the //runtime tree.
+
+    This is a pass-through to the native cc_test which adds specific
+    runtime specific options and deps.
+    """
+    native.cc_test(
+      deps=deps + [
+        "//runtime/src:runtime_defines",
+      ],
+    )

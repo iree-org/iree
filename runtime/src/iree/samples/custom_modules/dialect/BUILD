@@ -27,7 +27,7 @@ td_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "dialect",
     srcs = [
         "conversion_patterns.cc",
@@ -81,7 +81,7 @@ c_embed_data(
     identifier = "iree_custom_imports",
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "init_dialect",
     hdrs = ["init_dialect.h"],
     deps = [

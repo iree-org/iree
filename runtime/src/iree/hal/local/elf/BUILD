@@ -16,7 +16,7 @@ package(
 # Runtime ELF module loader/linker
 #===------------------------------------------------------------------------===#
 
-cc_library(
+iree_runtime_cc_library(
     name = "elf_module",
     srcs = [
         "elf_module.c",
@@ -56,7 +56,7 @@ native_test(
 # Architecture and platform support
 #===------------------------------------------------------------------------===#
 
-cc_library(
+iree_runtime_cc_library(
     name = "arch",
     srcs = [
         "arch/arm_32.c",
@@ -76,7 +76,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "platform",
     srcs = [
         "platform/apple.c",

@@ -14,7 +14,7 @@ package(
 # Public API
 #===------------------------------------------------------------------------===#
 
-cc_library(
+iree_runtime_cc_library(
     name = "runtime",
     hdrs = [
         "api.h",
@@ -29,7 +29,7 @@ cc_library(
 # Implementation
 #===------------------------------------------------------------------------===#
 
-cc_library(
+iree_runtime_cc_library(
     name = "impl",
     srcs = [
         "call.c",

@@ -10,7 +10,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "check",
     testonly = True,
     srcs = ["module.cc"],
@@ -27,7 +27,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "check_test",
     srcs = ["check_test.cc"],
     deps = [

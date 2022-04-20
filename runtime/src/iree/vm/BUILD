@@ -19,7 +19,7 @@ package(
 # Public API
 #===------------------------------------------------------------------------===#
 
-cc_library(
+iree_runtime_cc_library(
     name = "vm",
     hdrs = [
         "api.h",
@@ -31,7 +31,7 @@ cc_library(
 )
 
 # TODO(benvanik): make these srcs and only expose an api_cc.h.
-cc_library(
+iree_runtime_cc_library(
     name = "cc",
     hdrs = [
         "native_module_cc.h",
@@ -51,7 +51,7 @@ cc_library(
 # Implementation
 #===------------------------------------------------------------------------===#
 
-cc_library(
+iree_runtime_cc_library(
     name = "impl",
     srcs = [
         "buffer.c",
@@ -89,7 +89,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "buffer_test",
     srcs = ["buffer_test.cc"],
     deps = [
@@ -101,7 +101,7 @@ cc_test(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "list_test",
     srcs = ["list_test.cc"],
     deps = [
@@ -113,7 +113,7 @@ cc_test(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "native_module_test",
     srcs = ["native_module_test.cc"],
     deps = [
@@ -127,7 +127,7 @@ cc_test(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "native_module_test_hdrs",
     hdrs = [
         "native_module_test.h",
@@ -151,7 +151,7 @@ cc_binary_benchmark(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "ref_test",
     srcs = ["ref_test.cc"],
     deps = [
@@ -163,7 +163,7 @@ cc_test(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "stack_test",
     srcs = ["stack_test.cc"],
     deps = [
@@ -178,7 +178,7 @@ cc_test(
 # Bytecode interpreter module
 #===------------------------------------------------------------------------===#
 
-cc_library(
+iree_runtime_cc_library(
     name = "bytecode_module",
     srcs = [
         "bytecode_disasm.c",
@@ -230,7 +230,7 @@ if(${IREE_BUILD_COMPILER})
     inline = True,
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "bytecode_module_test",
     srcs = [
         "bytecode_dispatch_test.cc",
@@ -306,7 +306,7 @@ endif()
 # Common VM op implementations
 #===------------------------------------------------------------------------===#
 
-cc_library(
+iree_runtime_cc_library(
     name = "ops",
     hdrs = [
         "ops.h",
@@ -316,14 +316,14 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "ops_emitc",
     hdrs = [
         "ops_emitc.h",
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "shims_emitc",
     hdrs = [
         "shims_emitc.h",

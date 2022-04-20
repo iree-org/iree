@@ -29,7 +29,7 @@ endif()
     inline = True,
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "api",
     srcs = ["api.c"],
     hdrs = ["api.h"],
@@ -40,7 +40,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "task",
     srcs = [
         "executor.c",
@@ -90,7 +90,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "executor_demo",
     srcs = ["executor_demo.cc"],
     deps = [
@@ -102,7 +102,7 @@ cc_test(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "executor_test",
     srcs = ["executor_test.cc"],
     deps = [
@@ -114,7 +114,7 @@ cc_test(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "list_test",
     srcs = ["list_test.cc"],
     deps = [
@@ -126,7 +126,7 @@ cc_test(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "pool_test",
     srcs = ["pool_test.cc"],
     deps = [
@@ -138,7 +138,7 @@ cc_test(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "queue_test",
     srcs = ["queue_test.cc"],
     deps = [
@@ -150,7 +150,7 @@ cc_test(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "scope_test",
     srcs = [
         "scope_test.cc",
@@ -165,7 +165,7 @@ cc_test(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "task_tests",
     srcs = [
         "task_test_barrier.cc",
@@ -184,7 +184,7 @@ cc_test(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "topology_test",
     srcs = ["topology_test.cc"],
     tags = [

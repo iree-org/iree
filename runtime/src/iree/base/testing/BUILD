@@ -28,7 +28,7 @@ c_embed_data(
     h_file_output = "dynamic_library_test_library_embed.h",
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "dynamic_library_test",
     srcs = ["dynamic_library_test.cc"],
     deps = [

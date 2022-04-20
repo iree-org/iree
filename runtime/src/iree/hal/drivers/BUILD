@@ -42,7 +42,7 @@ string_list_flag(
     for driver in ALL_DRIVERS
 ]
 
-cc_library(
+iree_runtime_cc_library(
     name = "drivers",
     srcs = ["init.c"],
     hdrs = ["init.h"],

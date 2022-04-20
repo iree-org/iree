@@ -12,7 +12,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "buffer_transfer",
     srcs = ["buffer_transfer.c"],
     hdrs = ["buffer_transfer.h"],
@@ -24,7 +24,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "deferred_command_buffer",
     srcs = ["deferred_command_buffer.c"],
     hdrs = ["deferred_command_buffer.h"],
@@ -38,7 +38,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "resource_set",
     srcs = ["resource_set.c"],
     hdrs = ["resource_set.h"],
@@ -63,7 +63,7 @@ cc_binary_benchmark(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "resource_set_test",
     srcs = ["resource_set_test.cc"],
     deps = [

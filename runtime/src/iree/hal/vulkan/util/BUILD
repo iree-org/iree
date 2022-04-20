@@ -10,7 +10,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "arena",
     srcs = ["arena.cc"],
     hdrs = ["arena.h"],
@@ -20,7 +20,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "arena_test",
     srcs = ["arena_test.cc"],
     deps = [
@@ -30,7 +30,7 @@ cc_test(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "intrusive_list",
     hdrs = [
         "intrusive_list.h",
@@ -41,7 +41,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "intrusive_list_test",
     srcs = [
         "intrusive_list_test.cc",
@@ -54,7 +54,7 @@ cc_test(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "ref_ptr",
     hdrs = ["ref_ptr.h"],
     deps = [
@@ -64,7 +64,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "ref_ptr_test",
     size = "small",
     srcs = ["ref_ptr_test.cc"],

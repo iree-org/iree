@@ -10,7 +10,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "device",
     srcs = [
         "device_generic.c",

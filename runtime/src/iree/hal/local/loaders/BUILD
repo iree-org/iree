@@ -15,7 +15,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "embedded_library_loader",
     srcs = ["embedded_library_loader.c"],
     hdrs = ["embedded_library_loader.h"],
@@ -33,7 +33,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "static_library_loader",
     srcs = ["static_library_loader.c"],
     hdrs = ["static_library_loader.h"],
@@ -50,7 +50,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "system_library_loader",
     srcs = ["system_library_loader.c"],
     hdrs = ["system_library_loader.h"],
@@ -75,7 +75,7 @@ if(${IREE_HAL_DRIVER_VMVX} OR ${IREE_HAL_DRIVER_VMVX_SYNC})
     inline = True,
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "vmvx_module_loader",
     srcs = ["vmvx_module_loader.c"],
     hdrs = ["vmvx_module_loader.h"],

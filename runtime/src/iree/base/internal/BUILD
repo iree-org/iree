@@ -24,7 +24,7 @@ package(
 # Put files here that large percentages of the code include only; adding
 # infrequently used files here will cause extraneous large rebuilds.
 
-cc_library(
+iree_runtime_cc_library(
     name = "internal",
     srcs = [
         "atomics_clang.h",
@@ -43,7 +43,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "atomics_test",
     srcs = ["atomics_test.cc"],
     deps = [
@@ -54,7 +54,7 @@ cc_test(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "math_test",
     srcs = ["math_test.cc"],
     deps = [
@@ -68,7 +68,7 @@ cc_test(
 # Utilities
 #===------------------------------------------------------------------------===#
 
-cc_library(
+iree_runtime_cc_library(
     name = "arena",
     srcs = ["arena.c"],
     hdrs = ["arena.h"],
@@ -81,7 +81,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "atomic_slist",
     srcs = ["atomic_slist.c"],
     hdrs = ["atomic_slist.h"],
@@ -92,7 +92,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "atomic_slist_test",
     srcs = ["atomic_slist_test.cc"],
     deps = [
@@ -102,7 +102,7 @@ cc_test(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "cpu",
     srcs = ["cpu.c"],
     hdrs = ["cpu.h"],
@@ -112,7 +112,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "dynamic_library",
     srcs = [
         "dynamic_library_posix.c",
@@ -130,7 +130,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "file_io",
     srcs = ["file_io.c"],
     hdrs = ["file_io.h"],
@@ -141,7 +141,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "file_io_test",
     srcs = ["file_io_test.cc"],
     deps = [
@@ -154,7 +154,7 @@ cc_test(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "file_path",
     srcs = ["file_path.c"],
     hdrs = ["file_path.h"],
@@ -164,7 +164,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "file_path_test",
     srcs = [
         "file_path_test.cc",
@@ -177,7 +177,7 @@ cc_test(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "flags",
     srcs = ["flags.c"],
     hdrs = ["flags.h"],
@@ -208,7 +208,7 @@ iree_lit_test_suite(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "fpu_state",
     srcs = ["fpu_state.c"],
     hdrs = ["fpu_state.h"],
@@ -230,7 +230,7 @@ cc_binary_benchmark(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "fpu_state_test",
     srcs = ["fpu_state_test.cc"],
     deps = [
@@ -240,7 +240,7 @@ cc_test(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "main",
     srcs = [
         "main_posix.c",
@@ -252,7 +252,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "prng",
     hdrs = ["prng.h"],
     deps = [
@@ -261,7 +261,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "prng_test",
     srcs = ["prng_test.cc"],
     deps = [
@@ -271,12 +271,12 @@ cc_test(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "span",
     hdrs = ["span.h"],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "synchronization",
     srcs = [
         "synchronization.c",
@@ -305,7 +305,7 @@ cc_binary_benchmark(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "synchronization_test",
     srcs = ["synchronization_test.cc"],
     deps = [
@@ -315,7 +315,7 @@ cc_test(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "wait_handle",
     srcs = [
         "wait_handle.c",
@@ -338,7 +338,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "wait_handle_test",
     srcs = ["wait_handle_test.cc"],
     deps = [
@@ -361,7 +361,7 @@ endif()
     inline = True,
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "event_pool",
     srcs = ["event_pool.c"],
     hdrs = ["event_pool.h"],
@@ -375,7 +375,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "threading",
     srcs = [
         "threading.c",
@@ -396,7 +396,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "threading_test",
     srcs = [
         "threading_impl.h",

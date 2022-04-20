@@ -10,7 +10,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "task_test",
     testonly = 1,
     hdrs = ["task_test.h"],
@@ -20,7 +20,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "test_util",
     testonly = 1,
     hdrs = ["test_util.h"],

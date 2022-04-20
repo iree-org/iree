@@ -16,7 +16,7 @@ package(
 # Public API
 #===------------------------------------------------------------------------===#
 
-cc_library(
+iree_runtime_cc_library(
     name = "base",
     srcs = [
         "allocator.c",
@@ -49,7 +49,7 @@ cc_library(
 )
 
 # TODO(benvanik): make these srcs and only expose an api_cc.h.
-cc_library(
+iree_runtime_cc_library(
     name = "cc",
     srcs = [
         "status_cc.cc",
@@ -64,7 +64,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "bitfield_test",
     srcs = ["bitfield_test.cc"],
     deps = [
@@ -74,7 +74,7 @@ cc_test(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "loop_inline_test",
     srcs = [
         "loop_inline_test.cc",
@@ -88,7 +88,7 @@ cc_test(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "loop_test_hdrs",
     testonly = 1,
     hdrs = [
@@ -102,7 +102,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "status_test",
     srcs = ["status_test.cc"],
     deps = [
@@ -113,7 +113,7 @@ cc_test(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "string_builder_test",
     srcs = ["string_builder_test.cc"],
     deps = [
@@ -123,7 +123,7 @@ cc_test(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "string_view_test",
     srcs = ["string_view_test.cc"],
     deps = [
@@ -137,7 +137,7 @@ cc_test(
 # Core headers (platform detection, compiler compat, etc)
 #===------------------------------------------------------------------------===#
 
-cc_library(
+iree_runtime_cc_library(
     name = "core_headers",
     hdrs = [
         "alignment.h",
@@ -147,7 +147,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "target_platform",
     hdrs = ["target_platform.h"],
 )
@@ -156,7 +156,7 @@ cc_library(
 # Internal IREE C++ wrappers and utilities
 #===------------------------------------------------------------------------===#
 
-cc_library(
+iree_runtime_cc_library(
     name = "logging",
     srcs = ["logging.cc"],
     hdrs = ["logging.h"],
@@ -173,7 +173,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "loop_sync",
     srcs = ["loop_sync.c"],
     hdrs = ["loop_sync.h"],
@@ -185,7 +185,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "loop_sync_test",
     srcs = [
         "loop_sync_test.cc",
@@ -200,7 +200,7 @@ cc_test(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "tracing",
     hdrs = ["tracing.h"],
     deps = [

@@ -12,7 +12,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "benchmark",
     srcs = [
         "benchmark_full.cc",
@@ -27,7 +27,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "benchmark_main",
     testonly = True,
     srcs = ["benchmark_main.c"],
@@ -37,7 +37,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "gtest",
     testonly = True,
     hdrs = [
@@ -50,7 +50,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "gtest_main",
     testonly = True,
     srcs = ["gtest_main.cc"],

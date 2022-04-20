@@ -19,7 +19,7 @@ if(${IREE_HAL_DRIVER_VULKAN})
     inline = True,
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "registration",
     srcs = ["driver_module.cc"],
     hdrs = ["driver_module.h"],

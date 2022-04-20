@@ -22,7 +22,7 @@ endif()
 """,
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "vulkan",
     srcs = [
         "api.cc",
@@ -107,7 +107,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "dynamic_symbols",
     srcs = [
         "dynamic_symbols.cc",
@@ -130,7 +130,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "dynamic_symbols_test",
     srcs = ["dynamic_symbols_test.cc"],
     tags = ["driver=vulkan"],

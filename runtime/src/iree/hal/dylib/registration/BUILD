@@ -19,7 +19,7 @@ if(${IREE_HAL_DRIVER_DYLIB})
     inline = True,
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "registration",
     srcs = ["driver_module.c"],
     hdrs = ["driver_module.h"],
@@ -47,7 +47,7 @@ if(${IREE_HAL_DRIVER_DYLIB_SYNC})
     inline = True,
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "sync",
     srcs = ["driver_module_sync.c"],
     hdrs = ["driver_module_sync.h"],

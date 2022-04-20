@@ -13,7 +13,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "module",
     srcs = ["module.cc"],
     hdrs = ["module.h"],
@@ -47,7 +47,7 @@ iree_bytecode_module(
     translate_tool = "//iree/samples/custom_modules/dialect:custom-translate",
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "custom_modules_test",
     srcs = ["custom_modules_test.cc"],
     deps = [

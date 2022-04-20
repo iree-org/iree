@@ -16,7 +16,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "executable_environment",
     srcs = ["executable_environment.c"],
     hdrs = ["executable_environment.h"],
@@ -29,7 +29,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "executable_library",
     hdrs = ["executable_library.h"],
 )
@@ -51,7 +51,7 @@ cc_binary_benchmark(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "executable_library_test",
     srcs = [
         "executable_library_demo.c",
@@ -66,7 +66,7 @@ cc_test(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "local",
     srcs = [
         "executable_loader.c",
@@ -98,7 +98,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "sync_driver",
     srcs = [
         "sync_device.c",
@@ -141,7 +141,7 @@ endif()
     inline = True,
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "task_driver",
     srcs = [
         "task_command_buffer.c",
