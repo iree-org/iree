@@ -1332,50 +1332,56 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
   indices[kDim] = scfFor.getInductionVar();
   auto loopCarryValues = scfFor.getRegionIterArgs();
 
-  // Retrieve the comparison from the region and plug into our loop
+  // Retrieve region as black box comparision function f(x,y). Plug into op.
   auto &srcBlock = region().front();
-  Region &region = scfFor.getRegion();
-  BlockAndValueMapping bvm;
+  BlockAndValueMapping bvmF; // f(x,y)
+  BlockAndValueMapping bvmR; // f(y,x)
   {
+    // Save previous insertion point. Continue within loop body.
     OpBuilder::InsertionGuard guard(b);
-    auto &block = region.front();
-    b.setInsertionPointToEnd(&block);
+    b.setInsertionPointToEnd(&scfFor.getRegion().front());
     for (auto it : llvm::zip(srcBlock.getArguments(),
                              ValueRange{loopCarryValues[0], kValue})) {
-      bvm.map(std::get<0>(it), std::get<1>(it));
+      bvmF.map(std::get<0>(it), std::get<1>(it));
+    }
+    for (auto it : llvm::zip(srcBlock.getArguments(),
+                             ValueRange{kValue, loopCarryValues[0]})) {
+      bvmR.map(std::get<0>(it), std::get<1>(it));
     }
     for (auto &blockOp : srcBlock.without_terminator()) {
-      b.clone(blockOp, bvm);
+      b.clone(blockOp, bvmF);
+      b.clone(blockOp, bvmR);
     }
-  }
-  Value valueCmpRes =
-      bvm.lookupOrDefault(srcBlock.getTerminator()->getOperand(0));
-  OpBuilder::InsertionGuard g(b);
-  b.setInsertionPointToEnd(&region.front());
+    Value forwardCmpRes = bvmF.lookup(srcBlock.getTerminator()->getOperand(0));
+    Value reverseCmpRes = bvmR.lookup(srcBlock.getTerminator()->getOperand(0));
 
-  // Check if the two values are equal, which index came first.
-  Value cmpEqValRes = b.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OEQ,
-                                              loopCarryValues[0], kValue);
-  Value cmpEqIndRes = b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::slt,
-                                              loopCarryValues[1], kIndex);
-  Value combinedCmpEqRes =
-      b.create<arith::AndIOp>(loc, cmpEqValRes, cmpEqIndRes);
-  // True if N > K or N came before K
-  Value indexCmpRes =
-      b.create<arith::OrIOp>(loc, valueCmpRes, combinedCmpEqRes);
-  // Select results for K based on comparisons
-  Value resultKValue =
-      b.create<arith::SelectOp>(loc, valueCmpRes, loopCarryValues[0], kValue);
-  Value resultKIndex =
-      b.create<arith::SelectOp>(loc, indexCmpRes, loopCarryValues[1], kIndex);
-  b.create<memref::StoreOp>(loc, resultKValue, outputValues(), indices);
-  b.create<memref::StoreOp>(loc, resultKIndex, outputIndices(), indices);
-  // Select loop carry, opposite of K results
-  Value resultCarryValue =
-      b.create<arith::SelectOp>(loc, valueCmpRes, kValue, loopCarryValues[0]);
-  Value resultCarryIndex =
-      b.create<arith::SelectOp>(loc, indexCmpRes, kIndex, loopCarryValues[1]);
-  b.create<scf::YieldOp>(loc, ValueRange{resultCarryValue, resultCarryIndex});
+    // Check value equality using strictly weak ordering from the region:
+    //   f(x,y) --> forwardCmpRes
+    //   f(y,x) --> reverseCmpRes
+    //   if forwardCmpRes == reverseCmpRes then select which came first
+    Value cmpEqValRes = b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
+                                                forwardCmpRes, reverseCmpRes);
+    Value cmpEqIndRes = b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::slt,
+                                                loopCarryValues[1], kIndex);
+    Value combinedCmpEqRes =
+        b.create<arith::AndIOp>(loc, cmpEqValRes, cmpEqIndRes);
+    // True if N > K or N came before K
+    Value indexCmpRes =
+        b.create<arith::OrIOp>(loc, forwardCmpRes, combinedCmpEqRes);
+    // Select results for K based on comparisons
+    Value resultKValue = b.create<arith::SelectOp>(loc, forwardCmpRes,
+                                                   loopCarryValues[0], kValue);
+    Value resultKIndex =
+        b.create<arith::SelectOp>(loc, indexCmpRes, loopCarryValues[1], kIndex);
+    b.create<memref::StoreOp>(loc, resultKValue, outputValues(), indices);
+    b.create<memref::StoreOp>(loc, resultKIndex, outputIndices(), indices);
+    // Select loop carry, opposite of K results
+    Value resultCarryValue = b.create<arith::SelectOp>(
+        loc, forwardCmpRes, kValue, loopCarryValues[0]);
+    Value resultCarryIndex =
+        b.create<arith::SelectOp>(loc, indexCmpRes, kIndex, loopCarryValues[1]);
+    b.create<scf::YieldOp>(loc, ValueRange{resultCarryValue, resultCarryIndex});
+  }
   return success();
 }
 

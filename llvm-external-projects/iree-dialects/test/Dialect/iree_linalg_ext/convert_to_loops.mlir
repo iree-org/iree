@@ -662,14 +662,15 @@ func @topk_memref(%input_values: memref<2x10xf32>, %input_indices: memref<2x10xi
 // CHECK:               %[[D3:.+]] = memref.load %[[ARG2]][%[[ARG4]], %[[ARG6]]]
 // CHECK:               %[[D4:.+]] = memref.load %[[ARG3]][%[[ARG4]], %[[ARG6]]]
 // CHECK:               %[[D5:.+]] = arith.cmpf ogt, %[[ARG7]], %[[D3]] : f32
-// CHECK:               %[[D6:.+]] = arith.cmpf oeq, %[[ARG7]], %[[D3]] : f32
-// CHECK:               %[[D7:.+]] = arith.cmpi slt, %[[ARG8]], %[[D4]] : i32
-// CHECK:               %[[D8:.+]] = arith.andi %[[D6]], %[[D7]] : i1
-// CHECK:               %[[D9:.+]] = arith.ori %[[D5]], %[[D8]] : i1
-// CHECK:               %[[D10:.+]] = arith.select %[[D5]], %[[ARG7]], %[[D3]] : f32
-// CHECK:               %[[D11:.+]] = arith.select %[[D9]], %[[ARG8]], %[[D4]] : i32
-// CHECK:               memref.store %[[D10]], %[[ARG2]][%[[ARG4]], %[[ARG6]]]
-// CHECK:               memref.store %[[D11]], %[[ARG3]][%[[ARG4]], %[[ARG6]]]
-// CHECK:               %[[D12:.+]] = arith.select %[[D5]], %[[D3]], %[[ARG7]] : f32
-// CHECK:               %[[D13:.+]] = arith.select %[[D9]], %[[D4]], %[[ARG8]] : i32
-// CHECK:               scf.yield %[[D12]], %[[D13]] : f32, i32
+// CHECK:               %[[D6:.+]] = arith.cmpf ogt, %[[D3]], %[[ARG7]] : f32
+// CHECK:               %[[D7:.+]] = arith.cmpi eq, %[[D5]], %[[D6]] : i1
+// CHECK:               %[[D8:.+]] = arith.cmpi slt, %[[ARG8]], %[[D4]] : i32
+// CHECK:               %[[D9:.+]] = arith.andi %[[D7]], %[[D8]] : i1
+// CHECK:               %[[D10:.+]] = arith.ori %[[D5]], %[[D9]] : i1
+// CHECK:               %[[D11:.+]] = arith.select %[[D5]], %[[ARG7]], %[[D3]] : f32
+// CHECK:               %[[D12:.+]] = arith.select %[[D10]], %[[ARG8]], %[[D4]] : i32
+// CHECK:               memref.store %[[D11]], %[[ARG2]][%[[ARG4]], %[[ARG6]]]
+// CHECK:               memref.store %[[D12]], %[[ARG3]][%[[ARG4]], %[[ARG6]]]
+// CHECK:               %[[D13:.+]] = arith.select %[[D5]], %[[D3]], %[[ARG7]] : f32
+// CHECK:               %[[D14:.+]] = arith.select %[[D10]], %[[D4]], %[[ARG8]] : i32
+// CHECK:               scf.yield %[[D13]], %[[D14]] : f32, i32
