@@ -8,6 +8,7 @@
 
 #if !defined(IREE_WAIT_HANDLE_DISABLED)
 
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstring>
@@ -169,13 +170,13 @@ TEST(Event, BlockingBehavior) {
 
   // Spinup a thread to signal the event.
   // Note that it waits on the main_to_thread event until we get further along.
-  bool did_run_thread = false;
+  std::atomic<bool> did_run_thread{false};
   std::thread thread([&]() {
     // Wait for main thread to signal (below).
     IREE_ASSERT_OK(iree_wait_one(&main_to_thread, IREE_TIME_INFINITE_FUTURE));
 
     // Set something so we know this ran at all.
-    did_run_thread = true;
+    did_run_thread.store(true);
 
     // Notify the caller thread.
     iree_event_set(&thread_to_main);
@@ -184,12 +185,12 @@ TEST(Event, BlockingBehavior) {
   // The thread may take some time to spin up; it must wait for us to allow it
   // to run its body though so we should be fine here.
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  ASSERT_FALSE(did_run_thread);
+  ASSERT_FALSE(did_run_thread.load());
 
   // Allow the thread to continue and wait for it to exit.
   iree_event_set(&main_to_thread);
   IREE_ASSERT_OK(iree_wait_one(&thread_to_main, IREE_TIME_INFINITE_FUTURE));
-  ASSERT_TRUE(did_run_thread);
+  ASSERT_TRUE(did_run_thread.load());
 
   thread.join();
   iree_event_deinitialize(&main_to_thread);
