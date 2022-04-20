@@ -1328,8 +1328,13 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
 
   // Retrieve region as black box comparision function f(x,y). Plug into op.
   auto &srcBlock = region().front();
+<<<<<<< HEAD
   BlockAndValueMapping bvmF;  // f(x,y)
   BlockAndValueMapping bvmR;  // f(y,x)
+=======
+  BlockAndValueMapping bvmF;  // f(x,y)
+  BlockAndValueMapping bvmR;  // f(y,x)
+>>>>>>> 62ffa68dc (works forward and back)
   {
     // Save previous insertion point. Continue within loop body.
     OpBuilder::InsertionGuard guard(b);
