@@ -33,3 +33,14 @@ func.func @tensor.from_elements__within_dispatch_workgroups_not_converted() -> t
   }
   return %0 : tensor<f32>
 }
+
+// -----
+
+func.func @tensor.from_elements_0D(%arg0 : f32) -> tensor<f32> {
+  %0 = tensor.from_elements %arg0 : tensor<f32>
+  return %0 : tensor<f32>
+}
+//      CHECK: func @tensor.from_elements_0D
+// CHECK-SAME:     %[[ARG0:.+]]: f32
+//      CHECK:   %[[SPLAT:.+]] = flow.tensor.splat %[[ARG0]] : tensor<f32>
+//      CHECK:   return %[[SPLAT]]

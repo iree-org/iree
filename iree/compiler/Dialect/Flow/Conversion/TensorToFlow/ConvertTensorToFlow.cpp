@@ -307,13 +307,22 @@ struct ConvertTensorFromElementsPattern
     // TODO: This pattern was mainly added to iron out some kinks specific to
     // detensoring (see: https://github.com/google/iree/issues/1159). Do we need
     // to expand this check for other uses?
-    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>() ||
-        op.getType().getDimSize(0) != 1) {
+    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+      return failure();
+    }
+    auto tensorType = op.getType();
+    if (!tensorType.hasRank()) {
+      return failure();
+    }
+
+    // Check that all the dimensions are 1.
+    if (!llvm::all_of(tensorType.getShape(),
+                      [](int64_t dim) { return dim == 1; })) {
       return failure();
     }
 
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorSplatOp>(
-        op, op.getType(), op.getOperand(0), ValueRange());
+        op, tensorType, op.getOperand(0), ValueRange());
     return success();
   }
 };
