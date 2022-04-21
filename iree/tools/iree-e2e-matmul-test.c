@@ -741,11 +741,9 @@ typedef enum {
   MATRIX_MASK_IDENTITY,  // overwrite with (general rectangular) identity matrix
 } matrix_mask_t;
 
-// Allocates device-local |dst| and initializes it as an identity-matrix shaped
-// like |src|.
-static iree_status_t make_device_identity_matrix_like(
-    iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
-    iree_hal_buffer_view_t* src, iree_hal_buffer_view_t** dst) {
+static iree_status_t make_identity_matrix_callback(
+    iree_hal_buffer_mapping_t* mapping, void* user_data) {
+  iree_hal_buffer_view_t* src = (iree_hal_buffer_view_t*)user_data;
   iree_hal_element_type_t elem_type = iree_hal_buffer_view_element_type(src);
   iree_host_size_t elem_byte_count =
       iree_hal_element_dense_byte_count(elem_type);
@@ -753,20 +751,36 @@ static iree_status_t make_device_identity_matrix_like(
   IREE_RETURN_IF_ERROR(get_matrix_shape(src, dims));
   int rows = dims[0];
   int cols = dims[1];
-  iree_hal_buffer_view_t* host_dst = NULL;
-  IREE_RETURN_IF_ERROR(
-      allocate_host_buffer_view_like(hal_allocator, src, &host_dst));
-  void* host_dst_data = NULL;
-  IREE_CHECK_OK(map_host_local_row_major_data(
-      host_dst, IREE_HAL_MEMORY_ACCESS_WRITE, &host_dst_data));
   // Write 1 to matrix elements on the main diagonal.
   int diagonal_size = iree_min(rows, cols);
+  memset(mapping->contents.data, 0, mapping->contents.data_length);
+  intptr_t diagonal_elem_addr = (intptr_t)mapping->contents.data;
   for (int i = 0; i < diagonal_size; ++i) {
     write_int_element(
-        elem_type, 1,
-        (void*)(((intptr_t)host_dst_data) + elem_byte_count * (i * cols + i)));
+        elem_type, 1, (void*)diagonal_elem_addr);
+    // Due to the row-major storage, the diagonal entries are every
+    // (cols + 1)-th buffer elements.
+    diagonal_elem_addr += elem_byte_count * (cols + 1);
   }
-  return copy_host_buffer_view_to_device(device, hal_allocator, host_dst, dst);
+  return iree_ok_status();
+}
+
+// Allocates device-local |dst| and initializes it as an identity-matrix shaped
+// like |src|.
+static iree_status_t make_device_identity_matrix_like(
+    iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
+    iree_hal_buffer_view_t* src, iree_hal_buffer_view_t** dst) {
+  return iree_hal_buffer_view_generate_buffer(
+        hal_allocator, iree_hal_buffer_view_shape_dims(src),
+      iree_hal_buffer_view_shape_rank(src),
+      iree_hal_buffer_view_element_type(src),
+      iree_hal_buffer_view_encoding_type(src),
+        (iree_hal_buffer_params_t){
+            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+            .usage =
+                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
+        },
+        make_identity_matrix_callback, src, dst);
 }
 
 // Allocates device-local |dst| shaped like |src|, and:
