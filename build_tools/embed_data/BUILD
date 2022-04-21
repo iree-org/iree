@@ -47,7 +47,7 @@ cc_test(
     deps = [
         ":testembed1",
         ":testembed2",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
