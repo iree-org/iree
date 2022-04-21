@@ -24,4 +24,7 @@ c_embed_data(
     flatten = True,
     h_file_output = "libdevice.h",
     identifier = "iree_builtins_libdevice",
+    deps = [
+        "//runtime/src:runtime_defines",
+    ],
 )

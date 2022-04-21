@@ -406,6 +406,7 @@ class BuildFileFunctions(object):
                    strip_prefix=None,
                    flatten=None,
                    identifier=None,
+                   deps=None,
                    **kwargs):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
@@ -416,10 +417,12 @@ class BuildFileFunctions(object):
     testonly_block = _convert_option_block("TESTONLY", testonly)
     identifier_block = _convert_string_arg_block("IDENTIFIER", identifier)
     flatten_block = _convert_option_block("FLATTEN", flatten)
+    deps_block = _convert_target_list_block("DEPS", deps)
 
     self.converter.body += (f"iree_c_embed_data(\n"
                             f"{name_block}"
                             f"{srcs_block}"
+                            f"{deps_block}"
                             f"{c_file_output_block}"
                             f"{h_file_output_block}"
                             f"{identifier_block}"

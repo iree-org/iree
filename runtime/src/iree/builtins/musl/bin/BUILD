@@ -24,4 +24,7 @@ c_embed_data(
     flatten = True,
     h_file_output = "libmusl.h",
     identifier = "iree_builtins_libmusl",
+    deps = [
+        "//runtime/src:runtime_defines",
+    ],
 )

@@ -16,6 +16,8 @@ iree_c_embed_data(
   SRCS
     "libdevice_wasm32_generic.bc"
     "libdevice_wasm64_generic.bc"
+  DEPS
+    iree::runtime::defines
   C_FILE_OUTPUT
     "libdevice.c"
   H_FILE_OUTPUT
