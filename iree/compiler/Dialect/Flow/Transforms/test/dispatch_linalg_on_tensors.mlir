@@ -106,7 +106,8 @@ func.func @fuse_matmul_with_fill(%A : tensor<?x?xf32>, %B : tensor<?x?xf32>) -> 
 //   CHECK-DAG:     %[[ARG1_DIM1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //  CHECK-NEXT:     flow.dispatch.workgroups[%[[ARG1_DIM1]], %[[ARG0_DIM0]], %[[C1]]]
 //  CHECK-SAME:       (%[[ARG0_DIM0]], %[[ARG1_DIM1]], %[[ARG0]], %[[ARG0_DIM1]], %[[ARG1]], %[[ARG1_DIM0]])
-//  CHECK-NEXT:       (%[[ARG0_DIM0_CAPTURE:[a-zA-Z0-9_]+]]: index, %[[ARG1_DIM1_CAPTURE:[a-zA-Z0-9_]+]]: index,
+//  CHECK-NEXT:       (%[[ARG0_DIM0_CAPTURE:[a-zA-Z0-9_]+]]: index,
+//  CHECK-SAME:        %[[ARG1_DIM1_CAPTURE:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:        %[[ARG0_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>,
 //  CHECK-SAME:        %[[ARG0_DIM1_CAPTURE:[a-zA-Z0-9_]+]]: index,
 //  CHECK-SAME:        %[[ARG1_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>,
@@ -1286,13 +1287,13 @@ func.func @dont_fuse_reshape(%lhs : tensor<?xf32>, %rhs1 : tensor<4x?xf32>, %rhs
 // CHECK-SAME:     %[[LHS:.+]]: tensor<?xf32>
 //  CHECK-DAG:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[LHS]]
 //      CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
-// CHECK-SAME:       , %[[RESHAPE]]
+// CHECK-SAME:       %[[RESHAPE]]
 //  CHECK-NOT:     tensor.expand_shape
 //      CHECK:     linalg.fill
 //      CHECK:     linalg.matmul
 //      CHECK:     flow.return
 //      CHECK:   %[[DISPATCH2:.+]] = flow.dispatch.workgroups
-// CHECK-SAME:       , %[[RESHAPE]]
+// CHECK-SAME:       %[[RESHAPE]]
 //  CHECK-NOT:     tensor.expand_shape
 //      CHECK:     linalg.fill
 //      CHECK:     linalg.matmul
