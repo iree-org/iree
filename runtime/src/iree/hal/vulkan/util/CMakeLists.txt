@@ -23,7 +23,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     arena_test
   SRCS
@@ -32,7 +32,6 @@ iree_cc_library(
     ::arena
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
 iree_cc_library(
@@ -46,7 +45,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     intrusive_list_test
   SRCS
@@ -56,7 +55,6 @@ iree_cc_library(
     ::intrusive_list
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
 iree_cc_library(
@@ -71,7 +69,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     ref_ptr_test
   SRCS
@@ -80,7 +78,6 @@ iree_cc_library(
     ::ref_ptr
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

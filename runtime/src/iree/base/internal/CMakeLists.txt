@@ -28,7 +28,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     atomics_test
   SRCS
@@ -38,10 +38,9 @@ iree_cc_library(
     iree::base::core_headers
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     math_test
   SRCS
@@ -50,7 +49,6 @@ iree_cc_library(
     ::internal
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
 iree_cc_library(
@@ -83,7 +81,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     atomic_slist_test
   SRCS
@@ -92,7 +90,6 @@ iree_cc_library(
     ::atomic_slist
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
 iree_cc_library(
@@ -140,7 +137,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     file_io_test
   SRCS
@@ -152,7 +149,6 @@ iree_cc_library(
     iree::base::logging
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
 iree_cc_library(
@@ -168,7 +164,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     file_path_test
   SRCS
@@ -178,7 +174,6 @@ iree_cc_library(
     iree::base::core_headers
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
 iree_cc_library(
@@ -245,7 +240,7 @@ iree_cc_binary_benchmark(
   TESTONLY
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     fpu_state_test
   SRCS
@@ -254,7 +249,6 @@ iree_cc_library(
     ::fpu_state
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
 iree_cc_library(
@@ -281,7 +275,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     prng_test
   SRCS
@@ -290,7 +284,6 @@ iree_cc_library(
     ::prng
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
 iree_cc_library(
@@ -331,7 +324,7 @@ iree_cc_binary_benchmark(
   TESTONLY
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     synchronization_test
   SRCS
@@ -340,7 +333,6 @@ iree_cc_library(
     ::synchronization
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
 iree_cc_library(
@@ -367,7 +359,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     wait_handle_test
   SRCS
@@ -376,7 +368,6 @@ iree_cc_library(
     ::wait_handle
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
 if(NOT ${IREE_ENABLE_THREADING})
@@ -421,7 +412,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     threading_test
   SRCS
@@ -434,7 +425,6 @@ iree_cc_library(
     iree::base::cc
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

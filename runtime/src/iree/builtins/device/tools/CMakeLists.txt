@@ -23,7 +23,7 @@ iree_cc_binary_benchmark(
   TESTONLY
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     libdevice_test
   SRCS
@@ -34,7 +34,6 @@ iree_cc_library(
     iree::builtins::device
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

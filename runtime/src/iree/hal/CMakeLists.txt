@@ -64,7 +64,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     string_util_test
   SRCS
@@ -76,7 +76,6 @@ iree_cc_library(
     iree::base::internal::span
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

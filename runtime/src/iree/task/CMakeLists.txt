@@ -85,7 +85,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     executor_demo
   SRCS
@@ -96,10 +96,9 @@ iree_cc_library(
     iree::base::internal::prng
     iree::base::tracing
     iree::task::testing::test_util
-  PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     executor_test
   SRCS
@@ -110,10 +109,9 @@ iree_cc_library(
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     list_test
   SRCS
@@ -124,10 +122,9 @@ iree_cc_library(
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     pool_test
   SRCS
@@ -138,10 +135,9 @@ iree_cc_library(
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     queue_test
   SRCS
@@ -152,10 +148,9 @@ iree_cc_library(
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     scope_test
   SRCS
@@ -167,10 +162,9 @@ iree_cc_library(
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     task_tests
   SRCS
@@ -186,10 +180,9 @@ iree_cc_library(
     iree::task::testing::task_test
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     topology_test
   SRCS
@@ -199,7 +192,8 @@ iree_cc_library(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
+  LABELS
+    "noasan"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

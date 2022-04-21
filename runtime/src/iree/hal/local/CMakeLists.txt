@@ -55,7 +55,7 @@ iree_cc_binary_benchmark(
   TESTONLY
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     executable_library_test
   SRCS
@@ -67,7 +67,6 @@ iree_cc_library(
     ::executable_library
     iree::base
     iree::base::core_headers
-  PUBLIC
 )
 
 iree_cc_library(

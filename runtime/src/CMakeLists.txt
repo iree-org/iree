@@ -15,4 +15,4 @@ target_include_directories(
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
 
-iree_add_all_subdirs()
+add_subdirectory(iree)

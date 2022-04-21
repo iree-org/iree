@@ -369,7 +369,7 @@ class BuildFileFunctions(object):
                             f")\n\n")
 
   def iree_runtime_cc_test(self, deps=[], **kwargs):
-    self.cc_library(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
+    self.cc_test(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
 
   def cc_binary(self,
                 name,

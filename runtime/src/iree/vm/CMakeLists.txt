@@ -74,7 +74,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     buffer_test
   SRCS
@@ -85,10 +85,9 @@ iree_cc_library(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     list_test
   SRCS
@@ -99,10 +98,9 @@ iree_cc_library(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     native_module_test
   SRCS
@@ -115,7 +113,6 @@ iree_cc_library(
     iree::base::cc
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
 iree_cc_library(
@@ -144,7 +141,7 @@ iree_cc_binary_benchmark(
   TESTONLY
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     ref_test
   SRCS
@@ -155,10 +152,9 @@ iree_cc_library(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
     stack_test
   SRCS
@@ -168,7 +164,6 @@ iree_cc_library(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-  PUBLIC
 )
 
 iree_cc_library(
@@ -198,7 +193,7 @@ iree_cc_library(
 
 if(${IREE_BUILD_COMPILER})
 
-iree_cc_library(
+iree_cc_test(
   NAME
     bytecode_module_test
   SRCS
@@ -212,7 +207,8 @@ iree_cc_library(
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm::test::all_bytecode_modules_c
-  PUBLIC
+  LABELS
+    "notap"
 )
 
 iree_cc_binary_benchmark(
