@@ -23,7 +23,6 @@ iree_cc_library(
     iree::base
     iree::base::tracing
     iree::vm
-    iree_defs_runtime
   PUBLIC
 )
 

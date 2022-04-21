@@ -28,7 +28,6 @@ iree_cc_library(
     iree::hal::local::loaders::system_library_loader
     iree::hal::local::task_driver
     iree::task::api
-    iree_defs_runtime
   DEFINES
     "IREE_HAL_HAVE_DYLIB_DRIVER_MODULE=1"
   PUBLIC
@@ -51,7 +50,6 @@ iree_cc_library(
     iree::hal::local
     iree::hal::local::loaders::embedded_library_loader
     iree::hal::local::sync_driver
-    iree_defs_runtime
   DEFINES
     "IREE_HAL_HAVE_DYLIB_SYNC_DRIVER_MODULE=1"
   PUBLIC

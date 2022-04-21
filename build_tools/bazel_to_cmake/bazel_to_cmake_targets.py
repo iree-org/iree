@@ -13,9 +13,7 @@ EXPLICIT_TARGET_MAPPING = {
     # Internal utilities to emulate various binary/library options.
     "//build_tools:default_linkopts": [],
     "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
-
-    # Configuration targets.
-    "//runtime/src:runtime_defines": ["iree_defs_runtime"],
+    "//runtime/src:runtime_defines": [],
 
     # IREE llvm-external-projects
     "//llvm-external-projects/iree-dialects:IREEPyDMTransforms": [

@@ -18,7 +18,6 @@ iree_cc_library(
   DEPS
     ::impl
     iree::base
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -35,7 +34,6 @@ iree_cc_library(
     iree::base::cc
     iree::base::core_headers
     iree::base::internal::span
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -73,7 +71,6 @@ iree_cc_library(
     iree::base::core_headers
     iree::base::internal
     iree::base::tracing
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -88,7 +85,6 @@ iree_cc_library(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -103,7 +99,6 @@ iree_cc_library(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -120,7 +115,6 @@ iree_cc_library(
     iree::base::cc
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -132,7 +126,6 @@ iree_cc_library(
   DEPS
     ::impl
     iree::base
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -162,7 +155,6 @@ iree_cc_library(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -176,7 +168,6 @@ iree_cc_library(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -202,7 +193,6 @@ iree_cc_library(
     iree::base::internal::flatcc::parsing
     iree::base::tracing
     iree::schemas::bytecode_module_def_c_fbs
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -222,7 +212,6 @@ iree_cc_library(
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm::test::all_bytecode_modules_c
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -294,7 +283,6 @@ iree_cc_library(
     "ops.h"
   DEPS
     iree::base
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -304,7 +292,7 @@ iree_cc_library(
   HDRS
     "ops_emitc.h"
   DEPS
-    iree_defs_runtime
+
   PUBLIC
 )
 
@@ -316,7 +304,6 @@ iree_cc_library(
   DEPS
     ::impl
     iree::base::core_headers
-    iree_defs_runtime
   PUBLIC
 )
 

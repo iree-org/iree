@@ -18,7 +18,7 @@ iree_cc_library(
   SRCS
     "device_generic.c"
   DEPS
-    iree_defs_runtime
+
   PUBLIC
 )
 

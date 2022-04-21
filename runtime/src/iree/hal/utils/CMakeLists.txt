@@ -21,7 +21,6 @@ iree_cc_library(
     iree::base
     iree::base::tracing
     iree::hal
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -38,7 +37,6 @@ iree_cc_library(
     iree::base::internal::arena
     iree::base::tracing
     iree::hal
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -54,7 +52,6 @@ iree_cc_library(
     iree::base::internal::arena
     iree::base::tracing
     iree::hal
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -83,7 +80,6 @@ iree_cc_library(
     iree::hal
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 

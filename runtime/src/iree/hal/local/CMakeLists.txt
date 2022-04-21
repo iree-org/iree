@@ -23,7 +23,6 @@ iree_cc_library(
     iree::base::internal::cpu
     iree::base::tracing
     iree::hal
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -33,7 +32,7 @@ iree_cc_library(
   HDRS
     "executable_library.h"
   DEPS
-    iree_defs_runtime
+
   PUBLIC
 )
 
@@ -68,7 +67,6 @@ iree_cc_library(
     ::executable_library
     iree::base
     iree::base::core_headers
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -100,7 +98,6 @@ iree_cc_library(
     iree::base::internal::fpu_state
     iree::base::tracing
     iree::hal
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -127,7 +124,6 @@ iree_cc_library(
     iree::base::tracing
     iree::hal
     iree::hal::utils::buffer_transfer
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -173,7 +169,6 @@ iree_cc_library(
     iree::hal::utils::buffer_transfer
     iree::hal::utils::resource_set
     iree::task
-    iree_defs_runtime
   PUBLIC
 )
 

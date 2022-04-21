@@ -24,7 +24,6 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::tracing
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -65,7 +64,6 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::tracing
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -83,7 +81,6 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::tracing
-    iree_defs_runtime
   PUBLIC
 )
 

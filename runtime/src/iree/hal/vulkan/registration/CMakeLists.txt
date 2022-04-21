@@ -27,7 +27,6 @@ iree_cc_library(
     iree::base::tracing
     iree::hal
     iree::hal::vulkan
-    iree_defs_runtime
   DEFINES
     "IREE_HAL_HAVE_VULKAN_DRIVER_MODULE=1"
   PUBLIC

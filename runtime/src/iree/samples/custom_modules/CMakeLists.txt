@@ -29,7 +29,6 @@ iree_cc_library(
     iree::modules::hal
     iree::vm
     iree::vm::cc
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -41,7 +40,7 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_custom_modules_test_module"
   TRANSLATE_TOOL
-    __runtime_src_iree_samples_custom_modules_dialect_custom-translate
+    iree_samples_custom_modules_dialect_custom-translate
   FLAGS
     "-iree-mlir-to-vm-bytecode-module"
     "-iree-hal-target-backends=vmvx"
@@ -66,7 +65,6 @@ iree_cc_library(
     iree::vm
     iree::vm::bytecode_module
     iree::vm::cc
-    iree_defs_runtime
   PUBLIC
 )
 

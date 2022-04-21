@@ -92,7 +92,6 @@ iree_cc_library(
     iree::hal::vulkan::util::intrusive_list
     iree::hal::vulkan::util::ref_ptr
     iree::schemas::spirv_executable_def_c_fbs
-    iree_defs_runtime
     vulkan_memory_allocator
   PUBLIC
 )
@@ -115,7 +114,6 @@ iree_cc_library(
     iree::base::internal::dynamic_library
     iree::base::tracing
     iree::hal::vulkan::util::ref_ptr
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -129,7 +127,6 @@ iree_cc_library(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 

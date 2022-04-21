@@ -25,7 +25,6 @@ iree_cc_library(
     "atomics_msvc.h"
   DEPS
     iree::base::core_headers
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -39,7 +38,6 @@ iree_cc_library(
     iree::base::core_headers
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -52,7 +50,6 @@ iree_cc_library(
     ::internal
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -69,7 +66,6 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::tracing
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -84,7 +80,6 @@ iree_cc_library(
     ::internal
     ::synchronization
     iree::base::core_headers
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -97,7 +92,6 @@ iree_cc_library(
     ::atomic_slist
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -111,7 +105,6 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::core_headers
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -130,7 +123,6 @@ iree_cc_library(
     ::synchronization
     iree::base::core_headers
     iree::base::tracing
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -145,7 +137,6 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::tracing
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -161,7 +152,6 @@ iree_cc_library(
     iree::base::logging
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -175,7 +165,6 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::core_headers
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -189,7 +178,6 @@ iree_cc_library(
     iree::base::core_headers
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -205,7 +193,6 @@ iree_cc_library(
     ::internal
     iree::base
     iree::base::tracing
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -242,7 +229,6 @@ iree_cc_library(
     ::internal
     iree::base
     iree::base::core_headers
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -268,7 +254,6 @@ iree_cc_library(
     ::fpu_state
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -282,7 +267,6 @@ iree_cc_library(
     "main_win32.c"
   DEPS
     iree::base::core_headers
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -294,7 +278,6 @@ iree_cc_library(
   DEPS
     ::internal
     iree::base::core_headers
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -307,7 +290,6 @@ iree_cc_library(
     ::prng
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -317,7 +299,7 @@ iree_cc_library(
   HDRS
     "span.h"
   DEPS
-    iree_defs_runtime
+
   PUBLIC
 )
 
@@ -334,7 +316,6 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::tracing
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -359,7 +340,6 @@ iree_cc_library(
     ::synchronization
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -384,7 +364,6 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::tracing
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -397,7 +376,6 @@ iree_cc_library(
     ::wait_handle
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -419,7 +397,6 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::tracing
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -441,7 +418,6 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::tracing
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -458,7 +434,6 @@ iree_cc_library(
     iree::base::cc
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 

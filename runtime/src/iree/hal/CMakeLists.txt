@@ -61,7 +61,6 @@ iree_cc_library(
     iree::base::internal
     iree::base::internal::synchronization
     iree::base::tracing
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -77,7 +76,6 @@ iree_cc_library(
     iree::base::internal::span
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 

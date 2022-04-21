@@ -260,7 +260,6 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 #-------------------------------------------------------------------------------
 
 iree_set_compiler_cmake_options()
-add_subdirectory(build_tools/cmake/defs)
 
 #-------------------------------------------------------------------------------
 # IREE compilation flags

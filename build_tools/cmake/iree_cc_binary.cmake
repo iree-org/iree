@@ -122,6 +122,11 @@ function(iree_cc_binary)
   # Replace dependencies passed by ::name with iree::package::name
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
 
+  # Implicit deps.
+  if(IREE_IMPLICIT_DEFS_CC_DEPS)
+    list(APPEND _RULE_DEPS ${IREE_IMPLICIT_DEFS_CC_DEPS})
+  endif()
+
   target_link_libraries(${_NAME}
     PUBLIC
       ${_RULE_DEPS}

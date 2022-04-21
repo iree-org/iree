@@ -18,7 +18,6 @@ iree_cc_library(
   DEPS
     iree::task
     iree::testing::gtest
-    iree_defs_runtime
   TESTONLY
   PUBLIC
 )
@@ -31,7 +30,6 @@ iree_cc_library(
   DEPS
     iree::task
     iree::testing::gtest
-    iree_defs_runtime
   TESTONLY
   PUBLIC
 )

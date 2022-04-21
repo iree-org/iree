@@ -27,7 +27,6 @@ iree_cc_library(
     iree::hal::local::task_driver
     iree::task::api
     iree::vm
-    iree_defs_runtime
   DEFINES
     "IREE_HAL_HAVE_VMVX_DRIVER_MODULE=1"
   PUBLIC
@@ -51,7 +50,6 @@ iree_cc_library(
     iree::hal::local::loaders::vmvx_module_loader
     iree::hal::local::sync_driver
     iree::vm
-    iree_defs_runtime
   DEFINES
     "IREE_HAL_HAVE_VMVX_SYNC_DRIVER_MODULE=1"
   PUBLIC

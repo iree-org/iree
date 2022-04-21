@@ -20,7 +20,6 @@ iree_cc_library(
   DEPS
     iree::base::core_headers
     iree::base::logging
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -33,7 +32,6 @@ iree_cc_library(
     ::arena
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -45,7 +43,6 @@ iree_cc_library(
     "intrusive_list_unique_ptr.inc"
   DEPS
     iree::base::logging
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -59,7 +56,6 @@ iree_cc_library(
     ::intrusive_list
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -72,7 +68,6 @@ iree_cc_library(
     iree::base::core_headers
     iree::base::internal
     iree::base::logging
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -85,7 +80,6 @@ iree_cc_library(
     ::ref_ptr
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 

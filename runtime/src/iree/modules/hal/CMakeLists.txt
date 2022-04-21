@@ -24,7 +24,6 @@ iree_cc_library(
     iree::base::tracing
     iree::hal
     iree::vm
-    iree_defs_runtime
   PUBLIC
 )
 

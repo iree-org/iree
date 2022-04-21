@@ -33,7 +33,6 @@ iree_cc_library(
     ::task
     iree::base::internal::flags
     iree::base::tracing
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -83,7 +82,6 @@ iree_cc_library(
     iree::base::internal::threading
     iree::base::internal::wait_handle
     iree::base::tracing
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -98,7 +96,6 @@ iree_cc_library(
     iree::base::internal::prng
     iree::base::tracing
     iree::task::testing::test_util
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -113,7 +110,6 @@ iree_cc_library(
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -128,7 +124,6 @@ iree_cc_library(
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -143,7 +138,6 @@ iree_cc_library(
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -158,7 +152,6 @@ iree_cc_library(
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -174,7 +167,6 @@ iree_cc_library(
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -194,7 +186,6 @@ iree_cc_library(
     iree::task::testing::task_test
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -208,7 +199,6 @@ iree_cc_library(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 

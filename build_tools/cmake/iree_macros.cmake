@@ -56,8 +56,21 @@ endfunction()
 # Example when called from iree/base/CMakeLists.txt:
 #   iree::base
 function(iree_package_ns PACKAGE_NS)
-  string(REPLACE ${IREE_ROOT_DIR} "" _PACKAGE ${CMAKE_CURRENT_LIST_DIR})
-  string(SUBSTRING ${_PACKAGE} 1 -1 _PACKAGE)
+  # Get the relative path of the current dir (i.e. runtime/src/iree/vm).
+  string(REPLACE ${IREE_ROOT_DIR} "" _RELATIVE_PATH ${CMAKE_CURRENT_LIST_DIR})
+  string(SUBSTRING ${_RELATIVE_PATH} 1 -1 _RELATIVE_PATH)
+
+  # Some sub-trees form their own roots for package purposes. Rewrite them.
+  if(_RELATIVE_PATH MATCHES "^runtime/src/(.*)")
+    # runtime/src/iree/base -> iree/base
+    set(_PACKAGE "${CMAKE_MATCH_1}")
+  else()
+    # Default to pass-through. Examples:
+    #   iree/compiler/API
+    #   iree/tools
+    set(_PACKAGE "${_RELATIVE_PATH}")
+  endif()
+
   string(REPLACE "/" "::" _PACKAGE_NS ${_PACKAGE})
   set(${PACKAGE_NS} ${_PACKAGE_NS} PARENT_SCOPE)
 endfunction()

@@ -25,7 +25,6 @@ iree_cc_library(
     iree::hal::local
     iree::hal::local::elf::elf_module
     iree::hal::local::executable_library
-    iree_defs_runtime
   DEFINES
     "IREE_HAL_HAVE_EMBEDDED_LIBRARY_LOADER=1"
   PUBLIC
@@ -45,7 +44,6 @@ iree_cc_library(
     iree::hal::local
     iree::hal::local::executable_environment
     iree::hal::local::executable_library
-    iree_defs_runtime
   DEFINES
     "IREE_HAL_HAVE_STATIC_LIBRARY_LOADER=1"
   PUBLIC
@@ -66,7 +64,6 @@ iree_cc_library(
     iree::hal
     iree::hal::local
     iree::hal::local::executable_library
-    iree_defs_runtime
   DEFINES
     "IREE_HAL_HAVE_SYSTEM_LIBRARY_LOADER=1"
   PUBLIC
@@ -90,7 +87,6 @@ iree_cc_library(
     iree::modules::vmvx
     iree::vm
     iree::vm::bytecode_module
-    iree_defs_runtime
   DEFINES
     "IREE_HAL_HAVE_VMVX_MODULE_LOADER=1"
   PUBLIC

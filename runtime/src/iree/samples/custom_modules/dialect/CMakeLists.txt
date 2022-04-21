@@ -34,7 +34,6 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::Conversion
-    iree_defs_runtime
   PUBLIC
 )
 
@@ -71,7 +70,6 @@ iree_cc_library(
   DEPS
     ::dialect
     MLIRIR
-    iree_defs_runtime
   PUBLIC
 )
 

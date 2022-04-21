@@ -34,7 +34,6 @@ iree_cc_library(
     iree::builtins::device
     iree::testing::gtest
     iree::testing::gtest_main
-    iree_defs_runtime
   PUBLIC
 )
 

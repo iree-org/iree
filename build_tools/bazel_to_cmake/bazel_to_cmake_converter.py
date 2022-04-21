@@ -69,11 +69,18 @@ def _convert_option_block(option, option_value):
 def _convert_target_block(name, target):
   if target is None:
     return ""
-  # Bazel target name to cmake binary name
-  # Bazel `//iree/custom:custom-translate` -> CMake `iree_custom_custom-translate`
-  target = target.replace("//iree", "iree")  # iree/custom:custom-translate
-  target = target.replace(":", "_")  # iree/custom_custom-translate
-  target = target.replace("/", "_")  # iree_custom_custom-translate
+
+  # Targets in this context can't be aliases, because CMake. So we first convert
+  # it in the usual way and then syntactically change it back from the pretty
+  # alias name to the underscored variant. Example:
+  #   //iree/tools:iree-translate
+  #   iree::tools::iree-translate
+  #   iree_tools_iree-translate
+  cmake_aliases = bazel_to_cmake_targets.convert_target(target)
+  if len(cmake_aliases) != 1:
+    raise ValueError(f"Expected a CMake alias from {target}. Got {cmake_aliases}")
+  target = cmake_aliases[0]
+  target = target.replace("::", "_")
   return _convert_string_arg_block(name, target, quote=False)
 
 
