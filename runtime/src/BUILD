@@ -14,5 +14,5 @@ cc_library(
     name = "runtime_defines",
     includes = [
         ".",
-    ]
+    ],
 )
