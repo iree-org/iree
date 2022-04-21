@@ -78,7 +78,8 @@ def _convert_target_block(name, target):
   #   iree_tools_iree-translate
   cmake_aliases = bazel_to_cmake_targets.convert_target(target)
   if len(cmake_aliases) != 1:
-    raise ValueError(f"Expected a CMake alias from {target}. Got {cmake_aliases}")
+    raise ValueError(
+        f"Expected a CMake alias from {target}. Got {cmake_aliases}")
   target = cmake_aliases[0]
   target = target.replace("::", "_")
   return _convert_string_arg_block(name, target, quote=False)
