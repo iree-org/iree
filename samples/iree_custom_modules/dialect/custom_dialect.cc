@@ -4,12 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/samples/custom_modules/dialect/custom_dialect.h"
+#include "iree_custom_modules/dialect/custom_dialect.h"
 
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
-#include "iree/samples/custom_modules/dialect/conversion_patterns.h"
-#include "iree/samples/custom_modules/dialect/custom.imports.h"
+#include "iree_custom_modules/dialect/conversion_patterns.h"
+#include "iree_custom_modules/dialect/custom.imports.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/SymbolTable.h"
@@ -70,7 +70,7 @@ CustomDialect::CustomDialect(MLIRContext *context)
 
 #define GET_OP_LIST
   addOperations<
-#include "iree/samples/custom_modules/dialect/custom_ops.cc.inc"
+#include "iree_custom_modules/dialect/custom_ops.cc.inc"
       >();
 }
 
@@ -101,4 +101,4 @@ void CustomDialect::printType(Type type, DialectAsmPrinter &p) const {
 }  // namespace mlir
 
 #define GET_OP_CLASSES
-#include "iree/samples/custom_modules/dialect/custom_ops.cc.inc"
+#include "iree_custom_modules/dialect/custom_ops.cc.inc"

@@ -40,6 +40,7 @@ cc_library(
         "custom_ops.h.inc",
     ],
     deps = [
+        "//samples:defs",
         ":custom_imports",
         ":custom_ops_gen",
         "//iree/compiler/Dialect/HAL/Conversion",
@@ -85,6 +86,7 @@ cc_library(
     name = "init_dialect",
     hdrs = ["init_dialect.h"],
     deps = [
+        "//samples:defs",
         ":dialect",
         "@llvm-project//mlir:IR",
     ],
@@ -94,6 +96,7 @@ cc_binary(
     name = "custom-opt",
     srcs = ["custom-opt-main.cc"],
     deps = [
+        "//samples:defs",
         ":init_dialect",
         "//iree/tools:init_passes_and_dialects",
         "//iree/tools:init_targets",
@@ -108,6 +111,7 @@ cc_binary(
     name = "custom-translate",
     srcs = ["custom-translate-main.cc"],
     deps = [
+        "//samples:defs",
         ":init_dialect",
         "//iree/compiler/Dialect/VM/Target:init_targets",
         "//iree/compiler/Dialect/VM/Target/Bytecode",

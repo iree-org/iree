@@ -12,7 +12,7 @@
 #ifndef IREE_SAMPLES_CUSTOM_MODULES_DIALECT_INIT_DIALECT_H_
 #define IREE_SAMPLES_CUSTOM_MODULES_DIALECT_INIT_DIALECT_H_
 
-#include "iree/samples/custom_modules/dialect/custom_dialect.h"
+#include "iree_custom_modules/dialect/custom_dialect.h"
 #include "mlir/IR/Dialect.h"
 
 namespace mlir {

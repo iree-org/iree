@@ -10,13 +10,13 @@
 #include "iree/hal/api.h"
 #include "iree/hal/vmvx/registration/driver_module.h"
 #include "iree/modules/hal/module.h"
-#include "iree/samples/custom_modules/custom_modules_test_module_c.h"
-#include "iree/samples/custom_modules/module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/ref_cc.h"
+#include "iree_custom_modules/custom_modules_test_module_c.h"
+#include "iree_custom_modules/module.h"
 
 namespace {
 

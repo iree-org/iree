@@ -11,7 +11,7 @@ package(
 )
 
 cc_library(
-    name = "samples_defs",
+    name = "defs",
     includes = [
         ".",
     ],

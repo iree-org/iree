@@ -50,6 +50,9 @@ iree_bytecode_module(
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=vmvx",
     ],
+    deps = [
+        "//samples:defs",
+    ],
 )
 
 native_test(
@@ -108,6 +111,9 @@ iree_bytecode_module(
         "-iree-vm-bytecode-module-strip-source-map=true",
         "-iree-vm-emit-polyglot-zip=false",
     ],
+    deps = [
+        "//samples:defs",
+    ],
 )
 
 iree_bytecode_module(
@@ -125,6 +131,9 @@ iree_bytecode_module(
         "-iree-llvm-debug-symbols=false",
         "-iree-vm-bytecode-module-strip-source-map=true",
         "-iree-vm-emit-polyglot-zip=false",
+    ],
+    deps = [
+        "//samples:defs",
     ],
 )
 
@@ -144,6 +153,9 @@ iree_bytecode_module(
         "-iree-vm-bytecode-module-strip-source-map=true",
         "-iree-vm-emit-polyglot-zip=false",
     ],
+    deps = [
+        "//samples:defs",
+    ],
 )
 
 iree_bytecode_module(
@@ -160,6 +172,9 @@ iree_bytecode_module(
         "-iree-vm-bytecode-module-strip-source-map=true",
         "-iree-vm-emit-polyglot-zip=false",
     ],
+    deps = [
+        "//samples:defs",
+    ],
 )
 
 iree_bytecode_module(
@@ -174,6 +189,9 @@ iree_bytecode_module(
         "-iree-llvm-debug-symbols=false",
         "-iree-vm-bytecode-module-strip-source-map=true",
         "-iree-vm-emit-polyglot-zip=false",
+    ],
+    deps = [
+        "//samples:defs",
     ],
 )
 
@@ -258,6 +276,9 @@ iree_bytecode_module(
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=vulkan-spirv",
         "-iree-llvm-debug-symbols=false",
+    ],
+    deps = [
+        "//samples:defs",
     ],
 )
 

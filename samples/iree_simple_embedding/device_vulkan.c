@@ -13,7 +13,7 @@
 #include "iree/hal/vulkan/registration/driver_module.h"
 
 // Compiled module embedded here to avoid file IO:
-#include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module_vulkan_c.h"
+#include "iree_simple_embedding/simple_embedding_test_bytecode_module_vulkan_c.h"
 
 iree_status_t create_sample_device(iree_allocator_t host_allocator,
                                    iree_hal_device_t** out_device) {

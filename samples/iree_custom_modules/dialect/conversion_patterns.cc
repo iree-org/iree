@@ -4,11 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/samples/custom_modules/dialect/conversion_patterns.h"
+#include "iree_custom_modules/dialect/conversion_patterns.h"
 
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
-#include "iree/samples/custom_modules/dialect/custom_dialect.h"
+#include "iree_custom_modules/dialect/custom_dialect.h"
 
 namespace mlir {
 namespace iree_compiler {

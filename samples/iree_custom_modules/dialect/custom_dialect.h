@@ -38,6 +38,6 @@ class MessageType : public Type::TypeBase<MessageType, Type, TypeStorage> {
 }  // namespace mlir
 
 #define GET_OP_CLASSES
-#include "iree/samples/custom_modules/dialect/custom_ops.h.inc"
+#include "iree_custom_modules/dialect/custom_ops.h.inc"
 
 #endif  // IREE_SAMPLES_CUSTOM_MODULES_DIALECT_CUSTOM_DIALECT_H_
