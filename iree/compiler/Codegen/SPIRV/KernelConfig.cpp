@@ -422,6 +422,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
       loopBounds && llvm::none_of(loopBounds.getValue(), ShapedType::isDynamic);
 
   // Distribute workload to the given `numThreads` by allowing a potental loss.
+  // Returns 1 if all threads are utilized.
   auto distributeToThreads = [&](int64_t numThreads,
                                  Optional<int64_t> lossFactor = llvm::None) {
     LLVM_DEBUG(llvm::dbgs() << "\nLoss factor: " << lossFactor << "\n");
@@ -490,8 +491,10 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     return numThreads;
   };
 
-  // First try to see if we can use up all threads without any loss.
-  if (distributeToThreads(subgroupSize) != 1) {
+  // First try to see if we can use up all threads in 2/1 subgroups without
+  // any loss.
+  if (distributeToThreads(subgroupSize * 2) != 1 &&
+      distributeToThreads(subgroupSize) != 1) {
     // Otherwise, allow larger and larger loss factor.
 
     // Threads for distribution Use 32 at least.
