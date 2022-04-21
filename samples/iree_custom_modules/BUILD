@@ -44,7 +44,7 @@ iree_bytecode_module(
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=vmvx",
     ],
-    translate_tool = "//samples/custom_modules/dialect:custom-translate",
+    translate_tool = "//samples/iree_custom_modules/dialect:custom-translate",
 )
 
 cc_test(

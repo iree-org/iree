@@ -9,3 +9,10 @@ package(
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
+
+cc_library(
+    name = "samples_defs",
+    includes = [
+        ".",
+    ],
+)
