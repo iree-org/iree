@@ -24,6 +24,7 @@ iree_lit_test_suite(
         ],
         include = ["*.mlir"],
     ),
+    cfg = "//runtime:lit.cfg.py",
     tags = ["hostonly"],
     tools = [
         "//iree/tools:iree-check-module",

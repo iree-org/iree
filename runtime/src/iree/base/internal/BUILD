@@ -201,6 +201,7 @@ cc_binary(
 iree_lit_test_suite(
     name = "flags_test",
     srcs = ["flags_test.txt"],
+    cfg = "//runtime:lit.cfg.py",
     tags = ["hostonly"],
     tools = [
         ":flags_demo",
