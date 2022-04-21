@@ -23,7 +23,7 @@ iree_lit_test_suite(
         include = ["*.mlir"],
     ),
     tools = [
-        "//iree/samples/custom_modules/dialect:custom-opt",
+        "//samples/custom_modules/dialect:custom-opt",
         "@llvm-project//llvm:FileCheck",
     ],
 )
