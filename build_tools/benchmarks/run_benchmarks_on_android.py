@@ -41,37 +41,22 @@ from typing import Optional, Sequence
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_definition import (execute_cmd,
-                                         execute_cmd_and_get_output)
-from common.benchmark_suite import (BenchmarkCase, BenchmarkSuite)
+                                         execute_cmd_and_get_output,
+                                         get_git_commit_hash,
+                                         get_iree_benchmark_module_arguments,
+                                         wait_for_iree_benchmark_module_start)
+from common.benchmark_suite import (MODEL_FLAGFILE_NAME, BenchmarkCase,
+                                    BenchmarkSuite)
 from common.android_device_utils import (get_android_device_model,
                                          get_android_device_info,
                                          get_android_gpu_name)
 from common.common_arguments import build_common_argument_parser
-
-# The flagfile/toolfile's filename for compiled benchmark artifacts.
-MODEL_FLAGFILE_NAME = "flagfile"
-MODEL_TOOLFILE_NAME = "tool"
 
 # Root directory to perform benchmarks in on the Android device.
 ANDROID_TMP_DIR = "/data/local/tmp/iree-benchmarks"
 
 NORMAL_TOOL_REL_DIR = "normal-tools"
 TRACED_TOOL_REL_DIR = "traced-tools"
-
-
-def get_benchmark_repetition_count(runner: str) -> int:
-  """Returns the benchmark repetition count for the given runner."""
-  if runner == "iree-vmvx":
-    # VMVX is very unoptimized for now and can take a long time to run.
-    # Decrease the repetition for it until it's reasonably fast.
-    return 3
-  return 10
-
-
-def get_git_commit_hash(commit: str) -> str:
-  return execute_cmd_and_get_output(['git', 'rev-parse', commit],
-                                    cwd=os.path.dirname(
-                                        os.path.realpath(__file__)))
 
 
 def adb_push_to_tmp_dir(content: str,
@@ -239,20 +224,11 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         "taskset", taskset, android_tool, f"--flagfile={MODEL_FLAGFILE_NAME}"
     ]
     if tool_name == "iree-benchmark-module":
-      cmd.extend([
-          "--benchmark_format=json",
-          "--benchmark_out_format=json",
-          f"--benchmark_out='{os.path.basename(results_filename)}'",
-      ])
-      if self.config.benchmark_min_time:
-        cmd.extend([
-            f"--benchmark_min_time={self.config.benchmark_min_time}",
-        ])
-      else:
-        repetitions = get_benchmark_repetition_count(driver)
-        cmd.extend([
-            f"--benchmark_repetitions={repetitions}",
-        ])
+      cmd.extend(
+          get_iree_benchmark_module_arguments(
+              results_filename=f"'{os.path.basename(results_filename)}'",
+              driver=driver,
+              benchmark_min_time=self.config.benchmark_min_time))
 
     result_json = adb_execute_and_get_output(cmd,
                                              android_case_dir,
@@ -285,20 +261,8 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     # Just launch the traced benchmark tool with TRACY_NO_EXIT=1 without
     # waiting for the adb command to complete as that won't happen.
     process = adb_start_cmd(run_cmd, android_case_dir, verbose=self.verbose)
-    # But we do need to wait for its start; otherwise will see connection
-    # failure when opening the catpure tool. Here we cannot just sleep a
-    # certain amount of seconds---Pixel 4 seems to have an issue that will
-    # make the trace collection step get stuck. Instead wait for the
-    # benchmark result to be available.
-    while True:
-      line = process.stdout.readline()  # pytype: disable=attribute-error
-      if line == "" and process.poll() is not None:  # Process completed
-        raise ValueError("Cannot find benchmark result line in the log!")
-      if self.verbose:
-        print(line.strip())
-      # Result available
-      if re.match(r"^BM_.+/real_time", line) is not None:
-        break
+
+    wait_for_iree_benchmark_module_start(process, self.verbose)
 
     # Now it's okay to collect the trace via the capture tool. This will
     # send the signal to let the previously waiting benchmark tool to

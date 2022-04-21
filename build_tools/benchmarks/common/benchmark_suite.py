@@ -39,6 +39,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 # All benchmarks' relative path against root build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
 
+MODEL_FLAGFILE_NAME = "flagfile"
 MODEL_TOOLFILE_NAME = "tool"
 
 
