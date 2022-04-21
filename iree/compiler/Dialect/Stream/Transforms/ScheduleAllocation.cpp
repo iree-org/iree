@@ -346,7 +346,9 @@ struct AllocationScope {
         AsmState asmState(rootOp->getParentOp());
         llvm::dbgs() << "!! storage not pre-allocated for resource ";
         resource.printAsOperand(llvm::dbgs(), asmState);
-        llvm::dbgs() << ":\n";
+        llvm::dbgs() << "\n";
+        resource.getDefiningOp()->print(llvm::dbgs(), asmState);
+        llvm::dbgs() << "\ncurrent mappings:\n";
         for (auto mapping : resourceRangeMap) {
           llvm::dbgs() << "  * mapping ";
           mapping.first.printAsOperand(llvm::dbgs(), asmState);
