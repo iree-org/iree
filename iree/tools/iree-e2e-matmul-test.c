@@ -762,8 +762,7 @@ static iree_status_t make_identity_matrix_callback(
   memset(mapping->contents.data, 0, mapping->contents.data_length);
   intptr_t diagonal_elem_addr = (intptr_t)mapping->contents.data;
   for (int i = 0; i < diagonal_size; ++i) {
-    write_int_element(
-        elem_type, 1, (void*)diagonal_elem_addr);
+    write_int_element(elem_type, 1, (void*)diagonal_elem_addr);
     // Due to the row-major storage, the diagonal entries are every
     // (cols + 1)-th buffer elements.
     diagonal_elem_addr += elem_byte_count * (cols + 1);
@@ -777,16 +776,16 @@ static iree_status_t make_device_identity_matrix_like(
     iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
     iree_hal_buffer_view_t* src, iree_hal_buffer_view_t** dst) {
   return iree_hal_buffer_view_generate_buffer(
-        hal_allocator, iree_hal_buffer_view_shape_dims(src),
+      hal_allocator, iree_hal_buffer_view_shape_dims(src),
       iree_hal_buffer_view_shape_rank(src),
       iree_hal_buffer_view_element_type(src),
       iree_hal_buffer_view_encoding_type(src),
-        (iree_hal_buffer_params_t){
-            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-            .usage =
-                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
-        },
-        make_identity_matrix_callback, src, dst);
+      (iree_hal_buffer_params_t){
+          .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+          .usage =
+              IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
+      },
+      make_identity_matrix_callback, src, dst);
 }
 
 // Allocates device-local |dst| shaped like |src|, and:
