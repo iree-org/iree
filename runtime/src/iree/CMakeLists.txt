@@ -13,7 +13,3 @@ add_subdirectory(schemas)
 add_subdirectory(task)
 add_subdirectory(testing)
 add_subdirectory(vm)
-
-if(IREE_BUILD_SAMPLES)
-  add_subdirectory(samples)
-endif()

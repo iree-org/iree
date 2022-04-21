@@ -7,7 +7,6 @@
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:native_binary.bzl", "native_test")
-load("//iree:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -31,14 +30,14 @@ cc_binary(
     ],
     deps = [
         ":simple_embedding_test_bytecode_module_vmvx_c",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/local",
-        "//runtime/src/iree/hal/local:sync_driver",
-        "//runtime/src/iree/hal/local/loaders:vmvx_module_loader",
-        "//runtime/src/iree/modules/hal",
-        "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//iree/base",
+        "//iree/hal",
+        "//iree/hal/local",
+        "//iree/hal/local:sync_driver",
+        "//iree/hal/local/loaders:vmvx_module_loader",
+        "//iree/modules/hal",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
     ],
 )
 
@@ -85,14 +84,14 @@ cc_binary(
         ":simple_embedding_test_bytecode_module_dylib_riscv_32_c",
         ":simple_embedding_test_bytecode_module_dylib_riscv_64_c",
         ":simple_embedding_test_bytecode_module_dylib_x86_64_c",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/local",
-        "//runtime/src/iree/hal/local:sync_driver",
-        "//runtime/src/iree/hal/local/loaders:embedded_library_loader",
-        "//runtime/src/iree/modules/hal",
-        "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//iree/base",
+        "//iree/hal",
+        "//iree/hal/local",
+        "//iree/hal/local:sync_driver",
+        "//iree/hal/local/loaders:embedded_library_loader",
+        "//iree/modules/hal",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
     ],
 )
 
@@ -200,15 +199,15 @@ cc_binary(
         ":simple_embedding_test_bytecode_module_dylib_arm_64_c",
         ":simple_embedding_test_bytecode_module_dylib_riscv_64_c",
         ":simple_embedding_test_bytecode_module_dylib_x86_64_c",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/local",
-        "//runtime/src/iree/hal/local:task_driver",
-        "//runtime/src/iree/hal/local/loaders:embedded_library_loader",
-        "//runtime/src/iree/modules/hal",
-        "//runtime/src/iree/task:api",
-        "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//iree/base",
+        "//iree/hal",
+        "//iree/hal/local",
+        "//iree/hal/local:task_driver",
+        "//iree/hal/local/loaders:embedded_library_loader",
+        "//iree/modules/hal",
+        "//iree/task:api",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
     ],
 )
 
@@ -241,12 +240,12 @@ cc_binary(
     ],
     deps = [
         ":simple_embedding_test_bytecode_module_vulkan_c",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/vulkan/registration",
-        "//runtime/src/iree/modules/hal",
-        "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//iree/base",
+        "//iree/hal",
+        "//iree/hal/vulkan/registration",
+        "//iree/modules/hal",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
     ],
 )
 
@@ -291,12 +290,12 @@ endif()
 #     ],
 #     deps = [
 #         ":simple_embedding_test_bytecode_module_cuda_c",
-#         "//runtime/src/iree/base",
-#         "//runtime/src/iree/hal",
-#         "//runtime/src/iree/hal/cuda/registration",
-#         "//runtime/src/iree/modules/hal",
-#         "//runtime/src/iree/vm",
-#         "//runtime/src/iree/vm:bytecode_module",
+#         "//iree/base",
+#         "//iree/hal",
+#         "//iree/hal/cuda/registration",
+#         "//iree/modules/hal",
+#         "//iree/vm",
+#         "//iree/vm:bytecode_module",
 #     ],
 # )
 

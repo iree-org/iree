@@ -636,6 +636,10 @@ if(${IREE_BUILD_COMPILER})
   add_subdirectory(iree/compiler)
 endif()
 
+if(IREE_BUILD_SAMPLES)
+  add_subdirectory(iree/samples)
+endif()
+
 add_subdirectory(iree/tools)
 
 if(IREE_BUILD_TRACY)

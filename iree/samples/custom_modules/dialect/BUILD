@@ -7,7 +7,6 @@
 load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "td_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
-load("//iree:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -28,7 +27,7 @@ td_library(
     ],
 )
 
-iree_runtime_cc_library(
+cc_library(
     name = "dialect",
     srcs = [
         "conversion_patterns.cc",
@@ -82,7 +81,7 @@ c_embed_data(
     identifier = "iree_custom_imports",
 )
 
-iree_runtime_cc_library(
+cc_library(
     name = "init_dialect",
     hdrs = ["init_dialect.h"],
     deps = [
