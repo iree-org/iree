@@ -390,9 +390,8 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
                              });
 
     // 3b. For each of the result create a `flow.dispatch.tensor.store`
-    // operation
-    //     to publish the result of the cloned operation (from within the
-    //     dispatch).
+    //     operation to publish the result of the cloned operation (from within
+    //     the dispatch).
     for (auto clonedOpResult : clonedOp->getResults()) {
       auto resultType = clonedOpResult.getType().dyn_cast<ShapedType>();
       if (resultType) {
@@ -429,7 +428,7 @@ static SmallVector<Operation *> getOperationsToMoveIntoDispatch(
 
   while (!worklist.empty()) {
     Operation *currRoot = worklist.front();
-    worklist.pop_back();
+    worklist.pop_front();
     for (auto operand : currRoot->getOperands()) {
       auto producer = operand.getDefiningOp();
       if (movedOps.count(producer)) continue;
