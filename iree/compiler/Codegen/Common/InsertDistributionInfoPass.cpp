@@ -70,7 +70,7 @@ static LogicalResult defineWorkgroupCountRegion(
   }
   WorkgroupCountRegionBuilder regionBuilder =
       [&workloadPerWorkgroup, &interchange](
-          OpBuilder &b, Location loc,
+          OpBuilder &b, Location loc, Value device,
           std::array<Value, 3> workload) -> std::array<Value, 3> {
     Value one = b.create<arith::ConstantIndexOp>(loc, 1);
     std::array<Value, 3> numWorkgroups = {one, one, one};

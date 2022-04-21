@@ -731,18 +731,23 @@ LogicalResult ExecutableEntryPointOp::verify() {
   if (!llvm::hasSingleElement(workgroup_count_region())) {
     return op.emitOpError() << "expected a single region block";
   }
-  if (body->getNumArguments() != getNumWorkgroupDims()) {
-    return op.emitOpError("expected ")
-           << getNumWorkgroupDims()
-           << " arguments for workgroup_count_region for workload "
-              "along "
-              "x, y, and z";
-  }
-  for (BlockArgument &blockArg : body->getArguments()) {
-    if (!blockArg.getType().isa<IndexType>()) {
-      return op.emitOpError(
-          "expected arguments to workgroup_count_region body of index type");
+  bool validArguments = true;
+  if (body->getNumArguments() != /*device*/ 1 + getNumWorkgroupDims()) {
+    validArguments = false;
+  } else if (!body->getArgument(0).getType().isa<IREE::HAL::DeviceType>()) {
+    validArguments = false;
+  } else {
+    for (BlockArgument &blockArg : body->getArguments().drop_front(1)) {
+      if (!blockArg.getType().isa<IndexType>()) {
+        validArguments = false;
+        break;
+      }
     }
+  }
+  if (!validArguments) {
+    return op.emitOpError(
+        "expected workgroup_count_region to take (%device: !hal.device, "
+        "%workload_x: index, %workload_y: index, %workload_z: index");
   }
   // Check that the last statement in the block is `hal.yield` operation.
   // TODO(ravishankarm): The SingleBlockImplicitTerminator<"HAL::ReturnOp">
@@ -805,11 +810,13 @@ static std::array<Value, 3> calculateWorkloadWorkgroupCount(
 }
 
 static std::array<Value, 3> calculateWorkgroupCountFromRegion(
-    Location loc, Block *body, ValueRange workload, OpBuilder &builder) {
+    Location loc, Block *body, Value device, ValueRange workload,
+    OpBuilder &builder) {
   // TODO(benvanik): replace with region inlining util.
   BlockAndValueMapping bvm;
+  bvm.map(body->getArgument(0), device);
   for (auto args : llvm::enumerate(workload)) {
-    bvm.map(body->getArgument(args.index()), args.value());
+    bvm.map(body->getArgument(/*device*/ 1 + args.index()), args.value());
   }
   for (Operation &op : body->without_terminator()) {
     builder.clone(op, bvm);
@@ -827,19 +834,20 @@ static std::array<Value, 3> calculateWorkgroupCountFromRegion(
 // required as calculated by the generic workload logic (basically, number of
 // output elements in tensors).
 std::array<Value, 3> ExecutableEntryPointOp::calculateWorkgroupCount(
-    Location loc, ValueRange workload, OpBuilder &builder) {
+    Location loc, Value device, ValueRange workload, OpBuilder &builder) {
   Block *body = getWorkgroupCountBody();
   if (body) {
-    return calculateWorkgroupCountFromRegion(loc, body, workload, builder);
+    return calculateWorkgroupCountFromRegion(loc, body, device, workload,
+                                             builder);
   }
-  auto workgroupSize = calculateWorkgroupSize(loc, workload, builder);
+  auto workgroupSize = calculateWorkgroupSize(loc, device, workload, builder);
   return calculateWorkloadWorkgroupCount(loc, workload, workgroupSize, builder);
 }
 
 // Calculates the workgroup size (x, y, z). These are the dimension numbers
 // for a single workgroup.
 std::array<Value, 3> ExecutableEntryPointOp::calculateWorkgroupSize(
-    Location loc, ValueRange workload, OpBuilder &builder) {
+    Location loc, Value device, ValueRange workload, OpBuilder &builder) {
   // When no workgroup size is specified we just assume [1,1,1].
   // This yields a workgroup count that models the extents of the workload.
   return {

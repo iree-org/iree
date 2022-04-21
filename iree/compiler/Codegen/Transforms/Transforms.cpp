@@ -60,10 +60,13 @@ LogicalResult defineWorkgroupCountRegion(
   auto indexType = builder.getIndexType();
   assert(IREE::HAL::ExecutableEntryPointOp::getNumWorkgroupDims() == 3 &&
          "expected 3 dims");
+  auto device =
+      entryBlock->addArgument(builder.getType<IREE::HAL::DeviceType>(), loc);
   std::array<Value, 3> workload = {entryBlock->addArgument(indexType, loc),
                                    entryBlock->addArgument(indexType, loc),
                                    entryBlock->addArgument(indexType, loc)};
-  std::array<Value, 3> workgroupCount = regionBuilder(builder, loc, workload);
+  std::array<Value, 3> workgroupCount =
+      regionBuilder(builder, loc, device, workload);
   builder.create<IREE::HAL::ReturnOp>(loc, workgroupCount);
   entryPointOp.erase();
   return success();
