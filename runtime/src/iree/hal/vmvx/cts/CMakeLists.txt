@@ -8,7 +8,7 @@ iree_hal_cts_test_suite(
   DRIVER_NAME
     vmvx
   DRIVER_REGISTRATION_HDR
-    "iree/hal/vmvx/registration/driver_module.h"
+    "runtime/src/iree/hal/vmvx/registration/driver_module.h"
   DRIVER_REGISTRATION_FN
     "iree_hal_vmvx_driver_module_register"
   COMPILER_TARGET_BACKEND
@@ -23,7 +23,7 @@ iree_hal_cts_test_suite(
   DRIVER_NAME
     vmvx-sync
   DRIVER_REGISTRATION_HDR
-    "iree/hal/vmvx/registration/driver_module_sync.h"
+    "runtime/src/iree/hal/vmvx/registration/driver_module_sync.h"
   DRIVER_REGISTRATION_FN
     "iree_hal_vmvx_sync_driver_module_register"
   COMPILER_TARGET_BACKEND

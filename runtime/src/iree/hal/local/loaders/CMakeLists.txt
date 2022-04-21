@@ -18,14 +18,14 @@ iree_cc_library(
   SRCS
     "embedded_library_loader.c"
   DEPS
-    iree::runtime::base
-    iree::runtime::base::core_headers
-    iree::runtime::base::tracing
-    iree::runtime::defines
-    iree::runtime::hal
-    iree::runtime::hal::local
-    iree::runtime::hal::local::elf::elf_module
-    iree::runtime::hal::local::executable_library
+    iree::base
+    iree::base::core_headers
+    iree::base::tracing
+    iree::hal
+    iree::hal::local
+    iree::hal::local::elf::elf_module
+    iree::hal::local::executable_library
+    iree_defs_runtime
   DEFINES
     "IREE_HAL_HAVE_EMBEDDED_LIBRARY_LOADER=1"
   PUBLIC
@@ -39,13 +39,13 @@ iree_cc_library(
   SRCS
     "static_library_loader.c"
   DEPS
-    iree::runtime::base
-    iree::runtime::base::tracing
-    iree::runtime::defines
-    iree::runtime::hal
-    iree::runtime::hal::local
-    iree::runtime::hal::local::executable_environment
-    iree::runtime::hal::local::executable_library
+    iree::base
+    iree::base::tracing
+    iree::hal
+    iree::hal::local
+    iree::hal::local::executable_environment
+    iree::hal::local::executable_library
+    iree_defs_runtime
   DEFINES
     "IREE_HAL_HAVE_STATIC_LIBRARY_LOADER=1"
   PUBLIC
@@ -59,14 +59,14 @@ iree_cc_library(
   SRCS
     "system_library_loader.c"
   DEPS
-    iree::runtime::base
-    iree::runtime::base::core_headers
-    iree::runtime::base::internal::dynamic_library
-    iree::runtime::base::tracing
-    iree::runtime::defines
-    iree::runtime::hal
-    iree::runtime::hal::local
-    iree::runtime::hal::local::executable_library
+    iree::base
+    iree::base::core_headers
+    iree::base::internal::dynamic_library
+    iree::base::tracing
+    iree::hal
+    iree::hal::local
+    iree::hal::local::executable_library
+    iree_defs_runtime
   DEFINES
     "IREE_HAL_HAVE_SYSTEM_LIBRARY_LOADER=1"
   PUBLIC
@@ -82,15 +82,15 @@ iree_cc_library(
   SRCS
     "vmvx_module_loader.c"
   DEPS
-    iree::runtime::base
-    iree::runtime::base::tracing
-    iree::runtime::defines
-    iree::runtime::hal
-    iree::runtime::hal::local
-    iree::runtime::hal::local::executable_library
-    iree::runtime::modules::vmvx
-    iree::runtime::vm
-    iree::runtime::vm::bytecode_module
+    iree::base
+    iree::base::tracing
+    iree::hal
+    iree::hal::local
+    iree::hal::local::executable_library
+    iree::modules::vmvx
+    iree::vm
+    iree::vm::bytecode_module
+    iree_defs_runtime
   DEFINES
     "IREE_HAL_HAVE_VMVX_MODULE_LOADER=1"
   PUBLIC

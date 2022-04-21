@@ -56,12 +56,12 @@ iree_cc_library(
     "string_util.c"
     "string_util.h"
   DEPS
-    iree::runtime::base
-    iree::runtime::base::core_headers
-    iree::runtime::base::internal
-    iree::runtime::base::internal::synchronization
-    iree::runtime::base::tracing
-    iree::runtime::defines
+    iree::base
+    iree::base::core_headers
+    iree::base::internal
+    iree::base::internal::synchronization
+    iree::base::tracing
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -72,12 +72,12 @@ iree_cc_library(
     "string_util_test.cc"
   DEPS
     ::hal
-    iree::runtime::base
-    iree::runtime::base::cc
-    iree::runtime::base::internal::span
-    iree::runtime::defines
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::base
+    iree::base::cc
+    iree::base::internal::span
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 

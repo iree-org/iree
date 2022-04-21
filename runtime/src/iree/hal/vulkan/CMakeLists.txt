@@ -75,24 +75,24 @@ iree_cc_library(
   DEPS
     ::dynamic_symbols
     Vulkan::Headers
-    iree::runtime::base
-    iree::runtime::base::cc
-    iree::runtime::base::core_headers
-    iree::runtime::base::internal
-    iree::runtime::base::internal::arena
-    iree::runtime::base::internal::flatcc::parsing
-    iree::runtime::base::internal::synchronization
-    iree::runtime::base::logging
-    iree::runtime::base::tracing
-    iree::runtime::defines
-    iree::runtime::hal
-    iree::runtime::hal::utils::buffer_transfer
-    iree::runtime::hal::utils::resource_set
-    iree::runtime::hal::vulkan::builtin
-    iree::runtime::hal::vulkan::util::arena
-    iree::runtime::hal::vulkan::util::intrusive_list
-    iree::runtime::hal::vulkan::util::ref_ptr
-    iree::runtime::schemas::spirv_executable_def_c_fbs
+    iree::base
+    iree::base::cc
+    iree::base::core_headers
+    iree::base::internal
+    iree::base::internal::arena
+    iree::base::internal::flatcc::parsing
+    iree::base::internal::synchronization
+    iree::base::logging
+    iree::base::tracing
+    iree::hal
+    iree::hal::utils::buffer_transfer
+    iree::hal::utils::resource_set
+    iree::hal::vulkan::builtin
+    iree::hal::vulkan::util::arena
+    iree::hal::vulkan::util::intrusive_list
+    iree::hal::vulkan::util::ref_ptr
+    iree::schemas::spirv_executable_def_c_fbs
+    iree_defs_runtime
     vulkan_memory_allocator
   PUBLIC
 )
@@ -109,13 +109,13 @@ iree_cc_library(
     "vulkan_headers.h"
   DEPS
     Vulkan::Headers
-    iree::runtime::base
-    iree::runtime::base::cc
-    iree::runtime::base::core_headers
-    iree::runtime::base::internal::dynamic_library
-    iree::runtime::base::tracing
-    iree::runtime::defines
-    iree::runtime::hal::vulkan::util::ref_ptr
+    iree::base
+    iree::base::cc
+    iree::base::core_headers
+    iree::base::internal::dynamic_library
+    iree::base::tracing
+    iree::hal::vulkan::util::ref_ptr
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -126,10 +126,10 @@ iree_cc_library(
     "dynamic_symbols_test.cc"
   DEPS
     ::dynamic_symbols
-    iree::runtime::base
-    iree::runtime::defines
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 

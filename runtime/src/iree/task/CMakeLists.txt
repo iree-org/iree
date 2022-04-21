@@ -31,9 +31,9 @@ iree_cc_library(
     "api.c"
   DEPS
     ::task
-    iree::runtime::base::internal::flags
-    iree::runtime::base::tracing
-    iree::runtime::defines
+    iree::base::internal::flags
+    iree::base::tracing
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -71,19 +71,19 @@ iree_cc_library(
     "worker.h"
   DEPS
     ${IREE_CPUINFO_TARGET}
-    iree::runtime::base
-    iree::runtime::base::core_headers
-    iree::runtime::base::internal
-    iree::runtime::base::internal::atomic_slist
-    iree::runtime::base::internal::cpu
-    iree::runtime::base::internal::event_pool
-    iree::runtime::base::internal::fpu_state
-    iree::runtime::base::internal::prng
-    iree::runtime::base::internal::synchronization
-    iree::runtime::base::internal::threading
-    iree::runtime::base::internal::wait_handle
-    iree::runtime::base::tracing
-    iree::runtime::defines
+    iree::base
+    iree::base::core_headers
+    iree::base::internal
+    iree::base::internal::atomic_slist
+    iree::base::internal::cpu
+    iree::base::internal::event_pool
+    iree::base::internal::fpu_state
+    iree::base::internal::prng
+    iree::base::internal::synchronization
+    iree::base::internal::threading
+    iree::base::internal::wait_handle
+    iree::base::tracing
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -94,11 +94,11 @@ iree_cc_library(
     "executor_demo.cc"
   DEPS
     ::task
-    iree::runtime::base
-    iree::runtime::base::internal::prng
-    iree::runtime::base::tracing
-    iree::runtime::defines
-    iree::runtime::task::testing::test_util
+    iree::base
+    iree::base::internal::prng
+    iree::base::tracing
+    iree::task::testing::test_util
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -109,11 +109,11 @@ iree_cc_library(
     "executor_test.cc"
   DEPS
     ::task
-    iree::runtime::base
-    iree::runtime::defines
-    iree::runtime::task::testing::test_util
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::base
+    iree::task::testing::test_util
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -124,11 +124,11 @@ iree_cc_library(
     "list_test.cc"
   DEPS
     ::task
-    iree::runtime::base
-    iree::runtime::defines
-    iree::runtime::task::testing::test_util
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::base
+    iree::task::testing::test_util
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -139,11 +139,11 @@ iree_cc_library(
     "pool_test.cc"
   DEPS
     ::task
-    iree::runtime::base
-    iree::runtime::defines
-    iree::runtime::task::testing::test_util
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::base
+    iree::task::testing::test_util
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -154,11 +154,11 @@ iree_cc_library(
     "queue_test.cc"
   DEPS
     ::task
-    iree::runtime::base
-    iree::runtime::defines
-    iree::runtime::task::testing::test_util
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::base
+    iree::task::testing::test_util
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -170,11 +170,11 @@ iree_cc_library(
     "task_impl.h"
   DEPS
     ::task
-    iree::runtime::base
-    iree::runtime::defines
-    iree::runtime::task::testing::test_util
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::base
+    iree::task::testing::test_util
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -190,11 +190,11 @@ iree_cc_library(
     "task_test_wait.cc"
   DEPS
     ::task
-    iree::runtime::base
-    iree::runtime::defines
-    iree::runtime::task::testing::task_test
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::base
+    iree::task::testing::task_test
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -205,10 +205,10 @@ iree_cc_library(
     "topology_test.cc"
   DEPS
     ::task
-    iree::runtime::base
-    iree::runtime::defines
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 

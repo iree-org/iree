@@ -15,7 +15,7 @@ EXPLICIT_TARGET_MAPPING = {
     "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
 
     # Configuration targets.
-    "//runtime/src:runtime_defines": ["iree::runtime::defines"],
+    "//runtime/src:runtime_defines": ["iree_defs_runtime"],
 
     # IREE llvm-external-projects
     "//llvm-external-projects/iree-dialects:IREEPyDMTransforms": [
@@ -233,15 +233,15 @@ def convert_target(target):
   if target.startswith("//llvm-external-projects/iree-dialects"):
     return _convert_iree_dialects_target(target)
 
-  # Map //runtime/src/iree/(.*) -> iree::runtime::\1
+  # Map //runtime/src/iree/(.*) -> iree::\1
   m = re.match("^//runtime/src/iree/(.+)", target)
   if m:
-    return ["iree::runtime::" + _convert_bazel_path(m.group(1))]
+    return ["iree::" + _convert_bazel_path(m.group(1))]
 
-  # Map //runtime/bindings/(.*) -> iree::runtime::bindings\1
+  # Map //runtime/bindings/(.*) -> iree::bindings\1
   m = re.match("^//runtime/bindings/(.+)", target)
   if m:
-    return ["iree::runtime::bindings::" + _convert_bazel_path(m.group(1))]
+    return ["iree::bindings::" + _convert_bazel_path(m.group(1))]
 
   # Default (legacy) rewrite.
   if not target.startswith("@"):

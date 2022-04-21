@@ -17,7 +17,7 @@ iree_c_embed_data(
     "libmusl_wasm32_generic.bc"
     "libmusl_wasm64_generic.bc"
   DEPS
-    iree::runtime::defines
+    iree_defs_runtime
   C_FILE_OUTPUT
     "libmusl.c"
   H_FILE_OUTPUT

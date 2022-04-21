@@ -19,11 +19,11 @@ iree_cc_library(
     "executable_environment.c"
   DEPS
     ::executable_library
-    iree::runtime::base
-    iree::runtime::base::internal::cpu
-    iree::runtime::base::tracing
-    iree::runtime::defines
-    iree::runtime::hal
+    iree::base
+    iree::base::internal::cpu
+    iree::base::tracing
+    iree::hal
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -33,7 +33,7 @@ iree_cc_library(
   HDRS
     "executable_library.h"
   DEPS
-    iree::runtime::defines
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -46,13 +46,13 @@ iree_cc_binary_benchmark(
     ::executable_environment
     ::executable_library
     ::local
-    iree::runtime::base
-    iree::runtime::base::internal::file_io
-    iree::runtime::base::internal::flags
-    iree::runtime::base::tracing
-    iree::runtime::hal
-    iree::runtime::hal::local::loaders::embedded_library_loader
-    iree::runtime::testing::benchmark
+    iree::base
+    iree::base::internal::file_io
+    iree::base::internal::flags
+    iree::base::tracing
+    iree::hal
+    iree::hal::local::loaders::embedded_library_loader
+    iree::testing::benchmark
   TESTONLY
 )
 
@@ -66,9 +66,9 @@ iree_cc_library(
   DEPS
     ::executable_environment
     ::executable_library
-    iree::runtime::base
-    iree::runtime::base::core_headers
-    iree::runtime::defines
+    iree::base
+    iree::base::core_headers
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -94,13 +94,13 @@ iree_cc_library(
   DEPS
     ::executable_environment
     ::executable_library
-    iree::runtime::base
-    iree::runtime::base::core_headers
-    iree::runtime::base::internal
-    iree::runtime::base::internal::fpu_state
-    iree::runtime::base::tracing
-    iree::runtime::defines
-    iree::runtime::hal
+    iree::base
+    iree::base::core_headers
+    iree::base::internal
+    iree::base::internal::fpu_state
+    iree::base::tracing
+    iree::hal
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -119,15 +119,15 @@ iree_cc_library(
     "sync_semaphore.c"
   DEPS
     ::local
-    iree::runtime::base
-    iree::runtime::base::core_headers
-    iree::runtime::base::internal
-    iree::runtime::base::internal::arena
-    iree::runtime::base::internal::synchronization
-    iree::runtime::base::tracing
-    iree::runtime::defines
-    iree::runtime::hal
-    iree::runtime::hal::utils::buffer_transfer
+    iree::base
+    iree::base::core_headers
+    iree::base::internal
+    iree::base::internal::arena
+    iree::base::internal::synchronization
+    iree::base::tracing
+    iree::hal
+    iree::hal::utils::buffer_transfer
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -161,19 +161,19 @@ iree_cc_library(
     ::executable_environment
     ::executable_library
     ::local
-    iree::runtime::base
-    iree::runtime::base::core_headers
-    iree::runtime::base::internal
-    iree::runtime::base::internal::arena
-    iree::runtime::base::internal::event_pool
-    iree::runtime::base::internal::synchronization
-    iree::runtime::base::internal::wait_handle
-    iree::runtime::base::tracing
-    iree::runtime::defines
-    iree::runtime::hal
-    iree::runtime::hal::utils::buffer_transfer
-    iree::runtime::hal::utils::resource_set
-    iree::runtime::task
+    iree::base
+    iree::base::core_headers
+    iree::base::internal
+    iree::base::internal::arena
+    iree::base::internal::event_pool
+    iree::base::internal::synchronization
+    iree::base::internal::wait_handle
+    iree::base::tracing
+    iree::hal
+    iree::hal::utils::buffer_transfer
+    iree::hal::utils::resource_set
+    iree::task
+    iree_defs_runtime
   PUBLIC
 )
 

@@ -8,7 +8,7 @@ iree_hal_cts_test_suite(
   DRIVER_NAME
     vulkan
   DRIVER_REGISTRATION_HDR
-    "iree/hal/vulkan/registration/driver_module.h"
+    "runtime/src/iree/hal/vulkan/registration/driver_module.h"
   DRIVER_REGISTRATION_FN
     "iree_hal_vulkan_driver_module_register"
   COMPILER_TARGET_BACKEND

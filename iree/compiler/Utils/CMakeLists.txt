@@ -45,11 +45,11 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
+    iree::base::internal::flatcc::building
+    iree::base::internal::flatcc::debugging
+    iree::base::internal::flatcc::parsing
+    iree::base::tracing
     iree::compiler::Dialect::Util::IR
-    iree::runtime::base::internal::flatcc::building
-    iree::runtime::base::internal::flatcc::debugging
-    iree::runtime::base::internal::flatcc::parsing
-    iree::runtime::base::tracing
   PUBLIC
 )
 

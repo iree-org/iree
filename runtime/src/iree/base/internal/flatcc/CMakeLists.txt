@@ -19,7 +19,7 @@ iree_cc_library(
     ::dummy
     ::parsing
     flatcc::runtime
-    iree::runtime::defines
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -31,7 +31,7 @@ iree_cc_library(
   DEPS
     ::dummy
     flatcc::runtime
-    iree::runtime::defines
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -43,7 +43,7 @@ iree_cc_library(
   DEPS
     ::dummy
     flatcc::parsing
-    iree::runtime::defines
+    iree_defs_runtime
   PUBLIC
 )
 

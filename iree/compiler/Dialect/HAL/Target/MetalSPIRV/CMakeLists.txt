@@ -36,7 +36,7 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Utils
-    iree::runtime::schemas::metal_executable_def_c_fbs
+    iree::schemas::metal_executable_def_c_fbs
   PUBLIC
 )
 

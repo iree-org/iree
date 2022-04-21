@@ -20,11 +20,11 @@ iree_cc_library(
   SRCS
     "module.c"
   DEPS
-    iree::runtime::base
-    iree::runtime::base::tracing
-    iree::runtime::defines
-    iree::runtime::hal
-    iree::runtime::vm
+    iree::base
+    iree::base::tracing
+    iree::hal
+    iree::vm
+    iree_defs_runtime
   PUBLIC
 )
 

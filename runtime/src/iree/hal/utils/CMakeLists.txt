@@ -18,10 +18,10 @@ iree_cc_library(
   SRCS
     "buffer_transfer.c"
   DEPS
-    iree::runtime::base
-    iree::runtime::base::tracing
-    iree::runtime::defines
-    iree::runtime::hal
+    iree::base
+    iree::base::tracing
+    iree::hal
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -34,11 +34,11 @@ iree_cc_library(
     "deferred_command_buffer.c"
   DEPS
     ::resource_set
-    iree::runtime::base
-    iree::runtime::base::internal::arena
-    iree::runtime::base::tracing
-    iree::runtime::defines
-    iree::runtime::hal
+    iree::base
+    iree::base::internal::arena
+    iree::base::tracing
+    iree::hal
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -50,11 +50,11 @@ iree_cc_library(
   SRCS
     "resource_set.c"
   DEPS
-    iree::runtime::base
-    iree::runtime::base::internal::arena
-    iree::runtime::base::tracing
-    iree::runtime::defines
-    iree::runtime::hal
+    iree::base
+    iree::base::internal::arena
+    iree::base::tracing
+    iree::hal
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -65,10 +65,10 @@ iree_cc_binary_benchmark(
     "resource_set_benchmark.c"
   DEPS
     ::resource_set
-    iree::runtime::base
-    iree::runtime::base::internal::prng
-    iree::runtime::hal
-    iree::runtime::testing::benchmark
+    iree::base
+    iree::base::internal::prng
+    iree::hal
+    iree::testing::benchmark
   TESTONLY
 )
 
@@ -79,11 +79,11 @@ iree_cc_library(
     "resource_set_test.cc"
   DEPS
     ::resource_set
-    iree::runtime::base
-    iree::runtime::defines
-    iree::runtime::hal
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::base
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 

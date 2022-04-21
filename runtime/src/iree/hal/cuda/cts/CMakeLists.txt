@@ -8,7 +8,7 @@ iree_hal_cts_test_suite(
   DRIVER_NAME
     cuda
   DRIVER_REGISTRATION_HDR
-    "iree/hal/cuda/registration/driver_module.h"
+    "runtime/src/iree/hal/cuda/registration/driver_module.h"
   DRIVER_REGISTRATION_FN
     "iree_hal_cuda_driver_module_register"
   COMPILER_TARGET_BACKEND
@@ -35,7 +35,7 @@ iree_hal_cts_test_suite(
   VARIANT_SUFFIX
     graph
   DRIVER_REGISTRATION_HDR
-    "iree/hal/cuda/registration/driver_module.h"
+    "runtime/src/iree/hal/cuda/registration/driver_module.h"
   DRIVER_REGISTRATION_FN
     "iree_hal_cuda_driver_module_register"
   COMPILER_TARGET_BACKEND

@@ -43,7 +43,7 @@ iree_cc_library(
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Utils
-    iree::runtime::schemas::rocm_executable_def_c_fbs
+    iree::schemas::rocm_executable_def_c_fbs
   PUBLIC
 )
 

@@ -20,15 +20,15 @@ iree_cc_library(
   SRCS
     "driver_module.c"
   DEPS
-    iree::runtime::base
-    iree::runtime::base::internal::flags
-    iree::runtime::defines
-    iree::runtime::hal
-    iree::runtime::hal::local
-    iree::runtime::hal::local::loaders::embedded_library_loader
-    iree::runtime::hal::local::loaders::system_library_loader
-    iree::runtime::hal::local::task_driver
-    iree::runtime::task::api
+    iree::base
+    iree::base::internal::flags
+    iree::hal
+    iree::hal::local
+    iree::hal::local::loaders::embedded_library_loader
+    iree::hal::local::loaders::system_library_loader
+    iree::hal::local::task_driver
+    iree::task::api
+    iree_defs_runtime
   DEFINES
     "IREE_HAL_HAVE_DYLIB_DRIVER_MODULE=1"
   PUBLIC
@@ -46,12 +46,12 @@ iree_cc_library(
   SRCS
     "driver_module_sync.c"
   DEPS
-    iree::runtime::base
-    iree::runtime::defines
-    iree::runtime::hal
-    iree::runtime::hal::local
-    iree::runtime::hal::local::loaders::embedded_library_loader
-    iree::runtime::hal::local::sync_driver
+    iree::base
+    iree::hal
+    iree::hal::local
+    iree::hal::local::loaders::embedded_library_loader
+    iree::hal::local::sync_driver
+    iree_defs_runtime
   DEFINES
     "IREE_HAL_HAVE_DYLIB_SYNC_DRIVER_MODULE=1"
   PUBLIC

@@ -16,9 +16,9 @@ iree_cc_library(
   HDRS
     "task_test.h"
   DEPS
-    iree::runtime::defines
-    iree::runtime::task
-    iree::runtime::testing::gtest
+    iree::task
+    iree::testing::gtest
+    iree_defs_runtime
   TESTONLY
   PUBLIC
 )
@@ -29,9 +29,9 @@ iree_cc_library(
   HDRS
     "test_util.h"
   DEPS
-    iree::runtime::defines
-    iree::runtime::task
-    iree::runtime::testing::gtest
+    iree::task
+    iree::testing::gtest
+    iree_defs_runtime
   TESTONLY
   PUBLIC
 )

@@ -19,14 +19,14 @@ iree_cc_library(
     "trace_replay.c"
   DEPS
     ::yaml_util
-    iree::runtime::base
-    iree::runtime::base::internal::file_io
-    iree::runtime::base::internal::file_path
-    iree::runtime::base::tracing
-    iree::runtime::hal
-    iree::runtime::modules::hal
-    iree::runtime::vm
-    iree::runtime::vm::bytecode_module
+    iree::base
+    iree::base::internal::file_io
+    iree::base::internal::file_path
+    iree::base::tracing
+    iree::hal
+    iree::modules::hal
+    iree::vm
+    iree::vm::bytecode_module
     yaml
   PUBLIC
 )
@@ -39,16 +39,16 @@ iree_cc_library(
   SRCS
     "vm_util.cc"
   DEPS
-    iree::runtime::base
-    iree::runtime::base::cc
-    iree::runtime::base::internal::span
-    iree::runtime::base::logging
-    iree::runtime::base::tracing
-    iree::runtime::hal
-    iree::runtime::modules::hal
-    iree::runtime::vm
-    iree::runtime::vm::bytecode_module
-    iree::runtime::vm::cc
+    iree::base
+    iree::base::cc
+    iree::base::internal::span
+    iree::base::logging
+    iree::base::tracing
+    iree::hal
+    iree::modules::hal
+    iree::vm
+    iree::vm::bytecode_module
+    iree::vm::cc
   PUBLIC
 )
 
@@ -61,14 +61,14 @@ iree_cc_test(
     "vm_util_test.cc"
   DEPS
     ::vm_util
-    iree::runtime::base
-    iree::runtime::hal
-    iree::runtime::hal::vmvx::registration
-    iree::runtime::modules::hal
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
-    iree::runtime::vm
-    iree::runtime::vm::cc
+    iree::base
+    iree::hal
+    iree::hal::vmvx::registration
+    iree::modules::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree::vm
+    iree::vm::cc
 )
 
 endif()
@@ -81,7 +81,7 @@ iree_cc_library(
   SRCS
     "yaml_util.c"
   DEPS
-    iree::runtime::base
+    iree::base
     yaml
   PUBLIC
 )
@@ -94,8 +94,8 @@ iree_cc_library(
   SRCS
     "cpu_features.c"
   DEPS
-    iree::runtime::base
-    iree::runtime::base::target_platform
+    iree::base
+    iree::base::target_platform
   PUBLIC
 )
 

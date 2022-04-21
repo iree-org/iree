@@ -16,10 +16,10 @@ iree_cc_binary_benchmark(
   SRCS
     "libdevice_benchmark.c"
   DEPS
-    iree::runtime::base
-    iree::runtime::base::internal::flags
-    iree::runtime::builtins::device
-    iree::runtime::testing::benchmark
+    iree::base
+    iree::base::internal::flags
+    iree::builtins::device
+    iree::testing::benchmark
   TESTONLY
 )
 
@@ -29,12 +29,12 @@ iree_cc_library(
   SRCS
     "libdevice_test.cc"
   DEPS
-    iree::runtime::base
-    iree::runtime::base::internal::flags
-    iree::runtime::builtins::device
-    iree::runtime::defines
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::base
+    iree::base::internal::flags
+    iree::builtins::device
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 

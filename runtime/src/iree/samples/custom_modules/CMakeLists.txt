@@ -23,13 +23,13 @@ iree_cc_library(
   SRCS
     "module.cc"
   DEPS
-    iree::runtime::base
-    iree::runtime::base::cc
-    iree::runtime::defines
-    iree::runtime::hal
-    iree::runtime::modules::hal
-    iree::runtime::vm
-    iree::runtime::vm::cc
+    iree::base
+    iree::base::cc
+    iree::hal
+    iree::modules::hal
+    iree::vm
+    iree::vm::cc
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -56,17 +56,17 @@ iree_cc_library(
   DEPS
     ::custom_modules_test_module_c
     ::module
-    iree::runtime::base
-    iree::runtime::base::logging
-    iree::runtime::defines
-    iree::runtime::hal
-    iree::runtime::hal::vmvx::registration
-    iree::runtime::modules::hal
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
-    iree::runtime::vm
-    iree::runtime::vm::bytecode_module
-    iree::runtime::vm::cc
+    iree::base
+    iree::base::logging
+    iree::hal
+    iree::hal::vmvx::registration
+    iree::modules::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree::vm
+    iree::vm::bytecode_module
+    iree::vm::cc
+    iree_defs_runtime
   PUBLIC
 )
 

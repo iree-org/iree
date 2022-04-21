@@ -21,14 +21,14 @@ iree_cc_binary(
     "simple_embedding.c"
   DEPS
     ::simple_embedding_test_bytecode_module_vmvx_c
-    iree::runtime::base
-    iree::runtime::hal
-    iree::runtime::hal::local
-    iree::runtime::hal::local::loaders::vmvx_module_loader
-    iree::runtime::hal::local::sync_driver
-    iree::runtime::modules::hal
-    iree::runtime::vm
-    iree::runtime::vm::bytecode_module
+    iree::base
+    iree::hal
+    iree::hal::local
+    iree::hal::local::loaders::vmvx_module_loader
+    iree::hal::local::sync_driver
+    iree::modules::hal
+    iree::vm
+    iree::vm::bytecode_module
 )
 
 iree_bytecode_module(
@@ -69,14 +69,14 @@ iree_cc_binary(
     ::simple_embedding_test_bytecode_module_dylib_riscv_32_c
     ::simple_embedding_test_bytecode_module_dylib_riscv_64_c
     ::simple_embedding_test_bytecode_module_dylib_x86_64_c
-    iree::runtime::base
-    iree::runtime::hal
-    iree::runtime::hal::local
-    iree::runtime::hal::local::loaders::embedded_library_loader
-    iree::runtime::hal::local::sync_driver
-    iree::runtime::modules::hal
-    iree::runtime::vm
-    iree::runtime::vm::bytecode_module
+    iree::base
+    iree::hal
+    iree::hal::local
+    iree::hal::local::loaders::embedded_library_loader
+    iree::hal::local::sync_driver
+    iree::modules::hal
+    iree::vm
+    iree::vm::bytecode_module
 )
 
 iree_bytecode_module(
@@ -195,15 +195,15 @@ iree_cc_binary(
     ::simple_embedding_test_bytecode_module_dylib_arm_64_c
     ::simple_embedding_test_bytecode_module_dylib_riscv_64_c
     ::simple_embedding_test_bytecode_module_dylib_x86_64_c
-    iree::runtime::base
-    iree::runtime::hal
-    iree::runtime::hal::local
-    iree::runtime::hal::local::loaders::embedded_library_loader
-    iree::runtime::hal::local::task_driver
-    iree::runtime::modules::hal
-    iree::runtime::task::api
-    iree::runtime::vm
-    iree::runtime::vm::bytecode_module
+    iree::base
+    iree::hal
+    iree::hal::local
+    iree::hal::local::loaders::embedded_library_loader
+    iree::hal::local::task_driver
+    iree::modules::hal
+    iree::task::api
+    iree::vm
+    iree::vm::bytecode_module
 )
 
 iree_native_test(
@@ -227,12 +227,12 @@ iree_cc_binary(
     "simple_embedding.c"
   DEPS
     ::simple_embedding_test_bytecode_module_vulkan_c
-    iree::runtime::base
-    iree::runtime::hal
-    iree::runtime::hal::vulkan::registration
-    iree::runtime::modules::hal
-    iree::runtime::vm
-    iree::runtime::vm::bytecode_module
+    iree::base
+    iree::hal
+    iree::hal::vulkan::registration
+    iree::modules::hal
+    iree::vm
+    iree::vm::bytecode_module
 )
 
 iree_bytecode_module(

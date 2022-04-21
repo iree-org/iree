@@ -17,8 +17,8 @@ iree_cc_library(
     "api.h"
   DEPS
     ::impl
-    iree::runtime::base
-    iree::runtime::defines
+    iree::base
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -31,11 +31,11 @@ iree_cc_library(
     "ref_cc.h"
   DEPS
     ::vm
-    iree::runtime::base
-    iree::runtime::base::cc
-    iree::runtime::base::core_headers
-    iree::runtime::base::internal::span
-    iree::runtime::defines
+    iree::base
+    iree::base::cc
+    iree::base::core_headers
+    iree::base::internal::span
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -69,11 +69,11 @@ iree_cc_library(
     "shims.c"
     "stack.c"
   DEPS
-    iree::runtime::base
-    iree::runtime::base::core_headers
-    iree::runtime::base::internal
-    iree::runtime::base::tracing
-    iree::runtime::defines
+    iree::base
+    iree::base::core_headers
+    iree::base::internal
+    iree::base::tracing
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -85,10 +85,10 @@ iree_cc_library(
   DEPS
     ::cc
     ::impl
-    iree::runtime::base
-    iree::runtime::defines
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -100,10 +100,10 @@ iree_cc_library(
   DEPS
     ::cc
     ::impl
-    iree::runtime::base
-    iree::runtime::defines
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -116,11 +116,11 @@ iree_cc_library(
     ::cc
     ::impl
     ::native_module_test_hdrs
-    iree::runtime::base
-    iree::runtime::base::cc
-    iree::runtime::defines
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::base
+    iree::base::cc
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -131,8 +131,8 @@ iree_cc_library(
     "native_module_test.h"
   DEPS
     ::impl
-    iree::runtime::base
-    iree::runtime::defines
+    iree::base
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -145,9 +145,9 @@ iree_cc_binary_benchmark(
     ::impl
     ::native_module_test_hdrs
     benchmark
-    iree::runtime::base
-    iree::runtime::base::logging
-    iree::runtime::testing::benchmark_main
+    iree::base
+    iree::base::logging
+    iree::testing::benchmark_main
   TESTONLY
 )
 
@@ -159,10 +159,10 @@ iree_cc_library(
   DEPS
     ::cc
     ::impl
-    iree::runtime::base
-    iree::runtime::defines
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -173,10 +173,10 @@ iree_cc_library(
     "stack_test.cc"
   DEPS
     ::impl
-    iree::runtime::base
-    iree::runtime::defines
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -196,13 +196,13 @@ iree_cc_library(
   DEPS
     ::ops
     ::vm
-    iree::runtime::base
-    iree::runtime::base::core_headers
-    iree::runtime::base::internal
-    iree::runtime::base::internal::flatcc::parsing
-    iree::runtime::base::tracing
-    iree::runtime::defines
-    iree::runtime::schemas::bytecode_module_def_c_fbs
+    iree::base
+    iree::base::core_headers
+    iree::base::internal
+    iree::base::internal::flatcc::parsing
+    iree::base::tracing
+    iree::schemas::bytecode_module_def_c_fbs
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -217,12 +217,12 @@ iree_cc_library(
   DEPS
     ::bytecode_module
     ::vm
-    iree::runtime::base::cc
-    iree::runtime::base::logging
-    iree::runtime::defines
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
-    iree::runtime::vm::test::all_bytecode_modules_c
+    iree::base::cc
+    iree::base::logging
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree::vm::test::all_bytecode_modules_c
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -236,9 +236,9 @@ iree_cc_binary_benchmark(
     ::bytecode_module_benchmark_module_c
     ::vm
     benchmark
-    iree::runtime::base
-    iree::runtime::base::logging
-    iree::runtime::testing::benchmark_main
+    iree::base
+    iree::base::logging
+    iree::testing::benchmark_main
   TESTONLY
 )
 
@@ -266,7 +266,7 @@ iree_cc_binary_benchmark(
     ::bytecode_module
     ::bytecode_module_size_benchmark_module_c
     ::vm
-    iree::runtime::base
+    iree::base
   TESTONLY
 )
 
@@ -293,8 +293,8 @@ iree_cc_library(
   HDRS
     "ops.h"
   DEPS
-    iree::runtime::base
-    iree::runtime::defines
+    iree::base
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -304,7 +304,7 @@ iree_cc_library(
   HDRS
     "ops_emitc.h"
   DEPS
-    iree::runtime::defines
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -315,8 +315,8 @@ iree_cc_library(
     "shims_emitc.h"
   DEPS
     ::impl
-    iree::runtime::base::core_headers
-    iree::runtime::defines
+    iree::base::core_headers
+    iree_defs_runtime
   PUBLIC
 )
 

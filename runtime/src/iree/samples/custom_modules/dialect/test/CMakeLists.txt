@@ -18,7 +18,7 @@ iree_lit_test_suite(
     "custom_ops.mlir"
   TOOLS
     FileCheck
-    iree::runtime::samples::custom_modules::dialect::custom-opt
+    iree::samples::custom_modules::dialect::custom-opt
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

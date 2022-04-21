@@ -4,4 +4,16 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-iree_add_all_subdirs()
+add_subdirectory(base)
+add_subdirectory(builtins)
+add_subdirectory(hal)
+add_subdirectory(modules)
+add_subdirectory(runtime)
+add_subdirectory(schemas)
+add_subdirectory(task)
+add_subdirectory(testing)
+add_subdirectory(vm)
+
+if(IREE_BUILD_SAMPLES)
+  add_subdirectory(samples)
+endif()

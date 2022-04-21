@@ -16,7 +16,7 @@ iree_hal_cts_test_suite(
   DRIVER_NAME
     dylib
   DRIVER_REGISTRATION_HDR
-    "iree/hal/dylib/registration/driver_module.h"
+    "runtime/src/iree/hal/dylib/registration/driver_module.h"
   DRIVER_REGISTRATION_FN
     "iree_hal_dylib_driver_module_register"
   COMPILER_TARGET_BACKEND
@@ -31,7 +31,7 @@ iree_hal_cts_test_suite(
   DRIVER_NAME
     dylib-sync
   DRIVER_REGISTRATION_HDR
-    "iree/hal/dylib/registration/driver_module_sync.h"
+    "runtime/src/iree/hal/dylib/registration/driver_module_sync.h"
   DRIVER_REGISTRATION_FN
     "iree_hal_dylib_sync_driver_module_register"
   COMPILER_TARGET_BACKEND

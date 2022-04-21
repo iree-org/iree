@@ -21,10 +21,10 @@ iree_cc_library(
   DEPS
     ::arch
     ::platform
-    iree::runtime::base
-    iree::runtime::base::core_headers
-    iree::runtime::base::tracing
-    iree::runtime::defines
+    iree::base
+    iree::base::core_headers
+    iree::base::tracing
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -35,11 +35,11 @@ iree_cc_binary(
     "elf_module_test_main.c"
   DEPS
     ::elf_module
-    iree::runtime::base
-    iree::runtime::base::core_headers
-    iree::runtime::hal::local::elf::testdata::elementwise_mul
-    iree::runtime::hal::local::executable_environment
-    iree::runtime::hal::local::executable_library
+    iree::base
+    iree::base::core_headers
+    iree::hal::local::elf::testdata::elementwise_mul
+    iree::hal::local::executable_environment
+    iree::hal::local::executable_library
 )
 
 iree_native_test(
@@ -62,10 +62,10 @@ iree_cc_library(
     "arch/x86_64.c"
     "elf_types.h"
   DEPS
-    iree::runtime::base
-    iree::runtime::base::core_headers
-    iree::runtime::base::tracing
-    iree::runtime::defines
+    iree::base
+    iree::base::core_headers
+    iree::base::tracing
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -80,10 +80,10 @@ iree_cc_library(
     "platform/linux.c"
     "platform/windows.c"
   DEPS
-    iree::runtime::base
-    iree::runtime::base::core_headers
-    iree::runtime::base::tracing
-    iree::runtime::defines
+    iree::base
+    iree::base::core_headers
+    iree::base::tracing
+    iree_defs_runtime
   PUBLIC
 )
 

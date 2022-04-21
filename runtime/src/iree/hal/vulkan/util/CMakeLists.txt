@@ -18,9 +18,9 @@ iree_cc_library(
   SRCS
     "arena.cc"
   DEPS
-    iree::runtime::base::core_headers
-    iree::runtime::base::logging
-    iree::runtime::defines
+    iree::base::core_headers
+    iree::base::logging
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -31,9 +31,9 @@ iree_cc_library(
     "arena_test.cc"
   DEPS
     ::arena
-    iree::runtime::defines
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -44,8 +44,8 @@ iree_cc_library(
     "intrusive_list.h"
     "intrusive_list_unique_ptr.inc"
   DEPS
-    iree::runtime::base::logging
-    iree::runtime::defines
+    iree::base::logging
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -57,9 +57,9 @@ iree_cc_library(
     "intrusive_list_unique_ptr_test.cc"
   DEPS
     ::intrusive_list
-    iree::runtime::defines
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -69,10 +69,10 @@ iree_cc_library(
   HDRS
     "ref_ptr.h"
   DEPS
-    iree::runtime::base::core_headers
-    iree::runtime::base::internal
-    iree::runtime::base::logging
-    iree::runtime::defines
+    iree::base::core_headers
+    iree::base::internal
+    iree::base::logging
+    iree_defs_runtime
   PUBLIC
 )
 
@@ -83,9 +83,9 @@ iree_cc_library(
     "ref_ptr_test.cc"
   DEPS
     ::ref_ptr
-    iree::runtime::defines
-    iree::runtime::testing::gtest
-    iree::runtime::testing::gtest_main
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree_defs_runtime
   PUBLIC
 )
 
