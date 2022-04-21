@@ -5,12 +5,15 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import re
+
 # Bazel to CMake target name conversions used by bazel_to_cmake.py.
 
 EXPLICIT_TARGET_MAPPING = {
     # Internal utilities to emulate various binary/library options.
     "//build_tools:default_linkopts": [],
     "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
+    "//runtime/src:runtime_defines": [],
 
     # IREE llvm-external-projects
     "//llvm-external-projects/iree-dialects:IREEPyDMTransforms": [
@@ -192,6 +195,17 @@ def _convert_iree_dialects_target(target):
   return [target.rsplit(":")[-1]]
 
 
+def _convert_bazel_path(bazel_path: str) -> str:
+  # Bazel `:api`            -> CMake `::api`
+  # Bazel `//iree/base`     -> CMake `iree::base`
+  # Bazel `//iree/base:foo` -> CMake `iree::base::foo`
+  if bazel_path.startswith("//"):
+    bazel_path = bazel_path[len("//"):]
+  bazel_path = bazel_path.replace(":", "::")  # iree/base::foo or ::foo
+  bazel_path = bazel_path.replace("/", "::")  # iree::base
+  return bazel_path
+
+
 def convert_target(target):
   """Converts a Bazel target to a list of CMake targets.
 
@@ -216,14 +230,19 @@ def convert_target(target):
     return _convert_mlir_target(target)
   if target.startswith("//llvm-external-projects/iree-dialects"):
     return _convert_iree_dialects_target(target)
+
+  # Map //runtime/src/iree/(.*) -> iree::\1
+  m = re.match("^//runtime/src/iree/(.+)", target)
+  if m:
+    return ["iree::" + _convert_bazel_path(m.group(1))]
+
+  # Map //runtime/bindings/(.*) -> iree::bindings\1
+  m = re.match("^//runtime/bindings/(.+)", target)
+  if m:
+    return ["iree::bindings::" + _convert_bazel_path(m.group(1))]
+
+  # Default (legacy) rewrite.
   if not target.startswith("@"):
-    # Bazel `:api`            -> CMake `::api`
-    # Bazel `//iree/base`     -> CMake `iree::base`
-    # Bazel `//iree/base:foo` -> CMake `iree::base::foo`
-    if target.startswith("//"):
-      target = target[len("//"):]
-    target = target.replace(":", "::")  # iree/base::foo or ::foo
-    target = target.replace("/", "::")  # iree::base
-    return [target]
+    return [_convert_bazel_path(target)]
 
   raise KeyError(f"No conversion found for target '{target}'")

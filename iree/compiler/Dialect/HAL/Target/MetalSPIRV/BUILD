@@ -33,7 +33,7 @@ cc_library(
         "//iree/compiler/Codegen/Utils",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Utils",
-        "//iree/schemas:metal_executable_def_c_fbs",
+        "//runtime/src/iree/schemas:metal_executable_def_c_fbs",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:LinalgOps",

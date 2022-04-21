@@ -10,6 +10,9 @@
 # runlit.site.cfg.py which in turn is evaluated by lit.py.
 # pylint: disable=undefined-variable
 
+# NOTE: Each top-level which includes lit tests needs a copy of this file.
+# Please keep up to date.
+
 import os
 import tempfile
 

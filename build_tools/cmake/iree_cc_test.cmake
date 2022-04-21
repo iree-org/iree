@@ -127,6 +127,11 @@ function(iree_cc_test)
 
   list(APPEND _RULE_DEPS "gmock")
 
+  # Implicit deps.
+  if(IREE_IMPLICIT_DEFS_CC_DEPS)
+    list(APPEND _RULE_DEPS ${IREE_IMPLICIT_DEFS_CC_DEPS})
+  endif()
+
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
   set(_NAME_PATH "${_PACKAGE_PATH}/${_RULE_NAME}")
 

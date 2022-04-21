@@ -113,7 +113,7 @@ function(iree_hal_cts_test_suite)
           MODULE_FILE_NAME
             "${_RULE_COMPILER_TARGET_BACKEND}_${_FILE_NAME}.bin"
           SRC
-            "${IREE_ROOT_DIR}/iree/hal/cts/testdata/${_FILE_NAME}.mlir"
+            "${IREE_ROOT_DIR}/runtime/src/iree/hal/cts/testdata/${_FILE_NAME}.mlir"
           FLAGS
             ${_TRANSLATE_FLAGS}
           TRANSLATE_TOOL
@@ -191,14 +191,14 @@ function(iree_hal_cts_test_suite)
 
     # Generate the source file for this [test x driver] pair.
     # TODO(scotttodd): Move to build time instead of configure time?
-    set(IREE_CTS_TEST_FILE_PATH "iree/hal/cts/${_TEST_NAME}_test.h")
+    set(IREE_CTS_TEST_FILE_PATH "runtime/src/iree/hal/cts/${_TEST_NAME}_test.h")
     set(IREE_CTS_DRIVER_REGISTRATION_HDR "${_RULE_DRIVER_REGISTRATION_HDR}")
     set(IREE_CTS_DRIVER_REGISTRATION_FN "${_RULE_DRIVER_REGISTRATION_FN}")
     set(IREE_CTS_TEST_CLASS_NAME "${_TEST_NAME}_test")
     set(IREE_CTS_DRIVER_NAME "${_RULE_DRIVER_NAME}")
 
     configure_file(
-      "${IREE_ROOT_DIR}/iree/hal/cts/cts_test_template.cc.in"
+      "${IREE_ROOT_DIR}/runtime/src/iree/hal/cts/cts_test_template.cc.in"
       ${_TEST_SOURCE_NAME}
     )
 

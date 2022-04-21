@@ -83,7 +83,7 @@ bazel \
   --bazelrc=build_tools/bazel/iree.bazelrc \
   query \
     --config=non_darwin \
-    //iree/... + //build_tools/... + \
+    //iree/... + //runtime/... + //build_tools/... + \
     //llvm-external-projects/iree-dialects/... | \
       xargs --max-args 1000000 --max-chars 1000000 --exit \
         bazel \

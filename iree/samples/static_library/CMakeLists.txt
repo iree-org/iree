@@ -156,6 +156,10 @@ iree_cc_binary(
   SRCS
     "create_c_module.c"
     "static_library_demo.c"
+  COPTS
+    # TODO: Make emitc not generate unused variables.
+    # https://github.com/google/iree/issues/8954
+    "$<$<C_COMPILER_ID:Clang>:-Wno-unused-but-set-variable>"
   DEPS
     ::simple_mul_emitc
     iree::runtime

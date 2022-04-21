@@ -45,3 +45,29 @@ def iree_cmake_extra_content(content = "", inline = False):
         be inserted near the top of the converted file.
     """
     pass
+
+def iree_runtime_cc_library(deps = [], **kwargs):
+    """Used for cc_library targets within the //runtime tree.
+
+    This is a pass-through to the native cc_library which adds specific
+    runtime specific options and deps.
+    """
+    native.cc_library(
+        deps = deps + [
+            "//runtime/src:runtime_defines",
+        ],
+        **kwargs
+    )
+
+def iree_runtime_cc_test(deps = [], **kwargs):
+    """Used for cc_test targets within the //runtime tree.
+
+    This is a pass-through to the native cc_test which adds specific
+    runtime specific options and deps.
+    """
+    native.cc_test(
+        deps = deps + [
+            "//runtime/src:runtime_defines",
+        ],
+        **kwargs
+    )

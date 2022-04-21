@@ -4,6 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+add_subdirectory(src)
+
 if(IREE_BUILD_PYTHON_BINDINGS)
   # Copy Python packaging files to the build dir so that we can install from
   # there.

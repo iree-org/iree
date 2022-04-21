@@ -69,11 +69,19 @@ def _convert_option_block(option, option_value):
 def _convert_target_block(name, target):
   if target is None:
     return ""
-  # Bazel target name to cmake binary name
-  # Bazel `//iree/custom:custom-translate` -> CMake `iree_custom_custom-translate`
-  target = target.replace("//iree", "iree")  # iree/custom:custom-translate
-  target = target.replace(":", "_")  # iree/custom_custom-translate
-  target = target.replace("/", "_")  # iree_custom_custom-translate
+
+  # Targets in this context can't be aliases, because CMake. So we first convert
+  # it in the usual way and then syntactically change it back from the pretty
+  # alias name to the underscored variant. Example:
+  #   //iree/tools:iree-translate
+  #   iree::tools::iree-translate
+  #   iree_tools_iree-translate
+  cmake_aliases = bazel_to_cmake_targets.convert_target(target)
+  if len(cmake_aliases) != 1:
+    raise ValueError(
+        f"Expected a CMake alias from {target}. Got {cmake_aliases}")
+  target = cmake_aliases[0]
+  target = target.replace("::", "_")
   return _convert_string_arg_block(name, target, quote=False)
 
 
@@ -325,6 +333,9 @@ class BuildFileFunctions(object):
                             f"{testonly_block}"
                             f"  PUBLIC\n)\n\n")
 
+  def iree_runtime_cc_library(self, deps=[], **kwargs):
+    self.cc_library(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
+
   def cc_test(self,
               name,
               hdrs=None,
@@ -357,6 +368,9 @@ class BuildFileFunctions(object):
                             f"{args_block}"
                             f"{labels_block}"
                             f")\n\n")
+
+  def iree_runtime_cc_test(self, deps=[], **kwargs):
+    self.cc_test(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
 
   def cc_binary(self,
                 name,
@@ -400,6 +414,7 @@ class BuildFileFunctions(object):
                    strip_prefix=None,
                    flatten=None,
                    identifier=None,
+                   deps=None,
                    **kwargs):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
@@ -410,10 +425,12 @@ class BuildFileFunctions(object):
     testonly_block = _convert_option_block("TESTONLY", testonly)
     identifier_block = _convert_string_arg_block("IDENTIFIER", identifier)
     flatten_block = _convert_option_block("FLATTEN", flatten)
+    deps_block = _convert_target_list_block("DEPS", deps)
 
     self.converter.body += (f"iree_c_embed_data(\n"
                             f"{name_block}"
                             f"{srcs_block}"
+                            f"{deps_block}"
                             f"{c_file_output_block}"
                             f"{h_file_output_block}"
                             f"{identifier_block}"

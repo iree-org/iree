@@ -614,17 +614,8 @@ add_custom_target(iree-test-deps COMMENT "Building IREE test deps")
 
 add_subdirectory(build_tools/embed_data/)
 
-add_subdirectory(iree/base)
-add_subdirectory(iree/builtins)
-add_subdirectory(iree/hal)
-add_subdirectory(iree/modules)
-add_subdirectory(iree/runtime)
-add_subdirectory(iree/schemas)
-add_subdirectory(iree/task)
-add_subdirectory(iree/testing)
 # Note: Test deps are not built as part of all (use the iree-test-deps target).
 add_subdirectory(iree/test EXCLUDE_FROM_ALL)
-add_subdirectory(iree/vm)
 
 if(${IREE_BUILD_BENCHMARKS})
   find_program(IREE_IMPORT_TFLITE_PATH iree-import-tflite)
@@ -643,6 +634,10 @@ endif()
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(iree/compiler)
+endif()
+
+if(IREE_BUILD_SAMPLES)
+  add_subdirectory(iree/samples)
 endif()
 
 add_subdirectory(iree/tools)
@@ -674,10 +669,6 @@ endif()
 
 if(${IREE_BUILD_BINDINGS_TFLITE})
   add_subdirectory(bindings/tflite)
-endif()
-
-if(${IREE_BUILD_SAMPLES})
-  add_subdirectory(iree/samples)
 endif()
 
 if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
