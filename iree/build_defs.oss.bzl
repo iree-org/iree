@@ -53,10 +53,10 @@ def iree_runtime_cc_library(deps = [], **kwargs):
     runtime specific options and deps.
     """
     native.cc_library(
-      deps=deps + [
-        "//runtime/src:runtime_defines",
-      ],
-      **kwargs
+        deps = deps + [
+            "//runtime/src:runtime_defines",
+        ],
+        **kwargs
     )
 
 def iree_runtime_cc_test(deps = [], **kwargs):
@@ -66,8 +66,8 @@ def iree_runtime_cc_test(deps = [], **kwargs):
     runtime specific options and deps.
     """
     native.cc_test(
-      deps=deps + [
-        "//runtime/src:runtime_defines",
-      ],
-      **kwargs
+        deps = deps + [
+            "//runtime/src:runtime_defines",
+        ],
+        **kwargs
     )
