@@ -11,15 +11,18 @@ shared between different stages of the same benchmark pipeline.
 """
 
 import json
+import os
+import re
 import subprocess
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Sequence
+from typing import Any, Dict, Optional, Sequence
 
 # A map from CPU ABI to IREE's benchmark target architecture.
 CPU_ABI_TO_TARGET_ARCH_MAP = {
     "arm64-v8a": "cpu-arm64-v8a",
+    "x86_64": "cpu-x86-64",
 }
 
 # A map from GPU name to IREE's benchmark target architecture.
@@ -30,6 +33,7 @@ GPU_NAME_TO_TARGET_ARCH_MAP = {
     "adreno-730": "gpu-adreno",
     "mali-g77": "gpu-mali-valhall",
     "mali-g78": "gpu-mali-valhall",
+    "unknown": "gpu-unknown",
 }
 
 
@@ -99,6 +103,58 @@ def execute_cmd_and_get_output(args: Sequence[str],
                      **kwargs).stdout.strip()
 
 
+def get_git_commit_hash(commit: str) -> str:
+  return execute_cmd_and_get_output(['git', 'rev-parse', commit],
+                                    cwd=os.path.dirname(
+                                        os.path.realpath(__file__)))
+
+
+def get_iree_benchmark_module_arguments(
+    results_filename: str,
+    driver: str,
+    benchmark_min_time: Optional[float] = None):
+  """Returns the common arguments to run iree-benchmark-module."""
+
+  if driver == "iree-vmvx":
+    # VMVX is very unoptimized for now and can take a long time to run.
+    # Decrease the repetition for it until it's reasonably fast.
+    repetitions = 3
+  else:
+    repetitions = 10
+
+  cmd = [
+      "--benchmark_format=json",
+      "--benchmark_out_format=json",
+      f"--benchmark_out={results_filename}",
+  ]
+  if benchmark_min_time:
+    cmd.extend([
+        f"--benchmark_min_time={benchmark_min_time}",
+    ])
+  else:
+    cmd.extend([
+        f"--benchmark_repetitions={repetitions}",
+    ])
+
+  return cmd
+
+
+def wait_for_iree_benchmark_module_start(process: subprocess.Popen,
+                                         verbose: bool = False) -> None:
+  """Wait for the start of iree-benchmark module; otherwise will see connection
+  failure when opening the catpure tool."""
+
+  while True:
+    line = process.stdout.readline()  # pytype: disable=attribute-error
+    if line == "" and process.poll() is not None:  # Process completed
+      raise ValueError("Cannot find benchmark result line in the log!")
+    if verbose:
+      print(line.strip())
+    # Result available
+    if re.match(r"^BM_.+/real_time", line) is not None:
+      break
+
+
 class PlatformType(Enum):
   ANDROID = "Android"
   LINUX = "Linux"
@@ -150,6 +206,8 @@ class DeviceInfo:
   def get_cpu_arch_revision(self) -> str:
     if self.cpu_abi == "arm64-v8a":
       return self.__get_arm_cpu_arch_revision()
+    if self.cpu_abi == "x86_64":
+      return "x86_64"
     raise ValueError("Unrecognized CPU ABI; need to update the list")
 
   def to_json_object(self) -> Dict[str, Any]:
