@@ -6,7 +6,6 @@
 
 load("//iree:build_defs.oss.bzl", "iree_build_test")
 load("//build_tools/bazel:iree_flatcc.bzl", "iree_flatbuffer_c_library")
-load("//iree:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],

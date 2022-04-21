@@ -4,8 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
-load("//iree:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
