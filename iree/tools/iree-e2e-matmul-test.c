@@ -60,7 +60,8 @@ static iree_status_t validate_memory_type(iree_hal_buffer_view_t* buffer_view,
 // Map dense row-major data in a host-local buffer_view.
 static iree_status_t map_host_local_row_major_data(
     iree_hal_buffer_view_t* buffer_view,
-    enum iree_hal_memory_access_bits_t access, void** data) {
+    enum iree_hal_memory_access_bits_t access,
+    iree_hal_buffer_mapping_t* mapping) {
   // Really validate host-local, not just host-visible: callers may rely on
   // host-coherency.
   IREE_RETURN_IF_ERROR(
@@ -70,12 +71,9 @@ static iree_status_t map_host_local_row_major_data(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "buffer_view is not dense row major");
   }
-  iree_hal_buffer_mapping_t mapping = {{0}};
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_map_range(iree_hal_buffer_view_buffer(buffer_view),
-                                IREE_HAL_MAPPING_MODE_PERSISTENT, access, 0,
-                                IREE_WHOLE_BUFFER, &mapping));
-  *data = mapping.contents.data;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+      iree_hal_buffer_view_buffer(buffer_view),
+      IREE_HAL_MAPPING_MODE_PERSISTENT, access, 0, IREE_WHOLE_BUFFER, mapping));
   return iree_ok_status();
 }
 
@@ -101,7 +99,7 @@ static iree_status_t allocate_host_buffer_view_like(
 // Implicitly zero-filled.
 static iree_status_t allocate_device_buffer_view_like(
     iree_hal_allocator_t* hal_allocator, iree_hal_buffer_view_t* src,
-    iree_hal_buffer_view_t** dst) {
+    iree_const_byte_span_t initial_data, iree_hal_buffer_view_t** dst) {
   return iree_hal_buffer_view_allocate_buffer(
       hal_allocator, iree_hal_buffer_view_shape_dims(src),
       iree_hal_buffer_view_shape_rank(src),
@@ -112,7 +110,7 @@ static iree_status_t allocate_device_buffer_view_like(
           .usage =
               IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH,
       },
-      iree_const_byte_span_empty(), dst);
+      initial_data, dst);
 }
 
 // Performs a deep copy of device-local |src| into host-local |dst|.
@@ -123,15 +121,16 @@ static iree_status_t copy_device_buffer_view_to_host(
   IREE_RETURN_IF_ERROR(
       validate_memory_type(src, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL));
   IREE_RETURN_IF_ERROR(allocate_host_buffer_view_like(hal_allocator, src, dst));
-  void* dst_data = NULL;
+  iree_hal_buffer_mapping_t dst_mapping;
   iree_status_t status = map_host_local_row_major_data(
-      *dst, IREE_HAL_MEMORY_ACCESS_WRITE, &dst_data);
+      *dst, IREE_HAL_MEMORY_ACCESS_WRITE, &dst_mapping);
   if (iree_status_is_ok(status)) {
     status = iree_hal_device_transfer_d2h(
-        device, iree_hal_buffer_view_buffer(src), 0, dst_data,
+        device, iree_hal_buffer_view_buffer(src), 0, dst_mapping.contents.data,
         iree_hal_buffer_view_byte_length(src),
         IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
   }
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&dst_mapping));
   return status;
 }
 
@@ -140,23 +139,15 @@ static iree_status_t copy_device_buffer_view_to_host(
 static iree_status_t copy_host_buffer_view_to_device(
     iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
     iree_hal_buffer_view_t* src, iree_hal_buffer_view_t** dst) {
-  IREE_RETURN_IF_ERROR(
-      validate_memory_type(src, IREE_HAL_MEMORY_TYPE_HOST_LOCAL));
-  IREE_RETURN_IF_ERROR(
-      allocate_device_buffer_view_like(hal_allocator, src, dst));
-  void* src_data = NULL;
-  iree_status_t status = map_host_local_row_major_data(
-      src, IREE_HAL_MEMORY_ACCESS_READ, &src_data);
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_device_transfer_h2d(
-        device, src_data, iree_hal_buffer_view_buffer(*dst), 0,
-        iree_hal_buffer_view_byte_length(src),
-        IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
-  }
-  if (!iree_status_is_ok(status)) {
-    iree_hal_buffer_view_release(*dst);
-  }
-  return status;
+  iree_hal_buffer_mapping_t src_mapping;
+  IREE_RETURN_IF_ERROR(map_host_local_row_major_data(
+      src, IREE_HAL_MEMORY_ACCESS_READ, &src_mapping));
+  iree_const_byte_span_t const_src_bytes = iree_make_const_byte_span(
+      src_mapping.contents.data, src_mapping.contents.data_length);
+  IREE_RETURN_IF_ERROR(allocate_device_buffer_view_like(hal_allocator, src,
+                                                        const_src_bytes, dst));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&src_mapping));
+  return iree_ok_status();
 }
 
 // Performs a deep copy of device-local |src| into a device-local |dst|.
@@ -166,8 +157,8 @@ static iree_status_t copy_device_buffer_view_to_device(
     iree_hal_buffer_view_t* src, iree_hal_buffer_view_t** dst) {
   IREE_RETURN_IF_ERROR(
       validate_memory_type(src, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL));
-  IREE_RETURN_IF_ERROR(
-      allocate_device_buffer_view_like(hal_allocator, src, dst));
+  IREE_RETURN_IF_ERROR(allocate_device_buffer_view_like(
+      hal_allocator, src, iree_const_byte_span_empty(), dst));
   iree_status_t status = iree_hal_device_transfer_d2d(
       device, iree_hal_buffer_view_buffer(src), 0,
       iree_hal_buffer_view_buffer(*dst), 0,
@@ -356,28 +347,33 @@ static iree_status_t reference_matmul(iree_vm_list_t* input_list,
   iree_hal_dim_t m_size, k_size, n_size;
   IREE_RETURN_IF_ERROR(
       get_matmul_sizes(lhs, rhs, acc, result, &m_size, &k_size, &n_size));
-  void* lhs_data;
-  void* rhs_data;
-  void* acc_data;
-  void* result_data;
+  iree_hal_buffer_mapping_t lhs_mapping;
+  iree_hal_buffer_mapping_t rhs_mapping;
+  iree_hal_buffer_mapping_t acc_mapping;
+  iree_hal_buffer_mapping_t result_mapping;
   IREE_RETURN_IF_ERROR(map_host_local_row_major_data(
-      lhs, IREE_HAL_MEMORY_ACCESS_READ, &lhs_data));
+      lhs, IREE_HAL_MEMORY_ACCESS_READ, &lhs_mapping));
   IREE_RETURN_IF_ERROR(map_host_local_row_major_data(
-      rhs, IREE_HAL_MEMORY_ACCESS_READ, &rhs_data));
+      rhs, IREE_HAL_MEMORY_ACCESS_READ, &rhs_mapping));
   IREE_RETURN_IF_ERROR(map_host_local_row_major_data(
-      acc, IREE_HAL_MEMORY_ACCESS_READ, &acc_data));
+      acc, IREE_HAL_MEMORY_ACCESS_READ, &acc_mapping));
   IREE_RETURN_IF_ERROR(map_host_local_row_major_data(
-      result, IREE_HAL_MEMORY_ACCESS_WRITE, &result_data));
+      result, IREE_HAL_MEMORY_ACCESS_WRITE, &result_mapping));
   iree_hal_element_type_t lhs_type = iree_hal_buffer_view_element_type(lhs);
   iree_hal_element_type_t rhs_type = iree_hal_buffer_view_element_type(rhs);
   iree_hal_element_type_t acc_type = iree_hal_buffer_view_element_type(acc);
   for (iree_hal_dim_t m = 0; m < m_size; ++m) {
     for (iree_hal_dim_t n = 0; n < n_size; ++n) {
-      reference_matmul_element(m_size, k_size, n_size, lhs_type, rhs_type,
-                               acc_type, lhs_data, rhs_data, acc_data,
-                               result_data, m, n);
+      reference_matmul_element(
+          m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+          lhs_mapping.contents.data, rhs_mapping.contents.data,
+          acc_mapping.contents.data, result_mapping.contents.data, m, n);
     }
   }
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&lhs_mapping));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&rhs_mapping));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&acc_mapping));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&result_mapping));
   return iree_ok_status();
 }
 
@@ -495,20 +491,21 @@ static int get_max_elem_width(precision_t precision, int row_start, int row_end,
   int rows = dims[0];
   int cols = dims[1];
   iree_hal_element_type_t elem_type = iree_hal_buffer_view_element_type(matrix);
-  void* data = NULL;
+  iree_hal_buffer_mapping_t mapping;
   IREE_CHECK_OK(map_host_local_row_major_data(
-      matrix, IREE_HAL_MEMORY_ACCESS_READ, &data));
+      matrix, IREE_HAL_MEMORY_ACCESS_READ, &mapping));
   int max_elem_width = 0;
   for (int row = row_start; row < row_end; row++) {
     for (int col = col_start; col < col_end; col++) {
-      iree_vm_value_t elem =
-          read_matrix_element(rows, cols, elem_type, data, row, col);
+      iree_vm_value_t elem = read_matrix_element(
+          rows, cols, elem_type, mapping.contents.data, row, col);
       char buf[64];
       int this_elem_width = snprintf_value(buf, sizeof buf, elem, precision);
       // iree_max is a macro, may evaluate its args twice. Give it plain ints.
       max_elem_width = iree_max(max_elem_width, this_elem_width);
     }
   }
+  IREE_CHECK_OK(iree_hal_buffer_unmap_range(&mapping));
   return max_elem_width;
 }
 
@@ -541,15 +538,15 @@ static void print_matrix(FILE* file, const char* label, precision_t precision,
   int rows = dims[0];
   int cols = dims[1];
   iree_hal_element_type_t elem_type = iree_hal_buffer_view_element_type(matrix);
-  void* data = NULL;
+  iree_hal_buffer_mapping_t mapping;
   IREE_CHECK_OK(map_host_local_row_major_data(
-      matrix, IREE_HAL_MEMORY_ACCESS_READ, &data));
+      matrix, IREE_HAL_MEMORY_ACCESS_READ, &mapping));
   int max_elem_width = get_max_elem_width(precision, row_start, row_end,
                                           col_start, col_end, matrix);
-  void* other_data = NULL;
+  iree_hal_buffer_mapping_t other_mapping;
   if (other_matrix) {
     IREE_CHECK_OK(map_host_local_row_major_data(
-        other_matrix, IREE_HAL_MEMORY_ACCESS_READ, &other_data));
+        other_matrix, IREE_HAL_MEMORY_ACCESS_READ, &other_mapping));
     int other_matrix_max_elem_width = get_max_elem_width(
         precision, row_start, row_end, col_start, col_end, other_matrix);
     // iree_max is a macro, may evaluate its args twice. Give it plain ints.
@@ -562,12 +559,12 @@ static void print_matrix(FILE* file, const char* label, precision_t precision,
           cols - 1);
   for (int row = row_start; row < row_end; row++) {
     for (int col = col_start; col < col_end; col++) {
-      iree_vm_value_t elem =
-          read_matrix_element(rows, cols, elem_type, data, row, col);
+      iree_vm_value_t elem = read_matrix_element(
+          rows, cols, elem_type, mapping.contents.data, row, col);
       bool disagree = false;
       if (other_matrix) {
-        iree_vm_value_t other_elem =
-            read_matrix_element(rows, cols, elem_type, other_data, row, col);
+        iree_vm_value_t other_elem = read_matrix_element(
+            rows, cols, elem_type, other_mapping.contents.data, row, col);
         disagree = !matmul_result_elements_agree(elem, other_elem);
       }
       char buf[64];
@@ -579,6 +576,11 @@ static void print_matrix(FILE* file, const char* label, precision_t precision,
       fprintf(file, "%s ", disagree ? highlight : "  ");
     }
     fprintf(file, "\n");
+  }
+
+  IREE_CHECK_OK(iree_hal_buffer_unmap_range(&mapping));
+  if (other_matrix) {
+    IREE_CHECK_OK(iree_hal_buffer_unmap_range(&mapping));
   }
 }
 
@@ -666,20 +668,22 @@ static iree_status_t check_matmul_results_impl(
     iree_hal_buffer_view_t* rhs, iree_hal_buffer_view_t* acc,
     iree_hal_buffer_view_t* actual_result,
     iree_hal_buffer_view_t* expected_result) {
-  void* actual_result_data;
-  void* expected_result_data;
+  iree_hal_buffer_mapping_t actual_result_mapping;
+  iree_hal_buffer_mapping_t expected_result_mapping;
   IREE_RETURN_IF_ERROR(map_host_local_row_major_data(
-      actual_result, IREE_HAL_MEMORY_ACCESS_READ, &actual_result_data));
+      actual_result, IREE_HAL_MEMORY_ACCESS_READ, &actual_result_mapping));
   IREE_RETURN_IF_ERROR(map_host_local_row_major_data(
-      expected_result, IREE_HAL_MEMORY_ACCESS_READ, &expected_result_data));
+      expected_result, IREE_HAL_MEMORY_ACCESS_READ, &expected_result_mapping));
   iree_hal_element_type_t result_type =
       iree_hal_buffer_view_element_type(actual_result);
   for (iree_hal_dim_t m = 0; m < m_size; ++m) {
     for (iree_hal_dim_t n = 0; n < n_size; ++n) {
-      iree_vm_value_t actual_value = read_matrix_element(
-          m_size, n_size, result_type, actual_result_data, m, n);
-      iree_vm_value_t expected_value = read_matrix_element(
-          m_size, n_size, result_type, expected_result_data, m, n);
+      iree_vm_value_t actual_value =
+          read_matrix_element(m_size, n_size, result_type,
+                              actual_result_mapping.contents.data, m, n);
+      iree_vm_value_t expected_value =
+          read_matrix_element(m_size, n_size, result_type,
+                              expected_result_mapping.contents.data, m, n);
       if (!matmul_result_elements_agree(actual_value, expected_value)) {
         return check_matmul_failure(file, actual_value, expected_value, m, n,
                                     lhs, rhs, acc, actual_result,
@@ -687,6 +691,8 @@ static iree_status_t check_matmul_results_impl(
       }
     }
   }
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&actual_result_mapping));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&expected_result_mapping));
   return iree_ok_status();
 }
 
@@ -795,8 +801,8 @@ static iree_status_t mask_and_copy_device_buffer_view_to_device(
     IREE_RETURN_IF_ERROR(
         copy_device_buffer_view_to_device(device, hal_allocator, src, dst));
   } else if (mask == MATRIX_MASK_ZERO) {
-    IREE_RETURN_IF_ERROR(
-        allocate_device_buffer_view_like(hal_allocator, src, dst));
+    IREE_RETURN_IF_ERROR(allocate_device_buffer_view_like(
+        hal_allocator, src, iree_const_byte_span_empty(), dst));
   } else if (mask == MATRIX_MASK_IDENTITY) {
     IREE_RETURN_IF_ERROR(
         make_device_identity_matrix_like(device, hal_allocator, src, dst));
