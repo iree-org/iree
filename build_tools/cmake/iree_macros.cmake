@@ -202,8 +202,8 @@ endfunction()
 #
 # Parameters:
 # NAME: name of the target to add data dependencies to
-# DATA: List of targets and/or files in the source tree. Files should use the
-#       same format as targets (i.e. iree::package::subpackage::file.txt)
+# DATA: List of targets and/or files in the source tree (relative to the 
+# project root).
 function(iree_add_data_dependencies)
   cmake_parse_arguments(
     _RULE
@@ -222,11 +222,12 @@ function(iree_add_data_dependencies)
       add_dependencies(${_RULE_NAME} ${_DATA_LABEL})
     else()
       # Not a target, assume to be a file instead.
-      string(REPLACE "::" "/" _FILE_PATH ${_DATA_LABEL})
+      set(_FILE_PATH ${_DATA_LABEL})
 
       # Create a target which copies the data file into the build directory.
       # If this file is included in multiple rules, only create the target once.
       string(REPLACE "::" "_" _DATA_TARGET ${_DATA_LABEL})
+      string(REPLACE "/" "_" _DATA_TARGET ${_DATA_TARGET})
       if(NOT TARGET ${_DATA_TARGET})
         set(_INPUT_PATH "${PROJECT_SOURCE_DIR}/${_FILE_PATH}")
         set(_OUTPUT_PATH "${PROJECT_BINARY_DIR}/${_FILE_PATH}")
