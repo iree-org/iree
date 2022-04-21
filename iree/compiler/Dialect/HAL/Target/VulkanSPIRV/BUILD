@@ -38,7 +38,7 @@ cc_library(
         "//iree/compiler/Dialect/Vulkan/IR",
         "//iree/compiler/Dialect/Vulkan/Utils",
         "//iree/compiler/Utils",
-        "//iree/schemas:spirv_executable_def_c_fbs",
+        "//runtime/src/iree/schemas:spirv_executable_def_c_fbs",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",

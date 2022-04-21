@@ -31,7 +31,7 @@ iree_cc_binary(
   SRCS
     "iree-run-mnist-module.c"
   DATA
-    "iree::samples::vision::mnist_test.png"
+    "iree/samples/vision/mnist_test.png"
   DEPS
     ::mnist_bytecode_module_c
     iree::runtime

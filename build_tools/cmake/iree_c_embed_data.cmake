@@ -32,7 +32,7 @@ function(iree_c_embed_data)
     _RULE
     "PUBLIC;TESTONLY;FLATTEN"
     "NAME;IDENTIFIER;STRIP_PREFIX;C_FILE_OUTPUT;H_FILE_OUTPUT"
-    "SRCS;GENERATED_SRCS"
+    "DEPS;SRCS;GENERATED_SRCS"
     ${ARGN}
   )
 
@@ -87,6 +87,7 @@ function(iree_c_embed_data)
     NAME ${_RULE_NAME}
     HDRS "${_RULE_H_FILE_OUTPUT}"
     SRCS "${_RULE_C_FILE_OUTPUT}"
+    DEPS "${_RULE_DEPS}"
     "${_PUBLIC_ARG}"
     "${_TESTONLY_ARG}"
   )

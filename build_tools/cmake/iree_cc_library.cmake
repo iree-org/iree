@@ -95,6 +95,11 @@ function(iree_cc_library)
     set(_RULE_IS_INTERFACE 0)
   endif()
 
+  # Implicit deps.
+  if(IREE_IMPLICIT_DEFS_CC_DEPS)
+    list(APPEND _RULE_DEPS ${IREE_IMPLICIT_DEFS_CC_DEPS})
+  endif()
+
   if(NOT _RULE_IS_INTERFACE)
     add_library(${_OBJECTS_NAME} OBJECT)
     if(_RULE_SHARED)

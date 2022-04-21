@@ -25,7 +25,7 @@ cc_library(
         "//iree/compiler/Dialect/VM/Transforms",
         "//iree/compiler/Dialect/VM/Utils:CallingConvention",
         "//iree/compiler/Utils",
-        "//iree/schemas:bytecode_module_def_c_fbs",
+        "//runtime/src/iree/schemas:bytecode_module_def_c_fbs",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

@@ -27,7 +27,7 @@ package(
 #         "//iree/compiler/Codegen/LLVMGPU",
 #         "//iree/compiler/Dialect/HAL/Target",
 #         "//iree/compiler/Utils",
-#         "//iree/schemas:cuda_executable_def_c_fbs",
+#         "//runtime/src/iree/schemas:cuda_executable_def_c_fbs",
 #         "@llvm-project//llvm:Analysis",
 #         "@llvm-project//llvm:BitReader",
 #         "@llvm-project//llvm:Core",

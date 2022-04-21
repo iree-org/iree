@@ -21,8 +21,8 @@ cc_library(
         "Musl.h",
     ],
     deps = [
-        "//iree/builtins/device/bin:libdevice",
-        "//iree/builtins/musl/bin:libmusl",
+        "//runtime/src/iree/builtins/device/bin:libdevice",
+        "//runtime/src/iree/builtins/musl/bin:libmusl",
         "@llvm-project//llvm:BitReader",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",

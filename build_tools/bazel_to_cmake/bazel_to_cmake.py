@@ -71,15 +71,17 @@ def parse_arguments():
       " whether the directory is skipped."
       " 2: Also output when conversion was successful.")
 
-  # Specify only one of these (defaults to --root_dir=iree).
+  # Specify only one of these (defaults to --root_dir=<main source dirs>).
   group = parser.add_mutually_exclusive_group()
   group.add_argument("--dir",
                      help="Converts the BUILD file in the given directory",
                      default=None)
   group.add_argument(
       "--root_dir",
-      help="Converts all BUILD files under a root directory (defaults to iree/)",
-      default="iree")
+      nargs="+",
+      help=
+      "Converts all BUILD files under a root directory (defaults to iree, runtime)",
+      default=["iree", "runtime"])
 
   args = parser.parse_args()
 
@@ -240,12 +242,14 @@ def main(args):
   write_files = not args.preview
 
   if args.root_dir:
-    root_directory_path = os.path.join(repo_root, args.root_dir)
-    log(f"Converting directory tree rooted at: {root_directory_path}")
-    convert_directories((root for root, _, _ in os.walk(root_directory_path)),
-                        write_files=write_files,
-                        allow_partial_conversion=args.allow_partial_conversion,
-                        verbosity=args.verbosity)
+    for root_dir in args.root_dir:
+      root_directory_path = os.path.join(repo_root, root_dir)
+      log(f"Converting directory tree rooted at: {root_directory_path}")
+      convert_directories(
+          (root for root, _, _ in os.walk(root_directory_path)),
+          write_files=write_files,
+          allow_partial_conversion=args.allow_partial_conversion,
+          verbosity=args.verbosity)
   elif args.dir:
     convert_directories([os.path.join(repo_root, args.dir)],
                         write_files=write_files,

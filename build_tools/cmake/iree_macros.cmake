@@ -56,8 +56,21 @@ endfunction()
 # Example when called from iree/base/CMakeLists.txt:
 #   iree::base
 function(iree_package_ns PACKAGE_NS)
-  string(REPLACE ${IREE_ROOT_DIR} "" _PACKAGE ${CMAKE_CURRENT_LIST_DIR})
-  string(SUBSTRING ${_PACKAGE} 1 -1 _PACKAGE)
+  # Get the relative path of the current dir (i.e. runtime/src/iree/vm).
+  string(REPLACE ${IREE_ROOT_DIR} "" _RELATIVE_PATH ${CMAKE_CURRENT_LIST_DIR})
+  string(SUBSTRING ${_RELATIVE_PATH} 1 -1 _RELATIVE_PATH)
+
+  # Some sub-trees form their own roots for package purposes. Rewrite them.
+  if(_RELATIVE_PATH MATCHES "^runtime/src/(.*)")
+    # runtime/src/iree/base -> iree/base
+    set(_PACKAGE "${CMAKE_MATCH_1}")
+  else()
+    # Default to pass-through. Examples:
+    #   iree/compiler/API
+    #   iree/tools
+    set(_PACKAGE "${_RELATIVE_PATH}")
+  endif()
+
   string(REPLACE "/" "::" _PACKAGE_NS ${_PACKAGE})
   set(${PACKAGE_NS} ${_PACKAGE_NS} PARENT_SCOPE)
 endfunction()
@@ -189,8 +202,8 @@ endfunction()
 #
 # Parameters:
 # NAME: name of the target to add data dependencies to
-# DATA: List of targets and/or files in the source tree. Files should use the
-#       same format as targets (i.e. iree::package::subpackage::file.txt)
+# DATA: List of targets and/or files in the source tree (relative to the 
+# project root).
 function(iree_add_data_dependencies)
   cmake_parse_arguments(
     _RULE
@@ -209,11 +222,12 @@ function(iree_add_data_dependencies)
       add_dependencies(${_RULE_NAME} ${_DATA_LABEL})
     else()
       # Not a target, assume to be a file instead.
-      string(REPLACE "::" "/" _FILE_PATH ${_DATA_LABEL})
+      set(_FILE_PATH ${_DATA_LABEL})
 
       # Create a target which copies the data file into the build directory.
       # If this file is included in multiple rules, only create the target once.
       string(REPLACE "::" "_" _DATA_TARGET ${_DATA_LABEL})
+      string(REPLACE "/" "_" _DATA_TARGET ${_DATA_TARGET})
       if(NOT TARGET ${_DATA_TARGET})
         set(_INPUT_PATH "${PROJECT_SOURCE_DIR}/${_FILE_PATH}")
         set(_OUTPUT_PATH "${PROJECT_BINARY_DIR}/${_FILE_PATH}")

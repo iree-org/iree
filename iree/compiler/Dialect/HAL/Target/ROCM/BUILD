@@ -35,7 +35,7 @@ cc_library(
         "//iree/compiler/Codegen/LLVMGPU",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Utils",
-        "//iree/schemas:rocm_executable_def_c_fbs",
+        "//runtime/src/iree/schemas:rocm_executable_def_c_fbs",
         "@llvm-project//llvm:AMDGPUCodeGen",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:IPO",
