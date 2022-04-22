@@ -23,39 +23,66 @@ Notes:
   documentation](https://clang.llvm.org/docs/AddressSanitizer.html#memory-leak-detection)
   on leak detection. It is only enabled by default on some platforms.
 
-## Enabling the sanitizers
+## Support status and how to enable each sanitizer
 
-In the CMake build system of IREE, at least on Linux and Android, enabling these
-sanitizers is a simple matter of passing one of these options to the initial
-CMake command:
+### ASan (AddressSanitizer)
+
+Enabling ASan in the IREE build is a simple matter of setting the
+`IREE_ENABLE_ASAN` CMake option:
 
 ```
--DIREE_ENABLE_ASAN=ON
+cmake -DIREE_ENABLE_ASAN=ON ...
 ```
 
-or
+### TSan (ThreadSanitizer)
+
+To enable TSan, at the moment, the following 3 CMake options must be set:
+
+```
+cmake \
+  -DIREE_ENABLE_TSAN=ON \
+  -DIREE_BYTECODE_MODULE_ENABLE_TSAN=ON \
+  -DIREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER=ON \
+  ...
+```
+
+In practice, `IREE_ENABLE_TSAN` alone would be enough for many targets, but not
+all. The problem is that a IREE runtime built with `IREE_ENABLE_TSAN` cannot
+load a IREE compiled LLVM/CPU module unless the following flags were passed to
+the IREE compiler: `--iree-llvm-sanitize=thread` and
+`--iree-llvm-link-embedded=false`.
+
+The CMake options `IREE_BYTECODE_MODULE_ENABLE_TSAN` and
+`IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER` ensure that the above flags are
+passed to the IREE compiler when building modules used in tests, benchmarks,
+etc. (anything that internally uses the CMake `iree_bytecode_module` macro).
+
+At the moment, CMake logic heavy-handedly encores that whenever
+`IREE_ENABLE_TSAN` is set, these other two CMake variables are also set.
+That ensures that all tests succeed: no test is expected to fail with TSan.
+
+If you know what you're doing (i.e. if you are not building targets that
+internally involve a `iree_bytecode_module`), feel free to locally comment out
+the CMake error and only set `IREE_ENABLE_TSAN`. Also see
+[#8966](https://github.com/google/iree/pull/8966) for a past attempt to relax
+that CMake validation.
+
+### MSan (MemorySanitizer)
+
+In theory that should be a simple matter of
 
 ```
 -DIREE_ENABLE_MSAN=ON
 ```
 
-or
+However, that requires making and using a custom
+build of libc++ with MSan as explained
+[here](https://github.com/google/sanitizers/wiki/MemorySanitizerLibcxxHowTo).
 
-```
--DIREE_ENABLE_TSAN=ON
-```
+As of April 2022, all of IREE's tests succeeded with MSan on Linux/x86-64,
+provided that the `vulkan` driver was disabled (due to lack of MSan
+instrumentation in the NVIDIA Vulkan driver).
 
-These sanitizers will be most helpful on builds with debug info, so consider
-using
-
-```
--DCMAKE_BUILD_TYPE=RelWithDebInfo
-```
-
-instead of just `Release`. It's also fine to use sanitizers on `Debug` builds,
-of course --- if the issue that you're tracking down reproduces at all in a
-debug build! Sanitizers are often used to track down subtle issues that may only
-manifest themselves in certain build configurations.
 
 ## Symbolizing the reports
 
