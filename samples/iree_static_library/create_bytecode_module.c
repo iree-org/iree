@@ -5,8 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #include <stdio.h>
 
-#include "iree/samples/static_library/simple_mul_c.h"
 #include "iree/vm/bytecode_module.h"
+#include "iree_static_library/simple_mul_c.h"
 
 // A function to create the bytecode module.
 iree_status_t create_module(iree_vm_module_t** module) {

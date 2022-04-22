@@ -5,6 +5,10 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 if(IREE_ENABLE_EMITC)
+  # Configures all iree_cc_* targets to take this implicit dep,
+  # which provides common includes and copts for this directory.
+  set(IREE_IMPLICIT_DEFS_CC_DEPS iree::samples::defs)
+
   iree_c_module(
     NAME
       add_module

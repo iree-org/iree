@@ -5,12 +5,12 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/base/status_cc.h"
-#include "iree/samples/emitc_modules/import_module_a.h"
-#include "iree/samples/emitc_modules/import_module_b.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"
 #include "iree/vm/ref_cc.h"
+#include "iree_emitc_modules/import_module_a.h"
+#include "iree_emitc_modules/import_module_b.h"
 
 namespace iree {
 namespace {
