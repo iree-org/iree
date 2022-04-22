@@ -12,42 +12,45 @@ module {
   func.func @fuse_static(%arg0: index, %arg1: tensor<64xf32>, %arg2: tensor<64xf32>) -> tensor<64xf32> {
     %cst = arith.constant 4.200000e+01 : f32
     %0 = linalg.fill ins(%cst : f32) outs(%arg1 : tensor<64xf32>) -> tensor<64xf32>
-    %1 = linalg.fill ins(%cst : f32) outs(%arg2 : tensor<64xf32>) -> tensor<64xf32>
-
-    %2 = affine.apply #map0()[%arg0]
+    %1 = affine.apply #map0()[%arg0]
     // CHECK: iree_linalg_ext.in_parallel
-    %3 = iree_linalg_ext.in_parallel %2  -> (tensor<64xf32>) {
+    %2 = iree_linalg_ext.in_parallel %1  -> (tensor<64xf32>) {
     ^bb0(%arg3: index):
       // CHECK:    %[[OFFSET:.*]] = affine.apply
       // CHECK:    %[[SIZE:.*]] = affine.min
-      %4 = affine.apply #map1(%arg3)[%arg0]
-      %5 = affine.min #map2(%arg3)[%arg0]
-      %6 = tensor.extract_slice %0[%4] [%5] [1] : tensor<64xf32> to tensor<?xf32>
+      %3 = affine.apply #map1(%arg3)[%arg0]
+      %4 = affine.min #map2(%arg3)[%arg0]
+      %5 = tensor.extract_slice %arg2[%3] [%4] [1] : tensor<64xf32> to tensor<?xf32>
 
       // CHECK:    %[[T0:.*]] = tensor.extract_slice %[[IN]][%[[OFFSET]]] [%[[SIZE]]] [{{.*}}]
       // CHECK:    %[[T1:.*]] = linalg.fill {{.*}} outs(%[[T0]]
-      // CHECK:    %[[T2:.*]] = tensor.extract_slice %[[OUT]][%[[OFFSET]]] [%[[SIZE]]] [{{.*}}]
-      // CHECK:    %[[T3:.*]] = linalg.fill {{.*}} outs(%[[T2]]
-      %7 = tensor.extract_slice %1[%4] [%5] [1] : tensor<64xf32> to tensor<?xf32>
+      %6 = tensor.extract_slice %0[%3] [%4] [1] : tensor<64xf32> to tensor<?xf32>
 
-      // CHECK:    %[[T4:.*]] = linalg.elemwise_unary {{.*}} ins(%[[T1]] {{.*}} outs(%[[T3]]
-      %8 = linalg.elemwise_unary ins(%6 : tensor<?xf32>) outs(%7 : tensor<?xf32>) -> tensor<?xf32>
+      // CHECK:    %[[T2:.*]] = linalg.elemwise_unary ins(%[[T1]]
+      %7 = linalg.elemwise_unary ins(%6 : tensor<?xf32>) outs(%5 : tensor<?xf32>) -> tensor<?xf32>
       iree_linalg_ext.perform_concurrently {
-        iree_linalg_ext.parallel_insert_slice %8 into %arg2[%4] [%5] [1] : tensor<?xf32> into tensor<64xf32>
+        iree_linalg_ext.parallel_insert_slice %7 into %arg2[%3] [%4] [1] : tensor<?xf32> into tensor<64xf32>
       }
     }
-    func.return %3 : tensor<64xf32>
+    func.return %2 : tensor<64xf32>
   }
 
-  pdl.pattern @match_elemwise : benefit(1) {
+  pdl.pattern @match_fill : benefit(1) {
     %0 = operands
     %1 = types
-    %2 = operation "linalg.elemwise_unary"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+    %2 = operation "linalg.fill"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+    rewrite %2 with "iree_linalg_transform.apply"
+  }
+  pdl.pattern @match_in_parallel : benefit(1) {
+    %0 = operands
+    %1 = types
+    %2 = operation "iree_linalg_ext.in_parallel"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
     rewrite %2 with "iree_linalg_transform.apply"
   }
   iree_linalg_transform.sequence {
-    %0 = match @match_elemwise
-    %1, %fusedOps:2 = fuse_producers %0 {operands_to_fuse=[0, 1]}
+    %0 = match @match_fill
+    %1 = match @match_in_parallel
+    fuse_into_containing_op %0 into %1
   }
 }
 
@@ -82,7 +85,7 @@ module {
       // CHECK:    %[[T1:.*]] = linalg.fill {{.*}} outs(%[[T0]]
       %6 = tensor.extract_slice %0[%3] [%4] [1] : tensor<?xf32> to tensor<?xf32>
 
-      // CHECK:    %[[T2:.*]] = linalg.elemwise_unary {{.*}} ins(%[[T1]]
+      // CHECK:    %[[T2:.*]] = linalg.elemwise_unary ins(%[[T1]]
       %7 = linalg.elemwise_unary ins(%6 : tensor<?xf32>) outs(%5 : tensor<?xf32>) -> tensor<?xf32>
       iree_linalg_ext.perform_concurrently {
         iree_linalg_ext.parallel_insert_slice %7 into %arg2[%3] [%4] [1] : tensor<?xf32> into tensor<?xf32>
@@ -91,14 +94,21 @@ module {
     func.return %2 : tensor<?xf32>
   }
 
-  pdl.pattern @match_elemwise : benefit(1) {
+  pdl.pattern @match_fill : benefit(1) {
     %0 = operands
     %1 = types
-    %2 = operation "linalg.elemwise_unary"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+    %2 = operation "linalg.fill"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+    rewrite %2 with "iree_linalg_transform.apply"
+  }
+  pdl.pattern @match_in_parallel : benefit(1) {
+    %0 = operands
+    %1 = types
+    %2 = operation "iree_linalg_ext.in_parallel"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
     rewrite %2 with "iree_linalg_transform.apply"
   }
   iree_linalg_transform.sequence {
-    %0 = match @match_elemwise
-    %1, %fusedOps = fuse_producers %0 {operands_to_fuse=[0]}
+    %0 = match @match_fill
+    %1 = match @match_in_parallel
+    fuse_into_containing_op %0 into %1
   }
 }

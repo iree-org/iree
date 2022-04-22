@@ -114,6 +114,27 @@ struct InParallelOpToScfForRewriter : public OpRewritePattern<InParallelOp> {
   }
 };
 
+/// Pattern to fuse a LinalgOp into a containing op.
+struct LinalgExtFusionInContainingOpPattern
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+  LinalgExtFusionInContainingOpPattern(MLIRContext *context,
+                                       Operation *containingOp)
+      : OpInterfaceRewritePattern<linalg::LinalgOp>(context),
+        containingOp(containingOp) {}
+
+  FailureOr<SmallVector<linalg::LinalgOp>>
+  returningMatchAndRewrite(linalg::LinalgOp producerOp,
+                           PatternRewriter &rewriter) const;
+
+  LogicalResult matchAndRewrite(linalg::LinalgOp producerOp,
+                                PatternRewriter &rewriter) const override {
+    return returningMatchAndRewrite(producerOp, rewriter);
+  }
+
+private:
+  Operation *containingOp;
+};
+
 struct FusionResult {
   linalg::LinalgOp consumerOp;
   SmallVector<linalg::LinalgOp> fusedOps;

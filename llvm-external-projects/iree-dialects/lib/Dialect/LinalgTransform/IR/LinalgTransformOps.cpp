@@ -1077,6 +1077,27 @@ transform::TileToLinalgExtTileOp::apply(transform::TransformResults &results,
   return success();
 }
 
+LogicalResult
+transform::FuseIntoContainingOp::apply(transform::TransformResults &results,
+                                       transform::TransformState &state) {
+
+  ArrayRef<Operation *> producerOps = state.getPayloadOps(producer_op());
+  ArrayRef<Operation *> containingOps = state.getPayloadOps(containing_op());
+  for (auto it : llvm::zip(producerOps, containingOps)) {
+    auto producerOp = dyn_cast<LinalgOp>(std::get<0>(it));
+    Operation *containingOp = std::get<1>(it);
+    if (!producerOp) {
+      std::get<0>(it)->emitError("Cannot fuse op: Not a LinalgOp");
+      return failure();
+    }
+    LinalgExt::LinalgExtFusionInContainingOpPattern pattern(this->getContext(),
+                                                            containingOp);
+    if (failed(functional::applyReturningPatternAt(pattern, producerOp)))
+      return failure();
+  }
+  return success();
+}
+
 FailureOr<scf::ForOp> transform::RewriteLinalgExtTileToScfForOp::applyToOne(
     LinalgExt::TileOp target) {
   LinalgExt::TileOpToSCFRewriter pattern(this->getContext());

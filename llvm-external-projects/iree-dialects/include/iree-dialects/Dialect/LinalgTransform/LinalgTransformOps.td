@@ -411,6 +411,23 @@ def TileToLinalgExtTileOp :
   let assemblyFormat = "$target attr-dict";
 }
 
+def FuseIntoContainingOp :
+    Linalg_Transform_Operation<"fuse_into_containing_op", [
+      DeclareOpInterfaceMethods<TransformOpInterface, ["apply"]>
+    ]> {
+  let description = [{Fuse a producer into a containing operation.}];
+
+  let summary = [{
+    Search the body of the containing operation for all producer uses and
+    compute the accessed producer slices on-the-fly.
+    }];
+
+  let arguments = (ins PDL_Operation:$producer_op,
+                       PDL_Operation:$containing_op);
+
+  let assemblyFormat = "$producer_op `into` $containing_op attr-dict";
+}
+
 def RewriteLinalgExtTileToScfForOp :
   Linalg_Transform_Operation<"rewrite_iree_linalg_ext_tile_to_scf_for",
     [TransformOpInterface, TargetableSingleOperandTransformOpTrait]> {

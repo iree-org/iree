@@ -416,6 +416,18 @@ class TileToLinalgExtTileOp:
     super().__init__(operation_type, target, sizes, loc=loc, ip=ip)
 
 
+class FuseIntoContainingOp:
+  """Specialization for the FuseIntoContainingOp class."""
+
+  def __init__(self,
+               producerOp: Union[ir.Value, ir.Operation, ir.OpView],
+               *,
+               containingOp: Union[ir.Value, ir.Operation, ir.OpView],
+               loc=None,
+               ip=None):
+    super().__init__([], producerOp, containingOp, loc=loc, ip=ip)
+
+
 class RewriteLinalgExtTileToScfForOp:
   """Specialization for the RewriteLinalgExtTileToScfForOp class."""
 

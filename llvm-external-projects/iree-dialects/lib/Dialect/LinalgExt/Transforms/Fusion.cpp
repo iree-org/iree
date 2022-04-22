@@ -1,4 +1,4 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2022 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -57,6 +57,65 @@ getTiledIterationDomain(OpBuilder &b, linalg::LinalgOp producerOp,
         getValueOrCreateConstantIndexOp(b, sliceOp->getLoc(), std::get<1>(it));
 
   return tiledIterationDomain;
+}
+
+FailureOr<SmallVector<linalg::LinalgOp>>
+mlir::iree_compiler::IREE::LinalgExt::LinalgExtFusionInContainingOpPattern::
+    returningMatchAndRewrite(linalg::LinalgOp producerOp,
+                             PatternRewriter &rewriter) const {
+  if (!producerOp.hasTensorSemantics() && producerOp->getNumResults() != 1)
+    return failure();
+
+  // Search the producer slices accessed within the containing operation.
+  SmallVector<tensor::ExtractSliceOp> sliceOps;
+  for (Operation *user : producerOp->getUsers()) {
+    auto sliceOp = dyn_cast<tensor::ExtractSliceOp>(user);
+    if (!sliceOp)
+      continue;
+    if (sliceOp->getParentOp() != containingOp)
+      continue;
+    sliceOps.push_back(sliceOp);
+  }
+  // Check for a non-empty list of fusion opportunities.
+  if (sliceOps.empty())
+    return failure();
+
+  auto tilingInterfaceOp = cast<TilingInterface>(producerOp.getOperation());
+  SmallVector<Value> destinationOperands =
+      tilingInterfaceOp.getDestinationOperands(rewriter);
+
+  // Try to fuse the producer in-place of the tensor::ExtractSliceOps.
+  SmallVector<linalg::LinalgOp> fusedOps;
+  for (tensor::ExtractSliceOp sliceOp : sliceOps) {
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(sliceOp);
+
+    // Compute the tiled iteration domain.
+    FailureOr<SmallVector<Range>> tiledIterationDomain =
+        getTiledIterationDomain(rewriter, producerOp, sliceOp);
+    if (failed(tiledIterationDomain))
+      return failure();
+
+    // Compute the tile offsets and sizes.
+    SmallVector<OpFoldResult> tileOffsets, tileSizes;
+    for (auto range : tiledIterationDomain.getValue()) {
+      tileOffsets.push_back(range.offset);
+      tileSizes.push_back(range.size);
+    }
+
+    // Tile the producer.
+    FailureOr<SmallVector<Operation *>> tiledOps =
+        tilingInterfaceOp.getTiledImplementation(rewriter, destinationOperands,
+                                                 tileOffsets, tileSizes, true);
+    if (failed(tiledOps) || tiledOps->size() != 1)
+      return failure();
+    fusedOps.push_back(cast<linalg::LinalgOp>(tiledOps->front()));
+  }
+
+  // Replace the tensor::ExtractSliceOps.
+  for (const auto &en : enumerate(sliceOps))
+    rewriter.replaceOp(en.value(), fusedOps[en.index()]->getResult(0));
+  return fusedOps;
 }
 
 FailureOr<FusionResult> LinalgExtFusionPattern::returningMatchAndRewrite(
