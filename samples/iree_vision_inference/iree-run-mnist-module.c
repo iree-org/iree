@@ -11,8 +11,8 @@
 #include <float.h>
 
 #include "iree/runtime/api.h"
-#include "iree/samples/vision/mnist_bytecode_module_c.h"
 #include "iree/tools/utils/image_util.h"
+#include "iree_vision_inference/mnist_bytecode_module_c.h"
 
 iree_status_t Run(const iree_string_view_t image_path) {
   iree_runtime_instance_options_t instance_options;
