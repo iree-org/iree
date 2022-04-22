@@ -3,18 +3,15 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
 # Disable PyType, it does not seem to like the specialization pattern used in
 # MLIR.
 # pytype: skip-file
-
 try:
   from .. import ir
   from ..dialects import pdl
   from typing import Optional, Sequence, Union
 except ImportError as e:
   raise RuntimeError("Error loading imports from extension module") from e
-
 BoolArg = Optional[Union[bool, ir.BoolAttr]]
 IntArg = Optional[Union[int, ir.IntegerAttr]]
 IntListArg = Optional[Union[Sequence[int], ir.ArrayAttr]]
@@ -76,13 +73,18 @@ def _ensure_string_attr(value: StringArg):
   return value
 
 
+def _count_expected_loops(tile_sizes: ir.ArrayAttr) -> int:
+  # Number of loops = number of tile sizes != 0
+  zero = _ensure_int_attr(0)
+  return len(list(tile_sizes)) - list(tile_sizes).count(zero)
+
+
 class MatchOp:
   """Specialization for the MatchOp class."""
 
   def __init__(self, target: Union[str, ir.FlatSymbolRefAttr]):
     if isinstance(target, str):
       target = ir.FlatSymbolRefAttr.get(target)
-
     operation_type = pdl.OperationType.get()
     super().__init__(operation_type, target)
 
@@ -110,7 +112,6 @@ class LowerVectorsOp:
     unroll_vector_transfers = _ensure_bool_attr(unroll_vector_transfers, True)
     transpose_lowering = _ensure_string_attr(transpose_lowering, "eltwise")
     transpose_avx2_lowering = _ensure_bool_attr(transpose_avx2_lowering, False)
-
     super().__init__(stages,
                      contraction_lowering,
                      multireduction_lowering,
@@ -161,10 +162,30 @@ class FuseOp:
     tile_interchange = _ensure_int_array_attr(tile_interchange, [])
     operation_type = pdl.OperationType.get()
 
-    super().__init__(operation_type,
+    num_loops = _count_expected_loops(tile_sizes)
+    super().__init__(operation_type, [operation_type] * num_loops,
                      target,
                      tile_sizes,
                      tile_interchange,
+                     loc=loc,
+                     ip=ip)
+
+
+class FuseProducersOp:
+  """Specialization for the FuseProducersOp class."""
+
+  def __init__(self,
+               target: Union[ir.Value, ir.Operation, ir.OpView],
+               *,
+               operands_to_fuse: IntListArg = None,
+               loc=None,
+               ip=None):
+    operands_to_fuse = _ensure_int_array_attr(operands_to_fuse, [])
+    num_producers = len(operands_to_fuse)
+    operation_type = pdl.OperationType.get()
+    super().__init__(operation_type, [operation_type] * num_producers,
+                     target,
+                     operands_to_fuse,
                      loc=loc,
                      ip=ip)
 
@@ -183,8 +204,7 @@ class TileOp:
     interchange = _ensure_int_array_attr(interchange, [])
     operation_type = pdl.OperationType.get()
     tile_size_zero = _ensure_int_attr(0)
-    # Number of loops = number of tile sizes != 0
-    num_loops = sum(1 for _ in filter(lambda i: i != tile_size_zero, sizes))
+    num_loops = _count_expected_loops(sizes)
     super().__init__(operation_type, [operation_type] * num_loops,
                      target,
                      sizes,
@@ -202,7 +222,6 @@ class ScalarizeOp:
                loc=None,
                ip=None):
     operation_type = pdl.OperationType.get()
-
     super().__init__(operation_type, target, loc=loc, ip=ip)
 
 
@@ -395,6 +414,18 @@ class TileToLinalgExtTileOp:
     sizes = _ensure_int_array_attr(sizes, [])
     operation_type = pdl.OperationType.get()
     super().__init__(operation_type, target, sizes, loc=loc, ip=ip)
+
+
+class FuseIntoContainingOp:
+  """Specialization for the FuseIntoContainingOp class."""
+
+  def __init__(self,
+               producerOp: Union[ir.Value, ir.Operation, ir.OpView],
+               *,
+               containingOp: Union[ir.Value, ir.Operation, ir.OpView],
+               loc=None,
+               ip=None):
+    super().__init__([], producerOp, containingOp, loc=loc, ip=ip)
 
 
 class RewriteLinalgExtTileToScfForOp:

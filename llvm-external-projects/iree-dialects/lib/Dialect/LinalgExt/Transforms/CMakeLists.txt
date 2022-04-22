@@ -1,4 +1,5 @@
 add_mlir_library(IREELinalgExtTransforms
+  Fusion.cpp
   InParallelToAsync.cpp
   InParallelToHAL.cpp
   InParallelToSequentialFor.cpp
