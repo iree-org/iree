@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Keep this in sync with scripts/lint.sh
+# Keep this in sync with build_tools/scripts/lint.sh
 
 name: Lint
 
@@ -45,7 +45,7 @@ jobs:
           # Fail if the script fails (unfixable lint warnings) or it creates a
           # diff (fixable lint warnings or formatting).
           EXIT_CODE=0
-          ./scripts/run_buildifier.sh "${GITHUB_BASE_REF?}" || EXIT_CODE=1
+          ./build_tools/scripts/run_buildifier.sh "${GITHUB_BASE_REF?}" || EXIT_CODE=1
           git diff --exit-code
           exit "${EXIT_CODE?}"
 
@@ -118,7 +118,7 @@ jobs:
         # We have to explicitly fetch the base branch as well
         run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
       - name: Checking tabs
-        run: ./scripts/check_tabs.sh "${GITHUB_BASE_REF?}"
+        run: ./build_tools/scripts/check_tabs.sh "${GITHUB_BASE_REF?}"
 
   yamllint:
     runs-on: ubuntu-18.04
@@ -129,4 +129,4 @@ jobs:
         # We have to explicitly fetch the base branch as well
         run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
       - name: yamllint
-        run: ./scripts/run_yamllint.sh "${GITHUB_BASE_REF?}"
+        run: ./build_tools/scripts/run_yamllint.sh "${GITHUB_BASE_REF?}"

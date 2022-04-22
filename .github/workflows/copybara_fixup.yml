@@ -41,7 +41,7 @@ jobs:
           git config --local user.name "Copybara Fixup Action"
       - name: Running fixer script
         run: |
-          ./scripts/git/fix_copybara_export.sh
+          ./build_tools/scripts/git/fix_copybara_export.sh
       - name: Checking for a change
         run: |
           echo "commit_amended=false" >> $GITHUB_ENV
