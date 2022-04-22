@@ -46,7 +46,7 @@ void buildTFLImportPassPipeline(OpPassManager &pm) {
   //----------------------------------------------------------------------------
 
   pm.addPass(createConvertModuleMetadataPass());
-  pm.nest<FuncOp>().addPass(createConvertFunctionMetadataPass());
+  pm.nest<func::FuncOp>().addPass(createConvertFunctionMetadataPass());
 
   //----------------------------------------------------------------------------
   // Convert all TFL ops to TOSA ops
@@ -55,7 +55,7 @@ void buildTFLImportPassPipeline(OpPassManager &pm) {
   mlir::tosa::TOSATFTFLLegalizationPipelineOptions tosaOptions;
   pm.addPass(createLowerGlobalTensorsPass());
   mlir::tosa::createTFTFLtoTOSALegalizationPipeline(pm, tosaOptions);
-  pm.nest<FuncOp>().addPass(mlir::tosa::createStripQuantTypesPass());
+  pm.nest<func::FuncOp>().addPass(mlir::tosa::createStripQuantTypesPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createReconcileUnrealizedCastsPass());
 
@@ -73,7 +73,7 @@ void buildTFLImportPassPipeline(OpPassManager &pm) {
   // Remove the rest of the TFL goo and verify that all ops converted
   //----------------------------------------------------------------------------
 
-  pm.nest<FuncOp>().addPass(createStripFunctionMetadataPass());
+  pm.nest<func::FuncOp>().addPass(createStripFunctionMetadataPass());
   pm.addPass(createStripModuleMetadataPass());
   pm.addPass(createVerifyFullyConvertedPass());
 }

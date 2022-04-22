@@ -70,7 +70,7 @@ struct WorkGroupSwizzlePass
   void runOnOperation() override {
     if (swizzleLogTile == 0) return;
     unsigned swizzleTile = pow(2, swizzleLogTile);
-    FuncOp funcOp = getOperation();
+    func::FuncOp funcOp = getOperation();
     std::array<IREE::HAL::InterfaceWorkgroupIDOp, 2> oldWorkgroupIds;
     bool xFound = false, yFound = false;
     funcOp.walk([&](IREE::HAL::InterfaceWorkgroupIDOp idOp) {

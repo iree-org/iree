@@ -82,7 +82,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createStripModuleMetadataPass() {
   return std::make_unique<StripModuleMetadataPass>();
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createStripFunctionMetadataPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createStripFunctionMetadataPass() {
   return std::make_unique<StripFunctionMetadataPass>();
 }
 

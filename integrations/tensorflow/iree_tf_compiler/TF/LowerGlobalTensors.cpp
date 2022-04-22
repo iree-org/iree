@@ -82,7 +82,7 @@ static LogicalResult convertTFGlobalTensorsToFlowVariables(ModuleOp module) {
   }
 
   // TODO(silvasean): Make this conversion interprocedural.
-  for (auto func : module.getOps<FuncOp>()) {
+  for (auto func : module.getOps<func::FuncOp>()) {
     if (!tf_saved_model::IsExported(func)) {
       continue;
     }

@@ -68,7 +68,7 @@ class PropagateResourceCastsPass
 
   void runOnOperation() override {
     auto operation = getOperation();
-    for (auto func : operation.getOps<FuncOp>()) {
+    for (auto func : operation.getOps<func::FuncOp>()) {
       for (auto cast : func.getOps<mlir::TF::CastOp>()) {
         auto input = cast.x();
         auto output = cast.getResult();

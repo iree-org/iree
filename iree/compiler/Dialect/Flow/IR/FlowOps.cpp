@@ -496,7 +496,6 @@ static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
     }
   }
   return parser.parseRegion(body, regionArgs, regionArgTypes,
-                            /*argLocations=*/{},
                             /*enableNameShadowing=*/true);
 }
 

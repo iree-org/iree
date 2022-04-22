@@ -253,8 +253,9 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
   passManager.addPass(createVerifyLinalgTransformLegalityPass());
 
   // Do first level of tiling and distribution.
-  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
-  passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createTileAndDistributeToWorkgroupsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
   passManager.addNestedPass<func::FuncOp>(
@@ -320,8 +321,9 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createVerifyLinalgTransformLegalityPass());
 
   // Do first level of tiling and distribution.
-  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
-  passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createTileAndDistributeToWorkgroupsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
   passManager.addNestedPass<func::FuncOp>(

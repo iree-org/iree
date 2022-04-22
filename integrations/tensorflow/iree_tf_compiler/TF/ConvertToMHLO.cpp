@@ -32,7 +32,7 @@ namespace TF {
 // It does not require the same number of options as we can hardcode as the pass
 // the IREE requires.
 class ConvertToMHLOPass
-    : public PassWrapper<ConvertToMHLOPass, OperationPass<FuncOp>> {
+    : public PassWrapper<ConvertToMHLOPass, OperationPass<func::FuncOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::linalg::LinalgDialect, mlir::TF::TensorFlowDialect,
                     mlir::tf_executor::TensorFlowExecutorDialect,

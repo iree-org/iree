@@ -35,8 +35,8 @@ class LowerGlobalTensorsPass
     auto moduleOp = getOperation();
     mlir::OpBuilder builder(moduleOp.getBodyRegion());
 
-    DenseMap<StringRef, FuncOp> symNameToFunction;
-    for (auto func : moduleOp.getOps<FuncOp>()) {
+    DenseMap<StringRef, func::FuncOp> symNameToFunction;
+    for (auto func : moduleOp.getOps<func::FuncOp>()) {
       symNameToFunction[func.getSymName()] = func;
     }
 
@@ -58,7 +58,7 @@ class LowerGlobalTensorsPass
                          init.session_init_function());
           continue;
         }
-        FuncOp initFunc = std::get<1>(*findInitFunc);
+        func::FuncOp initFunc = std::get<1>(*findInitFunc);
         for (auto assign : initFunc.getOps<mlir::TFL::AssignVariableOp>()) {
           auto handle = dyn_cast<mlir::TFL::VarHandleOp>(
               assign.resource_id().getDefiningOp());
@@ -94,7 +94,7 @@ class LowerGlobalTensorsPass
     // TF::CallOnceOps are no longer needed as we have already extracted their
     // state.
     SmallVector<mlir::TFL::CallOnceOp> callOnceOps;
-    for (auto func : moduleOp.getOps<FuncOp>()) {
+    for (auto func : moduleOp.getOps<func::FuncOp>()) {
       for (auto init : func.getOps<mlir::TFL::CallOnceOp>()) {
         callOnceOps.push_back(init);
       }
