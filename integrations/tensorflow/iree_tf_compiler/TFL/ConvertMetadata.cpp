@@ -56,7 +56,8 @@ class ConvertFunctionMetadataPass
   // TF/TFL pack their I/O names on an annoying dictionary. We want our shape
   // names to match up with those for readability so we extract them here.
   // Is this ugly? Yeah - but such is what we have to deal with here.
-  void setupEntryPointAttrs(FuncOp funcOp, DictionaryAttr entryFunctionAttr) {
+  void setupEntryPointAttrs(func::FuncOp funcOp,
+                            DictionaryAttr entryFunctionAttr) {
     funcOp.setPublic();
 
     auto inputsAttr =
@@ -98,7 +99,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertModuleMetadataPass() {
   return std::make_unique<ConvertModuleMetadataPass>();
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createConvertFunctionMetadataPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createConvertFunctionMetadataPass() {
   return std::make_unique<ConvertFunctionMetadataPass>();
 }
 

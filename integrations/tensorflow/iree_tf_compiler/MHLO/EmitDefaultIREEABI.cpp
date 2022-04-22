@@ -6,6 +6,7 @@
 
 #include "iree_tf_compiler/MHLO/Passes.h"
 #include "llvm/Support/JSON.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -20,7 +21,7 @@ namespace iree_integrations {
 namespace MHLO {
 
 class EmitDefaultIREEABIPass
-    : public PassWrapper<EmitDefaultIREEABIPass, OperationPass<FuncOp>> {
+    : public PassWrapper<EmitDefaultIREEABIPass, OperationPass<func::FuncOp>> {
  public:
   StringRef getArgument() const override {
     return "iree-mhlo-emit-default-iree-abi";
@@ -130,7 +131,7 @@ class EmitDefaultIREEABIPass
   }
 };
 
-std::unique_ptr<OperationPass<FuncOp>> createEmitDefaultIREEABIPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createEmitDefaultIREEABIPass() {
   return std::make_unique<EmitDefaultIREEABIPass>();
 }
 

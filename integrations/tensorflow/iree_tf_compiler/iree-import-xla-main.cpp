@@ -236,7 +236,7 @@ int main(int argc, char **argv) {
   // function.
   std::string entryName = "main";
   SymbolTable symbolTable(module.get());
-  auto mainFunc = symbolTable.lookup<FuncOp>(entryName);
+  auto mainFunc = symbolTable.lookup<func::FuncOp>(entryName);
   if (!mainFunc) {
     llvm::errs() << "Unable to find main function '" << entryName
                  << "' in converted module.\n";
@@ -272,7 +272,7 @@ int main(int argc, char **argv) {
 
   // Note that we emit the ABI last since any needed function-level
   // transformations (i.e. de-tupling, etc) should have been done.
-  pm.addNestedPass<FuncOp>(
+  pm.addNestedPass<func::FuncOp>(
       iree_integrations::MHLO::createEmitDefaultIREEABIPass());
 
   if (failed(pm.run(*module))) {
