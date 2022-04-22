@@ -69,6 +69,8 @@ function(iree_package_ns PACKAGE_NS)
     set(_PACKAGE "${CMAKE_MATCH_1}")
   elseif(_RELATIVE_PATH MATCHES "^samples/(.*)")
     set(_PACKAGE "iree::samples::${CMAKE_MATCH_1}")
+  elseif(_RELATIVE_PATH MATCHES "^samples$")
+    set(_PACKAGE "iree::samples")
   else()
     # Default to pass-through. Examples:
     #   iree/compiler/API
@@ -77,6 +79,11 @@ function(iree_package_ns PACKAGE_NS)
   endif()
 
   string(REPLACE "/" "::" _PACKAGE_NS ${_PACKAGE})
+
+  if(_DEBUG_IREE_PACKAGE_NAME)
+    message(STATUS "iree_package_ns(): map ${_RELATIVE_PATH} -> ${_PACKAGE_NS}")
+  endif()
+
   set(${PACKAGE_NS} ${_PACKAGE_NS} PARENT_SCOPE)
 endfunction()
 

@@ -81,7 +81,7 @@ def parse_arguments():
       nargs="+",
       help=
       "Converts all BUILD files under a root directory (defaults to iree, runtime)",
-      default=["iree", "runtime"])
+      default=["iree", "runtime", "samples"])
 
   args = parser.parse_args()
 

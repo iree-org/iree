@@ -18,13 +18,13 @@ cc_library(
     srcs = ["module.cc"],
     hdrs = ["module.h"],
     deps = [
-        "//samples:defs",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:cc",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm:cc",
+        "//samples:defs",
     ],
 )
 

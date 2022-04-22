@@ -245,7 +245,7 @@ def convert_target(target):
     return ["iree::bindings::" + _convert_bazel_path(m.group(1))]
 
   # Map //samples/(.*) -> iree::samples::\1
-  m = re.match("^//samples/(.+)", target)
+  m = re.match("^//samples[/|:](.+)", target)
   if m:
     return ["iree::samples::" + _convert_bazel_path(m.group(1))]
 

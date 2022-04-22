@@ -22,6 +22,7 @@ iree_lit_test_suite(
         ],
         include = ["*.mlir"],
     ),
+    cfg = "//samples:lit.cfg.py",
     tools = [
         "//samples/iree_custom_modules/dialect:custom-opt",
         "@llvm-project//llvm:FileCheck",
