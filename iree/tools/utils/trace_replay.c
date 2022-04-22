@@ -533,39 +533,6 @@ static void iree_trace_replay_write_element(
 #undef IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE
 }
 
-// Writes an identity matrix, with matrix elements of the given |element_type|,
-// to the destination |span|. The matrix shape is inferred from |inner_size|
-// and the span's length.
-//
-// Here by 'identity matrix' we mean any two-dimensional array of integers
-// of the form
-//
-//   array[i, j] = ((i == j) ? 1 : 0)
-//
-// Technically they are only called 'identity matrix' for square shapes.
-//
-// These identity matrices are useful in matrix multiplication tests to
-// generate testcases that are easy to debug numerically, as the identity
-// matrix is the neutral element for matrix multiplication.
-static void iree_trace_replay_generate_identity_matrix(
-    iree_hal_element_type_t element_type, iree_byte_span_t span,
-    iree_hal_dim_t inner_size) {
-  iree_host_size_t element_byte_count =
-      iree_hal_element_dense_byte_count(element_type);
-  uint8_t* data_end = span.data + span.data_length;
-  iree_host_size_t inner_index = 0;
-  iree_host_size_t outer_index = 0;
-  for (uint8_t* data = span.data; data < data_end; data += element_byte_count) {
-    int value = inner_index == outer_index ? 1 : 0;
-    iree_trace_replay_write_element(element_type, value, data);
-    ++inner_index;
-    if (inner_index == inner_size) {
-      inner_index = 0;
-      ++outer_index;
-    }
-  }
-}
-
 // Simple deterministic pseudorandom generator.
 // Typically in tests we want reproducible results both across runs and across
 // machines.
@@ -609,17 +576,6 @@ static iree_status_t iree_trace_replay_generate_hal_buffer(
         IREE_STATUS_INVALID_ARGUMENT,
         "(%zu): expected scalar node for buffer contents_generator",
         generator_node->start_mark.line);
-  }
-  if (strcmp(generator_node->tag, "!tag:iree:identity_matrix") == 0) {
-    if (shape_rank == 2) {
-      iree_hal_dim_t inner_size = shape[shape_rank - 1];
-      iree_trace_replay_generate_identity_matrix(element_type,
-                                                 mapping->contents, inner_size);
-    } else {
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "the identity_matrix generator is only for 2D shapes (matrices)");
-    }
   } else if (strcmp(generator_node->tag,
                     "!tag:iree:fully_specified_pseudorandom") == 0) {
     // To enable pseudorandom tests that are both reproducible and invariant
