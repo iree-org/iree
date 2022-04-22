@@ -33,6 +33,7 @@ else()
     freetype2
     glfw3
     gtk+-3.0
+    dbus-1
   )
 endif()
 
@@ -52,7 +53,7 @@ endif()
 if(NOT TRACY_GTK_DEPS_FOUND)
   message(STATUS
     "Could not find deps required to build graphical programs: "
-    "Tracy graphical profiler will not be built (on Ubuntu/Debian, 'apt install libglfw3-dev libfreetype-dev libgtk-3-dev')")
+    "Tracy graphical profiler will not be built (on Ubuntu/Debian, 'apt install libglfw3-dev libfreetype-dev libgtk-3-dev libdbus-1-dev')")
 endif()
 
 #-------------------------------------------------------------------------------
@@ -172,8 +173,7 @@ if(TRACY_GTK_DEPS_FOUND)
   #-----------------------------------------------------------------------------
 
   set(NFD_SOURCES
-    ${TRACY_SOURCE_DIR}/nfd/nfd_common.c
-    ${TRACY_SOURCE_DIR}/nfd/nfd_gtk.c
+    ${TRACY_SOURCE_DIR}/nfd/nfd_portal.cpp
   )
   add_library(IREETracyNFD
     ${NFD_SOURCES}
