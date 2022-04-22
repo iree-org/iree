@@ -9,10 +9,10 @@
 
 Example usages:
   # Run all test suites and collect their artifacts:
-  python3 ./scripts/get_e2e_artifacts.py
+  python3 ./build_tools/scripts/get_e2e_artifacts.py
 
   # Run the e2e_tests test suite and collect its artifacts:
-  python3 ./scripts/get_e2e_artifacts.py --test_suites=e2e_tests
+  python3 ./build_tools/scripts/get_e2e_artifacts.py --test_suites=e2e_tests
 """
 
 import fileinput

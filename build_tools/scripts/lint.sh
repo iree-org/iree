@@ -18,6 +18,8 @@ set -uo pipefail
 FINAL_RET=0
 LATEST_RET=0
 
+scripts_dir="$(dirname $0)"
+
 function update_ret() {
   LATEST_RET="$?"
   if [[ "${LATEST_RET}" -gt "${FINAL_RET}" ]]; then
@@ -64,7 +66,7 @@ echo "***** buildifier *****"
 disable_update_ret
 if exists buildifier; then
   enable_update_ret
-  ./scripts/run_buildifier.sh
+  ${scripts_dir}/run_buildifier.sh
   git diff --exit-code
 else
   enable_update_ret
@@ -106,13 +108,13 @@ else
 fi
 
 echo "***** tabs *****"
-./scripts/check_tabs.sh
+${scripts_dir}/check_tabs.sh
 
 echo "***** yamllint *****"
 disable_update_ret
 if exists yamllint; then
   enable_update_ret
-  ./scripts/run_yamllint.sh
+  ${scripts_dir}/run_yamllint.sh
 else
   enable_update_ret
   echo "'yamllint' not found. Skipping check"

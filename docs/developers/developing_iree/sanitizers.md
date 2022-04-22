@@ -72,11 +72,11 @@ On Android it's more complicated due to
 [this](https://github.com/android/ndk/issues/753) Android NDK issue.
 Fortunately, we have a script to perform the symbolization. Copy the raw output
 from the sanitizer and feed it into the `stdin` of the
-`scripts/android_symbolize.sh` script, with the `ANDROID_NDK` environment
+`build_tools/scripts/android_symbolize.sh` script, with the `ANDROID_NDK` environment
 variable pointing to the NDK root directory, like this:
 
 ```shell
-ANDROID_NDK=~/android-ndk-r21d ./scripts/android_symbolize.sh < /tmp/asan.txt
+ANDROID_NDK=~/android-ndk-r21d ./build_tools/scripts/android_symbolize.sh < /tmp/asan.txt
 ```
 
 Where `/tmp/asan.txt` is where you've pasted the raw sanitizer report.
