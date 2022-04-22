@@ -104,7 +104,8 @@ class VMVXTargetBackend final : public TargetBackend {
         builder);
   }
 
-  LogicalResult serializeExecutable(IREE::HAL::ExecutableVariantOp variantOp,
+  LogicalResult serializeExecutable(const SerializationOptions &options,
+                                    IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
     // Add reflection information used at runtime specific to the HAL interface.
     SymbolTable symbolTable(variantOp.getInnerModule());
@@ -133,6 +134,11 @@ class VMVXTargetBackend final : public TargetBackend {
                << "failed to serialize VM bytecode module";
       }
     }
+    if (!options.dumpBinariesPath.empty()) {
+      dumpDataToPath<char>(options.dumpBinariesPath, options.dumpBaseName,
+                           variantOp.getName(), ".vmfb", moduleData);
+    }
+
     auto bufferAttr = DenseIntElementsAttr::get(
         VectorType::get({static_cast<int64_t>(moduleData.size())},
                         IntegerType::get(executableBuilder.getContext(), 8)),
@@ -144,6 +150,7 @@ class VMVXTargetBackend final : public TargetBackend {
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         variantOp.getLoc(), variantOp.sym_name(),
         variantOp.target().getFormat(), bufferAttr);
+
     return success();
   }
 

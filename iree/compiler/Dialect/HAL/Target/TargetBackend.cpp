@@ -8,9 +8,13 @@
 
 #include <algorithm>
 
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Path.h"
+#include "llvm/Support/ToolOutputFile.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/Support/FileUtilities.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -40,6 +44,18 @@ void TargetOptions::bindOptions(OptionsBinder &binder) {
       "iree-hal-dump-executable-benchmarks-to", executableBenchmarksPath,
       llvm::cl::desc("Path to write standalone hal.executable benchmarks into "
                      "(- for stdout)."),
+      llvm::cl::cat(halTargetOptionsCategory));
+
+  binder.opt<std::string>("iree-hal-dump-executable-intermediates-to",
+                          executableIntermediatesPath,
+                          llvm::cl::desc("Path to write translated executable "
+                                         "intermediates (.bc, .o, etc) into."),
+                          llvm::cl::cat(halTargetOptionsCategory));
+
+  binder.opt<std::string>(
+      "iree-hal-dump-executable-binaries-to", executableBinariesPath,
+      llvm::cl::desc(
+          "Path to write translated and serialized executable binaries into."),
       llvm::cl::cat(halTargetOptionsCategory));
 }
 
@@ -232,6 +248,22 @@ LogicalResult TargetBackend::linkExecutablesInto(
   }
 
   return success();
+}
+
+void dumpDataToPath(StringRef path, StringRef baseName, StringRef suffix,
+                    StringRef extension, StringRef data) {
+  auto fileName = (llvm::join_items("_", baseName, suffix) + extension).str();
+  auto fileParts =
+      llvm::join_items(llvm::sys::path::get_separator(), path, fileName);
+  auto filePath = llvm::sys::path::convert_to_slash(fileParts);
+  std::string error;
+  auto file = mlir::openOutputFile(filePath, &error);
+  if (!file) {
+    llvm::errs() << "Unable to dump debug output to " << filePath << "\n";
+    return;
+  }
+  file->os().write(data.data(), data.size());
+  file->keep();
 }
 
 }  // namespace HAL

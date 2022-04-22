@@ -213,7 +213,7 @@ iree_generated_trace_runner_test(
   DRIVERS
     "cuda"
   COMPILER_FLAGS
-    "--iree-cuda-llvm-target-arch=sm_80"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
   LABELS
     "noasan"
     "nomsan"

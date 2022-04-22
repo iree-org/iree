@@ -103,14 +103,17 @@ IREE's TensorFlow importer. We can now compile them for each GPU by running the 
     iree-compile \
         -iree-mlir-to-vm-bytecode-module \
         -iree-hal-target-backends=cuda \
-        -iree-cuda-llvm-target-arch=<...> \
+        -iree-hal-cuda-llvm-target-arch=<...> \
         -iree-hal-cuda-disable-loop-nounroll-wa \
         iree_input.mlir -o mobilenet-cuda.vmfb
     ```
 
-    Note that a cuda target architecture(`iree-cuda-llvm-target-arch`) of the form `sm_<arch_number>` is needed
-    to compile towards each GPU architecture. If no architecture is specified then we will default to `sm_35`
-    Here are a table of commonly used architecture
+    Note that a cuda target architecture(`iree-hal-cuda-llvm-target-arch`) of
+    the form `sm_<arch_number>` is needed to compile towards each GPU
+    architecture. If no architecture is specified then we will default to
+    `sm_35`.
+
+    Here are a table of commonly used architectures:
 
     CUDA GPU  | Target Architecture
     :--------: | :-----------:
