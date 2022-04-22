@@ -342,7 +342,7 @@ if(IREE_ERROR_ON_MISSING_SUBMODULES AND Python3_FOUND AND Git_FOUND)
   string(REGEX REPLACE "\n$" "" SHORT_HASH "${SHORT_HASH}")
   if(SHORT_HASH_RESULT EQUAL "0" AND NOT "${IREE_GIT_SHORT_HASH}" STREQUAL "${SHORT_HASH}")
     execute_process(
-      COMMAND ${Python3_EXECUTABLE} scripts/git/check_submodule_init.py
+      COMMAND ${Python3_EXECUTABLE} build_tools/scripts/git/check_submodule_init.py
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
       RESULT_VARIABLE SUBMODULE_INIT_RESULT
     )
