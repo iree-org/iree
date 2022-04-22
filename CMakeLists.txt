@@ -636,10 +636,6 @@ if(${IREE_BUILD_COMPILER})
   add_subdirectory(iree/compiler)
 endif()
 
-if(IREE_BUILD_SAMPLES)
-  add_subdirectory(iree/samples)
-endif()
-
 add_subdirectory(iree/tools)
 
 if(IREE_BUILD_TRACY)
@@ -704,3 +700,6 @@ add_subdirectory(build_tools/benchmarks)
 # many things into top-level APIs). This should resolve once we finish
 # relayering everything.
 add_subdirectory(runtime)
+if(IREE_BUILD_SAMPLES)
+  add_subdirectory(samples)
+endif()

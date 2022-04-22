@@ -60,10 +60,17 @@ function(iree_package_ns PACKAGE_NS)
   string(REPLACE ${IREE_ROOT_DIR} "" _RELATIVE_PATH ${CMAKE_CURRENT_LIST_DIR})
   string(SUBSTRING ${_RELATIVE_PATH} 1 -1 _RELATIVE_PATH)
 
+  # If changing the directory/package mapping rules, please also implement
+  # the corresponding rule in:
+  #   build_tools/bazel_to_cmake/bazel_to_cmake_targets.py
   # Some sub-trees form their own roots for package purposes. Rewrite them.
   if(_RELATIVE_PATH MATCHES "^runtime/src/(.*)")
     # runtime/src/iree/base -> iree/base
     set(_PACKAGE "${CMAKE_MATCH_1}")
+  elseif(_RELATIVE_PATH MATCHES "^samples/(.*)")
+    set(_PACKAGE "iree::samples::${CMAKE_MATCH_1}")
+  elseif(_RELATIVE_PATH MATCHES "^samples$")
+    set(_PACKAGE "iree::samples")
   else()
     # Default to pass-through. Examples:
     #   iree/compiler/API
@@ -72,6 +79,11 @@ function(iree_package_ns PACKAGE_NS)
   endif()
 
   string(REPLACE "/" "::" _PACKAGE_NS ${_PACKAGE})
+
+  if(_DEBUG_IREE_PACKAGE_NAME)
+    message(STATUS "iree_package_ns(): map ${_RELATIVE_PATH} -> ${_PACKAGE_NS}")
+  endif()
+
   set(${PACKAGE_NS} ${_PACKAGE_NS} PARENT_SCOPE)
 endfunction()
 

@@ -21,6 +21,7 @@ include(CMakeParseArguments)
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
 #     Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC
 #     will be in ${PACKAGE}/internal.
+# DEPS: Library dependencies to add to the generated embed cc library.
 # TESTONLY: When added, this target will only be built if IREE_BUILD_TESTS=ON.
 # MODULE_FILE_NAME: Optional. When specified, sets the output bytecode module
 #    file name. When not specified, a default file name will be generated from
@@ -37,7 +38,7 @@ function(iree_bytecode_module)
     _RULE
     "PUBLIC;TESTONLY"
     "NAME;SRC;TRANSLATE_TOOL;C_IDENTIFIER;MODULE_FILE_NAME;FRIENDLY_NAME"
-    "FLAGS;DEPENDS"
+    "FLAGS;DEPENDS;DEPS"
     ${ARGN}
   )
 
@@ -134,6 +135,8 @@ function(iree_bytecode_module)
       FLATTEN
         "${_PUBLIC_ARG}"
         "${_TESTONLY_ARG}"
+      DEPS
+        ${_RULE_DEPS}
     )
   endif()
 endfunction()

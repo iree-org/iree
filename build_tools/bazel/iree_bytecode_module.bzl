@@ -19,6 +19,7 @@ def iree_bytecode_module(
         translate_tool = "//iree/tools:iree-compile",
         linker_tool = "@llvm-project//lld:lld",
         c_identifier = "",
+        deps = [],
         **kwargs):
     """Builds an IREE bytecode module.
 
@@ -33,6 +34,7 @@ def iree_bytecode_module(
             Defaults to the lld from the llvm-project directory.
         module: Optional. Specifies the  path to use for the enerated IREE module (.vmfb).
         c_identifier: Optional. Enables embedding the module as C data.
+        deps: Optional. Dependencies to add to the generated library.
         **kwargs: any additional attributes to pass to the underlying rules.
     """
 
@@ -71,5 +73,6 @@ def iree_bytecode_module(
             c_file_output = "%s_c.c" % (name),
             h_file_output = "%s_c.h" % (name),
             flatten = True,
+            deps = deps,
             **kwargs
         )

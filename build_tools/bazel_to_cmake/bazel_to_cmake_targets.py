@@ -231,15 +231,23 @@ def convert_target(target):
   if target.startswith("//llvm-external-projects/iree-dialects"):
     return _convert_iree_dialects_target(target)
 
+  # IREE root paths map to package names based on explicit rules.
+  # If changing these, make the corresponding change in iree_macros.cmake
+  # (iree_package_ns function).
   # Map //runtime/src/iree/(.*) -> iree::\1
   m = re.match("^//runtime/src/iree/(.+)", target)
   if m:
     return ["iree::" + _convert_bazel_path(m.group(1))]
 
-  # Map //runtime/bindings/(.*) -> iree::bindings\1
+  # Map //runtime/bindings/(.*) -> iree::bindings::\1
   m = re.match("^//runtime/bindings/(.+)", target)
   if m:
     return ["iree::bindings::" + _convert_bazel_path(m.group(1))]
+
+  # Map //samples/(.*) -> iree::samples::\1
+  m = re.match("^//samples[/|:](.+)", target)
+  if m:
+    return ["iree::samples::" + _convert_bazel_path(m.group(1))]
 
   # Default (legacy) rewrite.
   if not target.startswith("@"):

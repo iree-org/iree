@@ -95,6 +95,11 @@ function(iree_cc_library)
     set(_RULE_IS_INTERFACE 0)
   endif()
 
+  # Wrap user specified INCLUDES in the $<BUILD_INTERFACE:>
+  # generator.
+  list(TRANSFORM _RULE_INCLUDES PREPEND "$<BUILD_INTERFACE:")
+  list(TRANSFORM _RULE_INCLUDES APPEND ">")
+
   # Implicit deps.
   if(IREE_IMPLICIT_DEFS_CC_DEPS)
     list(APPEND _RULE_DEPS ${IREE_IMPLICIT_DEFS_CC_DEPS})
@@ -157,7 +162,7 @@ function(iree_cc_library)
     )
     target_include_directories(${_NAME}
       PUBLIC
-        "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
+        ${_RULE_INCLUDES}
     )
     target_compile_options(${_NAME}
       PRIVATE
@@ -203,6 +208,7 @@ function(iree_cc_library)
       INTERFACE
         "$<BUILD_INTERFACE:${IREE_SOURCE_DIR}>"
         "$<BUILD_INTERFACE:${IREE_BINARY_DIR}>"
+        ${_RULE_INCLUDES}
     )
     target_link_options(${_NAME}
       INTERFACE
