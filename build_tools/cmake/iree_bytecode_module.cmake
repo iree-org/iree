@@ -6,6 +6,18 @@
 
 include(CMakeParseArguments)
 
+# Enforce consistency, regardless of whether iree_bytecode_module is called:
+# there is no valid reason to set mutually inconsistent IREE_BYTECODE_MODULE_*
+# options.
+if(IREE_BYTECODE_MODULE_ENABLE_TSAN)
+  if(NOT IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER)
+    message(SEND_ERROR
+        "When IREE_BYTECODE_MODULE_ENABLE_TSAN is ON, "
+        "IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER must also be ON. "
+        "TSAN instrumentation is not currently supported in embedded modules.")
+  endif()
+endif()
+
 # iree_bytecode_module()
 #
 # CMake function to imitate Bazel's iree_bytecode_module rule.
@@ -92,6 +104,31 @@ function(iree_bytecode_module)
     get_filename_component(_FRIENDLY_NAME "${_RULE_SRC}" NAME)
   endif()
 
+  # Enforce that IREE_ENABLE_TSAN agrees with IREE_BYTECODE_MODULE_ENABLE_TSAN,
+  # but only if iree_bytecode_module is called.
+  #
+  # That way, we allow people who don't build iree_bytecode_module's to flip
+  # only IREE_ENABLE_TSAN and not have to care about IREE_BYTECODE_MODULE_*.
+  #
+  # STREQUAL feels wrong here - we don't care about the exact true-value used,
+  # ON or TRUE or something else. But we haven't been able to think of a less bad
+  # alternative. https://github.com/google/iree/pull/8474#discussion_r840790062
+  if(NOT IREE_ENABLE_TSAN STREQUAL IREE_BYTECODE_MODULE_ENABLE_TSAN)
+    list(APPEND _CUSTOM_BUILD_TIME_CMAKE_ERRORS
+      ERROR_ON_INCONSISTENT_IREE_BYTECODE_MODULE_OPTIONS)
+    if(NOT TARGET ERROR_ON_INCONSISTENT_IREE_BYTECODE_MODULE_OPTIONS)
+      add_custom_target(
+        ERROR_ON_INCONSISTENT_IREE_BYTECODE_MODULE_OPTIONS
+        COMMAND
+          cmake -E echo "ERROR: Inconsistent CMake options: IREE_ENABLE_TSAN and IREE_BYTECODE_MODULE_ENABLE_TSAN must be simultaneously ON or OFF."
+        COMMAND
+          cmake -E false
+        VERBATIM
+        USES_TERMINAL
+      )
+    endif()
+  endif()
+
   # Depending on the binary instead of the target here given we might not have
   # a target in this CMake invocation when cross-compiling.
   add_custom_command(
@@ -107,6 +144,7 @@ function(iree_bytecode_module)
       ${_LINKER_TOOL_EXECUTABLE}
       ${_RULE_SRC}
       ${_RULE_DEPENDS}
+      ${_CUSTOM_BUILD_TIME_CMAKE_ERRORS}
     COMMENT
       "Generating VMFB for ${_FRIENDLY_NAME}"
     VERBATIM
