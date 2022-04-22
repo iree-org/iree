@@ -47,54 +47,58 @@ namespace iree_compiler {
 struct SpecialTerminatorOpCapture {
   Value initValue;
   // For now, must be scf.for ops.
-  SmallVector<Operation *, 4> loops;
-  // For now, must be a tensor.insert_slice op.
-  Operation *rootDestructiveUpdate;
+  SmallVector<scf::ForOp, 4> loops;
+  OpOperand *rootDestructiveUpdate;
   bool readOnly = false;
   bool writeOnly = false;
+  // `flow.dispatch.tensor.store` that is is written into.
+  // Could be empty for dead uses.
+  Optional<IREE::Flow::DispatchTensorStoreOp> dest = llvm::None;
 };
 
 // TODO(nicolasvasilache): Use some interface instead of op names directly.
 static bool hasDestructiveUpdateUses(BlockArgument arg,
                                      SpecialTerminatorOpCapture &capture) {
-  SmallVector<Operation *> reads;
-  SmallVector<Operation *> writes;
+  SmallVector<OpOperand *> reads;
+  SmallVector<OpOperand *> writes;
   for (OpOperand &u : arg.getUses()) {
     Operation *user = u.getOwner();
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(user)) {
       if (linalgOp.isOutputTensor(&u)) {
-        writes.push_back(linalgOp);
+        writes.push_back(&u);
       } else {
-        reads.push_back(linalgOp);
+        reads.push_back(&u);
       }
     } else if (auto linalgExtOp =
                    dyn_cast<IREE::LinalgExt::LinalgExtOp>(user)) {
       if (linalgExtOp.isOutputTensor(&u)) {
-        writes.push_back(linalgExtOp);
+        writes.push_back(&u);
       } else {
-        reads.push_back(linalgExtOp);
+        reads.push_back(&u);
       }
     } else if (auto sliceOp = dyn_cast<tensor::InsertSliceOp>(user)) {
       if (sliceOp.dest() == u.get()) {
-        writes.push_back(sliceOp);
+        writes.push_back(&u);
       } else {
-        reads.push_back(sliceOp);
+        reads.push_back(&u);
       }
     } else {
-      reads.push_back(user);
+      reads.push_back(&u);
     }
   }
   // For now, only allow exactly a single tensor.insert_slice op that must be
   // dominated by all tensor.extract_slice ops.
   if (writes.size() != 1) return false;
   // Small local dominance computation.
-  DominanceInfo domInfo(writes.front()->getParentOp());
+  DominanceInfo domInfo(writes.front()->getOwner()->getParentOp());
   for (auto read : reads) {
-    LLVM_DEBUG(llvm::dbgs() << "read: " << *read << "\n");
-    if (!domInfo.properlyDominates(read, writes.front())) {
-      LLVM_DEBUG(llvm::dbgs() << "non-destructive use-def: " << *read
-                              << " does not properly dominate "
-                              << *(writes.front()) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "read: " << *(read->getOwner()) << "\n");
+    if (!domInfo.properlyDominates(read->getOwner(),
+                                   writes.front()->getOwner())) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "non-destructive use-def: " << *(read->getOwner())
+                 << " does not properly dominate "
+                 << *(writes.front()->getOwner()) << "\n");
       return false;
     }
   }
@@ -102,8 +106,6 @@ static bool hasDestructiveUpdateUses(BlockArgument arg,
   capture.readOnly = writes.empty();
   capture.writeOnly = reads.empty();
   capture.rootDestructiveUpdate = writes.front();
-  LLVM_DEBUG(llvm::dbgs() << "readOnly: " << capture.readOnly
-                          << " writeOnly: " << capture.writeOnly << "\n");
   return true;
 }
 
@@ -206,8 +208,8 @@ static LogicalResult foldExtractSliceOp(OpBuilder &b,
                                         tensor::ExtractSliceOp op) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(op);
-  auto loadOp = op.source().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
-  if (!loadOp) {
+  auto sourceOp = op.source().getDefiningOp();
+  if (!sourceOp) {
     BlockArgument val = op.source().dyn_cast<BlockArgument>();
     while (val) {
       auto forOp = dyn_cast<scf::ForOp>(val.getOwner()->getParentOp());
@@ -215,58 +217,79 @@ static LogicalResult foldExtractSliceOp(OpBuilder &b,
       if (!forOp) return failure();
       unsigned idx = val.getArgNumber() - 1;  // accounting for IV arg.
       Value iterOperand = *(forOp.getIterOperands().begin() + idx);
-      loadOp = iterOperand.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+      sourceOp = iterOperand.getDefiningOp();
       val = iterOperand.dyn_cast<BlockArgument>();
     }
   }
-  if (!loadOp) return failure();
+  if (!sourceOp) return failure();
 
-  SmallVector<OpFoldResult> offsets, sizes, strides;
-  Location loc = op.getLoc();
-  if (failed(foldOffsetsSizesAndStrides(b, loc, loadOp, op,
-                                        loadOp.getDroppedDims(), offsets, sizes,
-                                        strides))) {
-    return failure();
+  Operation *replacement = nullptr;
+  if (auto loadOp = dyn_cast<IREE::Flow::DispatchTensorLoadOp>(sourceOp)) {
+    SmallVector<OpFoldResult> offsets, sizes, strides;
+    Location loc = op.getLoc();
+    if (failed(foldOffsetsSizesAndStrides(b, loc, loadOp, op,
+                                          loadOp.getDroppedDims(), offsets,
+                                          sizes, strides))) {
+      return failure();
+    }
+
+    replacement = b.create<IREE::Flow::DispatchTensorLoadOp>(
+        op.getLoc(), op.getType(), loadOp.source(), loadOp.source_dims(),
+        offsets, sizes, strides);
+  } else if (auto initTensorOp = dyn_cast<linalg::InitTensorOp>(sourceOp)) {
+    replacement = b.create<linalg::InitTensorOp>(
+        op.getLoc(), op.getMixedSizes(), op.getType().getElementType());
   }
 
-  Value loaded = b.create<IREE::Flow::DispatchTensorLoadOp>(
-      op.getLoc(), op.getType(), loadOp.source(), loadOp.source_dims(), offsets,
-      sizes, strides);
+  if (!replacement) return failure();
 
-  op.getResult().replaceAllUsesWith(loaded);
+  op->replaceAllUsesWith(replacement->getResults());
   op.erase();
   return success();
 }
 
 template <typename OpTy>
 static LogicalResult rewriteDestructiveUpdateInPlace(
-    OpBuilder &b, OpTy linalgLikeOp,
-    IREE::Flow::DispatchTensorStoreOp storeOp) {
+    OpBuilder &b, OpTy linalgLikeOp, OpOperand *operand,
+    Optional<IREE::Flow::DispatchTensorStoreOp> storeOp) {
   LLVM_DEBUG(llvm::dbgs() << "RewriteDestructiveUpdateInPlace: "
                           << *linalgLikeOp.getOperation() << "\n");
-  if (!linalgLikeOp->hasOneUse()) {
-    return linalgLikeOp.emitError("not a single use operation");
+  Optional<unsigned> resultNumber = llvm::None;
+  for (auto outputOperand : llvm::enumerate(linalgLikeOp.getOutputOperands())) {
+    if (outputOperand.value() == operand) {
+      resultNumber = outputOperand.index();
+      break;
+    }
+  }
+  if (!resultNumber) {
+    return linalgLikeOp.emitOpError("operand is not a out operand");
+  }
+  Value result = linalgLikeOp->getResult(resultNumber.getValue());
+  if (result.use_empty()) return success();
+  if (!result.hasOneUse()) {
+    return linalgLikeOp.emitError("not a single use result");
   }
 
-  OpOperand &use = *(linalgLikeOp->use_begin());
+  OpOperand &use = *(result.use_begin());
   if (isa<scf::YieldOp>(use.getOwner())) {
-    OpResult usedResult = use.get().cast<OpResult>();
-    Value dest =
-        linalgLikeOp.getOutputOperand(usedResult.getResultNumber())->get();
+    Value dest = operand->get();
     if (!dest || !dest.isa<BlockArgument>()) {
       return linalgLikeOp.emitError("dest is not a argument to the loop");
     }
-    OpBuilder::InsertionGuard g(b);
-    b.setInsertionPointAfter(linalgLikeOp);
-
     // Kills the SSA use-def chain.
-    usedResult.replaceAllUsesWith(dest);
+    result.replaceAllUsesWith(dest);
 
-    b.create<IREE::Flow::DispatchTensorStoreOp>(
-        linalgLikeOp.getLoc(), usedResult, storeOp.target(),
-        storeOp.target_dims(), storeOp.getMixedOffsets(),
-        storeOp.getMixedSizes(), storeOp.getMixedStrides());
+    if (storeOp) {
+      // If the result is the actual return of the dispatch, create the matching
+      // store.
+      OpBuilder::InsertionGuard g(b);
+      b.setInsertionPointAfter(linalgLikeOp);
 
+      b.create<IREE::Flow::DispatchTensorStoreOp>(
+          linalgLikeOp.getLoc(), result, storeOp->target(),
+          storeOp->target_dims(), storeOp->getMixedOffsets(),
+          storeOp->getMixedSizes(), storeOp->getMixedStrides());
+    }
     return success();
   }
   return failure();
@@ -276,12 +299,16 @@ static LogicalResult rewriteDestructiveUpdateInPlace(
 /// tensor.insert_slice.
 template <>
 LogicalResult rewriteDestructiveUpdateInPlace<tensor::InsertSliceOp>(
-    OpBuilder &b, tensor::InsertSliceOp insertSliceOp,
-    IREE::Flow::DispatchTensorStoreOp storeOp) {
+    OpBuilder &b, tensor::InsertSliceOp insertSliceOp, OpOperand *operand,
+    Optional<IREE::Flow::DispatchTensorStoreOp> storeOp) {
+  if (insertSliceOp.use_empty()) return success();
   LLVM_DEBUG(llvm::dbgs() << "RewriteDestructiveUpdateInPlace: "
                           << *insertSliceOp.getOperation() << "\n");
+  if (operand->get() != insertSliceOp.dest()) {
+    return insertSliceOp.emitOpError("expected operand to be the dest");
+  }
   if (!insertSliceOp->hasOneUse()) {
-    return insertSliceOp.emitError("not a single use operation");
+    return insertSliceOp.emitOpError("not a single use operation");
   }
 
   OpOperand &use = *(insertSliceOp->use_begin());
@@ -291,23 +318,25 @@ LogicalResult rewriteDestructiveUpdateInPlace<tensor::InsertSliceOp>(
     if (!dest || !dest.isa<BlockArgument>()) {
       return insertSliceOp.emitError("dest is not a argument to the loop");
     }
-    OpBuilder::InsertionGuard g(b);
-    b.setInsertionPoint(insertSliceOp);
-
     // Kills the SSA use-def chain.
     usedResult.replaceAllUsesWith(dest);
 
-    SmallVector<OpFoldResult> offsets, sizes, strides;
-    Location loc = insertSliceOp->getLoc();
-    if (failed(foldOffsetsSizesAndStrides(b, loc, storeOp, insertSliceOp,
-                                          storeOp.getDroppedDims(), offsets,
-                                          sizes, strides))) {
-      return failure();
-    }
+    if (storeOp) {
+      OpBuilder::InsertionGuard g(b);
+      b.setInsertionPoint(insertSliceOp);
 
-    b.create<IREE::Flow::DispatchTensorStoreOp>(
-        insertSliceOp->getLoc(), insertSliceOp.source(), storeOp.target(),
-        storeOp.target_dims(), offsets, sizes, strides);
+      SmallVector<OpFoldResult> offsets, sizes, strides;
+      Location loc = insertSliceOp->getLoc();
+      if (failed(foldOffsetsSizesAndStrides(
+              b, loc, storeOp.getValue(), insertSliceOp,
+              storeOp->getDroppedDims(), offsets, sizes, strides))) {
+        return failure();
+      }
+
+      b.create<IREE::Flow::DispatchTensorStoreOp>(
+          insertSliceOp->getLoc(), insertSliceOp.source(), storeOp->target(),
+          storeOp->target_dims(), offsets, sizes, strides);
+    }
 
     return success();
   }
@@ -330,28 +359,24 @@ static bool hasNonScfForControlFlow(func::FuncOp funcOp) {
 }
 
 static LogicalResult rewriteDestructiveUpdateInPlace(
-    OpBuilder &b, SpecialTerminatorOpCapture &capture,
-    IREE::Flow::DispatchTensorStoreOp storeOp) {
-  Operation *outermostProducingOp = (capture.loops.empty())
-                                        ? capture.rootDestructiveUpdate
-                                        : capture.loops.front();
+    OpBuilder &b, SpecialTerminatorOpCapture &capture) {
+  scf::ForOp outermostProducingOp = capture.loops.front();
   LLVM_DEBUG(llvm::dbgs() << "outermost producing: " << *outermostProducingOp
                           << "\n");
 
   // Try to rewrite inplace.
-  auto status =
-      TypeSwitch<Operation *, LogicalResult>(capture.rootDestructiveUpdate)
-          .Case<linalg::LinalgOp, IREE::LinalgExt::LinalgExtOp,
-                tensor::InsertSliceOp>([&](auto op) {
-            return rewriteDestructiveUpdateInPlace(b, op, storeOp);
-          })
-          .Default([&](Operation *) { return failure(); });
+  auto status = TypeSwitch<Operation *, LogicalResult>(
+                    capture.rootDestructiveUpdate->getOwner())
+                    .Case<linalg::LinalgOp, IREE::LinalgExt::LinalgExtOp,
+                          tensor::InsertSliceOp>([&](auto op) {
+                      return rewriteDestructiveUpdateInPlace(
+                          b, op, capture.rootDestructiveUpdate, capture.dest);
+                    })
+                    .Default([&](Operation *) { return failure(); });
   if (failed(status)) return failure();
 
-  if (scf::ForOp loopOp = dyn_cast<scf::ForOp>(outermostProducingOp)) {
-    loopOp.walk(
-        [&](tensor::ExtractSliceOp op) { (void)foldExtractSliceOp(b, op); });
-  }
+  outermostProducingOp.walk(
+      [&](tensor::ExtractSliceOp op) { (void)foldExtractSliceOp(b, op); });
 
   return success();
 }
@@ -365,20 +390,49 @@ LogicalResult rewriteLinalgDestructiveUpdates(func::FuncOp funcOp) {
   SmallVector<IREE::Flow::DispatchTensorStoreOp> processedStores;
   // For each tensor store op, look for destructive updates and replace the
   // destructive pattern by a custom inplace update pattern.
-  auto walkResult = funcOp.walk([&](IREE::Flow::DispatchTensorStoreOp op) {
+  llvm::MapVector<Value, SpecialTerminatorOpCapture> destructiveUpdates;
+  funcOp.walk([&](IREE::Flow::DispatchTensorStoreOp op) {
     SpecialTerminatorOpCapture capture;
     capture.initValue = op.value();
     Value sourceValue = isADestructiveUpdatePattern(capture.initValue, capture);
-    if (!sourceValue) return WalkResult::advance();
-    if (failed(rewriteDestructiveUpdateInPlace(b, capture, op))) {
-      return WalkResult::interrupt();
-    }
-    processedStores.push_back(op);
-    return WalkResult::advance();
+    if (!sourceValue || capture.loops.empty()) return;
+    capture.dest = op;
+    destructiveUpdates[op.value()] = capture;
   });
-  if (walkResult.wasInterrupted()) return failure();
 
+  // Check if the other returns of the destructive update loops are also
+  // destuctive updates. These come from values that are dead outside dispatch,
+  // so have no stores, but are still needed for use within the dispatch.
+  llvm::MapVector<Value, SpecialTerminatorOpCapture>
+      deadOutputDestructiveUpdates;
+  for (auto &it : destructiveUpdates) {
+    scf::ForOp outerMostLoop = it.second.loops.front();
+    for (auto result : outerMostLoop.getResults()) {
+      if (result == it.second.initValue) continue;
+      SpecialTerminatorOpCapture newCapture;
+      newCapture.initValue = result;
+      Value sourceValue = isADestructiveUpdatePattern(result, newCapture);
+      if (!sourceValue || newCapture.loops.empty()) continue;
+      deadOutputDestructiveUpdates[result] = newCapture;
+    }
+  }
+
+  // Rewrite destructive updates that are eventually published using
+  // `flow.dispatch.tensor`.
+  for (auto &it : destructiveUpdates) {
+    if (failed(rewriteDestructiveUpdateInPlace(b, it.second))) {
+      return failure();
+    }
+    processedStores.push_back(it.second.dest.getValue());
+  };
   for (auto op : processedStores) op.erase();
+
+  // Rewrite destructive updates that are dead outside the dispatch.
+  for (auto &it : deadOutputDestructiveUpdates) {
+    if (failed(rewriteDestructiveUpdateInPlace(b, it.second))) {
+      return failure();
+    }
+  }
 
   // Non-default canonicalization patterns.
   // TODO(nicolasvasilache): add Linalg tiling canonicalization patterns,
