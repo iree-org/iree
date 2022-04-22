@@ -285,7 +285,6 @@ static ParseResult parseResourceRegion(
     }
   }
   return parser.parseRegion(body, regionArgs, operandTypes,
-                            /*argLocations=*/{},
                             /*enableNameShadowing=*/false);
 }
 
@@ -358,7 +357,6 @@ static ParseResult parseExplicitResourceRegion(
     }
   }
   if (failed(parser.parseRegion(body, regionArgs, operandTypes,
-                                /*argLocations=*/{},
                                 /*enableNameShadowing=*/false))) {
     return failure();
   }

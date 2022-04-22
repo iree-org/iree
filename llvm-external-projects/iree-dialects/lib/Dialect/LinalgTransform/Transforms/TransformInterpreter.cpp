@@ -59,7 +59,7 @@ static llvm::cl::opt<std::string> clTransformFileName(
 /// Run enabling transformations (LICM and its variants, single-iteration loop
 /// removal, CSE) on the given function.
 static LogicalResult performEnablerTransformations(
-    FuncOp func, RewriteListener &listener,
+    func::FuncOp func, RewriteListener &listener,
     linalg::LinalgEnablingOptions options = linalg::LinalgEnablingOptions()) {
   MLIRContext *ctx = func->getContext();
   RewritePatternSet patterns(ctx);
@@ -95,7 +95,7 @@ static LogicalResult performEnablerTransformations(
 static LogicalResult performEnablerTransformations(
     Operation *containerOp, RewriteListener &listener,
     linalg::LinalgEnablingOptions options = linalg::LinalgEnablingOptions()) {
-  auto res = containerOp->walk([&](FuncOp func) {
+  auto res = containerOp->walk([&](func::FuncOp func) {
     if (failed(performEnablerTransformations(func, listener, options)))
       return WalkResult::interrupt();
     return WalkResult::advance();

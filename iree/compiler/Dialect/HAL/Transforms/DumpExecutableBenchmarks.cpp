@@ -178,7 +178,7 @@ static void appendDispatchBenchmark(
   // Create an exported benchmark function that runs the dispatches.
   auto funcType =
       moduleBuilder.getFunctionType({moduleBuilder.getI32Type()}, {});
-  auto funcOp = moduleBuilder.create<mlir::FuncOp>(loc, baseName, funcType);
+  auto funcOp = moduleBuilder.create<func::FuncOp>(loc, baseName, funcType);
   funcOp.setVisibility(SymbolTable::Visibility::Public);
 
   // Mark the function as being a dispatch benchmark.

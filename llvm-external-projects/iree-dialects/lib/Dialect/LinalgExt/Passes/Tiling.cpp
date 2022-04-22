@@ -281,7 +281,7 @@ static Value buildFlowWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
 }
 
 void TiledOpInterfaceTilingPass::runOnOperation() {
-  FuncOp funcOp = getOperation();
+  func::FuncOp funcOp = getOperation();
   MLIRContext *context = funcOp.getContext();
 
   RewritePatternSet patterns(context);
@@ -360,7 +360,7 @@ void TiledOpInterfaceTilingPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 IREE::LinalgExt::createTiledOpInterfaceTilingPass() {
   return std::make_unique<TiledOpInterfaceTilingPass>();
 }
