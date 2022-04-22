@@ -61,7 +61,7 @@ def iree_bytecode_module(
         tools = [translate_tool, linker_tool],
         message = "Compiling IREE module %s..." % (name),
         output_to_bindir = 1,
-        **kwargs,
+        **kwargs
     )
 
     # Embed the module for use in C.
