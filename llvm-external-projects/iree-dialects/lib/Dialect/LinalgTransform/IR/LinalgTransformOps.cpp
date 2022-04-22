@@ -699,17 +699,23 @@ transform::LowerVectorsOp::apply(transform::TransformResults &results,
 // BufferizeOp
 //===---------------------------------------------------------------------===//
 
+static void applyBufferizationEnablingTransformations(ModuleOp moduleOp) {
+  RewritePatternSet patterns(moduleOp.getContext());
+  patterns.add<GeneralizePadOpPattern>(moduleOp.getContext());
+  (void)applyPatternsAndFoldGreedily(moduleOp, std::move(patterns));
+}
+
 LogicalResult transform::BufferizeOp::apply(transform::TransformResults &result,
                                             transform::TransformState &state) {
-  PassManager pm(getContext());
-
   bufferization::OneShotBufferizationOptions options;
   options.memCpyFn = [](OpBuilder &builder, Location loc, Value from,
                         Value to) {
     return success(linalg::makeMemRefCopyOp(builder, loc, from, to));
   };
-  pm.addPass(createLinalgComprehensiveModuleBufferizePass(options));
-  if (failed(pm.run(state.getTopLevel())))
+
+  auto moduleOp = cast<ModuleOp>(state.getTopLevel());
+  applyBufferizationEnablingTransformations(moduleOp);
+  if (failed(comprehensive_bufferize::runModuleBufferize(moduleOp, options)))
     return failure();
 
   // Perform buffer-level hoistings.

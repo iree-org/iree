@@ -56,7 +56,6 @@ class Dynamicity(enum.Enum):
 @enum.unique
 class MatrixGenerator(enum.Enum):
   ZERO = "zero"  # Fill with zeros
-  IDENTITY = "identity"  # Make an identity matrix (generalized to any shape).
   RANDOM = "random"  # Fill with (deterministic) pseudorandom values.
 
 
@@ -67,17 +66,6 @@ class TestShape:
   m: int
   k: int
   n: int
-
-
-# Describes how to construct MLIR tensor types and how to initialize buffer
-# contents for a test case (for an already given TestShape, and already given
-# matrix element data types).
-@dataclasses.dataclass
-class TestGenerator:
-  lhs: MatrixGenerator
-  rhs: MatrixGenerator
-  acc: MatrixGenerator
-  dynamicity: Dynamicity
 
 
 # Describes how to construct compilation info for the testcase.
@@ -148,69 +136,17 @@ def get_test_shapes(shapes_id: ShapesId):
   raise ValueError(shapes_id)
 
 
-# Returns the list of TestGenerator's to use for the collection of shapes
+# Returns the list of Dynamicity's to use for the collection of shapes
 # identified by shapes_id.
-def get_test_generators(shapes_id: ShapesId):
-  if shapes_id == ShapesId.SMALL:
-    return [
-        # Generators using simple matrices for ease of numerical debugging.
-        # They don't add significant test coverage (all bugs are hit by
-        # tests using random matrices anyway). They are only here to make
-        # the bulk of our debugging easier.
-        TestGenerator(lhs=MatrixGenerator.IDENTITY,
-                      rhs=MatrixGenerator.IDENTITY,
-                      acc=MatrixGenerator.ZERO,
-                      dynamicity=Dynamicity.DYNAMIC),
-        TestGenerator(lhs=MatrixGenerator.RANDOM,
-                      rhs=MatrixGenerator.IDENTITY,
-                      acc=MatrixGenerator.ZERO,
-                      dynamicity=Dynamicity.DYNAMIC),
-        TestGenerator(lhs=MatrixGenerator.IDENTITY,
-                      rhs=MatrixGenerator.RANDOM,
-                      acc=MatrixGenerator.ZERO,
-                      dynamicity=Dynamicity.DYNAMIC),
-        TestGenerator(lhs=MatrixGenerator.IDENTITY,
-                      rhs=MatrixGenerator.IDENTITY,
-                      acc=MatrixGenerator.RANDOM,
-                      dynamicity=Dynamicity.DYNAMIC),
-        # Generators using general random matrices
-        TestGenerator(lhs=MatrixGenerator.RANDOM,
-                      rhs=MatrixGenerator.RANDOM,
-                      acc=MatrixGenerator.RANDOM,
-                      dynamicity=Dynamicity.DYNAMIC),
-        TestGenerator(lhs=MatrixGenerator.RANDOM,
-                      rhs=MatrixGenerator.RANDOM,
-                      acc=MatrixGenerator.RANDOM,
-                      dynamicity=Dynamicity.STATIC),
-        TestGenerator(lhs=MatrixGenerator.RANDOM,
-                      rhs=MatrixGenerator.RANDOM,
-                      acc=MatrixGenerator.RANDOM,
-                      dynamicity=Dynamicity.MIXED),
-    ]
-  if shapes_id == ShapesId.LARGE:
-    return [
-        # Fewer generators are used for large shapes, to limit the
-        # latency impact. Most bugs are going to be caught on small
-        # shapes anyway.
-        TestGenerator(lhs=MatrixGenerator.RANDOM,
-                      rhs=MatrixGenerator.RANDOM,
-                      acc=MatrixGenerator.RANDOM,
-                      dynamicity=Dynamicity.DYNAMIC),
-        TestGenerator(lhs=MatrixGenerator.RANDOM,
-                      rhs=MatrixGenerator.RANDOM,
-                      acc=MatrixGenerator.RANDOM,
-                      dynamicity=Dynamicity.STATIC),
-    ]
+def get_dynamicities(shapes_id: ShapesId):
   if shapes_id == ShapesId.GPU_LARGE:
     return [
-        TestGenerator(lhs=MatrixGenerator.IDENTITY,
-                      rhs=MatrixGenerator.IDENTITY,
-                      acc=MatrixGenerator.ZERO,
-                      dynamicity=Dynamicity.STATIC),
-        TestGenerator(lhs=MatrixGenerator.RANDOM,
-                      rhs=MatrixGenerator.RANDOM,
-                      acc=MatrixGenerator.RANDOM,
-                      dynamicity=Dynamicity.STATIC),
+        Dynamicity.STATIC,
+    ]
+  else:
+    return [
+        Dynamicity.DYNAMIC,
+        Dynamicity.STATIC,
     ]
   raise ValueError(shapes_id)
 
@@ -223,7 +159,10 @@ class TileWorkgroupSizePair:
 
 # Returns the list of CompilationInfo's to use for the CompilationInfoId.
 def get_test_compilation_infos(
-    compilation_info_id: CompilationInfoId) -> typing.List[CompilationInfo]:
+    compilation_info_id: CompilationInfoId
+) -> typing.List[typing.Optional[CompilationInfo]]:
+  if compilation_info_id == CompilationInfoId.NONE:
+    return [None]
   if compilation_info_id == CompilationInfoId.LLVMGPUMatmulSimt:
     tile_workgroup_size_pairs = [
         TileWorkgroupSizePair([32, 128, 32], [32, 8, 1]),
@@ -441,12 +380,9 @@ generate_function.compilation_index = 0
 pseudorandom_generator_seed = 1
 
 
-# Generates a contents_generator tag to use in the output trace.
 def contents_generator_tag(generator: MatrixGenerator):
   if generator == MatrixGenerator.ZERO:
     return ""
-  elif generator == MatrixGenerator.IDENTITY:
-    return "!tag:iree:identity_matrix"
   elif generator == MatrixGenerator.RANDOM:
     global pseudorandom_generator_seed
     pseudorandom_generator_seed = pseudorandom_generator_seed + 1
@@ -474,11 +410,13 @@ def generate_trace_matrix_arg(matrix_shape: list,
 # Generates the output trace for a testcase i.e. a single test function call,
 # as a dictionary to be passed to yaml.dump.
 def generate_trace(func_name: str, lhs_rhs_type: MatrixElemTypeId,
-                   acc_type: MatrixElemTypeId, shape: TestShape,
-                   gen: TestGenerator):
-  lhs_arg = generate_trace_matrix_arg([shape.m, shape.k], lhs_rhs_type, gen.lhs)
-  rhs_arg = generate_trace_matrix_arg([shape.k, shape.n], lhs_rhs_type, gen.rhs)
-  acc_arg = generate_trace_matrix_arg([shape.m, shape.n], acc_type, gen.acc)
+                   acc_type: MatrixElemTypeId, shape: TestShape):
+  lhs_arg = generate_trace_matrix_arg([shape.m, shape.k], lhs_rhs_type,
+                                      MatrixGenerator.RANDOM)
+  rhs_arg = generate_trace_matrix_arg([shape.k, shape.n], lhs_rhs_type,
+                                      MatrixGenerator.RANDOM)
+  acc_arg = generate_trace_matrix_arg([shape.m, shape.n], acc_type,
+                                      MatrixGenerator.RANDOM)
   result_arg = generate_trace_matrix_arg([shape.m, shape.n], acc_type,
                                          MatrixGenerator.ZERO)
   return {
@@ -494,38 +432,16 @@ def generate_trace(func_name: str, lhs_rhs_type: MatrixElemTypeId,
 
 
 # Generates all output files' contents as strings.
-def generate_default(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId,
-                     shapes_id: ShapesId):
-  function_definitions = {}
-  traces = []
-  for shape in get_test_shapes(shapes_id):
-    for gen in get_test_generators(shapes_id):
-      function = generate_function(lhs_rhs_type, acc_type, shape,
-                                   gen.dynamicity)
-      # Different testcases may differ only by runtime parameters but
-      # share the same code. For example, dynamic-shapes testcases
-      # share the same code involing tensor<?x?xf32> even though the runtime
-      # value in the trace are different. That's why we append conditionally
-      # to traces, but unconditionally to function_definitions.
-      if function.name not in function_definitions:
-        function_definitions[function.name] = function.definition
-      traces.append(
-          generate_trace(function.name, lhs_rhs_type, acc_type, shape, gen))
-  return (function_definitions, traces)
-
-
-# Generates all output files' contents as strings.
-def generate_gpu(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId,
-                 shapes_id: ShapesId, compilation_info_id: CompilationInfoId):
+def generate(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId,
+             shapes_id: ShapesId, compilation_info_id: CompilationInfoId):
   function_definitions = {}
   traces = []
 
   for compilation_info in get_test_compilation_infos(compilation_info_id):
     for shape in get_test_shapes(shapes_id):
-      for gen in get_test_generators(shapes_id):
-
-        function = generate_function(lhs_rhs_type, acc_type, shape,
-                                     gen.dynamicity, compilation_info)
+      for dynamicity in get_dynamicities(shapes_id):
+        function = generate_function(lhs_rhs_type, acc_type, shape, dynamicity,
+                                     compilation_info)
         # Different testcases may differ only by runtime parameters but
         # share the same code. For example, dynamic-shapes testcases
         # share the same code involing tensor<?x?xf32> even though the runtime
@@ -534,7 +450,7 @@ def generate_gpu(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId,
         if function.name not in function_definitions:
           function_definitions[function.name] = function.definition
         traces.append(
-            generate_trace(function.name, lhs_rhs_type, acc_type, shape, gen))
+            generate_trace(function.name, lhs_rhs_type, acc_type, shape))
 
   return (function_definitions, traces)
 
@@ -646,15 +562,8 @@ def main(args):
   acc_type = infer_acc_type(lhs_rhs_type)
   shapes_id = ShapesId(args.shapes)
   compilation_info_id = CompilationInfoId(args.compilation_info)
-  if compilation_info_id == CompilationInfoId.NONE:
-    (function_definitions, traces) = generate_default(lhs_rhs_type, acc_type,
-                                                      shapes_id)
-  elif compilation_info_id == CompilationInfoId.LLVMGPUMatmulSimt or compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCore:
-    (function_definitions, traces) = generate_gpu(lhs_rhs_type, acc_type,
-                                                  shapes_id,
-                                                  compilation_info_id)
-  else:
-    raise ValueError(compilation_info_id)
+  (function_definitions, traces) = generate(lhs_rhs_type, acc_type, shapes_id,
+                                            compilation_info_id)
 
   write_code_file(function_definitions, args.output_code)
   write_trace_file(traces, args.output_trace, args.module_path,
