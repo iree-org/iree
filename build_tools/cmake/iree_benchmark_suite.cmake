@@ -180,14 +180,17 @@ function(iree_benchmark_suite)
             "${_TAGS}" "${_MODE}" "${_RULE_TARGET_BACKEND}"
             "${_RULE_TARGET_ARCHITECTURE}")
 
+      # Add a friendly target name to drive this benchmark and any others that
+      # share the same easily-describable properties.
+      set(_FRIENDLY_TARGET_NAME_LIST "iree-generate-benchmark-artifact")
+      list(APPEND _FRIENDLY_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
+      list(JOIN _FRIENDLY_TARGET_NAME_LIST "__" _FRIENDLY_TARGET_NAME)
+
       # The full list of translation flags.
-      set(_TRANSLATION_ARGS "--iree-mlir-to-vm-bytecode-module")
+      set(_TRANSLATION_ARGS "")
+      list(APPEND _TRANSLATION_ARGS "--iree-mlir-to-vm-bytecode-module")
+      list(APPEND _TRANSLATION_ARGS "--mlir-print-op-on-diagnostic=false")
       list(APPEND _TRANSLATION_ARGS "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}")
-      if (IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER)
-        # Honor this option here --- it's only an accident that we're not
-        # currently using iree_bytecode_module here.
-        list(APPEND _TRANSLATION_ARGS "-iree-llvm-link-embedded=false")
-      endif()
       list(SORT _RULE_TRANSLATION_FLAGS)
       list(APPEND _TRANSLATION_ARGS ${_RULE_TRANSLATION_FLAGS})
 
@@ -198,31 +201,34 @@ function(iree_benchmark_suite)
       # better (like SHA256).
       string(MD5 _VMFB_HASH "${_TRANSLATION_ARGS};${_MODULE_SOURCE}")
       get_filename_component(_MODULE_SOURCE_BASENAME "${_MODULE_SOURCE}" NAME)
-      set(_VMFB_FILE "${_VMFB_ARTIFACTS_DIR}/${_MODULE_SOURCE_BASENAME}-${_VMFB_HASH}.vmfb")
+      set(_MODULE_SOURCE_BASENAME_WITH_HASH "${_MODULE_SOURCE_BASENAME}-${_VMFB_HASH}")
+      set(_VMFB_FILE "${_VMFB_ARTIFACTS_DIR}/${_MODULE_SOURCE_BASENAME_WITH_HASH}.vmfb")
 
       # Register the target once and share across all benchmarks having the same
       # MLIR source and translation flags.
       set(
         _TRANSLATION_TARGET_NAME
-        "${PACKAGE_NAME}_iree-generate-benchmark-artifact-${_MODULE_SOURCE_BASENAME}-${_VMFB_HASH}"
+        "${PACKAGE_NAME}_iree-generate-benchmark-artifact-${_MODULE_SOURCE_BASENAME_WITH_HASH}"
       )
       if(NOT TARGET "${_TRANSLATION_TARGET_NAME}")
-        iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE "iree-compile")
-        add_custom_command(
-          OUTPUT "${_VMFB_FILE}"
-          COMMAND
-            ${_COMPILE_TOOL_EXECUTABLE}
-              ${_TRANSLATION_ARGS}
-              "--mlir-print-op-on-diagnostic=false"
-              "${_MODULE_SOURCE}"
-              -o "${_VMFB_FILE}"
-          WORKING_DIRECTORY "${_VMFB_ARTIFACTS_DIR}"
+        iree_bytecode_module(
+          NAME
+            "${_TRANSLATION_TARGET_NAME}"
+          MODULE_FILE_NAME
+            "${_VMFB_FILE}"
+          SRC
+            "${_MODULE_SOURCE}"
+          FLAGS
+            ${_TRANSLATION_ARGS}
           DEPENDS
-            ${_COMPILE_TOOL_EXECUTABLE}
             "${_MODULE_SOURCE_TARGET}"
-            COMMENT "Generating VMFB for ${_COMMON_NAME_SEGMENTS}"
+          FRIENDLY_NAME
+            "${_FRIENDLY_TARGET_NAME}"
         )
 
+        # TODO: that add_custom_target should be done by iree_bytecode_module.
+        # Note: at the moment, iree_bytecode_module doesn't do much with its
+        # NAME argument.
         add_custom_target("${_TRANSLATION_TARGET_NAME}"
           DEPENDS "${_VMFB_FILE}"
         )
@@ -230,12 +236,6 @@ function(iree_benchmark_suite)
         # Mark dependency so that we have one target to drive them all.
         add_dependencies(iree-benchmark-suites "${_TRANSLATION_TARGET_NAME}")
       endif(NOT TARGET "${_TRANSLATION_TARGET_NAME}")
-
-      # Add a friendly target name to drive this benchmark and any others that
-      # share the same easily-describable properties.
-      set(_FRIENDLY_TARGET_NAME_LIST "iree-generate-benchmark-artifact")
-      list(APPEND _FRIENDLY_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
-      list(JOIN _FRIENDLY_TARGET_NAME_LIST "__" _FRIENDLY_TARGET_NAME)
 
       if (NOT TARGET "${_FRIENDLY_TARGET_NAME}")
         add_custom_target("${_FRIENDLY_TARGET_NAME}")

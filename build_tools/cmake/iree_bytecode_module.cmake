@@ -21,8 +21,12 @@ include(CMakeParseArguments)
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
 #     Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC
 #     will be in ${PACKAGE}/internal.
-# TESTONLY: When added, this target will only be built if user passes
-#    -DIREE_BUILD_TESTS=ON to CMake.
+# TESTONLY: When added, this target will only be built if IREE_BUILD_TESTS=ON.
+# MODULE_FILE_NAME: Optional. When specified, sets the output bytecode module
+#    file name. When not specified, a default file name will be generated from
+#    ${NAME}.
+# DEPENDS: Optional. Additional dependencies beyond SRC and the tools.
+# FRIENDLY_NAME: Optional. Name to use to display build progress info.
 #
 # Note:
 # By default, iree_bytecode_module will create a library named ${NAME}_c,
@@ -32,8 +36,8 @@ function(iree_bytecode_module)
   cmake_parse_arguments(
     _RULE
     "PUBLIC;TESTONLY"
-    "NAME;SRC;TRANSLATE_TOOL;C_IDENTIFIER;MODULE_FILE_NAME"
-    "FLAGS"
+    "NAME;SRC;TRANSLATE_TOOL;C_IDENTIFIER;MODULE_FILE_NAME;FRIENDLY_NAME"
+    "FLAGS;DEPENDS"
     ${ARGN}
   )
 
@@ -82,6 +86,12 @@ function(iree_bytecode_module)
     list(APPEND _ARGS "-iree-llvm-sanitize=thread")
   endif()
 
+  if(_RULE_FRIENDLY_NAME)
+    set(_FRIENDLY_NAME "${_RULE_FRIENDLY_NAME}")
+  else()
+    get_filename_component(_FRIENDLY_NAME "${_RULE_SRC}" NAME)
+  endif()
+
   # Depending on the binary instead of the target here given we might not have
   # a target in this CMake invocation when cross-compiling.
   add_custom_command(
@@ -96,6 +106,9 @@ function(iree_bytecode_module)
       ${_TRANSLATE_TOOL_EXECUTABLE}
       ${_LINKER_TOOL_EXECUTABLE}
       ${_RULE_SRC}
+      ${_RULE_DEPENDS}
+    COMMENT
+      "Generating VMFB for ${_FRIENDLY_NAME}"
     VERBATIM
   )
 
