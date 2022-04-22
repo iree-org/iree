@@ -15,6 +15,9 @@ namespace mlir {
 namespace scf {
 class ForOp;
 }
+namespace linalg {
+class LinalgOp;
+}
 
 namespace iree_compiler {
 namespace IREE {
@@ -109,6 +112,31 @@ struct InParallelOpToScfForRewriter : public OpRewritePattern<InParallelOp> {
                                 PatternRewriter &rewriter) const override {
     return returningMatchAndRewrite(inParallelOp, rewriter);
   }
+};
+
+struct FusionResult {
+  linalg::LinalgOp consumerOp;
+  SmallVector<linalg::LinalgOp> fusedOps;
+};
+
+/// Pattern to fuse the producers of a LinalgOp.
+struct LinalgExtFusionPattern
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+  LinalgExtFusionPattern(MLIRContext *context, ArrayRef<int64_t> operandsToFuse)
+      : OpInterfaceRewritePattern<linalg::LinalgOp>(context),
+        operandsToFuse(operandsToFuse.begin(), operandsToFuse.end()) {}
+
+  FailureOr<FusionResult>
+  returningMatchAndRewrite(linalg::LinalgOp consumerOp,
+                           PatternRewriter &rewriter) const;
+
+  LogicalResult matchAndRewrite(linalg::LinalgOp consumerOp,
+                                PatternRewriter &rewriter) const override {
+    return returningMatchAndRewrite(consumerOp, rewriter);
+  }
+
+private:
+  SmallVector<int64_t> operandsToFuse;
 };
 
 } // namespace LinalgExt

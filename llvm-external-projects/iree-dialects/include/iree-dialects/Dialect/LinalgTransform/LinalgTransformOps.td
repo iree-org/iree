@@ -122,11 +122,11 @@ def ScalarizeOp : Linalg_Transform_Operation<"scalarize",
     [TransformOpInterface, TargetableSingleOperandTransformOpTrait]> {
   let description = [{Indicates that ops of a specific kind in the given
     function should be scalarized (i.e. their dynamic dimensions tiled by 1).
-    
+
     This operation returns the tiled op but not the loops.
 
-    We make this design choice because it is hard to know ahead of time the 
-    number of loops that will be produced (it depends on the number of 
+    We make this design choice because it is hard to know ahead of time the
+    number of loops that will be produced (it depends on the number of
     dynamic dimensions after multiple transformations have been applied).
   }];
 
@@ -152,6 +152,26 @@ def FuseOp : Linalg_Transform_Operation<"fuse",
                   );
   let results = (outs PDL_Operation:$transformed,
                       Variadic<PDL_Operation>:$loops);
+
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    ::mlir::LogicalResult apply(
+        ::mlir::linalg::transform::TransformResults &transformResults,
+        ::mlir::linalg::transform::TransformState &state);
+  }];
+}
+
+
+def FuseProducersOp : Linalg_Transform_Operation<"fuse_producers",
+    [TransformOpInterface]> {
+  let description = [{Fuses the producers for the operands to fuse.}];
+
+  let arguments = (ins PDL_Operation:$target,
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$operands_to_fuse);
+  let results = (outs PDL_Operation:$transformed,
+                      Variadic<PDL_Operation>:$fused_ops);
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;

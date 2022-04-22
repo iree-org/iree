@@ -327,6 +327,91 @@ void transform::FuseOp::print(OpAsmPrinter &p) {
 }
 
 //===---------------------------------------------------------------------===//
+// FuseProducersOp
+//===---------------------------------------------------------------------===//
+
+LogicalResult
+transform::FuseProducersOp::apply(TransformResults &transformResults,
+                                  TransformState &state) {
+  SmallVector<int64_t> operandsToFuse = extractI64Array(operands_to_fuse());
+  LinalgExt::LinalgExtFusionPattern pattern(getContext(), operandsToFuse);
+  size_t numProducers = operandsToFuse.size();
+
+  SmallVector<Operation *> transformedOps;
+  SmallVector<SmallVector<Operation *>> fusedOps(numProducers);
+  for (Operation *target : state.getPayloadOps(target())) {
+    // Apply the pattern.
+    FailureOr<LinalgExt::FusionResult> result =
+        functional::applyReturningPatternAt(pattern,
+                                            cast<linalg::LinalgOp>(target));
+    if (failed(result))
+      return failure();
+
+    // Update the fused operations.
+    transformedOps.push_back(result->consumerOp);
+    for (size_t i = 0; i < numProducers; ++i)
+      fusedOps[i].push_back(result->fusedOps[i]);
+  }
+
+  transformResults.set(transformed().cast<OpResult>(), transformedOps);
+  for (size_t i = 0; i < numProducers; ++i)
+    transformResults.set(fused_ops()[i], fusedOps[i]);
+  return success();
+}
+
+LogicalResult transform::FuseProducersOp::verify() {
+  SmallVector<int64_t> operandsToFuse = extractI64Array(operands_to_fuse());
+  llvm::SmallDenseSet<int64_t> operandsSet;
+  for (int64_t operandToFuse : operandsToFuse) {
+    if (operandToFuse < 0) {
+      return emitOpError() << "expects positive operand numbers, found "
+                           << operandToFuse;
+    }
+    if (operandsSet.count(operandToFuse) != 0) {
+      return emitOpError() << "expects unique operand numbers, found "
+                           << operandToFuse << " multiple times";
+    }
+    operandsSet.insert(operandToFuse);
+  }
+  return success();
+}
+
+ParseResult transform::FuseProducersOp::parse(OpAsmParser &parser,
+                                              OperationState &result) {
+  OpAsmParser::UnresolvedOperand targetOperand;
+  SMLoc opLoc;
+  parser.getCurrentLocation(&opLoc);
+  if (parser.parseOperand(targetOperand))
+    return parser.emitError(opLoc, "expected `target` operand");
+  if (parser.parseOptionalAttrDict(result.attributes))
+    return failure();
+  StringRef operandsToFuseAttrName("operands_to_fuse");
+  Attribute operandsToFuseAttr = result.attributes.get(operandsToFuseAttrName);
+  if (!operandsToFuseAttr) {
+    return parser.emitError(opLoc, llvm::formatv("expected `{0}` attribute",
+                                                 operandsToFuseAttrName));
+  }
+  auto operandsToFuseArrayAttr = operandsToFuseAttr.dyn_cast<ArrayAttr>();
+  if (!operandsToFuseArrayAttr) {
+    return parser.emitError(opLoc,
+                            llvm::formatv("`{0}` attribute must be an array",
+                                          operandsToFuseAttrName));
+  }
+  Type pdlOpType = parser.getBuilder().getType<pdl::OperationType>();
+  size_t numProducers = operandsToFuseArrayAttr.size();
+  result.addTypes(SmallVector<Type>(numProducers + 1, pdlOpType));
+  if (parser.resolveOperand(targetOperand, pdlOpType, result.operands))
+    return failure();
+  return success();
+}
+
+void transform::FuseProducersOp::print(OpAsmPrinter &p) {
+  p << ' ';
+  p << target();
+  p.printOptionalAttrDict((*this)->getAttrs());
+}
+
+//===---------------------------------------------------------------------===//
 // GeneralizeOp
 //===---------------------------------------------------------------------===//
 
