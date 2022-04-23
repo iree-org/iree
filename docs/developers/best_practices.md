@@ -29,7 +29,7 @@ If you do externalize state, try to pack that state into a limited number of
 arguments.
 
 See the
-[variables and state](https://github.com/google/iree/tree/main/iree/samples/variables_and_state)
+[variables and state](https://github.com/google/iree/tree/main/samples/variables_and_state)
 sample for further guidance on tracking and using state.
 
 ### Limit uses of dynamic shapes
@@ -40,7 +40,7 @@ like batch index or timestamp are safer uses of dynamic shapes than faster
 varying dimensions like the x/y/channel dimensions of images.
 
 See the
-[dynamic shapes](https://github.com/google/iree/tree/main/iree/samples/dynamic_shapes)
+[dynamic shapes](https://github.com/google/iree/tree/main/samples/dynamic_shapes)
 sample for further guidance on using dynamic shapes.
 
 ## Practices for compilation settings

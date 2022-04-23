@@ -111,7 +111,7 @@ Check out what was built:
 ```
 
 Translate a
-[MLIR file](https://github.com/google/iree/blob/main/iree/samples/models/simple_abs.mlir)
+[MLIR file](https://github.com/google/iree/blob/main/samples/models/simple_abs.mlir)
 and execute a function in the compiled module:
 
 ```powershell

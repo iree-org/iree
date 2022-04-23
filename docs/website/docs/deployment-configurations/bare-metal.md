@@ -34,7 +34,7 @@ iree-compile \
     -iree-hal-target-backends=dylib-llvm-aot \
     -iree-llvm-target-triple=x86_64-pc-linux-elf \
     -iree-llvm-debug-symbols=false \
-    iree/samples/models/simple_abs.mlir \
+    samples/models/simple_abs.mlir \
     -o /tmp/simple_abs_dylib.vmfb
 
 ```
@@ -59,7 +59,7 @@ You can replace the MLIR file with the other MLIR model files, following the
 
 ### Compiling the bare-metal model for static-library support
 
-See the [static_library](https://github.com/google/iree/tree/main/iree/samples/static_library)
+See the [static_library](https://github.com/google/iree/tree/main/samples/iree_static_library)
 demo sample for an example and instructions on running a model with IREE's
 `static_library_loader`.
 
@@ -89,7 +89,7 @@ enable the synchronous HAL drivers with `set(IREE_HAL_DRIVER_VMVX_SYNC ON)` and
 * `set(IREE_BUILD_TESTS OFF)`: Disable tests until IREE supports running them on
 bare-metal platforms
 * `set(IREE_BUILD_SAMPLES ON)`: Build
-[simple_embedding](https://github.com/google/iree/tree/main/iree/samples/simple_embedding)
+[simple_embedding](https://github.com/google/iree/tree/main/samples/iree_simple_embedding)
 example
 
 !!! todo
@@ -121,6 +121,6 @@ Examples of how to setup the CMakeLists.txt and .cmake file:
 ## Bare-metal execution example
 
 See
-[simple_embedding for generic platform](https://github.com/google/iree/blob/main/iree/samples/simple_embedding/README.md#generic-platform-support)
+[simple_embedding for generic platform](https://github.com/google/iree/blob/main/samples/iree_simple_embedding/README.md#generic-platform-support)
 to see how to use the IREE runtime library to build/run the IREE model for the
 bare-metal target.

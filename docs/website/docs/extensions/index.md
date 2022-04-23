@@ -239,7 +239,7 @@ minimal overhead and is used for example [by the IREE HAL itself](https://github
 There is also a C++ wrapper that is significantly easier to work with however it
 needs some performance improvements.
 
-A full end-to-end example can be found under [`iree/samples/custom_modules/`](https://github.com/google/iree/tree/main/iree/samples/custom_modules),
+A full end-to-end example can be found under [`samples/iree_custom_modules/`](https://github.com/google/iree/tree/main/samples/iree_custom_modules),
 though it should not currently be considered representative of best practices.
 
 ## 3. Extend target-specific device conversion patterns

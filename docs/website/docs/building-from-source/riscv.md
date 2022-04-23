@@ -89,7 +89,7 @@ cmake --build ../iree-build-riscv/
 !!! note
     The following instructions are meant for the RISC-V 64-bit Linux
     target. For the bare-metal target, please refer to
-    [simple_embedding](https://github.com/google/iree/blob/main/iree/samples/simple_embedding)
+    [simple_embedding](https://github.com/google/iree/blob/main/samples/iree_simple_embedding)
     to see how to build a ML workload for a bare-metal machine.
 
 Set the path to qemu-riscv64 Linux emulator binary in the `QEMU_BIN` environment
@@ -106,7 +106,7 @@ Invoke the host compiler tools to produce a bytecode module flatbuffer:
 ../iree-build/install/bin/iree-compile \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \
-  iree/samples/models/simple_abs.mlir \
+  samples/models/simple_abs.mlir \
   -o /tmp/simple_abs_vmvx.vmfb
 ```
 
