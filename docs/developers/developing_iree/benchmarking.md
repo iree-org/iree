@@ -22,7 +22,7 @@ To use `iree-benchmark-module`, generate an IREE module for the target backend:
 $ bazel run //iree/tools:iree-compile -- \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \
-  $PWD/iree/samples/models/simple_abs.mlir \
+  $PWD/samples/models/simple_abs.mlir \
   -o /tmp/module.fb
 ```
 

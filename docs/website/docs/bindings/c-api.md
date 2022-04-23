@@ -11,7 +11,7 @@ API header files are organized by runtime component:
 | [iree/vm/api.h](https://github.com/google/iree/blob/main/iree/vm/api.h)     | VM APIs: loading modules, I/O, calling functions                          |
 | [iree/hal/api.h](https://github.com/google/iree/blob/main/iree/hal/api.h)   | HAL APIs: device management, synchronization, accessing hardware features |
 
-The [iree/samples/](https://github.com/google/iree/tree/main/iree/samples)
+The [samples/](https://github.com/google/iree/tree/main/iree/samples)
 directory demonstrates several ways to use IREE's C API.
 
 ## Prerequisites

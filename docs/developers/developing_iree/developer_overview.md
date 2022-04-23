@@ -100,7 +100,7 @@ $ ../iree-build/iree/tools/iree-opt \
 ```
 
 Custom passes may also be layered on top of `iree-opt`, see
-[iree/samples/custom_modules/dialect](https://github.com/google/iree/blob/main/iree/samples/custom_modules/dialect)
+[samples/iree_custom_modules/dialect](https://github.com/google/iree/blob/main/samples/iree_custom_modules/dialect)
 for a sample.
 
 ### iree-compile
@@ -113,7 +113,7 @@ For example, to translate `simple.mlir` to an IREE module:
 ```shell
 $ ../iree-build/iree/tools/iree-compile \
   -iree-hal-target-backends=vmvx \
-  $PWD/iree/samples/models/simple_abs.mlir \
+  $PWD/samples/models/simple_abs.mlir \
   -o /tmp/simple_abs_vmvx.vmfb
 ```
 
@@ -131,7 +131,7 @@ see "translation" in
 for more information.
 
 Custom translations may also be layered on top of `iree-translate`, see
-[iree/samples/custom_modules/dialect](https://github.com/google/iree/blob/main/iree/samples/custom_modules/dialect)
+[samples/iree_custom_modules/dialect](https://github.com/google/iree/blob/main/samples/iree_custom_modules/dialect)
 for a sample.
 
 ### iree-run-module
@@ -185,11 +185,11 @@ does some additional work that usually must be explicit, like marking every
 function as exported by default and running all of them.
 
 For example, to execute the contents of
-[iree/samples/models/simple_abs.mlir](https://github.com/google/iree/blob/main/iree/samples/models/simple_abs.mlir):
+[samples/models/simple_abs.mlir](https://github.com/google/iree/blob/main/samples/models/simple_abs.mlir):
 
 ```shell
 $ ../iree-build/iree/tools/iree-run-mlir \
-  $PWD/iree/samples/models/simple_abs.mlir \
+  $PWD/samples/models/simple_abs.mlir \
   -function-input="f32=-2" \
   -iree-hal-target-backends=vmvx
 ```
