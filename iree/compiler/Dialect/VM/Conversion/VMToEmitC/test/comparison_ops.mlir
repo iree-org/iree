@@ -54,3 +54,34 @@ vm.module @module {
 }
 
 // -----
+
+vm.module @module {
+  // CHECK-LABEL: @module_cmp_eq_ref
+  vm.func @cmp_eq_ref(%arg0 : !vm.ref<?>, %arg1 : !vm.ref<?>) -> i32 {
+    // CHECK-NEXT: %0 = emitc.call "vm_cmp_eq_ref"(%arg3, %arg4) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> i32
+    %0 = vm.cmp.eq.ref %arg0, %arg1 : !vm.ref<?>
+    vm.return %0 : i32
+  }
+}
+
+// -----
+
+vm.module @module {
+  // CHECK-LABEL: @module_cmp_ne_ref
+  vm.func @cmp_ne_ref(%arg0 : !vm.ref<?>, %arg1 : !vm.ref<?>) -> i32 {
+    // CHECK-NEXT: %0 = emitc.call "vm_cmp_ne_ref"(%arg3, %arg4) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> i32
+    %0 = vm.cmp.ne.ref %arg0, %arg1 : !vm.ref<?>
+    vm.return %0 : i32
+  }
+}
+
+// -----
+
+vm.module @module {
+  // CHECK-LABEL: @module_cmp_nz_ref
+  vm.func @cmp_nz_ref(%arg0 : !vm.ref<?>) -> i32 {
+    // CHECK-NEXT: %0 = emitc.call "vm_cmp_nz_ref"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> i32
+    %0 = vm.cmp.nz.ref %arg0 : !vm.ref<?>
+    vm.return %0 : i32
+  }
+}
