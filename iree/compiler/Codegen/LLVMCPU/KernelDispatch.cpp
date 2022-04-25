@@ -189,13 +189,13 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
         // Pick the factor of dim which is closest to the target tile size and
         // is a multiplier of vector size.
         for (int64_t k = vectorSize; k <= targetSize; k += vectorSize) {
-          if (dimSize % k == 0) {
+          if (dimSize % k == 0 && k >= minTileSizes[i]) {
             candidateTileSize = k;
           }
         }
       }
       // Fallback to power of 2 if there's no hint or can't find the ideal size.
-      if (vectorSize == 1 || candidateTileSize < minTileSizes[i]) {
+      if (vectorSize <= 1 || candidateTileSize == 1) {
         candidateTileSize =
             std::max<int64_t>(llvm::PowerOf2Floor(targetSize), minTileSizes[i]);
       }
