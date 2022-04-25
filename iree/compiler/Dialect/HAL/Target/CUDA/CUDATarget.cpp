@@ -32,17 +32,18 @@
 #include "mlir/Target/LLVMIR/Dialect/NVVM/NVVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 
-static llvm::cl::opt<bool> dumpPtx("iree-cuda-dump-ptx", llvm::cl::init(false),
-                                   llvm::cl::desc("Dump ptx"));
+static llvm::cl::opt<bool> dumpPtx(
+    "iree-hal-cuda-dump-ptx", llvm::cl::init(false),
+    llvm::cl::desc("Dump ptx to the debug stream."));
 
 static llvm::cl::opt<bool> clDisableLoopNounrollWa(
     "iree-hal-cuda-disable-loop-nounroll-wa",
-    llvm::cl::desc(
-        "Disable the workaround for bug in ptxas for CUDA version before 11.4"),
+    llvm::cl::desc("Disable the workaround for bug in ptxas for CUDA version "
+                   "before 11.4."),
     llvm::cl::init(false));
 
 static llvm::cl::opt<std::string> clTargetChip(
-    "iree-cuda-llvm-target-arch", llvm::cl::desc("LLVM target chip"),
+    "iree-hal-cuda-llvm-target-arch", llvm::cl::desc("LLVM target chip."),
     llvm::cl::init("sm_35"));
 
 namespace mlir {
@@ -177,7 +178,8 @@ class CUDATargetBackend final : public TargetBackend {
     buildLLVMGPUTransformPassPipeline(passManager, false);
   }
 
-  LogicalResult serializeExecutable(IREE::HAL::ExecutableVariantOp variantOp,
+  LogicalResult serializeExecutable(const SerializationOptions &options,
+                                    IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
     // Perform the translation in a separate context to avoid any
     // multi-threading issues.
@@ -281,6 +283,10 @@ class CUDATargetBackend final : public TargetBackend {
     std::string targetISA = translateModuleToISA(*llvmModule, *targetMachine);
     if (dumpPtx) {
       llvm::dbgs() << targetISA;
+    }
+    if (!options.dumpBinariesPath.empty()) {
+      dumpDataToPath(options.dumpBinariesPath, options.dumpBaseName,
+                     variantOp.getName(), ".ptx", targetISA);
     }
     auto ptxCudeRef = flatbuffers_uint8_vec_create(
         builder, reinterpret_cast<const uint8_t *>(targetISA.c_str()),

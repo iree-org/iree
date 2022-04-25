@@ -84,9 +84,9 @@ class ROCMTargetBackend final : public TargetBackend {
     buildLLVMGPUTransformPassPipeline(passManager, true);
   }
 
-  LogicalResult serializeExecutable(
-      iree_compiler::IREE::HAL::ExecutableVariantOp variantOp,
-      OpBuilder &executableBuilder) override {
+  LogicalResult serializeExecutable(const SerializationOptions &options,
+                                    IREE::HAL::ExecutableVariantOp variantOp,
+                                    OpBuilder &executableBuilder) override {
     // Perform the translation in a separate context to avoid any
     // multi-threading issues.
     llvm::LLVMContext context;
@@ -96,9 +96,7 @@ class ROCMTargetBackend final : public TargetBackend {
     // intermediate code/binary files), and at runtime (loaded
     // libraries/symbols/etc).
     auto libraryName =
-        variantOp->getParentOfType<iree_compiler::IREE::HAL::ExecutableOp>()
-            .getName()
-            .str();
+        variantOp->getParentOfType<IREE::HAL::ExecutableOp>().getName().str();
 
     ModuleOp innerModuleOp = variantOp.getInnerModule();
 
@@ -181,6 +179,11 @@ class ROCMTargetBackend final : public TargetBackend {
     // final flatbuffer.
     std::string targetISA = translateModuleToISA(*llvmModule, *targetMachine);
     std::string targetHSACO = createHsaco(targetISA, libraryName);
+    if (!options.dumpBinariesPath.empty()) {
+      dumpDataToPath(options.dumpBinariesPath, options.dumpBaseName,
+                     variantOp.getName(), ".hsaco", targetHSACO);
+    }
+
     auto hsacoRef = flatbuffers_uint8_vec_create(
         builder, reinterpret_cast<const uint8_t *>(targetHSACO.c_str()),
         targetHSACO.size());
@@ -233,7 +236,6 @@ class ROCMTargetBackend final : public TargetBackend {
         context, b.getStringAttr("rocm"), b.getStringAttr("rocm-hsaco-fb"),
         configAttr);
   }
-
 };
 
 void registerROCMTargetBackends() {

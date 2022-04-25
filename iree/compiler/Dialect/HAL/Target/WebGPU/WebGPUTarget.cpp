@@ -35,13 +35,8 @@ WebGPUTargetOptions getWebGPUTargetOptionsFromFlags() {
           "Include debug information like variable names in outputs"),
       llvm::cl::init(true));
 
-  static llvm::cl::opt<bool> clWebGPUKeepShaderModules(
-      "iree-webgpu-keep-shader-modules",
-      llvm::cl::desc("Save shader modules to disk separately"),
-      llvm::cl::init(false));
-
   WebGPUTargetOptions targetOptions;
-  targetOptions.keepShaderModules = clWebGPUKeepShaderModules;
+  targetOptions.debugSymbols = clDebugSymbols;
 
   return targetOptions;
 }
@@ -90,7 +85,8 @@ class WebGPUTargetBackend : public TargetBackend {
     //                  (here or during serialization?)
   }
 
-  LogicalResult serializeExecutable(IREE::HAL::ExecutableVariantOp variantOp,
+  LogicalResult serializeExecutable(const SerializationOptions &options,
+                                    IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto spirvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
@@ -140,10 +136,10 @@ class WebGPUTargetBackend : public TargetBackend {
         spvBinary.empty()) {
       return variantOp.emitError() << "failed to serialize spv.module";
     }
-    if (options_.keepShaderModules) {
-      saveShaderToTempFile(variantOp, "spv",
-                           reinterpret_cast<const char *>(spvBinary.data()),
-                           spvBinary.size_in_bytes());
+    if (!options.dumpIntermediatesPath.empty()) {
+      dumpDataToPath<uint32_t>(options.dumpIntermediatesPath,
+                               options.dumpBaseName, variantOp.getName(),
+                               ".spv", spvBinary);
 
       // Disassemble the shader and save that too.
       // Note: this should match what getWebGPUTargetEnv used.
@@ -154,8 +150,8 @@ class WebGPUTargetBackend : public TargetBackend {
               spvBinary.data(), spvBinary.size(), &spvDisassembled,
               SPV_BINARY_TO_TEXT_OPTION_INDENT |
                   SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES)) {
-        saveShaderToTempFile(variantOp, "spvasm", spvDisassembled.data(),
-                             spvDisassembled.size());
+        dumpDataToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                       variantOp.getName(), ".spvasm", spvDisassembled);
       } else {
         llvm::errs() << "Failed to disassemble SPIR-V binary\n";
       }
@@ -170,11 +166,11 @@ class WebGPUTargetBackend : public TargetBackend {
       //                  don't want to disassemble twice :P)
       return variantOp.emitError()
              << "failed to compile SPIR-V to WGSL. Consider inspecting the "
-                "shader program using -iree-webgpu-keep-shader-modules";
+                "shader program using -iree-hal-dump-executable-intermediates.";
     }
-    if (options_.keepShaderModules) {
-      saveShaderToTempFile(variantOp, "wgsl", wgsl.getValue().data(),
-                           wgsl.getValue().length());
+    if (!options.dumpBinariesPath.empty()) {
+      dumpDataToPath(options.dumpBinariesPath, options.dumpBaseName,
+                     variantOp.getName(), ".wgsl", wgsl.getValue());
     }
 
     // Pack the WGSL and metadata into a flatbuffer.
@@ -230,33 +226,6 @@ class WebGPUTargetBackend : public TargetBackend {
     return IREE::HAL::ExecutableTargetAttr::get(
         context, b.getStringAttr("webgpu"), b.getStringAttr("webgpu-wgsl-fb"),
         configAttr);
-  }
-
-  void saveShaderToTempFile(IREE::HAL::ExecutableVariantOp variantOp,
-                            llvm::StringRef suffix, const char *data,
-                            size_t size) {
-    llvm::SmallString<32> filePath;
-    if (std::error_code error = llvm::sys::fs::createTemporaryFile(
-            variantOp.getName(), suffix, filePath)) {
-      llvm::errs() << "failed to generate temp file for shader: "
-                   << error.message();
-      return;
-    }
-    std::error_code error;
-    auto file = std::make_unique<llvm::ToolOutputFile>(filePath, error,
-                                                       llvm::sys::fs::OF_None);
-    if (error) {
-      llvm::errs() << "failed to open temp file for shader '" << filePath
-                   << "': " << error.message();
-      return;
-    }
-
-    // TODO(scotttodd): refactor to group these messages
-    mlir::emitRemark(variantOp.getLoc())
-        << "Shader file for " << variantOp.getName() << " preserved:\n"
-        << "    " << filePath;
-    file->os().write(data, size);
-    file->keep();
   }
 
   WebGPUTargetOptions options_;

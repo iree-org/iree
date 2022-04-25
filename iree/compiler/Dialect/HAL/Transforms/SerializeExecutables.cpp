@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Support/FileSystem.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
@@ -29,8 +30,12 @@ class SerializeTargetExecutablesPass
  public:
   SerializeTargetExecutablesPass() = default;
   SerializeTargetExecutablesPass(const SerializeTargetExecutablesPass &pass) {}
-  SerializeTargetExecutablesPass(StringRef target) {
+  SerializeTargetExecutablesPass(StringRef target,
+                                 std::string dumpIntermediatesPath,
+                                 std::string dumpBinariesPath) {
     this->target = target.str();
+    this->dumpIntermediatesPath = dumpIntermediatesPath;
+    this->dumpBinariesPath = dumpBinariesPath;
   }
 
   StringRef getArgument() const override {
@@ -51,11 +56,29 @@ class SerializeTargetExecutablesPass
 
   void runOnOperation() override {
     auto executableOp = getOperation();
+    auto moduleOp = executableOp->getParentOfType<mlir::ModuleOp>();
+
     auto targetBackend = getTargetBackend(target);
     if (!targetBackend) {
       executableOp.emitError()
           << "unregistered target backend '" << target << "'";
       return signalPassFailure();
+    }
+
+    // Setup serialization options for dumping artifacts (if requested).
+    // Target backends are allowed to generate multiple binaries for each
+    // serialization.
+    TargetBackend::SerializationOptions serializationOptions;
+    serializationOptions.dumpBaseName =
+        (moduleOp.getName().getValueOr("module") + "_" + executableOp.getName())
+            .str();
+    serializationOptions.dumpIntermediatesPath = dumpIntermediatesPath;
+    serializationOptions.dumpBinariesPath = dumpBinariesPath;
+    if (!dumpIntermediatesPath.empty()) {
+      llvm::sys::fs::create_directories(dumpIntermediatesPath);
+    }
+    if (!dumpBinariesPath.empty()) {
+      llvm::sys::fs::create_directories(dumpBinariesPath);
     }
 
     auto variantOps = llvm::to_vector<4>(
@@ -66,8 +89,8 @@ class SerializeTargetExecutablesPass
       // Ask the target backend to serialize the executable. Note that it
       // may create one or more hal.executable.binary ops in the case of
       // multi-architecture binaries.
-      if (failed(targetBackend->serializeExecutable(variantOp,
-                                                    executableBuilder))) {
+      if (failed(targetBackend->serializeExecutable(
+              serializationOptions, variantOp, executableBuilder))) {
         variantOp.emitError()
             << "failed to serialize executable for target backend " << target;
         return signalPassFailure();
@@ -82,11 +105,23 @@ class SerializeTargetExecutablesPass
       llvm::cl::desc(
           "Target backend name whose executables will be serialized by "
           "this pass.")};
+
+  Option<std::string> dumpIntermediatesPath{
+      *this, "dump-intermediates-path",
+      llvm::cl::desc("Path to write translated executable intermediates (.bc, "
+                     ".o, etc) into for debugging.")};
+  Option<std::string> dumpBinariesPath{
+      *this, "dump-binaries-path",
+      llvm::cl::desc("Path to write translated and serialized executable "
+                     "binaries into for debugging.")};
 };
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createSerializeTargetExecutablesPass(StringRef target) {
-  return std::make_unique<SerializeTargetExecutablesPass>(target);
+createSerializeTargetExecutablesPass(StringRef target,
+                                     std::string dumpIntermediatesPath,
+                                     std::string dumpBinariesPath) {
+  return std::make_unique<SerializeTargetExecutablesPass>(
+      target, dumpIntermediatesPath, dumpBinariesPath);
 }
 
 static PassRegistration<SerializeTargetExecutablesPass> linkTargetPass([] {
@@ -98,6 +133,10 @@ class SerializeExecutablesPass
                          OperationPass<IREE::HAL::ExecutableOp>> {
  public:
   SerializeExecutablesPass() = default;
+  SerializeExecutablesPass(std::string dumpIntermediatesPath,
+                           std::string dumpBinariesPath)
+      : dumpIntermediatesPath(dumpIntermediatesPath),
+        dumpBinariesPath(dumpBinariesPath) {}
 
   StringRef getArgument() const override {
     return "iree-hal-serialize-executables";
@@ -111,18 +150,25 @@ class SerializeExecutablesPass
     auto executableOp = getOperation();
     OpPassManager passManager(executableOp.getOperationName());
     for (const auto &targetName : gatherExecutableTargetNames(executableOp)) {
-      passManager.addPass(createSerializeTargetExecutablesPass(targetName));
+      passManager.addPass(createSerializeTargetExecutablesPass(
+          targetName, dumpIntermediatesPath, dumpBinariesPath));
     }
     if (failed(runPipeline(passManager, executableOp))) {
       executableOp.emitError() << "failed to serialize executables";
       return signalPassFailure();
     }
   }
+
+ private:
+  std::string dumpIntermediatesPath;
+  std::string dumpBinariesPath;
 };
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createSerializeExecutablesPass() {
-  return std::make_unique<SerializeExecutablesPass>();
+createSerializeExecutablesPass(std::string dumpIntermediatesPath,
+                               std::string dumpBinariesPath) {
+  return std::make_unique<SerializeExecutablesPass>(dumpIntermediatesPath,
+                                                    dumpBinariesPath);
 }
 
 static PassRegistration<SerializeExecutablesPass> linkPass([] {

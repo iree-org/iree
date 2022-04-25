@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir --iree-hal-target-backends=dylib-llvm-aot --iree-llvm-link-embedded=true -mlir-disable-threading --iree-llvm-target-cpu-features='host' --iree-codegen-llvm-generic-ops-workgroup-size=2048 %s
+// RUN: iree-run-mlir -iree-hal-target-backends=dylib-llvm-aot -iree-llvm-link-embedded=true -iree-llvm-target-cpu-features='host' -iree-codegen-llvm-generic-ops-workgroup-size=2048 %s
 
 //===----------------------------------------------------------------------===//
 // Transpose ops.

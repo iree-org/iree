@@ -19,9 +19,6 @@ namespace HAL {
 struct WebGPUTargetOptions {
   // Include debug information like variable names in outputs.
   bool debugSymbols = true;
-
-  // True to keep shader modules for debugging.
-  bool keepShaderModules = false;
 };
 
 // Returns a WebGPUTargetOptions struct initialized with WebGPU/WGSL related

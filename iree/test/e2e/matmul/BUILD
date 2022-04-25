@@ -143,7 +143,7 @@ py_binary(
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_f32_gpu_large_%s" % compilation_info,
     compiler_flags = [
-        "--iree-cuda-llvm-target-arch=sm_80",
+        "--iree-hal-cuda-llvm-target-arch=sm_80",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
