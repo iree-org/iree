@@ -32,7 +32,7 @@ CMAKE_ARGS=(
   "-G" "Ninja"
   # Let's make linking fast
   "-DIREE_ENABLE_LLD=ON"
-  "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+  "-DCMAKE_BUILD_TYPE=Debug"
 
   # Enable docs build on the CI. The additional builds are pretty fast and
   # give us early warnings for some types of website publication errors.
