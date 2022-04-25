@@ -26,7 +26,7 @@
 #include "iree/base/logging.h"
 
 // Compiled module embedded here to avoid file IO:
-#include "iree/samples/vulkan/simple_mul_bytecode_module_c.h"
+#include "samples/vulkan/simple_mul_bytecode_module_c.h"
 
 static VkAllocationCallbacks* g_Allocator = NULL;
 static VkInstance g_Instance = VK_NULL_HANDLE;
