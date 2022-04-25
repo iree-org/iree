@@ -120,7 +120,7 @@ function(iree_bytecode_module)
       add_custom_target(
         error_on_mismatched_tsan_options
         COMMAND
-          cmake -E echo "ERROR: Inconsistent CMake options: IREE_ENABLE_TSAN and IREE_BYTECODE_MODULE_ENABLE_TSAN must be simultaneously ON or OFF."
+          cmake -E echo "ERROR: When building a bytecode-module target, if IREE_ENABLE_TSAN is ON then IREE_BYTECODE_MODULE_ENABLE_TSAN must also be ON."
         COMMAND
           cmake -E false
         VERBATIM
