@@ -160,7 +160,8 @@ static unsigned getReferenceTypeLengthInBytes(func::FuncOp entryPointFn) {
 /// Flow level.
 static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
     ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
-    ArrayRef<int64_t> minTileSizes, ArrayRef<int64_t> maxTileSizes) {
+    ArrayRef<int64_t> minTileSizes, ArrayRef<int64_t> maxTileSizes,
+    ArrayRef<int64_t> vectorSizeHints) {
   assert(lbs.size() == ubs.size() && lbs.size() == minTileSizes.size() &&
          lbs.size() == maxTileSizes.size() &&
          "expected all vectors to be of equal size");
@@ -181,10 +182,23 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
     }
     int64_t candidateTileSize = 1;
     if (ubs[i] > lbs[i]) {
-      // Pick a value that evenly distributes the workload.
-      candidateTileSize = std::max<int64_t>(
-          llvm::PowerOf2Floor(static_cast<uint64_t>(ubs[i] - lbs[i]) / 2),
-          minTileSizes[i]);
+      int64_t dimSize = static_cast<uint64_t>(ubs[i] - lbs[i]);
+      int64_t targetSize = std::min(dimSize / 2, maxTileSizes[i]);
+      int64_t vectorSize = vectorSizeHints[i];
+      if (vectorSize > 1) {
+        // Pick the factor of dim which is closest to the target tile size and
+        // is a multiplier of vector size.
+        for (int64_t k = vectorSize; k <= targetSize; k += vectorSize) {
+          if (dimSize % k == 0) {
+            candidateTileSize = k;
+          }
+        }
+      }
+      // Fallback to power of 2 if there's no hint or can't find the ideal size.
+      if (vectorSize == 1 || candidateTileSize < minTileSizes[i]) {
+        candidateTileSize =
+            std::max<int64_t>(llvm::PowerOf2Floor(targetSize), minTileSizes[i]);
+      }
     }
 
     // Limit the workload per workgroup to the default being the max to keep the
@@ -208,6 +222,13 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
     if (distributedTileSizes[currDim - 1] >= maxTileSizes[currDim - 1] ||
         workload[currDim - 1] == ShapedType::kDynamicSize ||
         distributedTileSizes[currDim - 1] >= workload[currDim - 1]) {
+      currDim--;
+      continue;
+    }
+    int64_t vectorSize = vectorSizeHints[currDim - 1];
+    // Don't change if there is a vector size hint and it's the ideal size.
+    if (vectorSize > 1 && distributedTileSizes[currDim - 1] % vectorSize == 0 &&
+        workload[currDim - 1] % distributedTileSizes[currDim - 1] == 0) {
       currDim--;
       continue;
     }
@@ -256,9 +277,14 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
 static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
     ArrayRef<Range> iterationDomain,
     IREE::Flow::PartitionableLoopsInterface partitionableLoopInterfaceOp,
-    ArrayRef<int64_t> minTileSizes, ArrayRef<int64_t> maxTileSizes) {
+    ArrayRef<int64_t> minTileSizes, ArrayRef<int64_t> maxTileSizes,
+    ArrayRef<int64_t> vectorSizeHints = {}) {
   assert(iterationDomain.size() == minTileSizes.size() &&
          "expected as many min tile sizes as number of loops");
+  assert(
+      vectorSizeHints.empty() ||
+      vectorSizeHints.size() == iterationDomain.size() &&
+          "vector size hints should be empty or equal to the number of loops");
   auto getStaticValue = [](Value v) -> int64_t {
     IntegerAttr attr;
     if (!matchPattern(v, m_Constant(&attr))) return ShapedType::kDynamicSize;
@@ -281,7 +307,8 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
       distributedLoopUbs(numPartitionedLoops, ShapedType::kDynamicSize),
       minDistributedLoopTileSizes(numPartitionedLoops, 1),
       maxDistributedLoopTileSizes(numPartitionedLoops,
-                                  defaultWorkgroupTileSize);
+                                  defaultWorkgroupTileSize),
+      distributedVectorSizeHints(numPartitionedLoops, 1);
   // Find the bounds of the partitionable loops
   unsigned index = 0;
   for (auto range : llvm::enumerate(iterationDomain)) {
@@ -291,13 +318,15 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
     maxDistributedLoopTileSizes[index] = maxTileSizes[range.index()];
     distributedLoopLbs[index] = lbs[range.index()];
     distributedLoopUbs[index] = ubs[range.index()];
+    distributedVectorSizeHints[index] =
+        vectorSizeHints.empty() ? 1 : vectorSizeHints[range.index()];
     index++;
   }
 
   SmallVector<int64_t> distributedTileSizes =
-      getDefaultDistributedLoopTileSizes(distributedLoopLbs, distributedLoopUbs,
-                                         minDistributedLoopTileSizes,
-                                         maxDistributedLoopTileSizes);
+      getDefaultDistributedLoopTileSizes(
+          distributedLoopLbs, distributedLoopUbs, minDistributedLoopTileSizes,
+          maxDistributedLoopTileSizes, distributedVectorSizeHints);
   SmallVector<int64_t> distributedLevelTileSizes(iterationDomain.size(), 0);
   for (auto loopID : llvm::enumerate(partitionableLoops)) {
     distributedLevelTileSizes[loopID.value()] =
@@ -827,7 +856,10 @@ static LogicalResult setConvRootConfig(
   unsigned numLoops = convOp.getNumLoops();
   SmallVector<int64_t> minTileSizes(numLoops, 1);
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
+  SmallVector<int64_t> vectorSizeHints(numLoops, 1);
 
+  // Give the vector size hint on OC.
+  vectorSizeHints[3] = vectorSize;
   // Set the flow level tiling to the default.
   OpBuilder builder(convOp.getContext());
   builder.setInsertionPoint(convOp);
@@ -837,7 +869,7 @@ static LogicalResult setConvRootConfig(
       cast<IREE::Flow::PartitionableLoopsInterface>(convOp.getOperation());
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
       iterationDomain, partitionableLoopsInterfaceOp, minTileSizes,
-      maxTileSizes);
+      maxTileSizes, vectorSizeHints);
 
   // Shapes of N, OH, OW, OC, KH, KW, (IC)
   Optional<SmallVector<int64_t, 4>> shapes = convOp.getStaticLoopRanges();
