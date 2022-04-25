@@ -114,11 +114,11 @@ function(iree_bytecode_module)
   # ON or TRUE or something else. But we haven't been able to think of a less bad
   # alternative. https://github.com/google/iree/pull/8474#discussion_r840790062
   if(NOT IREE_ENABLE_TSAN STREQUAL IREE_BYTECODE_MODULE_ENABLE_TSAN)
-    list(APPEND _CUSTOM_BUILD_TIME_CMAKE_ERRORS
-      ERROR_ON_INCONSISTENT_IREE_BYTECODE_MODULE_OPTIONS)
-    if(NOT TARGET ERROR_ON_INCONSISTENT_IREE_BYTECODE_MODULE_OPTIONS)
+    list(APPEND _CUSTOM_BUILD_TIME_CMAKE_ERROR_TARGETS
+      error_on_mismatched_tsan_options)
+    if(NOT TARGET error_on_mismatched_tsan_options)
       add_custom_target(
-        ERROR_ON_INCONSISTENT_IREE_BYTECODE_MODULE_OPTIONS
+        error_on_mismatched_tsan_options
         COMMAND
           cmake -E echo "ERROR: Inconsistent CMake options: IREE_ENABLE_TSAN and IREE_BYTECODE_MODULE_ENABLE_TSAN must be simultaneously ON or OFF."
         COMMAND
@@ -144,7 +144,7 @@ function(iree_bytecode_module)
       ${_LINKER_TOOL_EXECUTABLE}
       ${_RULE_SRC}
       ${_RULE_DEPENDS}
-      ${_CUSTOM_BUILD_TIME_CMAKE_ERRORS}
+      ${_CUSTOM_BUILD_TIME_CMAKE_ERROR_TARGETS}
     COMMENT
       "Generating VMFB for ${_FRIENDLY_NAME}"
     VERBATIM
