@@ -1340,12 +1340,12 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
     // Save previous insertion point. Continue within loop body.
     OpBuilder::InsertionGuard guard(b);
     b.setInsertionPointToEnd(&scfFor.getRegion().front());
-    for (auto it : llvm::zip(srcBlock.getArguments(),
-                             ValueRange{loopCarryValues[0], kValue})) {
+    SmallVector<Value> forwardValues{loopCarryValues[0], kValue};
+    SmallVector<Value> reverseValues{kValue, loopCarryValues[0]};
+    for (auto it : llvm::zip(srcBlock.getArguments(), forwardValues)) {
       bvmF.map(std::get<0>(it), std::get<1>(it));
     }
-    for (auto it : llvm::zip(srcBlock.getArguments(),
-                             ValueRange{kValue, loopCarryValues[0]})) {
+    for (auto it : llvm::zip(srcBlock.getArguments(), reverseValues)) {
       bvmR.map(std::get<0>(it), std::get<1>(it));
     }
     for (auto &blockOp : srcBlock.without_terminator()) {

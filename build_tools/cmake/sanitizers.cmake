@@ -16,6 +16,10 @@
 if(${IREE_ENABLE_ASAN})
   string(APPEND CMAKE_CXX_FLAGS " -fsanitize=address")
   string(APPEND CMAKE_C_FLAGS " -fsanitize=address")
+  # -fsanitize=address is needed also for linking per
+  # https://clang.llvm.org/docs/AddressSanitizer.html#id3
+  string(APPEND CMAKE_EXE_LINKER_FLAGS " -fsanitize=address")
+  string(APPEND CMAKE_SHARED_LINKER_FLAGS " -fsanitize=address shared-libasan -lpthread")
 endif()
 if(${IREE_ENABLE_MSAN})
   string(APPEND CMAKE_CXX_FLAGS " -fsanitize=memory")

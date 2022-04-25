@@ -54,6 +54,7 @@ CMAKE_ARGS=(
   # (but not necessarily test on real hardware).
   "-DIREE_HAL_DRIVER_CUDA=ON"
   "-DIREE_TARGET_BACKEND_CUDA=ON"
+  "-DIREE_ENABLE_ASAN=ON"
 )
 
 "$CMAKE_BIN" "${CMAKE_ARGS[@]?}" "$@" ..
