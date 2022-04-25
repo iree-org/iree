@@ -52,7 +52,6 @@
 /llvm-external-projects/iree-dialects/test/iree_linalgext @hanhanW @MaheshRavishankar
 
 # Other Top-Level Directories
-/colab/ @ScottTodd
 /docs/ @ScottTodd
 
 

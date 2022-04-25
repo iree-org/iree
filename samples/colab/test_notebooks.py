@@ -33,7 +33,7 @@ class ColabNotebookTests(absltest.TestCase):
                                "build_tools/testing/run_python_notebook.sh")
 
     # Create a test case for each notebook in this folder.
-    notebooks_path = os.path.join(repo_root, "colab/")
+    notebooks_path = os.path.join(repo_root, "samples/colab/")
     for notebook_path in glob.glob(notebooks_path + "*.ipynb"):
       notebook_name = os.path.basename(notebook_path)
 
