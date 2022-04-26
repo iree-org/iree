@@ -66,7 +66,8 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     buildSPIRVCodegenPassPipeline(passManager);
   }
 
-  LogicalResult serializeExecutable(IREE::HAL::ExecutableVariantOp variantOp,
+  LogicalResult serializeExecutable(const SerializationOptions &options,
+                                    IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto spvModuleOp = *innerModuleOp.getOps<spirv::ModuleOp>().begin();
@@ -83,6 +84,11 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     SmallVector<uint32_t, 0> spvBinary;
     if (failed(spirv::serialize(spvModuleOp, spvBinary))) {
       return variantOp.emitError() << "failed to serialize spv.module";
+    }
+    if (!options.dumpIntermediatesPath.empty()) {
+      dumpDataToPath<uint32_t>(options.dumpIntermediatesPath,
+                               options.dumpBaseName, variantOp.getName(),
+                               ".spv", spvBinary);
     }
 
     // 2. Cross compile SPIR-V to MSL source code.
@@ -105,6 +111,15 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     // a way to serialize the generated MTLLibrary. The only way available is
     // to use command-line tools like `metal` and `metallib`. Likely we need
     // to invoke them in C++.
+
+    if (!options.dumpBinariesPath.empty()) {
+      for (auto shader : llvm::enumerate(mslShaders)) {
+        dumpDataToPath(
+            options.dumpBinariesPath, options.dumpBaseName,
+            (variantOp.getName() + std::to_string(shader.index())).str(),
+            ".msl", shader.value().source);
+      }
+    }
 
     // 4. Pack the MTLLibrary and metadata into a flatbuffer.
     FlatbufferBuilder builder;

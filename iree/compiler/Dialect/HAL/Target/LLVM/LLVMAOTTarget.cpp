@@ -212,7 +212,8 @@ class LLVMAOTTargetBackend final : public TargetBackend {
         [](mlir::ModuleOp moduleOp) { return moduleOp; }, builder);
   }
 
-  LogicalResult serializeExecutable(IREE::HAL::ExecutableVariantOp variantOp,
+  LogicalResult serializeExecutable(const SerializationOptions &options,
+                                    IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
     // Perform the translation in a separate context to avoid any
     // multi-threading issues.
@@ -481,17 +482,18 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       }
     }
     if (options_.linkStatic) {
-      return serializeStaticLibraryExecutable(variantOp, executableBuilder,
-                                              libraryName, queryFunctionName,
-                                              objectFiles);
+      return serializeStaticLibraryExecutable(options, variantOp,
+                                              executableBuilder, libraryName,
+                                              queryFunctionName, objectFiles);
     } else {
-      return serializeDynamicLibraryExecutable(variantOp, executableBuilder,
-                                               libraryName, objectFiles,
-                                               linkerTool.get());
+      return serializeDynamicLibraryExecutable(options, variantOp,
+                                               executableBuilder, libraryName,
+                                               objectFiles, linkerTool.get());
     }
   }
 
   LogicalResult serializeStaticLibraryExecutable(
+      const SerializationOptions &options,
       IREE::HAL::ExecutableVariantOp variantOp, OpBuilder &executableBuilder,
       const std::string &libraryName, const std::string &queryFunctionName,
       const SmallVector<Artifact> &objectFiles) {
@@ -520,6 +522,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
   }
 
   LogicalResult serializeDynamicLibraryExecutable(
+      const SerializationOptions &options,
       IREE::HAL::ExecutableVariantOp variantOp, OpBuilder &executableBuilder,
       const std::string &libraryName, const SmallVector<Artifact> &objectFiles,
       LinkerTool *linkerTool) {
@@ -550,6 +553,10 @@ class LLVMAOTTargetBackend final : public TargetBackend {
                << "failed to read back dylib temp file at "
                << linkArtifacts.libraryFile.path;
       }
+      if (!options.dumpBinariesPath.empty()) {
+        dumpDataToPath<int8_t>(options.dumpBinariesPath, options.dumpBaseName,
+                               variantOp.getName(), ".so", *elfFile);
+      }
       auto bufferAttr = DenseIntElementsAttr::get(
           VectorType::get({static_cast<int64_t>(elfFile->size())},
                           IntegerType::get(executableBuilder.getContext(), 8)),
@@ -562,6 +569,31 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       binaryOp.mime_typeAttr(
           executableBuilder.getStringAttr("application/x-elf"));
     } else {
+      const char *mimeType = nullptr;
+      const char *extension = "";
+      llvm::Triple targetTriple(options_.targetTriple);
+      switch (targetTriple.getObjectFormat()) {
+        case llvm::Triple::ObjectFormatType::COFF:
+          mimeType = "application/x-msdownload";
+          extension = "dll";
+          break;
+        case llvm::Triple::ObjectFormatType::ELF:
+          mimeType = "application/x-elf";
+          extension = "so";
+          break;
+        case llvm::Triple::ObjectFormatType::MachO:
+          mimeType = "application/x-dylib";
+          extension = "dylib";
+          break;
+        case llvm::Triple::ObjectFormatType::Wasm:
+          mimeType = "application/wasm";
+          extension = "wasm";
+          break;
+        default:
+          mimeType = "application/octet-stream";
+          break;
+      }
+
       // Load the linked system library and optionally tag on the debug
       // database. This debug database sits at the tail of the file and is
       // ignored by system loaders and tools but still accessible to the runtime
@@ -579,6 +611,10 @@ class LLVMAOTTargetBackend final : public TargetBackend {
                  << "failed to append debug database to dylib file";
         }
       }
+      if (!options.dumpBinariesPath.empty()) {
+        dumpDataToPath<int8_t>(options.dumpBinariesPath, options.dumpBaseName,
+                               variantOp.getName(), extension, libraryFile);
+      }
       auto bufferAttr = DenseIntElementsAttr::get(
           VectorType::get({static_cast<int64_t>(libraryFile.size())},
                           IntegerType::get(executableBuilder.getContext(), 8)),
@@ -588,25 +624,6 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
           variantOp.getLoc(), variantOp.sym_name(),
           variantOp.target().getFormat(), bufferAttr);
-      const char *mimeType = nullptr;
-      llvm::Triple targetTriple(options_.targetTriple);
-      switch (targetTriple.getObjectFormat()) {
-        case llvm::Triple::ObjectFormatType::COFF:
-          mimeType = "application/x-msdownload";
-          break;
-        case llvm::Triple::ObjectFormatType::ELF:
-          mimeType = "application/x-elf";
-          break;
-        case llvm::Triple::ObjectFormatType::MachO:
-          mimeType = "application/x-dylib";
-          break;
-        case llvm::Triple::ObjectFormatType::Wasm:
-          mimeType = "application/wasm";
-          break;
-        default:
-          mimeType = "application/octet-stream";
-          break;
-      }
       binaryOp.mime_typeAttr(executableBuilder.getStringAttr(mimeType));
     }
 

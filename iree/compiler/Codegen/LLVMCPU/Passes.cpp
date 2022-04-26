@@ -194,6 +194,8 @@ void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
   passManager.addNestedPass<func::FuncOp>(
       createTileAndDistributeToWorkgroupsPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createFoldAffineMinInDistributedLoopsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
@@ -232,6 +234,8 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
   passManager.addNestedPass<func::FuncOp>(
       createTileAndDistributeToWorkgroupsPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createFoldAffineMinInDistributedLoopsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
@@ -256,6 +260,8 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
   passManager.addNestedPass<func::FuncOp>(
       createTileAndDistributeToWorkgroupsPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createFoldAffineMinInDistributedLoopsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
   passManager.addNestedPass<func::FuncOp>(
@@ -324,6 +330,8 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
   passManager.addNestedPass<func::FuncOp>(
       createTileAndDistributeToWorkgroupsPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createFoldAffineMinInDistributedLoopsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
   passManager.addNestedPass<func::FuncOp>(
@@ -383,6 +391,8 @@ void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
   passManager.addNestedPass<func::FuncOp>(
       createTileAndDistributeToWorkgroupsPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createFoldAffineMinInDistributedLoopsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
@@ -417,6 +427,8 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
   passManager.addNestedPass<func::FuncOp>(
       createTileAndDistributeToWorkgroupsPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createFoldAffineMinInDistributedLoopsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
   // Use stack allocation on CPU side.

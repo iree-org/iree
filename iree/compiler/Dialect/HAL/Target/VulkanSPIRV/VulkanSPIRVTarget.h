@@ -21,9 +21,6 @@ struct VulkanSPIRVTargetOptions {
   std::string vulkanTargetEnv;
   // Vulkan target triple.
   std::string vulkanTargetTriple;
-
-  // True to keep shader modules for debugging.
-  bool keepShaderModules;
 };
 
 // Returns a VulkanSPIRVTargetOptions struct initialized with Vulkan/SPIR-V

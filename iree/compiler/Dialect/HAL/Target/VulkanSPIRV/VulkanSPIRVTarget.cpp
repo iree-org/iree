@@ -79,15 +79,9 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
           "Vulkan target environment as #vk.target_env attribute assembly"),
       llvm::cl::init(""));
 
-  static llvm::cl::opt<bool> clVulkanKeepShaderModules(
-      "iree-vulkan-keep-shader-modules",
-      llvm::cl::desc("Save SPIR-V shader modules to disk separately"),
-      llvm::cl::init(false));
-
   VulkanSPIRVTargetOptions targetOptions;
   targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
   targetOptions.vulkanTargetTriple = clVulkanTargetTriple;
-  targetOptions.keepShaderModules = clVulkanKeepShaderModules;
 
   return targetOptions;
 }
@@ -269,7 +263,8 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
   }
 #endif
 
-  LogicalResult serializeExecutable(IREE::HAL::ExecutableVariantOp variantOp,
+  LogicalResult serializeExecutable(const SerializationOptions &options,
+                                    IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto spirvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
@@ -288,11 +283,13 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     if (failed(spirv::serialize(spvModuleOp, spvBinary)) || spvBinary.empty()) {
       return variantOp.emitError() << "failed to serialize spv.module";
     }
+    if (!options.dumpBinariesPath.empty()) {
+      dumpDataToPath<uint32_t>(options.dumpBinariesPath, options.dumpBaseName,
+                               variantOp.getName(), ".spv", spvBinary);
+    }
+
     auto spvCodeRef = flatbuffers_uint32_vec_create(builder, spvBinary.data(),
                                                     spvBinary.size());
-    if (options_.keepShaderModules) {
-      saveSpirvBinary(variantOp, spvBinary);
-    }
 
     // The sequencer and runtime use ordinals instead of names. We provide the
     // list of entry point names here that are then passed in
@@ -341,32 +338,6 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     return IREE::HAL::ExecutableTargetAttr::get(
         context, b.getStringAttr("vulkan"), b.getStringAttr("vulkan-spirv-fb"),
         configAttr);
-  }
-
-  void saveSpirvBinary(IREE::HAL::ExecutableVariantOp variantOp,
-                       ArrayRef<uint32_t> binary) {
-    llvm::SmallString<32> filePath;
-    if (std::error_code error = llvm::sys::fs::createTemporaryFile(
-            variantOp.getName(), "spv", filePath)) {
-      llvm::errs() << "failed to generate file for SPIR-V binary: "
-                   << error.message();
-      return;
-    }
-    std::error_code error;
-    auto file = std::make_unique<llvm::ToolOutputFile>(filePath, error,
-                                                       llvm::sys::fs::OF_None);
-    if (error) {
-      llvm::errs() << "failed to open file for SPIR-V binary '" << filePath
-                   << "': " << error.message();
-      return;
-    }
-
-    mlir::emitRemark(variantOp.getLoc())
-        << "SPIR-V binary for " << variantOp.getName() << " preserved:\n"
-        << "    " << filePath;
-    file->os().write(reinterpret_cast<const char *>(binary.data()),
-                     binary.size() * sizeof(uint32_t));
-    file->keep();
   }
 
   VulkanSPIRVTargetOptions options_;

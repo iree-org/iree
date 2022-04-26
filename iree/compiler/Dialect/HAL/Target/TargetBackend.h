@@ -37,6 +37,12 @@ struct TargetOptions {
   // A path to write standalone executable benchkmarks into.
   std::string executableBenchmarksPath;
 
+  // A path to write executable intermediates into.
+  std::string executableIntermediatesPath;
+
+  // A path to write translated and serialized executable binaries into.
+  std::string executableBinariesPath;
+
   // TODO(benvanik): flags for debug/optimization/etc.
   // The intent is that we can have a global debug/-ON flag that then each
   // target backend can have tickle it's own flags in the right way. Right now
@@ -201,6 +207,17 @@ class TargetBackend {
     return success();
   }
 
+  struct SerializationOptions {
+    // File name prefix used when creating scratch files.
+    // This contains the module and executable name in canonical form.
+    // Example: some_module_executable_43
+    std::string dumpBaseName;
+    // Optional path to write temporary/intermediate files into.
+    std::string dumpIntermediatesPath;
+    // Optional path to write serialized binary results into.
+    std::string dumpBinariesPath;
+  };
+
   // Serializes the given |variantOp| executable produced by this backend to one
   // or more binary byte buffer formats used for storage in the module file.
   // Implementations should insert `hal.executable.binary` ops for each format
@@ -209,6 +226,7 @@ class TargetBackend {
   // If no serialization is provided then lowering the parent module into a
   // binary format (such as to the IREE VM) will fail.
   virtual LogicalResult serializeExecutable(
+      const SerializationOptions &options,
       IREE::HAL::ExecutableVariantOp variantOp, OpBuilder &executableBuilder) {
     assert(false && "unimplemented serializeExecutable");
     return failure();
@@ -225,6 +243,18 @@ class TargetBackend {
       std::function<Operation *(mlir::ModuleOp moduleOp)> getInnerModuleFn,
       OpBuilder &builder);
 };
+
+// Dumps binary data to a file formed by joining the given path components:
+//   `path/baseName_suffix[extension]`
+void dumpDataToPath(StringRef path, StringRef baseName, StringRef suffix,
+                    StringRef extension, StringRef data);
+template <typename T>
+void dumpDataToPath(StringRef path, StringRef baseName, StringRef suffix,
+                    StringRef extension, ArrayRef<T> data) {
+  dumpDataToPath(path, baseName, suffix, extension,
+                 StringRef(reinterpret_cast<const char *>(data.data()),
+                           data.size() * sizeof(T)));
+}
 
 }  // namespace HAL
 }  // namespace IREE
