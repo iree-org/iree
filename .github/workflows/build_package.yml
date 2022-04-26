@@ -173,7 +173,7 @@ jobs:
             "${MANYLINUX_X86_64_IMAGE}" \
             bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./main_checkout/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@82c141cc518b40d92cc801eee768e7aafc9c2fa2
         with:
           # We upload all wheels (which includes deps so that subsequent
           # steps can run without further fetching).
