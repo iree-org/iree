@@ -100,7 +100,6 @@ cc_library(
         "@llvm-project//mlir:MathTransforms",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:MemRefTransforms",
-        "@llvm-project//mlir:ModuleBufferization",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SCFTransforms",
