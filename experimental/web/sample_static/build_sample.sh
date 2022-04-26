@@ -46,7 +46,7 @@ INSTALL_ROOT="${1:-${ROOT_DIR}/build-host/install}"
 COMPILE_TOOL="${INSTALL_ROOT?}/bin/iree-compile"
 EMBED_DATA_TOOL="${INSTALL_ROOT?}/bin/generate_embed_data"
 INPUT_NAME="mnist"
-INPUT_PATH="${ROOT_DIR?}/iree/samples/models/mnist.mlir"
+INPUT_PATH="${ROOT_DIR?}/samples/models/mnist.mlir"
 
 echo "=== Compiling MLIR to static library output (.vmfb, .h, .o) ==="
 ${COMPILE_TOOL?} ${INPUT_PATH} \

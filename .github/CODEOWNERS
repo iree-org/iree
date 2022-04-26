@@ -21,6 +21,7 @@
 
 # Bindings
 /bindings/python/ @stellaraccident
+/runtime/bindings/python/ @stellaraccident
 /bindings/tflite/ @benvanik
 
 # Integrations
@@ -41,9 +42,9 @@
 /build_tools/ @GMNGeoffrey @ScottTodd
 /build_tools/benchmarks/ @GMNGeoffrey @antiagainst
 /build_tools/python_deploy/ @stellaraccident
+/build_tools/scripts/ @GMNGeoffrey @ScottTodd
 /build_tools/third_party/ @GMNGeoffrey @ScottTodd @stellaraccident
 /.github/ @GMNGeoffrey @ScottTodd
-/scripts/ @GMNGeoffrey @ScottTodd
 
 # llvm-external-projects
 /llvm-external-projects/ @stellaraccident
@@ -74,11 +75,12 @@
 
 
 # Runtime
-/iree/hal/cuda/ @ThomasRaoux
-/iree/hal/cts/ @ScottTodd
-/iree/hal/vulkan/ @antiagainst @ScottTodd
+/runtime/src/iree/ @benvanik
+/runtime/src/iree/hal/cuda/ @ThomasRaoux
+/runtime/src/iree/hal/cts/ @ScottTodd
+/runtime/src/iree/hal/vulkan/ @antiagainst @ScottTodd
 
 # Other IREE directories
-/iree/samples/ @ScottTodd
+/samples/ @ScottTodd
 /iree/test/ @ghost
 /iree/tools/ @benvanik @GMNGeoffrey

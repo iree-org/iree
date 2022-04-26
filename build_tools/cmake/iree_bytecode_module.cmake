@@ -109,7 +109,7 @@ function(iree_bytecode_module)
       ${_RULE_SRC}
       ${_RULE_DEPENDS}
     COMMENT
-      "Generating VMFB for ${_FRIENDLY_NAME}"
+      "Generating ${_MODULE_FILE_NAME} from ${_FRIENDLY_NAME}"
     VERBATIM
   )
 

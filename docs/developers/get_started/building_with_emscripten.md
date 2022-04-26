@@ -55,7 +55,7 @@ Build:
 
 ```
 cmake --build ../iree-build-emscripten/ \
-  --target iree_samples_simple_embedding_simple_embedding_vmvx_sync
+  --target iree_samples_iree_simple_embedding_simple_embedding_vmvx_sync
 ```
 
 ### Load into a WebAssembly Environment
