@@ -196,14 +196,14 @@ py_binary(
 
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_f32_gpu_large_%s" % vulkan_target,
+    compiler_flags = [
+        "--iree-vulkan-target-triple=%s" % vulkan_target,
+    ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
         "--shapes=gpu_large",
         "--compilation_info=SPIRVVectorize",
-    ],
-    compiler_flags = [
-        "--iree-vulkan-target-triple=%s" % vulkan_target,
     ],
     tags = [
         "requires-gpu-nvidia",
