@@ -100,7 +100,6 @@ void populateVectorizationPatterns(RewritePatternSet &patterns) {
   patterns.add<linalg::LinalgVectorizationPattern>(
       patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>(),
       opt);
-  populateVectorizePadPatterns(patterns);
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
   vector::populateVectorReductionToContractPatterns(patterns);
 }
@@ -131,7 +130,9 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
     {
       RewritePatternSet patterns(context);
       populateVectorizationPatterns(patterns);
+      // Pull in additional vectorization patterns in IREE.
       populateLinalgToVectorVectorizeConvPatterns(context, patterns);
+      populateVectorizePadPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
@@ -142,6 +143,15 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
+
+    {
+      // Check that all linalg ops were vectorized to avoid issues.
+      auto check = funcOp.walk([](linalg::LinalgOp op) {
+        op.emitError("failed vectorization");
+        return WalkResult::interrupt();
+      });
+      if (check.wasInterrupted()) return signalPassFailure();
+    }
 
     // Speical peephole optimizations to clean up IR before unrolling.
     {
