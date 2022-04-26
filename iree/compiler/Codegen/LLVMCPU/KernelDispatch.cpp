@@ -219,25 +219,29 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
   }
   unsigned currDim = numDims;
   while (numWorkgroups > numWorkgroupsLimit && currDim > 0) {
-    if (distributedTileSizes[currDim - 1] >= maxTileSizes[currDim - 1] ||
-        workload[currDim - 1] == ShapedType::kDynamicSize ||
-        distributedTileSizes[currDim - 1] >= workload[currDim - 1]) {
+    unsigned index = currDim - 1;
+    int64_t currSize = distributedTileSizes[index];
+    if (currSize >= maxTileSizes[index] ||
+        workload[index] == ShapedType::kDynamicSize ||
+        currSize >= workload[index]) {
       currDim--;
       continue;
     }
-    int64_t vectorSize = vectorSizeHints[currDim - 1];
-    // Don't change if there is a vector size hint and it's the ideal size.
-    if (vectorSize > 1 && distributedTileSizes[currDim - 1] % vectorSize == 0 &&
-        workload[currDim - 1] % distributedTileSizes[currDim - 1] == 0) {
+    int64_t newSize = std::min<int64_t>(currSize * 2, maxTileSizes[index]);
+    int64_t vectorSize = vectorSizeHints[index];
+    // Chech if it's the ideal size with vector size hint. And skip if the new
+    // size will break the ideal size.
+    if (vectorSize > 1 &&
+        (currSize % vectorSize == 0 && workload[index] % currSize == 0) &&
+        (newSize % vectorSize != 0 || workload[index] % newSize != 0)) {
       currDim--;
       continue;
     }
-    distributedTileSizes[currDim - 1] = std::min<int64_t>(
-        distributedTileSizes[currDim - 1] * 2, maxTileSizes[currDim - 1]);
-    int64_t nwg =
-        ceilFn(workload[currDim - 1], distributedTileSizes[currDim - 1]);
-    if (nwg < numWorkgroupsPerDim[currDim - 1]) {
-      numWorkgroups /= numWorkgroupsPerDim[currDim - 1];
+
+    distributedTileSizes[index] = newSize;
+    int64_t nwg = ceilFn(workload[index], distributedTileSizes[index]);
+    if (nwg < numWorkgroupsPerDim[index]) {
+      numWorkgroups /= numWorkgroupsPerDim[index];
       numWorkgroups *= nwg;
     } else {
       currDim--;
@@ -274,6 +278,11 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
 
 /// Returns the tile size to use for the Flow level of an operation that
 /// implements the `PartitionableLoopsInterface`.
+///
+/// The vectorSizeHints can be empty or as many as the number of loops. When not
+/// empty, each hint should be 1 or the vector size. On the dimensions where the
+/// hints != 1, it will try to find the tile sizes which are multipliers of the
+/// hints.
 static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
     ArrayRef<Range> iterationDomain,
     IREE::Flow::PartitionableLoopsInterface partitionableLoopInterfaceOp,
