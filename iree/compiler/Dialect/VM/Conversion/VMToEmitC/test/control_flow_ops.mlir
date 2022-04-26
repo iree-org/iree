@@ -234,6 +234,210 @@ vm.module @my_module {
 
 // -----
 
+// Test vm.import conversion on a variadic function.
+vm.module @my_module {
+
+  // CHECK-LABEL: func @my_module_call_0iCiD_i_2_import_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>,
+  // CHECK-SAME:                                             %arg2: i32, %arg3: i32, %arg4: i32, %arg5: i32, %arg6: !emitc.ptr<!emitc.opaque<"int32_t">>)
+  // CHECK-SAME:      -> !emitc.opaque<"iree_status_t"> attributes {emitc.static} {
+
+  // Calculate the size of the arguments.
+  // CHECK-NEXT: %[[ARGSIZE0:.+]] = "emitc.constant"() {value = #emitc.opaque<"0">} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[ARGSIZE1:.+]] = emitc.call "sizeof"() {args = [#emitc.opaque<"int32_t">]}
+  // CHECK-NEXT: %[[ARGSIZE01:.+]] = emitc.call "EMITC_ADD"(%[[ARGSIZE0]], %[[ARGSIZE1]])
+  // CHECK-NEXT: %[[ARGSIZE2:.+]] = emitc.call "sizeof"() {args = [#emitc.opaque<"int32_t">]}
+  // CHECK-NEXT: %[[ARGSIZE012:.+]] = emitc.call "EMITC_ADD"(%[[ARGSIZE01]], %[[ARGSIZE2]])
+  // CHECK-NEXT: %[[ARGSIZE3:.+]] = emitc.call "sizeof"() {args = [#emitc.opaque<"int32_t">]}
+  // CHECK-NEXT: %[[ARGSIZE0123:.+]] = emitc.call "EMITC_ADD"(%[[ARGSIZE012]], %[[ARGSIZE3]])
+  // CHECK-NEXT: %[[ARGSIZE4:.+]] = emitc.call "sizeof"() {args = [#emitc.opaque<"int32_t">]}
+  // CHECK-NEXT: %[[ARGSIZE:.+]] = emitc.call "EMITC_ADD"(%[[ARGSIZE0123]], %[[ARGSIZE4]])
+
+  // Calculate the size of the result.
+  // CHECK-NEXT: %[[RESULTSIZE0:.+]] = "emitc.constant"() {value = #emitc.opaque<"0">} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[RESULTSIZE1:.+]] = emitc.call "sizeof"() {args = [#emitc.opaque<"int32_t">]}
+  // CHECK-NEXT: %[[RESULTSIZE:.+]] = emitc.call "EMITC_ADD"(%[[RESULTSIZE0]], %[[RESULTSIZE1]])
+
+  // Create a struct for the arguments and results.
+  // CHECK: %[[ARGSTRUCT:.+]] = "emitc.constant"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_function_call_t">
+  // CHECK-NEXT: %[[ARGSTRUCTFN:.+]] = emitc.apply "*"(%arg1) : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.opaque<"iree_vm_function_t">
+  // CHECK-NEXT: emitc.call "EMITC_STRUCT_MEMBER_ASSIGN"(%[[ARGSTRUCT]], %[[ARGSTRUCTFN]]) {args = [0 : index, #emitc.opaque<"function">, 1 : index]}
+
+  // Allocate space for the arguments.
+  // CHECK-NEXT: %[[ARGBYTESPAN:.+]] = emitc.call "EMITC_STRUCT_MEMBER_ADDRESS"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"arguments">]}
+  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
+  // CHECK-NEXT: %[[ARGBYTESPANDATAVOID:.+]] = emitc.call "iree_alloca"(%[[ARGSIZE]])
+  // CHECK-SAME:     : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
+  // CHECK-NEXT: %[[ARGBYTESPANDATA:.+]] = emitc.call "EMITC_CAST"(%[[ARGBYTESPANDATAVOID]]) {args = [0 : index, !emitc.ptr<ui8>]}
+  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"void">>) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
+  // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
+  // CHECK-NEXT: emitc.call "memset"(%[[ARGBYTESPANDATA]], %[[ARGSIZE]]) {args = [0 : index, 0 : i32, 1 : index]}
+
+  // Allocate space for the result.
+  // CHECK-NEXT: %[[RESBYTESPAN:.+]] = emitc.call "EMITC_STRUCT_MEMBER_ADDRESS"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"results">]}
+  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
+  // CHECK-NEXT: %[[RESBYTESPANDATAVOID:.+]] = emitc.call "iree_alloca"(%[[RESULTSIZE]])
+  // CHECK-SAME:     : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
+  // CHECK-NEXT: %[[RESBYTESPANDATA:.+]] = emitc.call "EMITC_CAST"(%[[RESBYTESPANDATAVOID]]) {args = [0 : index, !emitc.ptr<ui8>]}
+  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"void">>) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESULTSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
+  // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
+  // CHECK-NEXT: emitc.call "memset"(%[[RESBYTESPANDATA]], %[[RESULTSIZE]]) {args = [0 : index, 0 : i32, 1 : index]}
+
+  // Pack the arguments into the struct.
+  // Here we also create pointers for non-pointer types.
+  // CHECK-NEXT: %[[ARGS:.+]] = emitc.call "EMITC_STRUCT_MEMBER"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"arguments">]}
+  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[ARGSPTR:.+]] = emitc.call "EMITC_STRUCT_MEMBER"(%[[ARGS]]) {args = [0 : index, #emitc.opaque<"data">]}
+  // CHECK-SAME:     : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %[[ARGHOSTSIZE:.+]] = emitc.call "sizeof"() {args = [#emitc.opaque<"int32_t">]} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[A1PTR:.+]] = emitc.apply "&"(%arg2) : (i32) -> !emitc.ptr<!emitc.opaque<"int32_t">>
+  // CHECK-NEXT: emitc.call "memcpy"(%[[ARGSPTR]], %[[A1PTR]], %[[ARGHOSTSIZE]])
+  // CHECK-NEXT: %[[A1ADR:.+]] = emitc.call "EMITC_ADD"(%[[ARGSPTR]], %[[ARGHOSTSIZE]])
+  // CHECK-SAME:     : (!emitc.ptr<ui8>, !emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %[[A1SIZE:.+]] = emitc.call "sizeof"() {args = [#emitc.opaque<"int32_t">]} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[A2PTR:.+]] = emitc.apply "&"(%arg3) : (i32) -> !emitc.ptr<!emitc.opaque<"int32_t">>
+  // CHECK-NEXT: emitc.call "memcpy"(%[[A1ADR]], %[[A2PTR]], %[[A1SIZE]])
+  // CHECK-NEXT: %[[A2ADR:.+]] = emitc.call "EMITC_ADD"(%[[A1ADR]], %[[A1SIZE]])
+  // CHECK-SAME:     : (!emitc.ptr<ui8>, !emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %[[A2SIZE:.+]] = emitc.call "sizeof"() {args = [#emitc.opaque<"int32_t">]} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[A3PTR:.+]] = emitc.apply "&"(%arg4) : (i32) -> !emitc.ptr<!emitc.opaque<"int32_t">>
+  // CHECK-NEXT: emitc.call "memcpy"(%[[A2ADR]], %[[A3PTR]], %[[A2SIZE]])
+  // CHECK-NEXT: %[[A3ADR:.+]] = emitc.call "EMITC_ADD"(%[[A2ADR]], %[[A2SIZE]])
+  // CHECK-SAME:     : (!emitc.ptr<ui8>, !emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %[[A3SIZE:.+]] = emitc.call "sizeof"() {args = [#emitc.opaque<"int32_t">]} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[A4PTR:.+]] = emitc.apply "&"(%arg5) : (i32) -> !emitc.ptr<!emitc.opaque<"int32_t">>
+  // CHECK-NEXT: emitc.call "memcpy"(%[[A3ADR]], %[[A4PTR]], %[[A3SIZE:.+]])
+
+  // Create the call to the imported function.
+  // CHECK-NEXT: %[[EXECRESULT:.+]] = "emitc.variable"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_execution_result_t">
+  // CHECK-NEXT: %[[EXECRESULTPTR1:.+]] = emitc.apply "&"(%[[EXECRESULT]])
+  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_execution_result_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_execution_result_t">>
+  // CHECK-NEXT: %[[EXECRESULTSIZE:.+]] = emitc.call "sizeof"(%[[EXECRESULT]]) : (!emitc.opaque<"iree_vm_execution_result_t">) -> i32
+  // CHECK-NEXT: emitc.call "memset"(%[[EXECRESULTPTR1]], %[[EXECRESULTSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
+  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_execution_result_t">>, i32) -> ()
+  // CHECK-NEXT: %[[IMPORTMOD:.+]] = emitc.call "EMITC_STRUCT_PTR_MEMBER"(%arg1) {args = [0 : index, #emitc.opaque<"module">]}
+  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
+  // CHECK-NEXT: %[[ARGSTRUCTPTR:.+]] = emitc.apply "&"(%[[ARGSTRUCT]])
+  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_call_t">>
+  // CHECK-NEXT: %[[EXECRESULTPTR:.+]] = emitc.apply "&"(%[[EXECRESULT]])
+  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_execution_result_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_execution_result_t">>
+  // CHECK-NEXT: %{{.+}} = emitc.call "EMITC_STRUCT_PTR_MEMBER_CALL"(%[[IMPORTMOD]], %arg0, %[[ARGSTRUCTPTR]], %[[EXECRESULTPTR]])
+  // CHECK-SAME:     {args = [0 : index, #emitc.opaque<"begin_call">, 0 : index, 1 : index, 2 : index, 3 : index]}
+
+  // Unpack the function results.
+  //      CHECK: %[[RES:.+]] = emitc.call "EMITC_STRUCT_MEMBER"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"results">]}
+  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[RESPTR:.+]] = emitc.call "EMITC_STRUCT_MEMBER"(%[[RES]]) {args = [0 : index, #emitc.opaque<"data">]}
+  // CHECK-SAME:     : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %[[RESHOSTSIZE:.+]] = emitc.call "sizeof"() {args = [#emitc.opaque<"int32_t">]} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: emitc.call "memcpy"(%arg6, %[[RESPTR]], %[[RESHOSTSIZE]])
+
+  // Return ok status.
+  // CHECK-NEXT: %[[OK:.+]] = emitc.call "iree_ok_status"()
+  // CHECK-NEXT: return %[[OK]]
+  vm.import @variadic_fn(%arg0 : i32, %arg1 : i32 ...) -> i32
+
+  vm.func @import_variadic(%arg0 : i32, %arg1 : i32, %arg2 : i32) -> i32 {
+    %0 = vm.call.variadic @variadic_fn(%arg0, [%arg1, %arg2]) : (i32, i32 ...) -> i32
+    vm.return %0 : i32
+  }
+}
+
+// -----
+
+// Test vm.import conversion on a function with vm.ref arguments.
+vm.module @my_module {
+
+  // CHECK-LABEL: func @my_module_call_0r_r_import_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>,
+  // CHECK-SAME:                                        %arg2: !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, %arg3: !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>)
+  // CHECK-SAME:      -> !emitc.opaque<"iree_status_t"> attributes {emitc.static} {
+
+  // Calculate the size of the arguments.
+  // CHECK-NEXT: %[[ARGSIZE0:.+]] = "emitc.constant"() {value = #emitc.opaque<"0">} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[ARGSIZE1:.+]] = emitc.call "sizeof"() {args = [#emitc.opaque<"iree_vm_ref_t">]}
+  // CHECK-NEXT: %[[ARGSIZE:.+]] = emitc.call "EMITC_ADD"(%[[ARGSIZE0]], %[[ARGSIZE1]])
+
+  // Calculate the size of the result.
+  // CHECK-NEXT: %[[RESULTSIZE0:.+]] = "emitc.constant"() {value = #emitc.opaque<"0">} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[RESULTSIZE1:.+]] = emitc.call "sizeof"() {args = [#emitc.opaque<"iree_vm_ref_t">]}
+  // CHECK-NEXT: %[[RESULTSIZE:.+]] = emitc.call "EMITC_ADD"(%[[RESULTSIZE0]], %[[RESULTSIZE1]])
+
+  // Create a struct for the arguments and results.
+  // CHECK: %[[ARGSTRUCT:.+]] = "emitc.constant"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_function_call_t">
+  // CHECK-NEXT: %[[ARGSTRUCTFN:.+]] = emitc.apply "*"(%arg1) : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.opaque<"iree_vm_function_t">
+  // CHECK-NEXT: emitc.call "EMITC_STRUCT_MEMBER_ASSIGN"(%[[ARGSTRUCT]], %[[ARGSTRUCTFN]]) {args = [0 : index, #emitc.opaque<"function">, 1 : index]}
+
+  // Allocate space for the arguments.
+  // CHECK-NEXT: %[[ARGBYTESPAN:.+]] = emitc.call "EMITC_STRUCT_MEMBER_ADDRESS"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"arguments">]}
+  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
+  // CHECK-NEXT: %[[ARGBYTESPANDATAVOID:.+]] = emitc.call "iree_alloca"(%[[ARGSIZE]]) : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
+  // CHECK-NEXT: %[[ARGBYTESPANDATA:.+]] = emitc.call "EMITC_CAST"(%[[ARGBYTESPANDATAVOID]]) {args = [0 : index, !emitc.ptr<ui8>]}
+  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"void">>) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
+  // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
+  // CHECK-NEXT: emitc.call "memset"(%[[ARGBYTESPANDATA]], %[[ARGSIZE]]) {args = [0 : index, 0 : i32, 1 : index]}
+
+  // Allocate space for the result.
+  // CHECK-NEXT: %[[RESBYTESPAN:.+]] = emitc.call "EMITC_STRUCT_MEMBER_ADDRESS"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"results">]}
+  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.ptr<!emitc.opaque<"iree_byte_span_t">>
+  // CHECK-NEXT: %[[RESBYTESPANDATAVOID:.+]] = emitc.call "iree_alloca"(%[[RESULTSIZE]]) : (!emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<!emitc.opaque<"void">>
+  // CHECK-NEXT: %[[RESBYTESPANDATA:.+]] = emitc.call "EMITC_CAST"(%[[RESBYTESPANDATAVOID]]) {args = [0 : index, !emitc.ptr<ui8>]}
+  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"void">>) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESULTSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
+  // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
+  // CHECK-NEXT: emitc.call "memset"(%[[RESBYTESPANDATA]], %[[RESULTSIZE]]) {args = [0 : index, 0 : i32, 1 : index]}
+
+  // Pack the argument into the struct.
+  // CHECK-NEXT: %[[ARGS:.+]] = emitc.call "EMITC_STRUCT_MEMBER"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"arguments">]}
+  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[ARGSPTR:.+]] = emitc.call "EMITC_STRUCT_MEMBER"(%[[ARGS]]) {args = [0 : index, #emitc.opaque<"data">]}
+  // CHECK-SAME:     : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %{{.+}} = emitc.call "sizeof"() {args = [#emitc.opaque<"iree_vm_ref_t">]} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[ARG:.+]] = emitc.call "EMITC_CAST"(%[[ARGSPTR]]) {args = [0 : index, !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>]}
+  // CHECK-SAME:     : (!emitc.ptr<ui8>) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
+  // CHECK-NEXT: emitc.call "iree_vm_ref_assign"(%arg2, %[[ARG]])
+
+  // Create the call to the imported function.
+  // CHECK-NEXT: %[[EXECRESULT:.+]] = "emitc.variable"() {value = #emitc.opaque<"">}
+  // CHECK-SAME:     : () -> !emitc.opaque<"iree_vm_execution_result_t">
+  // CHECK-NEXT: %[[EXECRESULTPTR1:.+]] = emitc.apply "&"(%[[EXECRESULT]])
+  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_execution_result_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_execution_result_t">>
+  // CHECK-NEXT: %[[EXECRESULTSIZE:.+]] = emitc.call "sizeof"(%[[EXECRESULT]])
+  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_execution_result_t">) -> i32
+  // CHECK-NEXT: emitc.call "memset"(%[[EXECRESULTPTR1]], %[[EXECRESULTSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
+  // CHECK-NEXT: %[[IMPORTMOD:.+]] = emitc.call "EMITC_STRUCT_PTR_MEMBER"(%arg1) {args = [0 : index, #emitc.opaque<"module">]}
+  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
+  // CHECK-NEXT: %[[ARGSTRUCTPTR:.+]] = emitc.apply "&"(%[[ARGSTRUCT]])
+  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_call_t">>
+  // CHECK-NEXT: %[[EXECRESULTPTR:.+]] = emitc.apply "&"(%[[EXECRESULT]])
+  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_execution_result_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_execution_result_t">>
+  // CHECK-NEXT: %{{.+}} = emitc.call "EMITC_STRUCT_PTR_MEMBER_CALL"(%[[IMPORTMOD]], %arg0, %[[ARGSTRUCTPTR]], %[[EXECRESULTPTR]])
+  // CHECK-SAME:     {args = [0 : index, #emitc.opaque<"begin_call">, 0 : index, 1 : index, 2 : index, 3 : index]}
+
+  // Unpack the function results.
+  //      CHECK: %[[RES:.+]] = emitc.call "EMITC_STRUCT_MEMBER"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"results">]}
+  // CHECK-SAME:     : (!emitc.opaque<"iree_vm_function_call_t">) -> !emitc.opaque<"iree_byte_span_t">
+  // CHECK-NEXT: %[[RESPTR:.+]] = emitc.call "EMITC_STRUCT_MEMBER"(%[[RES]]) {args = [0 : index, #emitc.opaque<"data">]}
+  // CHECK-SAME:     : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
+  // CHECK-NEXT: %{{.+}} = emitc.call "sizeof"() {args = [#emitc.opaque<"iree_vm_ref_t">]} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[RESREFPTR:.+]] = emitc.call "EMITC_CAST"(%[[RESPTR]]) {args = [0 : index, !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>]}
+  // CHECK-SAME:     : (!emitc.ptr<ui8>) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
+  // CHECK-NEXT: emitc.call "iree_vm_ref_move"(%[[RESREFPTR]], %arg3)
+
+  // Return ok status.
+  // CHECK-NEXT: %[[OK:.+]] = emitc.call "iree_ok_status"()
+  // CHECK-NEXT: return %[[OK]]
+  vm.import @ref_fn(%arg0 : !vm.ref<?>) -> !vm.ref<?>
+
+  vm.func @import_ref(%arg0 : !vm.ref<?>) -> !vm.ref<?> {
+    %0 = vm.call @ref_fn(%arg0) : (!vm.ref<?>) -> !vm.ref<?>
+    vm.return %0 : !vm.ref<?>
+  }
+}
+
+// -----
+
 vm.module @my_module {
 
   // Typedef structs for arguments and results
