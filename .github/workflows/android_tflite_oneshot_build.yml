@@ -7,7 +7,7 @@ on:
 
 jobs:
   build_android_with_docker:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     env:
       ANDROID_CONTAINER: "gcr.io/iree-oss/gradle-android@sha256:61e55a46d58b881a22c6ce9b7e8186dbd362a0ebc9ebe1a0284f55cd6212bb18"
     steps:
