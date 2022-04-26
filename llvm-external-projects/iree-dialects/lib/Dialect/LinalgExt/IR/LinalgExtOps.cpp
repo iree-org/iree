@@ -1297,15 +1297,16 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
   Value initialIndex = b.create<memref::LoadOp>(loc, indices(), ivs);
 
   // Compute K (ub) from the selected dim of the output
-  ShapedType outputValuesType = outputValues().getType().cast<ShapedType>();
   Value ub = b.create<memref::DimOp>(loc, outputValues(), dimension());
 
   // Inner K loop functions:
-  //   Load current K val/ind
-  //   Compare N to K using inserted block compare
-  //   Check if N/K are equal, which came first
-  //   Store results in appropriate places
-  //   Yield loop carry vals
+  //   Load current K value and index
+  //   Compare N/K using inserted block compare
+  //   Check if N == K using strict weak ordering, select which index came first
+  //   Select new K value from N/K comparison
+  //   Select new K index from N/K comparison or which index came first
+  //   Store new k value and index
+  //   Yield loop carry values after K selection
   Value kValue, kIndex;
   auto scfFor = b.create<scf::ForOp>(
       loc, zero, ub, one, ValueRange{initialValue, initialIndex},
@@ -1347,12 +1348,12 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
     //   f(x,y) --> forwardCmpRes
     //   f(y,x) --> reverseCmpRes
     //   if forwardCmpRes == reverseCmpRes then select which came first
-    Value cmpEqValRes = b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
-                                                forwardCmpRes, reverseCmpRes);
-    Value cmpEqIndRes = b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::slt,
-                                                loopCarryValues[1], kIndex);
+    Value cmpValuesEqual = b.create<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::eq, forwardCmpRes, reverseCmpRes);
+    Value cmpFirstIndex = b.create<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::slt, loopCarryValues[1], kIndex);
     Value combinedCmpEqRes =
-        b.create<arith::AndIOp>(loc, cmpEqValRes, cmpEqIndRes);
+        b.create<arith::AndIOp>(loc, cmpValuesEqual, cmpFirstIndex);
     // True if N > K or N came before K
     Value indexCmpRes =
         b.create<arith::OrIOp>(loc, forwardCmpRes, combinedCmpEqRes);
