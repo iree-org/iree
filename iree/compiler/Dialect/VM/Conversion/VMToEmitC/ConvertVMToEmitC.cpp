@@ -2469,6 +2469,10 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
                                    mlir::func::FuncOp &funcOp, Value call,
                                    ConversionPatternRewriter &rewriter,
                                    Location loc) const {
+    if (inputTypes.empty()) {
+      return success();
+    }
+
     auto ctx = rewriter.getContext();
 
     size_t inputOffset = 2;
@@ -2516,19 +2520,6 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
         return failure();
       }
 
-      Value size =
-          rewriter
-              .create<emitc::CallOp>(
-                  /*location=*/loc,
-                  /*type=*/hostSizeType,
-                  /*callee=*/StringAttr::get(ctx, "sizeof"),
-                  /*args=*/
-                  ArrayAttr::get(
-                      ctx, {emitc::OpaqueAttr::get(ctx, cType.getValue())}),
-                  /*templateArgs=*/ArrayAttr{},
-                  /*operands=*/ArrayRef<Value>{})
-              .getResult(0);
-
       if (arg.getType() == emitc::PointerType::get(
                                emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
         Type refPtrType = emitc::PointerType::get(
@@ -2555,6 +2546,19 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
       } else {
         auto cPtrType = cType.getValue();
 
+        Value size =
+            rewriter
+                .create<emitc::CallOp>(
+                    /*location=*/loc,
+                    /*type=*/hostSizeType,
+                    /*callee=*/StringAttr::get(ctx, "sizeof"),
+                    /*args=*/
+                    ArrayAttr::get(
+                        ctx, {emitc::OpaqueAttr::get(ctx, cType.getValue())}),
+                    /*templateArgs=*/ArrayAttr{},
+                    /*operands=*/ArrayRef<Value>{})
+                .getResult(0);
+
         // memcpy(uint8Ptr, &arg, size);
         Value argPtr = rewriter
                            .create<emitc::ApplyOp>(
@@ -2576,6 +2580,19 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
 
       // Skip the addition in the last iteration.
       if (i < inputTypes.size() - 1) {
+        Value size =
+            rewriter
+                .create<emitc::CallOp>(
+                    /*location=*/loc,
+                    /*type=*/hostSizeType,
+                    /*callee=*/StringAttr::get(ctx, "sizeof"),
+                    /*args=*/
+                    ArrayAttr::get(
+                        ctx, {emitc::OpaqueAttr::get(ctx, cType.getValue())}),
+                    /*templateArgs=*/ArrayAttr{},
+                    /*operands=*/ArrayRef<Value>{})
+                .getResult(0);
+
         uint8Ptr = rewriter
                        .create<emitc::CallOp>(
                            /*location=*/loc,
@@ -2594,6 +2611,10 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
                                    mlir::func::FuncOp &funcOp, Value call,
                                    ConversionPatternRewriter &rewriter,
                                    Location loc) const {
+    if (resultTypes.empty()) {
+      return success();
+    }
+
     auto ctx = rewriter.getContext();
 
     // The last N arguments are the results.
@@ -2641,19 +2662,6 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
         return failure();
       }
 
-      Value size =
-          rewriter
-              .create<emitc::CallOp>(
-                  /*location=*/loc,
-                  /*type=*/hostSizeType,
-                  /*callee=*/StringAttr::get(ctx, "sizeof"),
-                  /*args=*/
-                  ArrayAttr::get(
-                      ctx, {emitc::OpaqueAttr::get(ctx, cType.getValue())}),
-                  /*templateArgs=*/ArrayAttr{},
-                  /*operands=*/ArrayRef<Value>{})
-              .getResult(0);
-
       if (arg.getType() == emitc::PointerType::get(
                                emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
         Type refPtrType = emitc::PointerType::get(
@@ -2678,6 +2686,19 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
             /*templateArgs=*/ArrayAttr{},
             /*operands=*/ArrayRef<Value>{refPtr, arg});
       } else {
+        Value size =
+            rewriter
+                .create<emitc::CallOp>(
+                    /*location=*/loc,
+                    /*type=*/hostSizeType,
+                    /*callee=*/StringAttr::get(ctx, "sizeof"),
+                    /*args=*/
+                    ArrayAttr::get(
+                        ctx, {emitc::OpaqueAttr::get(ctx, cType.getValue())}),
+                    /*templateArgs=*/ArrayAttr{},
+                    /*operands=*/ArrayRef<Value>{})
+                .getResult(0);
+
         // memcpy(arg, uint8Ptr, size);
         rewriter.create<emitc::CallOp>(
             /*location=*/loc,
@@ -2690,6 +2711,19 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
 
       // Skip the addition in the last iteration.
       if (i < resultTypes.size() - 1) {
+        Value size =
+            rewriter
+                .create<emitc::CallOp>(
+                    /*location=*/loc,
+                    /*type=*/hostSizeType,
+                    /*callee=*/StringAttr::get(ctx, "sizeof"),
+                    /*args=*/
+                    ArrayAttr::get(
+                        ctx, {emitc::OpaqueAttr::get(ctx, cType.getValue())}),
+                    /*templateArgs=*/ArrayAttr{},
+                    /*operands=*/ArrayRef<Value>{})
+                .getResult(0);
+
         uint8Ptr = rewriter
                        .create<emitc::CallOp>(
                            /*location=*/loc,
