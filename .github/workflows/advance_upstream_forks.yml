@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checking out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           repository: google/iree-llvm-fork
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checking out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           repository: google/iree-mhlo-fork
@@ -69,7 +69,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checking out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           repository: google/iree-tf-fork

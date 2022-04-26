@@ -14,7 +14,7 @@ jobs:
     if: github.repository == 'google/iree'
     steps:
       - name: Checking out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
 

@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - name: Checkout out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
       - name: Fetching base gh-pages branch

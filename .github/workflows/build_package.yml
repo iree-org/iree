@@ -62,7 +62,7 @@ jobs:
       MANYLINUX_X86_64_IMAGE: gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:3e7ac081b69bdc54650a98725b793f072f3c3beb229f8886dbcd6f23bc1eb9ca
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e
         with:
           path: 'main_checkout'
           submodules: true

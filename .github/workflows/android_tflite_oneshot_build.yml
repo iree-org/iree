@@ -11,7 +11,7 @@ jobs:
     env:
       ANDROID_CONTAINER: "gcr.io/iree-oss/gradle-android@sha256:61e55a46d58b881a22c6ce9b7e8186dbd362a0ebc9ebe1a0284f55cd6212bb18"
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e
         with:
           submodules: true
       - name: Execute Android Build
