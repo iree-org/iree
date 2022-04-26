@@ -46,7 +46,7 @@ jobs:
           prerelease: true
 
       - name: "Invoke workflow :: Build Native Release Packages"
-        uses: benc-uk/workflow-dispatch@v1
+        uses: benc-uk/workflow-dispatch@4c044c1613fabbe5250deadc65452d54c4ad4fc7
         with:
           workflow: Build Native Release Packages
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
