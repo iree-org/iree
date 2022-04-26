@@ -334,7 +334,8 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 //===----------------------------------------------------------------------===//
 
 static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
-                                        Operation *op) {
+                                        Operation *op,
+                                        bool allowVectorization = true) {
   LLVM_DEBUG(llvm::dbgs() << "Using default config for op: " << *op << "\n");
   func::FuncOp funcOp = op->getParentOfType<func::FuncOp>();
   auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
@@ -408,6 +409,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   // Whether we can try to use the vectorization pipeline.
   Optional<SmallVector<int64_t, 4>> loopBounds = linalgOp.getStaticLoopRanges();
   bool vectorizable =
+      allowVectorization &&
       // The vectorization pipeline assumes tensor semantics when tiling.
       !linalgOp.hasBufferSemantics() && !linalgOp.hasIndexSemantics() &&
       // Skip vectorization for non-minor identity inputs as it generates
@@ -578,8 +580,9 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
             // If unsuccessful, try to tile and distribute.
             return setDefaultOpConfig(limits, op);
           })
-      .Case<IREE::LinalgExt::FftOp>([limits](IREE::LinalgExt::FftOp op) {
-        return setFftOpConfig(limits, op);
+      .Case<linalg::ConvolutionOpInterface>([limits](auto op) {
+        // Other convolution/pooling op vectorization is not wired up.
+        return setDefaultOpConfig(limits, op, /*allowVectorization=*/false);
       })
       .Case<linalg::GenericOp>([limits](linalg::GenericOp op) {
         // If a generic op has reduction iterator types, it can be treated as a
@@ -589,6 +592,9 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
           return setDefaultOpConfig(limits, op);
         }
         return success();
+      })
+      .Case<IREE::LinalgExt::FftOp>([limits](IREE::LinalgExt::FftOp op) {
+        return setFftOpConfig(limits, op);
       })
       .Default([](Operation *) { return success(); });
 };
