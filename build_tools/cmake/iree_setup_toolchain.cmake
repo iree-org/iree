@@ -24,7 +24,7 @@ if(IREE_USE_LINKER AND NOT APPLE)
   # argument warning about -fuse-ld, which can foul up compiler flag detection,
   # causing false negatives. We lack a finer grained way to suppress such a
   # thing, and this is deemed least bad.
-  if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     iree_append("-Wno-unused-command-line-argument"
       CMAKE_REQUIRED_FLAGS
       CMAKE_EXE_LINKER_FLAGS

@@ -68,7 +68,7 @@ function(iree_native_test)
   set(_TEST_NAME "${_PACKAGE_PATH}/${_RULE_NAME}")
 
   # If driver was specified, add the corresponding test arg and label.
-  if (DEFINED _RULE_DRIVER)
+  if(DEFINED _RULE_DRIVER)
     list(APPEND _RULE_ARGS "--driver=${_RULE_DRIVER}")
     list(APPEND _RULE_LABELS "driver=${_RULE_DRIVER}")
   endif()
@@ -77,8 +77,8 @@ function(iree_native_test)
     set(_ANDROID_ABS_DIR "/data/local/tmp/${_PACKAGE_PATH}/${_RULE_NAME}")
   endif()
 
-  if (DEFINED _RULE_TEST_INPUT_FILE_ARG)
-    if (ANDROID)
+  if(DEFINED _RULE_TEST_INPUT_FILE_ARG)
+    if(ANDROID)
       get_filename_component(_TEST_INPUT_FILE_BASENAME "${_RULE_TEST_INPUT_FILE_ARG}" NAME)
       list(APPEND _RULE_ARGS "${_ANDROID_ABS_DIR}/${_TEST_INPUT_FILE_BASENAME}")
     else()
@@ -104,7 +104,7 @@ function(iree_native_test)
     # Use environment variables to instruct the script to push artifacts
     # onto the Android device before running the test. This needs to match
     # with the expectation of the run_android_test.{sh|bat|ps1} script.
-    string (REPLACE ";" " " _DATA_SPACE_SEPARATED "${_RULE_DATA}")
+    string(REPLACE ";" " " _DATA_SPACE_SEPARATED "${_RULE_DATA}")
     set(
       _ENVIRONMENT_VARS
         "TEST_ANDROID_ABS_DIR=${_ANDROID_ABS_DIR}"

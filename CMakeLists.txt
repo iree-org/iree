@@ -88,7 +88,7 @@ set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
 
 # Vulkan is not natively supported on Apple platforms.
 # Metal should generally be used instead, though MoltenVK may also work.
-if (APPLE)
+if(APPLE)
   set(IREE_HAL_DRIVER_VULKAN_DEFAULT OFF)
 else()
   set(IREE_HAL_DRIVER_VULKAN_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
@@ -193,11 +193,11 @@ function(iree_fix_ndebug)
   string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
   if(IREE_ENABLE_ASSERTIONS AND NOT "${uppercase_CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
       # Also remove /D NDEBUG to avoid MSVC warnings about conflicting defines.
-      foreach (flags_var_to_scrub
+      foreach(flags_var_to_scrub
               CMAKE_CXX_FLAGS_${uppercase_CMAKE_BUILD_TYPE}
               CMAKE_C_FLAGS_${uppercase_CMAKE_BUILD_TYPE})
           set(original_flags "${${flags_var_to_scrub}}")
-          string (REGEX REPLACE "(^| )[/-]D *NDEBUG($| )" " "
+          string(REGEX REPLACE "(^| )[/-]D *NDEBUG($| )" " "
                   altered_flags "${original_flags}")
           if(NOT "${original_flags}" STREQUAL "${altered_flags}")
             message(STATUS
@@ -534,7 +534,7 @@ add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 
 # TODO(scotttodd): Iterate some more and find a better place for this.
-if (NOT CMAKE_CROSSCOMPILING)
+if(NOT CMAKE_CROSSCOMPILING)
   install(
     TARGETS iree-flatcc-cli
     COMPONENT iree-flatcc-cli

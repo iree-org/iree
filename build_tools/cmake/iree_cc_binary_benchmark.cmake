@@ -44,12 +44,12 @@ function(iree_cc_binary_benchmark)
   )
 
   set(_MAYBE_TESTONLY "")
-  if (_RULE_TESTONLY)
+  if(_RULE_TESTONLY)
     set(_MAYBE_TESTONLY "TESTONLY")
   endif()
 
   set(_MAYBE_HOSTONLY "")
-  if (_RULE_HOSTONLY)
+  if(_RULE_HOSTONLY)
     set(_MAYBE_HOSTONLY "HOSTONLY")
   endif()
 

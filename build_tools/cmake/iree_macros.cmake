@@ -132,7 +132,7 @@ endfunction()
 #     the binary when importing a binary from a host build. Thus this should be
 #     the global unqualified name of the binary, not the fully-specified name.
 function(iree_get_executable_path OUTPUT_PATH_VAR EXECUTABLE)
-  if (NOT DEFINED IREE_HOST_BINARY_ROOT OR TARGET "${EXECUTABLE}")
+  if(NOT DEFINED IREE_HOST_BINARY_ROOT OR TARGET "${EXECUTABLE}")
     # We can either expect the target to be defined as part of this CMake
     # invocation (if not cross compiling) or the target is defined already.
     set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${EXECUTABLE}>" PARENT_SCOPE)
@@ -141,7 +141,7 @@ function(iree_get_executable_path OUTPUT_PATH_VAR EXECUTABLE)
     # for an already built executable at IREE_HOST_BINARY_ROOT. If we find it,
     # add it as an imported target so it gets picked up on later invocations.
     set(_EXECUTABLE_PATH "${IREE_HOST_BINARY_ROOT}/bin/${EXECUTABLE}${IREE_HOST_EXECUTABLE_SUFFIX}")
-    if (EXISTS ${_EXECUTABLE_PATH})
+    if(EXISTS ${_EXECUTABLE_PATH})
       add_executable("${EXECUTABLE}" IMPORTED GLOBAL)
       set_property(TARGET "${EXECUTABLE}" PROPERTY IMPORTED_LOCATION "${_EXECUTABLE_PATH}")
       set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${EXECUTABLE}>" PARENT_SCOPE)
@@ -214,7 +214,7 @@ endfunction()
 #
 # Parameters:
 # NAME: name of the target to add data dependencies to
-# DATA: List of targets and/or files in the source tree (relative to the 
+# DATA: List of targets and/or files in the source tree (relative to the
 # project root).
 function(iree_add_data_dependencies)
   cmake_parse_arguments(
