@@ -158,9 +158,9 @@ set(ANDROID_MALI_GPU_TRANSLATION_FLAGS
   "--iree-vulkan-target-triple=valhall-unknown-android11"
 )
 
-set(X86_64_CPU_TRANSLATION_FLAGS
+set(X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS
   "--iree-input-type=tosa"
-  "--iree-llvm-target-cpu-features=host"
+  "--iree-llvm-target-cpu=cascadelake"
   "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
 )
 
@@ -175,13 +175,13 @@ iree_benchmark_suite(
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
-    "1-thread,full-inference,default-flags"
+    "1-thread,full-inference,cascadelake"
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
-    "CPU-x86_64"
+    "CPU-x86-64"
   TRANSLATION_FLAGS
-    ${X86_64_CPU_TRANSLATION_FLAGS}
+    ${X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
   DRIVER
@@ -201,13 +201,13 @@ iree_benchmark_suite(
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
-    "4-thread,full-inference,default-flags"
+    "4-thread,full-inference,cascadelake"
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
-    "CPU-x86_64"
+    "CPU-x86-64"
   TRANSLATION_FLAGS
-    ${X86_64_CPU_TRANSLATION_FLAGS}
+    ${X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
   DRIVER
