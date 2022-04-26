@@ -792,10 +792,10 @@ struct MHLOToMHLOPreprocessingPass
     // whether it was legalized away at a higher level.
     // chlo::PopulateLegalizeChloToHloPatterns(context, &conversionPatterns);
     conversionTarget.addLegalDialect<
-        shape::ShapeDialect, chlo::ChloDialect, mhlo::MhloDialect,
+        shape::ShapeDialect, chlo::HloClientDialect, mhlo::MhloDialect,
         math::MathDialect, mlir::func::FuncDialect,
         mlir::arith::ArithmeticDialect, mlir::tensor::TensorDialect>();
-    // conversionTarget.addIllegalDialect<chlo::ChloDialect>();
+    // conversionTarget.addIllegalDialect<chlo::HloClientDialect>();
     if (failed(applyPartialConversion(getOperation(), conversionTarget,
                                       std::move(conversionPatterns)))) {
       return signalPassFailure();

@@ -358,7 +358,7 @@ struct TestMHLOConvertComplexToRealPass
     : public TestMHLOConvertComplexToRealBase<
           TestMHLOConvertComplexToRealPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mhlo::MhloDialect, chlo::ChloDialect>();
+    registry.insert<mhlo::MhloDialect, chlo::HloClientDialect>();
   }
 
   void runOnOperation() override {
@@ -389,7 +389,7 @@ struct TestMHLOConvertComplexToRealPass
     };
 
     target.addLegalDialect<mhlo::MhloDialect>();
-    target.addLegalDialect<chlo::ChloDialect>();
+    target.addLegalDialect<chlo::HloClientDialect>();
     target.addLegalDialect<func::FuncDialect, mlir::arith::ArithmeticDialect>();
 
     // For the test, require that casts fully convert.
