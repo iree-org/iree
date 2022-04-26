@@ -534,6 +534,9 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
     case spirv::Vendor::AMD:
       result = detail::setAMDCodeGenConfig(targetEnv, rootOp);
       break;
+    case spirv::Vendor::Apple:
+      result = detail::setAppleCodeGenConfig(targetEnv, rootOp);
+      break;
     case spirv::Vendor::ARM:
       result = detail::setMaliCodeGenConfig(targetEnv, rootOp);
       break;

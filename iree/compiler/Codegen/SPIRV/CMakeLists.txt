@@ -20,6 +20,7 @@ iree_cc_library(
   SRCS
     "AMDConfig.cpp"
     "AdrenoConfig.cpp"
+    "AppleConfig.cpp"
     "ConvertToSPIRVPass.cpp"
     "KernelConfig.cpp"
     "MaliConfig.cpp"

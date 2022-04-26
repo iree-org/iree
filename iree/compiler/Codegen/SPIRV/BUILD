@@ -15,6 +15,7 @@ cc_library(
     srcs = [
         "AMDConfig.cpp",
         "AdrenoConfig.cpp",
+        "AppleConfig.cpp",
         "ConvertToSPIRVPass.cpp",
         "KernelConfig.cpp",
         "MaliConfig.cpp",

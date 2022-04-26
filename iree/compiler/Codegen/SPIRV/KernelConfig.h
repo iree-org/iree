@@ -52,6 +52,8 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp linalgOp, int64_t subgroupSize,
 
 LogicalResult setAdrenoCodeGenConfig(const spirv::TargetEnv &targetEnv,
                                      Operation *rootOp);
+LogicalResult setAppleCodeGenConfig(const spirv::TargetEnv &targetEnv,
+                                    Operation *rootOp);
 LogicalResult setAMDCodeGenConfig(const spirv::TargetEnv &targetEnv,
                                   Operation *rootOp);
 LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
