@@ -271,7 +271,7 @@ endfunction()
 #   TO_EXE_NAME: The executable name to output in the current binary dir.
 function(iree_symlink_tool)
   cmake_parse_arguments(
-    ARG
+    _RULE
     ""
     "TARGET;FROM_TOOL_TARGET;TO_EXE_NAME"
     ""
@@ -281,16 +281,16 @@ function(iree_symlink_tool)
   # Transform TARGET
   iree_package_ns(_PACKAGE_NS)
   iree_package_name(_PACKAGE_NAME)
-  set(_TARGET "${_PACKAGE_NAME}_${ARG_TARGET}")
-  set(_FROM_TOOL_TARGET ${ARG_FROM_TOOL_TARGET})
-  set(_TO_TOOL_PATH "${CMAKE_CURRENT_BINARY_DIR}/${ARG_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}")
+  set(_TARGET "${_PACKAGE_NAME}_${_RULE_TARGET}")
+  set(_FROM_TOOL_TARGET ${_RULE_FROM_TOOL_TARGET})
+  set(_TO_TOOL_PATH "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}")
   get_filename_component(_TO_TOOL_DIR "${_TO_TOOL_PATH}" DIRECTORY)
 
 
   add_custom_command(
     TARGET "${_TARGET}"
     BYPRODUCTS
-      "${CMAKE_CURRENT_BINARY_DIR}/${ARG_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}"
+      "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}"
     COMMAND
       ${CMAKE_COMMAND} -E make_directory "${_TO_TOOL_DIR}"
     COMMAND

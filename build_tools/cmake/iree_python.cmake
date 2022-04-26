@@ -203,7 +203,7 @@ endfunction()
 # PYEXT_DEPS: List of deps of extensions built with iree_pyext_module
 function(iree_py_library)
   cmake_parse_arguments(
-    ARG
+    _RULE
     ""
     "NAME"
     "SRCS;DEPS;PYEXT_DEPS"
@@ -212,17 +212,17 @@ function(iree_py_library)
 
   iree_package_ns(_PACKAGE_NS)
   # Replace dependencies passed by ::name with ::iree::package::name
-  list(TRANSFORM ARG_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
 
   iree_package_name(_PACKAGE_NAME)
-  set(_NAME "${_PACKAGE_NAME}_${ARG_NAME}")
+  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   add_custom_target(${_NAME} ALL
-    DEPENDS ${ARG_DEPS}
+    DEPENDS ${_RULE_DEPS}
   )
 
   # Symlink each file as its own target.
-  foreach(_SRC_FILE ${ARG_SRCS})
+  foreach(_SRC_FILE ${_RULE_SRCS})
     # _SRC_FILE could have other path components in it, so we need to make a
     # directory for it. Ninja does this automatically, but make doesn't. See
     # https://github.com/google/iree/issues/6801
@@ -239,9 +239,9 @@ function(iree_py_library)
   endforeach()
 
   # Add PYEXT_DEPS if any.
-  if(ARG_PYEXT_DEPS)
-    list(TRANSFORM ARG_PYEXT_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
-    add_dependencies(${_NAME} ${ARG_PYEXT_DEPS})
+  if(_RULE_PYEXT_DEPS)
+    list(TRANSFORM _RULE_PYEXT_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+    add_dependencies(${_NAME} ${_RULE_PYEXT_DEPS})
   endif()
 endfunction()
 
