@@ -184,7 +184,7 @@ jobs:
       - name: Upload Release Assets
         if: github.event.inputs.release_id != ''
         id: upload-release-assets
-        uses: dwenegar/upload-release-assets@v1
+        uses: dwenegar/upload-release-assets@5bc3024cf83521df8ebfadf00ad0c4614fd59148
         env:
           GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
