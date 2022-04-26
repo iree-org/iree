@@ -96,6 +96,7 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
     ArrayRef<int64_t> workgroupSize) {
   auto pipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore;
+  unsigned softwarePipelinedepth = translationInfo.getSoftwarePipelineDepth();
   StringRef pipelineName = stringifyEnum(pipeline);
   if (workgroupSize.empty()) {
     return op->emitOpError("expected workgroup size for GPU pipelines");
@@ -153,7 +154,15 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
     return op->emitOpError("workgroup size is not 32 aligned for ")
            << pipelineName << ", got " << workgroupSize[0];
   }
-
+  if (softwarePipelinedepth > 1 && firstLevelTileSizes[2] == lhsShape[1]) {
+    return op->emitError(
+               "Software pipelining is not supported when first level K tile "
+               "size is same as matrix reduction size.\n This dispatch has\nk "
+               "tile: ")
+           << firstLevelTileSizes[2]
+           << "\nMatrix reduction size: " << lhsShape[1]
+           << "\nPipelinedepth: " << softwarePipelinedepth;
+  }
   // Verify the workgroup.z component should always be 1
   if (workgroupSize[2] != 1) {
     return op->emitOpError("expected workgroup z component to be 1 for ")

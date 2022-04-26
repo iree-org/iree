@@ -29,6 +29,11 @@ struct TileWorkgroupSizePair {
   std::array<int64_t, 3> tileSize;
   std::array<int64_t, 3> workgroupSize;
 };
+
+// Software pipeline depths
+constexpr unsigned softwarePipelineDepthTensorCore = 4;
+// Simt codegen does not do software pipelining.
+constexpr unsigned softwarePipelineDepthSimt = 0;
 }  // namespace
 
 /// Return the best combination of tile size and wg size. It will then used to
@@ -118,6 +123,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
   auto setMatmulConfig =
       [&entryPoint, &op](int64_t tileX, int64_t tileY, int64_t tileK,
                          llvm::ArrayRef<int64_t> workgroupSize,
+                         unsigned softwarePipelineDepth,
                          IREE::Codegen::DispatchLoweringPassPipeline pipeline) {
         TileSizesListType tileSizes;
         unsigned numParallelLoops = op.getNumParallelLoops();
@@ -140,7 +146,8 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
         tileSizes.emplace_back(
             std::move(workgroupTileSizes));  // Workgroup level.
         return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
-                                                     pipeline, workgroupSize);
+                                                     pipeline, workgroupSize,
+                                                     softwarePipelineDepth);
       };
   // Infer the MxN size of the matmul based on operands and indexing maps.
   auto lhsShape =
@@ -196,17 +203,19 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
         if (sizeK % config.tileSize[2] == 0 &&
             sizeN % config.tileSize[1] == 0 &&
             sizeM % config.tileSize[0] == 0) {
-          return setMatmulConfig(config.tileSize[0], config.tileSize[1],
-                                 config.tileSize[2], config.workgroupSize,
-                                 IREE::Codegen::DispatchLoweringPassPipeline::
-                                     LLVMGPUMatmulTensorCore);
+          return setMatmulConfig(
+              config.tileSize[0], config.tileSize[1], config.tileSize[2],
+              config.workgroupSize,
+              sizeK == config.tileSize[2] ? 1 : softwarePipelineDepthTensorCore,
+              IREE::Codegen::DispatchLoweringPassPipeline::
+                  LLVMGPUMatmulTensorCore);
         }
       }
     }
     // Special case for very small matrices.
     if (sizeM * sizeN <= cudaWarpSize) {
       return setMatmulConfig(
-          sizeN, sizeM, 4, {sizeM, sizeN, 1},
+          sizeN, sizeM, 4, {sizeM, sizeN, 1}, softwarePipelineDepthSimt,
           IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
     }
     // simt matmul case
@@ -219,7 +228,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
       if (sizeN % config.tileSize[1] == 0 && sizeM % config.tileSize[0] == 0) {
         return setMatmulConfig(
             config.tileSize[0], config.tileSize[1], config.tileSize[2],
-            config.workgroupSize,
+            config.workgroupSize, softwarePipelineDepthSimt,
             IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
       }
     }
@@ -230,7 +239,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
   int64_t tileK = 4;
   SmallVector<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
   return setMatmulConfig(
-      tileX, tileY, tileK, workgroupSize,
+      tileX, tileY, tileK, workgroupSize, softwarePipelineDepthSimt,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
 }
 
