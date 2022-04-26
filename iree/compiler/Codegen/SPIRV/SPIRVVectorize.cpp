@@ -144,15 +144,6 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
-    {
-      // Check that all linalg ops were vectorized to avoid issues.
-      auto check = funcOp.walk([](linalg::LinalgOp op) {
-        op.emitError("failed vectorization");
-        return WalkResult::interrupt();
-      });
-      if (check.wasInterrupted()) return signalPassFailure();
-    }
-
     // Speical peephole optimizations to clean up IR before unrolling.
     {
       RewritePatternSet patterns(context);
