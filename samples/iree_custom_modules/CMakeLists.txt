@@ -8,8 +8,8 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
-if(NOT "${IREE_TARGET_BACKEND_VMVX}" OR
-   NOT "${IREE_HAL_DRIVER_VMVX}")
+if(NOT IREE_TARGET_BACKEND_VMVX OR
+   NOT IREE_HAL_DRIVER_VMVX)
   return()
 endif()
 

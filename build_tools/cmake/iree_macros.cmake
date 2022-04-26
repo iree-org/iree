@@ -321,7 +321,7 @@ function(iree_add_test_environment_properties TEST_NAME)
   #
   # Tests which only depend on a compiler target backend or a runtime HAL
   # driver, but not both, should generally use a different method of filtering.
-  if(NOT "${IREE_TARGET_BACKEND_VULKAN_SPIRV}" OR NOT "${IREE_HAL_DRIVER_VULKAN}")
+  if(NOT IREE_TARGET_BACKEND_VULKAN_SPIRV OR NOT IREE_HAL_DRIVER_VULKAN)
     set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "IREE_VULKAN_DISABLE=1")
   endif()
 endfunction()

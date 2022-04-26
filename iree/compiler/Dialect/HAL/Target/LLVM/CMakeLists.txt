@@ -8,7 +8,7 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
-if(NOT "${IREE_TARGET_BACKEND_DYLIB_LLVM_AOT}" AND NOT "${IREE_TARGET_BACKEND_WASM_LLVM_AOT}")
+if(NOT IREE_TARGET_BACKEND_DYLIB_LLVM_AOT AND NOT IREE_TARGET_BACKEND_WASM_LLVM_AOT)
   return()
 endif()
 

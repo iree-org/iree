@@ -8,7 +8,7 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
-if(NOT "${IREE_ENABLE_EMITC}")
+if(NOT IREE_ENABLE_EMITC)
   # If the real "C" library is enabled, it will define IREE_ENABLE_EMITC,
   # which can be used for conditionally switching.
   iree_cc_library(

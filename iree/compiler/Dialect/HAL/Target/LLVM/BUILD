@@ -14,7 +14,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT "${IREE_TARGET_BACKEND_DYLIB_LLVM_AOT}" AND NOT "${IREE_TARGET_BACKEND_WASM_LLVM_AOT}")
+if(NOT IREE_TARGET_BACKEND_DYLIB_LLVM_AOT AND NOT IREE_TARGET_BACKEND_WASM_LLVM_AOT)
   return()
 endif()
 """,
