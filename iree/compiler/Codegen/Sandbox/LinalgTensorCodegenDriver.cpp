@@ -64,7 +64,7 @@ static LogicalResult getPaddingAttrs(func::FuncOp funcOp,
   for (auto op : computeOps) {
     if (op->getName().getStringRef() != anchorOpName) continue;
     if (!isa<linalg::LinalgOp>(op)) continue;
-    //if (linalgOp) return funcOp.emitOpError("have more than one anchor op");
+    // if (linalgOp) return funcOp.emitOpError("have more than one anchor op");
     if (linalgOp) return failure();
     linalgOp = cast<linalg::LinalgOp>(op);
   }
