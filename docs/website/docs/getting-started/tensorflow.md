@@ -97,10 +97,10 @@ Afterwards you can further compile the model in `iree_input.mlir` for
 
 | Colab notebooks |  |
 | -- | -- |
-Training an MNIST digits classifier | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/mnist_training.ipynb)
-Edge detection module | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/edge_detection.ipynb)
-Pretrained ResNet50 inference | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/resnet.ipynb)
-TensorFlow Hub Import | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/tensorflow_hub_import.ipynb)
+Training an MNIST digits classifier | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/samples/colab/mnist_training.ipynb)
+Edge detection module | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/samples/colab/edge_detection.ipynb)
+Pretrained ResNet50 inference | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/samples/colab/resnet.ipynb)
+TensorFlow Hub Import | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/samples/colab/tensorflow_hub_import.ipynb)
 
 End-to-end execution tests can be found in IREE's
 [integrations/tensorflow/e2e/](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e)

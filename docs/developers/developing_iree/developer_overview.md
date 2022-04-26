@@ -3,6 +3,9 @@
 This guide provides an overview of IREE's project structure and main tools for
 developers.
 
+** Note: project layout is evolving at the moment, see
+   https://github.com/google/iree/issues/8955 **
+
 ## Project Code Layout
 
 [iree/](https://github.com/google/iree/blob/main/iree/)
@@ -13,31 +16,38 @@ developers.
 
 *   Integrations between IREE and other frameworks, such as TensorFlow
 
+[runtime/](https://github.com/google/iree/tree/main/runtime/)
+
+*   IREE runtime code, with no dependencies on the compiler
+
 [bindings/](https://github.com/google/iree/blob/main/bindings/)
 
 *   Language and platform bindings, such as Python
+*   Also see [runtime/bindings/](https://github.com/google/iree/tree/main/runtime/bindings)
 
-[colab/](https://github.com/google/iree/blob/main/colab/)
+[samples/](https://github.com/google/iree/blob/main/samples/)
 
-*   Colab notebooks for interactively using IREE's Python bindings
+*   Samples built using IREE's runtime and compiler
+*   Also see the separate https://github.com/google/iree-samples repository
 
-## IREE Code Layout
-
-[iree/base/](https://github.com/google/iree/blob/main/iree/base/)
-
-*   Common types and utilities used throughout IREE
+## IREE Compiler Code Layout
 
 [iree/compiler/](https://github.com/google/iree/blob/main/iree/compiler/)
 
 *   IREE's MLIR dialects, LLVM compiler passes, module translation code, etc.
-    Code here should not depend on anything in the runtime
 
-[iree/hal/](https://github.com/google/iree/blob/main/iree/hal/)
+## IREE Runtime Code Layout
+
+[iree/base/](https://github.com/google/iree/blob/main/runtime/src/iree/base/)
+
+*   Common types and utilities used throughout the runtime
+
+[iree/hal/](https://github.com/google/iree/blob/main/runtime/src/iree/hal/)
 
 *   **H**ardware **A**bstraction **L**ayer for IREE's runtime, with
     implementations for hardware and software backends
 
-[iree/schemas/](https://github.com/google/iree/blob/main/iree/schemas/)
+[iree/schemas/](https://github.com/google/iree/blob/main/runtime/src/iree/schemas/)
 
 *   Shared data storage format definitions, primarily using
     [FlatBuffers](https://google.github.io/flatbuffers/)
@@ -46,7 +56,7 @@ developers.
 
 *   Assorted tools used to optimize, translate, and evaluate IREE
 
-[iree/vm/](https://github.com/google/iree/blob/main/iree/vm/)
+[iree/vm/](https://github.com/google/iree/blob/main/runtime/src/iree/vm/)
 
 *   Bytecode **V**irtual **M**achine used to work with IREE modules and invoke
     IREE functions

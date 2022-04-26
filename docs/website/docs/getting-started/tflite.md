@@ -130,11 +130,11 @@ print(iree_results)
 
 ## Troubleshooting
 
-Failures during the import step usually indicate a failure to lower from 
+Failures during the import step usually indicate a failure to lower from
 TensorFlow Lite's operations to TOSA, the intermediate representation used by
 IREE. Many TensorFlow Lite operations are not fully supported, particularly
 those than use dynamic shapes. File an issue to IREE's TFLite model support
-[project](https://github.com/google/iree/projects/42). 
+[project](https://github.com/google/iree/projects/42).
 
 
 ## Additional Samples
@@ -152,7 +152,7 @@ is available
 
 | Colab notebooks |  |
 | -- | -- |
-Text classification with TFLite and IREE | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/tflite_text_classification.ipynb)
+Text classification with TFLite and IREE | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/samples/colab/tflite_text_classification.ipynb)
 
 !!! todo
 
@@ -161,4 +161,3 @@ Text classification with TFLite and IREE | [![Open in Colab](https://colab.resea
     [Java TFLite bindings](https://github.com/google/iree/tree/main/bindings/tflite/java),
     once it is complete at
     [not-jenni/iree-android-tflite-demo](https://github.com/not-jenni/iree-android-tflite-demo).
-

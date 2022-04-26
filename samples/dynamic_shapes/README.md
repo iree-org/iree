@@ -13,7 +13,7 @@ Steps 1-2 are performed in Python via the
 [`dynamic_shapes.ipynb`](./dynamic_shapes.ipynb)
 [Colab](https://research.google.com/colaboratory/) notebook:
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/iree/samples/dynamic_shapes/dynamic_shapes.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/samples/dynamic_shapes/dynamic_shapes.ipynb)
 
 Step 3 should be performed on your development host machine
 
@@ -97,6 +97,6 @@ them.
 5. Run the sample binary:
 
    ```
-   ../iree-build/iree/samples/dynamic_shapes/dynamic-shapes \
+   ../iree-build/samples/dynamic_shapes/dynamic-shapes \
        /path/to/dynamic_shapes_dylib.vmfb dylib
    ```
