@@ -5,9 +5,9 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 function(iree_append value)
-  foreach(variable ${ARGN})
-    set(${variable} "${${variable}} ${value}" PARENT_SCOPE)
-  endforeach(variable)
+  foreach(_VARIABLE ${ARGN})
+    set(${_VARIABLE} "${${_VARIABLE}} ${value}" PARENT_SCOPE)
+  endforeach(_VARIABLE)
 endfunction()
 
 if(IREE_ENABLE_LLD)

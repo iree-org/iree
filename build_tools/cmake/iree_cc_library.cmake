@@ -84,9 +84,9 @@ function(iree_cc_library)
   # 16.04 LTS) only come with cmake 3.5 by default.  For this reason, we can't
   # use list(FILTER...)
   set(_CC_SRCS "${_RULE_SRCS}")
-  foreach(src_file IN LISTS _CC_SRCS)
-    if(${src_file} MATCHES ".*\\.(h|inc)")
-      list(REMOVE_ITEM _CC_SRCS "${src_file}")
+  foreach(_SRC_FILE IN LISTS _CC_SRCS)
+    if(${_SRC_FILE} MATCHES ".*\\.(h|inc)")
+      list(REMOVE_ITEM _CC_SRCS "${_SRC_FILE}")
     endif()
   endforeach()
   if("${_CC_SRCS}" STREQUAL "")
@@ -255,20 +255,20 @@ endfunction()
 #     targets that are not under teh "iree::" namespace but are encountered
 #     in the dependency dag.
 function(_iree_cc_library_add_object_deps name)
-  foreach(dep_target ${ARGN})
-    if(dep_target MATCHES "^iree::")
+  foreach(_DEP_TARGET ${ARGN})
+    if(_DEP_TARGET MATCHES "^iree::")
       set_property(TARGET ${name} APPEND PROPERTY
         INTERFACE_IREE_TRANSITIVE_OBJECTS
-        "$<GENEX_EVAL:$<TARGET_PROPERTY:${dep_target},INTERFACE_IREE_TRANSITIVE_OBJECTS>>"
+        "$<GENEX_EVAL:$<TARGET_PROPERTY:${_DEP_TARGET},INTERFACE_IREE_TRANSITIVE_OBJECTS>>"
       )
       set_property(TARGET ${name} APPEND PROPERTY
       INTERFACE_IREE_TRANSITIVE_OBJECT_LIBS
-        "$<GENEX_EVAL:$<TARGET_PROPERTY:${dep_target},INTERFACE_IREE_TRANSITIVE_OBJECT_LIBS>>"
+        "$<GENEX_EVAL:$<TARGET_PROPERTY:${_DEP_TARGET},INTERFACE_IREE_TRANSITIVE_OBJECT_LIBS>>"
       )
     else()
       set_property(TARGET ${name} APPEND PROPERTY
         INTERFACE_IREE_TRANSITIVE_OBJECT_LIBS
-        ${dep_target}
+        ${_DEP_TARGET}
       )
     endif()
   endforeach()
@@ -312,21 +312,21 @@ function(iree_cc_unified_library)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   # Evaluate the object and libs.
-  set(_objects "$<REMOVE_DUPLICATES:$<GENEX_EVAL:$<TARGET_PROPERTY:${_RULE_ROOT},INTERFACE_IREE_TRANSITIVE_OBJECTS>>>")
-  set(_libs "$<REMOVE_DUPLICATES:$<GENEX_EVAL:$<TARGET_PROPERTY:${_RULE_ROOT},INTERFACE_IREE_TRANSITIVE_OBJECT_LIBS>>>")
+  set(_OBJECTS "$<REMOVE_DUPLICATES:$<GENEX_EVAL:$<TARGET_PROPERTY:${_RULE_ROOT},INTERFACE_IREE_TRANSITIVE_OBJECTS>>>")
+  set(_LIBS "$<REMOVE_DUPLICATES:$<GENEX_EVAL:$<TARGET_PROPERTY:${_RULE_ROOT},INTERFACE_IREE_TRANSITIVE_OBJECT_LIBS>>>")
 
   # For debugging, write out evaluated objects to a file.
   file(GENERATE OUTPUT "${_RULE_NAME}.contents.txt" CONTENT
-    "OBJECTS:\n${_objects}\n\nLIBS:\n${_libs}\n")
+    "OBJECTS:\n${_OBJECTS}\n\nLIBS:\n${_LIBS}\n")
   if(_RULE_SHARED)
-    add_library(${_NAME} SHARED ${_objects})
+    add_library(${_NAME} SHARED ${_OBJECTS})
   else()
-    add_library(${_NAME} STATIC ${_objects})
+    add_library(${_NAME} STATIC ${_OBJECTS})
   endif()
 
   target_link_libraries(${_NAME}
     PUBLIC
-      ${_libs}
+      ${_LIBS}
   )
 
   # Forward compile usage requirements from the root library.

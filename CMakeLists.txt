@@ -190,19 +190,18 @@ option(IREE_ENABLE_ASSERTIONS "Force unset of NDEBUG compile option" OFF)
 # Filter -DNDEBUG from CMAKE_CXX_FLAGS_* and CMAKE_C_FLAGS_* (if
 # CMAKE_BUILD_TYPE is not Debug).
 function(iree_fix_ndebug)
-  string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
-  if(IREE_ENABLE_ASSERTIONS AND NOT "${uppercase_CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
+  string(TOUPPER "${CMAKE_BUILD_TYPE}" _UPPERCASE_CMAKE_BUILD_TYPE)
+  if(IREE_ENABLE_ASSERTIONS AND NOT "${_UPPERCASE_CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
       # Also remove /D NDEBUG to avoid MSVC warnings about conflicting defines.
-      foreach(flags_var_to_scrub
-              CMAKE_CXX_FLAGS_${uppercase_CMAKE_BUILD_TYPE}
-              CMAKE_C_FLAGS_${uppercase_CMAKE_BUILD_TYPE})
-          set(original_flags "${${flags_var_to_scrub}}")
-          string(REGEX REPLACE "(^| )[/-]D *NDEBUG($| )" " "
-                  altered_flags "${original_flags}")
-          if(NOT "${original_flags}" STREQUAL "${altered_flags}")
+      foreach(_FLAGS_VAR_TO_SCRUB
+              CMAKE_CXX_FLAGS_${_UPPERCASE_CMAKE_BUILD_TYPE}
+              CMAKE_C_FLAGS_${_UPPERCASE_CMAKE_BUILD_TYPE})
+          set(_ORIGINAL_FLAGS "${${_FLAGS_VAR_TO_SCRUB}}")
+          string(REGEX REPLACE "(^| )[/-]D *NDEBUG($| )" " " _ALTERED_FLAGS "${_ORIGINAL_FLAGS}")
+          if(NOT "${_ORIGINAL_FLAGS}" STREQUAL "${_ALTERED_FLAGS}")
             message(STATUS
-              "IREE_ENABLE_ASSERTIONS force disabled NDEBUG for ${flags_var_to_scrub}: '${original_flags}' -> '${altered_flags}'")
-            set(${flags_var_to_scrub} "${altered_flags}" PARENT_SCOPE)
+              "IREE_ENABLE_ASSERTIONS force disabled NDEBUG for ${_FLAGS_VAR_TO_SCRUB}: '${_ORIGINAL_FLAGS}' -> '${_ALTERED_FLAGS}'")
+            set(${_FLAGS_VAR_TO_SCRUB} "${_ALTERED_FLAGS}" PARENT_SCOPE)
           endif()
       endforeach()
 
@@ -482,7 +481,7 @@ else()
   # TODO: It should be possible to fix upstream targets so as to not require
   # any of these. Remove as they become unnecessary.
   function(_hack_llvm_include_paths)
-    set(_common_include_dirs
+    set(_COMMON_INCLUDE_DIRS
       # LLVM
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include>
       $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include>
@@ -500,8 +499,8 @@ else()
     )
     # Avoid globally modifying paths by instead adding the include paths to the
     # rules that really should have them in the first place.
-    target_include_directories(LLVMSupport PUBLIC ${_common_include_dirs})
-    target_include_directories(MLIRSupport PUBLIC ${_common_include_dirs})
+    target_include_directories(LLVMSupport PUBLIC ${_COMMON_INCLUDE_DIRS})
+    target_include_directories(MLIRSupport PUBLIC ${_COMMON_INCLUDE_DIRS})
   endfunction()
   _hack_llvm_include_paths()
 endif()
@@ -654,12 +653,12 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # Write out a .env file to make IDEs and developers happy.
   # Yes, we are writing this to the source dir. It is only for IDEs and if
   # it gets clobbered, it is fine.
-  set(_pythonpath_env "PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/iree/compiler/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>\n")
+  set(_PYTHONPATH_ENV "PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/iree/compiler/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>\n")
   file(GENERATE OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/.env"
-    CONTENT "${_pythonpath_env}"
+    CONTENT "${_PYTHONPATH_ENV}"
   )
   file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env"
-    CONTENT "${_pythonpath_env}"
+    CONTENT "${_PYTHONPATH_ENV}"
   )
 endif()
 

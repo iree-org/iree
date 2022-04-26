@@ -70,27 +70,26 @@ function(iree_py_install_package)
     "COMPONENT;PACKAGE_NAME;MODULE_PATH"
     "DEPS;ADDL_PACKAGE_FILES;FILES_MATCHING"
     ${ARGN})
-  set(_install_component ${ARG_COMPONENT})
-  set(_install_packages_dir "python_packages/${ARG_PACKAGE_NAME}")
-  set(_install_module_dir "${_install_packages_dir}/${ARG_MODULE_PATH}")
-  set(_target_name install-${_install_component})
+  set(_INSTALL_COMPONENT ${ARG_COMPONENT})
+  set(_INSTALL_PACKAGES_DIR "python_packages/${ARG_PACKAGE_NAME}")
+  set(_INSTALL_MODULE_DIR "${_INSTALL_PACKAGES_DIR}/${ARG_MODULE_PATH}")
 
   if(NOT FILES_MATCHING)
-    set(_files_matching PATTERN "*.py")
+    set(_FILES_MATCHING PATTERN "*.py")
   else()
-    set(_files_matching ${ARG_FILES_MATCHING})
+    set(_FILES_MATCHING ${ARG_FILES_MATCHING})
   endif()
 
   install(
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
-    COMPONENT ${_install_component}
-    DESTINATION "${_install_module_dir}"
-    FILES_MATCHING ${_files_matching}
+    COMPONENT ${_INSTALL_COMPONENT}
+    DESTINATION "${_INSTALL_MODULE_DIR}"
+    FILES_MATCHING ${_FILES_MATCHING}
   )
 
-  set(PY_INSTALL_COMPONENT ${_install_component} PARENT_SCOPE)
-  set(PY_INSTALL_PACKAGES_DIR "${_install_packages_dir}" PARENT_SCOPE)
-  set(PY_INSTALL_MODULE_DIR "${_install_module_dir}" PARENT_SCOPE)
+  set(PY_INSTALL_COMPONENT ${_INSTALL_COMPONENT} PARENT_SCOPE)
+  set(PY_INSTALL_PACKAGES_DIR "${_INSTALL_PACKAGES_DIR}" PARENT_SCOPE)
+  set(PY_INSTALL_MODULE_DIR "${_INSTALL_MODULE_DIR}" PARENT_SCOPE)
 endfunction()
 
 # iree_pyext_module()
@@ -223,18 +222,18 @@ function(iree_py_library)
   )
 
   # Symlink each file as its own target.
-  foreach(SRC_FILE ${ARG_SRCS})
-    # SRC_FILE could have other path components in it, so we need to make a
+  foreach(_SRC_FILE ${ARG_SRCS})
+    # _SRC_FILE could have other path components in it, so we need to make a
     # directory for it. Ninja does this automatically, but make doesn't. See
     # https://github.com/google/iree/issues/6801
-    set(_SRC_BIN_PATH "${CMAKE_CURRENT_BINARY_DIR}/${SRC_FILE}")
+    set(_SRC_BIN_PATH "${CMAKE_CURRENT_BINARY_DIR}/${_SRC_FILE}")
     get_filename_component(_SRC_BIN_DIR "${_SRC_BIN_PATH}" DIRECTORY)
     add_custom_command(
       TARGET ${_NAME}
       COMMAND
         ${CMAKE_COMMAND} -E make_directory "${_SRC_BIN_DIR}"
       COMMAND ${CMAKE_COMMAND} -E create_symlink
-        "${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}" "${_SRC_BIN_PATH}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/${_SRC_FILE}" "${_SRC_BIN_PATH}"
       BYPRODUCTS "${_SRC_BIN_PATH}"
     )
   endforeach()
