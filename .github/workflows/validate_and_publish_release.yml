@@ -77,7 +77,7 @@ jobs:
     steps:
       - name: Publish Release
         id: publish_release
-        uses: eregon/publish-release@v1
+        uses: eregon/publish-release@d6aee8c288e653387d895ee64d559fc0dd63339d
         env:
           GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
