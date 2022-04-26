@@ -13,15 +13,15 @@
 # defined with the same sanitizer flags, including e.g. standard library
 # symbols that might be used by both IREE and non-IREE (e.g. LLVM) code.
 
-if(${IREE_ENABLE_ASAN})
+if(IREE_ENABLE_ASAN)
   string(APPEND CMAKE_CXX_FLAGS " -fsanitize=address")
   string(APPEND CMAKE_C_FLAGS " -fsanitize=address")
 endif()
-if(${IREE_ENABLE_MSAN})
+if(IREE_ENABLE_MSAN)
   string(APPEND CMAKE_CXX_FLAGS " -fsanitize=memory")
   string(APPEND CMAKE_C_FLAGS " -fsanitize=memory")
 endif()
-if(${IREE_ENABLE_TSAN})
+if(IREE_ENABLE_TSAN)
   string(APPEND CMAKE_CXX_FLAGS " -fsanitize=thread")
   string(APPEND CMAKE_C_FLAGS " -fsanitize=thread")
 endif()

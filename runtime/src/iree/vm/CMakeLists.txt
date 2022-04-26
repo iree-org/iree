@@ -191,7 +191,7 @@ iree_cc_library(
   PUBLIC
 )
 
-if(${IREE_BUILD_COMPILER})
+if(IREE_BUILD_COMPILER)
 
 iree_cc_test(
   NAME

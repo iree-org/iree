@@ -19,7 +19,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(IREE_IDE_FOLDER IREE)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-if(${MSVC})
+if(MSVC)
   enable_language(ASM_MASM)
 else()
   enable_language(ASM)
@@ -156,7 +156,7 @@ endif()
 
 option(IREE_ENABLE_CCACHE "Use ccache if installed to speed up rebuilds." OFF)
 
-if(${IREE_ENABLE_CCACHE})
+if(IREE_ENABLE_CCACHE)
   find_program(CCACHE_PROGRAM ccache)
   if(CCACHE_PROGRAM)
       set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
@@ -578,7 +578,7 @@ endif()
 # IREE top-level targets
 #-------------------------------------------------------------------------------
 
-if(${IREE_BUILD_BENCHMARKS})
+if(IREE_BUILD_BENCHMARKS)
   # Add top-level custom targets to drive generating benchmark suites.
 
   # iree-benchmark-import-models imports benchmark models from their source
@@ -592,12 +592,12 @@ if(${IREE_BUILD_BENCHMARKS})
   add_custom_target(iree-benchmark-suites)
 endif()
 
-if(${IREE_BUILD_MICROBENCHMARKS})
+if(IREE_BUILD_MICROBENCHMARKS)
   # Add top-level custom targets to drive generating microbenchmark suites.
   add_custom_target(iree-microbenchmark-suites)
 endif()
 
-if(${IREE_BUILD_DOCS})
+if(IREE_BUILD_DOCS)
   # Add a top-level custom target to drive generating all documentation.
   # Register it to the default target given that IREE_BUILD_DOCS is explicitly
   # requested.
@@ -617,7 +617,7 @@ add_subdirectory(build_tools/embed_data/)
 # Note: Test deps are not built as part of all (use the iree-test-deps target).
 add_subdirectory(iree/test EXCLUDE_FROM_ALL)
 
-if(${IREE_BUILD_BENCHMARKS})
+if(IREE_BUILD_BENCHMARKS)
   find_program(IREE_IMPORT_TFLITE_PATH iree-import-tflite)
   if(IREE_IMPORT_TFLITE_PATH)
     message(STATUS "Found ${IREE_IMPORT_TFLITE_PATH} to generate benchmark artifacts")
@@ -627,12 +627,12 @@ if(${IREE_BUILD_BENCHMARKS})
   add_subdirectory(benchmarks)
 endif()
 
-if(${IREE_HAL_DRIVER_EXPERIMENTAL_ROCM})
+if(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM)
   add_subdirectory(build_tools/third_party/rocm EXCLUDE_FROM_ALL)
   add_subdirectory(experimental/rocm)
 endif()
 
-if(${IREE_BUILD_COMPILER})
+if(IREE_BUILD_COMPILER)
   add_subdirectory(iree/compiler)
 endif()
 
@@ -663,11 +663,11 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   )
 endif()
 
-if(${IREE_BUILD_BINDINGS_TFLITE})
+if(IREE_BUILD_BINDINGS_TFLITE)
   add_subdirectory(bindings/tflite)
 endif()
 
-if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
+if(IREE_BUILD_EXPERIMENTAL_REMOTING)
   # NOTE: Currently liburing is only used by the experimental remoting
   # support, so keeping it scoped here. If this broadens, then include along
   # with other dependencies as normal.
@@ -678,7 +678,7 @@ if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
   add_subdirectory(experimental/remoting)
 endif()
 
-if(${IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES})
+if(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES)
   add_subdirectory(experimental/web)
 endif()
 

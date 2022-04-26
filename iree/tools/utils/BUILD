@@ -51,7 +51,7 @@ cc_library(
 
 iree_cmake_extra_content(
     content = """
-if(${IREE_HAL_DRIVER_VMVX})
+if(IREE_HAL_DRIVER_VMVX)
 """,
     inline = True,
 )

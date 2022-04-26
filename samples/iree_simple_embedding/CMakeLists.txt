@@ -195,7 +195,7 @@ iree_native_test(
     ::simple_embedding_embedded_sync
 )
 
-if(${IREE_HAL_DRIVER_DYLIB})
+if(IREE_HAL_DRIVER_DYLIB)
 
 iree_cc_binary(
   NAME

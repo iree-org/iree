@@ -53,7 +53,7 @@ function(iree_c_embed_data)
   if(DEFINED _RULE_STRIP_PREFIX)
     list(APPEND _ARGS "--strip_prefix=${_RULE_STRIP_PREFIX}")
   endif()
-  if(${_RULE_FLATTEN})
+  if(_RULE_FLATTEN)
     list(APPEND _ARGS "--flatten")
   endif()
 

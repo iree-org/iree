@@ -199,7 +199,7 @@ iree_cc_binary(
     yaml
 )
 
-if(${IREE_BUILD_COMPILER})
+if(IREE_BUILD_COMPILER)
   iree_cc_binary(
     NAME
       iree-tblgen
@@ -538,4 +538,4 @@ if(${IREE_BUILD_COMPILER})
     DESTINATION "tests/bin"
     COMPONENT Tests
   )
-endif(${IREE_BUILD_COMPILER})
+endif(IREE_BUILD_COMPILER)
