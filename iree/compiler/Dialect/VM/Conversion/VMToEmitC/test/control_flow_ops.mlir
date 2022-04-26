@@ -504,8 +504,8 @@ vm.module @my_module {
     // Create duplicate ref for 
     // CHECK-NEXT: %[[REF:.+]] = "emitc.variable"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK-NEXT: %[[REFPTR:.+]] = emitc.apply "&"(%[[REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
-    // CHECK-NEXT: %[[REFSIZE:.+]] = emitc.call "sizeof"() {args = [!emitc.opaque<"iree_vm_ref_t">]} : () -> i32
-    // CHECK-NEXT: emitc.call "memset"(%[[REFPTR]], %[[REFSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]} : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, i32) -> ()
+    // CHECK-NEXT: %[[REFSIZE:.+]] = emitc.call "sizeof"() {args = [!emitc.opaque<"iree_vm_ref_t">]} : () -> !emitc.opaque<"iree_host_size_t">
+    // CHECK-NEXT: emitc.call "memset"(%[[REFPTR]], %[[REFSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]} : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_host_size_t">) -> ()
     // CHECK-NEXT: emitc.call "iree_vm_ref_move"(%arg4, %[[REFPTR]]) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> ()
 
     // Move the i32 value and ref into the result function arguments.

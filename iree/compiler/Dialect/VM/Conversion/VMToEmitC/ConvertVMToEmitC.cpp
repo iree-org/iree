@@ -61,6 +61,34 @@ Optional<std::string> getCType(Type type) {
   return None;
 }
 
+/// Create a call to the sizeof operator with `value` as operand.
+Value callSizeof(OpBuilder builder, Location loc, Value value) {
+  auto ctx = builder.getContext();
+  return builder
+      .create<emitc::CallOp>(
+          /*location=*/loc,
+          /*type=*/emitc::OpaqueType::get(ctx, "iree_host_size_t"),
+          /*callee=*/StringAttr::get(ctx, "sizeof"),
+          /*args=*/ArrayAttr{},
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>{value})
+      .getResult(0);
+}
+
+/// Create a call to the sizeof operator with `attr` as operand.
+Value callSizeof(OpBuilder builder, Location loc, Attribute attr) {
+  auto ctx = builder.getContext();
+  return builder
+      .create<emitc::CallOp>(
+          /*location=*/loc,
+          /*type=*/emitc::OpaqueType::get(ctx, "iree_host_size_t"),
+          /*callee=*/StringAttr::get(ctx, "sizeof"),
+          /*args=*/ArrayAttr::get(ctx, {attr}),
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>{})
+      .getResult(0);
+}
+
 /// Create a call to memset to clear a struct
 LogicalResult clearStruct(OpBuilder builder, Value structValue) {
   auto ctx = structValue.getContext();
@@ -73,17 +101,10 @@ LogicalResult clearStruct(OpBuilder builder, Value structValue) {
   auto ptrType = type.dyn_cast<emitc::PointerType>();
 
   if (ptrType) {
-    auto size = builder.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/builder.getI32Type(),
-        /*callee=*/StringAttr::get(ctx, "sizeof"),
-        /*args=*/
-        ArrayAttr::get(ctx, {TypeAttr::get(ptrType.getPointee())}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{});
+    Value size = callSizeof(builder, loc, TypeAttr::get(ptrType.getPointee()));
 
     structPointerValue = structValue;
-    sizeValue = size.getResult(0);
+    sizeValue = size;
   } else {
     Optional<std::string> cType = getCType(type);
     if (!cType.hasValue()) {
@@ -98,16 +119,10 @@ LogicalResult clearStruct(OpBuilder builder, Value structValue) {
         /*applicableOperator=*/StringAttr::get(ctx, "&"),
         /*operand=*/structValue);
 
-    auto size = builder.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/builder.getI32Type(),
-        /*callee=*/StringAttr::get(ctx, "sizeof"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{structValue});
+    Value size = callSizeof(builder, loc, structValue);
 
     structPointerValue = structPointer.getResult();
-    sizeValue = size.getResult(0);
+    sizeValue = size;
   }
 
   builder.create<emitc::CallOp>(
@@ -783,15 +798,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
             emitc::OpaqueType::get(ctx, moduleStateTypeName)),
         /*value=*/emitc::OpaqueAttr::get(ctx, "NULL"));
 
-    auto stateSize = builder.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_host_size_t"),
-        /*callee=*/StringAttr::get(ctx, "sizeof"),
-        /*args=*/
-        ArrayAttr::get(ctx,
-                       {emitc::OpaqueAttr::get(ctx, moduleName + "_state_t")}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{});
+    Value stateSize = callSizeof(
+        builder, loc, emitc::OpaqueAttr::get(ctx, moduleName + "_state_t"));
 
     auto statePtr = builder.create<emitc::ApplyOp>(
         /*location=*/loc,
@@ -815,10 +823,10 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{statePtr.getResult()});
 
-    returnIfError(
-        builder, loc, StringAttr::get(ctx, "iree_allocator_malloc"), {}, {},
-        {funcOp.getArgument(1), stateSize.getResult(0), voidPtr.getResult(0)},
-        /*typeConverter=*/typeConverter);
+    returnIfError(builder, loc, StringAttr::get(ctx, "iree_allocator_malloc"),
+                  {}, {},
+                  {funcOp.getArgument(1), stateSize, voidPtr.getResult(0)},
+                  /*typeConverter=*/typeConverter);
 
     builder.create<emitc::CallOp>(
         /*location=*/loc,
@@ -830,7 +838,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
                         builder.getIndexAttr(1)}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{stateOp.getResult(), stateSize.getResult(0)});
+        ArrayRef<Value>{stateOp.getResult(), stateSize});
 
     builder.create<emitc::CallOp>(
         /*location=*/loc,
@@ -861,14 +869,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{});
 
-      auto bufferSize = builder.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_host_size_t"),
-          /*callee=*/StringAttr::get(ctx, "sizeof"),
-          /*args=*/
-          ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, bufferName)}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{});
+      Value bufferSize =
+          callSizeof(builder, loc, emitc::OpaqueAttr::get(ctx, bufferName));
 
       auto byteSpan = builder.create<emitc::CallOp>(
           /*location=*/loc,
@@ -877,7 +879,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
           /*args=*/ArrayAttr{},
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/
-          ArrayRef<Value>{bufferVoid.getResult(0), bufferSize.getResult(0)});
+          ArrayRef<Value>{bufferVoid.getResult(0), bufferSize});
 
       auto allocator = builder.create<emitc::CallOp>(
           /*location=*/loc,
@@ -1236,14 +1238,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, moduleTypeName)),
         /*value=*/emitc::OpaqueAttr::get(ctx, "NULL"));
 
-    auto moduleSize = builder.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_host_size_t"),
-        /*callee=*/StringAttr::get(ctx, "sizeof"),
-        /*args=*/
-        ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, moduleName + "_t")}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{});
+    Value moduleSize = callSizeof(
+        builder, loc, emitc::OpaqueAttr::get(ctx, moduleName + "_t"));
 
     auto modulePtr = builder.create<emitc::ApplyOp>(
         /*location=*/loc,
@@ -1267,10 +1263,10 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{modulePtr.getResult()});
 
-    returnIfError(
-        builder, loc, StringAttr::get(ctx, "iree_allocator_malloc"), {}, {},
-        {funcOp.getArgument(0), moduleSize.getResult(0), voidPtr.getResult(0)},
-        /*typeConverter=*/typeConverter);
+    returnIfError(builder, loc, StringAttr::get(ctx, "iree_allocator_malloc"),
+                  {}, {},
+                  {funcOp.getArgument(0), moduleSize, voidPtr.getResult(0)},
+                  /*typeConverter=*/typeConverter);
 
     builder.create<emitc::CallOp>(
         /*location=*/loc,
@@ -1282,7 +1278,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
                         builder.getIndexAttr(1)}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{module.getResult(), moduleSize.getResult(0)});
+        ArrayRef<Value>{module.getResult(), moduleSize});
 
     builder.create<emitc::CallOp>(
         /*location=*/loc,
@@ -2312,14 +2308,8 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
         return failure();
       }
 
-      auto size = rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/hostSizeType,
-          /*callee=*/StringAttr::get(ctx, "sizeof"),
-          /*args=*/
-          ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, cType.getValue())}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{});
+      Value size = callSizeof(rewriter, loc,
+                              emitc::OpaqueAttr::get(ctx, cType.getValue()));
 
       result = rewriter
                    .create<emitc::CallOp>(
@@ -2328,7 +2318,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
                        /*callee=*/StringAttr::get(ctx, "EMITC_ADD"),
                        /*args=*/ArrayAttr{},
                        /*templateArgs=*/ArrayAttr{},
-                       /*operands=*/ArrayRef<Value>{result, size.getResult(0)})
+                       /*operands=*/ArrayRef<Value>{result, size})
                    .getResult(0);
     }
 
@@ -2505,7 +2495,6 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
                 /*operands=*/ArrayRef<Value>{arguments})
             .getResult(0);
 
-    Type hostSizeType = emitc::OpaqueType::get(ctx, "iree_host_size_t");
     for (size_t i = 0; i < inputTypes.size(); i++) {
       Type inputType = inputTypes[i];
 
@@ -2546,18 +2535,8 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
       } else {
         auto cPtrType = cType.getValue();
 
-        Value size =
-            rewriter
-                .create<emitc::CallOp>(
-                    /*location=*/loc,
-                    /*type=*/hostSizeType,
-                    /*callee=*/StringAttr::get(ctx, "sizeof"),
-                    /*args=*/
-                    ArrayAttr::get(
-                        ctx, {emitc::OpaqueAttr::get(ctx, cType.getValue())}),
-                    /*templateArgs=*/ArrayAttr{},
-                    /*operands=*/ArrayRef<Value>{})
-                .getResult(0);
+        Value size = callSizeof(rewriter, loc,
+                                emitc::OpaqueAttr::get(ctx, cType.getValue()));
 
         // memcpy(uint8Ptr, &arg, size);
         Value argPtr = rewriter
@@ -2580,18 +2559,8 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
 
       // Skip the addition in the last iteration.
       if (i < inputTypes.size() - 1) {
-        Value size =
-            rewriter
-                .create<emitc::CallOp>(
-                    /*location=*/loc,
-                    /*type=*/hostSizeType,
-                    /*callee=*/StringAttr::get(ctx, "sizeof"),
-                    /*args=*/
-                    ArrayAttr::get(
-                        ctx, {emitc::OpaqueAttr::get(ctx, cType.getValue())}),
-                    /*templateArgs=*/ArrayAttr{},
-                    /*operands=*/ArrayRef<Value>{})
-                .getResult(0);
+        Value size = callSizeof(rewriter, loc,
+                                emitc::OpaqueAttr::get(ctx, cType.getValue()));
 
         uint8Ptr = rewriter
                        .create<emitc::CallOp>(
@@ -2648,7 +2617,6 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
                 /*operands=*/ArrayRef<Value>{results})
             .getResult(0);
 
-    Type hostSizeType = emitc::OpaqueType::get(ctx, "iree_host_size_t");
     for (size_t i = 0; i < resultTypes.size(); i++) {
       Type resultType = resultTypes[i];
 
@@ -2686,18 +2654,8 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
             /*templateArgs=*/ArrayAttr{},
             /*operands=*/ArrayRef<Value>{refPtr, arg});
       } else {
-        Value size =
-            rewriter
-                .create<emitc::CallOp>(
-                    /*location=*/loc,
-                    /*type=*/hostSizeType,
-                    /*callee=*/StringAttr::get(ctx, "sizeof"),
-                    /*args=*/
-                    ArrayAttr::get(
-                        ctx, {emitc::OpaqueAttr::get(ctx, cType.getValue())}),
-                    /*templateArgs=*/ArrayAttr{},
-                    /*operands=*/ArrayRef<Value>{})
-                .getResult(0);
+        Value size = callSizeof(rewriter, loc,
+                                emitc::OpaqueAttr::get(ctx, cType.getValue()));
 
         // memcpy(arg, uint8Ptr, size);
         rewriter.create<emitc::CallOp>(
@@ -2711,18 +2669,8 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
 
       // Skip the addition in the last iteration.
       if (i < resultTypes.size() - 1) {
-        Value size =
-            rewriter
-                .create<emitc::CallOp>(
-                    /*location=*/loc,
-                    /*type=*/hostSizeType,
-                    /*callee=*/StringAttr::get(ctx, "sizeof"),
-                    /*args=*/
-                    ArrayAttr::get(
-                        ctx, {emitc::OpaqueAttr::get(ctx, cType.getValue())}),
-                    /*templateArgs=*/ArrayAttr{},
-                    /*operands=*/ArrayRef<Value>{})
-                .getResult(0);
+        Value size = callSizeof(rewriter, loc,
+                                emitc::OpaqueAttr::get(ctx, cType.getValue()));
 
         uint8Ptr = rewriter
                        .create<emitc::CallOp>(
