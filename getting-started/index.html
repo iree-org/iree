@@ -1028,9 +1028,10 @@ the import, compilation, and execution of the provided model.</p>
 </ul>
 <p>Importing from PyTorch and other frameworks is planned - stay tuned!</p>
 <h2 id="samples">Samples<a class="headerlink" href="#samples" title="Permanent link">&para;</a></h2>
-<p>Check out the samples in IREE's <a href="https://github.com/google/iree/tree/main/colab">colab/directory</a>,
-as well as the <a href="https://github.com/google/iree-samples">iree-samples repository</a>
-respository, which contains workflow comparisons across frameworks.</p>
+<p>Check out the samples in IREE's
+<a href="https://github.com/google/iree/tree/main/colab">samples/colab/ directory</a>,
+as well as the <a href="https://github.com/google/iree-samples">iree-samples repository</a>,
+which contains workflow comparisons across frameworks.</p>
 <h2 id="import">Import<a class="headerlink" href="#import" title="Permanent link">&para;</a></h2>
 <p>Importing models takes known file types and imports into a form that the core IREE
 compiler is able to ingest. This import process is specific to each frontend and typically
@@ -1041,7 +1042,7 @@ involves a number of stages:</p>
 <li>Validate only IREE compatible operations remain</li>
 <li>Write the remaining IR to a file</li>
 </ul>
-<p>This fully legalized form can then be compiled without dependencies on the 
+<p>This fully legalized form can then be compiled without dependencies on the
 source model language.</p>
 <h2 id="compilation">Compilation<a class="headerlink" href="#compilation" title="Permanent link">&para;</a></h2>
 <p>During compilation we load an MLIR file and compile for the specified set of backends
