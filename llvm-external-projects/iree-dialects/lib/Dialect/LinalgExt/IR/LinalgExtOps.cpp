@@ -1440,12 +1440,13 @@ ParseResult TileOp::parse(OpAsmParser &parser, OperationState &result) {
   if (succeeded(parser.parseOptionalKeyword("outs"))) {
     bool _1;
     SmallVector<NamedAttrList> _2;
+    SmallVector<Location> _3;
     outputsOperandsLoc = parser.getCurrentLocation();
     if (mlir::function_interface_impl::parseFunctionArgumentList(
             parser,
             /*allowAttributes=*/false,
             /*allowVariadic=*/false, outsOperands, outsTypes, /*argAttrs=*/_2,
-            /*isVariadic=*/_1) ||
+            /*argLocations=*/_3, /*isVariadic=*/_1) ||
         parser.resolveOperands(outsOperands, outsTypes, outputsOperandsLoc,
                                result.operands))
       return failure();

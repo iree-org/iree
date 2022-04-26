@@ -478,6 +478,7 @@ static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
                                               Region &body) {
   SmallVector<OpAsmParser::UnresolvedOperand> regionArgs;
   SmallVector<Type> regionArgTypes;
+  SmallVector<Location> argLocations;
   if (failed(parser.parseLParen())) {
     return failure();
   }
@@ -490,12 +491,14 @@ static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
           failed(parser.parseColonType(regionArgTypes.back()))) {
         return failure();
       }
+      argLocations.emplace_back(
+          parser.getEncodedSourceLoc(regionArgs.back().location));
     } while (succeeded(parser.parseOptionalComma()));
     if (failed(parser.parseRParen())) {
       return failure();
     }
   }
-  return parser.parseRegion(body, regionArgs, regionArgTypes,
+  return parser.parseRegion(body, regionArgs, regionArgTypes, argLocations,
                             /*enableNameShadowing=*/true);
 }
 

@@ -242,6 +242,7 @@ static ParseResult parseResourceRegion(
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultSizes,
     ArrayAttr &tiedOperands, Region &body) {
   SmallVector<OpAsmParser::UnresolvedOperand, 16> regionArgs;
+  SmallVector<Location> argLocations;
   if (failed(parser.parseLParen())) {
     return failure();
   }
@@ -260,6 +261,8 @@ static ParseResult parseResourceRegion(
                                     operandSizes.back()))) {
         return failure();
       }
+      argLocations.emplace_back(
+          parser.getEncodedSourceLoc(regionArgs.back().location));
     } while (succeeded(parser.parseOptionalComma()));
     if (failed(parser.parseRParen())) {
       return failure();
@@ -284,7 +287,7 @@ static ParseResult parseResourceRegion(
       }
     }
   }
-  return parser.parseRegion(body, regionArgs, operandTypes,
+  return parser.parseRegion(body, regionArgs, operandTypes, argLocations,
                             /*enableNameShadowing=*/false);
 }
 
@@ -333,6 +336,7 @@ static ParseResult parseExplicitResourceRegion(
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operandSizes,
     Region &body) {
   SmallVector<OpAsmParser::UnresolvedOperand, 16> regionArgs;
+  SmallVector<Location> argLocations;
   if (failed(parser.parseLParen())) {
     return failure();
   }
@@ -351,12 +355,14 @@ static ParseResult parseExplicitResourceRegion(
                                     operandSizes.back()))) {
         return failure();
       }
+      argLocations.emplace_back(
+          parser.getEncodedSourceLoc(regionArgs.back().location));
     } while (succeeded(parser.parseOptionalComma()));
     if (failed(parser.parseRParen())) {
       return failure();
     }
   }
-  if (failed(parser.parseRegion(body, regionArgs, operandTypes,
+  if (failed(parser.parseRegion(body, regionArgs, operandTypes, argLocations,
                                 /*enableNameShadowing=*/false))) {
     return failure();
   }
