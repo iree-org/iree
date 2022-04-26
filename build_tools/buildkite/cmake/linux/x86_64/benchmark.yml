@@ -30,11 +30,10 @@ steps:
       - "buildkite-agent artifact download --step Build iree-x86_64-tools-${BUILDKITE_BUILD_NUMBER}.tgz ./"
       - "tar -xzvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "tar -xzvf iree-x86_64-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
-      - "python3 build_tools/benchmarks/run_benchmarks_on_linux.py --normal_benchmark_tool_dir=build-x86_64/iree/tools/ -o benchmark-results-gcp-cpu-${BUILDKITE_BUILD_NUMBER}.json --verbose build-host/"
+      - "python3 build_tools/benchmarks/run_benchmarks_on_linux.py --device_model=GCP-c2-standard-16 --normal_benchmark_tool_dir=build-x86_64/iree/tools/ -o benchmark-results-gcp-cpu-${BUILDKITE_BUILD_NUMBER}.json --verbose build-host/"
     if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark')"
     agents:
       - "queue=benchmark-x86"
     artifact_paths:
       - "benchmark-results-gcp-cpu-${BUILDKITE_BUILD_NUMBER}.json"
-      - "trace-captures-gcp-cpu-${BUILDKITE_BUILD_NUMBER}.tgz"
     timeout_in_minutes: "60"
