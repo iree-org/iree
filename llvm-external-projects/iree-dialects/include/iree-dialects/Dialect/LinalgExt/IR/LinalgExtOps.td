@@ -473,7 +473,7 @@ def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
 def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TiledOpInterface,
-    ["generateScalarImplementation"]>
+    ["generateScalarImplementation", "getPartitionableLoops", "getTiledImplementation"]>
 ]> {
   let summary = "Top-K operator";
   let description = [{
