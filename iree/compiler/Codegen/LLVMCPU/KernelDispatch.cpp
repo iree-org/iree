@@ -352,6 +352,19 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
   }
   return distributedLevelTileSizes;
 }
+static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
+    linalg::LinalgOp linalgOp, ArrayRef<int64_t> minTileSizes,
+    ArrayRef<int64_t> maxTileSizes, ArrayRef<int64_t> vectorSizeHints = {}) {
+  OpBuilder builder(linalgOp.getContext());
+  builder.setInsertionPoint(linalgOp);
+  SmallVector<Range> iterationDomain =
+      linalgOp.createLoopRanges(builder, linalgOp.getLoc());
+  auto partitionableLoopsInterfaceOp =
+      cast<IREE::Flow::PartitionableLoopsInterface>(linalgOp.getOperation());
+  return getDefaultDistributedLevelTileSizes(
+      iterationDomain, partitionableLoopsInterfaceOp, minTileSizes,
+      maxTileSizes, vectorSizeHints);
+}
 
 /// Splits the tile sizes in `parallelSizes` into `reductionSizes` for the
 /// reduction loops.
@@ -538,16 +551,8 @@ static LogicalResult setRootConfig(
     minTileSizes[0] = 1;
     maxTileSizes[0] = 1;
   }
-
-  OpBuilder builder(entryPointFn.getContext());
-  builder.setInsertionPoint(contractionOp);
-  SmallVector<Range> iterationDomain =
-      linalgOp.createLoopRanges(builder, linalgOp->getLoc());
-  SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
-      iterationDomain,
-      cast<IREE::Flow::PartitionableLoopsInterface>(
-          contractionOp.getOperation()),
-      minTileSizes, maxTileSizes);
+  SmallVector<int64_t> flowTileSizes =
+      getDefaultDistributedLevelTileSizes(linalgOp, minTileSizes, maxTileSizes);
 
   // TODO(dcaballe): Find better configurations for RISC-V backends.
   if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
@@ -728,16 +733,8 @@ static LogicalResult setDefaultGenericOpRootConfig(
   }
 
   // Set the flow level tiling to the default.
-  OpBuilder builder(genericOp.getContext());
-  builder.setInsertionPoint(genericOp);
-  auto linalgOp = cast<linalg::LinalgOp>(genericOp.getOperation());
-  SmallVector<Range> iterationDomain =
-      linalgOp.createLoopRanges(builder, genericOp.getLoc());
-  auto partitionableLoopsInterfaceOp =
-      cast<IREE::Flow::PartitionableLoopsInterface>(genericOp.getOperation());
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
-      iterationDomain, partitionableLoopsInterfaceOp, minTileSizes,
-      maxTileSizes);
+      genericOp, minTileSizes, maxTileSizes);
 
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
@@ -746,7 +743,7 @@ static LogicalResult setDefaultGenericOpRootConfig(
                            maxTileSizes, parallelTileSizes);
   splitParallelAndReductionTiles(genericOp, parallelTileSizes,
                                  reductionTileSizes);
-  setAlwaysVectorizeSizes(linalgOp, parallelTileSizes, reductionTileSizes);
+  setAlwaysVectorizeSizes(genericOp, parallelTileSizes, reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
@@ -806,16 +803,8 @@ static LogicalResult setTransposeLikeOpRootConfig(
       [](int64_t tileSize) { return tileSize > 1; }, 8);
 
   // Set the flow level tiling to the default.
-  OpBuilder builder(genericOp.getContext());
-  builder.setInsertionPoint(genericOp);
-  auto linalgOp = cast<linalg::LinalgOp>(genericOp.getOperation());
-  SmallVector<Range> iterationDomain =
-      linalgOp.createLoopRanges(builder, genericOp.getLoc());
-  auto partitionableLoopsInterfaceOp =
-      cast<IREE::Flow::PartitionableLoopsInterface>(genericOp.getOperation());
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
-      iterationDomain, partitionableLoopsInterfaceOp, minTileSizes,
-      maxTileSizes);
+      genericOp, minTileSizes, maxTileSizes);
 
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
@@ -825,7 +814,7 @@ static LogicalResult setTransposeLikeOpRootConfig(
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
   tileSizes.push_back(parallelTileSizes);
-  tileSizes.push_back(/*reduction tile sizes*/ {});
+  tileSizes.push_back(/*reduction tile sizes=*/{});
 
   // For non-tensor based ops use the Buffer ops pipeline.
   auto passPipeline =
@@ -869,16 +858,10 @@ static LogicalResult setConvRootConfig(
 
   // Give the vector size hint on OC.
   vectorSizeHints[3] = vectorSize;
+
   // Set the flow level tiling to the default.
-  OpBuilder builder(convOp.getContext());
-  builder.setInsertionPoint(convOp);
-  SmallVector<Range> iterationDomain =
-      convOp.createLoopRanges(builder, convOp.getLoc());
-  auto partitionableLoopsInterfaceOp =
-      cast<IREE::Flow::PartitionableLoopsInterface>(convOp.getOperation());
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
-      iterationDomain, partitionableLoopsInterfaceOp, minTileSizes,
-      maxTileSizes, vectorSizeHints);
+      convOp, minTileSizes, maxTileSizes, vectorSizeHints);
 
   // Shapes of N, OH, OW, OC, KH, KW, (IC)
   Optional<SmallVector<int64_t, 4>> shapes = convOp.getStaticLoopRanges();
@@ -909,11 +892,10 @@ static LogicalResult setConvRootConfig(
 static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::Conv2DNhwcHwcfOp convOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
-  auto linalgOp = cast<linalg::LinalgOp>(convOp.getOperation());
   int64_t vectorSize =
       getVectorSize(entryPointFn, convOp.getResult(0).getType());
   SmallVector<int64_t> targetTileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8};
-  return setConvRootConfig(entryPointFn, linalgOp, tiledLoops, targetTileSizes,
+  return setConvRootConfig(entryPointFn, convOp, tiledLoops, targetTileSizes,
                            vectorSize);
 }
 
@@ -922,11 +904,10 @@ static LogicalResult setRootConfig(
 static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::DepthwiseConv2DNhwcHwcOp convOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
-  auto linalgOp = cast<linalg::LinalgOp>(convOp.getOperation());
   int64_t vectorSize =
       getVectorSize(entryPointFn, convOp.getResult(0).getType());
   SmallVector<int64_t> targetTileSizes = {1, 1, 8, vectorSize * 2, 1, 3};
-  return setConvRootConfig(entryPointFn, linalgOp, tiledLoops, targetTileSizes,
+  return setConvRootConfig(entryPointFn, convOp, tiledLoops, targetTileSizes,
                            vectorSize);
 }
 
