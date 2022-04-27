@@ -39,7 +39,6 @@ static llvm::cl::opt<bool> clCheckIRBeforeLLVMConversion(
 // Default allocation functions for CPU backend
 //===---------------------------------------------------------------------===//
 
-// Default allocation function to use with IREEs bufferization.
 static Value cpuAllocationFunction(OpBuilder &builder, Location loc,
                                    ArrayRef<int64_t> staticShape,
                                    Type elementType,
@@ -69,6 +68,16 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
                                                      Value to) {
   createLinalgCopyOp(builder, loc, from, to);
   return success();
+}
+
+static void addCPUIREEComprehensiveBufferizePasses(OpPassManager &passManager) {
+  BufferizationOptions::AllocationFn allocationFn =
+      cpuComprehensiveBufferizeAllocationFn;
+  BufferizationOptions::DeallocationFn deallocationFn =
+      cpuComprehensiveBufferizeDeallocationFn;
+  BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
+                                      memcpyFn);
 }
 
 //===---------------------------------------------------------------------===//
@@ -301,13 +310,7 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
     passManager.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  BufferizationOptions::AllocationFn allocationFn =
-      cpuComprehensiveBufferizeAllocationFn;
-  BufferizationOptions::DeallocationFn deallocationFn =
-      cpuComprehensiveBufferizeDeallocationFn;
-  BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
-  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
-                                      memcpyFn);
+  addCPUIREEComprehensiveBufferizePasses(passManager);
 
   // Run IREE specific passes before vector lowering expert.
   passManager.addNestedPass<func::FuncOp>(
@@ -364,13 +367,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
     passManager.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  BufferizationOptions::AllocationFn allocationFn =
-      cpuComprehensiveBufferizeAllocationFn;
-  BufferizationOptions::DeallocationFn deallocationFn =
-      cpuComprehensiveBufferizeDeallocationFn;
-  BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
-  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
-                                      memcpyFn);
+  addCPUIREEComprehensiveBufferizePasses(passManager);
 
   // Run IREE specific passes before vector lowering expert.
   passManager.addNestedPass<func::FuncOp>(
@@ -396,25 +393,17 @@ void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
+  passManager.addNestedPass<func::FuncOp>(
+      createConvertToDestinationPassingStylePass());
+  passManager.addPass(createCanonicalizerPass());
+
   // Tile and vectorize linalg ops on tensors.
   passManager.addNestedPass<func::FuncOp>(
       createLLVMCPUTileFuseAndVectorizePass(lowerToVectors));
   passManager.addNestedPass<func::FuncOp>(createCSEPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
-  // Use stack allocation on CPU side.
-
-  // TODO(ravishankarm): This is commented cause this is WIP, to be enabled
-  // soon.
-  //
-  // auto callbacks =
-  //    std::make_unique<linalg::comprehensive_bufferize::AllocationCallbacks>(
-  //        cpuComprehensiveBufferizeAllocationFn,
-  //        cpuComprehensiveBufferizeDeallocationFn,
-  //        cpuComprehensiveBufferizeCopyFn);
-  // addIREEComprehensiveBufferizePasses(passManager, std::move(callbacks));
-
-  addLinalgBufferizePasses(passManager, cpuAllocationFunction);
+  addCPUIREEComprehensiveBufferizePasses(passManager);
   passManager.addNestedPass<func::FuncOp>(createCSEPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
@@ -431,7 +420,13 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
       createFoldAffineMinInDistributedLoopsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
-  // Use stack allocation on CPU side.
+
+  // TODO(#9004): Use upstream bufferization once the bufferization of LinalgExt
+  // ops are implemented.
+  // passManager.addNestedPass<func::FuncOp>(
+  // createConvertToDestinationPassingStylePass());
+  // passManager.addPass(createCanonicalizerPass());
+  // addCPUIREEComprehensiveBufferizePasses(passManager);
   addLinalgBufferizePasses(passManager, cpuAllocationFunction);
 }
 
