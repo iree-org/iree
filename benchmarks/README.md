@@ -81,3 +81,41 @@ These steps help reproduce the failures in TFLite models.
 5. Then compile the input MLIR file with `iree-compile`. The exact flags used
    to compile and run the benchmarks can be found in
    [this CMakeLists.txt file](./TFLite/CMakeLists.txt).
+
+### Running benchmark suites locally
+
+First you need to have [`iree-import-tflite`](https://google.github.io/iree/getting-started/tflite/)
+and `requests` in your python environment. Then you can build the target
+`iree-benchmark-suites` to generate the required files:
+
+```sh
+// Assume your IREE build directory is $IREE_BUILD_DIR.
+
+cmake --build $IREE_BUILD_DIR --target iree-benchmark-suites
+```
+
+Once you built the `iree-benchmark-suites` target, you will have a
+`benchmark-suites` directory under `$IREE_BUILD_DIR`. You can then use
+`run_benchmarks_on_android.py` or `run_benchmarks_on_linux.py` scripts under
+`build_tools/benchmarks` to run the benchmark suites. For example:
+
+```sh
+build_tools/benchmarks/run_benchmarks_on_linux.py \
+  --normal_benchmark_tool_dir=$IREE_BUILD_DIR/iree/tools \
+  --output results.json $IREE_BUILD_DIR
+```
+
+The benchmark results will be saved in `results.json`. You can use
+`build_tools/benchmarks/diff_local_benchmarks.py` script to compare two local
+benchmark results and generate the report. More details can be found
+[here](build_tools/benchmarks/README.md).
+
+#### Importing the models only
+
+If you want to run custom benchmarks or do other work with the imported models,
+without compiling the full benchmarks suites. You can run the following command
+to get the imported `.mlir` files.
+
+```sh
+cmake --build $IREE_BUILD_DIR --target iree-benchmark-import-models
+```
