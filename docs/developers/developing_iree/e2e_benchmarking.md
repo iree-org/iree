@@ -29,8 +29,7 @@ $ cd iree-build/  # Make and cd into some build directory
 $ cmake ../iree -G Ninja \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
-    -DIREE_BUILD_PYTHON_BINDINGS=ON  \
-    -DIREE_BUILD_TENSORFLOW_COMPILER=ON
+    -DIREE_BUILD_PYTHON_BINDINGS=ON
 $ cmake --build .
 # Also from the Python get-started doc, set this environment variable:
 $ export PYTHONPATH=$(pwd)/bindings/python
