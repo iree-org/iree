@@ -118,7 +118,7 @@ hal.executable @avg_pool {
             : !flow.dispatch.tensor<readonly:1x24x24x8xf32> -> tensor<1x24x24x8xf32>
         %20 = linalg.init_tensor [1, 2, 2, 8] : tensor<1x2x2x8xf32>
         %21 = linalg.fill ins(%cst : f32) outs(%20 : tensor<1x2x2x8xf32>) -> tensor<1x2x2x8xf32>
-        %22 = linalg.pooling_nhwc_sum {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : vector<2xi64>, strides = dense<12> : vector<2xi64>}
+        %22 = linalg.pooling_nhwc_sum {dilations = dense<1> : vector<2xi64>, strides = dense<12> : vector<2xi64>}
             ins(%14, %2 : tensor<1x24x24x8xf32>, tensor<12x12xf32>)
             outs(%21 : tensor<1x2x2x8xf32>) -> tensor<1x2x2x8xf32>
         flow.dispatch.tensor.store %22, %1, offsets = [0, 0, 0, 0], sizes = [1, 2, 2, 8], strides = [1, 1, 1, 1]
@@ -130,6 +130,63 @@ hal.executable @avg_pool {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 2, 2, 8], [0, 1, 1, 1]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
+//      CHECK: hal.executable.entry_point public @avg_pool
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
+//      CHECK:   linalg.pooling_nhwc_sum
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
+// Polling vectorization is not supported for now.
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable @avg_pool {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, {
+        max_compute_shared_memory_size = 32768 : i32,
+        max_compute_workgroup_invocations = 512 : i32,
+        max_compute_workgroup_size = dense<512> : vector<3xi32>,
+        subgroup_size = 4 : i32}>
+    }> {
+    hal.executable.entry_point public @avg_pool layout(#executable_layout)
+    builtin.module {
+      func.func @avg_pool() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %cst_0 = arith.constant 4.900000e+01 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:1x7x7x1280xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:1x1x1x1280xf32>
+        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 7, 7, 1280], strides = [1, 1, 1, 1]
+          : !flow.dispatch.tensor<readonly:1x7x7x1280xf32> -> tensor<1x7x7x1280xf32>
+        %3 = linalg.init_tensor [7, 7] : tensor<7x7xf32>
+        %4 = linalg.init_tensor [1, 1, 1, 1280] : tensor<1x1x1x1280xf32>
+        %5 = linalg.fill ins(%cst : f32) outs(%4 : tensor<1x1x1x1280xf32>) -> tensor<1x1x1x1280xf32>
+        %6 = linalg.pooling_nhwc_sum {
+          dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>
+        } ins(%2, %3 : tensor<1x7x7x1280xf32>, tensor<7x7xf32>) outs(%5 : tensor<1x1x1x1280xf32>) -> tensor<1x1x1x1280xf32>
+        %7 = linalg.generic {
+          indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+          iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+        } ins(%6 : tensor<1x1x1x1280xf32>) outs(%4 : tensor<1x1x1x1280xf32>) {
+        ^bb0(%arg0: f32, %arg1: f32):
+          %8 = arith.divf %arg0, %cst_0 : f32
+          linalg.yield %8 : f32
+        } -> tensor<1x1x1x1280xf32>
+        flow.dispatch.tensor.store %7, %1, offsets = [0, 0, 0, 0], sizes = [1, 1, 1, 1280], strides = [1, 1, 1, 1]
+          : tensor<1x1x1x1280xf32> -> !flow.dispatch.tensor<writeonly:1x1x1x1280xf32>
+        return
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0, 4], [0, 0, 0, 1]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
 //      CHECK: hal.executable.entry_point public @avg_pool
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]

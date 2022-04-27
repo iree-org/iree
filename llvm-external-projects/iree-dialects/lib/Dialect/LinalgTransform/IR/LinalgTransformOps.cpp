@@ -31,9 +31,9 @@
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/Transforms/Bufferize.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
+#include "mlir/Dialect/Bufferization/Transforms/OneShotModuleBufferize.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/Linalg/ComprehensiveBufferize/ModuleBufferization.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -793,6 +793,7 @@ static void applyBufferizationEnablingTransformations(ModuleOp moduleOp) {
 LogicalResult transform::BufferizeOp::apply(transform::TransformResults &result,
                                             transform::TransformState &state) {
   bufferization::OneShotBufferizationOptions options;
+  options.bufferizeFunctionBoundaries = true;
   options.memCpyFn = [](OpBuilder &builder, Location loc, Value from,
                         Value to) {
     return success(linalg::makeMemRefCopyOp(builder, loc, from, to));
@@ -800,7 +801,7 @@ LogicalResult transform::BufferizeOp::apply(transform::TransformResults &result,
 
   auto moduleOp = cast<ModuleOp>(state.getTopLevel());
   applyBufferizationEnablingTransformations(moduleOp);
-  if (failed(comprehensive_bufferize::runModuleBufferize(moduleOp, options)))
+  if (failed(runOneShotModuleBufferize(moduleOp, options)))
     return failure();
 
   // Perform buffer-level hoistings.

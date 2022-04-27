@@ -23,7 +23,7 @@ etc.), just `control + C` to stop the local webserver and rerun the script.
 to compile the runtime into WebAssembly and JavaScript files.
 
 Any supported IREE program, such as
-[simple_abs.mlir](../../../iree/samples/models/simple_abs.mlir), is compiled using
+[simple_abs.mlir](../../../samples/models/simple_abs.mlir), is compiled using
 the "system library" linking mode. This creates a shared object (typically
 .so/.dll, .wasm in this case). When the runtime attempts to load this file
 using `dlopen()` and `dlsym()`, Emscripten makes use of its
