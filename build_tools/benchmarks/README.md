@@ -7,7 +7,7 @@ reports. More information about benchmark suites can be found [here](benchmarks/
 
 Currently we have `run_benchmarks_on_android.py` and
 `run_benchmarks_on_linux.py` scripts to run benchmark suites on Android devices
-(with `adb`) and Linux local machines.
+(with `adb`) and Linux machines.
 
 The available arguments can be shown with `--help`. Some common usages are
 listed below. Here we assume:
