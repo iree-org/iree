@@ -57,7 +57,7 @@ compile_sample() {
 }
 
 echo "=== Compiling sample MLIR files to VM flatbuffer outputs (.vmfb) ==="
-compile_sample "simple_abs"     "${ROOT_DIR?}/iree/samples/models/simple_abs.mlir"
+compile_sample "simple_abs"     "${ROOT_DIR?}/samples/models/simple_abs.mlir"
 compile_sample "fullyconnected" "${ROOT_DIR?}/iree/test/e2e/models/fullyconnected.mlir"
 compile_sample "collatz"        "${ROOT_DIR?}/iree/test/e2e/models/collatz.mlir"
 

@@ -7,7 +7,7 @@
 steps:
   - label: "Test Colab notebooks"
     commands:
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/samples@sha256:67c129c27ef1f3f3ed268e6a14cf36a58c965eb01058b9890524644f57fdf9a1 python3 ./colab/test_notebooks.py"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/samples@sha256:67c129c27ef1f3f3ed268e6a14cf36a58c965eb01058b9890524644f57fdf9a1 python3 ./samples/colab/test_notebooks.py"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     agents:

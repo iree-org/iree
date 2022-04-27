@@ -23,6 +23,7 @@
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 
 #define DEBUG_TYPE "iree-spirv-kernel-config"
@@ -333,7 +334,8 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 //===----------------------------------------------------------------------===//
 
 static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
-                                        Operation *op) {
+                                        Operation *op,
+                                        bool allowVectorization = true) {
   LLVM_DEBUG(llvm::dbgs() << "Using default config for op: " << *op << "\n");
   func::FuncOp funcOp = op->getParentOfType<func::FuncOp>();
   auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
@@ -407,6 +409,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   // Whether we can try to use the vectorization pipeline.
   Optional<SmallVector<int64_t, 4>> loopBounds = linalgOp.getStaticLoopRanges();
   bool vectorizable =
+      allowVectorization &&
       // The vectorization pipeline assumes tensor semantics when tiling.
       !linalgOp.hasBufferSemantics() && !linalgOp.hasIndexSemantics() &&
       // Skip vectorization for non-minor identity inputs as it generates
@@ -431,9 +434,9 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     // configuration for the corresponding GPU workgroup dimension.
     int64_t wgDim = 0;
     for (auto shapeDim : llvm::reverse(partitionedLoops)) {
-      // Skip untiled or dynamic dimensions.
-      // TODO: Skip size-1 dimensions in Flow level tiling and distribution.
-      if (loopBounds.getValue()[shapeDim] <= 0) continue;
+      int64_t loopBound = loopBounds.getValue()[shapeDim];
+      // Skip dynamic dimensions.
+      if (ShapedType::isDynamic(loopBound)) continue;
 
       // Try to find some power of two that can devide the current shape dim
       // size. This vector keeps the candidate tile sizes.
@@ -449,24 +452,23 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
         candidates.push_back(i);
       }
       LLVM_DEBUG({
-        llvm::dbgs() << "Candidates tile sizes: [";
+        llvm::dbgs() << "Candidate tile sizes: [";
         llvm::interleaveComma(candidates, llvm::dbgs());
         llvm::dbgs() << "]\n";
       });
 
       for (int64_t candidate : candidates) {
-        if (loopBounds.getValue()[shapeDim] % candidate != 0) {
+        if (loopBound % candidate != 0) {
           if (!lossFactor) continue;
           // Skip this candidate if it causes many threads to be idle.
-          int64_t idleThreads =
-              candidate - (loopBounds.getValue()[shapeDim] % candidate);
+          int64_t idleThreads = candidate - (loopBound % candidate);
           if (idleThreads > candidate / *lossFactor) continue;
         }
-        LLVM_DEBUG(llvm::dbgs() << "Chosen Candiate " << candidate << "\n");
 
         // Found a suitable candidate. Try to let each thread handle 4
         // elements if this is the workgroup x dimension.
         workgroupTileSizes[shapeDim] = candidate;
+        LLVM_DEBUG(llvm::dbgs() << "Chosen tile size: " << candidate << "\n");
         if (vectorizable && wgDim == 0 && !lossFactor && candidate % 4 == 0) {
           threadTileSizes[shapeDim] = 4;
           workgroupSize[wgDim] = candidate / 4;
@@ -578,8 +580,9 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
             // If unsuccessful, try to tile and distribute.
             return setDefaultOpConfig(limits, op);
           })
-      .Case<IREE::LinalgExt::FftOp>([limits](IREE::LinalgExt::FftOp op) {
-        return setFftOpConfig(limits, op);
+      .Case<linalg::ConvolutionOpInterface>([limits](auto op) {
+        // Other convolution/pooling op vectorization is not wired up.
+        return setDefaultOpConfig(limits, op, /*allowVectorization=*/false);
       })
       .Case<linalg::GenericOp>([limits](linalg::GenericOp op) {
         // If a generic op has reduction iterator types, it can be treated as a
@@ -589,6 +592,9 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
           return setDefaultOpConfig(limits, op);
         }
         return success();
+      })
+      .Case<IREE::LinalgExt::FftOp>([limits](IREE::LinalgExt::FftOp op) {
+        return setFftOpConfig(limits, op);
       })
       .Default([](Operation *) { return success(); });
 };

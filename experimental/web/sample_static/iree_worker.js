@@ -17,8 +17,10 @@ function ireeError(...args) {
 }
 
 // TODO(scotttodd): configure this through the build system / scripts?
-const MAIN_SCRIPT_URL = 'web-sample-static-multithreaded.js';
-// const MAIN_SCRIPT_URL = 'web-sample-static-sync.js';
+// TODO(scotttodd): fix multithreading (startup silently fails on some emsdk
+//                  versions, memory growth or high initial memory also req.)
+// const MAIN_SCRIPT_URL = 'web-sample-static-multithreaded.js';
+const MAIN_SCRIPT_URL = 'web-sample-static-sync.js';
 
 let wasmSetupSampleFn;
 let wasmCleanupSampleFn;

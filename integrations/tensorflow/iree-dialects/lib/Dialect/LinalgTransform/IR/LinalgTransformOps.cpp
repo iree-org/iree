@@ -33,7 +33,6 @@
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/Linalg/ComprehensiveBufferize/ModuleBufferization.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -704,6 +703,7 @@ LogicalResult transform::BufferizeOp::apply(transform::TransformResults &result,
   PassManager pm(getContext());
 
   bufferization::OneShotBufferizationOptions options;
+  options.bufferizeFunctionBoundaries = true;
   options.memCpyFn = [](OpBuilder &builder, Location loc, Value from,
                         Value to) {
     return success(linalg::makeMemRefCopyOp(builder, loc, from, to));

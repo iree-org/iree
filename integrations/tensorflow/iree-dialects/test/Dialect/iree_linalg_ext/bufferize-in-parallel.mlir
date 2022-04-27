@@ -6,8 +6,8 @@
 //  CHECK-SAME:     %[[arg2:.*]]: memref<?xf32, #{{.*}}>
 func @parallel_insert_slice_no_conflict(
     %idx: index, %idx2: index,
-    %arg1: tensor<?xf32> {linalg.inplaceable=true},
-    %arg2: tensor<?xf32> {linalg.inplaceable=true}) -> (tensor<?xf32>, f32)
+    %arg1: tensor<?xf32> {bufferization.writable = true},
+    %arg2: tensor<?xf32> {bufferization.writable = true}) -> (tensor<?xf32>, f32)
 {
   %cst = arith.constant 4.200000e+01 : f32
   %c0 = arith.constant 0 : index
@@ -45,8 +45,8 @@ module {
 //  CHECK-SAME:     %[[arg2:.*]]: memref<?xf32, #{{.*}}>
 func @parallel_insert_slice_with_conflict(
     %idx: index, %idx2: index,
-    %arg1: tensor<?xf32> {linalg.inplaceable=true},
-    %arg2: tensor<?xf32> {linalg.inplaceable=true}) -> (f32, f32)
+    %arg1: tensor<?xf32> {bufferization.writable = true},
+    %arg2: tensor<?xf32> {bufferization.writable = true}) -> (f32, f32)
 {
   %cst = arith.constant 4.200000e+01 : f32
   %c0 = arith.constant 0 : index

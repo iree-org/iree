@@ -34,8 +34,8 @@ Also see [instructions for installing pre-built binaries](../bindings/python.md)
 
 * **`IREE_BUILD_PYTHON_BINDINGS`** : `BOOL`
 
-    Enables building of Python bindings under `bindings/python` in the repository.
-    Defaults to `OFF`.
+    Enables building of Python bindings under `runtime/bindings/python` in the
+    repository. Defaults to `OFF`.
 
 * **`Python3_EXECUTABLE`** : `PATH`
 

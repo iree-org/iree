@@ -665,7 +665,7 @@ hal.executable private @conv_static {
 hal.executable private @depthwise_conv_static {
   hal.executable.variant public @system_elf_x86_64, target = <"llvm", "system-elf-x86_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-    native_vector_size = 16 : index,
+    native_vector_size = 64 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
     hal.executable.entry_point public @depthwise_conv_static layout(#executable_layout)
@@ -673,27 +673,27 @@ hal.executable private @depthwise_conv_static {
       func.func @depthwise_conv_static() {
         %cst = arith.constant 0.0 : f32
         %input_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-            : !flow.dispatch.tensor<readonly:1x161x161x96xf32>
+            : !flow.dispatch.tensor<readonly:1x161x161x240xf32>
         %filter_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-            : !flow.dispatch.tensor<readonly:3x3x96xf32>
+            : !flow.dispatch.tensor<readonly:3x3x240xf32>
         %result_binding = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-            : !flow.dispatch.tensor<writeonly:1x80x80x96xf32>
-        %input = flow.dispatch.tensor.load %input_binding, offsets = [0, 0, 0, 0], sizes = [1, 161, 161, 96], strides = [1, 1, 1, 1]
-            : !flow.dispatch.tensor<readonly:1x161x161x96xf32> -> tensor<1x161x161x96xf32>
-        %filter = flow.dispatch.tensor.load %filter_binding, offsets = [0, 0, 0], sizes = [3, 3, 96], strides = [1, 1, 1]
-            : !flow.dispatch.tensor<readonly:3x3x96xf32> -> tensor<3x3x96xf32>
-        %init = linalg.init_tensor [1, 80, 80, 96] : tensor<1x80x80x96xf32>
-        %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<1x80x80x96xf32>) -> tensor<1x80x80x96xf32>
+            : !flow.dispatch.tensor<writeonly:1x80x80x240xf32>
+        %input = flow.dispatch.tensor.load %input_binding, offsets = [0, 0, 0, 0], sizes = [1, 161, 161, 240], strides = [1, 1, 1, 1]
+            : !flow.dispatch.tensor<readonly:1x161x161x240xf32> -> tensor<1x161x161x240xf32>
+        %filter = flow.dispatch.tensor.load %filter_binding, offsets = [0, 0, 0], sizes = [3, 3, 240], strides = [1, 1, 1]
+            : !flow.dispatch.tensor<readonly:3x3x240xf32> -> tensor<3x3x240xf32>
+        %init = linalg.init_tensor [1, 80, 80, 240] : tensor<1x80x80x240xf32>
+        %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<1x80x80x240xf32>) -> tensor<1x80x80x240xf32>
         %conv = linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
-            ins(%input, %filter : tensor<1x161x161x96xf32>, tensor<3x3x96xf32>) outs(%fill : tensor<1x80x80x96xf32>) -> tensor<1x80x80x96xf32>
-        flow.dispatch.tensor.store %conv, %result_binding, offsets = [0, 0, 0, 0], sizes = [1, 80, 80, 96], strides = [1, 1, 1, 1]
-            : tensor<1x80x80x96xf32> -> !flow.dispatch.tensor<writeonly:1x80x80x96xf32>
+            ins(%input, %filter : tensor<1x161x161x240xf32>, tensor<3x3x240xf32>) outs(%fill : tensor<1x80x80x240xf32>) -> tensor<1x80x80x240xf32>
+        flow.dispatch.tensor.store %conv, %result_binding, offsets = [0, 0, 0, 0], sizes = [1, 80, 80, 240], strides = [1, 1, 1, 1]
+            : tensor<1x80x80x240xf32> -> !flow.dispatch.tensor<writeonly:1x80x80x240xf32>
         return
       }
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 20, 40, 48, 0, 0], [1, 1, 8, 8, 0, 0], [0, 0, 0, 0, 1, 3]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 40, 40, 48, 0, 0], [1, 1, 8, 16, 0, 0], [0, 0, 0, 0, 1, 3]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
 //      CHECK: hal.executable.entry_point public @depthwise_conv_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

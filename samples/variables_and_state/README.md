@@ -13,7 +13,7 @@ Steps 1-3 are performed in Python via the
 [`variables_and_state.ipynb`](./variables_and_state.ipynb)
 [Colab](https://research.google.com/colaboratory/) notebook:
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/iree/samples/variables_and_state/variables_and_state.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/samples/variables_and_state/variables_and_state.ipynb)
 
 Steps 4-5 are in [`main.c`](./main.c)
 
@@ -73,7 +73,7 @@ functions in the compiled programs.
 3. Run the sample binary:
 
    ```
-   ../iree-build/iree/samples/variables_and_state/variables-and-state \
+   ../iree-build/samples/variables_and_state/variables-and-state \
        /path/to/counter_vmvx.vmfb vmvx
    ```
 
@@ -101,6 +101,6 @@ and compile the imported `counter.mlir` file using `iree-compile`:
 then run the program with that new VM bytecode module:
 
 ```
-../iree-build/iree/samples/variables_and_state/variables-and-state \
+../iree-build/samples/variables_and_state/variables-and-state \
     /path/to/counter_dylib.vmfb dylib
 ```

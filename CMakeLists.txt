@@ -46,6 +46,7 @@ option(IREE_BUILD_MICROBENCHMARKS "Builds IREE microbenchmark suites." OFF)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
+option(IREE_BUILD_TORCH_MLIR_SUPPORT "Builds support for compiling torch-mlir programs." ON)
 
 option(IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER "Use the system linker when generating IREE modules in tests/samples/benchmarks (useful for Tracy)." OFF)
 
@@ -67,7 +68,6 @@ option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
 option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
 option(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM "Builds the experimental ROCm Backend." OFF)
-option(IREE_BUILD_TORCH_MLIR_SUPPORT "Builds support for compiling torch-mlir programs." ON)
 
 #-------------------------------------------------------------------------------
 # Derived flags based on primary options
