@@ -201,10 +201,6 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             addCPUBufferOpsTileAndVectorizePipeline(nestedModulePM);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
-              CPUSingleTilingExpert:
-            addSingleTilingExpertPassPipeline(nestedModulePM);
-            break;
-          case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingExpert:
             addDoubleTilingExpertPassPipeline(nestedModulePM, lowerToAVX2);
             break;
