@@ -295,16 +295,44 @@ struct DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
     SmallVector<OpFoldResult> mixedOffsets(op.getMixedOffsets());
     SmallVector<OpFoldResult> mixedSizes(op.getMixedSizes());
     SmallVector<OpFoldResult> mixedStrides(op.getMixedStrides());
+
+    // Determine which length-1 dimensions were collapsed.
+    auto sourceTy = op.source().getType().cast<DispatchTensorType>();
+    auto oldResultTy = op.result().getType().cast<RankedTensorType>();
+    auto oldInferredResultTy =
+        DispatchTensorLoadOp::inferResultType(sourceTy, mixedSizes);
+    llvm::SmallVector<bool> dropDim(oldInferredResultTy.getRank(), true);
+    for (int i = 0, j = 0, s = oldInferredResultTy.getRank(),
+             t = oldResultTy.getRank();
+         i < s && j < t; i++) {
+      auto inferredDim = oldInferredResultTy.getDimSize(i);
+      auto resultDim = oldResultTy.getDimSize(j);
+      if (inferredDim != 1 || inferredDim == resultDim) {
+        dropDim[i] = false;
+        j++;
+      }
+    }
+
     canonicalizeSubViewPart(mixedOffsets, ShapedType::isDynamicStrideOrOffset);
     canonicalizeSubViewPart(mixedSizes, ShapedType::isDynamic);
     canonicalizeSubViewPart(mixedStrides, ShapedType::isDynamicStrideOrOffset);
 
     // Create the new op in canonical form.
-    auto resultType = DispatchTensorLoadOp::inferRankReducedResultType(
-        op.result().getType().cast<RankedTensorType>().getRank(),
-        op.source().getType().cast<DispatchTensorType>(), mixedSizes);
+    auto resultTy = DispatchTensorLoadOp::inferResultType(sourceTy, mixedSizes);
+
+    // Drop out the same dimensions form before.
+    llvm::SmallVector<int64_t> newShape;
+    for (auto it : zip(resultTy.getShape(), dropDim)) {
+      if (!std::get<1>(it)) {
+        newShape.push_back(std::get<0>(it));
+      }
+    }
+
+    resultTy = RankedTensorType::get(newShape, resultTy.getElementType());
+
+    // We need to resolve the new inferred type with the specified type.
     auto newOp = rewriter.create<DispatchTensorLoadOp>(
-        op.getLoc(), resultType, op.source(), op.source_dims(), mixedOffsets,
+        op.getLoc(), resultTy, op.source(), op.source_dims(), mixedOffsets,
         mixedSizes, mixedStrides);
     rewriter.replaceOpWithNewOp<tensor::CastOp>(op, op.getResult().getType(),
                                                 newOp.getResult());
