@@ -233,3 +233,42 @@ func.func @rank_reduced_slice() {
 //      CHECK:     linalg.generic
 // CHECK-SAME:         ins(%[[SRC_SUBVIEW]] :
 // CHECK-SAME:         outs(%[[DST_SUBVIEW]] :
+
+// -----
+
+// CHECK-LABEL: func @reverse_dim(
+//   CHECK-DAG:   %[[alloc:.*]] = memref.alloc() : memref<2x3xf32>
+//   CHECK-DAG:   %[[global:.*]] = memref.get_global
+//       CHECK:   iree_linalg_ext.reverse dimensions(dense<0> : tensor<1xi64>) ins(%[[global]] : memref<2x3xf32>) outs(%[[alloc]] : memref<2x3xf32>)
+//       CHECK:   %[[load:.*]] = memref.load %[[alloc]]
+//       CHECK:   memref.dealloc %[[alloc]]
+//       CHECK:   return %[[load]]
+func.func @reverse_dim(%pos: index) -> f32 {
+  %input = arith.constant dense<[[1.0, 2.0, 3.0],
+                                 [4.0, 5.0, 6.0]]> : tensor<2x3xf32>
+
+  %init = linalg.init_tensor [2, 3] : tensor<2x3xf32>
+  %0 = iree_linalg_ext.reverse
+         dimensions(dense<0> : tensor<1xi64>)
+         ins(%input : tensor<2x3xf32>)
+         outs(%init : tensor<2x3xf32>) : tensor<2x3xf32>
+
+  %1 = tensor.extract %0[%pos, %pos] : tensor<2x3xf32>
+  return %1 : f32
+}
+
+// -----
+
+// CHECK-LABEL: func @fft_tensor(
+//       CHECK:   memref.alloc
+//       CHECK:   memref.alloc
+//       CHECK:   iree_linalg_ext.fft ins(%{{.*}} : index) outs(%{{.*}}, %{{.*}} : memref<1024xf32>, memref<1024xf32>)
+func @fft_tensor(%idx: index) -> (tensor<1024xf32>, tensor<1024xf32>) {
+  %t0 = linalg.init_tensor [1024] : tensor<1024xf32>
+  %t1 = linalg.init_tensor [1024] : tensor<1024xf32>
+  %0:2 = iree_linalg_ext.fft
+    ins(%idx: index)
+    outs(%t0, %t1: tensor<1024xf32>, tensor<1024xf32>)
+  : tensor<1024xf32>, tensor<1024xf32>
+  return %0#0, %0#1 : tensor<1024xf32>, tensor<1024xf32>
+}

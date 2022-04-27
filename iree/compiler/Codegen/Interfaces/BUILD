@@ -58,6 +58,7 @@ cc_library(
     deps = [
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "@llvm-project//mlir:ArithmeticTransforms",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:BufferizationTransforms",

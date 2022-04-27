@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
@@ -160,6 +162,121 @@ struct DispatchTensorStoreOpInterface
 };
 }  // namespace
 
+/// Generic conversion for any LinalgExtOp on tensors.
+static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
+                                          IREE::LinalgExt::LinalgExtOp op,
+                                          BufferizationState &state) {
+  // Take a guard before anything else.
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(op);
+
+  // Nothing to do. This op is already bufferized.
+  if (op.hasBufferSemantics()) return success();
+
+  // Ensure op has only tensors. Allow mixed tensor-buffer mode on a per-need
+  // basis.
+  if (!op.hasTensorSemantics())
+    return op->emitError() << "op does not have tensor semantics";
+
+  // New input operands for the cloned op.
+  SmallVector<Value> newInputBuffers;
+  newInputBuffers.reserve(op.getNumInputs());
+  for (OpOperand *opOperand : op.getInputOperands()) {
+    if (op.isScalar(opOperand)) {
+      newInputBuffers.push_back(opOperand->get());
+      continue;
+    }
+    // Input operands are never written to.
+    newInputBuffers.push_back(*state.getBuffer(
+        rewriter, *opOperand,
+        BufferizationState::ForceInPlacability::FORCE_INPLACE));
+  }
+
+  // New output operands for the cloned op.
+  SmallVector<Value> newOutputBuffers;
+  for (OpResult opResult : op->getOpResults()) {
+    SmallVector<OpOperand *> aliasingOpOperands =
+        state.getAnalysisState().getAliasingOpOperand(opResult);
+    assert(aliasingOpOperands.size() == 1 && "expected 1 OpOperand");
+    FailureOr<Value> resultBuffer =
+        state.getBuffer(rewriter, *aliasingOpOperands.front());
+    if (failed(resultBuffer)) return failure();
+    newOutputBuffers.push_back(*resultBuffer);
+  }
+
+  // Merge input/output operands.
+  SmallVector<Value> newOperands = newInputBuffers;
+  newOperands.append(newOutputBuffers.begin(), newOutputBuffers.end());
+
+  // Set insertion point now that potential alloc/dealloc are introduced.
+  rewriter.setInsertionPoint(op);
+  // Clone the op, but use the new operands. Move the existing block into the
+  // new op. Since the new op does not have any tensor results, it does not
+  // return anything.
+  auto newOp = cast<IREE::LinalgExt::LinalgExtOp>(op.cloneWithoutRegions(
+      rewriter, op.getLoc(), /*resultTypes=*/TypeRange{}, newOperands));
+  int64_t numRegions = op->getNumRegions();
+  for (int64_t i = 0; i < numRegions; ++i) {
+    rewriter.inlineRegionBefore(op->getRegion(i), newOp->getRegion(i),
+                                newOp->getRegion(i).begin());
+  }
+
+  // Replace the results of the old op with the new output buffers.
+  bufferization::replaceOpWithBufferizedValues(rewriter, op, newOutputBuffers);
+
+  return success();
+}
+
+/// Bufferization of ops that implement the LinalgExtOp interface. Replace with
+/// a new op that operates entirely on memrefs.
+template <typename OpTy>
+struct LinalgExtOpInterface
+    : public BufferizableOpInterface::ExternalModel<LinalgExtOpInterface<OpTy>,
+                                                    OpTy> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const AnalysisState &state) const {
+    // All operands are read.
+    // TODO: Is this correct?
+    return true;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const AnalysisState &state) const {
+    // Operand is written to if it has an aliasing OpResult.
+    auto bufferizableOp = cast<BufferizableOpInterface>(op);
+    return !bufferizableOp.getAliasingOpResult(opOperand, state).empty();
+  }
+
+  SmallVector<OpOperand *> getAliasingOpOperand(
+      Operation *op, OpResult opResult, const AnalysisState &state) const {
+    auto linalgExtOp = cast<IREE::LinalgExt::LinalgExtOp>(op);
+
+    // The i-th OpResult may alias with the i-th "out" tensor.
+    return {linalgExtOp.getOutputOperand(opResult.getResultNumber())};
+  }
+
+  SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
+                                            const AnalysisState &state) const {
+    auto linalgExtOp = cast<IREE::LinalgExt::LinalgExtOp>(op);
+
+    // The i-th "out" tensor may alias with the i-th OpResult.
+    if (linalgExtOp.isOutputTensor(&opOperand))
+      return {linalgExtOp.getTiedOpResult(&opOperand)};
+    return {};
+  }
+
+  bufferization::BufferRelation bufferRelation(
+      Operation *op, OpResult opResult, const AnalysisState &state) const {
+    return bufferization::BufferRelation::Equivalent;
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          BufferizationState &state) const {
+    return bufferizeLinalgExtOp(rewriter,
+                                cast<IREE::LinalgExt::LinalgExtOp>(op), state);
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // IREE specific post analysis transformations.
 //===----------------------------------------------------------------------===//
@@ -290,6 +407,13 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
             DispatchTensorLoadOpInterface>(*ctx);
         IREE::Flow::DispatchTensorStoreOp::attachInterface<
             DispatchTensorStoreOpInterface>(*ctx);
+      });
+  registry.addExtension(
+      +[](MLIRContext *ctx, IREE::LinalgExt::IREELinalgExtDialect *dialect) {
+        IREE::LinalgExt::ReverseOp::attachInterface<
+            LinalgExtOpInterface<IREE::LinalgExt::ReverseOp>>(*ctx);
+        IREE::LinalgExt::FftOp::attachInterface<
+            LinalgExtOpInterface<IREE::LinalgExt::FftOp>>(*ctx);
       });
 }
 
