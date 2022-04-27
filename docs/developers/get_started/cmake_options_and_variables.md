@@ -105,13 +105,6 @@ the current build type is Debug and the compiler supports it.
 Enable [thread sanitizer](https://clang.llvm.org/docs/ThreadSanitizer.html) if
 the current build type is Debug and the compiler supports it.
 
-#### `IREE_MLIR_DEP_MODE`:STRING
-
-Defines the MLIR dependency mode. Case-sensitive. Can be `BUNDLED`, `DISABLED`
-or `INSTALLED`. Defaults to `BUNDLED`. If set to `INSTALLED`, the variable
-`MLIR_DIR` needs to be passed and that LLVM needs to be compiled with
-`LLVM_ENABLE_RTTI` set to `ON`.
-
 #### `IREE_BUILD_TENSORFLOW_COMPILER`:BOOL
 
 Enables building of the TensorFlow to IREE compiler under
@@ -144,13 +137,6 @@ is where they would be placed by a `bazel build` invocation.
 #### `IREE_BUILD_TORCH_MLIR_SUPPORT`:BOOL
 
 Enables building of the torch-mlir-dialects to IREE compiler. Defaults to `ON`.
-
-## MLIR-specific CMake Options and Variables
-
-#### `MLIR_DIR`:STRING
-
-Specifies the path where to look for the installed MLIR/LLVM packages. Required
-if `IREE_MLIR_DEP_MODE` is set to `INSTALLED`.
 
 ## Cross-compilation
 
