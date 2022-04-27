@@ -38,7 +38,6 @@ iree_cc_library(
     MLIRFuncTransforms
     MLIRLinalgTransforms
     MLIRMemRef
-    MLIRModuleBufferization
     MLIRSCFTransforms
     MLIRSupport
     MLIRTensorTransforms

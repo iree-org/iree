@@ -74,7 +74,6 @@ iree_cc_library(
     MLIRMathTransforms
     MLIRMemRef
     MLIRMemRefTransforms
-    MLIRModuleBufferization
     MLIRPass
     MLIRSCF
     MLIRSCFToControlFlow
