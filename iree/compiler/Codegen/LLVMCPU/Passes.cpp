@@ -383,11 +383,6 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
     options.vectorizePadding = true;
-    // TODO(#8228): Enable the padding once we know how to deal with fusion. For
-    // now, we don't enable padding because alloca ops will be created in
-    // bufferization for some cases.
-    // options.pad = true;
-    // options.packPaddings = {1, 1, 0};
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
     passManager.addNestedPass<func::FuncOp>(
