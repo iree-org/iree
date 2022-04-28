@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-iree_lit_test_suite(
+iree_lit_test_suite(cfg = "//compiler:lit.cfg.py",
   NAME
     lit
   SRCS

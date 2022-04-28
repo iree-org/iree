@@ -44,6 +44,7 @@ iree_lit_test_suite(
         # transformation, it needs to be included as data.
         exclude = ["linalg_transform_spec.mlir"],
     ),
+    cfg = "//compiler:lit.cfg.py",
     data = ["linalg_transform_spec.mlir"],
     tools = [
         "//iree/tools:iree-compile",
