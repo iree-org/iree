@@ -240,7 +240,7 @@ def convert_target(target):
   m = re.match("^//compiler/src/iree/(.+)", target)
   if m:
     return ["iree::" + _convert_bazel_path(m.group(1))]
-    
+
   # Map //runtime/src/iree/(.*) -> iree::\1
   m = re.match("^//runtime/src/iree/(.+)", target)
   if m:
