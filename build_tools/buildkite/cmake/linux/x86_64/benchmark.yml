@@ -11,7 +11,6 @@ steps:
       - "tar --exclude='*.tar.gz' --exclude='*.tgz' --exclude='*.mlir' --exclude='*.tflite' -czvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz build-host/benchmark_suites"
       - "find build-host/benchmark_suites -name '*.mlir' | tar -czvf source-mlir-models-${BUILDKITE_BUILD_NUMBER}.tgz -T -"
       - "tar -czvf iree-x86_64-tools-${BUILDKITE_BUILD_NUMBER}.tgz build-x86_64/iree/tools/iree-benchmark-module build-x86_64/iree/tools/build_config.txt"
-    if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86')"
     agents:
       - "queue=build"
     env:
@@ -31,7 +30,6 @@ steps:
       - "tar -xzvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "tar -xzvf iree-x86_64-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "python3 build_tools/benchmarks/run_benchmarks_on_linux.py --device_model=GCP-c2-standard-16 --normal_benchmark_tool_dir=build-x86_64/iree/tools/ -o benchmark-results-gcp-cpu-${BUILDKITE_BUILD_NUMBER}.json --mode_regex=\".*cascadelake.*\" --verbose build-host/"
-    if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86')"
     agents:
       - "gcp:machine-type=c2-standard-16"
       - "queue=benchmark-x86"
