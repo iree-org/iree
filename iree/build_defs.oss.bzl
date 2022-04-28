@@ -47,6 +47,19 @@ def iree_cmake_extra_content(content = "", inline = False):
     pass
 
 def iree_runtime_cc_library(deps = [], **kwargs):
+    """Used for cc_library targets within the //compiler tree.
+
+    This is a pass-through to the native cc_library which adds specific
+    runtime specific options and deps.
+    """
+    native.cc_library(
+        deps = deps + [
+            "//compiler/src:defs",
+        ],
+        **kwargs
+    )
+
+def iree_runtime_cc_library(deps = [], **kwargs):
     """Used for cc_library targets within the //runtime tree.
 
     This is a pass-through to the native cc_library which adds specific
@@ -54,6 +67,7 @@ def iree_runtime_cc_library(deps = [], **kwargs):
     """
     native.cc_library(
         deps = deps + [
+            # TODO: Rename to //runtime/src:defs to match compiler.
             "//runtime/src:runtime_defines",
         ],
         **kwargs
@@ -67,6 +81,7 @@ def iree_runtime_cc_test(deps = [], **kwargs):
     """
     native.cc_test(
         deps = deps + [
+            # TODO: Rename to //runtime/src:defs to match compiler.
             "//runtime/src:runtime_defines",
         ],
         **kwargs
