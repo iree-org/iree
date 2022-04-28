@@ -26,7 +26,7 @@ endif()
 """,
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "PassesIncGen",
     tbl_outs = [
         (

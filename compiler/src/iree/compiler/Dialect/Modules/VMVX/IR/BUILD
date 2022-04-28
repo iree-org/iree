@@ -86,7 +86,7 @@ iree_compiler_cc_library(
     ],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "VMVXEnumsGen",
     tbl_outs = [
         (
@@ -103,7 +103,7 @@ gentbl_cc_library(
     deps = [":td_files"],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "VMVXOpsGen",
     tbl_outs = [
         (
@@ -120,7 +120,7 @@ gentbl_cc_library(
     deps = [":td_files"],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "VMVXOpInterfaceGen",
     tbl_outs = [
         (

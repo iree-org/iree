@@ -108,7 +108,7 @@ iree_compiler_cc_library(
     ],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "HALInterfacesGen",
     tbl_outs = [
         (
@@ -141,7 +141,7 @@ gentbl_cc_library(
     deps = [":td_files"],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "HALOpsGen",
     tbl_outs = [
         (
@@ -158,7 +158,7 @@ gentbl_cc_library(
     deps = [":td_files"],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "HALStructsGen",
     tbl_outs = [
         (
@@ -175,7 +175,7 @@ gentbl_cc_library(
     deps = [":td_files"],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "HALTypesGen",
     tbl_outs = [
         (

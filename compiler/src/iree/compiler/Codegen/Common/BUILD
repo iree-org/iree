@@ -14,7 +14,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "FoldTensorExtractOpIncGen",
     tbl_outs = [
         (

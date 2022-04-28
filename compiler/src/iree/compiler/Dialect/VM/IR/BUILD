@@ -83,7 +83,7 @@ iree_compiler_cc_library(
     ],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "VMEnumsGen",
     tbl_outs = [
         (
@@ -100,7 +100,7 @@ gentbl_cc_library(
     deps = [":td_files"],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "VMOpsGen",
     tbl_outs = [
         (
@@ -117,7 +117,7 @@ gentbl_cc_library(
     deps = [":td_files"],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "VMOpEncoderGen",
     tbl_outs = [
         (
@@ -130,7 +130,7 @@ gentbl_cc_library(
     deps = [":td_files"],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "VMOpInterfaceGen",
     tbl_outs = [
         (
@@ -147,7 +147,7 @@ gentbl_cc_library(
     deps = [":td_files"],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "VMStructsGen",
     tbl_outs = [
         (

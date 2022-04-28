@@ -69,7 +69,7 @@ iree_compiler_cc_library(
     ],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "check_ops_gen",
     tbl_outs = [
         (

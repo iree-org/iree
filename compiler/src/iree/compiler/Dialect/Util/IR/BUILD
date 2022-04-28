@@ -89,7 +89,7 @@ iree_compiler_cc_library(
     ],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "UtilAttrsGen",
     tbl_outs = [
         (
@@ -106,7 +106,7 @@ gentbl_cc_library(
     deps = [":td_files"],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "UtilInterfacesGen",
     tbl_outs = [
         (
@@ -139,7 +139,7 @@ gentbl_cc_library(
     deps = [":td_files"],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "UtilOpsGen",
     tbl_outs = [
         (

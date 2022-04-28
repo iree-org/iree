@@ -85,7 +85,7 @@ iree_compiler_cc_library(
     ],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "FlowEnumsGen",
     tbl_outs = [
         (
@@ -102,7 +102,7 @@ gentbl_cc_library(
     deps = [":td_files"],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "FlowInterfacesGen",
     tbl_outs = [
         (
@@ -127,7 +127,7 @@ gentbl_cc_library(
     deps = [":td_files"],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "FlowOpsGen",
     tbl_outs = [
         (
@@ -144,7 +144,7 @@ gentbl_cc_library(
     deps = [":td_files"],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "FlowTypesGen",
     tbl_outs = [
         (
@@ -205,7 +205,7 @@ iree_compiler_cc_library(
     ],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "PartitionableLoopsInterfaceGen",
     tbl_outs = [
         (

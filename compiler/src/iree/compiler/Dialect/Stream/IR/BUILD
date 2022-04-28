@@ -84,7 +84,7 @@ iree_compiler_cc_library(
     ],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "StreamEnumsGen",
     tbl_outs = [
         (
@@ -101,7 +101,7 @@ gentbl_cc_library(
     deps = [":td_files"],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "StreamInterfacesGen",
     tbl_outs = [
         (
@@ -126,7 +126,7 @@ gentbl_cc_library(
     deps = [":td_files"],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "StreamOpsGen",
     tbl_outs = [
         (
@@ -143,7 +143,7 @@ gentbl_cc_library(
     deps = [":td_files"],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "StreamTypesGen",
     tbl_outs = [
         (
