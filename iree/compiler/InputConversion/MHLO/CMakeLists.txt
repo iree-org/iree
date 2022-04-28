@@ -61,6 +61,7 @@ iree_cc_library(
     LmhloDialect
     MLIRAffine
     MLIRAffineUtils
+    MLIRArithmetic
     MLIRComplex
     MLIRControlFlow
     MLIRFunc

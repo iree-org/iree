@@ -34,6 +34,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineToStandard
     MLIRAnalysis
+    MLIRArithmetic
     MLIRArithmeticToLLVM
     MLIRArithmeticTransforms
     MLIRArmNeon

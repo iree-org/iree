@@ -57,6 +57,7 @@ iree_cc_library(
     MLIRPass
     MLIRSCF
     MLIRSCFToControlFlow
+    MLIRTensor
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
