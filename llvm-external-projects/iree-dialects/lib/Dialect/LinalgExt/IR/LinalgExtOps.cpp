@@ -1265,6 +1265,115 @@ LogicalResult TopkOp::verify() {
   return success();
 }
 
+SmallVector<Range> TopkOp::getIterationDomain(OpBuilder &builder) {
+  int64_t operandRank = getInputRank();
+  SmallVector<Range> loopBounds(operandRank);
+  Location loc = getLoc();
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value source = values();
+  for (auto dim : llvm::enumerate(getInputType().getShape())) {
+    loopBounds[dim.index()].offset = zero;
+    loopBounds[dim.index()].size =
+        getDimValue(builder, loc, source, dim.index());
+    loopBounds[dim.index()].stride = one;
+  }
+  return loopBounds;
+}
+
+SmallVector<StringRef> TopkOp::getLoopIteratorTypes() {
+  SmallVector<StringRef> iteratorTypes(getInputRank(),
+                                       getParallelIteratorTypeName());
+  iteratorTypes[dimension()] = getReductionIteratorTypeName();
+  return iteratorTypes;
+}
+
+LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
+                                                   ValueRange ivs) {
+  uint64_t kDim = dimension();
+  Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = b.create<arith::ConstantIndexOp>(loc, 1);
+  Value initialValue = b.create<memref::LoadOp>(loc, values(), ivs);
+  Value initialIndex = b.create<memref::LoadOp>(loc, indices(), ivs);
+
+  // Compute K (ub) from the selected dim of the output
+  Value ub = b.create<memref::DimOp>(loc, outputValues(), dimension());
+
+  // Inner K loop functions:
+  //   Load current K value and index
+  //   Compare N/K using inserted block compare
+  //   Check if N == K using strict weak ordering, select which index came first
+  //   Select new K value from N/K comparison
+  //   Select new K index from N/K comparison or which index came first
+  //   Store new k value and index
+  //   Yield loop carry values after K selection
+  Value kValue, kIndex;
+  auto scfFor = b.create<scf::ForOp>(
+      loc, zero, ub, one, ValueRange{initialValue, initialIndex},
+      [&](OpBuilder &b, Location loc, Value iv, ValueRange loopCarryValues) {
+        SmallVector<Value> indices(ivs);
+        indices[kDim] = iv;
+        kValue = b.create<memref::LoadOp>(loc, outputValues(), indices);
+        kIndex = b.create<memref::LoadOp>(loc, outputIndices(), indices);
+      });
+
+  SmallVector<Value> indices(ivs);
+  indices[kDim] = scfFor.getInductionVar();
+  auto loopCarryValues = scfFor.getRegionIterArgs();
+
+  // Retrieve region as black box comparision function f(x,y). Plug into op.
+  auto &srcBlock = region().front();
+  BlockAndValueMapping bvmF; // f(x,y)
+  BlockAndValueMapping bvmR; // f(y,x)
+  {
+    // Save previous insertion point. Continue within loop body.
+    OpBuilder::InsertionGuard guard(b);
+    b.setInsertionPointToEnd(&scfFor.getRegion().front());
+    SmallVector<Value> forwardValues{loopCarryValues[0], kValue};
+    SmallVector<Value> reverseValues{kValue, loopCarryValues[0]};
+    for (auto it : llvm::zip(srcBlock.getArguments(), forwardValues)) {
+      bvmF.map(std::get<0>(it), std::get<1>(it));
+    }
+    for (auto it : llvm::zip(srcBlock.getArguments(), reverseValues)) {
+      bvmR.map(std::get<0>(it), std::get<1>(it));
+    }
+    for (auto &blockOp : srcBlock.without_terminator()) {
+      b.clone(blockOp, bvmF);
+      b.clone(blockOp, bvmR);
+    }
+    Value forwardCmpRes = bvmF.lookup(srcBlock.getTerminator()->getOperand(0));
+    Value reverseCmpRes = bvmR.lookup(srcBlock.getTerminator()->getOperand(0));
+
+    // Check value equality using strictly weak ordering from the region:
+    //   f(x,y) --> forwardCmpRes
+    //   f(y,x) --> reverseCmpRes
+    //   if forwardCmpRes == reverseCmpRes then select which came first
+    Value cmpValuesEqual = b.create<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::eq, forwardCmpRes, reverseCmpRes);
+    Value cmpFirstIndex = b.create<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::slt, loopCarryValues[1], kIndex);
+    Value combinedCmpEqRes =
+        b.create<arith::AndIOp>(loc, cmpValuesEqual, cmpFirstIndex);
+    // True if N > K or N came before K
+    Value indexCmpRes =
+        b.create<arith::OrIOp>(loc, forwardCmpRes, combinedCmpEqRes);
+    // Select results for K based on comparisons
+    Value resultKValue = b.create<arith::SelectOp>(loc, forwardCmpRes,
+                                                   loopCarryValues[0], kValue);
+    Value resultKIndex =
+        b.create<arith::SelectOp>(loc, indexCmpRes, loopCarryValues[1], kIndex);
+    b.create<memref::StoreOp>(loc, resultKValue, outputValues(), indices);
+    b.create<memref::StoreOp>(loc, resultKIndex, outputIndices(), indices);
+    // Select loop carry, opposite of K results
+    Value resultCarryValue = b.create<arith::SelectOp>(
+        loc, forwardCmpRes, kValue, loopCarryValues[0]);
+    Value resultCarryIndex =
+        b.create<arith::SelectOp>(loc, indexCmpRes, kIndex, loopCarryValues[1]);
+    b.create<scf::YieldOp>(loc, ValueRange{resultCarryValue, resultCarryIndex});
+  }
+  return success();
+}
+
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \

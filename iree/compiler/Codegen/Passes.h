@@ -269,10 +269,6 @@ LogicalResult verifyTensorToVectorsPassPipelineConfig(
 void addTensorToVectorsPassPipeline(OpPassManager &passManager,
                                     bool lowerToVectors = true);
 
-/// Populates the passes needed to do one-level tile + vectorize of linalg ops
-/// using the Codegen drivers from sandbox.
-void addSingleTilingExpertPassPipeline(OpPassManager &passManager);
-
 /// Populates the passes needed to do two-level tile + vectorize of linalg ops
 /// using the Codegen drivers from sandbox.
 LogicalResult verifyDoubleTilingExpertPassPipelineConfig(

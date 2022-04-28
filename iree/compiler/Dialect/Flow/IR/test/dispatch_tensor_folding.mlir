@@ -51,6 +51,22 @@ func.func @canonicalizePartiallyStaticOperands(%arg0: !flow.dispatch.tensor<read
 
 // -----
 
+func.func @canonicalizeDispatchLoad(%arg0: !flow.dispatch.tensor<readonly:3x4x1x12x64xf32>, %arg1 : index, %arg2: index, %arg3 : index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %0 = flow.dispatch.tensor.load %arg0, offsets = [%arg1, %c0, 0, %arg2, %arg3], sizes = [1, 4, 1, 4, 32], strides = [%c1, %c1, 1, %c1, %c1] : !flow.dispatch.tensor<readonly:3x4x1x12x64xf32> -> tensor<1x4x?x32xf32>
+  "test.sink"(%0) : (tensor<1x4x?x32xf32>) -> ()
+}
+
+// CHECK:      @canonicalizeDispatchLoad
+// CHECK-SAME: %[[ARG0:.+]]: !flow.dispatch.tensor<readonly:3x4x1x12x64xf32>
+// CHECK-SAME: %[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index
+//             CHECK: %[[LOAD:.+]] = flow.dispatch.tensor.load %arg0, offsets = [%[[ARG1]], 0, 0, %[[ARG2]], %[[ARG3]]], sizes = [1, 4, 1, 4, 32], strides = [1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:3x4x1x12x64xf32> -> tensor<1x4x4x32xf32>
+//             CHECK: %[[CAST:.+]] = tensor.cast %[[LOAD]] : tensor<1x4x4x32xf32> to tensor<1x4x?x32xf32>
+//             CHECK: "test.sink"(%[[CAST]]) : (tensor<1x4x?x32xf32>) -> ()
+
+// -----
+
 func.func @canonicalizeDimOfTensorTile(%arg0: !flow.dispatch.tensor<readonly:250x1024xf32>, %arg1 : index, %arg2: index) {
   %c0 = arith.constant 0 : index
   %0 = affine.min affine_map<(d0) -> (64, -d0 + 250)>(%arg1)

@@ -21,11 +21,23 @@ struct LLVMCPUCheckIRBeforeLLVMConversionPass
 
 void LLVMCPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
   auto moduleOp = getOperation();
-  // For now only check that there are no stack allocations.
-  auto walkResult = moduleOp.walk([](memref::AllocaOp allocaOp) -> WalkResult {
-    return allocaOp.emitOpError("expected no static allocations");
+  int64_t bits = 0;
+  auto walkResult = moduleOp.walk([&](memref::AllocaOp allocaOp) -> WalkResult {
+    auto type = allocaOp.getType().cast<ShapedType>();
+    if (!type.hasStaticShape()) {
+      return allocaOp.emitOpError(
+          "expected no stack allocations with dynamic shapes");
+    }
+    bits += type.getSizeInBits();
+    return WalkResult::advance();
   });
   if (walkResult.wasInterrupted()) {
+    return signalPassFailure();
+  }
+  constexpr int k16KBInBits = 16 * 1024 * 8;
+  if (bits >= k16KBInBits) {
+    moduleOp.emitOpError(
+        "expected total size of stack allocation is smaller than 16 KB");
     return signalPassFailure();
   }
 }
