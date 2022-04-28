@@ -68,6 +68,7 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:Analysis",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ArithmeticUtils",
         "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:FuncDialect",
@@ -198,6 +199,7 @@ cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgInterfaces",
         "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:TensorDialect",
     ],
 )
 

@@ -289,6 +289,7 @@ cc_library(
         ":IREELinalgExtTiledOpInterfacesIncGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ArithmeticUtils",
         "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:DialectUtils",
@@ -631,6 +632,8 @@ cc_library(
         ":IREELinalgTransformInterfacesIncGen",
         "@llvm-project//llvm:Support",
         # Dialects
+        "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:AffineUtils",
         "@llvm-project//mlir:Async",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:BufferizationDialect",
@@ -640,6 +643,8 @@ cc_library(
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:SCFUtils",
+        "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         # IR
         "@llvm-project//mlir:IR",

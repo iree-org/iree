@@ -71,6 +71,7 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineUtils",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ComplexDialect",
         "@llvm-project//mlir:ControlFlowOps",
         "@llvm-project//mlir:DialectUtils",

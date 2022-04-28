@@ -40,6 +40,7 @@ cc_library(
         "//iree/compiler/Dialect/VM/IR",
         "//iree/compiler/Dialect/VM/Utils:CallingConvention",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ControlFlowOps",
         "@llvm-project//mlir:EmitC",
         "@llvm-project//mlir:FuncDialect",
