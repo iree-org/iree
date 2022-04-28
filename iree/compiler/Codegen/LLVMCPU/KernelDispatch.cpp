@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 
+#include <numeric>
+
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -165,58 +167,53 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
   assert(lbs.size() == ubs.size() && lbs.size() == minTileSizes.size() &&
          lbs.size() == maxTileSizes.size() &&
          "expected all vectors to be of equal size");
-  if (lbs.empty()) {
-    return {};
-  }
   size_t numDims = lbs.size();
   SmallVector<int64_t> distributedTileSizes(numDims, 1);
   SmallVector<int64_t> numWorkgroupsPerDim(numDims, 1);
   SmallVector<int64_t> workload(numDims, 1);
-  auto ceilFn = [](int64_t a, int64_t b) { return (a + b - 1) / b; };
-
   for (auto i : llvm::seq<size_t>(0, numDims)) {
-    if (ShapedType::isDynamic(lbs[i]) || ShapedType::isDynamic(ubs[i])) {
+    if (maxTileSizes[i] == 0 || ShapedType::isDynamic(lbs[i]) ||
+        ShapedType::isDynamic(ubs[i])) {
       distributedTileSizes[i] = maxTileSizes[i];
       workload[i] = ShapedType::kDynamicSize;
       continue;
     }
+
+    assert(lbs[i] <= ubs[i]);
+    workload[i] = ubs[i] - lbs[i];
     int64_t candidateTileSize = 1;
-    if (ubs[i] > lbs[i]) {
-      int64_t dimSize = static_cast<uint64_t>(ubs[i] - lbs[i]);
-      int64_t targetSize = std::min(dimSize / 2, maxTileSizes[i]);
-      int64_t vectorSize = vectorSizeHints[i];
-      if (vectorSize > 1) {
-        // Pick the factor of dim which is closest to the target tile size and
-        // is a multiplier of vector size.
-        for (int64_t k = vectorSize; k <= targetSize; k += vectorSize) {
-          if (dimSize % k == 0 && k >= minTileSizes[i]) {
-            candidateTileSize = k;
-          }
+    int64_t targetSize = std::min(workload[i] / 2, maxTileSizes[i]);
+    int64_t vectorSize = vectorSizeHints[i];
+    if (vectorSize > 1) {
+      // Pick the factor of dim which is closest to the target tile size and
+      // is a multiplier of vector size.
+      for (int64_t k = vectorSize; k <= targetSize; k += vectorSize) {
+        if (workload[i] % k == 0 && k >= minTileSizes[i]) {
+          candidateTileSize = k;
         }
       }
-      // Fallback to power of 2 if there's no hint or can't find the ideal size.
-      if (vectorSize <= 1 || candidateTileSize == 1) {
-        candidateTileSize =
-            std::max<int64_t>(llvm::PowerOf2Floor(targetSize), minTileSizes[i]);
-      }
+    }
+    // Fallback to power of 2 if there's no hint or can't find the ideal size.
+    if (vectorSize <= 1 || candidateTileSize == 1) {
+      candidateTileSize =
+          std::max<int64_t>(llvm::PowerOf2Floor(targetSize), minTileSizes[i]);
     }
 
     // Limit the workload per workgroup to the default being the max to keep the
     // work per invocation reasonable.
     distributedTileSizes[i] =
         std::min<int64_t>(candidateTileSize, maxTileSizes[i]);
-    workload[i] = (ubs[i] <= lbs[i] ? 1 : ubs[i] - lbs[i]);
-    numWorkgroupsPerDim[i] = ceilFn(workload[i], distributedTileSizes[i]);
+    numWorkgroupsPerDim[i] =
+        llvm::divideCeil(workload[i], distributedTileSizes[i]);
   }
 
   // Reduce the number of workgroups in cases where we are dividing the work too
   // much. Over-provision the number of workgroups to twice the number of
   // threads.
   int64_t numWorkgroupsLimit = 2 * clNumberOfRuntimeThreads;
-  int64_t numWorkgroups = 1;
-  for (auto ng : numWorkgroupsPerDim) {
-    numWorkgroups *= ng;
-  }
+  int64_t numWorkgroups =
+      std::accumulate(numWorkgroupsPerDim.begin(), numWorkgroupsPerDim.end(),
+                      1LL, std::multiplies<int64_t>{});
   unsigned currDim = numDims;
   while (numWorkgroups > numWorkgroupsLimit && currDim > 0) {
     unsigned index = currDim - 1;
@@ -239,7 +236,8 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
     }
 
     distributedTileSizes[index] = newSize;
-    int64_t nwg = ceilFn(workload[index], distributedTileSizes[index]);
+    int64_t nwg =
+        llvm::divideCeil(workload[index], distributedTileSizes[index]);
     if (nwg < numWorkgroupsPerDim[index]) {
       numWorkgroups /= numWorkgroupsPerDim[index];
       numWorkgroups *= nwg;
@@ -284,8 +282,7 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
 /// hints != 1, it will try to find the tile sizes which are multipliers of the
 /// hints.
 static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
-    ArrayRef<Range> iterationDomain,
-    IREE::Flow::PartitionableLoopsInterface partitionableLoopInterfaceOp,
+    ArrayRef<Range> iterationDomain, ArrayRef<unsigned> partitionableLoops,
     ArrayRef<int64_t> minTileSizes, ArrayRef<int64_t> maxTileSizes,
     ArrayRef<int64_t> vectorSizeHints = {}) {
   assert(iterationDomain.size() == minTileSizes.size() &&
@@ -304,53 +301,40 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
   auto ubs = llvm::to_vector(llvm::map_range(
       iterationDomain, [&](Range r) { return getStaticValue(r.size); }));
 
-  SmallVector<unsigned> partitionableLoops =
-      partitionableLoopInterfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   llvm::SmallDenseSet<unsigned, 4> partitionableLoopsSet;
   partitionableLoopsSet.insert(partitionableLoops.begin(),
                                partitionableLoops.end());
 
-  size_t numPartitionedLoops = partitionableLoops.size();
-  SmallVector<int64_t> distributedLoopLbs(numPartitionedLoops,
-                                          ShapedType::kDynamicSize),
-      distributedLoopUbs(numPartitionedLoops, ShapedType::kDynamicSize),
-      minDistributedLoopTileSizes(numPartitionedLoops, 1),
-      maxDistributedLoopTileSizes(numPartitionedLoops,
-                                  defaultWorkgroupTileSize),
-      distributedVectorSizeHints(numPartitionedLoops, 1);
+  SmallVector<int64_t> adjustedMinTileSizes(minTileSizes.begin(),
+                                            minTileSizes.end());
+  SmallVector<int64_t> adjustedMaxTileSizes(maxTileSizes.begin(),
+                                            maxTileSizes.end());
+  SmallVector<int64_t> adjustedVectorSizeHints(vectorSizeHints.begin(),
+                                               vectorSizeHints.end());
+  if (adjustedVectorSizeHints.empty()) {
+    adjustedVectorSizeHints.append(lbs.size(), 1);
+  }
   // Find the bounds of the partitionable loops
-  unsigned index = 0;
-  for (auto range : llvm::enumerate(iterationDomain)) {
-    if (!partitionableLoopsSet.count(range.index())) continue;
-
-    minDistributedLoopTileSizes[index] = minTileSizes[range.index()];
-    maxDistributedLoopTileSizes[index] = maxTileSizes[range.index()];
-    distributedLoopLbs[index] = lbs[range.index()];
-    distributedLoopUbs[index] = ubs[range.index()];
-    distributedVectorSizeHints[index] =
-        vectorSizeHints.empty() ? 1 : vectorSizeHints[range.index()];
-    index++;
+  for (auto i : llvm::seq<unsigned>(0, iterationDomain.size())) {
+    if (partitionableLoopsSet.count(i)) continue;
+    // Force non-partitionable loops not to be tiled.
+    adjustedMinTileSizes[i] = 0;
+    adjustedMaxTileSizes[i] = 0;
+    adjustedVectorSizeHints[i] = 1;
   }
 
   SmallVector<int64_t> distributedTileSizes =
-      getDefaultDistributedLoopTileSizes(
-          distributedLoopLbs, distributedLoopUbs, minDistributedLoopTileSizes,
-          maxDistributedLoopTileSizes, distributedVectorSizeHints);
-  SmallVector<int64_t> distributedLevelTileSizes(iterationDomain.size(), 0);
-  for (auto loopID : llvm::enumerate(partitionableLoops)) {
-    distributedLevelTileSizes[loopID.value()] =
-        distributedTileSizes[loopID.index()];
-  }
+      getDefaultDistributedLoopTileSizes(lbs, ubs, adjustedMinTileSizes,
+                                         adjustedMaxTileSizes,
+                                         adjustedVectorSizeHints);
   // Final fix up of the tile sizes to make sure that they divide the problem
   // size to make it vectorizable.
-  for (auto i : llvm::seq<unsigned>(0, distributedLevelTileSizes.size())) {
-    distributedLevelTileSizes[i] =
-        distributedLevelTileSizes[i] != 0
-            ? getMaxTileSize(lbs[i], ubs[i], distributedLevelTileSizes[i],
-                             minTileSizes[i])
-            : 0;
+  for (auto i : llvm::seq<unsigned>(0, distributedTileSizes.size())) {
+    if (!distributedTileSizes[i]) continue;
+    distributedTileSizes[i] = getMaxTileSize(
+        lbs[i], ubs[i], distributedTileSizes[i], minTileSizes[i]);
   }
-  return distributedLevelTileSizes;
+  return distributedTileSizes;
 }
 static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
     linalg::LinalgOp linalgOp, ArrayRef<int64_t> minTileSizes,
@@ -359,11 +343,11 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
   builder.setInsertionPoint(linalgOp);
   SmallVector<Range> iterationDomain =
       linalgOp.createLoopRanges(builder, linalgOp.getLoc());
-  auto partitionableLoopsInterfaceOp =
-      cast<IREE::Flow::PartitionableLoopsInterface>(linalgOp.getOperation());
+  auto loops =
+      cast<IREE::Flow::PartitionableLoopsInterface>(linalgOp.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
   return getDefaultDistributedLevelTileSizes(
-      iterationDomain, partitionableLoopsInterfaceOp, minTileSizes,
-      maxTileSizes, vectorSizeHints);
+      iterationDomain, loops, minTileSizes, maxTileSizes, vectorSizeHints);
 }
 
 /// Splits the tile sizes in `parallelSizes` into `reductionSizes` for the
@@ -428,8 +412,7 @@ static LogicalResult setDefaultRootConfig(
   }
 
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
-      iterationDomain, partitionableLoopsInterfaceOp, minTileSizes,
-      maxTileSizes);
+      iterationDomain, partitionableLoops, minTileSizes, maxTileSizes);
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(flowTileSizes));
   return setOpConfigAndEntryPointFnTranslation(
