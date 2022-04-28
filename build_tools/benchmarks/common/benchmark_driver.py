@@ -106,8 +106,8 @@ class BenchmarkDriver(object):
       benchmark_cases = self.benchmark_suite.filter_benchmarks_for_category(
           category=category,
           available_drivers=drivers,
-          cpu_target_arch_filter=cpu_target_arch,
-          gpu_target_arch_filter=gpu_target_arch,
+          cpu_target_arch_filter=f"^{cpu_target_arch}$",
+          gpu_target_arch_filter=f"^{gpu_target_arch}$",
           driver_filter=self.config.driver_filter,
           mode_filter=self.config.mode_filter,
           model_name_filter=self.config.model_name_filter)
