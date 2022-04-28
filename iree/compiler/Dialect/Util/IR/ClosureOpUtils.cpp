@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace mlir {
