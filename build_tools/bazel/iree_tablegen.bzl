@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("@llvm-project//mlir:tblgen.bzl", "gentbl_filegroup")
+load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "gentbl_filegroup", "td_library")
 
 def iree_tablegen_doc(*args, **kwargs):
     """iree_tablegen_doc() generates documentation from a table definition file.
@@ -14,3 +14,17 @@ def iree_tablegen_doc(*args, **kwargs):
     """
 
     gentbl_filegroup(*args, **kwargs)
+
+
+def iree_gentbl_cc_library(includes=[], **kwargs):
+    """IREE version of gentbl_cc_library which sets up includes properly."""
+
+    gentbl_cc_library(includes=includes + [
+        "/compiler/src",
+    ], **kwargs)
+
+
+def iree_td_library(**kwargs):
+    """IREE version of td_library."""
+
+    td_library(**kwargs)
