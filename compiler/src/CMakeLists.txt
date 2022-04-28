@@ -4,10 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Configures all iree_cc_* targets to take this implicit dep,
-# which provides common includes and copts for the tree.
-set(IREE_IMPLICIT_DEFS_CC_DEPS iree_compiler_defs)
-
 iree_cc_library(
   NAME
     defs
@@ -17,4 +13,7 @@ iree_cc_library(
   PUBLIC
 )
 
+# Configures all iree_cc_* targets to take this implicit dep,
+# which provides common includes and copts for the tree.
+set(IREE_IMPLICIT_DEFS_CC_DEPS iree::compiler::defs)
 add_subdirectory(iree/compiler)
