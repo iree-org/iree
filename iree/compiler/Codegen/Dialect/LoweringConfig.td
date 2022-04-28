@@ -13,53 +13,52 @@ include "mlir/IR/EnumAttr.td"
 // List of pre-existing pipelines for translating executables.
 def CPU_Default
     : I32EnumAttrCase<"CPUDefault", 0>;
-def CPU_SingleTilingExpert
-    : I32EnumAttrCase<"CPUSingleTilingExpert", 1>;
 def CPU_DoubleTilingExpert
-    : I32EnumAttrCase<"CPUDoubleTilingExpert", 2>;
+    : I32EnumAttrCase<"CPUDoubleTilingExpert", 1>;
 def CPU_ConvTileAndDecomposeExpert
-    : I32EnumAttrCase<"CPUConvTileAndDecomposeExpert", 3>;
+    : I32EnumAttrCase<"CPUConvTileAndDecomposeExpert", 2>;
 def CPU_TileFuseAndVectorize
-    : I32EnumAttrCase<"CPUTileFuseAndVectorize", 4>;
+    : I32EnumAttrCase<"CPUTileFuseAndVectorize", 3>;
 def CPU_BufferOpsTileAndVectorize
-    : I32EnumAttrCase<"CPUBufferOpsTileAndVectorize", 5>;
+    : I32EnumAttrCase<"CPUBufferOpsTileAndVectorize", 4>;
 
 def Linalg_TransformInterpCodegen
-    : I32EnumAttrCase<"LinalgTransformInterpCodegen", 6>;
+    : I32EnumAttrCase<"LinalgTransformInterpCodegen", 5>;
 
 def LLVMGPU_SimpleDistribute
-    : I32EnumAttrCase<"LLVMGPUDistribute", 7>;
+    : I32EnumAttrCase<"LLVMGPUDistribute", 6>;
 def LLVMGPU_Vectorize
-    : I32EnumAttrCase<"LLVMGPUVectorize", 8>;
+    : I32EnumAttrCase<"LLVMGPUVectorize", 7>;
 def LLVMGPU_MatmulSimt
-    : I32EnumAttrCase<"LLVMGPUMatmulSimt", 9>;
+    : I32EnumAttrCase<"LLVMGPUMatmulSimt", 8>;
 def LLVMGPU_MatmulTensorCore
-    : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 10>;
+    : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 9>;
 
 def SPIRV_Distribute
-    : I32EnumAttrCase<"SPIRVDistribute", 11>;
+    : I32EnumAttrCase<"SPIRVDistribute", 10>;
 def SPIRV_Vectorize
-    : I32EnumAttrCase<"SPIRVVectorize", 12>;
+    : I32EnumAttrCase<"SPIRVVectorize", 11>;
 def SPIRV_VectorizeToCooperativeOps
-    : I32EnumAttrCase<"SPIRVVectorizeToCooperativeOps", 13>;
+    : I32EnumAttrCase<"SPIRVVectorizeToCooperativeOps", 12>;
 def SPIRV_VectorizeWithWorkgroupMemory
-    : I32EnumAttrCase<"SPIRVVectorizeWithWorkgroupMemory", 14>;
+    : I32EnumAttrCase<"SPIRVVectorizeWithWorkgroupMemory", 13>;
 
 def None
     : I32EnumAttrCase<"None", 0xff>;
 
 // EnumAttrCase for all known lowerings for ops within dispatch region
 // to scalar/native-vector code.
-def DispatchLoweringPassPipelineEnum : I32EnumAttr<
-    "DispatchLoweringPassPipeline",
-    "identifier for pass pipeline use to lower dispatch region",
-    [CPU_Default, CPU_SingleTilingExpert, CPU_DoubleTilingExpert,
-     CPU_ConvTileAndDecomposeExpert, CPU_TileFuseAndVectorize,
-     CPU_BufferOpsTileAndVectorize, Linalg_TransformInterpCodegen,
-     LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize, LLVMGPU_MatmulSimt,
-     LLVMGPU_MatmulTensorCore, SPIRV_Distribute, SPIRV_Vectorize,
-     SPIRV_VectorizeToCooperativeOps, SPIRV_VectorizeWithWorkgroupMemory,
-     None]> {
+def DispatchLoweringPassPipelineEnum
+    : I32EnumAttr<
+          "DispatchLoweringPassPipeline",
+          "identifier for pass pipeline use to lower dispatch region", [
+            CPU_Default, CPU_DoubleTilingExpert, CPU_ConvTileAndDecomposeExpert,
+            CPU_TileFuseAndVectorize, CPU_BufferOpsTileAndVectorize,
+            Linalg_TransformInterpCodegen, LLVMGPU_SimpleDistribute,
+            LLVMGPU_Vectorize, LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
+            SPIRV_Distribute, SPIRV_Vectorize, SPIRV_VectorizeToCooperativeOps,
+            SPIRV_VectorizeWithWorkgroupMemory, None
+          ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   // Don't generate a C++ class! We want to use the AttrDef
   let genSpecializedAttr = 0;

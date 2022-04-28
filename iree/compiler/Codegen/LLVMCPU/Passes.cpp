@@ -198,46 +198,6 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
 // Codegen pipelines.
 //===---------------------------------------------------------------------===//
 
-void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
-  // Do first level of tiling and distribution.
-  passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createTileAndDistributeToWorkgroupsPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createFoldAffineMinInDistributedLoopsPass());
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
-
-  passManager.addNestedPass<func::FuncOp>(
-      createConvertToDestinationPassingStylePass());
-  passManager.addPass(createCanonicalizerPass());
-  // Add the sandbox single tiling expert to tile and vectorize.
-  {
-    LinalgSingleTilingExpertPassOptions options;
-    options.vectorize = true;
-    options.tilingLevel = static_cast<int64_t>(TilingLevel::L1Tiles);
-    passManager.addNestedPass<func::FuncOp>(
-        createLinalgSingleTilingExpertPass(options));
-  }
-
-  // TODO(ravishankarm): This is commented cause this is WIP, to be enabled
-  // soon.
-  // auto callbacks =
-  //     std::make_unique<linalg::comprehensive_bufferize::AllocationCallbacks>(
-  //         cpuComprehensiveBufferizeAllocationFn,
-  //         cpuComprehensiveBufferizeDeallocationFn,
-  //         cpuComprehensiveBufferizeCopyFn);
-  // addIREEComprehensiveBufferizePasses(passManager, std::move(callbacks));
-  addLinalgBufferizePasses(passManager, cpuAllocationFunction);
-
-  // Add the vector lowering expert.
-  {
-    OpPassManager &nestedFuncPassManager = passManager.nest<func::FuncOp>();
-    LinalgVectorLoweringPassOptions options;
-    addLowerToVectorTransforms(nestedFuncPassManager, options);
-  }
-}
-
 void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
   // Do first level of tiling and distribution.
   passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
