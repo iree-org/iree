@@ -5,9 +5,9 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 function(iree_append value)
-  foreach(variable ${ARGN})
-    set(${variable} "${${variable}} ${value}" PARENT_SCOPE)
-  endforeach(variable)
+  foreach(_VARIABLE ${ARGN})
+    set(${_VARIABLE} "${${_VARIABLE}} ${value}" PARENT_SCOPE)
+  endforeach(_VARIABLE)
 endfunction()
 
 if(IREE_ENABLE_LLD)
@@ -24,7 +24,7 @@ if(IREE_USE_LINKER AND NOT APPLE)
   # argument warning about -fuse-ld, which can foul up compiler flag detection,
   # causing false negatives. We lack a finer grained way to suppress such a
   # thing, and this is deemed least bad.
-  if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     iree_append("-Wno-unused-command-line-argument"
       CMAKE_REQUIRED_FLAGS
       CMAKE_EXE_LINKER_FLAGS

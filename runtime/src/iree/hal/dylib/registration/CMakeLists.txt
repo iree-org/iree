@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-if(${IREE_HAL_DRIVER_DYLIB})
+if(IREE_HAL_DRIVER_DYLIB)
 
 iree_cc_library(
   NAME
@@ -35,7 +35,7 @@ iree_cc_library(
 
 endif()
 
-if(${IREE_HAL_DRIVER_DYLIB_SYNC})
+if(IREE_HAL_DRIVER_DYLIB_SYNC)
 
 iree_cc_library(
   NAME

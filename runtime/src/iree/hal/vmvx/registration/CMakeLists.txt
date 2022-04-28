@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-if(${IREE_HAL_DRIVER_VMVX})
+if(IREE_HAL_DRIVER_VMVX)
 
 iree_cc_library(
   NAME
@@ -34,7 +34,7 @@ iree_cc_library(
 
 endif()
 
-if(${IREE_HAL_DRIVER_VMVX_SYNC})
+if(IREE_HAL_DRIVER_VMVX_SYNC)
 
 iree_cc_library(
   NAME
