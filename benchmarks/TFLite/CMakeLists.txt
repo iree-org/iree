@@ -175,11 +175,11 @@ iree_benchmark_suite(
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
-    "1-thread,full-inference,cascadelake"
+    "1-thread,full-inference,default-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
-    "CPU-x86_64"
+    "CPU-x86-64-CascadeLake"
   TRANSLATION_FLAGS
     ${X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS}
   BENCHMARK_TOOL
@@ -201,11 +201,11 @@ iree_benchmark_suite(
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
-    "4-thread,full-inference,cascadelake"
+    "4-thread,full-inference,default-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
-    "CPU-x86_64"
+    "CPU-x86-64-CascadeLake"
   TRANSLATION_FLAGS
     ${X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS}
   BENCHMARK_TOOL

@@ -11,6 +11,7 @@ steps:
       - "tar --exclude='*.tar.gz' --exclude='*.tgz' --exclude='*.mlir' --exclude='*.tflite' -czvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz build-host/benchmark_suites"
       - "find build-host/benchmark_suites -name '*.mlir' | tar -czvf source-mlir-models-${BUILDKITE_BUILD_NUMBER}.tgz -T -"
       - "tar -czvf iree-x86_64-tools-${BUILDKITE_BUILD_NUMBER}.tgz build-x86_64/iree/tools/iree-benchmark-module build-x86_64/iree/tools/build_config.txt"
+    if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86')"
     agents:
       - "queue=build"
     env:
@@ -29,10 +30,23 @@ steps:
       - "buildkite-agent artifact download --step Build iree-x86_64-tools-${BUILDKITE_BUILD_NUMBER}.tgz ./"
       - "tar -xzvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "tar -xzvf iree-x86_64-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
-      - "python3 build_tools/benchmarks/run_benchmarks_on_linux.py --device_model=GCP-c2-standard-16 --normal_benchmark_tool_dir=build-x86_64/iree/tools/ -o benchmark-results-gcp-cpu-${BUILDKITE_BUILD_NUMBER}.json --mode_regex=\".*cascadelake.*\" --verbose build-host/"
+      - "python3 build_tools/benchmarks/run_benchmarks_on_linux.py --device_model=GCP-c2-standard-16 --cpu_uarch=CascadeLake --normal_benchmark_tool_dir=build-x86_64/iree/tools/ -o benchmark-results-gcp-cpu-${BUILDKITE_BUILD_NUMBER}.json --verbose build-host/"
+    if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86')"
     agents:
       - "gcp:machine-type=c2-standard-16"
       - "queue=benchmark-x86"
     artifact_paths:
       - "benchmark-results-gcp-cpu-${BUILDKITE_BUILD_NUMBER}.json"
     timeout_in_minutes: "60"
+
+  - wait
+
+  - label: "Comment benchmark results on pull request"
+    commands:
+      - "git clean -fdx"
+      - "buildkite-agent artifact download benchmark-results-*.json ./ --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}"
+      - "python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py --verbose --query-base --comment_subtitle=\" (experimental x86)\" benchmark-results-*.json"
+    key: "post-on-pr-x86"
+    if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86')"
+    agents:
+      - "queue=report"
