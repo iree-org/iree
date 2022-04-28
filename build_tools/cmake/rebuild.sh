@@ -38,8 +38,7 @@ CMAKE_ARGS=(
   # give us early warnings for some types of website publication errors.
   "-DIREE_BUILD_DOCS=ON"
 
-  # Enable building the python bindings on CI. Most heavy targets are gated on
-  # IREE_ENABLE_TENSORFLOW, so what's left here should be fast.
+  # Enable building the python bindings on CI.
   "-DIREE_BUILD_PYTHON_BINDINGS=ON"
 
   # Enable assertions. We wouldn't want to be testing *only* with assertions

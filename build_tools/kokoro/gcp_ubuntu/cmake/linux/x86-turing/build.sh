@@ -6,7 +6,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build the project with cmake using Kokoro.
+# Build and test the project with CMake using Kokoro, with an NVIDIA GPU.
+# This tests both Vulkan and CUDA.
 
 set -e
 set -x
@@ -34,47 +35,7 @@ nvidia-smi || true
 # so a build failure only prevents building/testing things that depend on it and
 # we can still run the other tests.
 echo "Building with cmake"
-
-ROOT_DIR=$(git rev-parse --show-toplevel)
-
-cd ${ROOT_DIR?}
-rm -rf build/
-
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-
-"$CMAKE_BIN" --version
-ninja --version
-
-mkdir build
-cd build
-
-CMAKE_ARGS=(
-  "-G" "Ninja"
-  # Let's make linking fast
-  "-DIREE_ENABLE_LLD=ON"
-  "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
-
-  "-DIREE_BUILD_PYTHON_BINDINGS=ON"
-
-  "-DIREE_ENABLE_ASSERTIONS=ON"
-
-  # Enable CUDA backend to test on Turing hardware.
-  "-DIREE_TARGET_BACKEND_CUDA=ON"
-  "-DIREE_HAL_DRIVER_CUDA=ON"
-)
-
-echo "Configuring CMake"
-"$CMAKE_BIN" "${CMAKE_ARGS[@]?}" "$@" ..
-
-echo "Building all"
-echo "------------"
-"$CMAKE_BIN" --build . -- -k 0
-
-echo "Building test deps"
-echo "------------------"
-"$CMAKE_BIN" --build . --target iree-test-deps -- -k 0
-
-cd ${ROOT_DIR?}
+./build_tools/cmake/clean_build.sh
 
 export IREE_VULKAN_F16_DISABLE=0
 export IREE_CUDA_DISABLE=0
