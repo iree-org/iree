@@ -289,7 +289,7 @@ class BuildFileFunctions(object):
 
   # TODO(gcmn) implement these types of functions in a less hard-coded way
   def platform_trampoline_deps(self, basename, path="base"):
-    return [f"//iree/{path}/internal:{basename}_internal"]
+    return [f"//{path}/internal:{basename}_internal"]
 
   def select(self, d):
     self._convert_unimplemented_function("select", str(d))

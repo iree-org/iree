@@ -205,9 +205,9 @@ if(IREE_BUILD_COMPILER)
       iree-tblgen
     SRCS
       "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
-      "${IREE_SOURCE_DIR}/iree/compiler/Dialect/Util/Tools/StructAttrGen.cpp"
-      "${IREE_SOURCE_DIR}/iree/compiler/Dialect/VM/Tools/VMOpEncoderGen.cpp"
-      "${IREE_SOURCE_DIR}/iree/compiler/Dialect/VM/Tools/VMOpTableGen.cpp"
+      "${IREE_SOURCE_DIR}/compiler/src/iree/compiler/Dialect/Util/Tools/StructAttrGen.cpp"
+      "${IREE_SOURCE_DIR}/compiler/src/iree/compiler/Dialect/VM/Tools/VMOpEncoderGen.cpp"
+      "${IREE_SOURCE_DIR}/compiler/src/iree/compiler/Dialect/VM/Tools/VMOpTableGen.cpp"
     DEPS
       LLVMSupport
       LLVMTableGen

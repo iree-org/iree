@@ -17,4 +17,4 @@ iree_cc_library(
   PUBLIC
 )
 
-add_subdirectory(iree)
+add_subdirectory(iree/compiler)

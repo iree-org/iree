@@ -97,7 +97,7 @@ iree_cc_library(
     "LinkerTool.cpp"
   DEPS
     LLVMSupport
-    iree::compiler::src::iree::compiler::Dialect::HAL::Target::LLVM::internal::LinkerTools_internal
+    iree::compiler::Dialect::HAL::Target::LLVM::internal::LinkerTools_internal
   PUBLIC
 )
 

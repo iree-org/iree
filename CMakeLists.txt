@@ -632,7 +632,7 @@ if(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM)
 endif()
 
 if(IREE_BUILD_COMPILER)
-  add_subdirectory(iree/compiler)
+  add_subdirectory(compiler)
 endif()
 
 add_subdirectory(iree/tools)
