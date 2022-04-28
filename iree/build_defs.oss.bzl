@@ -46,7 +46,7 @@ def iree_cmake_extra_content(content = "", inline = False):
     """
     pass
 
-def iree_runtime_cc_library(deps = [], **kwargs):
+def iree_compiler_cc_library(deps = [], **kwargs):
     """Used for cc_library targets within the //compiler tree.
 
     This is a pass-through to the native cc_library which adds specific
