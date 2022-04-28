@@ -333,6 +333,9 @@ class BuildFileFunctions(object):
                             f"{testonly_block}"
                             f"  PUBLIC\n)\n\n")
 
+  def iree_compiler_cc_library(self, deps=[], **kwargs):
+    self.cc_library(deps=deps + ["//compiler/src:defs"], **kwargs)
+
   def iree_runtime_cc_library(self, deps=[], **kwargs):
     self.cc_library(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
 
@@ -506,6 +509,11 @@ class BuildFileFunctions(object):
                             f"{outs_block}"
                             f"{tblgen_block}"
                             f")\n\n")
+
+  def iree_gentbl_cc_library(self, **kwargs):
+    # The bazel version of this rule adds some include directories and defs
+    # that are implicitly handled by the cmake version.
+    self.gentbl_cc_library(**kwargs)
 
   def iree_tablegen_doc(self,
                         name,
