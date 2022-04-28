@@ -235,8 +235,7 @@ struct LinalgExtOpInterface
                                                     OpTy> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
-    // All operands are read.
-    // TODO: Is this correct?
+    // All operands (including outputs) may be read.
     return true;
   }
 
