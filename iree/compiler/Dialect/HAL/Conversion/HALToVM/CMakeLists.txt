@@ -27,6 +27,7 @@ iree_cc_library(
     "ConvertSemaphoreOps.cpp"
   DEPS
     LLVMSupport
+    MLIRArithmetic
     MLIRFunc
     MLIRIR
     MLIRPass

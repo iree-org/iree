@@ -8,7 +8,9 @@
 
 #include "iree/compiler/Dialect/Util/Analysis/Attributes/PotentialValues.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"  // TODO: Remove
+#include "mlir/Dialect/Math/IR/Math.h"
 
 #define DEBUG_TYPE "iree-util-attributes"
 using llvm::dbgs;

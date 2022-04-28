@@ -7,6 +7,7 @@
 #ifndef IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMS_UTILS_H_
 #define IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMS_UTILS_H_
 
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/Support/LLVM.h"

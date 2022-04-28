@@ -30,6 +30,7 @@ iree_cc_library(
     ::IREECodegenDialectGen
     ::LoweringConfigGen
     LLVMSupport
+    MLIRArithmetic
     MLIRFunc
     MLIRIR
     MLIRParser

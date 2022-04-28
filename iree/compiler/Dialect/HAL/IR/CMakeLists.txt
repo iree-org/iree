@@ -43,6 +43,7 @@ iree_cc_library(
     ::HALStructsGen
     ::HALTypesGen
     LLVMSupport
+    MLIRArithmetic
     MLIRFunc
     MLIRIR
     MLIRMemRef
@@ -65,6 +66,7 @@ iree_cc_library(
   DEPS
     ::IR
     LLVMSupport
+    MLIRArithmetic
     MLIRFunc
     MLIRIR
     MLIRMemRef

@@ -18,6 +18,7 @@ iree_cc_library(
   SRCS
     "ConvertFlowToStream.cpp"
   DEPS
+    MLIRArithmetic
     MLIRFunc
     MLIRIR
     MLIRTensor

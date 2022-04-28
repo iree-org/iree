@@ -10,6 +10,10 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
 namespace mlir {
+namespace memref {
+class SubViewOp;
+}  // namespace memref
+
 namespace iree_compiler {
 
 static constexpr int32_t kNumGPUDims = 3;

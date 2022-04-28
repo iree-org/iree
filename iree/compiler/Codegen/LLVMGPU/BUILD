@@ -46,6 +46,7 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineToStandard",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ArithmeticToLLVM",
         "@llvm-project//mlir:ArithmeticTransforms",
         "@llvm-project//mlir:ControlFlowToLLVM",

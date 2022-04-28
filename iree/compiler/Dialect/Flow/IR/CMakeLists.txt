@@ -40,6 +40,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAffine
     MLIRAnalysis
+    MLIRArithmetic
     MLIRArithmeticUtils
     MLIRControlFlowInterfaces
     MLIRFunc
@@ -124,6 +125,7 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRLinalg
+    MLIRTensor
   PUBLIC
 )
 

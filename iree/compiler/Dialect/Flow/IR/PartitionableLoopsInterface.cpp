@@ -11,6 +11,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
 
 // clang-format off
