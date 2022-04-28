@@ -6,7 +6,7 @@
 
 """Common Bazel definitions for IREE."""
 
-def platform_trampoline_deps(basename, path = "base"):
+def platform_trampoline_deps(basename, path = "runtime/src/iree/base"):
     """Produce a list of deps for the given `basename` platform target.
 
     Example:
@@ -16,14 +16,14 @@ def platform_trampoline_deps(basename, path = "base"):
     library in foreign source control systems.
 
     Args:
-      basename: Library name prefix for a library in iree/[path]/internal.
+      basename: Library name prefix for a library in [path]/internal.
       path: Folder name to work within.
     Returns:
       A list of dependencies for depending on the library in a platform
       sensitive way.
     """
     return [
-        "//iree/%s/internal:%s_internal" % (path, basename),
+        "//%s/internal:%s_internal" % (path, basename),
     ]
 
 def iree_build_test(name, targets):
