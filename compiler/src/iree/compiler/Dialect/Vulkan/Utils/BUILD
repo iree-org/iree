@@ -23,7 +23,7 @@ iree_compiler_cc_library(
         "TargetTriple.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Vulkan/IR",
+        "//compiler/src/iree/compiler/Dialect/Vulkan/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:SPIRVDialect",

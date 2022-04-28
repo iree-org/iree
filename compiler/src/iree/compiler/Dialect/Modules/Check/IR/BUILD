@@ -23,8 +23,8 @@ td_library(
         include = ["*.td"],
     ),
     deps = [
-        "//iree/compiler/Dialect/HAL/IR:td_files",
-        "//iree/compiler/Dialect/Util/IR:td_files",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR:td_files",
+        "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )
@@ -41,7 +41,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":check_ops_gen",
-        "//iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
@@ -59,10 +59,10 @@ iree_compiler_cc_library(
     deps = [
         ":IR",
         ":check_ops_gen",
-        "//iree/compiler/Dialect/HAL/Conversion",
-        "//iree/compiler/Dialect/Modules/Check:check_imports",
-        "//iree/compiler/Dialect/Modules/Check/Conversion",
-        "//iree/compiler/Dialect/VM/Conversion",
+        "//compiler/src/iree/compiler/Dialect/HAL/Conversion",
+        "//compiler/src/iree/compiler/Dialect/Modules/Check:check_imports",
+        "//compiler/src/iree/compiler/Dialect/Modules/Check/Conversion",
+        "//compiler/src/iree/compiler/Dialect/VM/Conversion",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Transforms",

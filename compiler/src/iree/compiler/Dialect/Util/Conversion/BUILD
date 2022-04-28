@@ -21,7 +21,7 @@ iree_compiler_cc_library(
         "ConversionPatterns.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",

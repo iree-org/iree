@@ -17,7 +17,7 @@ iree_compiler_cc_library(
     srcs = ["CallingConvention.cpp"],
     hdrs = ["CallingConvention.h"],
     deps = [
-        "//iree/compiler/Dialect/VM/IR",
+        "//compiler/src/iree/compiler/Dialect/VM/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Support",

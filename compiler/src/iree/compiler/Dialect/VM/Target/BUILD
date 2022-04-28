@@ -19,7 +19,7 @@ iree_compiler_cc_library(
         "IREE_HAVE_EMITC_DIALECT",
     ],
     deps = [
-        "//iree/compiler/Dialect/VM/Target/Bytecode",
-        "//iree/compiler/Dialect/VM/Target/C",
+        "//compiler/src/iree/compiler/Dialect/VM/Target/Bytecode",
+        "//compiler/src/iree/compiler/Dialect/VM/Target/C",
     ],
 )

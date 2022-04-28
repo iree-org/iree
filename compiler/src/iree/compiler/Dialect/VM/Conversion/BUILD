@@ -28,9 +28,9 @@ iree_compiler_cc_library(
         "TypeConverter.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Util/IR",
-        "//iree/compiler/Dialect/VM/IR",
-        "//iree/compiler/Utils",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/VM/IR",
+        "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:FuncDialect",

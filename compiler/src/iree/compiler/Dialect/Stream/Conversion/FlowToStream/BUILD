@@ -21,9 +21,9 @@ iree_compiler_cc_library(
         "ConvertFlowToStream.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Flow/IR",
-        "//iree/compiler/Dialect/Stream/Conversion",
-        "//iree/compiler/Dialect/Stream/IR",
+        "//compiler/src/iree/compiler/Dialect/Flow/IR",
+        "//compiler/src/iree/compiler/Dialect/Stream/Conversion",
+        "//compiler/src/iree/compiler/Dialect/Stream/IR",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",

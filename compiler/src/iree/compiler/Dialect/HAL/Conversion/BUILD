@@ -24,9 +24,9 @@ iree_compiler_cc_library(
         "TypeConverter.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/HAL/Utils",
-        "//iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/HAL/Utils",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MemRefDialect",
@@ -40,7 +40,7 @@ iree_compiler_cc_library(
         "Passes.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/HAL/Conversion/HALToVM",
+        "//compiler/src/iree/compiler/Dialect/HAL/Conversion/HALToVM",
         "@llvm-project//mlir:Pass",
     ],
 )

@@ -21,9 +21,9 @@ iree_compiler_cc_library(
         "BindingLayout.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/Stream/IR",
-        "//iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/Stream/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",

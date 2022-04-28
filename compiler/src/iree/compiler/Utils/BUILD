@@ -41,7 +41,7 @@ iree_compiler_cc_library(
         "TracingUtils.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal/flatcc:building",
         "//runtime/src/iree/base/internal/flatcc:debugging",

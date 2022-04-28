@@ -23,8 +23,8 @@ iree_compiler_cc_library(
         "Transforms.h",
     ],
     deps = [
-        "//iree/compiler/Codegen/Utils",
-        "//iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Codegen/Utils",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineUtils",

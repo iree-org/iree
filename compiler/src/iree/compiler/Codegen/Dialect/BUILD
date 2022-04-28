@@ -57,7 +57,7 @@ iree_compiler_cc_library(
     deps = [
         ":IREECodegenDialectGen",
         ":LoweringConfigGen",
-        "//iree/compiler/Codegen/Utils",
+        "//compiler/src/iree/compiler/Codegen/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:DialectUtils",

@@ -22,9 +22,9 @@ iree_compiler_cc_library(
         "ConvertStandardToVM.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Util/IR",
-        "//iree/compiler/Dialect/VM/Conversion",
-        "//iree/compiler/Dialect/VM/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/VM/Conversion",
+        "//compiler/src/iree/compiler/Dialect/VM/IR",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ControlFlowOps",
         "@llvm-project//mlir:FuncDialect",

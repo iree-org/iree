@@ -21,9 +21,9 @@ iree_compiler_cc_library(
         "ConvertStandardToVMVX.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Modules/VMVX/IR",
-        "//iree/compiler/Dialect/Modules/VMVX/IR:VMVXDialect",
-        "//iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/Modules/VMVX/IR",
+        "//compiler/src/iree/compiler/Dialect/Modules/VMVX/IR:VMVXDialect",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",

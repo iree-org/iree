@@ -46,7 +46,7 @@ iree_compiler_cc_library(
     deps = [
         ":VulkanAttrsGen",
         ":VulkanEnumsGen",
-        "//iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:SPIRVDialect",

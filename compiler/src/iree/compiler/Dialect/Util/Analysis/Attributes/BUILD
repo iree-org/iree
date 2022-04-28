@@ -23,8 +23,8 @@ iree_compiler_cc_library(
         "Range.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Util/Analysis/DFX",
-        "//iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/Analysis/DFX",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithmeticDialect",

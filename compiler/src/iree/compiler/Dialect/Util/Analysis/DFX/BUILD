@@ -27,8 +27,8 @@ iree_compiler_cc_library(
         "State.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Util/Analysis",
-        "//iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/Analysis",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",

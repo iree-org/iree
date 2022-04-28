@@ -23,8 +23,8 @@ iree_compiler_cc_library(
         "OpOracle.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Util/Analysis",
-        "//iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/Analysis",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:FuncDialect",

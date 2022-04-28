@@ -25,9 +25,9 @@ iree_compiler_cc_library(
         "ConvertUtilToVM.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Util/IR",
-        "//iree/compiler/Dialect/VM/Conversion",
-        "//iree/compiler/Dialect/VM/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/VM/Conversion",
+        "//compiler/src/iree/compiler/Dialect/VM/IR",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

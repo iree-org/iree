@@ -21,9 +21,9 @@ iree_compiler_cc_library(
         "ConvertUtilToHAL.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/Util/Conversion",
-        "//iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/Conversion",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Transforms",

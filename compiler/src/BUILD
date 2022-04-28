@@ -12,7 +12,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_compiler_cc_library(
+cc_library(
     name = "defs",
     includes = [
         ".",

@@ -21,9 +21,9 @@ iree_compiler_cc_library(
         "ConversionPatterns.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/HAL/Conversion",
-        "//iree/compiler/Dialect/Modules/Check/IR",
-        "//iree/compiler/Dialect/VM/Conversion",
+        "//compiler/src/iree/compiler/Dialect/HAL/Conversion",
+        "//compiler/src/iree/compiler/Dialect/Modules/Check/IR",
+        "//compiler/src/iree/compiler/Dialect/VM/Conversion",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Transforms",
     ],

@@ -28,7 +28,7 @@ td_library(
         exclude = ["PartitionableLoopsInterface.td"],
     ),
     deps = [
-        "//iree/compiler/Dialect/Util/IR:td_files",
+        "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
         "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
@@ -66,7 +66,7 @@ iree_compiler_cc_library(
         ":FlowInterfacesGen",
         ":FlowOpsGen",
         ":FlowTypesGen",
-        "//iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:Analysis",

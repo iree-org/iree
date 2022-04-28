@@ -23,8 +23,8 @@ iree_compiler_cc_library(
         "ConvertStandardToStream.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Stream/Conversion",
-        "//iree/compiler/Dialect/Stream/IR",
+        "//compiler/src/iree/compiler/Dialect/Stream/Conversion",
+        "//compiler/src/iree/compiler/Dialect/Stream/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ControlFlowOps",

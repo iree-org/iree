@@ -21,9 +21,9 @@ iree_compiler_cc_library(
         "ConvertUtilToStream.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Stream/Conversion",
-        "//iree/compiler/Dialect/Stream/IR",
-        "//iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/Stream/Conversion",
+        "//compiler/src/iree/compiler/Dialect/Stream/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Transforms",

@@ -22,8 +22,8 @@ iree_compiler_cc_library(
         "InferCustomKernelsTargetInfoFromParent.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Utils",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",

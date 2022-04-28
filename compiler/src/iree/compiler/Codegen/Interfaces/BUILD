@@ -45,7 +45,7 @@ iree_compiler_cc_library(
         ":ProcessorOpInterfaces",
         # TODO: Remove this dependency once the transform dialect extensions
         # have a better registration mechanism.
-        "//iree/compiler/Codegen/TransformDialectExtensions",
+        "//compiler/src/iree/compiler/Codegen/TransformDialectExtensions",
     ],
 )
 
@@ -58,8 +58,8 @@ iree_compiler_cc_library(
         "BufferizationInterfaces.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Flow/IR",
-        "//iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/Flow/IR",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "@llvm-project//mlir:ArithmeticTransforms",
         "@llvm-project//mlir:BufferizationDialect",
@@ -88,7 +88,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":ProcessorOpInterfaceGen",
-        "//iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",
     ],

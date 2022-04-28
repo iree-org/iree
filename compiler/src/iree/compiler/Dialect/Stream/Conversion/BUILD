@@ -21,7 +21,7 @@ iree_compiler_cc_library(
         "PatternUtils.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Stream/IR",
+        "//compiler/src/iree/compiler/Dialect/Stream/IR",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Transforms",
