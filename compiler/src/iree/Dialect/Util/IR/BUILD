@@ -8,6 +8,8 @@ load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
 load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "td_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
+load("//iree:build_defs.oss.bzl", "iree_compiler_cc_library")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],

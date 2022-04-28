@@ -6,6 +6,8 @@
 
 load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
+load("//iree:build_defs.oss.bzl", "iree_compiler_cc_library")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
