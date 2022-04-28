@@ -6,14 +6,16 @@
 
 load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "gentbl_filegroup", "td_library")
 
-def iree_tablegen_doc(*args, **kwargs):
+def iree_tablegen_doc(includes=[], **kwargs):
     """iree_tablegen_doc() generates documentation from a table definition file.
 
     This is a simple wrapper over gentbl() so we can differentiate between
     documentation and others. See gentbl() for details regarding arguments.
     """
 
-    gentbl_filegroup(*args, **kwargs)
+    gentbl_filegroup(includes=includes + [
+        "/compiler/src",
+    ], **kwargs)
 
 
 def iree_gentbl_cc_library(includes=[], **kwargs):
@@ -24,7 +26,9 @@ def iree_gentbl_cc_library(includes=[], **kwargs):
     ], **kwargs)
 
 
-def iree_td_library(**kwargs):
+def iree_td_library(includes=[], **kwargs):
     """IREE version of td_library."""
 
-    td_library(**kwargs)
+    td_library(includes=includes + [
+        "/compiler/src",
+    ], **kwargs)
