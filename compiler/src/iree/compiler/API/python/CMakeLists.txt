@@ -10,7 +10,7 @@ include(AddMLIRPython)
 # TODO: Add an upstream cmake param for this vs having a global here.
 add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=iree.compiler.")
 
-set(_PYTHON_BUILD_PREFIX "${IREE_BINARY_DIR}/iree/compiler/python")
+set(_PYTHON_BUILD_PREFIX "${IREE_BINARY_DIR}/compiler/bindings/python")
 set(_PYTHON_INSTALL_PREFIX "python_packages/iree_compiler")
 
 # HACK: This should not be necessary, but add_mlir_python_extension is
@@ -18,7 +18,7 @@ set(_PYTHON_INSTALL_PREFIX "python_packages/iree_compiler")
 # when built in-tree it is somehow working based on that. This will need
 # to be fixed to capture the correct include directories in that macro.
 include_directories(
-  "${IREE_SOURCE_DIR}"
+  "${IREE_SOURCE_DIR}/compiler/src"
   "${IREE_SOURCE_DIR}/llvm-external-projects/iree-dialects/include"
   "${IREE_SOURCE_DIR}/third_party/llvm-project/mlir/include"
   "${IREE_SOURCE_DIR}/third_party/mlir-hlo/include"

@@ -60,17 +60,17 @@
 /iree/ @benvanik
 
 # Compiler
-/iree/compiler/Codegen/ @MaheshRavishankar
-/iree/compiler/Codegen/LLVMCPU/ @hanhanW @MaheshRavishankar
-/iree/compiler/Codegen/LLVMGPU/ @MaheshRavishankar @ThomasRaoux
-/iree/compiler/Codegen/Sandbox/ @hanhanW @MaheshRavishankar
-/iree/compiler/Codegen/SPIRV/ @antiagainst @MaheshRavishankar
-/iree/compiler/ConstEval/ @stellaraccident
-/iree/compiler/Dialect/Flow/ @MaheshRavishankar
-/iree/compiler/Dialect/Vulkan/ @antiagainst
-/iree/compiler/InputConversion/ @MaheshRavishankar @stellaraccident
-/iree/compiler/InputConversion/MHLO @hanhanW @MaheshRavishankar @rsuderman
-/iree/compiler/InputConversion/TOSA @MaheshRavishankar @rsuderman
+/compiler/Codegen/ @MaheshRavishankar
+/compiler/Codegen/LLVMCPU/ @hanhanW @MaheshRavishankar
+/compiler/Codegen/LLVMGPU/ @MaheshRavishankar @ThomasRaoux
+/compiler/Codegen/Sandbox/ @hanhanW @MaheshRavishankar
+/compiler/Codegen/SPIRV/ @antiagainst @MaheshRavishankar
+/compiler/ConstEval/ @stellaraccident
+/compiler/Dialect/Flow/ @MaheshRavishankar
+/compiler/Dialect/Vulkan/ @antiagainst
+/compiler/InputConversion/ @MaheshRavishankar @stellaraccident
+/compiler/InputConversion/MHLO @hanhanW @MaheshRavishankar @rsuderman
+/compiler/InputConversion/TOSA @MaheshRavishankar @rsuderman
 
 
 # Runtime
