@@ -38,15 +38,3 @@ steps:
     artifact_paths:
       - "benchmark-results-gcp-cpu-${BUILDKITE_BUILD_NUMBER}.json"
     timeout_in_minutes: "60"
-
-  - wait
-
-  - label: "Comment benchmark results on pull request"
-    commands:
-      - "git clean -fdx"
-      - "buildkite-agent artifact download benchmark-results-*.json ./"
-      - "python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py --verbose --query-base --comment_subtitle=\" (experimental x86)\" benchmark-results-*.json"
-    key: "post-on-pr-x86"
-    if: "build.pull_request.id != null && (build.pull_request.labels includes 'buildkite:benchmark-x86')"
-    agents:
-      - "queue=report"

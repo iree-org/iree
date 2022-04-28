@@ -14,3 +14,13 @@ steps:
     if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark')"
 
   - wait
+
+  - label: "Comment benchmark results on pull request"
+    commands:
+      - "git clean -fdx"
+      - "buildkite-agent artifact download benchmark-results-*.json ./ --build $BUILDKITE_TRIGGERED_FROM_BUILD_ID"
+      - "python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py --verbose --query-base --comment_subtitle=\" (experimental x86)\" benchmark-results-*.json"
+    key: "post-on-pr-x86"
+    if: "build.pull_request.id != null && (build.pull_request.labels includes 'buildkite:benchmark-x86')"
+    agents:
+      - "queue=report"
