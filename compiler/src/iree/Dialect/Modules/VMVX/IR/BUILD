@@ -34,7 +34,7 @@ td_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "IR",
     srcs = [
         "VMVXEnums.cpp.inc",
@@ -68,7 +68,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "VMVXDialect",
     srcs = ["VMVXDialect.cpp"],
     hdrs = ["VMVXDialect.h"],

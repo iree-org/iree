@@ -53,7 +53,7 @@ filegroup(
 # CAPI
 ################################################################################
 
-cc_library(
+iree_compiler_cc_library(
     name = "CAPI",
     srcs = [
         "Compiler.cpp",

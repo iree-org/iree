@@ -12,7 +12,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "HALExecutable",
     srcs = ["HALExecutable.cpp"],
     hdrs = ["HALExecutable.h"],
@@ -28,7 +28,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "IREEVM",
     srcs = ["IREEVM.cpp"],
     hdrs = ["IREEVM.h"],

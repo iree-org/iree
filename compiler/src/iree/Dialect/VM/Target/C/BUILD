@@ -33,7 +33,7 @@ endif()
 """,
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "Enabled",
     defines = [
         "IREE_HAVE_EMITC_DIALECT",
@@ -43,7 +43,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "TranslateToCpp",
     srcs = [
         "TranslateToCpp.cpp",
@@ -63,7 +63,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "C",
     srcs = [
         "CModuleTarget.cpp",

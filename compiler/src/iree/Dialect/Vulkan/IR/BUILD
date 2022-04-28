@@ -27,7 +27,7 @@ td_library(
     deps = ["@llvm-project//mlir:OpBaseTdFiles"],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "IR",
     srcs = [
         "VulkanAttributes.cpp",

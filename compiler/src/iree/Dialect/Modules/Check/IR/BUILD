@@ -29,7 +29,7 @@ td_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "IR",
     srcs = [
         "CheckOps.cpp",
@@ -48,7 +48,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "CheckDialect",
     srcs = [
         "CheckDialect.cpp",

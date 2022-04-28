@@ -30,7 +30,7 @@ gentbl_cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
         "CaptureDispatchDynamicDims.cpp",

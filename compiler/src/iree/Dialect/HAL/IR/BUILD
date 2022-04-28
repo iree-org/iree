@@ -40,7 +40,7 @@ td_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "IR",
     srcs = [
         "HALOpFolders.cpp",
@@ -88,7 +88,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "HALDialect",
     srcs = ["HALDialect.cpp"],
     hdrs = ["HALDialect.h"],

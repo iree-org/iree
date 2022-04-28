@@ -22,7 +22,7 @@ endif()
 """,
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "MetalSPIRV",
     srcs = ["MetalSPIRVTarget.cpp"],
     hdrs = ["MetalSPIRVTarget.h"],
@@ -45,7 +45,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "SPIRVToMSL",
     srcs = [
         "SPIRVToMSL.cpp",

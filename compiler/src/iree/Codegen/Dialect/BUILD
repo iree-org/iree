@@ -36,7 +36,7 @@ td_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "IREECodegenDialect",
     srcs = [
         "IREECodegenDialect.cpp",

@@ -22,7 +22,7 @@ endif()
 """,
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "VMToEmitC",
     srcs = [
         "ConvertVMToEmitC.cpp",

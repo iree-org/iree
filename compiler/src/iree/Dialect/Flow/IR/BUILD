@@ -38,7 +38,7 @@ td_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "IR",
     srcs = [
         "FlowDialect.cpp",
@@ -182,7 +182,7 @@ iree_tablegen_doc(
     deps = [":td_files"],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "PartitionableLoopsInterface",
     srcs = [
         "PartitionableLoopsInterface.cpp",

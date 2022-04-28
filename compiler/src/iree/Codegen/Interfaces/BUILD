@@ -32,7 +32,7 @@ td_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "Interfaces",
     srcs = [
         "Interfaces.cpp",
@@ -49,7 +49,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "BufferizationInterfaces",
     srcs = [
         "BufferizationInterfaces.cpp",
@@ -74,7 +74,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "ProcessorOpInterfaces",
     srcs = [
         "ProcessorOpInterfaces.cpp",

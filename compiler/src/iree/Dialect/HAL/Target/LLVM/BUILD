@@ -22,7 +22,7 @@ endif()
 """,
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "LLVM",
     srcs = [
         "LLVMAOTTarget.cpp",
@@ -72,7 +72,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "LLVMIRPasses",
     srcs = [
         "LLVMIRPasses.cpp",
@@ -93,7 +93,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "LLVMTargetOptions",
     srcs = [
         "LLVMTargetOptions.cpp",
@@ -109,7 +109,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "LinkerTool",
     srcs = ["LinkerTool.cpp"],
     hdrs = ["LinkerTool.h"],
@@ -118,7 +118,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "LinkerTool_hdrs",
     hdrs = ["LinkerTool.h"],
     deps = [
@@ -129,7 +129,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "StaticLibraryGenerator",
     srcs = [
         "StaticLibraryGenerator.cpp",

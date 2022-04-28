@@ -27,7 +27,7 @@ gentbl_cc_library(
     deps = ["@llvm-project//mlir:PassBaseTdFiles"],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "PassHeaders",
     hdrs = [
         "PassDetail.h",
@@ -45,7 +45,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "Codegen",
     srcs = [
         "Passes.cpp",
