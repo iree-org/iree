@@ -10,10 +10,6 @@ load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 
-load("//iree:build_defs.oss.bzl", "iree_compiler_cc_library")
-
-load("//build_tools/bazel:iree_tablegen.bzl", "iree_tablegen_doc", "iree_gentbl_cc_library", "iree_td_library")
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
