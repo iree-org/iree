@@ -274,53 +274,34 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
   return 1;
 }
 
-/// Returns the tile size to use for the Flow level of an operation that
-/// implements the `PartitionableLoopsInterface`.
+/// Returns the tile size to use for the Flow level.
 ///
 /// The vectorSizeHints can be empty or as many as the number of loops. When not
 /// empty, each hint should be 1 or the vector size. On the dimensions where the
 /// hints != 1, it will try to find the tile sizes which are multipliers of the
 /// hints.
 static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
-    ArrayRef<Range> iterationDomain, ArrayRef<unsigned> partitionableLoops,
-    ArrayRef<int64_t> minTileSizes, ArrayRef<int64_t> maxTileSizes,
-    ArrayRef<int64_t> vectorSizeHints = {}) {
-  assert(iterationDomain.size() == minTileSizes.size() &&
-         "expected as many min tile sizes as number of loops");
+    ArrayRef<unsigned> partitionableLoops, ArrayRef<int64_t> lbs,
+    ArrayRef<int64_t> ubs, ArrayRef<int64_t> minTileSizes,
+    ArrayRef<int64_t> maxTileSizes, ArrayRef<int64_t> vectorSizeHints = {}) {
+  int64_t numLoops = lbs.size();
+  assert(numLoops == minTileSizes.size() && maxTileSizes.size() == numLoops &&
+         "expected as many min/max tile sizes as number of loops");
   assert(
       vectorSizeHints.empty() ||
-      vectorSizeHints.size() == iterationDomain.size() &&
+      vectorSizeHints.size() == numLoops &&
           "vector size hints should be empty or equal to the number of loops");
-  auto getStaticValue = [](Value v) -> int64_t {
-    IntegerAttr attr;
-    if (!matchPattern(v, m_Constant(&attr))) return ShapedType::kDynamicSize;
-    return attr.getInt();
-  };
-  auto lbs = llvm::to_vector(llvm::map_range(
-      iterationDomain, [&](Range r) { return getStaticValue(r.offset); }));
-  auto ubs = llvm::to_vector(llvm::map_range(
-      iterationDomain, [&](Range r) { return getStaticValue(r.size); }));
 
-  llvm::SmallDenseSet<unsigned, 4> partitionableLoopsSet;
-  partitionableLoopsSet.insert(partitionableLoops.begin(),
-                               partitionableLoops.end());
-
-  SmallVector<int64_t> adjustedMinTileSizes(minTileSizes.begin(),
-                                            minTileSizes.end());
-  SmallVector<int64_t> adjustedMaxTileSizes(maxTileSizes.begin(),
-                                            maxTileSizes.end());
-  SmallVector<int64_t> adjustedVectorSizeHints(vectorSizeHints.begin(),
-                                               vectorSizeHints.end());
-  if (adjustedVectorSizeHints.empty()) {
-    adjustedVectorSizeHints.append(lbs.size(), 1);
-  }
-  // Find the bounds of the partitionable loops
-  for (auto i : llvm::seq<unsigned>(0, iterationDomain.size())) {
-    if (partitionableLoopsSet.count(i)) continue;
-    // Force non-partitionable loops not to be tiled.
-    adjustedMinTileSizes[i] = 0;
-    adjustedMaxTileSizes[i] = 0;
-    adjustedVectorSizeHints[i] = 1;
+  // Only set values when the loop is partitionable.
+  SmallVector<int64_t> adjustedMinTileSizes(numLoops, 0);
+  SmallVector<int64_t> adjustedMaxTileSizes(numLoops, 0);
+  SmallVector<int64_t> adjustedVectorSizeHints(numLoops, 1);
+  for (auto i : partitionableLoops) {
+    adjustedMinTileSizes[i] = minTileSizes[i];
+    adjustedMaxTileSizes[i] = maxTileSizes[i];
+    if (!vectorSizeHints.empty()) {
+      adjustedVectorSizeHints[i] = vectorSizeHints[i];
+    }
   }
 
   SmallVector<int64_t> distributedTileSizes =
@@ -341,13 +322,13 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
     ArrayRef<int64_t> maxTileSizes, ArrayRef<int64_t> vectorSizeHints = {}) {
   OpBuilder builder(linalgOp.getContext());
   builder.setInsertionPoint(linalgOp);
-  SmallVector<Range> iterationDomain =
-      linalgOp.createLoopRanges(builder, linalgOp.getLoc());
+  SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
+  SmallVector<int64_t> ubs = *linalgOp.getStaticLoopRanges();
   auto loops =
       cast<IREE::Flow::PartitionableLoopsInterface>(linalgOp.getOperation())
           .getPartitionableLoops(kNumMaxParallelDims);
-  return getDefaultDistributedLevelTileSizes(
-      iterationDomain, loops, minTileSizes, maxTileSizes, vectorSizeHints);
+  return getDefaultDistributedLevelTileSizes(loops, lbs, ubs, minTileSizes,
+                                             maxTileSizes, vectorSizeHints);
 }
 
 /// Splits the tile sizes in `parallelSizes` into `reductionSizes` for the
@@ -384,18 +365,18 @@ static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
 }
 
 /// Sets the default configuration to use for an operation that implements the
-/// `PartitionableLoopsInterface`, given the iteration domain of all the loops.
+/// `PartitionableLoopsInterface`, given the `lbs` and `ubs` of all the loops.
 static LogicalResult setDefaultRootConfig(
     func::FuncOp entryPointFn,
     IREE::Flow::PartitionableLoopsInterface partitionableLoopsInterfaceOp,
-    ArrayRef<Range> iterationDomain) {
+    ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs) {
   if (getLoweringConfig(partitionableLoopsInterfaceOp)) return success();
 
   SmallVector<unsigned> partitionableLoops =
       partitionableLoopsInterfaceOp.getPartitionableLoops(kNumMaxParallelDims);
 
-  SmallVector<int64_t> minTileSizes(iterationDomain.size(), 1);
-  SmallVector<int64_t> maxTileSizes(iterationDomain.size(), 1);
+  SmallVector<int64_t> minTileSizes(lbs.size(), 1);
+  SmallVector<int64_t> maxTileSizes(lbs.size(), 1);
   if (!partitionableLoops.empty()) {
     // TODO: Here the min tile size is just looking at the type of the data in
     // the entry point function, and using a vector size that depends on just
@@ -412,7 +393,7 @@ static LogicalResult setDefaultRootConfig(
   }
 
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
-      iterationDomain, partitionableLoops, minTileSizes, maxTileSizes);
+      partitionableLoops, lbs, ubs, minTileSizes, maxTileSizes);
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(flowTileSizes));
   return setOpConfigAndEntryPointFnTranslation(
@@ -900,15 +881,11 @@ static LogicalResult setRootConfig(
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   if (getLoweringConfig(linalgOp)) return success();
 
-  OpBuilder builder(linalgOp.getContext());
-  builder.setInsertionPoint(linalgOp);
-  SmallVector<Range> iterationDomain =
-      linalgOp.createLoopRanges(builder, linalgOp.getLoc());
-
   auto partitionableLoopOp =
       cast<IREE::Flow::PartitionableLoopsInterface>(linalgOp.getOperation());
-  return setDefaultRootConfig(entryPointFn, partitionableLoopOp,
-                              iterationDomain);
+  SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
+  SmallVector<int64_t> ubs = *linalgOp.getStaticLoopRanges();
+  return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
 }
 
 /// Set the default configuration for operations that implement the
@@ -919,15 +896,24 @@ static LogicalResult setRootConfig(
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   if (getLoweringConfig(tiledOpInterfaceOp)) return success();
 
+  auto partitionableLoopOp = cast<IREE::Flow::PartitionableLoopsInterface>(
+      tiledOpInterfaceOp.getOperation());
+
+  // TODO(hanchung): Implement getStaticLoopRanges method for TiledOpInterface.
   OpBuilder builder(tiledOpInterfaceOp.getContext());
   builder.setInsertionPoint(tiledOpInterfaceOp);
   SmallVector<Range> iterationDomain =
       tiledOpInterfaceOp.getIterationDomain(builder);
-  auto partitionableLoopInterfaceOp =
-      cast<IREE::Flow::PartitionableLoopsInterface>(
-          tiledOpInterfaceOp.getOperation());
-  return setDefaultRootConfig(entryPointFn, partitionableLoopInterfaceOp,
-                              iterationDomain);
+  auto getStaticValue = [](Value v) -> int64_t {
+    IntegerAttr attr;
+    if (!matchPattern(v, m_Constant(&attr))) return ShapedType::kDynamicSize;
+    return attr.getInt();
+  };
+  auto lbs = llvm::to_vector(llvm::map_range(
+      iterationDomain, [&](Range r) { return getStaticValue(r.offset); }));
+  auto ubs = llvm::to_vector(llvm::map_range(
+      iterationDomain, [&](Range r) { return getStaticValue(r.size); }));
+  return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
 }
 
 /// Redirects to methods that set the configuration based on operation type.
