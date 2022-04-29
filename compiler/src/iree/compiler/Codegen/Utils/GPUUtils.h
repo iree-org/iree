@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 
 namespace mlir {
 namespace memref {

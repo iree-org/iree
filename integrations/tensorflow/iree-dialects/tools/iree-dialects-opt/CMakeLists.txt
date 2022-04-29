@@ -12,6 +12,7 @@ set(LIBS
   IREEPyDMDialect
   IREEPyDMPasses
   # Core dialects.
+  MLIRAffine
   MLIRArithmetic
   MLIRAsync
   MLIRControlFlow
