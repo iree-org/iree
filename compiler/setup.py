@@ -88,7 +88,7 @@ if IS_CONFIGURED:
       f"BINARY_DIR = {IREE_BINARY_DIR}",
       file=sys.stderr)
 else:
-  IREE_SOURCE_DIR = os.path.join(SETUPPY_DIR, "..", "..")
+  IREE_SOURCE_DIR = os.path.join(SETUPPY_DIR, "..")
   IREE_BINARY_DIR = os.getenv("IREE_COMPILER_API_CMAKE_BUILD_DIR")
   if not IREE_BINARY_DIR:
     # Note that setuptools always builds into a "build" directory that
@@ -251,9 +251,11 @@ def prepare_installation():
       print(f"Not re-configuring (already configured)", file=sys.stderr)
 
     # Build.
-    subprocess.check_call(
-        ["cmake", "--build", ".", "--target", "iree/compiler/API/python/all"],
-        cwd=IREE_BINARY_DIR)
+    subprocess.check_call([
+        "cmake", "--build", ".", "--target",
+        "compiler/src/iree/compiler/API/python/all"
+    ],
+                          cwd=IREE_BINARY_DIR)
     print("Build complete.", file=sys.stderr)
 
   # Install the directory we care about.
