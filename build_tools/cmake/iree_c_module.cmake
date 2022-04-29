@@ -75,7 +75,7 @@ function(iree_c_module)
       "${_TESTONLY_ARG}"
     DEPS
       # Include paths and options for the runtime sources.
-      iree_defs_runtime
+      iree::runtime::defs
   )
 
   set(_GEN_TARGET "${_NAME}_gen")

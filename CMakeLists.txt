@@ -632,7 +632,7 @@ if(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM)
 endif()
 
 if(IREE_BUILD_COMPILER)
-  add_subdirectory(iree/compiler)
+  add_subdirectory(compiler)
 endif()
 
 add_subdirectory(iree/tools)
@@ -653,7 +653,7 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # Write out a .env file to make IDEs and developers happy.
   # Yes, we are writing this to the source dir. It is only for IDEs and if
   # it gets clobbered, it is fine.
-  set(_PYTHONPATH_ENV "PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/iree/compiler/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>\n")
+  set(_PYTHONPATH_ENV "PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler/bindings/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>\n")
   file(GENERATE OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/.env"
     CONTENT "${_PYTHONPATH_ENV}"
   )

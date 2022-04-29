@@ -32,7 +32,7 @@
 #
 # Note that this script is meant to be run on CI and it will pollute both the
 # output directory and in-tree build/ directories (under runtime/ and
-# iree/compiler/) with docker created, root owned builds. Sorry - there is
+# compiler/) with docker created, root owned builds. Sorry - there is
 # no good way around it.
 #
 # It can be run on a workstation but recommend using a git worktree dedicated
@@ -126,7 +126,7 @@ function build_iree_runtime_instrumented() {
 
 function build_iree_compiler() {
   IREE_TARGET_BACKEND_CUDA=ON \
-  python -m pip wheel -v -w /wheelhouse /main_checkout/iree/iree/compiler/
+  python -m pip wheel -v -w /wheelhouse /main_checkout/iree/compiler/
 }
 
 function run_audit_wheel() {

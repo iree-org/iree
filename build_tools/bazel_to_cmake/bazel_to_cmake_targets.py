@@ -13,6 +13,7 @@ EXPLICIT_TARGET_MAPPING = {
     # Internal utilities to emulate various binary/library options.
     "//build_tools:default_linkopts": [],
     "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
+    "//compiler/src:defs": [],
     "//runtime/src:runtime_defines": [],
 
     # IREE llvm-external-projects
@@ -234,6 +235,12 @@ def convert_target(target):
   # IREE root paths map to package names based on explicit rules.
   # If changing these, make the corresponding change in iree_macros.cmake
   # (iree_package_ns function).
+
+  # Map //compiler/src/iree/(.*) -> iree::\1 (i.e. iree::compiler::\1)
+  m = re.match("^//compiler/src/iree/(.+)", target)
+  if m:
+    return ["iree::" + _convert_bazel_path(m.group(1))]
+
   # Map //runtime/src/iree/(.*) -> iree::\1
   m = re.match("^//runtime/src/iree/(.+)", target)
   if m:
