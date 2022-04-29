@@ -195,8 +195,9 @@ static LogicalResult analysePadTensorOp(tensor::PadOp padTensorOp,
 
 /// For every result of the LinalgOp, gets the operands (`ins` or `outs`) whose
 /// buffer can be reused for the result.
+template <typename OpType>
 static SmallVector<Value> getTiedOperandsForLinalgOps(
-    linalg::LinalgOp linalgOp, const BufferizationPlan &plan) {
+    OpType linalgOp, const BufferizationPlan &plan) {
   SmallVector<Value> tiedOperands(linalgOp.getOperation()->getNumResults());
   auto outputOperands = linalgOp.getOutputOperands();
   for (auto outTensor : llvm::enumerate(outputOperands)) {
@@ -210,29 +211,10 @@ static SmallVector<Value> getTiedOperandsForLinalgOps(
   return tiedOperands;
 }
 
-static LogicalResult analyseLinalgExtOps(IREE::LinalgExt::LinalgExtOp op,
-                                         BufferizationPlan &plan) {
-  if (!op.hasTensorSemantics()) return success();
-  // TODO(hanchung): Revisit if we can tie together op.getOutputOperands() with
-  // the corresponding op.getInputOperands(). For now we have limit LinalgExt
-  // ops, and there is no use case. So we ignore it.
-  // Note: this is what should be done for LinalgOps, except for a what is done
-  // for operand fusion today.
-  for (auto input : op.getInputOperands()) {
-    plan.insert(input->get());
-  }
-  for (auto output : op.getOutputOperands()) {
-    plan.insert(output->get());
-  }
-  for (auto result : op->getResults()) {
-    plan.insert(result);
-  }
-  return success();
-}
-
 /// Adds the corresponding `outs` and result tensors of the linalg op into the
 /// same equivalence class.
-static LogicalResult analyseLinalgOps(linalg::LinalgOp linalgOp,
+template <typename OpType>
+static LogicalResult analyseLinalgOps(OpType linalgOp,
                                       BufferizationPlan &plan) {
   if (!linalgOp.hasTensorSemantics()) return success();
   auto results = linalgOp->getResults();
@@ -528,7 +510,7 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
         })
         .Case<IREE::LinalgExt::LinalgExtOp>(
             [&](IREE::LinalgExt::LinalgExtOp linalgExtOp) {
-              return analyseLinalgExtOps(linalgExtOp, plan);
+              return analyseLinalgOps(linalgExtOp, plan);
             })
         .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
             [&](auto reshapeOp) {

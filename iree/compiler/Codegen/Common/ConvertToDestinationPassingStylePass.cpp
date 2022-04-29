@@ -198,6 +198,11 @@ static LogicalResult replaceDestinationBuffer(OpResult resultValue,
         linalgOp.setOutputOperand(resultNumber, destinationValue);
         return success();
       })
+      .Case<IREE::LinalgExt::LinalgExtOp>([&](auto linalgExtOp) {
+        unsigned resultNumber = resultValue.getResultNumber();
+        linalgExtOp.setOutputOperand(resultNumber, destinationValue);
+        return success();
+      })
       .Case<linalg::InitTensorOp>([&](auto initTensorOp) {
         initTensorOp.replaceAllUsesWith(destinationValue);
         return success();
