@@ -5,8 +5,9 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
-load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "td_library")
+load("@llvm-project//mlir:tblgen.bzl", "td_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_tablegen.bzl", "iree_gentbl_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -56,7 +57,7 @@ cc_library(
     ],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "custom_ops_gen",
     tbl_outs = [
         (
