@@ -60,10 +60,10 @@ where import tools live outside of the compiler/ directory (and possibly
 outside of the IREE repo itself).
 
 Refer to IREE's
-[presentations and talks](../../README.md#presentations-and-talks) and this
+[presentations and talks](../../../../README.md#presentations-and-talks) and this
 architecture diagram for details on how the pieces fit together:
 
-![IREE Architecture](../../docs/website/docs/assets/images/iree_architecture.svg)
+![IREE Architecture](../../../../docs/website/docs/assets/images/iree_architecture.svg)
 
 ## Coding Style
 

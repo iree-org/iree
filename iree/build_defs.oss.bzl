@@ -50,7 +50,7 @@ def iree_compiler_cc_library(deps = [], **kwargs):
     """Used for cc_library targets within the //compiler tree.
 
     This is a pass-through to the native cc_library which adds specific
-    runtime specific options and deps.
+    compiler specific options and deps.
     """
     native.cc_library(
         deps = deps + [
