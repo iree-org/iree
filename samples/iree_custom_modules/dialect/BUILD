@@ -21,8 +21,8 @@ td_library(
         include = ["*.td"],
     ),
     deps = [
-        "//iree/compiler/Dialect/HAL/IR:td_files",
-        "//iree/compiler/Dialect/Util/IR:td_files",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR:td_files",
+        "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
         "@llvm-project//mlir:StdOpsTdFiles",
     ],
 )
@@ -42,10 +42,10 @@ cc_library(
     deps = [
         ":custom_imports",
         ":custom_ops_gen",
-        "//iree/compiler/Dialect/HAL/Conversion",
-        "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/Util/IR",
-        "//iree/compiler/Dialect/VM/Conversion",
+        "//compiler/src/iree/compiler/Dialect/HAL/Conversion",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/VM/Conversion",
         "//samples:defs",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
@@ -112,9 +112,9 @@ cc_binary(
     srcs = ["custom-translate-main.cc"],
     deps = [
         ":init_dialect",
-        "//iree/compiler/Dialect/VM/Target:init_targets",
-        "//iree/compiler/Dialect/VM/Target/Bytecode",
-        "//iree/compiler/Translation:IREEVM",
+        "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",
+        "//compiler/src/iree/compiler/Dialect/VM/Target/Bytecode",
+        "//compiler/src/iree/compiler/Translation:IREEVM",
         "//iree/tools:init_compiler_modules",
         "//iree/tools:init_iree_passes_and_dialects",
         "//iree/tools:init_mlir_passes_and_dialects",
