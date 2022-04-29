@@ -601,3 +601,20 @@ vm.module @my_module {
     vm.return %arg0, %arg1 : i32, !vm.ref<?>
   }
 }
+
+// -----
+
+vm.module @my_module {
+  vm.import optional @optional_import_fn(%arg0 : i32) -> i32
+  // CHECK-LABEL: @my_module_call_fn
+  vm.func @call_fn() -> i32 {
+    // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.call "EMITC_STRUCT_PTR_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"imports">]} : (!emitc.ptr<!emitc.opaque<"my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS]]) {args = [0 : index, 0 : ui32]} : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[MODULE:.+]] = emitc.call "EMITC_STRUCT_PTR_MEMBER"(%[[IMPORT]]) {args = [0 : index, #emitc.opaque<"module">]} : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
+    // CHECK-NEXT: %[[CONDITION0:.+]] = emitc.call "EMITC_NOT"(%[[MODULE]]) {args = [0 : index]} : (!emitc.ptr<!emitc.opaque<"iree_vm_module_t">>) -> i1
+    // CHECK-NEXT: %[[CONDITION1:.+]] = emitc.call "EMITC_NOT"(%[[CONDITION0]]) {args = [0 : index]} : (i1) -> i1
+    // CHECK-NEXT: %[[RESULT:.+]] = emitc.call "EMITC_CAST"(%[[CONDITION1]]) {args = [0 : index, i32]} : (i1) -> i32
+    %has_optional_import_fn = vm.import.resolved @optional_import_fn : i32
+    vm.return %has_optional_import_fn : i32
+  }
+}

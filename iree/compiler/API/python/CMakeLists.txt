@@ -73,7 +73,7 @@ declare_mlir_python_extension(IREECompilerAPIPythonExtensions.IREECTransforms
 # Generate packages and shared library
 ################################################################################
 
-set(_source_components
+set(_SOURCE_COMPONENTS
   # Local sources.
   IREECompilerAPIPythonSources
   IREECompilerAPIPythonExtensions
@@ -114,13 +114,13 @@ add_mlir_python_common_capi_library(IREECompilerAggregateCAPI
   INSTALL_DESTINATION ${_PYTHON_INSTALL_PREFIX}/iree/compiler/_mlir_libs
   OUTPUT_DIRECTORY "${_PYTHON_BUILD_PREFIX}/iree/compiler/_mlir_libs"
   RELATIVE_INSTALL_ROOT "../../../.."
-  DECLARED_SOURCES ${_source_components}
+  DECLARED_SOURCES ${_SOURCE_COMPONENTS}
 )
 
 add_mlir_python_modules(IREECompilerPythonModules
   ROOT_PREFIX "${_PYTHON_BUILD_PREFIX}/iree/compiler"
   INSTALL_PREFIX "${_PYTHON_INSTALL_PREFIX}/iree/compiler"
-  DECLARED_SOURCES ${_source_components}
+  DECLARED_SOURCES ${_SOURCE_COMPONENTS}
   COMMON_CAPI_LINK_LIBS
     IREECompilerAggregateCAPI
   )

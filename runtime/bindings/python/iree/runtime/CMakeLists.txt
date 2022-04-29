@@ -8,15 +8,15 @@ set(NUMPY_DEPS "")
 set(PYBIND_COPTS "-fexceptions")
 set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
 
-set(_python_extra_srcs)
-set(_extra_install_tool_targets)
-set(_tracy_enabled OFF)
+set(_PYTHON_EXTRA_SRCS)
+set(_EXTRA_INSTALL_TOOL_TARGETS)
+set(_TRACY_ENABLED OFF)
 
 if(TARGET IREETracyCaptureServer)
   message(STATUS "Bundline Tracy CLI tools with Python API")
-  set(_tracy_enabled ON)
-  list(APPEND _python_extra_srcs "scripts/iree-tracy-capture")
-  list(APPEND _extra_install_tool_targets "IREETracyCaptureServer")
+  set(_TRACY_ENABLED ON)
+  list(APPEND _PYTHON_EXTRA_SRCS "scripts/iree-tracy-capture")
+  list(APPEND _EXTRA_INSTALL_TOOL_TARGETS "IREETracyCaptureServer")
 endif()
 
 ################################################################################
@@ -69,7 +69,7 @@ iree_py_library(
     "scripts/iree_benchmark_trace/__main__.py"
     "scripts/iree_run_trace/__main__.py"
     "scripts/iree_run_module/__main__.py"
-    ${_python_extra_srcs}
+    ${_PYTHON_EXTRA_SRCS}
   PYEXT_DEPS
     ::PyExtRt
 )
@@ -92,7 +92,7 @@ iree_symlink_tool(
   TO_EXE_NAME iree-run-module
 )
 
-if(_tracy_enabled)
+if(_TRACY_ENABLED)
   iree_symlink_tool(
     TARGET runtime
     FROM_TOOL_TARGET IREETracyCaptureServer
@@ -161,7 +161,7 @@ iree_py_install_package(
     iree_tools_iree-benchmark-trace
     iree_tools_iree-run-module
     iree_tools_iree-run-trace
-    ${_extra_install_tool_targets}
+    ${_EXTRA_INSTALL_TOOL_TARGETS}
   ADDL_PACKAGE_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/README.md
 )
@@ -179,7 +179,7 @@ install(
     iree_tools_iree-benchmark-trace
     iree_tools_iree-run-module
     iree_tools_iree-run-trace
-    ${_extra_install_tool_targets}
+    ${_EXTRA_INSTALL_TOOL_TARGETS}
   DESTINATION "${PY_INSTALL_MODULE_DIR}"
   COMPONENT "${PY_INSTALL_COMPONENT}"
 )

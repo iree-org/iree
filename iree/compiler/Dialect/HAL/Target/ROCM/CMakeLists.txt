@@ -8,7 +8,7 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
-if(NOT "${IREE_TARGET_BACKEND_ROCM}")
+if(NOT IREE_TARGET_BACKEND_ROCM)
   return()
 endif()
 

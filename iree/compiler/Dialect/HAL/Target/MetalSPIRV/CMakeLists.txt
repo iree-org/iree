@@ -8,7 +8,7 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
-if(NOT "${IREE_TARGET_BACKEND_METAL_SPIRV}")
+if(NOT IREE_TARGET_BACKEND_METAL_SPIRV)
   return()
 endif()
 

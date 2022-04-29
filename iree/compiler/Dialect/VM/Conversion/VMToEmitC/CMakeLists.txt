@@ -8,7 +8,7 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
-if(NOT "${IREE_ENABLE_EMITC}")
+if(NOT IREE_ENABLE_EMITC)
   return()
 endif()
 
@@ -28,6 +28,7 @@ iree_cc_library(
     "EmitCTypeConverter.cpp"
   DEPS
     LLVMSupport
+    MLIRArithmetic
     MLIRControlFlow
     MLIREmitC
     MLIRFunc

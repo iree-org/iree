@@ -74,7 +74,7 @@ declare_mlir_python_extension(IREEDialectsPythonExtensions.Main
 # testing.
 ################################################################################
 
-set(_source_components
+set(_SOURCE_COMPONENTS
   # TODO: Core is now implicitly building/registering all dialects, increasing
   # build burden by ~5x. Make it stop.
   MLIRPythonSources.Core
@@ -92,13 +92,13 @@ add_mlir_python_common_capi_library(IREEDialectsAggregateCAPI
   INSTALL_DESTINATION python_packages/iree_dialects/mlir/_mlir_libs
   OUTPUT_DIRECTORY "${IREE_DIALECTS_BINARY_DIR}/python_packages/iree_dialects/iree/compiler/_mlir_libs"
   RELATIVE_INSTALL_ROOT "../../../.."
-  DECLARED_SOURCES ${_source_components}
+  DECLARED_SOURCES ${_SOURCE_COMPONENTS}
 )
 
 add_mlir_python_modules(IREEDialectsPythonModules
   ROOT_PREFIX "${IREE_DIALECTS_BINARY_DIR}/python_packages/iree_dialects/iree/compiler"
   INSTALL_PREFIX "python_packages/iree_dialects/iree/compiler"
-  DECLARED_SOURCES ${_source_components}
+  DECLARED_SOURCES ${_SOURCE_COMPONENTS}
   COMMON_CAPI_LINK_LIBS
     IREEDialectsAggregateCAPI
   )

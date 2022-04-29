@@ -22,8 +22,10 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRAnalysis
+    MLIRArithmetic
     MLIRIR
     MLIRLinalg
+    MLIRMath
     MLIRPass
     MLIRSupport
     iree::compiler::Dialect::Util::Analysis::DFX

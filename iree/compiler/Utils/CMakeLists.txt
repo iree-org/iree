@@ -55,7 +55,7 @@ iree_cc_library(
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
-if(${IREE_ENABLE_COMPILER_TRACING})
+if(IREE_ENABLE_COMPILER_TRACING)
   target_compile_definitions(iree_compiler_Utils_Utils
   PUBLIC
     "IREE_ENABLE_COMPILER_TRACING=1"

@@ -87,7 +87,7 @@ iree_cc_library(
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 # TODO(*): figure out how to make this work on Bazel+Windows.
-if(${MSVC})
+if(MSVC)
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "amd64.*|x86_64.*|AMD64.*")
     set_source_files_properties(
       arch/x86_64_msvc.asm

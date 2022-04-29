@@ -27,7 +27,7 @@ iree_cc_library(
 )
 
 # Doesn't use bazel_to_cmake because IREE_HAL_DRIVER_VMVX filtering is custom logic
-if(${IREE_HAL_DRIVER_VMVX})
+if(IREE_HAL_DRIVER_VMVX)
   iree_cc_test(
     NAME
       check_test

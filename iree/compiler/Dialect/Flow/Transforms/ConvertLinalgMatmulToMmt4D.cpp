@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Utils/CustomKernelsTargetInfo.h"
 #include "llvm/ADT/Optional.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/PatternMatch.h"

@@ -19,7 +19,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(IREE_IDE_FOLDER IREE)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-if(${MSVC})
+if(MSVC)
   enable_language(ASM_MASM)
 else()
   enable_language(ASM)
@@ -88,7 +88,7 @@ set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
 
 # Vulkan is not natively supported on Apple platforms.
 # Metal should generally be used instead, though MoltenVK may also work.
-if (APPLE)
+if(APPLE)
   set(IREE_HAL_DRIVER_VULKAN_DEFAULT OFF)
 else()
   set(IREE_HAL_DRIVER_VULKAN_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
@@ -156,7 +156,7 @@ endif()
 
 option(IREE_ENABLE_CCACHE "Use ccache if installed to speed up rebuilds." OFF)
 
-if(${IREE_ENABLE_CCACHE})
+if(IREE_ENABLE_CCACHE)
   find_program(CCACHE_PROGRAM ccache)
   if(CCACHE_PROGRAM)
       set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
@@ -190,19 +190,18 @@ option(IREE_ENABLE_ASSERTIONS "Force unset of NDEBUG compile option" OFF)
 # Filter -DNDEBUG from CMAKE_CXX_FLAGS_* and CMAKE_C_FLAGS_* (if
 # CMAKE_BUILD_TYPE is not Debug).
 function(iree_fix_ndebug)
-  string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
-  if(IREE_ENABLE_ASSERTIONS AND NOT "${uppercase_CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
+  string(TOUPPER "${CMAKE_BUILD_TYPE}" _UPPERCASE_CMAKE_BUILD_TYPE)
+  if(IREE_ENABLE_ASSERTIONS AND NOT "${_UPPERCASE_CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
       # Also remove /D NDEBUG to avoid MSVC warnings about conflicting defines.
-      foreach (flags_var_to_scrub
-              CMAKE_CXX_FLAGS_${uppercase_CMAKE_BUILD_TYPE}
-              CMAKE_C_FLAGS_${uppercase_CMAKE_BUILD_TYPE})
-          set(original_flags "${${flags_var_to_scrub}}")
-          string (REGEX REPLACE "(^| )[/-]D *NDEBUG($| )" " "
-                  altered_flags "${original_flags}")
-          if(NOT "${original_flags}" STREQUAL "${altered_flags}")
+      foreach(_FLAGS_VAR_TO_SCRUB
+              CMAKE_CXX_FLAGS_${_UPPERCASE_CMAKE_BUILD_TYPE}
+              CMAKE_C_FLAGS_${_UPPERCASE_CMAKE_BUILD_TYPE})
+          set(_ORIGINAL_FLAGS "${${_FLAGS_VAR_TO_SCRUB}}")
+          string(REGEX REPLACE "(^| )[/-]D *NDEBUG($| )" " " _ALTERED_FLAGS "${_ORIGINAL_FLAGS}")
+          if(NOT "${_ORIGINAL_FLAGS}" STREQUAL "${_ALTERED_FLAGS}")
             message(STATUS
-              "IREE_ENABLE_ASSERTIONS force disabled NDEBUG for ${flags_var_to_scrub}: '${original_flags}' -> '${altered_flags}'")
-            set(${flags_var_to_scrub} "${altered_flags}" PARENT_SCOPE)
+              "IREE_ENABLE_ASSERTIONS force disabled NDEBUG for ${_FLAGS_VAR_TO_SCRUB}: '${_ORIGINAL_FLAGS}' -> '${_ALTERED_FLAGS}'")
+            set(${_FLAGS_VAR_TO_SCRUB} "${_ALTERED_FLAGS}" PARENT_SCOPE)
           endif()
       endforeach()
 
@@ -482,7 +481,7 @@ else()
   # TODO: It should be possible to fix upstream targets so as to not require
   # any of these. Remove as they become unnecessary.
   function(_hack_llvm_include_paths)
-    set(_common_include_dirs
+    set(_COMMON_INCLUDE_DIRS
       # LLVM
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include>
       $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include>
@@ -500,8 +499,8 @@ else()
     )
     # Avoid globally modifying paths by instead adding the include paths to the
     # rules that really should have them in the first place.
-    target_include_directories(LLVMSupport PUBLIC ${_common_include_dirs})
-    target_include_directories(MLIRSupport PUBLIC ${_common_include_dirs})
+    target_include_directories(LLVMSupport PUBLIC ${_COMMON_INCLUDE_DIRS})
+    target_include_directories(MLIRSupport PUBLIC ${_COMMON_INCLUDE_DIRS})
   endfunction()
   _hack_llvm_include_paths()
 endif()
@@ -534,7 +533,7 @@ add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 
 # TODO(scotttodd): Iterate some more and find a better place for this.
-if (NOT CMAKE_CROSSCOMPILING)
+if(NOT CMAKE_CROSSCOMPILING)
   install(
     TARGETS iree-flatcc-cli
     COMPONENT iree-flatcc-cli
@@ -578,7 +577,7 @@ endif()
 # IREE top-level targets
 #-------------------------------------------------------------------------------
 
-if(${IREE_BUILD_BENCHMARKS})
+if(IREE_BUILD_BENCHMARKS)
   # Add top-level custom targets to drive generating benchmark suites.
 
   # iree-benchmark-import-models imports benchmark models from their source
@@ -592,12 +591,12 @@ if(${IREE_BUILD_BENCHMARKS})
   add_custom_target(iree-benchmark-suites)
 endif()
 
-if(${IREE_BUILD_MICROBENCHMARKS})
+if(IREE_BUILD_MICROBENCHMARKS)
   # Add top-level custom targets to drive generating microbenchmark suites.
   add_custom_target(iree-microbenchmark-suites)
 endif()
 
-if(${IREE_BUILD_DOCS})
+if(IREE_BUILD_DOCS)
   # Add a top-level custom target to drive generating all documentation.
   # Register it to the default target given that IREE_BUILD_DOCS is explicitly
   # requested.
@@ -617,7 +616,7 @@ add_subdirectory(build_tools/embed_data/)
 # Note: Test deps are not built as part of all (use the iree-test-deps target).
 add_subdirectory(iree/test EXCLUDE_FROM_ALL)
 
-if(${IREE_BUILD_BENCHMARKS})
+if(IREE_BUILD_BENCHMARKS)
   find_program(IREE_IMPORT_TFLITE_PATH iree-import-tflite)
   if(IREE_IMPORT_TFLITE_PATH)
     message(STATUS "Found ${IREE_IMPORT_TFLITE_PATH} to generate benchmark artifacts")
@@ -627,12 +626,12 @@ if(${IREE_BUILD_BENCHMARKS})
   add_subdirectory(benchmarks)
 endif()
 
-if(${IREE_HAL_DRIVER_EXPERIMENTAL_ROCM})
+if(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM)
   add_subdirectory(build_tools/third_party/rocm EXCLUDE_FROM_ALL)
   add_subdirectory(experimental/rocm)
 endif()
 
-if(${IREE_BUILD_COMPILER})
+if(IREE_BUILD_COMPILER)
   add_subdirectory(iree/compiler)
 endif()
 
@@ -654,20 +653,20 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # Write out a .env file to make IDEs and developers happy.
   # Yes, we are writing this to the source dir. It is only for IDEs and if
   # it gets clobbered, it is fine.
-  set(_pythonpath_env "PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/iree/compiler/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>\n")
+  set(_PYTHONPATH_ENV "PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/iree/compiler/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>\n")
   file(GENERATE OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/.env"
-    CONTENT "${_pythonpath_env}"
+    CONTENT "${_PYTHONPATH_ENV}"
   )
   file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env"
-    CONTENT "${_pythonpath_env}"
+    CONTENT "${_PYTHONPATH_ENV}"
   )
 endif()
 
-if(${IREE_BUILD_BINDINGS_TFLITE})
+if(IREE_BUILD_BINDINGS_TFLITE)
   add_subdirectory(bindings/tflite)
 endif()
 
-if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
+if(IREE_BUILD_EXPERIMENTAL_REMOTING)
   # NOTE: Currently liburing is only used by the experimental remoting
   # support, so keeping it scoped here. If this broadens, then include along
   # with other dependencies as normal.
@@ -678,7 +677,7 @@ if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
   add_subdirectory(experimental/remoting)
 endif()
 
-if(${IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES})
+if(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES)
   add_subdirectory(experimental/web)
 endif()
 

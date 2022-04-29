@@ -14,7 +14,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT "${IREE_ENABLE_EMITC}")
+if(NOT IREE_ENABLE_EMITC)
   return()
 endif()
 """,
@@ -40,6 +40,7 @@ cc_library(
         "//iree/compiler/Dialect/VM/IR",
         "//iree/compiler/Dialect/VM/Utils:CallingConvention",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ControlFlowOps",
         "@llvm-project//mlir:EmitC",
         "@llvm-project//mlir:FuncDialect",

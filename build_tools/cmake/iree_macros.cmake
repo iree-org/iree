@@ -132,7 +132,7 @@ endfunction()
 #     the binary when importing a binary from a host build. Thus this should be
 #     the global unqualified name of the binary, not the fully-specified name.
 function(iree_get_executable_path OUTPUT_PATH_VAR EXECUTABLE)
-  if (NOT DEFINED IREE_HOST_BINARY_ROOT OR TARGET "${EXECUTABLE}")
+  if(NOT DEFINED IREE_HOST_BINARY_ROOT OR TARGET "${EXECUTABLE}")
     # We can either expect the target to be defined as part of this CMake
     # invocation (if not cross compiling) or the target is defined already.
     set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${EXECUTABLE}>" PARENT_SCOPE)
@@ -141,7 +141,7 @@ function(iree_get_executable_path OUTPUT_PATH_VAR EXECUTABLE)
     # for an already built executable at IREE_HOST_BINARY_ROOT. If we find it,
     # add it as an imported target so it gets picked up on later invocations.
     set(_EXECUTABLE_PATH "${IREE_HOST_BINARY_ROOT}/bin/${EXECUTABLE}${IREE_HOST_EXECUTABLE_SUFFIX}")
-    if (EXISTS ${_EXECUTABLE_PATH})
+    if(EXISTS ${_EXECUTABLE_PATH})
       add_executable("${EXECUTABLE}" IMPORTED GLOBAL)
       set_property(TARGET "${EXECUTABLE}" PROPERTY IMPORTED_LOCATION "${_EXECUTABLE_PATH}")
       set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${EXECUTABLE}>" PARENT_SCOPE)
@@ -214,7 +214,7 @@ endfunction()
 #
 # Parameters:
 # NAME: name of the target to add data dependencies to
-# DATA: List of targets and/or files in the source tree (relative to the 
+# DATA: List of targets and/or files in the source tree (relative to the
 # project root).
 function(iree_add_data_dependencies)
   cmake_parse_arguments(
@@ -271,7 +271,7 @@ endfunction()
 #   TO_EXE_NAME: The executable name to output in the current binary dir.
 function(iree_symlink_tool)
   cmake_parse_arguments(
-    ARG
+    _RULE
     ""
     "TARGET;FROM_TOOL_TARGET;TO_EXE_NAME"
     ""
@@ -281,16 +281,16 @@ function(iree_symlink_tool)
   # Transform TARGET
   iree_package_ns(_PACKAGE_NS)
   iree_package_name(_PACKAGE_NAME)
-  set(_TARGET "${_PACKAGE_NAME}_${ARG_TARGET}")
-  set(_FROM_TOOL_TARGET ${ARG_FROM_TOOL_TARGET})
-  set(_TO_TOOL_PATH "${CMAKE_CURRENT_BINARY_DIR}/${ARG_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}")
+  set(_TARGET "${_PACKAGE_NAME}_${_RULE_TARGET}")
+  set(_FROM_TOOL_TARGET ${_RULE_FROM_TOOL_TARGET})
+  set(_TO_TOOL_PATH "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}")
   get_filename_component(_TO_TOOL_DIR "${_TO_TOOL_PATH}" DIRECTORY)
 
 
   add_custom_command(
     TARGET "${_TARGET}"
     BYPRODUCTS
-      "${CMAKE_CURRENT_BINARY_DIR}/${ARG_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}"
+      "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}"
     COMMAND
       ${CMAKE_COMMAND} -E make_directory "${_TO_TOOL_DIR}"
     COMMAND
@@ -321,7 +321,7 @@ function(iree_add_test_environment_properties TEST_NAME)
   #
   # Tests which only depend on a compiler target backend or a runtime HAL
   # driver, but not both, should generally use a different method of filtering.
-  if(NOT "${IREE_TARGET_BACKEND_VULKAN_SPIRV}" OR NOT "${IREE_HAL_DRIVER_VULKAN}")
+  if(NOT IREE_TARGET_BACKEND_VULKAN_SPIRV OR NOT IREE_HAL_DRIVER_VULKAN)
     set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "IREE_VULKAN_DISABLE=1")
   endif()
 endfunction()

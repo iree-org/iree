@@ -14,7 +14,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(${IREE_HAL_DRIVER_DYLIB})
+if(IREE_HAL_DRIVER_DYLIB)
 """,
     inline = True,
 )
@@ -42,7 +42,7 @@ iree_cmake_extra_content(
     content = """
 endif()
 
-if(${IREE_HAL_DRIVER_DYLIB_SYNC})
+if(IREE_HAL_DRIVER_DYLIB_SYNC)
 """,
     inline = True,
 )

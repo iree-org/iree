@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/SourceMgr.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"

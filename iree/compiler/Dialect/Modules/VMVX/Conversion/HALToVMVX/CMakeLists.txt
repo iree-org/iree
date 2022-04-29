@@ -18,6 +18,7 @@ iree_cc_library(
   SRCS
     "ConvertHALToVMVX.cpp"
   DEPS
+    MLIRArithmetic
     MLIRFunc
     MLIRIR
     MLIRMemRef

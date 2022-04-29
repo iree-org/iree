@@ -16,6 +16,7 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/Support/Alignment.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"

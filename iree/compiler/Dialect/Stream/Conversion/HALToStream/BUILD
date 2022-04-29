@@ -22,6 +22,7 @@ cc_library(
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/Stream/Conversion",
         "//iree/compiler/Dialect/Stream/IR",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
     ],

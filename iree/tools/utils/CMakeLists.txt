@@ -52,7 +52,7 @@ iree_cc_library(
   PUBLIC
 )
 
-if(${IREE_HAL_DRIVER_VMVX})
+if(IREE_HAL_DRIVER_VMVX)
 
 iree_cc_test(
   NAME

@@ -37,6 +37,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAffine
     MLIRAffineToStandard
+    MLIRArithmetic
     MLIRArithmeticToLLVM
     MLIRArithmeticTransforms
     MLIRControlFlowToLLVM

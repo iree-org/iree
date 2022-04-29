@@ -23,6 +23,7 @@ cc_library(
         "//iree/compiler/Dialect/Modules/VMVX/IR",
         "//iree/compiler/Dialect/Modules/VMVX/IR:VMVXDialect",
         "//iree/compiler/Dialect/Util/IR",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MemRefDialect",

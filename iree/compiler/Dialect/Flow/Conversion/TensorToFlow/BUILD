@@ -20,6 +20,7 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/Flow/IR",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",

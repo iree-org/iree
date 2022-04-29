@@ -16,7 +16,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT "${IREE_ENABLE_EMITC}")
+if(NOT IREE_ENABLE_EMITC)
   return()
 endif()
 """,
