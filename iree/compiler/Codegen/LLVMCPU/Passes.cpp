@@ -316,6 +316,8 @@ void addMatmulDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   // passManager.addNestedPass<func::FuncOp>(createCSEPass());
   //}
 
+  // Fold dim(pad) away before vectorization.
+  passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   {
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
