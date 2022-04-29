@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -21,23 +22,39 @@ struct LLVMCPUCheckIRBeforeLLVMConversionPass
 
 void LLVMCPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
   auto moduleOp = getOperation();
-  int64_t bits = 0;
+  int64_t totalBits = 0;
   auto walkResult = moduleOp.walk([&](memref::AllocaOp allocaOp) -> WalkResult {
     auto type = allocaOp.getType().cast<ShapedType>();
-    if (!type.hasStaticShape()) {
-      return allocaOp.emitOpError(
-          "expected no stack allocations with dynamic shapes");
+    int64_t size = 1;
+    for (auto dimSize : type.getShape()) {
+      if (dimSize == ShapedType::kDynamicSize) continue;
+      size *= dimSize;
     }
-    bits += type.getSizeInBits();
+    for (auto operand : allocaOp.dynamicSizes()) {
+      auto ub = linalg::getConstantUpperBoundForIndex(operand);
+      if (failed(ub)) {
+        return allocaOp.emitOpError(
+            "expected no stack allocations without upper bound shapes");
+      }
+      size *= *ub;
+    }
+    size *= type.getElementType().getIntOrFloatBitWidth();
+    if (allocaOp.alignment()) {
+      int64_t alignmentInBits = *allocaOp.alignment() * 8;
+      size = llvm::divideCeil(size, alignmentInBits) * alignmentInBits;
+    }
+    totalBits += size;
     return WalkResult::advance();
   });
   if (walkResult.wasInterrupted()) {
     return signalPassFailure();
   }
-  constexpr int k16KBInBits = 16 * 1024 * 8;
-  if (bits >= k16KBInBits) {
+  constexpr int k32KBInBits = 32 * 1024 * 8;
+  if (totalBits > k32KBInBits) {
     moduleOp.emitOpError(
-        "expected total size of stack allocation is smaller than 16 KB");
+        "expected total size of stack allocation is not greater than 32 KB, "
+        "but got ")
+        << llvm::divideCeil(totalBits, 8) << " bytes";
     return signalPassFailure();
   }
 }
