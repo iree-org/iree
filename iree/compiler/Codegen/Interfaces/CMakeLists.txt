@@ -32,6 +32,7 @@ iree_cc_library(
   SRCS
     "BufferizationInterfaces.cpp"
   DEPS
+    IREELinalgExtDialect
     MLIRArithmeticTransforms
     MLIRBufferization
     MLIRBufferizationTransforms
