@@ -26,8 +26,6 @@ export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
 # We test on SwiftShader, which does not support this extension.
 export IREE_VULKAN_F16_DISABLE=${IREE_VULKAN_F16_DISABLE:-1}
 
-export LLVM_SYMBOLIZER_PATH=${LLVM_SYMBOLIZER_PATH:-$BUILD_DIR/third_party/llvm-project/llvm/bin/llvm-symbolizer}
-
 # Tests to exclude by label. In addition to any custom labels (which are carried
 # over from Bazel tags), every test should be labeled with the directory it is
 # in.
