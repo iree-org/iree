@@ -259,8 +259,8 @@ def prepare_installation():
     print("Build complete.", file=sys.stderr)
 
   # Install the directory we care about.
-  install_subdirectory = os.path.join(IREE_BINARY_DIR, "iree", "compiler",
-                                      "API", "python")
+  install_subdirectory = os.path.join(IREE_BINARY_DIR, "compiler", "src",
+                                      "iree", "compiler", "API", "python")
   install_args = [
       "-DCMAKE_INSTALL_DO_STRIP=ON",
       f"-DCMAKE_INSTALL_PREFIX={CMAKE_INSTALL_DIR_ABS}",
