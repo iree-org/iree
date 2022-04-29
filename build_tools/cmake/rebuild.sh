@@ -56,7 +56,17 @@ CMAKE_ARGS=(
   "-DIREE_TARGET_BACKEND_CUDA=ON"
 )
 
+echo "Configuring"
+echo "-----------"
 "$CMAKE_BIN" "${CMAKE_ARGS[@]?}" "$@" ..
+
+# Build llvm-symbolizer first and make it discoverable, so any future build
+# steps can include symbolized stack traces if there are crashes.
+echo "Building llvm-symbolizer"
+echo "------------------------"
+"$CMAKE_BIN" --build . --target llvm-symbolizer
+export LLVM_SYMBOLIZER_PATH=$PWD/third_party/llvm-project/llvm/bin/llvm-symbolizer
+
 echo "Building all"
 echo "------------"
 "$CMAKE_BIN" --build . -- -k 0
