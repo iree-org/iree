@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 
+#include <numeric>
+
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -165,58 +167,53 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
   assert(lbs.size() == ubs.size() && lbs.size() == minTileSizes.size() &&
          lbs.size() == maxTileSizes.size() &&
          "expected all vectors to be of equal size");
-  if (lbs.empty()) {
-    return {};
-  }
   size_t numDims = lbs.size();
   SmallVector<int64_t> distributedTileSizes(numDims, 1);
   SmallVector<int64_t> numWorkgroupsPerDim(numDims, 1);
   SmallVector<int64_t> workload(numDims, 1);
-  auto ceilFn = [](int64_t a, int64_t b) { return (a + b - 1) / b; };
-
   for (auto i : llvm::seq<size_t>(0, numDims)) {
-    if (ShapedType::isDynamic(lbs[i]) || ShapedType::isDynamic(ubs[i])) {
+    if (maxTileSizes[i] == 0 || ShapedType::isDynamic(lbs[i]) ||
+        ShapedType::isDynamic(ubs[i])) {
       distributedTileSizes[i] = maxTileSizes[i];
       workload[i] = ShapedType::kDynamicSize;
       continue;
     }
+
+    assert(lbs[i] <= ubs[i]);
+    workload[i] = ubs[i] - lbs[i];
     int64_t candidateTileSize = 1;
-    if (ubs[i] > lbs[i]) {
-      int64_t dimSize = static_cast<uint64_t>(ubs[i] - lbs[i]);
-      int64_t targetSize = std::min(dimSize / 2, maxTileSizes[i]);
-      int64_t vectorSize = vectorSizeHints[i];
-      if (vectorSize > 1) {
-        // Pick the factor of dim which is closest to the target tile size and
-        // is a multiplier of vector size.
-        for (int64_t k = vectorSize; k <= targetSize; k += vectorSize) {
-          if (dimSize % k == 0 && k >= minTileSizes[i]) {
-            candidateTileSize = k;
-          }
+    int64_t targetSize = std::min(workload[i] / 2, maxTileSizes[i]);
+    int64_t vectorSize = vectorSizeHints[i];
+    if (vectorSize > 1) {
+      // Pick the factor of dim which is closest to the target tile size and
+      // is a multiplier of vector size.
+      for (int64_t k = vectorSize; k <= targetSize; k += vectorSize) {
+        if (workload[i] % k == 0 && k >= minTileSizes[i]) {
+          candidateTileSize = k;
         }
       }
-      // Fallback to power of 2 if there's no hint or can't find the ideal size.
-      if (vectorSize <= 1 || candidateTileSize == 1) {
-        candidateTileSize =
-            std::max<int64_t>(llvm::PowerOf2Floor(targetSize), minTileSizes[i]);
-      }
+    }
+    // Fallback to power of 2 if there's no hint or can't find the ideal size.
+    if (vectorSize <= 1 || candidateTileSize == 1) {
+      candidateTileSize =
+          std::max<int64_t>(llvm::PowerOf2Floor(targetSize), minTileSizes[i]);
     }
 
     // Limit the workload per workgroup to the default being the max to keep the
     // work per invocation reasonable.
     distributedTileSizes[i] =
         std::min<int64_t>(candidateTileSize, maxTileSizes[i]);
-    workload[i] = (ubs[i] <= lbs[i] ? 1 : ubs[i] - lbs[i]);
-    numWorkgroupsPerDim[i] = ceilFn(workload[i], distributedTileSizes[i]);
+    numWorkgroupsPerDim[i] =
+        llvm::divideCeil(workload[i], distributedTileSizes[i]);
   }
 
   // Reduce the number of workgroups in cases where we are dividing the work too
   // much. Over-provision the number of workgroups to twice the number of
   // threads.
   int64_t numWorkgroupsLimit = 2 * clNumberOfRuntimeThreads;
-  int64_t numWorkgroups = 1;
-  for (auto ng : numWorkgroupsPerDim) {
-    numWorkgroups *= ng;
-  }
+  int64_t numWorkgroups =
+      std::accumulate(numWorkgroupsPerDim.begin(), numWorkgroupsPerDim.end(),
+                      1LL, std::multiplies<int64_t>{});
   unsigned currDim = numDims;
   while (numWorkgroups > numWorkgroupsLimit && currDim > 0) {
     unsigned index = currDim - 1;
@@ -239,7 +236,8 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
     }
 
     distributedTileSizes[index] = newSize;
-    int64_t nwg = ceilFn(workload[index], distributedTileSizes[index]);
+    int64_t nwg =
+        llvm::divideCeil(workload[index], distributedTileSizes[index]);
     if (nwg < numWorkgroupsPerDim[index]) {
       numWorkgroups /= numWorkgroupsPerDim[index];
       numWorkgroups *= nwg;
@@ -276,81 +274,61 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
   return 1;
 }
 
-/// Returns the tile size to use for the Flow level of an operation that
-/// implements the `PartitionableLoopsInterface`.
+/// Returns the tile size to use for the Flow level.
 ///
 /// The vectorSizeHints can be empty or as many as the number of loops. When not
 /// empty, each hint should be 1 or the vector size. On the dimensions where the
 /// hints != 1, it will try to find the tile sizes which are multipliers of the
 /// hints.
 static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
-    ArrayRef<Range> iterationDomain,
-    IREE::Flow::PartitionableLoopsInterface partitionableLoopInterfaceOp,
-    ArrayRef<int64_t> minTileSizes, ArrayRef<int64_t> maxTileSizes,
-    ArrayRef<int64_t> vectorSizeHints = {}) {
-  assert(iterationDomain.size() == minTileSizes.size() &&
-         "expected as many min tile sizes as number of loops");
+    ArrayRef<unsigned> partitionableLoops, ArrayRef<int64_t> lbs,
+    ArrayRef<int64_t> ubs, ArrayRef<int64_t> minTileSizes,
+    ArrayRef<int64_t> maxTileSizes, ArrayRef<int64_t> vectorSizeHints = {}) {
+  int64_t numLoops = lbs.size();
+  assert(numLoops == minTileSizes.size() && maxTileSizes.size() == numLoops &&
+         "expected as many min/max tile sizes as number of loops");
   assert(
       vectorSizeHints.empty() ||
-      vectorSizeHints.size() == iterationDomain.size() &&
+      vectorSizeHints.size() == numLoops &&
           "vector size hints should be empty or equal to the number of loops");
-  auto getStaticValue = [](Value v) -> int64_t {
-    IntegerAttr attr;
-    if (!matchPattern(v, m_Constant(&attr))) return ShapedType::kDynamicSize;
-    return attr.getInt();
-  };
-  auto lbs = llvm::to_vector(llvm::map_range(
-      iterationDomain, [&](Range r) { return getStaticValue(r.offset); }));
-  auto ubs = llvm::to_vector(llvm::map_range(
-      iterationDomain, [&](Range r) { return getStaticValue(r.size); }));
 
-  SmallVector<unsigned> partitionableLoops =
-      partitionableLoopInterfaceOp.getPartitionableLoops(kNumMaxParallelDims);
-  llvm::SmallDenseSet<unsigned, 4> partitionableLoopsSet;
-  partitionableLoopsSet.insert(partitionableLoops.begin(),
-                               partitionableLoops.end());
-
-  size_t numPartitionedLoops = partitionableLoops.size();
-  SmallVector<int64_t> distributedLoopLbs(numPartitionedLoops,
-                                          ShapedType::kDynamicSize),
-      distributedLoopUbs(numPartitionedLoops, ShapedType::kDynamicSize),
-      minDistributedLoopTileSizes(numPartitionedLoops, 1),
-      maxDistributedLoopTileSizes(numPartitionedLoops,
-                                  defaultWorkgroupTileSize),
-      distributedVectorSizeHints(numPartitionedLoops, 1);
-  // Find the bounds of the partitionable loops
-  unsigned index = 0;
-  for (auto range : llvm::enumerate(iterationDomain)) {
-    if (!partitionableLoopsSet.count(range.index())) continue;
-
-    minDistributedLoopTileSizes[index] = minTileSizes[range.index()];
-    maxDistributedLoopTileSizes[index] = maxTileSizes[range.index()];
-    distributedLoopLbs[index] = lbs[range.index()];
-    distributedLoopUbs[index] = ubs[range.index()];
-    distributedVectorSizeHints[index] =
-        vectorSizeHints.empty() ? 1 : vectorSizeHints[range.index()];
-    index++;
+  // Only set values when the loop is partitionable.
+  SmallVector<int64_t> adjustedMinTileSizes(numLoops, 0);
+  SmallVector<int64_t> adjustedMaxTileSizes(numLoops, 0);
+  SmallVector<int64_t> adjustedVectorSizeHints(numLoops, 1);
+  for (auto i : partitionableLoops) {
+    adjustedMinTileSizes[i] = minTileSizes[i];
+    adjustedMaxTileSizes[i] = maxTileSizes[i];
+    if (!vectorSizeHints.empty()) {
+      adjustedVectorSizeHints[i] = vectorSizeHints[i];
+    }
   }
 
   SmallVector<int64_t> distributedTileSizes =
-      getDefaultDistributedLoopTileSizes(
-          distributedLoopLbs, distributedLoopUbs, minDistributedLoopTileSizes,
-          maxDistributedLoopTileSizes, distributedVectorSizeHints);
-  SmallVector<int64_t> distributedLevelTileSizes(iterationDomain.size(), 0);
-  for (auto loopID : llvm::enumerate(partitionableLoops)) {
-    distributedLevelTileSizes[loopID.value()] =
-        distributedTileSizes[loopID.index()];
-  }
+      getDefaultDistributedLoopTileSizes(lbs, ubs, adjustedMinTileSizes,
+                                         adjustedMaxTileSizes,
+                                         adjustedVectorSizeHints);
   // Final fix up of the tile sizes to make sure that they divide the problem
   // size to make it vectorizable.
-  for (auto i : llvm::seq<unsigned>(0, distributedLevelTileSizes.size())) {
-    distributedLevelTileSizes[i] =
-        distributedLevelTileSizes[i] != 0
-            ? getMaxTileSize(lbs[i], ubs[i], distributedLevelTileSizes[i],
-                             minTileSizes[i])
-            : 0;
+  for (auto i : llvm::seq<unsigned>(0, distributedTileSizes.size())) {
+    if (!distributedTileSizes[i]) continue;
+    distributedTileSizes[i] = getMaxTileSize(
+        lbs[i], ubs[i], distributedTileSizes[i], minTileSizes[i]);
   }
-  return distributedLevelTileSizes;
+  return distributedTileSizes;
+}
+static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
+    linalg::LinalgOp linalgOp, ArrayRef<int64_t> minTileSizes,
+    ArrayRef<int64_t> maxTileSizes, ArrayRef<int64_t> vectorSizeHints = {}) {
+  OpBuilder builder(linalgOp.getContext());
+  builder.setInsertionPoint(linalgOp);
+  SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
+  SmallVector<int64_t> ubs = *linalgOp.getStaticLoopRanges();
+  auto loops =
+      cast<IREE::Flow::PartitionableLoopsInterface>(linalgOp.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
+  return getDefaultDistributedLevelTileSizes(loops, lbs, ubs, minTileSizes,
+                                             maxTileSizes, vectorSizeHints);
 }
 
 /// Splits the tile sizes in `parallelSizes` into `reductionSizes` for the
@@ -387,18 +365,18 @@ static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
 }
 
 /// Sets the default configuration to use for an operation that implements the
-/// `PartitionableLoopsInterface`, given the iteration domain of all the loops.
+/// `PartitionableLoopsInterface`, given the `lbs` and `ubs` of all the loops.
 static LogicalResult setDefaultRootConfig(
     func::FuncOp entryPointFn,
     IREE::Flow::PartitionableLoopsInterface partitionableLoopsInterfaceOp,
-    ArrayRef<Range> iterationDomain) {
+    ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs) {
   if (getLoweringConfig(partitionableLoopsInterfaceOp)) return success();
 
   SmallVector<unsigned> partitionableLoops =
       partitionableLoopsInterfaceOp.getPartitionableLoops(kNumMaxParallelDims);
 
-  SmallVector<int64_t> minTileSizes(iterationDomain.size(), 1);
-  SmallVector<int64_t> maxTileSizes(iterationDomain.size(), 1);
+  SmallVector<int64_t> minTileSizes(lbs.size(), 1);
+  SmallVector<int64_t> maxTileSizes(lbs.size(), 1);
   if (!partitionableLoops.empty()) {
     // TODO: Here the min tile size is just looking at the type of the data in
     // the entry point function, and using a vector size that depends on just
@@ -415,8 +393,7 @@ static LogicalResult setDefaultRootConfig(
   }
 
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
-      iterationDomain, partitionableLoopsInterfaceOp, minTileSizes,
-      maxTileSizes);
+      partitionableLoops, lbs, ubs, minTileSizes, maxTileSizes);
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(flowTileSizes));
   return setOpConfigAndEntryPointFnTranslation(
@@ -538,16 +515,8 @@ static LogicalResult setRootConfig(
     minTileSizes[0] = 1;
     maxTileSizes[0] = 1;
   }
-
-  OpBuilder builder(entryPointFn.getContext());
-  builder.setInsertionPoint(contractionOp);
-  SmallVector<Range> iterationDomain =
-      linalgOp.createLoopRanges(builder, linalgOp->getLoc());
-  SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
-      iterationDomain,
-      cast<IREE::Flow::PartitionableLoopsInterface>(
-          contractionOp.getOperation()),
-      minTileSizes, maxTileSizes);
+  SmallVector<int64_t> flowTileSizes =
+      getDefaultDistributedLevelTileSizes(linalgOp, minTileSizes, maxTileSizes);
 
   // TODO(dcaballe): Find better configurations for RISC-V backends.
   if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
@@ -728,16 +697,8 @@ static LogicalResult setDefaultGenericOpRootConfig(
   }
 
   // Set the flow level tiling to the default.
-  OpBuilder builder(genericOp.getContext());
-  builder.setInsertionPoint(genericOp);
-  auto linalgOp = cast<linalg::LinalgOp>(genericOp.getOperation());
-  SmallVector<Range> iterationDomain =
-      linalgOp.createLoopRanges(builder, genericOp.getLoc());
-  auto partitionableLoopsInterfaceOp =
-      cast<IREE::Flow::PartitionableLoopsInterface>(genericOp.getOperation());
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
-      iterationDomain, partitionableLoopsInterfaceOp, minTileSizes,
-      maxTileSizes);
+      genericOp, minTileSizes, maxTileSizes);
 
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
@@ -746,7 +707,7 @@ static LogicalResult setDefaultGenericOpRootConfig(
                            maxTileSizes, parallelTileSizes);
   splitParallelAndReductionTiles(genericOp, parallelTileSizes,
                                  reductionTileSizes);
-  setAlwaysVectorizeSizes(linalgOp, parallelTileSizes, reductionTileSizes);
+  setAlwaysVectorizeSizes(genericOp, parallelTileSizes, reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
@@ -806,16 +767,8 @@ static LogicalResult setTransposeLikeOpRootConfig(
       [](int64_t tileSize) { return tileSize > 1; }, 8);
 
   // Set the flow level tiling to the default.
-  OpBuilder builder(genericOp.getContext());
-  builder.setInsertionPoint(genericOp);
-  auto linalgOp = cast<linalg::LinalgOp>(genericOp.getOperation());
-  SmallVector<Range> iterationDomain =
-      linalgOp.createLoopRanges(builder, genericOp.getLoc());
-  auto partitionableLoopsInterfaceOp =
-      cast<IREE::Flow::PartitionableLoopsInterface>(genericOp.getOperation());
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
-      iterationDomain, partitionableLoopsInterfaceOp, minTileSizes,
-      maxTileSizes);
+      genericOp, minTileSizes, maxTileSizes);
 
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
@@ -825,7 +778,7 @@ static LogicalResult setTransposeLikeOpRootConfig(
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
   tileSizes.push_back(parallelTileSizes);
-  tileSizes.push_back(/*reduction tile sizes*/ {});
+  tileSizes.push_back(/*reduction tile sizes=*/{});
 
   // For non-tensor based ops use the Buffer ops pipeline.
   auto passPipeline =
@@ -869,16 +822,10 @@ static LogicalResult setConvRootConfig(
 
   // Give the vector size hint on OC.
   vectorSizeHints[3] = vectorSize;
+
   // Set the flow level tiling to the default.
-  OpBuilder builder(convOp.getContext());
-  builder.setInsertionPoint(convOp);
-  SmallVector<Range> iterationDomain =
-      convOp.createLoopRanges(builder, convOp.getLoc());
-  auto partitionableLoopsInterfaceOp =
-      cast<IREE::Flow::PartitionableLoopsInterface>(convOp.getOperation());
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
-      iterationDomain, partitionableLoopsInterfaceOp, minTileSizes,
-      maxTileSizes, vectorSizeHints);
+      convOp, minTileSizes, maxTileSizes, vectorSizeHints);
 
   // Shapes of N, OH, OW, OC, KH, KW, (IC)
   Optional<SmallVector<int64_t, 4>> shapes = convOp.getStaticLoopRanges();
@@ -909,11 +856,10 @@ static LogicalResult setConvRootConfig(
 static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::Conv2DNhwcHwcfOp convOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
-  auto linalgOp = cast<linalg::LinalgOp>(convOp.getOperation());
   int64_t vectorSize =
       getVectorSize(entryPointFn, convOp.getResult(0).getType());
   SmallVector<int64_t> targetTileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8};
-  return setConvRootConfig(entryPointFn, linalgOp, tiledLoops, targetTileSizes,
+  return setConvRootConfig(entryPointFn, convOp, tiledLoops, targetTileSizes,
                            vectorSize);
 }
 
@@ -922,11 +868,10 @@ static LogicalResult setRootConfig(
 static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::DepthwiseConv2DNhwcHwcOp convOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
-  auto linalgOp = cast<linalg::LinalgOp>(convOp.getOperation());
   int64_t vectorSize =
       getVectorSize(entryPointFn, convOp.getResult(0).getType());
   SmallVector<int64_t> targetTileSizes = {1, 1, 8, vectorSize * 2, 1, 3};
-  return setConvRootConfig(entryPointFn, linalgOp, tiledLoops, targetTileSizes,
+  return setConvRootConfig(entryPointFn, convOp, tiledLoops, targetTileSizes,
                            vectorSize);
 }
 
@@ -936,15 +881,11 @@ static LogicalResult setRootConfig(
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   if (getLoweringConfig(linalgOp)) return success();
 
-  OpBuilder builder(linalgOp.getContext());
-  builder.setInsertionPoint(linalgOp);
-  SmallVector<Range> iterationDomain =
-      linalgOp.createLoopRanges(builder, linalgOp.getLoc());
-
   auto partitionableLoopOp =
       cast<IREE::Flow::PartitionableLoopsInterface>(linalgOp.getOperation());
-  return setDefaultRootConfig(entryPointFn, partitionableLoopOp,
-                              iterationDomain);
+  SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
+  SmallVector<int64_t> ubs = *linalgOp.getStaticLoopRanges();
+  return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
 }
 
 /// Set the default configuration for operations that implement the
@@ -955,15 +896,24 @@ static LogicalResult setRootConfig(
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   if (getLoweringConfig(tiledOpInterfaceOp)) return success();
 
+  auto partitionableLoopOp = cast<IREE::Flow::PartitionableLoopsInterface>(
+      tiledOpInterfaceOp.getOperation());
+
+  // TODO(hanchung): Implement getStaticLoopRanges method for TiledOpInterface.
   OpBuilder builder(tiledOpInterfaceOp.getContext());
   builder.setInsertionPoint(tiledOpInterfaceOp);
   SmallVector<Range> iterationDomain =
       tiledOpInterfaceOp.getIterationDomain(builder);
-  auto partitionableLoopInterfaceOp =
-      cast<IREE::Flow::PartitionableLoopsInterface>(
-          tiledOpInterfaceOp.getOperation());
-  return setDefaultRootConfig(entryPointFn, partitionableLoopInterfaceOp,
-                              iterationDomain);
+  auto getStaticValue = [](Value v) -> int64_t {
+    IntegerAttr attr;
+    if (!matchPattern(v, m_Constant(&attr))) return ShapedType::kDynamicSize;
+    return attr.getInt();
+  };
+  auto lbs = llvm::to_vector(llvm::map_range(
+      iterationDomain, [&](Range r) { return getStaticValue(r.offset); }));
+  auto ubs = llvm::to_vector(llvm::map_range(
+      iterationDomain, [&](Range r) { return getStaticValue(r.size); }));
+  return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
 }
 
 /// Redirects to methods that set the configuration based on operation type.
