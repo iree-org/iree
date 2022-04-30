@@ -35,13 +35,13 @@ def get_linux_cpu_model(verbose: bool = False) -> str:
 
 
 def get_linux_device_info(device_model: str = "Unknown",
-                          cpu_microarch: Optional[str] = None,
+                          cpu_uarch: Optional[str] = None,
                           verbose: bool = False) -> DeviceInfo:
   """Returns device info for the Linux device.
 
     Args:
-    - device_model: the device model name, e.g., 'ThinkStation P520' 
-    - cpu_microarch: the CPU microarchitecture, e.g., 'CascadeLake'
+    - device_model: the device model name, e.g., 'ThinkStation P520'
+    - cpu_uarch: the CPU microarchitecture, e.g., 'CascadeLake'
   """
   return DeviceInfo(
       PlatformType.LINUX,
@@ -49,7 +49,7 @@ def get_linux_device_info(device_model: str = "Unknown",
       model=f"{device_model}({get_linux_cpu_model(verbose)})",
       # Currently we only have x86, so CPU ABI = CPU arch.
       cpu_abi=get_linux_cpu_arch(verbose),
-      cpu_microarch=cpu_microarch,
+      cpu_uarch=cpu_uarch,
       cpu_features=get_linux_cpu_features(verbose),
       # We don't yet support GPU benchmark on Linux devices.
       gpu_name="Unknown")

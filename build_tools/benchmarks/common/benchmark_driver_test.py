@@ -68,7 +68,7 @@ class BenchmarkDriverTest(unittest.TestCase):
     self.device_info = DeviceInfo(platform_type=PlatformType.LINUX,
                                   model="Unknown",
                                   cpu_abi="arm64-v8a",
-                                  cpu_microarch=None,
+                                  cpu_uarch=None,
                                   cpu_features=["sha2"],
                                   gpu_name="Mali-G78")
 

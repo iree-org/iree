@@ -44,7 +44,7 @@ class LinuxDeviceUtilsTest(unittest.TestCase):
         DeviceInfo(platform_type=PlatformType.LINUX,
                    model="Dummy(AMD EPYC 7B12)",
                    cpu_abi="x86_64",
-                   cpu_microarch="Zen2",
+                   cpu_uarch="Zen2",
                    cpu_features=["fpu", "vme", "de", "pse", "tsc"],
                    gpu_name="Unknown"))
 

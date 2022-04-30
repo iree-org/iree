@@ -63,6 +63,6 @@ def get_android_device_info(verbose: bool = False) -> DeviceInfo:
   return DeviceInfo(platform_type=PlatformType.ANDROID,
                     model=get_android_device_model(verbose),
                     cpu_abi=get_android_cpu_abi(verbose),
-                    cpu_microarch=None,
+                    cpu_uarch=None,
                     cpu_features=get_android_cpu_features(verbose),
                     gpu_name=get_android_gpu_name(verbose))
