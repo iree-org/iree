@@ -9,7 +9,7 @@
 steps:
   - label: "Build"
     commands:
-      - "docker run --user=$(id -u):$(id -g) --volume=\\${HOME?}:\\${HOME?} --volume=/etc/passwd:/etc/passwd:ro --volume=/etc/group:/etc/group:ro --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/frontends@sha256:e0a5d9a71cc7f087f4caaea0cc9b9a86ab4765b217970772780e446b4fdc65b0 build_tools/cmake/build_android_benchmark.sh"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\${HOME?}:\\${HOME?} --volume=/etc/passwd:/etc/passwd:ro --volume=/etc/group:/etc/group:ro --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/frontends@sha256:2ef3b3670808cdaa2a483dddf94fc58d50486148eb73f9f87e8a9d08a628d39a build_tools/cmake/build_android_benchmark.sh"
       - "tar --exclude='*.tar.gz' --exclude='*.tgz' --exclude='*.mlir' --exclude='*.tflite' -czvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz build-host/benchmark_suites"
       - "find build-host/benchmark_suites -name '*.mlir' | tar -czvf source-mlir-models-${BUILDKITE_BUILD_NUMBER}.tgz -T -"
       - "tar -czvf iree-android-tools-${BUILDKITE_BUILD_NUMBER}.tgz build-android/iree/tools/iree-benchmark-module build-android-trace/iree/tools/iree-benchmark-module build-android/iree/tools/build_config.txt"
