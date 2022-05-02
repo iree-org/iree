@@ -164,6 +164,30 @@ set(X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS
   "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
 )
 
+# CPU, Dylib-Sync, x86_64, full-inference
+iree_benchmark_suite(
+  MODULES
+    "${DEEPLABV3_FP32_MODULE}"
+    "${MOBILESSD_FP32_MODULE}"
+    "${POSENET_FP32_MODULE}"
+    "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
+
+  BENCHMARK_MODES
+    "full-inference,default-flags"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-x86-64-CascadeLake"
+  TRANSLATION_FLAGS
+    ${X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS}
+  BENCHMARK_TOOL
+    iree-benchmark-module
+  DRIVER
+    "dylib-sync"
+)
+
 # CPU, Dylib, 1 thread, x86_64, full-inference
 iree_benchmark_suite(
   MODULES
