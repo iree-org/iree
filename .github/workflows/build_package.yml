@@ -62,7 +62,7 @@ jobs:
       MANYLINUX_X86_64_IMAGE: gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:2c6a9120a5f96bcf3b1dda4086d807682705b51fb9c6ee5b48a8756c436220bc
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
           path: 'main_checkout'
           submodules: true
@@ -173,7 +173,7 @@ jobs:
             "${MANYLINUX_X86_64_IMAGE}" \
             bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./main_checkout/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@82c141cc518b40d92cc801eee768e7aafc9c2fa2  # v2
         with:
           # We upload all wheels (which includes deps so that subsequent
           # steps can run without further fetching).
@@ -184,7 +184,7 @@ jobs:
       - name: Upload Release Assets
         if: github.event.inputs.release_id != ''
         id: upload-release-assets
-        uses: dwenegar/upload-release-assets@v1
+        uses: dwenegar/upload-release-assets@5bc3024cf83521df8ebfadf00ad0c4614fd59148  # v1
         env:
           GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
@@ -198,7 +198,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: "Invoke workflow :: Validate and Publish Release"
-        uses: benc-uk/workflow-dispatch@v1
+        uses: benc-uk/workflow-dispatch@4c044c1613fabbe5250deadc65452d54c4ad4fc7  # v1
         with:
           workflow: Validate and Publish Release
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
