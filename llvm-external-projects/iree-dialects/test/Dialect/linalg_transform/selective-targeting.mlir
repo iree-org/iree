@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s -linalg-interp-transforms -split-input-file | FileCheck %s
+// RUN: iree-dialects-opt %s -linalg-transform-interp -split-input-file | FileCheck %s
 
 // CHECK-LABEL: func @matmul_tensors(
 func @matmul_tensors(
@@ -46,35 +46,39 @@ func @matmul_tensors(
   return %2 : tensor<128x128xf32>
 }
 
-// Match matmul operations inside @matmul_tensors with test.attrA set.
-pdl.pattern @pdl_target_attrA : benefit(1) {
-  %args = operands
-  %results = types
-  %attr = attribute
-  %0 = operation "linalg.matmul"(%args : !pdl.range<value>) {"test.attrA" = %attr}-> (%results : !pdl.range<type>)
-  %1 = pdl.attribute @matmul_tensors
-  apply_native_constraint "nestedInFunc"(%0, %1 : !pdl.operation, !pdl.attribute)
-  // TODO: we don't want this, but it is the required terminator for pdl.pattern
-  rewrite %0 with "iree_linalg_transform.apply"
-}
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  // Match matmul operations inside @matmul_tensors with test.attrA set.
+  pdl.pattern @pdl_target_attrA : benefit(1) {
+    %args = operands
+    %results = types
+    %attr = attribute
+    %0 = operation "linalg.matmul"(%args : !pdl.range<value>) {"test.attrA" = %attr}-> (%results : !pdl.range<type>)
+    %1 = pdl.attribute @matmul_tensors
+    apply_native_constraint "nestedInFunc"(%0, %1 : !pdl.operation, !pdl.attribute)
+    // TODO: we don't want this, but it is the required terminator for pdl.pattern
+    rewrite %0 with "transform.dialect"
+  }
 
-// Match matmul operations inside @matmul_tensors with test.attrC set.
-pdl.pattern @pdl_target_attrC : benefit(1) {
-  %args = operands
-  %results = types
-  %attr = attribute
-  %0 = operation "linalg.matmul"(%args : !pdl.range<value>) {"test.attrC" = %attr}-> (%results : !pdl.range<type>)
-  %1 = pdl.attribute @matmul_tensors
-  apply_native_constraint "nestedInFunc"(%0, %1 : !pdl.operation, !pdl.attribute)
-  // TODO: we don't want this, but it is the required terminator for pdl.pattern
-  rewrite %0 with "iree_linalg_transform.apply"
-}
+  // Match matmul operations inside @matmul_tensors with test.attrC set.
+  pdl.pattern @pdl_target_attrC : benefit(1) {
+    %args = operands
+    %results = types
+    %attr = attribute
+    %0 = operation "linalg.matmul"(%args : !pdl.range<value>) {"test.attrC" = %attr}-> (%results : !pdl.range<type>)
+    %1 = pdl.attribute @matmul_tensors
+    apply_native_constraint "nestedInFunc"(%0, %1 : !pdl.operation, !pdl.attribute)
+    // TODO: we don't want this, but it is the required terminator for pdl.pattern
+    rewrite %0 with "transform.dialect"
+  }
 
-iree_linalg_transform.sequence {
-  %0 = match @pdl_target_attrA
-  tile %0 {sizes = [4, 4, 4]}
-  %1 = match @pdl_target_attrC
-  vectorize %1
+  transform.structured.canonicalized_sequence %arg0 {
+  ^bb1(%arg1: !pdl.operation):
+    %0 = pdl_match @pdl_target_attrA in %arg1
+    transform.structured.tile %0 {sizes = [4, 4, 4]}
+    %1 = pdl_match @pdl_target_attrC in %arg1
+    transform.structured.vectorize %1
+  }
 }
 
 // -----
@@ -96,22 +100,25 @@ func @vectorize_one(
   return %1 : tensor<128x128xf32>
 }
 
-pdl.pattern @pdl_target : benefit(1) {
-  %args = operands
-  %results = types
-  %attr = attribute
-  %0 = operation "linalg.matmul"(%args : !pdl.range<value>) {"test.attrA" = %attr}-> (%results : !pdl.range<type>)
-  %1 = pdl.attribute @vectorize_one
-  apply_native_constraint "nestedInFunc"(%0, %1 : !pdl.operation, !pdl.attribute)
-  // TODO: we don't want this, but it is the required terminator for pdl.pattern
-  rewrite %0 with "iree_linalg_transform.apply"
-}
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  pdl.pattern @pdl_target : benefit(1) {
+    %args = operands
+    %results = types
+    %attr = attribute
+    %0 = operation "linalg.matmul"(%args : !pdl.range<value>) {"test.attrA" = %attr}-> (%results : !pdl.range<type>)
+    %1 = pdl.attribute @vectorize_one
+    apply_native_constraint "nestedInFunc"(%0, %1 : !pdl.operation, !pdl.attribute)
+    // TODO: we don't want this, but it is the required terminator for pdl.pattern
+    rewrite %0 with "transform.dialect"
+  }
 
-iree_linalg_transform.sequence {
-  %0 = match @pdl_target
-  vectorize %0
+  transform.structured.canonicalized_sequence %arg0 {
+  ^bb1(%arg1: !pdl.operation):
+    %0 = pdl_match @pdl_target in %arg1
+    transform.structured.vectorize %0
+  }
 }
-
 
 // -----
 
@@ -132,6 +139,7 @@ func @vectorize_all(
   return %1 : tensor<128x128xf32>
 }
 
-iree_linalg_transform.sequence {
-  vectorize
+transform.structured.canonicalized_sequence {
+^bb0(%arg0: !pdl.operation):
+  transform.structured.vectorize
 }

@@ -31,6 +31,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/IR/TensorInferTypeOpInterfaceImpl.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Dialect.h"
 
@@ -61,6 +62,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   mlir::arith::ArithmeticDialect,
                   vector::VectorDialect,
                   tensor::TensorDialect,
+                  transform::TransformDialect,
                   tosa::TosaDialect,
                   shape::ShapeDialect>();
   // clang-format on

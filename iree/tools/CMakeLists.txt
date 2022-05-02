@@ -226,6 +226,7 @@ if(IREE_BUILD_COMPILER)
     DEPS
       IREEInputDialect
       IREELinalgExtDialect
+      IREELinalgExtTransformOps
       IREELinalgExtTransforms
       IREELinalgExtOpInterfaceImpl
       IREELinalgTransformDialect

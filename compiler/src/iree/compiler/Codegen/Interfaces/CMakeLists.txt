@@ -20,6 +20,8 @@ iree_cc_library(
   DEPS
     ::BufferizationInterfaces
     ::ProcessorOpInterfaces
+    IREELinalgExtTransformOps
+    IREELinalgTransformDialect
     iree::compiler::Codegen::TransformDialectExtensions
   PUBLIC
 )

@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s  -linalg-interp-transforms -split-input-file | FileCheck %s
+// RUN: iree-dialects-opt %s  -linalg-transform-interp -split-input-file | FileCheck %s
 
 #map0 = affine_map<()[s0] -> (64 ceildiv s0)>
 #map1 = affine_map<(d0)[s0] -> (d0 * s0)>
@@ -30,7 +30,7 @@ module {
       // CHECK:    %[[T3:.*]] = linalg.fill {{.*}} outs(%[[T2]]
       %7 = tensor.extract_slice %1[%4] [%5] [1] : tensor<64xf32> to tensor<?xf32>
 
-      // CHECK:    %[[T4:.*]] = linalg.elemwise_unary{{.*}}ins(%[[T1]] {{.*}} outs(%[[T3]]
+      // CHECK:    %[[T4:.*]] = linalg.elemwise_unary ins(%[[T1]] {{.*}} outs(%[[T3]]
       %8 = linalg.elemwise_unary ins(%6 : tensor<?xf32>) outs(%7 : tensor<?xf32>) -> tensor<?xf32>
       iree_linalg_ext.perform_concurrently {
         iree_linalg_ext.parallel_insert_slice %8 into %arg2[%4] [%5] [1] : tensor<?xf32> into tensor<64xf32>
@@ -39,21 +39,25 @@ module {
     func.return %3 : tensor<64xf32>
   }
 
-  pdl.pattern @match_elemwise : benefit(1) {
-    %0 = operands
-    %1 = types
-    %2 = operation "linalg.elemwise_unary"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
-    rewrite %2 with "iree_linalg_transform.apply"
-  }
-  pdl.pattern @match_in_parallel : benefit(1) {
-    %0 = operands
-    %1 = types
-    %2 = operation "iree_linalg_ext.in_parallel"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
-    rewrite %2 with "iree_linalg_transform.apply"
-  }
-  iree_linalg_transform.sequence {
-    %0 = match @match_elemwise
-    %1, %fusedOps:2 = fuse_producers %0 {operands_to_fuse=[0, 1]}
+  transform.with_pdl_patterns {
+  ^bb0(%arg0: !pdl.operation):
+    pdl.pattern @match_elemwise : benefit(1) {
+      %0 = operands
+      %1 = types
+      %2 = operation "linalg.elemwise_unary"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      rewrite %2 with "transform.dialect"
+    }
+    pdl.pattern @match_in_parallel : benefit(1) {
+      %0 = operands
+      %1 = types
+      %2 = operation "iree_linalg_ext.in_parallel"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      rewrite %2 with "transform.dialect"
+    }
+    transform.structured.canonicalized_sequence %arg0 {
+    ^bb1(%arg1: !pdl.operation):
+      %0 = pdl_match @match_elemwise in %arg1
+      %1, %fusedOps:2 = fuse_producers %0 {operands_to_fuse=[0, 1]}
+    }
   }
 }
 
@@ -88,7 +92,7 @@ module {
       // CHECK:    %[[T1:.*]] = linalg.fill {{.*}} outs(%[[T0]]
       %6 = tensor.extract_slice %0[%3] [%4] [1] : tensor<?xf32> to tensor<?xf32>
 
-      // CHECK:    %[[T2:.*]] = linalg.elemwise_unary{{.*}}ins(%[[T1]]
+      // CHECK:    %[[T2:.*]] = linalg.elemwise_unary ins(%[[T1]]
       %7 = linalg.elemwise_unary ins(%6 : tensor<?xf32>) outs(%5 : tensor<?xf32>) -> tensor<?xf32>
       iree_linalg_ext.perform_concurrently {
         iree_linalg_ext.parallel_insert_slice %7 into %arg2[%3] [%4] [1] : tensor<?xf32> into tensor<?xf32>
@@ -97,20 +101,24 @@ module {
     func.return %2 : tensor<?xf32>
   }
 
-  pdl.pattern @match_elemwise : benefit(1) {
-    %0 = operands
-    %1 = types
-    %2 = operation "linalg.elemwise_unary"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
-    rewrite %2 with "iree_linalg_transform.apply"
-  }
-  pdl.pattern @match_in_parallel : benefit(1) {
-    %0 = operands
-    %1 = types
-    %2 = operation "iree_linalg_ext.in_parallel"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
-    rewrite %2 with "iree_linalg_transform.apply"
-  }
-  iree_linalg_transform.sequence {
-    %0 = match @match_elemwise
-    %1, %fusedOps = fuse_producers %0 {operands_to_fuse=[0]}
+  transform.with_pdl_patterns {
+  ^bb0(%arg0: !pdl.operation):
+    pdl.pattern @match_elemwise : benefit(1) {
+      %0 = operands
+      %1 = types
+      %2 = operation "linalg.elemwise_unary"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      rewrite %2 with "transform.dialect"
+    }
+    pdl.pattern @match_in_parallel : benefit(1) {
+      %0 = operands
+      %1 = types
+      %2 = operation "iree_linalg_ext.in_parallel"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      rewrite %2 with "transform.dialect"
+    }
+    transform.structured.canonicalized_sequence %arg0 {
+    ^bb1(%arg1: !pdl.operation):
+      %0 = pdl_match @match_elemwise in %arg1
+      %1, %fusedOps = fuse_producers %0 {operands_to_fuse=[0]}
+    }
   }
 }

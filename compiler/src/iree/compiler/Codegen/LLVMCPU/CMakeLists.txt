@@ -66,6 +66,7 @@ iree_cc_library(
     MLIRTensor
     MLIRTosa
     MLIRTosaToArith
+    MLIRTransformDialect
     MLIRTransforms
     MLIRVector
     MLIRVectorToLLVM

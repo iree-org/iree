@@ -4,6 +4,7 @@ set(LIBS
   IREELinalgExtDialect
   IREELinalgExtOpInterfaceImpl
   IREELinalgExtPasses
+  IREELinalgExtTransformOps
   IREELinalgExtTransforms
   IREELinalgTransformDialect
   IREELinalgTransformDialectTransforms
@@ -19,6 +20,7 @@ set(LIBS
   MLIRDialect
   MLIRFunc
   MLIRLinalg
+  MLIRLinalgTransformOps
   MLIRMemRef
   MLIROptLib
   MLIRPDL
