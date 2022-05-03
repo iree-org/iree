@@ -64,9 +64,18 @@ function(iree_package_ns PACKAGE_NS)
   # the corresponding rule in:
   #   build_tools/bazel_to_cmake/bazel_to_cmake_targets.py
   # Some sub-trees form their own roots for package purposes. Rewrite them.
-  if(_RELATIVE_PATH MATCHES "^runtime/src/(.*)")
+  if(_RELATIVE_PATH MATCHES "^compiler/src/(.*)")
+    # compiler/src/iree/compiler -> iree/compiler
+    set(_PACKAGE "${CMAKE_MATCH_1}")
+  elseif(_RELATIVE_PATH MATCHES "^compiler/src$")
+    # compiler/src (defs) -> iree::compiler::defs
+    set(_PACKAGE "iree::compiler")
+  elseif(_RELATIVE_PATH MATCHES "^runtime/src/(.*)")
     # runtime/src/iree/base -> iree/base
     set(_PACKAGE "${CMAKE_MATCH_1}")
+  elseif(_RELATIVE_PATH MATCHES "^runtime/src$")
+    # runtime/src (defs) -> iree::runtime::defs
+    set(_PACKAGE "iree::runtime")
   elseif(_RELATIVE_PATH MATCHES "^samples/(.*)")
     set(_PACKAGE "iree::samples::${CMAKE_MATCH_1}")
   elseif(_RELATIVE_PATH MATCHES "^samples$")

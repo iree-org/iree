@@ -11,11 +11,11 @@ func @matmul_tensors(
   // CHECK: scf.for {{.*}} to %[[c124]]
   // CHECK:   scf.for {{.*}} to %[[c128]]
   // CHECK:     scf.for {{.*}} to %[[c124]]
-  // CHECK:       linalg.matmul {{.*}} ins({{.*}} : tensor<4x4xf32>, tensor<4x4xf32>) outs({{.*}} : tensor<4x4xf32>) -> tensor<4x4xf32>
-  // CHECK:     linalg.matmul {{.*}} ins({{.*}} : tensor<4x3xf32>, tensor<3x4xf32>) outs({{.*}} : tensor<4x4xf32>) -> tensor<4x4xf32>
+  // CHECK:       linalg.matmul{{.*}}ins({{.*}} : tensor<4x4xf32>, tensor<4x4xf32>) outs({{.*}} : tensor<4x4xf32>) -> tensor<4x4xf32>
+  // CHECK:     linalg.matmul{{.*}}ins({{.*}} : tensor<4x3xf32>, tensor<3x4xf32>) outs({{.*}} : tensor<4x4xf32>) -> tensor<4x4xf32>
   // CHECK: scf.for {{.*}} to %[[c128]]
   // CHECK:   scf.for {{.*}} to %[[c127]]
-  // CHECK:     linalg.matmul {{.*}} ins({{.*}} : tensor<2x?xf32>, tensor<?x4xf32>) outs({{.*}} : tensor<2x4xf32>) -> tensor<2x4xf32>
+  // CHECK:     linalg.matmul{{.*}}ins({{.*}} : tensor<2x?xf32>, tensor<?x4xf32>) outs({{.*}} : tensor<2x4xf32>) -> tensor<2x4xf32>
   %0 = linalg.matmul  ins(%arg0, %arg1: tensor<126x127xf32>, tensor<127x128xf32>)
                      outs(%arg2: tensor<126x128xf32>)
     -> tensor<126x128xf32>

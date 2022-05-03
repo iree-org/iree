@@ -32,7 +32,7 @@
 #
 # Note that this script is meant to be run on CI and it will pollute both the
 # output directory and in-tree build/ directories (under runtime/ and
-# iree/compiler/) with docker created, root owned builds. Sorry - there is
+# compiler/) with docker created, root owned builds. Sorry - there is
 # no good way around it.
 #
 # It can be run on a workstation but recommend using a git worktree dedicated
@@ -43,7 +43,7 @@ this_dir="$(cd $(dirname $0) && pwd)"
 script_name="$(basename $0)"
 repo_root="$(cd $this_dir/../../ && pwd)"
 script_name="$(basename $0)"
-manylinux_docker_image="${manylinux_docker_image:-gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:3e7ac081b69bdc54650a98725b793f072f3c3beb229f8886dbcd6f23bc1eb9ca}"
+manylinux_docker_image="${manylinux_docker_image:-gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:2c6a9120a5f96bcf3b1dda4086d807682705b51fb9c6ee5b48a8756c436220bc}"
 python_versions="${override_python_versions:-cp37-cp37m cp38-cp38 cp39-cp39 cp310-cp310}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 packages="${packages:-iree-runtime iree-runtime-instrumented iree-compiler}"
@@ -126,7 +126,7 @@ function build_iree_runtime_instrumented() {
 
 function build_iree_compiler() {
   IREE_TARGET_BACKEND_CUDA=ON \
-  python -m pip wheel -v -w /wheelhouse /main_checkout/iree/iree/compiler/
+  python -m pip wheel -v -w /wheelhouse /main_checkout/iree/compiler/
 }
 
 function run_audit_wheel() {

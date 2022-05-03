@@ -40,10 +40,11 @@ class LinuxDeviceUtilsTest(unittest.TestCase):
 
   def test_get_linux_device_info(self):
     self.assertEqual(
-        get_linux_device_info("Dummy"),
+        get_linux_device_info("Dummy", "Zen2"),
         DeviceInfo(platform_type=PlatformType.LINUX,
                    model="Dummy(AMD EPYC 7B12)",
                    cpu_abi="x86_64",
+                   cpu_uarch="Zen2",
                    cpu_features=["fpu", "vme", "de", "pse", "tsc"],
                    gpu_name="Unknown"))
 

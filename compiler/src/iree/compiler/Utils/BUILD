@@ -1,0 +1,59 @@
+# Copyright 2019 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Utilities for working with IREE MLIR types.
+
+load("//iree:build_defs.oss.bzl", "iree_compiler_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_compiler_cc_library(
+    name = "Utils",
+    srcs = [
+        "ConversionUtils.cpp",
+        "CustomKernelsTargetInfo.cpp",
+        "FlatbufferUtils.cpp",
+        "GraphUtils.cpp",
+        "ModuleUtils.cpp",
+        "OptionUtils.cpp",
+        "PassUtils.cpp",
+        "StringUtils.cpp",
+        "TracingUtils.cpp",
+    ],
+    hdrs = [
+        "ConversionUtils.h",
+        "CustomKernelsTargetInfo.h",
+        "FlatbufferUtils.h",
+        "GraphUtils.h",
+        "IndexSet.h",
+        "ModuleUtils.h",
+        "OptionUtils.h",
+        "PassUtils.h",
+        "PatternUtils.h",
+        "StringUtils.h",
+        "TracingUtils.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal/flatcc:building",
+        "//runtime/src/iree/base/internal/flatcc:debugging",
+        "//runtime/src/iree/base/internal/flatcc:parsing",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:Transforms",
+    ],
+)

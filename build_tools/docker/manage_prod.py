@@ -23,7 +23,8 @@ if __name__ == "__main__":
 
   # Only allow the :prod tag to be pushed from the version of
   # `prod_digests.txt` at upstream HEAD on the main branch.
-  utils.run_command([os.path.normpath("scripts/git/git_update.sh"), "main"])
+  utils.run_command(
+      [os.path.normpath("build_tools/scripts/git/git_update.sh"), "main"])
 
   with open(utils.PROD_DIGESTS_PATH, "r") as f:
     images_with_digests = [line.strip() for line in f.readlines()]

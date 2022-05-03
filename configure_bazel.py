@@ -58,9 +58,6 @@ def write_platform(bazelrc):
     print(f"build:release --config=msvc_release", file=bazelrc)
   else:
     detect_unix_platform_config(bazelrc)
-  if not (platform.system() == "Darwin"):
-    print("common --config=non_darwin", file=bazelrc)
-
 
 if len(sys.argv) > 1:
   local_bazelrc = sys.argv[1]

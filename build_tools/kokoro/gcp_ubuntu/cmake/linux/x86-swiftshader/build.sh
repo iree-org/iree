@@ -6,7 +6,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build the project with cmake using Kokoro.
+# Build and test the project with CMake using Kokoro, using SwiftShader's
+# software Vulkan driver.
 
 set -e
 set -x

@@ -28,7 +28,7 @@ jobs:
     if: github.repository == 'google/iree'
     steps:
       - name: Checking out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           # Get all history. We're force-pushing here and will otherwise drop
@@ -56,7 +56,7 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - name: Checking out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
       - name: Checking for Copybara tag
         run: |
           if git log --format=%B -n 1 HEAD | grep -q "${COPYBARA_TAG}"; then

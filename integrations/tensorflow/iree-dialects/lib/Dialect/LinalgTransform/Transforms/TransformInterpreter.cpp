@@ -11,6 +11,7 @@
 #include "iree-dialects/Dialect/LinalgTransform/TrackingRewriteDriver.h"
 #include "iree-dialects/Dialect/LinalgTransform/TransformOpInterface.h"
 #include "iree-dialects/Dialect/LinalgTransform/TransformOpMapping.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Arithmetic/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"

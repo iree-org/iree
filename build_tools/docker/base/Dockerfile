@@ -27,7 +27,7 @@ RUN apt-get update \
     libsdl2-dev \
     libssl-dev \
     # A much better CMake builder
-     ninja-build \
+    ninja-build \
     # For building child images. Best practices would tell us to use multi-stage
     # builds (https://docs.docker.com/develop/develop-images/multistage-build/)
     # but it turns out that Dockerfile is a thoroughly non-composable awful
@@ -42,6 +42,9 @@ RUN apt-get update \
     gnupg \
     # Needed for building lld with Bazel (as currently configured)
     libxml2-dev \
+    # Optional for tools like llvm-symbolizer, which we could build from
+    # source but would rather just have available ahead of time
+    llvm-dev \
     # Someone is welcome to tell me a better way to just install lld-9 as lld
     # (lld=9 doesn't work)
     && ln -s lld-9 /usr/bin/lld \

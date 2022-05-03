@@ -91,7 +91,8 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
 
 
 def main(args):
-  device_info = get_linux_device_info(args.device_model, args.verbose)
+  device_info = get_linux_device_info(args.device_model, args.cpu_uarch,
+                                      args.verbose)
   if args.verbose:
     print(device_info)
 
@@ -141,6 +142,9 @@ def parse_argument():
   arg_parser.add_argument("--device_model",
                           default="Unknown",
                           help="Device model")
+  arg_parser.add_argument("--cpu_uarch",
+                          default=None,
+                          help="CPU microarchitecture, e.g., CascadeLake")
 
   return arg_parser.parse_args()
 
