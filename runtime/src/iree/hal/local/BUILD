@@ -134,7 +134,7 @@ iree_cmake_extra_content(
 # task_driver is used by asynchronuous drivers.
 # TODO(scotttodd): refactor this - code depending on threading should be
 #   possible to declare in the build system but conditionally link in
-if(NOT EMSCRIPTEN AND NOT (${IREE_HAL_DRIVER_DYLIB} OR ${IREE_HAL_DRIVER_VMVX}))
+if(NOT EMSCRIPTEN AND NOT (IREE_HAL_DRIVER_DYLIB OR IREE_HAL_DRIVER_VMVX))
   return()
 endif()
 """,

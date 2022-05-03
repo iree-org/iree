@@ -370,7 +370,7 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-if(NOT ${IREE_ENABLE_THREADING})
+if(NOT IREE_ENABLE_THREADING)
   return()
 endif()
 
