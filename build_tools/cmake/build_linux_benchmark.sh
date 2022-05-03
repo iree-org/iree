@@ -65,18 +65,18 @@ cd build-host
 # --------------------------------------------------------------------------- #
 
 # --------------------------------------------------------------------------- #
-# Build for the target (linux-x86-64).
+# Build for the target (linux-x86_64).
 
 cd "${ROOT_DIR}"
 
-if [ -d "build-linux-x86-64" ]
+if [ -d "build-linux-x86_64" ]
 then
-  echo "build-linux-x86-64 directory already exists. Will use cached results there."
+  echo "build-linux-x86_64 directory already exists. Will use cached results there."
 else
-  echo "build-linux-x86-64 directory does not already exist. Creating a new one."
-  mkdir build-linux-x86-64
+  echo "build-linux-x86_64 directory does not already exist. Creating a new one."
+  mkdir build-linux-x86_64
 fi
-cd build-linux-x86-64
+cd build-linux-x86_64
 
 "${CMAKE_BIN}" -G Ninja .. \
   -DIREE_HOST_BINARY_ROOT="${PWD}/../build-host/install" \

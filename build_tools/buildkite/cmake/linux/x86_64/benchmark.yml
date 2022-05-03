@@ -10,8 +10,8 @@ steps:
       - "docker run --user=$(id -u):$(id -g) --volume=\\${HOME?}:\\${HOME?} --volume=/etc/passwd:/etc/passwd:ro --volume=/etc/group:/etc/group:ro --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/frontends@sha256:2ef3b3670808cdaa2a483dddf94fc58d50486148eb73f9f87e8a9d08a628d39a build_tools/cmake/build_linux_benchmark.sh"
       - "tar --exclude='*.tar.gz' --exclude='*.tgz' --exclude='*.mlir' --exclude='*.tflite' -czvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz build-host/benchmark_suites"
       - "find build-host/benchmark_suites -name '*.mlir' | tar -czvf source-mlir-models-${BUILDKITE_BUILD_NUMBER}.tgz -T -"
-      - "tar -czvf iree-linux-x86-64-tools-${BUILDKITE_BUILD_NUMBER}.tgz build-linux-x86-64/iree/tools/iree-benchmark-module build-linux-x86-64/iree/tools/build_config.txt"
-    if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86')"
+      - "tar -czvf iree-linux-x86_64-tools-${BUILDKITE_BUILD_NUMBER}.tgz build-linux-x86_64/iree/tools/iree-benchmark-module build-linux-x86_64/iree/tools/build_config.txt"
+    if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86_64')"
     agents:
       - "queue=build"
     env:
@@ -19,7 +19,7 @@ steps:
     artifact_paths:
       - "benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "source-mlir-models-${BUILDKITE_BUILD_NUMBER}.tgz"
-      - "iree-linux-x86-64-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
+      - "iree-linux-x86_64-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
 
   - wait
 
@@ -27,14 +27,14 @@ steps:
     commands:
       - "git clean -fdx"
       - "buildkite-agent artifact download --step Build benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz ./"
-      - "buildkite-agent artifact download --step Build iree-linux-x86-64-tools-${BUILDKITE_BUILD_NUMBER}.tgz ./"
+      - "buildkite-agent artifact download --step Build iree-linux-x86_64-tools-${BUILDKITE_BUILD_NUMBER}.tgz ./"
       - "tar -xzvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz"
-      - "tar -xzvf iree-linux-x86-64-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
-      - "python3 build_tools/benchmarks/run_benchmarks_on_linux.py --device_model=GCP-c2-standard-16 --cpu_uarch=CascadeLake --normal_benchmark_tool_dir=build-linux-x86-64/iree/tools/ -o benchmark-results-gcp-cpu-${BUILDKITE_BUILD_NUMBER}.json --verbose build-host/"
-    if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86')"
+      - "tar -xzvf iree-linux-x86_64-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
+      - "python3 build_tools/benchmarks/run_benchmarks_on_linux.py --device_model=GCP-c2-standard-16 --cpu_uarch=CascadeLake --normal_benchmark_tool_dir=build-linux-x86_64/iree/tools/ -o benchmark-results-gcp-cpu-${BUILDKITE_BUILD_NUMBER}.json --verbose build-host/"
+    if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86_64')"
     agents:
       - "gcp:machine-type=c2-standard-16"
-      - "queue=benchmark-x86"
+      - "queue=benchmark-x86_64"
     artifact_paths:
       - "benchmark-results-gcp-cpu-${BUILDKITE_BUILD_NUMBER}.json"
     timeout_in_minutes: "10"
@@ -45,8 +45,8 @@ steps:
     commands:
       - "git clean -fdx"
       - "buildkite-agent artifact download benchmark-results-*.json ./"
-      - "python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py --verbose --query-base --comment-title=\"Abbreviated x86 Benchmark Summary (experimental)\" benchmark-results-*.json"
-    key: "post-on-pr-x86"
-    if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86')"
+      - "python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py --verbose --query-base --comment-title=\"Abbreviated x86_64 Benchmark Summary (experimental)\" benchmark-results-*.json"
+    key: "post-on-pr-x86_64"
+    if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86_64')"
     agents:
       - "queue=report"

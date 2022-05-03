@@ -22,7 +22,7 @@ from typing import Any, Dict, Optional, Sequence
 # A map from CPU ABI to IREE's benchmark target architecture.
 CPU_ABI_TO_TARGET_ARCH_MAP = {
     "arm64-v8a": "cpu-arm64-v8a",
-    "x86_64": "cpu-x86-64",
+    "x86_64": "cpu-x86_64",
 }
 
 # A map from GPU name to IREE's benchmark target architecture.

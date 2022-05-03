@@ -37,7 +37,7 @@ iree_benchmark_suite(
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
-    "CPU-x86-64-CascadeLake"
+    "CPU-x86_64-CascadeLake"
   TRANSLATION_FLAGS
     ${LINUX_X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS}
   BENCHMARK_TOOL
@@ -61,7 +61,7 @@ iree_benchmark_suite(
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
-    "CPU-x86-64-CascadeLake"
+    "CPU-x86_64-CascadeLake"
   TRANSLATION_FLAGS
     ${LINUX_X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS}
   BENCHMARK_TOOL
@@ -87,7 +87,7 @@ iree_benchmark_suite(
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
-    "CPU-x86-64-CascadeLake"
+    "CPU-x86_64-CascadeLake"
   TRANSLATION_FLAGS
     ${LINUX_X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS}
   BENCHMARK_TOOL
@@ -113,7 +113,7 @@ iree_benchmark_suite(
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
-    "CPU-x86-64-CascadeLake"
+    "CPU-x86_64-CascadeLake"
   TRANSLATION_FLAGS
     ${LINUX_X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS}
   BENCHMARK_TOOL
