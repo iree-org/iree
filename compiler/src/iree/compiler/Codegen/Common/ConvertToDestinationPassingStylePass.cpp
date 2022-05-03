@@ -193,14 +193,9 @@ static LogicalResult replaceDestinationBuffer(OpResult resultValue,
                                               Value destinationValue) {
   Operation *op = resultValue.getOwner();
   return TypeSwitch<Operation *, LogicalResult>(op)
-      .Case<linalg::LinalgOp>([&](auto linalgOp) {
+      .Case<linalg::LinalgOp, IREE::LinalgExt::LinalgExtOp>([&](auto linalgOp) {
         unsigned resultNumber = resultValue.getResultNumber();
         linalgOp.setOutputOperand(resultNumber, destinationValue);
-        return success();
-      })
-      .Case<IREE::LinalgExt::LinalgExtOp>([&](auto linalgExtOp) {
-        unsigned resultNumber = resultValue.getResultNumber();
-        linalgExtOp.setOutputOperand(resultNumber, destinationValue);
         return success();
       })
       .Case<linalg::InitTensorOp>([&](auto initTensorOp) {
