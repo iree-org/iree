@@ -17,7 +17,7 @@ buildscript {
 
 apply plugin: 'com.android.library'
 
-def cmakeListDir = "${rootDir}/../../.."
+def cmakeListDir = "${rootDir}/../../../.."
 def hostBuildDir = "${cmakeListDir}/../iree-build-host"
 def hostInstallDir = "${hostBuildDir}/install"
 
@@ -62,7 +62,7 @@ android {
     externalNativeBuild {
         cmake {
             version "3.13.4.0+"
-            path "../../../CMakeLists.txt"
+            path "../../../../CMakeLists.txt"
         }
     }
 }
