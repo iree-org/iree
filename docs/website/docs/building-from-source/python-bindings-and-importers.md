@@ -28,7 +28,7 @@ Also see [instructions for installing pre-built binaries](../bindings/python.md)
 * A relatively recent Python3 installation >=3.7 (we aim to support
   [non-eol Python versions](https://endoflife.date/python)).
 * Installation of python dependencies as specified in
-  [`bindings/python/build_requirements.txt`](https://github.com/google/iree/blob/main/bindings/python/build_requirements.txt).
+  [`runtime/bindings/python/iree/runtime/build_requirements.txt`](https://github.com/google/iree/blob/main/runtime/bindings/python/iree/runtime/build_requirements.txt).
 
 **CMake Variables:**
 
@@ -73,7 +73,7 @@ package manager ([about](https://docs.python.org/3/library/venv.html),
     python -m pip install --upgrade pip
 
     # Install IREE build pre-requisites.
-    python -m pip install -r ./bindings/python/build_requirements.txt
+    python -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
     ```
 
 === "Windows"
@@ -91,7 +91,7 @@ package manager ([about](https://docs.python.org/3/library/venv.html),
     python -m pip install --upgrade pip
 
     # Install IREE build pre-requisites.
-    python -m pip install -r bindings\python\build_requirements.txt
+    python -m pip install -r runtime\bindings\python\iree\runtime\build_requirements.txt
     ```
 
 When you are done with the venv, you can close it by closing your shell
