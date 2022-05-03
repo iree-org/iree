@@ -7,16 +7,16 @@
 #ifndef IREE_BINDINGS_TFLITE_INTERPRETER_H_
 #define IREE_BINDINGS_TFLITE_INTERPRETER_H_
 
-#include "./model.h"
-#include "./options.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/vm/api.h"
+#include "runtime/bindings/tflite/model.h"
+#include "runtime/bindings/tflite/options.h"
 
 // NOTE: we pull in our own copy here in case the tflite API changes upstream.
 #define TFL_COMPILE_LIBRARY 1
-#include "./include/tensorflow/lite/c/c_api.h"
-#include "./include/tensorflow/lite/c/c_api_experimental.h"
+#include "runtime/bindings/tflite/include/tensorflow/lite/c/c_api.h"
+#include "runtime/bindings/tflite/include/tensorflow/lite/c/c_api_experimental.h"
 
 struct TfLiteInterpreter {
   iree_allocator_t allocator;
