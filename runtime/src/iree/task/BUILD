@@ -15,7 +15,7 @@ package(
 iree_cmake_extra_content(
     content = """
 # Task-based executor requires threading support.
-if(NOT ${IREE_ENABLE_THREADING})
+if(NOT IREE_ENABLE_THREADING)
   return()
 endif()
 

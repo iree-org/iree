@@ -69,7 +69,7 @@ iree_cc_library(
   PUBLIC
 )
 
-if(${IREE_HAL_DRIVER_VMVX} OR ${IREE_HAL_DRIVER_VMVX_SYNC})
+if(IREE_HAL_DRIVER_VMVX OR IREE_HAL_DRIVER_VMVX_SYNC)
 
 iree_cc_library(
   NAME

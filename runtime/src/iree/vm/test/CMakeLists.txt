@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-if(NOT ${IREE_BUILD_COMPILER} OR NOT ${IREE_BUILD_TESTS})
+if(NOT IREE_BUILD_COMPILER OR NOT IREE_BUILD_TESTS)
   return()
 endif()
 

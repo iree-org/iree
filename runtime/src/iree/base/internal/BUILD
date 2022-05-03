@@ -355,7 +355,7 @@ iree_runtime_cc_test(
 
 iree_cmake_extra_content(
     content = """
-if(NOT ${IREE_ENABLE_THREADING})
+if(NOT IREE_ENABLE_THREADING)
   return()
 endif()
 """,
