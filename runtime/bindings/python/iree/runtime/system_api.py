@@ -289,7 +289,7 @@ class SystemContext:
 
   @property
   def instance(self) -> _binding.VmInstance:
-    return self._instance
+    return self._config.vm_instance
 
   @property
   def modules(self) -> BoundModules:
