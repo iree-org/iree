@@ -39,6 +39,14 @@ static llvm::cl::opt<bool> clCheckIRBeforeLLVMConversion(
 // Default allocation functions for CPU backend
 //===---------------------------------------------------------------------===//
 
+static Value cpuAllocationFunction(OpBuilder &builder, Location loc,
+                                   ArrayRef<int64_t> staticShape,
+                                   Type elementType,
+                                   ArrayRef<Value> dynamicSizes) {
+  MemRefType allocType = MemRefType::get(staticShape, elementType);
+  return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes);
+}
+
 // Allocation callbacks to use with upstream comprehensive bufferization
 static FailureOr<Value> cpuComprehensiveBufferizeAllocationFn(
     OpBuilder &builder, Location loc, MemRefType memRefType,
@@ -373,10 +381,13 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
-  passManager.addNestedPass<func::FuncOp>(
-      createConvertToDestinationPassingStylePass());
-  passManager.addPass(createCanonicalizerPass());
-  addCPUIREEComprehensiveBufferizePasses(passManager);
+  // TODO(#9004): Use upstream bufferization once the bufferization of LinalgExt
+  // ops are implemented.
+  // passManager.addNestedPass<func::FuncOp>(
+  // createConvertToDestinationPassingStylePass());
+  // passManager.addPass(createCanonicalizerPass());
+  // addCPUIREEComprehensiveBufferizePasses(passManager);
+  addLinalgBufferizePasses(passManager, cpuAllocationFunction);
 }
 
 void addLinalgTransformInterpPasses(OpPassManager &passManager) {
