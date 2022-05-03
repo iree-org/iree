@@ -663,7 +663,7 @@ if(IREE_BUILD_PYTHON_BINDINGS)
 endif()
 
 if(IREE_BUILD_BINDINGS_TFLITE)
-  add_subdirectory(bindings/tflite)
+  add_subdirectory(runtime/bindings/tflite)
 endif()
 
 if(IREE_BUILD_EXPERIMENTAL_REMOTING)

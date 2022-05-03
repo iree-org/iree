@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "bindings/tflite/options.h"
+#include "./options.h"
 
-#include "bindings/tflite/shim.h"
+#include "./shim.h"
 #include "iree/base/tracing.h"
 
 void _TfLiteInterpreterOptionsSetDefaults(TfLiteInterpreterOptions* options) {

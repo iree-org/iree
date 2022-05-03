@@ -61,13 +61,13 @@ cc_test(
     # TODO(benvanik): bazel/cmake to include this generated file.
     # Checked in right now until I can figure it out.
     # data = [
-    #     "//bindings/tflite/testdata:add.vmfb",
+    #     "//runtime/bindings/tflite/testdata:add.vmfb",
     # ],
     deps = [
         ":shim",
-        "//bindings/tflite/testdata:add_dynamic_c",
-        "//bindings/tflite/testdata:add_multi_c",
-        "//bindings/tflite/testdata:add_static_c",
+        "//runtime/bindings/tflite/testdata:add_dynamic_c",
+        "//runtime/bindings/tflite/testdata:add_multi_c",
+        "//runtime/bindings/tflite/testdata:add_static_c",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
