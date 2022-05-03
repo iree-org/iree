@@ -383,11 +383,11 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
 
   // TODO(#9004): Use upstream bufferization once the bufferization of LinalgExt
   // ops are implemented.
-  // passManager.addNestedPass<func::FuncOp>(
-  // createConvertToDestinationPassingStylePass());
-  // passManager.addPass(createCanonicalizerPass());
-  // addCPUIREEComprehensiveBufferizePasses(passManager);
-  addLinalgBufferizePasses(passManager, cpuAllocationFunction);
+  passManager.addNestedPass<func::FuncOp>(
+      createConvertToDestinationPassingStylePass());
+  passManager.addPass(createCanonicalizerPass());
+  addCPUIREEComprehensiveBufferizePasses(passManager);
+  //addLinalgBufferizePasses(passManager, cpuAllocationFunction);
 }
 
 void addLinalgTransformInterpPasses(OpPassManager &passManager) {
