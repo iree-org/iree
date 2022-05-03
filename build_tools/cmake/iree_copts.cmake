@@ -271,7 +271,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
 
 # Set some things back to warnings that are really annoying as build errors
 # during active development (but we still want as errors on CI).
-if (IREE_DEV_MODE)
+if(IREE_DEV_MODE)
   iree_select_compiler_opts(IREE_DEFAULT_COPTS
     CLANG_OR_GCC
       "-Wno-error=unused-parameter"
@@ -350,7 +350,7 @@ endif()
 #-------------------------------------------------------------------------------
 
 # TODO(#898): add a dedicated size-constrained configuration.
-if(${IREE_SIZE_OPTIMIZED})
+if(IREE_SIZE_OPTIMIZED)
   iree_select_compiler_opts(IREE_SIZE_OPTIMIZED_DEFAULT_COPTS
     MSVC_OR_CLANG_CL
       "/GS-"

@@ -115,7 +115,7 @@ function(iree_benchmark_suite)
       # Strip off gzip suffix if present (downloader unzips if necessary)
       string(REGEX REPLACE "\.gz$" "" _SOURCE_FILE_BASENAME "${_LAST_URL_SEGMENT}")
       set(_MODULE_SOURCE "${_ROOT_ARTIFACTS_DIR}/${_SOURCE_FILE_BASENAME}")
-      if (NOT TARGET "${_DOWNLOAD_TARGET}")
+      if(NOT TARGET "${_DOWNLOAD_TARGET}")
         add_custom_command(
           OUTPUT "${_MODULE_SOURCE}"
           COMMAND
@@ -134,7 +134,7 @@ function(iree_benchmark_suite)
 
     # If the source is a TFLite file, import it.
     if("${_MODULE_SOURCE}" MATCHES "\.tflite$")
-      if (NOT IREE_IMPORT_TFLITE_PATH)
+      if(NOT IREE_IMPORT_TFLITE_PATH)
         message(SEND_ERROR "Benchmarks of ${_MODULE_SOURCE} require"
                           " that iree-import-tflite be available "
                           " (either on PATH or via IREE_IMPORT_TFLITE_PATH)")
@@ -143,7 +143,7 @@ function(iree_benchmark_suite)
       set(_MODULE_SOURCE "${_TFLITE_FILE}.mlir")
       get_filename_component(_TFLITE_FILE_BASENAME "${_TFLITE_FILE}" NAME)
       set(_TFLITE_IMPORT_TARGET "${PACKAGE_NAME}_iree-import-tflite-${_TFLITE_FILE_BASENAME}")
-      if (NOT TARGET "${_TFLITE_IMPORT_TARGET}")
+      if(NOT TARGET "${_TFLITE_IMPORT_TARGET}")
         add_custom_command(
           OUTPUT "${_MODULE_SOURCE}"
           COMMAND
@@ -168,7 +168,7 @@ function(iree_benchmark_suite)
     # Next create the command and target for compiling the input module into
     # IREE deployable format for each benchmark mode.
     string(JOIN "-" _MODULE_DIR_NAME "${_MODULE_NAME}" "${_MODULE_TAGS}")
-    foreach (_BENCHMARK_MODE IN LISTS _RULE_BENCHMARK_MODES)
+    foreach(_BENCHMARK_MODE IN LISTS _RULE_BENCHMARK_MODES)
       set(_BENCHMARK_DIR_NAME
           "iree-${_RULE_DRIVER}__${_RULE_TARGET_ARCHITECTURE}__${_BENCHMARK_MODE}")
 
@@ -237,7 +237,7 @@ function(iree_benchmark_suite)
         add_dependencies(iree-benchmark-suites "${_TRANSLATION_TARGET_NAME}")
       endif(NOT TARGET "${_TRANSLATION_TARGET_NAME}")
 
-      if (NOT TARGET "${_FRIENDLY_TARGET_NAME}")
+      if(NOT TARGET "${_FRIENDLY_TARGET_NAME}")
         add_custom_target("${_FRIENDLY_TARGET_NAME}")
       endif()
       add_dependencies("${_FRIENDLY_TARGET_NAME}" "${_TRANSLATION_TARGET_NAME}")

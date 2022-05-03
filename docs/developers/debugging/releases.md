@@ -105,7 +105,7 @@ And change the branch from 'main' to the branch you are developing on
 [here](https://github.com/google/iree/blob/392449e986493bf710e3da637ebf807715da9ffe/.github/workflows/schedule_snapshot_release.yml#L37):
 ```yaml
 - name: Pushing changes
-  uses: ad-m/github-push-action@v0.6.0
+  uses: ad-m/github-push-action@40bf560936a8022e68a3c00e7d2abefaf01305a6  # v0.6.0
   with:
     github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
     branch: main

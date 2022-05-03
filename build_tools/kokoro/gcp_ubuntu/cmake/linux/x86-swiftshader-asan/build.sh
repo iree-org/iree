@@ -6,7 +6,14 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build the project with cmake using Kokoro.
+# Build and test the project with CMake using Kokoro, with ASan enabled and
+# using SwiftShader's software Vulkan driver.
+# ASan docs: https://clang.llvm.org/docs/AddressSanitizer.html
+#
+# Note: this script diverges from the non-ASan build in a few ways:
+#   * The CMake build sets `IREE_ENABLE_ASAN=ON`
+#   * Omit optional components that don't work with ASan (e.g. Python bindings)
+#   * Some tests that fail under ASan are individually excluded
 
 set -e
 set -x
@@ -126,7 +133,10 @@ excluded_tests_regex="($(IFS="|" ; echo "${excluded_tests[*]?}"))"
 
 cd ${CMAKE_BUILD_DIR?}
 
-echo "Testing with ctest"
+echo "******************** Running main project ctests ************************"
 ctest --timeout 900 --output-on-failure \
   --label-exclude "${label_exclude_regex}" \
   --exclude-regex "${excluded_tests_regex?}"
+
+echo "******************** llvm-external-projects tests ***********************"
+cmake --build . --target check-iree-dialects -- -k 0

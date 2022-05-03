@@ -11,7 +11,7 @@
 iree_add_all_subdirs()
 
 if((${IREE_HAL_DRIVER_VMVX} OR ${IREE_HAL_DRIVER_VMVX_SYNC})
-   AND (${IREE_TARGET_BACKEND_VMVX} OR DEFINED IREE_HOST_BINARY_ROOT))
+   AND(${IREE_TARGET_BACKEND_VMVX} OR DEFINED IREE_HOST_BINARY_ROOT))
 
 iree_cc_binary(
   NAME
@@ -57,7 +57,7 @@ iree_native_test(
 endif()
 
 if((${IREE_HAL_DRIVER_DYLIB} OR ${IREE_HAL_DRIVER_DYLIB_SYNC})
-   AND (${IREE_TARGET_BACKEND_DYLIB_LLVM_AOT} OR DEFINED IREE_HOST_BINARY_ROOT))
+   AND(${IREE_TARGET_BACKEND_DYLIB_LLVM_AOT} OR DEFINED IREE_HOST_BINARY_ROOT))
 
 iree_cc_binary(
   NAME
@@ -195,7 +195,7 @@ iree_native_test(
     ::simple_embedding_embedded_sync
 )
 
-if(${IREE_HAL_DRIVER_DYLIB})
+if(IREE_HAL_DRIVER_DYLIB)
 
 iree_cc_binary(
   NAME

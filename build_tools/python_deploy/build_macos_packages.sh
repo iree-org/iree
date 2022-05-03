@@ -94,7 +94,7 @@ function build_iree_runtime_instrumented() {
 }
 
 function build_iree_compiler() {
-  python3 -m pip wheel -v -w $output_dir $repo_root/iree/compiler/
+  python3 -m pip wheel -v -w $output_dir $repo_root/compiler/
 }
 
 function clean_wheels() {

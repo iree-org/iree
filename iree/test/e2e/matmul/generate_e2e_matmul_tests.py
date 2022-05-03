@@ -42,6 +42,7 @@ class CompilationInfoId(enum.Enum):
   NONE = ""
   LLVMGPUMatmulSimt = "LLVMGPUMatmulSimt"
   LLVMGPUMatmulTensorCore = "LLVMGPUMatmulTensorCore"
+  SPIRVVectorize = "SPIRVVectorize"
 
 
 # Enumerates ways to construct MLIR tensor types.
@@ -163,7 +164,8 @@ def get_test_compilation_infos(
 ) -> typing.List[typing.Optional[CompilationInfo]]:
   if compilation_info_id == CompilationInfoId.NONE:
     return [None]
-  if compilation_info_id == CompilationInfoId.LLVMGPUMatmulSimt:
+  if (compilation_info_id == CompilationInfoId.LLVMGPUMatmulSimt or
+      compilation_info_id == CompilationInfoId.SPIRVVectorize):
     tile_workgroup_size_pairs = [
         TileWorkgroupSizePair([32, 128, 32], [32, 8, 1]),
         TileWorkgroupSizePair([128, 64, 8], [16, 8, 1]),

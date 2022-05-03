@@ -248,4 +248,46 @@ iree_generated_trace_runner_test(
     "requires-gpu-nvidia"
 )
 
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_direct_f32_gpu_large_valhall-unknown-android11
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--shapes=gpu_large"
+    "--compilation_info=SPIRVVectorize"
+  TRACE_RUNNER
+    iree_tools_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "vulkan-spirv"
+  DRIVERS
+    "vulkan"
+  COMPILER_FLAGS
+    "--iree-vulkan-target-triple=valhall-unknown-android11"
+  LABELS
+    "requires-gpu-nvidia"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_direct_f32_gpu_large_ampere-unknown-linux
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--shapes=gpu_large"
+    "--compilation_info=SPIRVVectorize"
+  TRACE_RUNNER
+    iree_tools_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "vulkan-spirv"
+  DRIVERS
+    "vulkan"
+  COMPILER_FLAGS
+    "--iree-vulkan-target-triple=ampere-unknown-linux"
+  LABELS
+    "requires-gpu-nvidia"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

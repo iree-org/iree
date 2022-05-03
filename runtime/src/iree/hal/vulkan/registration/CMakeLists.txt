@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-if(${IREE_HAL_DRIVER_VULKAN})
+if(IREE_HAL_DRIVER_VULKAN)
 
 iree_cc_library(
   NAME

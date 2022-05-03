@@ -82,7 +82,6 @@ bazel \
   --noworkspace_rc \
   --bazelrc=build_tools/bazel/iree.bazelrc \
   query \
-    --config=non_darwin \
     //iree/... + //runtime/... + //samples/... + //build_tools/... + \
     //llvm-external-projects/iree-dialects/... | \
       xargs --max-args 1000000 --max-chars 1000000 --exit \
@@ -93,7 +92,6 @@ bazel \
               --color=yes \
               ${test_env_args[@]} \
               --config=generic_clang \
-              --config=non_darwin \
               --build_tag_filters="${BUILD_TAG_FILTERS?}" \
               --test_tag_filters="${TEST_TAG_FILTERS?}" \
               --keep_going \

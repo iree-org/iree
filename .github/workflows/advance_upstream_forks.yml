@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checking out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           repository: google/iree-llvm-fork
@@ -32,7 +32,7 @@ jobs:
           git remote add upstream https://github.com/llvm/llvm-project.git
           git pull --ff-only upstream main
       - name: Pushing changes
-        uses: ad-m/github-push-action@v0.6.0
+        uses: ad-m/github-push-action@40bf560936a8022e68a3c00e7d2abefaf01305a6  # v0.6.0
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: main
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checking out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           repository: google/iree-mhlo-fork
@@ -56,7 +56,7 @@ jobs:
           git remote add upstream https://github.com/tensorflow/mlir-hlo.git
           git pull --ff-only upstream master
       - name: Pushing changes
-        uses: ad-m/github-push-action@v0.6.0
+        uses: ad-m/github-push-action@40bf560936a8022e68a3c00e7d2abefaf01305a6  # v0.6.0
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: master
@@ -69,7 +69,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checking out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           repository: google/iree-tf-fork
@@ -80,7 +80,7 @@ jobs:
           git remote add upstream https://github.com/tensorflow/tensorflow.git
           git pull --ff-only upstream master
       - name: Pushing changes
-        uses: ad-m/github-push-action@v0.6.0
+        uses: ad-m/github-push-action@40bf560936a8022e68a3c00e7d2abefaf01305a6  # v0.6.0
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: master

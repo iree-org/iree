@@ -185,6 +185,19 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Set the `i`-th output operand.
+      }],
+      /*retTy=*/"void",
+      /*methodName=*/"setOutputOperand",
+      /*args=*/(ins "int64_t":$i, "Value":$value),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(i >= 0 && i < getNumOutputs());
+        this->getOperation()->setOperand(getNumInputs() + i, value);
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Return the subset of output operands that are of buffer type.
       }],
       /*retTy=*/"OpOperandVector",
@@ -257,6 +270,22 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
             return opOperands->get().getType().cast<RankedTensorType>();
           });
         return result;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the result tied to `opOperand`.
+      }],
+      /*retTy=*/"OpResult",
+      /*methodName=*/"getTiedOpResult",
+      /*args=*/(ins "OpOperand*":$opOperand),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(opOperand->getOwner() == this->getOperation());
+        int64_t resultIndex = opOperand->getOperandNumber() - getNumInputs();
+        assert(resultIndex >= 0 &&
+               resultIndex < this->getOperation()->getNumResults() );
+        return this->getOperation()->getResult(resultIndex);
       }]
     >,
     //===------------------------------------------------------------------===//
@@ -423,6 +452,26 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
           r.cloneInto(state.addRegion(), bvm);
         return b.create(state);
       }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Clone the current operation with the given location and operands but
+        leave the regions empty. This is used to abstract away the optional
+        underlying region creation. This does not change the balance between
+        input, output_buffer and init_tensors operands.
+      }],
+      /*retTy=*/"Operation *",
+      /*methodName=*/"cloneWithoutRegions",
+      (ins "OpBuilder &":$b, "Location":$loc, "TypeRange":$resultTypes,
+           "ValueRange":$operands),
+      [{
+        OperationState state(
+          loc, ConcreteOp::getOperationName(), operands, resultTypes,
+          $_op->getAttrs());
+        for (size_t cnt = 0, e = $_op->getNumRegions(); cnt < e; ++cnt)
+          state.addRegion();
+        return b.create(state);
+      }]
     >
   ];
 
@@ -431,7 +480,7 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
     /// shape of the input operands where possible.
     LogicalResult reifyResultShapes(OpBuilder &b,
         mlir::ReifiedRankedShapedTypeDims &reifiedReturnShapes);
-    
+
     //========================================================================//
     // Helper functions to mutate the `operand_segment_sizes` attribute.
     // These are useful when cloning and changing operand types.

@@ -65,8 +65,12 @@ class BenchmarkDriverTest(unittest.TestCase):
             capture_tarball="captures.tar",
             capture_tmp_dir=os.path.join(self.tmp_dir.name, CAPTURES_REL_PATH)))
 
-    self.device_info = DeviceInfo(PlatformType.LINUX, "Unknown", "arm64-v8a",
-                                  ["sha2"], "Mali-G78")
+    self.device_info = DeviceInfo(platform_type=PlatformType.LINUX,
+                                  model="Unknown",
+                                  cpu_abi="arm64-v8a",
+                                  cpu_uarch=None,
+                                  cpu_features=["sha2"],
+                                  gpu_name="Mali-G78")
 
     case1 = BenchmarkCase(model_name_with_tags="DeepNet",
                           bench_mode=["1-thread", "full-inference"],

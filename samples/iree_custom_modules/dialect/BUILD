@@ -5,8 +5,9 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
-load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "td_library")
+load("@llvm-project//mlir:tblgen.bzl", "td_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_tablegen.bzl", "iree_gentbl_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -21,8 +22,8 @@ td_library(
         include = ["*.td"],
     ),
     deps = [
-        "//iree/compiler/Dialect/HAL/IR:td_files",
-        "//iree/compiler/Dialect/Util/IR:td_files",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR:td_files",
+        "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
         "@llvm-project//mlir:StdOpsTdFiles",
     ],
 )
@@ -42,10 +43,10 @@ cc_library(
     deps = [
         ":custom_imports",
         ":custom_ops_gen",
-        "//iree/compiler/Dialect/HAL/Conversion",
-        "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/Util/IR",
-        "//iree/compiler/Dialect/VM/Conversion",
+        "//compiler/src/iree/compiler/Dialect/HAL/Conversion",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/VM/Conversion",
         "//samples:defs",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
@@ -56,7 +57,7 @@ cc_library(
     ],
 )
 
-gentbl_cc_library(
+iree_gentbl_cc_library(
     name = "custom_ops_gen",
     tbl_outs = [
         (
@@ -112,9 +113,9 @@ cc_binary(
     srcs = ["custom-translate-main.cc"],
     deps = [
         ":init_dialect",
-        "//iree/compiler/Dialect/VM/Target:init_targets",
-        "//iree/compiler/Dialect/VM/Target/Bytecode",
-        "//iree/compiler/Translation:IREEVM",
+        "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",
+        "//compiler/src/iree/compiler/Dialect/VM/Target/Bytecode",
+        "//compiler/src/iree/compiler/Translation:IREEVM",
         "//iree/tools:init_compiler_modules",
         "//iree/tools:init_iree_passes_and_dialects",
         "//iree/tools:init_mlir_passes_and_dialects",

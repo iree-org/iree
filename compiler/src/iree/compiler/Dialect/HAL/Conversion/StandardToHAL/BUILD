@@ -1,0 +1,42 @@
+# Copyright 2020 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//iree:build_defs.oss.bzl", "iree_compiler_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_compiler_cc_library(
+    name = "StandardToHAL",
+    srcs = [
+        "ConvertShapeOps.cpp",
+        "ConvertStandardToHAL.cpp",
+        "ConvertStructuralOps.cpp",
+    ],
+    hdrs = [
+        "ConvertStandardToHAL.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/HAL/Conversion",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR:HALDialect",
+        "//compiler/src/iree/compiler/Dialect/HAL/Target",
+        "//compiler/src/iree/compiler/Dialect/Util/Conversion",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:ControlFlowOps",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:Shape",
+        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:Transforms",
+    ],
+)

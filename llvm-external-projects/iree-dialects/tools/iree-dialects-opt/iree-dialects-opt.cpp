@@ -13,6 +13,7 @@
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/PyDM/IR/PyDMDialect.h"
 #include "iree-dialects/Dialect/PyDM/Transforms/Passes.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Async/IR/Async.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"

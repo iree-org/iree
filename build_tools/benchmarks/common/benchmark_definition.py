@@ -36,6 +36,9 @@ GPU_NAME_TO_TARGET_ARCH_MAP = {
     "unknown": "gpu-unknown",
 }
 
+# A map of canonical microarchitecture names.
+CANONICAL_MICROARCHITECTURE_NAMES = {"CascadeLake", "Zen2"}
+
 
 @dataclass
 class DriverInfo:
@@ -167,7 +170,8 @@ class DeviceInfo:
   It includes the following characteristics:
   - platform_type: the OS platform, e.g., 'Android'
   - model: the product model, e.g., 'Pixel-4'
-  - cpu_abi: the CPU ABI, e.g., 'arm64-v8a'
+  - cpu_abi: the CPU ABI, e.g., 'arm64-v8a', 'x86_64'
+  - cpu_uarch: the CPU microarchitecture, e.g., 'CascadeLake'
   - cpu_features: the detailed CPU features, e.g., ['fphp', 'sve']
   - gpu_name: the GPU name, e.g., 'Mali-G77'
   """
@@ -175,6 +179,7 @@ class DeviceInfo:
   platform_type: PlatformType
   model: str
   cpu_abi: str
+  cpu_uarch: Optional[str]
   cpu_features: Sequence[str]
   gpu_name: str
 
@@ -183,6 +188,7 @@ class DeviceInfo:
     params = [
         f"model='{self.model}'",
         f"cpu_abi='{self.cpu_abi}'",
+        f"cpu_uarch='{self.cpu_uarch}'",
         f"gpu_name='{self.gpu_name}'",
         f"cpu_features=[{features}]",
     ]
@@ -194,6 +200,15 @@ class DeviceInfo:
     if not arch:
       raise ValueError(f"Unrecognized CPU ABI: '{self.cpu_abi}'; "
                        "need to update the map")
+
+    if self.cpu_uarch:
+      if self.cpu_uarch not in CANONICAL_MICROARCHITECTURE_NAMES:
+        raise ValueError(
+            f"Unrecognized CPU microarchitecture: '{self.cpu_uarch}'; "
+            "need to update the map")
+
+      arch = f'{arch}-{self.cpu_uarch.lower()}'
+
     return arch
 
   def get_iree_gpu_arch_name(self) -> str:
@@ -203,11 +218,13 @@ class DeviceInfo:
                        "need to update the map")
     return arch
 
-  def get_cpu_arch_revision(self) -> str:
+  def get_detailed_cpu_arch_name(self) -> str:
+    """Returns the detailed architecture name."""
+
     if self.cpu_abi == "arm64-v8a":
       return self.__get_arm_cpu_arch_revision()
     if self.cpu_abi == "x86_64":
-      return "x86_64"
+      return self.__get_x86_detailed_cpu_arch_name()
     raise ValueError("Unrecognized CPU ABI; need to update the list")
 
   def to_json_object(self) -> Dict[str, Any]:
@@ -215,15 +232,26 @@ class DeviceInfo:
         "platform_type": self.platform_type.value,
         "model": self.model,
         "cpu_abi": self.cpu_abi,
+        "cpu_uarch": self.cpu_uarch if self.cpu_uarch else "",
         "cpu_features": self.cpu_features,
         "gpu_name": self.gpu_name,
     }
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
+    cpu_uarch = json_object.get("cpu_uarch")
     return DeviceInfo(PlatformType(json_object["platform_type"]),
                       json_object["model"], json_object["cpu_abi"],
+                      None if cpu_uarch == "" else cpu_uarch,
                       json_object["cpu_features"], json_object["gpu_name"])
+
+  def __get_x86_detailed_cpu_arch_name(self) -> str:
+    """Returns the x86 architecture with microarchitecture name."""
+
+    if not self.cpu_uarch:
+      return self.cpu_abi
+
+    return f"{self.cpu_abi}-{self.cpu_uarch}"
 
   def __get_arm_cpu_arch_revision(self) -> str:
     """Returns the ARM architecture revision."""
@@ -276,7 +304,7 @@ class BenchmarkInfo:
     if driver_info.device_type == 'GPU':
       target_arch = "GPU-" + self.device_info.gpu_name
     elif driver_info.device_type == 'CPU':
-      target_arch = "CPU-" + self.device_info.get_cpu_arch_revision()
+      target_arch = "CPU-" + self.device_info.get_detailed_cpu_arch_name()
     else:
       raise ValueError(
           f"Unrecognized device type '{driver_info.device_type}' of the runner '{self.runner}'"

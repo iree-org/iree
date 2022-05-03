@@ -225,7 +225,7 @@ iree_runtime_cc_library(
 
 iree_cmake_extra_content(
     content = """
-if(${IREE_BUILD_COMPILER})
+if(IREE_BUILD_COMPILER)
 """,
     inline = True,
 )

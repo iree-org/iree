@@ -1,0 +1,97 @@
+# Copyright 2021 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//iree:build_defs.oss.bzl", "iree_compiler_cc_library")
+load("//build_tools/bazel:iree_tablegen.bzl", "iree_gentbl_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_compiler_cc_library(
+    name = "Transforms",
+    srcs = [
+        "AnnotateDispatchArguments.cpp",
+        "ConvertToStream.cpp",
+        "DumpStatistics.cpp",
+        "ElideAsyncCopies.cpp",
+        "EncodeTensors.cpp",
+        "FoldUniformOperands.cpp",
+        "FuseDispatchBindings.cpp",
+        "LayoutSlices.cpp",
+        "MaterializeBuiltins.cpp",
+        "MaterializeCopyOnWrite.cpp",
+        "OutlineConstants.cpp",
+        "PackAllocations.cpp",
+        "PackConstants.cpp",
+        "PassDetail.h",
+        "Passes.cpp",
+        "PropagateSubviews.cpp",
+        "PropagateTimepoints.cpp",
+        "RefineUsage.cpp",
+        "ScheduleAllocation.cpp",
+        "ScheduleConcurrency.cpp",
+        "ScheduleExecution.cpp",
+        "SpecializeDispatches.cpp",
+        "VerifyLowerings.cpp",
+    ],
+    hdrs = [
+        "Passes.h",
+        "Passes.h.inc",
+    ],
+    deps = [
+        ":PassesIncGen",
+        "//compiler/src/iree/compiler/Dialect/Flow/IR",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/Stream/Analysis",
+        "//compiler/src/iree/compiler/Dialect/Stream/Conversion",
+        "//compiler/src/iree/compiler/Dialect/Stream/Conversion/FlowToStream",
+        "//compiler/src/iree/compiler/Dialect/Stream/Conversion/HALToStream",
+        "//compiler/src/iree/compiler/Dialect/Stream/Conversion/StandardToStream",
+        "//compiler/src/iree/compiler/Dialect/Stream/Conversion/UtilToStream",
+        "//compiler/src/iree/compiler/Dialect/Stream/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/Analysis",
+        "//compiler/src/iree/compiler/Dialect/Util/Analysis/DFX",
+        "//compiler/src/iree/compiler/Dialect/Util/Conversion",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/Transforms",
+        "//compiler/src/iree/compiler/Utils",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:Analysis",
+        "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:ControlFlowOps",
+        "@llvm-project//mlir:DialectUtils",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:VectorOps",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "PassesIncGen",
+    tbl_outs = [
+        (
+            ["-gen-pass-decls"],
+            "Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)

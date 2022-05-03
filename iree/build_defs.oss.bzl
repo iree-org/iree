@@ -6,7 +6,7 @@
 
 """Common Bazel definitions for IREE."""
 
-def platform_trampoline_deps(basename, path = "base"):
+def platform_trampoline_deps(basename, path = "runtime/src/iree/base"):
     """Produce a list of deps for the given `basename` platform target.
 
     Example:
@@ -16,14 +16,14 @@ def platform_trampoline_deps(basename, path = "base"):
     library in foreign source control systems.
 
     Args:
-      basename: Library name prefix for a library in iree/[path]/internal.
+      basename: Library name prefix for a library in [path]/internal.
       path: Folder name to work within.
     Returns:
       A list of dependencies for depending on the library in a platform
       sensitive way.
     """
     return [
-        "//iree/%s/internal:%s_internal" % (path, basename),
+        "//%s/internal:%s_internal" % (path, basename),
     ]
 
 def iree_build_test(name, targets):
@@ -46,6 +46,19 @@ def iree_cmake_extra_content(content = "", inline = False):
     """
     pass
 
+def iree_compiler_cc_library(deps = [], **kwargs):
+    """Used for cc_library targets within the //compiler tree.
+
+    This is a pass-through to the native cc_library which adds specific
+    compiler specific options and deps.
+    """
+    native.cc_library(
+        deps = deps + [
+            "//compiler/src:defs",
+        ],
+        **kwargs
+    )
+
 def iree_runtime_cc_library(deps = [], **kwargs):
     """Used for cc_library targets within the //runtime tree.
 
@@ -54,6 +67,7 @@ def iree_runtime_cc_library(deps = [], **kwargs):
     """
     native.cc_library(
         deps = deps + [
+            # TODO: Rename to //runtime/src:defs to match compiler.
             "//runtime/src:runtime_defines",
         ],
         **kwargs
@@ -67,6 +81,7 @@ def iree_runtime_cc_test(deps = [], **kwargs):
     """
     native.cc_test(
         deps = deps + [
+            # TODO: Rename to //runtime/src:defs to match compiler.
             "//runtime/src:runtime_defines",
         ],
         **kwargs

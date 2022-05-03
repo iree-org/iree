@@ -14,7 +14,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(${IREE_HAL_DRIVER_VMVX})
+if(IREE_HAL_DRIVER_VMVX)
 """,
     inline = True,
 )
@@ -41,7 +41,7 @@ iree_cmake_extra_content(
     content = """
 endif()
 
-if(${IREE_HAL_DRIVER_VMVX_SYNC})
+if(IREE_HAL_DRIVER_VMVX_SYNC)
 """,
     inline = True,
 )

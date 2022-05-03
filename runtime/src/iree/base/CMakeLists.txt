@@ -193,7 +193,7 @@ iree_cc_test(
 # to excusively static linkage scenarios and note that it's unstable. It's just
 # really really useful and the only way for applications to interleave with our
 # tracing (today).
-if(${IREE_ENABLE_RUNTIME_TRACING})
+if(IREE_ENABLE_RUNTIME_TRACING)
   iree_cc_library(
     NAME
       tracing
