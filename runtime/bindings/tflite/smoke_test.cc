@@ -29,16 +29,16 @@ limitations under the License.
 
 // NOTE: we pull in our own copy here in case the tflite API changes upstream.
 #define TFL_COMPILE_LIBRARY 1
-#include "bindings/tflite/include/tensorflow/lite/c/c_api.h"
+#include "runtime/bindings/tflite/include/tensorflow/lite/c/c_api.h"
 
 // Test model is available both on the filesystem and here for embedding testing
 // embedding the module directly in a binary.
-#include "bindings/tflite/testdata/add_dynamic_c.h"
+#include "runtime/bindings/tflite/testdata/add_dynamic_c.h"
 #define IREE_BINDINGS_TFLITE_TESTDATA_ADD_DYNAMIC_EMBEDDED_DATA \
   iree_tflite_testdata_add_dynamic_create()->data
 #define IREE_BINDINGS_TFLITE_TESTDATA_ADD_DYNAMIC_EMBEDDED_SIZE \
   iree_tflite_testdata_add_dynamic_create()->size
-#include "bindings/tflite/testdata/add_static_c.h"
+#include "runtime/bindings/tflite/testdata/add_static_c.h"
 #define IREE_BINDINGS_TFLITE_TESTDATA_ADD_STATIC_EMBEDDED_DATA \
   iree_tflite_testdata_add_static_create()->data
 #define IREE_BINDINGS_TFLITE_TESTDATA_ADD_STATIC_EMBEDDED_SIZE \

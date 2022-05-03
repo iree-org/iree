@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "bindings/tflite/options.h"
+#include "runtime/bindings/tflite/options.h"
 
-#include "bindings/tflite/shim.h"
 #include "iree/base/tracing.h"
+#include "runtime/bindings/tflite/shim.h"
 
 void _TfLiteInterpreterOptionsSetDefaults(TfLiteInterpreterOptions* options) {
   options->num_threads = -1;

@@ -11,8 +11,8 @@
 
 // NOTE: we pull in our own copy here in case the tflite API changes upstream.
 #define TFL_COMPILE_LIBRARY 1
-#include "bindings/tflite/include/tensorflow/lite/c/c_api.h"
-#include "bindings/tflite/include/tensorflow/lite/c/c_api_experimental.h"
+#include "runtime/bindings/tflite/include/tensorflow/lite/c/c_api.h"
+#include "runtime/bindings/tflite/include/tensorflow/lite/c/c_api_experimental.h"
 
 struct TfLiteInterpreterOptions {
   iree_allocator_t allocator;
