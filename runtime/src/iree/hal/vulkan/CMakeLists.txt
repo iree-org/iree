@@ -8,7 +8,7 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
-if(NOT ${IREE_HAL_DRIVER_VULKAN})
+if(NOT IREE_HAL_DRIVER_VULKAN)
   return()
 endif()
 

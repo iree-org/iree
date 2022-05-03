@@ -16,8 +16,8 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if((${IREE_HAL_DRIVER_VMVX} OR ${IREE_HAL_DRIVER_VMVX_SYNC})
-   AND(${IREE_TARGET_BACKEND_VMVX} OR DEFINED IREE_HOST_BINARY_ROOT))
+if((IREE_HAL_DRIVER_VMVX OR IREE_HAL_DRIVER_VMVX_SYNC) AND
+   (IREE_TARGET_BACKEND_VMVX OR DEFINED IREE_HOST_BINARY_ROOT))
 """,
     inline = True,
 )
@@ -69,8 +69,8 @@ endif()
 
 iree_cmake_extra_content(
     content = """
-if((${IREE_HAL_DRIVER_DYLIB} OR ${IREE_HAL_DRIVER_DYLIB_SYNC})
-   AND(${IREE_TARGET_BACKEND_DYLIB_LLVM_AOT} OR DEFINED IREE_HOST_BINARY_ROOT))
+if((IREE_HAL_DRIVER_DYLIB OR IREE_HAL_DRIVER_DYLIB_SYNC) AND
+   (IREE_TARGET_BACKEND_DYLIB_LLVM_AOT OR DEFINED IREE_HOST_BINARY_ROOT))
 """,
     inline = True,
 )
@@ -245,7 +245,8 @@ iree_cmake_extra_content(
     content = """
 endif()
 
-if(${IREE_HAL_DRIVER_VULKAN} AND (${IREE_TARGET_BACKEND_VULKAN_SPIRV} OR DEFINED IREE_HOST_BINARY_ROOT))
+if(IREE_HAL_DRIVER_VULKAN AND
+   (IREE_TARGET_BACKEND_VULKAN_SPIRV OR DEFINED IREE_HOST_BINARY_ROOT))
 """,
     inline = True,
 )
@@ -298,7 +299,8 @@ endif()
 # support configurability in a reasonable or useful way.
 # iree_cmake_extra_content(
 #     content = """
-# if(${IREE_HAL_DRIVER_CUDA} AND (${IREE_TARGET_BACKEND_CUDA} OR DEFINED IREE_HOST_BINARY_ROOT))
+# if(IREE_HAL_DRIVER_CUDA AND
+#    (IREE_TARGET_BACKEND_CUDA OR DEFINED IREE_HOST_BINARY_ROOT))
 # """,
 #     inline = True,
 # )

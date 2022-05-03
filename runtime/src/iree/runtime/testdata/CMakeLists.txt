@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-if(NOT ${IREE_HAL_DRIVER_VMVX} OR NOT ${IREE_TARGET_BACKEND_VMVX})
+if(NOT IREE_HAL_DRIVER_VMVX OR NOT IREE_TARGET_BACKEND_VMVX)
   return()
 endif()
 

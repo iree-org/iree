@@ -16,7 +16,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT ${IREE_HAL_DRIVER_VULKAN})
+if(NOT IREE_HAL_DRIVER_VULKAN)
   return()
 endif()
 """,

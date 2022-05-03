@@ -4,9 +4,9 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-if(NOT ${IREE_TARGET_BACKEND_DYLIB_LLVM_AOT}
-  OR NOT ${IREE_HAL_DRIVER_DYLIB}
-  OR NOT ${IREE_BUILD_COMPILER})
+if(NOT IREE_TARGET_BACKEND_DYLIB_LLVM_AOT OR
+   NOT IREE_HAL_DRIVER_DYLIB OR
+   NOT IREE_BUILD_COMPILER)
   return()
 endif()
 
@@ -100,7 +100,7 @@ iree_lit_test(
 )
 
 
-if(NOT (${IREE_ENABLE_EMITC} OR DEFINED IREE_HOST_BINARY_ROOT))
+if(NOT (IREE_ENABLE_EMITC OR DEFINED IREE_HOST_BINARY_ROOT))
   return()
 endif()
 
@@ -134,8 +134,8 @@ add_custom_target(
 )
 
 add_library(simple_mul_c_module
- STATIC
- ${CMAKE_CURRENT_BINARY_DIR}/simple_mul_c_module.o
+  STATIC
+  ${CMAKE_CURRENT_BINARY_DIR}/simple_mul_c_module.o
 )
 add_dependencies(simple_mul_c_module simple_mul_gen)
 
