@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "bindings/tflite/tensor.h"
+#include "runtime/bindings/tflite/tensor.h"
 
-#include "bindings/tflite/shim.h"
 #include "iree/base/tracing.h"
+#include "runtime/bindings/tflite/shim.h"
 
 iree_status_t _TfLiteTensorParseNameAttr(TfLiteTensor* tensor,
                                          iree_string_view_t attr,

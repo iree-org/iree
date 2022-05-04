@@ -1109,21 +1109,18 @@ void LinalgBufferizePass::runOnOperation() {
           }
           return convertTensorInsertOp(b, tensorInsertOp, bvm, plan);
         })
-        .Case<vector::TransferWriteOp>(
-            [&](vector::TransferWriteOp transferWriteOp) {
-              if (!transferWriteOp.getSource()
-                       .getType()
-                       .isa<RankedTensorType>()) {
-                // Nothing to do when source is not a tensor.
-                return success();
-              }
-              if (failed(getOrAllocateResultBuffers(b, transferWriteOp, bvm,
-                                                    plan, allocationFn))) {
-                return failure();
-              }
-              return convertVectorTransferWriteOp(b, transferWriteOp, bvm,
-                                                  plan);
-            })
+        .Case<vector::TransferWriteOp>([&](vector::TransferWriteOp
+                                               transferWriteOp) {
+          if (!transferWriteOp.getSource().getType().isa<RankedTensorType>()) {
+            // Nothing to do when source is not a tensor.
+            return success();
+          }
+          if (failed(getOrAllocateResultBuffers(b, transferWriteOp, bvm, plan,
+                                                allocationFn))) {
+            return failure();
+          }
+          return convertVectorTransferWriteOp(b, transferWriteOp, bvm, plan);
+        })
         .Default([&](Operation *op) { return success(); });
   };
   auto walkResult =

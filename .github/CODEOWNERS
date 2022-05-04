@@ -22,7 +22,7 @@
 # Bindings
 /bindings/python/ @stellaraccident
 /runtime/bindings/python/ @stellaraccident
-/bindings/tflite/ @benvanik
+/runtime/bindings/tflite/ @benvanik
 
 # Integrations
 /integrations/ @benvanik @stellaraccident

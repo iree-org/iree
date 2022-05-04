@@ -8,7 +8,7 @@
 
 # TODO(#6353)Tools has thread dependency in gtest and benchmark; they should
 # be separated into the runtime tools and compiler tools.
-if(NOT ${IREE_ENABLE_THREADING})
+if(NOT IREE_ENABLE_THREADING)
   return()
 endif()
 

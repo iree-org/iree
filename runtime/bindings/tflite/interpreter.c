@@ -4,15 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "bindings/tflite/interpreter.h"
+#include "runtime/bindings/tflite/interpreter.h"
 
-#include "bindings/tflite/model.h"
-#include "bindings/tflite/shim.h"
-#include "bindings/tflite/tensor.h"
 #include "iree/base/internal/call_once.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
+#include "runtime/bindings/tflite/model.h"
+#include "runtime/bindings/tflite/shim.h"
+#include "runtime/bindings/tflite/tensor.h"
 
 //===----------------------------------------------------------------------===//
 // HAL / driver support

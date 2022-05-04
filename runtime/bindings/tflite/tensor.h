@@ -13,8 +13,8 @@
 
 // NOTE: we pull in our own copy here in case the tflite API changes upstream.
 #define TFL_COMPILE_LIBRARY 1  // force dllexport
-#include "bindings/tflite/include/tensorflow/lite/c/c_api.h"
-#include "bindings/tflite/include/tensorflow/lite/c/c_api_experimental.h"
+#include "runtime/bindings/tflite/include/tensorflow/lite/c/c_api.h"
+#include "runtime/bindings/tflite/include/tensorflow/lite/c/c_api_experimental.h"
 
 // This is the same value as TFLITE_RESHAPE_PARAMS_MAX_DIMENSION_COUNT.
 // Since that's all tflite supports internally we are fairly safe to use that
