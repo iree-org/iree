@@ -51,8 +51,8 @@ static bool getTilingOptionsFromConfig(int64_t tilingLevel,
   return false;
 }
 
-/// Default method to initialize the tiling options for fusion in IREE. These
-/// could be ovveridden by the command line options if specified.
+/// Constructs padding attributes for given anchor op. Returns failure if there
+/// are multiple anchor ops.
 static LogicalResult getPaddingAttrs(func::FuncOp funcOp,
                                      StringRef anchorOpName,
                                      SmallVectorImpl<Attribute> &attrs) {
@@ -81,6 +81,8 @@ static LogicalResult getPaddingAttrs(func::FuncOp funcOp,
   return success();
 }
 
+/// Default method to initialize the tiling options for fusion in IREE. These
+/// could be ovveridden by the command line options if specified.
 static FailureOr<LinalgTilingAndFusionOptions> getTileAndFuseOptionsFromConfig(
     func::FuncOp funcOp, int64_t tilingLevel) {
   SmallVector<Operation *> computeOps;

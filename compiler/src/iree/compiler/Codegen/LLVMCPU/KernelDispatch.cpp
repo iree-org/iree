@@ -262,7 +262,6 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
       return i;
     }
   }
-
   // If it can't be a multiple of vectorSizeVal, let's choose a factor of dim
   // sizes heuristically.
   int64_t start = std::min(maxSize, dim);
@@ -411,6 +410,8 @@ static LogicalResult setMatmulPadConfig(func::FuncOp entryPointFn,
   parallelTileSizes.assign(target2ndTileSizes.begin(),
                            target2ndTileSizes.end());
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
+  // TODO(hanchung): Make logic more heuristic. Padding hurts performance a lot
+  // if the dim size is small (e.g., K=24).
   int64_t K = lhsShapedType.getShape().back();
   parallelTileSizes.back() =
       getMaxTileSize(0, K, target2ndTileSizes[2], vectorSize);

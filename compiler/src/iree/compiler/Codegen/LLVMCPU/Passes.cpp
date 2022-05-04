@@ -258,7 +258,6 @@ void addMatmulDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   // TODO(hanchung): pack and hoist padding for linalg.generic op.
   pad("linalg.generic", paddingDims);
 
-  // Add the sandbox single tiling expert to tile and vectorize.
   {
     LinalgSingleTilingExpertPassOptions options;
     options.tilingLevel =
@@ -271,8 +270,8 @@ void addMatmulDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
 
   paddingDims = {2};
   pad("linalg.matmul", paddingDims);
-  // options.packPaddings = SmallVector<int64_t>{1, 1, 0};
 
+  // TODO(hanchung): Evaluate if we want to enable hoist paddings.
   //{
   // LinalgFusePassOptions options;
   // options.pad = true;
@@ -287,6 +286,7 @@ void addMatmulDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
 
   // Fold dim(pad) away before vectorization.
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
+
   {
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
@@ -297,13 +297,7 @@ void addMatmulDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
     passManager.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  BufferizationOptions::AllocationFn allocationFn =
-      cpuComprehensiveBufferizeAllocationFn;
-  BufferizationOptions::DeallocationFn deallocationFn =
-      cpuComprehensiveBufferizeDeallocationFn;
-  BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
-  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
-                                      memcpyFn);
+  addCPUIREEComprehensiveBufferizePasses(passManager);
 
   // Run IREE specific passes before vector lowering expert.
   passManager.addNestedPass<func::FuncOp>(
@@ -353,7 +347,6 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
     // generating the IR as same as sandbox.
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
-    options.vectorizePadding = true;
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
     passManager.addNestedPass<func::FuncOp>(
