@@ -110,6 +110,7 @@ PYBIND11_MODULE(_ireeDialects, m) {
   // LinalgTransform
   //===--------------------------------------------------------------------===//
   auto iree_linalg_transform_m = m.def_submodule("iree_linalg_transform");
+  mlirIREELinalgTransformRegisterPasses();
   iree_linalg_transform_m.def(
       "register_dialect",
       [](MlirContext context, bool load) {
