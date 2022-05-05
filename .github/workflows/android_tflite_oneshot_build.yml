@@ -23,5 +23,5 @@ jobs:
           bash -c build_tools/gradle/build_tflite_android_library.sh
       - uses: actions/upload-artifact@82c141cc518b40d92cc801eee768e7aafc9c2fa2  # v2
         with:
-          path: ./bindings/tflite/java/build/outputs/aar/*.aar
+          path: ./runtime/bindings/tflite/java/build/outputs/aar/*.aar
           retention-days: 1

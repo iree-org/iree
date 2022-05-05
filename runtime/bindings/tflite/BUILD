@@ -4,6 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("//iree:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -17,7 +19,7 @@ package(
 # Use this *in place of tflite*; do not link both this and tflite into your
 # binary (you'll get ODR violations at the least, if not worse).
 
-cc_library(
+iree_runtime_cc_library(
     name = "shim",
     srcs = [
         "interpreter.c",
@@ -38,16 +40,16 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
-        "//iree/base/internal",
-        "//iree/base/internal:synchronization",
-        "//iree/hal",
-        "//iree/hal/drivers",
-        "//iree/modules/hal",
-        "//iree/vm",
-        "//iree/vm:bytecode_module",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:synchronization",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers",
+        "//runtime/src/iree/modules/hal",
+        "//runtime/src/iree/vm",
+        "//runtime/src/iree/vm:bytecode_module",
     ],
 )
 
@@ -55,20 +57,20 @@ cc_library(
 # Tests for our own unique functionality and tflite compatibility
 #===------------------------------------------------------------------------===#
 
-cc_test(
+iree_runtime_cc_test(
     name = "smoke_test",
     srcs = ["smoke_test.cc"],
     # TODO(benvanik): bazel/cmake to include this generated file.
     # Checked in right now until I can figure it out.
     # data = [
-    #     "//bindings/tflite/testdata:add.vmfb",
+    #     "//runtime/bindings/tflite/testdata:add.vmfb",
     # ],
     deps = [
         ":shim",
-        "//bindings/tflite/testdata:add_dynamic_c",
-        "//bindings/tflite/testdata:add_multi_c",
-        "//bindings/tflite/testdata:add_static_c",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/bindings/tflite/testdata:add_dynamic_c",
+        "//runtime/bindings/tflite/testdata:add_multi_c",
+        "//runtime/bindings/tflite/testdata:add_static_c",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )

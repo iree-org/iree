@@ -295,7 +295,7 @@ if(CMAKE_CXX_FLAGS AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
   string(REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
 
-if(NOT ANDROID AND ${IREE_ENABLE_THREADING})
+if(NOT ANDROID AND IREE_ENABLE_THREADING)
   iree_select_compiler_opts(_IREE_PTHREADS_LINKOPTS
     CLANG_OR_GCC
       "-lpthread"
@@ -312,7 +312,7 @@ endif()
 # TODO(scotttodd): Figure out how to use atomics and/or shared memory without
 #                  Specifying this flag
 # https://emscripten.org/docs/porting/pthreads.html#compiling-with-pthreads-enabled
-if(EMSCRIPTEN AND ${IREE_ENABLE_THREADING})
+if(EMSCRIPTEN AND IREE_ENABLE_THREADING)
   iree_select_compiler_opts(IREE_DEFAULT_COPTS
     ALL
       "-pthread"

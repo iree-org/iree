@@ -10,7 +10,7 @@
 
 // NOTE: we pull in our own copy here in case the tflite API changes upstream.
 #define TFL_COMPILE_LIBRARY 1
-#include "bindings/tflite/include/tensorflow/lite/c/c_api.h"
+#include "runtime/bindings/tflite/include/tensorflow/lite/c/c_api.h"
 
 #define JNI_FUNC extern "C" JNIEXPORT
 #define JNI_PREFIX(METHOD) Java_org_tensorflow_lite_Interpreter_##METHOD

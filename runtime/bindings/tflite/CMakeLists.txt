@@ -42,7 +42,7 @@ iree_cc_library(
   PUBLIC
 )
 
-if(NOT ${IREE_BUILD_COMPILER} OR NOT ${IREE_BUILD_TESTS})
+if(NOT IREE_BUILD_COMPILER OR NOT IREE_BUILD_TESTS)
   return()
 endif()
 
@@ -53,9 +53,9 @@ iree_cc_test(
     "smoke_test.cc"
   DEPS
     ::shim
-    bindings::tflite::testdata::add_dynamic_c
-    bindings::tflite::testdata::add_multi_c
-    bindings::tflite::testdata::add_static_c
+    runtime::bindings::tflite::testdata::add_dynamic_c
+    runtime::bindings::tflite::testdata::add_multi_c
+    runtime::bindings::tflite::testdata::add_static_c
     iree::testing::gtest
     iree::testing::gtest_main
 )

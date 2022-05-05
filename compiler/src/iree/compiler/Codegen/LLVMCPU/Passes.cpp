@@ -412,14 +412,6 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createCSEPass());
 
-  // SCF -> STD
-  passManager.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
-  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<func::FuncOp>(createCSEPass());
-
-  if (clCheckIRBeforeLLVMConversion) {
-    passManager.addPass(createLLVMCPUCheckIRBeforeLLVMConversionPass());
-  }
   // Handled tensor-type constants.
   passManager.addPass(arith::createConstantBufferizePass());
   passManager.addPass(createFoldTensorExtractOpPass());
@@ -427,7 +419,17 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   // math dialect elementry functions -> polynomial form.
   passManager.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
-  // (HAL, IREE, Linalg, STD) -> LLVM
+  // Checking stack allocation before converting to CF dialect is easier.
+  if (clCheckIRBeforeLLVMConversion) {
+    passManager.addPass(createLLVMCPUCheckIRBeforeLLVMConversionPass());
+  }
+
+  // SCF -> CF
+  passManager.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
+  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(createCSEPass());
+
+  // (HAL, IREE, Linalg, CF) -> LLVM
   passManager.addNestedPass<func::FuncOp>(
       arith::createArithmeticExpandOpsPass());
   passManager.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
