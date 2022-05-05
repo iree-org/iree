@@ -512,6 +512,7 @@ include(external_cc_library)
 include(flatbuffer_c_library)
 
 add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/llvm-project EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/stblib EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
 

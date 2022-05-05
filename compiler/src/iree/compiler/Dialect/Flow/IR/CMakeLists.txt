@@ -123,6 +123,7 @@ iree_cc_library(
     ::PartitionableLoopsInterfaceGen
     IREELinalgExtDialect
     LLVMSupport
+    LinalgStructuredOpsIncGen_Lib
     MLIRIR
     MLIRLinalg
     MLIRTensor

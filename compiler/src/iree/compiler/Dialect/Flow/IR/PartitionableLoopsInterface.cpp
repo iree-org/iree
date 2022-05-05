@@ -224,55 +224,10 @@ static void registerInterfaceForTiledOpInterfaceOps(MLIRContext *ctx) {
 void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   registry.insert<linalg::LinalgDialect>();
 
+#define GET_OP_LIST
   registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
     registerInterfaceForLinalgOps<
-        // clang-format off
-
-  // This is copy-pasted from LinalgStructuredOps.cpp.inc. In theory you could
-  // just include that generated file here, but that cause errors with bazel.
-  // The required generated header is not exposed correctly.
-  // Copy paste is fine for now.
-
-  ::mlir::linalg::BatchMatmulOp,
-  ::mlir::linalg::BatchMatvecOp,
-  ::mlir::linalg::Conv1DNwcWcfOp,
-  ::mlir::linalg::Conv1DOp,
-  ::mlir::linalg::Conv2DNchwFchwOp,
-  ::mlir::linalg::Conv2DNhwcHwcfOp,
-  ::mlir::linalg::Conv2DNhwcHwcfQOp,
-  ::mlir::linalg::Conv2DOp,
-  ::mlir::linalg::Conv3DNdhwcDhwcfOp,
-  ::mlir::linalg::Conv3DOp,
-  ::mlir::linalg::CopyOp,
-  ::mlir::linalg::DepthwiseConv1DNwcWcOp,
-  ::mlir::linalg::DepthwiseConv2DNhwcHwcOp,
-  ::mlir::linalg::DepthwiseConv2DNhwcHwcQOp,
-  ::mlir::linalg::DepthwiseConv2DNhwcHwcmOp,
-  ::mlir::linalg::DepthwiseConv2DNhwcHwcmQOp,
-  ::mlir::linalg::DotOp,
-  ::mlir::linalg::ElemwiseBinaryOp,
-  ::mlir::linalg::ElemwiseUnaryOp,
-  ::mlir::linalg::FillOp,
-  ::mlir::linalg::FillRng2DOp,
-  ::mlir::linalg::GenericOp,
-  ::mlir::linalg::MatmulOp,
-  ::mlir::linalg::MatmulUnsignedOp,
-  ::mlir::linalg::MatvecOp,
-  ::mlir::linalg::Mmt4DOp,
-  ::mlir::linalg::PoolingNchwMaxOp,
-  ::mlir::linalg::PoolingNchwSumOp,
-  ::mlir::linalg::PoolingNdhwcMaxOp,
-  ::mlir::linalg::PoolingNdhwcMinOp,
-  ::mlir::linalg::PoolingNdhwcSumOp,
-  ::mlir::linalg::PoolingNhwcMaxOp,
-  ::mlir::linalg::PoolingNhwcMaxUnsignedOp,
-  ::mlir::linalg::PoolingNhwcMinOp,
-  ::mlir::linalg::PoolingNhwcMinUnsignedOp,
-  ::mlir::linalg::PoolingNhwcSumOp,
-  ::mlir::linalg::QuantizedBatchMatmulOp,
-  ::mlir::linalg::QuantizedMatmulOp,
-  ::mlir::linalg::VecmatOp
-        // clang-format on
+#include "mlir/Dialect/Linalg/IR/LinalgStructuredOps.cpp.inc"
         >(ctx);
   });
 
