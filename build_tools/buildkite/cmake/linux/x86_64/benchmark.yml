@@ -51,7 +51,7 @@ steps:
     agents:
       - "queue=report"
 
-  - label: "Push benchmark results to dashboard"
+  - label: ":arrow_up: Push benchmark results to dashboard"
     commands:
       - "git clean -fdx"
       - "buildkite-agent artifact download benchmark-results-*.json ./"
