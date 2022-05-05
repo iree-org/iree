@@ -57,6 +57,7 @@ steps:
       - "buildkite-agent artifact download benchmark-results-*.json ./"
       - "python3 build_tools/benchmarks/upload_benchmarks_to_dashboard.py --verbose benchmark-results-*.json"
     key: "upload-to-dashboard-x86_64"
-    branches: "main"
+    if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86_64')"
+    # branches: "main"
     agents:
       - "queue=report"
