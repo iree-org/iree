@@ -29,11 +29,6 @@ def get_linux_cpu_features(verbose: bool = False) -> Sequence[str]:
   return _get_lscpu_field("Flags", verbose).split(" ")
 
 
-def get_linux_cpu_model(verbose: bool = False) -> str:
-  """Returns CPU model, e.g., 'AMD EPYC 7B12'."""
-  return _get_lscpu_field("Model name", verbose)
-
-
 def get_linux_device_info(device_model: str = "Unknown",
                           cpu_uarch: Optional[str] = None,
                           verbose: bool = False) -> DeviceInfo:
@@ -46,7 +41,7 @@ def get_linux_device_info(device_model: str = "Unknown",
   return DeviceInfo(
       PlatformType.LINUX,
       # Includes CPU model as it is the key factor of the device performance.
-      model=f"{device_model}({get_linux_cpu_model(verbose)})",
+      model=device_model,
       # Currently we only have x86, so CPU ABI = CPU arch.
       cpu_abi=get_linux_cpu_arch(verbose),
       cpu_uarch=cpu_uarch,
