@@ -1,3 +1,2 @@
 # REQUIRES: llvmaot
-# RUN: %PYTHON -m iree_tfl_tests.resnet_50_int8_test --target_backend=llvmaot --artifacts_dir=%t
-# XFAIL: *
+# RUN: %PYTHON -m iree_tfl_tests.resnet_50_int8_test --target_backend=llvmaot -artifacts_dir=%t
