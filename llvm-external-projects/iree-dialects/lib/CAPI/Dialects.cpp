@@ -9,6 +9,7 @@
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
+#include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/PyDM/IR/PyDMDialect.h"
 #include "iree-dialects/Dialect/PyDM/Transforms/Passes.h"
 #include "mlir/CAPI/IR.h"
@@ -44,6 +45,12 @@ MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(
 MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(
     IREELinalgTransform, iree_linalg_transform,
     mlir::linalg::transform::LinalgTransformDialect)
+
+void mlirIREELinalgTransformRegisterPasses() {
+  mlir::linalg::transform::registerLinalgTransformInterpreterPass();
+  mlir::linalg::transform::registerLinalgTransformExpertExpansionPass();
+  mlir::linalg::transform::registerDropSchedulePass();
+}
 
 //===----------------------------------------------------------------------===//
 // IREEPyDMDialect

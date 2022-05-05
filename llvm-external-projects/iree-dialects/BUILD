@@ -737,6 +737,7 @@ cc_library(
         ":IREEInputDialect",
         ":IREELinalgExtDialect",
         ":IREELinalgTransformDialect",
+        ":IREELinalgTransformDialectTransforms",
         ":IREEPyDMDialect",
         ":IREEPyDMTransforms",
         "@llvm-project//mlir:CAPIIR",
