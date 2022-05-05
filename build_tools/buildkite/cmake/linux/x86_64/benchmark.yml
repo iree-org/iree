@@ -48,7 +48,7 @@ steps:
       - "buildkite-agent artifact download benchmark-results-*.json ./"
       - "python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py --verbose --query-base --comment-title=\"Abbreviated x86_64 Benchmark Summary (experimental)\" benchmark-results-*.json"
     key: "post-on-pr-x86_64"
-    if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86_64')"
+    if: "build.pull_request.id != null && (build.pull_request.labels includes 'buildkite:benchmark-x86_64')"
     agents:
       - "queue=report"
 
