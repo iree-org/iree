@@ -275,7 +275,7 @@ func.func @fft_tensor(%idx: index) -> (tensor<1024xf32>, tensor<1024xf32>) {
 
 // -----
 
-func @scan_1d_dim0_inclusive_sum() {
+func.func @scan_1d_dim0_inclusive_sum() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:6xf32>
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readwrite:f32>
