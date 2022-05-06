@@ -4,17 +4,23 @@
 # of open coding.
 ################################################################################
 
+set(_NAME "compile-mhlo-test")
+
 add_executable(
-  iree-compiler-api-compile-mhlo-test
+  ${_NAME}
   compile-mhlo-test-main.c
 )
-target_link_libraries(iree-compiler-api-compile-mhlo-test
+target_link_libraries(${_NAME}
   PRIVATE
     IREECompilerCAPILib
     MLIRCAPIIR
 )
 
+iree_package_ns(_PACKAGE_NS)
+string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
+set(_NAME_PATH "${_PACKAGE_PATH}/${_NAME}")
+
 add_test(
-  NAME iree-compiler-api-compile-mhlo-test
-  COMMAND iree-compiler-api-compile-mhlo-test
+  NAME ${_NAME_PATH}
+  COMMAND ${_NAME}
 )
