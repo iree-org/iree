@@ -14,7 +14,7 @@ def iree_bytecode_module(
         name,
         src,
         module = None,
-        flags = ["-iree-mlir-to-vm-bytecode-module"],
+        flags = ["--iree-mlir-to-vm-bytecode-module"],
         # TODO: Rename this to 'compile_tool'
         translate_tool = "//iree/tools:iree-compile",
         linker_tool = "@llvm-project//lld:lld",

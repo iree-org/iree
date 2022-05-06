@@ -86,11 +86,11 @@ iree_gentbl_cc_library(
     name = "VMEnumsGen",
     tbl_outs = [
         (
-            ["-gen-enum-decls"],
+            ["--gen-enum-decls"],
             "VMEnums.h.inc",
         ),
         (
-            ["-gen-enum-defs"],
+            ["--gen-enum-defs"],
             "VMEnums.cpp.inc",
         ),
     ],
@@ -103,11 +103,11 @@ iree_gentbl_cc_library(
     name = "VMOpsGen",
     tbl_outs = [
         (
-            ["-gen-op-decls"],
+            ["--gen-op-decls"],
             "VMOps.h.inc",
         ),
         (
-            ["-gen-op-defs"],
+            ["--gen-op-defs"],
             "VMOps.cpp.inc",
         ),
     ],
@@ -120,7 +120,7 @@ iree_gentbl_cc_library(
     name = "VMOpEncoderGen",
     tbl_outs = [
         (
-            ["-gen-iree-vm-op-encoder-defs"],
+            ["--gen-iree-vm-op-encoder-defs"],
             "VMOpEncoder.cpp.inc",
         ),
     ],
@@ -133,11 +133,11 @@ iree_gentbl_cc_library(
     name = "VMOpInterfaceGen",
     tbl_outs = [
         (
-            ["-gen-op-interface-decls"],
+            ["--gen-op-interface-decls"],
             "VMOpInterface.h.inc",
         ),
         (
-            ["-gen-op-interface-defs"],
+            ["--gen-op-interface-defs"],
             "VMOpInterface.cpp.inc",
         ),
     ],
@@ -150,11 +150,11 @@ iree_gentbl_cc_library(
     name = "VMStructsGen",
     tbl_outs = [
         (
-            ["-gen-iree-struct-attr-decls"],
+            ["--gen-iree-struct-attr-decls"],
             "VMStructs.h.inc",
         ),
         (
-            ["-gen-iree-struct-attr-defs"],
+            ["--gen-iree-struct-attr-defs"],
             "VMStructs.cpp.inc",
         ),
     ],
@@ -167,7 +167,7 @@ iree_tablegen_doc(
     name = "VMDialectDocGen",
     tbl_outs = [
         (
-            ["-gen-dialect-doc"],
+            ["--gen-dialect-doc"],
             "VMDialect.md",
         ),
     ],

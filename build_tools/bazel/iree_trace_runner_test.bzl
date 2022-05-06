@@ -54,7 +54,7 @@ def iree_trace_runner_test(
         module = module,
         src = src,
         flags = [
-            "-iree-mlir-to-vm-bytecode-module",
+            "--iree-mlir-to-vm-bytecode-module",
             "--mlir-print-op-on-diagnostic=false",
             "--iree-hal-target-backends=%s" % target_backend,
         ] + compiler_flags,

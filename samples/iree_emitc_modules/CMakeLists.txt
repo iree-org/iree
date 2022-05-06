@@ -17,7 +17,7 @@ if(IREE_ENABLE_EMITC)
     H_FILE_OUTPUT
       "add_module.h"
     FLAGS
-      "-iree-mlir-to-vm-c-module"
+      "--iree-mlir-to-vm-c-module"
       "--iree-hal-target-backends=vmvx"
   )
 
@@ -60,7 +60,7 @@ if(IREE_ENABLE_EMITC)
     H_FILE_OUTPUT
       "import_module_a.h"
     FLAGS
-      "-iree-mlir-to-vm-c-module"
+      "--iree-mlir-to-vm-c-module"
       "--iree-hal-target-backends=vmvx"
   )
 
@@ -72,7 +72,7 @@ if(IREE_ENABLE_EMITC)
     H_FILE_OUTPUT
       "import_module_b.h"
     FLAGS
-      "-iree-mlir-to-vm-c-module"
+      "--iree-mlir-to-vm-c-module"
       "--iree-hal-target-backends=vmvx"
   )
 endif()

@@ -111,27 +111,27 @@ iree_gentbl_cc_library(
     name = "HALInterfacesGen",
     tbl_outs = [
         (
-            ["-gen-attr-interface-decls"],
+            ["--gen-attr-interface-decls"],
             "HALAttrInterfaces.h.inc",
         ),
         (
-            ["-gen-attr-interface-defs"],
+            ["--gen-attr-interface-defs"],
             "HALAttrInterfaces.cpp.inc",
         ),
         (
-            ["-gen-op-interface-decls"],
+            ["--gen-op-interface-decls"],
             "HALOpInterfaces.h.inc",
         ),
         (
-            ["-gen-op-interface-defs"],
+            ["--gen-op-interface-defs"],
             "HALOpInterfaces.cpp.inc",
         ),
         (
-            ["-gen-type-interface-decls"],
+            ["--gen-type-interface-decls"],
             "HALTypeInterfaces.h.inc",
         ),
         (
-            ["-gen-type-interface-defs"],
+            ["--gen-type-interface-defs"],
             "HALTypeInterfaces.cpp.inc",
         ),
     ],
@@ -144,11 +144,11 @@ iree_gentbl_cc_library(
     name = "HALOpsGen",
     tbl_outs = [
         (
-            ["-gen-op-decls"],
+            ["--gen-op-decls"],
             "HALOps.h.inc",
         ),
         (
-            ["-gen-op-defs"],
+            ["--gen-op-defs"],
             "HALOps.cpp.inc",
         ),
     ],
@@ -161,11 +161,11 @@ iree_gentbl_cc_library(
     name = "HALStructsGen",
     tbl_outs = [
         (
-            ["-gen-iree-struct-attr-decls"],
+            ["--gen-iree-struct-attr-decls"],
             "HALStructs.h.inc",
         ),
         (
-            ["-gen-iree-struct-attr-defs"],
+            ["--gen-iree-struct-attr-defs"],
             "HALStructs.cpp.inc",
         ),
     ],
@@ -178,19 +178,19 @@ iree_gentbl_cc_library(
     name = "HALTypesGen",
     tbl_outs = [
         (
-            ["-gen-attrdef-decls"],
+            ["--gen-attrdef-decls"],
             "HALAttrs.h.inc",
         ),
         (
-            ["-gen-attrdef-defs"],
+            ["--gen-attrdef-defs"],
             "HALAttrs.cpp.inc",
         ),
         (
-            ["-gen-enum-decls"],
+            ["--gen-enum-decls"],
             "HALEnums.h.inc",
         ),
         (
-            ["-gen-enum-defs"],
+            ["--gen-enum-defs"],
             "HALEnums.cpp.inc",
         ),
     ],
@@ -203,7 +203,7 @@ iree_tablegen_doc(
     name = "HALDialectDocGen",
     tbl_outs = [
         (
-            ["-gen-dialect-doc"],
+            ["--gen-dialect-doc"],
             "HALDialect.md",
         ),
     ],

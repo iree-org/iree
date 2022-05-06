@@ -89,11 +89,11 @@ iree_gentbl_cc_library(
     name = "VMVXEnumsGen",
     tbl_outs = [
         (
-            ["-gen-enum-decls"],
+            ["--gen-enum-decls"],
             "VMVXEnums.h.inc",
         ),
         (
-            ["-gen-enum-defs"],
+            ["--gen-enum-defs"],
             "VMVXEnums.cpp.inc",
         ),
     ],
@@ -106,11 +106,11 @@ iree_gentbl_cc_library(
     name = "VMVXOpsGen",
     tbl_outs = [
         (
-            ["-gen-op-decls"],
+            ["--gen-op-decls"],
             "VMVXOps.h.inc",
         ),
         (
-            ["-gen-op-defs"],
+            ["--gen-op-defs"],
             "VMVXOps.cpp.inc",
         ),
     ],
@@ -123,11 +123,11 @@ iree_gentbl_cc_library(
     name = "VMVXOpInterfaceGen",
     tbl_outs = [
         (
-            ["-gen-op-interface-decls"],
+            ["--gen-op-interface-decls"],
             "VMVXOpInterface.h.inc",
         ),
         (
-            ["-gen-op-interface-defs"],
+            ["--gen-op-interface-defs"],
             "VMVXOpInterface.cpp.inc",
         ),
     ],
@@ -140,7 +140,7 @@ iree_tablegen_doc(
     name = "VMVXDialecDocGen",
     tbl_outs = [
         (
-            ["-gen-dialect-doc"],
+            ["--gen-dialect-doc"],
             "VMVXDialect.md",
         ),
     ],

@@ -100,11 +100,11 @@ iree_gentbl_cc_library(
     name = "ProcessorOpInterfaceGen",
     tbl_outs = [
         (
-            ["-gen-op-interface-decls"],
+            ["--gen-op-interface-decls"],
             "ProcessorOpInterfaces.h.inc",
         ),
         (
-            ["-gen-op-interface-defs"],
+            ["--gen-op-interface-defs"],
             "ProcessorOpInterfaces.cpp.inc",
         ),
     ],

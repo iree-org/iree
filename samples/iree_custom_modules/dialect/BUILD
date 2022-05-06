@@ -61,11 +61,11 @@ iree_gentbl_cc_library(
     name = "custom_ops_gen",
     tbl_outs = [
         (
-            ["-gen-op-decls"],
+            ["--gen-op-decls"],
             "custom_ops.h.inc",
         ),
         (
-            ["-gen-op-defs"],
+            ["--gen-op-defs"],
             "custom_ops.cc.inc",
         ),
     ],

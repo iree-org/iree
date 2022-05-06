@@ -72,11 +72,11 @@ iree_gentbl_cc_library(
     name = "check_ops_gen",
     tbl_outs = [
         (
-            ["-gen-op-decls"],
+            ["--gen-op-decls"],
             "CheckOps.h.inc",
         ),
         (
-            ["-gen-op-defs"],
+            ["--gen-op-defs"],
             "CheckOps.cpp.inc",
         ),
     ],
@@ -89,7 +89,7 @@ iree_tablegen_doc(
     name = "CheckDialectDocGen",
     tbl_outs = [
         (
-            ["-gen-dialect-doc"],
+            ["--gen-dialect-doc"],
             "CheckDialect.md",
         ),
     ],

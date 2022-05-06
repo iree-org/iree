@@ -58,7 +58,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -70,7 +70,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -82,7 +82,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -94,7 +94,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -106,7 +106,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -118,7 +118,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -130,7 +130,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -142,7 +142,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -154,7 +154,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -166,7 +166,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -178,7 +178,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -190,7 +190,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -202,7 +202,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -214,7 +214,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -226,7 +226,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -238,7 +238,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -250,7 +250,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -262,7 +262,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -274,7 +274,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -286,7 +286,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -298,7 +298,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -310,7 +310,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -322,7 +322,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
@@ -334,7 +334,7 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_tools_iree-translate
   FLAGS
-    "-iree-vm-ir-to-bytecode-module"
+    "--iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
 
