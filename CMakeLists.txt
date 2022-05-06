@@ -218,7 +218,6 @@ iree_fix_ndebug()
 
 list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/build_tools/cmake/
-  ${CMAKE_CURRENT_LIST_DIR}/bindings/python/build_tools/cmake/
 )
 
 include(iree_macros)
