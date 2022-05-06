@@ -98,6 +98,7 @@ iree_status_t GetModuleContentsFromFlags(iree_file_contents_t** out_contents) {
   IREE_TRACE_SCOPE0("GetModuleContentsFromFlags");
   auto module_file = std::string(FLAG_module_file);
   if (module_file == "-") {
+    IREE_LOG(INFO) << "Reading module contents from stdin...";
     return iree_stdin_read_contents(iree_allocator_system(), out_contents);
   } else {
     return iree_file_read_contents(module_file.c_str(), iree_allocator_system(),
