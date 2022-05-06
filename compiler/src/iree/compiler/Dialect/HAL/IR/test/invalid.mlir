@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -verify-diagnostics %s
+// RUN: iree-opt --split-input-file --verify-diagnostics %s
 
 util.global mutable @var : !hal.buffer
 func.func @fn(%arg0: !hal.buffer_view) {

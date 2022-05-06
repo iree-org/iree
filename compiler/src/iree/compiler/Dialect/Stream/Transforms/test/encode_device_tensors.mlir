@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-encode-device-tensors %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-encode-device-tensors %s | FileCheck %s
 
 // CHECK-LABEL: @convert_load_i1
 stream.executable private @convert_load_i1 {

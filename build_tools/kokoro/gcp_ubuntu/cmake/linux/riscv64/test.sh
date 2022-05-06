@@ -22,7 +22,7 @@ export RISCV_TOOLCHAIN_ROOT=${RISCV_RV64_LINUX_TOOLCHAIN_ROOT?}
 function generate_dylib_vmfb {
   local target="${1}"; shift
   local translate_arg=(
-    -iree-mlir-to-vm-bytecode-module --iree-hal-target-backends=dylib-llvm-aot
+    --iree-mlir-to-vm-bytecode-module --iree-hal-target-backends=dylib-llvm-aot
     --iree-llvm-embedded-linker-path=${BUILD_HOST_DIR?}/install/bin/lld
     --iree-llvm-target-triple=riscv64
     --iree-llvm-target-cpu=generic-rv64

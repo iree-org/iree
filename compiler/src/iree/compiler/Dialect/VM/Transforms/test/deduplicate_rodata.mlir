@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-vm-deduplicate-rodata %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-vm-deduplicate-rodata %s | FileCheck %s
 
 // CHECK-LABEL: vm.module public @basic
 vm.module @basic {

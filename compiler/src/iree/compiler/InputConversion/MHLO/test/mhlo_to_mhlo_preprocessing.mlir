@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -verify-diagnostics -iree-mhlo-to-mhlo-preprocessing %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --iree-mhlo-to-mhlo-preprocessing %s | FileCheck %s
 
 // CHECK-LABEL: @batch_norm_inference
 // CHECK-SAME: %[[X:[^:[:space:]]+]]

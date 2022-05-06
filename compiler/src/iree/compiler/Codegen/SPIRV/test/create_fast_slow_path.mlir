@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-spirv-create-fast-slow-path -mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-spirv-create-fast-slow-path --mlir-print-local-scope %s | FileCheck %s
 
 func.func @padded_conv() {
   %cst = arith.constant 0.000000e+00 : f32
@@ -94,4 +94,3 @@ func.func @padded_conv() {
 //       CHECK:        flow.dispatch.tensor.store %[[GENERIC]]
 
 //       CHECK:      }
-

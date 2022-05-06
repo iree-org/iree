@@ -1,7 +1,7 @@
-// RUN: iree-opt -split-input-file %s | FileCheck %s
+// RUN: iree-opt --split-input-file %s | FileCheck %s
 
 module {
-  func.func @test() attributes { 
+  func.func @test() attributes {
       lowring_config = #iree_codegen.translation_info<CPUDefault, workload_per_wg = [32, 42]>} {
     return
   }

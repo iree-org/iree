@@ -62,8 +62,8 @@ iree_tablegen_library(
   TD_FILE
     "StreamBase.td"
   OUTS
-    -gen-enum-decls StreamEnums.h.inc
-    -gen-enum-defs StreamEnums.cpp.inc
+    --gen-enum-decls StreamEnums.h.inc
+    --gen-enum-defs StreamEnums.cpp.inc
 )
 
 iree_tablegen_library(
@@ -72,10 +72,10 @@ iree_tablegen_library(
   TD_FILE
     "StreamInterfaces.td"
   OUTS
-    -gen-op-interface-decls StreamOpInterfaces.h.inc
-    -gen-op-interface-defs StreamOpInterfaces.cpp.inc
-    -gen-type-interface-decls StreamTypeInterfaces.h.inc
-    -gen-type-interface-defs StreamTypeInterfaces.cpp.inc
+    --gen-op-interface-decls StreamOpInterfaces.h.inc
+    --gen-op-interface-defs StreamOpInterfaces.cpp.inc
+    --gen-type-interface-decls StreamTypeInterfaces.h.inc
+    --gen-type-interface-defs StreamTypeInterfaces.cpp.inc
 )
 
 iree_tablegen_library(
@@ -84,8 +84,8 @@ iree_tablegen_library(
   TD_FILE
     "StreamOps.td"
   OUTS
-    -gen-op-decls StreamOps.h.inc
-    -gen-op-defs StreamOps.cpp.inc
+    --gen-op-decls StreamOps.h.inc
+    --gen-op-defs StreamOps.cpp.inc
 )
 
 iree_tablegen_library(
@@ -94,10 +94,10 @@ iree_tablegen_library(
   TD_FILE
     "StreamBase.td"
   OUTS
-    -gen-attrdef-decls StreamAttrs.h.inc
-    -gen-attrdef-defs StreamAttrs.cpp.inc
-    -gen-typedef-decls StreamTypes.h.inc
-    -gen-typedef-defs StreamTypes.cpp.inc
+    --gen-attrdef-decls StreamAttrs.h.inc
+    --gen-attrdef-defs StreamAttrs.cpp.inc
+    --gen-typedef-decls StreamTypes.h.inc
+    --gen-typedef-defs StreamTypes.cpp.inc
 )
 
 iree_tablegen_doc(
@@ -106,7 +106,7 @@ iree_tablegen_doc(
   TD_FILE
     "StreamOps.td"
   OUTS
-    -gen-dialect-doc StreamDialect.md
+    --gen-dialect-doc StreamDialect.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

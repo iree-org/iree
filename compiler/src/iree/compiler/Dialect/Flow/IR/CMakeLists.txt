@@ -62,8 +62,8 @@ iree_tablegen_library(
   TD_FILE
     "FlowBase.td"
   OUTS
-    -gen-enum-decls FlowEnums.h.inc
-    -gen-enum-defs FlowEnums.cpp.inc
+    --gen-enum-decls FlowEnums.h.inc
+    --gen-enum-defs FlowEnums.cpp.inc
 )
 
 iree_tablegen_library(
@@ -72,10 +72,10 @@ iree_tablegen_library(
   TD_FILE
     "FlowInterfaces.td"
   OUTS
-    -gen-op-interface-decls FlowOpInterfaces.h.inc
-    -gen-op-interface-defs FlowOpInterfaces.cpp.inc
-    -gen-type-interface-decls FlowTypeInterfaces.h.inc
-    -gen-type-interface-defs FlowTypeInterfaces.cpp.inc
+    --gen-op-interface-decls FlowOpInterfaces.h.inc
+    --gen-op-interface-defs FlowOpInterfaces.cpp.inc
+    --gen-type-interface-decls FlowTypeInterfaces.h.inc
+    --gen-type-interface-defs FlowTypeInterfaces.cpp.inc
 )
 
 iree_tablegen_library(
@@ -84,8 +84,8 @@ iree_tablegen_library(
   TD_FILE
     "FlowOps.td"
   OUTS
-    -gen-op-decls FlowOps.h.inc
-    -gen-op-defs FlowOps.cpp.inc
+    --gen-op-decls FlowOps.h.inc
+    --gen-op-defs FlowOps.cpp.inc
 )
 
 iree_tablegen_library(
@@ -94,10 +94,10 @@ iree_tablegen_library(
   TD_FILE
     "FlowBase.td"
   OUTS
-    -gen-attrdef-decls FlowAttrs.h.inc
-    -gen-attrdef-defs FlowAttrs.cpp.inc
-    -gen-typedef-decls FlowTypes.h.inc
-    -gen-typedef-defs FlowTypes.cpp.inc
+    --gen-attrdef-decls FlowAttrs.h.inc
+    --gen-attrdef-defs FlowAttrs.cpp.inc
+    --gen-typedef-decls FlowTypes.h.inc
+    --gen-typedef-defs FlowTypes.cpp.inc
 )
 
 iree_tablegen_doc(
@@ -106,7 +106,7 @@ iree_tablegen_doc(
   TD_FILE
     "FlowOps.td"
   OUTS
-    -gen-dialect-doc FlowDialect.md
+    --gen-dialect-doc FlowDialect.md
 )
 
 iree_cc_library(
@@ -135,8 +135,8 @@ iree_tablegen_library(
   TD_FILE
     "PartitionableLoopsInterface.td"
   OUTS
-    -gen-op-interface-decls PartitionableLoopsInterface.h.inc
-    -gen-op-interface-defs PartitionableLoopsInterface.cpp.inc
+    --gen-op-interface-decls PartitionableLoopsInterface.h.inc
+    --gen-op-interface-defs PartitionableLoopsInterface.cpp.inc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

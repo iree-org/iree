@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -linalg-transform-interp %s | FileCheck %s
+// RUN: iree-dialects-opt --linalg-transform-interp %s | FileCheck %s
 
 //       CHECK: #[[$MAP:.*]] = affine_map<(d0, d1) -> (d1, d0)>
 

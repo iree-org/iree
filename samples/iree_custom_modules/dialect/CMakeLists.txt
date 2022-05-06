@@ -44,8 +44,8 @@ iree_tablegen_library(
   TD_FILE
     "custom_ops.td"
   OUTS
-    -gen-op-decls custom_ops.h.inc
-    -gen-op-defs custom_ops.cc.inc
+    --gen-op-decls custom_ops.h.inc
+    --gen-op-defs custom_ops.cc.inc
 )
 
 iree_c_embed_data(

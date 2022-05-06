@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -linalg-interp-transforms %s | FileCheck %s
+// RUN: iree-dialects-opt --linalg-interp-transforms %s | FileCheck %s
 
 // This test is verifying that a non-trivial 2*tiling+padding+vectorization transformation completes successfully
 

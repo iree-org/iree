@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-util-combine-initializers %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-util-combine-initializers %s | FileCheck %s
 
 // Tests that multiple initializers are combined in their module order.
 

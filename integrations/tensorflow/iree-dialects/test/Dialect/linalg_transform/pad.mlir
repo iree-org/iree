@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -linalg-interp-transforms %s | FileCheck %s
+// RUN: iree-dialects-opt --linalg-interp-transforms %s | FileCheck %s
 
 #map = affine_map<()[s0] -> (-s0 + 12, 5)>
 

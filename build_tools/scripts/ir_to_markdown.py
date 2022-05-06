@@ -10,11 +10,11 @@
 Example usage:
   # Get a dump of IR from a compiler tool:
   $ iree-opt \
-    -iree-transformation-pipeline \
+    --iree-transformation-pipeline \
     --iree-hal-target-backends=vmvx \
-    -mlir-disable-threading \
-    -mlir-print-ir-after-all \
-    -mlir-print-ir-after-change \
+    --mlir-disable-threading \
+    --mlir-print-ir-after-all \
+    --mlir-print-ir-after-change \
     --mlir-elide-elementsattrs-if-larger=8 \
     $PWD/iree/samples/models/simple_abs.mlir \
     2> /tmp/simple_abs_vmvx_pipeline.mlir

@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s -allow-unregistered-dialect -test-listener-cse | FileCheck %s
+// RUN: iree-dialects-opt %s --allow-unregistered-dialect --test-listener-cse | FileCheck %s
 
 //===----------------------------------------------------------------------===//
 // Everything below copied from mlir/test/Transforms/cse.mlir

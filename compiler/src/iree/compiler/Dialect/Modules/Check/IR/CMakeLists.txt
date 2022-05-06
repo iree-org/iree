@@ -54,8 +54,8 @@ iree_tablegen_library(
   TD_FILE
     "CheckOps.td"
   OUTS
-    -gen-op-decls CheckOps.h.inc
-    -gen-op-defs CheckOps.cpp.inc
+    --gen-op-decls CheckOps.h.inc
+    --gen-op-defs CheckOps.cpp.inc
 )
 
 iree_tablegen_doc(
@@ -64,7 +64,7 @@ iree_tablegen_doc(
   TD_FILE
     "CheckOps.td"
   OUTS
-    -gen-dialect-doc CheckDialect.md
+    --gen-dialect-doc CheckDialect.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

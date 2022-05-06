@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-codegen-bufferize-copy-only-dispatches -split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-bufferize-copy-only-dispatches --split-input-file %s | FileCheck %s
 
 builtin.module {
   func.func @tensor_insert_slice() {

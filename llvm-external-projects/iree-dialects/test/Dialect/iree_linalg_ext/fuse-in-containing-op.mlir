@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s  -linalg-transform-interp -split-input-file | FileCheck %s
+// RUN: iree-dialects-opt %s  --linalg-transform-interp --split-input-file | FileCheck %s
 
 #map0 = affine_map<()[s0] -> (64 ceildiv s0)>
 #map1 = affine_map<(d0)[s0] -> (d0 * s0)>
@@ -42,7 +42,7 @@ module {
       %1 = types
       %2 = operation "linalg.fill"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
       rewrite %2 with "transform.dialect"
-    } 
+    }
     pdl.pattern @match_in_parallel : benefit(1) {
       %0 = operands
       %1 = types

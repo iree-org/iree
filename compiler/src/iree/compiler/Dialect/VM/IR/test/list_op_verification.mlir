@@ -1,5 +1,5 @@
 // TODO(iree-team): Fix this, and reconcile the custom tablegen with upstream.
-// RUN: true || iree-opt -split-input-file %s -verify-diagnostics
+// RUN: true || iree-opt --split-input-file %s -verify-diagnostics
 
 
 // -----

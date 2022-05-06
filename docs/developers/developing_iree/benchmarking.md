@@ -20,7 +20,7 @@ To use `iree-benchmark-module`, generate an IREE module for the target backend:
 
 ```shell
 $ bazel run //iree/tools:iree-compile -- \
-  -iree-mlir-to-vm-bytecode-module \
+  --iree-mlir-to-vm-bytecode-module \
   --iree-hal-target-backends=vmvx \
   $PWD/samples/models/simple_abs.mlir \
   -o /tmp/module.fb
@@ -109,8 +109,8 @@ dispatch functions, generate an IREE module with the
 ```shell
 $ build/iree/tools/iree-compile \
   --iree-input-type=mhlo \
-  -iree-mlir-to-vm-bytecode-module \
-  -iree-flow-export-benchmark-funcs \
+  --iree-mlir-to-vm-bytecode-module \
+  --iree-flow-export-benchmark-funcs \
   --iree-hal-target-backends=vmvx \
   iree/test/e2e/models/fullyconnected.mlir \
   -o /tmp/fullyconnected.vmfb

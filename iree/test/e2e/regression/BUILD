@@ -80,7 +80,7 @@ iree_check_single_backend_test_suite(
     name = "check_regression_tosa_dylib-llvm-aot",
     srcs = [
         # --iree-input-type=tosa is interesting for this test because
-        # it includes the -iree-linalg-quantized-matmul-to-matmul pass,
+        # it includes the --iree-linalg-quantized-matmul-to-matmul pass,
         # so this tests provides e2e coverage for that pass.
         "linalg_quantized_matmul_vs_linalg_matmul.mlir",
     ],

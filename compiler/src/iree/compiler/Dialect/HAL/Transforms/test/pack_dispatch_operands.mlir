@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-pack-dispatch-operands %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-hal-pack-dispatch-operands %s | FileCheck %s
 
 stream.executable private @ex0 {
   stream.executable.export public @device_i1

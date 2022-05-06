@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @parse_print_do_not_optimize
 // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]

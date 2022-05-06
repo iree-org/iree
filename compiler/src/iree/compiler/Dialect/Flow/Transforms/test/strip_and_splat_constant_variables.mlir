@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-flow-strip-and-splat-constant-variables %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-flow-strip-and-splat-constant-variables %s | FileCheck %s
 
 func.func @fn() -> () {
   // CHECK: util.global private @float_0 {noinline} = dense<1.000000e+00> : tensor<3xf32>

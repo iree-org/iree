@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-flow-deduplicate-executables %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-flow-deduplicate-executables %s | FileCheck %s
 
 // CHECK-LABEL: flow.executable public @single_executable_ex_0
 flow.executable @single_executable_ex_0 {

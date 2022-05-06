@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | FileCheck %s
+// RUN: iree-opt --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @branch_empty
 vm.module @my_module {

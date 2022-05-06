@@ -29,7 +29,7 @@ The model can be compiled with the following command (assuming the path to
 
 ```shell
 iree-compile \
-    -iree-mlir-to-vm-bytecode-module \
+    --iree-mlir-to-vm-bytecode-module \
     --iree-stream-partitioning-favor=min-peak-memory \
     --iree-hal-target-backends=dylib-llvm-aot \
     --iree-llvm-target-triple=x86_64-pc-linux-elf \

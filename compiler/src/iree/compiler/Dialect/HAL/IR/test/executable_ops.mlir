@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | FileCheck %s
+// RUN: iree-opt --split-input-file %s | FileCheck %s
 
 
 #executable_target_format = #hal.executable.target<"backend", "format">

@@ -38,7 +38,7 @@ class WasmLinkerTool : public LinkerTool {
   using LinkerTool::LinkerTool;
 
   std::string getWasmToolPath() const {
-    // Always use the -iree-llvm-wasm-linker-path flag when specified as it's
+    // Always use the --iree-llvm-wasm-linker-path flag when specified as it's
     // explicitly telling us what to use.
     if (!targetOptions.wasmLinkerPath.empty()) {
       return targetOptions.wasmLinkerPath;

@@ -27,7 +27,7 @@ cmake --build ${BUILD_DIR} --target iree_tools_iree-compile -- -k 0
 
 # 3. Compile `dynamic_shapes.mlir` using `iree-compile`.
 ${BUILD_DIR}/iree/tools/iree-compile \
-  -iree-mlir-to-vm-bytecode-module \
+  --iree-mlir-to-vm-bytecode-module \
   --iree-hal-target-backends=dylib-llvm-aot \
   --iree-input-type=mhlo \
   ${ARTIFACTS_DIR}/dynamic_shapes.mlir -o ${ARTIFACTS_DIR}/dynamic_shapes_dylib.vmfb

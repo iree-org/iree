@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-flow-outline-dispatch-regions %s | FileCheck %s
+// RUN: iree-opt --allow-unregistered-dialect --split-input-file --iree-flow-outline-dispatch-regions %s | FileCheck %s
 
 //      CHECK: flow.executable private @staticShapeDispatch_dispatch_0
 // CHECK-NEXT:   flow.dispatch.entry public @staticShapeDispatch_dispatch_0 attributes {

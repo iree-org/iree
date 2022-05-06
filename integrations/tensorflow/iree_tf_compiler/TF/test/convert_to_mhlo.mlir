@@ -1,4 +1,4 @@
-// RUN: iree-tf-opt -iree-tf-convert-to-mhlo -split-input-file %s | FileCheck %s
+// RUN: iree-tf-opt --iree-tf-convert-to-mhlo --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @sigmoid
 func @sigmoid(%arg0: tensor<2xf32>) -> tensor<2xf32> {

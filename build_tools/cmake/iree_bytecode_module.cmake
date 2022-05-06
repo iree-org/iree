@@ -73,7 +73,7 @@ function(iree_bytecode_module)
     iree_get_executable_path(_LINKER_TOOL_EXECUTABLE "lld")
     list(APPEND _ARGS "--iree-llvm-embedded-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
     list(APPEND _ARGS "--iree-llvm-wasm-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
-    # Note: -iree-llvm-system-linker-path is left unspecified.
+    # Note: --iree-llvm-system-linker-path is left unspecified.
   endif()
 
   if(IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER)

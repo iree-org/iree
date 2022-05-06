@@ -99,7 +99,7 @@ system's `PATH`):
 
 ``` shell hl_lines="3"
 iree-compile \
-    -iree-mlir-to-vm-bytecode-module \
+    --iree-mlir-to-vm-bytecode-module \
     --iree-hal-target-backends=dylib-llvm-aot \
     iree_input.mlir -o mobilenet-dylib.vmfb
 ```

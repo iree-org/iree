@@ -91,9 +91,9 @@ Here's an example of a small compiler pass running on a
 
 ```shell
 $ ../iree-build/iree/tools/iree-opt \
-  -split-input-file \
-  -mlir-print-ir-before-all \
-  -iree-drop-compiler-hints \
+  --split-input-file \
+  --mlir-print-ir-before-all \
+  --iree-drop-compiler-hints \
   $PWD/iree/compiler/Dialect/Util/Transforms/test/drop_compiler_hints.mlir
 ```
 
@@ -104,7 +104,7 @@ model file:
 
 ```shell
 $ ../iree-build/iree/tools/iree-opt \
-  -iree-transformation-pipeline \
+  --iree-transformation-pipeline \
   --iree-hal-target-backends=vmvx \
   $PWD/iree/test/e2e/models/fullyconnected.mlir
 ```
@@ -173,7 +173,7 @@ runner for the IREE
 ```shell
 $ ../iree-build/iree/tools/iree-compile \
   --iree-input-type=mhlo \
-  -iree-mlir-to-vm-bytecode-module \
+  --iree-mlir-to-vm-bytecode-module \
   --iree-hal-target-backends=vmvx \
   $PWD/iree/test/e2e/xla_ops/abs.mlir \
   -o /tmp/abs.vmfb

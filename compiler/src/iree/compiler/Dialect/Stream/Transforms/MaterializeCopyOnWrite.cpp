@@ -38,7 +38,7 @@ namespace {
 // Returns true if the given |operand| value does not need a copy on write.
 // This is a conservative check and will return false ("not safe to elide") in
 // many cases that otherwise don't need a copy. The
-// -iree-stream-elide-async-copies pass will do a whole-program analysis and
+// --iree-stream-elide-async-copies pass will do a whole-program analysis and
 // remove the copies we insert here when possible.
 static bool isSafeToElideCOW(Value operand, IREE::Stream::ResourceType type) {
   // Can't do anything with block args without analysis - we don't know if the

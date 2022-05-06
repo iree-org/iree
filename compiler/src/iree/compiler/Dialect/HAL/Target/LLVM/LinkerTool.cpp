@@ -108,7 +108,7 @@ void Artifacts::keepAllFiles() {
 }
 
 std::string LinkerTool::getSystemToolPath() const {
-  // Always use the -iree-llvm-system-linker-path flag when specified as it's
+  // Always use the --iree-llvm-system-linker-path flag when specified as it's
   // explicitly telling us what to use.
   if (!targetOptions.systemLinkerPath.empty()) {
     return targetOptions.systemLinkerPath;

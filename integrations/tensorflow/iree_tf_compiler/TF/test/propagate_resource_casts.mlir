@@ -1,4 +1,4 @@
-// RUN: iree-tf-opt -split-input-file -verify-diagnostics -iree-tf-propagate-resource-casts %s | FileCheck %s
+// RUN: iree-tf-opt --split-input-file --verify-diagnostics --iree-tf-propagate-resource-casts %s | FileCheck %s
 
 // CHECK-LABEL: @noop_cast
 func @noop_cast(%arg0: tensor<!tf_type.resource>) -> tensor<*xi16> {

@@ -69,8 +69,8 @@ iree_tablegen_library(
   TD_FILE
     "VMVXBase.td"
   OUTS
-    -gen-enum-decls VMVXEnums.h.inc
-    -gen-enum-defs VMVXEnums.cpp.inc
+    --gen-enum-decls VMVXEnums.h.inc
+    --gen-enum-defs VMVXEnums.cpp.inc
 )
 
 iree_tablegen_library(
@@ -79,8 +79,8 @@ iree_tablegen_library(
   TD_FILE
     "VMVXOps.td"
   OUTS
-    -gen-op-decls VMVXOps.h.inc
-    -gen-op-defs VMVXOps.cpp.inc
+    --gen-op-decls VMVXOps.h.inc
+    --gen-op-defs VMVXOps.cpp.inc
 )
 
 iree_tablegen_library(
@@ -89,8 +89,8 @@ iree_tablegen_library(
   TD_FILE
     "VMVXBase.td"
   OUTS
-    -gen-op-interface-decls VMVXOpInterface.h.inc
-    -gen-op-interface-defs VMVXOpInterface.cpp.inc
+    --gen-op-interface-decls VMVXOpInterface.h.inc
+    --gen-op-interface-defs VMVXOpInterface.cpp.inc
 )
 
 iree_tablegen_doc(
@@ -99,7 +99,7 @@ iree_tablegen_doc(
   TD_FILE
     "VMVXOps.td"
   OUTS
-    -gen-dialect-doc VMVXDialect.md
+    --gen-dialect-doc VMVXDialect.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

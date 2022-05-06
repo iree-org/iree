@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-util-hoist-into-globals -allow-unregistered-dialect %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-util-hoist-into-globals --allow-unregistered-dialect %s | FileCheck %s
 // Spot verification that policies for linalg ops is respected.
 
 // CHECK-LABEL: @compute_hoisted
