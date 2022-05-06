@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --allow-unregistered-dialect --iree-llvmgpu-vector-to-gpu -canonicalize --split-input-file | FileCheck %s
+// RUN: iree-opt %s --allow-unregistered-dialect --iree-llvmgpu-vector-to-gpu --canonicalize --split-input-file | FileCheck %s
 
 // CHECK-LABEL: func @copies_to_asyncs
 func.func @copies_to_asyncs(%a: memref<1024x1024xf32>) {
