@@ -67,6 +67,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:PDLInterpDialect",
         "@llvm-project//mlir:ToLLVMIRTranslation",
+        "@llvm-project//mlir:TransformDialect",
     ],
 )
 

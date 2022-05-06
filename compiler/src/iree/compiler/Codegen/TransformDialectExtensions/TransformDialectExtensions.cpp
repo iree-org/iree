@@ -8,8 +8,6 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
-#include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
-#include "iree-dialects/Dialect/LinalgTransform/TransformOpInterface.h"
 #include "iree-dialects/Transforms/Functional.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
@@ -20,8 +18,11 @@
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Pass/PassManager.h"
 
 using namespace mlir;
@@ -81,21 +82,21 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
 
 // TODO: Move to tablegen. Until this stabilizes upstream, simple C++ is enough.
 class IREEBufferizeOp
-    : public Op<IREEBufferizeOp,
-                linalg::transform::TransformOpInterface::Trait> {
+    : public Op<IREEBufferizeOp, transform::TransformOpInterface::Trait,
+                MemoryEffectOpInterface::Trait> {
  public:
   using Op::Op;
 
   static ArrayRef<StringRef> getAttributeNames() { return {}; }
 
   static constexpr llvm::StringLiteral getOperationName() {
-    return llvm::StringLiteral("iree_linalg_transform.iree_bufferize");
+    return llvm::StringLiteral("transform.iree.bufferize");
   }
 
   Value target() { return nullptr; }
 
-  LogicalResult apply(linalg::transform::TransformResults &results,
-                      linalg::transform::TransformState &state) {
+  LogicalResult apply(transform::TransformResults &results,
+                      transform::TransformState &state) {
     PassManager pm(getContext());
     // Bufferize the dispatch.
     using mlir::bufferization::BufferizationOptions;
@@ -123,26 +124,34 @@ class IREEBufferizeOp
   void print(OpAsmPrinter &printer) {
     printer.printOptionalAttrDict((*this)->getAttrs());
   }
+
+  // This transform may affect the entirety of the payload IR.
+  void getEffects(SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+    effects.emplace_back(MemoryEffects::Read::get(),
+                         transform::PayloadIRResource::get());
+    effects.emplace_back(MemoryEffects::Write::get(),
+                         transform::PayloadIRResource::get());
+  }
 };
 
 // TODO: Move to tablegen. Until this stabilizes upstream, simple C++ is enough.
 class IREESetNumWorkgroupToOneOp
     : public Op<IREESetNumWorkgroupToOneOp,
-                linalg::transform::TransformOpInterface::Trait> {
+                transform::TransformOpInterface::Trait,
+                MemoryEffectOpInterface::Trait> {
  public:
   using Op::Op;
 
   static ArrayRef<StringRef> getAttributeNames() { return {}; }
 
   static constexpr llvm::StringLiteral getOperationName() {
-    return llvm::StringLiteral(
-        "iree_linalg_transform.iree_set_num_workgroups_to_one");
+    return llvm::StringLiteral("transform.iree.set_num_workgroups_to_one");
   }
 
   Value target() { return nullptr; }
 
-  LogicalResult apply(linalg::transform::TransformResults &results,
-                      linalg::transform::TransformState &state) {
+  LogicalResult apply(transform::TransformResults &results,
+                      transform::TransformState &state) {
     auto variantOp = dyn_cast<HAL::ExecutableVariantOp>(state.getTopLevel());
     if (!variantOp) return failure();
     return iree_compiler::setNumWorkgroupsImpl(variantOp, {});
@@ -158,19 +167,26 @@ class IREESetNumWorkgroupToOneOp
   void print(OpAsmPrinter &printer) {
     printer.printOptionalAttrDict((*this)->getAttrs());
   }
+
+  // This transform may affect the entirety of the payload IR.
+  void getEffects(SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+    effects.emplace_back(MemoryEffects::Read::get(),
+                         transform::PayloadIRResource::get());
+    effects.emplace_back(MemoryEffects::Write::get(),
+                         transform::PayloadIRResource::get());
+  }
 };
 
 /// Test extension of the Transform dialect. Registers additional ops and
 /// declares PDL as dependent dialect since the additional ops are using PDL
 /// types for operands and results.
 class LinalgTransformDialectExtension
-    : public mlir::linalg::transform::TransformDialectExtension<
+    : public mlir::transform::TransformDialectExtension<
           LinalgTransformDialectExtension> {
  public:
   LinalgTransformDialectExtension() {
     declareDependentDialect<pdl::PDLDialect>();
-    registerTransformOp<IREEBufferizeOp>();
-    registerTransformOp<IREESetNumWorkgroupToOneOp>();
+    registerTransformOps<IREEBufferizeOp, IREESetNumWorkgroupToOneOp>();
     // TODO: hook up to Tablegen.
     //     registerTransformOps<
     // #define GET_OP_LIST
