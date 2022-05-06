@@ -29,10 +29,10 @@ cd integrations/tensorflow/test/
 cat iree_tfl_tests/llvmaot_posenet_i8.run
 
 # REQUIRES: llvmaot
-# RUN: %PYTHON -m iree_tfl_tests.posenet_i8_test --target_backend=llvmaot -artifacts_dir=%t
+# RUN: %PYTHON -m iree_tfl_tests.posenet_i8_test --target_backend=llvmaot --artifacts_dir=%t
 
 cd python/
-python -m iree_tfl_tests.posenet_i8_test -- target_backend=llvmaot -artifacts_dir=/tmp/posenet_i8_failure
+python -m iree_tfl_tests.posenet_i8_test --target_backend=llvmaot --artifacts_dir=/tmp/posenet_i8_failure
 ```
 
 Note that the command can only be run under `integrations/tensorflow/test/python` directory.
@@ -42,4 +42,3 @@ Note that the command can only be run under `integrations/tensorflow/test/python
 ```
 iree-compile -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=dylib-llvm-aot -iree-input-type=mhlo iree_input.mlir
 ```
-
