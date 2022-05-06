@@ -10,9 +10,9 @@
 // We need this entry function because we want to register the custom
 // dialect, which is missing in IREE's opt main entry function.
 
-#include "iree/tools/init_dialects.h"
-#include "iree/tools/init_passes.h"
-#include "iree/tools/init_targets.h"
+#include "iree/compiler/Tools/init_dialects.h"
+#include "iree/compiler/Tools/init_passes.h"
+#include "iree/compiler/Tools/init_targets.h"
 #include "iree_custom_modules/dialect/init_dialect.h"
 #include "llvm/Support/InitLLVM.h"
 #include "mlir/IR/Dialect.h"

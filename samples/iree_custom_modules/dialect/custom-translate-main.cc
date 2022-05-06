@@ -11,12 +11,12 @@
 // dialect, which is missing in IREE's translation main entry function.
 
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
-#include "iree/tools/init_compiler_modules.h"
-#include "iree/tools/init_iree_dialects.h"
-#include "iree/tools/init_mlir_dialects.h"
-#include "iree/tools/init_targets.h"
-#include "iree/tools/init_translations.h"
-#include "iree/tools/init_xla_dialects.h"
+#include "iree/compiler/Tools/init_compiler_modules.h"
+#include "iree/compiler/Tools/init_iree_dialects.h"
+#include "iree/compiler/Tools/init_mlir_dialects.h"
+#include "iree/compiler/Tools/init_targets.h"
+#include "iree/compiler/Tools/init_translations.h"
+#include "iree/compiler/Tools/init_xla_dialects.h"
 #include "iree_custom_modules/dialect/init_dialect.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"

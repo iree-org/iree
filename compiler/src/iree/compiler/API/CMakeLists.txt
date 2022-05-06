@@ -52,14 +52,14 @@ add_mlir_public_c_api_library(IREECompilerCAPILib
     iree::compiler::Pipelines
 
     # Passes and dialects.
-    iree::tools::init_llvmir_translations
-    iree::tools::init_passes_and_dialects
+    iree::compiler::Tools::init_llvmir_translations
+    iree::compiler::Tools::init_passes_and_dialects
 
     # All HAL Targets.
-    iree::tools::init_targets
+    iree::compiler::Tools::init_targets
 
     # Tools.
-    iree::tools::iree_translate_lib
+    iree::compiler::Tools::iree_translate_lib
 
     ${_OPTIONAL_LINK_LIBS}
 )

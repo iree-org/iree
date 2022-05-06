@@ -8,7 +8,7 @@
 //
 // See https://mlir.llvm.org/docs/Tools/MLIRLSP/
 
-#include "iree/tools/init_dialects.h"
+#include "iree/compiler/Tools/init_dialects.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Tools/mlir-lsp-server/MlirLspServerMain.h"

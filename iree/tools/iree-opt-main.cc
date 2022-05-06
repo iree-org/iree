@@ -8,9 +8,9 @@
 //
 // Based on mlir-opt but registers the passes and dialects we care about.
 
-#include "iree/tools/init_dialects.h"
-#include "iree/tools/init_passes.h"
-#include "iree/tools/init_targets.h"
+#include "iree/compiler/Tools/init_dialects.h"
+#include "iree/compiler/Tools/init_passes.h"
+#include "iree/compiler/Tools/init_targets.h"
 #include "llvm/Support/InitLLVM.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Support/LogicalResult.h"
