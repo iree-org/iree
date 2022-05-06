@@ -4,19 +4,17 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-iree_cc_binary(
-  NAME
-    "compile-mhlo-test-binary"
-  SRCS
-    compile-mhlo-test-main.c
-  DEPS
+add_executable(
+  compile-mhlo-test-binary
+  compile-mhlo-test-main.c
+)
+target_link_libraries(compile-mhlo-test-binary
+  PRIVATE
     IREECompilerCAPILib
     MLIRCAPIIR
 )
 
-iree_native_test(
-  NAME
-    compile-mhlo-test
-  SRC
-    ::compile-mhlo-test-binary
+add_test(
+  NAME "iree/compiler/API/test/compile-mhlo-test"
+  COMMAND compile-mhlo-test-binary
 )
