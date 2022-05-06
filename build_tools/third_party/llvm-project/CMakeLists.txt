@@ -8,7 +8,7 @@
 # Re-export LLVM header-only targets as header-only libraries.                #
 ###############################################################################
 
-add_library(MLIRLinalgStructuredOpsIncGen_Lib INTERFACE)
-add_dependencies(MLIRLinalgStructuredOpsIncGen_Lib
+add_library(MLIRLinalgStructuredOpsIncGenLib INTERFACE)
+add_dependencies(MLIRLinalgStructuredOpsIncGenLib
   MLIRLinalgStructuredOpsIncGen
 )
