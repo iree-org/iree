@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -pass-pipeline='func.func(unroll-one-vector-op{anchor-func=test anchor-op=vector.contract source-shape=4,4,3 target-shape=2,4,3})' | FileCheck %s
+// RUN: iree-opt %s --pass-pipeline='func.func(unroll-one-vector-op{anchor-func=test anchor-op=vector.contract source-shape=4,4,3 target-shape=2,4,3})' | FileCheck %s
 
 #matmul_accesses = [
   affine_map<(i, j, k) -> (i, k)>,

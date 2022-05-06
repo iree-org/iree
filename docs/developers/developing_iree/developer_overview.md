@@ -105,7 +105,7 @@ model file:
 ```shell
 $ ../iree-build/iree/tools/iree-opt \
   -iree-transformation-pipeline \
-  -iree-hal-target-backends=vmvx \
+  --iree-hal-target-backends=vmvx \
   $PWD/iree/test/e2e/models/fullyconnected.mlir
 ```
 
@@ -122,7 +122,7 @@ For example, to translate `simple.mlir` to an IREE module:
 
 ```shell
 $ ../iree-build/iree/tools/iree-compile \
-  -iree-hal-target-backends=vmvx \
+  --iree-hal-target-backends=vmvx \
   $PWD/samples/models/simple_abs.mlir \
   -o /tmp/simple_abs_vmvx.vmfb
 ```
@@ -172,9 +172,9 @@ runner for the IREE
 
 ```shell
 $ ../iree-build/iree/tools/iree-compile \
-  -iree-input-type=mhlo \
+  --iree-input-type=mhlo \
   -iree-mlir-to-vm-bytecode-module \
-  -iree-hal-target-backends=vmvx \
+  --iree-hal-target-backends=vmvx \
   $PWD/iree/test/e2e/xla_ops/abs.mlir \
   -o /tmp/abs.vmfb
 ```
@@ -200,8 +200,8 @@ For example, to execute the contents of
 ```shell
 $ ../iree-build/iree/tools/iree-run-mlir \
   $PWD/samples/models/simple_abs.mlir \
-  -function-input="f32=-2" \
-  -iree-hal-target-backends=vmvx
+  --function-input="f32=-2" \
+  --iree-hal-target-backends=vmvx
 ```
 
 ### iree-dump-module

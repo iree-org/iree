@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -test-wrap-scope='opname=arith.addi' %s | FileCheck %s --check-prefix WRAP
+// RUN: iree-dialects-opt --test-wrap-scope='opname=arith.addi' %s | FileCheck %s --check-prefix WRAP
 // RUN: iree-dialects-opt -test-unwrap-scope %s | FileCheck %s --check-prefix UNWRAP
 
 // WRAP-LABEL: @test_wrap

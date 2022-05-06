@@ -19,7 +19,7 @@ iree_bytecode_module(
   FLAGS
     "--iree-input-type=mhlo"
     "-iree-mlir-to-vm-bytecode-module"
-    "-iree-hal-target-backends=vulkan-spirv"
+    "--iree-hal-target-backends=vulkan-spirv"
 )
 
 # This sample statically links against Vulkan.

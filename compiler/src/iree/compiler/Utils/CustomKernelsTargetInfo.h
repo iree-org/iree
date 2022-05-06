@@ -52,7 +52,7 @@ inline bool isFeatureForArch(CustomKernelTargetFeature feature,
 
 // Class used to pass some target information to patterns/passes that need it.
 // The information could come from pass options, e.g.
-//    -iree-llvmcpu-vector-contract-custom-kernels='arch=aarch64
+//    --iree-llvmcpu-vector-contract-custom-kernels='arch=aarch64
 //    features=+dotprod intrinsics'
 // or from a parent HAL::ExecutableVariantOp and/or be complemented by a
 // global flag like clMmt4dUseIntrinsics.

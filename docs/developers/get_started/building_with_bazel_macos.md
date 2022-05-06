@@ -113,5 +113,5 @@ and execute a function in the compiled module:
 
 ```shell
 $ ./bazel-bin/iree/tools/iree-run-mlir ./samples/models/simple_abs.mlir \
-  -function-input="f32=-2" -iree-hal-target-backends=vmvx -print-mlir
+  --function-input="f32=-2" --iree-hal-target-backends=vmvx -print-mlir
 ```

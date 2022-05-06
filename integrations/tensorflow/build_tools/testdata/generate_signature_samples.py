@@ -14,7 +14,7 @@ Fully convert to IREE input (run all import passes):
   iree-import-tf /tmp/sigs.sm
 
 Import only (useful for crafting test cases for the import pipeline):
-  iree-import-tf -o /dev/null -save-temp-tf-input=- /tmp/sigs.sm
+  iree-import-tf -o /dev/null --save-temp-tf-input=- /tmp/sigs.sm
 
 Can be further lightly pre-processed via:
   | iree-tf-opt --tf-standard-pipeline

@@ -26,7 +26,7 @@
 //
 // Command line arguments are handled by LLVM's parser by default but -- can be
 // used to separate the compiler flags from the runtime flags, such as:
-//   iree-run-mlir -iree-hal-target-backends=vulkan-spirv -- --logtostderr
+//   iree-run-mlir --iree-hal-target-backends=vulkan-spirv -- --logtostderr
 
 #include <cstring>
 #include <functional>

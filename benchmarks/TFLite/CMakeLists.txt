@@ -430,7 +430,7 @@ iree_benchmark_suite(
   TRANSLATION_FLAGS
     ${ANDROID_CPU_TRANSLATION_FLAGS}
     "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
-    "-iree-llvm-target-cpu-features=+dotprod"
+    "--iree-llvm-target-cpu-features=+dotprod"
   BENCHMARK_TOOL
     iree-benchmark-module
   DRIVER
@@ -489,7 +489,7 @@ iree_benchmark_suite(
   TRANSLATION_FLAGS
     ${ANDROID_CPU_TRANSLATION_FLAGS}
     "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
-    "-iree-llvm-target-cpu-features=+dotprod"
+    "--iree-llvm-target-cpu-features=+dotprod"
   BENCHMARK_TOOL
     iree-benchmark-module
   DRIVER
@@ -604,7 +604,7 @@ iree_benchmark_suite(
   TRANSLATION_FLAGS
     ${ANDROID_CPU_TRANSLATION_FLAGS}
     "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
-    "-iree-llvm-target-cpu-features=+dotprod"
+    "--iree-llvm-target-cpu-features=+dotprod"
 
   BENCHMARK_TOOL
     iree-benchmark-module

@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-llvmcpu-vector-contract-custom-kernels='arch=aarch64 features=+dotprod intrinsics' %s | FileCheck %s
+// RUN: iree-opt --iree-llvmcpu-vector-contract-custom-kernels='arch=aarch64 features=+dotprod intrinsics' %s | FileCheck %s
 
 // CHECK-LABEL: @vector_i8i8i32matmul(
 // CHECK-SAME:          %[[LHS:[^:[:space:]]+]]

@@ -75,7 +75,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "cuda"
   COMPILER_FLAGS
-    "-iree-input-type=mhlo"
+    "--iree-input-type=mhlo"
   RUNNER_ARGS
     "--cuda_use_streams=false"
   LABELS
@@ -151,7 +151,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "cuda"
   COMPILER_FLAGS
-    "-iree-input-type=mhlo"
+    "--iree-input-type=mhlo"
   RUNNER_ARGS
     "--cuda_use_streams=true"
   LABELS
@@ -227,7 +227,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "dylib"
   COMPILER_FLAGS
-    "-iree-input-type=mhlo"
+    "--iree-input-type=mhlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -290,7 +290,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vmvx"
   COMPILER_FLAGS
-    "-iree-input-type=mhlo"
+    "--iree-input-type=mhlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -356,7 +356,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vulkan"
   COMPILER_FLAGS
-    "-iree-input-type=mhlo"
+    "--iree-input-type=mhlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -422,8 +422,8 @@ iree_check_single_backend_test_suite(
   TARGET_BACKEND
     "dylib-llvm-aot"
   COMPILER_FLAGS
-    "-iree-input-type=mhlo"
-    "-iree-llvm-target-triple=wasm32-unknown-emscripten"
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-triple=wasm32-unknown-emscripten"
 )
 
 iree_check_single_backend_test_suite(
@@ -491,8 +491,8 @@ iree_check_single_backend_test_suite(
   DRIVER
     "dylib"
   COMPILER_FLAGS
-    "-iree-input-type=mhlo"
-    "-iree-llvm-target-cpu-features=host"
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-cpu-features=host"
   LABELS
     "hostonly"
     "local"

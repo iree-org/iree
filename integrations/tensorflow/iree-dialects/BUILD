@@ -120,7 +120,7 @@ gentbl_filegroup(
         (
             [
                 "-gen-python-op-bindings",
-                "-bind-dialect=iree",
+                "--bind-dialect=iree",
             ],
             "python/iree/compiler/dialects/_iree_ops_gen.py",
         ),
@@ -159,14 +159,14 @@ gentbl_cc_library(
     tbl_outs = [
         (
             [
-                "-dialect=iree_linalg_ext",
+                "--dialect=iree_linalg_ext",
                 "-gen-dialect-decls",
             ],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h.inc",
         ),
         (
             [
-                "-dialect=iree_linalg_ext",
+                "--dialect=iree_linalg_ext",
                 "-gen-dialect-defs",
             ],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.cpp.inc",
@@ -481,7 +481,7 @@ gentbl_filegroup(
         (
             [
                 "-gen-python-op-bindings",
-                "-bind-dialect=iree_pydm",
+                "--bind-dialect=iree_pydm",
             ],
             "python/iree/compiler/dialects/_iree_pydm_ops_gen.py",
         ),
@@ -562,14 +562,14 @@ gentbl_cc_library(
     tbl_outs = [
         (
             [
-                "-dialect=iree_linalg_transform",
+                "--dialect=iree_linalg_transform",
                 "-gen-dialect-decls",
             ],
             "include/iree-dialects/Dialect/LinalgTransform/LinalgTransformDialect.h.inc",
         ),
         (
             [
-                "-dialect=iree_linalg_transform",
+                "--dialect=iree_linalg_transform",
                 "-gen-dialect-defs",
             ],
             "include/iree-dialects/Dialect/LinalgTransform/LinalgTransformDialect.cpp.inc",

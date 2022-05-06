@@ -18,7 +18,7 @@ if(IREE_ENABLE_EMITC)
       "add_module.h"
     FLAGS
       "-iree-mlir-to-vm-c-module"
-      "-iree-hal-target-backends=vmvx"
+      "--iree-hal-target-backends=vmvx"
   )
 
   iree_cc_test(
@@ -61,7 +61,7 @@ if(IREE_ENABLE_EMITC)
       "import_module_a.h"
     FLAGS
       "-iree-mlir-to-vm-c-module"
-      "-iree-hal-target-backends=vmvx"
+      "--iree-hal-target-backends=vmvx"
   )
 
   iree_c_module(
@@ -73,6 +73,6 @@ if(IREE_ENABLE_EMITC)
       "import_module_b.h"
     FLAGS
       "-iree-mlir-to-vm-c-module"
-      "-iree-hal-target-backends=vmvx"
+      "--iree-hal-target-backends=vmvx"
   )
 endif()

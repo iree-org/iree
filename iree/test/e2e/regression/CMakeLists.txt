@@ -50,7 +50,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "dylib"
   COMPILER_FLAGS
-    "-iree-input-type=mhlo"
+    "--iree-input-type=mhlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -63,7 +63,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "dylib"
   COMPILER_FLAGS
-    "-iree-input-type=tosa"
+    "--iree-input-type=tosa"
 )
 
 iree_check_single_backend_test_suite(
@@ -86,7 +86,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vmvx"
   COMPILER_FLAGS
-    "-iree-input-type=mhlo"
+    "--iree-input-type=mhlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -109,7 +109,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vulkan"
   COMPILER_FLAGS
-    "-iree-input-type=mhlo"
+    "--iree-input-type=mhlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -132,7 +132,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "cuda"
   COMPILER_FLAGS
-    "-iree-input-type=mhlo"
+    "--iree-input-type=mhlo"
   LABELS
     "noasan"
     "nomsan"

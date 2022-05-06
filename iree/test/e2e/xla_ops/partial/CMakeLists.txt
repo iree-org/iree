@@ -21,8 +21,8 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vulkan"
   COMPILER_FLAGS
-    "-iree-input-type=mhlo"
-    "-iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-input-type=mhlo"
+    "--iree-vulkan-target-triple=valhall-unknown-android11"
   LABELS
     "manual"
     "notap"

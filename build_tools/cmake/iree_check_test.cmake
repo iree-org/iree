@@ -56,7 +56,7 @@ TARGET_BACKEND=${_RULE_TARGET_BACKEND}.")
       "${_RULE_SRC}"
     FLAGS
       "-iree-mlir-to-vm-bytecode-module"
-      "-mlir-print-op-on-diagnostic=false"
+      "--mlir-print-op-on-diagnostic=false"
       "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
       ${_RULE_FLAGS}
     TESTONLY
