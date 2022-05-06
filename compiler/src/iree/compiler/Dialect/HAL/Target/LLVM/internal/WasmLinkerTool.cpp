@@ -94,7 +94,7 @@ class WasmLinkerTool : public LinkerTool {
         // If not specified then lld tries to figure out what it is by progname
         // (ld, ld64, link, etc).
         // NOTE: must be first because lld sniffs argv[1]/argv[2].
-        "--flavor wasm",
+        "-flavor wasm",
 
         // entry symbol not defined (pass --no-entry to suppress): _start
         "--no-entry",
