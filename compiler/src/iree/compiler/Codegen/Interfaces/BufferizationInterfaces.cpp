@@ -236,8 +236,8 @@ struct LinalgExtOpInterface
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
     // TODO: Implement payloadUsesValueFromOperand for individual ops. There
-    // are only limit LinalgExt ops, so we hard-coded here. We don't expect
-    // to add more LinalgExt ops.
+    // are a limited number of LinalgExt ops, so we hardcode them here. We don't
+    // expect to add more LinalgExt ops.
     auto linalgExtOp = cast<IREE::LinalgExt::LinalgExtOp>(op);
     if (linalgExtOp.isInputTensor(&opOperand)) return true;
     return !isa<IREE::LinalgExt::ScatterOp, IREE::LinalgExt::ReverseOp>(op);
