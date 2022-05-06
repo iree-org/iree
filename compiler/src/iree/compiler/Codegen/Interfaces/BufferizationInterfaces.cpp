@@ -235,8 +235,12 @@ struct LinalgExtOpInterface
                                                     OpTy> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
-    // All operands (including outputs) may be read.
-    return true;
+    // TODO: Implement payloadUsesValueFromOperand for individual ops. There
+    // are a limited number of LinalgExt ops, so we hardcode them here. We don't
+    // expect to add more LinalgExt ops.
+    auto linalgExtOp = cast<IREE::LinalgExt::LinalgExtOp>(op);
+    if (linalgExtOp.isInputTensor(&opOperand)) return true;
+    return !isa<IREE::LinalgExt::ScatterOp, IREE::LinalgExt::ReverseOp>(op);
   }
 
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
@@ -413,6 +417,14 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
             LinalgExtOpInterface<IREE::LinalgExt::ReverseOp>>(*ctx);
         IREE::LinalgExt::FftOp::attachInterface<
             LinalgExtOpInterface<IREE::LinalgExt::FftOp>>(*ctx);
+        IREE::LinalgExt::SortOp::attachInterface<
+            LinalgExtOpInterface<IREE::LinalgExt::SortOp>>(*ctx);
+        IREE::LinalgExt::ScatterOp::attachInterface<
+            LinalgExtOpInterface<IREE::LinalgExt::ScatterOp>>(*ctx);
+        IREE::LinalgExt::ScanOp::attachInterface<
+            LinalgExtOpInterface<IREE::LinalgExt::ScanOp>>(*ctx);
+        IREE::LinalgExt::TopkOp::attachInterface<
+            LinalgExtOpInterface<IREE::LinalgExt::TopkOp>>(*ctx);
       });
 }
 

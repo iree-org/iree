@@ -263,7 +263,7 @@ func.func @reverse_dim(%pos: index) -> f32 {
 //       CHECK:   memref.alloc
 //       CHECK:   memref.alloc
 //       CHECK:   iree_linalg_ext.fft ins(%{{.*}} : index) outs(%{{.*}}, %{{.*}} : memref<1024xf32>, memref<1024xf32>)
-func @fft_tensor(%idx: index) -> (tensor<1024xf32>, tensor<1024xf32>) {
+func.func @fft_tensor(%idx: index) -> (tensor<1024xf32>, tensor<1024xf32>) {
   %t0 = linalg.init_tensor [1024] : tensor<1024xf32>
   %t1 = linalg.init_tensor [1024] : tensor<1024xf32>
   %0:2 = iree_linalg_ext.fft
@@ -272,3 +272,116 @@ func @fft_tensor(%idx: index) -> (tensor<1024xf32>, tensor<1024xf32>) {
   : tensor<1024xf32>, tensor<1024xf32>
   return %0#0, %0#1 : tensor<1024xf32>, tensor<1024xf32>
 }
+
+// -----
+
+func.func @scan_1d_dim0_inclusive_sum() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:6xf32>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readwrite:f32>
+  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:6xf32>
+  %3 = flow.dispatch.tensor.load %2, offsets = [0], sizes = [6], strides = [1] : !flow.dispatch.tensor<writeonly:6xf32> -> tensor<6xf32>
+  %4 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [6], strides = [1] : !flow.dispatch.tensor<readonly:6xf32> -> tensor<6xf32>
+  %5 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:f32> -> tensor<f32>
+  %6:2 = iree_linalg_ext.scan dimension(0) inclusive(true) ins(%4 : tensor<6xf32>) outs(%3, %5 : tensor<6xf32>, tensor<f32>) {
+  ^bb0(%arg0: f32, %arg1: f32):
+    %7 = arith.addf %arg0, %arg1 : f32
+    iree_linalg_ext.yield %7 : f32
+  } -> tensor<6xf32>, tensor<f32>
+  flow.dispatch.tensor.store %6#0, %2, offsets = [0], sizes = [6], strides = [1] : tensor<6xf32> -> !flow.dispatch.tensor<writeonly:6xf32>
+  flow.dispatch.tensor.store %6#1, %1, offsets = [], sizes = [], strides = [] : tensor<f32> -> !flow.dispatch.tensor<readwrite:f32>
+  return
+}
+// CHECK:      func @scan_1d_dim0_inclusive_sum
+// CHECK-NOT:    memref.alloca
+// CHECK:        iree_linalg_ext.scan
+// CHECK-SAME:     ins(%{{.*}} : memref<6xf32>)
+// CHECK-SAME:      outs(%{{.*}}, %{{.*}} : memref<6xf32>, memref<f32>)
+
+// -----
+
+func.func @sort1D() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readwrite:4xi32>
+  %1 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readwrite:4xi32> -> tensor<4xi32>
+  %2 = iree_linalg_ext.sort dimension(0) outs(%1 : tensor<4xi32>) {
+  ^bb0(%arg0: i32, %arg1: i32):
+    %3 = arith.cmpi slt, %arg0, %arg1 : i32
+    iree_linalg_ext.yield %3 : i1
+  } -> tensor<4xi32>
+  flow.dispatch.tensor.store %2, %0, offsets = [0], sizes = [4], strides = [1] : tensor<4xi32> -> !flow.dispatch.tensor<readwrite:4xi32>
+  return
+}
+// CHECK:      func @sort1D
+// CHECK:        %[[BUF:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<4xi32>
+// CHECK:        iree_linalg_ext.sort
+// CHECK-SAME:     outs(%[[BUF]] : memref<4xi32>)
+
+// -----
+
+func.func @scatter_update_scalar_1D() {
+  %c4 = arith.constant 4 : index
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:4xi32>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:4x1xi32>
+  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readwrite:8xi32>
+  %3 = flow.dispatch.tensor.load %2, offsets = [0], sizes = [8], strides = [1] : !flow.dispatch.tensor<readwrite:8xi32> -> tensor<8xi32>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %4 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
+  %5 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_x]
+  scf.for %arg0 = %4 to %c4 step %5 {
+    %6 = flow.dispatch.tensor.load %0, offsets = [%arg0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xi32> -> tensor<4xi32>
+    %7 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0], sizes = [4, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:4x1xi32> -> tensor<4x1xi32>
+    %8 = iree_linalg_ext.scatter unique_indices(true) ins(%6, %7 : tensor<4xi32>, tensor<4x1xi32>) outs(%3 : tensor<8xi32>) {
+    ^bb0(%arg1: i32, %arg2: i32):
+      iree_linalg_ext.yield %arg1 : i32
+    } -> tensor<8xi32>
+    flow.dispatch.tensor.store %8, %2, offsets = [0], sizes = [8], strides = [1] : tensor<8xi32> -> !flow.dispatch.tensor<readwrite:8xi32>
+  }
+  return
+}
+// CHECK:      func @scatter_update_scalar_1D
+// CHECK-DAG:    %[[UPDATE:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<4xi32>
+// CHECK-DAG:    %[[INDICES:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<4x1xi32>
+// CHECK-DAG:    %[[ORIGINAL:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : memref<8xi32>
+// CHECK:        scf.for %[[I:.+]] = %{{.+}} to %{{.+}} step %{{.+}}
+// CHECK-DAG:      %[[SUB_UPDATE:.+]] = memref.subview %[[UPDATE]][%[[I]]]
+// CHECK-DAG:      %[[SUB_INDICES:.+]] = memref.subview %[[INDICES]][%[[I]], 0]
+// CHECK:          iree_linalg_ext.scatter
+// CHECK-SAME:     ins(%[[SUB_UPDATE]], %[[SUB_INDICES]]
+// CHECK-SAME:     outs(%[[ORIGINAL:.+]]
+
+// -----
+
+func.func @topk() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:200x8xf32>
+  %input_values = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [200, 8], strides = [1, 1] : !flow.dispatch.tensor<readonly:200x8xf32> -> tensor<200x8xf32>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:200x8xi32>
+  %input_indices = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [200, 8], strides = [1, 1] : !flow.dispatch.tensor<readonly:200x8xi32> -> tensor<200x8xi32>
+  %out_values = linalg.init_tensor [200, 3] : tensor<200x3xf32>
+  %out_indices = linalg.init_tensor [200, 3] : tensor<200x3xi32>
+  %2:2 = iree_linalg_ext.topk
+        dimension(1)
+        ins(%input_values, %input_indices : tensor<200x8xf32> , tensor<200x8xi32>)
+        outs(%out_values, %out_indices : tensor<200x3xf32>, tensor<200x3xi32>) {
+        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+          %2 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %2 : i1
+        } -> tensor<200x3xf32>, tensor<200x3xi32>
+  return
+}
+
+// XXX(hanchung): I don't know why there are memref.cast ops, might be a bug?
+// Since we don't have e2e top-k tests, I can't figure out how it works today.
+// CHECK:      func @topk
+// CHECK-DAG:    %[[INPUT_VALUES:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<200x8xf32>
+// CHECK-DAG:    %[[XXX_VALUES:.+]] = memref.cast %[[INPUT_VALUES]] : memref<200x8xf32> to memref<200x8xf32,
+// CHECK-DAG:    %[[INPUT_INDICES:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<200x8xi32>
+// CHECK-DAG:    %[[XXX_INDICES:.+]] = memref.cast %[[INPUT_INDICES]] : memref<200x8xi32> to memref<200x8xi32,
+// CHECK-DAG:    %[[OUTPUT_VALUES:.+]] = memref.alloc() : memref<200x3xf32>
+// CHECK-DAG:    %[[OUTPUT_INDICES:.+]] = memref.alloc() : memref<200x3xi32>
+// CHECK:        iree_linalg_ext.topk
+// CHECK-SAME:     ins(%[[XXX_VALUES]], %[[XXX_INDICES]]
+// CHECK-SAME:     outs(%[[OUTPUT_VALUES]], %[[OUTPUT_INDICES]]
