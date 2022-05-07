@@ -23,7 +23,8 @@ class ColabNotebookTests(absltest.TestCase):
 
   @classmethod
   def generateTests(cls):
-    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    repo_root = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     script_path = os.path.join(repo_root,
                                "build_tools/testing/run_python_notebook.sh")
 
