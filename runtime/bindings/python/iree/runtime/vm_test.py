@@ -6,11 +6,12 @@
 
 # pylint: disable=unused-variable
 
-from absl import logging
-from absl.testing import absltest
+import logging
+import numpy as np
+import unittest
+
 import iree.compiler
 import iree.runtime
-import numpy as np
 
 
 def create_add_scalar_module():
@@ -60,7 +61,7 @@ def create_simple_dynamic_abs_module():
   return m
 
 
-class VmTest(absltest.TestCase):
+class VmTest(unittest.TestCase):
 
   @classmethod
   def setUpClass(cls):
@@ -189,4 +190,5 @@ class VmTest(absltest.TestCase):
 
 
 if __name__ == "__main__":
-  absltest.main()
+  logging.basicConfig(level=logging.DEBUG)
+  unittest.main()
