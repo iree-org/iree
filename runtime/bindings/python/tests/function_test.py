@@ -14,7 +14,7 @@ from iree.runtime.function import (
     IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
     IMPLICIT_BUFFER_ARG_USAGE,
 )
-from iree.runtime.binding import VmVariantList
+from iree.runtime._binding import VmVariantList
 
 
 class MockVmContext:

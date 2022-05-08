@@ -10,7 +10,7 @@ import logging
 import numpy as np
 import numpy.lib.mixins
 
-from .binding import (
+from ._binding import (
     BufferUsage,
     HalBufferView,
     HalDevice,
