@@ -76,6 +76,12 @@ iree_py_library(
 
 iree_symlink_tool(
   TARGET runtime
+  FROM_TOOL_TARGET iree_tools_iree-benchmark-module
+  TO_EXE_NAME iree-benchmark-module
+)
+
+iree_symlink_tool(
+  TARGET runtime
   FROM_TOOL_TARGET iree_tools_iree-benchmark-trace
   TO_EXE_NAME iree-benchmark-trace
 )
@@ -158,6 +164,7 @@ iree_py_install_package(
     # TODO: Update CMake target/path mangling rules to make this syntactically
     # rooted on "iree" in some way.
     runtime_bindings_python_iree_runtime_PyExtRt
+    iree_tools_iree-benchmark-module
     iree_tools_iree-benchmark-trace
     iree_tools_iree-run-module
     iree_tools_iree-run-trace
@@ -176,6 +183,7 @@ install(
 
 install(
   TARGETS
+    iree_tools_iree-benchmark-module
     iree_tools_iree-benchmark-trace
     iree_tools_iree-run-module
     iree_tools_iree-run-trace

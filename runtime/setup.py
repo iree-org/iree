@@ -402,6 +402,7 @@ setup(
             f"*{sysconfig.get_config_var('EXT_SUFFIX')}",
             "iree-run-module*",
             "iree-run-trace*",
+            "iree-benchmark-module*",
             "iree-benchmark-trace*",
             "iree-tracy-capture*",
         ],
@@ -410,6 +411,7 @@ setup(
         "console_scripts": [
             "iree-run-module = iree.runtime.scripts.iree_run_module.__main__:main",
             "iree-run-trace = iree.runtime.scripts.iree_run_trace.__main__:main",
+            "iree-benchmark-module = iree.runtime.scripts.iree_benchmark_module.__main__:main",
             "iree-benchmark-trace = iree.runtime.scripts.iree_benchmark_trace.__main__:main",
             "iree-tracy-capture = iree.runtime.scripts.iree_tracy_capture.__main__:main",
         ],
