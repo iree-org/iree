@@ -1463,6 +1463,20 @@ class GenericOpConversion : public OpConversionPattern<SrcOpTy> {
   StringRef funcName;
 };
 
+template <typename SrcOpTy>
+class DeleteOpConversion : public OpConversionPattern<SrcOpTy> {
+  using OpConversionPattern<SrcOpTy>::OpConversionPattern;
+  using Adaptor = typename SrcOpTy::Adaptor;
+
+ private:
+  LogicalResult matchAndRewrite(
+      SrcOpTy op, Adaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 class FuncOpConversion : public OpConversionPattern<mlir::func::FuncOp> {
  public:
   using OpConversionPattern<mlir::func::FuncOp>::OpConversionPattern;
@@ -4881,6 +4895,17 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
   patterns.add<ImportResolvedOpConversion>(typeConverter, context);
 
   // Globals
+  // Globals get packed into the state struct and are referenced by their
+  // ordinal only after the conversion.
+  patterns.add<DeleteOpConversion<IREE::VM::GlobalI32Op>>(typeConverter,
+                                                          context);
+  patterns.add<DeleteOpConversion<IREE::VM::GlobalI64Op>>(typeConverter,
+                                                          context);
+  patterns.add<DeleteOpConversion<IREE::VM::GlobalF32Op>>(typeConverter,
+                                                          context);
+  patterns.add<DeleteOpConversion<IREE::VM::GlobalRefOp>>(typeConverter,
+                                                          context);
+
   patterns.add<
       GlobalLoadOpConversion<IREE::VM::GlobalLoadI32Op, IREE::VM::GlobalI32Op>>(
       typeConverter, context, "vm_global_load_i32");
@@ -5280,13 +5305,6 @@ class ConvertVMToEmitCPass
           return llvm::find(importShims, key) != std::end(importShims);
         });
 
-    // Global ops
-    // The global ops are dead after the conversion and will get removed.
-    target.addLegalOp<IREE::VM::GlobalI32Op>();
-    target.addLegalOp<IREE::VM::GlobalI64Op>();
-    target.addLegalOp<IREE::VM::GlobalF32Op>();
-    target.addLegalOp<IREE::VM::GlobalRefOp>();
-
     // This op is needed in the printer to emit an array holding the data.
     target.addLegalOp<IREE::VM::RodataOp>();
 
@@ -5303,12 +5321,6 @@ class ConvertVMToEmitCPass
         typeConverter.sourceMaterializations;
 
     module.walk([&materializations](Operation *op) {
-      // Global ops are dead now
-      if (isa<IREE::VM::GlobalI32Op, IREE::VM::GlobalI64Op,
-              IREE::VM::GlobalF32Op, IREE::VM::GlobalRefOp>(op)) {
-        op->erase();
-        return;
-      }
       // Remove dead basic block arguments
       if (materializations.contains(op)) {
         assert(isa<emitc::VariableOp>(op));
