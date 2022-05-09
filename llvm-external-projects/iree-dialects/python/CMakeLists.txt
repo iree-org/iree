@@ -53,6 +53,15 @@ declare_mlir_dialect_python_bindings(
   DIALECT_NAME iree_pydm
 )
 
+declare_mlir_python_sources(
+  ADD_TO_PARENT IREEDialectsPythonSources.Dialects
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
+  SOURCES
+    dialects/transform.py
+    dialects/_transform_ops_ext.py
+    dialects/_transform_ops_gen.py
+)
+
 ################################################################################
 # Extensions
 ################################################################################
