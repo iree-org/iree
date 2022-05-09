@@ -369,7 +369,7 @@ static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
 static LogicalResult setDefaultRootConfig(
     func::FuncOp entryPointFn,
     IREE::Flow::PartitionableLoopsInterface partitionableLoopsInterfaceOp,
-    ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs) {
+    ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs, bool hasTensorSemantics) {
   if (getLoweringConfig(partitionableLoopsInterfaceOp)) return success();
 
   SmallVector<unsigned> partitionableLoops =
@@ -398,7 +398,8 @@ static LogicalResult setDefaultRootConfig(
   tileSizes.emplace_back(std::move(flowTileSizes));
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, partitionableLoopsInterfaceOp, tileSizes,
-      DispatchLoweringPassPipeline::CPUDefault);
+      hasTensorSemantics ? DispatchLoweringPassPipeline::CPUDefault
+                         : DispatchLoweringPassPipeline::CPUBufferOpsDefault);
 }
 
 static LogicalResult setSandboxRootConfig(func::FuncOp entryPointFn,
@@ -885,7 +886,8 @@ static LogicalResult setRootConfig(
       cast<IREE::Flow::PartitionableLoopsInterface>(linalgOp.getOperation());
   SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
   SmallVector<int64_t> ubs = *linalgOp.getStaticLoopRanges();
-  return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
+  return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs,
+                              linalgOp.hasTensorSemantics());
 }
 
 /// Set the default configuration for operations that implement the
@@ -913,7 +915,8 @@ static LogicalResult setRootConfig(
       iterationDomain, [&](Range r) { return getStaticValue(r.offset); }));
   auto ubs = llvm::to_vector(llvm::map_range(
       iterationDomain, [&](Range r) { return getStaticValue(r.size); }));
-  return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
+  return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs,
+                              /*hasTensorSemantics=*/true);
 }
 
 /// Redirects to methods that set the configuration based on operation type.
