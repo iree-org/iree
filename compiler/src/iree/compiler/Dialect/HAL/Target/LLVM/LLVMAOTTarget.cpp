@@ -31,6 +31,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 
@@ -154,6 +155,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     registry.insert<IREE::Codegen::IREECodegenDialect,
                     IREE::LinalgExt::IREELinalgExtDialect,
                     linalg::transform::LinalgTransformDialect,
+                    mlir::transform::TransformDialect,
                     pdl::PDLDialect,
                     pdl_interp::PDLInterpDialect,
                     arm_neon::ArmNeonDialect>();
@@ -575,19 +577,19 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       switch (targetTriple.getObjectFormat()) {
         case llvm::Triple::ObjectFormatType::COFF:
           mimeType = "application/x-msdownload";
-          extension = "dll";
+          extension = ".dll";
           break;
         case llvm::Triple::ObjectFormatType::ELF:
           mimeType = "application/x-elf";
-          extension = "so";
+          extension = ".so";
           break;
         case llvm::Triple::ObjectFormatType::MachO:
           mimeType = "application/x-dylib";
-          extension = "dylib";
+          extension = ".dylib";
           break;
         case llvm::Triple::ObjectFormatType::Wasm:
           mimeType = "application/wasm";
-          extension = "wasm";
+          extension = ".wasm";
           break;
         default:
           mimeType = "application/octet-stream";

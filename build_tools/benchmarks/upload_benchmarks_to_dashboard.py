@@ -303,8 +303,12 @@ def main(args):
   # Register a new build for the current commit.
   commit_hash = get_git_commit_hash(all_results.commit, verbose=args.verbose)
   commit_count = get_git_total_commit_count(commit_hash, verbose=args.verbose)
+
+  # Allow override to support uploading data for the same build in
+  # different batches.
   add_new_iree_build(commit_count,
                      commit_hash,
+                     override=True,
                      dry_run=args.dry_run,
                      verbose=args.verbose)
 

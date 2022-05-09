@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s  -linalg-interp-transforms --split-input-file | FileCheck %s
+// RUN: iree-dialects-opt %s  -linalg-transform-interp --split-input-file | FileCheck %s
 
 // CHECK-DAG: #[[$MUL_MAP:.*]] = affine_map<(d0)[s0] -> (d0 * s0)>
 // CHECK-DAG: #[[$SUB_MAP:.*]] = affine_map<(d0)[s0, s1] -> (-(d0 * s0) + s1, s0)>
@@ -88,14 +88,18 @@ module {
     return
   }
 
-  pdl.pattern @match_iree_linalg_ext_in_parallel : benefit(1) {
-    %0 = operands
-    %1 = types
-    %2 = operation "iree_linalg_ext.in_parallel"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
-    rewrite %2 with "iree_linalg_transform.apply"
-  }
-  iree_linalg_transform.sequence {
-    %0 = match @match_iree_linalg_ext_in_parallel
-    %1 = rewrite_iree_linalg_ext_in_parallel_to_scf_for %0
+  transform.with_pdl_patterns {
+  ^bb0(%arg0: !pdl.operation):
+    pdl.pattern @match_iree_linalg_ext_in_parallel : benefit(1) {
+      %0 = operands
+      %1 = types
+      %2 = operation "iree_linalg_ext.in_parallel"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      rewrite %2 with "transform.dialect"
+    }
+    transform.structured.canonicalized_sequence %arg0 {
+    ^bb1(%arg1: !pdl.operation):
+      %0 = pdl_match @match_iree_linalg_ext_in_parallel in %arg1
+      %1 = rewrite_iree_linalg_ext_in_parallel_to_scf_for %0
+    }
   }
 }

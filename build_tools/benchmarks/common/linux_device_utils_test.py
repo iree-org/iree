@@ -10,7 +10,7 @@ import unittest
 from unittest import mock
 
 from common.benchmark_definition import DeviceInfo, PlatformType
-from common.linux_device_utils import get_linux_cpu_arch, get_linux_cpu_features, get_linux_cpu_model, get_linux_device_info
+from common.linux_device_utils import get_linux_cpu_arch, get_linux_cpu_features, get_linux_device_info
 
 
 class LinuxDeviceUtilsTest(unittest.TestCase):
@@ -22,7 +22,6 @@ class LinuxDeviceUtilsTest(unittest.TestCase):
     self.execute_cmd_mock.return_value = (
         "Architecture:                    x86_64\n"
         "Vendor ID:                       AuthenticAMD\n"
-        "Model name:                      AMD EPYC 7B12\n"
         "Flags:                           fpu vme de pse tsc\n")
 
   def tearDown(self):
@@ -35,14 +34,11 @@ class LinuxDeviceUtilsTest(unittest.TestCase):
     self.assertEqual(get_linux_cpu_features(),
                      ["fpu", "vme", "de", "pse", "tsc"])
 
-  def test_get_linux_cpu_model(self):
-    self.assertEqual(get_linux_cpu_model(), "AMD EPYC 7B12")
-
   def test_get_linux_device_info(self):
     self.assertEqual(
         get_linux_device_info("Dummy", "Zen2"),
         DeviceInfo(platform_type=PlatformType.LINUX,
-                   model="Dummy(AMD EPYC 7B12)",
+                   model="Dummy",
                    cpu_abi="x86_64",
                    cpu_uarch="Zen2",
                    cpu_features=["fpu", "vme", "de", "pse", "tsc"],

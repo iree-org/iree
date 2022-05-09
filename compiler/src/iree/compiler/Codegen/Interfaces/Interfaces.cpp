@@ -10,6 +10,8 @@
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
 // TODO: Remove this dependency once the transform dialect extensions
 // have a better registration mechanism.
+#include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
+#include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree/compiler/Codegen/TransformDialectExtensions/TransformDialectExtensions.h"
 
 namespace mlir {
@@ -21,6 +23,8 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   // TODO: Remove this dependency once the transform dialect extensions
   // have a better registration mechanism.
   // TODO: when warranted, move to its own file.
+  registry.addExtensions<IREE::LinalgExt::LinalgExtTransformOpsExtension,
+                         transform_ext::StructuredTransformOpsExtension>();
   registerLinalgTransformDialectExtension(registry);
 }
 

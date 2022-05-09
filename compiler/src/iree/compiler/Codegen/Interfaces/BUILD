@@ -46,6 +46,8 @@ iree_compiler_cc_library(
         # TODO: Remove this dependency once the transform dialect extensions
         # have a better registration mechanism.
         "//compiler/src/iree/compiler/Codegen/TransformDialectExtensions",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
+        "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
     ],
 )
 

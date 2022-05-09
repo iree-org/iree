@@ -66,7 +66,8 @@ if BINDIST_DIR is None:
   BINDIST_DIR = os.path.join(WORK_DIR, "bindist")
 THIS_DIR = os.path.realpath(os.path.dirname(__file__))
 CMAKE_CI_SCRIPT = os.path.join(THIS_DIR, "cmake_ci.py")
-BUILD_REQUIREMENTS_TXT = os.path.join(IREESRC_DIR, "bindings", "python",
+BUILD_REQUIREMENTS_TXT = os.path.join(IREESRC_DIR, "runtime", "bindings",
+                                      "python", "iree", "runtime",
                                       "build_requirements.txt")
 CI_REQUIREMENTS_TXT = os.path.join(THIS_DIR, "ci_requirements.txt")
 CONFIGURE_BAZEL_PY = os.path.join(IREESRC_DIR, "configure_bazel.py")

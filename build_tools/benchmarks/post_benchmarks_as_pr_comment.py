@@ -125,6 +125,7 @@ def query_base_benchmark_results(commit,
 
 def get_benchmark_result_markdown(benchmark_files: Sequence[str],
                                   query_base: bool,
+                                  comment_title: str,
                                   verbose: bool = False) -> Tuple[str, str]:
   """Gets the full/abbreviated markdown summary of all benchmarks in files."""
   pr_commit = get_required_env_var("BUILDKITE_COMMIT")
@@ -169,7 +170,7 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
   full_table.append(categorize_benchmarks_into_tables(all_benchmarks))
 
   # Compose the abbreviated benchmark tables.
-  abbr_table = [md.header(ABBR_PR_COMMENT_TITLE, 2)]
+  abbr_table = [md.header(comment_title, 2)]
   abbr_table.append(commit_info)
   tables = categorize_benchmarks_into_tables(all_benchmarks, TABLE_SIZE_CUT)
   if len(tables) == 0:
@@ -220,6 +221,7 @@ def post_to_gist(filename: str, content: str, verbose: bool = False):
 
 
 def get_previous_comment_on_pr(pr_number: str,
+                               comment_title: str,
                                verbose: bool = False) -> Optional[int]:
   """Gets the previous comment's ID from GitHub."""
   # Increasing per_page limit requires user authentication.
@@ -244,7 +246,7 @@ def get_previous_comment_on_pr(pr_number: str,
   # Find the last comment from GITHUB_USER and has the ABBR_PR_COMMENT_TITILE
   # keyword.
   for comment in reversed(response):
-    if (comment["user"]["login"] == GITHUB_USER) and (ABBR_PR_COMMENT_TITLE
+    if (comment["user"]["login"] == GITHUB_USER) and (comment_title
                                                       in comment["body"]):
       return comment["id"]
   return None
@@ -306,6 +308,9 @@ def parse_arguments():
       help=
       "Query the dashboard for the benchmark results of the targeting base branch"
   )
+  parser.add_argument("--comment-title",
+                      default=ABBR_PR_COMMENT_TITLE,
+                      help="Title of the comment")
   parser.add_argument("--verbose",
                       action="store_true",
                       help="Print internal information during execution")
@@ -315,9 +320,11 @@ def parse_arguments():
 
 
 def main(args):
-  full_md, abbr_md = get_benchmark_result_markdown(args.benchmark_files,
-                                                   query_base=args.query_base,
-                                                   verbose=args.verbose)
+  full_md, abbr_md = get_benchmark_result_markdown(
+      args.benchmark_files,
+      query_base=args.query_base,
+      comment_title=args.comment_title,
+      verbose=args.verbose)
 
   if args.dry_run:
     print(full_md, "\n\n", abbr_md)
@@ -334,7 +341,8 @@ def main(args):
   gist_url = post_to_gist(filename, full_md, args.verbose)
   abbr_md = abbr_md.replace("<<placeholder-link>>", gist_url)
 
-  previous_comment = get_previous_comment_on_pr(pr_number, args.verbose)
+  previous_comment = get_previous_comment_on_pr(
+      pr_number, comment_title=args.comment_title, verbose=args.verbose)
   if previous_comment is not None:
     update_comment_on_pr(previous_comment, abbr_md, args.verbose)
   else:

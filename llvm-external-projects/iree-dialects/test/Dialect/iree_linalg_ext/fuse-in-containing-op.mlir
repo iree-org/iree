@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s  -linalg-interp-transforms -split-input-file | FileCheck %s
+// RUN: iree-dialects-opt %s  -linalg-transform-interp -split-input-file | FileCheck %s
 
 #map0 = affine_map<()[s0] -> (64 ceildiv s0)>
 #map1 = affine_map<(d0)[s0] -> (d0 * s0)>
@@ -35,22 +35,26 @@ module {
     func.return %2 : tensor<64xf32>
   }
 
-  pdl.pattern @match_fill : benefit(1) {
-    %0 = operands
-    %1 = types
-    %2 = operation "linalg.fill"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
-    rewrite %2 with "iree_linalg_transform.apply"
-  }
-  pdl.pattern @match_in_parallel : benefit(1) {
-    %0 = operands
-    %1 = types
-    %2 = operation "iree_linalg_ext.in_parallel"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
-    rewrite %2 with "iree_linalg_transform.apply"
-  }
-  iree_linalg_transform.sequence {
-    %0 = match @match_fill
-    %1 = match @match_in_parallel
-    fuse_into_containing_op %0 into %1
+  transform.with_pdl_patterns {
+  ^bb0(%arg0: !pdl.operation):
+    pdl.pattern @match_fill : benefit(1) {
+      %0 = operands
+      %1 = types
+      %2 = operation "linalg.fill"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      rewrite %2 with "transform.dialect"
+    } 
+    pdl.pattern @match_in_parallel : benefit(1) {
+      %0 = operands
+      %1 = types
+      %2 = operation "iree_linalg_ext.in_parallel"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      rewrite %2 with "transform.dialect"
+    }
+    transform.structured.canonicalized_sequence %arg0 {
+    ^bb1(%arg1: !pdl.operation):
+      %0 = pdl_match @match_fill in %arg1
+      %1 = pdl_match @match_in_parallel in %arg1
+      fuse_into_containing_op %0 into %1
+    }
   }
 }
 
@@ -94,21 +98,25 @@ module {
     func.return %2 : tensor<?xf32>
   }
 
-  pdl.pattern @match_fill : benefit(1) {
-    %0 = operands
-    %1 = types
-    %2 = operation "linalg.fill"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
-    rewrite %2 with "iree_linalg_transform.apply"
-  }
-  pdl.pattern @match_in_parallel : benefit(1) {
-    %0 = operands
-    %1 = types
-    %2 = operation "iree_linalg_ext.in_parallel"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
-    rewrite %2 with "iree_linalg_transform.apply"
-  }
-  iree_linalg_transform.sequence {
-    %0 = match @match_fill
-    %1 = match @match_in_parallel
-    fuse_into_containing_op %0 into %1
+  transform.with_pdl_patterns {
+  ^bb0(%arg0: !pdl.operation):
+    pdl.pattern @match_fill : benefit(1) {
+      %0 = operands
+      %1 = types
+      %2 = operation "linalg.fill"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      rewrite %2 with "transform.dialect"
+    }
+    pdl.pattern @match_in_parallel : benefit(1) {
+      %0 = operands
+      %1 = types
+      %2 = operation "iree_linalg_ext.in_parallel"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      rewrite %2 with "transform.dialect"
+    }
+    transform.structured.canonicalized_sequence %arg0 {
+    ^bb1(%arg1: !pdl.operation):
+      %0 = pdl_match @match_fill in %arg1
+      %1 = pdl_match @match_in_parallel in %arg1
+      fuse_into_containing_op %0 into %1
+    }
   }
 }
