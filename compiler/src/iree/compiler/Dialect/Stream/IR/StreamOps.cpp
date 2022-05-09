@@ -38,6 +38,18 @@ namespace Stream {
 // Op utilities used within the stream dialect
 //===----------------------------------------------------------------------===//
 
+// TODO(hanchung): Have a better fix. This is a fix for
+// https://reviews.llvm.org/D124649
+static void createArgs(ArrayRef<OpAsmParser::UnresolvedOperand> operands,
+                       ArrayRef<Type> types,
+                       SmallVector<OpAsmParser::Argument> &args) {
+  for (auto argAndType : llvm::zip(operands, types)) {
+    auto &arg = args.emplace_back();
+    arg.ssaName = std::get<0>(argAndType);
+    arg.type = std::get<1>(argAndType);
+  }
+}
+
 // Verifies that |dynamicDims| contains the appropriate number of dims for all
 // of the dynamic dimensions in |values|.
 static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
@@ -255,7 +267,8 @@ static ParseResult parseResourceRegion(
       regionArgs.emplace_back();
       if (failed(parser.parseOperand(operands.back())) ||
           failed(parser.parseKeyword("as")) ||
-          failed(parser.parseRegionArgument(regionArgs.back())) ||
+          failed(parser.parseOperand(regionArgs.back(),
+                                     /*allowResultNumber=*/false)) ||
           failed(parser.parseColon()) ||
           failed(parseSizeAwareType(parser, operandTypes.back(),
                                     operandSizes.back()))) {
@@ -285,8 +298,10 @@ static ParseResult parseResourceRegion(
       }
     }
   }
-  return parser.parseRegion(body, regionArgs, operandTypes,
-                            /*enableNameShadowing=*/false);
+
+  SmallVector<OpAsmParser::Argument> args;
+  createArgs(regionArgs, operandTypes, args);
+  return parser.parseRegion(body, args);
 }
 
 static void printResourceRegion(OpAsmPrinter &p, Operation *op,
@@ -346,7 +361,8 @@ static ParseResult parseExplicitResourceRegion(
       regionArgs.emplace_back();
       if (failed(parser.parseOperand(operands.back())) ||
           failed(parser.parseKeyword("as")) ||
-          failed(parser.parseRegionArgument(regionArgs.back())) ||
+          failed(parser.parseOperand(regionArgs.back(),
+                                     /*allowResultNumber=*/false)) ||
           failed(parser.parseColon()) ||
           failed(parseSizeAwareType(parser, operandTypes.back(),
                                     operandSizes.back()))) {
@@ -357,8 +373,9 @@ static ParseResult parseExplicitResourceRegion(
       return failure();
     }
   }
-  if (failed(parser.parseRegion(body, regionArgs, operandTypes,
-                                /*enableNameShadowing=*/false))) {
+  SmallVector<OpAsmParser::Argument> args;
+  createArgs(regionArgs, operandTypes, args);
+  if (failed(parser.parseRegion(body, args))) {
     return failure();
   }
   // HACK: I can't figure out how to make this work with the default parsing -

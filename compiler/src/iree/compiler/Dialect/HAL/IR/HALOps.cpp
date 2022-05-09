@@ -572,10 +572,9 @@ ParseResult DeviceSwitchOp::parse(OpAsmParser &parser, OperationState &result) {
       return failure();
     }
     conditionAttrs.push_back(conditionAttr);
-    SmallVector<OpAsmParser::UnresolvedOperand> regionArgs;
-    SmallVector<Type> regionArgTypes;
+    SmallVector<OpAsmParser::Argument> regionArgs;
     auto *regionBody = result.addRegion();
-    if (failed(parser.parseRegion(*regionBody, regionArgs, regionArgTypes))) {
+    if (failed(parser.parseRegion(*regionBody, regionArgs))) {
       return failure();
     }
   } while (succeeded(parser.parseOptionalComma()));
@@ -693,10 +692,9 @@ ParseResult ExecutableEntryPointOp::parse(OpAsmParser &parser,
   result.addAttribute("layout", layoutAttr);
 
   std::unique_ptr<Region> region;
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> regionOperands;
-  SmallVector<Type, 4> regionTypes;
+  SmallVector<OpAsmParser::Argument, 4> regionOperands;
   // A missing optional region is materialized as an empty region.
-  (void)parser.parseOptionalRegion(region, regionOperands, regionTypes);
+  (void)parser.parseOptionalRegion(region, regionOperands);
   result.addRegion(std::move(region));
 
   return success();
