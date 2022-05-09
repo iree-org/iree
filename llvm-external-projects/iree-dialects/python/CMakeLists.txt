@@ -53,7 +53,7 @@ declare_mlir_dialect_python_bindings(
   DIALECT_NAME iree_pydm
 )
 
-declare_mlir_python_sources(
+declare_mlir_python_sources(TmpTransformDialect
   ADD_TO_PARENT IREEDialectsPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   SOURCES
@@ -101,13 +101,17 @@ add_mlir_python_common_capi_library(IREEDialectsAggregateCAPI
   INSTALL_DESTINATION python_packages/iree_dialects/mlir/_mlir_libs
   OUTPUT_DIRECTORY "${IREE_DIALECTS_BINARY_DIR}/python_packages/iree_dialects/iree/compiler/_mlir_libs"
   RELATIVE_INSTALL_ROOT "../../../.."
-  DECLARED_SOURCES ${_source_components}
+  DECLARED_SOURCES
+    ${_source_components}
+    #${TmpTransformDialect}
 )
 
 add_mlir_python_modules(IREEDialectsPythonModules
   ROOT_PREFIX "${IREE_DIALECTS_BINARY_DIR}/python_packages/iree_dialects/iree/compiler"
   INSTALL_PREFIX "python_packages/iree_dialects/iree/compiler"
-  DECLARED_SOURCES ${_source_components}
+  DECLARED_SOURCES 
+    ${_source_components}
+    #${TmpTransformDialect}
   COMMON_CAPI_LINK_LIBS
     IREEDialectsAggregateCAPI
   )

@@ -9,6 +9,7 @@
 try:
   from .. import ir
   from ..dialects import pdl
+  from ._ods_common import extend_opview_class as _ods_extend_opview_class, segmented_accessor as _ods_segmented_accessor, equally_sized_accessor as _ods_equally_sized_accessor, get_default_loc_context as _ods_get_default_loc_context, get_op_result_or_value as _get_op_result_or_value, get_op_results_or_values as _get_op_results_or_values
   from typing import Optional, Sequence, Union
 except ImportError as e:
   raise RuntimeError("Error loading imports from extension module") from e
@@ -87,6 +88,55 @@ class MatchOp:
       target = ir.FlatSymbolRefAttr.get(target)
     operation_type = pdl.OperationType.get()
     super().__init__(operation_type, target)
+
+class WithPDLPatternsOp:
+  """Specialization for the WithPDLPatternsOp class."""
+
+  def __init__(self, root, *, loc=None, ip=None):
+    operands = []
+    results = []
+    attributes = {}
+    regions = 1
+    print(root)
+    if root is not None: operands.append(_get_op_result_or_value(root))
+    _ods_successors = None
+    super().__init__(self.build_generic(
+      attributes=attributes, results=results, operands=operands,
+      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    self.body.blocks.append(pdl.OperationType.get())
+
+
+class CanonicalizedSequenceOp:
+  """Specialization for the CanonicalizedSequenceOp class."""
+
+  def __init__(self, target, *, loc=None, ip=None):
+    operands = []
+    results = []
+    attributes = {}
+    regions = 1
+    if target is not None: operands.append(_get_op_result_or_value(target))
+    _ods_successors = None
+    super().__init__(self.build_generic(
+      attributes=attributes, results=results, operands=operands,
+      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    self.body.blocks.append(pdl.OperationType.get())
+
+
+class PDLMatchOp:
+  """Specialization for the PDLMatchOp class."""
+
+  def __init__(self, root, pattern_name: str, *, loc=None, ip=None):
+    operands = []
+    results = []
+    attributes = {}
+    regions = None
+    operands.append(_get_op_result_or_value(root))
+    attributes["pattern_name"] = ir.FlatSymbolRefAttr.get(pattern_name)
+    results.append(pdl.OperationType.get())
+    _ods_successors = None
+    super().__init__(self.build_generic(
+      attributes=attributes, results=results, operands=operands,
+      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
 
 
 class LowerVectorsOp:
