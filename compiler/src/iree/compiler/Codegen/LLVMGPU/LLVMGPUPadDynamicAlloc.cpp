@@ -13,32 +13,29 @@
 namespace mlir {
 namespace iree_compiler {
 
-static void padAlloc(memref::AllocOp allocOp) {
+static LogicalResult padAlloc(memref::AllocOp allocOp) {
+  OpBuilder builder(allocOp);
   SmallVector<int64_t> shape = llvm::to_vector(allocOp.getType().getShape());
   SmallVector<OpFoldResult> sizes;
   size_t dynamicDimIdx = 0;
   for (int64_t &dimSize : shape) {
     if (dimSize != ShapedType::kDynamicSize) {
-      Attribute dimAttr = IntegerAttr::get(IndexType::get(allocOp.getContext()),
-                                           APInt(64, dimSize));
-      sizes.push_back(dimAttr);
+      sizes.push_back(builder.getIndexAttr(dimSize));
       continue;
     }
     Value dim = allocOp.dynamicSizes()[dynamicDimIdx++];
     auto ub = linalg::getConstantUpperBoundForIndex(dim);
     if (failed(ub)) {
-      return;
-      // allocOp.emitOpError(
-      //    "unexpected allocation without upper bound shapes");
+      return allocOp.emitOpError(
+          "unexpected allocation without upper bound shapes");
     }
     dimSize = *ub;
     sizes.push_back(dim);
   }
-  if (dynamicDimIdx == 0) return;  // success();
+  if (dynamicDimIdx == 0) return success();
   Type elType = allocOp.getType().getElementType();
   MemRefType allocType = MemRefType::get(
       shape, elType, {}, allocOp.getType().getMemorySpaceAsInt());
-  OpBuilder builder(allocOp);
   Location loc = allocOp.getLoc();
   Value paddedAlloc = builder.create<memref::AllocOp>(loc, allocType);
   SmallVector<OpFoldResult> offsets(shape.size(), builder.getIndexAttr(0));
@@ -47,6 +44,7 @@ static void padAlloc(memref::AllocOp allocOp) {
                                                     sizes, strides);
   replaceMemrefUsesAndPropagateType(allocOp, subview, builder);
   allocOp->erase();
+  return success();
 }
 
 namespace {
@@ -63,7 +61,9 @@ struct LLVMGPUPadDynamicAllocPass
         sharedMemAllocs.push_back(allocOp);
       }
     });
-    for (memref::AllocOp alloc : sharedMemAllocs) padAlloc(alloc);
+    for (memref::AllocOp alloc : sharedMemAllocs) {
+      if (failed(padAlloc(alloc))) return signalPassFailure();
+    }
   }
 };
 }  // namespace
