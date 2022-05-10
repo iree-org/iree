@@ -108,16 +108,15 @@ static LogicalResult initTensorElimination(Operation *op) {
   // Analyze IR.
   OneShotBufferizationOptions options;
   OneShotAnalysisState state(op, options);
-  if (failed(analyzeOp(op, state)))
-    return failure();
+  if (failed(analyzeOp(op, state))) return failure();
 
   // Rewrite init_tensors that are anchored on specific ops.
   IRRewriter rewriter(op->getContext());
-  if (failed(linalg::insertSliceAnchoredInitTensorEliminationStep(
-      rewriter, op, state)))
+  if (failed(linalg::insertSliceAnchoredInitTensorEliminationStep(rewriter, op,
+                                                                  state)))
     return failure();
-  if (failed(storeTensorOpAnchoredInitTensorEliminationStep(
-      rewriter, op, state)))
+  if (failed(
+          storeTensorOpAnchoredInitTensorEliminationStep(rewriter, op, state)))
     return failure();
 
   return success();

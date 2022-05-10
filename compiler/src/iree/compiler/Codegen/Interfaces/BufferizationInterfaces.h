@@ -23,8 +23,7 @@ void addPostAnalysisTransformations(
 
 // Eliminate init_tensor ops that are anchored on flow store ops.
 LogicalResult storeTensorOpAnchoredInitTensorEliminationStep(
-    RewriterBase &rewriter, Operation *op,
-    bufferization::AnalysisState &state);
+    RewriterBase &rewriter, Operation *op, bufferization::AnalysisState &state);
 
 }  // namespace iree_compiler
 }  // namespace mlir
