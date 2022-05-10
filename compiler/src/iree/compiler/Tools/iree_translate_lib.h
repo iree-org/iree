@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_TOOLS_IREE_TRANSLATE_LIB_H
-#define IREE_TOOLS_IREE_TRANSLATE_LIB_H
+#ifndef IREE_COMPILER_TOOLS_IREE_TRANSLATE_LIB_H
+#define IREE_COMPILER_TOOLS_IREE_TRANSLATE_LIB_H
 
 namespace mlir {
 namespace iree_compiler {
@@ -21,4 +21,4 @@ int runIreecMain(int argc, char **argv);
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_TOOLS_IREE_TRANSLATE_LIB_H
+#endif  // IREE_COMPILER_TOOLS_IREE_TRANSLATE_LIB_H

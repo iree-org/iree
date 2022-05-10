@@ -6,8 +6,8 @@
 
 // This file defines a helper to add passes to the global registry.
 
-#ifndef IREE_TOOLS_INIT_PASSES_H_
-#define IREE_TOOLS_INIT_PASSES_H_
+#ifndef IREE_COMPILER_TOOLS_INIT_PASSES_H_
+#define IREE_COMPILER_TOOLS_INIT_PASSES_H_
 
 #include <cstdlib>
 
@@ -30,4 +30,4 @@ inline void registerAllPasses() {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_TOOLS_INIT_PASSES_H_
+#endif  // IREE_COMPILER_TOOLS_INIT_PASSES_H_

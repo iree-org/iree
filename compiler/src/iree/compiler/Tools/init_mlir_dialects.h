@@ -9,8 +9,8 @@
 //
 // Based on MLIR's InitAllDialects but without dialects we don't care about.
 
-#ifndef IREE_TOOLS_INIT_MLIR_DIALECTS_H_
-#define IREE_TOOLS_INIT_MLIR_DIALECTS_H_
+#ifndef IREE_COMPILER_TOOLS_INIT_MLIR_DIALECTS_H_
+#define IREE_COMPILER_TOOLS_INIT_MLIR_DIALECTS_H_
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
@@ -75,4 +75,4 @@ inline void registerMlirDialects(DialectRegistry &registry) {
 
 }  // namespace mlir
 
-#endif  // IREE_TOOLS_INIT_MLIR_DIALECTS_H_
+#endif  // IREE_COMPILER_TOOLS_INIT_MLIR_DIALECTS_H_

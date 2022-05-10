@@ -15,8 +15,8 @@
 // registered on a context and provide hooks for populating LLVM IR for
 // certain dialects. See init_llvmir_translations.h.
 
-#ifndef IREE_TOOLS_INIT_TRANSLATIONS_H_
-#define IREE_TOOLS_INIT_TRANSLATIONS_H_
+#ifndef IREE_COMPILER_TOOLS_INIT_TRANSLATIONS_H_
+#define IREE_COMPILER_TOOLS_INIT_TRANSLATIONS_H_
 
 #include "iree/compiler/Translation/HALExecutable.h"
 #include "iree/compiler/Translation/IREEVM.h"
@@ -53,4 +53,4 @@ inline void registerIreeTranslations() {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_TOOLS_INIT_TRANSLATIONS_H_
+#endif  // IREE_COMPILER_TOOLS_INIT_TRANSLATIONS_H_
