@@ -1559,7 +1559,9 @@ ParseResult TileOp::parse(OpAsmParser &parser, OperationState &result) {
   SmallVector<OpAsmParser::Argument, 8> regionOperands;
   std::unique_ptr<Region> region = std::make_unique<Region>();
   SmallVector<Type, 8> operandTypes, regionTypes;
-  if (parser.parseRegion(*region, regionOperands)) return failure();
+  if (parser.parseRegion(*region, regionOperands)) {
+    return failure();
+  }
 
   // Parse the optional attribute list.
   if (parser.parseOptionalAttrDict(result.attributes))
@@ -1628,7 +1630,9 @@ ParseResult InParallelOp::parse(OpAsmParser &parser, OperationState &result) {
 
   SmallVector<OpAsmParser::Argument, 8> regionOperands;
   std::unique_ptr<Region> region = std::make_unique<Region>();
-  if (parser.parseRegion(*region, regionOperands)) return failure();
+  if (parser.parseRegion(*region, regionOperands)) {
+    return failure();
+  }
   InParallelOp::ensureTerminator(*region, builder, result.location);
   result.addRegion(std::move(region));
 
@@ -1794,7 +1798,9 @@ ParseResult PerformConcurrentlyOp::parse(OpAsmParser &parser,
 
   SmallVector<OpAsmParser::Argument, 8> regionOperands;
   std::unique_ptr<Region> region = std::make_unique<Region>();
-  if (parser.parseRegion(*region, regionOperands)) return failure();
+  if (parser.parseRegion(*region, regionOperands)) {
+    return failure();
+  }
   PerformConcurrentlyOp::ensureTerminator(*region, builder, result.location);
   result.addRegion(std::move(region));
 
