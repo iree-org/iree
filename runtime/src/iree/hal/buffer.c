@@ -194,11 +194,6 @@ IREE_API_EXPORT void iree_hal_buffer_initialize(
   buffer->allowed_access = allowed_access;
   buffer->allowed_usage = allowed_usage;
 
-  // Retain the backing allocator.
-  if (IREE_LIKELY(device_allocator)) {
-    iree_hal_allocator_retain(device_allocator);
-  }
-
   // Retain the base allocated buffer if it's unique from the buffer we are
   // initializing.
   if (allocated_buffer != buffer) {
@@ -220,15 +215,8 @@ IREE_API_EXPORT void iree_hal_buffer_recycle(iree_hal_buffer_t* buffer) {
 
 IREE_API_EXPORT void iree_hal_buffer_destroy(iree_hal_buffer_t* buffer) {
   if (IREE_LIKELY(buffer)) {
-    iree_hal_allocator_t* device_allocator_to_release =
-        buffer->device_allocator;
     IREE_HAL_VTABLE_DISPATCH(buffer, iree_hal_buffer, destroy)
     (buffer);
-
-    // Release backing allocator, only after unused.
-    if (IREE_LIKELY(device_allocator_to_release)) {
-      iree_hal_allocator_release(device_allocator_to_release);
-    }
   }
 }
 
