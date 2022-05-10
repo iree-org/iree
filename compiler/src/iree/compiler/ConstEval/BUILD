@@ -77,7 +77,7 @@ iree_compiler_cc_library(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/vmvx/registration",
         "//runtime/src/iree/modules/hal",
-        "//runtime/src/iree/utils:vm_util",
+        "//runtime/src/iree/tools/utils:vm_util",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm:bytecode_module",
         "//runtime/src/iree/vm:cc",

@@ -37,7 +37,7 @@ iree_cc_binary(
   DEPS
     ::mnist_bytecode_module_c
     iree::runtime
-    iree::utils::image_util
+    iree::tools::utils::image_util
 )
 
 iree_lit_test(

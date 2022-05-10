@@ -17,9 +17,9 @@
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
-#include "iree/utils/cpu_features.h"
-#include "iree/utils/trace_replay.h"
-#include "iree/utils/yaml_util.h"
+#include "iree/tools/utils/cpu_features.h"
+#include "iree/tools/utils/trace_replay.h"
+#include "iree/tools/utils/yaml_util.h"
 #include "iree/vm/api.h"
 
 IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");

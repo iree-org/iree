@@ -44,7 +44,7 @@ iree_cc_binary(
     iree::hal
     iree::hal::drivers
     iree::modules::hal
-    iree::utils::vm_util
+    iree::tools::utils::vm_util
     iree::vm
     iree::vm::bytecode_module
     iree::vm::cc
@@ -65,8 +65,8 @@ iree_cc_binary(
     iree::hal::drivers
     iree::modules::hal
     iree::testing::benchmark
-    iree::utils::trace_replay
-    iree::utils::yaml_util
+    iree::tools::utils::trace_replay
+    iree::tools::utils::yaml_util
     iree::vm
     yaml
 )
@@ -89,7 +89,7 @@ iree_cc_binary(
     iree::modules::check
     iree::modules::hal
     iree::testing::gtest
-    iree::utils::vm_util
+    iree::tools::utils::vm_util
     iree::vm
     iree::vm::bytecode_module
   TESTONLY
@@ -121,7 +121,7 @@ iree_cc_binary(
     iree::base::tracing
     iree::hal::drivers
     iree::modules::hal
-    iree::utils::vm_util
+    iree::tools::utils::vm_util
     iree::vm
     iree::vm::bytecode_module
     iree::vm::cc
@@ -140,8 +140,8 @@ iree_cc_binary(
     iree::hal
     iree::hal::drivers
     iree::modules::hal
-    iree::utils::trace_replay
-    iree::utils::yaml_util
+    iree::tools::utils::trace_replay
+    iree::tools::utils::yaml_util
     iree::vm
     yaml
 )
@@ -159,9 +159,9 @@ iree_cc_binary(
     iree::hal
     iree::hal::drivers
     iree::modules::hal
-    iree::utils::cpu_features
-    iree::utils::trace_replay
-    iree::utils::yaml_util
+    iree::tools::utils::cpu_features
+    iree::tools::utils::trace_replay
+    iree::tools::utils::yaml_util
     iree::vm
     yaml
 )
@@ -273,7 +273,7 @@ if(IREE_BUILD_COMPILER)
       iree::hal
       iree::hal::drivers
       iree::modules::hal
-      iree::utils::vm_util
+      iree::tools::utils::vm_util
       iree::vm
       iree::vm::bytecode_module
       iree::vm::cc

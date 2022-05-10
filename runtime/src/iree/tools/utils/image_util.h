@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_UTILS_IMAGE_UTIL_H_
-#define IREE_UTILS_IMAGE_UTIL_H_
+#ifndef IREE_TOOLS_UTILS_IMAGE_UTIL_H_
+#define IREE_TOOLS_UTILS_IMAGE_UTIL_H_
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
@@ -74,4 +74,4 @@ iree_status_t iree_tools_utils_pixel_rescaled_to_buffer(
 }
 #endif  // __cplusplus
 
-#endif  // IREE_UTILS_IMAGE_UTIL_H_
+#endif  // IREE_TOOLS_UTILS_IMAGE_UTIL_H_

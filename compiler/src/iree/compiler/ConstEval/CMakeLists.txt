@@ -67,7 +67,7 @@ iree_cc_library(
     iree::hal
     iree::hal::vmvx::registration
     iree::modules::hal
-    iree::utils::vm_util
+    iree::tools::utils::vm_util
     iree::vm
     iree::vm::bytecode_module
     iree::vm::cc

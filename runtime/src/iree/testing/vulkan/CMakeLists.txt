@@ -62,7 +62,7 @@ iree_cc_binary(
     iree::base::tracing
     iree::hal::vulkan::registration
     iree::modules::hal
-    iree::utils::vm_util
+    iree::tools::utils::vm_util
     iree::vm
     iree::vm::bytecode_module
   LINKOPTS

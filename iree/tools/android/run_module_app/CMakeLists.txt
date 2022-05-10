@@ -34,7 +34,7 @@ iree_cc_library(
     iree::base::cc
     iree::hal::drivers
     iree::modules::hal
-    iree::utils::vm_util
+    iree::tools::utils::vm_util
     iree::vm
   LINKOPTS
     "-landroid"
