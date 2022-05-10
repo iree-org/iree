@@ -317,35 +317,6 @@ static LogicalResult inplaceTensorStoreOpAnalysis(
   return success();
 }
 
-/// Try to eliminate InitTensorOps that are eventually fed into a
-/// DispatchTensorStoreOp. Such InitTensorOps are replaced with matching
-/// DispatchTensorLoadOps. Two conditions must be met:
-///
-/// * The target must be a "readwrite" tensor.
-/// * All ops along the reverse SSA use-def chain from the
-///   DispatchTensorStoreOp to the InitTensorOp must have bufferized in-place.
-static LogicalResult storeTensorOpAnchoredInitTensorEliminationStep(
-    Operation *op, AnalysisState &state, BufferizationAliasInfo &aliasInfo,
-    SmallVector<Operation *> &newOps) {
-  return eliminateInitTensors(
-      op, state, aliasInfo,
-      /*anchorMatchFunc=*/
-      [&](OpOperand &operand, SmallVector<Value> &) {
-        return isa<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
-      },
-      /*rewriteFunc=*/
-      [](OpBuilder &b, Location loc, OpOperand &operand) {
-        auto storeOp =
-            cast<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
-        auto loadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
-            loc, storeOp.value().getType().cast<RankedTensorType>(),
-            storeOp.target(), storeOp.target_dims(), storeOp.getMixedOffsets(),
-            storeOp.getMixedSizes(), storeOp.getMixedStrides());
-        return loadOp.result();
-      },
-      newOps);
-}
-
 static LogicalResult createSubSpanBuffers(Operation *op, AnalysisState &state,
                                           BufferizationAliasInfo &aliasInfo,
                                           SmallVector<Operation *> &newOps) {
@@ -430,7 +401,6 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
 
 void addPostAnalysisTransformations(OneShotBufferizationOptions &options) {
   options.addPostAnalysisStep(createSubSpanBuffers);
-  options.addPostAnalysisStep(storeTensorOpAnchoredInitTensorEliminationStep);
   options.addPostAnalysisStep(inplaceTensorStoreOpAnalysis);
 }
 
