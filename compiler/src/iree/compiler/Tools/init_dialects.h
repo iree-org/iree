@@ -12,13 +12,13 @@
 #ifndef IREE_TOOLS_INIT_DIALECTS_H_
 #define IREE_TOOLS_INIT_DIALECTS_H_
 
-#include "iree/tools/init_compiler_modules.h"
-#include "iree/tools/init_iree_dialects.h"
-#include "iree/tools/init_mlir_dialects.h"
+#include "iree/compiler/Tools/init_compiler_modules.h"
+#include "iree/compiler/Tools/init_iree_dialects.h"
+#include "iree/compiler/Tools/init_mlir_dialects.h"
 #ifdef IREE_HAVE_TORCH_MLIR_DIALECTS
-#include "iree/tools/init_torch_mlir_dialects.h"
+#include "iree/compiler/Tools/init_torch_mlir_dialects.h"
 #endif
-#include "iree/tools/init_xla_dialects.h"
+#include "iree/compiler/Tools/init_xla_dialects.h"
 
 namespace mlir {
 namespace iree_compiler {

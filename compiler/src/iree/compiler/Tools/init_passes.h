@@ -13,8 +13,8 @@
 
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Conversion/Passes.h"
-#include "iree/tools/init_iree_passes.h"
-#include "iree/tools/init_mlir_passes.h"
+#include "iree/compiler/Tools/init_iree_passes.h"
+#include "iree/compiler/Tools/init_mlir_passes.h"
 
 namespace mlir {
 namespace iree_compiler {

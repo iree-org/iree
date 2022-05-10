@@ -86,9 +86,9 @@ iree_cc_binary(
     MLIRIR
     MLIROptLib
     MLIRSupport
+    iree::compiler::Tools::init_passes_and_dialects
+    iree::compiler::Tools::init_targets
     iree::samples::defs
-    iree::tools::init_passes_and_dialects
-    iree::tools::init_targets
 )
 
 iree_cc_binary(
@@ -106,14 +106,14 @@ iree_cc_binary(
     MLIRTranslateLib
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Target::init_targets
+    iree::compiler::Tools::init_compiler_modules
+    iree::compiler::Tools::init_iree_passes_and_dialects
+    iree::compiler::Tools::init_mlir_passes_and_dialects
+    iree::compiler::Tools::init_targets
+    iree::compiler::Tools::init_translations
+    iree::compiler::Tools::init_xla_dialects
     iree::compiler::Translation::IREEVM
     iree::samples::defs
-    iree::tools::init_compiler_modules
-    iree::tools::init_iree_passes_and_dialects
-    iree::tools::init_mlir_passes_and_dialects
-    iree::tools::init_targets
-    iree::tools::init_translations
-    iree::tools::init_xla_dialects
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
