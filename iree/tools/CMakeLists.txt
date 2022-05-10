@@ -6,8 +6,8 @@
 
 # Doesn't use bazel_to_cmake because of various special logic throughout.
 
-# TODO(#6353)Tools has thread dependency in gtest and benchmark; they should
-# be separated into the runtime tools and compiler tools.
+# TODO(#6353): Tools has thread dependencies in gtest, benchmark, yaml, etc.
+# This should be split between runtime/compiler with optional threading support.
 if(NOT IREE_ENABLE_THREADING)
   return()
 endif()
@@ -28,7 +28,6 @@ endif()
 
 add_subdirectory(android)
 add_subdirectory(test)
-add_subdirectory(utils)
 
 iree_cc_binary(
   NAME
