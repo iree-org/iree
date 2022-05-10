@@ -6,6 +6,6 @@
  */
 
 {
-  global: PyInit_binding;
+  global: PyInit__runtime;
   local: *;
 };

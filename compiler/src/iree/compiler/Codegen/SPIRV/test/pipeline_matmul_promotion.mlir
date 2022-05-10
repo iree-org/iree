@@ -45,8 +45,8 @@ hal.executable @matmul_128x256x64 {
   }
 }
 
-// CHECK: spv.GlobalVariable @{{.+}} : !spv.ptr<!spv.struct<(!spv.array<1024 x vector<4xf32>, stride=16>)>, Workgroup>
-// CHECK: spv.GlobalVariable @{{.+}} : !spv.ptr<!spv.struct<(!spv.array<1024 x vector<4xf32>, stride=16>)>, Workgroup>
+// CHECK: spv.GlobalVariable @{{.+}} : !spv.ptr<!spv.struct<(!spv.array<1024 x vector<4xf32>>)>, Workgroup>
+// CHECK: spv.GlobalVariable @{{.+}} : !spv.ptr<!spv.struct<(!spv.array<1024 x vector<4xf32>>)>, Workgroup>
 
 // CHECK-LABEL: spv.func @matmul_128x256x64
 

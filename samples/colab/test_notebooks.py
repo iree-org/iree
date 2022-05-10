@@ -5,29 +5,25 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import glob
+import logging
 import os
 import subprocess
 import unittest
 
-from absl.testing import absltest
-
 NOTEBOOKS_TO_SKIP = []
 
 NOTEBOOKS_EXPECTED_TO_FAIL = [
-    # Logs: https://buildkite.com/iree/iree-samples/builds/212#2d108f5a-b7d1-46de-93d3-85ce60250514
-    # error: 'util.global.store' op global type mismatch;
-    #        global __iree_flow___sm_node14__optimizer.iter is 'tensor<i64>' but
-    #        store is 'tensor<i32>'
-    "mnist_training.ipynb",
+    # None!
 ]
 
 
-class ColabNotebookTests(absltest.TestCase):
+class ColabNotebookTests(unittest.TestCase):
   """Tests running all Colab notebooks in this directory."""
 
   @classmethod
   def generateTests(cls):
-    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    repo_root = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     script_path = os.path.join(repo_root,
                                "build_tools/testing/run_python_notebook.sh")
 
@@ -53,4 +49,5 @@ class ColabNotebookTests(absltest.TestCase):
 
 if __name__ == "__main__":
   ColabNotebookTests.generateTests()
-  absltest.main()
+  logging.basicConfig(level=logging.DEBUG)
+  unittest.main()

@@ -804,3 +804,86 @@ func @scan_2d_memref(%0: memref<16x32xi32>, %1: memref<16x32xi32>) {
 // CHECK-SAME:       ins(%[[UPDATE_SLICE_IN]]
 // CHECK-SAME:       outs(%[[UPDATE_SLICE_OUT]], %[[UPDATE_SLICE_ACC]]
 //      CHECK:   return
+
+// -----
+
+func @topk_tile_tensor(%input_values: tensor<?x?xf32>, %input_indices: tensor<?x?xi32>, %out_values: tensor<?x3xf32> , %out_indices: tensor<?x3xi32>) -> (tensor<?x3xf32>, tensor<?x3xi32>) {
+  %0:2 = iree_linalg_ext.topk
+        {__internal_linalg_transform__ = "inner_reduce_input"}
+        dimension(1)
+        ins(%input_values, %input_indices : tensor<?x?xf32> , tensor<?x?xi32>)
+        outs(%out_values, %out_indices : tensor<?x3xf32>, tensor<?x3xi32>) {
+        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        } -> tensor<?x3xf32>, tensor<?x3xi32>
+  return %0#0, %0#1 : tensor<?x3xf32>, tensor<?x3xi32>
+}
+
+// CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (10, -d0 + s1)>
+// CHECK-LABEL: func @topk_tile_tensor
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG3:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C10:.+]] = arith.constant 10 : index
+// CHECK-DAG:     %[[C3:.+]] = arith.constant 3 : index
+// CHECK:         %[[D0:.+]] = tensor.dim %[[ARG0:.+]], %[[C0]]
+// CHECK:         %[[D1:.+]] = tensor.dim %[[ARG0:.+]], %[[C1]]
+// CHECK:         %[[RESULT:.+]]:2 = scf.for %[[ARG4:.+]] = %[[C0]] to %[[D0]] step %[[C10]] iter_args(%[[ARG5:.+]] = %[[ARG2]], %[[ARG6:.+]] = %[[ARG3]])
+// CHECK:           %[[D3:.+]] = affine.min #[[MAP0]](%[[ARG4]])[%[[C10]], %[[D0]]]
+// CHECK:           %[[D4:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG4]], 0] [%[[D3]], %[[D1]]] [1, 1]
+// CHECK:           %[[D5:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG4]], 0] [%[[D3]], %[[D1]]] [1, 1]
+// CHECK:           %[[D6:.+]] = tensor.extract_slice %[[ARG5]][%[[ARG4]], 0] [%[[D3]], %[[C3]]] [1, 1]
+// CHECK:           %[[D7:.+]] = tensor.extract_slice %[[ARG6]][%[[ARG4]], 0] [%[[D3]], %[[C3]]] [1, 1]
+// CHECK:           %[[D8:.+]]:2 = iree_linalg_ext.topk {__internal_linalg_transform__ = "inner_reduce_output"}
+// CHECK-SAME:      dimension(1)
+// CHECK-SAME:      ins(%[[D4]], %[[D5]]
+// CHECK-SAME:      outs(%[[D6]], %[[D7]]
+// CHECK:           %[[D9:.+]] = tensor.insert_slice %[[D8]]#0 into %[[ARG5]][%[[ARG4]], 0] [%[[D3]], %[[D1]]] [1, 1]
+// CHECK:           %[[D10:.+]] = tensor.insert_slice %[[D8]]#1 into %[[ARG6]][%[[ARG4]], 0] [%[[D3]], %[[D1]]] [1, 1]
+// CHECK:           scf.yield %[[D9]], %[[D10]]
+// CHECK:           return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func @topk_tile_memref(%input_values: memref<?x?xf32>, %input_indices: memref<?x?xi32>, %out_values: memref<?x3xf32>, %out_indices: memref<?x3xi32>) {
+  iree_linalg_ext.topk
+        {__internal_linalg_transform__ = "inner_reduce_input"}
+        dimension(1)
+        ins(%input_values, %input_indices : memref<?x?xf32> , memref<?x?xi32>)
+        outs(%out_values, %out_indices : memref<?x3xf32>, memref<?x3xi32>) {
+        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        }
+  return
+}
+
+// CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (10, -d0 + s1)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 3 + s0 + d1)>
+// CHECK-LABEL: func @topk_tile_memref
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG3:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C10:.+]] = arith.constant 10 : index
+// CHECK-DAG:     %[[C3:.+]] = arith.constant 3 : index
+// CHECK:         %[[D0:.+]] = memref.dim %[[ARG0:.+]], %[[C0]]
+// CHECK:         %[[D1:.+]] = memref.dim %[[ARG0:.+]], %[[C1]]
+// CHECK:         scf.for %[[ARG4:.+]] = %[[C0]] to %[[D0]] step %[[C10]]
+// CHECK:           %[[D2:.+]] = affine.min #[[MAP0]](%[[ARG4]])[%[[C10]], %[[D0]]]
+// CHECK:           %[[D3:.+]] = memref.subview %[[ARG0]][%[[ARG4]], 0] [%[[D2]], %[[D1]]] [1, 1]
+// CHECK:           %[[D4:.+]] = memref.subview %[[ARG1]][%[[ARG4]], 0] [%[[D2]], %[[D1]]] [1, 1]
+// CHECK:           %[[D5:.+]] = memref.subview %[[ARG2]][%[[ARG4]], 0] [%[[D2]], %[[C3]]] [1, 1]
+// CHECK:           %[[D6:.+]] = memref.subview %[[ARG3]][%[[ARG4]], 0] [%[[D2]], %[[C3]]] [1, 1]
+// CHECK:           iree_linalg_ext.topk {__internal_linalg_transform__ = "inner_reduce_output"}
+// CHECK-SAME:      dimension(1)
+// CHECK-SAME:      ins(%[[D3]], %[[D4]]
+// CHECK-SAME:      outs(%[[D5]], %[[D6]]
+// CHECK:           return

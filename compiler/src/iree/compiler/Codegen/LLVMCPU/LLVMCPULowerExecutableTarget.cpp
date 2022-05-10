@@ -198,6 +198,9 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
           case IREE::Codegen::DispatchLoweringPassPipeline::None:
             addCPUDefaultPassPipeline(nestedModulePM);
             break;
+          case IREE::Codegen::DispatchLoweringPassPipeline::CPUBufferOpsDefault:
+            addCPUBufferOpsDefaultPipeline(nestedModulePM);
+            break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUBufferOpsTileAndVectorize:
             addCPUBufferOpsTileAndVectorizePipeline(nestedModulePM);

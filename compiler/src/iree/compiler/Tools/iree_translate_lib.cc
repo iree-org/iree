@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/tools/iree_translate_lib.h"
+#include "iree/compiler/Tools/iree_translate_lib.h"
 
 #include <functional>
 #include <memory>
@@ -12,11 +12,11 @@
 #include <type_traits>
 
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
-#include "iree/tools/init_dialects.h"
-#include "iree/tools/init_llvmir_translations.h"
-#include "iree/tools/init_passes.h"
-#include "iree/tools/init_targets.h"
-#include "iree/tools/init_translations.h"
+#include "iree/compiler/Tools/init_dialects.h"
+#include "iree/compiler/Tools/init_llvmir_translations.h"
+#include "iree/compiler/Tools/init_passes.h"
+#include "iree/compiler/Tools/init_targets.h"
+#include "iree/compiler/Tools/init_translations.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"

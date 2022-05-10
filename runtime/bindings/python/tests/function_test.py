@@ -6,8 +6,7 @@
 
 import json
 import numpy as np
-
-from absl.testing import absltest
+import unittest
 
 from iree import runtime as rt
 from iree.runtime.function import (
@@ -15,7 +14,7 @@ from iree.runtime.function import (
     IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
     IMPLICIT_BUFFER_ARG_USAGE,
 )
-from iree.runtime.binding import VmVariantList
+from iree.runtime._binding import VmVariantList
 
 
 class MockVmContext:
@@ -40,7 +39,7 @@ class MockVmFunction:
     self.reflection = reflection
 
 
-class FunctionTest(absltest.TestCase):
+class FunctionTest(unittest.TestCase):
 
   @classmethod
   def setUpClass(cls):
@@ -592,4 +591,4 @@ class FunctionTest(absltest.TestCase):
 
 
 if __name__ == "__main__":
-  absltest.main()
+  unittest.main()

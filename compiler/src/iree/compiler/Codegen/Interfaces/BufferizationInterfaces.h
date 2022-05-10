@@ -21,6 +21,10 @@ void registerBufferizationInterfaces(DialectRegistry &registry);
 void addPostAnalysisTransformations(
     bufferization::OneShotBufferizationOptions &options);
 
+// Eliminate init_tensor ops that are anchored on flow store ops.
+LogicalResult storeTensorOpAnchoredInitTensorEliminationStep(
+    RewriterBase &rewriter, Operation *op, bufferization::AnalysisState &state);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
