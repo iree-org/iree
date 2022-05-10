@@ -1600,26 +1600,21 @@ ParseResult TileOp::parse(OpAsmParser &parser, OperationState &result) {
   }
 
   if (succeeded(parser.parseOptionalKeyword("outs"))) {
-    bool _1;
-    SmallVector<NamedAttrList> _2;
     outputsOperandsLoc = parser.getCurrentLocation();
-    if (mlir::function_interface_impl::parseFunctionArgumentList(
-            parser,
-            /*allowAttributes=*/false,
-            /*allowVariadic=*/false, outsOperands, outsTypes, /*argAttrs=*/_2,
-            /*isVariadic=*/_1) ||
-        parser.resolveOperands(outsOperands, outsTypes, outputsOperandsLoc,
-                               result.operands))
+    SmallVector<OpAsmParser::Argument> args;
+    if (parser.parseArgumentList(args, OpAsmParser::Delimiter::Paren,
+                                 /*allowType=*/true))
       return failure();
   }
   if (parser.parseArrowTypeList(result.types))
     return failure();
 
-  SmallVector<OpAsmParser::UnresolvedOperand, 8> regionOperands;
+  SmallVector<OpAsmParser::Argument, 8> regionOperands;
   std::unique_ptr<Region> region = std::make_unique<Region>();
   SmallVector<Type, 8> operandTypes, regionTypes;
-  if (parser.parseRegion(*region, regionOperands, regionTypes))
+  if (parser.parseRegion(*region, regionOperands)) {
     return failure();
+  }
 
   // Parse the optional attribute list.
   if (parser.parseOptionalAttrDict(result.attributes))
@@ -1686,11 +1681,11 @@ ParseResult InParallelOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseArrowTypeList(result.types))
     return failure();
 
-  SmallVector<OpAsmParser::UnresolvedOperand, 8> regionOperands;
-  SmallVector<Type, 8> regionTypes;
+  SmallVector<OpAsmParser::Argument, 8> regionOperands;
   std::unique_ptr<Region> region = std::make_unique<Region>();
-  if (parser.parseRegion(*region, regionOperands, regionTypes))
+  if (parser.parseRegion(*region, regionOperands)) {
     return failure();
+  }
   InParallelOp::ensureTerminator(*region, builder, result.location);
   result.addRegion(std::move(region));
 
@@ -1854,11 +1849,11 @@ ParseResult PerformConcurrentlyOp::parse(OpAsmParser &parser,
                                          OperationState &result) {
   auto &builder = parser.getBuilder();
 
-  SmallVector<OpAsmParser::UnresolvedOperand, 8> regionOperands;
-  SmallVector<Type, 8> regionTypes;
+  SmallVector<OpAsmParser::Argument, 8> regionOperands;
   std::unique_ptr<Region> region = std::make_unique<Region>();
-  if (parser.parseRegion(*region, regionOperands, regionTypes))
+  if (parser.parseRegion(*region, regionOperands)) {
     return failure();
+  }
   PerformConcurrentlyOp::ensureTerminator(*region, builder, result.location);
   result.addRegion(std::move(region));
 

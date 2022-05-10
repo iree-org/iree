@@ -37,12 +37,9 @@ llvm::SmallVector<unsigned> getPartitionableLoopsImpl(
   llvm::SmallVector<unsigned> parallelLoops;
   linalgOp.getParallelDims(parallelLoops);
   // Get the static loop ranges.
-  llvm::Optional<llvm::SmallVector<int64_t, 4>> staticLoopRanges =
+  llvm::SmallVector<int64_t, 4> staticLoopRanges =
       linalgOp.getStaticLoopRanges();
-  if (staticLoopRanges) {
-    parallelLoops =
-        pruneUnitTripParallelLoops(parallelLoops, *staticLoopRanges);
-  }
+  parallelLoops = pruneUnitTripParallelLoops(parallelLoops, staticLoopRanges);
   // TODO(ravishankarm): For now the outer parallel loops are dropped. This is
   // a pragmatic choice for now but might need to be revisited.
   if (parallelLoops.size() > maxNumPartitionedLoops) {

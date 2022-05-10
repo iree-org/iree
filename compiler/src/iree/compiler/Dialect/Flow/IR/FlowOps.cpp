@@ -40,6 +40,18 @@ namespace Flow {
 // Op utilities used within the Flow dialect
 //===----------------------------------------------------------------------===//
 
+// TODO(hanchung): Have a better fix. This is a fix for
+// https://reviews.llvm.org/D124649
+static void createArgs(ArrayRef<OpAsmParser::UnresolvedOperand> operands,
+                       ArrayRef<Type> types,
+                       SmallVector<OpAsmParser::Argument> &args) {
+  for (auto argAndType : llvm::zip(operands, types)) {
+    auto &arg = args.emplace_back();
+    arg.ssaName = std::get<0>(argAndType);
+    arg.type = std::get<1>(argAndType);
+  }
+}
+
 // Verifies that |dynamicDims| contains the appropriate number of dims for all
 // of the dynamic dimensions in |values|.
 static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
@@ -486,7 +498,8 @@ static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
       // Reserve entries in the lists.
       regionArgs.emplace_back();
       regionArgTypes.emplace_back();
-      if (failed(parser.parseRegionArgument(regionArgs.back())) ||
+      if (failed(parser.parseOperand(regionArgs.back(),
+                                     /*allowResultNumber=*/false)) ||
           failed(parser.parseColonType(regionArgTypes.back()))) {
         return failure();
       }
@@ -495,8 +508,9 @@ static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
       return failure();
     }
   }
-  return parser.parseRegion(body, regionArgs, regionArgTypes,
-                            /*enableNameShadowing=*/true);
+  SmallVector<OpAsmParser::Argument> args;
+  createArgs(regionArgs, regionArgTypes, args);
+  return parser.parseRegion(body, args, /*enableNameShadowing=*/true);
 }
 
 static void printDispatchWorkgroupBody(OpAsmPrinter &p, Operation *op,

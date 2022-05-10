@@ -323,7 +323,7 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
   OpBuilder builder(linalgOp.getContext());
   builder.setInsertionPoint(linalgOp);
   SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
-  SmallVector<int64_t> ubs = *linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> ubs = linalgOp.getStaticLoopRanges();
   auto loops =
       cast<IREE::Flow::PartitionableLoopsInterface>(linalgOp.getOperation())
           .getPartitionableLoops(kNumMaxParallelDims);
@@ -350,9 +350,9 @@ static void splitParallelAndReductionTiles(
 static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
                                     SmallVectorImpl<int64_t> &parallelSizes,
                                     SmallVectorImpl<int64_t> &reductionSizes) {
-  Optional<SmallVector<int64_t, 4>> staticLoopRanges = op.getStaticLoopRanges();
+  SmallVector<int64_t, 4> staticLoopRanges = op.getStaticLoopRanges();
   for (auto en :
-       llvm::enumerate(llvm::zip(*staticLoopRanges, op.iterator_types()))) {
+       llvm::enumerate(llvm::zip(staticLoopRanges, op.iterator_types()))) {
     auto size = std::get<0>(en.value());
     if (!ShapedType::isDynamic(size)) continue;
     auto iterType = std::get<1>(en.value()).cast<StringAttr>().getValue();
@@ -630,8 +630,7 @@ static void setX86WorkgroupTileSizes(
     ArrayRef<int64_t> maxTileSizes,
     SmallVectorImpl<int64_t> &workgroupTileSizes) {
   workgroupTileSizes.append(numLoops, 0);
-  Optional<SmallVector<int64_t, 4>> staticLoopRanges =
-      genericOp.getStaticLoopRanges();
+  SmallVector<int64_t, 4> staticLoopRanges = genericOp.getStaticLoopRanges();
   for (auto loopNum : llvm::seq<unsigned>(0, numLoops)) {
     if (flowTileSizes[loopNum]) {
       workgroupTileSizes[loopNum] =
@@ -641,9 +640,7 @@ static void setX86WorkgroupTileSizes(
       // If the flow level tile size is zero, and static loop range is 0 as
       // well, set the tile sizes here to zero as well.
       workgroupTileSizes[loopNum] =
-          (staticLoopRanges && staticLoopRanges.getValue()[loopNum] == 1)
-              ? 0
-              : minTileSizes[loopNum];
+          staticLoopRanges[loopNum] == 1 ? 0 : minTileSizes[loopNum];
     }
   }
 }
@@ -829,11 +826,11 @@ static LogicalResult setConvRootConfig(
       convOp, minTileSizes, maxTileSizes, vectorSizeHints);
 
   // Shapes of N, OH, OW, OC, KH, KW, (IC)
-  Optional<SmallVector<int64_t, 4>> shapes = convOp.getStaticLoopRanges();
+  SmallVector<int64_t, 4> shapes = convOp.getStaticLoopRanges();
   SmallVector<int64_t> parallelTileSizes(targetTileSizes.begin(),
                                          targetTileSizes.end());
   for (auto i : llvm::seq<unsigned>(0, parallelTileSizes.size())) {
-    auto tileSize = flowTileSizes[i] ? flowTileSizes[i] : shapes.getValue()[i];
+    auto tileSize = flowTileSizes[i] ? flowTileSizes[i] : shapes[i];
     // If the tile size is intended to be 1, do not adjust it to `vectorSize`.
     // The ops will be decomposed to lower-rank named ops.
     if (parallelTileSizes[i] != 1) {
@@ -885,7 +882,7 @@ static LogicalResult setRootConfig(
   auto partitionableLoopOp =
       cast<IREE::Flow::PartitionableLoopsInterface>(linalgOp.getOperation());
   SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
-  SmallVector<int64_t> ubs = *linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> ubs = linalgOp.getStaticLoopRanges();
   return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs,
                               linalgOp.hasTensorSemantics());
 }

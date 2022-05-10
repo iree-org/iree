@@ -36,6 +36,7 @@
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
@@ -55,6 +56,7 @@
 #define DEBUG_TYPE "iree-codegen-linalg-bufferize"
 
 using mlir::bufferization::BufferizationOptions;
+using mlir::bufferization::OneShotAnalysisState;
 using mlir::bufferization::OneShotBufferizationOptions;
 
 namespace mlir {
@@ -102,9 +104,33 @@ class IREEComprehensiveBufferizePass
 
 static bool isaTensor(Type t) { return t.isa<TensorType>(); };
 
+static LogicalResult initTensorElimination(Operation *op) {
+  // Analyze IR.
+  OneShotBufferizationOptions options;
+  OneShotAnalysisState state(op, options);
+  if (failed(analyzeOp(op, state))) return failure();
+
+  // Rewrite init_tensors that are anchored on specific ops.
+  IRRewriter rewriter(op->getContext());
+  if (failed(linalg::insertSliceAnchoredInitTensorEliminationStep(rewriter, op,
+                                                                  state)))
+    return failure();
+  if (failed(
+          storeTensorOpAnchoredInitTensorEliminationStep(rewriter, op, state)))
+    return failure();
+
+  return success();
+}
+
 /// Run comprehensive bufferize.
 void IREEComprehensiveBufferizePass::runOnOperation() {
   ModuleOp moduleOp = getOperation();
+
+  if (failed(initTensorElimination(moduleOp.getOperation()))) {
+    signalPassFailure();
+    return;
+  }
+
   OneShotBufferizationOptions options;
   options.allocationFn = allocationFn;
   options.deallocationFn = deallocationFn;

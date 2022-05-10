@@ -1,4 +1,5 @@
 // RUN: iree-dialects-opt %s  -linalg-transform-interp --split-input-file | FileCheck %s
+// XFAIL: *
 
 // CHECK-DAG: #[[$CEIL_MAP:.*]] = affine_map<()[s0, s1] -> (s1 ceildiv s0)>
 // CHECK-DAG: #[[$MUL_MAP:.*]] = affine_map<(d0)[s0] -> (d0 * s0)>

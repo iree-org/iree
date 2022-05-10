@@ -324,11 +324,10 @@ static LogicalResult inplaceTensorStoreOpAnalysis(
 /// * The target must be a "readwrite" tensor.
 /// * All ops along the reverse SSA use-def chain from the
 ///   DispatchTensorStoreOp to the InitTensorOp must have bufferized in-place.
-static LogicalResult storeTensorOpAnchoredInitTensorEliminationStep(
-    Operation *op, AnalysisState &state, BufferizationAliasInfo &aliasInfo,
-    SmallVector<Operation *> &newOps) {
+LogicalResult storeTensorOpAnchoredInitTensorEliminationStep(
+    RewriterBase &rewriter, Operation *op, AnalysisState &state) {
   return eliminateInitTensors(
-      op, state, aliasInfo,
+      rewriter, op, state,
       /*anchorMatchFunc=*/
       [&](OpOperand &operand, SmallVector<Value> &) {
         return isa<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
@@ -342,8 +341,7 @@ static LogicalResult storeTensorOpAnchoredInitTensorEliminationStep(
             storeOp.target(), storeOp.target_dims(), storeOp.getMixedOffsets(),
             storeOp.getMixedSizes(), storeOp.getMixedStrides());
         return loadOp.result();
-      },
-      newOps);
+      });
 }
 
 static LogicalResult createSubSpanBuffers(Operation *op, AnalysisState &state,
@@ -430,7 +428,6 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
 
 void addPostAnalysisTransformations(OneShotBufferizationOptions &options) {
   options.addPostAnalysisStep(createSubSpanBuffers);
-  options.addPostAnalysisStep(storeTensorOpAnchoredInitTensorEliminationStep);
   options.addPostAnalysisStep(inplaceTensorStoreOpAnalysis);
 }
 

@@ -176,14 +176,12 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     funcOp.walk([&](linalg::ContractionOpInterface op) {
       auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
       auto loopRanges = linalgOp.getStaticLoopRanges();
-      if (loopRanges) {
-        auto l1Tiles =
-            getTileSizes(op, static_cast<unsigned>(TilingLevel::L1Tiles));
-        for (int i = linalgOp.getNumParallelLoops(); i < l1Tiles.size(); ++i) {
-          if (loopRanges.getValue()[i] != ShapedType::kDynamicSize &&
-              l1Tiles[i] && loopRanges.getValue()[i] <= l1Tiles[i]) {
-            shouldTileReductionLoop = false;
-          }
+      auto l1Tiles =
+          getTileSizes(op, static_cast<unsigned>(TilingLevel::L1Tiles));
+      for (int i = linalgOp.getNumParallelLoops(); i < l1Tiles.size(); ++i) {
+        if (loopRanges[i] != ShapedType::kDynamicSize && l1Tiles[i] &&
+            loopRanges[i] <= l1Tiles[i]) {
+          shouldTileReductionLoop = false;
         }
       }
     });
