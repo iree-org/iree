@@ -34,7 +34,7 @@ transform.with_pdl_patterns {
     %args = operands
     %results = types
     %0 = operation "linalg.matmul"(%args : !pdl.range<value>) -> (%results : !pdl.range<type>)
-    %1 = pdl.attribute @matmul_tensors
+    %1 = pdl.attribute = @matmul_tensors
     apply_native_constraint "nestedInFunc"(%0, %1 : !pdl.operation, !pdl.attribute)
     // TODO: we don't want this, but it is the required terminator for pdl.pattern
     rewrite %0 with "transform.dialect"
