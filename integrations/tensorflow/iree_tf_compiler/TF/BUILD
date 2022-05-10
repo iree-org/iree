@@ -36,6 +36,7 @@ cc_library(
         "//iree_tf_compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineUtils",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
