@@ -20,6 +20,7 @@ iree_check_single_backend_test_suite(
         [
             "reverse.mlir",
             "scan.mlir",
+            "top-k.mlir",
         ],
         include = ["*.mlir"],
     ),
@@ -42,6 +43,7 @@ iree_check_single_backend_test_suite(
         [
             "reverse.mlir",
             "scan.mlir",
+            "top-k.mlir",
         ],
         include = ["*.mlir"],
     ),
@@ -56,6 +58,7 @@ iree_check_single_backend_test_suite(
         [
             "reverse.mlir",
             "scan.mlir",
+            "top-k.mlir",
         ],
         include = ["*.mlir"],
     ),
@@ -69,6 +72,7 @@ iree_check_single_backend_test_suite(
         # keep sorted
         [
             "reverse.mlir",
+            "top-k.mlir",
         ],
         include = ["*.mlir"],
         exclude = [

@@ -1,0 +1,128 @@
+func.func @topk_1d_dim0_max() {
+  %input_values = util.unfoldable_constant dense<[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]> : tensor<10xf32>
+  %input_indices = util.unfoldable_constant dense<[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]> : tensor<10xi32>
+
+  %out_values_empty = linalg.init_tensor [3] : tensor<3xf32>
+  %out_indices_empty = linalg.init_tensor [3] : tensor<3xi32>
+  %neg_inf = arith.constant 0xFF800000 : f32
+  %c0 = arith.constant 0 : i32
+  %out_values = linalg.fill ins(%neg_inf : f32) outs(%out_values_empty : tensor<3xf32>) -> tensor<3xf32>
+  %out_indices = linalg.fill ins(%c0 : i32) outs(%out_indices_empty : tensor<3xi32>) -> tensor<3xi32>
+  %0:2 = iree_linalg_ext.topk
+        dimension(0)
+        ins(%input_values, %input_indices : tensor<10xf32> , tensor<10xi32>)
+        outs(%out_values, %out_indices : tensor<3xf32>, tensor<3xi32>) {
+        ^bb0(%arg0 : f32, %arg1 : f32):
+         %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+         iree_linalg_ext.yield %0 : i1
+        } -> tensor<3xf32>, tensor<3xi32>
+
+  check.expect_almost_eq_const(
+      %0#0,
+      dense<[10.0, 9.0, 8.0]> : tensor<3xf32>
+  ) : tensor<3xf32>
+
+  check.expect_eq_const(
+      %0#1,
+      dense<[9, 8, 7]> : tensor<3xi32>
+  ) : tensor<3xi32>
+
+  return
+}
+
+func.func @topk_1d_dim0_min() {
+  %input_values = util.unfoldable_constant dense<[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]> : tensor<10xf32>
+  %input_indices = util.unfoldable_constant dense<[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]> : tensor<10xi32>
+
+  %out_values_empty = linalg.init_tensor [3] : tensor<3xf32>
+  %out_indices_empty = linalg.init_tensor [3] : tensor<3xi32>
+  %pos_inf = arith.constant 0x7F800000 : f32
+  %c0 = arith.constant 0 : i32
+  %out_values = linalg.fill ins(%pos_inf : f32) outs(%out_values_empty : tensor<3xf32>) -> tensor<3xf32>
+  %out_indices = linalg.fill ins(%c0 : i32) outs(%out_indices_empty : tensor<3xi32>) -> tensor<3xi32>
+  %0:2 = iree_linalg_ext.topk
+        dimension(0)
+        ins(%input_values, %input_indices : tensor<10xf32> , tensor<10xi32>)
+        outs(%out_values, %out_indices : tensor<3xf32>, tensor<3xi32>) {
+        ^bb0(%arg0 : f32, %arg1 : f32):
+         %0 = arith.cmpf olt, %arg0, %arg1 : f32
+         iree_linalg_ext.yield %0 : i1
+        } -> tensor<3xf32>, tensor<3xi32>
+
+  check.expect_almost_eq_const(
+      %0#0,
+      dense<[1.0, 2.0, 3.0]> : tensor<3xf32>
+  ) : tensor<3xf32>
+
+  check.expect_eq_const(
+      %0#1,
+      dense<[0, 1, 2]> : tensor<3xi32>
+  ) : tensor<3xi32>
+
+  return
+}
+
+
+func.func @topk_2d_dim1_max() {
+  %input_values = util.unfoldable_constant dense<[[1.0, 2.0, 3.0, 4.0, 5.0, 6.0],[ 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]]> : tensor<2x6xf32>
+  %input_indices = util.unfoldable_constant dense<[[0, 1, 2, 3, 4, 5],[6, 7, 8, 9, 10, 11]]> : tensor<2x6xi32>
+
+  %out_values_empty = linalg.init_tensor [2, 3] : tensor<2x3xf32>
+  %out_indices_empty = linalg.init_tensor [2, 3] : tensor<2x3xi32>
+  %neg_inf = arith.constant 0xFF800000 : f32
+  %c0 = arith.constant 0 : i32
+  %out_values = linalg.fill ins(%neg_inf : f32) outs(%out_values_empty : tensor<2x3xf32>) -> tensor<2x3xf32>
+  %out_indices = linalg.fill ins(%c0 : i32) outs(%out_indices_empty : tensor<2x3xi32>) -> tensor<2x3xi32>
+  %0:2 = iree_linalg_ext.topk
+        dimension(1)
+        ins(%input_values, %input_indices : tensor<2x6xf32> , tensor<2x6xi32>)
+        outs(%out_values_empty, %out_indices : tensor<2x3xf32>, tensor<2x3xi32>) {
+        ^bb0(%arg0 : f32, %arg1 : f32):
+         %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+         iree_linalg_ext.yield %0 : i1
+        } -> tensor<2x3xf32>, tensor<2x3xi32>
+
+  check.expect_almost_eq_const(
+      %0#0,
+      dense<[[6.0, 5.0, 4.0],[12.0, 11.0, 10.0]]> : tensor<2x3xf32>
+  ) : tensor<2x3xf32>
+
+  check.expect_eq_const(
+      %0#1,
+      dense<[[5, 4, 3],[11, 10, 9]]> : tensor<2x3xi32>
+  ) : tensor<2x3xi32>
+
+  return
+}
+
+func.func @topk_2d_dim1_inverted_max() {
+  %input_values = util.unfoldable_constant dense<[[6.0, 5.0, 4.0, 3.0, 2.0, 1.0], [7.0, 8.0, 9.0, 10.0, 11.0, 12.0]]> : tensor<2x6xf32>
+  %input_indices = util.unfoldable_constant dense<[[0, 1, 2, 3, 4, 5],[6, 7, 8, 9, 10, 11]]> : tensor<2x6xi32>
+
+  %out_values_empty = linalg.init_tensor [2, 3] : tensor<2x3xf32>
+  %out_indices_empty = linalg.init_tensor [2, 3] : tensor<2x3xi32>
+  %neg_inf = arith.constant 0xFF800000 : f32
+  %c0 = arith.constant 0 : i32
+  %out_values = linalg.fill ins(%neg_inf : f32) outs(%out_values_empty : tensor<2x3xf32>) -> tensor<2x3xf32>
+  %out_indices = linalg.fill ins(%c0 : i32) outs(%out_indices_empty : tensor<2x3xi32>) -> tensor<2x3xi32>
+  %0:2 = iree_linalg_ext.topk
+        dimension(1)
+        ins(%input_values, %input_indices : tensor<2x6xf32> , tensor<2x6xi32>)
+        outs(%out_values, %out_indices : tensor<2x3xf32>, tensor<2x3xi32>) {
+        ^bb0(%arg0 : f32, %arg1 : f32):
+         %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+         iree_linalg_ext.yield %0 : i1
+        } -> tensor<2x3xf32>, tensor<2x3xi32>
+
+  check.expect_almost_eq_const(
+      %0#0,
+      dense<[[6.0, 5.0, 4.0],[12.0, 11.0, 10.0]]> : tensor<2x3xf32>
+  ) : tensor<2x3xf32>
+
+  check.expect_eq_const(
+      %0#1,
+      dense<[[0, 1, 2],[11, 10, 9]]> : tensor<2x3xi32>
+  ) : tensor<2x3xi32>
+
+  return
+}

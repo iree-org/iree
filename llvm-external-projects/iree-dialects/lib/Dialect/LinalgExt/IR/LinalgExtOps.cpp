@@ -80,7 +80,7 @@ static Value getSlice(OpBuilder &b, Location loc, Value source,
       .Default([&](Type t) { return nullptr; });
 }
 
-/// Returns true if the dimensions of ShapedType are dynamic or equal.
+/// Returns true if the dimensions of ShapedType aren't dynamic or aren't equal.
 static bool isShapedTypeDimEqual(int64_t lhs, int64_t rhs) {
   return lhs != ShapedType::kDynamicSize && rhs != ShapedType::kDynamicSize &&
          lhs != rhs;
@@ -1421,7 +1421,8 @@ Operation *TopkOp::getTiledImplementation(OpBuilder &builder,
 
   for (auto result : llvm::enumerate(tiledTopkOp->getResults())) {
     auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
-        loc, result.value(), outputs[result.index()], offsets, sizes, strides);
+        loc, result.value(), outputs[result.index()], offsets, outputSizes,
+        strides);
     results.push_back(insertSliceOp.getResult());
   }
   return tiledTopkOp;
