@@ -13,7 +13,7 @@ import logging
 import os
 import sys
 
-from . import binding as _binding
+from . import _binding
 
 try:
   import yaml

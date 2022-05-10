@@ -15,7 +15,7 @@ set(_TRACY_ENABLED OFF)
 if(TARGET IREETracyCaptureServer)
   message(STATUS "Bundline Tracy CLI tools with Python API")
   set(_TRACY_ENABLED ON)
-  list(APPEND _PYTHON_EXTRA_SRCS "scripts/iree-tracy-capture")
+  list(APPEND _PYTHON_EXTRA_SRCS "iree/runtime/scripts/iree-tracy-capture")
   list(APPEND _EXTRA_INSTALL_TOOL_TARGETS "IREETracyCaptureServer")
 endif()
 
@@ -26,7 +26,7 @@ endif()
 iree_pyext_module(
   NAME
     PyExtRt
-  MODULE_NAME binding
+  MODULE_NAME iree/_runtime
   SRCS
     "binding.h"
     "initialize_module.cc"
@@ -60,15 +60,16 @@ iree_py_library(
   NAME
     runtime
   SRCS
-    "__init__.py"
-    "array_interop.py"
-    "flags.py"
-    "function.py"
-    "system_api.py"
-    "tracing.py"
-    "scripts/iree_benchmark_trace/__main__.py"
-    "scripts/iree_run_trace/__main__.py"
-    "scripts/iree_run_module/__main__.py"
+    "iree/runtime/__init__.py"
+    "iree/runtime/_binding.py"
+    "iree/runtime/array_interop.py"
+    "iree/runtime/flags.py"
+    "iree/runtime/function.py"
+    "iree/runtime/system_api.py"
+    "iree/runtime/tracing.py"
+    "iree/runtime/scripts/iree_benchmark_trace/__main__.py"
+    "iree/runtime/scripts/iree_run_trace/__main__.py"
+    "iree/runtime/scripts/iree_run_module/__main__.py"
     ${_PYTHON_EXTRA_SRCS}
   PYEXT_DEPS
     ::PyExtRt
@@ -114,43 +115,54 @@ iree_py_test(
   NAME
     array_interop_test
   SRCS
-    "array_interop_test.py"
+    "tests/array_interop_test.py"
 )
 
 iree_py_test(
   NAME
     flags_test
   SRCS
-    "flags_test.py"
+    "tests/flags_test.py"
 )
 
 iree_py_test(
   NAME
     function_test
   SRCS
-    "function_test.py"
+    "tests/function_test.py"
 )
 
 iree_py_test(
   NAME
     hal_test
   SRCS
-    "hal_test.py"
+    "tests/hal_test.py"
 )
 
 iree_py_test(
   NAME
     system_api_test
   SRCS
-    "system_api_test.py"
+    "tests/system_api_test.py"
 )
 
 iree_py_test(
   NAME
     vm_test
   SRCS
-    "vm_test.py"
+    "tests/vm_test.py"
 )
+
+# TODO: Enable this once the CI bots are updated to install the python3-venv
+# apt package. https://github.com/google/iree/issues/9080
+# iree_py_test(
+#   NAME
+#     package_test
+#   SRCS
+#     "tests/package_test.py"
+#   ARGS
+#     "${IREE_BINARY_DIR}/runtime"
+# )
 
 ################################################################################
 # Install
@@ -163,7 +175,7 @@ iree_py_install_package(
   DEPS
     # TODO: Update CMake target/path mangling rules to make this syntactically
     # rooted on "iree" in some way.
-    runtime_bindings_python_iree_runtime_PyExtRt
+    runtime_bindings_python_PyExtRt
     iree_tools_iree-benchmark-module
     iree_tools_iree-benchmark-trace
     iree_tools_iree-run-module
@@ -176,7 +188,7 @@ iree_py_install_package(
 install(
   # TODO: Update CMake target/path mangling rules to make this syntactically
   # rooted on "iree" in some way.
-  TARGETS runtime_bindings_python_iree_runtime_PyExtRt
+  TARGETS runtime_bindings_python_PyExtRt
   COMPONENT ${PY_INSTALL_COMPONENT}
   DESTINATION "${PY_INSTALL_MODULE_DIR}"
 )
