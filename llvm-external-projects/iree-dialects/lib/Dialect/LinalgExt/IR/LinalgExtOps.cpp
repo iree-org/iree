@@ -1581,7 +1581,6 @@ ParseResult TileOp::parse(OpAsmParser &parser, OperationState &result) {
   //     RankedTensorType::get({ShapedType::kDynamicSize}, indexType);
   Type tileSizesType = builder.getIndexType();
   SmallVector<Type> outsTypes;
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> outsOperands;
 
   llvm::SMLoc outputsOperandsLoc;
   if (parser.parseOperand(tileSizes) ||
@@ -1605,6 +1604,8 @@ ParseResult TileOp::parse(OpAsmParser &parser, OperationState &result) {
     if (parser.parseArgumentList(args, OpAsmParser::Delimiter::Paren,
                                  /*allowType=*/true))
       return failure();
+    for (OpAsmParser::Argument arg : args)
+      parser.resolveOperand(arg.ssaName, arg.type, result.operands);
   }
   if (parser.parseArrowTypeList(result.types))
     return failure();
