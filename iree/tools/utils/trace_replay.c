@@ -129,6 +129,7 @@ static iree_status_t iree_trace_replay_load_bytecode_module(
   iree_file_contents_t* flatbuffer_contents = NULL;
   iree_status_t status = iree_ok_status();
   if (iree_yaml_string_equal(path_node, iree_make_cstring_view("<stdin>"))) {
+    fprintf(stdout, "Reading bytecode contents from stdin...\n");
     status =
         iree_stdin_read_contents(replay->host_allocator, &flatbuffer_contents);
   } else {

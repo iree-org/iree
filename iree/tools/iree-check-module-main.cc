@@ -97,6 +97,7 @@ iree_status_t Run(std::string module_file_path, int* out_exit_code) {
 
   iree_file_contents_t* flatbuffer_contents = NULL;
   if (module_file_path == "-") {
+    std::cout << "Reading module contents from stdin...\n";
     IREE_RETURN_IF_ERROR(iree_stdin_read_contents(iree_allocator_system(),
                                                   &flatbuffer_contents));
   } else {
