@@ -1400,10 +1400,8 @@ Operation *TopkOp::getTiledImplementation(OpBuilder &builder,
   tiledOperands.emplace_back(
       getSlice(builder, loc, indices(), offsets, sizes, strides));
 
-  // For output sizes, we need to slice using the K dim of the output (tiling
-  // sizes come from the iteration domain based on the input). For Top-K,
-  // the K dim is a reduction and not tiled so we can change sizes[dimension()]
-  // to the size of K on the output.
+  // Replace the tile size for the K dimension to use the output size instead of
+  // the input size.
   SmallVector<OpFoldResult> outputSizes(sizes.begin(), sizes.end());
   Value kSize = getDimValue(builder, getLoc(), outputValues(), dimension());
   outputSizes[dimension()] = getAsOpFoldResult(kSize);
