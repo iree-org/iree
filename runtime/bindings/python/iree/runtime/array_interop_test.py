@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import copy
+import gc
 import numpy as np
 import unittest
 
@@ -18,6 +19,25 @@ class DeviceHalTest(unittest.TestCase):
     self.driver = iree.runtime.HalDriver.create("vmvx")
     self.device = self.driver.create_default_device()
     self.allocator = self.device.allocator
+
+  def testGcShutdownFiasco(self):
+    init_ary = np.zeros([3, 4], dtype=np.int32) + 2
+    ary = iree.runtime.asdevicearray(self.device, init_ary)
+
+    # Drop all references to backing objects in reverse order to try to
+    # trigger heap use-after-free on bad shutdown order.
+    self.allocator = None
+    gc.collect()
+    self.device = None
+    gc.collect()
+    self.driver = None
+    gc.collect()
+
+    # Now drop the ary and make sure nothing crashes (which would indicate
+    # a reference counting problem of some kind): The array should retain
+    # everything that it needs to stay live.
+    ary = None
+    gc.collect()
 
   def testMetadataAttributes(self):
     init_ary = np.zeros([3, 4], dtype=np.int32) + 2
