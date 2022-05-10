@@ -65,6 +65,7 @@ def check_tool(tool_name: str, args: List[str]):
                         cwd=venv_bin)
 
 
+check_tool("iree-benchmark-module", ["--help"])
 check_tool("iree-benchmark-trace", ["--help"])
 check_tool("iree-run-module", ["--help"])
 check_tool("iree-run-trace", ["--help"])
