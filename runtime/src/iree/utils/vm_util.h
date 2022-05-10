@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_TOOLS_UTILS_VM_UTIL_H_
-#define IREE_TOOLS_UTILS_VM_UTIL_H_
+#ifndef IREE_UTILS_VM_UTIL_H_
+#define IREE_UTILS_VM_UTIL_H_
 
 #include <iostream>
 #include <ostream>
@@ -60,4 +60,4 @@ Status CreateDevice(const char* driver_name, iree_hal_device_t** out_device);
 
 }  // namespace iree
 
-#endif  // IREE_TOOLS_UTILS_VM_UTIL_H_
+#endif  // IREE_UTILS_VM_UTIL_H_
