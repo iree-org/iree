@@ -157,6 +157,9 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
 }
 
 static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
+  // Pad allocations with dynamic dimension before lowering of SCF and affine.
+  pm.addNestedPass<func::FuncOp>(createLLVMGPUPadDynamicAlloc());
+
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
