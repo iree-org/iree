@@ -230,9 +230,9 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
     registerInterfaceForLinalgOps<
         // clang-format off
-  
+
   // This is copy-pasted from LinalgStructuredOps.cpp.inc. In theory you could
-  // just include that generated file here, but that cause errors with bazel. 
+  // just include that generated file here, but that cause errors with bazel.
   // The required generated header is not exposed correctly.
   // Copy paste is fine for now.
 
@@ -285,7 +285,7 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
       +[](MLIRContext *ctx, LinalgExt::IREELinalgExtDialect *dialect) {
         registerInterfaceForTiledOpInterfaceOps<
             LinalgExt::FftOp, LinalgExt::ReverseOp, LinalgExt::ScanOp,
-            LinalgExt::ScatterOp, LinalgExt::SortOp>(ctx);
+            LinalgExt::ScatterOp, LinalgExt::SortOp, LinalgExt::TopkOp>(ctx);
       });
   registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
     tensor::ExtractSliceOp::attachInterface<TensorExtractOpPartitionableLoops>(
