@@ -23,6 +23,7 @@ iree_cc_library(
     "KernelConfig.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUMultiBuffering.cpp"
+    "LLVMGPUPadDynamicAlloc.cpp"
     "LLVMGPUReduceBankConflicts.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTileAndDistribute.cpp"

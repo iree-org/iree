@@ -163,6 +163,13 @@ Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
 /// ID/Count operations.
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions();
 
+/// Replace the uses of memref `oldOp` with the given `val` and for subview uses
+/// propagate the type change. Changing the memref type may require propagating
+/// it through subview ops so we cannot just do a replaceAllUse but need to
+/// propagate the type change and erase old subview ops.
+void replaceMemrefUsesAndPropagateType(Operation *oldOp, Value val,
+                                       OpBuilder &builder);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
