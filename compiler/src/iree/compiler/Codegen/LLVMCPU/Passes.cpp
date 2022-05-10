@@ -371,6 +371,16 @@ void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
 }
 
+void addCPUBufferOpsDefaultPipeline(OpPassManager &passManager) {
+  passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createTileAndDistributeToWorkgroupsPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createFoldAffineMinInDistributedLoopsPass());
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
+}
+
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   // Do first level of tile and distribute to workgroups.
   passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
@@ -381,13 +391,10 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
-  // TODO(#9004): Use upstream bufferization once the bufferization of LinalgExt
-  // ops are implemented.
-  // passManager.addNestedPass<func::FuncOp>(
-  // createConvertToDestinationPassingStylePass());
-  // passManager.addPass(createCanonicalizerPass());
-  // addCPUIREEComprehensiveBufferizePasses(passManager);
-  addLinalgBufferizePasses(passManager, cpuAllocationFunction);
+  passManager.addNestedPass<func::FuncOp>(
+      createConvertToDestinationPassingStylePass());
+  passManager.addPass(createCanonicalizerPass());
+  addCPUIREEComprehensiveBufferizePasses(passManager);
 }
 
 void addLinalgTransformInterpPasses(OpPassManager &passManager) {

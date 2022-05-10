@@ -6,12 +6,12 @@
 
 # pylint: disable=unused-variable
 
+import logging
 import os
 import re
 import tempfile
+import unittest
 
-from absl import logging
-from absl.testing import absltest
 import iree.compiler
 import iree.runtime
 import numpy as np
@@ -34,7 +34,7 @@ def create_simple_mul_module():
   return m
 
 
-class SystemApiTest(absltest.TestCase):
+class SystemApiTest(unittest.TestCase):
 
   def test_non_existing_driver(self):
     with self.assertRaisesRegex(RuntimeError,
@@ -137,4 +137,5 @@ class SystemApiTest(absltest.TestCase):
 
 
 if __name__ == "__main__":
-  absltest.main()
+  logging.basicConfig(level=logging.DEBUG)
+  unittest.main()

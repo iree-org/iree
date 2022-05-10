@@ -407,14 +407,18 @@ void SetupHalBindings(pybind11::module m) {
       .def_static("map_to_dtype", &MapElementTypeToDType);
 
   py::class_<HalDevice>(m, "HalDevice")
-      .def_property_readonly("allocator", [](HalDevice& self) {
-        return HalAllocator::BorrowFromRawPtr(self.allocator());
-      });
+      .def_property_readonly(
+          "allocator",
+          [](HalDevice& self) {
+            return HalAllocator::BorrowFromRawPtr(self.allocator());
+          },
+          py::keep_alive<0, 1>());
 
   py::class_<HalDriver>(m, "HalDriver")
       .def_static("query", &HalDriver::Query)
       .def_static("create", &HalDriver::Create, py::arg("driver_name"))
-      .def("create_default_device", &HalDriver::CreateDefaultDevice);
+      .def("create_default_device", &HalDriver::CreateDefaultDevice,
+           py::keep_alive<0, 1>());
 
   py::class_<HalAllocator>(m, "HalAllocator")
       .def("trim",
@@ -456,12 +460,12 @@ void SetupHalBindings(pybind11::module m) {
             return HalBuffer::StealFromRawPtr(buffer);
           },
           py::arg("memory_type"), py::arg("allowed_usage"),
-          py::arg("allocation_size"),
+          py::arg("allocation_size"), py::keep_alive<0, 1>(),
           "Allocates a new buffer with requested characteristics (does not "
           "initialize with specific data).")
       .def("allocate_buffer_copy", &HalAllocator::AllocateBufferCopy,
            py::arg("memory_type"), py::arg("allowed_usage"), py::arg("buffer"),
-           py::arg("element_type") = py::none(),
+           py::arg("element_type") = py::none(), py::keep_alive<0, 1>(),
            "Allocates a new buffer and initializes it from a Python buffer "
            "object. If an element type is specified, wraps in a BufferView "
            "matching the characteristics of the Python buffer. The format is "
@@ -472,11 +476,11 @@ void SetupHalBindings(pybind11::module m) {
       .def("fill_zero", &HalBuffer::FillZero, py::arg("byte_offset"),
            py::arg("byte_length"))
       .def("create_view", &HalBuffer::CreateView, py::arg("shape"),
-           py::arg("element_size"))
+           py::arg("element_size"), py::keep_alive<0, 1>())
       .def("__repr__", &HalBuffer::Repr);
 
   py::class_<HalBufferView>(m, "HalBufferView")
-      .def("map", HalMappedMemory::Create)
+      .def("map", HalMappedMemory::Create, py::keep_alive<0, 1>())
       .def_property_readonly(
           "shape",
           [](HalBufferView& self) {

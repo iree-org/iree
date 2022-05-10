@@ -11,7 +11,7 @@ import logging
 
 import numpy as np
 
-from .binding import (
+from ._binding import (
     _invoke_statics,
     ArgumentPacker,
     BufferUsage,
