@@ -13,20 +13,12 @@ package(
 )
 
 cc_library(
-    name = "trace_replay",
-    srcs = ["trace_replay.c"],
-    hdrs = ["trace_replay.h"],
+    name = "cpu_features",
+    srcs = ["cpu_features.c"],
+    hdrs = ["cpu_features.h"],
     deps = [
-        ":yaml_util",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:tracing",
-        "//runtime/src/iree/base/internal:file_io",
-        "//runtime/src/iree/base/internal:file_path",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/modules/hal",
-        "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
-        "@com_github_yaml_libyaml//:yaml",
+        "//runtime/src/iree/base:target_platform",
     ],
 )
 
@@ -79,6 +71,32 @@ endif()
     inline = True,
 )
 
+iree_cmake_extra_content(
+    content = """
+# libyaml does not build cleanly on bare-metal systems
+if(IREE_ENABLE_THREADING)
+""",
+    inline = True,
+)
+
+cc_library(
+    name = "trace_replay",
+    srcs = ["trace_replay.c"],
+    hdrs = ["trace_replay.h"],
+    deps = [
+        ":yaml_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:file_io",
+        "//runtime/src/iree/base/internal:file_path",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/modules/hal",
+        "//runtime/src/iree/vm",
+        "//runtime/src/iree/vm:bytecode_module",
+        "@com_github_yaml_libyaml//:yaml",
+    ],
+)
+
 cc_library(
     name = "yaml_util",
     srcs = ["yaml_util.c"],
@@ -89,12 +107,9 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "cpu_features",
-    srcs = ["cpu_features.c"],
-    hdrs = ["cpu_features.h"],
-    deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base:target_platform",
-    ],
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
 )
