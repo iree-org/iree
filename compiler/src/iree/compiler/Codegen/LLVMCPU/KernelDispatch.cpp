@@ -529,7 +529,7 @@ static LogicalResult setRootConfig(
   // Use the default distribution for the matmul loops.
   int64_t defaultMaxSize = defaultWorkgroupTileSize;
   if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
-    defaultMaxSize = 256;
+    defaultMaxSize = 128;
   }
   SmallVector<int64_t> minTileSizes =
       getMinTilingSizesForEachDim(entryPointFn, linalgOp);
