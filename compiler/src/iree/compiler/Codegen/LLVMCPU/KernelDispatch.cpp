@@ -527,9 +527,13 @@ static LogicalResult setRootConfig(
   vectorSize = std::min(vectorSize, getVectorSize(entryPointFn, resShapedType));
 
   // Use the default distribution for the matmul loops.
+  int64_t defaultMaxSize = defaultWorkgroupTileSize;
+  if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
+    defaultMaxSize = 256;
+  }
   SmallVector<int64_t> minTileSizes =
       getMinTilingSizesForEachDim(entryPointFn, linalgOp);
-  SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
+  SmallVector<int64_t> maxTileSizes(numLoops, defaultMaxSize);
   if (numLoops > 3) {
     minTileSizes[0] = 1;
     maxTileSizes[0] = 1;
