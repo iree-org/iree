@@ -39,14 +39,6 @@ static llvm::cl::opt<bool> clCheckIRBeforeLLVMConversion(
 // Default allocation functions for CPU backend
 //===---------------------------------------------------------------------===//
 
-static Value cpuAllocationFunction(OpBuilder &builder, Location loc,
-                                   ArrayRef<int64_t> staticShape,
-                                   Type elementType,
-                                   ArrayRef<Value> dynamicSizes) {
-  MemRefType allocType = MemRefType::get(staticShape, elementType);
-  return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes);
-}
-
 // Allocation callbacks to use with upstream comprehensive bufferization
 static FailureOr<Value> cpuComprehensiveBufferizeAllocationFn(
     OpBuilder &builder, Location loc, MemRefType memRefType,
@@ -78,6 +70,19 @@ static void addCPUIREEComprehensiveBufferizePasses(OpPassManager &passManager) {
   BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
   addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
                                       memcpyFn);
+}
+
+static void addTileAndDistributePasses(OpPassManager &pm,
+                                       bool convertToDestinationStyle) {
+  pm.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
+  pm.addNestedPass<func::FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  pm.addNestedPass<func::FuncOp>(createFoldAffineMinInDistributedLoopsPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+  if (convertToDestinationStyle) {
+    pm.addNestedPass<func::FuncOp>(
+        createConvertToDestinationPassingStylePass());
+  }
 }
 
 //===---------------------------------------------------------------------===//
@@ -199,14 +204,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
 //===---------------------------------------------------------------------===//
 
 void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
-  // Do first level of tiling and distribution.
-  passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createTileAndDistributeToWorkgroupsPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createFoldAffineMinInDistributedLoopsPass());
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
+  addTileAndDistributePasses(passManager, /*convertToDestinatinoStyle=*/false);
 
   // Run IREE specific passes before vector lowering expert.
   passManager.addNestedPass<func::FuncOp>(
@@ -224,17 +222,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
                                        bool lowerToAVX2) {
   passManager.addPass(createVerifyLinalgTransformLegalityPass());
-
-  // Do first level of tiling and distribution.
-  passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createTileAndDistributeToWorkgroupsPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createFoldAffineMinInDistributedLoopsPass());
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createConvertToDestinationPassingStylePass());
+  addTileAndDistributePasses(passManager, /*convertToDestinatinoStyle=*/true);
 
   // Run LinalgFusePass firstly in case that we have fill + matmul + generic
   // ops. At this stage, we do not apply vectorization. The reduction dim won't
@@ -288,17 +276,7 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
 
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createVerifyLinalgTransformLegalityPass());
-
-  // Do first level of tiling and distribution.
-  passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createTileAndDistributeToWorkgroupsPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createFoldAffineMinInDistributedLoopsPass());
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createConvertToDestinationPassingStylePass());
+  addTileAndDistributePasses(passManager, /*convertToDestinatinoStyle=*/true);
 
   // Run LinalgFusePass firstly in case that we have fill + conv + generic
   // ops. At this stage, we do not apply vectorization. The reduction dim won't
@@ -344,18 +322,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
 
 void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
                                          bool lowerToVectors) {
-  // Do first level of tile and distribute to workgroups.
-  passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createTileAndDistributeToWorkgroupsPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createFoldAffineMinInDistributedLoopsPass());
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
-
-  passManager.addNestedPass<func::FuncOp>(
-      createConvertToDestinationPassingStylePass());
-  passManager.addPass(createCanonicalizerPass());
+  addTileAndDistributePasses(passManager, /*convertToDestinatinoStyle=*/true);
 
   // Tile and vectorize linalg ops on tensors.
   passManager.addNestedPass<func::FuncOp>(
@@ -372,28 +339,11 @@ void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
 }
 
 void addCPUBufferOpsDefaultPipeline(OpPassManager &passManager) {
-  passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createTileAndDistributeToWorkgroupsPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createFoldAffineMinInDistributedLoopsPass());
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
+  addTileAndDistributePasses(passManager, /*convertToDestinatinoStyle=*/false);
 }
 
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
-  // Do first level of tile and distribute to workgroups.
-  passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createTileAndDistributeToWorkgroupsPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createFoldAffineMinInDistributedLoopsPass());
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
-
-  passManager.addNestedPass<func::FuncOp>(
-      createConvertToDestinationPassingStylePass());
-  passManager.addPass(createCanonicalizerPass());
+  addTileAndDistributePasses(passManager, /*convertToDestinatinoStyle=*/true);
   addCPUIREEComprehensiveBufferizePasses(passManager);
 }
 
