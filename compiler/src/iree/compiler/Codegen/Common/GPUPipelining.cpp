@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/Dialect/NVGPU/NVGPUDialect.h"
 #include "mlir/Dialect/SCF/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -63,7 +64,7 @@ static void getPipelineStages(scf::ForOp forOp,
 static void setAsyncAnnotations(Operation* op,
                                 scf::PipeliningOption::PipelinerPart part,
                                 unsigned iteration, unsigned depth) {
-  auto waitOp = dyn_cast<gpu::DeviceAsyncWaitOp>(op);
+  auto waitOp = dyn_cast<nvgpu::DeviceAsyncWaitOp>(op);
   if (!waitOp || waitOp.numGroups()) return;
   int numGroupInFlight = 0;
   if (part == scf::PipeliningOption::PipelinerPart::Kernel) {
@@ -98,7 +99,8 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
         if (isa<gpu::BarrierOp>(op)) {
           barriers.push_back(&op);
         }
-        if (isa<gpu::DeviceAsyncCopyOp, gpu::DeviceAsyncCreateGroupOp>(op)) {
+        if (isa<nvgpu::DeviceAsyncCopyOp, nvgpu::DeviceAsyncCreateGroupOp>(
+                op)) {
           copyToWorkgroupMemory = true;
           op.setAttr(kPipeliningGlobalLoad, builder.getUnitAttr());
           // async copy ops need to be moved along with previous barrier.
