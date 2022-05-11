@@ -81,7 +81,7 @@ hal.executable private @matvec_dynamic  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 0], [32, 0], [0, 16]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 0], [32, 0], [0, 16]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
 //      CHECK: hal.executable.entry_point public @matvec_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -785,7 +785,7 @@ hal.executable private @matmul_static  {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [8, 32, 0], [0, 0, 16]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 64, 0], [8, 32, 0], [0, 0, 16]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
 //      CHECK: hal.executable.entry_point public @matmul_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -887,7 +887,7 @@ hal.executable private @matmul_i8_i8_i32_static  {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [8, 32, 0], [0, 0, 16]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 128, 0], [8, 32, 0], [0, 0, 16]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
 //      CHECK: hal.executable.entry_point public @matmul_i8_i8_i32_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -940,7 +940,7 @@ hal.executable private @gemm_unit_N {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 0, 0], [8, 32, 0], [0, 0, 16]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 0, 0], [8, 32, 0], [0, 0, 16]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
 //      CHECK: hal.executable.entry_point public @gemm_unit_N
 // CHECK-SAME:       translation_info = #[[TRANSLATION]]
