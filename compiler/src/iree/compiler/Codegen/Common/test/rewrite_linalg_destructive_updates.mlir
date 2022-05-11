@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-codegen-rewrite-linalg-destructive-updates -split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-rewrite-linalg-destructive-updates --split-input-file %s | FileCheck %s
 
 func.func @matmul() {
   %cst = arith.constant 0.000000e+00 : f32
@@ -203,7 +203,7 @@ func @argmax() {
       %20:2 = linalg.generic {
           indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>,
                            affine_map<(d0, d1, d2) -> (d0, d1)>],
-          iterator_types = ["parallel", "parallel", "reduction"]} 
+          iterator_types = ["parallel", "parallel", "reduction"]}
           ins(%15 : tensor<?x?x?xf32>) outs(%17, %19 : tensor<?x?xf32>, tensor<?x?xi32>) {
         ^bb0(%arg3: f32, %arg4: f32, %arg5: i32):
           %23 = linalg.index 1 : index
@@ -275,7 +275,7 @@ func @reduce() {
       %20:2 = linalg.generic {
           indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>,
                            affine_map<(d0, d1, d2) -> (d0, d1)>],
-          iterator_types = ["parallel", "parallel", "reduction"]} 
+          iterator_types = ["parallel", "parallel", "reduction"]}
           ins(%15 : tensor<?x?x?xf32>) outs(%17, %19 : tensor<?x?xf32>, tensor<?x?xi32>) {
         ^bb0(%arg3: f32, %arg4: f32, %arg5: i32):
           %23 = linalg.index 1 : index

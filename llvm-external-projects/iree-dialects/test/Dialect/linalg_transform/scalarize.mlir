@@ -1,11 +1,11 @@
-// RUN: iree-dialects-opt -linalg-transform-interp %s | FileCheck %s
+// RUN: iree-dialects-opt --linalg-transform-interp %s | FileCheck %s
 
-func @fun_to_benchmark(%arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32>) -> 
+func @fun_to_benchmark(%arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32>) ->
     tensor<128x128xf32> attributes {passthrough = ["noinline", ["target-cpu", "skylake-avx512"], ["prefer-vector-width", "512"]]} {
   // With scalarization we expect vectorization to still work albeit with a leading
   // `1` dimension.
   // CHECK: vector.contract {{.*}} : vector<1x32xf32>, vector<32x16xf32> into vector<1x16xf32>
-  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<128x128xf32>, tensor<128x128xf32>) 
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<128x128xf32>, tensor<128x128xf32>)
                     outs(%arg2 : tensor<128x128xf32>) -> tensor<128x128xf32>
   return %0 : tensor<128x128xf32>
 }

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -canonicalize -cse %s | iree-opt -split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize -cse %s | iree-opt --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @foldTensorImportExport
 func.func @foldTensorImportExport(%arg0: !hal.buffer_view) -> !hal.buffer_view {

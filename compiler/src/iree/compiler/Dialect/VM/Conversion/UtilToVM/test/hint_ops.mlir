@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-vm-conversion %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-vm-conversion %s | FileCheck %s
 
 // CHECK-LABEL: @unreachable_block
 module @unreachable_block {

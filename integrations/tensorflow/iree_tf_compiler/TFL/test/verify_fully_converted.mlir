@@ -1,4 +1,4 @@
-// RUN: iree-opt-tflite %s -iree-tflite-verify-fully-converted -split-input-file -verify-diagnostics
+// RUN: iree-opt-tflite %s --iree-tflite-verify-fully-converted --split-input-file -verify-diagnostics
 
 // CHECK-LABEL: func @main
 func @main(%arg0: tensor<2xf32>) -> (tensor<2xf32>) {

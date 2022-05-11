@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -iree-linalg-ext-tile -split-input-file %s | FileCheck  %s
+// RUN: iree-dialects-opt --iree-linalg-ext-tile --split-input-file %s | FileCheck  %s
 // XFAIL: *
 // TODO: Re-enable when upstream tensor.pad op properly implements the tiling
 // interface.

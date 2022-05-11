@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-flow-convert-to-flow -split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-flow-convert-to-flow --split-input-file %s | FileCheck %s
 
 func.func @tensor_reshape(%arg0 : tensor<?x4x?x5x?x6xf32>, %arg1 : tensor<20x?x40xf32>)
     -> (tensor<?x5x?xf32>, tensor<5x4x?x4x2x4x5xf32>)

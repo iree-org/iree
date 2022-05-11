@@ -91,8 +91,8 @@ function(iree_hal_cts_test_suite)
     set(_EXECUTABLES_TESTDATA_NAME "${_RULE_COMPILER_TARGET_BACKEND}_executables")
 
     set(_TRANSLATE_FLAGS
-      "-iree-mlir-to-hal-executable"
-      "-iree-hal-target-backends=${_RULE_COMPILER_TARGET_BACKEND}"
+      "--iree-mlir-to-hal-executable"
+      "--iree-hal-target-backends=${_RULE_COMPILER_TARGET_BACKEND}"
     )
     if(ANDROID)
       set(_TARGET_TRIPLE "aarch64-none-linux-android${ANDROID_PLATFORM_LEVEL}")

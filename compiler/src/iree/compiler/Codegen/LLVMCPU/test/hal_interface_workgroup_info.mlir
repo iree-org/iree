@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -iree-convert-to-llvm -split-input-file %s | FileCheck %s
+// RUN: iree-opt --allow-unregistered-dialect --iree-convert-to-llvm --split-input-file %s | FileCheck %s
 
 llvm.func @sink(i64)
 

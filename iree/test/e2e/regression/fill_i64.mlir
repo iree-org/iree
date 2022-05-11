@@ -1,5 +1,5 @@
-// RUN: iree-run-mlir %s -iree-hal-target-backends=dylib-llvm-aot -function-input="2x3xi64" | FileCheck %s
-// RUN: [[ $IREE_VMVX_DISABLE == 1 ]]    || (iree-run-mlir %s -iree-hal-target-backends=vmvx           -function-input="2x3xi64" | FileCheck %s)
+// RUN: iree-run-mlir %s --iree-hal-target-backends=dylib-llvm-aot --function-input="2x3xi64" | FileCheck %s
+// RUN: [[ $IREE_VMVX_DISABLE == 1 ]]    || (iree-run-mlir %s --iree-hal-target-backends=vmvx           --function-input="2x3xi64" | FileCheck %s)
 
 // CHECK: EXEC @fill_i64
 func.func @fill_i64(%arg0: tensor<?x?xi64>) -> (tensor<?x?xi64>, tensor<?x?xi64>) {

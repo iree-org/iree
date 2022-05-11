@@ -1,4 +1,4 @@
-// RUN: iree-translate -iree-vm-ir-to-c-module -iree-vm-c-module-optimize=false %s | FileCheck %s
+// RUN: iree-translate --iree-vm-ir-to-c-module --iree-vm-c-module-optimize=false %s | FileCheck %s
 
 vm.module @control_flow_module {
   vm.func @control_flow_test(%a: i32, %cond: i32) -> i32 {

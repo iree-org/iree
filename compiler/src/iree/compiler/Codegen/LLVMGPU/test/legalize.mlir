@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-test-llvmgpu-legalize-ops -split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-test-llvmgpu-legalize-ops --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func @scalarize
 func.func @scalarize(

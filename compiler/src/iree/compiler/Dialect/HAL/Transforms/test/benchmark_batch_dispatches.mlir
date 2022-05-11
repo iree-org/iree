@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -test-iree-hal-benchmark-batch-dispatches-2-times %s | FileCheck %s
+// RUN: iree-opt --split-input-file -test-iree-hal-benchmark-batch-dispatches-2-times %s | FileCheck %s
 
 util.global @_executable : !hal.executable
 

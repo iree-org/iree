@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-vm-conversion %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-vm-conversion %s | FileCheck %s
 
 // CHECK-LABEL: @byte_buffer_constant
 module @byte_buffer_constant {

@@ -87,11 +87,11 @@ iree_gentbl_cc_library(
     name = "StreamEnumsGen",
     tbl_outs = [
         (
-            ["-gen-enum-decls"],
+            ["--gen-enum-decls"],
             "StreamEnums.h.inc",
         ),
         (
-            ["-gen-enum-defs"],
+            ["--gen-enum-defs"],
             "StreamEnums.cpp.inc",
         ),
     ],
@@ -104,19 +104,19 @@ iree_gentbl_cc_library(
     name = "StreamInterfacesGen",
     tbl_outs = [
         (
-            ["-gen-op-interface-decls"],
+            ["--gen-op-interface-decls"],
             "StreamOpInterfaces.h.inc",
         ),
         (
-            ["-gen-op-interface-defs"],
+            ["--gen-op-interface-defs"],
             "StreamOpInterfaces.cpp.inc",
         ),
         (
-            ["-gen-type-interface-decls"],
+            ["--gen-type-interface-decls"],
             "StreamTypeInterfaces.h.inc",
         ),
         (
-            ["-gen-type-interface-defs"],
+            ["--gen-type-interface-defs"],
             "StreamTypeInterfaces.cpp.inc",
         ),
     ],
@@ -129,11 +129,11 @@ iree_gentbl_cc_library(
     name = "StreamOpsGen",
     tbl_outs = [
         (
-            ["-gen-op-decls"],
+            ["--gen-op-decls"],
             "StreamOps.h.inc",
         ),
         (
-            ["-gen-op-defs"],
+            ["--gen-op-defs"],
             "StreamOps.cpp.inc",
         ),
     ],
@@ -146,19 +146,19 @@ iree_gentbl_cc_library(
     name = "StreamTypesGen",
     tbl_outs = [
         (
-            ["-gen-attrdef-decls"],
+            ["--gen-attrdef-decls"],
             "StreamAttrs.h.inc",
         ),
         (
-            ["-gen-attrdef-defs"],
+            ["--gen-attrdef-defs"],
             "StreamAttrs.cpp.inc",
         ),
         (
-            ["-gen-typedef-decls"],
+            ["--gen-typedef-decls"],
             "StreamTypes.h.inc",
         ),
         (
-            ["-gen-typedef-defs"],
+            ["--gen-typedef-defs"],
             "StreamTypes.cpp.inc",
         ),
     ],
@@ -171,7 +171,7 @@ iree_tablegen_doc(
     name = "StreamDialectDocGen",
     tbl_outs = [
         (
-            ["-gen-dialect-doc"],
+            ["--gen-dialect-doc"],
             "StreamDialect.md",
         ),
     ],

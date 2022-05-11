@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -canonicalize -iree-convert-hal-to-vm %s | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize --iree-convert-hal-to-vm %s | FileCheck %s
 
 // CHECK-LABEL: vm.func private @allocatorAllocate
 func.func @allocatorAllocate(%arg0 : !hal.allocator) -> !hal.buffer {

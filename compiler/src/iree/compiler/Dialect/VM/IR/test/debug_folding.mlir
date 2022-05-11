@@ -1,6 +1,6 @@
 // Tests folding and canonicalization of debug ops.
 
-// RUN: iree-opt -split-input-file -pass-pipeline="vm.module(canonicalize)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="vm.module(canonicalize)" %s | FileCheck %s
 
 // CHECK-LABEL: @cond_break_folds
 vm.module @cond_break_folds {

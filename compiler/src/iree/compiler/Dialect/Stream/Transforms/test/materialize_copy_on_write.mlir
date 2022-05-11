@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='func.func(iree-stream-materialize-copy-on-write)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='func.func(iree-stream-materialize-copy-on-write)' %s | FileCheck %s
 
 // Tests that block arguments (including function arguments) are always cloned.
 // Until a whole-program analysis runs we don't know their semantics.
@@ -44,7 +44,7 @@ func.func @singleUseTiedOperand(%size: index) -> !stream.resource<*> {
 
 // Tests that copies are inserted when there are multiple uses of a mutated
 // value (in this case, the splat acting as an initializer). The additional
-// copy will be elided with the -iree-stream-elide-async-copies pass.
+// copy will be elided with the --iree-stream-elide-async-copies pass.
 
 // CHECK-LABEL: @multiUseTiedOperand
 //  CHECK-SAME: (%[[SIZE:.+]]: index)

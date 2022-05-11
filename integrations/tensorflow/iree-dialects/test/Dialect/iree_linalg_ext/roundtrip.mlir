@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -split-input-file %s | FileCheck %s
+// RUN: iree-dialects-opt --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func @sort_tensor
 // CHECK:         iree_linalg_ext.sort

@@ -1,6 +1,6 @@
-// RUN: iree-opt -split-input-file --iree-mhlo-to-linalg-ext %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-mhlo-to-linalg-ext %s | FileCheck %s
 // Also ensure that full lowering to linalg doesn't error.
-// RUN: iree-opt -split-input-file --iree-mhlo-to-linalg-ext --iree-mhlo-to-linalg-on-tensors --reconcile-unrealized-casts %s
+// RUN: iree-opt --split-input-file --iree-mhlo-to-linalg-ext --iree-mhlo-to-linalg-on-tensors --reconcile-unrealized-casts %s
 
 func.func @sort_1d(%arg0: tensor<128xi32>) -> (tensor<128xi32>) {
   %0 = "mhlo.sort"(%arg0) ( {

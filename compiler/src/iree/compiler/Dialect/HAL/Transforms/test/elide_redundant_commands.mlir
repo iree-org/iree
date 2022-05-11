@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='func.func(iree-hal-elide-redundant-commands)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='func.func(iree-hal-elide-redundant-commands)' %s | FileCheck %s
 
 // Tests that redundant barriers are elided but barriers gaurding ops are not.
 

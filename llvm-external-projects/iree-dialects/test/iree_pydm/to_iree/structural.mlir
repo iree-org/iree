@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -split-input-file -convert-iree-pydm-to-iree %s | FileCheck  --dump-input-filter=all %s
+// RUN: iree-dialects-opt --split-input-file --convert-iree-pydm-to-iree %s | FileCheck  --dump-input-filter=all %s
 
 // CHECK-LABEL: @bool_to_pred
 // NOTE: Also tests cf.cond_br conversion.

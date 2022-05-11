@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-util-test-float-range-analysis -allow-unregistered-dialect %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-util-test-float-range-analysis --allow-unregistered-dialect %s | FileCheck %s
 
 // CHECK-LABEL: @scalar_const_trunc
 func.func @scalar_const_trunc() -> f32 {

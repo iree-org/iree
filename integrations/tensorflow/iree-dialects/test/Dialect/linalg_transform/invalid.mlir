@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s -split-input-file -verify-diagnostics
+// RUN: iree-dialects-opt %s --split-input-file -verify-diagnostics
 
 iree_linalg_transform.sequence {
   %0 = match @match

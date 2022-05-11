@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-convert-to-rocdl %s | FileCheck %s
+// RUN: iree-opt --iree-convert-to-rocdl %s | FileCheck %s
 
 // Test that that standard and GPU ops are converted to LLVM and NVVM.
 func.func @abs_ex_dispatch_0() {

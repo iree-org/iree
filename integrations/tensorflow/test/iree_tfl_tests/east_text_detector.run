@@ -1,1 +1,1 @@
-# RUN: %PYTHON -m iree_tfl_tests.east_text_detector_test -artifacts_dir=%t
+# RUN: %PYTHON -m iree_tfl_tests.east_text_detector_test --artifacts_dir=%t

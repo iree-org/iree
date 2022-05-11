@@ -1,2 +1,2 @@
 # REQUIRES: llvmaot
-# RUN: %PYTHON -m iree_tfl_tests.mobilebert_tf2_quant_test --target_backend=llvmaot -artifacts_dir=%t
+# RUN: %PYTHON -m iree_tfl_tests.mobilebert_tf2_quant_test --target_backend=llvmaot --artifacts_dir=%t

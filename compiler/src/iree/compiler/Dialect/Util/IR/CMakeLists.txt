@@ -62,8 +62,8 @@ iree_tablegen_library(
   TD_FILE
     "UtilAttrs.td"
   OUTS
-    -gen-attrdef-decls UtilAttrs.h.inc
-    -gen-attrdef-defs UtilAttrs.cpp.inc
+    --gen-attrdef-decls UtilAttrs.h.inc
+    --gen-attrdef-defs UtilAttrs.cpp.inc
 )
 
 iree_tablegen_library(
@@ -72,12 +72,12 @@ iree_tablegen_library(
   TD_FILE
     "UtilInterfaces.td"
   OUTS
-    -gen-attr-interface-decls UtilAttrInterfaces.h.inc
-    -gen-attr-interface-defs UtilAttrInterfaces.cpp.inc
-    -gen-op-interface-decls UtilOpInterfaces.h.inc
-    -gen-op-interface-defs UtilOpInterfaces.cpp.inc
-    -gen-type-interface-decls UtilTypeInterfaces.h.inc
-    -gen-type-interface-defs UtilTypeInterfaces.cpp.inc
+    --gen-attr-interface-decls UtilAttrInterfaces.h.inc
+    --gen-attr-interface-defs UtilAttrInterfaces.cpp.inc
+    --gen-op-interface-decls UtilOpInterfaces.h.inc
+    --gen-op-interface-defs UtilOpInterfaces.cpp.inc
+    --gen-type-interface-decls UtilTypeInterfaces.h.inc
+    --gen-type-interface-defs UtilTypeInterfaces.cpp.inc
 )
 
 iree_tablegen_library(
@@ -86,8 +86,8 @@ iree_tablegen_library(
   TD_FILE
     "UtilOps.td"
   OUTS
-    -gen-op-decls UtilOps.h.inc
-    -gen-op-defs UtilOps.cpp.inc
+    --gen-op-decls UtilOps.h.inc
+    --gen-op-defs UtilOps.cpp.inc
 )
 
 iree_tablegen_doc(
@@ -96,7 +96,7 @@ iree_tablegen_doc(
   TD_FILE
     "UtilOps.td"
   OUTS
-    -gen-dialect-doc UtilDialect.md
+    --gen-dialect-doc UtilDialect.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

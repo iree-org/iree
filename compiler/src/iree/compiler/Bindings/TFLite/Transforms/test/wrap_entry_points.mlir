@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-tflite-wrap-entry-points -canonicalize -cse -split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-tflite-wrap-entry-points --canonicalize -cse --split-input-file %s | FileCheck %s
 
 // NOTE: CSE is run because otherwise there's just way too much IR and we don't
 //       care about 100 random 0-N constants.

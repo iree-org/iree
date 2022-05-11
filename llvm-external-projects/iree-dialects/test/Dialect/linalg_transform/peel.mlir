@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -linalg-transform-interp %s | FileCheck %s
+// RUN: iree-dialects-opt --linalg-transform-interp %s | FileCheck %s
 
 
 //  CHECK-DAG: #[[MAP0:.*]] = affine_map<()[s0, s1, s2] -> (s1 - (-s0 + s1) mod s2)>

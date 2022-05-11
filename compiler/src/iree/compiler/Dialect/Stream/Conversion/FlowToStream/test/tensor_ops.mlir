@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-conversion %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-conversion %s | FileCheck %s
 
 // CHECK-LABEL: @tensorReshapePassThrough
 //  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index)

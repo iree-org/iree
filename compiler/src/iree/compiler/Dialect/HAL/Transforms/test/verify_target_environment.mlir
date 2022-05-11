@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-verify-target-environment %s -verify-diagnostics | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-hal-verify-target-environment %s --verify-diagnostics | FileCheck %s
 
 // expected-error@+1 {{no HAL target devices specified}}
 module @module {

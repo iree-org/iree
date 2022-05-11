@@ -26,7 +26,7 @@
 //
 // Command line arguments are handled by LLVM's parser by default but -- can be
 // used to separate the compiler flags from the runtime flags, such as:
-//   iree-run-mlir -iree-hal-target-backends=vulkan-spirv -- --logtostderr
+//   iree-run-mlir --iree-hal-target-backends=vulkan-spirv -- --logtostderr
 
 #include <cstring>
 #include <functional>
@@ -442,7 +442,7 @@ Status RunFile(const std::string& mlir_filename,
   }
 
   // Split the buffer into separate modules and evaluate independently.
-  // This matches the -split-input-file arg to mlir-opt.
+  // This matches the --split-input-file arg to mlir-opt.
   const char kSplitMarker[] = "// -----";
   auto* full_buffer = file.get();
   llvm::SmallVector<llvm::StringRef, 8> source_buffers;

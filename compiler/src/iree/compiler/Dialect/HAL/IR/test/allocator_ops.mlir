@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @allocator_allocate
 //  CHECK-SAME: (%[[ALLOCATOR:.+]]: !hal.allocator)

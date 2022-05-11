@@ -22,33 +22,33 @@ export RISCV_TOOLCHAIN_ROOT=${RISCV_RV64_LINUX_TOOLCHAIN_ROOT?}
 function generate_dylib_vmfb {
   local target="${1}"; shift
   local translate_arg=(
-    -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=dylib-llvm-aot
-    -iree-llvm-embedded-linker-path=${BUILD_HOST_DIR?}/install/bin/lld
-    -iree-llvm-target-triple=riscv64
-    -iree-llvm-target-cpu=generic-rv64
-    -iree-llvm-target-abi=lp64d
+    --iree-mlir-to-vm-bytecode-module --iree-hal-target-backends=dylib-llvm-aot
+    --iree-llvm-embedded-linker-path=${BUILD_HOST_DIR?}/install/bin/lld
+    --iree-llvm-target-triple=riscv64
+    --iree-llvm-target-cpu=generic-rv64
+    --iree-llvm-target-abi=lp64d
   )
   if [[ "${target}" == "mhlo" ]]; then
     translate_arg+=(
-      -iree-input-type=mhlo
-      -iree-llvm-target-cpu-features="+m,+a,+f,+d,+c"
+      --iree-input-type=mhlo
+      --iree-llvm-target-cpu-features="+m,+a,+f,+d,+c"
     )
   elif [[ "${target}" == "tosa" ]]; then
     local input_file="${1}"; shift
     iree-import-tflite -o "${BUILD_RISCV_DIR?}/tosa.mlir" "${input_file}"
     translate_arg+=(
-      -iree-input-type=tosa
-      -iree-llvm-target-cpu-features="+m,+a,+f,+d,+c"
+      --iree-input-type=tosa
+      --iree-llvm-target-cpu-features="+m,+a,+f,+d,+c"
       "${BUILD_RISCV_DIR?}/tosa.mlir"
     )
   elif [[ "${target}" == "tosa-rvv" ]]; then
     local input_file="${1}"; shift
     iree-import-tflite -o "${BUILD_RISCV_DIR?}/tosa.mlir" "${input_file}"
     translate_arg+=(
-      -iree-input-type=tosa
-      -iree-llvm-target-cpu-features="+m,+a,+f,+d,+c,+v"
-      -riscv-v-fixed-length-vector-lmul-max=8
-      -riscv-v-vector-bits-min=256
+      --iree-input-type=tosa
+      --iree-llvm-target-cpu-features="+m,+a,+f,+d,+c,+v"
+      --riscv-v-fixed-length-vector-lmul-max=8
+      --riscv-v-vector-bits-min=256
       "${BUILD_RISCV_DIR?}/tosa.mlir"
     )
   fi

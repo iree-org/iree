@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='func.func(iree-util-strip-debug-ops)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='func.func(iree-util-strip-debug-ops)' %s | FileCheck %s
 
 // CHECK-LABEL: @stripAssert
 func.func @stripAssert(%cond: i1) {

@@ -1,4 +1,4 @@
-// RUN: iree-compile -split-input-file --iree-input-type=mhlo -iree-hal-target-backends=vmvx -iree-mlir-to-vm-bytecode-module -iree-vm-bytecode-module-output-format=flatbuffer-text %s | FileCheck %s
+// RUN: iree-compile --split-input-file --iree-input-type=mhlo --iree-hal-target-backends=vmvx --iree-mlir-to-vm-bytecode-module --iree-vm-bytecode-module-output-format=flatbuffer-text %s | FileCheck %s
 
 // CHECK-LABEL: "name": "simple_module"
 module @simple_module {

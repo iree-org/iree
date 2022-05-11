@@ -239,7 +239,7 @@ iree_generated_trace_runner_test(
     "cuda"
     "dylib"
   COMPILER_FLAGS
-    "-iree-flow-split-matmul-reduction=4"
+    "--iree-flow-split-matmul-reduction=4"
   LABELS
     "noasan"
     "nomsan"

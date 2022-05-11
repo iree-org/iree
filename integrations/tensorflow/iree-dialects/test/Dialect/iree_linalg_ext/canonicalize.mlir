@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -canonicalize -split-input-file %s | FileCheck %s
+// RUN: iree-dialects-opt --canonicalize --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func @tensor.cast(
 func @tensor.cast(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {

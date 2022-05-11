@@ -26,7 +26,7 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
     ),
     compiler_flags = [
-        "-iree-input-type=mhlo",
+        "--iree-input-type=mhlo",
     ],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",

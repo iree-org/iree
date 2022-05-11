@@ -1,8 +1,8 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='iree-stream-fuse-dispatch-bindings{alias-mutable-bindings=true}' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='iree-stream-fuse-dispatch-bindings{alias-mutable-bindings=true}' %s | FileCheck %s
 
 // Test that bindings that are unique are rebased to the widest possible access
 // and to have a 0 offset by passing in the actual offset as operands. The
-// -iree-stream-fold-uniform-operands pass will take care of inlining/deduping
+// --iree-stream-fold-uniform-operands pass will take care of inlining/deduping
 // the operands that we insert.
 //
 // TODO(benvanik): do this in a canonicalize bindings pass. This should not be

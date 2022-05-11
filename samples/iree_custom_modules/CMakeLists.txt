@@ -43,8 +43,8 @@ iree_bytecode_module(
   TRANSLATE_TOOL
     iree_samples_iree_custom_modules_dialect_custom-translate
   FLAGS
-    "-iree-mlir-to-vm-bytecode-module"
-    "-iree-hal-target-backends=vmvx"
+    "--iree-mlir-to-vm-bytecode-module"
+    "--iree-hal-target-backends=vmvx"
   PUBLIC
 )
 

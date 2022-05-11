@@ -8,7 +8,7 @@
 // This doesn't have much meaning here as we don't define any custom printers or
 // parsers but does serve as a reference for the op usage.
 
-// RUN: custom-opt -split-input-file %s | custom-opt -split-input-file | FileCheck %s
+// RUN: custom-opt --split-input-file %s | custom-opt --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @printOp
 func.func @printOp(%arg0 : !custom.message) {

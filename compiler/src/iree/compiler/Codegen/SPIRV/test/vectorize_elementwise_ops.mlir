@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-spirv-vectorize %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-spirv-vectorize %s | FileCheck %s
 
 func.func @add(%lhs: tensor<2x8xf32>, %rhs: tensor<2x8xf32>) -> tensor<2x8xf32> {
   %init = linalg.init_tensor [2, 8] : tensor<2x8xf32>

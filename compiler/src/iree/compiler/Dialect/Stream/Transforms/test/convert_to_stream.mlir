@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -allow-unregistered-dialect -iree-stream-conversion %s | FileCheck %s
+// RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-stream-conversion %s | FileCheck %s
 
 // CHECK: stream.executable private @executable
 flow.executable private @executable {

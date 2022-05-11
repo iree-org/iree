@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s -linalg-transform-interp -canonicalize | FileCheck %s
+// RUN: iree-dialects-opt %s --linalg-transform-interp --canonicalize | FileCheck %s
 
 // CHECK-LABEL: func @parallel_insert_slice_no_conflict(
 //  CHECK-SAME:     %[[idx:.*]]: index, %[[idx2:.*]]: index,

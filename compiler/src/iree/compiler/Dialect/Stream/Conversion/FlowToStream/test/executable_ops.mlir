@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-conversion -canonicalize %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-conversion --canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: @rank_0_binding
 flow.executable private @rank_0_binding {

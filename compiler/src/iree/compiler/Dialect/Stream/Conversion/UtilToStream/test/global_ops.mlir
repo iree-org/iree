@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-conversion %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-conversion %s | FileCheck %s
 
 // CHECK: util.global public mutable @var_i32 : !stream.resource<variable>
 // CHECK: util.global public mutable @var_i32__size : index

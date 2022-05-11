@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="vm.module(iree-vm-drop-empty-module-initializers)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="vm.module(iree-vm-drop-empty-module-initializers)" %s | FileCheck %s
 
 // Tests an empty module is ignored.
 

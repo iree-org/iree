@@ -26,7 +26,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vulkan"
   COMPILER_FLAGS
-    "-iree-input-type=mhlo"
+    "--iree-input-type=mhlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -39,8 +39,8 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vulkan"
   COMPILER_FLAGS
-    "-iree-input-type=mhlo"
-    "-iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-input-type=mhlo"
+    "--iree-vulkan-target-triple=valhall-unknown-android11"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

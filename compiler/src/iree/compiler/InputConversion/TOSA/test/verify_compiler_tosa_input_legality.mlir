@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-tosa-verify-compiler-input-legality -verify-diagnostics %s
+// RUN: iree-opt --split-input-file --iree-tosa-verify-compiler-input-legality --verify-diagnostics %s
 // -verify-diagnostics
 
 // expected-error@+1 {{one or more illegal operations were found in the compiler input}}

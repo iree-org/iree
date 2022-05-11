@@ -83,7 +83,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
     ),
-    compiler_flags = ["-iree-input-type=mhlo"],
+    compiler_flags = ["--iree-input-type=mhlo"],
     driver = "cuda",
     runner_args = ["--cuda_use_streams=false"],
     tags = [
@@ -162,7 +162,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
     ),
-    compiler_flags = ["-iree-input-type=mhlo"],
+    compiler_flags = ["--iree-input-type=mhlo"],
     driver = "cuda",
     runner_args = ["--cuda_use_streams=true"],
     tags = [
@@ -240,7 +240,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
     ),
-    compiler_flags = ["-iree-input-type=mhlo"],
+    compiler_flags = ["--iree-input-type=mhlo"],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
 )
@@ -311,7 +311,7 @@ iree_check_single_backend_test_suite(
             "round.mlir",  # TODO(#7618): Fix and enable (math.copysign -> VM)
         ],
     ),
-    compiler_flags = ["-iree-input-type=mhlo"],
+    compiler_flags = ["--iree-input-type=mhlo"],
     driver = "vmvx",
     target_backend = "vmvx",
 )
@@ -382,7 +382,7 @@ iree_check_single_backend_test_suite(
             "exponential_fp16.mlir",
         ],
     ),
-    compiler_flags = ["-iree-input-type=mhlo"],
+    compiler_flags = ["--iree-input-type=mhlo"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
@@ -460,8 +460,8 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
     ),
     compiler_flags = [
-        "-iree-input-type=mhlo",
-        "-iree-llvm-target-triple=wasm32-unknown-emscripten",
+        "--iree-input-type=mhlo",
+        "--iree-llvm-target-triple=wasm32-unknown-emscripten",
     ],
     # driver = "wasm",  # No driver yet, only test compilation.
     target_backend = "dylib-llvm-aot",
@@ -533,8 +533,8 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
     ),
     compiler_flags = [
-        "-iree-input-type=mhlo",
-        "-iree-llvm-target-cpu-features=host",
+        "--iree-input-type=mhlo",
+        "--iree-llvm-target-cpu-features=host",
     ],
     driver = "dylib",
     # Building and testing must be on the same architecture, which doesn't work

@@ -1,5 +1,5 @@
-// RUN: iree-run-mlir --iree-input-type=mhlo -iree-hal-target-backends=vmvx %s | FileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo %s -iree-hal-target-backends=vulkan-spirv | FileCheck %s)
+// RUN: iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=vmvx %s | FileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo %s --iree-hal-target-backends=vulkan-spirv | FileCheck %s)
 
 // CHECK-LABEL: EXEC @collatz
 func.func @collatz() -> tensor<f32> {

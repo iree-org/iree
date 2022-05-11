@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --iree-codegen-iree-comprehensive-bufferize -canonicalize -cse -canonicalize -split-input-file | FileCheck %s
+// RUN: iree-opt %s --iree-codegen-iree-comprehensive-bufferize --canonicalize -cse --canonicalize --split-input-file | FileCheck %s
 
 func.func @matmul() {
   %c0 = arith.constant 0 : index

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @tensorImportStatic
 func.func @tensorImportStatic(%arg0: !hal.buffer_view) -> tensor<5xi32> {

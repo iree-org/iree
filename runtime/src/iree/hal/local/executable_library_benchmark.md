@@ -81,12 +81,12 @@ to many different formats/architectures.
 
 ```
 iree-translate \
-    -iree-mlir-to-hal-executable \
+    --iree-mlir-to-hal-executable \
     iree/hal/local/testdata/elementwise_mul.mlir \
     -o=elementwise_mul.so \
-    -iree-hal-target-backends=dylib-llvm-aot \
-    -iree-llvm-debug-symbols=false \
-    -iree-llvm-target-triple=x86_64-pc-linux-elf
+    --iree-hal-target-backends=dylib-llvm-aot \
+    --iree-llvm-debug-symbols=false \
+    --iree-llvm-target-triple=x86_64-pc-linux-elf
 ```
 
 Note that the architecture and other related LLVM flags must be specified by the
@@ -114,13 +114,13 @@ inspect the IR to find the proper way to call their kernels.
 
 ```
 iree-compile \
-    -iree-input-type=mhlo \
+    --iree-input-type=mhlo \
     iree/samples/simple_embedding/simple_embedding_test.mlir \
     -o=module.vmfb \
-    -iree-hal-target-backends=dylib-llvm-aot \
-    -iree-llvm-debug-symbols=false \
-    -iree-llvm-target-triple=x86_64-pc-linux-elf \
-    -mlir-print-ir-after-all \
+    --iree-hal-target-backends=dylib-llvm-aot \
+    --iree-llvm-debug-symbols=false \
+    --iree-llvm-target-triple=x86_64-pc-linux-elf \
+    --mlir-print-ir-after-all \
     >module_dump.mlir 2>&1
 ```
 

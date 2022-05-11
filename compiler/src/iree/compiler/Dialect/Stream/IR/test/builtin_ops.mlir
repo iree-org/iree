@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @builtinSplatI64
 func.func @builtinSplatI64(%arg0: index, %arg1: i64) -> !stream.resource<*> {

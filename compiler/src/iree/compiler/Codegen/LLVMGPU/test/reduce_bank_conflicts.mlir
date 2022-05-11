@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -iree-llvmgpu-reduce-bank-conflicts  | FileCheck %s
+// RUN: iree-opt %s --iree-llvmgpu-reduce-bank-conflicts  | FileCheck %s
 
 #map = affine_map<(d0, d1, d2) -> (d0 * 2048 + d1 * 64 + d2)>
 // CHECK-DAG: #[[$MAP:.*]] = affine_map<(d0, d1, d2) -> (d0 * 2176 + d1 * 68 + d2)>
@@ -15,8 +15,8 @@ func.func @pad_alloc(%a: memref<1024x1024xf32>) {
   %cst_0 = arith.constant 0.000000e+00 : f32
   %2 = vector.transfer_read %a[%c0, %c0], %cst_0 {in_bounds = [true]} :
     memref<1024x1024xf32>, vector<4xf32>
-// CHECK: vector.transfer_write %{{.*}}, %[[S2]][%{{.*}}, %{{.*}}, %{{.*}}] {in_bounds = [true]} : vector<4xf32>, memref<1x32x64xf32, #[[$MAP]], 3>    
-  vector.transfer_write %2, %1[%c0, %c0, %c0] {in_bounds = [true]} : 
+// CHECK: vector.transfer_write %{{.*}}, %[[S2]][%{{.*}}, %{{.*}}, %{{.*}}] {in_bounds = [true]} : vector<4xf32>, memref<1x32x64xf32, #[[$MAP]], 3>
+  vector.transfer_write %2, %1[%c0, %c0, %c0] {in_bounds = [true]} :
     vector<4xf32>, memref<1x32x64xf32, #map, 3>
   return
 }

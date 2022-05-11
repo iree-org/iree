@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -canonicalize %s | iree-opt -split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize %s | iree-opt --split-input-file | FileCheck %s
 
 // Ensures that the splat moves to the first common dominator of bb2/bb3.
 // We likely want to clone instead to reduce lifetime of the splats.

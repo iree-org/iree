@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass{test-lowering-configuration}))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass{test-lowering-configuration}))' %s | FileCheck %s
 
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -142,7 +142,7 @@ hal.executable private @reduction_aligned2 {
         %3 = linalg.init_tensor [128, 384] : tensor<128x384xf32>
         %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<128x384xf32>) -> tensor<128x384xf32>
         %5 = linalg.generic {
-          indexing_maps = [affine_map<(d0, d1, d2) -> (d2, d0, d1)>, 
+          indexing_maps = [affine_map<(d0, d1, d2) -> (d2, d0, d1)>,
                            affine_map<(d0, d1, d2) -> (d0, d1)>],
           iterator_types = ["parallel", "parallel", "reduction"]}
           ins(%2 : tensor<4x128x384xf32>) outs(%4 : tensor<128x384xf32>) {

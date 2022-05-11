@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -mlir-print-local-scope %s | iree-opt -split-input-file -mlir-print-local-scope | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-local-scope %s | iree-opt --split-input-file --mlir-print-local-scope | FileCheck %s
 
 // CHECK-LABEL: @byte_range
 builtin.module @byte_range attributes {

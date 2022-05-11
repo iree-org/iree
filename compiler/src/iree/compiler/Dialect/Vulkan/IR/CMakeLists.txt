@@ -42,8 +42,8 @@ iree_tablegen_library(
   TD_FILE
     "VulkanAttributes.td"
   OUTS
-    -gen-struct-attr-decls VulkanAttributes.h.inc
-    -gen-struct-attr-defs VulkanAttributes.cpp.inc
+    --gen-struct-attr-decls VulkanAttributes.h.inc
+    --gen-struct-attr-defs VulkanAttributes.cpp.inc
 )
 
 iree_tablegen_library(
@@ -52,8 +52,8 @@ iree_tablegen_library(
   TD_FILE
     "VulkanBase.td"
   OUTS
-    -gen-enum-decls VulkanEnums.h.inc
-    -gen-enum-defs VulkanEnums.cpp.inc
+    --gen-enum-decls VulkanEnums.h.inc
+    --gen-enum-defs VulkanEnums.cpp.inc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir %s --iree-hal-target-backends=dylib-llvm-aot -iree-codegen-use-linalg-transform-interp -linalg-transform-file-name=%p/linalg_transform_spec.mlir 
+// RUN: iree-run-mlir %s --iree-hal-target-backends=dylib-llvm-aot --iree-codegen-use-linalg-transform-interp --linalg-transform-file-name=%p/linalg_transform_spec.mlir
 
 func @matmul_static() -> tensor<5x5xf32> {
   %res = flow.tensor.constant dense<[

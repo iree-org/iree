@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-llvmcpu-check-ir-before-llvm-conversion %s -verify-diagnostics -split-input-file
+// RUN: iree-opt --iree-llvmcpu-check-ir-before-llvm-conversion %s --verify-diagnostics -split-input-file
 
 module {
   func.func @dynamic_allocas(%arg0: index) {

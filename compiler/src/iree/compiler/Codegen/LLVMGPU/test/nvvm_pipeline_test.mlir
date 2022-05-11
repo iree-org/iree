@@ -1,5 +1,5 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline))' -iree-codegen-cuda-pipeline-depth=1 %s | FileCheck %s
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline))' -iree-codegen-cuda-pipeline-depth=4 %s | FileCheck %s -check-prefix=CHECKP
+// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline))' --iree-codegen-cuda-pipeline-depth=1 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline))' --iree-codegen-cuda-pipeline-depth=4 %s | FileCheck %s --check-prefix=CHECKP
 
 // Verify that a simple element wise op gets lowered succefully all the way to
 // nvvm/llvm dialect.
@@ -136,7 +136,7 @@ hal.executable @dot_dispatch_0 {
             : !flow.dispatch.tensor<readonly:1024x1024xf32> -> tensor<1024x1024xf32>
         %15 = linalg.init_tensor [1024, 1024] : tensor<1024x1024xf32>
         %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
-        %17 = linalg.generic #matmul_trait 
+        %17 = linalg.generic #matmul_trait
             ins(%8, %10 : tensor<1024x1024xf32>, tensor<1024x1024xf32>) outs(%16 : tensor<1024x1024xf32>)  {
           ^bb(%a: f32, %b: f32, %c: f32) :
             %d = arith.mulf %a, %b: f32
@@ -398,9 +398,9 @@ hal.executable @mma_fused {
       %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2048, 1024], strides = [1, 1]
           : !flow.dispatch.tensor<readonly:2048x1024xf32> -> tensor<2048x1024xf32>
       %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1]
-          : !flow.dispatch.tensor<readonly:1024x512xf32> -> tensor<1024x512xf32>   
+          : !flow.dispatch.tensor<readonly:1024x512xf32> -> tensor<1024x512xf32>
       %d = flow.dispatch.tensor.load %di, offsets = [0, 0], sizes = [2048, 512], strides = [1, 1]
-          : !flow.dispatch.tensor<readonly:2048x512xf32> -> tensor<2048x512xf32>             
+          : !flow.dispatch.tensor<readonly:2048x512xf32> -> tensor<2048x512xf32>
       %init = linalg.init_tensor [2048, 512] : tensor<2048x512xf32>
       %f = linalg.fill ins(%cst : f32) outs(%init : tensor<2048x512xf32>) -> tensor<2048x512xf32>
       %m = linalg.matmul ins(%3, %4 : tensor<2048x1024xf32>, tensor<1024x512xf32>) outs(%f : tensor<2048x512xf32>) -> tensor<2048x512xf32>

@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-flow-cleanup-tensor-shapes -split-input-file -verify-diagnostics %s | FileCheck  %s
+// RUN: iree-opt --iree-flow-cleanup-tensor-shapes --split-input-file --verify-diagnostics %s | FileCheck  %s
 
 // Tests that we strip out shape metadata ops.
 

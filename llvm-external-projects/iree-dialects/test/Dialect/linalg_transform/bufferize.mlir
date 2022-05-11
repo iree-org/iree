@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -linalg-transform-interp %s | FileCheck %s
+// RUN: iree-dialects-opt --linalg-transform-interp %s | FileCheck %s
 
 // CHECK-LABEL: func @matmul_tensors(
 // CHECK-SAME:    %[[TA:[0-9a-z]+]]: memref<128x128xf32

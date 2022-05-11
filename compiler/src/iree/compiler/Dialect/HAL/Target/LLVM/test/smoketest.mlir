@@ -1,5 +1,5 @@
-// RUN: iree-opt -split-input-file -iree-stream-transformation-pipeline -iree-hal-transformation-pipeline %s | FileCheck %s
-// RUN: iree-opt -split-input-file -iree-stream-transformation-pipeline -iree-hal-transformation-pipeline -iree-llvm-link-embedded=false %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-transformation-pipeline --iree-hal-transformation-pipeline %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-transformation-pipeline --iree-hal-transformation-pipeline --iree-llvm-link-embedded=false %s | FileCheck %s
 
 #map = affine_map<(d0) -> (d0)>
 

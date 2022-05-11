@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-conversion -canonicalize %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-conversion --canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: @dispatch
 //  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index, %[[DIM1:.+]]: index, %[[DIM3:.+]]: index)

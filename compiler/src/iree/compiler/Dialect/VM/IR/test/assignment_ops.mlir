@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file %s | FileCheck %s
+// RUN: iree-opt --allow-unregistered-dialect --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @select_i32
 vm.module @my_module {

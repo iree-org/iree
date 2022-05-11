@@ -41,10 +41,10 @@
 //
 // For coarse dispatch testing and triaging it can still be useful to remove
 // some of the overheads introduced by whole-program execution and the compiler
-// flag -iree-hal-benchmark-dispatch-repeat-count=N is provided to enable
+// flag --iree-hal-benchmark-dispatch-repeat-count=N is provided to enable
 // batching. Whatever N is chosen must then be passed to this tool via
 // --batch_size=N so that the benchmark reporting properly reflects the
-// batching. As an example -iree-hal-benchmark-dispatch-repeat-count=32 +
+// batching. As an example --iree-hal-benchmark-dispatch-repeat-count=32 +
 // --batch_size=32 will reduce the overheads by 32x. Think of this as a way to
 // control the p value in Amdahl's law representing the amount of time spent in
 // dispatches relative to the rest of the program. This isn't representative of

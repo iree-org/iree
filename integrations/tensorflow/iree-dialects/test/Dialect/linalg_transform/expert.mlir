@@ -1,5 +1,5 @@
-// RUN: iree-dialects-opt -linalg-transform-expert-expansion -split-input-file %s | FileCheck %s --check-prefix=EXPAND
-// RUN: iree-dialects-opt -linalg-transform-expert-expansion -linalg-interp-transforms -split-input-file %s | FileCheck %s
+// RUN: iree-dialects-opt --linalg-transform-expert-expansion --split-input-file %s | FileCheck %s --check-prefix=EXPAND
+// RUN: iree-dialects-opt --linalg-transform-expert-expansion --linalg-interp-transforms --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func @matmul_tensors
 // CHECK-NOT: linalg

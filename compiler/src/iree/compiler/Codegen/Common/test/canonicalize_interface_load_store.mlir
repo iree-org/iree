@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-codegen-cleanup-buffer-alloc-view %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-codegen-cleanup-buffer-alloc-view %s | FileCheck %s
 
 // CHECK-LABEL: func @fold_reshape()
 func.func @fold_reshape() {

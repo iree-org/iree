@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -linalg-transform-interp -split-input-file -verify-diagnostics -allow-unregistered-dialect %s
+// RUN: iree-dialects-opt --linalg-transform-interp --split-input-file --verify-diagnostics --allow-unregistered-dialect %s
 
 // This cannot be vectorized because of dynamic tensor shapes. We expect the
 // pass fail and report an error at the vectorization operation below.

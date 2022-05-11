@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-vm-conversion %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-vm-conversion %s | FileCheck %s
 
 // CHECK: vm.global.i32 public @v_initialized_const = 4 : i32
 util.global @v_initialized_const = 4 : i32

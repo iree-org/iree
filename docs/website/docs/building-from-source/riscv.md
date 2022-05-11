@@ -104,8 +104,8 @@ Invoke the host compiler tools to produce a bytecode module flatbuffer:
 
 ``` shell
 ../iree-build/install/bin/iree-compile \
-  -iree-mlir-to-vm-bytecode-module \
-  -iree-hal-target-backends=vmvx \
+  --iree-mlir-to-vm-bytecode-module \
+  --iree-hal-target-backends=vmvx \
   samples/models/simple_abs.mlir \
   -o /tmp/simple_abs_vmvx.vmfb
 ```
@@ -146,13 +146,13 @@ with the additional command-line flags
 
 ```shell hl_lines="3 4 5 6 7 8"
 iree/tools/iree-compile \
-  -iree-mlir-to-vm-bytecode-module \
-  -iree-hal-target-backends=dylib-llvm-aot \
-  -iree-llvm-target-triple=riscv64 \
-  -iree-llvm-target-cpu=generic-rv64 \
-  -iree-llvm-target-abi=lp64d \
-  -iree-llvm-target-cpu-features="+m,+a,+f,+d,+v" \
-  -riscv-v-vector-bits-min=256 -riscv-v-fixed-length-vector-lmul-max=8 \
+  --iree-mlir-to-vm-bytecode-module \
+  --iree-hal-target-backends=dylib-llvm-aot \
+  --iree-llvm-target-triple=riscv64 \
+  --iree-llvm-target-cpu=generic-rv64 \
+  --iree-llvm-target-abi=lp64d \
+  --iree-llvm-target-cpu-features="+m,+a,+f,+d,+v" \
+  --riscv-v-vector-bits-min=256 --riscv-v-fixed-length-vector-lmul-max=8 \
   iree_input.mlir -o mobilenet-dylib.vmfb
 ```
 

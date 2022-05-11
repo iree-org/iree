@@ -1,7 +1,7 @@
 // TODO(antiagainst): Re-enable SPIR-V linking once the tensorflow integration
 // crash is fixed.
-// RUN-disabled: iree-opt -split-input-file -iree-hal-link-target-executables='target=vulkan-spirv'  %s | FileCheck %s
-// RUN: iree-opt -split-input-file %s
+// RUN-disabled: iree-opt --split-input-file --iree-hal-link-target-executables='target=vulkan-spirv'  %s | FileCheck %s
+// RUN: iree-opt --split-input-file %s
 
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan", "vulkan-spirv-fb">
 

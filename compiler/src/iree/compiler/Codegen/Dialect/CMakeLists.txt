@@ -44,8 +44,8 @@ iree_tablegen_library(
   TD_FILE
     "IREECodegenAttributes.td"
   OUTS
-    -gen-dialect-decls IREECodegenDialect.h.inc
-    -gen-dialect-defs IREECodegenDialect.cpp.inc
+    --gen-dialect-decls IREECodegenDialect.h.inc
+    --gen-dialect-defs IREECodegenDialect.cpp.inc
 )
 
 iree_tablegen_library(
@@ -54,10 +54,10 @@ iree_tablegen_library(
   TD_FILE
     "LoweringConfig.td"
   OUTS
-    -gen-attrdef-decls LoweringConfig.h.inc
-    -gen-attrdef-defs LoweringConfig.cpp.inc
-    -gen-enum-decls LoweringConfigEnums.h.inc
-    -gen-enum-defs LoweringConfigEnums.cpp.inc
+    --gen-attrdef-decls LoweringConfig.h.inc
+    --gen-attrdef-defs LoweringConfig.cpp.inc
+    --gen-enum-decls LoweringConfigEnums.h.inc
+    --gen-enum-defs LoweringConfigEnums.cpp.inc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
