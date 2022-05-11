@@ -5,7 +5,7 @@
 #map2 = affine_map<(d0)[s0] -> (-(d0 * s0) + 64, s0)>
 
 module {
-  // CHECK-LABEL: func @fuse_static
+  // CHECK-LABEL: func.func @fuse_static
   //  CHECK-SAME:   %[[CHUNK_SIZE:[0-9a-z]+]]: index
   //  CHECK-SAME:   %[[IN:[0-9a-z]+]]: tensor<64xf32>
   //  CHECK-SAME:   %[[OUT:[0-9a-z]+]]: tensor<64xf32>
@@ -65,7 +65,7 @@ module {
 #map2 = affine_map<(d0)[s0, s1] -> (-(d0 * s1) + s0, s1)>
 
 module {
-  // CHECK-LABEL: func @fuse_dynamic
+  // CHECK-LABEL: func.func @fuse_dynamic
   //  CHECK-SAME:   %[[CHUNK_SIZE:[0-9a-z]+]]: index
   //  CHECK-SAME:   %[[IN:[0-9a-z]+]]: tensor<?xf32>
   //  CHECK-SAME:   %[[OUT:[0-9a-z]+]]: tensor<?xf32>

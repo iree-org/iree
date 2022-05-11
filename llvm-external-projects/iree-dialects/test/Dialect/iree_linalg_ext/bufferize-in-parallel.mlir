@@ -1,6 +1,6 @@
 // RUN: iree-dialects-opt %s --linalg-transform-interp --canonicalize | FileCheck %s
 
-// CHECK-LABEL: func @parallel_insert_slice_no_conflict(
+// CHECK-LABEL: func.func @parallel_insert_slice_no_conflict(
 //  CHECK-SAME:     %[[idx:.*]]: index, %[[idx2:.*]]: index,
 //  CHECK-SAME:     %[[arg1:.*]]: memref<?xf32, #{{.*}}>,
 //  CHECK-SAME:     %[[arg2:.*]]: memref<?xf32, #{{.*}}>
@@ -35,7 +35,7 @@ func.func @parallel_insert_slice_no_conflict(
   return %2, %f : tensor<?xf32>, f32
 }
 
-// CHECK-LABEL: func @parallel_insert_slice_with_conflict(
+// CHECK-LABEL: func.func @parallel_insert_slice_with_conflict(
 //  CHECK-SAME:     %[[idx:.*]]: index, %[[idx2:.*]]: index,
 //  CHECK-SAME:     %[[arg1:.*]]: memref<?xf32, #{{.*}}>,
 //  CHECK-SAME:     %[[arg2:.*]]: memref<?xf32, #{{.*}}>

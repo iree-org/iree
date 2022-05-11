@@ -2,7 +2,7 @@
 // _UN: iree-dialects-opt --linalg-transform-expert-expansion --linalg-interp-transforms --split-input-file %s | FileCheck %s
 // RUN: true
 
-// CHECK-LABEL: func @matmul_tensors
+// CHECK-LABEL: func.func @matmul_tensors
 // CHECK-NOT: linalg
 // CHECK: llvm
 func.func @matmul_tensors(
@@ -85,7 +85,7 @@ module @strategies {
 
 // -----
 
-// CHECK-LABEL: func @matmul_tensors2
+// CHECK-LABEL: func.func @matmul_tensors2
 // CHECK-NOT: linalg
 // CHECK: llvm
 func.func @matmul_tensors2(

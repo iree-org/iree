@@ -1,6 +1,6 @@
 // RUN: iree-dialects-opt --split-input-file --convert-iree-pydm-to-iree %s | FileCheck  --dump-input-filter=all %s
 
-// CHECK-LABEL:   func @neg_integer(
+// CHECK-LABEL:   func.func @neg_integer(
 // CHECK-SAME:                      %[[VAL_0:.*]]: i32) -> (i32, i32) {
 // CHECK:           %[[VAL_1:.*]] = arith.constant 0 : i32
 // CHECK:           %[[VAL_2:.*]] = arith.subi %[[VAL_1]], %[[VAL_0]] : i32
@@ -13,7 +13,7 @@ iree_pydm.func @neg_integer(%arg0 : !iree_pydm.integer<32>) -> (!iree_pydm.excep
 }
 
 // -----
-// CHECK-LABEL:   func @integer_add(
+// CHECK-LABEL:   func.func @integer_add(
 // CHECK-SAME:                      %[[VAL_0:.*]]: i32,
 // CHECK-SAME:                      %[[VAL_1:.*]]: i32) -> (i32, i32) {
 // CHECK:           %[[VAL_2:.*]] = arith.addi %[[VAL_0]], %[[VAL_1]] : i32
@@ -74,7 +74,7 @@ iree_pydm.func @integer_rshift_usigned(%arg0 : !iree_pydm.integer<unsigned 32>, 
 }
 
 // -----
-// CHECK-LABEL:   func @real_add(
+// CHECK-LABEL:   func.func @real_add(
 // CHECK-SAME:                   %[[VAL_0:.*]]: f32,
 // CHECK-SAME:                   %[[VAL_1:.*]]: f32) -> (i32, f32) {
 // CHECK:           %[[VAL_2:.*]] = arith.addf %[[VAL_0]], %[[VAL_1]] : f32
