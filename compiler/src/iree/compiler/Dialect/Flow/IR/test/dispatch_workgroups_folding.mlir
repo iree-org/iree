@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -canonicalize %s | iree-opt -allow-unregistered-dialect -split-input-file | FileCheck %s
+// RUN: iree-opt --allow-unregistered-dialect --split-input-file --canonicalize %s | iree-opt --allow-unregistered-dialect --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @workgroupRankFolding
 func.func @workgroupRankFolding(%arg0 : tensor<?x4xf32>) -> tensor<4x?xf32> {

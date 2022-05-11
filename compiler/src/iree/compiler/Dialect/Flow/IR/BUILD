@@ -88,11 +88,11 @@ iree_gentbl_cc_library(
     name = "FlowEnumsGen",
     tbl_outs = [
         (
-            ["-gen-enum-decls"],
+            ["--gen-enum-decls"],
             "FlowEnums.h.inc",
         ),
         (
-            ["-gen-enum-defs"],
+            ["--gen-enum-defs"],
             "FlowEnums.cpp.inc",
         ),
     ],
@@ -105,19 +105,19 @@ iree_gentbl_cc_library(
     name = "FlowInterfacesGen",
     tbl_outs = [
         (
-            ["-gen-op-interface-decls"],
+            ["--gen-op-interface-decls"],
             "FlowOpInterfaces.h.inc",
         ),
         (
-            ["-gen-op-interface-defs"],
+            ["--gen-op-interface-defs"],
             "FlowOpInterfaces.cpp.inc",
         ),
         (
-            ["-gen-type-interface-decls"],
+            ["--gen-type-interface-decls"],
             "FlowTypeInterfaces.h.inc",
         ),
         (
-            ["-gen-type-interface-defs"],
+            ["--gen-type-interface-defs"],
             "FlowTypeInterfaces.cpp.inc",
         ),
     ],
@@ -130,11 +130,11 @@ iree_gentbl_cc_library(
     name = "FlowOpsGen",
     tbl_outs = [
         (
-            ["-gen-op-decls"],
+            ["--gen-op-decls"],
             "FlowOps.h.inc",
         ),
         (
-            ["-gen-op-defs"],
+            ["--gen-op-defs"],
             "FlowOps.cpp.inc",
         ),
     ],
@@ -147,19 +147,19 @@ iree_gentbl_cc_library(
     name = "FlowTypesGen",
     tbl_outs = [
         (
-            ["-gen-attrdef-decls"],
+            ["--gen-attrdef-decls"],
             "FlowAttrs.h.inc",
         ),
         (
-            ["-gen-attrdef-defs"],
+            ["--gen-attrdef-defs"],
             "FlowAttrs.cpp.inc",
         ),
         (
-            ["-gen-typedef-decls"],
+            ["--gen-typedef-decls"],
             "FlowTypes.h.inc",
         ),
         (
-            ["-gen-typedef-defs"],
+            ["--gen-typedef-defs"],
             "FlowTypes.cpp.inc",
         ),
     ],
@@ -172,7 +172,7 @@ iree_tablegen_doc(
     name = "FlowDialectDocGen",
     tbl_outs = [
         (
-            ["-gen-dialect-doc"],
+            ["--gen-dialect-doc"],
             "FlowDialect.md",
         ),
     ],
@@ -208,11 +208,11 @@ iree_gentbl_cc_library(
     name = "PartitionableLoopsInterfaceGen",
     tbl_outs = [
         (
-            ["-gen-op-interface-decls"],
+            ["--gen-op-interface-decls"],
             "PartitionableLoopsInterface.h.inc",
         ),
         (
-            ["-gen-op-interface-defs"],
+            ["--gen-op-interface-defs"],
             "PartitionableLoopsInterface.cpp.inc",
         ),
     ],

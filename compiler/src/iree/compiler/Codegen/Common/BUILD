@@ -17,7 +17,7 @@ iree_gentbl_cc_library(
     name = "FoldTensorExtractOpIncGen",
     tbl_outs = [
         (
-            ["-gen-rewriters"],
+            ["--gen-rewriters"],
             "FoldTensorExtractOp.cpp.inc",
         ),
     ],

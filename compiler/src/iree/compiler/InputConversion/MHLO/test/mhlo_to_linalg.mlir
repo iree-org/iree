@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file --iree-mhlo-to-linalg-on-tensors -canonicalize -cse %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-mhlo-to-linalg-on-tensors --canonicalize -cse %s | FileCheck %s
 
 func.func @concatenate(%arg0: tensor<2x2xi32>, %arg1: tensor<2x4xi32>) -> tensor<2x9xi32> {
   %cst = mhlo.constant dense<514> : tensor<2x3xi32>

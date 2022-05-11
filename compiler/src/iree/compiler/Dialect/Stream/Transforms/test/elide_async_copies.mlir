@@ -1,7 +1,7 @@
-// RUN: iree-opt -split-input-file -iree-stream-elide-async-copies %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-elide-async-copies %s | FileCheck %s
 
 // Tests that a normal clone-on-multiple-uses pattern has the last clone elided.
-// This is what the -iree-stream-materialize-copy-on-write pass generates and
+// This is what the --iree-stream-materialize-copy-on-write pass generates and
 // expects us to clean up.
 
 // CHECK-LABEL: @multiUseTiedOperand

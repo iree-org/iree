@@ -322,6 +322,12 @@ def LLVMGPUVectorToGPU :
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorToGPU()";
 }
 
+def LLVMGPUPadDynamicAlloc :
+    Pass<"iree-llvmgpu-pad-dynamic-alloc", "func::FuncOp"> {
+  let summary = "Pass to pad dynamic alloc into static one.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUPadDynamicAlloc()";
+}
+
 //------------------------------------------------------------------------------
 // SPIR-V
 //------------------------------------------------------------------------------

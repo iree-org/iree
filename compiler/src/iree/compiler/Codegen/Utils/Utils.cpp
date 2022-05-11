@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/Matchers.h"
@@ -595,6 +596,36 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions() {
        linalg::DistributionMethod::Cyclic},
       DenseMap<StringRef,
                std::function<linalg::ProcInfo(OpBuilder &, Location)>>()};
+}
+
+void replaceMemrefUsesAndPropagateType(Operation *oldOp, Value val,
+                                       OpBuilder &builder) {
+  SmallVector<Operation *> opToDelete;
+  SmallVector<OpOperand *> operandsToReplace;
+  for (OpOperand &use : oldOp->getUses()) {
+    auto subviewUse = dyn_cast<memref::SubViewOp>(use.getOwner());
+    if (!subviewUse) {
+      // Save the operand to and replace outside the loop to not invalidate the
+      // iterator.
+      operandsToReplace.push_back(&use);
+      continue;
+    }
+    builder.setInsertionPoint(subviewUse);
+    Type newType = memref::SubViewOp::inferRankReducedResultType(
+        subviewUse.getType().getRank(), val.getType().cast<MemRefType>(),
+        extractFromI64ArrayAttr(subviewUse.static_offsets()),
+        extractFromI64ArrayAttr(subviewUse.static_sizes()),
+        extractFromI64ArrayAttr(subviewUse.static_strides()));
+    Value newSubview = builder.create<memref::SubViewOp>(
+        subviewUse->getLoc(), newType.cast<MemRefType>(), val,
+        subviewUse.getMixedOffsets(), subviewUse.getMixedSizes(),
+        subviewUse.getMixedStrides());
+    replaceMemrefUsesAndPropagateType(subviewUse, newSubview, builder);
+    opToDelete.push_back(use.getOwner());
+  }
+  for (OpOperand *operand : operandsToReplace) operand->set(val);
+  // Clean up old subview ops.
+  for (Operation *op : opToDelete) op->erase();
 }
 
 }  // namespace iree_compiler

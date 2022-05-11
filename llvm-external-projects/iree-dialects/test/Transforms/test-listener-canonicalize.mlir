@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s -allow-unregistered-dialect -test-listener-canonicalize --split-input-file | FileCheck %s
+// RUN: iree-dialects-opt %s --allow-unregistered-dialect --test-listener-canonicalize --split-input-file | FileCheck %s
 
 //===----------------------------------------------------------------------===//
 // Everything below copied from mlir/test/Dialect/Standard/canonicalize.mlir
@@ -99,4 +99,3 @@ func @selToNot(%arg0: i1) -> i1 {
   %res = arith.select %arg0, %false, %true : i1
   return %res : i1
 }
-

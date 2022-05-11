@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-util-apply-patterns -allow-unregistered-dialect %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-util-apply-patterns --allow-unregistered-dialect %s | FileCheck %s
 
 // CHECK-LABEL: @foldBrArguments
 // CHECK-SAME: (%[[COND:.+]]: i1, %[[ARG1:.+]]: index)

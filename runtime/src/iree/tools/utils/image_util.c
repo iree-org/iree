@@ -84,9 +84,9 @@ iree_status_t iree_tools_utils_load_pixel_data_impl(
       break;
     }
     default:
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "Input buffer shape rank %lu not supported",
-                              shape_rank);
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "Input buffer shape rank %" PRIhsz " not supported", shape_rank);
   }
   // Drop the alpha channel if present.
   int req_ch = (img_dims[2] >= 3) ? 3 : 0;

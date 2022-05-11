@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -split-input-file -convert-iree-pydm-to-iree %s | FileCheck  --dump-input-filter=all %s
+// RUN: iree-dialects-opt --split-input-file --convert-iree-pydm-to-iree %s | FileCheck  --dump-input-filter=all %s
 
 // CHECK-LABEL: @none_constant
 iree_pydm.func @none_constant() -> (!iree_pydm.exception_result, !iree_pydm.none) {

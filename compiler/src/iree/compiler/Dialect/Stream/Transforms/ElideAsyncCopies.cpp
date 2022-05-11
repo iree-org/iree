@@ -353,7 +353,7 @@ class LastUseAnalysis {
 // Returns true if the given |operand| value does not need a copy on write.
 // This is a conservative check and will return false ("not safe to elide") in
 // many cases that otherwise don't need a copy. The
-// -iree-stream-elide-async-copies pass will do a whole-program analysis and
+// --iree-stream-elide-async-copies pass will do a whole-program analysis and
 // remove the copies we insert here when possible.
 //
 // No-op clone is elidable:
@@ -456,7 +456,7 @@ static bool tryElideAsyncCopiesInRegion(Region &region,
 
 // Elides async copies that perform no meaningful work - such as clones of the
 // last use of a value. This is designed to be run after
-// -iree-stream-materialize-copy-on-write to clean up the copies it introduces
+// --iree-stream-materialize-copy-on-write to clean up the copies it introduces
 // but will also pick up any copies that came from the frontend.
 //
 // This should never remove copies that are required for correctness: we err on

@@ -28,6 +28,7 @@ iree_lit_test_suite(
             "linalg_transform.mlir",
             "materialize_aarch64_launch_configuration.mlir",
             "materialize_riscv_launch_configuration.mlir",
+            "materialize_vmvx_launch_configuration.mlir",
             "materialize_x86_64_launch_configuration.mlir",
             "pipeline_tests.mlir",
             "synchronize_symbol_visibility.mlir",

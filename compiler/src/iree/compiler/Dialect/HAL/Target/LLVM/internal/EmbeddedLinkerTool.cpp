@@ -68,11 +68,11 @@ class EmbeddedLinkerTool : public LinkerTool {
     llvm::errs()
         << "error: required embedded linker tool (typically `lld`) not found "
            "after searching:\n"
-           "  * -iree-llvm-embedded-linker-path= flag\n"
+           "  * --iree-llvm-embedded-linker-path= flag\n"
            "  * IREE_LLVMAOT_EMBEDDED_LINKER_PATH environment variable\n"
            "  * common locations at relative file paths\n"
            "  * system PATH\n"
-           "Run with -debug-only=llvmaot-linker for search details\n";
+           "Run with --debug-only=llvmaot-linker for search details\n";
     return "";
   }
 

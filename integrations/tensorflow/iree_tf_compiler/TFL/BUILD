@@ -16,7 +16,7 @@ gentbl_cc_library(
     name = "PassesIncGen",
     tbl_outs = [
         (
-            ["-gen-pass-decls"],
+            ["--gen-pass-decls"],
             "Passes.h.inc",
         ),
     ],

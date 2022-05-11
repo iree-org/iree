@@ -260,16 +260,14 @@ def prepare_installation():
       print(f"Not re-configuring (already configured)", file=sys.stderr)
 
     # Build.
-    subprocess.check_call([
-        "cmake", "--build", ".", "--target",
-        "runtime/bindings/python/iree/runtime/all"
-    ],
-                          cwd=IREE_BINARY_DIR)
+    subprocess.check_call(
+        ["cmake", "--build", ".", "--target", "runtime/bindings/python/all"],
+        cwd=IREE_BINARY_DIR)
     print("Build complete.", file=sys.stderr)
 
   # Install the directory we care about.
   install_subdirectory = os.path.join(IREE_BINARY_DIR, "runtime", "bindings",
-                                      "python", "iree", "runtime")
+                                      "python")
   install_args = [
       "-DCMAKE_INSTALL_DO_STRIP=ON",
       f"-DCMAKE_INSTALL_PREFIX={CMAKE_INSTALL_DIR_ABS}/",
@@ -348,6 +346,7 @@ packages = find_namespace_packages(where=os.path.join(CMAKE_INSTALL_DIR_ABS,
                                                       "python_packages",
                                                       "iree_runtime"),
                                    include=[
+                                       "iree._runtime",
                                        "iree.runtime",
                                        "iree.runtime.*",
                                    ])
@@ -381,7 +380,7 @@ setup(
     url="https://github.com/google/iree",
     python_requires=">=3.7",
     ext_modules=[
-        CMakeExtension("iree.runtime.binding"),
+        CMakeExtension("iree._runtime"),
     ],
     cmdclass={
         "build": CustomBuild,

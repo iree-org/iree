@@ -16,7 +16,7 @@
 namespace iree {
 namespace python {
 
-PYBIND11_MODULE(binding, m) {
+PYBIND11_MODULE(_runtime, m) {
   IREE_CHECK_OK(iree_hal_register_all_available_drivers(
       iree_hal_driver_registry_default()));
 

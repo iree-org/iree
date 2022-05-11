@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-propagate-subviews %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-propagate-subviews %s | FileCheck %s
 
 // Tests that resource global loads also load all the subview params.
 //
@@ -144,6 +144,6 @@ func.func @br(%resource0: !stream.resource<external>, %resource1: !stream.resour
   util.do_not_optimize(%bb1_resource0) : !stream.resource<external>
   // CHECK-NEXT: util.do_not_optimize(%[[BB1_SUBVIEW1]])
   util.do_not_optimize(%bb1_resource1) : !stream.resource<transient>
-  
+
   return
 }

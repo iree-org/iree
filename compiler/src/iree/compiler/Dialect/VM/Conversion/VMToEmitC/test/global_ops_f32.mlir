@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="vm.module(iree-vm-ordinal-allocation),vm.module(iree-convert-vm-to-emitc)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="vm.module(iree-vm-ordinal-allocation),vm.module(iree-convert-vm-to-emitc)" %s | FileCheck %s
 
 vm.module @my_module {
   vm.global.f32 private @c42 = 42.5 : f32

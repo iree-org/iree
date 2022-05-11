@@ -33,7 +33,7 @@ import sys
 
 from typing import Any, List, Mapping, Optional, Sequence, Tuple, Union
 
-from . import binding as _binding
+from . import _binding
 from .function import FunctionInvoker
 from . import tracing
 

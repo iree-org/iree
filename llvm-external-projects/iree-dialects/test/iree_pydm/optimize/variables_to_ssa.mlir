@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -pydm-variables-to-ssa --allow-unregistered-dialect %s | FileCheck  --dump-input-filter=all %s
+// RUN: iree-dialects-opt --pydm-variables-to-ssa --allow-unregistered-dialect %s | FileCheck  --dump-input-filter=all %s
 
 // CHECK-LABEL: @entry_block_does_not_hoist
 // Hoisting must be disabled for the entry block as that would change the

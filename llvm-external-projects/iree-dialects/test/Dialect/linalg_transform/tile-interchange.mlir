@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -linalg-transform-interp -split-input-file %s | FileCheck %s
+// RUN: iree-dialects-opt --linalg-transform-interp --split-input-file %s | FileCheck %s
 
 #map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -25,7 +25,7 @@ transform.with_pdl_patterns {
     %0 = operands
     %1 = types
     %2 = operation "linalg.generic"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
-    %3 = pdl.attribute @matmul_021
+    %3 = pdl.attribute = @matmul_021
     apply_native_constraint "nestedInFunc"(%2, %3 : !pdl.operation, !pdl.attribute)
     rewrite %2 with "transform.dialect"
   }
@@ -66,7 +66,7 @@ transform.with_pdl_patterns {
     %0 = operands
     %1 = types
     %2 = operation "linalg.generic"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
-    %3 = pdl.attribute @matmul_210
+    %3 = pdl.attribute = @matmul_210
     apply_native_constraint "nestedInFunc"(%2, %3 : !pdl.operation, !pdl.attribute)
     rewrite %2 with "transform.dialect"
   }

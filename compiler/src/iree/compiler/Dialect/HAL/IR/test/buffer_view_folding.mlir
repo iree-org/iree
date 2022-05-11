@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -canonicalize -cse %s | iree-opt -allow-unregistered-dialect -split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize -cse %s | iree-opt --allow-unregistered-dialect --split-input-file | FileCheck %s
 
 // CHECK-LABEL: func @skip_buffer_view_buffer
 // CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer

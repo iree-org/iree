@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -linalg-interp-transforms -linalg-transform-file-name=%p/vectorize-transforms.mlir %s | FileCheck %s
+// RUN: iree-dialects-opt --linalg-interp-transforms --linalg-transform-file-name=%p/vectorize-transforms.mlir %s | FileCheck %s
 
 // CHECK-LABEL: func @matmul_tensors(
 // CHECK-SAME:    %[[TA:[0-9a-z]+]]: tensor<128x128xf32>

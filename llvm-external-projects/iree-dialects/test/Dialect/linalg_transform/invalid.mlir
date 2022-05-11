@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s -split-input-file -verify-diagnostics
+// RUN: iree-dialects-opt %s --split-input-file -verify-diagnostics
 
 transform.structured.canonicalized_sequence {
 ^bb0(%arg0: !pdl.operation):

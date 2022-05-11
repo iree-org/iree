@@ -634,6 +634,7 @@ if(IREE_BUILD_COMPILER)
   add_subdirectory(compiler)
 endif()
 
+# tools/ can depend on compiler/ and runtime/
 add_subdirectory(iree/tools)
 
 if(IREE_BUILD_TRACY)
@@ -690,7 +691,7 @@ set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"
 add_subdirectory(build_tools/benchmarks)
 
 #-------------------------------------------------------------------------------
-# Transitional directories.
+# Transitional directories
 #-------------------------------------------------------------------------------
 
 # The runtime uses tools and targets from elsewhere in the tree in a way
@@ -698,6 +699,8 @@ add_subdirectory(build_tools/benchmarks)
 # many things into top-level APIs). This should resolve once we finish
 # relayering everything.
 add_subdirectory(runtime)
+
+# samples/ can depend on anything, so we include it last
 if(IREE_BUILD_SAMPLES)
   add_subdirectory(samples)
 endif()

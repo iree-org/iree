@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-resolve-entry-point-ordinals %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-hal-resolve-entry-point-ordinals %s | FileCheck %s
 
 hal.executable @exe {
   hal.executable.variant @target, target = <"vmvx", "vmvx-bytecode-fb"> {

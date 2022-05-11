@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-flow-interchange-generic-ops %s | FileCheck %s
+// RUN: iree-opt --iree-flow-interchange-generic-ops %s | FileCheck %s
 
 // CHECK: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 // CHECK: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d3, d0, d1)>

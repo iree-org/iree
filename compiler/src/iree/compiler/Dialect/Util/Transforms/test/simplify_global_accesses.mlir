@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='func.func(iree-util-simplify-global-accesses)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='func.func(iree-util-simplify-global-accesses)' %s | FileCheck %s
 
 util.global private @varA = dense<1> : tensor<2xi32>
 util.global private @varB = dense<3> : tensor<2x4xi32>

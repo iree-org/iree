@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-util-hoist-into-globals -allow-unregistered-dialect %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-util-hoist-into-globals --allow-unregistered-dialect %s | FileCheck %s
 
 // CHECK-LABEL: @hoist_simple_const_expr
 module @hoist_simple_const_expr {

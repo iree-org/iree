@@ -1,5 +1,5 @@
-// RUN: iree-dialects-opt -test-listener-canonicalize='listener=1' %s | FileCheck %s --check-prefix CANON
-// RUN: iree-dialects-opt -test-listener-cse='listener=1' %s | FileCheck %s --check-prefix CSE
+// RUN: iree-dialects-opt --test-listener-canonicalize='listener=1' %s | FileCheck %s --check-prefix CANON
+// RUN: iree-dialects-opt --test-listener-cse='listener=1' %s | FileCheck %s --check-prefix CSE
 
 func @test_canonicalize(%arg0: i32) -> (i32, i32) {
   // CANON: REPLACED arith.addi

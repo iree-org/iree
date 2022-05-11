@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-sanitize-module-names %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-sanitize-module-names %s | FileCheck %s
 
 // CHECK-LABEL: module @letters
 builtin.module @letters {}

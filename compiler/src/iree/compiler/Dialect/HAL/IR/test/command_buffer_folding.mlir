@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -canonicalize %s | iree-opt -split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize %s | iree-opt --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @skip_command_buffer_device
 func.func @skip_command_buffer_device() -> !hal.executable {

@@ -5,11 +5,10 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import glob
+import logging
 import os
 import subprocess
 import unittest
-
-from absl.testing import absltest
 
 NOTEBOOKS_TO_SKIP = []
 
@@ -18,7 +17,7 @@ NOTEBOOKS_EXPECTED_TO_FAIL = [
 ]
 
 
-class ColabNotebookTests(absltest.TestCase):
+class ColabNotebookTests(unittest.TestCase):
   """Tests running all Colab notebooks in this directory."""
 
   @classmethod
@@ -50,4 +49,5 @@ class ColabNotebookTests(absltest.TestCase):
 
 if __name__ == "__main__":
   ColabNotebookTests.generateTests()
-  absltest.main()
+  logging.basicConfig(level=logging.DEBUG)
+  unittest.main()

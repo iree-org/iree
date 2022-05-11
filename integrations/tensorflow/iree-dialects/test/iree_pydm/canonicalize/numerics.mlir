@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -split-input-file --allow-unregistered-dialect -canonicalize %s | FileCheck  --dump-input-filter=all %s
+// RUN: iree-dialects-opt --split-input-file --allow-unregistered-dialect --canonicalize %s | FileCheck  --dump-input-filter=all %s
 
 // CHECK-LABEL: @dynamic_binary_promote_same_type
 iree_pydm.func @dynamic_binary_promote_same_type(%arg0 : !iree_pydm.bool, %arg1 : !iree_pydm.bool) -> (!iree_pydm.exception_result, !iree_pydm.none) {

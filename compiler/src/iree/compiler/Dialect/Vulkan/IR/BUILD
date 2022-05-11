@@ -58,11 +58,11 @@ iree_gentbl_cc_library(
     name = "VulkanAttrsGen",
     tbl_outs = [
         (
-            ["-gen-struct-attr-decls"],
+            ["--gen-struct-attr-decls"],
             "VulkanAttributes.h.inc",
         ),
         (
-            ["-gen-struct-attr-defs"],
+            ["--gen-struct-attr-defs"],
             "VulkanAttributes.cpp.inc",
         ),
     ],
@@ -75,11 +75,11 @@ iree_gentbl_cc_library(
     name = "VulkanEnumsGen",
     tbl_outs = [
         (
-            ["-gen-enum-decls"],
+            ["--gen-enum-decls"],
             "VulkanEnums.h.inc",
         ),
         (
-            ["-gen-enum-defs"],
+            ["--gen-enum-defs"],
             "VulkanEnums.cpp.inc",
         ),
     ],

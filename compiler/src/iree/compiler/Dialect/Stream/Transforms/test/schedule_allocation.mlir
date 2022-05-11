@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='func.func(iree-stream-schedule-allocation)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='func.func(iree-stream-schedule-allocation)' %s | FileCheck %s
 
 // Tests that async constant ops get extracted into a dedicated constant op
 // outside of the execution region. This allows us to handle them in various

@@ -1,6 +1,6 @@
-// RUN: iree-opt -iree-llvmcpu-vector-contract-custom-kernels='arch=aarch64' %s | FileCheck %s -check-prefix=AARCH64-BASELINE
-// RUN: iree-opt -iree-llvmcpu-vector-contract-custom-kernels='arch=aarch64 features=+dotprod' %s | FileCheck %s -check-prefix=AARCH64-DOTPROD
-// RUN: iree-opt -iree-llvmcpu-vector-contract-custom-kernels='arch=aarch64 features=+i8mm' %s | FileCheck %s -check-prefix=AARCH64-I8MM
+// RUN: iree-opt --iree-llvmcpu-vector-contract-custom-kernels='arch=aarch64' %s | FileCheck %s --check-prefix=AARCH64-BASELINE
+// RUN: iree-opt --iree-llvmcpu-vector-contract-custom-kernels='arch=aarch64 features=+dotprod' %s | FileCheck %s --check-prefix=AARCH64-DOTPROD
+// RUN: iree-opt --iree-llvmcpu-vector-contract-custom-kernels='arch=aarch64 features=+i8mm' %s | FileCheck %s --check-prefix=AARCH64-I8MM
 
 // There are two parts to this test: the "deep" part and the "wide part".
 

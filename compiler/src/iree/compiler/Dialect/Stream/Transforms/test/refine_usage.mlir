@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-refine-usage %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-refine-usage %s | FileCheck %s
 
 // Tests that the refinement of a caller propagates into its callees.
 // Here because %result is returned from the caller it becomes external, and

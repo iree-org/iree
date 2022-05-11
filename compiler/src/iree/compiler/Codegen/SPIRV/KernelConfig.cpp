@@ -407,7 +407,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   };
 
   // Whether we can try to use the vectorization pipeline.
-  Optional<SmallVector<int64_t, 4>> loopBounds = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t, 4> loopBounds = linalgOp.getStaticLoopRanges();
   bool vectorizable =
       allowVectorization &&
       // The vectorization pipeline assumes tensor semantics when tiling.
@@ -422,7 +422,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
       // TODO: Lowering of integers other than i32 may require emulation.
       // This is currently not supported for vector operation.
       llvm::all_of(linalgOp->getOperands(), has32BitElementType) &&
-      loopBounds && llvm::none_of(loopBounds.getValue(), ShapedType::isDynamic);
+      llvm::none_of(loopBounds, ShapedType::isDynamic);
 
   // Distribute workload to the given `numThreads` by allowing a potental loss.
   auto distributeToThreads = [&](int64_t numThreads,
@@ -434,7 +434,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     // configuration for the corresponding GPU workgroup dimension.
     int64_t wgDim = 0;
     for (auto shapeDim : llvm::reverse(partitionedLoops)) {
-      int64_t loopBound = loopBounds.getValue()[shapeDim];
+      int64_t loopBound = loopBounds[shapeDim];
       // Skip dynamic dimensions.
       if (ShapedType::isDynamic(loopBound)) continue;
 

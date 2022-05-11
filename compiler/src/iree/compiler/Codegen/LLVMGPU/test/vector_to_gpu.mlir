@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -allow-unregistered-dialect -iree-llvmgpu-vector-to-gpu -canonicalize -split-input-file | FileCheck %s
+// RUN: iree-opt %s --allow-unregistered-dialect --iree-llvmgpu-vector-to-gpu --canonicalize --split-input-file | FileCheck %s
 
 // CHECK-LABEL: func @copies_to_asyncs
 func.func @copies_to_asyncs(%a: memref<1024x1024xf32>) {
@@ -31,10 +31,10 @@ func.func @ksplitmatmul_basic(%a: memref<128x16x256xf32>) -> vector<16x1x8xf32> 
 }
 //   CHECK-DAG:#[[$MAP:.*]] = affine_map<(d0, d1) -> (d0 * 4096 + d1 + 8964)>
 // CHECK-LABEL: func @ksplitmatmul_basic
-//   CHECK-DAG: %[[ID:.*]] = arith.constant 0 : index  
+//   CHECK-DAG: %[[ID:.*]] = arith.constant 0 : index
 //   CHECK-DAG: %[[CST:.*]] = arith.constant 0.000000e+00 : f32
 //       CHECK: %[[M:.*]] = memref.subview
-//  CHECK-SAME:[2, 3, 4] [16, 1, 8] [1, 1, 1] 
+//  CHECK-SAME:[2, 3, 4] [16, 1, 8] [1, 1, 1]
 //  CHECK-SAME:memref<128x16x256xf32> to memref<16x8xf32, #[[$MAP]]>
 //       CHECK: vector.transfer_read %[[M]][%[[ID]], %[[ID]]]
 //  CHECK-SAME: {in_bounds = [true, true]} : memref<16x8xf32, #[[$MAP]]>, vector<16x8xf32>
@@ -55,7 +55,7 @@ func.func @ksplitmatmul_nounitdim(%a: memref<128x16x256xf32>) -> vector<16x2x8xf
 // CHECK-LABEL: func @ksplitmatmul_nounitdim
 //   CHECK-DAG: %[[ID:.*]] = arith.constant 2 : index
 //   CHECK-DAG: %[[ID2:.*]] = arith.constant 3 : index
-//   CHECK-DAG: %[[ID3:.*]] = arith.constant 4 : index    
+//   CHECK-DAG: %[[ID3:.*]] = arith.constant 4 : index
 //   CHECK-DAG: %[[CST:.*]] = arith.constant 0.000000e+00 : f32
 //       CHECK: vector.transfer_read %{{.*}}[%[[ID]], %[[ID2]], %[[ID3]]]
 //  CHECK-SAME: {in_bounds = [true, true, true]} : memref<128x16x256xf32>, vector<16x2x8xf32>
@@ -74,7 +74,7 @@ func.func @ksplitmatmul_4D(%a: memref<128x16x32x256xf32>) -> vector<16x1x1x8xf32
 }
 //   CHECK-DAG:#[[$MAP:.*]] = affine_map<(d0, d1) -> (d0 * 131072 + d1 + 287749)>
 // CHECK-LABEL: func @ksplitmatmul_4D
-//   CHECK-DAG: %[[ID:.*]] = arith.constant 0 : index 
+//   CHECK-DAG: %[[ID:.*]] = arith.constant 0 : index
 //   CHECK-DAG: %[[CST:.*]] = arith.constant 0.000000e+00 : f32
 //       CHECK: %[[M:.*]] = memref.subview
 //  CHECK-SAME:[2, 3, 4, 5] [16, 1, 1, 8] [1, 1, 1, 1]
@@ -98,7 +98,7 @@ func.func @ksplitmatmul_4D_lower_rank_read(%a: memref<128x512x32x256xf32>) -> ve
 }
 //   CHECK-DAG:#[[$MAP:.*]] = affine_map<(d0, d1) -> (d0 * 8192 + d1 + 8414213)>
 // CHECK-LABEL: func @ksplitmatmul_4D_lower_rank_read
-//   CHECK-DAG: %[[ID:.*]] = arith.constant 0 : index 
+//   CHECK-DAG: %[[ID:.*]] = arith.constant 0 : index
 //   CHECK-DAG: %[[CST:.*]] = arith.constant 0.000000e+00 : f32
 //       CHECK: %[[M:.*]] = memref.subview
 //  CHECK-SAME:[2, 3, 4, 5] [1, 16, 1, 8] [1, 1, 1, 1]
@@ -125,7 +125,7 @@ func.func @ksplitmatmul_4D_negative(%a: memref<128x16x32x256xf32>) -> vector<16x
 //   CHECK-DAG: %[[ID:.*]] = arith.constant 2 : index
 //   CHECK-DAG: %[[ID2:.*]] = arith.constant 3 : index
 //   CHECK-DAG: %[[ID3:.*]] = arith.constant 4 : index
-//   CHECK-DAG: %[[ID4:.*]] = arith.constant 5 : index     
+//   CHECK-DAG: %[[ID4:.*]] = arith.constant 5 : index
 //   CHECK-DAG: %[[CST:.*]] = arith.constant 0.000000e+00 : f32
 //       CHECK: vector.transfer_read %{{.*}}[%[[ID]], %[[ID2]], %[[ID3]], %[[ID4]]]
 //  CHECK-SAME: {in_bounds = [true, true, true, true]} : memref<128x16x32x256xf32>, vector<16x1x8x1xf32>
@@ -145,7 +145,7 @@ func.func @ksplitmatmul_4D_allone(%a: memref<128x16x32x256xf32>) -> vector<1x1x1
 
 //   CHECK-DAG:#[[$MAP:.*]] = affine_map<(d0, d1) -> (d0 * 256 + d1 + 287749)>
 // CHECK-LABEL: func @ksplitmatmul_4D_allone
-//   CHECK-DAG: %[[ID:.*]] = arith.constant 0 : index 
+//   CHECK-DAG: %[[ID:.*]] = arith.constant 0 : index
 //   CHECK-DAG: %[[CST:.*]] = arith.constant 0.000000e+00 : f32
 //       CHECK: %[[M:.*]] = memref.subview
 //  CHECK-SAME:[2, 3, 4, 5] [1, 1, 1, 1] [1, 1, 1, 1]

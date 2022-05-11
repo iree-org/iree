@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -linalg-interp-transforms %s | FileCheck %s
+// RUN: iree-dialects-opt --linalg-interp-transforms %s | FileCheck %s
 
 // CHECK-LABEL: func @matmul_tensors(
 // CHECK-SAME:    %[[TA:[0-9a-z]+]]: tensor<128x128xf32>
@@ -42,5 +42,5 @@ pdl.pattern @pdl_target : benefit(1) {
 iree_linalg_transform.sequence {
   %0 = match @pdl_target
   %1, %loops:3 = tile %0 {sizes = [4, 4, 4]}
-  print %1 {name = "Tiled"} 
+  print %1 {name = "Tiled"}
 }

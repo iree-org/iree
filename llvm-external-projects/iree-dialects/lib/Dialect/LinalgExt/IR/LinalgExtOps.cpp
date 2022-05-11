@@ -1374,6 +1374,59 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
+SmallVector<unsigned>
+TopkOp::getPartitionableLoops(unsigned maxNumParallelDims) {
+  auto partitionableLoops =
+      llvm::to_vector(llvm::seq<unsigned>(0, getInputRank()));
+  partitionableLoops.erase(std::next(partitionableLoops.begin(), dimension()));
+  return partitionableLoops;
+}
+
+Operation *TopkOp::getTiledImplementation(OpBuilder &builder,
+                                          ValueRange outputs,
+                                          ArrayRef<OpFoldResult> offsets,
+                                          ArrayRef<OpFoldResult> sizes,
+                                          SmallVectorImpl<Value> &results) {
+  assert(outputs.size() == this->outputs().size());
+  int64_t rank = getInputRank();
+  assert(offsets.size() == static_cast<size_t>(rank) &&
+         sizes.size() == static_cast<size_t>(rank));
+  SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
+  Location loc = getLoc();
+
+  SmallVector<Value> tiledOperands;
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, values(), offsets, sizes, strides));
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, indices(), offsets, sizes, strides));
+
+  // Replace the tile size for the K dimension to use the output size instead of
+  // the input size.
+  SmallVector<OpFoldResult> outputSizes(sizes.begin(), sizes.end());
+  Value kSize = getDimValue(builder, getLoc(), outputValues(), dimension());
+  outputSizes[dimension()] = getAsOpFoldResult(kSize);
+
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, outputs[0], offsets, outputSizes, strides));
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, outputs[1], offsets, outputSizes, strides));
+  SmallVector<Type, 2> resultTypes;
+  if (hasTensorSemantics()) {
+    resultTypes.push_back(tiledOperands[2].getType());
+    resultTypes.push_back(tiledOperands[3].getType());
+  }
+
+  Operation *tiledTopkOp = cast<LinalgExtOp>(getOperation())
+                               .clone(builder, loc, resultTypes, tiledOperands);
+
+  for (auto result : llvm::enumerate(tiledTopkOp->getResults())) {
+    auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
+        loc, result.value(), outputs[result.index()], offsets, sizes, strides);
+    results.push_back(insertSliceOp.getResult());
+  }
+  return tiledTopkOp;
+}
+
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
@@ -1528,7 +1581,6 @@ ParseResult TileOp::parse(OpAsmParser &parser, OperationState &result) {
   //     RankedTensorType::get({ShapedType::kDynamicSize}, indexType);
   Type tileSizesType = builder.getIndexType();
   SmallVector<Type> outsTypes;
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> outsOperands;
 
   llvm::SMLoc outputsOperandsLoc;
   if (parser.parseOperand(tileSizes) ||
@@ -1547,26 +1599,23 @@ ParseResult TileOp::parse(OpAsmParser &parser, OperationState &result) {
   }
 
   if (succeeded(parser.parseOptionalKeyword("outs"))) {
-    bool _1;
-    SmallVector<NamedAttrList> _2;
     outputsOperandsLoc = parser.getCurrentLocation();
-    if (mlir::function_interface_impl::parseFunctionArgumentList(
-            parser,
-            /*allowAttributes=*/false,
-            /*allowVariadic=*/false, outsOperands, outsTypes, /*argAttrs=*/_2,
-            /*isVariadic=*/_1) ||
-        parser.resolveOperands(outsOperands, outsTypes, outputsOperandsLoc,
-                               result.operands))
+    SmallVector<OpAsmParser::Argument> args;
+    if (parser.parseArgumentList(args, OpAsmParser::Delimiter::Paren,
+                                 /*allowType=*/true))
       return failure();
+    for (OpAsmParser::Argument arg : args)
+      parser.resolveOperand(arg.ssaName, arg.type, result.operands);
   }
   if (parser.parseArrowTypeList(result.types))
     return failure();
 
-  SmallVector<OpAsmParser::UnresolvedOperand, 8> regionOperands;
+  SmallVector<OpAsmParser::Argument, 8> regionOperands;
   std::unique_ptr<Region> region = std::make_unique<Region>();
   SmallVector<Type, 8> operandTypes, regionTypes;
-  if (parser.parseRegion(*region, regionOperands, regionTypes))
+  if (parser.parseRegion(*region, regionOperands)) {
     return failure();
+  }
 
   // Parse the optional attribute list.
   if (parser.parseOptionalAttrDict(result.attributes))
@@ -1633,11 +1682,11 @@ ParseResult InParallelOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseArrowTypeList(result.types))
     return failure();
 
-  SmallVector<OpAsmParser::UnresolvedOperand, 8> regionOperands;
-  SmallVector<Type, 8> regionTypes;
+  SmallVector<OpAsmParser::Argument, 8> regionOperands;
   std::unique_ptr<Region> region = std::make_unique<Region>();
-  if (parser.parseRegion(*region, regionOperands, regionTypes))
+  if (parser.parseRegion(*region, regionOperands)) {
     return failure();
+  }
   InParallelOp::ensureTerminator(*region, builder, result.location);
   result.addRegion(std::move(region));
 
@@ -1801,11 +1850,11 @@ ParseResult PerformConcurrentlyOp::parse(OpAsmParser &parser,
                                          OperationState &result) {
   auto &builder = parser.getBuilder();
 
-  SmallVector<OpAsmParser::UnresolvedOperand, 8> regionOperands;
-  SmallVector<Type, 8> regionTypes;
+  SmallVector<OpAsmParser::Argument, 8> regionOperands;
   std::unique_ptr<Region> region = std::make_unique<Region>();
-  if (parser.parseRegion(*region, regionOperands, regionTypes))
+  if (parser.parseRegion(*region, regionOperands)) {
     return failure();
+  }
   PerformConcurrentlyOp::ensureTerminator(*region, builder, result.location);
   result.addRegion(std::move(region));
 

@@ -10,11 +10,11 @@
 # pylint: disable=g-bad-import-order
 # pylint: disable=wildcard-import
 
-from . import binding
+from . import _binding
 
 # Pull some of the native symbols into the public API.
 # Hal imports
-from .binding import (
+from ._binding import (
     BufferCompatibility,
     BufferUsage,
     HalAllocator,
@@ -29,7 +29,7 @@ from .binding import (
 )
 
 # Vm imports
-from .binding import (
+from ._binding import (
     create_hal_module,
     Linkage,
     VmVariantList,

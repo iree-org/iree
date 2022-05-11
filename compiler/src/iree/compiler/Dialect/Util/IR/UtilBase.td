@@ -269,7 +269,7 @@ def YieldPoint : NativeOpTrait<"IREE::Util::YieldPoint">;
 def Unsafe : NativeOpTrait<"IREE::Util::Unsafe">;
 
 // Denotes that an operation is only valid in debug builds.
-// These ops are removed by the -iree-util-strip-debug-ops pass.
+// These ops are removed by the --iree-util-strip-debug-ops pass.
 def Util_DebugOnly : NativeOpTrait<"IREE::Util::DebugOnly">;
 
 #endif  // IREE_DIALECT_UTIL_IR_UTIL_BASE

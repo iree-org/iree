@@ -111,8 +111,8 @@ Invoke the host compiler tools to produce a bytecode module flatbuffer:
 
 ``` shell
 ../iree-build/install/bin/iree-compile \
-  -iree-mlir-to-vm-bytecode-module \
-  -iree-hal-target-backends=vmvx \
+  --iree-mlir-to-vm-bytecode-module \
+  --iree-hal-target-backends=vmvx \
   samples/models/simple_abs.mlir \
   -o /tmp/simple_abs_vmvx.vmfb
 ```
@@ -128,8 +128,8 @@ adb push /tmp/simple_abs_vmvx.vmfb /data/local/tmp/
 Run the tool:
 
 ``` shell
-adb shell /data/local/tmp/iree-run-module -driver=vmvx \
-  -module_file=/data/local/tmp/simple_abs_vmvx.vmfb \
-  -entry_function=abs \
-  -function_input="f32=-5"
+adb shell /data/local/tmp/iree-run-module --driver=vmvx \
+  --module_file=/data/local/tmp/simple_abs_vmvx.vmfb \
+  --entry_function=abs \
+  --function_input="f32=-5"
 ```

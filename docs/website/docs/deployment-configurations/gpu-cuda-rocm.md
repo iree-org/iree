@@ -101,10 +101,10 @@ IREE's TensorFlow importer. We can now compile them for each GPU by running the 
 
     ``` shell hl_lines="3-5"
     iree-compile \
-        -iree-mlir-to-vm-bytecode-module \
-        -iree-hal-target-backends=cuda \
-        -iree-hal-cuda-llvm-target-arch=<...> \
-        -iree-hal-cuda-disable-loop-nounroll-wa \
+        --iree-mlir-to-vm-bytecode-module \
+        --iree-hal-target-backends=cuda \
+        --iree-hal-cuda-llvm-target-arch=<...> \
+        --iree-hal-cuda-disable-loop-nounroll-wa \
         iree_input.mlir -o mobilenet-cuda.vmfb
     ```
 
@@ -127,11 +127,11 @@ IREE's TensorFlow importer. We can now compile them for each GPU by running the 
 
     ``` shell hl_lines="3-6"
     iree/tools/iree-compile \
-        -iree-mlir-to-vm-bytecode-module \
-        -iree-hal-target-backends=rocm \
-        -iree-rocm-target-chip=<...> \
-        -iree-rocm-link-bc=true \
-        -iree-rocm-bc-dir=<...> \
+        --iree-mlir-to-vm-bytecode-module \
+        --iree-hal-target-backends=rocm \
+        --iree-rocm-target-chip=<...> \
+        --iree-rocm-link-bc=true \
+        --iree-rocm-bc-dir=<...> \
         iree_input.mlir -o mobilenet-rocm.vmfb
     ```
 

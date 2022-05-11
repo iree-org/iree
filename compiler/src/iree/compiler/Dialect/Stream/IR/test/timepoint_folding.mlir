@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -canonicalize %s | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: @FoldTimepointExport
 func.func @FoldTimepointExport(%arg0: !hal.semaphore, %arg1: index) -> (!hal.semaphore, index) {

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-distribute))))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-distribute))))' %s | FileCheck %s
 
 #map0 = affine_map<()[s0] -> (s0 * 8)>
 #map1 = affine_map<()[s0, s1] -> (8, s1 - s0 * 8)>
@@ -477,4 +477,3 @@ hal.executable @matvec {
 //       CHECK:       linalg.matvec
 //  CHECK-SAME:         ins(%[[INPUT]], %[[B]] : memref<1x1024xf32, #map2>, memref<1024xf32>
 //  CHECK-SAME:         outs(%[[OUTPUT]] : memref<1xf32, #map3>)
-

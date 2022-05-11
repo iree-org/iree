@@ -255,6 +255,11 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 /// to memrefs
 void addCPUDefaultPassPipeline(OpPassManager &passManager);
 
+/// Populates the passes to lower to scalars operations for linalg based
+/// code-generation. Different from CPUDefault pipeline, this pipeline intends
+/// to handle early bufferized kernels.
+void addCPUBufferOpsDefaultPipeline(OpPassManager &passManager);
+
 /// Populates the passes to lower linalg ops on buffers. Currenly this pipeline
 /// is only used for dispatches that just copy data from input interfaces to
 /// output interface.
@@ -369,6 +374,9 @@ createLLVMGPUReduceSharedMemoryBankConflicts();
 
 /// Converts vector ops to gpu dialect.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU();
+
+/// Pad dynamic alloc op to convert them into static one.
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUPadDynamicAlloc();
 
 //------------------------------------------------------------------------------
 // SPIR-V Passes

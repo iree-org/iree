@@ -74,8 +74,8 @@ iree_tablegen_library(
   TD_FILE
     "ProcessorOpInterfaces.td"
   OUTS
-    -gen-op-interface-decls ProcessorOpInterfaces.h.inc
-    -gen-op-interface-defs ProcessorOpInterfaces.cpp.inc
+    --gen-op-interface-decls ProcessorOpInterfaces.h.inc
+    --gen-op-interface-defs ProcessorOpInterfaces.cpp.inc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

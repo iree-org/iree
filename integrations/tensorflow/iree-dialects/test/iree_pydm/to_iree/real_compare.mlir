@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -convert-iree-pydm-to-iree %s | FileCheck  --dump-input-filter=all %s
+// RUN: iree-dialects-opt --convert-iree-pydm-to-iree %s | FileCheck  --dump-input-filter=all %s
 
 // CHECK-LABEL: @lt
 iree_pydm.func @lt(%arg0 : !iree_pydm.real, %arg1 : !iree_pydm.real) -> (!iree_pydm.exception_result, !iree_pydm.bool) {

@@ -208,7 +208,7 @@ iree_runtime_cc_library(
 # gentbl_cc_library(
 #     name = "bytecode_op_table_gen",
 #     tbl_outs = [
-#         (["-gen-iree-vm-op-table-defs"], "bytecode_op_table.h"),
+#         (["--gen-iree-vm-op-table-defs"], "bytecode_op_table.h"),
 #     ],
 #     tblgen = "//iree/tools:iree-tblgen",
 #     td_file = "//iree/compiler/Dialect/VM/IR:VMOps.td",
@@ -271,7 +271,7 @@ iree_bytecode_module(
     testonly = True,
     src = "bytecode_module_benchmark.mlir",
     c_identifier = "iree_vm_bytecode_module_benchmark_module",
-    flags = ["-iree-vm-ir-to-bytecode-module"],
+    flags = ["--iree-vm-ir-to-bytecode-module"],
     translate_tool = "//iree/tools:iree-translate",
 )
 
@@ -291,7 +291,7 @@ iree_bytecode_module(
     testonly = True,
     src = "bytecode_module_size_benchmark.mlir",
     c_identifier = "iree_vm_bytecode_module_size_benchmark_module",
-    flags = ["-iree-vm-ir-to-bytecode-module"],
+    flags = ["--iree-vm-ir-to-bytecode-module"],
     translate_tool = "//iree/tools:iree-translate",
 )
 

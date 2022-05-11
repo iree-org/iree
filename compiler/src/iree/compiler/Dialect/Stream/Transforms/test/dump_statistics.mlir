@@ -1,5 +1,5 @@
-// RUN: iree-opt -split-input-file -pass-pipeline=iree-stream-dump-statistics{output-format=pretty} %s 2>&1 | FileCheck %s -check-prefix=CHECK-PRETTY
-// RUN: iree-opt -split-input-file -pass-pipeline=iree-stream-dump-statistics{output-format=csv} %s 2>&1 | FileCheck %s -check-prefix=CHECK-CSV
+// RUN: iree-opt --split-input-file --pass-pipeline=iree-stream-dump-statistics{output-format=pretty} %s 2>&1 | FileCheck %s --check-prefix=CHECK-PRETTY
+// RUN: iree-opt --split-input-file --pass-pipeline=iree-stream-dump-statistics{output-format=csv} %s 2>&1 | FileCheck %s --check-prefix=CHECK-CSV
 
 // CHECK-PRETTY: Aggregate Statistics
 // CHECK-PRETTY:   Constants: 1, 0 B

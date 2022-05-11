@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-util-demote-i64-to-i32 %s | FileCheck %s
+// RUN: iree-opt --split-input-file -iree-util-demote-i64-to-i32 %s | FileCheck %s
 
 // CHECK-LABEL: func @constant_i64
 // CHECK-SAME: () -> i32

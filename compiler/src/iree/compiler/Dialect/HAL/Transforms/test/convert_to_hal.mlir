@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-conversion -canonicalize -cse %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-hal-conversion --canonicalize -cse %s | FileCheck %s
 
 // Tests an end-to-end simple single-dispatch `dispatch(arg0, arg1) -> result`.
 

@@ -18,6 +18,25 @@ namespace python {
 
 //------------------------------------------------------------------------------
 // Retain/release bindings
+// Note that all HAL types have keep alive relationships in addition to this
+// (using the py:keep_alive<>() facility). These relationships form a chain
+// such that any live Python leaf (like a buffer or buffer_view) must keep
+// alive the allocator, device and driver that created it.
+//
+// The hierarchy is:
+//   HalDriver
+//   HalDevice
+//   HalAllocator
+//   HalBuffer
+//   HalBufferView
+//
+// Any Python API which produces one of the above must be annotated with
+// py::keep_alive<0, 1>() in order to establish the relationship with the
+// parent.
+//
+// Any Python API which consumes one of these objects such that its lifetime
+// may extend outside of the current invocation must arrange to retain/release
+// all backing devices that may need to survive.
 //------------------------------------------------------------------------------
 
 template <>

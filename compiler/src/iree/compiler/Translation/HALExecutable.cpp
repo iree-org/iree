@@ -46,7 +46,7 @@ static LogicalResult translateFromMLIRToHALExecutable(
 // target-specific binary form (such as an ELF file or a flatbuffer containing
 // a SPIR-V blob).
 //
-// Exposed via the -iree-mlir-to-hal-executable translation.
+// Exposed via the --iree-mlir-to-hal-executable translation.
 static LogicalResult translateFromMLIRToHALExecutableWithFlags(
     mlir::ModuleOp moduleOp, llvm::raw_ostream &output) {
   mlir::registerPassManagerCLOptions();

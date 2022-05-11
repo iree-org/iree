@@ -57,8 +57,8 @@ iree_tablegen_library(
   TD_FILE
     "VMBase.td"
   OUTS
-    -gen-enum-decls VMEnums.h.inc
-    -gen-enum-defs VMEnums.cpp.inc
+    --gen-enum-decls VMEnums.h.inc
+    --gen-enum-defs VMEnums.cpp.inc
 )
 
 iree_tablegen_library(
@@ -67,8 +67,8 @@ iree_tablegen_library(
   TD_FILE
     "VMOps.td"
   OUTS
-    -gen-op-decls VMOps.h.inc
-    -gen-op-defs VMOps.cpp.inc
+    --gen-op-decls VMOps.h.inc
+    --gen-op-defs VMOps.cpp.inc
 )
 
 iree_tablegen_library(
@@ -77,7 +77,7 @@ iree_tablegen_library(
   TD_FILE
     "VMOps.td"
   OUTS
-    -gen-iree-vm-op-encoder-defs VMOpEncoder.cpp.inc
+    --gen-iree-vm-op-encoder-defs VMOpEncoder.cpp.inc
   TBLGEN
     IREE
 )
@@ -88,8 +88,8 @@ iree_tablegen_library(
   TD_FILE
     "VMBase.td"
   OUTS
-    -gen-op-interface-decls VMOpInterface.h.inc
-    -gen-op-interface-defs VMOpInterface.cpp.inc
+    --gen-op-interface-decls VMOpInterface.h.inc
+    --gen-op-interface-defs VMOpInterface.cpp.inc
 )
 
 iree_tablegen_library(
@@ -98,8 +98,8 @@ iree_tablegen_library(
   TD_FILE
     "VMBase.td"
   OUTS
-    -gen-iree-struct-attr-decls VMStructs.h.inc
-    -gen-iree-struct-attr-defs VMStructs.cpp.inc
+    --gen-iree-struct-attr-decls VMStructs.h.inc
+    --gen-iree-struct-attr-defs VMStructs.cpp.inc
   TBLGEN
     IREE
 )
@@ -110,7 +110,7 @@ iree_tablegen_doc(
   TD_FILE
     "VMOps.td"
   OUTS
-    -gen-dialect-doc VMDialect.md
+    --gen-dialect-doc VMDialect.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

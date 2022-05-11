@@ -1,4 +1,4 @@
-// RUN: iree-opt-tflite -allow-unregistered-dialect -split-input-file -pass-pipeline='iree-tflite-retain-call-once-funcs' %s | FileCheck %s
+// RUN: iree-opt-tflite --allow-unregistered-dialect --split-input-file --pass-pipeline='iree-tflite-retain-call-once-funcs' %s | FileCheck %s
 
 // CHECK-LABEL: module {
 module {

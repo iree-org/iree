@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-codegen-type-propagation -split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-type-propagation --split-input-file %s | FileCheck %s
 
 func.func @generic_op_illegal_operand() {
   %d = hal.interface.constant.load[0] : index
@@ -148,7 +148,7 @@ func.func @tensor_extract() {
   %4 = arith.trunci %3 : tensor<?xi8> to tensor<?xi1>
   %5 = arith.extui %4 : tensor<?xi1> to tensor<?xi8>
   flow.dispatch.tensor.store %5, %1, offsets = [%offset], sizes=[%size], strides=[1] : tensor<?xi8> -> !flow.dispatch.tensor<writeonly:?xi8>{%d}
-  return   
+  return
 }
 // CHECK-LABEL: func @tensor_extract()
 //   CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0)

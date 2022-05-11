@@ -52,7 +52,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "arithmetic_ops.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -65,7 +65,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "arithmetic_ops_f32.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -78,7 +78,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "arithmetic_ops_i64.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -91,7 +91,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "assignment_ops.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -104,7 +104,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "assignment_ops_f32.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -117,7 +117,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "assignment_ops_i64.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -130,7 +130,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "buffer_ops.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -143,7 +143,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "call_ops.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -156,7 +156,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "comparison_ops.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -169,7 +169,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "comparison_ops_f32.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -182,7 +182,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "comparison_ops_i64.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -195,7 +195,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "control_flow_ops.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -208,7 +208,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "conversion_ops.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -221,7 +221,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "conversion_ops_f32.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -234,7 +234,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "conversion_ops_i64.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -247,7 +247,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "global_ops.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -260,7 +260,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "global_ops_f32.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -273,7 +273,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "global_ops_i64.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -286,7 +286,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "list_ops.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -299,7 +299,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "list_variant_ops.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -312,7 +312,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "ref_ops.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -325,7 +325,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "shift_ops.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )
@@ -338,7 +338,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "shift_ops_i64.h"
   FLAGS
-    "-iree-vm-ir-to-c-module"
+    "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
     iree_tools_iree-translate
 )

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-vm-conversion %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-vm-conversion %s | FileCheck %s
 
 module {
   // CHECK-LABEL: vm.func private @arithmetic

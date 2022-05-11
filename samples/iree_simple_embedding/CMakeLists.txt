@@ -39,9 +39,9 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_vmvx"
   FLAGS
-    "-iree-input-type=mhlo"
-    "-iree-mlir-to-vm-bytecode-module"
-    "-iree-hal-target-backends=vmvx"
+    "--iree-input-type=mhlo"
+    "--iree-mlir-to-vm-bytecode-module"
+    "--iree-hal-target-backends=vmvx"
   DEPS
     iree::samples::defs
   PUBLIC
@@ -89,13 +89,13 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_dylib_x86_64"
   FLAGS
-    "-iree-input-type=mhlo"
-    "-iree-mlir-to-vm-bytecode-module"
-    "-iree-hal-target-backends=dylib-llvm-aot"
-    "-iree-llvm-target-triple=x86_64-pc-linux-elf"
-    "-iree-llvm-debug-symbols=false"
-    "-iree-vm-bytecode-module-strip-source-map=true"
-    "-iree-vm-emit-polyglot-zip=false"
+    "--iree-input-type=mhlo"
+    "--iree-mlir-to-vm-bytecode-module"
+    "--iree-hal-target-backends=dylib-llvm-aot"
+    "--iree-llvm-target-triple=x86_64-pc-linux-elf"
+    "--iree-llvm-debug-symbols=false"
+    "--iree-vm-bytecode-module-strip-source-map=true"
+    "--iree-vm-emit-polyglot-zip=false"
   DEPS
     iree::samples::defs
   PUBLIC
@@ -109,16 +109,16 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_dylib_riscv_32"
   FLAGS
-    "-iree-input-type=mhlo"
-    "-iree-mlir-to-vm-bytecode-module"
-    "-iree-hal-target-backends=dylib-llvm-aot"
-    "-iree-llvm-target-triple=riscv32-pc-linux-elf"
-    "-iree-llvm-target-cpu=generic-rv32"
-    "-iree-llvm-target-cpu-features=+m,+f"
-    "-iree-llvm-target-abi=ilp32"
-    "-iree-llvm-debug-symbols=false"
-    "-iree-vm-bytecode-module-strip-source-map=true"
-    "-iree-vm-emit-polyglot-zip=false"
+    "--iree-input-type=mhlo"
+    "--iree-mlir-to-vm-bytecode-module"
+    "--iree-hal-target-backends=dylib-llvm-aot"
+    "--iree-llvm-target-triple=riscv32-pc-linux-elf"
+    "--iree-llvm-target-cpu=generic-rv32"
+    "--iree-llvm-target-cpu-features=+m,+f"
+    "--iree-llvm-target-abi=ilp32"
+    "--iree-llvm-debug-symbols=false"
+    "--iree-vm-bytecode-module-strip-source-map=true"
+    "--iree-vm-emit-polyglot-zip=false"
   DEPS
     iree::samples::defs
   PUBLIC
@@ -132,16 +132,16 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_dylib_riscv_64"
   FLAGS
-    "-iree-input-type=mhlo"
-    "-iree-mlir-to-vm-bytecode-module"
-    "-iree-hal-target-backends=dylib-llvm-aot"
-    "-iree-llvm-target-triple=riscv64-pc-linux-elf"
-    "-iree-llvm-target-cpu=generic-rv64"
-    "-iree-llvm-target-cpu-features=+m,+a,+f,+d,+c"
-    "-iree-llvm-target-abi=lp64d"
-    "-iree-llvm-debug-symbols=false"
-    "-iree-vm-bytecode-module-strip-source-map=true"
-    "-iree-vm-emit-polyglot-zip=false"
+    "--iree-input-type=mhlo"
+    "--iree-mlir-to-vm-bytecode-module"
+    "--iree-hal-target-backends=dylib-llvm-aot"
+    "--iree-llvm-target-triple=riscv64-pc-linux-elf"
+    "--iree-llvm-target-cpu=generic-rv64"
+    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+c"
+    "--iree-llvm-target-abi=lp64d"
+    "--iree-llvm-debug-symbols=false"
+    "--iree-vm-bytecode-module-strip-source-map=true"
+    "--iree-vm-emit-polyglot-zip=false"
   DEPS
     iree::samples::defs
   PUBLIC
@@ -155,14 +155,14 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_dylib_arm_32"
   FLAGS
-    "-iree-input-type=mhlo"
-    "-iree-mlir-to-vm-bytecode-module"
-    "-iree-hal-target-backends=dylib-llvm-aot"
-    "-iree-llvm-target-triple=armv7a-pc-linux-elf"
-    "-iree-llvm-target-float-abi=hard"
-    "-iree-llvm-debug-symbols=false"
-    "-iree-vm-bytecode-module-strip-source-map=true"
-    "-iree-vm-emit-polyglot-zip=false"
+    "--iree-input-type=mhlo"
+    "--iree-mlir-to-vm-bytecode-module"
+    "--iree-hal-target-backends=dylib-llvm-aot"
+    "--iree-llvm-target-triple=armv7a-pc-linux-elf"
+    "--iree-llvm-target-float-abi=hard"
+    "--iree-llvm-debug-symbols=false"
+    "--iree-vm-bytecode-module-strip-source-map=true"
+    "--iree-vm-emit-polyglot-zip=false"
   DEPS
     iree::samples::defs
   PUBLIC
@@ -176,13 +176,13 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_dylib_arm_64"
   FLAGS
-    "-iree-input-type=mhlo"
-    "-iree-mlir-to-vm-bytecode-module"
-    "-iree-hal-target-backends=dylib-llvm-aot"
-    "-iree-llvm-target-triple=aarch64-pc-linux-elf"
-    "-iree-llvm-debug-symbols=false"
-    "-iree-vm-bytecode-module-strip-source-map=true"
-    "-iree-vm-emit-polyglot-zip=false"
+    "--iree-input-type=mhlo"
+    "--iree-mlir-to-vm-bytecode-module"
+    "--iree-hal-target-backends=dylib-llvm-aot"
+    "--iree-llvm-target-triple=aarch64-pc-linux-elf"
+    "--iree-llvm-debug-symbols=false"
+    "--iree-vm-bytecode-module-strip-source-map=true"
+    "--iree-vm-emit-polyglot-zip=false"
   DEPS
     iree::samples::defs
   PUBLIC
@@ -256,10 +256,10 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_vulkan"
   FLAGS
-    "-iree-input-type=mhlo"
-    "-iree-mlir-to-vm-bytecode-module"
-    "-iree-hal-target-backends=vulkan-spirv"
-    "-iree-llvm-debug-symbols=false"
+    "--iree-input-type=mhlo"
+    "--iree-mlir-to-vm-bytecode-module"
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-llvm-debug-symbols=false"
   DEPS
     iree::samples::defs
   PUBLIC

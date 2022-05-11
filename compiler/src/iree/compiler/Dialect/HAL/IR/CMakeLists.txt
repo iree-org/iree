@@ -85,12 +85,12 @@ iree_tablegen_library(
   TD_FILE
     "HALInterfaces.td"
   OUTS
-    -gen-attr-interface-decls HALAttrInterfaces.h.inc
-    -gen-attr-interface-defs HALAttrInterfaces.cpp.inc
-    -gen-op-interface-decls HALOpInterfaces.h.inc
-    -gen-op-interface-defs HALOpInterfaces.cpp.inc
-    -gen-type-interface-decls HALTypeInterfaces.h.inc
-    -gen-type-interface-defs HALTypeInterfaces.cpp.inc
+    --gen-attr-interface-decls HALAttrInterfaces.h.inc
+    --gen-attr-interface-defs HALAttrInterfaces.cpp.inc
+    --gen-op-interface-decls HALOpInterfaces.h.inc
+    --gen-op-interface-defs HALOpInterfaces.cpp.inc
+    --gen-type-interface-decls HALTypeInterfaces.h.inc
+    --gen-type-interface-defs HALTypeInterfaces.cpp.inc
 )
 
 iree_tablegen_library(
@@ -99,8 +99,8 @@ iree_tablegen_library(
   TD_FILE
     "HALOps.td"
   OUTS
-    -gen-op-decls HALOps.h.inc
-    -gen-op-defs HALOps.cpp.inc
+    --gen-op-decls HALOps.h.inc
+    --gen-op-defs HALOps.cpp.inc
 )
 
 iree_tablegen_library(
@@ -109,8 +109,8 @@ iree_tablegen_library(
   TD_FILE
     "HALBase.td"
   OUTS
-    -gen-iree-struct-attr-decls HALStructs.h.inc
-    -gen-iree-struct-attr-defs HALStructs.cpp.inc
+    --gen-iree-struct-attr-decls HALStructs.h.inc
+    --gen-iree-struct-attr-defs HALStructs.cpp.inc
   TBLGEN
     IREE
 )
@@ -121,10 +121,10 @@ iree_tablegen_library(
   TD_FILE
     "HALBase.td"
   OUTS
-    -gen-attrdef-decls HALAttrs.h.inc
-    -gen-attrdef-defs HALAttrs.cpp.inc
-    -gen-enum-decls HALEnums.h.inc
-    -gen-enum-defs HALEnums.cpp.inc
+    --gen-attrdef-decls HALAttrs.h.inc
+    --gen-attrdef-defs HALAttrs.cpp.inc
+    --gen-enum-decls HALEnums.h.inc
+    --gen-enum-defs HALEnums.cpp.inc
 )
 
 iree_tablegen_doc(
@@ -133,7 +133,7 @@ iree_tablegen_doc(
   TD_FILE
     "HALOps.td"
   OUTS
-    -gen-dialect-doc HALDialect.md
+    --gen-dialect-doc HALDialect.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

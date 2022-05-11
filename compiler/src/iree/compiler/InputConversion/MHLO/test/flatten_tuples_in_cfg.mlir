@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file --iree-mhlo-flatten-tuples-in-cfg -canonicalize %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-mhlo-flatten-tuples-in-cfg --canonicalize %s | FileCheck %s
 // We rely on canonicalization to cancel out tuple/get_element operations, so
 // we test this followed by the canonicalizer rather than just the pass in
 // isolation.

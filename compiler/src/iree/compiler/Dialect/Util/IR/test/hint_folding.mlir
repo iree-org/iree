@@ -1,4 +1,4 @@
-// RUN: iree-opt -verify-diagnostics -canonicalize -split-input-file %s | FileCheck %s
+// RUN: iree-opt --verify-diagnostics --canonicalize --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @no_fold_constant
 func.func @no_fold_constant() -> (i32) {

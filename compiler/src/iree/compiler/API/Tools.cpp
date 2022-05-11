@@ -6,7 +6,7 @@
 
 #include "iree/compiler/API/Tools.h"
 
-#include "iree/tools/iree_translate_lib.h"
+#include "iree/compiler/Tools/iree_translate_lib.h"
 
 int ireeCompilerRunMain(int argc, char **argv) {
   return mlir::iree_compiler::runIreecMain(argc, argv);

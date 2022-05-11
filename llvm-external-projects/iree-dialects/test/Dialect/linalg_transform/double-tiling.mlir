@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -linalg-transform-interp %s | FileCheck %s
+// RUN: iree-dialects-opt --linalg-transform-interp %s | FileCheck %s
 
 // This test is verifying that a non-trivial 2*tiling+padding+vectorization transformation completes successfully
 
@@ -33,7 +33,7 @@ transform.with_pdl_patterns {
     %args = operands
     %results = types
     %0 = operation "linalg.matmul"(%args : !pdl.range<value>) -> (%results : !pdl.range<type>)
-    %1 = pdl.attribute @matmul_tensors
+    %1 = pdl.attribute = @matmul_tensors
     apply_native_constraint "nestedInFunc"(%0, %1 : !pdl.operation, !pdl.attribute)
     rewrite %0 with "transform.dialect"
   }

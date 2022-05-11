@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-codegen-optimize-vector-transfer %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-optimize-vector-transfer %s | FileCheck %s
 
 module {
   func.func @dead_alloc() {

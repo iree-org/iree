@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-mhlo-to-linalg-on-tensors -canonicalize %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-mhlo-to-linalg-on-tensors --canonicalize %s | FileCheck %s
 
 func.func @rfft_1d(%input: tensor<32xf32>) -> (tensor<17xf32>, tensor<17xf32>) {
   %0 = "mhlo.fft"(%input) {

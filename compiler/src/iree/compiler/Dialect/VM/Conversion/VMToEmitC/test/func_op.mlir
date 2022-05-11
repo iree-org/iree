@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="vm.module(iree-vm-ordinal-allocation),vm.module(iree-convert-vm-to-emitc)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="vm.module(iree-vm-ordinal-allocation),vm.module(iree-convert-vm-to-emitc)" %s | FileCheck %s
 
 // This tests the vm.func conversion. Using the calling convention of EmitC,
 // some arguments are getting added. For more details see comments on the

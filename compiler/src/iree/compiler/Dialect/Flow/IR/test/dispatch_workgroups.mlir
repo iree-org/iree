@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file %s | iree-opt -allow-unregistered-dialect -split-input-file | FileCheck %s
+// RUN: iree-opt --allow-unregistered-dialect --split-input-file %s | iree-opt --allow-unregistered-dialect --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @complexWorkgroupsUsage
 func.func @complexWorkgroupsUsage(

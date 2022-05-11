@@ -69,27 +69,27 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
-            ["-gen-dialect-decls"],
+            ["--gen-dialect-decls"],
             "include/iree-dialects/Dialect/Input/InputDialect.h.inc",
         ),
         (
-            ["-gen-dialect-defs"],
+            ["--gen-dialect-defs"],
             "include/iree-dialects/Dialect/Input/InputDialect.cpp.inc",
         ),
         (
-            ["-gen-op-decls"],
+            ["--gen-op-decls"],
             "include/iree-dialects/Dialect/Input/InputOps.h.inc",
         ),
         (
-            ["-gen-op-defs"],
+            ["--gen-op-defs"],
             "include/iree-dialects/Dialect/Input/InputOps.cpp.inc",
         ),
         (
-            ["-gen-typedef-decls"],
+            ["--gen-typedef-decls"],
             "include/iree-dialects/Dialect/Input/InputTypes.h.inc",
         ),
         (
-            ["-gen-typedef-defs"],
+            ["--gen-typedef-defs"],
             "include/iree-dialects/Dialect/Input/InputTypes.cpp.inc",
         ),
     ],
@@ -120,8 +120,8 @@ gentbl_filegroup(
     tbl_outs = [
         (
             [
-                "-gen-python-op-bindings",
-                "-bind-dialect=iree",
+                "--gen-python-op-bindings",
+                "--bind-dialect=iree",
             ],
             "python/iree/compiler/dialects/_iree_ops_gen.py",
         ),
@@ -160,32 +160,32 @@ gentbl_cc_library(
     tbl_outs = [
         (
             [
-                "-dialect=iree_linalg_ext",
-                "-gen-dialect-decls",
+                "--dialect=iree_linalg_ext",
+                "--gen-dialect-decls",
             ],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h.inc",
         ),
         (
             [
-                "-dialect=iree_linalg_ext",
-                "-gen-dialect-defs",
+                "--dialect=iree_linalg_ext",
+                "--gen-dialect-defs",
             ],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.cpp.inc",
         ),
         (
-            ["-gen-op-decls"],
+            ["--gen-op-decls"],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h.inc",
         ),
         (
-            ["-gen-op-defs"],
+            ["--gen-op-defs"],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc",
         ),
         (
-            ["-gen-typedef-decls"],
+            ["--gen-typedef-decls"],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtTypes.h.inc",
         ),
         (
-            ["-gen-typedef-defs"],
+            ["--gen-typedef-defs"],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtTypes.cpp.inc",
         ),
     ],
@@ -206,19 +206,19 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
-            ["-gen-op-interface-decls"],
+            ["--gen-op-interface-decls"],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtOpInterfaces.h.inc",
         ),
         (
-            ["-gen-op-interface-defs"],
+            ["--gen-op-interface-defs"],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtOpInterfaces.cpp.inc",
         ),
         (
-            ["-gen-type-interface-decls"],
+            ["--gen-type-interface-decls"],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtTypeInterfaces.h.inc",
         ),
         (
-            ["-gen-type-interface-defs"],
+            ["--gen-type-interface-defs"],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtTypeInterfaces.cpp.inc",
         ),
     ],
@@ -234,11 +234,11 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
-            ["-gen-op-interface-decls"],
+            ["--gen-op-interface-decls"],
             "include/iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h.inc",
         ),
         (
-            ["-gen-op-interface-defs"],
+            ["--gen-op-interface-defs"],
             "include/iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.cpp.inc",
         ),
     ],
@@ -254,15 +254,15 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
-            ["-gen-pass-decls"],
+            ["--gen-pass-decls"],
             "include/iree-dialects/Dialect/LinalgExt/Passes/Passes.h.inc",
         ),
         (
-            ["-gen-pass-capi-header"],
+            ["--gen-pass-capi-header"],
             "include/iree-dialects/Dialect/LinalgExt/Passes/Passes.capi.h.inc",
         ),
         (
-            ["-gen-pass-capi-impl"],
+            ["--gen-pass-capi-impl"],
             "include/iree-dialects/Dialect/LinalgExt/Passes/Passes.capi.cpp.inc",
         ),
     ],
@@ -348,11 +348,11 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
-            ["-gen-op-decls"],
+            ["--gen-op-decls"],
             "include/iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h.inc",
         ),
         (
-            ["-gen-op-defs"],
+            ["--gen-op-defs"],
             "include/iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.cpp.inc",
         ),
     ],
@@ -429,27 +429,27 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
-            ["-gen-dialect-decls"],
+            ["--gen-dialect-decls"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMDialect.h.inc",
         ),
         (
-            ["-gen-dialect-defs"],
+            ["--gen-dialect-defs"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMDialect.cpp.inc",
         ),
         (
-            ["-gen-op-decls"],
+            ["--gen-op-decls"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMOps.h.inc",
         ),
         (
-            ["-gen-op-defs"],
+            ["--gen-op-defs"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMOps.cpp.inc",
         ),
         (
-            ["-gen-typedef-decls"],
+            ["--gen-typedef-decls"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMTypes.h.inc",
         ),
         (
-            ["-gen-typedef-defs"],
+            ["--gen-typedef-defs"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMTypes.cpp.inc",
         ),
     ],
@@ -468,19 +468,19 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
-            ["-gen-op-interface-decls"],
+            ["--gen-op-interface-decls"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMOpInterfaces.h.inc",
         ),
         (
-            ["-gen-op-interface-defs"],
+            ["--gen-op-interface-defs"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMOpInterfaces.cpp.inc",
         ),
         (
-            ["-gen-type-interface-decls"],
+            ["--gen-type-interface-decls"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMTypeInterfaces.h.inc",
         ),
         (
-            ["-gen-type-interface-defs"],
+            ["--gen-type-interface-defs"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMTypeInterfaces.cpp.inc",
         ),
     ],
@@ -496,15 +496,15 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
-            ["-gen-pass-decls"],
+            ["--gen-pass-decls"],
             "include/iree-dialects/Dialect/PyDM/Transforms/Passes.h.inc",
         ),
         (
-            ["-gen-pass-capi-header"],
+            ["--gen-pass-capi-header"],
             "include/iree-dialects/Dialect/PyDM/Transforms/Passes.capi.h.inc",
         ),
         (
-            ["-gen-pass-capi-impl"],
+            ["--gen-pass-capi-impl"],
             "include/iree-dialects/Dialect/PyDM/Transforms/Passes.capi.cpp.inc",
         ),
     ],
@@ -521,8 +521,8 @@ gentbl_filegroup(
     tbl_outs = [
         (
             [
-                "-gen-python-op-bindings",
-                "-bind-dialect=iree_pydm",
+                "--gen-python-op-bindings",
+                "--bind-dialect=iree_pydm",
             ],
             "python/iree/compiler/dialects/_iree_pydm_ops_gen.py",
         ),
@@ -603,24 +603,24 @@ gentbl_cc_library(
     tbl_outs = [
         (
             [
-                "-dialect=iree_linalg_transform",
-                "-gen-dialect-decls",
+                "--dialect=iree_linalg_transform",
+                "--gen-dialect-decls",
             ],
             "include/iree-dialects/Dialect/LinalgTransform/LinalgTransformDialect.h.inc",
         ),
         (
             [
-                "-dialect=iree_linalg_transform",
-                "-gen-dialect-defs",
+                "--dialect=iree_linalg_transform",
+                "--gen-dialect-defs",
             ],
             "include/iree-dialects/Dialect/LinalgTransform/LinalgTransformDialect.cpp.inc",
         ),
         (
-            ["-gen-op-decls"],
+            ["--gen-op-decls"],
             "include/iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h.inc",
         ),
         (
-            ["-gen-op-defs"],
+            ["--gen-op-defs"],
             "include/iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.cpp.inc",
         ),
     ],
@@ -637,11 +637,11 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
-            ["-gen-op-interface-decls"],
+            ["--gen-op-interface-decls"],
             "include/iree-dialects/Dialect/LinalgTransform/TransformOpInterface.h.inc",
         ),
         (
-            ["-gen-op-interface-defs"],
+            ["--gen-op-interface-defs"],
             "include/iree-dialects/Dialect/LinalgTransform/TransformOpInterface.cpp.inc",
         ),
     ],
@@ -657,11 +657,11 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
-            ["-gen-op-decls"],
+            ["--gen-op-decls"],
             "include/iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h.inc",
         ),
         (
-            ["-gen-op-defs"],
+            ["--gen-op-defs"],
             "include/iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.cpp.inc",
         ),
     ],

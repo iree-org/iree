@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-convert-to-nvvm -split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-convert-to-nvvm --split-input-file %s | FileCheck %s
 
 // Test that that standard and GPU ops are converted to LLVM and NVVM.
 func.func @abs_ex_dispatch_0() {
@@ -129,7 +129,7 @@ func.func @mixed_type() {
 //       CHECK:   llvm.insertvalue %[[PTR]], %{{.*}}[1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<1 x i64>, array<1 x i64>)>
 //       CHECK:   nvvm.read.ptx.sreg.tid.x
 //       CHECK:   llvm.fadd
-  
+
 // -----
 
 func.func @shared_memory_lowering() {
@@ -137,7 +137,7 @@ func.func @shared_memory_lowering() {
   %cst = arith.constant dense<0.000000e+00> : vector<4xf32>
   %0 = memref.alloc() : memref<1x16x32xf32, 3>
   %1 = memref.alloc() : memref<1x32x16xf32, 3>
-  %2 = memref.alloc() : memref<1x8x16xf32, 3> 
+  %2 = memref.alloc() : memref<1x8x16xf32, 3>
   vector.store %cst, %1[%c0, %c0, %c0] : memref<1x32x16xf32, 3>, vector<4xf32>
   vector.store %cst, %2[%c0, %c0, %c0] : memref<1x8x16xf32, 3>, vector<4xf32>
   vector.store %cst, %0[%c0, %c0, %c0] : memref<1x16x32xf32, 3>, vector<4xf32>
@@ -161,4 +161,3 @@ func.func @shared_memory_lowering() {
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(4096 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
 //  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<1 x array<8 x array<16 x f32>>>, 3>
-

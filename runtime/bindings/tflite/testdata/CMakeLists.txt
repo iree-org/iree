@@ -18,11 +18,11 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_tflite_testdata_add_dynamic"
   FLAGS
-    "-iree-input-type=mhlo"
-    "-iree-native-bindings-support=false"
-    "-iree-tflite-bindings-support"
-    "-iree-mlir-to-vm-bytecode-module"
-    "-iree-hal-target-backends=vmvx"
+    "--iree-input-type=mhlo"
+    "--iree-native-bindings-support=false"
+    "--iree-tflite-bindings-support"
+    "--iree-mlir-to-vm-bytecode-module"
+    "--iree-hal-target-backends=vmvx"
   PUBLIC
   TESTONLY
 )
@@ -35,11 +35,11 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_tflite_testdata_add_multi"
   FLAGS
-    "-iree-input-type=mhlo"
-    "-iree-native-bindings-support=false"
-    "-iree-tflite-bindings-support"
-    "-iree-mlir-to-vm-bytecode-module"
-    "-iree-hal-target-backends=vmvx"
+    "--iree-input-type=mhlo"
+    "--iree-native-bindings-support=false"
+    "--iree-tflite-bindings-support"
+    "--iree-mlir-to-vm-bytecode-module"
+    "--iree-hal-target-backends=vmvx"
   PUBLIC
   TESTONLY
 )
@@ -52,11 +52,11 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_tflite_testdata_add_static"
   FLAGS
-    "-iree-input-type=mhlo"
-    "-iree-native-bindings-support=false"
-    "-iree-tflite-bindings-support"
-    "-iree-mlir-to-vm-bytecode-module"
-    "-iree-hal-target-backends=vmvx"
+    "--iree-input-type=mhlo"
+    "--iree-native-bindings-support=false"
+    "--iree-tflite-bindings-support"
+    "--iree-mlir-to-vm-bytecode-module"
+    "--iree-hal-target-backends=vmvx"
   PUBLIC
   TESTONLY
 )

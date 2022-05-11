@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s  -linalg-interp-transforms --split-input-file | FileCheck %s
+// RUN: iree-dialects-opt %s  --linalg-interp-transforms --split-input-file | FileCheck %s
 
 // CHECK-DAG: #[[$CEIL_MAP:.*]] = affine_map<()[s0, s1] -> (s1 ceildiv s0)>
 // CHECK-DAG: #[[$MUL_MAP:.*]] = affine_map<(d0)[s0] -> (d0 * s0)>
@@ -44,7 +44,7 @@ module {
 
     // CHECK: iree_linalg_ext.perform_concurrently {
     // CHECK:    iree_linalg_ext.parallel_insert_slice %[[R]] into %[[OUT]][%[[OFFSET]]] [%[[SIZE]]] [{{.*}}] : tensor<?xf32> into tensor<?xf32>
-        iree_linalg_ext.tile_yield %3: tensor<?xf32> 
+        iree_linalg_ext.tile_yield %3: tensor<?xf32>
     }
     return %0: tensor<?xf32>
   }

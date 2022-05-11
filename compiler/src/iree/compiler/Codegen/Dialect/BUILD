@@ -71,11 +71,11 @@ iree_gentbl_cc_library(
     name = "IREECodegenDialectGen",
     tbl_outs = [
         (
-            ["-gen-dialect-decls"],
+            ["--gen-dialect-decls"],
             "IREECodegenDialect.h.inc",
         ),
         (
-            ["-gen-dialect-defs"],
+            ["--gen-dialect-defs"],
             "IREECodegenDialect.cpp.inc",
         ),
     ],
@@ -88,19 +88,19 @@ iree_gentbl_cc_library(
     name = "LoweringConfigGen",
     tbl_outs = [
         (
-            ["-gen-attrdef-decls"],
+            ["--gen-attrdef-decls"],
             "LoweringConfig.h.inc",
         ),
         (
-            ["-gen-attrdef-defs"],
+            ["--gen-attrdef-defs"],
             "LoweringConfig.cpp.inc",
         ),
         (
-            ["-gen-enum-decls"],
+            ["--gen-enum-decls"],
             "LoweringConfigEnums.h.inc",
         ),
         (
-            ["-gen-enum-defs"],
+            ["--gen-enum-defs"],
             "LoweringConfigEnums.cpp.inc",
         ),
     ],

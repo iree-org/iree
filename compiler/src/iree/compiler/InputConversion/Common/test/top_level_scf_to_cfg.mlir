@@ -1,10 +1,10 @@
-// RUN: iree-opt -split-input-file -iree-top-level-scf-to-cfg %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-top-level-scf-to-cfg %s | FileCheck %s
 
 // CHECK-LABEL: @generic_nested_for
 // While not super recommended, we do have cases of SCF constructs embedded
 // in linalg.generic. This sample was reduced from a lowering of tf.pow.
-// The normal -convert-scf-to-std pass will produce an illegal linalg op
-// (multiple basic blocks). The -iree-top-level-scf-to-cfg should not touch it.
+// The normal --convert-scf-to-std pass will produce an illegal linalg op
+// (multiple basic blocks). The --iree-top-level-scf-to-cfg should not touch it.
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 func.func @generic_nested_for(%arg0: tensor<?x?x?x?xi32>, %arg1: tensor<?x?x?x?xi32>, %out0: tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32> {
   %c0 = arith.constant 0 : index

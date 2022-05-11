@@ -1,4 +1,4 @@
-// RUN: iree-tf-opt %s -iree-tf-verify-fully-converted -split-input-file -verify-diagnostics
+// RUN: iree-tf-opt %s --iree-tf-verify-fully-converted --split-input-file -verify-diagnostics
 
 // CHECK-LABEL: func @f
 func @f() -> (tensor<i32>) {

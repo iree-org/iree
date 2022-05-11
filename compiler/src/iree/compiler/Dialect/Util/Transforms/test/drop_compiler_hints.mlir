@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-util-drop-compiler-hints %s | FileCheck --implicit-check-not="util.do_not_optimize" %s
+// RUN: iree-opt --split-input-file --iree-util-drop-compiler-hints %s | FileCheck --implicit-check-not="util.do_not_optimize" %s
 
 // This file is used as an example in docs/developing_iree/developer_overview.md.
 // If you move or delete it, please update the documentation accordingly.

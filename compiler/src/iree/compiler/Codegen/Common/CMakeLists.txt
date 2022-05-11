@@ -16,7 +16,7 @@ iree_tablegen_library(
   TD_FILE
     "FoldTensorExtractOp.td"
   OUTS
-    -gen-rewriters FoldTensorExtractOp.cpp.inc
+    --gen-rewriters FoldTensorExtractOp.cpp.inc
 )
 
 iree_cc_library(

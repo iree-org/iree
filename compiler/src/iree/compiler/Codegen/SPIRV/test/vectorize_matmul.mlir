@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-spirv-vectorize %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-spirv-vectorize %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[2, 128], [1, 4], [0, 0, 4]]>
 

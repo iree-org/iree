@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-dump-executable-sources %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-hal-dump-executable-sources %s | FileCheck %s
 
 // Tests dumping executable sources to stdout - it's more common to use files
 // but this is much easier to test with lit.

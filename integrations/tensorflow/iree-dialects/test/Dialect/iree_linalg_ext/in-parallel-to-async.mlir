@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s  -linalg-interp-transforms --split-input-file | FileCheck %s
+// RUN: iree-dialects-opt %s  --linalg-interp-transforms --split-input-file | FileCheck %s
 
 // CHECK-DAG: #[[$MUL_MAP:.*]] = affine_map<(d0)[s0] -> (d0 * s0)>
 // CHECK-DAG: #[[$SUB_MAP:.*]] = affine_map<(d0)[s0, s1] -> (-(d0 * s0) + s1, s0)>
@@ -22,8 +22,8 @@ module {
     %1 = affine.apply #map0(%0)[%arg0]
 
     // CHECK: %[[M:.*]] = memref.dim %{{.*}}, %{{.*}} : memref<?xf32>
-    // CHECK: %[[group:.*]] = async.create_group {{.*}}: !async.group 
-    // CHECK: scf.for %[[IV:.*]] = {{.*}} 
+    // CHECK: %[[group:.*]] = async.create_group {{.*}}: !async.group
+    // CHECK: scf.for %[[IV:.*]] = {{.*}}
     // CHECK:   %[[token:.*]] = async.execute {
     // CHECK:     subview
     // CHECK:     subview
@@ -42,7 +42,7 @@ module {
         %6 = memref.subview %arg2[%3] [%5] [%c1] : memref<?xf32> to memref<?xf32, offset:?, strides:[?]>
         %7 = memref.subview %arg1[%3] [%5] [1] : memref<?xf32> to memref<?xf32, offset:?, strides:[?]>
 
-        linalg.generic {indexing_maps = [#map4, #map4], iterator_types = ["parallel"]} 
+        linalg.generic {indexing_maps = [#map4, #map4], iterator_types = ["parallel"]}
           ins(%7 : memref<?xf32, offset:?, strides:[?]>) outs(%6 : memref<?xf32, offset:?, strides:[?]>) {
         ^bb0(%arg4: f32, %arg5: f32):  // no predecessors
           %9 = arith.mulf %arg4, %cst : f32

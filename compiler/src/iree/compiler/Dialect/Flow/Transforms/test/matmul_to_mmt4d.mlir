@@ -1,7 +1,7 @@
-// RUN: iree-opt -split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow %s | FileCheck %s
-// RUN: iree-opt -split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d='arch=aarch64' %s | FileCheck %s -check-prefix=AARCH64-BASELINE
-// RUN: iree-opt -split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d='arch=aarch64 features=+dotprod' %s | FileCheck %s -check-prefix=AARCH64-DOTPROD
-// RUN: iree-opt -split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d='arch=aarch64 features=+i8mm' %s | FileCheck %s -check-prefix=AARCH64-I8MM
+// RUN: iree-opt --split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d='arch=aarch64' %s | FileCheck %s --check-prefix=AARCH64-BASELINE
+// RUN: iree-opt --split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d='arch=aarch64 features=+dotprod' %s | FileCheck %s --check-prefix=AARCH64-DOTPROD
+// RUN: iree-opt --split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d='arch=aarch64 features=+i8mm' %s | FileCheck %s --check-prefix=AARCH64-I8MM
 
 // There are two parts to this test: the "deep" part and the "wide part".
 

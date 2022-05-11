@@ -170,7 +170,7 @@ py_binary(
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_%s_large_split_k" % lhs_rhs_type,
     compiler_flags = [
-        "-iree-flow-split-matmul-reduction=4",
+        "--iree-flow-split-matmul-reduction=4",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [

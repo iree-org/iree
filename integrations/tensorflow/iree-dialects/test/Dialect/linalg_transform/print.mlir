@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -linalg-interp-transforms %s | FileCheck %s
+// RUN: iree-dialects-opt --linalg-interp-transforms %s | FileCheck %s
 
 // CHECK-LABEL: IR printer: test print
 // CHECK-NEXT:  module

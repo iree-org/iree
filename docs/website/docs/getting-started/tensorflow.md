@@ -67,8 +67,8 @@ as an example and assuming the serving signature is `predict`:
 
 ``` shell
 iree-import-tf
-  -tf-import-type=savedmodel_v1 \
-  -tf-savedmodel-exported-names=predict \
+  --tf-import-type=savedmodel_v1 \
+  --tf-savedmodel-exported-names=predict \
   /path/to/savedmodel -o iree_input.mlir
 ```
 

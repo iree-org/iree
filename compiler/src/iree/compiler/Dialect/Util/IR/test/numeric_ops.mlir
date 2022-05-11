@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | FileCheck %s
+// RUN: iree-opt --split-input-file %s | FileCheck %s
 
 func.func @optional_convert_scalar(%arg0 : i32) -> i32 {
   // CHECK: util.numeric.optional_narrow %arg0 : i32 as si8

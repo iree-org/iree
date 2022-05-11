@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -linalg-transform-interp -split-input-file -verify-diagnostics -allow-unregistered-dialect %s
+// RUN: iree-dialects-opt --linalg-transform-interp --split-input-file --verify-diagnostics --allow-unregistered-dialect %s
 
 // This cannot be vectorized because of dynamic tensor shapes. We expect the
 // pass fail and report an error at the vectorization operation below.
@@ -134,7 +134,7 @@ transform.with_pdl_patterns {
     %args = operands
     %results = types
     %0 = operation "linalg.matmul"(%args : !pdl.range<value>) -> (%results : !pdl.range<type>)
-    %1 = pdl.attribute @no_replacement
+    %1 = pdl.attribute = @no_replacement
     apply_native_constraint "nestedInFunc"(%0, %1 : !pdl.operation, !pdl.attribute)
     // TODO: we don't want this, but it is the required terminator for pdl.pattern
     rewrite %0 with "transform.dialect"
@@ -169,7 +169,7 @@ transform.with_pdl_patterns {
     %args = operands
     %results = types
     %0 = operation "linalg.matmul"(%args : !pdl.range<value>) -> (%results : !pdl.range<type>)
-    %1 = pdl.attribute @repeated_match
+    %1 = pdl.attribute = @repeated_match
     apply_native_constraint "nestedInFunc"(%0, %1 : !pdl.operation, !pdl.attribute)
     // TODO: we don't want this, but it is the required terminator for pdl.pattern
     rewrite %0 with "transform.dialect"
@@ -180,7 +180,7 @@ transform.with_pdl_patterns {
     %args = operands
     %results = types
     %0 = operation "linalg.matmul"(%args : !pdl.range<value>) -> (%results : !pdl.range<type>)
-    %1 = pdl.attribute @repeated_match
+    %1 = pdl.attribute = @repeated_match
     apply_native_constraint "nestedInFunc"(%0, %1 : !pdl.operation, !pdl.attribute)
     // TODO: we don't want this, but it is the required terminator for pdl.pattern
     rewrite %0 with "transform.dialect"

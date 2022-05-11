@@ -14,7 +14,7 @@ def iree_bytecode_module(
         name,
         src,
         module = None,
-        flags = ["-iree-mlir-to-vm-bytecode-module"],
+        flags = ["--iree-mlir-to-vm-bytecode-module"],
         # TODO: Rename this to 'compile_tool'
         translate_tool = "//iree/tools:iree-compile",
         linker_tool = "@llvm-project//lld:lld",
@@ -51,9 +51,9 @@ def iree_bytecode_module(
             " ".join([
                 "$(location %s)" % (translate_tool),
                 " ".join(flags),
-                "-iree-llvm-embedded-linker-path=$(location %s)" % (linker_tool),
-                "-iree-llvm-wasm-linker-path=$(location %s)" % (linker_tool),
-                # Note: -iree-llvm-system-linker-path is left unspecified.
+                "--iree-llvm-embedded-linker-path=$(location %s)" % (linker_tool),
+                "--iree-llvm-wasm-linker-path=$(location %s)" % (linker_tool),
+                # Note: --iree-llvm-system-linker-path is left unspecified.
                 "-o $(location %s)" % (module),
                 "$(location %s)" % (src),
             ]),

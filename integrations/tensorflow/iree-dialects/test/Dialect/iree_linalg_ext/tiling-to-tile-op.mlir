@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s -linalg-interp-transforms --split-input-file | FileCheck %s
+// RUN: iree-dialects-opt %s --linalg-interp-transforms --split-input-file | FileCheck %s
 
 // CHECK: #[[$MAP:.+]] = affine_map<(d0, d1)[s0] -> (-d1 + s0, d0)>
 module {

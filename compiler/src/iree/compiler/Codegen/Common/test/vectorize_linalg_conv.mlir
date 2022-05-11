@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-codegen-vectorize-linalg-conv -canonicalize -cse %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-codegen-vectorize-linalg-conv --canonicalize -cse %s | FileCheck %s
 
 func.func @vectorize_conv(%filter: memref<1x1x3x4xf32>, %input: memref<1x2x2x3xf32>, %output: memref<1x2x2x4xf32>) {
   linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}

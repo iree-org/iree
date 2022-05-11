@@ -1,5 +1,5 @@
-// RUN: iree-compile --iree-input-type=mhlo --iree-hal-target-backends=vmvx -iree-mlir-to-vm-bytecode-module %s | iree-check-module --driver=vmvx -
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-compile --iree-input-type=mhlo --iree-hal-target-backends=vulkan-spirv -iree-mlir-to-vm-bytecode-module %s | iree-check-module --driver=vulkan -)
+// RUN: iree-compile --iree-input-type=mhlo --iree-hal-target-backends=vmvx --iree-mlir-to-vm-bytecode-module %s | iree-check-module --driver=vmvx -
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-compile --iree-input-type=mhlo --iree-hal-target-backends=vulkan-spirv --iree-mlir-to-vm-bytecode-module %s | iree-check-module --driver=vulkan -)
 
 func.func @expect_true() {
   %true = util.unfoldable_constant 1 : i32

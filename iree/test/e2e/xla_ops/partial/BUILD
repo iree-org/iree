@@ -30,8 +30,8 @@ iree_check_single_backend_test_suite(
         "dot_f16.mlir",
     ],
     compiler_flags = [
-        "-iree-input-type=mhlo",
-        "-iree-vulkan-target-triple=valhall-unknown-android11",
+        "--iree-input-type=mhlo",
+        "--iree-vulkan-target-triple=valhall-unknown-android11",
     ],
     driver = "vulkan",
     tags = [

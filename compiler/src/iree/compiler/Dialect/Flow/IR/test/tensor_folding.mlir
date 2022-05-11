@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -canonicalize %s | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: @expandStaticShapeConstant
 func.func @expandStaticShapeConstant() -> (tensor<2x4xi32>, index, index) {

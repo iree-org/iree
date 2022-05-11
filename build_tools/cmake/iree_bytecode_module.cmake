@@ -71,20 +71,20 @@ function(iree_bytecode_module)
   # If an LLVM CPU backend is enabled, supply the linker tool.
   if(IREE_LLD_TARGET)
     iree_get_executable_path(_LINKER_TOOL_EXECUTABLE "lld")
-    list(APPEND _ARGS "-iree-llvm-embedded-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
-    list(APPEND _ARGS "-iree-llvm-wasm-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
-    # Note: -iree-llvm-system-linker-path is left unspecified.
+    list(APPEND _ARGS "--iree-llvm-embedded-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
+    list(APPEND _ARGS "--iree-llvm-wasm-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
+    # Note: --iree-llvm-system-linker-path is left unspecified.
   endif()
 
   if(IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER)
-    list(APPEND _ARGS "-iree-llvm-link-embedded=false")
+    list(APPEND _ARGS "--iree-llvm-link-embedded=false")
   endif()
 
   # Support testing in TSan build dirs. Unlike other sanitizers, TSan is an
   # ABI break: when the host code is built with TSan, the module must be too,
   # otherwise we get crashes calling module code.
   if(IREE_BYTECODE_MODULE_ENABLE_TSAN)
-    list(APPEND _ARGS "-iree-llvm-sanitize=thread")
+    list(APPEND _ARGS "--iree-llvm-sanitize=thread")
   endif()
 
   if(_RULE_FRIENDLY_NAME)

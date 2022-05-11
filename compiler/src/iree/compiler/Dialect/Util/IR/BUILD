@@ -92,11 +92,11 @@ iree_gentbl_cc_library(
     name = "UtilAttrsGen",
     tbl_outs = [
         (
-            ["-gen-attrdef-decls"],
+            ["--gen-attrdef-decls"],
             "UtilAttrs.h.inc",
         ),
         (
-            ["-gen-attrdef-defs"],
+            ["--gen-attrdef-defs"],
             "UtilAttrs.cpp.inc",
         ),
     ],
@@ -109,27 +109,27 @@ iree_gentbl_cc_library(
     name = "UtilInterfacesGen",
     tbl_outs = [
         (
-            ["-gen-attr-interface-decls"],
+            ["--gen-attr-interface-decls"],
             "UtilAttrInterfaces.h.inc",
         ),
         (
-            ["-gen-attr-interface-defs"],
+            ["--gen-attr-interface-defs"],
             "UtilAttrInterfaces.cpp.inc",
         ),
         (
-            ["-gen-op-interface-decls"],
+            ["--gen-op-interface-decls"],
             "UtilOpInterfaces.h.inc",
         ),
         (
-            ["-gen-op-interface-defs"],
+            ["--gen-op-interface-defs"],
             "UtilOpInterfaces.cpp.inc",
         ),
         (
-            ["-gen-type-interface-decls"],
+            ["--gen-type-interface-decls"],
             "UtilTypeInterfaces.h.inc",
         ),
         (
-            ["-gen-type-interface-defs"],
+            ["--gen-type-interface-defs"],
             "UtilTypeInterfaces.cpp.inc",
         ),
     ],
@@ -142,11 +142,11 @@ iree_gentbl_cc_library(
     name = "UtilOpsGen",
     tbl_outs = [
         (
-            ["-gen-op-decls"],
+            ["--gen-op-decls"],
             "UtilOps.h.inc",
         ),
         (
-            ["-gen-op-defs"],
+            ["--gen-op-defs"],
             "UtilOps.cpp.inc",
         ),
     ],
@@ -159,7 +159,7 @@ iree_tablegen_doc(
     name = "UtilDialectDocGen",
     tbl_outs = [
         (
-            ["-gen-dialect-doc"],
+            ["--gen-dialect-doc"],
             "UtilDialect.md",
         ),
     ],
