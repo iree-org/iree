@@ -87,5 +87,6 @@ popd
 echo "=== Copying static files (.html, .js) to the build directory ==="
 
 cp ${SOURCE_DIR?}/index.html ${BINARY_DIR}
+cp ${ROOT_DIR?}/docs/website/overrides/ghost.svg ${BINARY_DIR}
 cp ${SOURCE_DIR?}/iree_api.js ${BINARY_DIR}
 cp ${SOURCE_DIR?}/iree_worker.js ${BINARY_DIR}
