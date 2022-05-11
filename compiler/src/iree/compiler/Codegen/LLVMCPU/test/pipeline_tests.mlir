@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target))' %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target))' --split-input-file %s | FileCheck %s
 
 // Check that this dispatch compiles to vectors and that there are no allocas.
 // By proxy checks that destination passing style kicked in correctly
@@ -57,3 +57,50 @@ hal.executable private @check_no_cse {
 //      CHECK:    %[[DIVF:.+]] = arith.divf %[[FOR]]
 //      CHECK:    %[[RES:.+]] = vector.extract %[[DIVF]]
 //      CHECK:    memref.store %[[RES]]
+
+// -----
+
+// Checks that the ops are padded and vectorized. The test sets tiling sizes to
+// be non-divisible by problem sizes. If padding and vectorizing are kicked in,
+// vector ops will be generated.
+#compilation = #iree_codegen.compilation_info<
+    lowering_config = <tile_sizes = [[65, 65, 0], [8, 32, 0], [0, 0, 16]]>,
+    translation_info  = <CPUDoubleTilingPadExpert>,
+    workgroup_size = []>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @preset_config_matmul  {
+  hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
+    hal.executable.entry_point @preset_config_matmul layout(#executable_layout)
+    builtin.module {
+      func.func @preset_config_matmul() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %lhs_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:128x49xf32>
+        %rhs_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:49x512xf32>
+        %result_binding = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+            : !flow.dispatch.tensor<writeonly:128x512xf32>
+        %lhs = flow.dispatch.tensor.load %lhs_binding, offsets = [0, 0], sizes = [128, 49], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:128x49xf32> -> tensor<128x49xf32>
+        %rhs = flow.dispatch.tensor.load %rhs_binding, offsets = [0, 0], sizes = [49, 512], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:49x512xf32> -> tensor<49x512xf32>
+        %init = linalg.init_tensor [128, 512] : tensor<128x512xf32>
+        %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<128x512xf32>) -> tensor<128x512xf32>
+        %gemm = linalg.matmul {compilation_info = #compilation}
+            ins(%lhs, %rhs : tensor<128x49xf32>, tensor<49x512xf32>)
+            outs(%fill : tensor<128x512xf32>) -> tensor<128x512xf32>
+        flow.dispatch.tensor.store %gemm, %result_binding, offsets = [0, 0], sizes = [128, 512], strides = [1, 1]
+            : tensor<128x512xf32> -> !flow.dispatch.tensor<writeonly:128x512xf32>
+        return
+      }
+    }
+  }
+}
+// CHECK: func @preset_config_matmul
+// CHECK:   vector.outerproduct
