@@ -4,10 +4,10 @@
 // CHECK-DAG: #[[$ID1_MAP:.*]] = affine_map<(d0) -> (d0)>
 
 module {
-  // CHECK-LABEL: func @static_tile
+  // CHECK-LABEL: func.func @static_tile
   //  CHECK-SAME:   %[[CHUNK_SIZE:[0-9a-z]+]]: index
   //  CHECK-SAME:   %[[IN:[0-9a-z]+]]: tensor<?xf32>
-  func @static_tile(%chunk_size: index, %in: tensor<?xf32>, %out: tensor<?xf32>, %out2: tensor<?xf32>) -> (tensor<?xf32>) {
+  func.func @static_tile(%chunk_size: index, %in: tensor<?xf32>, %out: tensor<?xf32>, %out2: tensor<?xf32>) -> (tensor<?xf32>) {
     %c0 = arith.constant 0: index
 
     // CHECK: %[[M:.*]] = tensor.dim %{{.*}}, %{{.*}} : tensor<?xf32>

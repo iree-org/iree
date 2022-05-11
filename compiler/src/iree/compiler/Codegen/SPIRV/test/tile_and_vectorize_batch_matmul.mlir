@@ -63,7 +63,7 @@ hal.executable private @fused_fill_batch_matmul {
   }
 }
 
-//    CHECK-LABEL: func @fused_fill_batch_matmul
+//    CHECK-LABEL: func.func @fused_fill_batch_matmul
 //      CHECK-NOT:   vector.transfer
 //          CHECK:   %{{.+}}:8 = scf.for
 // CHECK-COUNT-12:     vector.transfer_read

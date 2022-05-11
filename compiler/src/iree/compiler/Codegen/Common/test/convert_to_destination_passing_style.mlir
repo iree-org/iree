@@ -31,7 +31,7 @@ func.func @matmul() {
   }
   return
 }
-//      CHECK: func @matmul()
+//      CHECK: func.func @matmul()
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //  CHECK-DAG:   %[[INIT:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -81,7 +81,7 @@ func.func @matmul_fill() {
   }
   return
 }
-//      CHECK: func @matmul_fill()
+//      CHECK: func.func @matmul_fill()
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //  CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -130,7 +130,7 @@ func.func @matmul_inplace() {
   }
   return
 }
-//      CHECK: func @matmul_inplace()
+//      CHECK: func.func @matmul_inplace()
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //  CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -159,7 +159,7 @@ func.func @reshape_simple() {
   flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
   return
 }
-//      CHECK: func @reshape_simple()
+//      CHECK: func.func @reshape_simple()
 //  CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //  CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //      CHECK:   %[[SOURCE:.+]] = flow.dispatch.tensor.load %[[ARG0]]
@@ -190,7 +190,7 @@ func.func @reshape_fused_source() {
   flow.dispatch.tensor.store %5, %1, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
   return
 }
-//      CHECK: func @reshape_fused_source()
+//      CHECK: func.func @reshape_fused_source()
 //  CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //  CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //      CHECK:   %[[TARGET:.+]] = flow.dispatch.tensor.load %[[RET0]]
@@ -227,7 +227,7 @@ func.func @reshape_fused_source_and_copyout() {
   flow.dispatch.tensor.store %4, %2, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
   return
 }
-//      CHECK: func @reshape_fused_source_and_copyout()
+//      CHECK: func.func @reshape_fused_source_and_copyout()
 //  CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //  CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //  CHECK-DAG:   %[[RET1:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -264,7 +264,7 @@ func.func @reshape_fused_target() {
   flow.dispatch.tensor.store %5, %1, offsets = [0], sizes = [12], strides = [1] : tensor<12xi32> -> !flow.dispatch.tensor<writeonly:12xi32>
   return
 }
-//      CHECK: func @reshape_fused_target()
+//      CHECK: func.func @reshape_fused_target()
 //  CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //  CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //  CHECK-DAG:   %[[SOURCE:.+]] = flow.dispatch.tensor.load %[[ARG0]]
@@ -313,7 +313,7 @@ func.func @cast_followed_by_store() {
   }
   return
 }
-//      CHECK: func @cast_followed_by_store()
+//      CHECK: func.func @cast_followed_by_store()
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //  CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -385,7 +385,7 @@ func.func @multi_result() {
   }
   return
 }
-//      CHECK: func @multi_result()
+//      CHECK: func.func @multi_result()
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //  CHECK-DAG:   %[[RESULT0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -461,7 +461,7 @@ func.func @unused_ins_operand() {
   }
   return
 }
-// CHECK-LABEL: func @unused_ins_operand()
+// CHECK-LABEL: func.func @unused_ins_operand()
 //   CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(2)
 //   CHECK-DAG:   %[[IN_VIEW:.+]] = flow.dispatch.tensor.load %[[IN]]
@@ -518,7 +518,7 @@ func.func @three_init_tensor_uses() {
   }
   return
 }
-// CHECK-LABEL: func @three_init_tensor_uses()
+// CHECK-LABEL: func.func @three_init_tensor_uses()
 //       CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //   CHECK-NOT:   linalg.init_tensor
 //       CHECK:   %[[LOAD:.+]] = flow.dispatch.tensor.load %[[OUTPUT]]
@@ -571,14 +571,14 @@ func.func @fill_matmul_exp() {
   }
   return
 }
-// CHECK-LABEL: func @fill_matmul_exp()
+// CHECK-LABEL: func.func @fill_matmul_exp()
 //       CHECK:   %[[MATMUL:.+]] = linalg.matmul
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       outs(%[[MATMUL]]
 
 // -----
 
-func @cumsum__2x2x2x2x2x2x2() {
+func.func @cumsum__2x2x2x2x2x2x2() {
   %cst = arith.constant dense<0.000000e+00> : tensor<2x2x2x2x2x2x2xf32>
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:3x2x2x2x2x2x2xf32>
@@ -599,7 +599,7 @@ func @cumsum__2x2x2x2x2x2x2() {
   return
 }
 
-// CHECK-LABEL: func @cumsum__2x2x2x2x2x2x2()
+// CHECK-LABEL: func.func @cumsum__2x2x2x2x2x2x2()
 //   CHECK-DAG:   %[[CST:.+]] = arith.constant 0.000000e+00 : f32
 //       CHECK:   %[[DST:.+]] = flow.dispatch.tensor.load {{.+}} !flow.dispatch.tensor<writeonly:2x2x2x2x2x2x2xf32> -> tensor<2x2x2x2x2x2x2xf32>
 //       CHECK:   %[[FILL:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[DST]]
@@ -608,7 +608,7 @@ func @cumsum__2x2x2x2x2x2x2() {
 
 // -----
 
-func @reduce_window_max_4x6xf32() {
+func.func @reduce_window_max_4x6xf32() {
   %cst = arith.constant dense<0xFF800000> : tensor<2x2xf32>
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:2x4x6xf32>
@@ -623,7 +623,7 @@ func @reduce_window_max_4x6xf32() {
   flow.dispatch.tensor.store %4, %1, offsets = [0, 0], sizes = [2, 2], strides = [1, 1] : tensor<2x2xf32> -> !flow.dispatch.tensor<writeonly:2x2xf32>
   return
 }
-// CHECK-LABEL: func @reduce_window_max_4x6xf32()
+// CHECK-LABEL: func.func @reduce_window_max_4x6xf32()
 //   CHECK-DAG:   %[[CST:.+]] = arith.constant 0xFF800000 : f32
 //       CHECK:   %[[DST:.+]] = flow.dispatch.tensor.load {{.+}} !flow.dispatch.tensor<writeonly:2x2xf32> -> tensor<2x2xf32>
 //       CHECK:   %[[FILL:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[DST]]
@@ -658,7 +658,7 @@ func.func @linalg_ext_reverse_dim0() {
   }
   return
 }
-//      CHECK: func @linalg_ext_reverse_dim0()
+//      CHECK: func.func @linalg_ext_reverse_dim0()
 //  CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //  CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //      CHECK:   scf.for %[[IV0:.+]] =
@@ -684,7 +684,7 @@ func.func @sort1D() {
   flow.dispatch.tensor.store %2, %0, offsets = [0], sizes = [4], strides = [1] : tensor<4xi32> -> !flow.dispatch.tensor<readwrite:4xi32>
   return
 }
-//      CHECK: func @sort1D()
+//      CHECK: func.func @sort1D()
 //  CHECK-DAG:   %[[BUF:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //  CHECK-DAG:   %[[IN:.+]] = flow.dispatch.tensor.load %[[BUF]]
 //      CHECK:   %[[SORT:.+]] = iree_linalg_ext.sort

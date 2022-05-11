@@ -81,7 +81,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
 //      CHECK: hal.executable.entry_point public @matmul_256x1024x128_div_sub
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
-//      CHECK: func @matmul_256x1024x128_div_sub()
+//      CHECK: func.func @matmul_256x1024x128_div_sub()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 

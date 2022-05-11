@@ -1,4 +1,4 @@
-func @main(
+func.func @main(
     %arg0: tensor<1x8x8x3xf32> {iree.identifier = "a"},
     %arg1: tensor<1x8x8x3xf32> {iree.identifier = "b"},
     %arg2: tensor<1x8x8x3xf32> {iree.identifier = "c"},

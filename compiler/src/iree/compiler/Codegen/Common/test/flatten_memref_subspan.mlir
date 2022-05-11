@@ -7,7 +7,7 @@ func.func @load_subspan_with_offset(%offset : index, %i0: index, %i1: index, %i2
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 * 56 + s1 * 8 + s2 + s3 floordiv 4)>
-//      CHECK: func @load_subspan_with_offset
+//      CHECK: func.func @load_subspan_with_offset
 // CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
 //  CHECK-DAG:   %[[ZERO:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[C336:.+]] = arith.constant 336 : index
@@ -25,7 +25,7 @@ func.func @store_subspan_with_offset(%value: f32, %offset : index, %i0: index, %
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 * 12 + s1 * 4 + s2 + s3 floordiv 4)>
-//      CHECK: func @store_subspan_with_offset
+//      CHECK: func.func @store_subspan_with_offset
 // CHECK-SAME: (%[[VALUE:.+]]: f32, %[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
 //  CHECK-DAG:   %[[ZERO:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[C24:.+]] = arith.constant 24 : index
@@ -42,7 +42,7 @@ func.func @load_subspan_with_vector_element(%offset : index, %i0: index, %i1: in
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 * 56 + s1 * 8 + s2 + s3 floordiv 16)>
-//      CHECK: func @load_subspan_with_vector_element
+//      CHECK: func.func @load_subspan_with_vector_element
 //      CHECK:   affine.apply #[[MAP]]()
 
 // -----
@@ -54,7 +54,7 @@ func.func @load_subspan_with_16bit_element(%offset : index, %i0: index, %i1: ind
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 * 56 + s1 * 8 + s2 + s3 floordiv 2)>
-//      CHECK: func @load_subspan_with_16bit_element
+//      CHECK: func.func @load_subspan_with_16bit_element
 //      CHECK:   affine.apply #[[MAP]]()
 
 // -----
@@ -68,7 +68,7 @@ func.func @store_subspan_with_leading_dynamic_dim(%value: f32, %offset : index, 
 
 //      CHECK: #[[SIZE_MAP:.+]] = affine_map<()[s0] -> (s0 * 12)
 //      CHECK: #[[OFFSET_MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 * 12 + s1 * 4 + s2 + s3 floordiv 4)>
-//      CHECK: func @store_subspan_with_leading_dynamic_dim
+//      CHECK: func.func @store_subspan_with_leading_dynamic_dim
 // CHECK-SAME: (%[[VALUE:.+]]: f32, %[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   %[[DIM:.+]] = hal.interface.constant.load[0] : index
@@ -91,7 +91,7 @@ func.func @store_subspan_with_all_dynamic_dim(%value: f32, %offset : index, %i0:
 
 //      CHECK: #[[SIZE_MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (((s0 * s1) * s2) * s3)>
 //      CHECK: #[[OFFSET_MAP:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5, s6, s7] -> (s1 + (s3 + (s6 + s4 * s5) * s2) * s0 + s7 floordiv 4)>
-//      CHECK: func @store_subspan_with_all_dynamic_dim
+//      CHECK: func.func @store_subspan_with_all_dynamic_dim
 // CHECK-SAME: (%[[VALUE:.+]]: f32, %[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index, %[[I3:.+]]: index)
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   %[[DIM0:.+]] = hal.interface.constant.load[0] : index
@@ -115,7 +115,7 @@ func.func @store_subspan_with_mixed_dynamic_dim(%value: f32, %offset : index, %i
 
 //      CHECK: #[[SIZE_MAP:.+]] = affine_map<()[s0, s1] -> ((s0 * s1) * 32)>
 //      CHECK: #[[OFFSET_MAP:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5] -> (s0 + s2 * 8 + ((s3 * 4 + s4) * s1) * 8 + s5 floordiv 4)>
-//      CHECK: func @store_subspan_with_mixed_dynamic_dim
+//      CHECK: func.func @store_subspan_with_mixed_dynamic_dim
 // CHECK-SAME: (%[[VALUE:.+]]: f32, %[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index, %[[I3:.+]]: index)
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   %[[DIM0:.+]] = hal.interface.constant.load[0] : index
@@ -138,7 +138,7 @@ func.func @store_subspan_with_flow_control(%value: f32, %offset : index, %i0: in
 
 //      CHECK: #[[SIZE_MAP:.+]] = affine_map<()[s0] -> (s0 * 12)
 //      CHECK: #[[OFFSET_MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 * 12 + s1 * 4 + s2 + s3 floordiv 4)>
-//      CHECK: func @store_subspan_with_flow_control
+//      CHECK: func.func @store_subspan_with_flow_control
 // CHECK-SAME: (%[[VALUE:.+]]: f32, %[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   %[[DIM:.+]] = hal.interface.constant.load[0] : index
@@ -158,7 +158,7 @@ func.func @load_store_alloc_static(%value : f32, %i0: index, %i1 : index, %i2: i
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 * 12 + s1 * 4 + s2)>
-//      CHECK: func @load_store_alloc_static
+//      CHECK: func.func @load_store_alloc_static
 // CHECK-SAME: (%[[VAL:.+]]: f32, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
 //      CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<24xf32, 3>
 //      CHECK:   %[[INDEX0:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[I2]]]
@@ -179,7 +179,7 @@ func.func @load_store_alloca_dynamic(%value : f32, %dim0 : index, %dim1: index, 
 
 //      CHECK: #[[SIZE_MAP:.+]] = affine_map<()[s0, s1, s2] -> ((s0 * s1) * s2)>
 //      CHECK: #[[INDEX_MAP:.+]] = affine_map<()[s0, s1, s2, s3, s4] -> (s1 + (s4 + s2 * s3) * s0)>
-// CHECK: func @load_store_alloca_dynamic
+// CHECK: func.func @load_store_alloca_dynamic
 // CHECK-SAME: (%[[VAL:.+]]: f32, %[[DIM0:.+]]: index, %[[DIM1:.+]]: index, %[[DIM2:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
 //      CHECK:   %[[SIZE:.+]] = affine.apply #[[SIZE_MAP]]()[%[[DIM0]], %[[DIM1]], %[[DIM2]]]
 //      CHECK:   %[[ALLOC:.+]] = memref.alloca(%[[SIZE]]) : memref<?xf32>
@@ -199,7 +199,7 @@ func.func @use_subspan_with_unrealized_conversion_cast(%offset : index, %i: inde
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1] -> (s0 + s1 floordiv 4)>
-//      CHECK: func @use_subspan_with_unrealized_conversion_cast
+//      CHECK: func.func @use_subspan_with_unrealized_conversion_cast
 // CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I:.+]]: index)
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%[[C0]]) : memref<?xf32>
@@ -217,7 +217,7 @@ func.func @load_global_with_offset(%i0: index, %i1: index, %i2: index, %i3: inde
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 * 3 + s1 + s2 + s3)>
 //      CHECK: memref.global "private" constant @constant_3x3x1x1xf32 : memref<9xf32> = dense<[-1.000000e+00, 0.000000e+00, 1.000000e+00, -2.000000e+00, 0.000000e+00, 2.000000e+00, -1.000000e+00, 0.000000e+00, 1.000000e+00]>
-//      CHECK: func @load_global_with_offset
+//      CHECK: func.func @load_global_with_offset
 // CHECK-SAME: (%[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index, %[[I3:.+]]: index)
 //      CHECK:   %[[GLOBAL:.+]] = memref.get_global @constant_3x3x1x1xf32 : memref<9xf32>
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[I2]], %[[I3]]]
@@ -235,7 +235,7 @@ func.func @transfer_read_subspan_with_offset(
 }
 
 //      CHECK: #[[MAP:.+]] =  affine_map<()[s0, s1, s2] -> (s0 * 56 + s1 * 8 + s2)>
-//      CHECK: func @transfer_read_subspan_with_offset
+//      CHECK: func.func @transfer_read_subspan_with_offset
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index
@@ -255,7 +255,7 @@ func.func @transfer_write_subspan_with_offset(
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 * 56 + s1 * 8 + s2)>
-//      CHECK: func @transfer_write_subspan_with_offset
+//      CHECK: func.func @transfer_write_subspan_with_offset
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index
@@ -276,7 +276,7 @@ func.func @load_store_rank_zero_subspan_with_offset(%offset : index) {
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 floordiv 4)>
-//      CHECK: func @load_store_rank_zero_subspan_with_offset
+//      CHECK: func.func @load_store_rank_zero_subspan_with_offset
 // CHECK-SAME: (%[[OFFSET:.+]]: index)
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
@@ -297,7 +297,7 @@ func.func @collapse_shape(%offset : index, %i0 : index, %i1 : index) -> f32 {
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 * 42 + s1 + s2 floordiv 4)>
-//      CHECK: func @collapse_shape
+//      CHECK: func.func @collapse_shape
 // CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index)
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[SIZE:.+]] = arith.constant 840 : index
@@ -315,7 +315,7 @@ func.func @expand_shape(%offset : index, %i0: index, %i1: index, %i2: index, %i3
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3, s4] -> (s0 * 210 + s1 * 42 + s2 * 7 + s3 + s4 floordiv 4)>
-//      CHECK: func @expand_shape
+//      CHECK: func.func @expand_shape
 // CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index, %[[I3:.+]]: index)
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[SIZE:.+]] = arith.constant 840 : index
@@ -334,7 +334,7 @@ func.func @load_store_rank_one_static_size_subspan_with_offset(%offset : index, 
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1] -> (s0 + s1 floordiv 4)>
-//      CHECK: func @load_store_rank_one_static_size_subspan_with_offset
+//      CHECK: func.func @load_store_rank_one_static_size_subspan_with_offset
 // CHECK-SAME: %[[OFFSET:.+]]: index, %[[I:.+]]: index
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index

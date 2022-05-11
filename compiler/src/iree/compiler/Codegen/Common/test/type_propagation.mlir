@@ -18,7 +18,7 @@ func.func @generic_op_illegal_operand() {
   flow.dispatch.tensor.store %5, %1, offsets = [0], sizes=[%d], strides=[1] : tensor<?xi8> -> !flow.dispatch.tensor<writeonly:?xi8>{%d}
   return
 }
-// CHECK-LABEL: func @generic_op_illegal_operand()
+// CHECK-LABEL: func.func @generic_op_illegal_operand()
 //   CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //   CHECK-DAG:   %[[INTENSOR:.+]] = flow.dispatch.tensor.load %[[IN]]
@@ -52,7 +52,7 @@ func.func @generic_op_illegal_operand_i7() {
   flow.dispatch.tensor.store %5, %1, offsets = [0], sizes=[%d], strides=[1] : tensor<?xi8> -> !flow.dispatch.tensor<writeonly:?xi8>{%d}
   return
 }
-// CHECK-LABEL: func @generic_op_illegal_operand_i7()
+// CHECK-LABEL: func.func @generic_op_illegal_operand_i7()
 //   CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //   CHECK-DAG:   %[[INTENSOR:.+]] = flow.dispatch.tensor.load %[[IN]]
@@ -86,7 +86,7 @@ func.func @generic_op_illegal_operand_i33() {
   flow.dispatch.tensor.store %5, %1, offsets = [0], sizes=[%d], strides=[1] : tensor<?xi64> -> !flow.dispatch.tensor<writeonly:?xi64>{%d}
   return
 }
-// CHECK-LABEL: func @generic_op_illegal_operand_i33()
+// CHECK-LABEL: func.func @generic_op_illegal_operand_i33()
 //   CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //   CHECK-DAG:   %[[INTENSOR:.+]] = flow.dispatch.tensor.load %[[IN]]
@@ -121,7 +121,7 @@ func.func @generic_op_illegal_result() {
   flow.dispatch.tensor.store %5, %1, offsets = [0], sizes=[%d], strides=[1] : tensor<?xi8> -> !flow.dispatch.tensor<writeonly:?xi8>{%d}
   return
 }
-// CHECK-LABEL: func @generic_op_illegal_result()
+// CHECK-LABEL: func.func @generic_op_illegal_result()
 //   CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //   CHECK-DAG:   %[[INTENSOR:.+]] = flow.dispatch.tensor.load %[[IN]]
@@ -150,7 +150,7 @@ func.func @tensor_extract() {
   flow.dispatch.tensor.store %5, %1, offsets = [%offset], sizes=[%size], strides=[1] : tensor<?xi8> -> !flow.dispatch.tensor<writeonly:?xi8>{%d}
   return
 }
-// CHECK-LABEL: func @tensor_extract()
+// CHECK-LABEL: func.func @tensor_extract()
 //   CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //   CHECK-DAG:   %[[INTENSOR:.+]] = flow.dispatch.tensor.load %[[IN]]
@@ -175,7 +175,7 @@ func.func @tensor_insert() {
   flow.dispatch.tensor.store %8, %2, offsets = [0], sizes=[%d], strides=[1] : tensor<?xi8> -> !flow.dispatch.tensor<writeonly:?xi8>{%d}
   return
 }
-// CHECK-LABEL: func @tensor_insert()
+// CHECK-LABEL: func.func @tensor_insert()
 //   CHECK-DAG:   %[[IN1:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[IN2:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(2)
@@ -206,7 +206,7 @@ func.func @for_loop() {
   flow.dispatch.tensor.store %8, %1, offsets=[0], sizes=[%d], strides=[1]: tensor<?xi8> -> !flow.dispatch.tensor<writeonly:?xi8>{%d}
   return
 }
-// CHECK-LABEL: func @for_loop()
+// CHECK-LABEL: func.func @for_loop()
 //   CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //   CHECK-DAG:   %[[INTENSOR:.+]] = flow.dispatch.tensor.load %[[IN]]
@@ -230,7 +230,7 @@ func.func @fill_op() {
   flow.dispatch.tensor.store %3, %0, offsets=[0], sizes=[%d], strides=[1] : tensor<?xi8> -> !flow.dispatch.tensor<writeonly:?xi8>{%d}
   return
 }
-// CHECK-LABEL: func @fill_op()
+// CHECK-LABEL: func.func @fill_op()
 //   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor
 //   CHECK-DAG:   %[[FALSE:.+]] = arith.constant false

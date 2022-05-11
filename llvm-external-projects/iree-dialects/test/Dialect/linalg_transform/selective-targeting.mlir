@@ -1,7 +1,7 @@
 // RUN: iree-dialects-opt %s --linalg-transform-interp --split-input-file | FileCheck %s
 
-// CHECK-LABEL: func @matmul_tensors(
-func @matmul_tensors(
+// CHECK-LABEL: func.func @matmul_tensors(
+func.func @matmul_tensors(
   %arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32>,
   %arg3: tensor<128x128xf32>, %arg4: tensor<128x128xf32>, %arg5: tensor<128x128xf32>,
   %arg6: tensor<128x128xf32> {linalg.inplaceable = true})
@@ -84,7 +84,7 @@ transform.with_pdl_patterns {
 // -----
 
 // CHECK-LABEL: @vectorize_one
-func @vectorize_one(
+func.func @vectorize_one(
   %arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32>,
   %arg3: tensor<128x128xf32> {linalg.inplaceable = true})
     -> tensor<128x128xf32> {
@@ -123,7 +123,7 @@ transform.with_pdl_patterns {
 // -----
 
 // CHECK-LABEL: @vectorize_all
-func @vectorize_all(
+func.func @vectorize_all(
   %arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32>,
   %arg3: tensor<128x128xf32> {linalg.inplaceable = true})
     -> tensor<128x128xf32> {

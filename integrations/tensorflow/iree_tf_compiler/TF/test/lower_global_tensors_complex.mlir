@@ -6,7 +6,7 @@
 module attributes {tf_saved_model.semantics} {
 
 // CHECK:      iree_input.global private mutable [[V:@.+]] : tensor<?xf32> = dense<1.000000e+00> : tensor<1xf32>
-// CHECK:      func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}) attributes {tf_saved_model.exported_names = ["f"]} {
+// CHECK:      func.func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}) attributes {tf_saved_model.exported_names = ["f"]} {
 // CHECK-NEXT:   [[PTR:%.+]] = iree_input.global.address [[V]] : !iree_input.ptr<tensor<?xf32>>
 // CHECK-NEXT:   cf.br ^bb1([[PTR]] : !iree_input.ptr<tensor<?xf32>>)
 // CHECK-NEXT: ^bb1([[PTR1:%.+]]: !iree_input.ptr<tensor<?xf32>>):   // pred: ^bb0
@@ -15,7 +15,7 @@ module attributes {tf_saved_model.semantics} {
 
 
   "tf_saved_model.global_tensor"() { is_mutable, sym_name = "v", type = tensor<?xf32>, value = dense<1.> : tensor<1xf32> } : () -> ()
-  func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}, %arg1: tensor<!tf_type.resource<tensor<?xf32>>> {tf_saved_model.bound_input = @v}) attributes {tf_saved_model.exported_names = ["f"]} {
+  func.func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}, %arg1: tensor<!tf_type.resource<tensor<?xf32>>> {tf_saved_model.bound_input = @v}) attributes {tf_saved_model.exported_names = ["f"]} {
     cf.br ^bb1(%arg1 : tensor<!tf_type.resource<tensor<?xf32>>>)
   ^bb1(%r: tensor<!tf_type.resource<tensor<?xf32>>>):
     "tf.AssignVariableOp"(%r, %arg0) : (tensor<!tf_type.resource<tensor<?xf32>>>, tensor<?xf32>) -> ()
@@ -30,7 +30,7 @@ module attributes {tf_saved_model.semantics} {
 
 // CHECK:      iree_input.global private mutable [[V:@.+]] : tensor<?xf32> = dense<1.000000e+00> : tensor<1xf32>
 // CHECK:      iree_input.global private mutable [[V1:@.+]] : tensor<?xf32> = dense<1.000000e+00> : tensor<1xf32>
-// CHECK:      func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}) -> (tensor<?xf32> {tf_saved_model.index_path = [0]}) attributes {tf_saved_model.exported_names = ["f"]} {
+// CHECK:      func.func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}) -> (tensor<?xf32> {tf_saved_model.index_path = [0]}) attributes {tf_saved_model.exported_names = ["f"]} {
 // CHECK-NEXT:   [[PTR0:%.+]] = iree_input.global.address [[V]] : !iree_input.ptr<tensor<?xf32>>
 // CHECK-NEXT:   [[PTR1:%.+]] = iree_input.global.address [[V1]] : !iree_input.ptr<tensor<?xf32>>
 // CHECK-NEXT:   %[[FALSE:.+]] = arith.constant false
@@ -41,7 +41,7 @@ module attributes {tf_saved_model.semantics} {
 
   "tf_saved_model.global_tensor"() { is_mutable, sym_name = "v", type = tensor<?xf32>, value = dense<1.> : tensor<1xf32> } : () -> ()
   "tf_saved_model.global_tensor"() { is_mutable, sym_name = "v1", type = tensor<?xf32>, value = dense<1.> : tensor<1xf32> } : () -> ()
-  func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}, %v: tensor<!tf_type.resource<tensor<?xf32>>> {tf_saved_model.bound_input = @v}, %v1: tensor<!tf_type.resource<tensor<?xf32>>> {tf_saved_model.bound_input = @v1}) -> (tensor<?xf32> {tf_saved_model.index_path = [0]}) attributes {tf_saved_model.exported_names = ["f"]} {
+  func.func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}, %v: tensor<!tf_type.resource<tensor<?xf32>>> {tf_saved_model.bound_input = @v}, %v1: tensor<!tf_type.resource<tensor<?xf32>>> {tf_saved_model.bound_input = @v1}) -> (tensor<?xf32> {tf_saved_model.index_path = [0]}) attributes {tf_saved_model.exported_names = ["f"]} {
     %pred = arith.constant false
     cf.cond_br %pred, ^bb1(%v : tensor<!tf_type.resource<tensor<?xf32>>>), ^bb1(%v1 : tensor<!tf_type.resource<tensor<?xf32>>>)
   ^bb1(%either: tensor<!tf_type.resource<tensor<?xf32>>>):
@@ -56,7 +56,7 @@ module attributes {tf_saved_model.semantics} {
 module attributes {tf_saved_model.semantics} {
 
 // CHECK:      iree_input.global private mutable [[V:@.+]] : tensor<?xf32> = dense<1.000000e+00> : tensor<1xf32>
-// CHECK:      func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}) attributes {tf_saved_model.exported_names = ["f"]} {
+// CHECK:      func.func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}) attributes {tf_saved_model.exported_names = ["f"]} {
 // CHECK-NEXT:   [[PTR:%.+]] = iree_input.global.address [[V]] : !iree_input.ptr<tensor<?xf32>>
 // CHECK-NEXT:   cf.br ^bb1([[PTR]], [[PTR]], [[PTR]] : !iree_input.ptr<tensor<?xf32>>, !iree_input.ptr<tensor<?xf32>>, !iree_input.ptr<tensor<?xf32>>)
 // CHECK-NEXT: ^bb1([[PTR0:%.+]]: !iree_input.ptr<tensor<?xf32>>, [[PTR1:%.+]]: !iree_input.ptr<tensor<?xf32>>, [[PTR2:%.+]]: !iree_input.ptr<tensor<?xf32>>):       // 2 preds: ^bb0, ^bb1
@@ -64,7 +64,7 @@ module attributes {tf_saved_model.semantics} {
 // CHECK-NEXT:   cf.br ^bb1([[PTR1]], [[PTR2]], [[PTR0]] : !iree_input.ptr<tensor<?xf32>>, !iree_input.ptr<tensor<?xf32>>, !iree_input.ptr<tensor<?xf32>>)
 
   "tf_saved_model.global_tensor"() { is_mutable, sym_name = "v", type = tensor<?xf32>, value = dense<1.> : tensor<1xf32> } : () -> ()
-  func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}, %arg1: tensor<!tf_type.resource<tensor<?xf32>>> {tf_saved_model.bound_input = @v}) attributes {tf_saved_model.exported_names = ["f"]} {
+  func.func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}, %arg1: tensor<!tf_type.resource<tensor<?xf32>>> {tf_saved_model.bound_input = @v}) attributes {tf_saved_model.exported_names = ["f"]} {
     cf.br ^bb1(%arg1, %arg1, %arg1 : tensor<!tf_type.resource<tensor<?xf32>>>, tensor<!tf_type.resource<tensor<?xf32>>>, tensor<!tf_type.resource<tensor<?xf32>>>)
   ^bb1(%0: tensor<!tf_type.resource<tensor<?xf32>>>, %1: tensor<!tf_type.resource<tensor<?xf32>>>, %2: tensor<!tf_type.resource<tensor<?xf32>>>):
     "tf.AssignVariableOp"(%0, %arg0) : (tensor<!tf_type.resource<tensor<?xf32>>>, tensor<?xf32>) -> ()

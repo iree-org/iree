@@ -10,7 +10,7 @@ module {
 
 // CHECK-DAG: util.global private @[[MAIN_IN_0:.+]] {noinline} = dense<{{.*}}> : tensor<5x3xf32>
 // CHECK-DAG: util.global private @[[MAIN_IN_1:.+]] {noinline} = dense<{{.*}}> : tensor<3x5xf32>
-//     CHECK: func @two_dispatch_benchmark()
+//     CHECK: func.func @two_dispatch_benchmark()
 // CHECK-DAG: %[[ARG0:.+]] = util.global.load @[[MAIN_IN_0]] : tensor<5x3xf32>
 // CHECK-DAG: %[[ARG1:.+]] = util.global.load @[[MAIN_IN_1]] : tensor<3x5xf32>
 //     CHECK: %[[RET:.+]]:2 = call @two_dispatch(%[[ARG0]], %[[ARG1]])
@@ -34,7 +34,7 @@ func.func @while(%start: tensor<i32>, %bound: tensor<i32>) -> tensor<i32> {
 
 //     CHECK: util.global private @_benchmark_input_0 {noinline} = dense<0> : tensor<i32>
 //     CHECK: util.global private @_benchmark_input_1 {noinline} = dense<0> : tensor<i32>
-//     CHECK: func @while_benchmark() attributes {iree.abi.stub, iree.reflection = {iree.benchmark = "entry"}} {
+//     CHECK: func.func @while_benchmark() attributes {iree.abi.stub, iree.reflection = {iree.benchmark = "entry"}} {
 // CHECK-DAG:   %[[ARG0:.+]] = util.global.load @_benchmark_input_0 : tensor<i32>
 // CHECK-DAG:   %[[ARG1:.+]] = util.global.load @_benchmark_input_1 : tensor<i32>
 //     CHECK:   %[[RET0:.+]] = call @while(%[[ARG0]], %[[ARG1]])

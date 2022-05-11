@@ -33,7 +33,7 @@ func.func @dot() {
   return
 }
 
-//    CHECK-LABEL: func @dot
+//    CHECK-LABEL: func.func @dot
 // CHECK-COUNT-4:   vector.transfer_write {{.*}} : vector<16x16xf32>, memref<32x32xf32
 //         CHECK:   scf.for
 // CHECK-COUNT-4:     vector.transfer_read {{.*}} {in_bounds = [true, true]} : memref<32x16xf32, #{{.*}}>, vector<16x8xf32>

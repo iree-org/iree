@@ -1,8 +1,8 @@
 // RUN: iree-opt %s --outline-one-parent-loop="anchor-func=test anchor-op=scf.yield parent-loop-num=1 result-func-name=foo" | FileCheck %s
 // RUN: iree-opt %s --outline-one-parent-loop="anchor-func=matmul anchor-op=vector.contract parent-loop-num=2 result-func-name=bar" | FileCheck %s --check-prefix=MATMUL
 
-// CHECK-LABEL: func @foo
-// CHECK-LABEL: func @test
+// CHECK-LABEL: func.func @foo
+// CHECK-LABEL: func.func @test
 func.func @test(%ub: index, %it: index) -> index {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -12,8 +12,8 @@ func.func @test(%ub: index, %it: index) -> index {
   return %res: index
 }
 
-// MATMUL-LABEL: func @bar
-// MATMUL-LABEL: func @matmul
+// MATMUL-LABEL: func.func @bar
+// MATMUL-LABEL: func.func @matmul
 func.func @matmul(%arg0: tensor<24x48xf32> {linalg.buffer_layout = affine_map<(d0, d1) -> (d0, d1)>, linalg.inplaceable = false}, %arg1: tensor<48x32xf32> {linalg.buffer_layout = affine_map<(d0, d1) -> (d0, d1)>, linalg.inplaceable = false}, %arg2: tensor<24x32xf32> {linalg.buffer_layout = affine_map<(d0, d1) -> (d0, d1)>, linalg.inplaceable = true}) -> tensor<24x32xf32> attributes {passthrough = ["noinline", ["target-cpu", "skylake-avx512"], ["prefer-vector-width", "512"]]} {
   %c0 = arith.constant 0 : index
   %c32 = arith.constant 32 : index
@@ -100,9 +100,9 @@ func.func public @main(%arg0: tensor<24x48xf32> {linalg.buffer_layout = affine_m
   %c0 = arith.constant 0 : index
   %0 = memref.dim %arg3, %c0 : memref<?xi64>
   %1 = scf.for %arg4 = %c0 to %0 step %c1 iter_args(%arg5 = %arg2) -> (tensor<24x32xf32>) {
-    %2 = call @nano_time() : () -> i64
-    %3 = call @matmul(%arg0, %arg1, %arg5) : (tensor<24x48xf32>, tensor<48x32xf32>, tensor<24x32xf32>) -> tensor<24x32xf32>
-    %4 = call @nano_time() : () -> i64
+    %2 = func.call @nano_time() : () -> i64
+    %3 = func.call @matmul(%arg0, %arg1, %arg5) : (tensor<24x48xf32>, tensor<48x32xf32>, tensor<24x32xf32>) -> tensor<24x32xf32>
+    %4 = func.call @nano_time() : () -> i64
     %5 = arith.subi %4, %2 : i64
     memref.store %5, %arg3[%arg4] : memref<?xi64>
     scf.yield %3 : tensor<24x32xf32>

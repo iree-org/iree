@@ -6,7 +6,7 @@ func.func @matmul(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tens
       outs(%arg2 : tensor<?x?xf32>) -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
-//      CHECK: func @matmul(
+//      CHECK: func.func @matmul(
 //      CHECK:   scf.for
 // CHECK-SAME:   {
 //      CHECK:     scf.for
@@ -26,7 +26,7 @@ func.func @matmul(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tens
       outs(%arg2 : tensor<20x80xf32>) -> tensor<20x80xf32>
   return %0 : tensor<20x80xf32>
 }
-//      CHECK: func @matmul_static(
+//      CHECK: func.func @matmul_static(
 //      CHECK:   scf.for
 // CHECK-SAME:   {
 //      CHECK:     scf.for

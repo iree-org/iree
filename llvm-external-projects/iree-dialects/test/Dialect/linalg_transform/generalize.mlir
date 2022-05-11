@@ -1,8 +1,8 @@
 // RUN: iree-dialects-opt --linalg-transform-interp %s | FileCheck %s
 
 
-// CHECK-LABEL: func @generalize_unary
-func @generalize_unary(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> {
+// CHECK-LABEL: func.func @generalize_unary
+func.func @generalize_unary(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> {
 
   // CHECK-NOT:   linalg.elemwise_unary
   //     CHECK:   linalg.generic

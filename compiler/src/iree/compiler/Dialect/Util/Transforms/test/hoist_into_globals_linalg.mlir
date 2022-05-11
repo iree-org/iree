@@ -6,7 +6,7 @@
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 module @compute_hoisted {
   // CHECK: util.global private @[[HOISTED:.*]] : tensor<5x6xf32>
-  // CHECK: func @main
+  // CHECK: func.func @main
   func.func @main() -> (tensor<5x6xf32>) {
     %cst_0 = arith.constant dense<1.270000e+02> : tensor<f32>
 
@@ -41,7 +41,7 @@ module @compute_hoisted {
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 module @broadcast_treated_as_leaf {
   // CHECK-NOT: util.global
-  // CHECK: func @main
+  // CHECK: func.func @main
   func.func @main() -> (tensor<5x6xf32>) {
     %cst_0 = arith.constant dense<1.270000e+02> : tensor<f32>
     // CHECK: linalg.init_tensor

@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --iree-spirv-vectorize-load-store --canonicalize -cse --mlir-print-local-scope %s | FileCheck %s
 
-// CHECK-LABEL: func @alloc_copy
+// CHECK-LABEL: func.func @alloc_copy
 //  CHECK-SAME: (%[[ARG0:.+]]: memref<4096x1024xvector<4xf32>>, %[[X:.+]]: index, %[[Y:.+]]: index)
 //       CHECK: %[[ALLOC:.+]] = memref.alloc() : memref<128x8xvector<4xf32>, 3>
 //       CHECK: %[[IDX:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 4)>()[%[[Y]]]
@@ -24,7 +24,7 @@ func.func @alloc_copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
 
 // Test that the memref is not vectorized if used by scalar load or store.
 
-// CHECK-LABEL: func @alloc_copy
+// CHECK-LABEL: func.func @alloc_copy
 //  CHECK-SAME: %[[ARG0:.+]]: memref<4096x4096xf32>
 func.func @alloc_copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
   %cst = arith.constant 0.000000e+00 : f32
@@ -37,7 +37,7 @@ func.func @alloc_copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
 
 // -----
 
-// CHECK-LABEL: func @resource_copy
+// CHECK-LABEL: func.func @resource_copy
 //     CHECK: %[[A:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4096x1024xvector<4xf32>>
 //     CHECK: %[[B:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<4096x1024xvector<4xf32>>
 //     CHECK: %[[V:.+]] = memref.load %[[A]][%{{.*}}, %{{.*}}] : memref<4096x1024xvector<4xf32>>
@@ -58,7 +58,7 @@ func.func @resource_copy() {
 
 // -----
 
-// CHECK-LABEL: func @resource_copy_f16
+// CHECK-LABEL: func.func @resource_copy_f16
 //     CHECK: %[[A:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4096x1024xvector<4xf16>>
 //     CHECK: %[[B:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<4096x1024xvector<4xf16>>
 //     CHECK: %[[V:.+]] = memref.load %[[A]][%{{.*}}, %{{.*}}] : memref<4096x1024xvector<4xf16>>
@@ -79,7 +79,7 @@ func.func @resource_copy_f16() {
 
 // -----
 
-// CHECK-LABEL: func @resource_copy_8xf16
+// CHECK-LABEL: func.func @resource_copy_8xf16
 //     CHECK: %[[A:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4096x512xvector<4xf32>>
 //     CHECK: %[[B:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<4096x512xvector<4xf32>>
 //     CHECK: %[[V:.+]] = memref.load %[[A]][%{{.*}}, %{{.*}}] : memref<4096x512xvector<4xf32>>
@@ -100,7 +100,7 @@ func.func @resource_copy_8xf16() {
 
 // -----
 
-// CHECK-LABEL: func @resource_copy_dynamic_shape()
+// CHECK-LABEL: func.func @resource_copy_dynamic_shape()
 func.func @resource_copy_dynamic_shape() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -128,7 +128,7 @@ func.func @resource_copy_dynamic_shape() {
 
 // -----
 
-// CHECK-LABEL: func @resource_copy_dynamic_last_dim()
+// CHECK-LABEL: func.func @resource_copy_dynamic_last_dim()
 func.func @resource_copy_dynamic_last_dim() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -144,7 +144,7 @@ func.func @resource_copy_dynamic_last_dim() {
 
 // -----
 
-// CHECK-LABEL: func @do_not_vectorize_odd_vector_size
+// CHECK-LABEL: func.func @do_not_vectorize_odd_vector_size
 func.func @do_not_vectorize_odd_vector_size() {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
@@ -176,7 +176,7 @@ func.func @vectorize_binding_subspan() {
 
 // -----
 
-// CHECK-LABEL: func @scalarize_vector_transfer_op
+// CHECK-LABEL: func.func @scalarize_vector_transfer_op
 func.func @scalarize_vector_transfer_op(%arg: vector<3xf32>) -> (vector<3xf32>) {
   %c0 = arith.constant 0: index
   %c3 = arith.constant 3: index
@@ -209,7 +209,7 @@ func.func @scalarize_vector_transfer_op(%arg: vector<3xf32>) -> (vector<3xf32>) 
 // -----
 
 
-// CHECK-LABEL: func @scalarize_non_minor_identity_transfer_write
+// CHECK-LABEL: func.func @scalarize_non_minor_identity_transfer_write
 //  CHECK-SAME: (%[[VALUE:.+]]: vector<4xf32>, %[[I1:.+]]: index, %[[I2:.+]]: index)
 func.func @scalarize_non_minor_identity_transfer_write(%value: vector<4xf32>, %i1: index, %i2: index) {
   %c0 = arith.constant 0: index

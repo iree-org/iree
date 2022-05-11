@@ -38,7 +38,7 @@ hal.executable private @static_1d_sort {
 //       CHECK: hal.executable.entry_point public @static_1d_sort
 //  CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [1 : index, 1 : index, 1 : index]
-//       CHECK: func @static_1d_sort()
+//       CHECK: func.func @static_1d_sort()
 //       CHECK:   iree_linalg_ext.sort
 //  CHECK-SAME:     lowering_config = #[[CONFIG]]
 
@@ -87,7 +87,7 @@ hal.executable private @static_3d_sort {
 //      CHECK: hal.executable.entry_point public @static_3d_sort
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
-//      CHECK: func @static_3d_sort()
+//      CHECK: func.func @static_3d_sort()
 //      CHECK:   iree_linalg_ext.sort
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
@@ -132,7 +132,7 @@ hal.executable private @static_1d_fft_stage2 {
 //       CHECK: hal.executable.entry_point public @static_1d_fft_stage2
 //  CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
-//       CHECK: func @static_1d_fft_stage2()
+//       CHECK: func.func @static_1d_fft_stage2()
 //       CHECK:   iree_linalg_ext.fft
 //  CHECK-SAME:     lowering_config = #[[CONFIG]]
 
@@ -181,6 +181,6 @@ hal.executable private @static_3d_fft_stage3 {
 //       CHECK: hal.executable.entry_point public @static_3d_fft_stage3
 //  CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
-//       CHECK: func @static_3d_fft_stage3()
+//       CHECK: func.func @static_3d_fft_stage3()
 //       CHECK:   iree_linalg_ext.fft
 //  CHECK-SAME:     lowering_config = #[[CONFIG]]

@@ -20,7 +20,7 @@ func.func @loop_carried_vector_shape_cast(%arg0: vector<4xf32>, %arg1: vector<4x
   return %21, %22 : vector<4xf32>, vector<4xf32>
 }
 
-// CHECK-LABEL:   func @loop_carried_vector_shape_cast
+// CHECK-LABEL:   func.func @loop_carried_vector_shape_cast
 //   CHECK-NOT:     vector.shape_cast
 //       CHECK:     scf.for {{.*}} -> (vector<4xf32>, vector<4xf32>) {
 //   CHECK-NOT:       vector.shape_cast
@@ -51,7 +51,7 @@ func.func @loop_carried_unrealized_conversion_cast(%arg0: vector<4xf32>, %arg1: 
   return %21, %22 : vector<4xf32>, vector<4xf32>
 }
 
-// CHECK-LABEL:   func @loop_carried_unrealized_conversion_cast
+// CHECK-LABEL:   func.func @loop_carried_unrealized_conversion_cast
 //   CHECK-NOT:     unrealized_conversion_cast
 //       CHECK:     scf.for {{.*}} -> (vector<4xf32>, vector<4xf32>) {
 //   CHECK-NOT:       unrealized_conversion_cast
@@ -77,7 +77,7 @@ func.func @loop_carried_extract(%arg0: f32) -> f32 {
   return %21 : f32
 }
 
-// CHECK-LABEL:   func @loop_carried_extract
+// CHECK-LABEL:   func.func @loop_carried_extract
 //   CHECK-NOT:     vector.broadcast
 //       CHECK:     scf.for {{.*}} -> (f32) {
 //   CHECK-NOT:       vector.extract
@@ -105,7 +105,7 @@ func.func @loop_pack_v8f16(%arg0: vector<8xf16>, %arg1: vector<8xf16>, %arg2: ve
   return %0#0, %0#1, %0#2 : vector<8xf16>, vector<8xf16>, vector<4xf16>
 }
 
-// CHECK-LABEL: func @loop_pack_v8f16
+// CHECK-LABEL: func.func @loop_pack_v8f16
 //  CHECK-SAME: (%[[ARG0:.+]]: vector<8xf16>, %[[ARG1:.+]]: vector<8xf16>, %[[ARG2:.+]]: vector<4xf16>)
 //       CHECK:    %[[CAST_ARG0:.+]] = vector.bitcast %[[ARG0]] : vector<8xf16> to vector<4xf32>
 //       CHECK:    %[[CAST_ARG1:.+]] = vector.bitcast %[[ARG1]] : vector<8xf16> to vector<4xf32>

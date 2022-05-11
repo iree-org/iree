@@ -10,7 +10,7 @@ func.func @scan(%in: tensor<128xi32>, %out: tensor<128xi32>, %acc: tensor<i32>) 
   } -> tensor<128xi32>, tensor<i32>
   return %ret_out, %ret_acc: tensor<128xi32>, tensor<i32>
 }
-// CHECK-LABEL:   func @scan(
+// CHECK-LABEL:   func.func @scan(
 // CHECK-SAME:            %[[IN:.*]]: tensor<128xi32>, %[[OUT:.*]]: tensor<128xi32>,
 // CHECK-SAME:            %[[ACC:.*]]: tensor<i32>) -> (tensor<128xi32>, tensor<i32>) {
 // CHECK:           %[[SCAN:.*]]:2 = iree_linalg_ext.scan
@@ -36,7 +36,7 @@ func.func @scatter_update(
   } -> tensor<8xi32>
   return %0 : tensor<8xi32>
 }
-// CHECK-LABEL:   func @scatter_update(
+// CHECK-LABEL:   func.func @scatter_update(
 // CHECK-SAME:            %[[ORIGINAL:.*]]: tensor<8xi32>,
 // CHECK-SAME:            %[[INDICES:.*]]: tensor<3x1xi32>,
 // CHECK-SAME:            %[[UPDATES:.*]]: tensor<3xi32>) -> tensor<8xi32> {
@@ -62,7 +62,7 @@ func.func @scatter_add(
   } -> tensor<8xi32>
   return %0 : tensor<8xi32>
 }
-// CHECK-LABEL:   func @scatter_add(
+// CHECK-LABEL:   func.func @scatter_add(
 // CHECK-SAME:            %[[ORIGINAL:.*]]: tensor<8xi32>,
 // CHECK-SAME:            %[[INDICES:.*]]: tensor<3x1xi32>,
 // CHECK-SAME:            %[[UPDATES:.*]]: tensor<3xi32>) -> tensor<8xi32> {

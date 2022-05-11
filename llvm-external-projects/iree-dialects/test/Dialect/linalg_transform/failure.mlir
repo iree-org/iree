@@ -2,7 +2,7 @@
 
 // This cannot be vectorized because of dynamic tensor shapes. We expect the
 // pass fail and report an error at the vectorization operation below.
-func public @non_vectorizable(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) -> tensor<?xf32> {
+func.func public @non_vectorizable(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) -> tensor<?xf32> {
   %0 = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
       iterator_types = ["parallel"]}
@@ -33,7 +33,7 @@ transform.with_pdl_patterns {
 
 // -----
 
-func public @no_loop(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) -> tensor<?xf32> {
+func.func public @no_loop(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) -> tensor<?xf32> {
   %0 = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
       iterator_types = ["parallel"]}
@@ -64,11 +64,11 @@ transform.with_pdl_patterns {
 
 // -----
 
-func private @prevent_dce()
+func.func private @prevent_dce()
 
-func public @loop(%lb: index, %ub: index, %step: index) {
+func.func public @loop(%lb: index, %ub: index, %step: index) {
   scf.for %i = %lb to %ub step %step {
-    call @prevent_dce() : () -> ()
+    func.call @prevent_dce() : () -> ()
   }
   return
 }
@@ -93,7 +93,7 @@ transform.with_pdl_patterns {
 
 // -----
 
-func public @no_outlining() {
+func.func public @no_outlining() {
   "some.operation"() ({}, {}) : () -> ()
   return
 }
@@ -116,7 +116,7 @@ transform.with_pdl_patterns {
 
 // -----
 
-func @no_replacement(
+func.func @no_replacement(
   %arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>,
   %arg2: tensor<128x128xf32> {linalg.inplaceable = true})
     -> tensor<128x128xf32> {
@@ -151,7 +151,7 @@ transform.with_pdl_patterns {
 
 // -----
 
-func @repeated_match(
+func.func @repeated_match(
   %arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>,
   %arg2: tensor<128x128xf32> {linalg.inplaceable = true})
     -> tensor<128x128xf32> {

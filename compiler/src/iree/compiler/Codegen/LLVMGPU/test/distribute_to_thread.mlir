@@ -350,7 +350,7 @@ hal.executable private @conv_dispatch  {
 }
 
 // Check that the convolution is distributed.
-// CHECK-LABEL: func @conv_dispatch
+// CHECK-LABEL: func.func @conv_dispatch
 //       CHECK:   scf.for
 //       CHECK:     scf.for
 //       CHECK:       scf.for

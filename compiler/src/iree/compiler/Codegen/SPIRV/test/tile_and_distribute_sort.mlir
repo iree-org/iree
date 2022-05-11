@@ -52,7 +52,7 @@ hal.executable private @static_3d_sort  {
   }
 }
 
-// CHECK-LABEL: func @static_3d_sort()
+// CHECK-LABEL: func.func @static_3d_sort()
 //       CHECK: %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //       CHECK: %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //       CHECK: scf.for

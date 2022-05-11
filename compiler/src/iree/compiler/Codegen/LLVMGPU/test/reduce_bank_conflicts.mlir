@@ -3,7 +3,7 @@
 #map = affine_map<(d0, d1, d2) -> (d0 * 2048 + d1 * 64 + d2)>
 // CHECK-DAG: #[[$MAP:.*]] = affine_map<(d0, d1, d2) -> (d0 * 2176 + d1 * 68 + d2)>
 
-// CHECK-LABEL: func @pad_alloc
+// CHECK-LABEL: func.func @pad_alloc
 func.func @pad_alloc(%a: memref<1024x1024xf32>) {
 // CHECK: %[[A:.*]] = memref.alloc() : memref<4x32x68xf32, 3>
   %0 = memref.alloc() : memref<4x32x64xf32, 3>

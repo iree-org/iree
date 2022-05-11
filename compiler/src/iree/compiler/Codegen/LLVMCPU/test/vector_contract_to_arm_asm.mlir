@@ -24,7 +24,7 @@ func.func @check_in_depth_mmt_8x4x8_i8i8i32(
   } %lhs_wide, %rhs_wide, %acc : vector<8x4xi32>, vector<8x4xi32> into vector<8x8xi32>
   return %res : vector<8x8xi32>
 }
-// AARCH64-DOTPROD-LABEL: func @check_in_depth_mmt_8x4x8_i8i8i32(
+// AARCH64-DOTPROD-LABEL: func.func @check_in_depth_mmt_8x4x8_i8i8i32(
 // AARCH64-DOTPROD-SAME:      %[[LHS:[^:[:space:]]+]]
 // AARCH64-DOTPROD-SAME:      %[[RHS:[^:[:space:]]+]]
 // AARCH64-DOTPROD-SAME:      %[[ACC:[^:[:space:]]+]]

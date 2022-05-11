@@ -66,7 +66,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   // CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%{{.+}} : !hal.allocator> type("DeviceVisible|DeviceLocal") usage(Dispatch) : !hal.buffer{%c768}
   // CHECK-NEXT: util.global.store %[[BUFFER]], @ex0_embedded_elf_x86_64_dispatch0_512x1x1_buffer : !hal.buffer
 
-  // CHECK: func @ex0_embedded_elf_x86_64_dispatch0_512x1x1(%arg0: i32)
+  // CHECK: func.func @ex0_embedded_elf_x86_64_dispatch0_512x1x1(%arg0: i32)
   // CHECK-SAME: attributes {iree.abi.stub, iree.reflection = {iree.benchmark = "dispatch"}} {
   // CHECK: %[[BATCH_SIZE:.+]] = arith.index_cast %arg0 : i32 to index
 
@@ -98,14 +98,14 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   // ===========================================================================
 
   // CHECK: util.global private mutable @ex0_embedded_elf_x86_64_dispatch1_512x1x1_buffer : !hal.buffer
-  // CHECK: func @ex0_embedded_elf_x86_64_dispatch1_512x1x1(%arg0: i32)
+  // CHECK: func.func @ex0_embedded_elf_x86_64_dispatch1_512x1x1(%arg0: i32)
   // CHECK:   hal.command_buffer.dispatch.symbol<%{{.+}} : !hal.command_buffer> target(@ex0::@embedded_elf_x86_64::@dispatch1) workgroups([%c128, %c1, %c1])
 
   // CHECK: util.global private mutable @ex0_embedded_elf_x86_64_dispatch1_128x32x1_buffer : !hal.buffer
-  // CHECK: func @ex0_embedded_elf_x86_64_dispatch1_128x32x1(%arg0: i32)
+  // CHECK: func.func @ex0_embedded_elf_x86_64_dispatch1_128x32x1(%arg0: i32)
   // CHECK:   hal.command_buffer.dispatch.symbol<%{{.+}} : !hal.command_buffer> target(@ex0::@embedded_elf_x86_64::@dispatch1) workgroups([%c32, %c1, %c1])
 
-  func private @main() -> !stream.timepoint {
+  func.func private @main() -> !stream.timepoint {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c32 = arith.constant 32 : index

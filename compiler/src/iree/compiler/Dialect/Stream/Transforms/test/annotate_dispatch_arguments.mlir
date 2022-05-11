@@ -10,7 +10,7 @@
 stream.executable private @annotatePotentialValuesEx {
   stream.executable.export public @dispatch
   builtin.module  {
-    // CHECK: func @dispatch(
+    // CHECK: func.func @dispatch(
     // CHECK-SAME: %arg0: i32,
     // CHECK-SAME: %arg1: index {stream.alignment = 4 : index, stream.values = [20 : index, 40 : index]},
     // CHECK-SAME: %arg2: i1 {stream.values = [false, true]},
@@ -54,7 +54,7 @@ func.func @annotatePotentialValues(%arg0: i32) {
 stream.executable private @annotateOperandAlignmentEx {
   stream.executable.export public @dispatch
   builtin.module  {
-    // CHECK: func @dispatch(
+    // CHECK: func.func @dispatch(
     // CHECK-SAME: %arg0: index,
     // CHECK-SAME: %arg1: index {stream.alignment = 16 : index},
     // CHECK-SAME: %arg2: index {stream.values = [4096 : index, 4097 : index]},
@@ -103,7 +103,7 @@ func.func @annotateOperandAlignment(%arg0: index, %arg1: index) {
 stream.executable private @annotateBindingAlignmentEx {
   stream.executable.export public @dispatch
   builtin.module  {
-    // CHECK: func @dispatch(
+    // CHECK: func.func @dispatch(
     // CHECK-SAME: %arg0: !stream.binding {stream.alignment = 64 : index},
     // CHECK-SAME: %arg1: !stream.binding,
     // CHECK-SAME: %arg2: !stream.binding {stream.alignment = 8 : index},

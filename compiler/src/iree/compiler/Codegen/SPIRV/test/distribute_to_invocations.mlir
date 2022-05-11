@@ -14,7 +14,7 @@ func.func @distribute_to_x(%lb : index, %ub : index, %step: index, %output: memr
   return
 }
 
-// CHECK-LABEL: func @distribute_to_x
+// CHECK-LABEL: func.func @distribute_to_x
 //  CHECK-SAME: %[[LB:.+]]: index, %[[UB:.+]]: index, %[[STEP:.+]]: index
 //       CHECK:   %[[ID:.+]] = gpu.thread_id x
 //       CHECK:   %[[DIM:.+]] = gpu.block_dim x
@@ -39,7 +39,7 @@ func.func @distribute_to_y(%lb : index, %ub : index, %step: index, %output: memr
   return
 }
 
-// CHECK-LABEL: func @distribute_to_y
+// CHECK-LABEL: func.func @distribute_to_y
 //  CHECK-SAME: %[[LB:.+]]: index, %[[UB:.+]]: index, %[[STEP:.+]]: index
 //       CHECK:   %[[ID:.+]] = gpu.thread_id y
 //       CHECK:   %[[DIM:.+]] = gpu.block_dim y
@@ -64,7 +64,7 @@ func.func @distribute_to_z(%lb : index, %ub : index, %step: index, %output: memr
   return
 }
 
-// CHECK-LABEL: func @distribute_to_z
+// CHECK-LABEL: func.func @distribute_to_z
 //  CHECK-SAME: %[[LB:.+]]: index, %[[UB:.+]]: index, %[[STEP:.+]]: index
 //       CHECK:   %[[ID:.+]] = gpu.thread_id z
 //       CHECK:   %[[DIM:.+]] = gpu.block_dim z
@@ -89,6 +89,6 @@ func.func @no_distribute_without_attr(%lb : index, %ub : index, %step: index, %o
   return
 }
 
-// CHECK-LABEL: func @no_distribute_without_attr
+// CHECK-LABEL: func.func @no_distribute_without_attr
 //  CHECK-SAME: %[[LB:.+]]: index, %[[UB:.+]]: index, %[[STEP:.+]]: index
 //       CHECK:   scf.for %{{.+}} = %[[LB]] to %[[UB]] step %[[STEP]] {

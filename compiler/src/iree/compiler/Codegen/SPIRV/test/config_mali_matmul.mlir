@@ -46,7 +46,7 @@ hal.executable @matmul_1024x2048x512 {
 //      CHECK: hal.executable.entry_point public @matmul_1024x2048x512
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
-//      CHECK: func @matmul_1024x2048x512()
+//      CHECK: func.func @matmul_1024x2048x512()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
@@ -99,7 +99,7 @@ hal.executable @matmul_3136x24x96 {
 //      CHECK: hal.executable.entry_point public @matmul_3136x24x96
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [2 : index, 8 : index, 1 : index]
-//      CHECK: func @matmul_3136x24x96()
+//      CHECK: func.func @matmul_3136x24x96()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
@@ -153,7 +153,7 @@ hal.executable @matmul_196x64x192 {
 //      CHECK: hal.executable.entry_point public @matmul_196x64x192
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
-//      CHECK: func @matmul_196x64x192()
+//      CHECK: func.func @matmul_196x64x192()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:      lowering_config = #[[CONFIG]]
 
@@ -200,7 +200,7 @@ hal.executable @matmul_12544x96x16 {
 //      CHECK: hal.executable.entry_point public @matmul_12544x96x16
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
-//      CHECK: func @matmul_12544x96x16()
+//      CHECK: func.func @matmul_12544x96x16()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
@@ -254,7 +254,7 @@ hal.executable @matmul_49x160x576 {
 //      CHECK: hal.executable.entry_point public @matmul_49x160x576
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 1 : index, 1 : index]
-//      CHECK: func @matmul_49x160x576()
+//      CHECK: func.func @matmul_49x160x576()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
@@ -280,7 +280,7 @@ hal.executable @matmul_1x1024x576 {
     }> {
     hal.executable.entry_point @matmul_1x1024x576 layout(#executable_layout)
     builtin.module {
-      func @matmul_1x1024x576() {
+      func.func @matmul_1x1024x576() {
         %cst = arith.constant 0.000000e+00 : f32
         %cst_0 = arith.constant 3.000000e+00 : f32
         %cst_1 = arith.constant 6.000000e+00 : f32
@@ -311,7 +311,7 @@ hal.executable @matmul_1x1024x576 {
 //      CHECK: hal.executable.entry_point public @matmul_1x1024x576
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
-//      CHECK: func @matmul_1x1024x576()
+//      CHECK: func.func @matmul_1x1024x576()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
@@ -366,7 +366,7 @@ hal.executable @batch_matmul_4x384x384 {
 //      CHECK: hal.executable.entry_point public @batch_matmul_4x384x384
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
-//      CHECK: func @batch_matmul_4x384x384()
+//      CHECK: func.func @batch_matmul_4x384x384()
 //      CHECK:   linalg.batch_matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
@@ -421,6 +421,6 @@ hal.executable @batch_matmul_4x2x8 {
 //      CHECK: hal.executable.entry_point public @batch_matmul_4x2x8
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [2 : index, 2 : index, 1 : index]
-//      CHECK: func @batch_matmul_4x2x8()
+//      CHECK: func.func @batch_matmul_4x2x8()
 //      CHECK:   linalg.batch_matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]

@@ -29,7 +29,7 @@ func.func @fuse_conv2d_elementwise(%input: tensor<1x225x225x16xf32>, %filter: te
 // * linalg.generic's linalg.fill is pulled into the same group;
 // * linalg.conv's linalg.fill is pulled into the same group.
 
-// CHECK-LABEL: func @fuse_conv2d_elementwise
+// CHECK-LABEL: func.func @fuse_conv2d_elementwise
 
 //      CHECK: flow.dispatch.workgroups
 //      CHECK:   %[[INIT:.+]] = linalg.init_tensor
@@ -68,7 +68,7 @@ func.func @dont_fuse_conv2d_with_multiple_uses(%input: tensor<1x225x225x16xf32>,
   return %3, %2 : tensor<1x112x112x32xf32>, tensor<1x112x112x32xf32>
 }
 
-// CHECK-LABLE: func @dont_fuse_conv2d_with_multiple_uses
+// CHECK-LABLE: func.func @dont_fuse_conv2d_with_multiple_uses
 
 // CHECK: flow.dispatch.workgroups
 // CHECK:   linalg.conv_2d_nhwc_hwcf
@@ -102,7 +102,7 @@ func.func @dont_fuse_conv2d_with_non_identity_map(%input: tensor<1x225x225x16xf3
   return %3 : tensor<1x112x112x32xf32>
 }
 
-// CHECK-LABEL: func @dont_fuse_conv2d_with_non_identity_map
+// CHECK-LABEL: func.func @dont_fuse_conv2d_with_non_identity_map
 
 // CHECK: flow.dispatch.workgroups
 // CHECK:   linalg.conv_2d_nhwc_hwcf

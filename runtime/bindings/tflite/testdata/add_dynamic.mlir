@@ -1,4 +1,4 @@
-func @main(
+func.func @main(
     %input : tensor<?xf32> {iree.identifier = "input"}
   ) -> (
     tensor<?xf32> {iree.identifier = "output"}

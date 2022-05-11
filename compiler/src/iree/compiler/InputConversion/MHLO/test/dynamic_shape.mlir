@@ -7,7 +7,7 @@ attributes {iree.dispatch_fn_name = ""} {
 }
 
 //      CHECK: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-//      CHECK: func @dynamic_shape
+//      CHECK: func.func @dynamic_shape
 // CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32>
 //      CHECK:   %[[SHAPE:.+]] = shape.shape_of %[[ARG0]]
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index

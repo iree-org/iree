@@ -20,7 +20,7 @@
 // CHECK:           %[[VAL_15:.*]] = linalg.matmul ins(%[[VAL_16:.*]], %[[VAL_17:.*]] : tensor<256x512xf32>, tensor<512x1024xf32>) outs(%[[VAL_18:.*]] : tensor<256x1024xf32>) -> tensor<256x1024xf32>
 // CHECK:           %[[VAL_19:.*]] = tensor.extract_slice %[[VAL_15]][0, 0] [250, 1020] [1, 1] : tensor<256x1024xf32> to tensor<250x1020xf32>
 // CHECK:           return %[[VAL_19]] : tensor<250x1020xf32>
-func @pad_matmul_static(%arg0 : tensor<250x500xf32>, %arg1 : tensor<500x1020xf32>,
+func.func @pad_matmul_static(%arg0 : tensor<250x500xf32>, %arg1 : tensor<500x1020xf32>,
         %arg2 : tensor<250x1020xf32>) -> tensor<250x1020xf32> {
   %matmul = linalg.matmul
       ins(%arg0, %arg1 : tensor<250x500xf32>, tensor<500x1020xf32>)
@@ -32,7 +32,7 @@ func @pad_matmul_static(%arg0 : tensor<250x500xf32>, %arg1 : tensor<500x1020xf32
 // CHECK-LABEL: @pad_matmul_noop
 // CHECK-NOT: pad_tensor
 // CHECK-NOT: extract_slice
-func @pad_matmul_noop(%arg0 : tensor<256x512xf32>, %arg1 : tensor<512x1024xf32>,
+func.func @pad_matmul_noop(%arg0 : tensor<256x512xf32>, %arg1 : tensor<512x1024xf32>,
         %arg2 : tensor<256x1024xf32>) -> tensor<256x1024xf32> {
   %matmul = linalg.matmul
       ins(%arg0, %arg1 : tensor<256x512xf32>, tensor<512x1024xf32>)
@@ -60,7 +60,7 @@ func @pad_matmul_noop(%arg0 : tensor<256x512xf32>, %arg1 : tensor<512x1024xf32>,
 // CHECK:           %[[ORIG_DIM_VALUE:.*]] = tensor.dim %arg2, %[[DIM0]]
 // CHECK:           %[[RETURN:.*]] = tensor.extract_slice %[[PADDED_RESULT]][0, 0] {{\[}}%[[ORIG_DIM_VALUE]], 1024] [1, 1] : tensor<?x1024xf32> to tensor<?x1024xf32>
 // CHECK:           return %[[RETURN]] : tensor<?x1024xf32>
-func @pad_matmul_dynamic_row(%arg0 : tensor<?x512xf32>, %arg1 : tensor<512x1024xf32>,
+func.func @pad_matmul_dynamic_row(%arg0 : tensor<?x512xf32>, %arg1 : tensor<512x1024xf32>,
         %arg2 : tensor<?x1024xf32>) -> tensor<?x1024xf32> {
   %matmul = linalg.matmul
       ins(%arg0, %arg1 : tensor<?x512xf32>, tensor<512x1024xf32>)
@@ -83,7 +83,7 @@ func @pad_matmul_dynamic_row(%arg0 : tensor<?x512xf32>, %arg1 : tensor<512x1024x
 // CHECK:           } : tensor<256x?xf32> to tensor<256x?xf32>
 // Matmul:
 // CHECK:           %{{.*}} = linalg.matmul ins(%arg0, %[[RHS_PADDED]] : tensor<256x512xf32>, tensor<512x?xf32>) outs(%[[OUTPUT_PADDED]] : tensor<256x?xf32>) -> tensor<256x?xf32>
-func @pad_matmul_dynamic_col(%arg0 : tensor<256x512xf32>, %arg1 : tensor<512x?xf32>,
+func.func @pad_matmul_dynamic_col(%arg0 : tensor<256x512xf32>, %arg1 : tensor<512x?xf32>,
         %arg2 : tensor<256x?xf32>) -> tensor<256x?xf32> {
   %matmul = linalg.matmul
       ins(%arg0, %arg1 : tensor<256x512xf32>, tensor<512x?xf32>)

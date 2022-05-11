@@ -9,7 +9,7 @@
 stream.executable private @deduplicateBindingsEx {
   stream.executable.export public @dispatch
   builtin.module  {
-    // CHECK: func @dispatch(%[[BINDING_A:.+]]: !stream.binding, %[[BINDING_C:.+]]: !stream.binding,
+    // CHECK: func.func @dispatch(%[[BINDING_A:.+]]: !stream.binding, %[[BINDING_C:.+]]: !stream.binding,
     // CHECK-SAME:           %[[OFFSET_A:.+]]: index, %[[OFFSET_B:.+]]: index, %[[OFFSET_C:.+]]: index, %[[OPERAND:.+]]: index)
     func.func @dispatch(%binding_a: !stream.binding, %binding_b: !stream.binding, %binding_c: !stream.binding, %operand: index) {
       %c0 = arith.constant 0 : index
@@ -40,7 +40,7 @@ stream.executable private @deduplicateBindingsEx {
     }
   }
 }
-// CHECK: func @deduplicateBindings(%[[OPERAND:.+]]: index)
+// CHECK: func.func @deduplicateBindings(%[[OPERAND:.+]]: index)
 func.func @deduplicateBindings(%operand: index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
