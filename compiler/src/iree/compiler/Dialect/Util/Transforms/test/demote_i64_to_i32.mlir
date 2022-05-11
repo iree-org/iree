@@ -212,7 +212,7 @@ func.func @nested_region_i64() -> (tensor<4xi64>) {
 // CHECK-LABEL:   func @arith.trunci(
 // CHECK-SAME:            %[[ARG0:.*]]: i32) -> i32 {
 // CHECK:           return %[[ARG0]] : i32
-func @arith.trunci(%arg0: i64) -> i32 {
+func.func @arith.trunci(%arg0: i64) -> i32 {
   %0 = arith.trunci %arg0 : i64 to i32
   return %0 : i32
 }
@@ -220,7 +220,7 @@ func @arith.trunci(%arg0: i64) -> i32 {
 // CHECK-LABEL:   func @arith.extui(
 // CHECK-SAME:            %[[ARG0:.*]]: i32) -> i32 {
 // CHECK:           return %[[ARG0]] : i32
-func @arith.extui(%arg0: i32) -> i64 {
+func.func @arith.extui(%arg0: i32) -> i64 {
   %0 = arith.extui %arg0 : i32 to i64
   return %0 : i64
 }
@@ -228,7 +228,7 @@ func @arith.extui(%arg0: i32) -> i64 {
 // CHECK-LABEL:   func @arith.extsi(
 // CHECK-SAME:            %[[ARG0:.*]]: i32) -> i32 {
 // CHECK:           return %[[ARG0]] : i32
-func @arith.extsi(%arg0: i32) -> i64 {
+func.func @arith.extsi(%arg0: i32) -> i64 {
   %0 = arith.extsi %arg0 : i32 to i64
   return %0 : i64
 }

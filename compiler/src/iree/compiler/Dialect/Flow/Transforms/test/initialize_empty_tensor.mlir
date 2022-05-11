@@ -1,6 +1,6 @@
 // RUN: iree-opt --iree-flow-initialize-empty-tensors %s | FileCheck %s
 
-func @return_zero_init(%arg0 : index, %arg1 : index) -> (tensor<?x?x42xi32>, tensor<?x42x?xf32>) {
+func.func @return_zero_init(%arg0 : index, %arg1 : index) -> (tensor<?x?x42xi32>, tensor<?x42x?xf32>) {
   %0 = linalg.init_tensor [%arg0, %arg1, 42] : tensor<?x?x42xi32>
   %1 = linalg.init_tensor [%arg1, 42, %arg0] : tensor<?x42x?xf32>
   return %0, %1 : tensor<?x?x42xi32>, tensor<?x42x?xf32>

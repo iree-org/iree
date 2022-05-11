@@ -21,7 +21,7 @@ util.initializer {
   util.initializer.return
 }
 // CHECK-NEXT: vm.func private @initializer() -> !vm.ref<!hal.buffer>
-func private @initializer() -> !hal.buffer
+func.funcprivate @initializer() -> !hal.buffer
 
 // -----
 

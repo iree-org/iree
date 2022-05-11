@@ -165,7 +165,7 @@ func.func @check_offset_strides() {
 
 // -----
 
-func @argmax() {
+func.func @argmax() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -236,7 +236,7 @@ func @argmax() {
 
 // -----
 
-func @reduce() {
+func.func @reduce() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -311,7 +311,7 @@ func @reduce() {
 
 // -----
 
-func @scatter() {
+func.func @scatter() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index

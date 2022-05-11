@@ -578,7 +578,7 @@ func.func @fill_matmul_exp() {
 
 // -----
 
-func @cumsum__2x2x2x2x2x2x2() {
+func.func @cumsum__2x2x2x2x2x2x2() {
   %cst = arith.constant dense<0.000000e+00> : tensor<2x2x2x2x2x2x2xf32>
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:3x2x2x2x2x2x2xf32>
@@ -608,7 +608,7 @@ func @cumsum__2x2x2x2x2x2x2() {
 
 // -----
 
-func @reduce_window_max_4x6xf32() {
+func.func @reduce_window_max_4x6xf32() {
   %cst = arith.constant dense<0xFF800000> : tensor<2x2xf32>
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:2x4x6xf32>

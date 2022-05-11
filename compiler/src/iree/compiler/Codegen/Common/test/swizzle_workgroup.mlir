@@ -1,6 +1,6 @@
 // RUN: iree-opt --iree-workgroup-swizzle='logTile=3' %s | FileCheck %s
 
-func @matmul() {
+func.func @matmul() {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c96 = arith.constant 96 : index

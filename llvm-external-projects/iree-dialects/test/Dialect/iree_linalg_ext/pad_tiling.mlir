@@ -3,7 +3,7 @@
 // TODO: Re-enable when upstream tensor.pad op properly implements the tiling
 // interface.
 
-func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
+func.func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
     %arg3 : index, %arg4 : index, %arg5 : f32) -> tensor<?x?xf32> {
   %0 = tensor.pad %arg0 low[%arg1, %arg2] high[%arg3, %arg4] {
     ^bb0(%arg6 : index, %arg7 : index):
