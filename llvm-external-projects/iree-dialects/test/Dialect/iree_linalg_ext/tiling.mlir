@@ -842,8 +842,8 @@ func.func @topk_tile_tensor(%input_values: tensor<?x?xf32>, %input_indices: tens
 // CHECK-SAME:      dimension(1)
 // CHECK-SAME:      ins(%[[D4]], %[[D5]]
 // CHECK-SAME:      outs(%[[D6]], %[[D7]]
-// CHECK:           %[[D9:.+]] = tensor.insert_slice %[[D8]]#0 into %[[ARG5]][%[[ARG4]], 0] [%[[D3]], %[[D1]]] [1, 1]
-// CHECK:           %[[D10:.+]] = tensor.insert_slice %[[D8]]#1 into %[[ARG6]][%[[ARG4]], 0] [%[[D3]], %[[D1]]] [1, 1]
+// CHECK:           %[[D9:.+]] = tensor.insert_slice %[[D8]]#0 into %[[ARG5]][%[[ARG4]], 0] [%[[D3]], %[[C3]]] [1, 1]
+// CHECK:           %[[D10:.+]] = tensor.insert_slice %[[D8]]#1 into %[[ARG6]][%[[ARG4]], 0] [%[[D3]], %[[C3]]] [1, 1]
 // CHECK:           scf.yield %[[D9]], %[[D10]]
 // CHECK:           return %[[RESULT]]#0, %[[RESULT]]#1
 
