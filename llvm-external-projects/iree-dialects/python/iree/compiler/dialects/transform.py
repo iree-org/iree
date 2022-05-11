@@ -5,3 +5,4 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 from ._transform_ops_gen import *
+from .._mlir_libs._ireeDialects.transform import *
