@@ -10,7 +10,7 @@ func.func @sort_1d(%arg0: tensor<128xi32>) -> (tensor<128xi32>) {
   }) {dimension = 0 : i64, is_stable = false} : (tensor<128xi32>) -> (tensor<128xi32>)
   return %0 : tensor<128xi32>
 }
-// CHECK-LABEL: func @sort_1d(
+// CHECK-LABEL: func.func @sort_1d(
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
 // CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
@@ -31,7 +31,7 @@ func.func @sort_1d_ui(%arg0: tensor<128xui32>) -> (tensor<128xui32>) {
   }) {dimension = 0 : i64, is_stable = false} : (tensor<128xui32>) -> (tensor<128xui32>)
   return %0 : tensor<128xui32>
 }
-// CHECK-LABEL: func @sort_1d_ui(
+// CHECK-LABEL: func.func @sort_1d_ui(
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
 // CHECK:         %[[CAST:.+]] = builtin.unrealized_conversion_cast %[[ARG0]] : tensor<128xui32> to tensor<128xi32>
@@ -56,7 +56,7 @@ func.func @sort_cst_capture(%arg0: tensor<1x10xi32>) -> tensor<1x10xi32> {
   return %1 : tensor<1x10xi32>
 }
 
-// CHECK-LABEL: func @sort_cst_capture(
+// CHECK-LABEL: func.func @sort_cst_capture(
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
 // CHECK:         %[[SCALAR:.+]] = arith.constant 0 : i32
@@ -78,7 +78,7 @@ func.func @sort_argument_capture(%arg0: tensor<1x10xi32>, %arg1 : tensor<i32>) -
   return %1 : tensor<1x10xi32>
 }
 
-// CHECK-LABEL: func @sort_argument_capture(
+// CHECK-LABEL: func.func @sort_argument_capture(
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
@@ -100,7 +100,7 @@ func.func @sort_2d(%arg0: tensor<16x32xi32>) -> (tensor<16x32xi32>) {
   }) {dimension = 0 : i64, is_stable = false} : (tensor<16x32xi32>) -> (tensor<16x32xi32>)
   return %0 : tensor<16x32xi32>
 }
-// CHECK-LABEL: func @sort_2d(
+// CHECK-LABEL: func.func @sort_2d(
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
 // CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
@@ -124,7 +124,7 @@ func.func @sort_unsigned(%arg0: tensor<1x5xf32>) -> tensor<1x5xf32> {
   return %1 : tensor<1x5xf32>
 }
 
-// CHECK-LABEL: func @sort_unsigned(
+// CHECK-LABEL: func.func @sort_unsigned(
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
 // CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
@@ -150,7 +150,7 @@ func.func @sort_unsigned_cst_capture(%arg0: tensor<1x5xf32>) -> tensor<1x5xf32> 
   return %1 : tensor<1x5xf32>
 }
 
-// CHECK-LABEL: func @sort_unsigned_cst_capture(
+// CHECK-LABEL: func.func @sort_unsigned_cst_capture(
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
 // CHECK:         %[[UI32:.+]] = mhlo.constant dense<2> : tensor<ui32>
@@ -182,7 +182,7 @@ func.func @sort_complex(%arg0: tensor<1x5xf32>, %arg1 : tensor<complex<f32>>) ->
   return %1 : tensor<1x5xf32>
 }
 
-// CHECK-LABEL: func @sort_complex(
+// CHECK-LABEL: func.func @sort_complex(
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
@@ -205,7 +205,7 @@ func.func @topk(%arg0: tensor<128xi32>, %arg1: tensor<128xi32>) -> (tensor<128xi
   }) {dimension = 0 : i64, is_stable = false} : (tensor<128xi32>, tensor<128xi32>) -> (tensor<128xi32>, tensor<128xi32>)
   return %0#0 : tensor<128xi32>
 }
-// CHECK-LABEL: func @topk
+// CHECK-LABEL: func.func @topk
 // CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK:         %[[SORT:.+]]:2 = iree_linalg_ext.sort
@@ -234,7 +234,7 @@ func.func @scatter_update_scalar_1D(%arg0: tensor<8xi32>, %arg1: tensor<4x1xi32>
   } : (tensor<8xi32>, tensor<4x1xi32>, tensor<4xi32>) -> tensor<8xi32>
   return %0 : tensor<8xi32>
 }
-// CHECK-LABEL: func @scatter_update_scalar_1D
+// CHECK-LABEL: func.func @scatter_update_scalar_1D
 // CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
@@ -263,7 +263,7 @@ func.func @scatter_update_scalar_2D(%arg0: tensor<4x3xi32>, %arg1: tensor<3x2xi3
   } : (tensor<4x3xi32>, tensor<3x2xi32>, tensor<3xi32>) -> tensor<4x3xi32>
   return %0 : tensor<4x3xi32>
 }
-// CHECK-LABEL: func @scatter_update_scalar_2D
+// CHECK-LABEL: func.func @scatter_update_scalar_2D
 // CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
@@ -294,7 +294,7 @@ func.func @scatter_update_slice_2D(%arg0: tensor<6x3xi32>, %arg1: tensor<2x1xi32
   } : (tensor<6x3xi32>, tensor<2x1xi32>, tensor<2x3xi32>) -> tensor<6x3xi32>
   return %0 : tensor<6x3xi32>
 }
-// CHECK-LABEL: func @scatter_update_slice_2D
+// CHECK-LABEL: func.func @scatter_update_slice_2D
 // CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
@@ -326,7 +326,7 @@ func.func @scatter_add_slice_2D(%arg0: tensor<6x3xi32>, %arg1: tensor<2x1xi32>,
   } : (tensor<6x3xi32>, tensor<2x1xi32>, tensor<2x3xi32>) -> tensor<6x3xi32>
   return %0 : tensor<6x3xi32>
 }
-// CHECK-LABEL: func @scatter_add_slice_2D
+// CHECK-LABEL: func.func @scatter_add_slice_2D
 // CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
@@ -359,7 +359,7 @@ func.func @scatter_update_batch_scalar_1D(%arg0: tensor<8xi32>,
   } : (tensor<8xi32>, tensor<3x4x1xi32>, tensor<3x4xi32>) -> tensor<8xi32>
   return %0 : tensor<8xi32>
 }
-// CHECK-LABEL: func @scatter_update_batch_scalar_1D
+// CHECK-LABEL: func.func @scatter_update_batch_scalar_1D
 // CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
@@ -393,7 +393,7 @@ func.func @scatter_update_batch_slice_3D_dynamic(%arg0: tensor<1x24x512xi32>,
   } : (tensor<1x24x512xi32>, tensor<?x3x2xi32>, tensor<?x3x512xi32>) -> tensor<1x24x512xi32>
   return %0 : tensor<1x24x512xi32>
 }
-// CHECK-LABEL: func @scatter_update_batch_slice_3D_dynamic
+// CHECK-LABEL: func.func @scatter_update_batch_slice_3D_dynamic
 // CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
@@ -420,7 +420,7 @@ func.func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
   return %1, %2 : tensor<5xf32>, tensor<5xf32>
 }
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0)>
-// CHECK:      func @rfft_1d
+// CHECK:      func.func @rfft_1d
 // CHECK-SAME:   %[[REAL:[a-zA-Z0-9]+]]
 // CHECK-DAG:    %[[INDICES:.+]] = arith.constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xi32>
 // CHECK-DAG:    %[[INIT_TENSOR:.+]] = linalg.init_tensor [8] : tensor<8xf32>
@@ -468,7 +468,7 @@ func.func @rfft_2d(%input: tensor<4x8xf32>) -> (tensor<4x5xf32>, tensor<4x5xf32>
 }
 // CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0, d1) -> (d1)>
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK:      func @rfft_2d
+// CHECK:      func.func @rfft_2d
 // CHECK-SAME:   %[[REAL:[a-zA-Z0-9]+]]
 // CHECK-DAG:    %[[INDICES:.+]] = arith.constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xi32>
 // CHECK-DAG:    %[[INIT_TENSOR:.+]] = linalg.init_tensor [4, 8] : tensor<4x8xf32>
@@ -513,7 +513,7 @@ func.func @reverse_dim1(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
   } : (tensor<3x5xi32>) -> tensor<3x5xi32>
   return %0 : tensor<3x5xi32>
 }
-// CHECK-LABEL: func @reverse_dim1
+// CHECK-LABEL: func.func @reverse_dim1
 // CHECK-SAME:   %[[IN:[a-zA-Z0-9]+]]
 // CHECK:        %[[INIT:.+]] = linalg.init_tensor [3, 5] : tensor<3x5xi32>
 // CHECK:        %[[REV:.+]] = iree_linalg_ext.reverse
@@ -530,7 +530,7 @@ func.func @reverse_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
   } : (tensor<?x?xi32>) -> tensor<?x?xi32>
   return %0 : tensor<?x?xi32>
 }
-// CHECK-LABEL: func @reverse_multi_dim
+// CHECK-LABEL: func.func @reverse_multi_dim
 // CHECK-SAME:   %[[IN:[a-zA-Z0-9]+]]
 // CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index

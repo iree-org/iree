@@ -14,7 +14,7 @@ func.func @functionExpansion(%arg0: tensor<4x?xf32>, %arg1: i1, %arg2: tensor<i3
   return %0#0, %0#1, %0#2 : tensor<4x?xf32>, i1, tensor<i32>
 }
 
-// CHECK: func private @callee
+// CHECK: func.func private @callee
 func.func private @callee(%arg0: tensor<4x?xf32>, %arg1: i1, %arg2: tensor<i32>)
     -> (tensor<4x?xf32>, i1, tensor<i32>)
 

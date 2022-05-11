@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @func_cfg_conversion
 module @func_cfg_conversion {
-  // CHECK: func @caller(%arg0: tensor<2xi32>, %arg1: i1) -> tensor<2xi32>
+  // CHECK: func.func @caller(%arg0: tensor<2xi32>, %arg1: i1) -> tensor<2xi32>
   func.func @caller(%arg0: tensor<2xui32>, %arg1 : i1) -> tensor<2xui32> {
     // CHECK: %[[RESULT:.*]] = call @callee(%arg0, %arg1) : (tensor<2xi32>, i1) -> tensor<2xi32>
     %1 = call @callee(%arg0, %arg1) : (tensor<2xui32>, i1) -> tensor<2xui32>
@@ -10,7 +10,7 @@ module @func_cfg_conversion {
     return %1 : tensor<2xui32>
   }
 
-  // CHECK: func @callee(%arg0: tensor<2xi32>, %arg1: i1) -> tensor<2xi32>
+  // CHECK: func.func @callee(%arg0: tensor<2xi32>, %arg1: i1) -> tensor<2xi32>
   func.func @callee(%arg0: tensor<2xui32>, %arg1: i1) -> tensor<2xui32> {
     // CHECK: cf.cond_br %arg1, ^bb1(%arg0 : tensor<2xi32>), ^bb2(%arg0 : tensor<2xi32>)
     cf.cond_br %arg1, ^bb1(%arg0 : tensor<2xui32>), ^bb2(%arg0 : tensor<2xui32>)

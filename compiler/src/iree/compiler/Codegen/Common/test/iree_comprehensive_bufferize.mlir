@@ -36,7 +36,7 @@ func.func @matmul() {
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (-d0 + s1, s0)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>
-//      CHECK: func @matmul()
+//      CHECK: func.func @matmul()
 //  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
 //  CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load[1]
 //  CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load[2]
@@ -109,7 +109,7 @@ func.func @matmul_fill() {
 
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (-d0 + s1, s0)>
-//      CHECK: func @matmul_fill()
+//      CHECK: func.func @matmul_fill()
 //  CHECK-DAG:   %[[CST:.+]] = arith.constant 0.000000e+00 : f32
 //  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
 //  CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load[1]
@@ -185,7 +185,7 @@ func.func @elementwise() {
   }
   return
 }
-//      CHECK: func @elementwise()
+//      CHECK: func.func @elementwise()
 //  CHECK-DAG:   %[[GLB_CST:.+]] = memref.get_global @__constant_1x10xf32 : memref<1x10xf32>
 //  CHECK-DAG:   %[[IN_BUF:.+]] = hal.interface.binding.subspan set(0)  binding(0) {{.+}} : memref<1x10xf32>
 //  CHECK-DAG:   %[[OUT_BUF:.+]] = hal.interface.binding.subspan set(0)  binding(1) {{.+}} : memref<1x10xf32>
@@ -224,7 +224,7 @@ func.func @rank_reduced_slice() {
   }
   return
 }
-//      CHECK: func @rank_reduced_slice()
+//      CHECK: func.func @rank_reduced_slice()
 //  CHECK-DAG:   %[[SRC_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1x40xf32>
 //  CHECK-DAG:   %[[DST_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<10xf32>
 //      CHECK:   scf.for %[[IV0:.+]] =
@@ -236,7 +236,7 @@ func.func @rank_reduced_slice() {
 
 // -----
 
-// CHECK-LABEL: func @reverse_dim(
+// CHECK-LABEL: func.func @reverse_dim(
 //   CHECK-DAG:   %[[alloc:.*]] = memref.alloc() : memref<2x3xf32>
 //   CHECK-DAG:   %[[global:.*]] = memref.get_global
 //       CHECK:   iree_linalg_ext.reverse dimensions(dense<0> : tensor<1xi64>) ins(%[[global]] : memref<2x3xf32>) outs(%[[alloc]] : memref<2x3xf32>)
@@ -259,7 +259,7 @@ func.func @reverse_dim(%pos: index) -> f32 {
 
 // -----
 
-// CHECK-LABEL: func @fft_tensor(
+// CHECK-LABEL: func.func @fft_tensor(
 //       CHECK:   memref.alloc
 //       CHECK:   memref.alloc
 //       CHECK:   iree_linalg_ext.fft ins(%{{.*}} : index) outs(%{{.*}}, %{{.*}} : memref<1024xf32>, memref<1024xf32>)
@@ -292,7 +292,7 @@ func.func @scan_1d_dim0_inclusive_sum() {
   flow.dispatch.tensor.store %6#1, %1, offsets = [], sizes = [], strides = [] : tensor<f32> -> !flow.dispatch.tensor<readwrite:f32>
   return
 }
-// CHECK:      func @scan_1d_dim0_inclusive_sum
+// CHECK:      func.func @scan_1d_dim0_inclusive_sum
 // CHECK-NOT:    memref.alloca
 // CHECK:        iree_linalg_ext.scan
 // CHECK-SAME:     ins(%{{.*}} : memref<6xf32>)
@@ -312,7 +312,7 @@ func.func @sort1D() {
   flow.dispatch.tensor.store %2, %0, offsets = [0], sizes = [4], strides = [1] : tensor<4xi32> -> !flow.dispatch.tensor<readwrite:4xi32>
   return
 }
-// CHECK:      func @sort1D
+// CHECK:      func.func @sort1D
 // CHECK:        %[[BUF:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<4xi32>
 // CHECK:        iree_linalg_ext.sort
 // CHECK-SAME:     outs(%[[BUF]] : memref<4xi32>)
@@ -341,7 +341,7 @@ func.func @scatter_update_scalar_1D() {
   }
   return
 }
-// CHECK:      func @scatter_update_scalar_1D
+// CHECK:      func.func @scatter_update_scalar_1D
 // CHECK-DAG:    %[[UPDATE:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<4xi32>
 // CHECK-DAG:    %[[INDICES:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<4x1xi32>
 // CHECK-DAG:    %[[ORIGINAL:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : memref<8xi32>
@@ -375,7 +375,7 @@ func.func @topk() {
 
 // XXX(hanchung): I don't know why there are memref.cast ops, might be a bug?
 // Since we don't have e2e top-k tests, I can't figure out how it works today.
-// CHECK:      func @topk
+// CHECK:      func.func @topk
 // CHECK-DAG:    %[[INPUT_VALUES:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<200x8xf32>
 // CHECK-DAG:    %[[XXX_VALUES:.+]] = memref.cast %[[INPUT_VALUES]] : memref<200x8xf32> to memref<200x8xf32,
 // CHECK-DAG:    %[[INPUT_INDICES:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<200x8xi32>

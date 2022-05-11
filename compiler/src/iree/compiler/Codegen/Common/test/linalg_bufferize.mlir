@@ -27,7 +27,7 @@ func.func @tile_from_tensor_load() {
   return
 }
 
-// CHECK-LABEL: func @tile_from_tensor_load()
+// CHECK-LABEL: func.func @tile_from_tensor_load()
 //   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   memref.assume_alignment %[[TENSOR_LHS]], 32 : memref<?x?xf32>
 //   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -72,7 +72,7 @@ func.func @tile_from_tensor_load_inplace() {
   return
 }
 
-// CHECK-LABEL: func @tile_from_tensor_load_inplace()
+// CHECK-LABEL: func.func @tile_from_tensor_load_inplace()
 //   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -115,7 +115,7 @@ func.func @tile_from_tensor_load_inplace_and_copy() {
   return
 }
 
-// CHECK-LABEL: func @tile_from_tensor_load_inplace_and_copy()
+// CHECK-LABEL: func.func @tile_from_tensor_load_inplace_and_copy()
 //   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG:   %[[RETURN1:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -167,7 +167,7 @@ func.func @tile_from_pointwise_lhs() {
   return
 }
 
-// CHECK-LABEL: func @tile_from_pointwise_lhs()
+// CHECK-LABEL: func.func @tile_from_pointwise_lhs()
 //       CHECK:       %[[ALLOC:.+]] = memref.alloc() : memref<1x3xf32>
 //   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -222,7 +222,7 @@ func.func @tile_from_pointwise_lhs_inplace() {
   return
 }
 
-// CHECK-LABEL: func @tile_from_pointwise_lhs_inplace()
+// CHECK-LABEL: func.func @tile_from_pointwise_lhs_inplace()
 //       CHECK:       %[[ALLOC:.+]] = memref.alloc() : memref<1x3xf32>
 //   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -275,7 +275,7 @@ func.func @tile_from_pointwise_outs() {
   return
 }
 
-// CHECK-LABEL: func @tile_from_pointwise_outs()
+// CHECK-LABEL: func.func @tile_from_pointwise_outs()
 //   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG:   %[[TENSOR_INIT:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -330,7 +330,7 @@ func.func @tile_from_pointwise_outs_inplace() {
   return
 }
 
-// CHECK-LABEL: func @tile_from_pointwise_outs_inplace()
+// CHECK-LABEL: func.func @tile_from_pointwise_outs_inplace()
 //   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -377,7 +377,7 @@ func.func @tile_from_matmul_outs() {
   return
 }
 
-// CHECK-LABEL: func @tile_from_matmul_outs()
+// CHECK-LABEL: func.func @tile_from_matmul_outs()
 //   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG:   %[[TENSOR_INIT:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -424,7 +424,7 @@ func.func @tile_from_matmul_outs_inplace() {
   return
 }
 
-// CHECK-LABEL: func @tile_from_matmul_outs_inplace()
+// CHECK-LABEL: func.func @tile_from_matmul_outs_inplace()
 //   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -484,7 +484,7 @@ func.func @bufferize_dynamic() {
 
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (-d0 + s0, s1)>
 //   CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0, s1] -> (-d0 + s1, s0)>
-//       CHECK: func @bufferize_dynamic()
+//       CHECK: func.func @bufferize_dynamic()
 //       CHECK:   %[[DIM0:.+]] = hal.interface.constant.load[0] : index
 //       CHECK:   %[[DIM1:.+]] = hal.interface.constant.load[1] : index
 //       CHECK:   %[[DIM2:.+]] = hal.interface.constant.load[2] : index
@@ -556,7 +556,7 @@ func.func @bufferize_dynamic_inplace() {
 
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (-d0 + s0, s1)>
 //   CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0, s1] -> (-d0 + s1, s0)>
-//       CHECK: func @bufferize_dynamic_inplace()
+//       CHECK: func.func @bufferize_dynamic_inplace()
 //       CHECK:   %[[DIM0:.+]] = hal.interface.constant.load[0] : index
 //       CHECK:   %[[DIM1:.+]] = hal.interface.constant.load[1] : index
 //       CHECK:   %[[DIM2:.+]] = hal.interface.constant.load[2] : index
@@ -597,7 +597,7 @@ func.func @reshape_simple() {
   return
 }
 
-//       CHECK: func @reshape_simple()
+//       CHECK: func.func @reshape_simple()
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //       CHECK:   %[[RESHAPE:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]]
@@ -628,7 +628,7 @@ func.func @reshape_fused_source() {
   return
 }
 
-//       CHECK: func @reshape_fused_source()
+//       CHECK: func.func @reshape_fused_source()
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<12xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<3x4xi32>
 //       CHECK:   %[[RESHAPE:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]]
@@ -663,7 +663,7 @@ func.func @reshape_fused_source_and_copyout() {
   return
 }
 
-//       CHECK: func @reshape_fused_source_and_copyout()
+//       CHECK: func.func @reshape_fused_source_and_copyout()
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<12xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<3x4xi32>
 //   CHECK-DAG:   %[[RET1:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<3x4xi32>
@@ -698,7 +698,7 @@ func.func @reshape_fused_target() {
   return
 }
 
-//       CHECK: func @reshape_fused_target()
+//       CHECK: func.func @reshape_fused_target()
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<3x4xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<12xi32>
 //       CHECK:   %[[RESHAPE:.+]] = memref.expand_shape %[[RET0]] {{\[}}[0, 1]]
@@ -744,7 +744,7 @@ func.func @dot_general_lowering() {
   return
 }
 
-// CHECK-LABEL: func @dot_general_lowering()
+// CHECK-LABEL: func.func @dot_general_lowering()
 //   CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG:   %[[RESHAPE_LHS:.+]] = memref.collapse_shape %[[LHS]]
@@ -776,7 +776,7 @@ func.func @slice() {
   return
 }
 
-// CHECK-LABEL: func @slice()
+// CHECK-LABEL: func.func @slice()
 //   CHECK-DAG: %[[ARG:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG: %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //       CHECK: %[[SUBVIEW:.+]] = memref.subview %[[ARG]]
@@ -799,7 +799,7 @@ func.func @slice_rank_reducing() {
   return
 }
 
-// CHECK-LABEL: func @slice_rank_reducing()
+// CHECK-LABEL: func.func @slice_rank_reducing()
 //   CHECK-DAG: %[[ARG:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG: %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //       CHECK: %[[SUBVIEW:.+]] = memref.subview %[[ARG]]
@@ -827,7 +827,7 @@ func.func @slice_multiple_copy() {
   return
 }
 
-// CHECK-LABEL: func @slice_multiple_copy()
+// CHECK-LABEL: func.func @slice_multiple_copy()
 //   CHECK-DAG: %[[ARG:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG: %[[RETURN1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG: %[[RETURN2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -852,7 +852,7 @@ func.func @slice_in_place() {
   return
 }
 
-// CHECK-LABEL: func @slice_in_place()
+// CHECK-LABEL: func.func @slice_in_place()
 //   CHECK-NOT:   linalg.generic
 
 
@@ -872,7 +872,7 @@ func.func @slice_whole_stride_dispatch_0() {
   return
 }
 
-// CHECK-LABEL: func @slice_whole_stride_dispatch_0()
+// CHECK-LABEL: func.func @slice_whole_stride_dispatch_0()
 //   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG:   %[[SUBVIEW_INPUT:.+]] = memref.subview %[[INPUT]]
@@ -902,7 +902,7 @@ func.func @subtensor_insert() {
   return
 }
 
-// CHECK-LABEL: func @subtensor_insert()
+// CHECK-LABEL: func.func @subtensor_insert()
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -926,7 +926,7 @@ func.func @tensor_extract() {
   return
 }
 
-// CHECK-LABEL: func @tensor_extract()
+// CHECK-LABEL: func.func @tensor_extract()
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //       CHECK:   %[[LOAD:.+]] = memref.load %[[ARG0]]
@@ -945,7 +945,7 @@ func.func @load_to_store() {
   return
 }
 
-// CHECK-LABEL: func @load_to_store()
+// CHECK-LABEL: func.func @load_to_store()
 //       CHECK:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<3x4xi32>
 //       CHECK:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<3x4xi32>
 //       CHECK:   linalg.generic {{.*}} ins(%[[IN]] {{.*}} outs(%[[OUT]]
@@ -960,7 +960,7 @@ func.func @constant() {
   return
 }
 
-// CHECK-LABEL: func @constant()
+// CHECK-LABEL: func.func @constant()
 //       CHECK:   %[[CST:.+]] = arith.constant {{.+}} : tensor<2x2x3xi32>
 //       CHECK:   %[[MEMREF:.+]] = bufferization.to_memref %[[CST]] : memref<2x2x3xi32>
 //       CHECK:   %[[RESULT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
@@ -1003,7 +1003,7 @@ func.func @rhs_non_splat_constant() {
   return
 }
 
-// CHECK-LABEL: func @rhs_non_splat_constant
+// CHECK-LABEL: func.func @rhs_non_splat_constant
 //   CHECK-DAG:   %[[CONSTANT:.+]] = arith.constant {{.+}} : tensor<3x5xf32>
 //   CHECK-DAG:   %[[RHS:.+]] = bufferization.to_memref %[[CONSTANT]]
 //   CHECK-DAG:   %[[LHS_INPUT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1x5x3x1xf32>
@@ -1049,7 +1049,7 @@ func.func @gather() {
   return
 }
 
-// CHECK-LABEL: func @gather()
+// CHECK-LABEL: func.func @gather()
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -1081,7 +1081,7 @@ func.func @pooling_nhwc_sum() {
   return
 }
 
-// CHECK-LABEL: func @pooling_nhwc_sum
+// CHECK-LABEL: func.func @pooling_nhwc_sum
 //       CHECK:   %[[WINDOW:.+]] = memref.alloc() : memref<2x3xf32>
 //   CHECK-DAG:   %[[INIT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<f32>
 //   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<1x4x6x1xf32>
@@ -1155,7 +1155,7 @@ func.func @read_only_subtensor() {
   return
 }
 
-// CHECK-LABEL: func @read_only_subtensor
+// CHECK-LABEL: func.func @read_only_subtensor
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xf32>
 //   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xf32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<?x?xf32>
@@ -1194,7 +1194,7 @@ func.func @reshape_read_only() {
   return
 }
 
-// CHECK-LABEL: func @reshape_read_only
+// CHECK-LABEL: func.func @reshape_read_only
 //   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //       CHECK:   %[[RESHAPE:.+]] = memref.collapse_shape %[[INPUT]]
@@ -1240,7 +1240,7 @@ func.func @use_buffer_for_operand_when_output_tensor_not_used() {
   return
 }
 
-// CHECK: func @use_buffer_for_operand_when_output_tensor_not_used()
+// CHECK: func.func @use_buffer_for_operand_when_output_tensor_not_used()
 
 //  CHECK-NOT: memref.alloc
 //      CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
@@ -1293,7 +1293,7 @@ func.func @dont_use_buffer_for_operand_when_output_tensor_used() {
   return
 }
 
-// CHECK-LABEL: func @dont_use_buffer_for_operand_when_output_tensor_used()
+// CHECK-LABEL: func.func @dont_use_buffer_for_operand_when_output_tensor_used()
 //      CHECK: %[[ALLOC:.+]] = memref.alloc
 //      CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
 //      CHECK: linalg.fill
@@ -1333,7 +1333,7 @@ func.func @bufferize_cst_output_tensor() {
   return
 }
 
-// CHECK-LABEL: func @bufferize_cst_output_tensor()
+// CHECK-LABEL: func.func @bufferize_cst_output_tensor()
 
 //       CHECK-DAG: %[[CST1:.+]] = arith.constant dense<-2147483648> : tensor<i32>
 //       CHECK-DAG: %[[CST5:.+]] = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
@@ -1384,7 +1384,7 @@ func.func @cast_follwed_by_store() {
   return
 }
 
-// CHECK-LABEL: func @cast_follwed_by_store()
+// CHECK-LABEL: func.func @cast_follwed_by_store()
 //   CHECK-DAG: %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
 //   CHECK-DAG: %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4x32x1024xf32>
 //   CHECK-DAG: %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<4x1024x64xf32>
@@ -1419,7 +1419,7 @@ func.func @rank_reduced_subtensor_insert() {
   return
 }
 
-// CHECK-LABEL: func @rank_reduced_subtensor_insert()
+// CHECK-LABEL: func.func @rank_reduced_subtensor_insert()
 //   CHECK-DAG:   %[[ARG:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[RET:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[RET]]
@@ -1466,7 +1466,7 @@ func.func @bufferize_transfer_op() {
   return
 }
 
-//   CHECK-LABEL: func @bufferize_transfer_op()
+//   CHECK-LABEL: func.func @bufferize_transfer_op()
 //     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //     CHECK-DAG:   %[[ARG2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -1522,7 +1522,7 @@ func.func @bufferize_transfer_op_inplace() {
   return
 }
 
-//   CHECK-LABEL: func @bufferize_transfer_op_inplace()
+//   CHECK-LABEL: func.func @bufferize_transfer_op_inplace()
 //     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -1593,7 +1593,7 @@ func.func @multi_result() {
   return
 }
 
-// CHECK-LABEL: func @multi_result()
+// CHECK-LABEL: func.func @multi_result()
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -1649,7 +1649,7 @@ func.func @padded_matmul() {
   return
 }
 
-// CHECK-LABEL: func @padded_matmul()
+// CHECK-LABEL: func.func @padded_matmul()
 //   CHECK-DAG: %[[LHS_PADDED:.+]] = memref.alloc() : memref<64x32xf32>
 //   CHECK-DAG: %[[RHS_PADDED:.+]] = memref.alloc() : memref<32x16xf32>
 //   CHECK-DAG: %[[C0:.+]] = arith.constant 0.000000e+00 : f32
@@ -1722,7 +1722,7 @@ func.func @dot_general_padded() {
 }
 
 //      CHECK: #[[MAP1:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 4)>
-//      CHECK: func @dot_general_padded
+//      CHECK: func.func @dot_general_padded
 //   CHECK-DAG:      %[[ALLOC_RET0:.+]] = memref.alloc
 //   CHECK-DAG:      %[[ALLOC_ARG1:.+]] = memref.alloc
 //   CHECK-DAG:      %[[ALLOC_ARG0:.+]] = memref.alloc
@@ -1795,7 +1795,7 @@ func.func @multi_result_reduce() {
   return
 }
 
-// CHECK-LABEL: func @multi_result_reduce
+// CHECK-LABEL: func.func @multi_result_reduce
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -2129,7 +2129,7 @@ func.func @sort1D() {
   return
 }
 
-// CHECK-LABEL: func @sort1D()
+// CHECK-LABEL: func.func @sort1D()
 //   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //       CHECK:   linalg.generic {{.*}} ins(%[[INPUT]] {{.*}} outs(%[[OUTPUT]]
@@ -2172,7 +2172,7 @@ func.func @sort1D_inplace() {
   return
 }
 
-// CHECK-LABEL: func @sort1D_inplace()
+// CHECK-LABEL: func.func @sort1D_inplace()
 //   CHECK-DAG:   %[[INOUT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //       CHECK:   scf.for %[[ARG0:.+]] =
 //       CHECK:     scf.for %[[ARG1:.+]] =
@@ -2198,7 +2198,7 @@ func.func @iree_linalg_ext_sort_1d() {
   return
 }
 
-// CHECK-LABEL: func @iree_linalg_ext_sort_1d()
+// CHECK-LABEL: func.func @iree_linalg_ext_sort_1d()
 //   CHECK-DAG:   %[[INOUT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //       CHECK:   iree_linalg_ext.sort
 //  CHECK-SAME:     dimension(0)
@@ -2240,7 +2240,7 @@ func.func @tensor_insert_slice() {
 }
 
 //       CHECK: #[[MAP:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
-//       CHECK: func @tensor_insert_slice()
+//       CHECK: func.func @tensor_insert_slice()
 //   CHECK-DAG:   %[[SRC:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xi32>
 //   CHECK-DAG:   %[[DST:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xi32>
 //   CHECK-DAG:   %[[OFFSET_Y:.+]] = hal.interface.constant.load[0]
@@ -2285,7 +2285,7 @@ func.func @dynamic_update_slice() {
   return
 }
 
-// CHECK-LABEL: func @dynamic_update_slice()
+// CHECK-LABEL: func.func @dynamic_update_slice()
 //   CHECK-DAG:   %[[SRC:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?xi32>
 //   CHECK-DAG:   %[[DST:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<?x?xi32>
 //   CHECK-DAG:   %[[OFFSET_Y:.+]] = hal.interface.constant.load[0]
@@ -2368,7 +2368,7 @@ func.func @multi_level_tile_fuse() {
   return
 }
 
-// CHECK-LABEL: func @multi_level_tile_fuse()
+// CHECK-LABEL: func.func @multi_level_tile_fuse()
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
 //   CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load[1]
@@ -2448,7 +2448,7 @@ func.func @operand_fusion() {
   return
 }
 
-// CHECK-LABEL: func @operand_fusion()
+// CHECK-LABEL: func.func @operand_fusion()
 //   CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
 //   CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load[1]
 //   CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load[2]
@@ -2538,7 +2538,7 @@ func.func @two_level_tile_and_fuse() {
   return
 }
 
-// CHECK-LABEL: func @two_level_tile_and_fuse()
+// CHECK-LABEL: func.func @two_level_tile_and_fuse()
 //   CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG:   %[[BIAS:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -2613,7 +2613,7 @@ func.func @forward_dispatch_3() {
   }
   return
 }
-// CHECK: func @forward_dispatch_3()
+// CHECK: func.func @forward_dispatch_3()
 
 // -----
 
@@ -2662,7 +2662,7 @@ func.func @dot_general_nontrivial_batching_mutliple_parallel_dimension() {
   }
   return
 }
-// CHECK-LABEL: func @dot_general_nontrivial_batching_mutliple_parallel_dimension()
+// CHECK-LABEL: func.func @dot_general_nontrivial_batching_mutliple_parallel_dimension()
 //   CHECK-NOT:   memref.alloc
 
 // -----
@@ -2695,7 +2695,7 @@ func.func @no_op_subview() {
       : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>{%d0, %d1}
   return
 }
-// CHECK-LABEL: func @no_op_subview()
+// CHECK-LABEL: func.func @no_op_subview()
 //   CHECK-DAG:   %[[SRC:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[DEST:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //       CHECK:   linalg.generic
@@ -2716,7 +2716,7 @@ func.func @rank_reducing_no_op_subview() {
       : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:?xf32>{%d0}
   return
 }
-// CHECK-LABEL: func @rank_reducing_no_op_subview()
+// CHECK-LABEL: func.func @rank_reducing_no_op_subview()
 //   CHECK-DAG:   %[[SRC:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[DEST:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[SRC]][0, 0] [1, %{{.+}}]
@@ -2726,7 +2726,7 @@ func.func @rank_reducing_no_op_subview() {
 
 // -----
 
-// CHECK-LABEL: func @dispatch_scatter()
+// CHECK-LABEL: func.func @dispatch_scatter()
 func.func @dispatch_scatter() {
   %c1 = arith.constant 1 : index
   %c0 = arith.constant 0 : index

@@ -78,7 +78,7 @@ module {
 module @t005_call {
 
 module {
-  func private @import_fn(%arg0 : i32) -> i32
+  func.func private @import_fn(%arg0 : i32) -> i32
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   func.func @my_fn(%arg0 : i32) -> (i32) {
@@ -95,7 +95,7 @@ module {
 module @t005_call_int_promotion {
 
 module {
-  func private @import_fn(%arg0 : i1) -> i1
+  func.func private @import_fn(%arg0 : i1) -> i1
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   func.func @my_fn(%arg0 : i1) -> (i1) {

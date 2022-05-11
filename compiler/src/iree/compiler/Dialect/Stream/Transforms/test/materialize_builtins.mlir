@@ -45,7 +45,7 @@ util.initializer {
   util.initializer.return
 }
 
-// CHECK: func @otherUser
+// CHECK: func.func @otherUser
 func.func @otherUser() -> !stream.resource<*> {
   %c128 = arith.constant 128 : index
   %c1_i64 = arith.constant 1 : i64

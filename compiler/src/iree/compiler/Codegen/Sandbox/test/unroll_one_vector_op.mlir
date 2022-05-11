@@ -10,7 +10,7 @@
   iterator_types = ["parallel", "parallel", "reduction"]
 }
 
-// CHECK-LABEL: func @test
+// CHECK-LABEL: func.func @test
 func.func @test(%a: vector<4x3xf32>, %b: vector<3x4xf32>, %c: vector<4x4xf32>) -> vector<4x4xf32> {
   // CHECK: vector.contract {{.*}} : vector<2x3xf32>, vector<3x4xf32> into vector<2x4xf32>
   // CHECK: vector.contract {{.*}} : vector<2x3xf32>, vector<3x4xf32> into vector<2x4xf32>

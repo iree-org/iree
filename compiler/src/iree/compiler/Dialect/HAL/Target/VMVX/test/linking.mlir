@@ -95,7 +95,7 @@ util.initializer {
 // CHECK-NEXT:    }
 // CHECK-NEXT:  }
 //
-// CHECK:       func @basic_linking() {
+// CHECK:       func.func @basic_linking() {
 // CHECK:         hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_0) workgroups([%c1, %c1, %c1])
 // CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_1) workgroups([%c1, %c1, %c1])
 // CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_2) workgroups([%c1, %c1, %c1])

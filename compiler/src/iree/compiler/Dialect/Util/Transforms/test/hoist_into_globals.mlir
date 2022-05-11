@@ -3,7 +3,7 @@
 // CHECK-LABEL: @hoist_simple_const_expr
 module @hoist_simple_const_expr {
   // CHECK: util.global private @[[HOISTED_SYM:.*]] : i32
-  // CHECK: func @main
+  // CHECK: func.func @main
   func.func @main() -> (i32) {
     %0 = arith.constant 0 : i32
     %1 = arith.constant 1 : i32
@@ -28,7 +28,7 @@ module @hoist_simple_const_expr {
 // checks.
 // CHECK-LABEL: @do_not_hoist_variable_op
 // CHECK-NOT: util.global
-// CHECK: func @main
+// CHECK: func.func @main
 // CHECK: %[[VAL:.*]] = "iree_unregistered.var_expr"
 // CHECK: return %[[VAL]]
 // CHECK-NOT: util.initializer
@@ -112,7 +112,7 @@ module @hoist_tree_const_expr {
   // CHECK: util.global private @latent_global : i32
   util.global private @latent_global : i32
 
-  // CHECK: func @main
+  // CHECK: func.func @main
   func.func @main() -> (i32, i32, i32) {
     // CHECK-DAG: %[[LOAD_HOISTED_0:.*]] = util.global.load @[[HOISTED_0]] : i32
     // CHECK-DAG: %[[LOAD_HOISTED_1:.*]] = util.global.load @[[HOISTED_1]] : i32
@@ -149,7 +149,7 @@ module @hoist_tree_const_expr {
 // CHECK-LABEL: @hoist_non_leaf_const_expr
 module @hoist_non_leaf_const_expr {
   // CHECK: util.global private @[[HOISTED:.*]] : i32
-  // CHECK: func @main
+  // CHECK: func.func @main
   func.func @main() -> (i32) {
     // CHECK: %[[LOAD_HOISTED:.*]] = util.global.load @[[HOISTED]] : i32
     // CHECK: %[[RESULT:.*]] = "iree_unregistered.non_leaf_const_expr"(%hoisted)
@@ -175,7 +175,7 @@ module @hoist_non_leaf_const_expr {
 // CHECK-LABEL: @hoist_implicit_capture
 module @hoist_implicit_capture {
   // CHECK: util.global private @[[HOISTED_SYM:.*]] : i32
-  // CHECK: func @main
+  // CHECK: func.func @main
   func.func @main() -> (i32) {
     %0 = arith.constant 0 : i32
     %1 = arith.constant 1 : i32

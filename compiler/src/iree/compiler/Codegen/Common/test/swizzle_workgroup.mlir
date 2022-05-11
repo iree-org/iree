@@ -28,7 +28,7 @@ func.func @matmul() {
   return
 }
 
-//    CHECK-LABEL: func @matmul
+//    CHECK-LABEL: func.func @matmul
 //          CHECK: %[[WORKGROUPIDX:.*]] = hal.interface.workgroup.id[0] : index
 //          CHECK: %[[WORKGROUPIDY:.*]] = hal.interface.workgroup.id[1] : index
 //          CHECK: %[[WORKGROUPCOUNTX:.*]] = hal.interface.workgroup.count[0] : index

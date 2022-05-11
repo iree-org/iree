@@ -22,7 +22,7 @@ func.func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %ar
     } -> tensor<?x?xf32>
   return %2 : tensor<?x?xf32>
 }
-//      CHECK: func @matmul_bias_add(
+//      CHECK: func.func @matmul_bias_add(
 //      CHECK:   scf.for
 // CHECK-SAME:   {
 //      CHECK:     scf.for
@@ -55,7 +55,7 @@ func.func @matmul_bias_add_static(%arg0 : tensor<20x60xf32>, %arg1 : tensor<60x1
     } -> tensor<20x120xf32>
   return %2 : tensor<20x120xf32>
 }
-//      CHECK: func @matmul_bias_add_static(
+//      CHECK: func.func @matmul_bias_add_static(
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<20x60xf32>
 // CHECK-SAME:     %[[ARG1:.+]]: tensor<60x120xf32>
 // CHECK-SAME:     %[[ARG2:.+]]: tensor<120xf32>

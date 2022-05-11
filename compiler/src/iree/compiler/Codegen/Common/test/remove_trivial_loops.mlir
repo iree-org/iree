@@ -7,7 +7,7 @@
   ]>
 ]>
 
-// CHECK-LABEL: func @dispatch_0()
+// CHECK-LABEL: func.func @dispatch_0()
 hal.executable private @dispatch_0  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @dispatch_0 layout(#executable_layout) {
@@ -53,7 +53,7 @@ hal.executable private @dispatch_0  {
   ]>
 ]>
 
-// CHECK-LABEL: func @workgroup_tile_loop()
+// CHECK-LABEL: func.func @workgroup_tile_loop()
 #translation = #iree_codegen.translation_info<LLVMGPUDistribute, workload_per_wg = [32]>
 hal.executable private @workgroup_tile_loop  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
@@ -87,7 +87,7 @@ hal.executable private @workgroup_tile_loop  {
   ]>
 ]>
 
-// CHECK-LABEL: func @workgroup_tile_loop_negative()
+// CHECK-LABEL: func.func @workgroup_tile_loop_negative()
 #translation = #iree_codegen.translation_info<LLVMGPUDistribute, workload_per_wg = [16]>
 hal.executable private @workgroup_tile_loop_negative  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
@@ -121,7 +121,7 @@ hal.executable private @workgroup_tile_loop_negative  {
   ]>
 ]>
 
-// CHECK-LABEL: func @both_workgroup_and_workitem()
+// CHECK-LABEL: func.func @both_workgroup_and_workitem()
 //   CHECK-NOT:   scf.for
 //       CHECK:   gpu.barrier
 #translation = #iree_codegen.translation_info<LLVMGPUDistribute, workload_per_wg = [32, 8, 1]>

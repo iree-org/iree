@@ -84,7 +84,7 @@ func.func @dynamicBroadcastCompare(%arg0: tensor<?xf32>, %arg1: tensor<?x?xf32>)
 }
 
 // -----
-// CHECK-LABEL: func @selectv2
+// CHECK-LABEL: func.func @selectv2
 func.func @selectv2(%arg0: tensor<2xi1>, %arg1: tensor<2xi32>, %arg2: tensor<2xi32>) -> tensor<2xi32> {
   // All same type: should just short-circtuit to one mhlo.select / one generic.
   // CHECK: linalg.generic
@@ -97,7 +97,7 @@ func.func @selectv2(%arg0: tensor<2xi1>, %arg1: tensor<2xi32>, %arg2: tensor<2xi
 // -----
 // CHECK: #map0 = affine_map<(d0) -> ()>
 // CHECK: #map1 = affine_map<(d0) -> (d0)>
-// CHECK-LABEL: func @selectv2_pred_scalar
+// CHECK-LABEL: func.func @selectv2_pred_scalar
 func.func @selectv2_pred_scalar(%arg0: tensor<i1>, %arg1: tensor<2xi32>, %arg2: tensor<2xi32>) -> tensor<2xi32> {
   // CHECK: %[[INIT_0:.*]] = linalg.init_tensor [2] : tensor<2xi1>
   // CHECK: %[[BCAST_PRED:.*]] = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel"]} ins(%arg0 : tensor<i1>) outs(%[[INIT_0]] : tensor<2xi1>)
@@ -112,7 +112,7 @@ func.func @selectv2_pred_scalar(%arg0: tensor<i1>, %arg1: tensor<2xi32>, %arg2: 
 // CHECK: #map0 = affine_map<(d0, d1, d2) -> ()>
 // CHECK: #map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 // CHECK: #map2 = affine_map<(d0, d1, d2) -> (d1, 0)>
-// CHECK-LABEL: func @selectv2_broadcast_then
+// CHECK-LABEL: func.func @selectv2_broadcast_then
 func.func @selectv2_broadcast_then(%arg0: tensor<i1>, %arg1: tensor<8x1xi32>, %arg2: tensor<2x8x8xi32>) -> tensor<2x8x8xi32> {
   // CHECK: %[[BCAST_PRED:.*]] = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0 : tensor<i1>)
   // CHECK: %[[BCAST_THEN:.*]] = linalg.generic {indexing_maps = [#map2, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg1 : tensor<8x1xi32>)
@@ -127,7 +127,7 @@ func.func @selectv2_broadcast_then(%arg0: tensor<i1>, %arg1: tensor<8x1xi32>, %a
 // CHECK: #map0 = affine_map<(d0, d1, d2) -> ()>
 // CHECK: #map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 // CHECK: #map2 = affine_map<(d0, d1, d2) -> (d1, 0)>
-// CHECK-LABEL: func @selectv2_broadcast_else
+// CHECK-LABEL: func.func @selectv2_broadcast_else
 func.func @selectv2_broadcast_else(%arg0: tensor<i1>, %arg1: tensor<2x8x8xi32>, %arg2: tensor<8x1xi32>) -> tensor<2x8x8xi32> {
   // CHECK: %[[BCAST_PRED:.*]] = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0 : tensor<i1>)
   // CHECK: %[[BCAST_ELSE:.*]] = linalg.generic {indexing_maps = [#map2, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg2 : tensor<8x1xi32>)
@@ -141,7 +141,7 @@ func.func @selectv2_broadcast_else(%arg0: tensor<i1>, %arg1: tensor<2x8x8xi32>, 
 // -----
 // CHECK: #map0 = affine_map<(d0, d1, d2) -> (0)>
 // CHECK: #map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-// CHECK-LABEL: func @selectv2_broadcast_pred
+// CHECK-LABEL: func.func @selectv2_broadcast_pred
 func.func @selectv2_broadcast_pred(%arg0: tensor<1xi1>, %arg1: tensor<2x8x8xi32>, %arg2: tensor<2x8x8xi32>) -> tensor<2x8x8xi32> {
   // CHECK: %[[BCAST_PRED:.*]] = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0 : tensor<1xi1>)
   // CHECK: linalg.generic
@@ -156,7 +156,7 @@ func.func @selectv2_broadcast_pred(%arg0: tensor<1xi1>, %arg1: tensor<2x8x8xi32>
 // CHECK: #map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 // CHECK: #map2 = affine_map<(d0, d1, d2) -> (0, d1, 0)>
 // CHECK: #map3 = affine_map<(d0, d1, d2) -> (0, 0, d2)>
-// CHECK-LABEL: func @selectv2_broadcast_all
+// CHECK-LABEL: func.func @selectv2_broadcast_all
 func.func @selectv2_broadcast_all(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x8x1xi32>, %arg2: tensor<1x1x8xi32>) -> tensor<8x8x8xi32> {
   // CHECK: %[[BCAST_PRED:.*]] = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0 : tensor<8x1x1xi1>)
   // CHECK: %[[BCAST_THEN:.*]] = linalg.generic {indexing_maps = [#map2, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg1 : tensor<1x8x1xi32>)
@@ -172,7 +172,7 @@ func.func @selectv2_broadcast_all(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x8x1xi
 // CHECK: #map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 // CHECK: #map2 = affine_map<(d0, d1, d2) -> (0, d1, 0)>
 // CHECK: #map3 = affine_map<(d0, d1, d2) -> (0, 0, d2)>
-// CHECK-LABEL: func @selectv2_broadcast_dyn_pred
+// CHECK-LABEL: func.func @selectv2_broadcast_dyn_pred
 func.func @selectv2_broadcast_dyn_pred(%arg0: tensor<?x1x1xi1>, %arg1: tensor<1x8x1xi32>, %arg2: tensor<1x1x8xi32>) -> tensor<?x8x8xi32> {
   // CHECK: %[[C0_0:.*]] = arith.constant 0 : index
   // CHECK: %[[DIM_PRED_0:.*]] = tensor.dim %arg0, %[[C0_0]]
@@ -199,7 +199,7 @@ func.func @selectv2_broadcast_dyn_pred(%arg0: tensor<?x1x1xi1>, %arg1: tensor<1x
 }
 
 // -----
-// CHECK-LABEL: func @selectv2_broadcast_dyn_then
+// CHECK-LABEL: func.func @selectv2_broadcast_dyn_then
 func.func @selectv2_broadcast_dyn_then(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x?x1xi32>, %arg2: tensor<1x1x8xi32>) -> tensor<8x?x8xi32> {
   // CHECK: %[[C1_0:.*]] = arith.constant 1 : index
   // CHECK: %[[DIM_THEN_1:.*]] = tensor.dim %arg1, %[[C1_0]]
@@ -226,7 +226,7 @@ func.func @selectv2_broadcast_dyn_then(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x
 }
 
 // -----
-// CHECK-LABEL: func @selectv2_broadcast_dyn_else
+// CHECK-LABEL: func.func @selectv2_broadcast_dyn_else
 func.func @selectv2_broadcast_dyn_else(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x8x1xi32>, %arg2: tensor<1x1x?xi32>) -> tensor<8x8x?xi32> {
   // CHECK: %[[C2_0:.*]] = arith.constant 2 : index
   // CHECK: %[[DIM_ELSE_2:.*]] = tensor.dim %arg2, %[[C2_0]]
@@ -254,7 +254,7 @@ func.func @selectv2_broadcast_dyn_else(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x
 }
 
 // -----
-// CHECK-LABEL: func @selectv2_broadcast_dyn_all
+// CHECK-LABEL: func.func @selectv2_broadcast_dyn_all
 func.func @selectv2_broadcast_dyn_all(%arg0: tensor<?x1x1xi1>, %arg1: tensor<?x8x1xi32>, %arg2: tensor<?x1x?xi32>) -> tensor<?x8x?xi32> {
   // CHECK: %[[C0:.*]] = arith.constant 0 : index
   // CHECK: %[[PRED_D0:.*]] = tensor.dim %arg0, %[[C0]] : tensor<?x1x1xi1>

@@ -20,7 +20,7 @@ hal.executable private @transpose_10_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.entry_point @transpose_10_8x8_pattern layout(#executable_layout)
     builtin.module {
-      func @transpose_10_8x8_pattern() {
+      func.func @transpose_10_8x8_pattern() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:512x1024xf32>
@@ -41,7 +41,7 @@ hal.executable private @transpose_10_8x8_pattern {
   }
 }
 
-//    CHECK-LABEL: func @transpose_10_8x8_pattern
+//    CHECK-LABEL: func.func @transpose_10_8x8_pattern
 //  CHECK-COUNT-8: vector.load
 //      CHECK-NOT: vector.extract
 //      CHECK-NOT: vector.insert
@@ -74,7 +74,7 @@ hal.executable private @transpose_021_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.entry_point @transpose_021_8x8_pattern layout(#executable_layout)
     builtin.module {
-      func @transpose_021_8x8_pattern() {
+      func.func @transpose_021_8x8_pattern() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:64x96x128xf32>
@@ -95,7 +95,7 @@ hal.executable private @transpose_021_8x8_pattern {
   }
 }
 
-//    CHECK-LABEL: func @transpose_021_8x8_pattern
+//    CHECK-LABEL: func.func @transpose_021_8x8_pattern
 //  CHECK-COUNT-8: vector.load
 //      CHECK-NOT: vector.extract
 //      CHECK-NOT: vector.insert
@@ -128,7 +128,7 @@ hal.executable private @transpose_201_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.entry_point @transpose_201_8x8_pattern layout(#executable_layout)
     builtin.module {
-      func @transpose_201_8x8_pattern() {
+      func.func @transpose_201_8x8_pattern() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:64x96x128xf32>
@@ -149,7 +149,7 @@ hal.executable private @transpose_201_8x8_pattern {
   }
 }
 
-//   CHECK-LABEL: func @transpose_201_8x8_pattern
+//   CHECK-LABEL: func.func @transpose_201_8x8_pattern
 //  CHECK-COUNT-8: vector.load
 //      CHECK-NOT: vector.extract
 //      CHECK-NOT: vector.insert
@@ -182,7 +182,7 @@ hal.executable private @transpose_210_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.entry_point @transpose_210_8x8_pattern layout(#executable_layout)
     builtin.module {
-      func @transpose_210_8x8_pattern() {
+      func.func @transpose_210_8x8_pattern() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:64x96x128xf32>
@@ -203,7 +203,7 @@ hal.executable private @transpose_210_8x8_pattern {
   }
 }
 
-//   CHECK-LABEL: func @transpose_210_8x8_pattern
+//   CHECK-LABEL: func.func @transpose_210_8x8_pattern
 //  CHECK-COUNT-8: vector.load
 //      CHECK-NOT: vector.extract
 //      CHECK-NOT: vector.insert
@@ -236,7 +236,7 @@ hal.executable private @transpose_120_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.entry_point @transpose_120_8x8_pattern layout(#executable_layout)
     builtin.module {
-      func @transpose_120_8x8_pattern() {
+      func.func @transpose_120_8x8_pattern() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:64x96x128xf32>
@@ -257,7 +257,7 @@ hal.executable private @transpose_120_8x8_pattern {
   }
 }
 
-//   CHECK-LABEL: func @transpose_120_8x8_pattern
+//   CHECK-LABEL: func.func @transpose_120_8x8_pattern
 //  CHECK-COUNT-8: vector.load
 //      CHECK-NOT: vector.extract
 //      CHECK-NOT: vector.insert
@@ -290,7 +290,7 @@ hal.executable private @transpose_102 {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.entry_point @transpose_102 layout(#executable_layout)
     builtin.module {
-      func @transpose_102() {
+      func.func @transpose_102() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:64x96x128xf32>
@@ -311,7 +311,7 @@ hal.executable private @transpose_102 {
   }
 }
 
-// CHECK-LABEL: func @transpose_102
+// CHECK-LABEL: func.func @transpose_102
 //   CHECK-NOT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
 //   CHECK-NOT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
 // -----
@@ -336,7 +336,7 @@ hal.executable private @test_no_avx2_feature {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.entry_point @test_no_avx2_feature layout(#executable_layout)
     builtin.module {
-      func @test_no_avx2_feature() {
+      func.func @test_no_avx2_feature() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:512x1024xf32>
@@ -357,6 +357,6 @@ hal.executable private @test_no_avx2_feature {
   }
 }
 
-// CHECK-LABEL: func @test_no_avx2_feature
+// CHECK-LABEL: func.func @test_no_avx2_feature
 //   CHECK-NOT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
 //   CHECK-NOT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>

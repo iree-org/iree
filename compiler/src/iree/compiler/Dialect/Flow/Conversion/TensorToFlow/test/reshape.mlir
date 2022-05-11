@@ -15,7 +15,7 @@ func.func @turn_fill_into_splat(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg
 }
 
 //       CHECK: #[[MAP:.+]] = affine_map<(d0)[s0, s1] -> (d0 + s0 + s1)>
-//       CHECK: func @turn_fill_into_splat
+//       CHECK: func.func @turn_fill_into_splat
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: tensor<f32>
 //  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9]+]]: index
