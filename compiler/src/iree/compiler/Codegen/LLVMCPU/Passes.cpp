@@ -221,7 +221,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
   }
 }
 
-void addMatmulDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
+void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createVerifyLinalgTransformLegalityPass());
 
   // Do first level of tiling and distribution.

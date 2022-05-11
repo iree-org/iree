@@ -20,8 +20,8 @@ def CPU_BufferOpsDefault
     : I32EnumAttrCase<"CPUBufferOpsDefault", 1>;
 def CPU_DoubleTilingExpert
     : I32EnumAttrCase<"CPUDoubleTilingExpert", 2>;
-def CPU_MatmulDoubleTilingExpert
-    : I32EnumAttrCase<"CPUMatmulDoubleTilingExpert", 3>;
+def CPU_DoubleTilingPadExpert
+    : I32EnumAttrCase<"CPUDoubleTilingPadExpert", 3>;
 def CPU_ConvTileAndDecomposeExpert
     : I32EnumAttrCase<"CPUConvTileAndDecomposeExpert", 4>;
 def CPU_TileFuseAndVectorize
@@ -60,7 +60,7 @@ def DispatchLoweringPassPipelineEnum
           "DispatchLoweringPassPipeline",
           "identifier for pass pipeline use to lower dispatch region", [
             CPU_Default, CPU_BufferOpsDefault, CPU_DoubleTilingExpert,
-            CPU_MatmulDoubleTilingExpert, CPU_ConvTileAndDecomposeExpert,
+            CPU_DoubleTilingPadExpert, CPU_ConvTileAndDecomposeExpert,
             CPU_TileFuseAndVectorize, CPU_BufferOpsTileAndVectorize,
             Linalg_TransformInterpCodegen, LLVMGPU_SimpleDistribute,
             LLVMGPU_Vectorize, LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
