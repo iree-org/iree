@@ -1,6 +1,6 @@
 // RUN: iree-opt-tflite %s --iree-tflite-verify-fully-converted --split-input-file -verify-diagnostics
 
-// CHECK-LABEL: func @main
+// CHECK-LABEL: func.func @main
 func.func @main(%arg0: tensor<2xf32>) -> (tensor<2xf32>) {
   // CHECK: "tosa.add"
   %0 = "tosa.add"(%arg0, %arg0) : (tensor<2xf32>, tensor<2xf32>) -> tensor<2xf32>

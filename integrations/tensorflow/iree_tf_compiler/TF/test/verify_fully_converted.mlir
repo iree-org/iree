@@ -1,6 +1,6 @@
 // RUN: iree-tf-opt %s --iree-tf-verify-fully-converted --split-input-file -verify-diagnostics
 
-// CHECK-LABEL: func @f
+// CHECK-LABEL: func.func @f
 func.func @f() -> (tensor<i32>) {
   // CHECK: [[VAL0:%.+]] = mhlo.constant dense<3>
   %0 = mhlo.constant dense<3> : tensor<i32>
