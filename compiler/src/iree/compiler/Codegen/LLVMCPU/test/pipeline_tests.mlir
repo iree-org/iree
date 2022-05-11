@@ -1,4 +1,5 @@
 // RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target))' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target))' --iree-llvmcpu-enable-hoist-padding --split-input-file %s | FileCheck %s --check-prefix=HOIST-PAD
 
 // Check that this dispatch compiles to vectors and that there are no allocas.
 // By proxy checks that destination passing style kicked in correctly
@@ -104,6 +105,11 @@ hal.executable private @preset_config_matmul  {
 }
 // CHECK: func.func @preset_config_matmul
 // CHECK:   vector.outerproduct
+// HOIST-PAD:   func.func @preset_config_matmul
+// HOIST-PAD:     %[[BUF:.+]] = memref.alloca() {{.+}} : memref<4x8x16xf32>
+// HOIST-PAD-8:     vector.store {{.+}}, %[[BUF]]
+// HOIST-PAD-8:     vector.load %[[BUF]]
+// HOIST-PAD:       vector.outerproduct
 
 // -----
 
