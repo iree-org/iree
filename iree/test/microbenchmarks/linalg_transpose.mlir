@@ -10,7 +10,7 @@
 
 util.global private @"__transpose_10_input" {noinline} = dense<1.0> : tensor<512x1024xf32>
 
-func @transpose_10() -> tensor<1024x512xf32> {
+func.func @transpose_10() -> tensor<1024x512xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %input_ptr = util.global.address @"__transpose_10_input" : !util.ptr<tensor<512x1024xf32>>
@@ -28,7 +28,7 @@ func @transpose_10() -> tensor<1024x512xf32> {
 
 util.global private @"__transpose_021_input" {noinline} = dense<1.0> : tensor<64x96x128xf32>
 
-func @transpose_021() -> tensor<64x128x96xf32> {
+func.func @transpose_021() -> tensor<64x128x96xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %input_ptr = util.global.address @"__transpose_021_input" : !util.ptr<tensor<64x96x128xf32>>
@@ -46,7 +46,7 @@ func @transpose_021() -> tensor<64x128x96xf32> {
 
 util.global private @"__transpose_201_input" {noinline} = dense<1.0> : tensor<64x96x128xf32>
 
-func @transpose_201() -> tensor<128x64x96xf32> {
+func.func @transpose_201() -> tensor<128x64x96xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %input_ptr = util.global.address @"__transpose_201_input" : !util.ptr<tensor<64x96x128xf32>>
@@ -64,7 +64,7 @@ func @transpose_201() -> tensor<128x64x96xf32> {
 
 util.global private @"__transpose_210_input" {noinline} = dense<1.0> : tensor<64x96x128xf32>
 
-func @transpose_210() -> tensor<128x96x64xf32> {
+func.func @transpose_210() -> tensor<128x96x64xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %input_ptr = util.global.address @"__transpose_210_input" : !util.ptr<tensor<64x96x128xf32>>
@@ -82,7 +82,7 @@ func @transpose_210() -> tensor<128x96x64xf32> {
 
 util.global private @"__transpose_120_input" {noinline} = dense<1.0> : tensor<64x96x128xf32>
 
-func @transpose_120() -> tensor<96x128x64xf32> {
+func.func @transpose_120() -> tensor<96x128x64xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %input_ptr = util.global.address @"__transpose_120_input" : !util.ptr<tensor<64x96x128xf32>>
@@ -100,7 +100,7 @@ func @transpose_120() -> tensor<96x128x64xf32> {
 
 util.global private @"__transpose_102_input" {noinline} = dense<1.0> : tensor<64x96x128xf32>
 
-func @transpose_102() -> tensor<96x64x128xf32> {
+func.func @transpose_102() -> tensor<96x64x128xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %input_ptr = util.global.address @"__transpose_102_input" : !util.ptr<tensor<64x96x128xf32>>

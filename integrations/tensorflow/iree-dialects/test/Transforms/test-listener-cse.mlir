@@ -8,7 +8,7 @@
 #map0 = affine_map<(d0) -> (d0 mod 2)>
 
 // CHECK-LABEL: @simple_constant
-func @simple_constant() -> (i32, i32) {
+func.func @simple_constant() -> (i32, i32) {
   // CHECK-NEXT: %c1_i32 = arith.constant 1 : i32
   %0 = arith.constant 1 : i32
 
@@ -18,7 +18,7 @@ func @simple_constant() -> (i32, i32) {
 }
 
 // CHECK-LABEL: @basic
-func @basic() -> (index, index) {
+func.func @basic() -> (index, index) {
   // CHECK: %c0 = arith.constant 0 : index
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 0 : index
@@ -32,7 +32,7 @@ func @basic() -> (index, index) {
 }
 
 // CHECK-LABEL: @many
-func @many(f32, f32) -> (f32) {
+func.func @many(f32, f32) -> (f32) {
 ^bb0(%a : f32, %b : f32):
   // CHECK-NEXT: %0 = arith.addf %arg0, %arg1 : f32
   %c = arith.addf %a, %b : f32
@@ -58,7 +58,7 @@ func @many(f32, f32) -> (f32) {
 
 /// Check that operations are not eliminated if they have different operands.
 // CHECK-LABEL: @different_ops
-func @different_ops() -> (i32, i32) {
+func.func @different_ops() -> (i32, i32) {
   // CHECK: %c0_i32 = arith.constant 0 : i32
   // CHECK: %c1_i32 = arith.constant 1 : i32
   %0 = arith.constant 0 : i32
@@ -71,7 +71,7 @@ func @different_ops() -> (i32, i32) {
 /// Check that operations are not eliminated if they have different result
 /// types.
 // CHECK-LABEL: @different_results
-func @different_results(%arg0: tensor<*xf32>) -> (tensor<?x?xf32>, tensor<4x?xf32>) {
+func.func @different_results(%arg0: tensor<*xf32>) -> (tensor<?x?xf32>, tensor<4x?xf32>) {
   // CHECK: %0 = tensor.cast %arg0 : tensor<*xf32> to tensor<?x?xf32>
   // CHECK-NEXT: %1 = tensor.cast %arg0 : tensor<*xf32> to tensor<4x?xf32>
   %0 = tensor.cast %arg0 : tensor<*xf32> to tensor<?x?xf32>
@@ -83,7 +83,7 @@ func @different_results(%arg0: tensor<*xf32>) -> (tensor<?x?xf32>, tensor<4x?xf3
 
 /// Check that operations are not eliminated if they have different attributes.
 // CHECK-LABEL: @different_attributes
-func @different_attributes(index, index) -> (i1, i1, i1) {
+func.func @different_attributes(index, index) -> (i1, i1, i1) {
 ^bb0(%a : index, %b : index):
   // CHECK: %0 = arith.cmpi slt, %arg0, %arg1 : index
   %0 = arith.cmpi slt, %a, %b : index
@@ -99,7 +99,7 @@ func @different_attributes(index, index) -> (i1, i1, i1) {
 
 /// Check that operations with side effects are not eliminated.
 // CHECK-LABEL: @side_effect
-func @side_effect() -> (memref<2x1xf32>, memref<2x1xf32>) {
+func.func @side_effect() -> (memref<2x1xf32>, memref<2x1xf32>) {
   // CHECK: %0 = memref.alloc() : memref<2x1xf32>
   %0 = memref.alloc() : memref<2x1xf32>
 
@@ -113,7 +113,7 @@ func @side_effect() -> (memref<2x1xf32>, memref<2x1xf32>) {
 /// Check that operation definitions are properly propagated down the dominance
 /// tree.
 // CHECK-LABEL: @down_propagate_for
-func @down_propagate_for() {
+func.func @down_propagate_for() {
   // CHECK: %c1_i32 = arith.constant 1 : i32
   %0 = arith.constant 1 : i32
 
@@ -127,7 +127,7 @@ func @down_propagate_for() {
 }
 
 // CHECK-LABEL: @down_propagate
-func @down_propagate() -> i32 {
+func.func @down_propagate() -> i32 {
   // CHECK-NEXT: %c1_i32 = arith.constant 1 : i32
   %0 = arith.constant 1 : i32
 
@@ -148,7 +148,7 @@ func @down_propagate() -> i32 {
 
 /// Check that operation definitions are NOT propagated up the dominance tree.
 // CHECK-LABEL: @up_propagate_for
-func @up_propagate_for() -> i32 {
+func.func @up_propagate_for() -> i32 {
   // CHECK: affine.for {{.*}} = 0 to 4 {
   affine.for %i = 0 to 4 {
     // CHECK-NEXT: %c1_i32_0 = arith.constant 1 : i32
@@ -164,7 +164,7 @@ func @up_propagate_for() -> i32 {
 }
 
 // CHECK-LABEL: func @up_propagate
-func @up_propagate() -> i32 {
+func.func @up_propagate() -> i32 {
   // CHECK-NEXT:  %c0_i32 = arith.constant 0 : i32
   %0 = arith.constant 0 : i32
 
@@ -195,7 +195,7 @@ func @up_propagate() -> i32 {
 /// The same test as above except that we are testing on a cfg embedded within
 /// an operation region.
 // CHECK-LABEL: func @up_propagate_region
-func @up_propagate_region() -> i32 {
+func.func @up_propagate_region() -> i32 {
   // CHECK-NEXT: %0 = "foo.region"
   %0 = "foo.region"() ({
     // CHECK-NEXT:  %c0_i32 = arith.constant 0 : i32
@@ -228,7 +228,7 @@ func @up_propagate_region() -> i32 {
 /// This test checks that nested regions that are isolated from above are
 /// properly handled.
 // CHECK-LABEL: @nested_isolated
-func @nested_isolated() -> i32 {
+func.func @nested_isolated() -> i32 {
   // CHECK-NEXT: arith.constant 1
   %0 = arith.constant 1 : i32
 
