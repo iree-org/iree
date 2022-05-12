@@ -60,7 +60,6 @@ iree_check_single_backend_test_suite(
     check_vulkan-spirv_vulkan
   SRCS
     "reverse.mlir"
-    "top-k.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER
