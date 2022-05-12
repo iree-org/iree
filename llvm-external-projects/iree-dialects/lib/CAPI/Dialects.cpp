@@ -72,6 +72,11 @@ void ireeRegisterTransformDialectExtensions(MlirContext context) {
   ctx->appendDialectRegistry(registry);
 }
 
+void mlirIREETransformRegisterPasses() {
+  mlir::linalg::transform::registerDropSchedulePass();
+  mlir::linalg::transform::registerLinalgTransformInterpreterPass();
+}
+
 //===----------------------------------------------------------------------===//
 // IREEPyDMDialect
 //===----------------------------------------------------------------------===//

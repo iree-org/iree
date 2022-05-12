@@ -737,9 +737,9 @@ cc_library(
 )
 
 cc_library(
-    name = "IREELinalgTransformDialectTransforms",
+    name = "IREELinalgTransformDialectPasses",
     srcs = glob([
-        "lib/Dialect/LinalgTransform/Transforms/*.cpp",
+        "lib/Dialect/LinalgTransform/Passes/*.cpp",
     ]),
     hdrs = [
         "include/iree-dialects/Dialect/LinalgTransform/TrackingListener.h",
@@ -798,7 +798,7 @@ cc_library(
         ":IREEInputDialect",
         ":IREELinalgExtDialect",
         ":IREELinalgTransformDialect",
-        ":IREELinalgTransformDialectTransforms",
+        ":IREELinalgTransformDialectPasses",
         ":IREEPyDMDialect",
         ":IREEPyDMTransforms",
         "@llvm-project//mlir:CAPIIR",
@@ -820,7 +820,7 @@ cc_library(
         ":IREEDialectsTransforms",
         ":IREELinalgExtDialect",
         ":IREELinalgTransformDialect",
-        ":IREELinalgTransformDialectTransforms",
+        ":IREELinalgTransformDialectPasses",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Rewrite",
@@ -846,7 +846,7 @@ cc_binary(
         ":IREELinalgExtPasses",
         ":IREELinalgExtTransformOps",
         ":IREELinalgTransformDialect",
-        ":IREELinalgTransformDialectTransforms",
+        ":IREELinalgTransformDialectPasses",
         ":IREEPyDMDialect",
         ":IREEPyDMTransforms",
         "@llvm-project//llvm:Support",
