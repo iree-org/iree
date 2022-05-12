@@ -219,6 +219,87 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
   }
 }
 
+void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
+  passManager.addPass(createVerifyLinalgTransformLegalityPass());
+  addTileAndDistributePasses(passManager, /*convertToDestinatinoStyle=*/true);
+
+  {
+    LinalgFusePassOptions options;
+    options.tilingLevel =
+        static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
+    passManager.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
+    passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<func::FuncOp>(createCSEPass());
+  }
+
+  auto pad = [&](std::string anchorOpName, ArrayRef<int64_t> paddingDims) {
+    LinalgFusePassOptions options;
+    options.pad = true;
+    options.anchorOpName = anchorOpName;
+    options.paddingDimensions.assign(paddingDims.begin(), paddingDims.end());
+    passManager.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
+  };
+
+  SmallVector<int64_t> paddingDims = {0, 1};
+  pad("linalg.fill", paddingDims);
+  pad("linalg.matmul", paddingDims);
+  // TODO(hanchung): pack and hoist padding for linalg.generic op.
+  pad("linalg.generic", paddingDims);
+
+  {
+    LinalgSingleTilingExpertPassOptions options;
+    options.tilingLevel =
+        static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
+    passManager.addNestedPass<func::FuncOp>(
+        createLinalgSingleTilingExpertPass(options));
+    passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<func::FuncOp>(createCSEPass());
+  }
+
+  paddingDims = {2};
+  pad("linalg.matmul", paddingDims);
+
+  // TODO(hanchung): Evaluate if we want to enable hoist paddings.
+  //{
+  // LinalgFusePassOptions options;
+  // options.pad = true;
+  // options.anchorOpName = "linalg.matmul";
+  // options.hoistPaddings = SmallVector<int64_t>{2, 3, 0};
+  // options.transposePaddings = SmallVector<std::string>{"0:1", "0:1",
+  // "0:1"};
+  // passManager.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
+  // passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  // passManager.addNestedPass<func::FuncOp>(createCSEPass());
+  //}
+
+  // Fold dim(pad) away before vectorization.
+  passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
+
+  {
+    LinalgSingleTilingExpertPassOptions options;
+    options.vectorize = true;
+    options.vectorizePadding = true;
+    passManager.addNestedPass<func::FuncOp>(
+        createLinalgSingleTilingExpertPass(options));
+    passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<func::FuncOp>(createCSEPass());
+  }
+
+  addCPUIREEComprehensiveBufferizePasses(passManager);
+
+  // Run IREE specific passes before vector lowering expert.
+  passManager.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+
+  // Add the vector lowering expert.
+  {
+    OpPassManager &nestedFuncPassManager = passManager.nest<func::FuncOp>();
+    LinalgVectorLoweringPassOptions options;
+    options.splitVectorTransfersTo = "linalg-copy";
+    addLowerToVectorTransforms(nestedFuncPassManager, options);
+  }
+}
+
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
                                        bool lowerToAVX2) {
   passManager.addPass(createVerifyLinalgTransformLegalityPass());
@@ -244,12 +325,6 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
     // generating the IR as same as sandbox.
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
-    options.vectorizePadding = true;
-    // TODO(#8228): Enable the padding once we know how to deal with fusion. For
-    // now, we don't enable padding because alloca ops will be created in
-    // bufferization for some cases.
-    // options.pad = true;
-    // options.packPaddings = {1, 1, 0};
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
     passManager.addNestedPass<func::FuncOp>(

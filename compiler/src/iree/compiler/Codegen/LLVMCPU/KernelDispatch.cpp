@@ -68,6 +68,13 @@ static llvm::cl::opt<bool> useLinalgTransformInterp(
         "experimental path to use the linalg transform dialect interpreter"),
     llvm::cl::init(false));
 
+// TODO(hanchung): Remove the flag. This is the flag for fastly falling back to
+// the previous snapshot.
+static llvm::cl::opt<bool> disableMatmulPadPipeline(
+    "iree-codegen-disable-matmul-pad-pipeline",
+    llvm::cl::desc("disable padding options in Matmul codegen"),
+    llvm::cl::init(false));
+
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.variant
@@ -402,11 +409,49 @@ static LogicalResult setDefaultRootConfig(
                          : DispatchLoweringPassPipeline::CPUBufferOpsDefault);
 }
 
-static LogicalResult setSandboxRootConfig(func::FuncOp entryPointFn,
-                                          linalg::ContractionOpInterface op,
-                                          ArrayRef<int64_t> flowTileSizes,
-                                          ArrayRef<int64_t> target2ndTileSizes,
-                                          int vectorSize) {
+static LogicalResult setMatmulPadRootConfig(
+    func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
+    ArrayRef<int64_t> flowTileSizes, ArrayRef<int64_t> target2ndTileSizes,
+    int vectorSize) {
+  assert(target2ndTileSizes.size() == 3 &&
+         "the current configuration is driven by matmul which has exactly "
+         "three loops");
+  // The tiling for parallel dims and reduction dims should be separated.
+  SmallVector<int64_t> parallelTileSizes;
+  auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
+  int64_t nLoops = linalgOp.getNumLoops();
+  if (nLoops >= 3) {
+    parallelTileSizes.append(nLoops - 3, 1);
+    parallelTileSizes.push_back(target2ndTileSizes[0]);
+  }
+  if (nLoops >= 2) {
+    parallelTileSizes.push_back(target2ndTileSizes[1]);
+  }
+  parallelTileSizes.push_back(0);
+
+  // TODO(hanchung): Make logic more heuristic. Padding hurts performance a lot
+  // if the dim size is small (e.g., K=24).
+  auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
+  int64_t K = lhsShapedType.getShape().back();
+  SmallVector<int64_t> reductionTileSizes;
+  reductionTileSizes.append(nLoops - 1, 0);
+  reductionTileSizes.push_back(
+      getMaxTileSize(0, K, target2ndTileSizes[2], vectorSize));
+
+  TileSizesListType tileSizes;
+  tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
+  tileSizes.push_back(parallelTileSizes);
+  tileSizes.push_back(reductionTileSizes);
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, op, tileSizes,
+      DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert);
+}
+
+static LogicalResult setMatmulNoPadRootConfig(
+    func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
+    ArrayRef<int64_t> flowTileSizes, ArrayRef<int64_t> target2ndTileSizes,
+    int vectorSize) {
   assert(target2ndTileSizes.size() == 3 &&
          "the current configuration is driven by matmul which has exactly "
          "three loops");
@@ -509,9 +554,13 @@ static LogicalResult setRootConfig(
   vectorSize = std::min(vectorSize, getVectorSize(entryPointFn, resShapedType));
 
   // Use the default distribution for the matmul loops.
+  int64_t defaultMaxSize = defaultWorkgroupTileSize;
+  if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
+    defaultMaxSize = 128;
+  }
   SmallVector<int64_t> minTileSizes =
       getMinTilingSizesForEachDim(entryPointFn, linalgOp);
-  SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
+  SmallVector<int64_t> maxTileSizes(numLoops, defaultMaxSize);
   if (numLoops > 3) {
     minTileSizes[0] = 1;
     maxTileSizes[0] = 1;
@@ -522,8 +571,12 @@ static LogicalResult setRootConfig(
   // TODO(dcaballe): Find better configurations for RISC-V backends.
   if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
     SmallVector<int64_t> tileSizes = {8, 32, 16};
-    return setSandboxRootConfig(entryPointFn, contractionOp, flowTileSizes,
-                                tileSizes, vectorSize);
+    if (disableMatmulPadPipeline) {
+      return setMatmulNoPadRootConfig(entryPointFn, contractionOp,
+                                      flowTileSizes, tileSizes, vectorSize);
+    }
+    return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
+                                  tileSizes, vectorSize);
   }
 
   // Fall back to ARM configurations.
@@ -531,8 +584,8 @@ static LogicalResult setRootConfig(
       lhsShapedType.getElementType() != resShapedType.getElementType();
   if (isQuantized) {
     SmallVector<int64_t> tileSizes = {4, 16, 4};
-    return setSandboxRootConfig(entryPointFn, contractionOp, flowTileSizes,
-                                tileSizes, vectorSize);
+    return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
+                                  tileSizes, vectorSize);
   } else {
     return setARMRootConfig(entryPointFn, contractionOp, flowTileSizes,
                             vectorSize);
