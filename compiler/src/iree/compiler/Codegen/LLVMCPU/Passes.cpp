@@ -217,7 +217,6 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
         createLinalgSingleTilingExpertPass(options));
     passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     passManager.addNestedPass<func::FuncOp>(createCSEPass());
-
   }
 
   // Run IREE specific passes before vector lowering expert.
