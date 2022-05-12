@@ -91,7 +91,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 
-// CHECK: func @matmul_256x1024x128_div_sub
+// CHECK: func.func @matmul_256x1024x128_div_sub
 
 // CHECK-DAG: %[[INIT:.+]] = arith.constant dense<0.000000e+00> : vector<16x16xf16>
 // CHECK-DAG: %[[PAD:.+]] = arith.constant 0.000000e+00 : f16

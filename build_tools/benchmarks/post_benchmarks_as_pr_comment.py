@@ -246,7 +246,8 @@ def get_previous_comment_on_pr(pr_number: str,
   # Find the last comment from GITHUB_USER and has the ABBR_PR_COMMENT_TITILE
   # keyword.
   for comment in reversed(response):
-    if (comment["user"]["login"] == GITHUB_USER) and (comment_title
+    escaped_title = md.esc_format(comment_title)
+    if (comment["user"]["login"] == GITHUB_USER) and (escaped_title
                                                       in comment["body"]):
       return comment["id"]
   return None

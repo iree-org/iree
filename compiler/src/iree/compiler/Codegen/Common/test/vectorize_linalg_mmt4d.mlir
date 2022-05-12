@@ -8,7 +8,7 @@ func.func @tiled_mmt4d_4x4x4_f32(%lhs: tensor<1x1x4x4xf32>, %rhs: tensor<1x1x4x4
 // CHECK:       #[[MAP0:.+]] = affine_map<([[D0:.*]], [[D1:.*]], [[D2:.*]]) -> ([[D0]], [[D2]])>
 // CHECK:       #[[MAP1:.+]] = affine_map<([[D0]], [[D1]], [[D2]]) -> ([[D1]], [[D2]])>
 // CHECK:       #[[MAP2:.+]] = affine_map<([[D0]], [[D1]], [[D2]]) -> ([[D0]], [[D1]])>
-// CHECK:       func @tiled_mmt4d_4x4x4_f32(
+// CHECK:       func.func @tiled_mmt4d_4x4x4_f32(
 // CHECK-SAME:      %[[LHS:[[:alnum:]]+]]: tensor<1x1x4x4xf32>
 // CHECK-SAME:      %[[RHS:[[:alnum:]]+]]: tensor<1x1x4x4xf32>
 // CHECK-SAME:      %[[ACC:[[:alnum:]]+]]: tensor<1x1x4x4xf32>
@@ -35,7 +35,7 @@ func.func @tiled_mmt4d_8x2x4_i8(%lhs: tensor<1x1x8x2xi8>, %rhs: tensor<1x1x4x2xi
 // CHECK:       #[[MAP0:.+]] = affine_map<([[D0:.*]], [[D1:.*]], [[D2:.*]]) -> ([[D0]], [[D2]])>
 // CHECK:       #[[MAP1:.+]] = affine_map<([[D0]], [[D1]], [[D2]]) -> ([[D1]], [[D2]])>
 // CHECK:       #[[MAP2:.+]] = affine_map<([[D0]], [[D1]], [[D2]]) -> ([[D0]], [[D1]])>
-// CHECK:       func @tiled_mmt4d_8x2x4_i8(
+// CHECK:       func.func @tiled_mmt4d_8x2x4_i8(
 // CHECK-SAME:      %[[LHS:[[:alnum:]]+]]: tensor<1x1x8x2xi8>
 // CHECK-SAME:      %[[RHS:[[:alnum:]]+]]: tensor<1x1x4x2xi8>
 // CHECK-SAME:      %[[ACC:[[:alnum:]]+]]: tensor<1x1x8x4xi32>

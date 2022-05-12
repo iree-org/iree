@@ -43,7 +43,7 @@ func.func @matmul_2x128x4() {
   return
 }
 
-// CHECK-LABEL: func @matmul_2x128x4()
+// CHECK-LABEL: func.func @matmul_2x128x4()
 
 //   CHECK-DAG:   %[[ZERO:.+]] = arith.constant dense<0.000000e+00> : vector<4xf32>
 //   CHECK-DAG:   %[[PAD:.+]] = arith.constant 0.000000e+00 : f32
@@ -86,7 +86,7 @@ func.func @matmul_8x8x2(%lhs: tensor<8x2xf32>, %rhs: tensor<2x8xf32>, %init: ten
   return %0 : tensor<8x8xf32>
 }
 
-//    CHECK-LABEL: func @matmul_8x8x2
+//    CHECK-LABEL: func.func @matmul_8x8x2
 
 //  CHECK-COUNT-8: vector.transfer_read {{.*}} : tensor<8x2xf32>, vector<2xf32>
 //  CHECK-COUNT-4: vector.transfer_read {{.*}} : tensor<2x8xf32>, vector<4xf32>
@@ -103,7 +103,7 @@ func.func @matmul_8x8x1(%lhs: tensor<8x1xf32>, %rhs: tensor<1x8xf32>, %init: ten
   return %0 : tensor<8x8xf32>
 }
 
-//    CHECK-LABEL: func @matmul_8x8x1
+//    CHECK-LABEL: func.func @matmul_8x8x1
 
 //  CHECK-COUNT-8: vector.transfer_read {{.*}} : tensor<8x1xf32>, vector<1xf32>
 //  CHECK-COUNT-2: vector.transfer_read {{.*}} : tensor<1x8xf32>, vector<4xf32>
@@ -133,7 +133,7 @@ func.func @matmul_broadcast_add(%init: tensor<1x8xf32>, %a: tensor<1x8xf32>, %b:
   return %bcast_add: tensor<1x8xf32>
 }
 
-//    CHECK-LABEL: func @matmul_broadcast_add
+//    CHECK-LABEL: func.func @matmul_broadcast_add
 //     CHECK-SAME: (%[[INIT:[a-z0-9]+]]: tensor<1x8xf32>
 //     CHECK-SAME:  %[[BIAS:[a-z0-9]+]]: tensor<1xf32>)
 
@@ -182,7 +182,7 @@ func.func @matmul_2x8x128_fp16(%a: tensor<2x128xf16>, %b: tensor<128x8xf16>, %x:
   return %0: tensor<2x8xf16>
 }
 
-//    CHECK-LABEL: func @matmul_2x8x128_fp16
+//    CHECK-LABEL: func.func @matmul_2x8x128_fp16
 //     CHECK-SAME: (%{{.+}}: tensor<2x128xf16>, %{{.+}}: tensor<128x8xf16>, %[[X:.+]]: tensor<2x8xf16>, %[[Y:.+]]: tensor<2x8xf16>)
 //          CHECK:   %[[ZERO:.+]] = arith.constant dense<0.000000e+00> : vector<8xf16>
 //          CHECK:   %[[FOR:.+]]:2 = scf.for %arg4 = %{{.+}} to %{{.+}} step %{{.+}} iter_args(%arg5 = %[[ZERO]], %arg6 = %[[ZERO]])

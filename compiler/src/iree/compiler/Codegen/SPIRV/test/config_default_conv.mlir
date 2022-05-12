@@ -67,6 +67,6 @@ hal.executable private @conv_pointwise_112x112x32 {
 //      CHECK: hal.executable.entry_point public @conv_pointwise_112x112x32
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 2 : index]
-//      CHECK: func @conv_pointwise_112x112x32()
+//      CHECK: func.func @conv_pointwise_112x112x32()
 //      CHECK:   linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME:     lowering_config = #[[CONFIG]]

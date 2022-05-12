@@ -43,11 +43,11 @@ hal.executable.source public @ex {
 // CHECK:   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64
 // CHECK:     hal.executable.entry_point public @entry layout(#executable_layout)
 // CHECK:     builtin.module
-// CHECK-NEXT:  func @entry()
+// CHECK-NEXT:  func.func @entry()
 // CHECK:   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64
 // CHECK:     hal.executable.entry_point public @entry layout(#executable_layout)
 // CHECK:     builtin.module
-// CHECK-NEXT:  func @entry()
+// CHECK-NEXT:  func.func @entry()
 
 // TODO(benvanik): test fixup of stream ops when attrs to specify the
 // layout bindings are implemented.

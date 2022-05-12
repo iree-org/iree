@@ -52,7 +52,7 @@ func.func @padded_conv() {
   return
 }
 
-// CHECK-LABEL: func @padded_conv
+// CHECK-LABEL: func.func @padded_conv
 
 //       CHECK: %[[C0:.+]] = arith.constant 0 : index
 

@@ -58,7 +58,7 @@ hal.executable private @matmul_tensors {
 //  CHECK-DAG:    %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
 //  CHECK-DAG:    %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_Y]]]
 //      CHECK:    hal.return %[[D0]], %[[D1]], %[[C1]] : index, index, index
-//      CHECK: func @matmul_tensors()
+//      CHECK: func.func @matmul_tensors()
 
 // -----
 
@@ -124,7 +124,7 @@ hal.executable private @add {
 //  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_X]]]
 //  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_Y]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[C1]] : index, index, index
-//      CHECK: func @add()
+//      CHECK: func.func @add()
 
 // -----
 
@@ -189,7 +189,7 @@ hal.executable private @add4D {
 //  CHECK-DAG:    %[[D1:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_Y]]]
 //  CHECK-DAG:    %[[D2:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_Z]]]
 //      CHECK:    hal.return %[[D0]], %[[D1]], %[[D2]] : index, index, index
-//      CHECK: func @add4D()
+//      CHECK: func.func @add4D()
 
 // -----
 
@@ -247,7 +247,7 @@ hal.executable private @batch_matmul_tensors {
 //  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
 //  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_Y]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[WORKLOAD_Z]]
-//      CHECK: func @batch_matmul_tensors()
+//      CHECK: func.func @batch_matmul_tensors()
 
 // -----
 
@@ -300,7 +300,7 @@ hal.executable private @preset_config_matmul_tensors {
 //  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
 //  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[WORKLOAD_Y]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[C1]]
-//      CHECK: func @preset_config()
+//      CHECK: func.func @preset_config()
 
 // -----
 
@@ -409,7 +409,7 @@ hal.executable private @static_1d_fft_stage2 {
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_X]]]
 //      CHECK:   hal.return %[[D0]], %[[C1]], %[[C1]] : index, index, index
-//      CHECK: func @static_1d_fft_stage2()
+//      CHECK: func.func @static_1d_fft_stage2()
 
 // -----
 
@@ -454,7 +454,7 @@ hal.executable private @static_3d_fft_stage3 {
 //  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_Y]]]
 //  CHECK-DAG:   %[[D2:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_Z]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[D2]] : index, index, index
-//      CHECK: func @static_3d_fft_stage3()
+//      CHECK: func.func @static_3d_fft_stage3()
 
 // -----
 
@@ -524,7 +524,7 @@ hal.executable private @outs_fusion {
 //  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_X]]]
 //  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_Y]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[C1]] : index, index, index
-//      CHECK: func @outs_fusion_fn()
+//      CHECK: func.func @outs_fusion_fn()
 
 // -----
 
@@ -589,7 +589,7 @@ hal.executable private @conv {
 //  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_Y]]]
 //  CHECK-DAG:   %[[D2:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_Z]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[D2]] : index, index, index
-//      CHECK: func @conv()
+//      CHECK: func.func @conv()
 
 // -----
 
@@ -648,7 +648,7 @@ hal.executable private @conv_static {
 //  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[WORKLOAD_Y]]]
 //  CHECK-DAG:   %[[D2:.+]] = affine.apply #[[MAP2]]()[%[[WORKLOAD_Z]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[D2]] : index, index, index
-//      CHECK: func @conv_static()
+//      CHECK: func.func @conv_static()
 
 // -----
 
@@ -705,7 +705,7 @@ hal.executable private @generic_static {
 //  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
 //  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[WORKLOAD_Y]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[C1]] : index, index, index
-//      CHECK: func @generic_static()
+//      CHECK: func.func @generic_static()
 
 // -----
 
@@ -883,7 +883,7 @@ hal.executable private @reduction {
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
 //      CHECK:   hal.return %[[D0]], %[[C1]], %[[C1]] : index, index, index
-//      CHECK: func @reduction
+//      CHECK: func.func @reduction
 
 // -----
 
@@ -941,7 +941,7 @@ hal.executable private @gemm_unit_N {
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
 //      CHECK:   hal.return %[[D0]], %[[C1]], %[[C1]] : index, index, index
-//      CHECK: func @gemm_unit_N()
+//      CHECK: func.func @gemm_unit_N()
 
 // -----
 
@@ -996,7 +996,7 @@ hal.executable private @gemm_unit_M_unit_N {
 // CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //      CHECK:   hal.return %[[C1]], %[[C1]], %[[C1]] : index, index, index
-//      CHECK: func @gemm_unit_M_unit_N()
+//      CHECK: func.func @gemm_unit_M_unit_N()
 
 // -----
 
@@ -1057,7 +1057,7 @@ hal.executable private @generic_unit_dims {
 //  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_Y]]]
 //  CHECK-DAG:   %[[D2:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_Z]]]
 //      CHECK:   hal.return %[[D0]], %[[D1]], %[[D2]] : index, index, index
-//      CHECK: func @generic_unit_dims()
+//      CHECK: func.func @generic_unit_dims()
 
 // -----
 
@@ -1114,7 +1114,7 @@ hal.executable private @reduce_to_scalar {
 // CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
 //      CHECK:   %[[C1:.+]] = arith.constant 1 : index
 //      CHECK:   hal.return %[[C1]], %[[C1]], %[[C1]] : index, index, index
-//      CHECK: func @reduce_to_scalar()
+//      CHECK: func.func @reduce_to_scalar()
 
 // -----
 
@@ -1168,7 +1168,7 @@ hal.executable private @scalar {
 // CHECK-SAME:    %[[WORKLOAD_Z:[a-zA-Z0-9_]+]]: index)
 //      CHECK:   %[[C1:.+]] = arith.constant 1 : index
 //      CHECK:   hal.return %[[C1]], %[[C1]], %[[C1]] : index, index, index
-//      CHECK: func @scalar()
+//      CHECK: func.func @scalar()
 
 // -----
 
@@ -1190,7 +1190,7 @@ hal.executable private @matmul_interchange {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.entry_point public @matmul_interchange layout(#executable_layout) {translation_info = #translation}
     builtin.module {
-      func @matmul_interchange() {
+      func.func @matmul_interchange() {
         %0 = hal.interface.constant.load[0] : index
         %1 = hal.interface.constant.load[1] : index
         %2 = hal.interface.constant.load[2] : index
@@ -1230,4 +1230,4 @@ hal.executable private @matmul_interchange {
 //  CHECK-DAG:    %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_X]]]
 //  CHECK-DAG:    %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[WORKLOAD_Y]]]
 //      CHECK:    hal.return %[[D1]], %[[D0]], %[[C1]] : index, index, index
-//      CHECK: func @matmul_interchange()
+//      CHECK: func.func @matmul_interchange()

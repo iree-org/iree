@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='func.func(iree-flow-inject-dispatch-tracing)' %s | FileCheck %s
 
-// CHECK-LABEL: func @singleDispatch
+// CHECK-LABEL: func.func @singleDispatch
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4xf32>)
 func.func @singleDispatch(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   %c4 = arith.constant 4 : index
@@ -14,7 +14,7 @@ func.func @singleDispatch(%arg0: tensor<4xf32>) -> tensor<4xf32> {
 
 // -----
 
-// CHECK-LABEL: func @multiDispatch
+// CHECK-LABEL: func.func @multiDispatch
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4xf32>)
 func.func @multiDispatch(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   %c4 = arith.constant 4 : index

@@ -6,7 +6,7 @@ func.func @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
     outs(%arg2 : tensor<?x?xf32>) -> tensor<?x?xf32>
   return %1 : tensor<?x?xf32>
 }
-//      CHECK: func @tile_matmul_alone
+//      CHECK: func.func @tile_matmul_alone
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
@@ -60,7 +60,7 @@ func.func @generic_op_alone(%A: tensor<?x?xf32>, %B: tensor<?xf32>) -> tensor<?x
     } -> tensor<?x?xf32>
   return %1 : tensor<?x?xf32>
 }
-//      CHECK: func @generic_op_alone(
+//      CHECK: func.func @generic_op_alone(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?xf32>
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -95,7 +95,7 @@ func.func @fuse_matmul_with_fill(%A : tensor<?x?xf32>, %B : tensor<?x?xf32>) -> 
     outs(%1 : tensor<?x?xf32>) -> tensor<?x?xf32>
   return %2 : tensor<?x?xf32>
 }
-//       CHECK:   func @fuse_matmul_with_fill
+//       CHECK:   func.func @fuse_matmul_with_fill
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //   CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
@@ -152,7 +152,7 @@ func.func @keep_separate_dispatches_for_producer(%A : tensor<?x?xf32>, %B : tens
     outs(%1 : tensor<?x?xf32>) -> tensor<?x?xf32>
   return %4 : tensor<?x?xf32>
 }
-//      CHECK: func @keep_separate_dispatches_for_producer
+//      CHECK: func.func @keep_separate_dispatches_for_producer
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //   CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
@@ -210,7 +210,7 @@ func.func @tile_4d_generic_op_alone
 }
 // For ops of rank greater than 3 we serialized the higher dimension. When flow
 // supports larger ranks this can be changed.
-//      CHECK: func @tile_4d_generic_op_alone
+//      CHECK: func.func @tile_4d_generic_op_alone
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?x?x?xf32>
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
@@ -248,7 +248,7 @@ func.func @always_fuse_cast
   return %1, %2 : tensor<?x?xf32>, tensor<?x?xf32>
 }
 
-//      CHECK: func @always_fuse_cast(
+//      CHECK: func.func @always_fuse_cast(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 // CHECK-SAME:   %[[RHS1:[a-zA-Z0-9_]+]]: tensor<4x?xf32>
 // CHECK-SAME:   %[[RHS2:[a-zA-Z0-9_]+]]: tensor<4x?xf32>
@@ -288,7 +288,7 @@ func.func @dont_fuse_tensor_update_with_fill(
   return %7 : tensor<?x?xf32>
 }
 
-// CHECK: func @dont_fuse_tensor_update_with_fill
+// CHECK: func.func @dont_fuse_tensor_update_with_fill
 // CHECK:   %[[SPLAT:.+]] = flow.tensor.splat
 // CHECK:   flow.tensor.update %{{.+}}, %[[SPLAT]]
 
@@ -298,7 +298,7 @@ func.func @pass_constant_through() -> tensor<2x2x3xi32> {
   %cst = arith.constant dense<[[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]]> : tensor<2x2x3xi32>
   return %cst : tensor<2x2x3xi32>
 }
-// CHECK-LABEL: func @pass_constant_through()
+// CHECK-LABEL: func.func @pass_constant_through()
 //       CHECK:   %[[CST:.+]] = arith.constant dense<{{.+}}> : tensor<2x2x3xi32>
 //       CHECK:   return %[[CST]]
 
@@ -320,7 +320,7 @@ func.func @fuse_matmul_with_generic_op(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>,
                     outs(%CC: tensor<?x?xf32>) -> tensor<?x?xf32>
   return %D: tensor<?x?xf32>
 }
-// CHECK-LABEL: func @fuse_matmul_with_generic_op
+// CHECK-LABEL: func.func @fuse_matmul_with_generic_op
 // linalg.generic is fused inside the dispatch region and becomes dead.
 //   CHECK-NOT: generic
 //     CHECK: flow.dispatch.workgroups
@@ -348,7 +348,7 @@ func.func @keep_original_producer_uses(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>,
 
   return %D, %CC: tensor<?x?xf32>, tensor<?x?xf32>
 }
-//      CHECK: func @keep_original_producer_uses
+//      CHECK: func.func @keep_original_producer_uses
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
@@ -383,7 +383,7 @@ func.func @conv2d(%input: tensor<1x225x225x16xf32>, %filter: tensor<3x3x16x32xf3
   return %2 : tensor<1x112x112x32xf32>
 }
 
-// CHECK-LABEL: func @conv2d
+// CHECK-LABEL: func.func @conv2d
 //   CHECK-DAG:   %[[C32:.+]] = arith.constant 32
 //   CHECK-DAG:   %[[C112:.+]] = arith.constant 112
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups[%[[C32]], %[[C112]], %[[C112]]]
@@ -401,7 +401,7 @@ func.func @depthwise_conv2d(%input: tensor<1x113x113x96xf32>, %filter: tensor<3x
   return %4 : tensor<1x56x56x96xf32>
 }
 
-// CHECK-LABEL: func @depthwise_conv2d
+// CHECK-LABEL: func.func @depthwise_conv2d
 //   CHECK-DAG:   %[[C56:.+]] = arith.constant 56
 //   CHECK-DAG:   %[[C96:.+]] = arith.constant 96
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups[%[[C96]], %[[C56]], %[[C56]]]
@@ -417,7 +417,7 @@ func.func @subtensor_insert(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>,
       %arg1[%arg2, %arg3] [%arg4, %arg5] [1, 1] : tensor<?x?xf32> into tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
-//      CHECK: func @subtensor_insert
+//      CHECK: func.func @subtensor_insert
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9_]+]]: index
@@ -475,7 +475,7 @@ func.func @fuse_non_tiled_reduction_fill(%input1: tensor<1000xf32>, %input2: ten
   return %reduce : tensor<f32>
 }
 
-// CHECK-LABEL: func @fuse_non_tiled_reduction_fill
+// CHECK-LABEL: func.func @fuse_non_tiled_reduction_fill
 
 //      CHECK: %[[C1:.+]] = arith.constant 1 : index
 //      CHECK: flow.dispatch.workgroups[%[[C1]], %[[C1]], %[[C1]]]({{.+}}) : (tensor<1000xf32>, tensor<1000xf32>, tensor<f32>) -> tensor<f32> =
@@ -524,7 +524,7 @@ func.func @inline_dag_1(
       } -> tensor<1x?xf32>
   return %9 : tensor<1x?xf32>
 }
-// CHECK-LABEL: func @inline_dag_1
+// CHECK-LABEL: func.func @inline_dag_1
 //   CHECK-NOT:   linalg.
 //   CHECK-NOT:   tensor.extract_slice
 //       CHECK:   flow.dispatch.workgroups
@@ -584,7 +584,7 @@ func.func @inline_dag_2(
       } -> tensor<1x?xf32>
   return %9 : tensor<1x?xf32>
 }
-// CHECK-LABEL: func @inline_dag_2
+// CHECK-LABEL: func.func @inline_dag_2
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<1x?xf32>
 //       CHECK:   flow.dispatch.workgroups
@@ -634,7 +634,7 @@ func.func @inline_dag_3(%240 : tensor<9xi32>, %244 : tensor<18xi32>, %247 : tens
       } -> tensor<9xi1>
   return %256 : tensor<9xi1>
 }
-//       CHECK: func @inline_dag_3
+//       CHECK: func.func @inline_dag_3
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<9xi32>
 //  CHECK-SAME:   %[[ARG1:.+]]: tensor<18xi32>
 //  CHECK-SAME:   %[[ARG2:.+]]: tensor<i32>
@@ -683,7 +683,7 @@ func.func @inline_dag_4(%arg0: tensor<4xi32>, %arg1: tensor<i32>) -> tensor<i16>
   } -> tensor<i16>
   return %8 : tensor<i16>
 }
-// CHECK-LABEL: func @inline_dag_4
+// CHECK-LABEL: func.func @inline_dag_4
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<4xi32>
 //  CHECK-SAME:   %[[ARG1:.+]]: tensor<i32>
 //       CHECK:   flow.dispatch.workgroups
@@ -741,7 +741,7 @@ func.func @multi_result(%arg0: tensor<?x?xi32>, %arg1: tensor<?x?xi32>) -> (tens
   } -> (tensor<?xi32>, tensor<?xi32>)
   return %4#0, %4#1 : tensor<?xi32>, tensor<?xi32>
 }
-// CHECK-LABEL: func @multi_result
+// CHECK-LABEL: func.func @multi_result
 //       CHECK:   %[[RESULT_OUT:.+]]:2 = flow.dispatch.workgroups
 //  CHECK-NEXT:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?xi32>
 //  CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?xi32>
@@ -770,7 +770,7 @@ func.func @dynamic_slice(%arg0: tensor<?x?xi32>, %arg1: tensor<i32>, %arg2: tens
   %12 = tensor.extract_slice %arg0[%5, %11] [1, %arg3] [1, 1] : tensor<?x?xi32> to tensor<1x?xi32>
   return %12 : tensor<1x?xi32>
 }
-// CHECK-LABEL: func @dynamic_slice(
+// CHECK-LABEL: func.func @dynamic_slice(
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xi32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<i32>
 //  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<i32>
@@ -813,7 +813,7 @@ func.func @dynamic_dot() -> !hal.buffer_view attributes {iree.abi.stub} {
   %9 = hal.tensor.export %6 : tensor<?x?xf32>{%7, %8} -> !hal.buffer_view
   return %9 : !hal.buffer_view
 }
-// CHECK-LABEL: func @dynamic_dot()
+// CHECK-LABEL: func.func @dynamic_dot()
 //   CHECK-NOT:    linalg.fill
 //   CHECK-NOT:    linalg.matmul
 //       CHECK:    flow.dispatch.workgroups
@@ -839,7 +839,7 @@ func.func @scatter(
   } -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
-//      CHECK: func @scatter(
+//      CHECK: func.func @scatter(
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?x1xi32>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
@@ -877,7 +877,7 @@ func.func @sort_3d(%arg0: tensor<?x?x?xi32>, %arg1 : tensor<?x?x?xf32>)
       } -> tensor<?x?x?xi32>, tensor<?x?x?xf32>
   return %0, %1 : tensor<?x?x?xi32>, tensor<?x?x?xf32>
 }
-//      CHECK: func @sort_3d(
+//      CHECK: func.func @sort_3d(
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?x?xi32>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?x?x?xf32>
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -926,7 +926,7 @@ func.func @scatter_static(%arg0 : tensor<4xi32>, %arg1 : tensor<4x1xi32>, %arg2 
     } -> tensor<8xi32>
   return %0 : tensor<8xi32>
 }
-//      CHECK: func @scatter_static
+//      CHECK: func.func @scatter_static
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<4xi32>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<4x1xi32>
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<8xi32>
@@ -951,7 +951,7 @@ func.func @pooling_nwhc_sum_static(%input: tensor<1x33x33x160xf32>) -> tensor<1x
   return %4 : tensor<1x3x3x160xf32>
 }
 
-// CHECK-LABEL: func @pooling_nwhc_sum_static
+// CHECK-LABEL: func.func @pooling_nwhc_sum_static
 //  CHECK-DAG:    %[[C3:.+]] = arith.constant 3 : index
 //  CHECK-DAG:    %[[C160:.+]] = arith.constant 160 : index
 //       CHECK:   flow.dispatch.workgroups[%[[C160]], %[[C3]], %[[C3]]]
@@ -973,7 +973,7 @@ func.func @named_op_outs_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>
       outs(%fill : tensor<?x?xf32>) -> tensor<?x?xf32>
   return %matmul : tensor<?x?xf32>
 }
-// CHECK-LABEL: func @named_op_outs_fusion
+// CHECK-LABEL: func.func @named_op_outs_fusion
 //       CHECK:   flow.dispatch.workgroups
 //       CHECK:     %[[FILL:.+]] = linalg.fill_rng_2d
 //       CHECK:     linalg.matmul
@@ -1001,7 +1001,7 @@ func.func @dynamic_slice(%arg0 : i32, %arg1 : i32, %arg2 : tensor<?xi32>,
       %arg3[%9, %15] [1, %d0] [1, 1] : tensor<?xi32> into tensor<?x?xi32>
   return %17 : tensor<?x?xi32>
 }
-// CHECK-LABEL: func @dynamic_slice
+// CHECK-LABEL: func.func @dynamic_slice
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: i32
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: i32
 //  CHECK-SAME:     %[[ARG2:.+]]: tensor<?xi32>
@@ -1025,7 +1025,7 @@ func.func @extract_slice(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
       tensor<?x?xf32> to tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
-//      CHECK: func @extract_slice
+//      CHECK: func.func @extract_slice
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index
@@ -1081,7 +1081,7 @@ func.func @inline_cst(%arg0 : tensor<4x32xi32>) -> tensor<32xi32> {
       } -> tensor<32xi32>
   return %0 : tensor<32xi32>
 }
-//      CHECK: func @inline_cst(%[[ARG0:.+]]: tensor<4x32xi32>)
+//      CHECK: func.func @inline_cst(%[[ARG0:.+]]: tensor<4x32xi32>)
 //      CHECK:   flow.dispatch.workgroups
 // CHECK-SAME:     (%[[ARG0]])
 //      CHECK:     %[[CST:.+]] = arith.constant dense<0> : tensor<32xi32>
@@ -1100,7 +1100,7 @@ func.func @inline_cst2(%arg0 : tensor<4x2xi32>) -> tensor<2xi32> {
       } -> tensor<2xi32>
   return %0 : tensor<2xi32>
 }
-//      CHECK: func @inline_cst2(%[[ARG0:.+]]: tensor<4x2xi32>)
+//      CHECK: func.func @inline_cst2(%[[ARG0:.+]]: tensor<4x2xi32>)
 //      CHECK:   flow.dispatch.workgroups
 // CHECK-SAME:     (%[[ARG0]])
 //      CHECK:     %[[CST:.+]] = arith.constant dense<[21, 42]> : tensor<2xi32>
@@ -1114,7 +1114,7 @@ func.func @gemm_unitN(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x1xf32>,
       outs(%arg2 : tensor<?x1xf32>) -> tensor<?x1xf32>
   return %0 : tensor<?x1xf32>
 }
-//      CHECK: func @gemm_unitN(
+//      CHECK: func.func @gemm_unitN(
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>,
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x1xf32>,
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x1xf32>)
@@ -1132,7 +1132,7 @@ func.func @gemm_unitM_unitN(%arg0 : tensor<1x1xf32>, %arg1 : tensor<1x1xf32>,
       outs(%arg2 : tensor<1x1xf32>) -> tensor<1x1xf32>
   return %0 : tensor<1x1xf32>
 }
-//     CHECK: func @gemm_unitM_unitN(
+//     CHECK: func.func @gemm_unitM_unitN(
 //     CHECK:   %[[C1:.+]] = arith.constant 1 : index
 //     CHECK:   flow.dispatch.workgroups[%[[C1]], %[[C1]], %[[C1]]]
 //     CHECK:     linalg.matmul
@@ -1146,7 +1146,7 @@ func.func @gemm_unitM(%arg0 : tensor<1x?xf32>, %arg1 : tensor<?x?xf32>,
       outs(%arg2 : tensor<1x?xf32>) -> tensor<1x?xf32>
   return %0 : tensor<1x?xf32>
 }
-//     CHECK: func @gemm_unitM(
+//     CHECK: func.func @gemm_unitM(
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x?xf32>,
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32>,
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<1x?xf32>)
@@ -1171,7 +1171,7 @@ func.func @unit_dim_generic(%arg0 : tensor<1x?x1x1x?x?x1x?xf32>,
       } -> tensor<1x?x1x1x?x?x1x?xf32>
   return %0 : tensor<1x?x1x1x?x?x1x?xf32>
 }
-//      CHECK: func @unit_dim_generic(
+//      CHECK: func.func @unit_dim_generic(
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x?x1x1x?x?x1x?xf32>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<1x?x1x1x?x?x1x?xf32>)
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
@@ -1208,7 +1208,7 @@ func.func @no_fuse_quantized(%arg0 : tensor<?x113x113x64xi8>, %arg1 : tensor<3x3
     } -> tensor<?x56x56x64xi8>
   return %4 : tensor<?x56x56x64xi8>
 }
-//     CHECK: func @no_fuse_quantized
+//     CHECK: func.func @no_fuse_quantized
 //     CHECK:   flow.dispatch.workgroups
 //     CHECK:   linalg.depthwise_conv_2d_nhwc_hwc_q
 // CHECK-NOT:   linalg.generic
@@ -1234,7 +1234,7 @@ func.func @dont_fuse_tensor_insert_dest_producer(%arg0 : tensor<2x2xf32>) -> ten
       : tensor<2x2xf32> into tensor<3x3xf32>
   return %1 : tensor<3x3xf32>
 }
-//      CHECK: func @dont_fuse_tensor_insert_dest_producer
+//      CHECK: func.func @dont_fuse_tensor_insert_dest_producer
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<2x2xf32>
 //      CHECK:   %[[CST:.+]] = arith.constant {{.+}} : tensor<3x3xf32>
 //      CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
@@ -1252,7 +1252,7 @@ func.func @fill_op_alone(%arg0 : index, %arg1 : index) -> tensor<?x?xf32> {
   %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<?x?xf32>) -> tensor<?x?xf32>
   return %1 : tensor<?x?xf32>
 }
-//      CHECK: func @fill_op_alone(
+//      CHECK: func.func @fill_op_alone(
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
 //      CHECK:   %[[SPLAT:.+]] = flow.tensor.splat %[[CST]] : tensor<?x?xf32>{%arg0, %arg1}
@@ -1283,7 +1283,7 @@ func.func @dont_fuse_reshape(%lhs : tensor<?xf32>, %rhs1 : tensor<4x?xf32>, %rhs
     outs(%fill2 : tensor<?x?xf32>) -> tensor<?x?xf32>
   return %1, %2 : tensor<?x?xf32>, tensor<?x?xf32>
 }
-//      CHECK: func @dont_fuse_reshape(
+//      CHECK: func.func @dont_fuse_reshape(
 // CHECK-SAME:     %[[LHS:.+]]: tensor<?xf32>
 //  CHECK-DAG:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[LHS]]
 //      CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
@@ -1310,7 +1310,7 @@ func.func @concat_pattern(%src1 : tensor<2x40xf32>, %src2 : tensor<3x40xf32>,
       : tensor<3x40xf32> into tensor<5x40xf32>
   return %1 : tensor<5x40xf32>
 }
-//      CHECK: func @concat_pattern
+//      CHECK: func.func @concat_pattern
 // CHECK-SAME:     %[[SRC1:.+]]: tensor<2x40xf32>
 // CHECK-SAME:     %[[SRC2:.+]]: tensor<3x40xf32>
 // CHECK-SAME:     %[[DEST:.+]]: tensor<5x40xf32>
@@ -1328,7 +1328,7 @@ func.func @generic_tensor_insert(%arg0 : tensor<?x?xf32>,
   %1 = tensor.insert_slice %0 into %arg10[%arg6, %arg7] [%arg3, 1] [%arg8, %arg9] : tensor<?xf32> into tensor<?x?xf32>
   return %1 : tensor<?x?xf32>
 }
-//      CHECK: func @generic_tensor_insert(
+//      CHECK: func.func @generic_tensor_insert(
 // CHECK-SAME:     %[[SOURCE:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 // CHECK-SAME:     %[[SOURCE_OFFSET_Y:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[SOURCE_OFFSET_X:[a-zA-Z0-9]+]]: index

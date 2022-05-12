@@ -51,7 +51,7 @@ hal.executable private @matmul_tensors {
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
 //      CHECK: hal.executable.entry_point public @matmul_tensors
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-//      CHECK: func @matmul_tensors()
+//      CHECK: func.func @matmul_tensors()
 //  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
 //  CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load[1]
 //  CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load[2]
@@ -138,7 +138,7 @@ hal.executable private @add {
 //      CHECK: hal.executable private @add
 //      CHECK: hal.executable.entry_point public @add
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-//      CHECK: func @add()
+//      CHECK: func.func @add()
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       %[[RESULT:.+]] = linalg.generic
@@ -198,7 +198,7 @@ hal.executable private @add4D {
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point public @add4D
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-//      CHECK: func @add4D()
+//      CHECK: func.func @add4D()
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
@@ -255,7 +255,7 @@ hal.executable private @batch_matmul_tensors {
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
 //      CHECK: hal.executable.entry_point public @batch_matmul_tensors
-//      CHECK: func @batch_matmul_tensors()
+//      CHECK: func.func @batch_matmul_tensors()
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       scf.for %[[IV2:.+]] =
@@ -305,7 +305,7 @@ hal.executable private @preset_config_matmul_tensors {
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point public @preset_config
-//      CHECK: func @preset_config()
+//      CHECK: func.func @preset_config()
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
 //  CHECK-DAG:       %[[LHS:.+]] = flow.dispatch.tensor.load %{{.+}}, offsets = [%[[IV0]], 0], sizes = [32, 256]
@@ -364,7 +364,7 @@ hal.executable public @copy_op {
 }
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 64)>
-//      CHECK: func @copy_op()
+//      CHECK: func.func @copy_op()
 //  CHECK-DAG:   %[[SOURCE_SIZE_Y:.+]] = hal.interface.constant.load[0] : index
 //  CHECK-DAG:   %[[SOURCE_SIZE_X:.+]] = hal.interface.constant.load[1] : index
 //  CHECK-DAG:   %[[DEST_SIZE_Y:.+]] = hal.interface.constant.load[2] : index
@@ -439,7 +439,7 @@ hal.executable private @static_1d_fft_stage2 {
 //      CHECK: hal.executable private @static_1d_fft_stage2
 //      CHECK: hal.executable.entry_point public @static_1d_fft_stage2
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-//      CHECK: func @static_1d_fft_stage2()
+//      CHECK: func.func @static_1d_fft_stage2()
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     %[[RESULT:.+]]:2 = iree_linalg_ext.fft
 //  CHECK-DAG:     flow.dispatch.tensor.store %[[RESULT]]#0, %{{.+}}, offsets = [%[[IV0]]]
@@ -479,7 +479,7 @@ hal.executable private @static_3d_fft_stage3 {
 //      CHECK: hal.executable private @static_3d_fft_stage3
 //      CHECK: hal.executable.entry_point public @static_3d_fft_stage3
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-//      CHECK: func @static_3d_fft_stage3()
+//      CHECK: func.func @static_3d_fft_stage3()
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       scf.for %[[IV2:.+]] =
@@ -543,7 +543,7 @@ hal.executable private @outs_fusion {
     }
   }
 }
-//      CHECK: func @outs_fusion_fn
+//      CHECK: func.func @outs_fusion_fn
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       %[[INIT:.+]] = linalg.init_tensor
@@ -607,7 +607,7 @@ hal.executable private @conv {
 //      CHECK: hal.executable private @conv
 //      CHECK: hal.executable.entry_point public @conv
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-//      CHECK: func @conv()
+//      CHECK: func.func @conv()
 //      CHECK:   %[[C0:.+]] = arith.constant 0
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
@@ -664,7 +664,7 @@ hal.executable private @conv_static {
 //      CHECK: hal.executable private @conv_static
 //      CHECK: hal.executable.entry_point public @conv_static
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-//      CHECK: func @conv_static()
+//      CHECK: func.func @conv_static()
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
@@ -720,7 +720,7 @@ hal.executable private @generic_static {
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @generic_static
 //      CHECK: hal.executable.entry_point public @generic_static
-//      CHECK: func @generic_static()
+//      CHECK: func.func @generic_static()
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       %[[RESULT:.+]] = linalg.generic
@@ -875,7 +875,7 @@ hal.executable private @reduction {
 //      CHECK: hal.executable private @reduction
 //      CHECK: hal.executable.entry_point public @reduction
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-//      CHECK: func @reduction
+//      CHECK: func.func @reduction
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     %[[INIT:.+]] = linalg.init_tensor
 //      CHECK:     %[[FILL:.+]] = linalg.fill
@@ -934,7 +934,7 @@ hal.executable private @gemm_unit_N {
 //      CHECK: hal.executable private @gemm_unit_N
 //      CHECK: hal.executable.entry_point public @gemm_unit_N
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-//      CHECK: func @gemm_unit_N()
+//      CHECK: func.func @gemm_unit_N()
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
 //  CHECK-DAG:   %[[WG_ID_X:.+]] = hal.interface.workgroup.id[0]
@@ -993,7 +993,7 @@ hal.executable private @gemm_unit_M_unit_N {
 //      CHECK: hal.executable private @gemm_unit_M_unit_N
 //      CHECK: hal.executable.entry_point public @gemm_unit_M_unit_N
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-//      CHECK: func @gemm_unit_M_unit_N()
+//      CHECK: func.func @gemm_unit_M_unit_N()
 //  CHECK-NOT:   scf.for
 //      CHECK:   %[[GEMM:.+]] = linalg.matmul
 //      CHECK:   flow.dispatch.tensor.store %[[GEMM]], %{{.+}}, offsets = [0, 0]
@@ -1048,7 +1048,7 @@ hal.executable private @generic_unit_dims {
 //      CHECK: hal.executable private @generic_unit_dims
 //      CHECK: hal.executable.entry_point public @generic_unit_dims
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-//      CHECK: func @generic_unit_dims()
+//      CHECK: func.func @generic_unit_dims()
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
@@ -1105,7 +1105,7 @@ hal.executable private @reduce_to_scalar {
 //      CHECK: hal.executable private @reduce_to_scalar
 //      CHECK: hal.executable.entry_point public @reduce_to_scalar
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-//      CHECK: func @reduce_to_scalar()
+//      CHECK: func.func @reduce_to_scalar()
 //  CHECK-NOT:   scf.for
 
 // -----
@@ -1154,7 +1154,7 @@ hal.executable private @scalar {
 //      CHECK: hal.executable private @scalar
 //      CHECK: hal.executable.entry_point public @scalar
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-//      CHECK: func @scalar()
+//      CHECK: func.func @scalar()
 //  CHECK-NOT:   scf.for
 
 // -----
@@ -1200,7 +1200,7 @@ hal.executable private @rank_reduced_slice {
   }
 }
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 + 10)>
-//      CHECK: func @rank_reduced_slice()
+//      CHECK: func.func @rank_reduced_slice()
 //  CHECK-DAG:   %[[SRC_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0)
 // CHECK-SAME:       : !flow.dispatch.tensor<readonly:5x40xf32>
 //  CHECK-DAG:   %[[DST_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1)
@@ -1262,7 +1262,7 @@ hal.executable private @matmul_interchange {
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point public @matmul_interchange
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-//      CHECK: func @matmul_interchange()
+//      CHECK: func.func @matmul_interchange()
 //  CHECK-DAG:   %[[D0:.+]] = hal.interface.constant.load[0] : index
 //  CHECK-DAG:   %[[D1:.+]] = hal.interface.constant.load[1] : index
 //      CHECK:   scf.for %{{.+}} = %{{.+}} to %[[D1]] step %{{.+}} {

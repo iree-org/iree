@@ -1,6 +1,6 @@
 // RUN: iree-dialects-opt --split-input-file --iree-linalg-ext-to-loops %s | FileCheck %s
 
-func @sort_1d(%arg0: memref<128xi32>) {
+func.func @sort_1d(%arg0: memref<128xi32>) {
   iree_linalg_ext.sort dimension(0)
     outs(%arg0 : memref<128xi32>) {
   ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
@@ -30,7 +30,7 @@ func @sort_1d(%arg0: memref<128xi32>) {
 
 // -----
 
-func @sort_2d(%arg0: memref<16x32xi32>) {
+func.func @sort_2d(%arg0: memref<16x32xi32>) {
   iree_linalg_ext.sort dimension(0)
     outs(%arg0 : memref<16x32xi32>) {
   ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
@@ -62,7 +62,7 @@ func @sort_2d(%arg0: memref<16x32xi32>) {
 
 // -----
 
-func @sort_multi(%arg0: memref<128xf32>, %arg1: memref<128xi32>) {
+func.func @sort_multi(%arg0: memref<128xf32>, %arg1: memref<128xi32>) {
   iree_linalg_ext.sort
     dimension(0)
     outs(%arg0, %arg1 : memref<128xf32>, memref<128xi32>) {
@@ -98,7 +98,7 @@ func @sort_multi(%arg0: memref<128xf32>, %arg1: memref<128xi32>) {
 
 // -----
 
-func @scatter_update_scalar_1D(
+func.func @scatter_update_scalar_1D(
     %original: memref<8xi32>, %indices: memref<3x1xi32>,
     %updates: memref<3xi32>) {
   iree_linalg_ext.scatter unique_indices(true)
@@ -124,7 +124,7 @@ func @scatter_update_scalar_1D(
 
 // -----
 
-func @scatter_add_scalar_2D(
+func.func @scatter_add_scalar_2D(
     %original: memref<4x3xi32>, %indices: memref<3x2xi32>,
     %updates: memref<3xi32>) {
   iree_linalg_ext.scatter unique_indices(true)
@@ -155,7 +155,7 @@ func @scatter_add_scalar_2D(
 
 // -----
 
-func @scatter_update_slice_2D(
+func.func @scatter_update_slice_2D(
     %original: memref<4x3xi32>, %indices: memref<2x1xi32>,
     %updates: memref<2x3xi32>) {
   iree_linalg_ext.scatter unique_indices(true)
@@ -185,7 +185,7 @@ func @scatter_update_slice_2D(
 
 // -----
 
-func @scatter_add_scalar_1D(
+func.func @scatter_add_scalar_1D(
     %original: memref<8xi32>, %indices: memref<3x1xi32>,
     %updates: memref<3xi32>) {
   iree_linalg_ext.scatter unique_indices(true)
@@ -214,7 +214,7 @@ func @scatter_add_scalar_1D(
 
 // -----
 
-func @scatter_add_slice_2D(
+func.func @scatter_add_slice_2D(
     %original: memref<4x3xi32>, %indices: memref<2x1xi32>,
     %updates: memref<2x3xi32>) {
   iree_linalg_ext.scatter unique_indices(true)
@@ -244,7 +244,7 @@ func @scatter_add_slice_2D(
 
 // -----
 
-func @scatter_update_scalar_dynamic_1D(
+func.func @scatter_update_scalar_dynamic_1D(
     %original: memref<?xi32>, %indices: memref<?x1xi32>,
     %updates: memref<?xi32>) {
   iree_linalg_ext.scatter unique_indices(true)
@@ -270,7 +270,7 @@ func @scatter_update_scalar_dynamic_1D(
 
 // -----
 
-func @scatter_add_scalar_dynamic_2D(
+func.func @scatter_add_scalar_dynamic_2D(
     %original: memref<?x?xi32>, %indices: memref<?x2xi32>,
     %updates: memref<?xi32>) {
   iree_linalg_ext.scatter unique_indices(true)
@@ -301,7 +301,7 @@ func @scatter_add_scalar_dynamic_2D(
 
 // -----
 
-func @scatter_update_slice_dynamic_2D(
+func.func @scatter_update_slice_dynamic_2D(
     %original: memref<?x?xi32>, %indices: memref<?x1xi32>,
     %updates: memref<?x?xi32>) {
   iree_linalg_ext.scatter unique_indices(true)
@@ -329,7 +329,7 @@ func @scatter_update_slice_dynamic_2D(
 
 // -----
 
-func @scatter_partial_slices(%arg0: memref<2x64x12xf32>, %arg1: memref<2x3xi32>, %arg2: memref<2x1x12xf32>) {
+func.func @scatter_partial_slices(%arg0: memref<2x64x12xf32>, %arg1: memref<2x3xi32>, %arg2: memref<2x1x12xf32>) {
   iree_linalg_ext.scatter
     unique_indices(true)
     ins(%arg2, %arg1 : memref<2x1x12xf32>, memref<2x3xi32>)
@@ -364,7 +364,7 @@ func @scatter_partial_slices(%arg0: memref<2x64x12xf32>, %arg1: memref<2x3xi32>,
 
 // -----
 
-func @fft_1D(%real: memref<16xf32>, %imag: memref<16xf32>) {
+func.func @fft_1D(%real: memref<16xf32>, %imag: memref<16xf32>) {
   %stage = arith.constant 1 : index
   iree_linalg_ext.fft
     ins(%stage: index)
@@ -422,7 +422,7 @@ func @fft_1D(%real: memref<16xf32>, %imag: memref<16xf32>) {
 
 // -----
 
-func @fft_2D(%real: memref<?x16xf32>, %imag: memref<?x16xf32>) {
+func.func @fft_2D(%real: memref<?x16xf32>, %imag: memref<?x16xf32>) {
   %stage = arith.constant 2 : index
   iree_linalg_ext.fft
     ins(%stage: index)
@@ -456,7 +456,7 @@ func @fft_2D(%real: memref<?x16xf32>, %imag: memref<?x16xf32>) {
 
 // -----
 
-func @fft_2D_coef_buf(%real: memref<?x16xf32>, %imag: memref<?x16xf32>,
+func.func @fft_2D_coef_buf(%real: memref<?x16xf32>, %imag: memref<?x16xf32>,
                       %coef_real: memref<1xf32>, %coef_imag: memref<1xf32>) {
   %stage = arith.constant 1 : index
   iree_linalg_ext.fft
@@ -509,7 +509,7 @@ func @fft_2D_coef_buf(%real: memref<?x16xf32>, %imag: memref<?x16xf32>,
 
 // -----
 
-func @reverse_dim_0(%arg0: memref<?x?xi32>, %arg1: memref<?x?xi32>) {
+func.func @reverse_dim_0(%arg0: memref<?x?xi32>, %arg1: memref<?x?xi32>) {
   iree_linalg_ext.reverse
     dimensions(dense<0> : tensor<1xi64>)
     ins(%arg0 : memref<?x?xi32>)
@@ -531,7 +531,7 @@ func @reverse_dim_0(%arg0: memref<?x?xi32>, %arg1: memref<?x?xi32>) {
 // CHECK:             %[[V0:.+]] = memref.load %[[IN]][%[[I]], %[[J]]]
 // CHECK:             memref.store %[[V0]], %[[OUT]][%[[T2]], %[[J]]] : memref<?x?xi32>
 
-func @scan_1d_inclusive(%0: memref<128xi32>, %1: memref<128xi32>) {
+func.func @scan_1d_inclusive(%0: memref<128xi32>, %1: memref<128xi32>) {
   %c0 = memref.alloc() : memref<i32>
   iree_linalg_ext.scan dimension(0) inclusive(true)
     ins(%0 : memref<128xi32>) outs(%1, %c0 : memref<128xi32>, memref<i32>) {
@@ -564,7 +564,7 @@ func @scan_1d_inclusive(%0: memref<128xi32>, %1: memref<128xi32>) {
 
 // -----
 
-func @scan_1d_exclusive(%0: memref<128xi32>, %1: memref<128xi32>) {
+func.func @scan_1d_exclusive(%0: memref<128xi32>, %1: memref<128xi32>) {
   %c0 = memref.alloc() : memref<i32>
   iree_linalg_ext.scan dimension(0) inclusive(false)
     ins(%0 : memref<128xi32>) outs(%1, %c0 : memref<128xi32>, memref<i32>) {
@@ -597,7 +597,7 @@ func @scan_1d_exclusive(%0: memref<128xi32>, %1: memref<128xi32>) {
 
 // -----
 
-func @scan_2d(%0: memref<16x32xi32>, %1: memref<16x32xi32>) {
+func.func @scan_2d(%0: memref<16x32xi32>, %1: memref<16x32xi32>) {
   %t0 = memref.alloc() : memref<32xi32>
   iree_linalg_ext.scan dimension(0) inclusive(true)
     ins(%0 : memref<16x32xi32>) outs(%1, %t0 : memref<16x32xi32>, memref<32xi32>) {

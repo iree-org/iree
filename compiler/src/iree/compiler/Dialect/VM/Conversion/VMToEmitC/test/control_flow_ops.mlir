@@ -60,10 +60,10 @@ vm.module @my_module {
 
 // Test vm.call conversion on an imported function.
 vm.module @my_module {
-  // CHECK: func @my_module_call_[[IMPORTFN:[^\(]+]]
+  // CHECK: func.func @my_module_call_[[IMPORTFN:[^\(]+]]
   vm.import @imported_fn(%arg0 : i32) -> i32
 
-  // CHECK: func @my_module_call_imported_fn
+  // CHECK: func.func @my_module_call_imported_fn
   vm.func @call_imported_fn(%arg0 : i32) -> i32 {
 
     // Lookup import from module struct.
@@ -114,10 +114,10 @@ vm.module @my_module {
 
 // Test vm.call.variadic conversion on an imported function.
 vm.module @my_module {
-  // CHECK: func @my_module_call_[[VARIADICFN:[^\(]+]]
+  // CHECK: func.func @my_module_call_[[VARIADICFN:[^\(]+]]
   vm.import @variadic_fn(%arg0 : i32 ...) -> i32
 
-  // CHECK: func @my_module_call_variadic
+  // CHECK: func.func @my_module_call_variadic
   vm.func @call_variadic(%arg0 : i32, %arg1 : i32) -> i32 {
 
     // Lookup import from module struct.
@@ -237,7 +237,7 @@ vm.module @my_module {
 // Test vm.import conversion on a void function.
 vm.module @my_module {
 
-  // CHECK-LABEL: func @my_module_call_0v_v_import_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>)
+  // CHECK-LABEL: func.func @my_module_call_0v_v_import_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>)
   // CHECK-SAME:      -> !emitc.opaque<"iree_status_t"> attributes {emitc.static} {
 
   // Calculate the size of the arguments. To avoid empty structs we insert a dummy value.
@@ -316,7 +316,7 @@ vm.module @my_module {
 // Test vm.import conversion on a variadic function.
 vm.module @my_module {
 
-  // CHECK-LABEL: func @my_module_call_0iCiD_i_2_import_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>,
+  // CHECK-LABEL: func.func @my_module_call_0iCiD_i_2_import_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>,
   // CHECK-SAME:                                             %arg2: i32, %arg3: i32, %arg4: i32, %arg5: i32, %arg6: !emitc.ptr<!emitc.opaque<"int32_t">>)
   // CHECK-SAME:      -> !emitc.opaque<"iree_status_t"> attributes {emitc.static} {
 
@@ -431,7 +431,7 @@ vm.module @my_module {
 // Test vm.import conversion on a function with vm.ref arguments.
 vm.module @my_module {
 
-  // CHECK-LABEL: func @my_module_call_0r_r_import_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>,
+  // CHECK-LABEL: func.func @my_module_call_0r_r_import_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>,
   // CHECK-SAME:                                        %arg2: !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, %arg3: !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>)
   // CHECK-SAME:      -> !emitc.opaque<"iree_status_t"> attributes {emitc.static} {
 
@@ -525,7 +525,7 @@ vm.module @my_module {
   // CHECK: emitc.call "EMITC_TYPEDEF_STRUCT"() {args = [#emitc.opaque<"my_module_fn_result_t">, #emitc.opaque<"int32_t res0;">]} : () -> ()
 
   // Create a new function to export with the adapted siganture.
-  //      CHECK: func @my_module_fn_export_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.ptr<!emitc.opaque<"iree_vm_function_call_t">>,
+  //      CHECK: func.func @my_module_fn_export_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.ptr<!emitc.opaque<"iree_vm_function_call_t">>,
   // CHECK-SAME:                                %arg2: !emitc.ptr<!emitc.opaque<"void">>, %arg3: !emitc.ptr<!emitc.opaque<"void">>, %arg4: !emitc.ptr<!emitc.opaque<"iree_vm_execution_result_t">>)
   // CHECK-SAME:     -> !emitc.opaque<"iree_status_t"> attributes {emitc.static, vm.calling_convention = "0i_i"}
 

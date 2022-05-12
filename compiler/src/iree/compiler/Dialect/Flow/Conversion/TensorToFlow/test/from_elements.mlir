@@ -1,6 +1,6 @@
 // RUN: iree-opt --allow-unregistered-dialect --split-input-file --iree-flow-convert-to-flow %s | FileCheck %s
 
-// CHECK: func @tensor.from_elements__to__flow.tensor.splat(%[[arg0:.*]]: i8)
+// CHECK: func.func @tensor.from_elements__to__flow.tensor.splat(%[[arg0:.*]]: i8)
 func.func @tensor.from_elements__to__flow.tensor.splat(%arg0: i8) -> (i8) {
   // CHECK: %[[splat_res:.*]] = flow.tensor.splat %[[arg0]] : tensor<1xi8>
   %0 = tensor.from_elements %arg0 : tensor<1xi8>
@@ -10,7 +10,7 @@ func.func @tensor.from_elements__to__flow.tensor.splat(%arg0: i8) -> (i8) {
 }
 
 // -----
-// CHECK: func @tensor.from_elements__not_convertible(%[[arg0:.*]]: i8)
+// CHECK: func.func @tensor.from_elements__not_convertible(%[[arg0:.*]]: i8)
 func.func @tensor.from_elements__not_convertible(%arg0: i8) -> (i8) {
   // CHECK: %[[c0:.*]] = arith.constant 0
   %c0 = arith.constant 0 : index
@@ -40,7 +40,7 @@ func.func @tensor.from_elements_0D(%arg0 : f32) -> tensor<f32> {
   %0 = tensor.from_elements %arg0 : tensor<f32>
   return %0 : tensor<f32>
 }
-//      CHECK: func @tensor.from_elements_0D
+//      CHECK: func.func @tensor.from_elements_0D
 // CHECK-SAME:     %[[ARG0:.+]]: f32
 //      CHECK:   %[[SPLAT:.+]] = flow.tensor.splat %[[ARG0]] : tensor<f32>
 //      CHECK:   return %[[SPLAT]]

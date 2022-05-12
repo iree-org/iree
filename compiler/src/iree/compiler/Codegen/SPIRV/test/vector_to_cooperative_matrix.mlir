@@ -12,7 +12,7 @@ hal.executable private @matmul_contract  {
         [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage]>,
         {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>}> {
     builtin.module {
-      // CHECK-LABEL: func @matmul_contract
+      // CHECK-LABEL: func.func @matmul_contract
       //  CHECK-SAME: %[[ARG0:.+]]: memref<8x32xi8>, %[[ARG1:.+]]: memref<32x8xi8>, %[[ARG2:.+]]: memref<8x8xi32>
       func.func @matmul_contract(%arg0: memref<8x32xi8>, %arg1: memref<32x8xi8>, %arg2: memref<8x8xi32>) {
         %c0 = arith.constant 0 : index
@@ -57,7 +57,7 @@ hal.executable private @matmul_contract_licm  {
           [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage, SPV_KHR_16bit_storage]>,
           {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>}> {
     builtin.module {
-      // CHECK-LABEL: func @matmul_contract_licm
+      // CHECK-LABEL: func.func @matmul_contract_licm
       func.func @matmul_contract_licm(%arg0: memref<4096x4096xi8>, %arg1: memref<4096x4096xi8>, %arg2: memref<4096x4096xi32>) {
         %c32 = arith.constant 32 : index
         %c4096 = arith.constant 4096 : index
@@ -103,7 +103,7 @@ hal.executable private @matmul_contract_vector_memref  {
         [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage, SPV_KHR_16bit_storage]>,
         {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>}> {
     builtin.module {
-      // CHECK-LABEL: func @matmul_contract_vector_memref
+      // CHECK-LABEL: func.func @matmul_contract_vector_memref
       func.func @matmul_contract_vector_memref(%arg0: memref<4096x256xvector<4xi32>>, %arg1: memref<4096x256xvector<4xi32>>, %arg2: memref<4096x1024xvector<4xi32>>) {
         %c32 = arith.constant 32 : index
         %c4096 = arith.constant 4096 : index
@@ -138,7 +138,7 @@ hal.executable private @const_elementwise_ops  {
         [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage]>,
         {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>}> {
     builtin.module {
-      // CHECK-LABEL: func @const_elementwise_ops
+      // CHECK-LABEL: func.func @const_elementwise_ops
       func.func @const_elementwise_ops(%add_val: vector<16x16xf16>, %sub_val: vector<16x16xf16>, %div_val: vector<16x16xf16>) -> vector<16x16xf16> {
         // CHECK: %[[SPLAT:.+]] = spv.Constant 8.000000e+00 : f16
         // CHECK: %[[CST:.+]] = spv.CompositeConstruct %[[SPLAT]] : !spv.coopmatrix<16x16xf16, Subgroup>

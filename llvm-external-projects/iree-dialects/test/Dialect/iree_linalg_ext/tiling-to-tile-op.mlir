@@ -6,7 +6,7 @@ module {
 //  CHECK-SAME:   %[[A:[0-9a-z]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[B:[0-9a-z]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[C:[0-9a-z]+]]: tensor<?x?xf32>
-  func @matmul(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>) -> tensor<?x?xf32> {
+  func.func @matmul(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>) -> tensor<?x?xf32> {
   //      CHECK: %[[C10:.*]] = arith.constant 10 : index
   //      CHECK: iree_linalg_ext.tile %[[C10]] outs(%[[C]]: tensor<?x?xf32>) -> (tensor<?x?xf32>) {
   //      CHECK: ^bb0(%[[OFF:.*]]: index, %[[SZ:.*]]: index, %[[C_ITER:.*]]: tensor<?x?xf32>):
@@ -45,7 +45,7 @@ module {
 //  CHECK-SAME:   %[[A:[0-9a-z]+]]: tensor<100x200xf32>
 //  CHECK-SAME:   %[[B:[0-9a-z]+]]: tensor<200x300xf32>
 //  CHECK-SAME:   %[[C:[0-9a-z]+]]: tensor<100x300xf32>
-  func @matmul_static(%A: tensor<100x200xf32>, %B: tensor<200x300xf32>, %C: tensor<100x300xf32>) -> tensor<100x300xf32> {
+  func.func @matmul_static(%A: tensor<100x200xf32>, %B: tensor<200x300xf32>, %C: tensor<100x300xf32>) -> tensor<100x300xf32> {
     //      CHECK: %[[C10:.*]] = arith.constant 10 : index
     //      CHECK: iree_linalg_ext.tile %[[C10]] outs(%[[C]]: tensor<100x300xf32>) -> (tensor<100x300xf32>) {
     //      CHECK: ^bb0(%[[OFF:.*]]: index, %[[SZ:.*]]: index, %[[C_ITER:.*]]: tensor<?x?xf32>):

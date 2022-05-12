@@ -1,6 +1,6 @@
 // RUN: iree-opt --iree-workgroup-swizzle='logTile=3' %s | FileCheck %s
 
-func @matmul() {
+func.func @matmul() {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c96 = arith.constant 96 : index
@@ -28,7 +28,7 @@ func @matmul() {
   return
 }
 
-//    CHECK-LABEL: func @matmul
+//    CHECK-LABEL: func.func @matmul
 //          CHECK: %[[WORKGROUPIDX:.*]] = hal.interface.workgroup.id[0] : index
 //          CHECK: %[[WORKGROUPIDY:.*]] = hal.interface.workgroup.id[1] : index
 //          CHECK: %[[WORKGROUPCOUNTX:.*]] = hal.interface.workgroup.count[0] : index

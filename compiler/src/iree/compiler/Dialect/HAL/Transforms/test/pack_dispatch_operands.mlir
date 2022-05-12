@@ -3,7 +3,7 @@
 stream.executable private @ex0 {
   stream.executable.export public @device_i1
   builtin.module {
-    // CHECK-LABEL: func @device_i1
+    // CHECK-LABEL: func.func @device_i1
     // CHECK-SAME: (%arg0: i32, %arg1: !stream.binding)
     func.func @device_i1(%arg0: i1 {stream.values = [true, false]}, %arg1: !stream.binding) {
       // CHECK-NEXT: %[[DEV_I1:.+]] = arith.trunci %arg0 {stream.values = [true, false]} : i32 to i1
@@ -33,7 +33,7 @@ func.func @host_i1(%arg0: i1) -> !stream.timepoint {
 stream.executable private @ex1 {
   stream.executable.export public @device_bf16
   builtin.module {
-    // CHECK-LABEL: func @device_bf16
+    // CHECK-LABEL: func.func @device_bf16
     // CHECK-SAME: (%arg0: i32, %arg1: !stream.binding)
     func.func @device_bf16(%arg0: bf16, %arg1: !stream.binding) {
       // CHECK-NEXT: %[[DEV_I16:.+]] = arith.trunci %arg0 : i32 to i16
@@ -66,7 +66,7 @@ stream.executable private @ex2 {
   // CHECK-LABEL: @device_i64
   stream.executable.export public @device_i64
   builtin.module {
-    // CHECK-LABEL: func @device_i64
+    // CHECK-LABEL: func.func @device_i64
     // CHECK-SAME: (%arg0: i32, %arg1: i32, %arg2: !stream.binding)
     func.func @device_i64(%arg0: i64 {stream.values = [-1 : i64, 0x0000000200000003 : i64]}, %arg1: !stream.binding) {
       // CHECK-DAG: %[[DEV_LO64:.+]] = arith.extui %arg0 : i32 to i64
@@ -101,7 +101,7 @@ func.func @host_i64(%arg0: i64) -> !stream.timepoint {
 stream.executable private @ex3 {
   stream.executable.export public @device_index
   builtin.module {
-    // CHECK-LABEL: func @device_index
+    // CHECK-LABEL: func.func @device_index
     // CHECK-SAME: (%arg0: i32, %arg1: !stream.binding)
     func.func @device_index(%arg0: index {stream.alignment = 16 : index, stream.values = [0 : index, 1234 : index]}, %arg1: !stream.binding) {
       // CHECK: %[[DEV_INDEX:.+]] = arith.index_cast %arg0 {

@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --iree-codegen-fold-affinemin-in-distributed-loops --mlir-print-local-scope %s | FileCheck %s
 
-// CHECK-LABEL: func @loop_distributed_to_workgroup_x
+// CHECK-LABEL: func.func @loop_distributed_to_workgroup_x
 func.func @loop_distributed_to_workgroup_x() -> index {
   %c0 = arith.constant 0 : index
   // CHECK: %[[C32:.+]] = arith.constant 32 : index
@@ -22,7 +22,7 @@ func.func @loop_distributed_to_workgroup_x() -> index {
 
 // -----
 
-// CHECK-LABEL: func @loop_distributed_to_workgroup_y
+// CHECK-LABEL: func.func @loop_distributed_to_workgroup_y
 func.func @loop_distributed_to_workgroup_y() -> index {
   %c0 = arith.constant 0 : index
   // CHECK: %[[C32:.+]] = arith.constant 32 : index
@@ -44,7 +44,7 @@ func.func @loop_distributed_to_workgroup_y() -> index {
 
 // -----
 
-// CHECK-LABEL: func @loop_distributed_to_workgroup_z
+// CHECK-LABEL: func.func @loop_distributed_to_workgroup_z
 func.func @loop_distributed_to_workgroup_z() -> index {
   %c0 = arith.constant 0 : index
   // CHECK: %[[C32:.+]] = arith.constant 32 : index
@@ -66,7 +66,7 @@ func.func @loop_distributed_to_workgroup_z() -> index {
 
 // -----
 
-// CHECK-LABEL: func @loop_distributed_to_workitem_x
+// CHECK-LABEL: func.func @loop_distributed_to_workitem_x
 func.func @loop_distributed_to_workitem_x() -> index {
   %c0 = arith.constant 0 : index
   // CHECK: %[[C32:.+]] = arith.constant 32 : index
@@ -88,7 +88,7 @@ func.func @loop_distributed_to_workitem_x() -> index {
 
 // -----
 
-// CHECK-LABEL: func @loop_distributed_to_workitem_y
+// CHECK-LABEL: func.func @loop_distributed_to_workitem_y
 func.func @loop_distributed_to_workitem_y() -> index {
   %c0 = arith.constant 0 : index
   // CHECK: %[[C32:.+]] = arith.constant 32 : index
@@ -110,7 +110,7 @@ func.func @loop_distributed_to_workitem_y() -> index {
 
 // -----
 
-// CHECK-LABEL: func @loop_distributed_to_workitem_z
+// CHECK-LABEL: func.func @loop_distributed_to_workitem_z
 func.func @loop_distributed_to_workitem_z() -> index {
   %c0 = arith.constant 0 : index
   // CHECK: %[[C32:.+]] = arith.constant 32 : index
@@ -132,7 +132,7 @@ func.func @loop_distributed_to_workitem_z() -> index {
 
 // -----
 
-// CHECK-LABEL: func @cst_folded_into_affine_map
+// CHECK-LABEL: func.func @cst_folded_into_affine_map
 func.func @cst_folded_into_affine_map() -> index {
   %c0 = arith.constant 0 : index
   // CHECK: %[[C32:.+]] = arith.constant 32 : index
@@ -154,7 +154,7 @@ func.func @cst_folded_into_affine_map() -> index {
 
 // -----
 
-// CHECK-LABEL: func @affine_apply_folded_into_loop
+// CHECK-LABEL: func.func @affine_apply_folded_into_loop
 func.func @affine_apply_folded_into_loop() -> index {
   %c0 = arith.constant 0 : index
   // CHECK: %[[C1:.+]] = arith.constant 1 : index
@@ -174,7 +174,7 @@ func.func @affine_apply_folded_into_loop() -> index {
 
 // -----
 
-// CHECK-LABEL: func @unknown_tile_size
+// CHECK-LABEL: func.func @unknown_tile_size
 func.func @unknown_tile_size() -> index {
   %c0 = arith.constant 0 : index
   %c32 = arith.constant 32 : index
@@ -198,7 +198,7 @@ func.func @unknown_tile_size() -> index {
 
 // -----
 
-// CHECK-LABEL: func @mismatched_id_count
+// CHECK-LABEL: func.func @mismatched_id_count
 func.func @mismatched_id_count() -> index {
   %c0 = arith.constant 0 : index
   // CHECK: %[[C32:.+]] = arith.constant 32 : index
@@ -221,7 +221,7 @@ func.func @mismatched_id_count() -> index {
 
 // -----
 
-// CHECK-LABEL: func @min_over_min
+// CHECK-LABEL: func.func @min_over_min
 func.func @min_over_min() -> index {
   %c0 = arith.constant 0 : index
   %c8 = arith.constant 8 : index
@@ -250,7 +250,7 @@ func.func @min_over_min() -> index {
 
 // -----
 
-// CHECK-LABEL: func @cannot_prove_cst_bound
+// CHECK-LABEL: func.func @cannot_prove_cst_bound
 func.func @cannot_prove_cst_bound() -> index {
   %c0 = arith.constant 0 : index
   %c8 = arith.constant 8 : index
@@ -278,7 +278,7 @@ func.func @cannot_prove_cst_bound() -> index {
 
 // -----
 
-// CHECK-LABEL: func @can_prove_symbolic_bound
+// CHECK-LABEL: func.func @can_prove_symbolic_bound
 func.func @can_prove_symbolic_bound() -> index {
   %c0 = arith.constant 0 : index
   %c8 = arith.constant 8 : index

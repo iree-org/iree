@@ -11,11 +11,11 @@
 
 module {
 
-  // CHECK-LABEL: func @static_tile_tensors
+  // CHECK-LABEL: func.func @static_tile_tensors
   //  CHECK-SAME:   %[[CHUNK_SIZE:[0-9a-z]+]]: index
   //  CHECK-SAME:   %[[IN:[0-9a-z]+]]: tensor<?xf32>
   //  CHECK-SAME:   %[[OUT:[0-9a-z]+]]: tensor<?xf32>
-  func @static_tile_tensors(%arg0: index, %arg1: tensor<?xf32>, %arg2: tensor<?xf32>) -> tensor<?xf32> {
+  func.func @static_tile_tensors(%arg0: index, %arg1: tensor<?xf32>, %arg2: tensor<?xf32>) -> tensor<?xf32> {
     %cst = arith.constant 4.200000e+01 : f32
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
@@ -50,11 +50,11 @@ module {
     return %2 : tensor<?xf32>
   }
 
-  // CHECK-LABEL: func @static_tile_buffers
+  // CHECK-LABEL: func.func @static_tile_buffers
   //  CHECK-SAME:   %[[CHUNK_SIZE:[0-9a-z]+]]: index
   //  CHECK-SAME:   %[[IN:[0-9a-z]+]]: memref<?xf32>
   //  CHECK-SAME:   %[[OUT:[0-9a-z]+]]: memref<?xf32>
-  func @static_tile_buffers(%arg0: index, %arg1: memref<?xf32>, %arg2: memref<?xf32>) {
+  func.func @static_tile_buffers(%arg0: index, %arg1: memref<?xf32>, %arg2: memref<?xf32>) {
     %cst = arith.constant 4.200000e+01 : f32
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index

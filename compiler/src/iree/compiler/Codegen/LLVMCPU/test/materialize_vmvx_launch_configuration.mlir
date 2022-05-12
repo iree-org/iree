@@ -114,6 +114,6 @@ hal.executable private @static_1d_fft_stage2  {
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //       CHECK: hal.executable.entry_point public @static_1d_fft_stage2
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//       CHECK: func @static_1d_fft_stage2()
+//       CHECK: func.func @static_1d_fft_stage2()
 //       CHECK:   iree_linalg_ext.fft
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]

@@ -1,6 +1,6 @@
 // RUN: iree-dialects-opt --linalg-interp-transforms %s | FileCheck %s
 
-func @fun_to_benchmark(%arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32>) ->
+func.func @fun_to_benchmark(%arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32>) ->
     tensor<128x128xf32> attributes {passthrough = ["noinline", ["target-cpu", "skylake-avx512"], ["prefer-vector-width", "512"]]} {
   // With scalarization we expect vectorization to still work albeit with a leading
   // `1` dimension.

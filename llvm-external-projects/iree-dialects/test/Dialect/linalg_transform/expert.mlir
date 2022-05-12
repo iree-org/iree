@@ -2,10 +2,10 @@
 // _UN: iree-dialects-opt --linalg-transform-expert-expansion --linalg-interp-transforms --split-input-file %s | FileCheck %s
 // RUN: true
 
-// CHECK-LABEL: func @matmul_tensors
+// CHECK-LABEL: func.func @matmul_tensors
 // CHECK-NOT: linalg
 // CHECK: llvm
-func @matmul_tensors(
+func.func @matmul_tensors(
   %arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32> { linalg.inplaceable = true})
     -> tensor<128x128xf32> {
   %0 = linalg.matmul  ins(%arg0, %arg1: tensor<128x128xf32>, tensor<128x128xf32>)
@@ -85,10 +85,10 @@ module @strategies {
 
 // -----
 
-// CHECK-LABEL: func @matmul_tensors2
+// CHECK-LABEL: func.func @matmul_tensors2
 // CHECK-NOT: linalg
 // CHECK: llvm
-func @matmul_tensors2(
+func.func @matmul_tensors2(
   %arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32> { linalg.inplaceable = true})
     -> tensor<128x128xf32> {
   %0 = linalg.matmul  ins(%arg0, %arg1: tensor<128x128xf32>, tensor<128x128xf32>)

@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --iree-codegen-cleanup-buffer-alloc-view %s | FileCheck %s
 
-// CHECK-LABEL: func @fold_reshape()
+// CHECK-LABEL: func.func @fold_reshape()
 func.func @fold_reshape() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -18,7 +18,7 @@ func.func @fold_reshape() {
 
 // -----
 
-// CHECK-LABEL: func @dont_fold_reshape_with_not_full_load()
+// CHECK-LABEL: func.func @dont_fold_reshape_with_not_full_load()
 func.func @dont_fold_reshape_with_not_full_load() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -37,7 +37,7 @@ func.func @dont_fold_reshape_with_not_full_load() {
 
 // -----
 
-// CHECK-LABEL: func @dont_fold_dynamic_reshape()
+// CHECK-LABEL: func.func @dont_fold_dynamic_reshape()
 func.func @dont_fold_dynamic_reshape() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index

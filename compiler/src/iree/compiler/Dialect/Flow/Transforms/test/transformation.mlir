@@ -18,12 +18,12 @@ func.func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 // CHECK-LABEL: flow.executable private @hloElementwiseOps_dispatch_0 {
 //  CHECK-NEXT:   flow.dispatch.entry public @hloElementwiseOps_dispatch_0
 //  CHECK-NEXT:   module {
-//  CHECK-NEXT:     func @hloElementwiseOps_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:4xf32>, %arg1: !flow.dispatch.tensor<writeonly:4xf32>) {
+//  CHECK-NEXT:     func.func @hloElementwiseOps_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:4xf32>, %arg1: !flow.dispatch.tensor<writeonly:4xf32>) {
 //       CHECK:       %{{.+}} = linalg.generic
 //       CHECK:         %{{.+}} = arith.addf %{{.+}}, %{{.+}} : f32
 //  CHECK-NEXT:         %{{.+}} = arith.subf %{{.+}}, %{{.+}} : f32
 //  CHECK-NEXT:         %{{.+}} = arith.mulf %{{.+}}, %{{.+}} : f32
-//       CHECK: func @hloElementwiseOps(%arg0: tensor<4xf32>) -> tensor<4xf32> {
+//       CHECK: func.func @hloElementwiseOps(%arg0: tensor<4xf32>) -> tensor<4xf32> {
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
 //  CHECK-NEXT:   %0 = flow.dispatch @hloElementwiseOps_dispatch_0::@hloElementwiseOps_dispatch_0[%[[C4]], %[[C1]], %[[C1]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
@@ -42,17 +42,17 @@ func.func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 // CHECK-LABEL: flow.executable private @interleavedDot_dispatch_0 {
 //  CHECK-NEXT:   flow.dispatch.entry public @interleavedDot_dispatch_0
 //  CHECK-NEXT:   module {
-//  CHECK-NEXT:     func @interleavedDot_dispatch_0
+//  CHECK-NEXT:     func.func @interleavedDot_dispatch_0
 //       CHECK:       %{{.+}} = linalg.generic
 //       CHECK:         %{{.+}} = arith.addf %{{.+}}, %{{.+}} : f32
 //       CHECK: flow.executable private @interleavedDot_dispatch_1 {
 //  CHECK-NEXT:   flow.dispatch.entry public @interleavedDot_dispatch_1
 //  CHECK-NEXT:   module {
-//  CHECK-NEXT:     func @interleavedDot_dispatch_1
+//  CHECK-NEXT:     func.func @interleavedDot_dispatch_1
 //       CHECK:       %{{.+}} = linalg.matmul
 //       CHECK:       %{{.+}} = linalg.generic
 //       CHECK:         %{{.+}} = arith.mulf %{{.+}}, %{{.+}} : f32
-//       CHECK: func @interleavedDot(
+//       CHECK: func.func @interleavedDot(
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<4x4xf32>) -> tensor<4x4xf32> {
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
@@ -76,10 +76,10 @@ func.func @reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
 // CHECK-LABEL: flow.executable private @reduction_dispatch_0 {
 //  CHECK-NEXT:   flow.dispatch.entry public @reduction_dispatch_0
 //  CHECK-NEXT:   module {
-//  CHECK-NEXT:     func @reduction_dispatch_0
+//  CHECK-NEXT:     func.func @reduction_dispatch_0
 //       CHECK:       %{{.+}} = linalg.generic
 //       CHECK:         %{{.+}} = arith.addf %{{.+}}, %{{.+}} : f32
-//       CHECK: func @reduction(%arg0: tensor<4x8xf32>) -> tensor<4xf32> {
+//       CHECK: func.func @reduction(%arg0: tensor<4x8xf32>) -> tensor<4xf32> {
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
 //  CHECK-NEXT:   %0 = flow.dispatch @reduction_dispatch_0::@reduction_dispatch_0[%[[C4]], %[[C1]], %[[C1]]](%arg0) : (tensor<4x8xf32>) -> tensor<4xf32>

@@ -1,6 +1,6 @@
 // RUN: iree-dialects-opt --iree-linalg-ext-tile --split-input-file --verify-diagnostics %s | FileCheck  %s
 
-func @scatter_tiling(
+func.func @scatter_tiling(
     %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,
     %update : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = iree_linalg_ext.scatter
@@ -52,7 +52,7 @@ func @scatter_tiling(
 
 // -----
 
-func @scatter_tiling_memref(
+func.func @scatter_tiling_memref(
     %original: memref<?x?xf32>, %indices: memref<?x1xi32>,
     %update : memref<?x?xf32>) {
   iree_linalg_ext.scatter
@@ -97,7 +97,7 @@ func @scatter_tiling_memref(
 
 // -----
 
-func @scatter_tiling_distribution(
+func.func @scatter_tiling_distribution(
     %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,
     %update : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = iree_linalg_ext.scatter
@@ -147,7 +147,7 @@ func @scatter_tiling_distribution(
 
 // -----
 
-func @scatter_no_tiling(
+func.func @scatter_no_tiling(
     %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,
     %update : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = iree_linalg_ext.scatter
@@ -174,7 +174,7 @@ func @scatter_no_tiling(
 
 // -----
 
-func @scatter_repeated_indices_tiling(
+func.func @scatter_repeated_indices_tiling(
     %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,
     %update : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = iree_linalg_ext.scatter
@@ -221,7 +221,7 @@ func @scatter_repeated_indices_tiling(
 
 // -----
 
-func @scatter_repeated_indices_no_tiling(
+func.func @scatter_repeated_indices_no_tiling(
     %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,
     %update : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error @+1 {{unimplemented tiling of non-parallel loop iterator type}}
@@ -239,7 +239,7 @@ func @scatter_repeated_indices_no_tiling(
 
 // -----
 
-func @sort_1d(%arg0: tensor<?xi32>) -> tensor<?xi32> {
+func.func @sort_1d(%arg0: tensor<?xi32>) -> tensor<?xi32> {
   %0 = iree_linalg_ext.sort
        {__internal_linalg_transform__ = "outer_reduce_input"}
        dimension(0)
@@ -259,7 +259,7 @@ func @sort_1d(%arg0: tensor<?xi32>) -> tensor<?xi32> {
 
 // -----
 
-func @sort_2d(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
+func.func @sort_2d(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
   %0 = iree_linalg_ext.sort
        {__internal_linalg_transform__ = "inner_reduce_input"}
        dimension(1)
@@ -293,7 +293,7 @@ func @sort_2d(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 
 // -----
 
-func @sort_2d_inner_parallel(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
+func.func @sort_2d_inner_parallel(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
   %0 = iree_linalg_ext.sort
        {__internal_linalg_transform__ = "outer_reduce_input"}
        dimension(0)
@@ -327,7 +327,7 @@ func @sort_2d_inner_parallel(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 
 // -----
 
-func @sort_2d_multi_result(
+func.func @sort_2d_multi_result(
     %arg0: tensor<?x?xi32>, %arg1: tensor<?x?xf32>)
     -> (tensor<?x?xi32>, tensor<?x?xf32>) {
   %0:2 = iree_linalg_ext.sort
@@ -368,7 +368,7 @@ func @sort_2d_multi_result(
 
 // -----
 
-func @sort_2d_multi_result_memref(
+func.func @sort_2d_multi_result_memref(
     %arg0: memref<?x?xi32>, %arg1: memref<?x?xf32>) {
   iree_linalg_ext.sort
      {__internal_linalg_transform__ = "outer_reduce_input"}
@@ -401,7 +401,7 @@ func @sort_2d_multi_result_memref(
 
 // -----
 
-func @sort_3d_multi_result_distribute(
+func.func @sort_3d_multi_result_distribute(
   %arg0: tensor<?x?x?xi32>, %arg1 : tensor<?x?x?xf32>)
   -> (tensor<?x?x?xi32>, tensor<?x?x?xf32>) {
   %0, %1 = iree_linalg_ext.sort
@@ -460,7 +460,7 @@ func @sort_3d_multi_result_distribute(
 
 // -----
 
-func @sort_3d_multi_result_distribute_memref(
+func.func @sort_3d_multi_result_distribute_memref(
   %arg0: memref<?x?x?xi32>, %arg1 : memref<?x?x?xf32>) {
   iree_linalg_ext.sort
       {__internal_linalg_transform__ = "distribute_input"}
@@ -509,7 +509,7 @@ func @sort_3d_multi_result_distribute_memref(
 
 // -----
 
-func @fft_1d_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
+func.func @fft_1d_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
     %arg2: tensor<16xf32>, %arg3: tensor<16xf32>) -> (tensor<1024xf32>, tensor<1024xf32>) {
   %cst1 = arith.constant 5 : index
   %0:2 = iree_linalg_ext.fft
@@ -546,7 +546,7 @@ func @fft_1d_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
 
 // -----
 
-func @fft_2d_stage_5(%arg0: tensor<3x1024xf32>, %arg1: tensor<3x1024xf32>,
+func.func @fft_2d_stage_5(%arg0: tensor<3x1024xf32>, %arg1: tensor<3x1024xf32>,
     %arg2: tensor<16xf32>, %arg3: tensor<16xf32>) -> (tensor<3x1024xf32>, tensor<3x1024xf32>) {
   %cst1 = arith.constant 5 : index
   %0:2 = iree_linalg_ext.fft
@@ -588,7 +588,7 @@ func @fft_2d_stage_5(%arg0: tensor<3x1024xf32>, %arg1: tensor<3x1024xf32>,
 
 // -----
 
-func @fft_1d_stage_5_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32>,
+func.func @fft_1d_stage_5_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32>,
     %arg2: memref<16xf32>, %arg3: memref<16xf32>) {
   %cst1 = arith.constant 5 : index
   iree_linalg_ext.fft
@@ -619,7 +619,7 @@ func @fft_1d_stage_5_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32>,
 
 // -----
 
-func @reverse_memref(%arg0: memref<?xi32>, %arg1: memref<?xi32>) {
+func.func @reverse_memref(%arg0: memref<?xi32>, %arg1: memref<?xi32>) {
   iree_linalg_ext.reverse
     {__internal_linalg_transform__ = "tiling_input"}
     dimensions(dense<0> : tensor<1xi64>)
@@ -650,7 +650,7 @@ func @reverse_memref(%arg0: memref<?xi32>, %arg1: memref<?xi32>) {
 
 // -----
 
-func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
+func.func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %d0 = tensor.dim %arg0, %c0 : tensor<?x?xi32>
@@ -704,7 +704,7 @@ func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 
 // -----
 
-func @scan_1d(%0: tensor<128xi32>) -> tensor<128xi32> {
+func.func @scan_1d(%0: tensor<128xi32>) -> tensor<128xi32> {
   %c0 = linalg.init_tensor [] : tensor<i32>
   %1 = linalg.init_tensor [128] : tensor<128xi32>
   %2:2 = iree_linalg_ext.scan
@@ -729,7 +729,7 @@ func @scan_1d(%0: tensor<128xi32>) -> tensor<128xi32> {
 
 // -----
 
-func @scan_2d(%0: tensor<16x32xi32>) -> tensor<16x32xi32> {
+func.func @scan_2d(%0: tensor<16x32xi32>) -> tensor<16x32xi32> {
   %c0 = linalg.init_tensor [32] : tensor<32xi32>
   %1 = linalg.init_tensor [16, 32] : tensor<16x32xi32>
   %2:2 = iree_linalg_ext.scan
@@ -771,7 +771,7 @@ func @scan_2d(%0: tensor<16x32xi32>) -> tensor<16x32xi32> {
 
 // -----
 
-func @scan_2d_memref(%0: memref<16x32xi32>, %1: memref<16x32xi32>) {
+func.func @scan_2d_memref(%0: memref<16x32xi32>, %1: memref<16x32xi32>) {
   %c0 = memref.alloc() : memref<32xi32>
   iree_linalg_ext.scan
     {__internal_linalg_transform__ = "outer_reduce_input"}

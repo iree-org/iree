@@ -23,7 +23,7 @@ hal.executable private @check_no_cse {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.entry_point public @check_no_cse ordinal(0) layout(#executable_layout5)
     builtin.module {
-      func @check_no_cse() {
+      func.func @check_no_cse() {
         %cst = arith.constant 3.840000e+02 : f32
         %cst_0 = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.constant.load[0] : i32
@@ -51,7 +51,7 @@ hal.executable private @check_no_cse {
     }
   }
 }
-//      CHECK: func @check_no_cse()
+//      CHECK: func.func @check_no_cse()
 //  CHECK-NOT:    memref.alloc
 //      CHECK:    %[[FOR:.+]] = scf.for
 //      CHECK:    %[[DIVF:.+]] = arith.divf %[[FOR]]

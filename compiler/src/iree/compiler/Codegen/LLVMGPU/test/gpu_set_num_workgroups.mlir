@@ -36,7 +36,7 @@ hal.executable @add_dispatch_0 {
 //      CHECK: hal.executable.entry_point public @add_dispatch_0
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-SAME:     workgroup_size = [64 : index, 1 : index, 1 : index]
-//      CHECK: func @add_dispatch_0
+//      CHECK: func.func @add_dispatch_0
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
@@ -74,7 +74,7 @@ hal.executable private @dot_dispatch_1  {
 //      CHECK: hal.executable.entry_point public @dot_dispatch_1
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-SAME:     workgroup_size = [2 : index, 4 : index, 1 : index]
-//      CHECK: func @dot_dispatch_1
+//      CHECK: func.func @dot_dispatch_1
 //      CHECK:   linalg.fill
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 //      CHECK:   linalg.matmul

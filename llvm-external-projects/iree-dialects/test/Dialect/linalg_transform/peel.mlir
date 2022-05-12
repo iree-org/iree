@@ -3,7 +3,7 @@
 
 //  CHECK-DAG: #[[MAP0:.*]] = affine_map<()[s0, s1, s2] -> (s1 - (-s0 + s1) mod s2)>
 //  CHECK-DAG: #[[MAP1:.*]] = affine_map<(d0)[s0] -> (-d0 + s0)>
-//      CHECK: func @fully_dynamic_bounds(
+//      CHECK: func.func @fully_dynamic_bounds(
 // CHECK-SAME:     %[[LB:.*]]: index, %[[UB:.*]]: index, %[[STEP:.*]]: index
 //      CHECK:   %[[C0_I32:.*]] = arith.constant 0 : i32
 //      CHECK:   %[[NEW_UB:.*]] = affine.apply #[[MAP0]]()[%[[LB]], %[[UB]], %[[STEP]]]
@@ -22,7 +22,7 @@
 //      CHECK:   }
 //      CHECK:   return %[[RESULT]]
 #map = affine_map<(d0, d1)[s0] -> (s0, d0 - d1)>
-func @fully_dynamic_bounds(%lb : index, %ub: index, %step: index) -> i32 {
+func.func @fully_dynamic_bounds(%lb : index, %ub: index, %step: index) -> i32 {
   %c0 = arith.constant 0 : i32
   %r = scf.for %iv = %lb to %ub step %step iter_args(%arg = %c0) -> i32 {
     %s = affine.min #map(%ub, %iv)[%step]

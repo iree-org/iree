@@ -242,7 +242,7 @@ func.func @rng_normal(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<3x5xf32>
   %0 = "mhlo.rng_normal"(%arg0, %arg1, %shape) : (tensor<f32>, tensor<f32>, tensor<2xi64>) -> tensor<3x5xf32>
   return %0 : tensor<3x5xf32>
 }
-// CHECK-LABEL: func @rng_normal
+// CHECK-LABEL: func.func @rng_normal
 // CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %{{.*}} = mhlo.constant dense<{{.*}}> : tensor<8xf32>
@@ -280,7 +280,7 @@ func.func @scatter_rank0(%arg0: tensor<5x5xi32>, %arg1: tensor<2xi32>, %arg2: te
   return %0 : tensor<5x5xi32>
 }
 
-// CHECK-LABEL: func @scatter_rank0
+// CHECK-LABEL: func.func @scatter_rank0
 // CHECK-DAG: %[[RE_I:.+]] = "mhlo.reshape"(%arg1) : (tensor<2xi32>) -> tensor<1x2xi32>
 // CHECK-DAG: %[[RE_U:.+]] = "mhlo.reshape"(%arg2) : (tensor<i32>) -> tensor<1xi32>
 // CHECK:     %[[SCATTER:.+]] = "mhlo.scatter"(%arg0, %[[RE_I]], %[[RE_U]])

@@ -123,7 +123,7 @@ func.func @dot_general_4d_transposed(%arg0: tensor<1x1x8x64xf32>, %arg1: tensor<
   return %0 : tensor<1x8x1x512xf32>
 }
 
-// CHECK-LABEL: func @dot_general_4d_transposed
+// CHECK-LABEL: func.func @dot_general_4d_transposed
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]
 // CHECK:         %[[ARG0_TRANSPOSED:.+]] = "mhlo.transpose"(%[[ARG0]])
@@ -149,7 +149,7 @@ func.func @dot_general_1d_batching_1d_contracting(%arg0: tensor<64x155x4x36xf32>
   return %0 : tensor<4x64x155x309xf32>
 }
 
-// CHECK-LABEL: func @dot_general_1d_batching_1d_contracting
+// CHECK-LABEL: func.func @dot_general_1d_batching_1d_contracting
 // CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]+]]
 // CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]+]]
 // CHECK: %[[ARG0_RESHAPED_TR:.+]] = "mhlo.transpose"(%[[ARG0]])

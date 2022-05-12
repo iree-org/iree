@@ -5,7 +5,7 @@ func.func @extract_slice1(%arg0 : tensor<5x24x48xf32>) -> tensor<4xf32> {
       : tensor<5x24x48xf32> to tensor<4xf32>
   return %0 : tensor<4xf32>
 }
-// CHECK-LABEL: func @extract_slice1(
+// CHECK-LABEL: func.func @extract_slice1(
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<5x24x48xf32>)
 //   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
 //   CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
@@ -22,7 +22,7 @@ func.func @extract_slice2(%arg0 : tensor<5x24x48xf32>) -> tensor<2x48xf32> {
       : tensor<5x24x48xf32> to tensor<2x48xf32>
   return %0 : tensor<2x48xf32>
 }
-// CHECK-LABEL: func @extract_slice2
+// CHECK-LABEL: func.func @extract_slice2
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<5x24x48xf32>)
 //   CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -40,7 +40,7 @@ func.func @extract_slice3(%arg0 : tensor<5x24x48xf32>) -> tensor<2x24xf32> {
       : tensor<5x24x48xf32> to tensor<2x24xf32>
   return %0 : tensor<2x24xf32>
 }
-// CHECK-LABEL: func @extract_slice3
+// CHECK-LABEL: func.func @extract_slice3
 //       CHECK:   tensor.extract_slice
 
 // -----
@@ -50,7 +50,7 @@ func.func @extract_slice4(%arg0 : tensor<5x24x48xf32>, %arg1 : index) -> tensor<
       : tensor<5x24x48xf32> to tensor<2x24xf32>
   return %0 : tensor<2x24xf32>
 }
-// CHECK-LABEL: func @extract_slice4
+// CHECK-LABEL: func.func @extract_slice4
 //       CHECK:   tensor.extract_slice
 
 // -----
@@ -60,7 +60,7 @@ func.func @extract_slice5(%arg0 : tensor<5x24x48xf32>, %arg1 : index) -> tensor<
       : tensor<5x24x48xf32> to tensor<2x48xf32>
   return %0 : tensor<2x48xf32>
 }
-// CHECK-LABEL: func @extract_slice5
+// CHECK-LABEL: func.func @extract_slice5
 //       CHECK:   tensor.extract_slice
 
 // -----
@@ -70,7 +70,7 @@ func.func @extract_slice6(%arg0 : tensor<5x24x48xf32>, %arg1 : index) -> tensor<
       : tensor<5x24x48xf32> to tensor<?x48xf32>
   return %0 : tensor<?x48xf32>
 }
-// CHECK-LABEL: func @extract_slice6
+// CHECK-LABEL: func.func @extract_slice6
 //       CHECK:   tensor.extract_slice
 
 // -----
@@ -80,7 +80,7 @@ func.func @extract_slice7(%arg0 : tensor<5x?x48xf32>, %arg1 : index) -> tensor<2
       : tensor<5x?x48xf32> to tensor<2x48xf32>
   return %0 : tensor<2x48xf32>
 }
-// CHECK-LABEL: func @extract_slice7(
+// CHECK-LABEL: func.func @extract_slice7(
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<5x?x48xf32>
 //  CHECK-SAME:   %[[ARG1:.+]]: index)
 //   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
@@ -99,7 +99,7 @@ func.func @rank_reducing_extract_slice(%arg0: tensor<?x513xi32>) -> tensor<513xi
   %0 = tensor.extract_slice %arg0[4, 0] [1, 513] [1, 1] : tensor<?x513xi32> to tensor<513xi32>
   return %0 : tensor<513xi32>
 }
-// CHECK-LABEL: func @rank_reducing_extract_slice
+// CHECK-LABEL: func.func @rank_reducing_extract_slice
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
@@ -119,7 +119,7 @@ func.func @rank_reducing_extract_slice_trailing_unit_dims
   %0 = tensor.extract_slice %arg0[0, 1, 0, 0] [1, 49, 20, 1] [1, 1, 1, 1] : tensor<1x50x20x1xf32> to tensor<49x20xf32>
   return %0 : tensor<49x20xf32>
 }
-// CHECK-LABEL: func @rank_reducing_extract_slice_trailing_unit_dims
+// CHECK-LABEL: func.func @rank_reducing_extract_slice_trailing_unit_dims
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C49:.+]] = arith.constant 49 : index

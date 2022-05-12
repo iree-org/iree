@@ -5,7 +5,7 @@
 // CHECK-SAME:      dimension(0)
 // CHECK-SAME:      outs({{.*}})
 // CHECK:           iree_linalg_ext.yield
-func @sort_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
+func.func @sort_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
   %0 = iree_linalg_ext.sort
     dimension(0)
     outs(%arg0 : tensor<128xi32>) {
@@ -23,7 +23,7 @@ func @sort_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
 // CHECK-SAME:      dimension(0)
 // CHECK-SAME:      outs({{.*}})
 // CHECK:           iree_linalg_ext.yield
-func @sort_memref(%arg0: memref<128xi32>) {
+func.func @sort_memref(%arg0: memref<128xi32>) {
   iree_linalg_ext.sort dimension(0)
     outs(%arg0 : memref<128xi32>) {
   ^bb0(%arg1: i32, %arg2: i32):  // no predecessors
@@ -35,7 +35,7 @@ func @sort_memref(%arg0: memref<128xi32>) {
 
 // -----
 
-func @sort_multi_result_tensor(
+func.func @sort_multi_result_tensor(
     %arg0: tensor<?x?xi32>, %arg1: tensor<?x?xf32>)
     -> (tensor<?x?xi32>, tensor<?x?xf32>) {
   %0:2 = iree_linalg_ext.sort dimension(0)
@@ -55,7 +55,7 @@ func @sort_multi_result_tensor(
 
 // -----
 
-func @sort_multi_result_memref(
+func.func @sort_multi_result_memref(
     %arg0: memref<?x?xi32>, %arg1: memref<?x?xf32>) {
   iree_linalg_ext.sort dimension(0)
      outs(%arg0, %arg1 : memref<?x?xi32>, memref<?x?xf32>) {
@@ -73,7 +73,7 @@ func @sort_multi_result_memref(
 
 // -----
 
-func @scatter_tensor_dynamic(
+func.func @scatter_tensor_dynamic(
     %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,
     %update: tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = iree_linalg_ext.scatter
@@ -99,7 +99,7 @@ func @scatter_tensor_dynamic(
 
 // -----
 
-func @scatter_repeated_tensor_dynamic(
+func.func @scatter_repeated_tensor_dynamic(
     %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,
     %update: tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = iree_linalg_ext.scatter
@@ -125,7 +125,7 @@ func @scatter_repeated_tensor_dynamic(
 
 // -----
 
-func @scatter_tensor_static(
+func.func @scatter_tensor_static(
     %original: tensor<128x3xf32>, %indices: tensor<48x1xi32>,
     %update: tensor<48x3xf32>) -> tensor<128x3xf32> {
   %0 = iree_linalg_ext.scatter
@@ -151,7 +151,7 @@ func @scatter_tensor_static(
 
 // -----
 
-func @scatter_tensor_multi_index_depth(
+func.func @scatter_tensor_multi_index_depth(
     %original: tensor<1x128x3xf32>, %indices: tensor<48x2xi32>,
     %update: tensor<48x3xf32>) -> tensor<1x128x3xf32> {
   %0 = iree_linalg_ext.scatter
@@ -177,7 +177,7 @@ func @scatter_tensor_multi_index_depth(
 
 // -----
 
-func @scatter_memref_dynamic(
+func.func @scatter_memref_dynamic(
     %original: memref<?x?xf32>, %indices: memref<?x1xi32>,
     %update: memref<?x?xf32>) {
   iree_linalg_ext.scatter
@@ -203,7 +203,7 @@ func @scatter_memref_dynamic(
 
 // -----
 
-func @scatter_memref_static(
+func.func @scatter_memref_static(
     %original: memref<128x3xf32>, %indices: memref<48x1xi32>,
     %update: memref<48x3xf32>) {
   iree_linalg_ext.scatter
@@ -229,7 +229,7 @@ func @scatter_memref_static(
 
 // -----
 
-func @scatter_memref_multi_index_depth(
+func.func @scatter_memref_multi_index_depth(
     %original: memref<1x128x3xf32>, %indices: memref<48x2xi32>,
     %update: memref<48x3xf32>) {
   iree_linalg_ext.scatter
@@ -255,7 +255,7 @@ func @scatter_memref_multi_index_depth(
 
 // -----
 
-func @scatter_update_scalar_1D(
+func.func @scatter_update_scalar_1D(
     %original: tensor<8xi32>, %indices: tensor<3x1xi32>,
     %updates: tensor<3xi32>) -> tensor<8xi32> {
   %0 = iree_linalg_ext.scatter
@@ -280,7 +280,7 @@ func @scatter_update_scalar_1D(
 
 // -----
 
-func @scatter_update_scalar_2D(
+func.func @scatter_update_scalar_2D(
     %original: tensor<4x3xi32>, %indices: tensor<3x2xi32>,
     %updates: tensor<3xi32>) -> tensor<4x3xi32> {
   %0 = iree_linalg_ext.scatter
@@ -305,7 +305,7 @@ func @scatter_update_scalar_2D(
 
 // -----
 
-func @scatter_update_slice_2D(
+func.func @scatter_update_slice_2D(
     %original: tensor<4x3xi32>, %indices: tensor<1x1xi32>,
     %updates: tensor<1x3xi32>) -> tensor<4x3xi32> {
   %0 = iree_linalg_ext.scatter
@@ -330,7 +330,7 @@ func @scatter_update_slice_2D(
 
 // -----
 
-func @fft_tensor(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>)
+func.func @fft_tensor(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>)
     -> (tensor<1024xf32>, tensor<1024xf32>) {
   %cst1 = arith.constant 1 : index
   %0:2 = iree_linalg_ext.fft
@@ -351,7 +351,7 @@ func @fft_tensor(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>)
 
 // -----
 
-func @fft_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32>) {
+func.func @fft_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32>) {
   %cst1 = arith.constant 1 : index
   iree_linalg_ext.fft
     ins(%cst1: index)
@@ -369,7 +369,7 @@ func @fft_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32>) {
 
 // -----
 
-func @fft_tensor_coef(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
+func.func @fft_tensor_coef(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
     %arg2: tensor<1xf32>, %arg3: tensor<1xf32>) -> (tensor<1024xf32>, tensor<1024xf32>) {
   %cst1 = arith.constant 1 : index
   %0:2 = iree_linalg_ext.fft
@@ -392,7 +392,7 @@ func @fft_tensor_coef(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
 
 // -----
 
-func @fft_memref_coef(%arg0: memref<1024xf32>, %arg1: memref<1024xf32>,
+func.func @fft_memref_coef(%arg0: memref<1024xf32>, %arg1: memref<1024xf32>,
                  %arg2: memref<1xf32>, %arg3: memref<1xf32>) {
   %cst1 = arith.constant 1 : index
   iree_linalg_ext.fft
@@ -414,7 +414,7 @@ func @fft_memref_coef(%arg0: memref<1024xf32>, %arg1: memref<1024xf32>,
 // -----
 
 // The size of coefficient tensor is 2^(stage-1).
-func @fft_tensor_coef_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
+func.func @fft_tensor_coef_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
     %arg2: tensor<16xf32>, %arg3: tensor<16xf32>) -> (tensor<1024xf32>, tensor<1024xf32>) {
   %cst1 = arith.constant 5 : index
   %0:2 = iree_linalg_ext.fft
@@ -437,7 +437,7 @@ func @fft_tensor_coef_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
 
 // -----
 
-func @reverse_tensor(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
+func.func @reverse_tensor(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
   %init = linalg.init_tensor [3, 5] : tensor<3x5xi32>
   %0 = iree_linalg_ext.reverse
          dimensions(dense<0> : tensor<1xi64>)
@@ -455,7 +455,7 @@ func @reverse_tensor(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
 
 // -----
 
-func @reverse_memref(%arg0: memref<3x5xi32>, %arg1: memref<3x5xi32>) {
+func.func @reverse_memref(%arg0: memref<3x5xi32>, %arg1: memref<3x5xi32>) {
   iree_linalg_ext.reverse
     dimensions(dense<0> : tensor<1xi64>)
     ins(%arg0 : memref<3x5xi32>)
@@ -472,7 +472,7 @@ func @reverse_memref(%arg0: memref<3x5xi32>, %arg1: memref<3x5xi32>) {
 
 // -----
 
-func @reverse_dynamic_tensor(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
+func.func @reverse_dynamic_tensor(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %d0 = tensor.dim %arg0, %c0 : tensor<?x?xi32>
@@ -498,7 +498,7 @@ func @reverse_dynamic_tensor(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 
 // -----
 
-func @reverse_static_dynamic_tensor(%arg0: tensor<3x5xi32>) -> tensor<?x?xi32> {
+func.func @reverse_static_dynamic_tensor(%arg0: tensor<3x5xi32>) -> tensor<?x?xi32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %d0 = tensor.dim %arg0, %c0 : tensor<3x5xi32>
@@ -524,7 +524,7 @@ func @reverse_static_dynamic_tensor(%arg0: tensor<3x5xi32>) -> tensor<?x?xi32> {
 
 // -----
 
-func @reverse_multi_dims(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
+func.func @reverse_multi_dims(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
   %init = linalg.init_tensor [3, 5] : tensor<3x5xi32>
   %0 = iree_linalg_ext.reverse
          dimensions(dense<[0, 1]> : tensor<2xi64>)
@@ -542,7 +542,7 @@ func @reverse_multi_dims(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
 
 // -----
 
-func @topk_tensor(%input_values: tensor<20x10x8x4xf32>, %input_indices: tensor<20x10x8x4xi32>) -> (tensor<20x10x3x4xf32>, tensor<20x10x3x4xi32>) {
+func.func @topk_tensor(%input_values: tensor<20x10x8x4xf32>, %input_indices: tensor<20x10x8x4xi32>) -> (tensor<20x10x3x4xf32>, tensor<20x10x3x4xi32>) {
   %out_values = linalg.init_tensor [20, 10, 3, 4] : tensor<20x10x3x4xf32>
   %out_indices = linalg.init_tensor [20, 10, 3, 4] : tensor<20x10x3x4xi32>
   %0:2 = iree_linalg_ext.topk
@@ -570,7 +570,7 @@ func @topk_tensor(%input_values: tensor<20x10x8x4xf32>, %input_indices: tensor<2
 
 // -----
 
-func @topk_memref(%input_values: memref<4x10xf32>, %input_indices: memref<4x10xi32>, %out_values: memref<4x3xf32>, %out_indices: memref<4x3xi32>) {
+func.func @topk_memref(%input_values: memref<4x10xf32>, %input_indices: memref<4x10xi32>, %out_values: memref<4x3xf32>, %out_indices: memref<4x3xi32>) {
   iree_linalg_ext.topk
         dimension(1)
         ins(%input_values, %input_indices : memref<4x10xf32> , memref<4x10xi32>)
@@ -594,7 +594,7 @@ func @topk_memref(%input_values: memref<4x10xf32>, %input_indices: memref<4x10xi
 
 // -----
 
-func @topk_dynamic_tensor(%input_values: tensor<?x?xf32>, %input_indices: tensor<?x?xi32>, %out_values: tensor<?x?xf32>, %out_indices: tensor<?x?xi32>) -> (tensor<?x?xf32>, tensor<?x?xi32>)  {
+func.func @topk_dynamic_tensor(%input_values: tensor<?x?xf32>, %input_indices: tensor<?x?xi32>, %out_values: tensor<?x?xf32>, %out_indices: tensor<?x?xi32>) -> (tensor<?x?xf32>, tensor<?x?xi32>)  {
   %0:2 = iree_linalg_ext.topk
         dimension(1)
         ins(%input_values, %input_indices : tensor<?x?xf32> , tensor<?x?xi32>)
@@ -620,7 +620,7 @@ func @topk_dynamic_tensor(%input_values: tensor<?x?xf32>, %input_indices: tensor
 // -----
 
 // CHECK-LABEL: func @static_tile
-func @static_tile(%chunk_size: index, %in: tensor<?xf32>, %out: tensor<?xf32>, %out2: tensor<?xf32>) -> (tensor<?xf32>) {
+func.func @static_tile(%chunk_size: index, %in: tensor<?xf32>, %out: tensor<?xf32>, %out2: tensor<?xf32>) -> (tensor<?xf32>) {
   %c0 = arith.constant 0: index
   //%d0 = tensor.dim %out, %c0: tensor<?xf32>
 
@@ -650,7 +650,7 @@ func @static_tile(%chunk_size: index, %in: tensor<?xf32>, %out: tensor<?xf32>, %
 // -----
 
 // CHECK-LABEL: func @simple_example
-func @simple_example(%in: tensor<100xf32>, %out: tensor<100xf32>) -> (tensor<100xf32>) {
+func.func @simple_example(%in: tensor<100xf32>, %out: tensor<100xf32>) -> (tensor<100xf32>) {
   %num_threads = arith.constant 100 : index
   %result = iree_linalg_ext.in_parallel %num_threads -> tensor<100xf32> {
     ^bb0(%thread_idx : index):
@@ -664,7 +664,7 @@ func @simple_example(%in: tensor<100xf32>, %out: tensor<100xf32>) -> (tensor<100
   return %result : tensor<100xf32>
 }
 
-func @no_terminator() -> () {
+func.func @no_terminator() -> () {
   %num_threads = arith.constant 100 : index
   iree_linalg_ext.in_parallel %num_threads -> () {
     ^bb0(%thread_idx : index):

@@ -2,8 +2,8 @@
 
 // This test is verifying that a non-trivial 2*tiling+padding+vectorization transformation completes successfully
 
-// CHECK-LABEL: func @matmul_tensors(
-func @matmul_tensors(
+// CHECK-LABEL: func.func @matmul_tensors(
+func.func @matmul_tensors(
   %arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32> { linalg.inplaceable = true})
     -> tensor<128x128xf32> {
   // Pack transposed padding of 1st operand.

@@ -369,7 +369,7 @@ hal.executable private @preset_config_matmul_tensors  {
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK: func @preset_config
+//      CHECK: func.func @preset_config
 //      CHECK:   linalg.matmul
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
@@ -449,7 +449,7 @@ hal.executable private @static_1d_fft_stage2  {
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //       CHECK: hal.executable.entry_point public @static_1d_fft_stage2
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//       CHECK: func @static_1d_fft_stage2()
+//       CHECK: func.func @static_1d_fft_stage2()
 //       CHECK:   iree_linalg_ext.fft
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]
 
@@ -486,7 +486,7 @@ hal.executable private @static_3d_fft_stage3  {
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //       CHECK: hal.executable.entry_point public @static_3d_fft_stage3
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//       CHECK: func @static_3d_fft_stage3()
+//       CHECK: func.func @static_3d_fft_stage3()
 //       CHECK:   iree_linalg_ext.fft
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]
 
@@ -548,7 +548,7 @@ hal.executable private @outs_fusion {
 //      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point public @outs_fusion_fn
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-//      CHECK: func @outs_fusion_fn()
+//      CHECK: func.func @outs_fusion_fn()
 //      CHECK:   linalg.generic
 //  CHECK-NOT:   lowering_config
 //      CHECK:   linalg.generic
@@ -1247,7 +1247,7 @@ hal.executable private @transpose_8x8 {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.entry_point @transpose_8x8 layout(#executable_layout)
     builtin.module {
-      func @transpose_8x8() {
+      func.func @transpose_8x8() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:512x1024xf32>

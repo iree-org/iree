@@ -3,7 +3,7 @@
 // NOTE: for more comprehensive tests see demote_i64_to_i32.mlir.
 
 //       CHECK: util.global {{.*}} : tensor<4xf32>
-// CHECK-LABEL: func @simple_f16() -> tensor<4xf32>
+// CHECK-LABEL: func.func @simple_f16() -> tensor<4xf32>
 //  CHECK-NEXT: %{{.*}} = util.global.address @__global : !util.ptr<tensor<4xf32>>
 //  CHECK-NEXT: %{{.*}} = util.global.load.indirect %{{.*}} : !util.ptr<tensor<4xf32>> -> tensor<4xf32>
 //  CHECK-NEXT: return %{{.*}} : tensor<4xf32>
@@ -18,7 +18,7 @@ func.func @simple_f16() -> (tensor<4xf16>) {
 
 // CHECK: util.global
 // CHECK-NOT: f16
-// CHECK-LABEL: func @nested_region_f16()
+// CHECK-LABEL: func.func @nested_region_f16()
 // CHECK-NOT: f16
 // CHECK: return %{{.*}} : tensor<4xf32>
 util.global private @"__global" = dense<[1.000000e+01, 5.000000e+00, 1.000000e+01, 5.000000e+00]> : tensor<4xf16>

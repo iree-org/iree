@@ -31,8 +31,8 @@ util.global public @v_initialized_const5 : tensor<4xf32> = dense<4> : tensor<4xi
 util.global private @v_initialized : tensor<4xi32>
 // CHECK-NEXT: util.initializer {
 util.initializer {
-  // CHECK-NEXT: %[[VALUE:.+]] = call @initializer() : () -> tensor<4xi32>
-  %0 = call @initializer() : () -> tensor<4xi32>
+  // CHECK-NEXT: %[[VALUE:.+]] = func.call @initializer() : () -> tensor<4xi32>
+  %0 = func.call @initializer() : () -> tensor<4xi32>
   // CHECK-NEXT: util.global.store %[[VALUE]], @v_initialized : tensor<4xi32>
   util.global.store %0, @v_initialized : tensor<4xi32>
   util.initializer.return

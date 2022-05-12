@@ -9,7 +9,7 @@ func.func @tensor_reshape(%arg0 : tensor<?x4x?x5x?x6xf32>, %arg1 : tensor<20x?x4
       : tensor<20x?x40xf32> into tensor<5x4x?x4x2x4x5xf32>
   return %0, %1 : tensor<?x5x?xf32>, tensor<5x4x?x4x2x4x5xf32>
 }
-// CHECK-LABEL: func @tensor_reshape
+// CHECK-LABEL: func.func @tensor_reshape
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x4x?x5x?x6xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<20x?x40xf32>
 //   CHECK-DAG:   %[[R0:.+]] = flow.tensor.reshape %[[ARG0]]

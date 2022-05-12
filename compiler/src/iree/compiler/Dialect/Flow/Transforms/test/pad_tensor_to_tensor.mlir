@@ -15,7 +15,7 @@ module  {
 }
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 + s1 + 4)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1] -> (s0 + s1 + 3)>
-//       CHECK: func @pad_tensor
+//       CHECK: func.func @pad_tensor
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<f32>
 //  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index
@@ -50,7 +50,7 @@ module  {
     return %1 : tensor<18x12xf32>
   }
 }
-// CHECK-LABEL: func @pad_tensor_static
+// CHECK-LABEL: func.func @pad_tensor_static
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<12x4xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<f32>
 //   CHECK-DAG:   %[[VAL:.+]] = tensor.extract %[[ARG1]]
