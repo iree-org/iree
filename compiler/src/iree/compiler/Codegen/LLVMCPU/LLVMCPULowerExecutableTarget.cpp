@@ -210,6 +210,10 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             addDoubleTilingExpertPassPipeline(nestedModulePM, lowerToAVX2);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
+              CPUDoubleTilingPadExpert:
+            addDoubleTilingPadExpertPassPipeline(nestedModulePM);
+            break;
+          case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUConvTileAndDecomposeExpert:
             addConvTileAndDecomposeExpertPassPipeline(nestedModulePM);
             break;
