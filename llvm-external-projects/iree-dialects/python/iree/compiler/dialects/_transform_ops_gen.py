@@ -25,19 +25,6 @@ class PDLMatchOp(_ods_ir.OpView):
 
   _ODS_REGIONS = (0, True)
 
-  # def __init__(self, matched, root, pattern_name, *, loc=None, ip=None):
-  #   operands = []
-  #   results = []
-  #   attributes = {}
-  #   regions = None
-  #   operands.append(_get_op_result_or_value(root))
-  #   attributes["pattern_name"] = pattern_name
-  #   results.append(matched)
-  #   _ods_successors = None
-  #   super().__init__(self.build_generic(
-  #     attributes=attributes, results=results, operands=operands,
-  #     successors=_ods_successors, regions=regions, loc=loc, ip=ip))
-
   @builtins.property
   def root(self):
     return self.operation.operands[0]
@@ -48,53 +35,10 @@ class PDLMatchOp(_ods_ir.OpView):
 
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
-class SequenceOp(_ods_ir.OpView):
-  OPERATION_NAME = "transform.sequence"
-
-  _ODS_REGIONS = (1, True)
-
-  def __init__(self, results_, root, *, loc=None, ip=None):
-    operands = []
-    results = []
-    attributes = {}
-    regions = None
-    if root is not None: operands.append(_get_op_result_or_value(root))
-    results.extend(results_)
-    _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
-
-  @builtins.property
-  def root(self):
-    return None if len(self.operation.operands) < 1 else self.operation.operands[0]
-
-  @builtins.property
-  def results_(self):
-    _ods_variadic_group_length = len(self.operation.results) - 1 + 1
-    return self.operation.results[0:0 + _ods_variadic_group_length]
-
-  @builtins.property
-  def body(self):
-    return self.regions[0]
-
-@_ods_cext.register_operation(_Dialect)
-@_ods_extend_opview_class(_ods_ext_module)
 class WithPDLPatternsOp(_ods_ir.OpView):
   OPERATION_NAME = "transform.with_pdl_patterns"
 
   _ODS_REGIONS = (1, True)
-
-  # def __init__(self, root, *, loc=None, ip=None):
-  #   operands = []
-  #   results = []
-  #   attributes = {}
-  #   regions = None
-  #   if root is not None: operands.append(_get_op_result_or_value(root))
-  #   _ods_successors = None
-  #   super().__init__(self.build_generic(
-  #     attributes=attributes, results=results, operands=operands,
-  #     successors=_ods_successors, regions=regions, loc=loc, ip=ip))
 
   @builtins.property
   def root(self):
@@ -151,17 +95,6 @@ class CanonicalizedSequenceOp(_ods_ir.OpView):
   OPERATION_NAME = "transform.structured.canonicalized_sequence"
 
   _ODS_REGIONS = (1, True)
-
-  # def __init__(self, target, *, loc=None, ip=None):
-  #   operands = []
-  #   results = []
-  #   attributes = {}
-  #   regions = None
-  #   if target is not None: operands.append(_get_op_result_or_value(target))
-  #   _ods_successors = None
-  #   super().__init__(self.build_generic(
-  #     attributes=attributes, results=results, operands=operands,
-  #     successors=_ods_successors, regions=regions, loc=loc, ip=ip))
 
   @builtins.property
   def target(self):

@@ -312,18 +312,6 @@ transform_ext::StructuredTransformOpsExtension::
 
   declareDependentDialect<bufferization::BufferizationDialect>();
   declareDependentDialect<vector::VectorDialect>();
-
-  // declareDependentDialect<arith::ArithmeticDialect>();
-  // declareDependentDialect<scf::SCFDialect>();
-  // declareDependentDialect<LLVM::LLVMDialect>();
-  // declareDependentDialect<AffineDialect>();
-  // declareDependentDialect<bufferization::BufferizationDialect>();
-  // declareDependentDialect<func::FuncDialect>();
-  // declareDependentDialect<linalg::LinalgDialect>();
-  // // declareDependentDialect<pdl::PDLDialect>();
-  // // declareDependentDialect<pdl_interp::PDLInterpDialect>();
-  // declareDependentDialect<scf::SCFDialect>();
-  // declareDependentDialect<tensor::TensorDialect>();
 }
 
 #define GET_OP_CLASSES
