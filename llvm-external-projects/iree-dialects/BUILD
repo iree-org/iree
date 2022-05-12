@@ -797,6 +797,7 @@ cc_library(
     deps = [
         ":IREEInputDialect",
         ":IREELinalgExtDialect",
+        ":IREELinalgExtTransformOps",
         ":IREELinalgTransformDialect",
         ":IREELinalgTransformDialectPasses",
         ":IREEPyDMDialect",
