@@ -1,6 +1,6 @@
 // RUN: iree-opt --iree-abi-wrap-entry-points --split-input-file %s | FileCheck %s
 
-// CHECK-LABEL: func @dynamicEntry(
+// CHECK-LABEL: func.func @dynamicEntry(
 //  CHECK-SAME:   %[[ARG0:.+]]: !hal.buffer_view, %[[ARG1:.+]]: !hal.buffer_view
 //  CHECK-SAME: -> (
 //  CHECK-SAME:   !hal.buffer_view, !hal.buffer_view
@@ -19,7 +19,7 @@
 //  CHECK-NEXT:   return %[[RET0_VIEW]], %[[RET1_VIEW]] : !hal.buffer_view, !hal.buffer_view
 //  CHECK-NEXT: }
 
-// CHECK-LABEL: func private @_dynamicEntry(
+// CHECK-LABEL: func.func private @_dynamicEntry(
 func.func @dynamicEntry(%arg0: tensor<?x8x8x3xf32>, %arg1: tensor<?x8x8x3xf32>) ->
     (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) {
   %0 = "mhlo.add"(%arg0, %arg1) : (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) -> tensor<?x8x8x3xf32>
@@ -29,7 +29,7 @@ func.func @dynamicEntry(%arg0: tensor<?x8x8x3xf32>, %arg1: tensor<?x8x8x3xf32>) 
 
 // -----
 
-// CHECK-LABEL: func @outputStorage(
+// CHECK-LABEL: func.func @outputStorage(
 //  CHECK-SAME:   %[[ARG0:.+]]: !hal.buffer_view,
 //  CHECK-SAME:   %[[RET1_STORAGE:.+]]: !hal.buffer
 //  CHECK-SAME: -> (
@@ -47,7 +47,7 @@ func.func @dynamicEntry(%arg0: tensor<?x8x8x3xf32>, %arg1: tensor<?x8x8x3xf32>) 
 //  CHECK-NEXT:   return %[[RET0_VIEW]], %[[RET1_VIEW]] : !hal.buffer_view, !hal.buffer_view
 //  CHECK-NEXT: }
 
-// CHECK-LABEL: func private @_outputStorage(
+// CHECK-LABEL: func.func private @_outputStorage(
 func.func @outputStorage(%arg0: tensor<?x8x8x3xf32>, %ret1: !hal.buffer {iree.abi.output = 1 : index}) ->
     (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) {
   %0 = "mhlo.add"(%arg0, %arg0) : (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) -> tensor<?x8x8x3xf32>
@@ -57,30 +57,30 @@ func.func @outputStorage(%arg0: tensor<?x8x8x3xf32>, %ret1: !hal.buffer {iree.ab
 
 // -----
 
-// CHECK-LABEL: func @wrappedAlready
+// CHECK-LABEL: func.func @wrappedAlready
 //  CHECK-SAME: (%arg0: !hal.buffer_view) -> !hal.buffer_view
 //  CHECK-SAME: attributes {iree.abi.stub}
 func.func @wrappedAlready(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
   return %arg0 : !hal.buffer_view
 }
-// CHECK-NOT: func @_wrappedAlready
+// CHECK-NOT: func.func @_wrappedAlready
 
 // -----
 
 // Tests that a function calling an exported function is redirected to the
 // original unwrapped call.
 
-// CHECK: func @exportA(%arg0: !hal.buffer_view) -> !hal.buffer_view
+// CHECK: func.func @exportA(%arg0: !hal.buffer_view) -> !hal.buffer_view
 // CHECK:   call @_exportA
-// CHECK: func private @_exportA(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32>
+// CHECK: func.func private @_exportA(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32>
 // CHECK:   return %arg0
 func.func @exportA(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
   return %arg0 : tensor<?x?xi32>
 }
 
-// CHECK: func @exportB(%arg0: !hal.buffer_view) -> !hal.buffer_view
+// CHECK: func.func @exportB(%arg0: !hal.buffer_view) -> !hal.buffer_view
 // CHECK:   call @_exportB
-// CHECK: func private @_exportB(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32>
+// CHECK: func.func private @_exportB(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32>
 // CHECK:   call @_exportA
 func.func @exportB(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
     %0 = call @exportA(%arg0) : (tensor<?x?xi32>) -> tensor<?x?xi32>

@@ -13,7 +13,7 @@ module {
   }
 }
 
-// CHECK-LABEL:   func @dead_alloc
+// CHECK-LABEL:   func.func @dead_alloc
 //   CHECK-NOT:     alloc
 //   CHECK-NOT:     memref.subview
 //   CHECK-NOT:     vector.transfer_write

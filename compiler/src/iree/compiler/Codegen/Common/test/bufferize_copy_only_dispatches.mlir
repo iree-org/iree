@@ -28,7 +28,7 @@ builtin.module {
     return
   }
 }
-//      CHECK: func @tensor_insert_slice()
+//      CHECK: func.func @tensor_insert_slice()
 //  CHECK-DAG:   %[[SLICE_SIZE:.+]] = hal.interface.constant.load[0]
 //  CHECK-DAG:   %[[DEST_OFFSET_Y:.+]] = hal.interface.constant.load[1]
 //  CHECK-DAG:   %[[DEST_OFFSET_X:.+]] = hal.interface.constant.load[2]
@@ -58,7 +58,7 @@ builtin.module {
     return
   }
 }
-// CHECK-LABEL: func @UpSampling1D()
+// CHECK-LABEL: func.func @UpSampling1D()
 //   CHECK-DAG:   %[[DEST:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[SOURCE:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //   CHECK-DAG:   %[[SOURCE_SUBVIEW:.+]] = memref.subview %[[SOURCE]][0, 0, 0] [2, 1, 3]
@@ -78,7 +78,7 @@ builtin.module {
     return
   }
 }
-// CHECK-LABEL: func @concatenate_cst()
+// CHECK-LABEL: func.func @concatenate_cst()
 //   CHECK-DAG:   %[[CST:.+]] = arith.constant dense<0> : tensor<2x3xi32>
 //   CHECK-DAG:   %[[ZERO:.+]] = bufferization.to_memref %[[CST]] : memref<2x3xi32>
 //   CHECK-DAG:   %[[DEST_BINDING:.+]] = hal.interface.binding.subspan

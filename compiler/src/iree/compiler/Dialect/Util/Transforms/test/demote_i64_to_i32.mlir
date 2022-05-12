@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file -iree-util-demote-i64-to-i32 %s | FileCheck %s
 
-// CHECK-LABEL: func @constant_i64
+// CHECK-LABEL: func.func @constant_i64
 // CHECK-SAME: () -> i32
 func.func @constant_i64() -> i64 {
   // CHECK-NEXT: constant 123 : i32
@@ -10,7 +10,7 @@ func.func @constant_i64() -> i64 {
 
 // -----
 
-// CHECK-LABEL: func @constant_splat_i64
+// CHECK-LABEL: func.func @constant_splat_i64
 // CHECK-SAME: () -> tensor<4xi32>
 func.func @constant_splat_i64() -> tensor<4xi64> {
   // CHECK-NEXT: constant dense<123> : tensor<4xi32>
@@ -20,7 +20,7 @@ func.func @constant_splat_i64() -> tensor<4xi64> {
 
 // -----
 
-// CHECK-LABEL: func @constant_dense_i64
+// CHECK-LABEL: func.func @constant_dense_i64
 // CHECK-SAME: () -> tensor<4xi32>
 func.func @constant_dense_i64() -> tensor<4xi64> {
   // CHECK-NEXT: constant dense<[0, 1, 2, 3]> : tensor<4xi32>
@@ -30,7 +30,7 @@ func.func @constant_dense_i64() -> tensor<4xi64> {
 
 // -----
 
-// CHECK-LABEL: func @args_i64
+// CHECK-LABEL: func.func @args_i64
 // CHECK-SAME: (%arg0: i32) -> i32
 func.func @args_i64(%arg0: i64) -> i64 {
   // CHECK-NEXT: return %arg0 : i32
@@ -39,7 +39,7 @@ func.func @args_i64(%arg0: i64) -> i64 {
 
 // -----
 
-// CHECK-LABEL: func @args_ui64
+// CHECK-LABEL: func.func @args_ui64
 // CHECK-SAME: (%arg0: ui32) -> ui32
 func.func @args_ui64(%arg0: ui64) -> ui64 {
   // CHECK-NEXT: return %arg0 : ui32
@@ -48,7 +48,7 @@ func.func @args_ui64(%arg0: ui64) -> ui64 {
 
 // -----
 
-// CHECK-LABEL: func @args_tensor_i64
+// CHECK-LABEL: func.func @args_tensor_i64
 // CHECK-SAME: (%arg0: tensor<4x4xi32>) -> tensor<4x4xi32>
 func.func @args_tensor_i64(%arg0: tensor<4x4xi64>) -> tensor<4x4xi64> {
   // CHECK-NEXT: return %arg0 : tensor<4x4xi32>
@@ -57,7 +57,7 @@ func.func @args_tensor_i64(%arg0: tensor<4x4xi64>) -> tensor<4x4xi64> {
 
 // -----
 
-// CHECK-LABEL: func @mhlo_constant_i64
+// CHECK-LABEL: func.func @mhlo_constant_i64
 // CHECK-SAME: () -> tensor<1xi32>
 func.func @mhlo_constant_i64() -> tensor<1xi64> {
   // CHECK-NEXT: mhlo.constant dense<123> : tensor<1xi32>
@@ -67,7 +67,7 @@ func.func @mhlo_constant_i64() -> tensor<1xi64> {
 
 // -----
 
-// CHECK-LABEL: func @mhlo_constant_ui64
+// CHECK-LABEL: func.func @mhlo_constant_ui64
 // CHECK-SAME: () -> tensor<1xui32>
 func.func @mhlo_constant_ui64() -> tensor<1xui64> {
   // CHECK-NEXT: mhlo.constant dense<123> : tensor<1xui32>
@@ -77,7 +77,7 @@ func.func @mhlo_constant_ui64() -> tensor<1xui64> {
 
 // -----
 
-// CHECK-LABEL: func @mhlo_compare_i64
+// CHECK-LABEL: func.func @mhlo_compare_i64
 // CHECK-SAME: (%arg0: tensor<i32>, %arg1: tensor<i32>) -> (i1, tensor<i32>)
 func.func @mhlo_compare_i64(%arg0 : tensor<i64>, %arg1 : tensor<i64>) -> (i1, tensor<i64>) {
   // CHECK-NEXT: %0 = "mhlo.compare"(%arg0, %arg1) {comparison_direction = #mhlo<"comparison_direction LT">} : (tensor<i32>, tensor<i32>) -> tensor<i1>
@@ -98,7 +98,7 @@ func.func @mhlo_compare_i64(%arg0 : tensor<i64>, %arg1 : tensor<i64>) -> (i1, te
 
 // -----
 
-// CHECK-LABEL: func @linalg_matmul_i64
+// CHECK-LABEL: func.func @linalg_matmul_i64
 func.func @linalg_matmul_i64(%arg0: tensor<2x3xi64>, %arg1: tensor<3x4xi64>, %arg2: tensor<2x4xi64>)  -> tensor<2x4xi64> {
   // CHECK: %[[T:.+]] = linalg.matmul ins(%arg0, %arg1 : tensor<2x3xi32>, tensor<3x4xi32>)
   // CHECK-SAME:                     outs(%arg2 : tensor<2x4xi32>) -> tensor<2x4xi32>
@@ -110,7 +110,7 @@ func.func @linalg_matmul_i64(%arg0: tensor<2x3xi64>, %arg1: tensor<3x4xi64>, %ar
 
 // -----
 
-// CHECK-LABEL: func @linalg_generic_i64
+// CHECK-LABEL: func.func @linalg_generic_i64
 // CHECK-SAME: (%[[ARG:.+]]: tensor<2xi32>) -> tensor<2xi32>
 func.func @linalg_generic_i64(%arg: tensor<2xi64>)  -> tensor<2xi64> {
   // CHECK: %[[INIT:.+]] = linalg.init_tensor [2] : tensor<2xi32>
@@ -128,7 +128,7 @@ func.func @linalg_generic_i64(%arg: tensor<2xi64>)  -> tensor<2xi64> {
 
 // -----
 
-// CHECK-LABEL: func @linalg_non_structured_op
+// CHECK-LABEL: func.func @linalg_non_structured_op
 // CHECK-SAME:    (%arg0: tensor<9xi32>) -> tensor<1x9xi32>
 func.func @linalg_non_structured_op(%arg0: tensor<9xi64>) -> tensor<1x9xi64> {
   // CHECK:       %[[RES:.+]] = tensor.expand_shape %arg0 {{\[}}[0, 1]] : tensor<9xi32> into tensor<1x9xi32>
@@ -155,19 +155,19 @@ func.func @foo(%arg0 : tensor<i64>) {
 // CHECK: util.global private @{{.+}} : tensor<4xi32>
 util.global private @v_initializer : tensor<4xi64>
 util.initializer {
-  // CHECK: %[[VALUE:.+]] = call @initializer() : () -> tensor<4xi32>
-  %0 = call @initializer() : () -> tensor<4xi64>
+  // CHECK: %[[VALUE:.+]] = func.call @initializer() : () -> tensor<4xi32>
+  %0 = func.call @initializer() : () -> tensor<4xi64>
   // CHECK: util.global.store %[[VALUE]], @v_initializer : tensor<4xi32>
   util.global.store %0, @v_initializer : tensor<4xi64>
   util.initializer.return
 }
-// CHECK: func private @initializer() -> tensor<4xi32>
+// CHECK: func.func private @initializer() -> tensor<4xi32>
 func.func private @initializer() -> tensor<4xi64>
 
 // -----
 
 //       CHECK: util.global {{.*}} : tensor<4xi32>
-// CHECK-LABEL: func @simple_i64() -> tensor<4xi32>
+// CHECK-LABEL: func.func @simple_i64() -> tensor<4xi32>
 //  CHECK-NEXT: %{{.*}} = util.global.address @__global : !util.ptr<tensor<4xi32>>
 //  CHECK-NEXT: %{{.*}} = util.global.load.indirect %{{.*}} : !util.ptr<tensor<4xi32>> -> tensor<4xi32>
 //  CHECK-NEXT: return %{{.*}} : tensor<4xi32>
@@ -182,7 +182,7 @@ func.func @simple_i64() -> (tensor<4xi64>) {
 
 // CHECK: util.global {{.+}} : tensor<4xi32>
 util.global private @"__global" = dense<[1, 2, 3, 4]> : tensor<4xi64>
-// CHECK-LABEL: func @nested_region_i64()
+// CHECK-LABEL: func.func @nested_region_i64()
 func.func @nested_region_i64() -> (tensor<4xi64>) {
   // CHECK-NEXT: util.global.address {{.+}} : !util.ptr<tensor<4xi32>>
   %0 = util.global.address @"__global" : !util.ptr<tensor<4xi64>>
@@ -209,26 +209,26 @@ func.func @nested_region_i64() -> (tensor<4xi64>) {
 
 // Check handling of width-sensitive arith casts.
 
-// CHECK-LABEL:   func @arith.trunci(
+// CHECK-LABEL:   func.func @arith.trunci(
 // CHECK-SAME:            %[[ARG0:.*]]: i32) -> i32 {
 // CHECK:           return %[[ARG0]] : i32
-func @arith.trunci(%arg0: i64) -> i32 {
+func.func @arith.trunci(%arg0: i64) -> i32 {
   %0 = arith.trunci %arg0 : i64 to i32
   return %0 : i32
 }
 
-// CHECK-LABEL:   func @arith.extui(
+// CHECK-LABEL:   func.func @arith.extui(
 // CHECK-SAME:            %[[ARG0:.*]]: i32) -> i32 {
 // CHECK:           return %[[ARG0]] : i32
-func @arith.extui(%arg0: i32) -> i64 {
+func.func @arith.extui(%arg0: i32) -> i64 {
   %0 = arith.extui %arg0 : i32 to i64
   return %0 : i64
 }
 
-// CHECK-LABEL:   func @arith.extsi(
+// CHECK-LABEL:   func.func @arith.extsi(
 // CHECK-SAME:            %[[ARG0:.*]]: i32) -> i32 {
 // CHECK:           return %[[ARG0]] : i32
-func @arith.extsi(%arg0: i32) -> i64 {
+func.func @arith.extsi(%arg0: i32) -> i64 {
   %0 = arith.extsi %arg0 : i32 to i64
   return %0 : i64
 }

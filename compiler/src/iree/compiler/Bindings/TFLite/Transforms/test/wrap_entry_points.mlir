@@ -14,7 +14,7 @@
 
 
 
-// CHECK-LABEL: func private @_tflite_dynamicEntry_calculate_shapes() {
+// CHECK-LABEL: func.func private @_tflite_dynamicEntry_calculate_shapes() {
 
 // Only recalculate shapes if the shapes are dirty.
 //       CHECK:   %[[IS_DIRTY:.+]] = util.global.load @_tflite_dynamicEntry_shapes_dirty : i1
@@ -52,7 +52,7 @@
 
 
 
-// CHECK-LABEL: func @_tflite_dynamicEntry_query_input_shape
+// CHECK-LABEL: func.func @_tflite_dynamicEntry_query_input_shape
 //  CHECK-SAME:   (%[[INDEX:.+]]: index, %[[LIST:.+]]: !util.list<index>)
 
 // Query input0 shape:
@@ -87,7 +87,7 @@
 
 
 
-// CHECK-LABEL: func @_tflite_dynamicEntry_resize_input_shape
+// CHECK-LABEL: func.func @_tflite_dynamicEntry_resize_input_shape
 //  CHECK-SAME:   (%[[INDEX:.+]]: index, %[[LIST:.+]]: !util.list<index>)
 
 //       CHECK:   %[[IS_0:.+]] = arith.cmpi eq, %[[INDEX]], %c0 : index
@@ -113,7 +113,7 @@
 
 
 
-// CHECK-LABEL: func @_tflite_dynamicEntry_query_output_shape
+// CHECK-LABEL: func.func @_tflite_dynamicEntry_query_output_shape
 //  CHECK-SAME:   (%[[INDEX:.+]]: index, %[[LIST:.+]]: !util.list<index>)
 
 // Recalculate shapes, if needed.
@@ -150,7 +150,7 @@
 
 
 
-// CHECK-LABEL: func @_tflite_main(
+// CHECK-LABEL: func.func @_tflite_main(
 //  CHECK-SAME:   %[[IN0_BUFFER:.+]]: !hal.buffer {iree.identifier = "input0"},
 //  CHECK-SAME:   %[[IN1_BUFFER:.+]]: !hal.buffer {iree.identifier = "input1"})
 //  CHECK-SAME: -> (
@@ -192,7 +192,7 @@
 
 
 
-// CHECK-LABEL: func private @dynamicEntry(
+// CHECK-LABEL: func.func private @dynamicEntry(
 func.func @dynamicEntry(
   %arg0: tensor<?x8x8x3xf32> {iree.identifier = "input0"},
   %arg1: tensor<?x8x8x3xf32> {iree.identifier = "input1"}
@@ -210,7 +210,7 @@ func.func @dynamicEntry(
 
 // -----
 
-// CHECK-LABEL: func @_tflite_main(
+// CHECK-LABEL: func.func @_tflite_main(
 //  CHECK-SAME:   %[[IN0_BUFFER:.+]]: !hal.buffer,
 //  CHECK-SAME:   %[[IN1_BUFFER:.+]]: !hal.buffer)
 //  CHECK-SAME: -> (

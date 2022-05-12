@@ -7,7 +7,7 @@ func.func private @extern() -> index
 // CHECK: util.global private mutable @global0 : index
 util.global private mutable @global0 : index
 util.initializer {
-  %value0 = call @extern() : () -> index
+  %value0 = func.call @extern() : () -> index
   util.global.store %value0, @global0 : index
   util.initializer.return
 }
@@ -16,18 +16,18 @@ util.global private @global1 : index
 // CHECK-NEXT: util.global private @global2 : index
 util.global private @global2 : index
 util.initializer {
-  %value1 = call @extern() : () -> index
+  %value1 = func.call @extern() : () -> index
   util.global.store %value1, @global1 : index
-  %value2 = call @extern() : () -> index
+  %value2 = func.call @extern() : () -> index
   util.global.store %value2, @global2 : index
   util.initializer.return
 }
 // CHECK-NEXT: util.initializer {
-// CHECK-NEXT: %[[VALUE0:.+]] = call @extern()
+// CHECK-NEXT: %[[VALUE0:.+]] = func.call @extern()
 // CHECK-NEXT: util.global.store %[[VALUE0]], @global0
-// CHECK-NEXT: %[[VALUE1:.+]] = call @extern()
+// CHECK-NEXT: %[[VALUE1:.+]] = func.call @extern()
 // CHECK-NEXT: util.global.store %[[VALUE1]], @global1
-// CHECK-NEXT: %[[VALUE2:.+]] = call @extern()
+// CHECK-NEXT: %[[VALUE2:.+]] = func.call @extern()
 // CHECK-NEXT: util.global.store %[[VALUE2]], @global2
 // CHECK-NEXT: util.initializer.return
 

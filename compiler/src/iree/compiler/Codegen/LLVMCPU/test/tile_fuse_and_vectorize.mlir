@@ -41,7 +41,7 @@ module  {
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 * 64)>
-//      CHECK: func @dot_384x512x128_dispatch_0() {
+//      CHECK: func.func @dot_384x512x128_dispatch_0() {
 //  CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
 //  CHECK-DAG: %[[CST_VECTOR:.+]] = arith.constant dense<0.000000e+00> : vector<16x16xf32>
 //  CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
@@ -130,7 +130,7 @@ func.func @matmul_gather() {
   return
 }
 
-//      CHECK: func @matmul_gather() {
+//      CHECK: func.func @matmul_gather() {
 // Check that matmul is lowered to vector ops
 //  CHECK-NOT:   linalg.matmul
 //      CHECK:   vector.outerproduct
@@ -201,7 +201,7 @@ func.func @nonvectorizable_matmul_and_vectorizable_generic() {
   return
 }
 
-// CHECK: func @nonvectorizable_matmul_and_vectorizable_generic
+// CHECK: func.func @nonvectorizable_matmul_and_vectorizable_generic
 // Verify that both matmul and generic ops are not vectorized.
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index

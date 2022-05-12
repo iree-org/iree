@@ -11,7 +11,7 @@ func.func @vectorize_conv(%filter: memref<1x1x3x4xf32>, %input: memref<1x2x2x3xf
 // CHECK: #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 // CHECK: #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
-// CHECK: func @vectorize_conv
+// CHECK: func.func @vectorize_conv
 // CHECK-SAME: %[[FILTER_SUBVIEW:.+]]: memref<1x1x3x4xf32>,
 // CHECK-SAME: %[[INPUT_SUBVIEW:.+]]: memref<1x2x2x3xf32>,
 // CHECK-SAME: %[[OUTPUT_SUBVIEW:.+]]: memref<1x2x2x4xf32>
@@ -70,7 +70,7 @@ func.func @vectorize_conv(%filter: memref<1x1x3x4xf32>, %input: memref<1x2x2x3xf
 
 // -----
 
-// CHECK-LABEL: func @do_not_vectorize_conv_with_non_1_batch
+// CHECK-LABEL: func.func @do_not_vectorize_conv_with_non_1_batch
 func.func @do_not_vectorize_conv_with_non_1_batch(%filter: memref<1x1x4x4xf32>, %input: memref<2x1x7x4xf32>, %output: memref<2x1x4x4xf32>) {
   // CHECK: linalg.conv_2d_nhwc_hwcf
   linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<2> : vector<2xi64>}
@@ -81,7 +81,7 @@ func.func @do_not_vectorize_conv_with_non_1_batch(%filter: memref<1x1x4x4xf32>, 
 
 // -----
 
-// CHECK-LABEL: func @do_not_vectorize_conv_with_non_1_filter_height
+// CHECK-LABEL: func.func @do_not_vectorize_conv_with_non_1_filter_height
 func.func @do_not_vectorize_conv_with_non_1_filter_height(%filter: memref<2x1x4x4xf32>, %input: memref<1x2x7x4xf32>, %output: memref<1x1x4x4xf32>) {
   // CHECK: linalg.conv_2d_nhwc_hwcf
   linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<2> : vector<2xi64>}
@@ -92,7 +92,7 @@ func.func @do_not_vectorize_conv_with_non_1_filter_height(%filter: memref<2x1x4x
 
 // -----
 
-// CHECK-LABEL: func @do_not_vectorize_conv_with_non_1_filter_width
+// CHECK-LABEL: func.func @do_not_vectorize_conv_with_non_1_filter_width
 func.func @do_not_vectorize_conv_with_non_1_filter_width(%filter: memref<1x2x4x4xf32>, %input: memref<1x1x8x4xf32>, %output: memref<1x1x4x4xf32>) {
   // CHECK: linalg.conv_2d_nhwc_hwcf
   linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<2> : vector<2xi64>}
@@ -103,7 +103,7 @@ func.func @do_not_vectorize_conv_with_non_1_filter_width(%filter: memref<1x2x4x4
 
 // -----
 
-// CHECK-LABEL: func @do_not_vectorize_conv_with_non_1_dilation
+// CHECK-LABEL: func.func @do_not_vectorize_conv_with_non_1_dilation
 func.func @do_not_vectorize_conv_with_non_1_dilation(%filter: memref<1x1x4x4xf32>, %input: memref<1x1x7x4xf32>, %output: memref<1x1x4x4xf32>) {
   // CHECK: linalg.conv_2d_nhwc_hwcf
   linalg.conv_2d_nhwc_hwcf {dilations = dense<[2, 1]> : vector<2xi64>, strides = dense<2> : vector<2xi64>}
@@ -119,7 +119,7 @@ func.func @vectorize_depthwise_conv(%input: memref<1x3x3x8xf32>, %filter: memref
   return
 }
 
-// CHECK-LABEL: func @vectorize_depthwise_conv
+// CHECK-LABEL: func.func @vectorize_depthwise_conv
 // CHECK-SAME: %[[INPUT_SUBVIEW:.+]]: memref<1x3x3x8xf32>,
 // CHECK-SAME: %[[FILTER_SUBVIEW:.+]]: memref<1x1x8xf32>,
 // CHECK-SAME: %[[OUTPUT_SUBVIEW:.+]]: memref<1x2x2x8xf32>
@@ -178,7 +178,7 @@ func.func @vectorize_depthwise_conv(%input: memref<1x3x3x8xf32>, %filter: memref
 
 // -----
 
-// CHECK-LABEL: func @do_not_vectorize_depthwise_conv_with_non_1_filter_height
+// CHECK-LABEL: func.func @do_not_vectorize_depthwise_conv_with_non_1_filter_height
 func.func @do_not_vectorize_depthwise_conv_with_non_1_filter_height(%input: memref<1x2x3x4xf32>, %filter: memref<2x1x4xf32>, %output: memref<1x1x2x4xf32>) {
   // CHECK: linalg.depthwise_conv_2d_nhwc_hwc
   linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
@@ -189,7 +189,7 @@ func.func @do_not_vectorize_depthwise_conv_with_non_1_filter_height(%input: memr
 
 // -----
 
-// CHECK-LABEL: func @do_not_vectorize_depthwise_conv_with_non_1_filter_width
+// CHECK-LABEL: func.func @do_not_vectorize_depthwise_conv_with_non_1_filter_width
 func.func @do_not_vectorize_depthwise_conv_with_non_1_filter_width(%input: memref<1x1x4x4xf32>, %filter: memref<1x2x4xf32>, %output: memref<1x1x2x4xf32>) {
   // CHECK: linalg.depthwise_conv_2d_nhwc_hwc
   linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
@@ -207,7 +207,7 @@ func.func @vectorize_conv(%filter: tensor<1x1x3x4xf32>, %input: tensor<1x2x2x3xf
   return %0 : tensor<1x2x2x4xf32>
 }
 
-// CHECK-LABEL: func @vectorize_conv
+// CHECK-LABEL: func.func @vectorize_conv
 //  CHECK-SAME: %[[FILTER_TENSOR:.+]]: tensor<1x1x3x4xf32>,
 //  CHECK-SAME: %[[INPUT_TENSOR:.+]]: tensor<1x2x2x3xf32>,
 //  CHECK-SAME: %[[INIT_TENSOR:.+]]: tensor<1x2x2x4xf32>
@@ -244,7 +244,7 @@ func.func @vectorize_depthwise_conv(%input: tensor<1x3x3x8xf32>, %filter: tensor
   return %0 : tensor<1x2x2x8xf32>
 }
 
-// CHECK-LABEL: func @vectorize_depthwise_conv
+// CHECK-LABEL: func.func @vectorize_depthwise_conv
 // CHECK-SAME: %[[INPUT_TENSOR:.+]]: tensor<1x3x3x8xf32>,
 // CHECK-SAME: %[[FILTER_TENSOR:.+]]: tensor<1x1x8xf32>,
 // CHECK-SAME: %[[INIT_TENSOR:.+]]: tensor<1x2x2x8xf32>

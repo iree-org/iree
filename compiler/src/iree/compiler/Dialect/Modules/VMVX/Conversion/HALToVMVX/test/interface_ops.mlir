@@ -3,7 +3,7 @@
 // CHECK: memref.global "private" constant @__constant_5xi32 : memref<5xi32> = dense<[1, 2, 3, 4, 5]>
 memref.global "private" constant @__constant_5xi32 : memref<5xi32> = dense<[1, 2, 3, 4, 5]>
 
-// CHECK-LABEL: func @entry(
+// CHECK-LABEL: func.func @entry(
 //  CHECK-SAME:   %[[SCRATCHPAD:.+]]: memref<?xi8>,
 //  CHECK-SAME:   %[[CONSTANTS:.+]]: memref<?xi32>,
 //  CHECK-SAME:   %[[BINDINGS:.+]]: !util.list<memref<?xi8>>,

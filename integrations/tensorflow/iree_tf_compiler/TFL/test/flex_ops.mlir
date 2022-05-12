@@ -5,7 +5,7 @@
 // This excerpt was extracted from:
 // https://tfhub.dev/tulasiram58827/lite-model/parallel-wavegan/float16/1
 // CHECK-LABEL: @test_flex_ops
-func @test_flex_ops(%arg0: tensor<?x2x64xf32>, %arg1: tensor<1x1x64xf32>) -> tensor<*xf32> {
+func.func @test_flex_ops(%arg0: tensor<?x2x64xf32>, %arg1: tensor<1x1x64xf32>) -> tensor<*xf32> {
   // CHECK: %[[ADD:.+]] = "tosa.add"(%arg0, %arg1) : (tensor<?x2x64xf32>, tensor<1x1x64xf32>)
   // CHECK: %[[CAST:.+]] = tensor.cast %[[ADD]]
   // CHECK: return %[[CAST]]

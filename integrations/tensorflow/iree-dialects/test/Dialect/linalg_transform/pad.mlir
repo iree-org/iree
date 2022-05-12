@@ -3,7 +3,7 @@
 #map = affine_map<()[s0] -> (-s0 + 12, 5)>
 
 // CHECK-LABEL: func @pad_unary
-func @pad_unary(%arg0: tensor<24x12xf32>,
+func.func @pad_unary(%arg0: tensor<24x12xf32>,
                 %arg1: tensor<24x12xf32>) -> tensor<24x12xf32> {
   //      CHECK:   %[[C0:.*]] = arith.constant 0 : index
   %c0 = arith.constant 0 : index

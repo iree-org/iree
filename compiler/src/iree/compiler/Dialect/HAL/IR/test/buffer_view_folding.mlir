@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --canonicalize -cse %s | iree-opt --allow-unregistered-dialect --split-input-file | FileCheck %s
 
-// CHECK-LABEL: func @skip_buffer_view_buffer
+// CHECK-LABEL: func.func @skip_buffer_view_buffer
 // CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer
 func.func @skip_buffer_view_buffer(%buffer : !hal.buffer) -> !hal.buffer {
   %c1 = arith.constant 1 : i32
@@ -18,7 +18,7 @@ func.func @skip_buffer_view_buffer(%buffer : !hal.buffer) -> !hal.buffer {
 
 // -----
 
-// CHECK-LABEL: func @expand_buffer_view_dims
+// CHECK-LABEL: func.func @expand_buffer_view_dims
 // CHECK-SAME: %[[VIEW:.+]]: !hal.buffer_view
 func.func @expand_buffer_view_dims(%view : !hal.buffer_view) -> (index, index, index) {
   // CHECK-DAG: %[[D0:.+]] = hal.buffer_view.dim<%[[VIEW]] : !hal.buffer_view>[0] : index

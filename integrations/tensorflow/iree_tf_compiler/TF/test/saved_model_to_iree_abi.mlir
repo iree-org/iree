@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: module @binary_func
 // Should just be a pass through.
-// CHECK: func @binary_func
+// CHECK: func.func @binary_func
 // CHECK-SAME{LITERAL}: iree.abi = "{\22a\22:[[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]],\22r\22:[[\22stuple\22,[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]]],\22v\22:1}"
 // CHECK: %[[ARG0_TENSOR:.*]] = iree_input.cast.buffer_view_to_tensor %arg0 : !iree_input.buffer_view -> tensor<16xf32>
 // CHECK: %[[ARG1_TENSOR:.*]] = iree_input.cast.buffer_view_to_tensor %arg1 : !iree_input.buffer_view -> tensor<16xf32>
@@ -10,7 +10,7 @@
 // CHECK: %[[R0_BV:.*]] = iree_input.cast.tensor_to_buffer_view %[[R]]#0 : tensor<16xf32> -> !iree_input.buffer_view
 // CHECK: %[[R1_BV:.*]] = iree_input.cast.tensor_to_buffer_view %[[R]]#1 : tensor<16xf32> -> !iree_input.buffer_view
 // CHECK: return %[[R0_BV]], %[[R1_BV]] : !iree_input.buffer_view, !iree_input.buffer_view
-// CHECK: func private @__inference_binary_func_70
+// CHECK: func.func private @__inference_binary_func_70
 // CHECK-NOT: tf_saved_model
 builtin.module @binary_func attributes {tf.versions = {bad_consumers = [], min_consumer = 12 : i32, producer = 729 : i32}, tf_saved_model.semantics}  {
   func.func @__inference_binary_func_70(%arg0: tensor<16xf32> {tf._user_specified_name = "a", tf_saved_model.index_path = [0]}, %arg1: tensor<16xf32> {tf._user_specified_name = "b", tf_saved_model.index_path = [1]}) -> (tensor<16xf32> {tf_saved_model.index_path = [0]}, tensor<16xf32> {tf_saved_model.index_path = [1]}) attributes {tf._construction_context = "kEagerRuntime", tf._input_shapes = [#tf_type.shape<16>, #tf_type.shape<16>], tf_saved_model.exported_names = ["binary_func"]} {
@@ -22,13 +22,13 @@ builtin.module @binary_func attributes {tf.versions = {bad_consumers = [], min_c
 
 // -----
 // CHECK-LABEL: module @unary_func
-// CHECK: func @unary_func
+// CHECK: func.func @unary_func
 // CHECK-SAME{LITERAL}: iree.abi = "{\22a\22:[[\22ndarray\22,\22f32\22,1,16]],\22r\22:[[\22ndarray\22,\22f32\22,1,16]],\22v\22:1}"
 // CHECK: %[[ARG0_TENSOR:.*]] = iree_input.cast.buffer_view_to_tensor %arg0 : !iree_input.buffer_view -> tensor<16xf32>
 // CHECK: %[[R:.*]] = call @__inference_unary_func_240(%[[ARG0_TENSOR]])
 // CHECK: %[[R0_BV:.*]] = iree_input.cast.tensor_to_buffer_view %[[R]] : tensor<16xf32> -> !iree_input.buffer_view
 // CHECK: return %[[R0_BV]] : !iree_input.buffer_view
-// CHECK: func private @__inference_unary_func_240
+// CHECK: func.func private @__inference_unary_func_240
   // CHECK-NOT: tf_saved_model
 builtin.module @unary_func attributes {tf.versions = {bad_consumers = [], min_consumer = 12 : i32, producer = 729 : i32}, tf_saved_model.semantics}  {
   func.func @__inference_unary_func_240(%arg0: tensor<16xf32> {tf._user_specified_name = "a", tf_saved_model.index_path = [0]}) -> (tensor<16xf32> {tf_saved_model.index_path = []}) attributes {tf._construction_context = "kEagerRuntime", tf._input_shapes = [#tf_type.shape<16>], tf_saved_model.exported_names = ["unary_func"]} {
@@ -39,7 +39,7 @@ builtin.module @unary_func attributes {tf.versions = {bad_consumers = [], min_co
 
 // -----
 // CHECK-LABEL: module @return_list
-// CHECK: func @return_list
+// CHECK: func.func @return_list
 // CHECK-SAME{LITERAL}: iree.abi = "{\22a\22:[[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]],\22r\22:[[\22stuple\22,[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]]],\22v\22:1}"
 // CHECK: %[[ARG0_TENSOR:.*]] = iree_input.cast.buffer_view_to_tensor %arg0 : !iree_input.buffer_view -> tensor<16xf32>
 // CHECK: %[[ARG1_TENSOR:.*]] = iree_input.cast.buffer_view_to_tensor %arg1 : !iree_input.buffer_view -> tensor<16xf32>
@@ -47,7 +47,7 @@ builtin.module @unary_func attributes {tf.versions = {bad_consumers = [], min_co
 // CHECK: %[[R0_BV:.*]] = iree_input.cast.tensor_to_buffer_view %[[R]]#0 : tensor<16xf32> -> !iree_input.buffer_view
 // CHECK: %[[R1_BV:.*]] = iree_input.cast.tensor_to_buffer_view %[[R]]#1 : tensor<16xf32> -> !iree_input.buffer_view
 // CHECK: return %[[R0_BV]], %[[R1_BV]] : !iree_input.buffer_view, !iree_input.buffer_view
-// CHECK: func private @__inference_return_list_260
+// CHECK: func.func private @__inference_return_list_260
 // CHECK-NOT: tf_saved_model
 builtin.module @return_list attributes {tf.versions = {bad_consumers = [], min_consumer = 12 : i32, producer = 729 : i32}, tf_saved_model.semantics}  {
   func.func @__inference_return_list_260(%arg0: tensor<16xf32> {tf._user_specified_name = "a", tf_saved_model.index_path = [0]}, %arg1: tensor<16xf32> {tf._user_specified_name = "b", tf_saved_model.index_path = [1]}) -> (tensor<16xf32> {tf_saved_model.index_path = [0]}, tensor<16xf32> {tf_saved_model.index_path = [1]}) attributes {tf._construction_context = "kEagerRuntime", tf._input_shapes = [#tf_type.shape<16>, #tf_type.shape<16>], tf_saved_model.exported_names = ["return_list"]} {
@@ -59,7 +59,7 @@ builtin.module @return_list attributes {tf.versions = {bad_consumers = [], min_c
 
 // -----
 // CHECK-LABEL: module @dict_nest
-// CHECK: func @dict_nest(%arg0: !iree_input.list<!iree_input.variant>, %arg1: !iree_input.buffer_view) -> (!iree_input.list<!iree_input.variant>, !iree_input.list<!iree_input.variant>)
+// CHECK: func.func @dict_nest(%arg0: !iree_input.list<!iree_input.variant>, %arg1: !iree_input.buffer_view) -> (!iree_input.list<!iree_input.variant>, !iree_input.list<!iree_input.variant>)
 // CHECK-SAME{LITERAL}: iree.abi = "{\22a\22:[[\22sdict\22,[\22dict\22,[\22sdict\22,[\22a\22,[\22ndarray\22,\22f32\22,1,16]],[\22b\22,[\22ndarray\22,\22f32\22,1,16]]]],[\22list\22,[\22slist\22,[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]]]],[\22ndarray\22,\22f32\22,0]],\22r\22:[[\22sdict\22,[\22dict\22,[\22sdict\22,[\22a\22,[\22ndarray\22,\22f32\22,1,16]],[\22b\22,[\22ndarray\22,\22f32\22,1,16]]]],[\22list\22,[\22stuple\22,[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]]]]],\22v\22:1}"
 // CHECK: %[[c0:.+]] = arith.constant 0 : index
 // CHECK: %[[L0:.+]] = iree_input.list.get %arg0[%[[c0]]] : !iree_input.list<!iree_input.variant> -> !iree_input.list<!iree_input.variant>
@@ -98,7 +98,7 @@ builtin.module @return_list attributes {tf.versions = {bad_consumers = [], min_c
 // CHECK: %[[c1_10:.+]] = arith.constant 1 : index
 // CHECK: iree_input.list.set %[[R9]][%[[c1_10]]], %[[R3_BV]] : !iree_input.list<!iree_input.variant>, !iree_input.buffer_view
 // return %[[R7]], %[[R8]] : !iree_input.list<!iree_input.variant>, !iree_input.list<!iree_input.variant>
-// CHECK: func private @__inference_dict_nest_190
+// CHECK: func.func private @__inference_dict_nest_190
 // CHECK-NOT: tf_saved_model
 builtin.module @dict_nest attributes {tf.versions = {bad_consumers = [], min_consumer = 12 : i32, producer = 729 : i32}, tf_saved_model.semantics}  {
   func.func @__inference_dict_nest_190(
@@ -117,7 +117,7 @@ builtin.module @dict_nest attributes {tf.versions = {bad_consumers = [], min_con
 
 // -----
 // CHECK-LABEL: module @kwargs
-// CHECK: func @dict_nest(%arg0: !iree_input.buffer_view, %arg1: !iree_input.buffer_view, %arg2: !iree_input.buffer_view) -> !iree_input.list<!iree_input.variant>
+// CHECK: func.func @dict_nest(%arg0: !iree_input.buffer_view, %arg1: !iree_input.buffer_view, %arg2: !iree_input.buffer_view) -> !iree_input.list<!iree_input.variant>
 // CHECK-SAME{LITERAL}: iree.abi = "{\22a\22:[[\22named\22,\22a\22,[\22ndarray\22,\22f32\22,1,16]],[\22named\22,\22b\22,[\22ndarray\22,\22f32\22,1,16]],[\22named\22,\22scalar\22,[\22ndarray\22,\22f32\22,0]]],\22r\22:[[\22sdict\22,[\22dict\22,[\22sdict\22,[\22a\22,[\22ndarray\22,\22f32\22,1,16]],[\22b\22,[\22ndarray\22,\22f32\22,1,16]],[\22scalar\22,[\22ndarray\22,\22f32\22,0]]]]]],\22v\22:1}"
 builtin.module @kwargs attributes {tf.versions = {bad_consumers = [], min_consumer = 12 : i32, producer = 729 : i32}, tf_saved_model.semantics}  {
   func.func @__inference_dict_nest_190(

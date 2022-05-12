@@ -1,6 +1,6 @@
 // RUN: iree-dialects-opt --split-input-file --verify-diagnostics %s
 
-func @sort_invalid_dimension(%arg0: tensor<128xi32>) -> tensor<128xi32> {
+func.func @sort_invalid_dimension(%arg0: tensor<128xi32>) -> tensor<128xi32> {
   // expected-error @+1 {{dimension must be within (0, 1]}}
   %0 = iree_linalg_ext.sort dimension(1)
     outs(%arg0 : tensor<128xi32>) {
@@ -13,7 +13,7 @@ func @sort_invalid_dimension(%arg0: tensor<128xi32>) -> tensor<128xi32> {
 
 // -----
 
-func @sort_mismatch_rank(%arg0: tensor<?x?xi32>, %arg1: tensor<?xf32>)
+func.func @sort_mismatch_rank(%arg0: tensor<?x?xi32>, %arg1: tensor<?xf32>)
     -> (tensor<?x?xi32>, tensor<?xf32>) {
   // expected-error @+1 {{expected operand 1 to be rank 2, same as other operands}}
   %0:2 = iree_linalg_ext.sort dimension(0)
@@ -27,7 +27,7 @@ func @sort_mismatch_rank(%arg0: tensor<?x?xi32>, %arg1: tensor<?xf32>)
 
 // -----
 
-func @sort_mismatch_shape(%arg0: tensor<?xi32>, %arg1: tensor<42xf32>)
+func.func @sort_mismatch_shape(%arg0: tensor<?xi32>, %arg1: tensor<42xf32>)
     -> (tensor<?xi32>, tensor<42xf32>) {
   // expected-error @+1 {{expected operand 1 to have same shape as other operands}}
   %0:2 = iree_linalg_ext.sort dimension(0)
@@ -41,7 +41,7 @@ func @sort_mismatch_shape(%arg0: tensor<?xi32>, %arg1: tensor<42xf32>)
 
 // -----
 
-func @scatter_mixed_tensor_memref(
+func.func @scatter_mixed_tensor_memref(
     %update : memref<?x?xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error @+1 {{expected inputs and outputs to be RankedTensorType or scalar}}
@@ -57,7 +57,7 @@ func @scatter_mixed_tensor_memref(
 
 // -----
 
-func @scatter_mixed_tensor_memref(
+func.func @scatter_mixed_tensor_memref(
     %update : tensor<?x?xf32>, %indices : memref<?x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error @+1 {{expected inputs and outputs to be RankedTensorType or scalar}}
@@ -73,7 +73,7 @@ func @scatter_mixed_tensor_memref(
 
 // -----
 
-func @scatter_extra_outputs(
+func.func @scatter_extra_outputs(
     %update : tensor<?x?xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> (tensor<?x?xf32>, tensor<?x?xf32>) {
   // expected-error @+1 {{expected number of outputs to be same as the number of results}}
@@ -89,7 +89,7 @@ func @scatter_extra_outputs(
 
 // -----
 
-func @scatter_mixed_tensor_memref(
+func.func @scatter_mixed_tensor_memref(
     %update : tensor<?x?xf32>, %indices : tensor<?x1xi32>,
     %original : memref<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error @+1 {{expected inputs and outputs to be RankedTensorType or scalar}}
@@ -105,7 +105,7 @@ func @scatter_mixed_tensor_memref(
 
 // -----
 
-func @scatter_output_type_mismatch(
+func.func @scatter_output_type_mismatch(
     %update : tensor<?x?xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<4x?xf32> {
   // expected-error @+1 {{expected type of `outs` operand #0 'tensor<?x?xf32>' to be same as result type 'tensor<4x?xf32>'}}
@@ -121,7 +121,7 @@ func @scatter_output_type_mismatch(
 
 // -----
 
-func @scatter_mixed_tensor_memref(
+func.func @scatter_mixed_tensor_memref(
     %update : memref<?x?xf32>, %indices : tensor<?x1xi32>,
     %original : memref<?x?xf32>) {
   // expected-error @+1 {{expected inputs and outputs to be MemRefType or scalar}}
@@ -137,7 +137,7 @@ func @scatter_mixed_tensor_memref(
 
 // -----
 
-func @scatter_mixed_tensor_memref(
+func.func @scatter_mixed_tensor_memref(
     %update : memref<?x?xf32>, %indices : memref<?x1xi32>,
     %original : tensor<?x?xf32>) {
   // expected-error @+1 {{expected inputs and outputs to be MemRefType or scalar}}
@@ -153,7 +153,7 @@ func @scatter_mixed_tensor_memref(
 
 // -----
 
-func @scatter_dim_mismatch(
+func.func @scatter_dim_mismatch(
     %update : tensor<?x?xf32>, %indices : tensor<48x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error @+1 {{mismatch in shape of indices and update value at dim#0}}
@@ -169,7 +169,7 @@ func @scatter_dim_mismatch(
 
 // -----
 
-func @scatter_dim_mismatch(
+func.func @scatter_dim_mismatch(
     %update : tensor<64x?xf32>, %indices : tensor<48x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error @+1 {{mismatch in shape of indices and update value at dim#0}}
@@ -185,7 +185,7 @@ func @scatter_dim_mismatch(
 
 // -----
 
-func @scatter_dim_mismatch(
+func.func @scatter_dim_mismatch(
     %update : tensor<?x?x?x?xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error @+1 {{op update value rank exceeds the rank of the original value}}
@@ -201,7 +201,7 @@ func @scatter_dim_mismatch(
 
 // -----
 
-func @scatter_dim_mismatch(
+func.func @scatter_dim_mismatch(
     %update : tensor<?x4xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error @+1 {{mismatch in shape of update value dim#1 and original value at dim#1}}
@@ -217,7 +217,7 @@ func @scatter_dim_mismatch(
 
 // -----
 
-func @scatter_region_type_mismatch(
+func.func @scatter_region_type_mismatch(
     %update : tensor<?x?xi32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xi32>) -> tensor<?x?xi32> {
   // expected-error @+1 {{expected region to have scalar argument of integer or float types}}
@@ -234,7 +234,7 @@ func @scatter_region_type_mismatch(
 
 // -----
 
-func @scatter_region_type_mismatch(
+func.func @scatter_region_type_mismatch(
     %update : tensor<?x?xi32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xi32>) -> tensor<?x?xi32> {
   // expected-error @+1 {{mismatch in argument 0 of region 'i64' and element type of update value 'i32'}}
@@ -251,7 +251,7 @@ func @scatter_region_type_mismatch(
 
 // -----
 
-func @scatter_region_type_mismatch(
+func.func @scatter_region_type_mismatch(
     %update : tensor<?x?xi32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xi32>) -> tensor<?x?xi32> {
   // expected-error @+1 {{mismatch in argument 1 of region 'i64' and element type of original value 'i32'}}
@@ -268,7 +268,7 @@ func @scatter_region_type_mismatch(
 
 // -----
 
-func @scatter_region_type_mismatch(
+func.func @scatter_region_type_mismatch(
     %update : tensor<?x?xi32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xi64>) -> tensor<?x?xi64> {
   // expected-error @+1 {{mismatch in region argument types 'i32' and 'i64'}}
@@ -285,7 +285,7 @@ func @scatter_region_type_mismatch(
 
 // -----
 
-func @scatter_region_type_mismatch(
+func.func @scatter_region_type_mismatch(
     %update : tensor<?x?xi64>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xi64>) -> tensor<?x?xi64> {
   // expected-error @+1 {{expected region to have two arguments}}
@@ -302,7 +302,7 @@ func @scatter_region_type_mismatch(
 
 // -----
 
-func @scatter_yield_mismatch(
+func.func @scatter_yield_mismatch(
     %update : tensor<?x?xi64>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xi64>) -> tensor<?x?xi64> {
   %0 = iree_linalg_ext.scatter unique_indices(true)
@@ -319,7 +319,7 @@ func @scatter_yield_mismatch(
 
 // -----
 
-func @scatter_yield_mismatch(
+func.func @scatter_yield_mismatch(
     %update : tensor<?x?xi64>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xi64>) -> tensor<?x?xi64> {
   %0 = iree_linalg_ext.scatter unique_indices(true)
@@ -336,7 +336,7 @@ func @scatter_yield_mismatch(
 
 // -----
 
-func @scatter_index_depth_dynamic(
+func.func @scatter_index_depth_dynamic(
     %update : tensor<?x?xi64>, %indices : tensor<?x?xi32>,
     %original : tensor<?x?xi64>) -> tensor<?x?xi64> {
   // expected-error @+1 {{expected index depth is static}}
@@ -353,7 +353,7 @@ func @scatter_index_depth_dynamic(
 
 // -----
 
-func @scatter_original_rank_mismatch(
+func.func @scatter_original_rank_mismatch(
     %update : tensor<?xi64>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xi64>) -> tensor<?x?xi64> {
   // expected-error @+1 {{op index depth and update value does not cover rank of original value}}
@@ -370,7 +370,7 @@ func @scatter_original_rank_mismatch(
 
 // -----
 
-func @reverse_diff_element_type(%arg0: tensor<3x5xi32>) -> tensor<3x5xf32> {
+func.func @reverse_diff_element_type(%arg0: tensor<3x5xi32>) -> tensor<3x5xf32> {
   %init = linalg.init_tensor [3, 5] : tensor<3x5xf32>
   // expected-error @+1 {{expected input/output element types to be identical}}
   %0 = iree_linalg_ext.reverse
@@ -382,7 +382,7 @@ func @reverse_diff_element_type(%arg0: tensor<3x5xi32>) -> tensor<3x5xf32> {
 
 // -----
 
-func @reverse_diff_shape(%arg0: tensor<3x5xi32>) -> tensor<3x6xi32> {
+func.func @reverse_diff_shape(%arg0: tensor<3x5xi32>) -> tensor<3x6xi32> {
   %init = linalg.init_tensor [3, 6] : tensor<3x6xi32>
   // expected-error @+1 {{incompatible input/output shapes}}
   %0 = iree_linalg_ext.reverse
@@ -394,7 +394,7 @@ func @reverse_diff_shape(%arg0: tensor<3x5xi32>) -> tensor<3x6xi32> {
 
 // -----
 
-func @reverse_dup_dims(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
+func.func @reverse_dup_dims(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
   %init = linalg.init_tensor [3, 5] : tensor<3x5xi32>
   // expected-error @+1 {{expected dimensions numbers are all unique}}
   %0 = iree_linalg_ext.reverse
@@ -406,7 +406,7 @@ func @reverse_dup_dims(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
 
 // -----
 
-func @not_enough_results() -> () {
+func.func @not_enough_results() -> () {
   %num_threads = arith.constant 100 : index
   // expected-error@+1 {{'iree_linalg_ext.in_parallel' op produces 1 results, but its terminator yields 0 values}}
   %result = iree_linalg_ext.in_parallel %num_threads -> tensor<100xf32> {
@@ -417,7 +417,7 @@ func @not_enough_results() -> () {
 
 // -----
 
-func @too_many_results(%1 : tensor<1xf32>, %out : tensor<100xf32>) -> () {
+func.func @too_many_results(%1 : tensor<1xf32>, %out : tensor<100xf32>) -> () {
   %num_threads = arith.constant 100 : index
   // expected-error@+1 {{'iree_linalg_ext.in_parallel' op produces 1 results, but its terminator yields 2 values}}
   %result = iree_linalg_ext.in_parallel %num_threads -> tensor<100xf32> {
@@ -434,7 +434,7 @@ func @too_many_results(%1 : tensor<1xf32>, %out : tensor<100xf32>) -> () {
 
 // -----
 
-func @type_mismatch(%1 : tensor<1xf32>, %out : tensor<200xf32>) -> () {
+func.func @type_mismatch(%1 : tensor<1xf32>, %out : tensor<200xf32>) -> () {
   %num_threads = arith.constant 100 : index
   // expected-error@+1 {{'iree_linalg_ext.in_parallel' op type mismatch between 0th result of in_parallel ('tensor<200xf32>') and 0th result yielded by its terminator ('tensor<100xf32>')}}
   %result = iree_linalg_ext.in_parallel %num_threads -> tensor<100xf32> {
@@ -449,7 +449,7 @@ func @type_mismatch(%1 : tensor<1xf32>, %out : tensor<200xf32>) -> () {
 
 // -----
 
-func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
+func.func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
   // expected-error@+1 {{expected two input operands}}
   %0:2 = iree_linalg_ext.topk
         dimension(1)
@@ -464,7 +464,7 @@ func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10x
 
 // -----
 
-func @topk_invalid(%input_values: tensor<2x10xi32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
+func.func @topk_invalid(%input_values: tensor<2x10xi32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
    // expected-error@+1 {{expected input/output value types to be identical}}
   %0:2 = iree_linalg_ext.topk
         dimension(1)
@@ -479,7 +479,7 @@ func @topk_invalid(%input_values: tensor<2x10xi32>, %input_indices: tensor<2x10x
 
 // -----
 
-func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10xf32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
+func.func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10xf32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
    // expected-error@+1 {{expected input/output indices types to be int}}
   %0:2 = iree_linalg_ext.topk
         dimension(1)
@@ -494,7 +494,7 @@ func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10x
 
 // -----
 
-func @topk_invalid(%input_values: tensor<10x2x10xf32>, %input_indices: tensor<10x2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
+func.func @topk_invalid(%input_values: tensor<10x2x10xf32>, %input_indices: tensor<10x2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
    // expected-error@+1 {{expected input/output to have the same rank}}
   %0:2 = iree_linalg_ext.topk
         dimension(1)
@@ -509,7 +509,7 @@ func @topk_invalid(%input_values: tensor<10x2x10xf32>, %input_indices: tensor<10
 
 // -----
 
-func @topk_invalid(%input_values: tensor<3x10xf32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
+func.func @topk_invalid(%input_values: tensor<3x10xf32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
    // expected-error@+1 {{input indices/values shape must match}}
   %0:2 = iree_linalg_ext.topk
         dimension(1)
@@ -524,7 +524,7 @@ func @topk_invalid(%input_values: tensor<3x10xf32>, %input_indices: tensor<2x10x
 
 // -----
 
-func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<3x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<3x3xf32>, tensor<2x3xi32>) {
+func.func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<3x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<3x3xf32>, tensor<2x3xi32>) {
    // expected-error@+1 {{output indices/values shape must match}}
   %0:2 = iree_linalg_ext.topk
         dimension(1)
@@ -539,7 +539,7 @@ func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10x
 
 // -----
 
-func @topk_invalid(%input_values: tensor<3x10xf32>, %input_indices: tensor<3x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
+func.func @topk_invalid(%input_values: tensor<3x10xf32>, %input_indices: tensor<3x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
    // expected-error@+1 {{incompatible input/output shapes}}
   %0:2 = iree_linalg_ext.topk
         dimension(1)

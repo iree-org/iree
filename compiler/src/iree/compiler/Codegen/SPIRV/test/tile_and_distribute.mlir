@@ -64,7 +64,7 @@ hal.executable private @matmul {
   }
 }
 
-// CHECK-LABEL: func @matmul
+// CHECK-LABEL: func.func @matmul
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[TIDX:.+]] = gpu.thread_id x
@@ -124,7 +124,7 @@ hal.executable private @conv_1d {
   }
 }
 
-// CHECK-LABEL: func @conv_1d
+// CHECK-LABEL: func.func @conv_1d
 //       CHECK-DAG: %[[RET:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
 //       CHECK-DAG: %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //       CHECK-DAG: %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -241,7 +241,7 @@ hal.executable private @conv_2d {
 
 //     CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
 //     CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
-//         CHECK: func @conv_2d
+//         CHECK: func.func @conv_2d
 //     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -318,7 +318,7 @@ hal.executable private @conv_3d {
   }
 }
 
-//   CHECK-LABEL: func @conv_3d
+//   CHECK-LABEL: func.func @conv_3d
 //     CHECK-DAG:   %[[TIDX:.+]] = gpu.thread_id x
 //     CHECK-DAG:   %[[TIDY:.+]] = gpu.thread_id y
 //     CHECK-DAG:   %[[TIDZ:.+]] = gpu.thread_id z
@@ -387,7 +387,7 @@ module  {
 
 //     CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
 //     CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 32)>
-//         CHECK: func @pooling_nhwc_max
+//         CHECK: func.func @pooling_nhwc_max
 //     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
@@ -455,7 +455,7 @@ hal.executable @matvec {
   }
 }
 
-// CHECK-LABEL: func @matvec()
+// CHECK-LABEL: func.func @matvec()
 //       CHECK:   %[[A:.+]] = hal.interface.binding.subspan {{.+}} : memref<250x1024xf32>
 //       CHECK:   %[[B:.+]] = hal.interface.binding.subspan {{.+}} : memref<1024xf32>
 //       CHECK:   %[[C:.+]] = hal.interface.binding.subspan {{.+}} : memref<250xf32>

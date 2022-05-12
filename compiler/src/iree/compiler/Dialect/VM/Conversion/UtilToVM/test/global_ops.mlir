@@ -16,12 +16,12 @@ util.global public @v_initialized : !hal.buffer
 // CHECK-NEXT:   vm.return
 // CHECK-NEXT: }
 util.initializer {
-  %0 = call @initializer() : () -> !hal.buffer
+  %0 = func.call @initializer() : () -> !hal.buffer
   util.global.store %0, @v_initialized : !hal.buffer
   util.initializer.return
 }
 // CHECK-NEXT: vm.func private @initializer() -> !vm.ref<!hal.buffer>
-func private @initializer() -> !hal.buffer
+func.func private @initializer() -> !hal.buffer
 
 // -----
 

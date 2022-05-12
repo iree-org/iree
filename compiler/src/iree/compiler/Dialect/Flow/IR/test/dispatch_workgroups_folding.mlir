@@ -75,7 +75,7 @@ func.func @inlineWithTiedResults2(%arg0: tensor<1x4xf32>) -> tensor<1x4xf32> {
 
 // -----
 
-// CHECK-LABEL: func @dontInlineReadWrite
+// CHECK-LABEL: func.func @dontInlineReadWrite
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<1x4xf32>)
 func.func @dontInlineReadWrite(%arg0: tensor<1x4xf32>) -> tensor<4x8xf32> {
   // CHECK: %[[CST:.+]] = arith.constant dense<0.000000e+00> : tensor<4x8xf32>
@@ -99,7 +99,7 @@ func.func @dontInlineReadWrite(%arg0: tensor<1x4xf32>) -> tensor<4x8xf32> {
 
 // -----
 
-// CHECK-LABEL: func @remove_unused_result
+// CHECK-LABEL: func.func @remove_unused_result
 func.func @remove_unused_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
   %c1 = arith.constant 1 : index
   //      CHECK: flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> tensor<i32> =
@@ -124,7 +124,7 @@ func.func @remove_unused_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) ->
 
 // -----
 
-// CHECK-LABEL: func @remove_unused_dynamic_result
+// CHECK-LABEL: func.func @remove_unused_dynamic_result
 func.func @remove_unused_dynamic_result(%dim: index) -> (tensor<i32>) {
   %c1 = arith.constant 1 : index
   //      CHECK: flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> tensor<i32> =
@@ -153,7 +153,7 @@ func.func @remove_unused_dynamic_result(%dim: index) -> (tensor<i32>) {
 
 // -----
 
-// CHECK-LABEL: func @remove_unused_read_write_result
+// CHECK-LABEL: func.func @remove_unused_read_write_result
 func.func @remove_unused_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
   %c1 = arith.constant 1 : index
   //      CHECK: flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> tensor<i32> =
@@ -178,7 +178,7 @@ func.func @remove_unused_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor
 
 // -----
 
-// CHECK-LABEL: func @keep_used_read_write_result
+// CHECK-LABEL: func.func @keep_used_read_write_result
 func.func @keep_used_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
   %c1 = arith.constant 1 : index
   //      CHECK: flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> (tensor<i32>, tensor<i32>) =

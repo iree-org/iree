@@ -1,7 +1,7 @@
 // RUN: iree-dialects-opt --linalg-transform-interp %s | FileCheck %s
 
-// CHECK-LABEL: func @matmul_tensors(
-func @matmul_tensors(
+// CHECK-LABEL: func.func @matmul_tensors(
+func.func @matmul_tensors(
   %arg0: tensor<126x127xf32>, %arg1: tensor<127x128xf32>, %arg2: tensor<126x128xf32> { linalg.inplaceable = true})
     -> tensor<126x128xf32> {
   // CHECK-DAG: %[[c124:.*]] = arith.constant 124 : index

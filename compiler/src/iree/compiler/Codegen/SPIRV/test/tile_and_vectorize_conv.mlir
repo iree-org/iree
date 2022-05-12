@@ -69,7 +69,7 @@ hal.executable private @conv_static_shape_f32 {
   }
 }
 
-// CHECK-LABEL: func @conv_static_shape_f32()
+// CHECK-LABEL: func.func @conv_static_shape_f32()
 
 // No vector transfer write ops generated for the linalg.fill op: it's cancelled with read ops.
 // CHECK-NOT: vector.transfer
@@ -160,7 +160,7 @@ hal.executable private @depthwise_conv_static_shape_f32 {
   }
 }
 
-// CHECK-LABEL: func @depthwise_conv_static_shape_f32()
+// CHECK-LABEL: func.func @depthwise_conv_static_shape_f32()
 
 // No vector transfer write ops generated for the linalg.fill op: it's cancelled with read ops.
 // CHECK-NOT: vector.transfer
@@ -274,7 +274,7 @@ hal.executable private @low_padded_conv {
   }
 }
 
-// CHECK-LABEL: func @low_padded_conv()
+// CHECK-LABEL: func.func @low_padded_conv()
 
 // Loop nest for workgroup tiling and distribution
 // CHECK-COUNT-3: scf.for
@@ -403,7 +403,7 @@ hal.executable private @low_high_padded_depthwise_conv {
   }
 }
 
-// CHECK-LABEL: func @low_high_padded_depthwise_conv()
+// CHECK-LABEL: func.func @low_high_padded_depthwise_conv()
 
 // Loop nest for workgroup tiling and distribution
 // CHECK-COUNT-3: scf.for

@@ -112,7 +112,7 @@ static bool iree_compile_mlir_to_bytecode(iree_string_view_t mlir_source,
 int main(int argc, char** argv) {
   // MLIR code that we will compile
   iree_string_view_t mlir_code = iree_make_cstring_view(
-      "func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> "
+      "func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> "
       "tensor<4xf32>\n"
       "    {\n"
       "  %0 = \"mhlo.multiply\"(%arg0, %arg1) : "

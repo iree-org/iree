@@ -23,7 +23,7 @@ module {
 #map = affine_map<(d0) -> (-d0, 16384)>
 // expected-error @+1 {{expected total size of stack allocation is not greater than 32 KB, but got 65536 bytes}}
 module {
-  func @dynamic_big_allocas(%arg0: index) {
+  func.func @dynamic_big_allocas(%arg0: index) {
     %0 = affine.min #map(%arg0)
     %1 = memref.alloca(%0) : memref<?xf32>
     return

@@ -5,7 +5,7 @@ func.func @concatenate(%arg0: tensor<2x2xi32>, %arg1: tensor<2x4xi32>) -> tensor
   %0 = "mhlo.concatenate"(%arg0, %cst, %arg1) {dimension = 1} : (tensor<2x2xi32>, tensor<2x3xi32>, tensor<2x4xi32>) -> tensor<2x9xi32>
   return %0 : tensor<2x9xi32>
 }
-// CHECK:       func @concatenate
+// CHECK:       func.func @concatenate
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9$._-]+]]
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9$._-]+]]
 // CHECK:         %[[CST:.+]] = arith.constant dense<514> : tensor<2x3xi32>

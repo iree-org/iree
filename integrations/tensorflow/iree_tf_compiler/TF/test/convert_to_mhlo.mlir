@@ -1,7 +1,7 @@
 // RUN: iree-tf-opt --iree-tf-convert-to-mhlo --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @sigmoid
-func @sigmoid(%arg0: tensor<2xf32>) -> tensor<2xf32> {
+func.func @sigmoid(%arg0: tensor<2xf32>) -> tensor<2xf32> {
   // CHECK-DAG: [[SCALAR:%.+]] = mhlo.constant dense<5.000000e-01> : tensor<f32>
   // CHECK-DAG: [[SHAPE_OF:%.+]] = shape.shape_of %arg0 : tensor<2xf32> -> tensor<1xindex>
   // CHECK-DAG: [[SHAPE_VAL:%.+]] = shape.to_extent_tensor [[SHAPE_OF]] : tensor<1xindex> -> tensor<1xindex>
@@ -15,7 +15,7 @@ func @sigmoid(%arg0: tensor<2xf32>) -> tensor<2xf32> {
 }
 
 // CHECK-LABEL: @sigmoid_complex
-func @sigmoid_complex(%arg0: tensor<2xcomplex<f32>>) -> tensor<2xcomplex<f32>> {
+func.func @sigmoid_complex(%arg0: tensor<2xcomplex<f32>>) -> tensor<2xcomplex<f32>> {
   // CHECK: [[R0:%.+]] = mhlo.constant dense<(5.000000e-01,0.000000e+00)> : tensor<complex<f32>>
   // CHECK-NOT: tf.Sigmoid
   %0 = "tf.Sigmoid"(%arg0) : (tensor<2xcomplex<f32>>) -> tensor<2xcomplex<f32>>
@@ -23,7 +23,7 @@ func @sigmoid_complex(%arg0: tensor<2xcomplex<f32>>) -> tensor<2xcomplex<f32>> {
 }
 
 // CHECK-LABEL: @sigmoid_unranked
-func @sigmoid_unranked(%arg0: tensor<*xf32>) -> tensor<*xf32> {
+func.func @sigmoid_unranked(%arg0: tensor<*xf32>) -> tensor<*xf32> {
   // CHECK-DAG: [[SCALAR:%.+]] = mhlo.constant dense<5.000000e-01> : tensor<f32>
   // CHECK-DAG: [[SHAPE_OF:%.+]] = shape.shape_of %arg0 : tensor<*xf32> -> tensor<?xindex>
   // CHECK-DAG: [[SHAPE_VAL:%.+]] = shape.to_extent_tensor [[SHAPE_OF]] : tensor<?xindex> -> tensor<?xindex>

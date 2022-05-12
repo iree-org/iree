@@ -4,7 +4,7 @@
 //  CHECK-SAME:     %[[idx:.*]]: index, %[[idx2:.*]]: index,
 //  CHECK-SAME:     %[[arg1:.*]]: memref<?xf32, #{{.*}}>,
 //  CHECK-SAME:     %[[arg2:.*]]: memref<?xf32, #{{.*}}>
-func @parallel_insert_slice_no_conflict(
+func.func @parallel_insert_slice_no_conflict(
     %idx: index, %idx2: index,
     %arg1: tensor<?xf32> {bufferization.writable = true},
     %arg2: tensor<?xf32> {bufferization.writable = true}) -> (tensor<?xf32>, f32)
@@ -43,7 +43,7 @@ module {
 //  CHECK-SAME:     %[[idx:.*]]: index, %[[idx2:.*]]: index,
 //  CHECK-SAME:     %[[arg1:.*]]: memref<?xf32, #{{.*}}>,
 //  CHECK-SAME:     %[[arg2:.*]]: memref<?xf32, #{{.*}}>
-func @parallel_insert_slice_with_conflict(
+func.func @parallel_insert_slice_with_conflict(
     %idx: index, %idx2: index,
     %arg1: tensor<?xf32> {bufferization.writable = true},
     %arg2: tensor<?xf32> {bufferization.writable = true}) -> (f32, f32)

@@ -1,10 +1,10 @@
 // RUN: iree-dialects-opt %s --linalg-transform-interp --canonicalize | FileCheck %s
 
-// CHECK-LABEL: func @parallel_insert_slice_no_conflict(
+// CHECK-LABEL: func.func @parallel_insert_slice_no_conflict(
 //  CHECK-SAME:     %[[idx:.*]]: index, %[[idx2:.*]]: index,
 //  CHECK-SAME:     %[[arg1:.*]]: memref<?xf32, #{{.*}}>,
 //  CHECK-SAME:     %[[arg2:.*]]: memref<?xf32, #{{.*}}>
-func @parallel_insert_slice_no_conflict(
+func.func @parallel_insert_slice_no_conflict(
     %idx: index, %idx2: index,
     %arg1: tensor<?xf32> {bufferization.writable=true},
     %arg2: tensor<?xf32> {bufferization.writable=true}) -> (tensor<?xf32>, f32)
@@ -35,11 +35,11 @@ func @parallel_insert_slice_no_conflict(
   return %2, %f : tensor<?xf32>, f32
 }
 
-// CHECK-LABEL: func @parallel_insert_slice_with_conflict(
+// CHECK-LABEL: func.func @parallel_insert_slice_with_conflict(
 //  CHECK-SAME:     %[[idx:.*]]: index, %[[idx2:.*]]: index,
 //  CHECK-SAME:     %[[arg1:.*]]: memref<?xf32, #{{.*}}>,
 //  CHECK-SAME:     %[[arg2:.*]]: memref<?xf32, #{{.*}}>
-func @parallel_insert_slice_with_conflict(
+func.func @parallel_insert_slice_with_conflict(
     %idx: index, %idx2: index,
     %arg1: tensor<?xf32> {bufferization.writable=true},
     %arg2: tensor<?xf32> {bufferization.writable=true}) -> (f32, f32)

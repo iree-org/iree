@@ -6,7 +6,7 @@ stream.executable private @executable {
   stream.executable.export public @dispatch
   // CHECK-NEXT: builtin.module
   builtin.module  {
-    // CHECK-NEXT: func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding, %arg2: index) {
+    // CHECK-NEXT: func.func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding, %arg2: index) {
     func.func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding, %arg2: index) {
       %c0 = arith.constant 0 : index
       // CHECK-DAG: = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readwrite:?x5x64xf32>{%arg2}

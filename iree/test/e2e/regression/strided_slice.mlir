@@ -1,4 +1,4 @@
-func @stride_slice() {
+func.func @stride_slice() {
   %c15 = arith.constant 15 : i32
   %c16 = arith.constant 16 : i32
   %0 = linalg.init_tensor [12, 15] : tensor<12x15xi32>
@@ -59,7 +59,7 @@ func @stride_slice() {
 }
 
 #map = affine_map<(d0) -> (d0)>
-func @issue_8825() {
+func.func @issue_8825() {
   %c0 = arith.constant 0 : index
   %c0_i64 = arith.constant 0 : i64
   %c3_i64 = arith.constant 3 : i64

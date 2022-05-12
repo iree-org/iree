@@ -1,6 +1,6 @@
 // RUN: iree-opt --iree-llvmcpu-verify-linalg-transform-legality %s --verify-diagnostics -split-input-file
 
-func @matmul_123x456xf32_times_456x789xf32_into_123x789xf32_dispatch_0() {
+func.func @matmul_123x456xf32_times_456x789xf32_into_123x789xf32_dispatch_0() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:123x4x114xf32>

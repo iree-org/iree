@@ -18,7 +18,7 @@ func.func @add(%lhs: tensor<2x8xf32>, %rhs: tensor<2x8xf32>) -> tensor<2x8xf32> 
   return %0 : tensor<2x8xf32>
 }
 
-//   CHECK-LABEL: func @add
+//   CHECK-LABEL: func.func @add
 // CHECK-COUNT-8:   vector.transfer_read %{{.+}} : tensor<2x8xf32>, vector<4xf32>
 // CHECK-COUNT-4:   arith.addf %{{.*}}, %{{.*}} : vector<4xf32>
 // CHECK-COUNT-4:   arith.mulf %{{.*}}, %{{.*}} : vector<4xf32>
@@ -43,7 +43,7 @@ func.func @transpose_add(%lhs: tensor<4x2xf32>, %rhs: tensor<2xf32>) -> tensor<2
   return %0 : tensor<2x4xf32>
 }
 
-// CHECK-LABEL: func @transpose_add
+// CHECK-LABEL: func.func @transpose_add
 //  CHECK-SAME: (%[[LHS:.+]]: tensor<4x2xf32>, %[[RHS:.+]]: tensor<2xf32>)
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index

@@ -10,11 +10,11 @@
 #map4 = affine_map<(d0) -> (d0)>
 
 module {
-  // CHECK-LABEL: func @static_tile
+  // CHECK-LABEL: func.func @static_tile
   //  CHECK-SAME:   %[[CHUNK_SIZE:[0-9a-z]+]]: index
   //  CHECK-SAME:   %[[IN:[0-9a-z]+]]: memref<?xf32>
   //  CHECK-SAME:   %[[OUT:[0-9a-z]+]]: memref<?xf32>
-  func @static_tile(%arg0: index, %arg1: memref<?xf32>, %arg2: memref<?xf32>) {
+  func.func @static_tile(%arg0: index, %arg1: memref<?xf32>, %arg2: memref<?xf32>) {
     %cst = arith.constant 4.200000e+01 : f32
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index

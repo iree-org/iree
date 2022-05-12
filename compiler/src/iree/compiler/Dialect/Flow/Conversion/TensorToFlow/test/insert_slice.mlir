@@ -8,7 +8,7 @@ func.func @insert_slice_convert
       tensor<1x4x48xf32> into tensor<?x24x48xf32>
   return %0 : tensor<?x24x48xf32>
 }
-// CHECK-LABEL: func @insert_slice_convert
+// CHECK-LABEL: func.func @insert_slice_convert
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0
@@ -28,7 +28,7 @@ func.func @insert_slice_convert_rank_reducing
       tensor<4x48xf32> into tensor<?x24x48xf32>
   return %0 : tensor<?x24x48xf32>
 }
-// CHECK-LABEL: func @insert_slice_convert_rank_reducing
+// CHECK-LABEL: func.func @insert_slice_convert_rank_reducing
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0
@@ -46,7 +46,7 @@ func.func @rank_reducing_insert_slice_trailing_unit_dims
   %0 = tensor.insert_slice %arg0 into %arg1[0, 1, 0, 0] [1, 49, 20, 1] [1, 1, 1, 1] : tensor<49x20xf32> into tensor<1x50x20x1xf32>
   return %0 : tensor<1x50x20x1xf32>
 }
-// CHECK-LABEL: func @rank_reducing_insert_slice_trailing_unit_dims
+// CHECK-LABEL: func.func @rank_reducing_insert_slice_trailing_unit_dims
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //       CHECK:   %[[RESHAPE:.+]] = flow.tensor.reshape %{{.+}} : tensor<49x20xf32> -> tensor<1x49x20x1xf32>

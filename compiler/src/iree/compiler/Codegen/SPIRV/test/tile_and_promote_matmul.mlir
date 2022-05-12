@@ -68,7 +68,7 @@ hal.executable @matmul_256x1024x128 {
   }
 }
 
-// CHECK-LABEL: func @matmul_256x1024x128()
+// CHECK-LABEL: func.func @matmul_256x1024x128()
 
 //  CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index

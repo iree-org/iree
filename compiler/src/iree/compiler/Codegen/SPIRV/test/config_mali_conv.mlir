@@ -49,7 +49,7 @@ hal.executable @conv_112x112x512 {
 //      CHECK: hal.executable.entry_point public @conv_112x112x512
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
-//      CHECK: func @conv_112x112x512()
+//      CHECK: func.func @conv_112x112x512()
 //      CHECK:   linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
@@ -103,7 +103,7 @@ hal.executable @conv_112x112x32 {
 //      CHECK: hal.executable.entry_point public @conv_112x112x32
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
-//      CHECK: func @conv_112x112x32()
+//      CHECK: func.func @conv_112x112x32()
 //      CHECK:   linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
@@ -156,7 +156,7 @@ hal.executable @conv_16x16x16 {
 //      CHECK: hal.executable.entry_point public @conv_16x16x16
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [4 : index, 2 : index, 2 : index]
-//      CHECK: func @conv_16x16x16()
+//      CHECK: func.func @conv_16x16x16()
 //      CHECK:   linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
@@ -210,7 +210,7 @@ hal.executable @dwconv_28x28x144 {
 //      CHECK: hal.executable.entry_point public @dwconv_28x28x144
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [4 : index, 2 : index, 2 : index]
-//      CHECK: func @dwconv_28x28x144()
+//      CHECK: func.func @dwconv_28x28x144()
 //      CHECK:   linalg.depthwise_conv_2d_nhwc_hwc
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
@@ -265,6 +265,6 @@ hal.executable @dwconv_1x2x8 {
 //      CHECK: hal.executable.entry_point public @dwconv_1x2x8
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [2 : index, 2 : index, 1 : index]
-//      CHECK: func @dwconv_1x2x8()
+//      CHECK: func.func @dwconv_1x2x8()
 //      CHECK:   linalg.depthwise_conv_2d_nhwc_hwc
 // CHECK-SAME:     lowering_config = #[[CONFIG]]

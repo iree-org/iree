@@ -35,7 +35,7 @@ func.func @matmul() {
   flow.dispatch.tensor.store %10, %2, offsets = [0, 0], sizes = [128, 384], strides = [1, 1] : tensor<128x384xf32> -> !flow.dispatch.tensor<writeonly:128x384xf32>
   return
 }
-// CHECK-LABEL: func @matmul
+// CHECK-LABEL: func.func @matmul
 // CHECK:         scf.for
 // CHECK:           scf.for
 // CHECK:             %[[MATMUL:.+]] = linalg.matmul
@@ -120,7 +120,7 @@ func.func @check_offset_strides() {
 }
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 64)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>
-//      CHECK: func @check_offset_strides()
+//      CHECK: func.func @check_offset_strides()
 //  CHECK-DAG:   %[[LHS_OFFSET_Y:.+]] = hal.interface.constant.load[0]
 //  CHECK-DAG:   %[[LHS_OFFSET_X:.+]] = hal.interface.constant.load[1]
 //  CHECK-DAG:   %[[LHS_STRIDE_Y:.+]] = hal.interface.constant.load[2]
@@ -165,7 +165,7 @@ func.func @check_offset_strides() {
 
 // -----
 
-func @argmax() {
+func.func @argmax() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -222,7 +222,7 @@ func @argmax() {
   flow.dispatch.tensor.store %t5#1, %5, offsets = [0, 0], sizes = [%2, %t1], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>{%2, %t1}
   return
 }
-// CHECK-LABEL: func @argmax()
+// CHECK-LABEL: func.func @argmax()
 //       CHECK: scf.for
 //   CHECK-NOT:     iter_args
 //       CHECK:   scf.for
@@ -236,7 +236,7 @@ func @argmax() {
 
 // -----
 
-func @reduce() {
+func.func @reduce() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -295,7 +295,7 @@ func @reduce() {
   flow.dispatch.tensor.store %t5#0, %o1, offsets = [0, 0], sizes = [%2, %t1], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>{%2, %t1}
   return
 }
-// CHECK-LABEL: func @reduce()
+// CHECK-LABEL: func.func @reduce()
 //   CHECK-DAG:   %[[OUT1:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //   CHECK-DAG:   %[[OUT2:.+]] = hal.interface.binding.subspan set(0) binding(2)
 //       CHECK:   scf.for
@@ -311,7 +311,7 @@ func @reduce() {
 
 // -----
 
-func @scatter() {
+func.func @scatter() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -355,7 +355,7 @@ func @scatter() {
   flow.dispatch.tensor.store %t8, %t2, offsets = [0, 0], sizes = [%t1, %3], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<readwrite:?x?xf32>{%t1, %3}
   return
 }
-// CHECK-LABEL: func @scatter()
+// CHECK-LABEL: func.func @scatter()
 //       CHECK:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(2)
 //       CHECK:   %[[OUT_TENSOR:.+]] = flow.dispatch.tensor.load %[[OUT]]
 //       CHECK:   scf.for

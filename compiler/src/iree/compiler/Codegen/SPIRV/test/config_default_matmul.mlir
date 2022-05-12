@@ -49,7 +49,7 @@ hal.executable @batch_matmul_1x3x32 {
 //      CHECK: hal.executable.entry_point public @batch_matmul_1x3x32
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
-//      CHECK: func @batch_matmul_1x3x32()
+//      CHECK: func.func @batch_matmul_1x3x32()
 //      CHECK:   linalg.batch_matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
@@ -103,7 +103,7 @@ hal.executable private @matmul_64x16 {
 //      CHECK: hal.executable.entry_point public @matmul_64x16
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [16 : index, 4 : index, 1 : index]
-//      CHECK: func @matmul_64x16()
+//      CHECK: func.func @matmul_64x16()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
@@ -168,7 +168,7 @@ hal.executable @matmul_400x273 {
 //      CHECK: hal.executable.entry_point public @matmul_400x273
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [32 : index, 2 : index, 1 : index]
-//      CHECK: func @matmul_400x273()
+//      CHECK: func.func @matmul_400x273()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
@@ -234,7 +234,7 @@ hal.executable @matmul_25x546 {
 //      CHECK: hal.executable.entry_point public @matmul_25x546
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [2 : index, 32 : index, 1 : index]
-//      CHECK: func @matmul_25x546()
+//      CHECK: func.func @matmul_25x546()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
@@ -310,6 +310,6 @@ hal.executable private @matmul_pointwise_256x1024 {
 //      CHECK: hal.executable.entry_point public @matmul_pointwise_256x1024
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [32 : index, 2 : index, 1 : index]
-//      CHECK: func @matmul_pointwise_256x1024()
+//      CHECK: func.func @matmul_pointwise_256x1024()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]

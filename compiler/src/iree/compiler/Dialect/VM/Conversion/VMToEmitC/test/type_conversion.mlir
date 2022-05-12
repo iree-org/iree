@@ -46,7 +46,7 @@ vm.module @my_module {
 // vm.func conversion. All references in the signature should be converted to
 // emitc pointers.
 vm.module @my_module {
-  // CHECK: func @fn(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, %arg1: i32)
+  // CHECK: func.func @fn(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, %arg1: i32)
   func.func @fn(%arg0 : !vm.ref<?>, %arg1 : i32) -> () {
     return
   }

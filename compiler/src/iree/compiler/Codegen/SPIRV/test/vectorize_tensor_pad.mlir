@@ -13,7 +13,7 @@ func.func @pad_tensor(%source: tensor<1x?x?x3xf32>, %low1: index, %low2: index, 
   return %pad: tensor<1x2x2x3xf32>
 }
 
-// CHECK-LABEL: func @pad_tensor
+// CHECK-LABEL: func.func @pad_tensor
 //  CHECK-SAME: (%[[SOURCE:.+]]: tensor<1x?x?x3xf32>, %[[LOW1:.+]]: index, %[[LOW2:.+]]: index, %{{.+}}: index, %{{.+}}: index)
 
 // CHECK-DAG:   %[[I0:.+]] = arith.constant 0 : index
