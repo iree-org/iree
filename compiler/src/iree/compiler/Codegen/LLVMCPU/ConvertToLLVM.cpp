@@ -993,22 +993,6 @@ void ConvertToLLVMPass::runOnOperation() {
                            math::MathDialect, tosa::TosaDialect>();
   target.addIllegalOp<UnrealizedConversionCastOp>();
 
-  // Don't apply patterns to private function (e.g num_workgroups func).
-  target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
-    if (isEntryPoint(funcOp)) return false;
-    return true;
-  });
-  target.addDynamicallyLegalDialect<func::FuncDialect, mlir::math::MathDialect,
-                                    mlir::arith::ArithmeticDialect,
-                                    IREE::Util::UtilDialect,
-                                    IREE::HAL::HALDialect, math::MathDialect>(
-      [&](Operation *op) {
-        auto funcParent = op->getParentOfType<func::FuncOp>();
-        if (!funcParent) return false;
-        if (isEntryPoint(funcParent)) return false;
-        return true;
-      });
-
   if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
     signalPassFailure();
     return;

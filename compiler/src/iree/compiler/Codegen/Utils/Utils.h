@@ -37,7 +37,7 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
     ModuleOp module);
 
 /// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
-IREE::HAL::ExecutableEntryPointOp getEntryPoint(func::FuncOp funcOp);
+FailureOr<IREE::HAL::ExecutableEntryPointOp> getEntryPoint(func::FuncOp funcOp);
 
 /// Methods to get backend information.
 bool isX86(IREE::HAL::ExecutableVariantOp variantOp);

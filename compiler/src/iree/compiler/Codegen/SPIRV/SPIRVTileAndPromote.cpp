@@ -147,8 +147,9 @@ struct SPIRVTileAndPromotePass final
 void SPIRVTileAndPromotePass::runOnOperation() {
   MLIRContext *context = &getContext();
   func::FuncOp funcOp = getOperation();
-  auto entryPointOp = getEntryPoint(funcOp);
-  if (!entryPointOp) return;
+  FailureOr<IREE::HAL::ExecutableEntryPointOp> entryPointOp =
+      getEntryPoint(funcOp);
+  if (failed(entryPointOp)) return;
 
   {  // Tile reduction dimensions.
     RewritePatternSet tilingPatterns(context);
@@ -178,7 +179,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   });
 
   auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
-      entryPointOp.workgroup_size().getValue(),
+      entryPointOp->workgroup_size().getValue(),
       [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
   int64_t flatWorkgroupSize =
       workgroupSize[0] * workgroupSize[1] * workgroupSize[2];

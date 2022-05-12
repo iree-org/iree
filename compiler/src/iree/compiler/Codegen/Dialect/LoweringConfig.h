@@ -52,9 +52,10 @@ IREE::Codegen::TranslationInfoAttr getTranslationInfo(
 /// point). Returns `nullptr` on failure.
 inline IREE::Codegen::TranslationInfoAttr getTranslationInfo(
     func::FuncOp funcOp) {
-  auto entryPointOp = getEntryPoint(funcOp);
-  if (!entryPointOp) return nullptr;
-  return getTranslationInfo(entryPointOp);
+  FailureOr<IREE::HAL::ExecutableEntryPointOp> entryPointOp =
+      getEntryPoint(funcOp);
+  if (failed(entryPointOp)) return nullptr;
+  return getTranslationInfo(*entryPointOp);
 }
 
 /// Returns the workgroup size specified on the `entryPointOp`.
@@ -73,8 +74,9 @@ inline void setTranslationInfo(
     func::FuncOp entryPointFn,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize = {}) {
-  auto entryPointOp = getEntryPoint(entryPointFn);
-  return setTranslationInfo(entryPointOp, translationInfo, workgroupSize);
+  FailureOr<IREE::HAL::ExecutableEntryPointOp> entryPointOp =
+      getEntryPoint(entryPointFn);
+  return setTranslationInfo(*entryPointOp, translationInfo, workgroupSize);
 }
 
 /// Sets the translation info on the `hal.executable.entry_point` op
@@ -86,11 +88,12 @@ inline void setTranslationInfo(
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workloadPerWorkgroup, ArrayRef<int64_t> workgroupSize,
     unsigned softwarePipelineDepth = 0) {
-  auto entryPointOp = getEntryPoint(entryPointFn);
+  FailureOr<IREE::HAL::ExecutableEntryPointOp> entryPointOp =
+      getEntryPoint(entryPointFn);
   MLIRContext *context = entryPointFn.getContext();
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       context, passPipeline, workloadPerWorkgroup);
-  setTranslationInfo(entryPointOp, translationInfo, workgroupSize);
+  setTranslationInfo(*entryPointOp, translationInfo, workgroupSize);
 }
 
 //===----------------------------------------------------------------------===//
