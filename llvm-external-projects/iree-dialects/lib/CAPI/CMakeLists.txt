@@ -3,10 +3,12 @@ add_mlir_public_c_api_library(IREEDialectsCAPI
   Utils.cpp
   LINK_LIBS PUBLIC
   MLIRIR
+  MLIRTransformDialect
   IREEInputDialect
   IREELinalgExtDialect
+  IREELinalgExtTransformOps
   IREELinalgTransformDialect
-  IREELinalgTransformDialectTransforms
+  IREELinalgTransformDialectPasses
   IREEPyDMDialect
   IREEPyDMPasses
 )

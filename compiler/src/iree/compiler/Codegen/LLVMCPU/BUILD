@@ -46,7 +46,7 @@ iree_compiler_cc_library(
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
-        "//llvm-external-projects/iree-dialects:IREELinalgTransformDialectTransforms",
+        "//llvm-external-projects/iree-dialects:IREELinalgTransformDialectPasses",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:Analysis",

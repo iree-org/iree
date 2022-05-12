@@ -79,6 +79,220 @@ static LogicalResult nestedInFunc(PatternRewriter &rewriter,
   return success(functionSymbol.getLeafReference() == func.getName());
 }
 
+/// Construct a BlockAndValueMapping from `linalgOp` to `genericLinalgModelOp`.
+/// Walk both ops and check whether all subops are the same.
+static LogicalResult
+haveIdenticalBodiesImpl(linalg::LinalgOp linalgOp,
+                        linalg::LinalgOp genericLinalgModelOp) {
+  BlockAndValueMapping bvm;
+  bvm.map(linalgOp.getBlock()->getArguments(),
+          genericLinalgModelOp.getBlock()->getArguments());
+  SmallVector<Operation *> linalgBodyOps;
+  linalgOp.getBlock()->walk(
+      [&](Operation *op) { linalgBodyOps.push_back(op); });
+
+  unsigned idx = 0;
+  WalkResult res = genericLinalgModelOp.getBlock()->walk([&](Operation *op) {
+    Operation *linalgSubOp = linalgBodyOps[idx++];
+    if (op->getName() != linalgSubOp->getName())
+      return WalkResult::interrupt();
+    if (op->getAttrs() != linalgSubOp->getAttrs())
+      return WalkResult::interrupt();
+    for (auto it : llvm::zip(op->getOperands(), linalgSubOp->getOperands()))
+      if (std::get<0>(it) != bvm.lookupOrNull(std::get<1>(it)))
+        return WalkResult::interrupt();
+    bvm.map(linalgSubOp->getResults(), op->getResults());
+    return WalkResult::advance();
+  });
+
+  return success(!res.wasInterrupted());
+}
+
+/// Dispatch body equivalence check depending on case.
+static LogicalResult haveEquivalentBodies(linalg::LinalgOp linalgOp,
+                                          linalg::LinalgOp genericLinalgModelOp,
+                                          PatternRewriter &rewriter) {
+  if (succeeded(haveIdenticalBodiesImpl(linalgOp, genericLinalgModelOp)))
+    return success();
+  // TODO: haveEquivalentBodiesImpl, see e.g.
+  // https://gist.github.com/nicolasvasilache/39e89e18c46e02335c16db6ec20a07e3
+  return failure();
+}
+
+/// Succeed when `linalgOp` and `linalgModelOp` are deemed equivalent.
+static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
+                                          linalg::LinalgOp linalgOp,
+                                          linalg::LinalgOp linalgModelOp) {
+  // If basic properties do not match, return failure.
+  if (linalgOp.inputs() != linalgModelOp.inputs() ||
+      linalgOp.outputs() != linalgModelOp.outputs() ||
+      linalgOp.indexing_maps() != linalgModelOp.indexing_maps() ||
+      linalgOp.iterator_types() != linalgModelOp.iterator_types())
+    return failure();
+
+  // Build the block and go perform a body comparison.
+  {
+    // createBlock moves the insertion point, scope it in an RAII block.
+    OpBuilder::InsertionGuard guard(rewriter);
+    Region &r = linalgModelOp->getRegion(0);
+    Block *bodyBlock = rewriter.createBlock(
+        &r, r.end(), linalgOp.getBlock()->getArgumentTypes(),
+        llvm::to_vector<4>(
+            llvm::map_range(linalgOp.getBlock()->getArguments(),
+                            [](Value v) { return v.getLoc(); })));
+    ImplicitLocOpBuilder b(linalgModelOp.getLoc(), rewriter);
+    auto regionBuilder = linalgModelOp.getRegionBuilder();
+    llvm::ArrayRef<mlir::NamedAttribute> attrs = {};
+    regionBuilder(b, *bodyBlock, attrs);
+  }
+
+  return haveEquivalentBodies(linalgOp, linalgModelOp, rewriter);
+}
+
+/// Check whether the unique Operation* stored in `values[0]` (assumed) is
+/// equivalent to the unique StringRefAttr passed in `values[1]` (assumed).
+/// Equivalence is achieved when either:
+///   1. `values[0]` has the name stored in `values[1]`.
+///   2. `values[0]` and `values[1]` are both linalg ops and their structured
+///      interfaces as well as their bodies are equivalent.
+///      Structured interfaces equivalence is a simple attribute level check.
+///      Body equivalence is more involved and currently limited:
+///        a. the current impl constructs an instance of the op whose name is
+///           specified in `values[1]` and checks for exact body equality.
+///        b. a more advanced version would "subtract" the bodies and fold, cse
+///           and canonicalize to fixed point. If the result is "all zeros",
+///           then the bodies would be equivalent (really isomorphic).
+///   3. other cases TBD (e.g. vector.generic when available).
+static LogicalResult isEquivalentToOp(PatternRewriter &rewriter,
+                                      Operation *operation,
+                                      Attribute attribute) {
+  auto modelOpNameAttr = attribute.dyn_cast<StringAttr>();
+  if (!modelOpNameAttr)
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  auto modelOpName = modelOpNameAttr.strref();
+
+  // 1. If op has name `modelOpName`, the match is trivial.
+  if (operation->getName().getStringRef() == modelOpName)
+    return success();
+
+  // 2. Linalg vs Linalg.
+  // Create op from `modelOpName`.
+  OperationState modelOpState(
+      operation->getLoc(), modelOpName, operation->getOperands(),
+      operation->getResultTypes(), operation->getAttrs());
+  modelOpState.addRegion();
+  Operation *modelOp = rewriter.create(modelOpState);
+  auto g1 = llvm::make_scope_exit([&]() { rewriter.eraseOp(modelOp); });
+  linalg::LinalgOp linalgOp = dyn_cast<linalg::LinalgOp>(operation);
+  linalg::LinalgOp linalgModelOp = dyn_cast<linalg::LinalgOp>(modelOp);
+  if (linalgOp && linalgModelOp)
+    return isEquivalentToOpImpl(rewriter, linalgOp, linalgModelOp);
+
+  // 3. TBD
+  return failure();
+}
+
+/// Assume that:
+///   1. `values[0]` is an operands range
+///   2. `values[1]` contains a DictAttr with `operand_number`, `dim` and
+///      `divisor` IntegerAttr entries.
+/// Succeed if `operands`[`operand_number`] is a ranked type whose `dim` is a
+/// multiple of `divisor`.
+/// Note: 0 is the convention to express "do not tile", it is considered to
+/// divide everything.
+static LogicalResult isDimMultipleOf(PatternRewriter &rewriter,
+                                     ValueRange operands, Attribute attribute) {
+  auto dict = attribute.dyn_cast<DictionaryAttr>();
+  if (!dict)
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+
+  int64_t dim;
+  auto dimAttr = dict.getAs<IntegerAttr>("dim");
+  if (!dimAttr)
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  dim = dimAttr.getInt();
+
+  int64_t divisor;
+  auto divisorAttr = dict.getAs<IntegerAttr>("divisor");
+  if (!divisorAttr)
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  divisor = divisorAttr.getInt();
+
+  int64_t operandNumber;
+  auto operandNumberAttr = dict.getAs<IntegerAttr>("operand_number");
+  if (!operandNumberAttr)
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  operandNumber = operandNumberAttr.getInt();
+
+  ShapedType shapedType;
+  if (static_cast<int64_t>(operands.size()) > operandNumber)
+    shapedType = operands[operandNumber].getType().dyn_cast<ShapedType>();
+  if (!shapedType || shapedType.getRank() <= dim)
+    return failure();
+  return success(divisor == 0 || (shapedType.getShape()[dim] > 0 &&
+                                  shapedType.getShape()[dim] % divisor == 0));
+}
+
+/// Assume that:
+///   1. `values[0]` is an operands range
+///   2. `values[1]` contains a DictAttr with `operand_number` and `dim`
+///       IntegerAttr entries.
+/// Succeed if `value`[`operand_number`] is a ranked type whose `dim` is
+/// dynamic.
+static LogicalResult isDimStatic(PatternRewriter &rewriter, ValueRange operands,
+                                 Attribute attribute) {
+  auto dict = attribute.dyn_cast<DictionaryAttr>();
+  if (!dict)
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+
+  int64_t dim;
+  auto dimAttr = dict.getAs<IntegerAttr>("dim");
+  if (!dimAttr)
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  dim = dimAttr.getInt();
+
+  int64_t operandNumber;
+  auto operandNumberAttr = dict.getAs<IntegerAttr>("operand_number");
+  if (!operandNumberAttr)
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  operandNumber = operandNumberAttr.getInt();
+
+  ShapedType shapedType;
+  if (static_cast<int64_t>(operands.size()) > operandNumber)
+    shapedType = operands[operandNumber].getType().dyn_cast<ShapedType>();
+  return success(shapedType && !shapedType.isDynamicDim(dim));
+}
+
+/// Assume that:
+///   1. `values[0]` is an operands range
+///   2. `values[1]` contains a DictAttr with `operand_number` and `dim`
+///       IntegerAttr entries.
+/// Succeed if `value`[`operand_number`] is a ranked type whose `dim` is
+/// dynamic.
+static LogicalResult isDimDynamic(PatternRewriter &rewriter,
+                                  ValueRange operands, Attribute attribute) {
+  auto dict = attribute.dyn_cast<DictionaryAttr>();
+  if (!dict)
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+
+  int64_t dim;
+  auto dimAttr = dict.getAs<IntegerAttr>("dim");
+  if (!dimAttr)
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  dim = dimAttr.getInt();
+
+  int64_t operandNumber;
+  auto operandNumberAttr = dict.getAs<IntegerAttr>("operand_number");
+  if (!operandNumberAttr)
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  operandNumber = operandNumberAttr.getInt();
+
+  ShapedType shapedType;
+  if (static_cast<int64_t>(operands.size()) > operandNumber)
+    shapedType = operands[operandNumber].getType().dyn_cast<ShapedType>();
+  return success(shapedType && shapedType.isDynamicDim(dim));
+}
+
 //===----------------------------------------------------------------------===//
 // StructuredTransformOpsExtension
 //===----------------------------------------------------------------------===//
@@ -91,21 +305,13 @@ transform_ext::StructuredTransformOpsExtension::
       >();
 
   registerPDLMatchConstraintFn("nestedInFunc", nestedInFunc);
+  registerPDLMatchConstraintFn("isDimDynamic", isDimDynamic);
+  registerPDLMatchConstraintFn("isDimMultipleOf", isDimMultipleOf);
+  registerPDLMatchConstraintFn("isDimStatic", isDimStatic);
+  registerPDLMatchConstraintFn("isEquivalentToOp", isEquivalentToOp);
 
   declareDependentDialect<bufferization::BufferizationDialect>();
   declareDependentDialect<vector::VectorDialect>();
-
-  // declareDependentDialect<arith::ArithmeticDialect>();
-  // declareDependentDialect<scf::SCFDialect>();
-  // declareDependentDialect<LLVM::LLVMDialect>();
-  // declareDependentDialect<AffineDialect>();
-  // declareDependentDialect<bufferization::BufferizationDialect>();
-  // declareDependentDialect<func::FuncDialect>();
-  // declareDependentDialect<linalg::LinalgDialect>();
-  // // declareDependentDialect<pdl::PDLDialect>();
-  // // declareDependentDialect<pdl_interp::PDLInterpDialect>();
-  // declareDependentDialect<scf::SCFDialect>();
-  // declareDependentDialect<tensor::TensorDialect>();
 }
 
 #define GET_OP_CLASSES

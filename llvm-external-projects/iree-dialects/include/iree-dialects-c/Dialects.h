@@ -36,6 +36,18 @@ MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(LinalgTransform, iree_linalg_transform);
 /// Register all passes for LinalgTransform.
 MLIR_CAPI_EXPORTED void mlirIREELinalgTransformRegisterPasses();
 
+//===--------------------------------------------------------------------===//
+// TransformDialect
+//===--------------------------------------------------------------------===//
+
+MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Transform, transform);
+
+MLIR_CAPI_EXPORTED void
+ireeRegisterTransformDialectExtensions(MlirContext context);
+
+/// Register all passes for the transform dialect.
+MLIR_CAPI_EXPORTED void mlirIREETransformRegisterPasses();
+
 //===----------------------------------------------------------------------===//
 // IREEPyDMDialect
 //===----------------------------------------------------------------------===//

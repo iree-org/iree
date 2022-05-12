@@ -30,7 +30,7 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtPasses
     IREELinalgTransformDialect
-    IREELinalgTransformDialectTransforms
+    IREELinalgTransformDialectPasses
     LLVMSupport
     MLIRAffineToStandard
     MLIRAnalysis

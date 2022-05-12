@@ -1,4 +1,4 @@
-add_mlir_library(IREELinalgTransformDialectTransforms
+add_mlir_library(IREELinalgTransformDialectPasses
   ExpertExpansion.cpp
   TransformInterpreter.cpp
 

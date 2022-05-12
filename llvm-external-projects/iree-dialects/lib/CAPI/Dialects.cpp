@@ -8,8 +8,10 @@
 
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
+#include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Dialect/PyDM/IR/PyDMDialect.h"
 #include "iree-dialects/Dialect/PyDM/Transforms/Passes.h"
 #include "mlir/CAPI/IR.h"
@@ -18,6 +20,8 @@
 #include "mlir/CAPI/Support.h"
 #include "mlir/CAPI/Utils.h"
 #include "mlir/CAPI/Wrap.h"
+#include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Support/LLVM.h"
 
 using namespace mlir;
@@ -50,6 +54,27 @@ void mlirIREELinalgTransformRegisterPasses() {
   mlir::linalg::transform::registerLinalgTransformInterpreterPass();
   mlir::linalg::transform::registerLinalgTransformExpertExpansionPass();
   mlir::linalg::transform::registerDropSchedulePass();
+}
+//===--------------------------------------------------------------------===//
+// TransformDialect
+//===--------------------------------------------------------------------===//
+
+// TODO: this should go to upstream MLIR eventually.
+MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(Transform, transform,
+                                      mlir::transform::TransformDialect)
+
+void ireeRegisterTransformDialectExtensions(MlirContext context) {
+  MLIRContext *ctx = unwrap(context);
+  DialectRegistry registry;
+  registry.addExtensions<
+      mlir::iree_compiler::IREE::LinalgExt::LinalgExtTransformOpsExtension,
+      transform_ext::StructuredTransformOpsExtension>();
+  ctx->appendDialectRegistry(registry);
+}
+
+void mlirIREETransformRegisterPasses() {
+  mlir::linalg::transform::registerDropSchedulePass();
+  mlir::linalg::transform::registerLinalgTransformInterpreterPass();
 }
 
 //===----------------------------------------------------------------------===//
