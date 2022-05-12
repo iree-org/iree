@@ -144,8 +144,15 @@ struct DispatchTensorStoreOpInterface
 
     const AnalysisState &analysisState = state.getAnalysisState();
     Value target = getSubspanBuffer(storeOp.target(), rewriter, analysisState);
+    auto subviewMemRefType =
+        memref::SubViewOp::inferRankReducedResultType(
+            storeOp.value().getType().cast<ShapedType>().getRank(),
+            target.getType().cast<MemRefType>(), storeOp.getMixedOffsets(),
+            storeOp.getMixedSizes(), storeOp.getMixedStrides())
+            .cast<MemRefType>();
+
     Value subView = rewriter.create<memref::SubViewOp>(
-        storeOp->getLoc(), target, storeOp.getMixedOffsets(),
+        storeOp->getLoc(), subviewMemRefType, target, storeOp.getMixedOffsets(),
         storeOp.getMixedSizes(), storeOp.getMixedStrides());
     Value srcMemref =
         *state.getBuffer(rewriter, storeOp->getOpOperand(0) /*tensor*/);

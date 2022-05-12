@@ -80,7 +80,28 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
 
   // Apply the bufferization passes.
   OpPassManager bufferizationPipeline(module.getOperationName());
-  addLinalgBufferizePasses(bufferizationPipeline);
+  // The copy-only dispatch shouldnt need an allocation. Error out on
+  // allocation.
+  bufferization::BufferizationOptions::AllocationFn allocationFn =
+      [](OpBuilder &, Location loc, MemRefType, ValueRange,
+         unsigned int) -> FailureOr<Value> {
+    return emitError(
+        loc, "unexpected allocation while bufferizing copy only dispatches");
+  };
+  bufferization::BufferizationOptions::DeallocationFn deallocationFn =
+      [](OpBuilder &, Location loc, Value) -> LogicalResult {
+    return emitError(
+        loc, "unexpected deallocation while bufferizing copy only dispatches");
+  };
+  bufferization::BufferizationOptions::MemCpyFn memcpyFn =
+      [](OpBuilder &builder, Location loc, Value from,
+         Value to) -> LogicalResult {
+    createLinalgCopyOp(builder, loc, from, to);
+    return success();
+  };
+
+  addIREEComprehensiveBufferizePasses(bufferizationPipeline, allocationFn,
+                                      deallocationFn, memcpyFn);
   if (failed(runPipeline(bufferizationPipeline, module))) {
     return signalPassFailure();
   }

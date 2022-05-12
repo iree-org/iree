@@ -186,7 +186,8 @@ func.func @elementwise() {
   return
 }
 //      CHECK: func.func @elementwise()
-//  CHECK-DAG:   %[[GLB_CST:.+]] = memref.get_global @__constant_1x10xf32 : memref<1x10xf32>
+//  CHECK-DAG:   %[[CST_TENSOR:.+]] = arith.constant opaque<"elided_large_const", "0xDEADBEEF"> : tensor<1x10xf32>
+//  CHECK-DAG:   %[[CST_BUF:.+]] = bufferization.to_memref %[[CST_TENSOR]]
 //  CHECK-DAG:   %[[IN_BUF:.+]] = hal.interface.binding.subspan set(0)  binding(0) {{.+}} : memref<1x10xf32>
 //  CHECK-DAG:   %[[OUT_BUF:.+]] = hal.interface.binding.subspan set(0)  binding(1) {{.+}} : memref<1x10xf32>
 //      CHECK:   scf.for
@@ -194,7 +195,7 @@ func.func @elementwise() {
 //  CHECK-DAG:     %[[SUB_OUT1:.+]] = memref.subview %[[OUT_BUF]]
 //      CHECK:     scf.for
 //  CHECK-DAG:       %[[SUB_IN2:.+]] = memref.subview %[[SUB_IN1]]
-//  CHECK-DAG:       %[[SUB_CST:.+]] = memref.subview %[[GLB_CST]]
+//  CHECK-DAG:       %[[SUB_CST:.+]] = memref.subview %[[CST_BUF]]
 //  CHECK-DAG:       %[[SUB_OUT2:.+]] = memref.subview %[[SUB_OUT1]]
 //      CHECK:       linalg.generic
 // CHECK-SAME:         ins(%[[SUB_IN2]], %[[SUB_CST]]
@@ -237,9 +238,11 @@ func.func @rank_reduced_slice() {
 // -----
 
 // CHECK-LABEL: func.func @reverse_dim(
-//   CHECK-DAG:   %[[alloc:.*]] = memref.alloc() : memref<2x3xf32>
-//   CHECK-DAG:   %[[global:.*]] = memref.get_global
-//       CHECK:   iree_linalg_ext.reverse dimensions(dense<0> : tensor<1xi64>) ins(%[[global]] : memref<2x3xf32>) outs(%[[alloc]] : memref<2x3xf32>)
+//   CHECK-DAG:   %[[alloc:.*]] = memref.alloc()
+//   CHECK-DAG:   %[[cst:.*]] = bufferization.to_memref
+//       CHECK:   iree_linalg_ext.reverse dimensions(dense<0> : tensor<1xi64>)
+//  CHECK-SAME:       ins(%[[cst]] :
+//  CHECK-SAME:       outs(%[[alloc]] :
 //       CHECK:   %[[load:.*]] = memref.load %[[alloc]]
 //       CHECK:   memref.dealloc %[[alloc]]
 //       CHECK:   return %[[load]]
