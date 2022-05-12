@@ -138,6 +138,7 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   options.testAnalysisOnly = testAnalysisOnly;
   options.printConflicts = printConflicts;
   options.alwaysAliasingWithDest = true;
+  options.denyOperationInFilter(arith::ConstantOp::getOperationName());
   addPostAnalysisTransformations(options);
 
   if (failed(bufferization::runOneShotBufferize(moduleOp, options))) {

@@ -80,7 +80,7 @@ builtin.module {
 }
 // CHECK-LABEL: func.func @concatenate_cst()
 //   CHECK-DAG:   %[[CST:.+]] = arith.constant dense<0> : tensor<2x3xi32>
-//   CHECK-DAG:   %[[ZERO:.+]] = bufferization.to_memref %[[CST]] : memref<2x3xi32>
+//   CHECK-DAG:   %[[ZERO:.+]] = bufferization.to_memref %[[CST]] : memref<2x3xi32
 //   CHECK-DAG:   %[[DEST_BINDING:.+]] = hal.interface.binding.subspan
 //   CHECK-DAG:   %[[SUBVIEW:.+]] = memref.subview %[[DEST_BINDING]][0, 2] [2, 3]
 //       CHECK:   linalg.generic
