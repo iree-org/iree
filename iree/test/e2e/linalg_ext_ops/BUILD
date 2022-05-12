@@ -72,12 +72,14 @@ iree_check_single_backend_test_suite(
         # keep sorted
         [
             "reverse.mlir",
-            "top-k.mlir",
+            # Top-k test disabled due to miscompile on vulkan.
+            #    "top-k.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
             # TODO(antiagainst): scan fails on Adreno GPUs due to driver bug.
             # Re-enable this once we have new devices with up-to-date drivers.
+            "top-k.mlir",
             "scan.mlir",
         ],
     ),
