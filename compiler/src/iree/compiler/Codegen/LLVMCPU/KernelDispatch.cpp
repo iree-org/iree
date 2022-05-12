@@ -422,18 +422,10 @@ static LogicalResult setMatmulPadRootConfig(
   int64_t nLoops = linalgOp.getNumLoops();
   if (nLoops >= 3) {
     parallelTileSizes.append(nLoops - 3, 1);
-    parallelTileSizes.push_back(
-        disableMatmulPadPipeline
-            ? getMaxTileSize(-0, flowTileSizes[nLoops - 3],
-                             target2ndTileSizes[0], vectorSize)
-            : target2ndTileSizes[0]);
+    parallelTileSizes.push_back(target2ndTileSizes[0]);
   }
   if (nLoops >= 2) {
-    parallelTileSizes.push_back(
-        disableMatmulPadPipeline
-            ? getMaxTileSize(-0, flowTileSizes[nLoops - 2],
-                             target2ndTileSizes[1], vectorSize)
-            : target2ndTileSizes[1]);
+    parallelTileSizes.push_back(target2ndTileSizes[1]);
   }
   parallelTileSizes.push_back(0);
 
@@ -446,9 +438,46 @@ static LogicalResult setMatmulPadRootConfig(
   reductionTileSizes.push_back(
       getMaxTileSize(0, K, target2ndTileSizes[2], vectorSize));
 
-  if (disableMatmulPadPipeline) {
-    setAlwaysVectorizeSizes(linalgOp, parallelTileSizes, reductionTileSizes);
+  TileSizesListType tileSizes;
+  tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
+  tileSizes.push_back(parallelTileSizes);
+  tileSizes.push_back(reductionTileSizes);
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, op, tileSizes,
+      DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert);
+}
+
+static LogicalResult setMatmulNoPadRootConfig(
+    func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
+    ArrayRef<int64_t> flowTileSizes, ArrayRef<int64_t> target2ndTileSizes,
+    int vectorSize) {
+  assert(target2ndTileSizes.size() == 3 &&
+         "the current configuration is driven by matmul which has exactly "
+         "three loops");
+  // The tiling for parallel dims and reduction dims should be separated.
+  SmallVector<int64_t> parallelTileSizes;
+  auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
+  int64_t nLoops = linalgOp.getNumLoops();
+  if (nLoops >= 3) {
+    parallelTileSizes.append(nLoops - 3, 1);
+    parallelTileSizes.push_back(getMaxTileSize(
+        0, flowTileSizes[nLoops - 3], target2ndTileSizes[0], vectorSize));
   }
+  if (nLoops >= 2) {
+    parallelTileSizes.push_back(getMaxTileSize(
+        0, flowTileSizes[nLoops - 2], target2ndTileSizes[1], vectorSize));
+  }
+  parallelTileSizes.push_back(0);
+
+  auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
+  int64_t K = lhsShapedType.getShape().back();
+  SmallVector<int64_t> reductionTileSizes;
+  reductionTileSizes.append(nLoops - 1, 0);
+  reductionTileSizes.push_back(
+      getMaxTileSize(0, K, target2ndTileSizes[2], vectorSize));
+
+  setAlwaysVectorizeSizes(linalgOp, parallelTileSizes, reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
@@ -457,9 +486,7 @@ static LogicalResult setMatmulPadRootConfig(
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
-      disableMatmulPadPipeline
-          ? DispatchLoweringPassPipeline::CPUDoubleTilingExpert
-          : DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert);
+      DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
 }
 
 static LogicalResult setARMRootConfig(func::FuncOp entryPointFn,
@@ -544,6 +571,10 @@ static LogicalResult setRootConfig(
   // TODO(dcaballe): Find better configurations for RISC-V backends.
   if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
     SmallVector<int64_t> tileSizes = {8, 32, 16};
+    if (disableMatmulPadPipeline) {
+      return setMatmulNoPadRootConfig(entryPointFn, contractionOp,
+                                      flowTileSizes, tileSizes, vectorSize);
+    }
     return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
                                   tileSizes, vectorSize);
   }

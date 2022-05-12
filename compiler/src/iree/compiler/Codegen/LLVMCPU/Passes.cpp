@@ -221,17 +221,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
 
 void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createVerifyLinalgTransformLegalityPass());
-
-  // Do first level of tiling and distribution.
-  passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createTileAndDistributeToWorkgroupsPass());
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createFoldAffineMinInDistributedLoopsPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createConvertToDestinationPassingStylePass());
+  addTileAndDistributePasses(passManager, /*convertToDestinatinoStyle=*/true);
 
   {
     LinalgFusePassOptions options;
