@@ -103,7 +103,6 @@ add_mlir_python_common_capi_library(IREEDialectsAggregateCAPI
   RELATIVE_INSTALL_ROOT "../../../.."
   DECLARED_SOURCES
     ${_source_components}
-    #${TmpTransformDialect}
 )
 
 add_mlir_python_modules(IREEDialectsPythonModules
@@ -111,7 +110,6 @@ add_mlir_python_modules(IREEDialectsPythonModules
   INSTALL_PREFIX "python_packages/iree_dialects/iree/compiler"
   DECLARED_SOURCES 
     ${_source_components}
-    #${TmpTransformDialect}
   COMMON_CAPI_LINK_LIBS
     IREEDialectsAggregateCAPI
   )
