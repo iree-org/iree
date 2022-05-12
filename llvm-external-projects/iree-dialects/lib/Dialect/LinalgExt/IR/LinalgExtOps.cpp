@@ -1283,8 +1283,8 @@ SmallVector<Range> TopkOp::getIterationDomain(OpBuilder &builder) {
 
 SmallVector<StringRef> TopkOp::getLoopIteratorTypes() {
   SmallVector<StringRef> iteratorTypes(getInputRank(),
-                                       getParallelIteratorTypeName());
-  iteratorTypes[dimension()] = getReductionIteratorTypeName();
+                                       getReductionIteratorTypeName());
+  // iteratorTypes[dimension()] = getReductionIteratorTypeName();
   return iteratorTypes;
 }
 
