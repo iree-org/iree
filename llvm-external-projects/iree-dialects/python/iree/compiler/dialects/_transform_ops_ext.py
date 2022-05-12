@@ -89,6 +89,7 @@ class MatchOp:
     operation_type = pdl.OperationType.get()
     super().__init__(operation_type, target)
 
+
 class WithPDLPatternsOp:
   """Specialization for the WithPDLPatternsOp class."""
 
@@ -98,11 +99,17 @@ class WithPDLPatternsOp:
     attributes = {}
     regions = 1
     print(root)
-    if root is not None: operands.append(_get_op_result_or_value(root))
+    if root is not None:
+      operands.append(_get_op_result_or_value(root))
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
     self.body.blocks.append(pdl.OperationType.get())
 
 
@@ -114,11 +121,17 @@ class CanonicalizedSequenceOp:
     results = []
     attributes = {}
     regions = 1
-    if target is not None: operands.append(_get_op_result_or_value(target))
+    if target is not None:
+      operands.append(_get_op_result_or_value(target))
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
     self.body.blocks.append(pdl.OperationType.get())
 
 
@@ -134,9 +147,14 @@ class PDLMatchOp:
     attributes["pattern_name"] = ir.FlatSymbolRefAttr.get(pattern_name)
     results.append(pdl.OperationType.get())
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
 
 
 class LowerVectorsOp:
@@ -445,4 +463,3 @@ class PrintOp:
                ip=None):
     name = _ensure_string_attr(name)
     super().__init__(target, name, loc=loc, ip=ip)
-

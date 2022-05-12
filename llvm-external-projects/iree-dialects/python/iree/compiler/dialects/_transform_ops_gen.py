@@ -2,6 +2,7 @@
 
 from ._ods_common import _cext as _ods_cext
 from ._ods_common import extend_opview_class as _ods_extend_opview_class, segmented_accessor as _ods_segmented_accessor, equally_sized_accessor as _ods_equally_sized_accessor, get_default_loc_context as _ods_get_default_loc_context, get_op_result_or_value as _get_op_result_or_value, get_op_results_or_values as _get_op_results_or_values
+
 _ods_ir = _ods_cext.ir
 
 try:
@@ -33,6 +34,7 @@ class PDLMatchOp(_ods_ir.OpView):
   def matched(self):
     return self.operation.results[0]
 
+
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
 class WithPDLPatternsOp(_ods_ir.OpView):
@@ -42,11 +44,13 @@ class WithPDLPatternsOp(_ods_ir.OpView):
 
   @builtins.property
   def root(self):
-    return None if len(self.operation.operands) < 1 else self.operation.operands[0]
+    return None if len(
+        self.operation.operands) < 1 else self.operation.operands[0]
 
   @builtins.property
   def body(self):
     return self.regions[0]
+
 
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
@@ -62,9 +66,14 @@ class YieldOp(_ods_ir.OpView):
     regions = None
     operands.extend(_get_op_results_or_values(operands_))
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
 
   @builtins.property
   def operands_(self):
@@ -85,9 +94,15 @@ class BufferizeOp(_ods_ir.OpView):
     attributes = {}
     regions = None
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
+
 
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
@@ -98,11 +113,13 @@ class CanonicalizedSequenceOp(_ods_ir.OpView):
 
   @builtins.property
   def target(self):
-    return None if len(self.operation.operands) < 1 else self.operation.operands[0]
+    return None if len(
+        self.operation.operands) < 1 else self.operation.operands[0]
 
   @builtins.property
   def body(self):
     return self.regions[0]
+
 
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
@@ -111,7 +128,15 @@ class TileOp(_ods_ir.OpView):
 
   _ODS_REGIONS = (0, True)
 
-  def __init__(self, tiled_linalg_op, loops, target, sizes, interchange, *, loc=None, ip=None):
+  def __init__(self,
+               tiled_linalg_op,
+               loops,
+               target,
+               sizes,
+               interchange,
+               *,
+               loc=None,
+               ip=None):
     operands = []
     results = []
     attributes = {}
@@ -122,9 +147,14 @@ class TileOp(_ods_ir.OpView):
     results.append(tiled_linalg_op)
     results.extend(loops)
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
 
   @builtins.property
   def target(self):
@@ -139,6 +169,7 @@ class TileOp(_ods_ir.OpView):
     _ods_variadic_group_length = len(self.operation.results) - 2 + 1
     return self.operation.results[1:1 + _ods_variadic_group_length]
 
+
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
 class DecomposeOp(_ods_ir.OpView):
@@ -152,9 +183,15 @@ class DecomposeOp(_ods_ir.OpView):
     attributes = {}
     regions = None
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
+
 
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
@@ -163,7 +200,15 @@ class FuseOp(_ods_ir.OpView):
 
   _ODS_REGIONS = (0, True)
 
-  def __init__(self, transformed, loops, target, tile_sizes, tile_interchange, *, loc=None, ip=None):
+  def __init__(self,
+               transformed,
+               loops,
+               target,
+               tile_sizes,
+               tile_interchange,
+               *,
+               loc=None,
+               ip=None):
     operands = []
     results = []
     attributes = {}
@@ -174,9 +219,14 @@ class FuseOp(_ods_ir.OpView):
     results.append(transformed)
     results.extend(loops)
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
 
   @builtins.property
   def target(self):
@@ -190,6 +240,7 @@ class FuseOp(_ods_ir.OpView):
   def loops(self):
     _ods_variadic_group_length = len(self.operation.results) - 2 + 1
     return self.operation.results[1:1 + _ods_variadic_group_length]
+
 
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
@@ -206,9 +257,14 @@ class GeneralizeOp(_ods_ir.OpView):
     operands.append(_get_op_result_or_value(target))
     results.append(transformed)
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
 
   @builtins.property
   def target(self):
@@ -217,6 +273,7 @@ class GeneralizeOp(_ods_ir.OpView):
   @builtins.property
   def transformed(self):
     return self.operation.results[0]
+
 
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
@@ -234,9 +291,14 @@ class GetParentLoopOp(_ods_ir.OpView):
     attributes["num_loops"] = num_loops
     results.append(transformed)
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
 
   @builtins.property
   def target(self):
@@ -256,6 +318,7 @@ class GetParentLoopOp(_ods_ir.OpView):
   def transformed(self):
     return self.operation.results[0]
 
+
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
 class InterchangeOp(_ods_ir.OpView):
@@ -263,7 +326,13 @@ class InterchangeOp(_ods_ir.OpView):
 
   _ODS_REGIONS = (0, True)
 
-  def __init__(self, transformed, target, iterator_interchange, *, loc=None, ip=None):
+  def __init__(self,
+               transformed,
+               target,
+               iterator_interchange,
+               *,
+               loc=None,
+               ip=None):
     operands = []
     results = []
     attributes = {}
@@ -272,9 +341,14 @@ class InterchangeOp(_ods_ir.OpView):
     attributes["iterator_interchange"] = iterator_interchange
     results.append(transformed)
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
 
   @builtins.property
   def target(self):
@@ -284,6 +358,7 @@ class InterchangeOp(_ods_ir.OpView):
   def transformed(self):
     return self.operation.results[0]
 
+
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
 class LowerToLLVMOp(_ods_ir.OpView):
@@ -291,7 +366,17 @@ class LowerToLLVMOp(_ods_ir.OpView):
 
   _ODS_REGIONS = (0, True)
 
-  def __init__(self, reassociate_fp_reductions, enable_index_optimizations, enable_arm_neon, enable_arm_sve, enable_amx, enable_x86vector, enable_async, *, loc=None, ip=None):
+  def __init__(self,
+               reassociate_fp_reductions,
+               enable_index_optimizations,
+               enable_arm_neon,
+               enable_arm_sve,
+               enable_amx,
+               enable_x86vector,
+               enable_async,
+               *,
+               loc=None,
+               ip=None):
     operands = []
     results = []
     attributes = {}
@@ -304,13 +389,19 @@ class LowerToLLVMOp(_ods_ir.OpView):
     attributes["enable_x86vector"] = enable_x86vector
     attributes["enable_async"] = enable_async
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
 
   @builtins.property
   def reassociate_fp_reductions(self):
-    return _ods_ir.BoolAttr(self.operation.attributes["reassociate_fp_reductions"])
+    return _ods_ir.BoolAttr(
+        self.operation.attributes["reassociate_fp_reductions"])
 
   @reassociate_fp_reductions.setter
   def reassociate_fp_reductions(self, value):
@@ -320,7 +411,8 @@ class LowerToLLVMOp(_ods_ir.OpView):
 
   @builtins.property
   def enable_index_optimizations(self):
-    return _ods_ir.BoolAttr(self.operation.attributes["enable_index_optimizations"])
+    return _ods_ir.BoolAttr(
+        self.operation.attributes["enable_index_optimizations"])
 
   @enable_index_optimizations.setter
   def enable_index_optimizations(self, value):
@@ -378,6 +470,7 @@ class LowerToLLVMOp(_ods_ir.OpView):
       raise ValueError("'None' not allowed as value for mandatory attributes")
     self.operation.attributes["enable_async"] = value
 
+
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
 class LowerVectorsOp(_ods_ir.OpView):
@@ -385,7 +478,17 @@ class LowerVectorsOp(_ods_ir.OpView):
 
   _ODS_REGIONS = (0, True)
 
-  def __init__(self, stages, contraction_lowering, multireduction_lowering, split_transfers, unroll_vector_transfers, transpose_lowering, transpose_avx2_lowering, *, loc=None, ip=None):
+  def __init__(self,
+               stages,
+               contraction_lowering,
+               multireduction_lowering,
+               split_transfers,
+               unroll_vector_transfers,
+               transpose_lowering,
+               transpose_avx2_lowering,
+               *,
+               loc=None,
+               ip=None):
     operands = []
     results = []
     attributes = {}
@@ -398,9 +501,14 @@ class LowerVectorsOp(_ods_ir.OpView):
     attributes["transpose_lowering"] = transpose_lowering
     attributes["transpose_avx2_lowering"] = transpose_avx2_lowering
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
 
   @builtins.property
   def contraction_lowering(self):
@@ -414,7 +522,8 @@ class LowerVectorsOp(_ods_ir.OpView):
 
   @builtins.property
   def multireduction_lowering(self):
-    return _ods_ir.StringAttr(self.operation.attributes["multireduction_lowering"])
+    return _ods_ir.StringAttr(
+        self.operation.attributes["multireduction_lowering"])
 
   @multireduction_lowering.setter
   def multireduction_lowering(self, value):
@@ -434,7 +543,8 @@ class LowerVectorsOp(_ods_ir.OpView):
 
   @builtins.property
   def unroll_vector_transfers(self):
-    return _ods_ir.BoolAttr(self.operation.attributes["unroll_vector_transfers"])
+    return _ods_ir.BoolAttr(
+        self.operation.attributes["unroll_vector_transfers"])
 
   @unroll_vector_transfers.setter
   def unroll_vector_transfers(self, value):
@@ -454,13 +564,15 @@ class LowerVectorsOp(_ods_ir.OpView):
 
   @builtins.property
   def transpose_avx2_lowering(self):
-    return _ods_ir.BoolAttr(self.operation.attributes["transpose_avx2_lowering"])
+    return _ods_ir.BoolAttr(
+        self.operation.attributes["transpose_avx2_lowering"])
 
   @transpose_avx2_lowering.setter
   def transpose_avx2_lowering(self, value):
     if value is None:
       raise ValueError("'None' not allowed as value for mandatory attributes")
     self.operation.attributes["transpose_avx2_lowering"] = value
+
 
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
@@ -478,9 +590,14 @@ class OutlineLoopOp(_ods_ir.OpView):
     attributes["func_name"] = func_name
     results.append(transformed)
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
 
   @builtins.property
   def target(self):
@@ -500,6 +617,7 @@ class OutlineLoopOp(_ods_ir.OpView):
   def transformed(self):
     return self.operation.results[0]
 
+
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
 class PadOp(_ods_ir.OpView):
@@ -507,7 +625,17 @@ class PadOp(_ods_ir.OpView):
 
   _ODS_REGIONS = (0, True)
 
-  def __init__(self, transformed, target, padding_values, padding_dimensions, pack_paddings, hoist_paddings, transpose_paddings, *, loc=None, ip=None):
+  def __init__(self,
+               transformed,
+               target,
+               padding_values,
+               padding_dimensions,
+               pack_paddings,
+               hoist_paddings,
+               transpose_paddings,
+               *,
+               loc=None,
+               ip=None):
     operands = []
     results = []
     attributes = {}
@@ -520,9 +648,14 @@ class PadOp(_ods_ir.OpView):
     attributes["transpose_paddings"] = transpose_paddings
     results.append(transformed)
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
 
   @builtins.property
   def target(self):
@@ -531,6 +664,7 @@ class PadOp(_ods_ir.OpView):
   @builtins.property
   def transformed(self):
     return self.operation.results[0]
+
 
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
@@ -547,9 +681,14 @@ class PeelLoopOp(_ods_ir.OpView):
     operands.append(_get_op_result_or_value(target))
     results.append(transformed)
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
 
   @builtins.property
   def target(self):
@@ -559,6 +698,7 @@ class PeelLoopOp(_ods_ir.OpView):
   def transformed(self):
     return self.operation.results[0]
 
+
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
 class PipelineLoopOp(_ods_ir.OpView):
@@ -566,7 +706,14 @@ class PipelineLoopOp(_ods_ir.OpView):
 
   _ODS_REGIONS = (0, True)
 
-  def __init__(self, transformed, target, iteration_interval, read_latency, *, loc=None, ip=None):
+  def __init__(self,
+               transformed,
+               target,
+               iteration_interval,
+               read_latency,
+               *,
+               loc=None,
+               ip=None):
     operands = []
     results = []
     attributes = {}
@@ -576,9 +723,14 @@ class PipelineLoopOp(_ods_ir.OpView):
     attributes["read_latency"] = read_latency
     results.append(transformed)
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
 
   @builtins.property
   def target(self):
@@ -608,6 +760,7 @@ class PipelineLoopOp(_ods_ir.OpView):
   def transformed(self):
     return self.operation.results[0]
 
+
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
 class PrintOp(_ods_ir.OpView):
@@ -620,16 +773,23 @@ class PrintOp(_ods_ir.OpView):
     results = []
     attributes = {}
     regions = None
-    if target is not None: operands.append(_get_op_result_or_value(target))
+    if target is not None:
+      operands.append(_get_op_result_or_value(target))
     attributes["name"] = name
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
 
   @builtins.property
   def target(self):
-    return None if len(self.operation.operands) < 1 else self.operation.operands[0]
+    return None if len(
+        self.operation.operands) < 1 else self.operation.operands[0]
 
   @builtins.property
   def name(self):
@@ -640,6 +800,7 @@ class PrintOp(_ods_ir.OpView):
     if value is None:
       raise ValueError("'None' not allowed as value for mandatory attributes")
     self.operation.attributes["name"] = value
+
 
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
@@ -656,9 +817,14 @@ class ScalarizeOp(_ods_ir.OpView):
     operands.append(_get_op_result_or_value(target))
     results.append(result)
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
 
   @builtins.property
   def target(self):
@@ -667,6 +833,7 @@ class ScalarizeOp(_ods_ir.OpView):
   @builtins.property
   def result(self):
     return self.operation.results[0]
+
 
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
@@ -683,9 +850,14 @@ class UnrollLoopOp(_ods_ir.OpView):
     operands.append(_get_op_result_or_value(target))
     attributes["factor"] = factor
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
 
   @builtins.property
   def target(self):
@@ -701,6 +873,7 @@ class UnrollLoopOp(_ods_ir.OpView):
       raise ValueError("'None' not allowed as value for mandatory attributes")
     self.operation.attributes["factor"] = value
 
+
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
 class VectorizeOp(_ods_ir.OpView):
@@ -708,22 +881,36 @@ class VectorizeOp(_ods_ir.OpView):
 
   _ODS_REGIONS = (0, True)
 
-  def __init__(self, transformed, target, vectorize_padding, *, loc=None, ip=None):
+  def __init__(self,
+               transformed,
+               target,
+               vectorize_padding,
+               *,
+               loc=None,
+               ip=None):
     operands = []
     results = []
     attributes = {}
     regions = None
-    if target is not None: operands.append(_get_op_result_or_value(target))
+    if target is not None:
+      operands.append(_get_op_result_or_value(target))
     attributes["vectorize_padding"] = vectorize_padding
-    if transformed is not None: results.append(transformed)
+    if transformed is not None:
+      results.append(transformed)
     _ods_successors = None
-    super().__init__(self.build_generic(
-      attributes=attributes, results=results, operands=operands,
-      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+    super().__init__(
+        self.build_generic(attributes=attributes,
+                           results=results,
+                           operands=operands,
+                           successors=_ods_successors,
+                           regions=regions,
+                           loc=loc,
+                           ip=ip))
 
   @builtins.property
   def target(self):
-    return None if len(self.operation.operands) < 1 else self.operation.operands[0]
+    return None if len(
+        self.operation.operands) < 1 else self.operation.operands[0]
 
   @builtins.property
   def vectorize_padding(self):
@@ -737,4 +924,5 @@ class VectorizeOp(_ods_ir.OpView):
 
   @builtins.property
   def transformed(self):
-    return None if len(self.operation.results) < 1 else self.operation.results[0]
+    return None if len(
+        self.operation.results) < 1 else self.operation.results[0]
