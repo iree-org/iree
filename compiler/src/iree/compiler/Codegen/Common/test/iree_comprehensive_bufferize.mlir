@@ -237,6 +237,30 @@ func.func @rank_reduced_slice() {
 
 // -----
 
+// Check that there are no errors in early bufferized copy ops. The
+// bufferization pass should make it as it is.
+func.func @early_bufferized_copy_cst_ops() {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %cst = arith.constant dense<0> : tensor<2x3xi32>
+  %0 = bufferization.to_memref %cst : memref<2x3xi32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
+  %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<2x5xi32>
+  memref.assume_alignment %1, 64 : memref<2x5xi32>
+  %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readwrite:2x5xi32>
+  %3 = memref.subview %1[%c0, %c2] [2, 3] [%c1, %c1] : memref<2x5xi32> to memref<2x3xi32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%0 : memref<2x3xi32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>) outs(%3 : memref<2x3xi32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>) {
+  ^bb0(%arg0: i32, %arg1: i32):
+    linalg.yield %arg0 : i32
+  }
+  return
+}
+// CHECK: func.func @early_bufferized_copy_cst_ops
+// CHECK:   %[[CST:.+]] = arith.constant dense<0> : tensor<2x3xi32>
+// CHECK:   %{{.+}} = bufferization.to_memref %[[CST]]
+
+// -----
+
 // CHECK-LABEL: func.func @reverse_dim(
 //   CHECK-DAG:   %[[alloc:.*]] = memref.alloc()
 //   CHECK-DAG:   %[[cst:.*]] = bufferization.to_memref

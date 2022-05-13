@@ -138,7 +138,13 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   options.testAnalysisOnly = testAnalysisOnly;
   options.printConflicts = printConflicts;
   options.alwaysAliasingWithDest = true;
+
+  // bufferization.to_memref is used to bufferize constants in IREE. IREE has
+  // it's own logic to handle constants. We'd like to leave the arith.constant
+  // as is and insert bufferization.to_memref to convert the tensor to memref.
   options.denyOperationInFilter(arith::ConstantOp::getOperationName());
+  options.denyOperationInFilter(bufferization::ToMemrefOp::getOperationName());
+
   addPostAnalysisTransformations(options);
 
   if (failed(bufferization::runOneShotBufferize(moduleOp, options))) {

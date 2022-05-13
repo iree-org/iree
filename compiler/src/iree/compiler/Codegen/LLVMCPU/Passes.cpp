@@ -426,10 +426,6 @@ void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
 }
 
-void addCPUBufferOpsDefaultPipeline(OpPassManager &passManager) {
-  addTileAndDistributePasses(passManager, /*convertToDestinatinoStyle=*/false);
-}
-
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager, /*convertToDestinatinoStyle=*/true);
   addCPUIREEComprehensiveBufferizePasses(passManager);
