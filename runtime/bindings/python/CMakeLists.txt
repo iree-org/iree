@@ -168,31 +168,29 @@ iree_py_test(
 # Install
 ################################################################################
 
-iree_py_install_package(
-  COMPONENT IreePythonPackage-runtime
-  PACKAGE_NAME iree_runtime
-  MODULE_PATH iree/runtime
-  DEPS
-    # TODO: Update CMake target/path mangling rules to make this syntactically
-    # rooted on "iree" in some way.
-    runtime_bindings_python_PyExtRt
-    iree_tools_iree-benchmark-module
-    iree_tools_iree-benchmark-trace
-    iree_tools_iree-run-module
-    iree_tools_iree-run-trace
-    ${_EXTRA_INSTALL_TOOL_TARGETS}
-  ADDL_PACKAGE_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/README.md
+set(_INSTALL_DIR "python_packages/iree_runtime")
+set(_INSTALL_COMPONENT "IreePythonPackage-runtime")
+
+# Install iree/runtime/*.py files verbatim into the tree.
+# We do this at the package level so as to avoid any loose files
+# from outside (i.e. tests, etc).
+install(
+  DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/iree/runtime/"
+  COMPONENT "${_INSTALL_COMPONENT}"
+  DESTINATION "${_INSTALL_DIR}/iree/runtime/"
+  FILES_MATCHING PATTERN "*.py"
 )
 
+# _runtime.so -> python_packages/iree_runtime/iree/_runtime.so
 install(
   # TODO: Update CMake target/path mangling rules to make this syntactically
   # rooted on "iree" in some way.
   TARGETS runtime_bindings_python_PyExtRt
-  COMPONENT ${PY_INSTALL_COMPONENT}
-  DESTINATION "${PY_INSTALL_MODULE_DIR}"
+  DESTINATION "${_INSTALL_DIR}/iree"
+  COMPONENT "${_INSTALL_COMPONENT}"
 )
 
+# Install tools into python_packages/iree_runtime/iree/runtime
 install(
   TARGETS
     iree_tools_iree-benchmark-module
@@ -200,6 +198,6 @@ install(
     iree_tools_iree-run-module
     iree_tools_iree-run-trace
     ${_EXTRA_INSTALL_TOOL_TARGETS}
-  DESTINATION "${PY_INSTALL_MODULE_DIR}"
-  COMPONENT "${PY_INSTALL_COMPONENT}"
+  DESTINATION "${_INSTALL_DIR}/iree/runtime"
+  COMPONENT "${_INSTALL_COMPONENT}"
 )

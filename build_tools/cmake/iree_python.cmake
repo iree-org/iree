@@ -33,65 +33,6 @@ endfunction()
 # Main user rules
 ###############################################################################
 
-# Declares that the current source directory is part of a python package
-# that will:
-#   - Will create an install target install-COMPONENT (global, not package
-#     scoped)
-#   - Be installed under python_packages/PACKAGE_NAME
-#   - Have a local path of MODULE_PATH (i.e. namespace package path)
-# Will set parent scope variables:
-#   - PY_INSTALL_COMPONENT: Install component. Echoed back from the argument
-#     for easier addition after this call.
-#   - PY_INSTALL_PACKAGES_DIR: The python_packages/PACKAGE_NAME path
-#   - PY_INSTALL_MODULE_DIR: The path to the module directory under
-#     INSTALL_PACKAGES_DIR.
-#
-# Add any built deps to DEPS (you will need to add install actions to them
-# after).
-#
-# Any python files in the source directory will be automatically installed
-# (recursive).
-#
-# Also adds a *-stripped target which strips any binaries that are
-# present.
-#
-# Arguments:
-#   AUGMENT_EXISTING_PACKAGE: Whether to add install artifacts to an existing
-#     package.
-#   COMPONENT: Install component
-#   PACKAGE_NAME: Name of the Python package in the install directory tree.
-#   MODULE_PATH: Relative path within the package to the module being installed.
-#   FILES_MATCHING: Explicit arguments to the install FILES_MATCHING directive.
-#     (Defaults to "PATTERN *.py")
-#   DEPS: Dependencies.
-function(iree_py_install_package)
-  cmake_parse_arguments(ARG
-    "AUGMENT_EXISTING_PACKAGE"
-    "COMPONENT;PACKAGE_NAME;MODULE_PATH"
-    "DEPS;ADDL_PACKAGE_FILES;FILES_MATCHING"
-    ${ARGN})
-  set(_INSTALL_COMPONENT ${ARG_COMPONENT})
-  set(_INSTALL_PACKAGES_DIR "python_packages/${ARG_PACKAGE_NAME}")
-  set(_INSTALL_MODULE_DIR "${_INSTALL_PACKAGES_DIR}/${ARG_MODULE_PATH}")
-
-  if(NOT FILES_MATCHING)
-    set(_FILES_MATCHING PATTERN "*.py")
-  else()
-    set(_FILES_MATCHING ${ARG_FILES_MATCHING})
-  endif()
-
-  install(
-    DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
-    COMPONENT ${_INSTALL_COMPONENT}
-    DESTINATION "${_INSTALL_MODULE_DIR}"
-    FILES_MATCHING ${_FILES_MATCHING}
-  )
-
-  set(PY_INSTALL_COMPONENT ${_INSTALL_COMPONENT} PARENT_SCOPE)
-  set(PY_INSTALL_PACKAGES_DIR "${_INSTALL_PACKAGES_DIR}" PARENT_SCOPE)
-  set(PY_INSTALL_MODULE_DIR "${_INSTALL_MODULE_DIR}" PARENT_SCOPE)
-endfunction()
-
 # iree_pyext_module()
 #
 # Builds a native python module (.so/.dylib/.pyd).

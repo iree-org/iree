@@ -61,7 +61,7 @@ function run_on_host() {
     -v "${repo_root}:/main_checkout/iree" \
     -v "${output_dir}:/wheelhouse" \
     -e __MANYLINUX_BUILD_WHEELS_IN_DOCKER=1 \
-    -e "python_versions=${python_versions}" \
+    -e "override_python_versions=${python_versions}" \
     -e "packages=${packages}" \
     ${manylinux_docker_image} \
     -- bash /main_checkout/iree/build_tools/python_deploy/build_linux_packages.sh
