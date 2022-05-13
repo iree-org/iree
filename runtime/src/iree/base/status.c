@@ -628,9 +628,9 @@ iree_status_annotate(iree_status_t base_status, iree_string_view_t message) {
                                     (iree_status_payload_t*)payload);
 }
 
-static IREE_MUST_USE_RESULT iree_status_t
-iree_status_annotate_vf(iree_status_t base_status, const char* format,
-                        va_list varargs_0, va_list varargs_1) {
+IREE_MUST_USE_RESULT static iree_status_t iree_status_annotate_vf(
+    iree_status_t base_status, const char* format, va_list varargs_0,
+    va_list varargs_1) {
   if (iree_status_is_ok(base_status)) return base_status;
 
   // If there's no storage yet we can just reuse normal allocation. Both that
