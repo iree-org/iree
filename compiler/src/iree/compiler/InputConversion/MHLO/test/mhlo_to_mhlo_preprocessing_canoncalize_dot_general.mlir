@@ -43,6 +43,28 @@ func.func @dot_general_to_dot_general_rank_reduced(%arg0: tensor<1x8x32x64xf32>,
 
 // -----
 
+func.func @dot_general_to_dot_general_rank_reduced_attribute(%arg0: tensor<1x8x32x64xf32>, %arg1 : tensor<1x8x64x32xf32>) -> tensor<1x8x32x32xf32> {
+  %0 = "mhlo.dot_general"(%arg0, %arg1) {
+    unknown_attribute_to_propagate,
+    dot_dimension_numbers = #mhlo.dot<
+      lhs_batching_dimensions = [0, 1],
+      lhs_contracting_dimensions = [3],
+      rhs_batching_dimensions = [0, 1],
+      rhs_contracting_dimensions = [2],
+    >,
+    precision_config = [#mhlo<"precision DEFAULT">, #mhlo<"precision DEFAULT">]
+  } : (tensor<1x8x32x64xf32>, tensor<1x8x64x32xf32>) -> tensor<1x8x32x32xf32>
+  return %0 : tensor<1x8x32x32xf32>
+}
+// CHECK: dot_general_to_dot_general_rank_reduced_attribute(%[[ARG0:.+]]: tensor<1x8x32x64xf32>, %[[ARG1:.+]]: tensor<1x8x64x32xf32>) -> tensor<1x8x32x32xf32>
+// CHECK: %[[ARG0_RESHAPED:.+]] = "mhlo.reshape"(%[[ARG0]]) : (tensor<1x8x32x64xf32>) -> tensor<8x32x64xf32>
+// CHECK: %[[ARG1_RESHAPED:.+]] = "mhlo.reshape"(%[[ARG1]]) : (tensor<1x8x64x32xf32>) -> tensor<8x64x32xf32>
+// CHECK: %[[DOT_RESULT:.+]] = "mhlo.dot_general"(%[[ARG0_RESHAPED]], %[[ARG1_RESHAPED]]) {{{.*}}, unknown_attribute_to_propagate
+// CHECK: %[[RESULT:.+]] = "mhlo.reshape"(%[[DOT_RESULT]]) : (tensor<8x32x32xf32>) -> tensor<1x8x32x32xf32>
+// CHECK: return %[[RESULT]] : tensor<1x8x32x32xf32>
+
+// -----
+
 func.func @dot_general_to_dot_general_rank_reduced_a_transposed(%arg0: tensor<1x8x64x32xf32>, %arg1: tensor<1x8x64x32xf32>) -> tensor<1x8x32x32xf32> {
   %0 = "mhlo.dot_general"(%arg0, %arg1) {
     dot_dimension_numbers = #mhlo.dot<
