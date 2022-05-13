@@ -141,7 +141,10 @@ LogicalResult setNumWorkgroupsImpl(IREE::HAL::ExecutableVariantOp variantOp,
     }
 
     OpBuilder builder(context);
-    return defineWorkgroupCountRegion(builder, funcOp, regionBuilder);
+    if (failed(
+            defineWorkgroupCountRegion(builder, entryPointOp, regionBuilder))) {
+      return failure();
+    }
   }
 
   // Apply post distribution canonicalization passes.
