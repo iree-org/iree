@@ -106,6 +106,7 @@ iree_cc_library(
     MLIRLinalgToLLVM
     MLIRLinalgToSPIRV
     MLIRLinalgTransforms
+    MLIRLinalgTransformOps
     MLIRQuant
     MLIRQuantTransforms
     MLIRSCF

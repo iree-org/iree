@@ -13,6 +13,7 @@ transform.with_pdl_patterns {
   transform.structured.canonicalized_sequence %arg0 {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_matmul_target in %arg1
+    %tiled_linalg_op, %loops:1 = transform.structured.tile %0 {interchange = [], sizes = [2]}
     transform.iree.bufferize
   }
 }

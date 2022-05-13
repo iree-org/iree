@@ -20,6 +20,7 @@
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
@@ -67,6 +68,9 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   shape::ShapeDialect>();
   // clang-format on
   tensor::registerInferTypeOpInterfaceExternalModels(registry);
+
+  // Register all dialect extensions.
+  linalg::registerTransformDialectExtension(registry);
 
 #ifdef IREE_HAVE_EMITC_DIALECT
   registry.insert<emitc::EmitCDialect>();
