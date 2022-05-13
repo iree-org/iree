@@ -23,7 +23,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
     // CHECK-NEXT: hal.executable.variant {{.+}}, target = <"llvm"
     hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
       hal.executable.entry_point public @dispatch0 ordinal(0) layout(#executable_layout) {
-        translation_info = #iree_codegen.translation_info<CPUDefault, workload_per_wg = [4]>
+        translation_info = #iree_codegen.translation_info<CPUDefault workload_per_wg = [4]>
       } {
       ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
         %c1 = arith.constant 1 : index
@@ -42,7 +42,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   hal.executable private @ex1 {
     hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
       hal.executable.entry_point public @dispatch1 ordinal(0) layout(#executable_layout) {
-        translation_info = #iree_codegen.translation_info<CPUDefault, workload_per_wg = [4]>
+        translation_info = #iree_codegen.translation_info<CPUDefault workload_per_wg = [4]>
       } {
       ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
         %c1 = arith.constant 1 : index

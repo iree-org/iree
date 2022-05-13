@@ -104,7 +104,7 @@ def IREECodegen_TranslationInfoAttr :
   }];
 
   let assemblyFormat = [{
-    `<` `` $passPipeline (`,` `workload_per_wg` `=` $workloadPerWorkgroup^)? `>`
+    `<` `` $passPipeline (`workload_per_wg` `=` $workloadPerWorkgroup^)? `>`
   }];
 
   let parameters = (ins
