@@ -18,10 +18,12 @@
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
+#include "mlir/Conversion/NVGPUToNVVM/NVGPUToNVVM.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
+#include "mlir/Dialect/NVGPU/NVGPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
@@ -52,7 +54,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       return convertMMAToLLVMType(type);
     });
     // Convert dummy tokens.
-    converter.addConversion([&](gpu::DeviceAsyncTokenType type) -> Type {
+    converter.addConversion([&](nvgpu::DeviceAsyncTokenType type) -> Type {
       return converter.convertType(IntegerType::get(type.getContext(), 32));
     });
     // Apply in-dialect lowering first. In-dialect lowering will replace ops
@@ -96,6 +98,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
                                                         llvmPatterns);
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
       populateGpuToNVVMConversionPatterns(converter, llvmPatterns);
+      populateNVGPUToNVVMConversionPatterns(converter, llvmPatterns);
       populateGpuWMMAToNVVMConversionPatterns(converter, llvmPatterns);
       LLVMConversionTarget target(getContext());
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);

@@ -102,6 +102,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:MathTransforms",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:MemRefTransforms",
+        "@llvm-project//mlir:NVGPU",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SCFTransforms",
