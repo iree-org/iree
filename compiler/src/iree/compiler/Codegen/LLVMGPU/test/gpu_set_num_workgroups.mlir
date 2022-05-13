@@ -283,7 +283,7 @@ hal.executable private @static_3d_fft_stage3 {
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config  = <tile_sizes = [[32, 128, 64]]>,
-    translation_info = <LLVMGPUMatmulSimt, workload_per_wg = [256, 32]>,
+    translation_info = <LLVMGPUMatmulSimt workload_per_wg = [256, 32]>,
     workgroup_size = [16, 8, 1]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -320,7 +320,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb">
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 128, 64]{{\]}}
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulSimt, workload_per_wg = [256, 32]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulSimt workload_per_wg = [256, 32]>
 //      CHECK: hal.executable.entry_point public @_lowering_config_test_dispatch_1
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-SAME:     workgroup_size = [16 : index, 8 : index, 1 : index]

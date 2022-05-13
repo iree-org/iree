@@ -289,7 +289,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[2, 32, 32, 16]]>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore, workload_per_wg = [32, 8, 1]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workload_per_wg = [32, 8, 1]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
