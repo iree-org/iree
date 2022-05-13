@@ -206,6 +206,19 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
 void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager, /*convertToDestinatinoStyle=*/false);
 
+  {
+    // Skip tiling reduction loops because this is expected to apply on copy ops
+    // only.
+    LinalgSingleTilingExpertPassOptions options;
+    options.tilingLevel =
+        static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
+    options.vectorize = true;
+    passManager.addNestedPass<func::FuncOp>(
+        createLinalgSingleTilingExpertPass(options));
+    passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<func::FuncOp>(createCSEPass());
+  }
+
   // Run IREE specific passes before vector lowering expert.
   passManager.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());

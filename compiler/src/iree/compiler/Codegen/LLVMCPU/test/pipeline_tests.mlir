@@ -102,5 +102,44 @@ hal.executable private @preset_config_matmul  {
     }
   }
 }
-// CHECK: func @preset_config_matmul
+// CHECK: func.func @preset_config_matmul
 // CHECK:   vector.outerproduct
+
+// -----
+
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+  cpu_features = "",
+  data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+  native_vector_size = 16 : index,
+  target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+#executable_layout = #hal.executable.layout<push_constants = 2, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>]
+  >]>
+hal.executable private @check_buffer_ops_vectorization {
+  hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+    hal.executable.entry_point public @check_buffer_ops_vectorization ordinal(0) layout(#executable_layout)
+    builtin.module {
+      func.func @check_buffer_ops_vectorization() {
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<128x1024xi32>
+        memref.assume_alignment %0, 64 : memref<128x1024xi32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<128x1536xi32>
+        memref.assume_alignment %1, 64 : memref<128x1536xi32>
+        %2 = memref.subview %1[0, 0] [128, 1024] [1, 1] : memref<128x1536xi32> to memref<128x1024xi32, affine_map<(d0, d1) -> (d0 * 1536 + d1)>>
+        linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+          ins(%0 : memref<128x1024xi32>)
+          outs(%2 : memref<128x1024xi32, affine_map<(d0, d1) -> (d0 * 1536 + d1)>>) {
+        ^bb0(%arg0: i32, %arg1: i32):
+          linalg.yield %arg0 : i32
+        }
+        return
+      }
+    }
+  }
+}
+// CHECK:      #{{.+}} = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize
+// CHECK:      func.func @check_buffer_ops_vectorization
+// CHECK:        vector.load
+// CHECK-NEXT:   vector.store
