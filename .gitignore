@@ -51,6 +51,7 @@ compile_commands.json
 
 # Python deployment artifacts
 *.whl
+*.egg-info
 
 # Android Studio / Gradle files
 .cxx
