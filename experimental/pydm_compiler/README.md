@@ -37,3 +37,11 @@ install without deps:
 ```
 pip install --no-deps -e experimental/pydm_compiler/
 ```
+
+## Running tests
+
+From this directory:
+
+```
+pytest
+```
