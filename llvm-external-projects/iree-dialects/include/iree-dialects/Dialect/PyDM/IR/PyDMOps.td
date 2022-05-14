@@ -593,6 +593,7 @@ def IREEPyDM_ExprStatementDiscardOp : IREEPyDM_Op<"expr_statement_discard"> {
   let assemblyFormat = [{
     $value `:` type($value) attr-dict
   }];
+  let hasCanonicalizer = 1;
 }
 
 def FunctionalIfOp : IREEPyDM_Op<"functional_if", [

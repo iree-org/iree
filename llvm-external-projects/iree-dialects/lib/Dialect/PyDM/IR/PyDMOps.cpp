@@ -10,6 +10,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/FunctionImplementation.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "llvm/ADT/SmallSet.h"
@@ -437,6 +438,36 @@ void DynamicBinaryPromoteOp::getCanonicalizationPatterns(
   patterns.add<ResolveNumericDynamicBinaryPromote>(context);
   patterns.add<UnboxOperands>(getOperationName(), context);
   patterns.add<ElideNonNumericDynamicBinaryPromote>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// ExprStatementDiscardOp
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Elides any expr_statement_discard whose value is a constant. By definition,
+/// these are no-ops. They will be typically filtered later in the pipeline,
+/// but it is better to elide early, since this is used in idiomatic Python
+/// so much (i.e. docstrings).
+struct ElideConstantExprStatementDiscard
+    : public OpRewritePattern<ExprStatementDiscardOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ExprStatementDiscardOp op,
+                                PatternRewriter &rewriter) const override {
+    if (!matchPattern(op.value(), m_Constant()))
+      return failure();
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+} // namespace
+
+void ExprStatementDiscardOp::getCanonicalizationPatterns(
+    RewritePatternSet &patterns, MLIRContext *context) {
+  patterns.add<ElideConstantExprStatementDiscard>(context);
 }
 
 //===----------------------------------------------------------------------===//
