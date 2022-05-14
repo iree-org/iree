@@ -542,3 +542,69 @@ func.func @reverse_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 // CHECK-SAME:     ins(%[[IN]] : tensor<?x?xi32>)
 // CHECK-SAME:     outs(%[[INIT]] : tensor<?x?xi32>) : tensor<?x?xi32>
 // CHECK:        return %[[REV]]
+
+// -----
+
+func.func @chlo_top_k_int(%arg : tensor<16x16xi32>) -> (tensor<16x8xi32>, tensor<16x8xi32>) {
+  %1:2 = chlo.top_k(%arg, k=8) : tensor<16x16xi32> -> (tensor<16x8xi32>, tensor<16x8xi32>)
+  return %1#0, %1#1 : tensor<16x8xi32>, tensor<16x8xi32>
+}
+
+// CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK:       func.func @chlo_top_k_int
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK:        %[[D0:.+]] = linalg.init_tensor [16, 16] : tensor<16x16xi32>
+// CHECK:        %[[D1:.+]] = linalg.generic
+// CHECK-SAME:   {indexing_maps = [#[[MAP0]]]
+// CHECK-SAME:   iterator_types = ["parallel", "parallel"]
+// CHECK-SAME:   outs(%[[D0]] : tensor<16x16xi32>)
+// CHECK:        %[[D7:.+]] = linalg.index 1 : index
+// CHECK:        %[[D8:.+]] = arith.index_cast %[[D7]] : index to i32
+// CHECK:        inalg.yield %[[D8]] : i32
+// CHECK:        %[[D2:.+]] = linalg.init_tensor [16, 8] : tensor<16x8xi32>
+// CHECK:        %[[D3:.+]] = linalg.init_tensor [16, 8] : tensor<16x8xi32>
+// CHECK-DAG:    %[[CNEG:.+]] = arith.constant -2147483648 : i32
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : i32
+// CHECK-DAG:    %[[D4:.+]] = linalg.fill ins(%[[CNEG]] : i32) outs(%[[D2]]
+// CHECK-DAG:    %[[D5:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[D3]]
+// CHECK:        %[[D6:.+]]:2 = iree_linalg_ext.topk
+// CHECK-SAME:     dimension(1)
+// CHECK-SAME:     ins(%[[ARG0]], %[[D1]]
+// CHECK-SAME:     outs(%[[D4]], %[[D5]]
+// CHECK:        ^bb0(%[[ARG1:.+]]: i32, %[[ARG2:.+]]: i32)
+// CHECK:        %[[D7:.+]] = arith.cmpi sge, %[[ARG1]], %[[ARG2]] : i32
+// CHECK:        iree_linalg_ext.yield %[[D7]] : i1
+// CHECK:        return %[[D6]]#0, %[[D6]]#1
+
+// -----
+
+func.func @chlo_top_k_float(%arg : tensor<16x16xf32>) -> (tensor<16x8xf32>, tensor<16x8xi32>) {
+  %1:2 = chlo.top_k(%arg, k=8) : tensor<16x16xf32> -> (tensor<16x8xf32>, tensor<16x8xi32>)
+  return %1#0, %1#1 : tensor<16x8xf32>, tensor<16x8xi32>
+}
+
+// CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK:       func.func @chlo_top_k_float
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK:        %[[D0:.+]] = linalg.init_tensor [16, 16] : tensor<16x16xi32>
+// CHECK:        %[[D1:.+]] = linalg.generic
+// CHECK-SAME:   {indexing_maps = [#[[MAP0]]]
+// CHECK-SAME:   iterator_types = ["parallel", "parallel"]
+// CHECK-SAME:   outs(%[[D0]] : tensor<16x16xi32>)
+// CHECK:        %[[D7:.+]] = linalg.index 1 : index
+// CHECK:        %[[D8:.+]] = arith.index_cast %[[D7]] : index to i32
+// CHECK:        inalg.yield %[[D8]] : i32
+// CHECK:        %[[D2:.+]] = linalg.init_tensor [16, 8] : tensor<16x8xf32>
+// CHECK:        %[[D3:.+]] = linalg.init_tensor [16, 8] : tensor<16x8xi32>
+// CHECK-DAG:    %[[CNEG:.+]] = arith.constant 0xFF800000 : f32
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : i32
+// CHECK-DAG:    %[[D4:.+]] = linalg.fill ins(%[[CNEG]] : f32) outs(%[[D2]]
+// CHECK-DAG:    %[[D5:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[D3]]
+// CHECK:        %[[D6:.+]]:2 = iree_linalg_ext.topk
+// CHECK-SAME:     dimension(1)
+// CHECK-SAME:     ins(%[[ARG0]], %[[D1]]
+// CHECK-SAME:     outs(%[[D4]], %[[D5]]
+// CHECK:        ^bb0(%[[ARG1:.+]]: f32, %[[ARG2:.+]]: f32)
+// CHECK:        %[[D7:.+]] = arith.cmpf ogt, %[[ARG1]], %[[ARG2]] : f32
+// CHECK:        iree_linalg_ext.yield %[[D7]] : i1
+// CHECK:        return %[[D6]]#0, %[[D6]]#1

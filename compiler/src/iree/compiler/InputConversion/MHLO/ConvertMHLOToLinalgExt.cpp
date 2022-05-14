@@ -15,6 +15,7 @@
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Rewriters.h"
+#include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/map_mhlo_to_scalar_op.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
@@ -471,6 +472,140 @@ struct ReverseOpConversion : public OpConversionPattern<mhlo::ReverseOp> {
 };
 
 //===----------------------------------------------------------------------===//
+// TopkOp
+//===----------------------------------------------------------------------===//
+
+struct TopkOpConversion : public OpConversionPattern<mlir::chlo::TopKOp> {
+  using OpConversionPattern<mlir::chlo::TopKOp>::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      mlir::chlo::TopKOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const final {
+    Location loc = op.getLoc();
+    Value operand = adaptor.operand();
+    uint64_t k = adaptor.k();
+
+    auto inputValuesType = operand.getType().dyn_cast<RankedTensorType>();
+    if (!inputValuesType) {
+      return failure();
+    }
+    uint64_t kDim = inputValuesType.getShape().size() - 1;
+
+    // Create a range of indicies for the input tensor match input shape but
+    // with i32 type.
+    SmallVector<Value> dynSizes;
+    for (auto en : llvm::enumerate(inputValuesType.getShape())) {
+      if (en.value() == ShapedType::kDynamicSize) {
+        dynSizes.push_back(rewriter.create<tensor::DimOp>(
+            loc, adaptor.getOperands()[0], en.index()));
+      }
+    }
+    Value initAcc = rewriter
+                        .create<linalg::InitTensorOp>(
+                            loc, dynSizes, inputValuesType.getShape(),
+                            rewriter.getI32Type())
+                        .getResult();
+
+    // Create the indexing maps for the generic
+    size_t inputRank = inputValuesType.getShape().size();
+    AffineMap mapIdentity = rewriter.getMultiDimIdentityMap(inputRank);
+    SmallVector<AffineMap> indexingMaps{mapIdentity};
+    SmallVector<StringRef> iterators{inputRank, "parallel"};
+    Value inputIndices =
+        rewriter
+            .create<linalg::GenericOp>(
+                loc, initAcc.getType() /* result type */,
+                ValueRange{} /* inputs */, ValueRange{initAcc} /* outputs */,
+                indexingMaps, iterators,
+                [=](OpBuilder &b, Location loc, ValueRange args) {
+                  // Indicies increase along the k dimension
+                  Value index = b.create<linalg::IndexOp>(loc, kDim);
+                  Value intIndex =
+                      b.create<arith::IndexCastOp>(loc, b.getI32Type(), index);
+                  b.create<linalg::YieldOp>(loc, intIndex);
+                })
+            .getResult(0);
+
+    // Create and initialize output tensors for LinalgExt TopK results
+    // Define the output types based on the results of CHLO TopK
+    ShapedType outputValuesType = op.getResultTypes()[0].dyn_cast<ShapedType>();
+    ShapedType outputIndicesType =
+        op.getResultTypes()[1].dyn_cast<ShapedType>();
+    dynSizes.clear();
+    for (auto en : llvm::enumerate(outputValuesType.getShape())) {
+      if (en.value() == ShapedType::kDynamicSize) {
+        dynSizes.push_back(rewriter.create<tensor::DimOp>(
+            loc, adaptor.getOperands()[0], en.index()));
+      }
+    }
+    Value initTensorOutputValues = rewriter.create<mlir::linalg::InitTensorOp>(
+        loc, dynSizes, outputValuesType.getShape(),
+        outputValuesType.getElementType());
+    Value initTensorOutputIndices = rewriter.create<mlir::linalg::InitTensorOp>(
+        loc, dynSizes, outputIndicesType.getShape(),
+        outputIndicesType.getElementType());
+    // Check that the last dim size in the output = k
+    if (outputValuesType.getShape().back() != k ||
+        outputIndicesType.getShape().back() != k) {
+      return failure();
+    }
+    // Initialize indices to 0 and values to negative infinity
+    Attribute negInfAttr;
+    if (outputValuesType.getElementType().isa<IntegerType>()) {
+      negInfAttr = rewriter.getIntegerAttr(
+          outputValuesType.getElementType(),
+          APInt::getSignedMinValue(outputValuesType.getElementType()
+                                       .cast<IntegerType>()
+                                       .getWidth()));
+    } else {
+      auto negApFloat = APFloat::getInf(outputValuesType.getElementType()
+                                            .cast<FloatType>()
+                                            .getFloatSemantics(),
+                                        true);
+      negInfAttr =
+          rewriter.getFloatAttr(outputValuesType.getElementType(), negApFloat);
+    }
+    Value negInf = rewriter.create<arith::ConstantOp>(
+        loc, negInfAttr, outputValuesType.getElementType());
+    Value zero = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(outputIndicesType.getElementType()));
+    Value negInfTensor =
+        rewriter.create<linalg::FillOp>(loc, negInf, initTensorOutputValues)
+            .getResult(0);
+    Value zeroTensor =
+        rewriter.create<linalg::FillOp>(loc, zero, initTensorOutputIndices)
+            .getResult(0);
+
+    // Replace the CHLO TopK with LinalgExt TopK
+    auto topkOp = rewriter.replaceOpWithNewOp<IREE::LinalgExt::TopkOp>(
+        op, op->getResultTypes(), ValueRange{operand, inputIndices},
+        ValueRange{negInfTensor, zeroTensor}, kDim);
+
+    // Define the region of TopK with a GT comparison
+    SmallVector<Type> types{inputValuesType.getElementType(),
+                            inputValuesType.getElementType()};
+    SmallVector<Location> locations{loc, loc};
+    Block *block = rewriter.createBlock(&topkOp.region(), {}, types, locations);
+    {
+      rewriter.setInsertionPointToStart(&topkOp.region().front());
+      Value lhs = block->getArgument(0);
+      Value rhs = block->getArgument(1);
+      Value condition;
+      if (inputValuesType.getElementType().isa<IntegerType>()) {
+        condition = rewriter.create<arith::CmpIOp>(
+            loc, arith::CmpIPredicate::sge, lhs, rhs);
+      } else {
+        condition = rewriter.create<arith::CmpFOp>(
+            loc, arith::CmpFPredicate::OGT, lhs, rhs);
+      }
+      rewriter.create<IREE::LinalgExt::YieldOp>(loc, condition);
+    }
+
+    rewriter.setInsertionPoint(topkOp);
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
 
@@ -490,7 +625,8 @@ struct ConvertMHLOToLinalgExtPass
 
     MhloToStdTypeConverter typeConverter;
     patterns.insert<SortOpConversion, ScatterOpConversion, FftOpConversion,
-                    ReverseOpConversion>(typeConverter, context);
+                    ReverseOpConversion, TopkOpConversion>(typeConverter,
+                                                           context);
     // FIXME: It shouldn't be necessary to list every matching MHLO op here,
     // especially since they're already listed in
     // populateHLOToLinalgConversionPattern and in HloOpToStdScalarOp. These
