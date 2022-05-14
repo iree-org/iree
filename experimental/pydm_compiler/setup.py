@@ -28,15 +28,13 @@ except FileNotFoundError:
 PACKAGE_SUFFIX = version_info.get("package-suffix") or "-dev"
 PACKAGE_VERSION = version_info.get("package-version") or "0.1dev1"
 
-setup(
-    name=f"iree-pydm{PACKAGE_SUFFIX}",
-    version=f"{PACKAGE_VERSION}",
-    packages=find_namespace_packages(include=[
-        "iree.pydm",
-        "iree.pydm.*",
-    ],),
-    install_requires=[
-        "iree-compiler",
-        "iree-runtime",
-    ]
-)
+setup(name=f"iree-pydm{PACKAGE_SUFFIX}",
+      version=f"{PACKAGE_VERSION}",
+      packages=find_namespace_packages(include=[
+          "iree.pydm",
+          "iree.pydm.*",
+      ],),
+      install_requires=[
+          "iree-compiler",
+          "iree-runtime",
+      ])

@@ -8,7 +8,8 @@ from iree.pydm.testing import jit
 
 
 @jit
-def type_error_on_return(condition: bool, true_value: int, false_value: float) -> int:
+def type_error_on_return(condition: bool, true_value: int,
+                         false_value: float) -> int:
   """
   Taking the false branch attempts to cast a float to an int.
     >>> type_error_on_return(0, 1, 2.0)
