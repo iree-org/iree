@@ -47,7 +47,7 @@ class FunctionTest(unittest.TestCase):
     config = rt.Config("vmvx")
     cls.device = config.device
 
-  def testNoReflectionScalars(self):
+  def testNoReflectionInts(self):
 
     def invoke(arg_list, ret_list):
       ret_list.push_int(3)
@@ -59,6 +59,19 @@ class FunctionTest(unittest.TestCase):
     result = invoker(1, 2)
     self.assertEqual("[<VmVariantList(2): [1, 2]>]", vm_context.mock_arg_reprs)
     self.assertEqual((3, 4), result)
+
+  def testNoReflectionBools(self):
+
+    def invoke(arg_list, ret_list):
+      ret_list.push_int(False)
+      ret_list.push_int(True)
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(reflection={})
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    result = invoker(True, False)
+    self.assertEqual("[<VmVariantList(2): [1, 0]>]", vm_context.mock_arg_reprs)
+    self.assertEqual((0, 1), result)
 
   def testKeywordArgs(self):
 

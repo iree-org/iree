@@ -418,7 +418,17 @@ class InvokeStatics {
 
   void PopulatePyTypeToPackCallbacks() {
     if (!py_type_to_pack_callbacks_.empty()) return;
+    // Bool.
+    AddPackCallback(
+        py::type::of(py::cast(false)),
+        [](InvokeContext &c, iree_vm_list_t *list, py::handle py_value) {
+          iree_vm_value_t vm_value =
+              iree_vm_value_make_i8(py::cast<int8_t>(py_value));
+          CheckApiStatus(iree_vm_list_push_value(list, &vm_value),
+                         "could not append value");
+        });
 
+    // Numeric hierarchy.
     // We only care about int and double in the numeric hierarchy. Since Python
     // has no further refinement of these, just treat them as vm 64 bit int and
     // floats and let the VM take care of it. There isn't much else we can do.

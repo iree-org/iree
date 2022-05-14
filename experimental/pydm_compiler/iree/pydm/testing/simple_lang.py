@@ -108,6 +108,8 @@ class SimpleModule:
       symbol = f.__name__
     intrinsic = def_pyfunc_intrinsic(f, symbol=symbol, visibility=visibility)
     self.exported_funcs.append(intrinsic)
+    # Important: Make sure it acts like the original (incl. docstring, et al).
+    functools.update_wrapper(intrinsic, f)
     return intrinsic
 
   def internal_pyfunc(self,
@@ -122,6 +124,8 @@ class SimpleModule:
     if symbol is None:
       symbol = f.__name__
     intrinsic = def_pyfunc_intrinsic(f, symbol=symbol, visibility=visibility)
+    # Important: Make sure it acts like the original (incl. docstring, et al).
+    functools.update_wrapper(intrinsic, f)
     return intrinsic
 
   def compile(self, context: Optional[ir.Context] = None) -> "Compiler":
