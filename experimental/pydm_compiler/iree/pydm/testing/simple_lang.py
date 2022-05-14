@@ -64,7 +64,8 @@ def jit(f=None, debug: _DebugMode = None):
 
   wrapped.module = SimpleModule(debug=debug)
   wrapped.module.export_pyfunc(f, symbol="main")
-  wrapped.__name__ = __name__
+  # Important: Make sure it acts like the original (incl. docstring, et al).
+  functools.update_wrapper(wrapped, f)
   return wrapped
 
 

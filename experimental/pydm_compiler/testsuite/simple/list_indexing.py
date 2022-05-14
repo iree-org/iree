@@ -10,10 +10,13 @@ from iree.pydm.testing import jit
 @jit
 def getitem_int(a: int, b: int) -> int:
   """
-    >>> getitem_int(1, 7)
-    7
+  >>> getitem_int(1, 7)
+  7
   """
   lst = [a, b, 9]
   return lst[1]
 
-print(getitem_int(1, 7))
+
+if __name__ == "__main__":
+  import doctest
+  doctest.testmod()
