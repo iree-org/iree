@@ -414,6 +414,75 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
       d.ReturnOp(self.fctx.cast_to_return_type(expr.get_immediate()))
     self.terminated = True
 
+  def visit_For(self, node: ast.For):
+    if self.terminated:
+      return
+    fctx = self.fctx
+    ic = fctx.ic
+
+    # Blocks:
+    #   next: evaluate __next__ and branch to either body or orelse
+    #   body: main loop body
+    #   orelse: optional block to execute when iteration is exhausted
+    #   successor: statements following the loop
+    predecessor_block = ic.ip.block
+    next_block = predecessor_block.create_after()
+    body_block = next_block.create_after()
+    if node.orelse:
+      orelse_block = body_block.create_after()
+      successor_block = orelse_block.create_after()
+    else:
+      successor_block = body_block.create_after()
+
+    # Emit iterator creation and branch to next block.
+    iter_target_expr = ExpressionImporter(fctx)
+    iter_target_expr.visit(node.iter)
+    with ic.ip, ic.loc:
+      iterator = d.IterOp(result=d.ObjectType.get(),
+                          target=iter_target_expr.get_immediate()).result
+      cf_d.BranchOp([], next_block)
+
+    # Emit next block.
+    with ic.scoped_ip(ir.InsertionPoint(next_block)):
+      with ic.ip, ic.loc:
+        valid_pred = d.NextOp(ir.IntegerType.get_signless(1), iterator)
+        cf_d.CondBranchOp(
+            condition=valid_pred,
+            trueDestOperands=[],
+            falseDestOperands=[],
+            trueDest=body_block,
+            falseDest=orelse_block if node.orelse else successor_block)
+
+    # Emit body block.
+    with ic.scoped_ip(ir.InsertionPoint(body_block)):
+      with ic.ip, ic.loc:
+        next_item = d.NextItemOp(result=d.ObjectType.get(),
+                                 target=iterator).result
+        # TODO: Generalize to handle unpack (and merge with visit_Assign in
+        # some way).
+        assign_target = node.target
+        if isinstance(assign_target, ast.Name):
+          boxed = ic.box(next_item)
+          d.StoreVarOp(fctx.find_variable(assign_target.id), boxed)
+        else:
+          ic.abort(f"unsupported assignment target: "
+                   f"{assign_target.__class__.__name__}")
+        body_importer = FunctionDefBodyImporter(fctx,
+                                                successor_block=next_block,
+                                                break_block=successor_block,
+                                                continue_block=next_block)
+        body_importer.import_block(node.body)
+
+    # Emit orelse.
+    if node.orelse:
+      with ic.scoped_ip(ir.InsertionPoint(orelse_block)):
+        orelse_importer = FunctionDefBodyImporter(
+            fctx, successor_block=successor_block)
+        orelse_importer.import_block(node.orelse)
+
+    # Done.
+    ic.reset_ip(ir.InsertionPoint(successor_block))
+
   def visit_While(self, node: ast.While):
     if self.terminated:
       return
