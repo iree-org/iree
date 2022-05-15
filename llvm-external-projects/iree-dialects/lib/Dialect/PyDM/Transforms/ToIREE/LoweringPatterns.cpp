@@ -588,7 +588,7 @@ class BuiltinNextItemConversion : public OpConversionPattern<PYDM::NextItemOp> {
     Type indexType = rewriter.getType<IndexType>();
     Value iterList = adaptor.iter();
     Value index0 =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(1));
+        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(0));
     Value index1 =
         rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(1));
     Value iterIndex =
