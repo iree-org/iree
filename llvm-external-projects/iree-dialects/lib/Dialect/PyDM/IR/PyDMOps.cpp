@@ -625,7 +625,7 @@ bool IterOp::refineResultTypes() {
   // If the target is a builtin sequence type, then we set the result
   // type to an appropriate iterator.
   Type targetType = target().getType();
-  if (targetType.isa<BytesType, ListType, StrType, TupleType>()) {
+  if (targetType.isa<BytesType, ListType, RangeType, StrType, TupleType>()) {
     newResultType = SequenceIteratorType::get(getContext(),
                                               targetType.cast<PrimitiveType>());
   }
@@ -681,6 +681,39 @@ LogicalResult MakeListOp::verify() {
     break;
   }
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// MakeRangeOp
+//===----------------------------------------------------------------------===//
+
+void MakeRangeOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                              MLIRContext *context) {
+  patterns.add<UnboxOperands>(getOperationName(), context);
+}
+
+bool MakeRangeOp::refineResultTypes() {
+  auto *context = getContext();
+  Type newResultType = getResult().getType();
+
+  // Propagate the range integer type based on the type of the stop value.
+  // Naturally, this will be an appropriate bounding type and the others
+  // are ancillary and can be cast accordingly.
+  auto stopType = stop().getType().dyn_cast<IntegerType>();
+  if (stopType) {
+    // Known integer type.
+    newResultType = RangeType::get(context, stopType);
+  } else {
+    // Unknown.
+    newResultType = RangeType::get(context);
+  }
+
+  // Commit changes.
+  if (newResultType != getResult().getType()) {
+    getResult().setType(newResultType);
+    return true;
+  }
+  return false;
 }
 
 //===----------------------------------------------------------------------===//

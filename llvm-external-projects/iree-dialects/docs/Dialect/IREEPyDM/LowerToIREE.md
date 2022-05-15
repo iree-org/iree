@@ -22,6 +22,15 @@ elements are laid out as:
 * [2] (optional): i64 TypeID - if the `id()` function has been evaluated for
   this object, then this element will contain the unique id.
 
+## `range` records
+
+Objects map to an IREE typed list where the type is the converted integer
+type of the range's `indexType`. It is laid out as:
+
+* [0]: Stop
+* [1]: Start
+* [2]: Step
+
 ## `sequence_iterator` records
 
 Sequence iterators map to IREE variant lists of 3 elements:

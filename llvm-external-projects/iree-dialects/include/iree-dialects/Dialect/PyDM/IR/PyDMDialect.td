@@ -192,6 +192,39 @@ def IREEPyDM_NoneType : IREEPyDM_PrimitiveTypeDef<"None"> {
   }];
 }
 
+def IREEPyDM_RangeType : IREEPyDM_PrimitiveTypeDef<"Range"> {
+  let mnemonic = "range";
+  let summary = "Models a range sequence";
+  let description = [{
+    See: https://docs.python.org/3/library/stdtypes.html#range
+    Represents a range over integer (stop, start, step) values.
+
+    For a positive step, the range is defined as:
+    ```
+      r[i] = start + step*i
+    ```
+
+    For a negative step, the range is defined the same but with additional
+    constraints:
+    ```
+      i >= 0 and r[i] > stop
+    ```
+
+    A range is considered empty if `r[0]` does not meet the constraint.
+  }];
+  let parameters = (ins
+    "IntegerType":$indexType
+  );
+  let assemblyFormat = "`<` $indexType `>`";
+
+  let builders = [
+    // Builds a weak RangeType
+    TypeBuilder<(ins), [{
+      return Base::get($_ctxt, IntegerType::get($_ctxt));
+    }]>,
+  ];
+}
+
 def IREEPyDM_RealType : IREEPyDM_PrimitiveTypeDef<"Real",
     ["getNumericPromotionOrder", "getNumericCategory", "getNumericSubTypeCode"]> {
   let mnemonic = "real";

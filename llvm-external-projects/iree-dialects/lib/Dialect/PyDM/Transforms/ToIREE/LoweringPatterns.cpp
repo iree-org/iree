@@ -7,6 +7,7 @@
 #include "iree-dialects/Dialect/Input/InputOps.h"
 #include "iree-dialects/Dialect/PyDM/IR/PyDMOps.h"
 #include "iree-dialects/Dialect/PyDM/Transforms/ToIREE/Patterns.h"
+#include "iree-dialects/Dialect/PyDM/Transforms/ToIREE/TypeConverter.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -22,6 +23,8 @@ using namespace mlir;
 namespace PYDM = mlir::iree_compiler::IREE::PYDM;
 namespace Input = mlir::iree_compiler::IREE::Input;
 using namespace PYDM;
+
+using PYDM::RecordIndices;
 
 namespace {
 
@@ -44,6 +47,12 @@ enum class ExceptionCode : int {
 static Type getVariantListType(Builder &builder) {
   return builder.getType<Input::ListType>(
       builder.getType<Input::VariantType>());
+}
+
+static Value makeRecordIndex(Location loc, OpBuilder &builder,
+                             RecordIndices index) {
+  return builder.create<arith::ConstantOp>(
+      loc, builder.getIndexAttr(static_cast<int>(index)));
 }
 
 static Value getNullValue(Location loc, OpBuilder &builder, Type t) {
@@ -546,19 +555,49 @@ class BuiltinLenConversion : public OpConversionPattern<PYDM::LenOp> {
     // Type switch on the original (pydm) type.
     Type origTargetType = srcOp.target().getType();
 
+    Value target = adaptor.target();
+    // Len of ListType and TupleType.
+    // Both list and tuple share a physical representation (they are just
+    // an IREE list of the same arity).
     if (origTargetType.isa<PYDM::ListType>() ||
         origTargetType.isa<PYDM::TupleType>()) {
-      // Both list and tuple share a physical representation (they are just
-      // an IREE list of the same arity).
       Type resultType =
           getTypeConverter()->convertType(srcOp.result().getType());
       assert(resultType && "could not convert result type");
       auto indexType = rewriter.getType<IndexType>();
       Value listSizeIndex =
-          rewriter.create<Input::ListSizeOp>(loc, indexType, adaptor.target());
+          rewriter.create<Input::ListSizeOp>(loc, indexType, target);
       Value listSizeInteger =
           rewriter.create<arith::IndexCastOp>(loc, resultType, listSizeIndex);
       rewriter.replaceOp(srcOp, ValueRange{listSizeInteger});
+      return success();
+    }
+
+    // Len of RangeType.
+    if (auto rangeType = origTargetType.dyn_cast<PYDM::RangeType>()) {
+      // Length = Max((Stop - Start) / Step, 0)
+      Type rangeIndexType =
+          getTypeConverter()->convertType(rangeType.getIndexType());
+      assert(rangeIndexType && "could not convert range index type");
+      Value stop = rewriter.create<Input::ListGetOp>(
+          loc, rangeIndexType, target,
+          makeRecordIndex(loc, rewriter, RecordIndices::RangeStop));
+      Value start = rewriter.create<Input::ListGetOp>(
+          loc, rangeIndexType, target,
+          makeRecordIndex(loc, rewriter, RecordIndices::RangeStart));
+      Value step = rewriter.create<Input::ListGetOp>(
+          loc, rangeIndexType, target,
+          makeRecordIndex(loc, rewriter, RecordIndices::RangeStep));
+      Value zero =
+          rewriter.create<arith::ConstantIntOp>(loc, 0, rangeIndexType);
+
+      Value stopMinusStart = rewriter.create<arith::SubIOp>(loc, stop, start);
+      Value divByStep =
+          rewriter.create<arith::CeilDivSIOp>(loc, stopMinusStart, step);
+      Value ltZero = rewriter.create<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::slt, divByStep, zero);
+      rewriter.replaceOpWithNewOp<arith::SelectOp>(srcOp, ltZero, zero,
+                                                   divByStep);
       return success();
     }
 
@@ -915,6 +954,40 @@ class MakeListOpBoxedConversion : public OpConversionPattern<PYDM::MakeListOp> {
     }
 
     rewriter.replaceOp(srcOp, ValueRange{list});
+    return success();
+  }
+};
+
+class MakeRangeOpConversion : public OpConversionPattern<PYDM::MakeRangeOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(PYDM::MakeRangeOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto loc = srcOp.getLoc();
+    Type resultType =
+        getTypeConverter()->convertType(srcOp.getResult().getType());
+    if (!resultType) {
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "could not convert result range type");
+    }
+    auto arity = makeRecordIndex(loc, rewriter, RecordIndices::RangeArity);
+    auto record = rewriter.create<Input::ListCreateOp>(loc, resultType,
+                                                       /*capacity=*/arity);
+    rewriter.create<Input::ListResizeOp>(loc, record, arity);
+    // Stop.
+    rewriter.create<Input::ListSetOp>(
+        loc, record, makeRecordIndex(loc, rewriter, RecordIndices::RangeStop),
+        adaptor.stop());
+    // Start.
+    rewriter.create<Input::ListSetOp>(
+        loc, record, makeRecordIndex(loc, rewriter, RecordIndices::RangeStart),
+        adaptor.start());
+    // Step.
+    rewriter.create<Input::ListSetOp>(
+        loc, record, makeRecordIndex(loc, rewriter, RecordIndices::RangeStep),
+        adaptor.step());
+    rewriter.replaceOp(srcOp, ValueRange{record});
     return success();
   }
 };
@@ -1449,8 +1522,9 @@ void PYDM::populatePyDMToIREELoweringPatterns(MLIRContext *context,
       MakeListOpBoxedConversion, CallOpConversion, ConstantOpConversion,
       DynamicUnpackOpConversion, ElideStaticInfoCast, FailureOpConversion,
       FuncOpConversion, GetTypeCodeConversion, LoadVarOpConversion,
-      MakeTupleOpConversion, NegIntegerOpConversion, RaiseOnFailureOpConversion,
-      ReturnOpConversion, SequenceCloneBuiltinConversion, StoreVarOpConversion,
+      MakeRangeOpConversion, MakeTupleOpConversion, NegIntegerOpConversion,
+      RaiseOnFailureOpConversion, ReturnOpConversion,
+      SequenceCloneBuiltinConversion, StoreVarOpConversion,
       SubscriptOpBuiltinSequenceConversion, UnboxOpConversion>(typeConverter,
                                                                context);
 

@@ -360,6 +360,14 @@ bool PYDM::ObjectType::isRefinable() const {
   return false;
 }
 
+// RangeType
+
+BuiltinTypeCode PYDM::RangeType::getTypeCode() const {
+  return BuiltinTypeCode::Range;
+}
+
+StringRef PYDM::RangeType::getPythonTypeName() const { return "range"; }
+
 // RealType
 void PyRealType::print(mlir::AsmPrinter &printer) const {
   auto ft = getImpl()->floatType;

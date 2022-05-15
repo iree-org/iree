@@ -74,6 +74,13 @@ struct FixateWeakNumericPass
               type.getContext(), newPrimitiveType.cast<PYDM::PrimitiveType>());
         }
       }
+    } else if (auto rangeType = type.dyn_cast<PYDM::RangeType>()) {
+      auto indexType = rangeType.getIndexType();
+      if (indexType.isWeak()) {
+        return PYDM::RangeType::get(
+            type.getContext(),
+            convertType(indexType).cast<PYDM::IntegerType>());
+      }
     }
 
     return type;

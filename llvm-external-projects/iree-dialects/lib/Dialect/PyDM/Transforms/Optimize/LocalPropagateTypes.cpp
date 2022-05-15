@@ -38,6 +38,7 @@ struct LocalPropagateTypesPass
     HasNextOp::getCanonicalizationPatterns(canonicalizePatterns, context);
     IterOp::getCanonicalizationPatterns(canonicalizePatterns, context);
     LenOp::getCanonicalizationPatterns(canonicalizePatterns, context);
+    MakeRangeOp::getCanonicalizationPatterns(canonicalizePatterns, context);
     NegOp::getCanonicalizationPatterns(canonicalizePatterns, context);
     NextItemOp::getCanonicalizationPatterns(canonicalizePatterns, context);
     PromoteNumericOp::getCanonicalizationPatterns(canonicalizePatterns,

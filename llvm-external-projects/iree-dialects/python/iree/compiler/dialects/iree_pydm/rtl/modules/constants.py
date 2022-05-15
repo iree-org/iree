@@ -15,6 +15,7 @@ TYPE_BYTES = 5
 TYPE_EXCEPTION_RESULT = 6
 TYPE_TYPE = 7
 TYPE_SEQUENCE_ITERATOR = 8
+TYPE_RANGE = 9
 TYPE_OBJECT = 0x100
 
 # Numeric type exist in a range between 0x20 and 0x7f (inclusive).

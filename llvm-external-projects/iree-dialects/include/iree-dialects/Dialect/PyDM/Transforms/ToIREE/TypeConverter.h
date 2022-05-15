@@ -15,6 +15,16 @@ namespace iree_compiler {
 namespace IREE {
 namespace PYDM {
 
+/// For types which match to fixed-format list records, the indices are here.
+/// See also LowerToIREE.md.
+enum class RecordIndices {
+  // Range record.
+  RangeArity = 3,
+  RangeStop = 0,
+  RangeStart = 1,
+  RangeStep = 2,
+};
+
 class LoweringTypeConverter : public mlir::TypeConverter {
 public:
   enum class WeakFloatType {

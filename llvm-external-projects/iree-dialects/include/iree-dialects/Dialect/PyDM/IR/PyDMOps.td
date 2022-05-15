@@ -482,6 +482,30 @@ def IREEPyDM_MakeListOp : IREEPyDM_PureOp<"make_list", [
   let hasVerifier = 1;
 }
 
+def IREEPyDM_MakeRangeOp : IREEPyDM_PureOp<"make_range", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface, ["refineResultTypes"]>
+  ]> {
+  let summary = "Makes a range object from parameters";
+  let description = [{
+    A range consists of (stop, start, step), all of which must dynamically
+    be an IntegerType. While this op-set allows them to vary the exact
+    IntegerType used, backends typically benefit from agreement. Appropriate
+    promotion is outside of the scope of this op.
+  }];
+  let arguments = (ins
+    IREEPyDM_AnyValueType:$stop,
+    IREEPyDM_AnyValueType:$start,
+    IREEPyDM_AnyValueType:$step
+  );
+  let results = (outs
+    IREEPyDM_RangeType:$range
+  );
+  let assemblyFormat = [{
+    `to` $stop `from` $start `by` $step `:` type(operands) `->` type($range) attr-dict
+  }];
+  let hasCanonicalizer = 1;
+}
+
 def IREEPyDM_MakeTupleOp : IREEPyDM_PureOp<"make_tuple"> {
   let summary = "Makes a tuple from a static list of values";
   let description = [{

@@ -62,6 +62,14 @@ LoweringTypeConverter::LoweringTypeConverter() {
     return t.getFloatType();
   });
 
+  // Range.
+  addConversion([&](PYDM::RangeType t) -> Optional<Type> {
+    auto indexType = convertType(t.getIndexType());
+    assert(indexType && "integral type must convert but did not");
+    Builder b(t.getContext());
+    return b.getType<IREE::Input::ListType>(indexType);
+  });
+
   // Tuple, List.
   // TODO: Fork these based on CollectionStorageClass as they can avoid
   // using variant lists.
