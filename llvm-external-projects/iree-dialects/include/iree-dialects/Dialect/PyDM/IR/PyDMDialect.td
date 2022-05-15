@@ -275,6 +275,19 @@ def IREEPyDM_TypeType : IREEPyDM_PrimitiveTypeDef<"Type"> {
 }
 
 //===----------------------------------------------------------------------===//
+// Iterators
+//===----------------------------------------------------------------------===//
+
+def IREEPyDM_SequenceIteratorType : IREEPyDM_PrimitiveTypeDef<"SequenceIterator"> {
+  let mnemonic = "sequence_iterator";
+  let summary = "An iterator over a built-in sequence type (list/tuple/str)";
+  let parameters = (ins
+    "::mlir::iree_compiler::IREE::PYDM::PrimitiveType":$sequenceType
+  );
+  let assemblyFormat = "`<` $sequenceType `>`";
+}
+
+//===----------------------------------------------------------------------===//
 // Boxed objects
 //===----------------------------------------------------------------------===//
 

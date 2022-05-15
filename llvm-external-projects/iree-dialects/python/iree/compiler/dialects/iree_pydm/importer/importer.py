@@ -445,7 +445,8 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
     # Emit next block.
     with ic.scoped_ip(ir.InsertionPoint(next_block)):
       with ic.ip, ic.loc:
-        valid_pred = d.NextOp(ir.IntegerType.get_signless(1), iterator)
+        valid_pred = d.HasNextOp(iter=iterator,
+                                 valid=ir.IntegerType.get_signless(1))
         cf_d.CondBranchOp(
             condition=valid_pred,
             trueDestOperands=[],
@@ -457,7 +458,7 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
     with ic.scoped_ip(ir.InsertionPoint(body_block)):
       with ic.ip, ic.loc:
         next_item = d.NextItemOp(result=d.ObjectType.get(),
-                                 target=iterator).result
+                                 iter=iterator).result
         # TODO: Generalize to handle unpack (and merge with visit_Assign in
         # some way).
         assign_target = node.target

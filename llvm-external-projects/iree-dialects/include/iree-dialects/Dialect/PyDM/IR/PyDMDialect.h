@@ -45,7 +45,8 @@ namespace PYDM {
 inline bool PrimitiveType::classof(Type type) {
   // Must corresponds with each subclass.
   return type.isa<BoolType, BytesType, IntegerType, ExceptionResultType,
-                  ListType, NoneType, RealType, StrType, TupleType, TypeType>();
+                  ListType, NoneType, RealType, SequenceIteratorType, StrType,
+                  TupleType, TypeType>();
 }
 
 } // namespace PYDM

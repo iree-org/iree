@@ -745,7 +745,7 @@ def IREEPyDM_NegOp : IREEPyDM_PureOp<"neg", [
 //===----------------------------------------------------------------------===//
 
 def IREEPyDM_IterOp : IREEPyDM_PureOp<"iter", [
-    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface, ["refineResultTypes"]>
   ]> {
   let summary = "Evaluates __iter__ against some target";
   let description = [{
@@ -767,6 +767,7 @@ def IREEPyDM_IterOp : IREEPyDM_PureOp<"iter", [
   let assemblyFormat = [{
     $target `:` type($target) `->` type($result) attr-dict
   }];
+  let hasCanonicalizer = 1;
 }
 
 def IREEPyDM_LenOp : IREEPyDM_PureOp<"len", [
@@ -794,7 +795,7 @@ def IREEPyDM_LenOp : IREEPyDM_PureOp<"len", [
   let hasCanonicalizer = 1;
 }
 
-def IREEPyDM_NextOp : IREEPyDM_Op<"next", [
+def IREEPyDM_HasNextOp : IREEPyDM_Op<"has_next", [
     DeclareOpInterfaceMethods<TypeRefinableOpInterface>
   ]> {
   let summary = "Evaluates __next__ against some target";
@@ -803,46 +804,47 @@ def IREEPyDM_NextOp : IREEPyDM_Op<"next", [
 
     Note that the Python level `__next__` method is monolithic and uses
     exception handling to signal iterator exhaustion. The protocol implemented
-    here is broken into a separate phase: This op advances the iterator and
-    returns whether it is valid. It is expected that if so, a follow-up
-    `next_item` op will be used to fetch the value. This is done with an eye
-    towards efficiency and overhead reduction for builtin iterators and
-    corresponding CFG IR.
+    here is broken into a separate phase: This op determines whether the
+    iterator has more items. A follow-up call to `next_item` will return
+    and advance.
 
     This op always canonicalizes to an unboxed target for builtin target
     types.
   }];
   let arguments = (ins
-    IREEPyDM_AnyValueType:$target
+    IREEPyDM_AnyValueType:$iter
   );
   let results = (outs
     I1:$valid
   );
   let assemblyFormat = [{
-    $target `:` type($target) attr-dict
+    $iter `:` type($iter) attr-dict
   }];
+  let hasCanonicalizer = 1;
 }
 
 def IREEPyDM_NextItemOp : IREEPyDM_Op<"next_item", [
-    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface, ["refineResultTypes"]>
   ]> {
   let summary = "Gets the item advanced in a prior `next` evaluation";
   let description = [{
     If an invocation of `next` returns valid, if the value is required, it
-    must be immediately followed by a call to `next_item` to fetch the value.
+    must be immediately followed by a call to `next_item` to fetch the value
+    and advance the iterator.
 
     This op always canonicalizes to an unboxed target for builtin target
     types.
   }];
   let arguments = (ins
-    IREEPyDM_AnyValueType:$target
+    IREEPyDM_AnyValueType:$iter
   );
   let results = (outs
     IREEPyDM_AnyValueType:$result
   );
   let assemblyFormat = [{
-    $target `:` type($target) `->` type($result) attr-dict
+    $iter `:` type($iter) `->` type($result) attr-dict
   }];
+  let hasCanonicalizer = 1;
 }
 
 def IREEPyDM_SubscriptOp : IREEPyDM_PureOp<"subscript", [

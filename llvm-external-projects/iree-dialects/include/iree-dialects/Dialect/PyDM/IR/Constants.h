@@ -98,6 +98,7 @@ enum class BuiltinTypeCode : int {
   Bytes = 0x5,
   ExceptionResult = 0x6,
   Type = 0x7,
+  SequenceIterator = 0x8,
 
   // Start of the encoded numeric types codes. Lower 5 bits represent a bit
   // packed encoding of the numeric category (3 bits) and sub type

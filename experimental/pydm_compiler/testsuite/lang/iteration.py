@@ -11,10 +11,11 @@ from iree.pydm.testing import jit
 def for_in(n: int) -> int:
   """
     >>> for_in(2)
-    20
+    6
   """
   lst = [5, 1, 3] * n
   v = 0
   for i in lst:
     v = v + i
+    #v = v + 1
   return v

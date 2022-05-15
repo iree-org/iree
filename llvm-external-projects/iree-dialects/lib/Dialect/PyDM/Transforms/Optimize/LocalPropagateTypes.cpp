@@ -35,7 +35,11 @@ struct LocalPropagateTypesPass
     BoxOp::getCanonicalizationPatterns(canonicalizePatterns, context);
     DynamicBinaryPromoteOp::getCanonicalizationPatterns(canonicalizePatterns,
                                                         context);
+    HasNextOp::getCanonicalizationPatterns(canonicalizePatterns, context);
+    IterOp::getCanonicalizationPatterns(canonicalizePatterns, context);
+    LenOp::getCanonicalizationPatterns(canonicalizePatterns, context);
     NegOp::getCanonicalizationPatterns(canonicalizePatterns, context);
+    NextItemOp::getCanonicalizationPatterns(canonicalizePatterns, context);
     PromoteNumericOp::getCanonicalizationPatterns(canonicalizePatterns,
                                                   context);
     SubscriptOp::getCanonicalizationPatterns(canonicalizePatterns, context);

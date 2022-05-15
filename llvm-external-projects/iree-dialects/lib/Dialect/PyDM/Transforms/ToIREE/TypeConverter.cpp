@@ -34,6 +34,10 @@ LoweringTypeConverter::LoweringTypeConverter() {
     Builder b(t.getContext());
     return getVariantListType(b);
   });
+  addConversion([](PYDM::SequenceIteratorType t) -> Optional<Type> {
+    Builder b(t.getContext());
+    return getVariantListType(b);
+  });
 
   // Bool.
   addConversion([&](PYDM::BoolType t) -> Optional<Type> {

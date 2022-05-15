@@ -432,6 +432,16 @@ Optional<int> PYDM::RealType::getNumericPromotionOrder() const {
 
 bool PYDM::RealType::isWeak() const { return !getImpl()->floatType; }
 
+// SequenceIteratorType
+
+BuiltinTypeCode PYDM::SequenceIteratorType::getTypeCode() const {
+  return BuiltinTypeCode::Str;
+}
+
+StringRef PYDM::SequenceIteratorType::getPythonTypeName() const {
+  return "__sequence_iter__";
+}
+
 // StrType
 BuiltinTypeCode PYDM::StrType::getTypeCode() const {
   return BuiltinTypeCode::Str;

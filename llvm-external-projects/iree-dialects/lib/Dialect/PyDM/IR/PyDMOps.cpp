@@ -602,6 +602,43 @@ void PyFuncOp::print(OpAsmPrinter &p) {
 }
 
 //===----------------------------------------------------------------------===//
+// HasNextOp
+//===----------------------------------------------------------------------===//
+
+void HasNextOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                            MLIRContext *context) {
+  patterns.add<UnboxOperands>(getOperationName(), context);
+}
+
+//===----------------------------------------------------------------------===//
+// IterOp
+//===----------------------------------------------------------------------===//
+
+void IterOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                         MLIRContext *context) {
+  patterns.add<UnboxOperands>(getOperationName(), context);
+}
+
+bool IterOp::refineResultTypes() {
+  Type newResultType = getResult().getType();
+
+  // If the target is a builtin sequence type, then we set the result
+  // type to an appropriate iterator.
+  Type targetType = target().getType();
+  if (targetType.isa<BytesType, ListType, StrType, TupleType>()) {
+    newResultType = SequenceIteratorType::get(getContext(),
+                                              targetType.cast<PrimitiveType>());
+  }
+
+  // Commit changes.
+  if (newResultType != getResult().getType()) {
+    getResult().setType(newResultType);
+    return true;
+  }
+  return false;
+}
+
+//===----------------------------------------------------------------------===//
 // LenOp
 //===----------------------------------------------------------------------===//
 
@@ -660,6 +697,20 @@ bool NegOp::refineResultTypes() {
     getResult().setType(value().getType());
     return true;
   }
+  return false;
+}
+
+//===----------------------------------------------------------------------===//
+// NextItemOp
+//===----------------------------------------------------------------------===//
+
+void NextItemOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                             MLIRContext *context) {
+  patterns.add<UnboxOperands>(getOperationName(), context);
+}
+
+bool NextItemOp::refineResultTypes() {
+  // TODO: Refine to the container element type.
   return false;
 }
 

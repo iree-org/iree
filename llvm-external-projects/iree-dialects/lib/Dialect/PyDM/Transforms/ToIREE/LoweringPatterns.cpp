@@ -105,6 +105,23 @@ static Value createObjectList(Location loc, OpBuilder &builder, int typeCode,
   return list;
 }
 
+static Value createSequenceIteratorList(Location loc, OpBuilder &builder,
+                                        Value sequence, Value nextIndex,
+                                        Value limit) {
+  auto size = builder.create<arith::ConstantIndexOp>(loc, 3);
+  auto list =
+      builder.create<Input::ListCreateOp>(loc, getVariantListType(builder),
+                                          /*capacity=*/size);
+  builder.create<Input::ListResizeOp>(loc, list, size);
+  auto index0 = builder.create<arith::ConstantIndexOp>(loc, 0);
+  auto index1 = builder.create<arith::ConstantIndexOp>(loc, 1);
+  auto index2 = builder.create<arith::ConstantIndexOp>(loc, 2);
+  builder.create<Input::ListSetOp>(loc, list, index0, sequence);
+  builder.create<Input::ListSetOp>(loc, list, index1, nextIndex);
+  builder.create<Input::ListSetOp>(loc, list, index2, limit);
+  return list;
+}
+
 static Value castIntegerValue(Location loc, Value input,
                               mlir::IntegerType resultType,
                               OpBuilder &builder) {
@@ -455,6 +472,69 @@ class BoxOpConversion : public OpConversionPattern<PYDM::BoxOp> {
   }
 };
 
+/// Lowers the `next` op for builtin types.
+class BuiltinHasNextConversion : public OpConversionPattern<PYDM::HasNextOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(PYDM::HasNextOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto loc = srcOp.getLoc();
+    auto iterType =
+        srcOp.iter().getType().dyn_cast<PYDM::SequenceIteratorType>();
+    if (!iterType)
+      return rewriter.notifyMatchFailure(srcOp, "not a builtin iterator type");
+
+    Type indexType = rewriter.getType<IndexType>();
+    Value iterList = adaptor.iter();
+    Value index1 =
+        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(1));
+    Value index2 =
+        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(2));
+    Value iterIndex =
+        rewriter.create<Input::ListGetOp>(loc, indexType, iterList, index1);
+    Value iterLimit =
+        rewriter.create<Input::ListGetOp>(loc, indexType, iterList, index2);
+
+    rewriter.replaceOpWithNewOp<arith::CmpIOp>(srcOp, arith::CmpIPredicate::slt,
+                                               iterIndex, iterLimit);
+    return success();
+  }
+};
+
+/// Lowers the `has_next` op for builtin types.
+class BuiltinIterConversion : public OpConversionPattern<PYDM::IterOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(PYDM::IterOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto loc = srcOp.getLoc();
+    auto iterType =
+        srcOp.result().getType().dyn_cast<PYDM::SequenceIteratorType>();
+    if (!iterType)
+      return failure();
+    // List and tuple share a representation. The arity is just the arity
+    // of the lowered list.
+    auto sequenceType = iterType.getSequenceType();
+    if (sequenceType.isa<PYDM::ListType>() ||
+        sequenceType.isa<PYDM::TupleType>()) {
+      // Both list and tuple share a physical representation (they are just
+      // an IREE list of the same arity).
+      auto indexType = rewriter.getType<IndexType>();
+      Value listSizeIndex =
+          rewriter.create<Input::ListSizeOp>(loc, indexType, adaptor.target());
+      auto index0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+      auto iter = createSequenceIteratorList(loc, rewriter, adaptor.target(),
+                                             index0, listSizeIndex);
+      rewriter.replaceOp(srcOp, ValueRange{iter});
+      return success();
+    }
+
+    return failure();
+  }
+};
+
 /// Lowers the __len__ special method for builtin types.
 class BuiltinLenConversion : public OpConversionPattern<PYDM::LenOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -468,12 +548,12 @@ class BuiltinLenConversion : public OpConversionPattern<PYDM::LenOp> {
 
     if (origTargetType.isa<PYDM::ListType>() ||
         origTargetType.isa<PYDM::TupleType>()) {
+      // Both list and tuple share a physical representation (they are just
+      // an IREE list of the same arity).
       Type resultType =
           getTypeConverter()->convertType(srcOp.result().getType());
       assert(resultType && "could not convert result type");
       auto indexType = rewriter.getType<IndexType>();
-      // Both list and tuple share a physical representation (they are just
-      // an IREE list of the same arity).
       Value listSizeIndex =
           rewriter.create<Input::ListSizeOp>(loc, indexType, adaptor.target());
       Value listSizeInteger =
@@ -483,6 +563,54 @@ class BuiltinLenConversion : public OpConversionPattern<PYDM::LenOp> {
     }
 
     return failure();
+  }
+};
+
+/// Lowers the `next_item` op for builtin types.
+class BuiltinNextItemConversion : public OpConversionPattern<PYDM::NextItemOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(PYDM::NextItemOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto loc = srcOp.getLoc();
+    auto iterType =
+        srcOp.iter().getType().dyn_cast<PYDM::SequenceIteratorType>();
+    if (!iterType)
+      return rewriter.notifyMatchFailure(srcOp, "not a builtin iterator type");
+    Type returnType =
+        getTypeConverter()->convertType(srcOp.getResult().getType());
+    assert(returnType && "could not convert return type");
+    if (!returnType) {
+      return failure();
+    }
+
+    Type indexType = rewriter.getType<IndexType>();
+    Value iterList = adaptor.iter();
+    Value index0 =
+        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(1));
+    Value index1 =
+        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(1));
+    Value iterIndex =
+        rewriter.create<Input::ListGetOp>(loc, indexType, iterList, index1);
+
+    // Get the backing sequence and resolve the current index.
+    // TODO: If handling non list/tuple types, will need to specialize this
+    // to them.
+    Type variantList = getVariantListType(rewriter);
+    Value sequence =
+        rewriter.create<Input::ListGetOp>(loc, variantList, iterList, index0);
+    Value returnValue =
+        rewriter.create<Input::ListGetOp>(loc, returnType, sequence, iterIndex);
+
+    // Advance the iterator.
+    Value incrementedIterIndex =
+        rewriter.create<arith::AddIOp>(loc, iterIndex, index1);
+    rewriter.create<Input::ListSetOp>(loc, iterList, index1,
+                                      incrementedIterIndex);
+
+    rewriter.replaceOp(srcOp, ValueRange{returnValue});
+    return success();
   }
 };
 
@@ -1316,7 +1444,8 @@ void PYDM::populatePyDMToIREELoweringPatterns(MLIRContext *context,
   patterns.insert<
       AllocFreeVarOpConversion, ApplyBinaryNumericConversion,
       ApplyCompareNumericConversion, AssignSubscriptListConversion,
-      BoolToPredConversion, BoxOpConversion, BuiltinLenConversion,
+      BoolToPredConversion, BoxOpConversion, BuiltinHasNextConversion,
+      BuiltinIterConversion, BuiltinLenConversion, BuiltinNextItemConversion,
       MakeListOpBoxedConversion, CallOpConversion, ConstantOpConversion,
       DynamicUnpackOpConversion, ElideStaticInfoCast, FailureOpConversion,
       FuncOpConversion, GetTypeCodeConversion, LoadVarOpConversion,

@@ -22,6 +22,16 @@ elements are laid out as:
 * [2] (optional): i64 TypeID - if the `id()` function has been evaluated for
   this object, then this element will contain the unique id.
 
+## `sequence_iterator` records
+
+Sequence iterators map to IREE variant lists of 3 elements:
+
+* [0]: Sequence
+* [1]: Next index
+* [2]: Limit
+
+The current formulation is only sufficient for forward iteration.
+
 ### Type Codes
 
 The special type code `0` means "not assigned", which is distinct from `None`.
