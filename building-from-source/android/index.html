@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://google.github.io/iree/building-from-source/android/">
       
       <link rel="icon" href="../../ghost.svg">
-      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.13">
+      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.15">
     
     
       
@@ -19,7 +19,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.e411adfe.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.c382b1dc.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.cc9b2e1e.min.css">
@@ -1227,8 +1227,8 @@ run the tests, then report the status back to your host machine.</p>
 <h2 id="running-tools-directly">Running tools directly<a class="headerlink" href="#running-tools-directly" title="Permanent link">&para;</a></h2>
 <p>Invoke the host compiler tools to produce a bytecode module flatbuffer:</p>
 <div class="highlight"><pre><span></span><code>../iree-build/install/bin/iree-compile <span class="se">\</span>
-  -iree-mlir-to-vm-bytecode-module <span class="se">\</span>
-  -iree-hal-target-backends<span class="o">=</span>vmvx <span class="se">\</span>
+  --iree-mlir-to-vm-bytecode-module <span class="se">\</span>
+  --iree-hal-target-backends<span class="o">=</span>vmvx <span class="se">\</span>
   samples/models/simple_abs.mlir <span class="se">\</span>
   -o /tmp/simple_abs_vmvx.vmfb
 </code></pre></div>
@@ -1238,10 +1238,10 @@ adb shell chmod +x /data/local/tmp/iree-run-module
 adb push /tmp/simple_abs_vmvx.vmfb /data/local/tmp/
 </code></pre></div>
 <p>Run the tool:</p>
-<div class="highlight"><pre><span></span><code>adb shell /data/local/tmp/iree-run-module -driver<span class="o">=</span>vmvx <span class="se">\</span>
-  -module_file<span class="o">=</span>/data/local/tmp/simple_abs_vmvx.vmfb <span class="se">\</span>
-  -entry_function<span class="o">=</span>abs <span class="se">\</span>
-  -function_input<span class="o">=</span><span class="s2">&quot;f32=-5&quot;</span>
+<div class="highlight"><pre><span></span><code>adb shell /data/local/tmp/iree-run-module --driver<span class="o">=</span>vmvx <span class="se">\</span>
+  --module_file<span class="o">=</span>/data/local/tmp/simple_abs_vmvx.vmfb <span class="se">\</span>
+  --entry_function<span class="o">=</span>abs <span class="se">\</span>
+  --function_input<span class="o">=</span><span class="s2">&quot;f32=-5&quot;</span>
 </code></pre></div>
 
               
@@ -1314,7 +1314,7 @@ adb push /tmp/simple_abs_vmvx.vmfb /data/local/tmp/
     <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes"], "search": "../../assets/javascripts/workers/search.2a1c317c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.ed9748b7.min.js"></script>
+      <script src="../../assets/javascripts/bundle.a6c66575.min.js"></script>
       
     
   </body>

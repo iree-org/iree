@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://google.github.io/iree/deployment-configurations/bare-metal/">
       
       <link rel="icon" href="../../ghost.svg">
-      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.13">
+      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.15">
     
     
       
@@ -19,7 +19,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.e411adfe.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.c382b1dc.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.cc9b2e1e.min.css">
@@ -1144,11 +1144,11 @@ to retrieve the IREE compiler.</p>
 <p>The model can be compiled with the following command (assuming the path to
 <code>iree-compile</code> is in your system's <code>PATH</code>):</p>
 <div class="highlight"><pre><span></span><code>iree-compile <span class="se">\</span>
-    -iree-mlir-to-vm-bytecode-module <span class="se">\</span>
-    -iree-stream-partitioning-favor<span class="o">=</span>min-peak-memory <span class="se">\</span>
-    -iree-hal-target-backends<span class="o">=</span>dylib-llvm-aot <span class="se">\</span>
-    -iree-llvm-target-triple<span class="o">=</span>x86_64-pc-linux-elf <span class="se">\</span>
-    -iree-llvm-debug-symbols<span class="o">=</span><span class="nb">false</span> <span class="se">\</span>
+    --iree-mlir-to-vm-bytecode-module <span class="se">\</span>
+    --iree-stream-partitioning-favor<span class="o">=</span>min-peak-memory <span class="se">\</span>
+    --iree-hal-target-backends<span class="o">=</span>dylib-llvm-aot <span class="se">\</span>
+    --iree-llvm-target-triple<span class="o">=</span>x86_64-pc-linux-elf <span class="se">\</span>
+    --iree-llvm-debug-symbols<span class="o">=</span><span class="nb">false</span> <span class="se">\</span>
     samples/models/simple_abs.mlir <span class="se">\</span>
     -o /tmp/simple_abs_dylib.vmfb
 </code></pre></div>
@@ -1301,7 +1301,7 @@ bare-metal target.</p>
     <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes"], "search": "../../assets/javascripts/workers/search.2a1c317c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.ed9748b7.min.js"></script>
+      <script src="../../assets/javascripts/bundle.a6c66575.min.js"></script>
       
     
   </body>

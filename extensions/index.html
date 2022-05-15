@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://google.github.io/iree/extensions/">
       
       <link rel="icon" href="../ghost.svg">
-      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.13">
+      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.15">
     
     
       
@@ -19,7 +19,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.e411adfe.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.c382b1dc.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.cc9b2e1e.min.css">
@@ -1359,14 +1359,14 @@ system.</p>
 </div>
 <div class="highlight"><pre><span></span><code>// Main user module compiled by IREE:
 module @model {
-  func @predict() {
+  func.func @predict() {
     %4 = call @my_custom_module::@some_func(%3) : (tensor&lt;?xf32&gt;) -&gt; i32
     ...
   }
 }
 // External module that will be available at runtime:
 module @my_custom_module {
-  func @some_func(%input: tensor&lt;?xf32&gt;) -&gt; i32  // note empty for extern
+  func.func @some_func(%input: tensor&lt;?xf32&gt;) -&gt; i32  // note empty for extern
 }
 </code></pre></div>
 <p>IREE provides dynamic linking at runtime via its VM interfaces. For code that
@@ -1726,7 +1726,7 @@ The runtime-side is complete and resolution is performed by a user-supplied
     <script id="__config" type="application/json">{"base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes"], "search": "../assets/javascripts/workers/search.2a1c317c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.ed9748b7.min.js"></script>
+      <script src="../assets/javascripts/bundle.a6c66575.min.js"></script>
       
     
   </body>

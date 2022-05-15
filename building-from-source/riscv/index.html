@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://google.github.io/iree/building-from-source/riscv/">
       
       <link rel="icon" href="../../ghost.svg">
-      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.13">
+      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.15">
     
     
       
@@ -19,7 +19,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.e411adfe.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.c382b1dc.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.cc9b2e1e.min.css">
@@ -1281,8 +1281,8 @@ ${HOME}/riscv/qemu/linux/RISCV/bin/qemu-riscv64.</p>
 </code></pre></div>
 <p>Invoke the host compiler tools to produce a bytecode module flatbuffer:</p>
 <div class="highlight"><pre><span></span><code>../iree-build/install/bin/iree-compile <span class="se">\</span>
-  -iree-mlir-to-vm-bytecode-module <span class="se">\</span>
-  -iree-hal-target-backends<span class="o">=</span>vmvx <span class="se">\</span>
+  --iree-mlir-to-vm-bytecode-module <span class="se">\</span>
+  --iree-hal-target-backends<span class="o">=</span>vmvx <span class="se">\</span>
   samples/models/simple_abs.mlir <span class="se">\</span>
   -o /tmp/simple_abs_vmvx.vmfb
 </code></pre></div>
@@ -1318,13 +1318,13 @@ ${HOME}/riscv/qemu/linux/RISCV/bin/qemu-riscv64.</p>
 <a href="../../deployment-configurations/cpu-dylib/">IREE dynamic library CPU HAL driver flow</a>
 with the additional command-line flags</p>
 <div class="highlight"><pre><span></span><code>iree/tools/iree-compile <span class="se">\</span>
-  -iree-mlir-to-vm-bytecode-module <span class="se">\</span>
-<span class="hll">  -iree-hal-target-backends<span class="o">=</span>dylib-llvm-aot <span class="se">\</span>
-</span><span class="hll">  -iree-llvm-target-triple<span class="o">=</span>riscv64 <span class="se">\</span>
-</span><span class="hll">  -iree-llvm-target-cpu<span class="o">=</span>generic-rv64 <span class="se">\</span>
-</span><span class="hll">  -iree-llvm-target-abi<span class="o">=</span>lp64d <span class="se">\</span>
-</span><span class="hll">  -iree-llvm-target-cpu-features<span class="o">=</span><span class="s2">&quot;+m,+a,+f,+d,+v&quot;</span> <span class="se">\</span>
-</span><span class="hll">  -riscv-v-vector-bits-min<span class="o">=</span><span class="m">256</span> -riscv-v-fixed-length-vector-lmul-max<span class="o">=</span><span class="m">8</span> <span class="se">\</span>
+  --iree-mlir-to-vm-bytecode-module <span class="se">\</span>
+<span class="hll">  --iree-hal-target-backends<span class="o">=</span>dylib-llvm-aot <span class="se">\</span>
+</span><span class="hll">  --iree-llvm-target-triple<span class="o">=</span>riscv64 <span class="se">\</span>
+</span><span class="hll">  --iree-llvm-target-cpu<span class="o">=</span>generic-rv64 <span class="se">\</span>
+</span><span class="hll">  --iree-llvm-target-abi<span class="o">=</span>lp64d <span class="se">\</span>
+</span><span class="hll">  --iree-llvm-target-cpu-features<span class="o">=</span><span class="s2">&quot;+m,+a,+f,+d,+v&quot;</span> <span class="se">\</span>
+</span><span class="hll">  --riscv-v-vector-bits-min<span class="o">=</span><span class="m">256</span> --riscv-v-fixed-length-vector-lmul-max<span class="o">=</span><span class="m">8</span> <span class="se">\</span>
 </span>  iree_input.mlir -o mobilenet-dylib.vmfb
 </code></pre></div>
 <p>Then run on the RISC-V QEMU:</p>
@@ -1408,7 +1408,7 @@ with the additional command-line flags</p>
     <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes"], "search": "../../assets/javascripts/workers/search.2a1c317c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.ed9748b7.min.js"></script>
+      <script src="../../assets/javascripts/bundle.a6c66575.min.js"></script>
       
     
   </body>
