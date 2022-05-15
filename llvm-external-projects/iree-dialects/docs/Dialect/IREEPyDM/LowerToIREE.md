@@ -33,13 +33,23 @@ type of the range's `indexType`. It is laid out as:
 
 ## `sequence_iterator` records
 
-Sequence iterators map to IREE variant lists of 3 elements:
+Sequence iterators map to different records depending on their sequence type:
+
+### `sequence_iterator<list|tuple>`
+
+List/tuple iterators map to IREE variant lists of 3 elements:
 
 * [0]: Sequence
 * [1]: Next index
 * [2]: Limit
 
 The current formulation is only sufficient for forward iteration.
+
+### `sequence_iterator<range>`
+
+Range iterators are exactly the same as the `range` record, with the only
+exception being usage: their `Start` field will be incremented as iteration
+progresses.
 
 ### Type Codes
 

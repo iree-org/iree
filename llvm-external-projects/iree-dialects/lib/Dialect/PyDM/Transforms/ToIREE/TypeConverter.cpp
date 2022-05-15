@@ -34,18 +34,28 @@ LoweringTypeConverter::LoweringTypeConverter() {
     Builder b(t.getContext());
     return getVariantListType(b);
   });
-  addConversion([](PYDM::SequenceIteratorType t) -> Optional<Type> {
+  addConversion([this](PYDM::SequenceIteratorType t) -> Optional<Type> {
     Builder b(t.getContext());
-    return getVariantListType(b);
+    auto sequenceType = t.getSequenceType();
+    if (sequenceType.isa<PYDM::ListType, PYDM::TupleType>()) {
+      return getVariantListType(b);
+    } else if (auto rangeType = sequenceType.dyn_cast<PYDM::RangeType>()) {
+      auto rangeIndexType = convertType(rangeType.getIndexType());
+      if (!rangeIndexType)
+        return None;
+      return b.getType<IREE::Input::ListType>(rangeIndexType);
+    }
+
+    return None;
   });
 
   // Bool.
-  addConversion([&](PYDM::BoolType t) -> Optional<Type> {
+  addConversion([this](PYDM::BoolType t) -> Optional<Type> {
     return mlir::IntegerType::get(t.getContext(), 1);
   });
 
   // Integer type hierarchy.
-  addConversion([&](PYDM::IntegerType t) -> Optional<Type> {
+  addConversion([this](PYDM::IntegerType t) -> Optional<Type> {
     Builder b(t.getContext());
     if (t.isWeak()) {
       return getWeakIntegerType(b);
@@ -54,7 +64,7 @@ LoweringTypeConverter::LoweringTypeConverter() {
   });
 
   // Real type hierarchy.
-  addConversion([&](PYDM::RealType t) -> Optional<Type> {
+  addConversion([this](PYDM::RealType t) -> Optional<Type> {
     Builder b(t.getContext());
     if (t.isWeak()) {
       return getWeakFloatType(b);
@@ -63,7 +73,7 @@ LoweringTypeConverter::LoweringTypeConverter() {
   });
 
   // Range.
-  addConversion([&](PYDM::RangeType t) -> Optional<Type> {
+  addConversion([this](PYDM::RangeType t) -> Optional<Type> {
     auto indexType = convertType(t.getIndexType());
     assert(indexType && "integral type must convert but did not");
     Builder b(t.getContext());
@@ -73,11 +83,11 @@ LoweringTypeConverter::LoweringTypeConverter() {
   // Tuple, List.
   // TODO: Fork these based on CollectionStorageClass as they can avoid
   // using variant lists.
-  addConversion([&](PYDM::ListType t) -> Optional<Type> {
+  addConversion([this](PYDM::ListType t) -> Optional<Type> {
     Builder b(t.getContext());
     return getVariantListType(b);
   });
-  addConversion([&](PYDM::TupleType t) -> Optional<Type> {
+  addConversion([this](PYDM::TupleType t) -> Optional<Type> {
     Builder b(t.getContext());
     return getVariantListType(b);
   });

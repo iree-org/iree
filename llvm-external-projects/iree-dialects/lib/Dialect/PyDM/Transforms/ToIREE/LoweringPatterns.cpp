@@ -493,21 +493,64 @@ class BuiltinHasNextConversion : public OpConversionPattern<PYDM::HasNextOp> {
         srcOp.iter().getType().dyn_cast<PYDM::SequenceIteratorType>();
     if (!iterType)
       return rewriter.notifyMatchFailure(srcOp, "not a builtin iterator type");
+    auto sequenceType = iterType.getSequenceType();
 
-    Type indexType = rewriter.getType<IndexType>();
-    Value iterList = adaptor.iter();
-    Value index1 =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(1));
-    Value index2 =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(2));
-    Value iterIndex =
-        rewriter.create<Input::ListGetOp>(loc, indexType, iterList, index1);
-    Value iterLimit =
-        rewriter.create<Input::ListGetOp>(loc, indexType, iterList, index2);
+    // List and tuple share a representation. The arity is just the arity
+    // of the lowered list.
+    if (sequenceType.isa<PYDM::ListType>() ||
+        sequenceType.isa<PYDM::TupleType>()) {
+      Type indexType = rewriter.getType<IndexType>();
+      Value iterList = adaptor.iter();
+      Value index1 =
+          rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(1));
+      Value index2 =
+          rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(2));
+      Value iterIndex =
+          rewriter.create<Input::ListGetOp>(loc, indexType, iterList, index1);
+      Value iterLimit =
+          rewriter.create<Input::ListGetOp>(loc, indexType, iterList, index2);
 
-    rewriter.replaceOpWithNewOp<arith::CmpIOp>(srcOp, arith::CmpIPredicate::slt,
-                                               iterIndex, iterLimit);
-    return success();
+      rewriter.replaceOpWithNewOp<arith::CmpIOp>(
+          srcOp, arith::CmpIPredicate::slt, iterIndex, iterLimit);
+      return success();
+    }
+
+    // Range iterator.
+    if (auto rangeType = sequenceType.dyn_cast<PYDM::RangeType>()) {
+      Type rangeIndexType =
+          getTypeConverter()->convertType(rangeType.getIndexType());
+      assert(rangeIndexType && "could not convert range index type");
+
+      Value rangeIterRecord = adaptor.iter();
+      Value stop = rewriter.create<Input::ListGetOp>(
+          loc, rangeIndexType, rangeIterRecord,
+          makeRecordIndex(loc, rewriter, RecordIndices::RangeStop));
+      Value start = rewriter.create<Input::ListGetOp>(
+          loc, rangeIndexType, rangeIterRecord,
+          makeRecordIndex(loc, rewriter, RecordIndices::RangeStart));
+      Value step = rewriter.create<Input::ListGetOp>(
+          loc, rangeIndexType, rangeIterRecord,
+          makeRecordIndex(loc, rewriter, RecordIndices::RangeStep));
+
+      // If step < 0, then there is a next if start > stop.
+      // Otherwise if step > 0, then there is a next if start < stop.
+      // Note that this does two comparisons and selects. In almost all
+      // canonical usage, we expect step to be constant derived and for this
+      // to fold.
+      Value zero =
+          rewriter.create<arith::ConstantIntOp>(loc, 0, rangeIndexType);
+      Value stepLtZero = rewriter.create<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::slt, step, zero);
+      Value startGtStop = rewriter.create<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::sgt, start, stop);
+      Value stopLtStart = rewriter.create<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::slt, stop, start);
+      rewriter.replaceOpWithNewOp<arith::SelectOp>(srcOp, stepLtZero,
+                                                   startGtStop, stopLtStart);
+      return success();
+    }
+
+    return failure();
   }
 };
 
@@ -523,9 +566,10 @@ class BuiltinIterConversion : public OpConversionPattern<PYDM::IterOp> {
         srcOp.result().getType().dyn_cast<PYDM::SequenceIteratorType>();
     if (!iterType)
       return failure();
+    auto sequenceType = iterType.getSequenceType();
+
     // List and tuple share a representation. The arity is just the arity
     // of the lowered list.
-    auto sequenceType = iterType.getSequenceType();
     if (sequenceType.isa<PYDM::ListType>() ||
         sequenceType.isa<PYDM::TupleType>()) {
       // Both list and tuple share a physical representation (they are just
@@ -537,6 +581,27 @@ class BuiltinIterConversion : public OpConversionPattern<PYDM::IterOp> {
       auto iter = createSequenceIteratorList(loc, rewriter, adaptor.target(),
                                              index0, listSizeIndex);
       rewriter.replaceOp(srcOp, ValueRange{iter});
+      return success();
+    }
+
+    // Range iterators share a representation with the range container, so
+    // we can just clone it.
+    if (sequenceType.isa<PYDM::RangeType>()) {
+      Value srcList = adaptor.target();
+      auto listType = srcList.getType().cast<Input::ListType>();
+      auto listElementType = listType.getElementType();
+      Value arity = makeRecordIndex(loc, rewriter, RecordIndices::RangeArity);
+      Value dstList = rewriter.create<Input::ListCreateOp>(loc, listType,
+                                                           /*capacity=*/arity);
+      rewriter.create<Input::ListResizeOp>(loc, dstList, arity);
+      for (int i = 0; i < static_cast<int>(RecordIndices::RangeArity); ++i) {
+        Value itemIndex =
+            rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(i));
+        Value item = rewriter.create<Input::ListGetOp>(loc, listElementType,
+                                                       srcList, itemIndex);
+        rewriter.create<Input::ListSetOp>(loc, dstList, itemIndex, item);
+      }
+      rewriter.replaceOp(srcOp, ValueRange{dstList});
       return success();
     }
 
@@ -617,39 +682,81 @@ class BuiltinNextItemConversion : public OpConversionPattern<PYDM::NextItemOp> {
         srcOp.iter().getType().dyn_cast<PYDM::SequenceIteratorType>();
     if (!iterType)
       return rewriter.notifyMatchFailure(srcOp, "not a builtin iterator type");
-    Type returnType =
-        getTypeConverter()->convertType(srcOp.getResult().getType());
+    auto sequenceType = iterType.getSequenceType();
+
+    Type origReturnType = srcOp.getResult().getType();
+    bool origReturnTypeIsBoxed = origReturnType.isa<PYDM::ObjectType>();
+    Type returnType = getTypeConverter()->convertType(origReturnType);
     assert(returnType && "could not convert return type");
     if (!returnType) {
       return failure();
     }
 
-    Type indexType = rewriter.getType<IndexType>();
-    Value iterList = adaptor.iter();
-    Value index0 =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(0));
-    Value index1 =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(1));
-    Value iterIndex =
-        rewriter.create<Input::ListGetOp>(loc, indexType, iterList, index1);
+    // List and tuple share a representation. The arity is just the arity
+    // of the lowered list.
+    if (sequenceType.isa<PYDM::ListType>() ||
+        sequenceType.isa<PYDM::TupleType>()) {
+      Type indexType = rewriter.getType<IndexType>();
+      Value iterList = adaptor.iter();
+      Value index0 =
+          rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(0));
+      Value index1 =
+          rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(1));
+      Value iterIndex =
+          rewriter.create<Input::ListGetOp>(loc, indexType, iterList, index1);
 
-    // Get the backing sequence and resolve the current index.
-    // TODO: If handling non list/tuple types, will need to specialize this
-    // to them.
-    Type variantList = getVariantListType(rewriter);
-    Value sequence =
-        rewriter.create<Input::ListGetOp>(loc, variantList, iterList, index0);
-    Value returnValue =
-        rewriter.create<Input::ListGetOp>(loc, returnType, sequence, iterIndex);
+      // Get the backing sequence and resolve the current index.
+      // TODO: If handling non list/tuple types, will need to specialize this
+      // to them.
+      Type variantList = getVariantListType(rewriter);
+      Value sequence =
+          rewriter.create<Input::ListGetOp>(loc, variantList, iterList, index0);
+      Value returnValue = rewriter.create<Input::ListGetOp>(
+          loc, returnType, sequence, iterIndex);
 
-    // Advance the iterator.
-    Value incrementedIterIndex =
-        rewriter.create<arith::AddIOp>(loc, iterIndex, index1);
-    rewriter.create<Input::ListSetOp>(loc, iterList, index1,
-                                      incrementedIterIndex);
+      // Advance the iterator.
+      Value incrementedIterIndex =
+          rewriter.create<arith::AddIOp>(loc, iterIndex, index1);
+      rewriter.create<Input::ListSetOp>(loc, iterList, index1,
+                                        incrementedIterIndex);
 
-    rewriter.replaceOp(srcOp, ValueRange{returnValue});
-    return success();
+      rewriter.replaceOp(srcOp, ValueRange{returnValue});
+      return success();
+    }
+
+    // Range iterator.
+    if (auto rangeType = sequenceType.dyn_cast<PYDM::RangeType>()) {
+      Type pythonRangeIndexType = rangeType.getIndexType();
+      Type rangeIndexType =
+          getTypeConverter()->convertType(pythonRangeIndexType);
+      assert(rangeIndexType && "could not convert range index type");
+
+      Value rangeIterRecord = adaptor.iter();
+      Value startIndex =
+          makeRecordIndex(loc, rewriter, RecordIndices::RangeStart);
+      Value start = rewriter.create<Input::ListGetOp>(
+          loc, rangeIndexType, rangeIterRecord, startIndex);
+      Value step = rewriter.create<Input::ListGetOp>(
+          loc, rangeIndexType, rangeIterRecord,
+          makeRecordIndex(loc, rewriter, RecordIndices::RangeStep));
+      Value delta = rewriter.create<arith::AddIOp>(loc, start, step);
+      rewriter.create<Input::ListSetOp>(loc, rangeIterRecord, startIndex,
+                                        delta);
+
+      Value result = delta;
+      // If the original return type is an object, then we have to box it.
+      // Otherwise, we just return as-is, taking advantage of the equivalence
+      // of raw, lowered integer types.
+      if (origReturnTypeIsBoxed) {
+        result = boxConvertedValue(loc, pythonRangeIndexType, result, rewriter);
+        assert(result && "could not box range next item");
+      }
+
+      rewriter.replaceOp(srcOp, ValueRange{result});
+      return success();
+    }
+
+    return failure();
   }
 };
 
