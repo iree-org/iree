@@ -602,6 +602,15 @@ void PyFuncOp::print(OpAsmPrinter &p) {
 }
 
 //===----------------------------------------------------------------------===//
+// LenOp
+//===----------------------------------------------------------------------===//
+
+void LenOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                        MLIRContext *context) {
+  patterns.add<UnboxOperands>(getOperationName(), context);
+}
+
+//===----------------------------------------------------------------------===//
 // MakeListOp
 //===----------------------------------------------------------------------===//
 

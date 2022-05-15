@@ -315,6 +315,22 @@ def IREEPyDM_ObjectType : IREEPyDM_TypeDef<
         return !objectType.getPrimitiveType();
       return false;
     }
+
+    /// If `maybeBoxedType` is boxed, unboxes and returns the unboxed
+    /// type, setting `wasBoxed` to true. Otherwise, returns `maybeBoxedType`
+    /// and sets `wasBoxed` to false.
+    static Type unboxType(Type maybeBoxedType, bool &wasBoxed) {
+      if (auto objectType = maybeBoxedType.dyn_cast<PYDM::ObjectType>()) {
+        auto primitiveType = objectType.getPrimitiveType();
+        if (primitiveType) {
+          wasBoxed = true;
+          return primitiveType;
+        }
+      }
+
+      wasBoxed = false;
+      return maybeBoxedType;
+    }
   }];
 }
 

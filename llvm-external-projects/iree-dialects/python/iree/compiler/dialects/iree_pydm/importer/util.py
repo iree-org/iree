@@ -355,8 +355,11 @@ class DefaultImportHooks(ImportHooks):
       return Intrinsic.UNBOUND_VALUE
 
     from . import builtins_intrinsics
-    if hasattr(builtins_intrinsics, name):
-      return getattr(builtins_intrinsics, name)
+    # Look up by a specially qualified name so that the module isn't forced
+    # to alias builtin names.
+    qualified_name = f"py_builtin_{name}"
+    if hasattr(builtins_intrinsics, qualified_name):
+      return getattr(builtins_intrinsics, qualified_name)
     ic.abort(f"builtin {name} is defined for the host Python but not yet"
              f"implemented for this compiler")
 

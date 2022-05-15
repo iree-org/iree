@@ -744,6 +744,31 @@ def IREEPyDM_NegOp : IREEPyDM_PureOp<"neg", [
 // Object method/feature access
 //===----------------------------------------------------------------------===//
 
+def IREEPyDM_LenOp : IREEPyDM_PureOp<"len", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+  ]> {
+  let summary = "Evaluates __len__ against some target";
+  let description = [{
+    Implements the Python `__len__` special method on some target object.
+    This op on its own cannot fail (which is true for all builtin types). If
+    it is implemented by a custom object, then the expansion pattern for
+    that type must internally raise errors.
+
+    This op always canonicalizes to an unboxed target for builtin target
+    types.
+  }];
+  let arguments = (ins
+    IREEPyDM_AnyValueType:$target
+  );
+  let results = (outs
+    IREEPyDM_IntegerType:$result
+  );
+  let assemblyFormat = [{
+    $target `:` type($target) `->` type($result) attr-dict
+  }];
+  let hasCanonicalizer = 1;
+}
+
 def IREEPyDM_SubscriptOp : IREEPyDM_PureOp<"subscript", [
     DeclareOpInterfaceMethods<TypeRefinableOpInterface>
   ]> {

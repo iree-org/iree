@@ -455,6 +455,37 @@ class BoxOpConversion : public OpConversionPattern<PYDM::BoxOp> {
   }
 };
 
+/// Lowers the __len__ special method for builtin types.
+class BuiltinLenConversion : public OpConversionPattern<PYDM::LenOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(PYDM::LenOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto loc = srcOp.getLoc();
+    // Type switch on the original (pydm) type.
+    Type origTargetType = srcOp.target().getType();
+
+    if (origTargetType.isa<PYDM::ListType>() ||
+        origTargetType.isa<PYDM::TupleType>()) {
+      Type resultType =
+          getTypeConverter()->convertType(srcOp.result().getType());
+      assert(resultType && "could not convert result type");
+      auto indexType = rewriter.getType<IndexType>();
+      // Both list and tuple share a physical representation (they are just
+      // an IREE list of the same arity).
+      Value listSizeIndex =
+          rewriter.create<Input::ListSizeOp>(loc, indexType, adaptor.target());
+      Value listSizeInteger =
+          rewriter.create<arith::IndexCastOp>(loc, resultType, listSizeIndex);
+      rewriter.replaceOp(srcOp, ValueRange{listSizeInteger});
+      return success();
+    }
+
+    return failure();
+  }
+};
+
 class CallOpConversion : public OpConversionPattern<PYDM::CallOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -1285,12 +1316,12 @@ void PYDM::populatePyDMToIREELoweringPatterns(MLIRContext *context,
   patterns.insert<
       AllocFreeVarOpConversion, ApplyBinaryNumericConversion,
       ApplyCompareNumericConversion, AssignSubscriptListConversion,
-      BoolToPredConversion, BoxOpConversion, MakeListOpBoxedConversion,
-      CallOpConversion, ConstantOpConversion, DynamicUnpackOpConversion,
-      ElideStaticInfoCast, FailureOpConversion, FuncOpConversion,
-      GetTypeCodeConversion, LoadVarOpConversion, MakeTupleOpConversion,
-      NegIntegerOpConversion, RaiseOnFailureOpConversion, ReturnOpConversion,
-      SequenceCloneBuiltinConversion, StoreVarOpConversion,
+      BoolToPredConversion, BoxOpConversion, BuiltinLenConversion,
+      MakeListOpBoxedConversion, CallOpConversion, ConstantOpConversion,
+      DynamicUnpackOpConversion, ElideStaticInfoCast, FailureOpConversion,
+      FuncOpConversion, GetTypeCodeConversion, LoadVarOpConversion,
+      MakeTupleOpConversion, NegIntegerOpConversion, RaiseOnFailureOpConversion,
+      ReturnOpConversion, SequenceCloneBuiltinConversion, StoreVarOpConversion,
       SubscriptOpBuiltinSequenceConversion, UnboxOpConversion>(typeConverter,
                                                                context);
 
