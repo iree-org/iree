@@ -11,6 +11,7 @@ const MAIN_SCRIPT_URL = 'web-sample-dynamic-sync.js';
 let wasmSetupSampleFn;
 let wasmCleanupSampleFn;
 let wasmLoadProgramFn;
+let wasmInspectProgramFn;
 let wasmUnloadProgramFn;
 let wasmCallFunctionFn;
 
@@ -28,9 +29,10 @@ var Module = {
     wasmCleanupSampleFn = Module.cwrap('cleanup_sample', null, ['number']);
     wasmLoadProgramFn =
         Module.cwrap('load_program', 'number', ['number', 'number', 'number']);
+    wasmInspectProgramFn = Module.cwrap('inspect_program', null, ['number']);
     wasmUnloadProgramFn = Module.cwrap('unload_program', null, ['number']);
-    wasmCallFunctionFn =
-        Module.cwrap('call_function', 'string', ['number', 'string', 'string']);
+    wasmCallFunctionFn = Module.cwrap(
+        'call_function', 'string', ['number', 'string', 'string', 'number']);
 
     sampleState = wasmSetupSampleFn();
 
@@ -83,6 +85,15 @@ function loadProgram(id, vmfbPathOrBuffer) {
   fetchRequest.send();
 }
 
+function inspectProgram(id, programState) {
+  wasmInspectProgramFn(programState);
+
+  postMessage({
+    'messageType': 'callResult',
+    'id': id,
+  });
+}
+
 function unloadProgram(id, programState) {
   wasmUnloadProgramFn(programState);
 
@@ -93,7 +104,7 @@ function unloadProgram(id, programState) {
 }
 
 function callFunction(id, functionParams) {
-  const {programState, functionName, inputs} = functionParams;
+  const {programState, functionName, inputs, iterations} = functionParams;
 
   let inputsJoined;
   if (Array.isArray(inputs)) {
@@ -110,7 +121,7 @@ function callFunction(id, functionParams) {
   }
 
   const returnValue =
-      wasmCallFunctionFn(programState, functionName, inputsJoined);
+      wasmCallFunctionFn(programState, functionName, inputsJoined, iterations);
 
   if (returnValue === '') {
     postMessage({
@@ -122,7 +133,7 @@ function callFunction(id, functionParams) {
     postMessage({
       'messageType': 'callResult',
       'id': id,
-      'payload': returnValue,
+      'payload': JSON.parse(returnValue),
     });
     // TODO(scotttodd): free char* buffer? Or does Emscripten handle that?
     // Could refactor to
@@ -137,6 +148,8 @@ self.onmessage = function(messageEvent) {
 
   if (messageType == 'loadProgram') {
     loadProgram(id, payload);
+  } else if (messageType == 'inspectProgram') {
+    inspectProgram(id, payload);
   } else if (messageType == 'unloadProgram') {
     unloadProgram(id, payload);
   } else if (messageType == 'callFunction') {

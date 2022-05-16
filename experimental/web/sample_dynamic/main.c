@@ -35,6 +35,9 @@ typedef struct iree_program_state_t iree_program_state_t;
 iree_program_state_t* load_program(iree_sample_state_t* sample_state,
                                    uint8_t* vmfb_data, size_t length);
 
+// Inspects metadata about a loaded program, printing to stdout.
+void inspect_program(iree_program_state_t* program_state);
+
 // Unloads a program and frees its state.
 void unload_program(iree_program_state_t* program_state);
 
@@ -49,8 +52,10 @@ void unload_program(iree_program_state_t* program_state);
 //   described in iree/tools/utils/vm_util and used in IREE's CLI tools.
 //   For example, the CLI `--function_input=f32=1 --function_input=f32=2`
 //   should be passed here as `f32=1;f32=2`.
+// * |iterations| is the number of times to call the function, for benchmarking
 const char* call_function(iree_program_state_t* program_state,
-                          const char* function_name, const char* inputs);
+                          const char* function_name, const char* inputs,
+                          int iterations);
 
 //===----------------------------------------------------------------------===//
 // Implementation
@@ -68,46 +73,6 @@ typedef struct iree_program_state_t {
 
 extern iree_status_t create_device_with_wasm_loader(
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
-
-static void inspect_module(iree_vm_module_t* module) {
-  fprintf(stdout, "=== module properties ===\n");
-
-  iree_string_view_t module_name = iree_vm_module_name(module);
-  fprintf(stdout, "  module name: '%.*s'\n", (int)module_name.size,
-          module_name.data);
-
-  iree_vm_module_signature_t module_signature =
-      iree_vm_module_signature(module);
-  fprintf(stdout, "  module signature:\n");
-  fprintf(stdout, "    %" PRIhsz " imported functions\n",
-          module_signature.import_function_count);
-  fprintf(stdout, "    %" PRIhsz " exported functions\n",
-          module_signature.export_function_count);
-  fprintf(stdout, "    %" PRIhsz " internal functions\n",
-          module_signature.internal_function_count);
-
-  fprintf(stdout, "  exported functions:\n");
-  for (iree_host_size_t i = 0; i < module_signature.export_function_count;
-       ++i) {
-    iree_vm_function_t function;
-    iree_status_t status = iree_vm_module_lookup_function_by_ordinal(
-        module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function);
-    if (!iree_status_is_ok(status)) {
-      iree_status_fprint(stderr, status);
-      iree_status_free(status);
-      continue;
-    }
-
-    iree_string_view_t function_name = iree_vm_function_name(&function);
-    iree_vm_function_signature_t function_signature =
-        iree_vm_function_signature(&function);
-    iree_string_view_t calling_convention =
-        function_signature.calling_convention;
-    fprintf(stdout, "    function name: '%.*s', calling convention: %.*s'\n",
-            (int)function_name.size, function_name.data,
-            (int)calling_convention.size, calling_convention.data);
-  }
-}
 
 iree_sample_state_t* setup_sample() {
   iree_sample_state_t* sample_state = NULL;
@@ -148,8 +113,6 @@ void cleanup_sample(iree_sample_state_t* sample_state) {
 
 iree_program_state_t* load_program(iree_sample_state_t* sample_state,
                                    uint8_t* vmfb_data, size_t length) {
-  fprintf(stdout, "load_program() received %zu bytes of data\n", length);
-
   iree_program_state_t* program_state = NULL;
   iree_status_t status = iree_allocator_malloc(iree_allocator_system(),
                                                sizeof(iree_program_state_t),
@@ -177,7 +140,6 @@ iree_program_state_t* load_program(iree_sample_state_t* sample_state,
   }
 
   if (iree_status_is_ok(status)) {
-    inspect_module(program_state->module);
     status = iree_runtime_session_append_module(program_state->session,
                                                 program_state->module);
   }
@@ -190,6 +152,47 @@ iree_program_state_t* load_program(iree_sample_state_t* sample_state,
   }
 
   return program_state;
+}
+
+void inspect_program(iree_program_state_t* program_state) {
+  fprintf(stdout, "=== program properties ===\n");
+
+  iree_vm_module_t* module = program_state->module;
+  iree_string_view_t module_name = iree_vm_module_name(module);
+  fprintf(stdout, "  module name: '%.*s'\n", (int)module_name.size,
+          module_name.data);
+
+  iree_vm_module_signature_t module_signature =
+      iree_vm_module_signature(module);
+  fprintf(stdout, "  module signature:\n");
+  fprintf(stdout, "    %" PRIhsz " imported functions\n",
+          module_signature.import_function_count);
+  fprintf(stdout, "    %" PRIhsz " exported functions\n",
+          module_signature.export_function_count);
+  fprintf(stdout, "    %" PRIhsz " internal functions\n",
+          module_signature.internal_function_count);
+
+  fprintf(stdout, "  exported functions:\n");
+  for (iree_host_size_t i = 0; i < module_signature.export_function_count;
+       ++i) {
+    iree_vm_function_t function;
+    iree_status_t status = iree_vm_module_lookup_function_by_ordinal(
+        module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function);
+    if (!iree_status_is_ok(status)) {
+      iree_status_fprint(stderr, status);
+      iree_status_free(status);
+      continue;
+    }
+
+    iree_string_view_t function_name = iree_vm_function_name(&function);
+    iree_vm_function_signature_t function_signature =
+        iree_vm_function_signature(&function);
+    iree_string_view_t calling_convention =
+        function_signature.calling_convention;
+    fprintf(stdout, "    function name: '%.*s', calling convention: %.*s'\n",
+            (int)function_name.size, function_name.data,
+            (int)calling_convention.size, calling_convention.data);
+  }
 }
 
 void unload_program(iree_program_state_t* program_state) {
@@ -363,7 +366,8 @@ static iree_status_t print_outputs_from_call(
 }
 
 const char* call_function(iree_program_state_t* program_state,
-                          const char* function_name, const char* inputs) {
+                          const char* function_name, const char* inputs,
+                          int iterations) {
   iree_status_t status = iree_ok_status();
 
   // Fully qualify the function name. This sample only supports loading one
@@ -394,19 +398,33 @@ const char* call_function(iree_program_state_t* program_state,
   // side-channel security threats.
   // https://developer.mozilla.org/en-US/docs/Web/API/Performance/now#reduced_time_precision
   iree_time_t start_time = iree_time_now();
-  if (iree_status_is_ok(status)) {
-    status = iree_runtime_call_invoke(&call, /*flags=*/0);
+  for (int i = 0; i < iterations; ++i) {
+    if (iree_status_is_ok(status)) {
+      status = iree_runtime_call_invoke(&call, /*flags=*/0);
+    }
   }
   iree_time_t end_time = iree_time_now();
   iree_time_t time_elapsed = end_time - start_time;
-  fprintf(stdout,
-          "(Approximate) time for calling '%s': %" PRId64 " nanoseconds\n",
-          function_name, time_elapsed);
 
   iree_string_builder_t outputs_builder;
   iree_string_builder_initialize(iree_allocator_system(), &outputs_builder);
+
+  // Output a JSON object as a string:
+  // {
+  //   "total_invoke_time_ms": [number],
+  //   "outputs": [semicolon delimited list of formatted outputs]
+  // }
+  if (iree_status_is_ok(status)) {
+    status = iree_string_builder_append_format(
+        &outputs_builder,
+        "{ \"total_invoke_time_ms\": %" PRId64 ", \"outputs\": \"",
+        time_elapsed / 1000000);
+  }
   if (iree_status_is_ok(status)) {
     status = print_outputs_from_call(&call, &outputs_builder);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_string_builder_append_cstring(&outputs_builder, "\"}");
   }
 
   if (!iree_status_is_ok(status)) {
