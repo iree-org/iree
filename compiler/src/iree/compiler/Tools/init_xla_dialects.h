@@ -7,8 +7,8 @@
 // This files defines a helper to trigger the registration of dialects to
 // the system.
 
-#ifndef IREE_TOOLS_INIT_XLA_DIALECTS_H_
-#define IREE_TOOLS_INIT_XLA_DIALECTS_H_
+#ifndef IREE_COMPILER_TOOLS_INIT_XLA_DIALECTS_H_
+#define IREE_COMPILER_TOOLS_INIT_XLA_DIALECTS_H_
 
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
@@ -26,4 +26,4 @@ inline void registerXLADialects(DialectRegistry &registry) {
 
 }  // namespace mlir
 
-#endif  // IREE_TOOLS_INIT_XLA_DIALECTS_H_
+#endif  // IREE_COMPILER_TOOLS_INIT_XLA_DIALECTS_H_

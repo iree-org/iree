@@ -9,8 +9,8 @@
 //
 // Based on MLIR's InitAllPasses but without passes we don't care about.
 
-#ifndef IREE_TOOLS_INIT_MLIR_PASSES_H_
-#define IREE_TOOLS_INIT_MLIR_PASSES_H_
+#ifndef IREE_COMPILER_TOOLS_INIT_MLIR_PASSES_H_
+#define IREE_COMPILER_TOOLS_INIT_MLIR_PASSES_H_
 
 #include <cstdlib>
 
@@ -94,4 +94,4 @@ inline void registerMlirPasses() {
 
 }  // namespace mlir
 
-#endif  // IREE_TOOLS_INIT_MLIR_PASSES_H_
+#endif  // IREE_COMPILER_TOOLS_INIT_MLIR_PASSES_H_

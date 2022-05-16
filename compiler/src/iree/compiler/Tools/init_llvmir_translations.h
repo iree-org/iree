@@ -10,8 +10,8 @@
 // driving iree-translate. This is maintained separately to other dialect
 // initializations because it causes a transitive dependency on LLVMIR.
 
-#ifndef IREE_TOOLS_INIT_LLVMIR_TRANSLATIONS_H_
-#define IREE_TOOLS_INIT_LLVMIR_TRANSLATIONS_H_
+#ifndef IREE_COMPILER_TOOLS_INIT_LLVMIR_TRANSLATIONS_H_
+#define IREE_COMPILER_TOOLS_INIT_LLVMIR_TRANSLATIONS_H_
 
 #include "mlir/Target/LLVMIR/Dialect/ArmNeon/ArmNeonToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
@@ -27,4 +27,4 @@ inline void registerLLVMIRTranslations(DialectRegistry &registry) {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_TOOLS_INIT_LLVMIR_TRANSLATIONS_H_
+#endif  // IREE_COMPILER_TOOLS_INIT_LLVMIR_TRANSLATIONS_H_
