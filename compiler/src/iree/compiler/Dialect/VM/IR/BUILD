@@ -123,7 +123,7 @@ iree_gentbl_cc_library(
             "VMOpEncoder.cpp.inc",
         ),
     ],
-    tblgen = "//iree/tools:iree-tblgen",
+    tblgen = "//tools:iree-tblgen",
     td_file = "VMOps.td",
     deps = [":td_files"],
 )
@@ -157,7 +157,7 @@ iree_gentbl_cc_library(
             "VMStructs.cpp.inc",
         ),
     ],
-    tblgen = "//iree/tools:iree-tblgen",
+    tblgen = "//tools:iree-tblgen",
     td_file = "VMBase.td",
     deps = [":td_files"],
 )

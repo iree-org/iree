@@ -27,9 +27,9 @@ iree_lit_test_suite(
     cfg = "//runtime:lit.cfg.py",
     tags = ["hostonly"],
     tools = [
-        "//iree/tools:iree-check-module",
-        "//iree/tools:iree-compile",
-        "//iree/tools:iree-run-module",
+        "//tools:iree-check-module",
+        "//tools:iree-compile",
+        "//tools:iree-run-module",
         "@llvm-project//llvm:FileCheck",
     ],
 )

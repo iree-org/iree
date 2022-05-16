@@ -169,7 +169,7 @@ iree_gentbl_cc_library(
             "HALStructs.cpp.inc",
         ),
     ],
-    tblgen = "//iree/tools:iree-tblgen",
+    tblgen = "//tools:iree-tblgen",
     td_file = "HALBase.td",
     deps = [":td_files"],
 )

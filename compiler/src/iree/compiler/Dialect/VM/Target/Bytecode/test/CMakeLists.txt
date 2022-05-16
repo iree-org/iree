@@ -19,7 +19,7 @@ iree_lit_test_suite(
     "reflection_attrs.mlir"
   TOOLS
     FileCheck
-    iree::tools::iree-translate
+    tools::iree-translate
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

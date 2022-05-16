@@ -33,10 +33,10 @@ iree_lit_test_suite(
         "hostonly",
     ],
     tools = [
-        "//iree/tools:iree-benchmark-module",
-        "//iree/tools:iree-compile",
-        "//iree/tools:iree-run-mlir",
-        "//iree/tools:iree-run-module",
+        "//tools:iree-benchmark-module",
+        "//tools:iree-compile",
+        "//tools:iree-run-mlir",
+        "//tools:iree-run-module",
         "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
     ],
@@ -49,8 +49,8 @@ iree_lit_test_suite(
         "hostonly",
     ],
     tools = [
-        "//iree/tools:iree-benchmark-module",
-        "//iree/tools:iree-compile",
+        "//tools:iree-benchmark-module",
+        "//tools:iree-compile",
         "@llvm-project//llvm:FileCheck",
     ],
 )

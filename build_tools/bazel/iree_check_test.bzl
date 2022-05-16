@@ -71,7 +71,7 @@ def iree_check_test(
             "$(location :%s)" % bytecode_module_name,
         ] + runner_args,
         data = [":%s" % bytecode_module_name],
-        src = "//iree/tools:iree-check-module",
+        src = "//tools:iree-check-module",
         tags = tags + ["driver=%s" % driver],
         timeout = timeout,
         **kwargs

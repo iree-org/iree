@@ -21,9 +21,9 @@ iree_lit_test_suite(
     ],
     tags = ["hostonly"],
     tools = [
-        "//iree/tools:iree-benchmark-module",
-        "//iree/tools:iree-compile",
-        "//iree/tools:iree-run-mlir",
+        "//tools:iree-benchmark-module",
+        "//tools:iree-compile",
+        "//tools:iree-run-mlir",
         "@llvm-project//llvm:FileCheck",
     ],
 )

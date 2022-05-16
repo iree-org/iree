@@ -19,9 +19,9 @@ iree_lit_test_suite(
     "unavailable.mlir"
   TOOLS
     FileCheck
-    iree::tools::iree-check-module
-    iree::tools::iree-compile
-    iree::tools::iree-run-module
+    tools::iree-check-module
+    tools::iree-compile
+    tools::iree-run-module
   LABELS
     "hostonly"
 )

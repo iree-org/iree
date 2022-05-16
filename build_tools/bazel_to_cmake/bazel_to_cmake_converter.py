@@ -72,9 +72,9 @@ def _convert_target_block(name, target):
   # Targets in this context can't be aliases, because CMake. So we first convert
   # it in the usual way and then syntactically change it back from the pretty
   # alias name to the underscored variant. Example:
-  #   //iree/tools:iree-translate
-  #   iree::tools::iree-translate
-  #   iree_tools_iree-translate
+  #   //tools:iree-translate
+  #   tools::iree-translate
+  #   tools_iree-translate
   cmake_aliases = bazel_to_cmake_targets.convert_target(target)
   if len(cmake_aliases) != 1:
     raise ValueError(

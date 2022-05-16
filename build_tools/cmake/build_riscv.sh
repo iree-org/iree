@@ -78,7 +78,7 @@ if [[ "${RISCV_CONFIG?}" == "rv64" ]]; then
   )
 elif [[ "${RISCV_CONFIG?}" == "rv32-baremetal" ]]; then
   args+=(
-    # TODO(#6353): Off until iree/tools are refactored to support threadless config.
+    # TODO(#6353): Off until tools/ are refactored to support threadless config.
     -DIREE_BUILD_TESTS=OFF
     -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV32_NEWLIB_TOOLCHAIN_ROOT?}"
   )

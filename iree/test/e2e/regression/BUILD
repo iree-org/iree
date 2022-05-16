@@ -59,8 +59,8 @@ iree_lit_test_suite(
     ),
     tags = ["hostonly"],
     tools = [
-        "//iree/tools:iree-opt",
-        "//iree/tools:iree-run-mlir",
+        "//tools:iree-opt",
+        "//tools:iree-run-mlir",
         "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
     ],
