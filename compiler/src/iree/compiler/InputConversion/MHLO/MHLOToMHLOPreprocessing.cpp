@@ -427,10 +427,20 @@ class TransposeReshapeGenericDotGeneral
             ? RankedTensorType::get(newShape, resultType.getElementType())
             : op.getType();
 
-    Value result = rewriter.create<mhlo::DotGeneralOp>(
-        op.getLoc(), newResultType, lhs, rhs, dimensionNumbers,
-        op.precision_configAttr());
+    auto newOp = rewriter.create<mhlo::DotGeneralOp>(op.getLoc(), newResultType,
+                                                     lhs, rhs, dimensionNumbers,
+                                                     op.precision_configAttr());
 
+    // Copy over unknown attributes as we currently rely on it to let user tune
+    // lowering parameters.
+    ArrayRef<StringRef> odsAttrs = op.getAttributeNames();
+    for (NamedAttribute kv : op->getAttrs()) {
+      if (!llvm::is_contained(odsAttrs, kv.getName().getValue())) {
+        newOp->setAttr(kv.getName(), kv.getValue());
+      }
+    }
+
+    Value result = newOp.getResult();
     if (needReshapeResult) {
       result =
           rewriter.create<mhlo::ReshapeOp>(op.getLoc(), resultType, result);
