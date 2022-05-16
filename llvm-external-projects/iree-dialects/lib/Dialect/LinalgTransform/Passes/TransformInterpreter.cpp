@@ -74,10 +74,8 @@ public:
     if (clTransformFileName.empty()) {
       Block &body = topLevel->getRegion(0).front();
       for (auto op : body.getOps<transform::TransformOpInterface>()) {
-        if (failed(state.applyTransform(op))) {
-          topLevel->emitError() << "failed to apply transform '" << op;
+        if (failed(state.applyTransform(op)))
           return signalPassFailure();
-        }
       }
       return;
     }
@@ -86,7 +84,7 @@ public:
     std::string errorMessage;
     auto memoryBuffer = openInputFile(clTransformFileName, &errorMessage);
     if (!memoryBuffer) {
-      topLevel->emitError() << errorMessage << "\n";
+      llvm::errs() << errorMessage << "\n";
       return signalPassFailure();
     }
     // Tell sourceMgr about this buffer, the parser will pick it up.
@@ -96,10 +94,8 @@ public:
         parseSourceFile<ModuleOp>(sourceMgr, &getContext()));
     for (auto op : transformModule->getBody()
                        ->getOps<transform::TransformOpInterface>()) {
-      if (failed(state.applyTransform(op))) {
-        topLevel->emitError() << "failed to apply transform '" << op;
+      if (failed(state.applyTransform(op)))
         return signalPassFailure();
-      }
     }
   }
 
