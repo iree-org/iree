@@ -91,7 +91,7 @@ execution using LLVM, refer to the
 and compile the imported `counter.mlir` file using `iree-compile`:
 
 ```
-../iree-build/iree/tools/iree-compile \
+../iree-build/tools/iree-compile \
     --iree-mlir-to-vm-bytecode-module \
     --iree-hal-target-backends=dylib-llvm-aot \
     --iree-input-type=mhlo \

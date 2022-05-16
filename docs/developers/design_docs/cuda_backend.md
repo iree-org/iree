@@ -75,7 +75,7 @@ func @add(%lhs: tensor<4xf32>, %rhs: tensor<4xf32>) -> tensor<4xf32> {
 
 ```shell
 # First translate into a VM bytecode module.
-$ ../iree-build/iree/tools/iree-compile \
+$ ../iree-build/tools/iree-compile \
  --iree-input-type=mhlo \
  --iree-mlir-to-vm-bytecode-module \
  --iree-hal-target-backends=cuda \
@@ -83,7 +83,7 @@ $ ../iree-build/iree/tools/iree-compile \
  -o /tmp/mhlo-add.vmfb
 
 # Run the module through CUDA HAL backend.
-$ ../iree-build/iree/tools/iree-run-module \
+$ ../iree-build/tools/iree-run-module \
   --driver=cuda \
   --module_file=/tmp/mhlo-add.vmfb \
   --entry_function=add \

@@ -76,7 +76,7 @@ programs such as Chrome and Bazel.
 Now we'll actually invoke the binary:
 
 ```shell
-$ ./bazel-bin/iree/tools/iree-benchmark-module \
+$ ./bazel-bin/tools/iree-benchmark-module \
   --module_file=/tmp/module.fb \
   --driver=vmvx \
   --entry_function=abs \
@@ -107,7 +107,7 @@ dispatch functions, generate an IREE module with the
 `-iree-flow-export-benchmark-funcs` flag set:
 
 ```shell
-$ build/iree/tools/iree-compile \
+$ build/tools/iree-compile \
   --iree-input-type=mhlo \
   --iree-mlir-to-vm-bytecode-module \
   --iree-flow-export-benchmark-funcs \
@@ -120,7 +120,7 @@ and then benchmark all exported dispatch functions (and all exported functions)
 in that module:
 
 ```shell
-$ build/iree/tools/iree-benchmark-module
+$ build/tools/iree-benchmark-module
   --module_file=/tmp/fullyconnected.vmfb
   --driver=vmvx
 ```

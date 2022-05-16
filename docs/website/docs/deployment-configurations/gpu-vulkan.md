@@ -175,7 +175,7 @@ SwiftShader CPU | `cpu-swiftshader-unknown`
 In the build directory, run the following command:
 
 ``` shell hl_lines="2"
-iree/tools/iree-run-module \
+tools/iree-run-module \
     --driver=vulkan \
     --module_file=mobilenet-vulkan.vmfb \
     --entry_function=predict \

@@ -110,8 +110,8 @@ import_program "MobileNetV3SmallStaticBatch" "MobileNetV3SmallStaticBatch.tflite
 ###############################################################################
 
 # Either build from source (setting this path), or use from the python packages.
-# IREE_COMPILE_PATH=~/code/iree-build/iree/tools/iree-compile
-# IREE_COMPILE_PATH="D:\dev\projects\iree-build\iree\tools\iree-compile"
+# IREE_COMPILE_PATH=~/code/iree-build/tools/iree-compile
+# IREE_COMPILE_PATH="D:\dev\projects\iree-build\tools\iree-compile"
 IREE_COMPILE_PATH=iree-compile
 
 # compile_program_wasm helper

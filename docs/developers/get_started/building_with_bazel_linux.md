@@ -94,14 +94,14 @@ build:asserts --compilation_mode=opt '--copt=-UNDEBUG'
 Build all of IREE's 'tools' directory:
 
 ```shell
-$ bazel build iree/tools/...
+$ bazel build tools/...
 ```
 
 Check out what was built:
 
 ```shell
-$ ls bazel-bin/iree/tools/
-$ ./bazel-bin/iree/tools/iree-compile --help
+$ ls bazel-bin/tools/
+$ ./bazel-bin/tools/iree-compile --help
 ```
 
 Translate a
@@ -109,6 +109,6 @@ Translate a
 and execute a function in the compiled module:
 
 ```shell
-$ ./bazel-bin/iree/tools/iree-run-mlir ./samples/models/simple_abs.mlir \
-  --function-input="f32=-2" --iree-hal-target-backends=vmvx -print-mlir
+$ ./bazel-bin/tools/iree-run-mlir ./samples/models/simple_abs.mlir \
+  --function-input="f32=-2" --iree-hal-target-backends=vmvx --print-mlir
 ```

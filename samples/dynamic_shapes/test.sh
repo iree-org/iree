@@ -26,7 +26,7 @@ cmake -B ${BUILD_DIR} -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo ${ROOT_DIR}
 cmake --build ${BUILD_DIR} --target iree-compile -- -k 0
 
 # 3. Compile `dynamic_shapes.mlir` using `iree-compile`.
-${BUILD_DIR}/iree/tools/iree-compile \
+${BUILD_DIR}/tools/iree-compile \
   --iree-mlir-to-vm-bytecode-module \
   --iree-hal-target-backends=dylib-llvm-aot \
   --iree-input-type=mhlo \
