@@ -116,8 +116,7 @@ class IREEBufferizeOp
 
   // let assemblyFormat = "attr-dict";
   static ParseResult parse(OpAsmParser &parser, OperationState &state) {
-    parser.parseOptionalAttrDict(state.attributes);
-    return success();
+    return parser.parseOptionalAttrDict(state.attributes);
   }
 
   // let assemblyFormat = "attr-dict";
@@ -159,8 +158,7 @@ class IREESetNumWorkgroupToOneOp
 
   // let assemblyFormat = "attr-dict";
   static ParseResult parse(OpAsmParser &parser, OperationState &state) {
-    parser.parseOptionalAttrDict(state.attributes);
-    return success();
+    return parser.parseOptionalAttrDict(state.attributes);
   }
 
   // let assemblyFormat = "attr-dict";
