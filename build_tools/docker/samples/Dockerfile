@@ -11,14 +11,6 @@
 
 FROM gcr.io/iree-oss/swiftshader@sha256:8fcbbf19698d831decc902eb1974f58cd76d5841eb404b5a16d90484134ce902
 
-# Update setuptools per https://github.com/pypa/setuptools/issues/1694#issuecomment-466010982
-RUN apt-get update \
-  && apt-get install -y \
-    python3-venv \
-    python3.7-venv \
-    python-setuptools \
-  && python3 -m pip install --upgrade setuptools
-
 # Install additional packages often used in notebooks.
 # Installing these at the system level helps with caching, since venvs can
 # set --system-site-packages to use the already installed versions.
