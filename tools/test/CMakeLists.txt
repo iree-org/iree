@@ -24,10 +24,10 @@ iree_lit_test_suite(
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck
-    tools::iree-benchmark-module
-    tools::iree-compile
-    tools::iree-run-mlir
-    tools::iree-run-module
+    iree-benchmark-module
+    iree-compile
+    iree-run-mlir
+    iree-run-module
   LABELS
     "hostonly"
 )
@@ -39,8 +39,8 @@ iree_lit_test_suite(
     "benchmark_flags.txt"
   TOOLS
     FileCheck
-    tools::iree-benchmark-module
-    tools::iree-compile
+    iree-benchmark-module
+    iree-compile
   LABELS
     "hostonly"
 )

@@ -168,7 +168,7 @@ iree_lit_test_suite(
     "arithmetic_ops.mlir"
   DATA
     FileCheck
-    tools::iree-opt
+    iree-opt
 )
 ```
 

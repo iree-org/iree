@@ -73,7 +73,7 @@ them.
 
     ```
     cmake -B ../iree-build/ -DCMAKE_BUILD_TYPE=RelWithDebInfo .
-    cmake --build ../iree-build/ --target tools_iree-compile
+    cmake --build ../iree-build/ --target iree-compile
     ```
 
 3. Compile the `dynamic_shapes.mlir` file using `iree-compile`. The

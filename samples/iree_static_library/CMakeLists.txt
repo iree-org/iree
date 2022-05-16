@@ -16,7 +16,7 @@ endif()
 set(IREE_IMPLICIT_DEFS_CC_DEPS iree::samples::defs)
 
 # Set iree-compile binary.
-set(_COMPILE_TOOL_EXECUTABLE $<TARGET_FILE:tools_iree-compile>)
+set(_COMPILE_TOOL_EXECUTABLE $<TARGET_FILE:iree-compile>)
 
 ## Example with VM bytecode module.
 # Setup args for iree-compile.

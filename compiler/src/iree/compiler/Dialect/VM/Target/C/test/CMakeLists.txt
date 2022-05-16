@@ -14,5 +14,5 @@ iree_lit_test_suite(
     "${_GLOB_X_MLIR}"
   TOOLS
     FileCheck
-    tools::iree-translate
+    iree-translate
 )

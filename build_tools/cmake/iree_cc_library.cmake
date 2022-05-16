@@ -232,12 +232,14 @@ function(iree_cc_library)
   # disambiguate the underscores in paths vs. the separators.
   add_library(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
 
-  # If the library name matches the final component of the package then treat
-  # it as a default. For example, foo/bar/ library 'bar' would end up as
-  # 'foo::bar'.
-  iree_package_dir(_PACKAGE_DIR)
-  if(${_RULE_NAME} STREQUAL ${_PACKAGE_DIR})
-    add_library(${_PACKAGE_NS} ALIAS ${_NAME})
+  if(NOT "${_PACKAGE_NS}" STREQUAL "")
+    # If the library name matches the final component of the package then treat
+    # it as a default. For example, foo/bar/ library 'bar' would end up as
+    # 'foo::bar'.
+    iree_package_dir(_PACKAGE_DIR)
+    if(${_RULE_NAME} STREQUAL ${_PACKAGE_DIR})
+      add_library(${_PACKAGE_NS} ALIAS ${_NAME})
+    endif()
   endif()
 endfunction()
 
