@@ -571,7 +571,7 @@ static LogicalResult setRootConfig(
   // TODO(dcaballe): Find better configurations for RISC-V backends.
   if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
     SmallVector<int64_t> tileSizes = {8, 32, 16};
-    if (disableMatmulPadPipeline) {
+    if (disableMatmulPadPipeline || numLoops != 3) {
       return setMatmulNoPadRootConfig(entryPointFn, contractionOp,
                                       flowTileSizes, tileSizes, vectorSize);
     }
