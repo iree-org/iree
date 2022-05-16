@@ -31,33 +31,6 @@ func.func @batch_norm_inference(
 
 // -----
 
-// CHECK: @depth_conv(%[[ARG0:.+]]: tensor<2x4x5x2xf32>, %[[ARG1:.+]]: tensor<2x2x2x3xf32>)
-func.func @depth_conv(%arg0: tensor<2x4x5x2xf32>, %arg1: tensor<2x2x2x3xf32>) -> tensor<2x3x4x6xf32> {
-    // CHECK-NOT: mhlo.reshape
-    // CHECK: mhlo.convolution(%[[ARG0]], %[[ARG1]])
-    %0 = "mhlo.reshape"(%arg1) : (tensor<2x2x2x3xf32>) -> tensor<2x2x1x6xf32>
-    %1 = "mhlo.convolution"(%arg0, %0) {
-      batch_group_count = 1 : i64,
-      dimension_numbers = #mhlo.conv<raw
-      input_batch_dimension = 0,
-      input_feature_dimension = 3,
-      input_spatial_dimensions = [1, 2],
-      kernel_input_feature_dimension = 2,
-      kernel_output_feature_dimension = 3,
-      kernel_spatial_dimensions = [0, 1],
-      output_batch_dimension = 0,
-      output_feature_dimension = 3,
-      output_spatial_dimensions = [1, 2]
-    >,
-     feature_group_count = 2 : i64,
-     padding = dense<0> : tensor<2x2xi64>,
-     rhs_dilation = dense<1> : tensor<2xi64>,
-     window_strides = dense<1> : tensor<2xi64>} : (tensor<2x4x5x2xf32>, tensor<2x2x1x6xf32>) -> tensor<2x3x4x6xf32>
-    return %1 : tensor<2x3x4x6xf32>
-}
-
-// -----
-
 // CHECK: @reorder_broadcast_in_dim_scalar_binary(%[[ARG0:.*]]: tensor<f32>, %[[ARG1:.*]]: tensor<f32>, %[[ARG2:.*]]: tensor<i32>, %[[ARG3:.*]]: tensor<i32>)
 func.func @reorder_broadcast_in_dim_scalar_binary(%arg0: tensor<f32>, %arg1: tensor<f32>, %arg2: tensor<i32>, %arg3: tensor<i32>) -> (tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>) {
   // CHECK: %[[ADD:.*]] = mhlo.add %[[ARG0]], %[[ARG1]] : tensor<f32>
