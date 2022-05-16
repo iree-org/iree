@@ -743,7 +743,23 @@ void NextItemOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
 }
 
 bool NextItemOp::refineResultTypes() {
-  // TODO: Refine to the container element type.
+  Type newResultType = getResult().getType();
+
+  // If iterating over a sequence_iterator<range>, then the range has
+  // the result type.
+  if (auto sequenceIterator =
+          iter().getType().dyn_cast<SequenceIteratorType>()) {
+    if (auto range = sequenceIterator.getSequenceType().dyn_cast<RangeType>()) {
+      assert(range.getIndexType());
+      newResultType = range.getIndexType();
+    }
+  }
+
+  // Commit changes.
+  if (newResultType != getResult().getType()) {
+    getResult().setType(newResultType);
+    return true;
+  }
   return false;
 }
 

@@ -32,13 +32,11 @@ def fib_list_item(n: int) -> int:
   >>> fib_list_item(20)
   6765
   """
-  values = [0] * (n + 2)
+  values = [0] * (n + 1)
   values[0] = 0
   values[1] = 1
-  i = 2
-  while i <= n:  # TODO: Upgrade to for...range
+  for i in range(2, n + 1):
     values[i] = values[i - 1] + values[i - 2]
-    i = i + 1  # TODO: Support AugAssign
   return values[n]
 
 
@@ -52,10 +50,16 @@ def fib_spaceopt_item(n: int) -> int:
   b = 1
   if n == 0:
     return a
+  # TODO: Switch to for..in when crash is fixed.
   i = 2
   while i <= n:  # TODO: Upgrade to for...range
     c = a + b
     a = b
     b = c
     i = i + 1  # TODO: Support AugAssign
+  # for i in range(n):
+  #   c = a + b
+  #   a = b
+  #   b = c
+
   return b
