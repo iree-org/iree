@@ -126,21 +126,6 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
-    // Picked from here to start:
-    // https://vulkan.gpuinfo.org/displaydevicelimit.php?name=minStorageBufferOffsetAlignment&platform=android
-    // https://vulkan.gpuinfo.org/displaydevicelimit.php?name=maxStorageBufferRange&platform=android
-    // We should instead be querying the vulkan environment attributes.
-    uint64_t maxAllocationSize = 1 * 1024 * 1024 * 1024ull;
-    uint64_t minBufferOffsetAlignment = 256ull;
-    uint64_t maxBufferRange = 128 * 1024 * 1024ull;
-    uint64_t minBufferRangeAlignment = 16ull;
-    configItems.emplace_back(
-        b.getStringAttr("buffer_constraints"),
-        BufferConstraintsAttr::get(b.getIndexAttr(maxAllocationSize),
-                                   b.getIndexAttr(minBufferOffsetAlignment),
-                                   b.getIndexAttr(maxBufferRange),
-                                   b.getIndexAttr(minBufferRangeAlignment)));
-
     configItems.emplace_back(b.getStringAttr("executable_targets"),
                              getExecutableTargets(context));
 
