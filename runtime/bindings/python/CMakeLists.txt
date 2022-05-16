@@ -191,7 +191,14 @@ install(
 )
 
 # Install tools into python_packages/iree_runtime/iree/runtime
-install(
+#
+# Our runtime/... directory is included by the root CMakeLists before the
+# tools/ directory which defines these targets, so we defer the install() to
+# the end of the root file. While deferred calls are generally fragile, this
+# install is purely a leaf feature (with no other calls depending on its
+# sequencing), so this use is okay.
+cmake_language(DEFER DIRECTORY "${IREE_SOURCE_DIR}"
+  CALL install
   TARGETS
     iree_tools_iree-benchmark-module
     iree_tools_iree-benchmark-trace
