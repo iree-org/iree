@@ -39,11 +39,26 @@ static llvm::cl::opt<Favor> partitioningFavor(
                    "Favor maximizing concurrency at the cost of additional "
                    "memory consumption.")));
 
-// TODO(#8506): remove the flag once the bug is fixed.
-static llvm::cl::opt<uint64_t> streamDefaultBufferAlignment(
-    "iree-stream-default-buffer-alignment",
-    llvm::cl::desc("the default value of stream alignment"),
+// TODO(#8042): properly choose this value based on target devices. We don't
+// yet have the device information up in stream and thus for targets that have
+// high alignment requirements (128/256/etc) we are not picking the right
+// value here. Having the max sizes set to 64-bit also creates a grey area
+// where a program may not have any particular resource that needs 64-bit
+// but may trip the limit when packing. For now if a program is on the edge
+// it'll result in runtime failures if the max sizes are smaller than INT_MAX.
+static llvm::cl::opt<uint64_t> clResourceMaxAllocationSize(
+    "iree-stream-resource-max-allocation-size",
+    llvm::cl::desc("Maximum size of an individual memory allocation."),
+    llvm::cl::init(INT64_MAX));
+static llvm::cl::opt<uint64_t> clResourceMinOffsetAlignment(
+    "iree-stream-resource-min-offset-alignment",
+    llvm::cl::desc("Minimum required alignment in bytes for resource offsets."),
     llvm::cl::init(64ull));
+static llvm::cl::opt<uint64_t> clResourceMaxRange(
+    "iree-stream-resource-max-range",
+    llvm::cl::desc("Maximum range of a resource binding; may be less than the "
+                   "max allocation size."),
+    llvm::cl::init(INT64_MAX));
 
 //===----------------------------------------------------------------------===//
 // #stream.resource_config<...>
@@ -113,17 +128,11 @@ ResourceConfigAttr ResourceConfigAttr::intersectBufferConstraints(
 ResourceConfigAttr ResourceConfigAttr::getDefaultHostConstraints(
     MLIRContext *context) {
   // Picked to represent what we kind of want on CPU today.
-  // TODO(#8484): properly choose this value based on target devices. We don't
-  // yet have the device information up in stream and thus for targets that have
-  // high alignment requirements (128/256/etc) we are not picking the right
-  // value here.
-  uint64_t maxAllocationSize = UINT32_MAX;
-  uint64_t minBufferOffsetAlignment = streamDefaultBufferAlignment;
-  uint64_t maxBufferRange = UINT32_MAX;
-  uint64_t minBufferRangeAlignment = streamDefaultBufferAlignment;
-  return ResourceConfigAttr::get(context, maxAllocationSize,
-                                 minBufferOffsetAlignment, maxBufferRange,
-                                 minBufferRangeAlignment);
+  // We should be able to get rid of queries for this from real programs and
+  // only use this during testing by ensuring affinities are always assigned.
+  return ResourceConfigAttr::get(
+      context, clResourceMaxAllocationSize, clResourceMinOffsetAlignment,
+      clResourceMaxRange, clResourceMinOffsetAlignment);
 }
 
 // TODO(benvanik): find a way to go affinity -> resource config.
