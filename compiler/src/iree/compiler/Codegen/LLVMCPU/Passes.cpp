@@ -451,15 +451,14 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
 }
 
 void addLinalgTransformInterpPasses(OpPassManager &passManager) {
-  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   // Give control to the linalg_transform dialect.
-  nestedModulePM.addPass(createLinalgTransformInterpreterPass());
+  passManager.addPass(createLinalgTransformInterpreterPass());
 
   // Dropping the schedule is only needed if we want to embed the transform in
   // the module: we should drop the schedule once applied.
   // This pass does nothing in the case where we apply a separate policy
   // through a file.
-  nestedModulePM.addPass(createDropSchedulePass());
+  passManager.addPass(createDropSchedulePass());
 }
 
 static void addLowerToLLVMPasses(OpPassManager &passManager) {
