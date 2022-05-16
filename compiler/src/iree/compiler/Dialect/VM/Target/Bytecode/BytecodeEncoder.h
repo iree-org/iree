@@ -31,6 +31,10 @@ struct EncodedBytecodeFunction {
 // Abstract encoder used for function bytecode encoding.
 class BytecodeEncoder : public VMFuncEncoder {
  public:
+  static constexpr uint32_t kVersionMajor = 0;
+  static constexpr uint32_t kVersionMinor = 0;
+  static constexpr uint32_t kVersion = (kVersionMajor << 16) | kVersionMinor;
+
   // Encodes a vm.func to bytecode and returns the result.
   // Returns None on failure.
   static Optional<EncodedBytecodeFunction> encodeFunction(
