@@ -18,37 +18,37 @@ ENV CXX /usr/bin/clang++
 
 RUN apt-get update \
   && apt-get install -y \
-    # For updating IREE's submodules.
-    git \
-    # Default compiler and linker.
-    clang \
-    lld-9 \
-    # IREE transitive dependencies
-    libsdl2-dev \
-    libssl-dev \
-    # A much better CMake builder
-    ninja-build \
-    # For building child images. Best practices would tell us to use multi-stage
-    # builds (https://docs.docker.com/develop/develop-images/multistage-build/)
-    # but it turns out that Dockerfile is a thoroughly non-composable awful
-    # format and that doesn't actually work that well. These deps are pretty
-    # small.
-    unzip \
-    wget \
-    gnupg2 \
-    # Needed for installing Bazel, per https://bazel.build/install/ubuntu
-    apt-transport-https \
-    curl \
-    gnupg \
-    # Needed for building lld with Bazel (as currently configured)
-    libxml2-dev \
-    # Optional for tools like llvm-symbolizer, which we could build from
-    # source but would rather just have available ahead of time
-    llvm-dev \
-    # Someone is welcome to tell me a better way to just install lld-9 as lld
-    # (lld=9 doesn't work)
-    && ln -s lld-9 /usr/bin/lld \
-    && ln -s ld.lld-9 /usr/bin/ld.lld
+  # For updating IREE's submodules.
+  git \
+  # Default compiler and linker.
+  clang \
+  lld-9 \
+  # IREE transitive dependencies
+  libsdl2-dev \
+  libssl-dev \
+  # A much better CMake builder
+  ninja-build \
+  # For building child images. Best practices would tell us to use multi-stage
+  # builds (https://docs.docker.com/develop/develop-images/multistage-build/)
+  # but it turns out that Dockerfile is a thoroughly non-composable awful
+  # format and that doesn't actually work that well. These deps are pretty
+  # small.
+  unzip \
+  wget \
+  gnupg2 \
+  # Needed for installing Bazel, per https://bazel.build/install/ubuntu
+  apt-transport-https \
+  curl \
+  gnupg \
+  # Needed for building lld with Bazel (as currently configured)
+  libxml2-dev \
+  # Optional for tools like llvm-symbolizer, which we could build from
+  # source but would rather just have available ahead of time
+  llvm-dev \
+  # Someone is welcome to tell me a better way to just install lld-9 as lld
+  # (lld=9 doesn't work)
+  && ln -s lld-9 /usr/bin/lld \
+  && ln -s ld.lld-9 /usr/bin/ld.lld
 
 ######## CMake ########
 WORKDIR /install-cmake
@@ -57,16 +57,16 @@ WORKDIR /install-cmake
 # to get the /usr/share path.
 # See https://github.com/moby/moby/issues/41383
 ARG CMAKE_MAJOR_VERSION=3
-ARG CMAKE_MINOR_VERSION=17
-ARG CMAKE_PATCH_VERSION=5
+ARG CMAKE_MINOR_VERSION=21
+ARG CMAKE_PATCH_VERSION=6
 
 ENV CMAKE_VERSION="${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}.${CMAKE_PATCH_VERSION}"
 
-# Install CMake v3.13, which is ahead of apt-get's version (3.10.2).
+# Install our CMake version, which may be ahead of apt-get's version.
 RUN wget "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION?}/cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" \
-    && chmod +x "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" \
-    && "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" --skip-license --prefix=/usr/  \
-    && rm -rf /install-cmake
+  && chmod +x "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" \
+  && "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" --skip-license --prefix=/usr/  \
+  && rm -rf /install-cmake
 
 ##############
 
@@ -95,17 +95,17 @@ WORKDIR /install-python
 
 RUN apt-get update \
   && apt-get install -y \
-    python3.7 \
-    python3.7-dev \
+  python3.7 \
+  python3.7-dev \
   && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.7 1 \
   && apt-get install -y \
-    python3-pip \
-    python3-setuptools \
-    python3-distutils \
+  python3-pip \
+  python3-setuptools \
+  python3-distutils \
   && python3 -m pip install --upgrade pip \
   && python3 -m pip install \
-    numpy==1.19.4 absl-py==0.12.0 requests PyYAML==5.4.1 wheel==0.36.2 \
-    pybind11==2.9.0
+  numpy==1.19.4 absl-py==0.12.0 requests PyYAML==5.4.1 wheel==0.36.2 \
+  pybind11==2.9.0
 
 ENV PYTHON_BIN /usr/bin/python3
 
