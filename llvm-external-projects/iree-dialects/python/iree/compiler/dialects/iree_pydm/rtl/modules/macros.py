@@ -45,6 +45,7 @@ def _unbox_i32(stage: ImportStage, value: ir.Value) -> ir.Value:
 def unbox_i32(stage: ImportStage, value: ir.Value) -> ir.Value:
   return _unbox_i32(stage, value)
 
+
 def _unbox_i64(stage: ImportStage, value: ir.Value) -> ir.Value:
   i64_type = d.IntegerType.get_explicit(64)
   if d.ObjectType.isinstance(value.type):
@@ -54,6 +55,7 @@ def _unbox_i64(stage: ImportStage, value: ir.Value) -> ir.Value:
       stage.ic.abort(
           f"Type error unbox a non object type -> integer<64>: {value.type}")
     return value
+
 
 @def_ir_macro_intrinsic
 def unbox_i64(stage: ImportStage, value: ir.Value) -> ir.Value:
@@ -148,6 +150,9 @@ def raise_value_error(stage: ImportStage, dummy_return: ir.Value) -> ir.Value:
   This needs to be changed completely when more capabilities are available.
   It is only enough now to get program flow correct.
   """
-  exc_result = d.FailureOp(d.ExceptionResultType.get()).result
+  # Exception result code -3 == RuntimeError.
+  exc_result = d.FailureOp(exc_result=d.ExceptionResultType.get(),
+                           code=ir.IntegerAttr.get(
+                               ir.IntegerType.get_signless(32), -3)).result
   d.RaiseOnFailureOp(exc_result)
   return dummy_return

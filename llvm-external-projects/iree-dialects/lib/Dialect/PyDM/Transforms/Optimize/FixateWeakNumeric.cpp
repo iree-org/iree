@@ -81,6 +81,11 @@ struct FixateWeakNumericPass
             type.getContext(),
             convertType(indexType).cast<PYDM::IntegerType>());
       }
+    } else if (auto sequenceIteratorType =
+                   type.dyn_cast<PYDM::SequenceIteratorType>()) {
+      return PYDM::SequenceIteratorType::get(
+          type.getContext(), convertType(sequenceIteratorType.getSequenceType())
+                                 .cast<PYDM::PrimitiveType>());
     }
 
     return type;

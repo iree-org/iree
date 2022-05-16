@@ -7,6 +7,7 @@
 from typing import Any, Optional, Sequence
 
 from .util import ImportContext, ImportStage, Intrinsic
+from ... import cf as cf_d
 from ... import iree_pydm as d
 from .... import ir
 
@@ -62,14 +63,50 @@ class py_builtin_range(Intrinsic):
       stop = args[1]
       step = args[2]
 
-    # TODO: Per https://docs.python.org/3/library/stdtypes.html#range
+    zero = stage.ic.emit_constant(0)
+
+    # If step was explicitly provided. Ensure it is not zero.
+    # Per https://docs.python.org/3/library/stdtypes.html#range
     # we should dynamically validate that step != 0 and raise a ValueError
     # if it is.
+    if step is not None:
+      predecessor_block = ic.ip.block
+      fail_block = predecessor_block.create_after()
+      successor_block = fail_block.create_after()
+      with ic.loc, ic.ip:
+        object_type = d.ObjectType.get()
+        cmp_zero, cmp_step = d.DynamicBinaryPromoteOp(
+            left=zero,
+            right=step,
+            left_prime=object_type,
+            right_prime=object_type).results
+        step_eq_zero = d.ApplyCompareOp(dunder_name=ir.StringAttr.get("eq"),
+                                        left=cmp_zero,
+                                        right=cmp_step,
+                                        result=d.BoolType.get()).result
+        step_eq_zero_pred = d.BoolToPredOp(ir.IntegerType.get_signless(1),
+                                           step_eq_zero).result
+        cf_d.CondBranchOp(condition=step_eq_zero_pred,
+                          trueDestOperands=[],
+                          falseDestOperands=[],
+                          trueDest=fail_block,
+                          falseDest=successor_block)
+      with ic.scoped_ip(ir.InsertionPoint(fail_block)):
+        with ic.loc, ic.ip:
+          # TODO: Use constants for error code (-4 == ValueError).
+          exc_result = d.FailureOp(exc_result=d.ExceptionResultType.get(),
+                                   code=ir.IntegerAttr.get(
+                                       ir.IntegerType.get_signless(32), -4))
+          d.ReturnErrorOp(exc_result)
 
+      # Continue with successor.
+      ic.reset_ip(ir.InsertionPoint(successor_block))
+
+    # Emit MakeRangeOp.
     with ic.loc, ic.ip:
       # Default values.
       if start is None:
-        start = stage.ic.emit_constant(0)
+        start = zero
       if step is None:
         step = stage.ic.emit_constant(1)
 

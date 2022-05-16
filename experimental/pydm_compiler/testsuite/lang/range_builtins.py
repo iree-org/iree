@@ -52,3 +52,14 @@ def len_range_start_stop_step(start: int, stop: int, step: int) -> int:
     14
   """
   return len(range(start, stop, step))
+
+
+@jit
+def range_step_0_error(step: int) -> int:
+  """
+    >>> range_step_0_error(0)
+    Traceback (most recent call last):
+    ...
+    ValueError: Raised from compiled function
+  """
+  return len(range(0, 20, step))

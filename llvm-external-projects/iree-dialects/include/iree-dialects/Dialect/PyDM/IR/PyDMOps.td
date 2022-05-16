@@ -204,6 +204,22 @@ def IREEPyDM_ReturnOp : IREEPyDM_Op<"return", [
   }];
 }
 
+def IREEPyDM_ReturnErrorOp : IREEPyDM_Op<"return_error", [
+    NoSideEffect,
+    HasParent<"FuncOp">,
+    ReturnLike,
+    Terminator]> {
+  let summary = "Failure return from a function (used as a terminator)";
+  let description = [{
+    Raises an exception from a function.
+  }];
+
+  let arguments = (ins IREEPyDM_ExceptionResultType:$exc_result);
+  let assemblyFormat = [{
+    $exc_result `:` type($exc_result) attr-dict
+  }];
+}
+
 def IREEPyDM_RaiseOnFailureOp : IREEPyDM_Op<"raise_on_failure", [
     HasParent<"FuncOp">]> {
   let summary = "Performs a non-local exit on failure of an ExceptionResult";
@@ -420,9 +436,10 @@ def IREEPyDM_NoneOp : IREEPyDM_PureOp<"none", [ConstantLike]> {
 // TODO: Make ConstantLike
 def IREEPyDM_FailureOp : IREEPyDM_PureOp<"failure", []> {
   let summary = "Generates a constant failure ExceptionResult";
-  let results = (outs IREEPyDM_ExceptionResultType);
+  let arguments = (ins I32Attr:$code);
+  let results = (outs IREEPyDM_ExceptionResultType:$exc_result);
   let assemblyFormat = [{
-    `->` type(results) attr-dict
+    $code attr-dict
   }];
 }
 

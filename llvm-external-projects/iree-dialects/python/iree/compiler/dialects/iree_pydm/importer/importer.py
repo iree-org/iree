@@ -408,9 +408,10 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
     if self.terminated:
       return
     ic = self.fctx.ic
+    expr = ExpressionImporter(self.fctx)
+    expr.visit(ast_node.value)
+
     with ic.loc, ic.ip:
-      expr = ExpressionImporter(self.fctx)
-      expr.visit(ast_node.value)
       d.ReturnOp(self.fctx.cast_to_return_type(expr.get_immediate()))
     self.terminated = True
 

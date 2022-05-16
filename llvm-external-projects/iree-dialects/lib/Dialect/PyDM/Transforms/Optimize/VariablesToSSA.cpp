@@ -114,8 +114,8 @@ struct VariablesToSSAPass : public VariablesToSSABase<VariablesToSSAPass> {
     }
     Operation *terminator = block.getTerminator();
     if (!terminator ||
-        !llvm::isa<cf::BranchOp, cf::CondBranchOp, PYDM::ReturnOp>(
-            terminator)) {
+        !llvm::isa<cf::BranchOp, cf::CondBranchOp, PYDM::ReturnOp,
+                   PYDM::ReturnErrorOp>(terminator)) {
       return emitError(terminator->getLoc())
              << "unsupported terminator for block";
     }

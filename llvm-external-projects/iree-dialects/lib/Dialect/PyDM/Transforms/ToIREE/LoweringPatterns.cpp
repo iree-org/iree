@@ -533,7 +533,7 @@ class BuiltinHasNextConversion : public OpConversionPattern<PYDM::HasNextOp> {
           makeRecordIndex(loc, rewriter, RecordIndices::RangeStep));
 
       // If step < 0, then there is a next if start > stop.
-      // Otherwise if step > 0, then there is a next if start < stop.
+      // Otherwise if step > 0, then there is a next if stop > start.
       // Note that this does two comparisons and selects. In almost all
       // canonical usage, we expect step to be constant derived and for this
       // to fold.
@@ -543,10 +543,10 @@ class BuiltinHasNextConversion : public OpConversionPattern<PYDM::HasNextOp> {
           loc, arith::CmpIPredicate::slt, step, zero);
       Value startGtStop = rewriter.create<arith::CmpIOp>(
           loc, arith::CmpIPredicate::sgt, start, stop);
-      Value stopLtStart = rewriter.create<arith::CmpIOp>(
-          loc, arith::CmpIPredicate::slt, stop, start);
+      Value stopGtStart = rewriter.create<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::sgt, stop, start);
       rewriter.replaceOpWithNewOp<arith::SelectOp>(srcOp, stepLtZero,
-                                                   startGtStop, stopLtStart);
+                                                   startGtStop, stopGtStart);
       return success();
     }
 
@@ -743,7 +743,7 @@ class BuiltinNextItemConversion : public OpConversionPattern<PYDM::NextItemOp> {
       rewriter.create<Input::ListSetOp>(loc, rangeIterRecord, startIndex,
                                         delta);
 
-      Value result = delta;
+      Value result = start;
       // If the original return type is an object, then we have to box it.
       // Otherwise, we just return as-is, taking advantage of the equivalence
       // of raw, lowered integer types.
@@ -930,9 +930,8 @@ class FailureOpConversion : public OpConversionPattern<PYDM::FailureOp> {
   matchAndRewrite(PYDM::FailureOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     Type i32 = rewriter.getI32Type();
-    // '-3' == RuntimeError
-    rewriter.replaceOpWithNewOp<arith::ConstantOp>(
-        srcOp, i32, rewriter.getIntegerAttr(i32, -3));
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(srcOp, i32,
+                                                   adaptor.codeAttr());
     return success();
   }
 };
@@ -1217,6 +1216,29 @@ class ReturnOpConversion : public OpConversionPattern<PYDM::ReturnOp> {
         rewriter.create<arith::ConstantOp>(loc, rewriter.getI32IntegerAttr(0));
     rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(
         srcOp, ValueRange{zeroResult, adaptor.getOperands()[0]});
+    return success();
+  }
+};
+
+/// Converts to a failure return.
+class ReturnErrorOpConversion
+    : public OpConversionPattern<PYDM::ReturnErrorOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(PYDM::ReturnErrorOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto loc = srcOp.getLoc();
+
+    // Get the containing function return type so that we can create a
+    // suitable null return value.
+    auto parentFunc = srcOp->getParentOfType<func::FuncOp>();
+    if (!parentFunc)
+      return rewriter.notifyMatchFailure(srcOp, "not contained by a func");
+    Type convertedReturnType = parentFunc.getFunctionType().getResult(1);
+    auto nullReturnValue = getNullValue(loc, rewriter, convertedReturnType);
+    rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(
+        srcOp, ValueRange{adaptor.exc_result(), nullReturnValue});
     return success();
   }
 };
@@ -1630,7 +1652,7 @@ void PYDM::populatePyDMToIREELoweringPatterns(MLIRContext *context,
       DynamicUnpackOpConversion, ElideStaticInfoCast, FailureOpConversion,
       FuncOpConversion, GetTypeCodeConversion, LoadVarOpConversion,
       MakeRangeOpConversion, MakeTupleOpConversion, NegIntegerOpConversion,
-      RaiseOnFailureOpConversion, ReturnOpConversion,
+      RaiseOnFailureOpConversion, ReturnErrorOpConversion, ReturnOpConversion,
       SequenceCloneBuiltinConversion, StoreVarOpConversion,
       SubscriptOpBuiltinSequenceConversion, UnboxOpConversion>(typeConverter,
                                                                context);
