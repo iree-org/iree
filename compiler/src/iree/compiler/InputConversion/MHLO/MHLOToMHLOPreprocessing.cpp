@@ -33,15 +33,6 @@ namespace MHLO {
 
 namespace {
 
-/// Returns true if the given `attr` is a splat of the given `value`.
-static bool isSplatValue(DenseIntElementsAttr attr, uint64_t value) {
-  return attr.isSplat() && attr.getSplatValue<uint64_t>() == value;
-}
-
-static bool isAllZero(DenseIntElementsAttr attr) {
-  return isSplatValue(attr, 0);
-}
-
 static bool isIota(ArrayRef<int64_t> array) {
   for (auto it : llvm::enumerate(array)) {
     if (it.index() != it.value()) {
@@ -49,15 +40,6 @@ static bool isIota(ArrayRef<int64_t> array) {
     }
   }
   return true;
-}
-
-/// Returns true if the conv op has padding attribute, and that it has
-/// non-zero entries.
-static bool hasPadding(mhlo::ConvOp op) {
-  Optional<DenseIntElementsAttr> padding = op.padding();
-  if (!padding) return false;
-  return llvm::any_of(padding.getValue(),
-                      [](APInt v) -> bool { return !v.isNullValue(); });
 }
 
 static DenseIntElementsAttr make1DElementsAttr(OpBuilder &b,
@@ -312,14 +294,6 @@ bool isConsecutive(ArrayRef<int64_t> array) {
     if (array[i] - array[i - 1] != 1) return false;
   }
   return true;
-}
-
-SmallVector<int64_t> extract1DVector(DenseIntElementsAttr elements) {
-  SmallVector<int64_t> ret;
-  for (const APInt &element : elements) {
-    ret.push_back(element.getLimitedValue());
-  }
-  return ret;
 }
 
 // Rewrites mhlo.dot_general so lhs contraction dimensions are innermost and rhs
