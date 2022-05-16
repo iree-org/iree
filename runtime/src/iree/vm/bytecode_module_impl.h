@@ -30,6 +30,15 @@ extern "C" {
 #define VMMAX(a, b) (((a) > (b)) ? (a) : (b))
 #define VMMIN(a, b) (((a) < (b)) ? (a) : (b))
 
+// Major bytecode version; mismatches on this will fail in either direction.
+// This allows coarse versioning of completely incompatible versions.
+#define IREE_VM_BYTECODE_VERSION_MAJOR 0
+// Minor bytecode version; lower versions are allowed to enable newer runtimes
+// to load older serialized files when there are backwards-compatible changes.
+// Higher versions are disallowed as they occur when new ops are added that
+// otherwise cannot be executed by older runtimes.
+#define IREE_VM_BYTECODE_VERSION_MINOR 0
+
 // Maximum register count per bank.
 // This determines the bits required to reference registers in the VM bytecode.
 #define IREE_I32_REGISTER_COUNT 0x7FFF

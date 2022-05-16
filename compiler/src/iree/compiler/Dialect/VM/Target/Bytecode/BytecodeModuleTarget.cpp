@@ -768,6 +768,8 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   iree_vm_BytecodeModuleDef_rwdata_segments_add(fbb, rwdataSegmentsRef);
   iree_vm_BytecodeModuleDef_function_descriptors_add(fbb,
                                                      functionDescriptorsRef);
+  iree_vm_BytecodeModuleDef_bytecode_version_add(fbb,
+                                                 BytecodeEncoder::kVersion);
   iree_vm_BytecodeModuleDef_bytecode_data_add(fbb, bytecodeDataRef);
   iree_vm_BytecodeModuleDef_debug_database_add(fbb, debugDatabaseRef);
   iree_vm_BytecodeModuleDef_end_as_root(fbb);

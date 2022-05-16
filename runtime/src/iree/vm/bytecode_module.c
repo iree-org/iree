@@ -196,6 +196,22 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
     }
   }
 
+  // Verify that we can properly handle the bytecode embedded in the module.
+  // We require that major versions match and allow loading of older minor
+  // versions (we keep changes backwards-compatible).
+  const uint32_t bytecode_version =
+      iree_vm_BytecodeModuleDef_bytecode_version(module_def);
+  const uint32_t bytecode_version_major = bytecode_version >> 16;
+  const uint32_t bytecode_version_minor = bytecode_version & 0xFFFF;
+  if ((bytecode_version_major != IREE_VM_BYTECODE_VERSION_MAJOR) ||
+      (bytecode_version_minor > IREE_VM_BYTECODE_VERSION_MINOR)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "bytecode version mismatch; runtime supports %d.%d, module has %d.%d",
+        IREE_VM_BYTECODE_VERSION_MAJOR, IREE_VM_BYTECODE_VERSION_MINOR,
+        bytecode_version_major, bytecode_version_minor);
+  }
+
   flatbuffers_uint8_vec_t bytecode_data =
       iree_vm_BytecodeModuleDef_bytecode_data(module_def);
   for (size_t i = 0;
