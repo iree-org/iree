@@ -7,7 +7,7 @@
 steps:
   - label: "Test Colab notebooks"
     commands:
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/samples@sha256:fd683a82b68e7a27788dafdcc50d8dcbb2fc4d189363c2dd92f26393c7eddf48 python3 ./samples/colab/test_notebooks.py"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/samples@sha256:4690f9189e45d7d988aa449af8297d1c2a8457b5e18d3abc873ae498436b20f7 python3 ./samples/colab/test_notebooks.py"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     agents:
@@ -15,7 +15,7 @@ steps:
 
   - label: "Test Samples"
     commands:
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/samples@sha256:fd683a82b68e7a27788dafdcc50d8dcbb2fc4d189363c2dd92f26393c7eddf48 ./build_tools/testing/test_samples.sh"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/samples@sha256:4690f9189e45d7d988aa449af8297d1c2a8457b5e18d3abc873ae498436b20f7 ./build_tools/testing/test_samples.sh"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     agents:
@@ -29,7 +29,7 @@ steps:
     key: "build-host-install"
     commands:
       - "git submodule sync && git submodule update --init --jobs 8 --depth 1"
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/base@sha256:dfbda75e83081aa3f6ca3b724613b88019492cc0472320361d422d69a8b89822 ./build_tools/cmake/build_host_install.sh"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/base@sha256:292dfd59ec3eb7f44e1e0dd4e462d59b0c1c484e88d101ec2fe7e0aeb0b8430b ./build_tools/cmake/build_host_install.sh"
       - "tar -czvf build-artifacts.tgz build-host/install"
     artifact_paths: "build-artifacts.tgz"
     env:
@@ -43,7 +43,7 @@ steps:
       - "buildkite-agent artifact download --step build-host-install build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
       - "git submodule update --init --jobs 8 --depth 1"
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/emscripten@sha256:1a7ce0f740c46c7abf76e9ba0042b61038e28f0aec3e3b2029b8f4c108edbce6 ./experimental/web/test_samples.sh"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/emscripten@sha256:596914a48af7f703c412c549529907d7912c5e027fe13b843c68faa143c956c7 ./experimental/web/test_samples.sh"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     agents:

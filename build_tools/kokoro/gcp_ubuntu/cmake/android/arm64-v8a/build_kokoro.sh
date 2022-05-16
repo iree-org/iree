@@ -26,7 +26,7 @@ docker_setup
 # Need to use frontends image (which also has Android toolchain) to build the
 # TFLite compiler for generating benchmarks.
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/frontends@sha256:2ef3b3670808cdaa2a483dddf94fc58d50486148eb73f9f87e8a9d08a628d39a \
+  gcr.io/iree-oss/frontends@sha256:5868b0de784a590d710c837c3799d9d52456510e6db3d555661ba5f9f87ce213 \
   build_tools/kokoro/gcp_ubuntu/cmake/android/build.sh arm64-v8a
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
