@@ -17,7 +17,7 @@ func.func @func(%arg0 : i32) -> i32 {
 }
 
 // CHECK: "bytecode_data": [
-// CHECK-NEXT:   84,
+// CHECK-NEXT:   90,
 // CHECK-NEXT:   0,
 // CHECK-NEXT:   1,
 // CHECK-NEXT:   0,

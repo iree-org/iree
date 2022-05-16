@@ -22,7 +22,7 @@ vm.module @simple_module {
   }
 
   //      CHECK: "bytecode_data": [
-  // CHECK-NEXT:   84,
+  // CHECK-NEXT:   90,
   // CHECK-NEXT:   0,
   // CHECK-NEXT:   1,
   // CHECK-NEXT:   0,

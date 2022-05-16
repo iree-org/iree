@@ -60,7 +60,6 @@ class VMVXTargetBackend final : public TargetBackend {
 
     // TODO(benvanik): derive these from a vm target triple.
     auto vmOptions = IREE::VM::TargetOptions::FromFlags::get();
-    vmOptions.i64Extension = true;
     vmOptions.f32Extension = true;
     vmOptions.optimizeForStackSize = false;
     IREE::VM::buildVMTransformPassPipeline(nestedModulePM, vmOptions);
