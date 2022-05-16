@@ -24,11 +24,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-// TODO(thomasraoux): Add a new optional attribute to translate info.
-static llvm::cl::opt<unsigned> pipelineDepth("iree-codegen-cuda-pipeline-depth",
-                                             llvm::cl::desc("Pipeline depth"),
-                                             llvm::cl::init(4));
-
 static llvm::cl::opt<unsigned> logSwizzleTile(
     "iree-codegen-log-swizzle-tile", llvm::cl::desc("log swizzle tile value"),
     llvm::cl::init(0));
@@ -109,7 +104,8 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   pm.addNestedPass<func::FuncOp>(createGPUPipeliningPass());
 }
 
-void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm) {
+void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
+                                        unsigned pipelineDepth) {
   tileAndBufferize(pm);
 
   // Distribute linalg onto warps within the workgroup.

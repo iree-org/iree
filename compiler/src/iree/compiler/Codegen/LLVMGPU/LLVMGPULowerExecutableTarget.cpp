@@ -155,7 +155,9 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
         addGPUMatmulSimtPassPipeline(nestedModulePM);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
-        addGPUMatmulTensorCorePassPipeline(nestedModulePM);
+        addGPUMatmulTensorCorePassPipeline(
+            nestedModulePM,
+            translationInfo.getValue().getSoftwarePipelineDepth());
         break;
       default:
         variantOp.emitOpError("Unsupported pipeline on GPU target.");

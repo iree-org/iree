@@ -1,5 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline))' --iree-codegen-cuda-pipeline-depth=1 %s | FileCheck %s
-// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline))' --iree-codegen-cuda-pipeline-depth=4 %s | FileCheck %s --check-prefix=CHECKP
+// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline))' %s | FileCheck %s
 
 // Verify that a simple element wise op gets lowered succefully all the way to
 // nvvm/llvm dialect.
@@ -421,57 +420,39 @@ hal.executable @mma_fused {
 }
 }
 
+// case with larger pipeline depth
 //     CHECK-LABEL: hal.executable public @mma_fused
 //           CHECK:   hal.executable.variant public @cuda
 //       CHECK-NOT:   llvm.store
 //   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
 //           CHECK:   nvvm.cp.async.commit.group
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
-//           CHECK:   nvvm.cp.async.wait.group 0
+//           CHECK:   nvvm.cp.async.wait.group 3
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
 //   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
+//           CHECK:   nvvm.cp.async.wait.group 3
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
+//           CHECK:   nvvm.cp.async.wait.group 2
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
+//           CHECK:   nvvm.cp.async.wait.group 1
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
 //           CHECK:   nvvm.cp.async.wait.group 0
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
 //   CHECK-COUNT-8:   llvm.fadd
 //   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
-
-// case with larger pipeline depth
-//     CHECKP-LABEL: hal.executable public @mma_fused
-//           CHECKP:   hal.executable.variant public @cuda
-//       CHECKP-NOT:   llvm.store
-//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECKP:   nvvm.cp.async.commit.group
-//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECKP:   nvvm.cp.async.commit.group
-//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECKP:   nvvm.cp.async.commit.group
-//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECKP:   nvvm.cp.async.commit.group
-//           CHECKP:   llvm.br
-//           CHECKP:   nvvm.cp.async.wait.group 3
-//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECKP-COUNT-2:   nvvm.wmma.mma
-//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECKP:   nvvm.cp.async.commit.group
-//           CHECKP:   llvm.br
-//           CHECKP:   nvvm.cp.async.wait.group 3
-//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECKP-COUNT-2:   nvvm.wmma.mma
-//           CHECKP:   nvvm.cp.async.wait.group 2
-//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECKP-COUNT-2:   nvvm.wmma.mma
-//           CHECKP:   nvvm.cp.async.wait.group 1
-//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECKP-COUNT-2:   nvvm.wmma.mma
-//           CHECKP:   nvvm.cp.async.wait.group 0
-//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECKP-COUNT-2:   nvvm.wmma.mma
-//   CHECKP-COUNT-8:   llvm.fadd
-//   CHECKP-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
 
 // -----
 
@@ -521,56 +502,39 @@ hal.executable @mma_fused_fp16 {
 }
 }
 
+// case with larger pipeline depth
 //     CHECK-LABEL: hal.executable public @mma_fused_fp16
 //           CHECK:   hal.executable.variant public @cuda
 //       CHECK-NOT:   llvm.store
 //   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
 //           CHECK:   nvvm.cp.async.commit.group
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
-//           CHECK:   nvvm.cp.async.wait.group 0
+//           CHECK:   nvvm.cp.async.wait.group 3
 //   CHECK-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
 //   CHECK-COUNT-1:   nvvm.wmma.mma
 //   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
+//           CHECK:   nvvm.cp.async.wait.group 3
+//   CHECK-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
+//   CHECK-COUNT-1:   nvvm.wmma.mma
+//           CHECK:   nvvm.cp.async.wait.group 2
+//   CHECK-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
+//   CHECK-COUNT-1:   nvvm.wmma.mma
+//           CHECK:   nvvm.cp.async.wait.group 1
+//   CHECK-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
+//   CHECK-COUNT-1:   nvvm.wmma.mma
+//           CHECK:   nvvm.cp.async.wait.group 0
 //   CHECK-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
 //   CHECK-COUNT-1:   nvvm.wmma.mma
 //   CHECK-COUNT-4:   llvm.fadd
 //   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>
-
-// case with larger pipeline depth
-//     CHECKP-LABEL: hal.executable public @mma_fused_fp16
-//           CHECKP:   hal.executable.variant public @cuda
-//       CHECKP-NOT:   llvm.store
-//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECKP:   nvvm.cp.async.commit.group
-//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECKP:   nvvm.cp.async.commit.group
-//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECKP:   nvvm.cp.async.commit.group
-//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECKP:   nvvm.cp.async.commit.group
-//           CHECKP:   llvm.br
-//           CHECKP:   nvvm.cp.async.wait.group 3
-//   CHECKP-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
-//   CHECKP-COUNT-1:   nvvm.wmma.mma
-//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECKP:   nvvm.cp.async.commit.group
-//           CHECKP:   llvm.br
-//           CHECKP:   nvvm.cp.async.wait.group 3
-//   CHECKP-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
-//   CHECKP-COUNT-1:   nvvm.wmma.mma
-//           CHECKP:   nvvm.cp.async.wait.group 2
-//   CHECKP-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
-//   CHECKP-COUNT-1:   nvvm.wmma.mma
-//           CHECKP:   nvvm.cp.async.wait.group 1
-//   CHECKP-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
-//   CHECKP-COUNT-1:   nvvm.wmma.mma
-//           CHECKP:   nvvm.cp.async.wait.group 0
-//   CHECKP-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
-//   CHECKP-COUNT-1:   nvvm.wmma.mma
-//   CHECKP-COUNT-4:   llvm.fadd
-//   CHECKP-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>
 
 // -----
 
@@ -620,55 +584,39 @@ hal.executable @mma_fused_fp16 {
       }
     }
   }
+
+// case with larger pipeline depth
 //     CHECK-LABEL: hal.executable public @large_dot_general_dispatch_0
 //           CHECK:   hal.executable.variant public @cuda
 //       CHECK-NOT:   llvm.store
 //   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
 //           CHECK:   nvvm.cp.async.commit.group
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
-//           CHECK:   nvvm.cp.async.wait.group 0
+//           CHECK:   nvvm.cp.async.wait.group 3
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
 //   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
+//           CHECK:   nvvm.cp.async.wait.group 3
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
+//           CHECK:   nvvm.cp.async.wait.group 2
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
+//           CHECK:   nvvm.cp.async.wait.group 1
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
 //           CHECK:   nvvm.cp.async.wait.group 0
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
 //   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
-
-// case with larger pipeline depth
-//     CHECKP-LABEL: hal.executable public @large_dot_general_dispatch_0
-//           CHECKP:   hal.executable.variant public @cuda
-//       CHECKP-NOT:   llvm.store
-//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECKP:   nvvm.cp.async.commit.group
-//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECKP:   nvvm.cp.async.commit.group
-//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECKP:   nvvm.cp.async.commit.group
-//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECKP:   nvvm.cp.async.commit.group
-//           CHECKP:   llvm.br
-//           CHECKP:   nvvm.cp.async.wait.group 3
-//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECKP-COUNT-2:   nvvm.wmma.mma
-//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECKP:   nvvm.cp.async.commit.group
-//           CHECKP:   llvm.br
-//           CHECKP:   nvvm.cp.async.wait.group 3
-//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECKP-COUNT-2:   nvvm.wmma.mma
-//           CHECKP:   nvvm.cp.async.wait.group 2
-//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECKP-COUNT-2:   nvvm.wmma.mma
-//           CHECKP:   nvvm.cp.async.wait.group 1
-//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECKP-COUNT-2:   nvvm.wmma.mma
-//           CHECKP:   nvvm.cp.async.wait.group 0
-//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECKP-COUNT-2:   nvvm.wmma.mma
-//   CHECKP-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
 
 // -----
 
@@ -722,12 +670,15 @@ hal.executable @mma_fused_fp16 {
 //   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
-//           CHECK:   nvvm.cp.async.wait.group 0
+//           CHECK:   nvvm.cp.async.wait.group 3
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
-//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECK:   nvvm.cp.async.commit.group
-//           CHECK:   llvm.br
+//           CHECK:   nvvm.cp.async.wait.group 2
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
+//           CHECK:   nvvm.cp.async.wait.group 1
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
 //           CHECK:   nvvm.cp.async.wait.group 0
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma

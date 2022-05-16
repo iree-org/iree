@@ -327,7 +327,8 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize);
-void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm);
+void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
+                                        unsigned pipelineDepth);
 
 /// Simple lowering only distributute linalg ops on blocks and threads. This
 /// will result in scalar operations. Expects pass manager to be a module-level
