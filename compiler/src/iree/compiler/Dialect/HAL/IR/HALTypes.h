@@ -141,28 +141,6 @@ class SemaphoreType : public Type::TypeBase<SemaphoreType, Type, TypeStorage> {
 // Struct types
 //===----------------------------------------------------------------------===//
 
-// Returns the intersection (most conservative) constraints |lhs| ∩ |rhs|.
-BufferConstraintsAttr intersectBufferConstraints(BufferConstraintsAttr lhs,
-                                                 BufferConstraintsAttr rhs);
-
-// TODO(benvanik): runtime buffer constraint queries from the allocator.
-// We can add folders for those when the allocator is strongly-typed with
-// #hal.buffer_constraints and otherwise leave them for runtime queries.
-class BufferConstraintsAdaptor {
- public:
-  BufferConstraintsAdaptor(Location loc, Value allocator);
-
-  Value getMaxAllocationSize(OpBuilder &builder);
-  Value getMinBufferOffsetAlignment(OpBuilder &builder);
-  Value getMaxBufferRange(OpBuilder &builder);
-  Value getMinBufferRangeAlignment(OpBuilder &builder);
-
- private:
-  Location loc_;
-  Value allocator_;
-  BufferConstraintsAttr bufferConstraints_;
-};
-
 // A tuple containing runtime values for a descriptor set binding.
 struct DescriptorSetBindingValue {
   Value ordinal;

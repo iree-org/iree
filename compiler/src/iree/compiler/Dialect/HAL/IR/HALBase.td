@@ -396,26 +396,6 @@ def HAL_DurationMillisAttr : SignlessIntElementsAttr<32> {
 // HAL structs
 //===----------------------------------------------------------------------===//
 
-def HAL_BufferConstraintsAttr :
-  Util_StructAttr<"buffer_constraints", "BufferConstraintsAttr", HAL_Dialect, [
-    // The maximum size of a memory allocation that can be created, even if
-    // there is more space available in the heap.
-    Util_StructFieldAttr<"max_allocation_size", HAL_DeviceSizeAttr>,
-    // The minimum required alignment, in bytes, for offsets used in runtime
-    // buffer bindings for target backends. Offset values (both dynamic and
-    // static) must be an integer multiple of this limit.
-    Util_StructFieldAttr<"min_buffer_offset_alignment", HAL_DeviceSizeAttr>,
-    // The maximum value that can be specified for size ranges of buffer
-    // bindings. The underlying allocation may be larger than this but only
-    // up to this amount will be visible to kernels.
-    Util_StructFieldAttr<"max_buffer_range", HAL_DeviceSizeAttr>,
-    // The minimum required alignment, in bytes, for size ranges of buffer
-    // bindings.
-    Util_StructFieldAttr<"min_buffer_range_alignment", HAL_DeviceSizeAttr>,
-  ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
-}
-
 def HAL_DescriptorSetBindingAttr :
     AttrDef<HAL_Dialect, "DescriptorSetBinding", []> {
   let mnemonic = "descriptor_set.binding";
@@ -542,10 +522,6 @@ def HAL_DeviceTargetAttr :
     // target device.
     Attribute getMatchExpression();
 
-    // Returns the constraints defining buffer allocation and usage allowed on
-    // the device or the host defaults if none are defined.
-    BufferConstraintsAttr getBufferConstraints();
-
     // Returns zero or more executable targets that this device supports.
     SmallVector<ExecutableTargetAttr, 4> getExecutableTargets();
 
@@ -553,22 +529,6 @@ def HAL_DeviceTargetAttr :
     // operation. This will recursively walk parent operations until one with
     // the `hal.device.targets` attribute is found.
     static SmallVector<DeviceTargetAttr, 4> lookup(Operation *op);
-
-    // Returns a set of buffer constraints compatible with the host.
-    // These must only be used with device buffers when it is known that the
-    // device is local.
-    static BufferConstraintsAttr
-    getDefaultHostBufferConstraints(MLIRContext *context);
-
-    // Tries to find the min/max constraints on buffers across all target
-    // devices applicable to the given operation. If no target device specifies
-    // constraints then a generally acceptable default set with minimums will be
-    // returned.
-    //
-    // This can result in non-optimal constraints when multi-targeting wildly
-    // different device types and should only be used as a fallback.
-    static BufferConstraintsAttr
-    lookupConservativeBufferConstraints(Operation *op);
 
     // Returns a list of all target executable configurations that may be
     // required for the given operation.
