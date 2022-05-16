@@ -4,6 +4,7 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+"""Downloads the selected artifacts from a Buildkite build."""
 
 import argparse
 import json
@@ -17,7 +18,7 @@ from pybuildkite import buildkite
 
 def parse_args() -> argparse.Namespace:
   parser = argparse.ArgumentParser(
-      description="Downloads the artifacts from a Buildkite build.")
+      description="Downloads the selected artifacts from a Buildkite build.")
   parser.add_argument("--filter",
                       default=".*",
                       help="Filter on the paths of artifacts.")

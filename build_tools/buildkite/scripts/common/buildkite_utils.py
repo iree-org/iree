@@ -8,7 +8,10 @@
 from typing import Any, Dict, Optional
 from pybuildkite import buildkite
 
+# Type signature of Buildkite build object.
 BuildObject = Dict[str, Any]
+# Type signature of Buildkite artifact object.
+ArtifactObject = Dict[str, Any]
 
 
 def get_build_number(build: BuildObject) -> int:
@@ -19,9 +22,11 @@ def get_build_state(build: BuildObject) -> buildkite.BuildState:
   return buildkite.BuildState(build.get("state"))
 
 
-# Make a link clickable using ANSI escape sequences. See
-# https://buildkite.com/docs/pipelines/links-and-images-in-log-output
 def linkify(url: str, text: Optional[str] = None):
+  """Make a link clickable using ANSI escape sequences.
+    See https://buildkite.com/docs/pipelines/links-and-images-in-log-output
+  """
+
   if text is None:
     text = url
 

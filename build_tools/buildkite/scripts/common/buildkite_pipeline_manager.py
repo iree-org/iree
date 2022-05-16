@@ -10,7 +10,7 @@ import time
 
 from typing import Iterable, List, Optional, Union
 from pybuildkite import buildkite
-from common.buildkite_utils import BuildObject, get_build_number, get_build_state, linkify
+from common.buildkite_utils import ArtifactObject, BuildObject, get_build_number, get_build_state, linkify
 
 # Fake build to return when running locally.
 FAKE_PASSED_BUILD = dict(number=42, state="passed")
@@ -170,7 +170,7 @@ class BuildkitePipelineManager(object):
   def get_url_for_build(self, build_number: int) -> str:
     return f"https://buildkite.com/{self._organization}/{self._pipeline}/builds/{build_number}"
 
-  def list_artifacts_for_build(self, build_number: int):
+  def list_artifacts_for_build(self, build_number: int) -> List[ArtifactObject]:
     return self._buildkite.artifacts().list_artifacts_for_build(
         self._organization, self._pipeline, build_number)
 
