@@ -56,6 +56,7 @@ td_library(
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:PDLDialectTdFiles",
         "@llvm-project//mlir:SideEffectTdFiles",
+        "@llvm-project//mlir:TransformDialectTdFiles",
     ],
 )
 
@@ -289,6 +290,7 @@ cc_library(
         ":IREELinalgExtTiledOpInterfacesIncGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ArithmeticUtils",
         "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:DialectUtils",
@@ -341,6 +343,43 @@ cc_library(
     ],
 )
 
+gentbl_cc_library(
+    name = "IREELinalgExtTransformOpsIncGen",
+    strip_include_prefix = "include",
+    tbl_outs = [
+        (
+            ["--gen-op-decls"],
+            "include/iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "include/iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.td",
+    deps = [
+        ":TdFiles",
+        "@llvm-project//mlir:SideEffectInterfacesTdFiles",
+    ],
+)
+
+cc_library(
+    name = "IREELinalgExtTransformOps",
+    srcs = glob(["lib/Dialect/LinalgExt/TransformOps/*.cpp"]),
+    hdrs = glob(["include/iree-dialects/Dialect/LinalgExt/TransformOps/*.h"]),
+    deps = [
+        ":IREEDialectsTransforms",
+        ":IREELinalgExtDialect",
+        ":IREELinalgExtTransformOpsIncGen",
+        ":IREELinalgExtTransforms",
+        ":IREELinalgTransformDialect",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:TransformDialect",
+    ],
+)
+
 cc_library(
     name = "IREELinalgExtTransforms",
     srcs = glob([
@@ -357,11 +396,13 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:ArithmeticUtils",
         "@llvm-project//mlir:Async",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgInterfaces",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgStructuredOpsIncGen",
         "@llvm-project//mlir:LinalgTransforms",
@@ -611,6 +652,26 @@ gentbl_cc_library(
     ],
 )
 
+gentbl_cc_library(
+    name = "IREELinalgTransformStructuredIncGen",
+    strip_include_prefix = "include",
+    tbl_outs = [
+        (
+            ["--gen-op-decls"],
+            "include/iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "include/iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.td",
+    deps = [
+        ":TdFiles",
+    ],
+)
+
 cc_library(
     name = "IREELinalgTransformDialect",
     srcs = glob([
@@ -627,8 +688,11 @@ cc_library(
         ":IREELinalgExtTransforms",
         ":IREELinalgTransformIncGen",
         ":IREELinalgTransformInterfacesIncGen",
+        ":IREELinalgTransformStructuredIncGen",
         "@llvm-project//llvm:Support",
         # Dialects
+        "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:AffineUtils",
         "@llvm-project//mlir:Async",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:BufferizationDialect",
@@ -638,7 +702,10 @@ cc_library(
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:SCFUtils",
+        "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TransformDialect",
         # IR
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
@@ -670,12 +737,11 @@ cc_library(
 )
 
 cc_library(
-    name = "IREELinalgTransformDialectTransforms",
+    name = "IREELinalgTransformDialectPasses",
     srcs = glob([
-        "lib/Dialect/LinalgTransform/Transforms/*.cpp",
+        "lib/Dialect/LinalgTransform/Passes/*.cpp",
     ]),
     hdrs = [
-        "include/iree-dialects/Dialect/LinalgTransform/TrackingCSE.h",
         "include/iree-dialects/Dialect/LinalgTransform/TrackingListener.h",
         "include/iree-dialects/Dialect/LinalgTransform/TrackingRewriteDriver.h",
     ],
@@ -686,8 +752,10 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineUtils",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ArithmeticTransforms",
         "@llvm-project//mlir:BufferizationDialect",
+        "@llvm-project//mlir:BufferizationTransforms",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
@@ -708,6 +776,7 @@ cc_library(
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:TensorUtils",
+        "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorOps",
@@ -728,12 +797,16 @@ cc_library(
     deps = [
         ":IREEInputDialect",
         ":IREELinalgExtDialect",
+        ":IREELinalgExtTransformOps",
         ":IREELinalgTransformDialect",
+        ":IREELinalgTransformDialectPasses",
         ":IREEPyDMDialect",
         ":IREEPyDMTransforms",
         "@llvm-project//mlir:CAPIIR",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgTransformOps",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformDialect",
     ],
 )
 
@@ -750,7 +823,7 @@ cc_library(
         ":IREEDialectsTransforms",
         ":IREELinalgExtDialect",
         ":IREELinalgTransformDialect",
-        ":IREELinalgTransformDialectTransforms",
+        ":IREELinalgTransformDialectPasses",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Rewrite",
@@ -774,8 +847,9 @@ cc_binary(
         ":IREEInputDialect",
         ":IREELinalgExtDialect",
         ":IREELinalgExtPasses",
+        ":IREELinalgExtTransformOps",
         ":IREELinalgTransformDialect",
-        ":IREELinalgTransformDialectTransforms",
+        ":IREELinalgTransformDialectPasses",
         ":IREEPyDMDialect",
         ":IREEPyDMTransforms",
         "@llvm-project//llvm:Support",
@@ -786,6 +860,7 @@ cc_binary(
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:LinalgTransformOps",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:MlirOptLib",
         "@llvm-project//mlir:PDLDialect",
@@ -793,6 +868,7 @@ cc_binary(
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:Transforms",
     ],
 )

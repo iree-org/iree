@@ -1,7 +1,7 @@
 add_mlir_library(IREELinalgTransformDialect
   LinalgTransformOps.cpp
-  PDL.cpp
   ScopedTransform.cpp
+  StructuredTransformOpsExt.cpp
   TransformOpInterface.cpp
   TrackingListener.cpp
   TrackingRewriteDriver.cpp
@@ -22,6 +22,7 @@ add_mlir_library(IREELinalgTransformDialect
   MLIRLinalg
   MLIRPDL
   MLIRRewrite
+  MLIRTransformDialect
 
   # Transforms
   MLIRAsyncTransforms

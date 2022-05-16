@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s --linalg-interp-transforms --split-input-file | FileCheck %s
+// RUN: iree-dialects-opt %s --linalg-transform-interp --split-input-file | FileCheck %s
 
 // CHECK: #[[$MAP:.+]] = affine_map<(d0, d1)[s0] -> (-d1 + s0, d0)>
 module {
@@ -6,7 +6,7 @@ module {
 //  CHECK-SAME:   %[[A:[0-9a-z]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[B:[0-9a-z]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[C:[0-9a-z]+]]: tensor<?x?xf32>
-  func @matmul(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>) -> tensor<?x?xf32> {
+  func.func @matmul(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>) -> tensor<?x?xf32> {
   //      CHECK: %[[C10:.*]] = arith.constant 10 : index
   //      CHECK: iree_linalg_ext.tile %[[C10]] outs(%[[C]]: tensor<?x?xf32>) -> (tensor<?x?xf32>) {
   //      CHECK: ^bb0(%[[OFF:.*]]: index, %[[SZ:.*]]: index, %[[C_ITER:.*]]: tensor<?x?xf32>):
@@ -20,15 +20,20 @@ module {
                       outs(%C : tensor<?x?xf32>) -> (tensor<?x?xf32>)
     return %0 : tensor<?x?xf32>
   }
-  pdl.pattern @match_linalg_matmul : benefit(1) {
-    %0 = operands
-    %1 = types
-    %2 = operation "linalg.matmul"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
-    rewrite %2 with "iree_linalg_transform.apply"
-  }
-  iree_linalg_transform.sequence {
-    %0 = match @match_linalg_matmul
-    %1:2 = tile_to_iree_linalg_ext_tile_op %0 {sizes = [10]}
+
+  transform.with_pdl_patterns {
+  ^bb0(%arg0: !pdl.operation):
+    pdl.pattern @match_linalg_matmul : benefit(1) {
+      %0 = operands
+      %1 = types
+      %2 = operation "linalg.matmul"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      rewrite %2 with "transform.dialect"
+    }
+    transform.structured.canonicalized_sequence %arg0 {
+    ^bb1(%arg1: !pdl.operation):
+      %0 = pdl_match @match_linalg_matmul in %arg1
+      %1:2 = tile_to_iree_linalg_ext_tile_op %0 {sizes = [10]}
+    }
   }
 }
 
@@ -40,7 +45,7 @@ module {
 //  CHECK-SAME:   %[[A:[0-9a-z]+]]: tensor<100x200xf32>
 //  CHECK-SAME:   %[[B:[0-9a-z]+]]: tensor<200x300xf32>
 //  CHECK-SAME:   %[[C:[0-9a-z]+]]: tensor<100x300xf32>
-  func @matmul_static(%A: tensor<100x200xf32>, %B: tensor<200x300xf32>, %C: tensor<100x300xf32>) -> tensor<100x300xf32> {
+  func.func @matmul_static(%A: tensor<100x200xf32>, %B: tensor<200x300xf32>, %C: tensor<100x300xf32>) -> tensor<100x300xf32> {
     //      CHECK: %[[C10:.*]] = arith.constant 10 : index
     //      CHECK: iree_linalg_ext.tile %[[C10]] outs(%[[C]]: tensor<100x300xf32>) -> (tensor<100x300xf32>) {
     //      CHECK: ^bb0(%[[OFF:.*]]: index, %[[SZ:.*]]: index, %[[C_ITER:.*]]: tensor<?x?xf32>):
@@ -55,14 +60,19 @@ module {
     %0 = linalg.matmul ins(%A, %B : tensor<100x200xf32>, tensor<200x300xf32>) outs(%C : tensor<100x300xf32>) -> (tensor<100x300xf32>)
     return %0 : tensor<100x300xf32>
   }
-  pdl.pattern @match_linalg_matmul : benefit(1) {
-    %0 = operands
-    %1 = types
-    %2 = operation "linalg.matmul"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
-    rewrite %2 with "iree_linalg_transform.apply"
-  }
-  iree_linalg_transform.sequence {
-    %0 = match @match_linalg_matmul
-    %1:2 = tile_to_iree_linalg_ext_tile_op %0 {sizes = [10]}
+
+  transform.with_pdl_patterns {
+  ^bb0(%arg0: !pdl.operation):
+    pdl.pattern @match_linalg_matmul : benefit(1) {
+      %0 = operands
+      %1 = types
+      %2 = operation "linalg.matmul"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      rewrite %2 with "transform.dialect"
+    }
+    transform.structured.canonicalized_sequence %arg0 {
+    ^bb1(%arg1: !pdl.operation):
+      %0 = pdl_match @match_linalg_matmul in %arg1
+      %1:2 = tile_to_iree_linalg_ext_tile_op %0 {sizes = [10]}
+    }
   }
 }

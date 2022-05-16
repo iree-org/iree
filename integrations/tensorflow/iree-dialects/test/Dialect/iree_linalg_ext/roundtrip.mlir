@@ -1,6 +1,6 @@
 // RUN: iree-dialects-opt --split-input-file %s | FileCheck %s
 
-// CHECK-LABEL: func @sort_tensor
+// CHECK-LABEL: func.func @sort_tensor
 // CHECK:         iree_linalg_ext.sort
 // CHECK-SAME:      dimension(0)
 // CHECK-SAME:      outs({{.*}})
@@ -18,7 +18,7 @@ func.func @sort_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
 
 // -----
 
-// CHECK-LABEL: func @sort_memref
+// CHECK-LABEL: func.func @sort_memref
 // CHECK:         iree_linalg_ext.sort
 // CHECK-SAME:      dimension(0)
 // CHECK-SAME:      outs({{.*}})
@@ -46,7 +46,7 @@ func.func @sort_multi_result_tensor(
       } -> tensor<?x?xi32>, tensor<?x?xf32>
   return %0#0, %0#1 : tensor<?x?xi32>, tensor<?x?xf32>
 }
-// CHECK-LABEL: func @sort_multi_result_tensor
+// CHECK-LABEL: func.func @sort_multi_result_tensor
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xi32>
 //  CHECK-SAME:   %[[ARG1:.+]]: tensor<?x?xf32>
 //       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.sort dimension(0)
@@ -65,7 +65,7 @@ func.func @sort_multi_result_memref(
      }
   return
 }
-// CHECK-LABEL: func @sort_multi_result_memref
+// CHECK-LABEL: func.func @sort_multi_result_memref
 //  CHECK-SAME:   %[[ARG0:.+]]: memref<?x?xi32>
 //  CHECK-SAME:   %[[ARG1:.+]]: memref<?x?xf32>
 //       CHECK:   iree_linalg_ext.sort dimension(0)
@@ -86,7 +86,7 @@ func.func @scatter_tensor_dynamic(
     } -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
-// CHECK-LABEL: func @scatter_tensor_dynamic(
+// CHECK-LABEL: func.func @scatter_tensor_dynamic(
 //  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]: tensor<?x1xi32>
 //  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
@@ -112,7 +112,7 @@ func.func @scatter_repeated_tensor_dynamic(
     } -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
-// CHECK-LABEL: func @scatter_repeated_tensor_dynamic(
+// CHECK-LABEL: func.func @scatter_repeated_tensor_dynamic(
 //  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]: tensor<?x1xi32>
 //  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
@@ -138,7 +138,7 @@ func.func @scatter_tensor_static(
     } -> tensor<128x3xf32>
   return %0 : tensor<128x3xf32>
 }
-// CHECK-LABEL: func @scatter_tensor_static(
+// CHECK-LABEL: func.func @scatter_tensor_static(
 //  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]: tensor<128x3xf32>
 //  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]: tensor<48x1xi32>
 //  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]: tensor<48x3xf32>
@@ -164,7 +164,7 @@ func.func @scatter_tensor_multi_index_depth(
     } -> tensor<1x128x3xf32>
   return %0 : tensor<1x128x3xf32>
 }
-// CHECK-LABEL: func @scatter_tensor_multi_index_depth(
+// CHECK-LABEL: func.func @scatter_tensor_multi_index_depth(
 //  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]: tensor<1x128x3xf32>
 //  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]: tensor<48x2xi32>
 //  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]: tensor<48x3xf32>
@@ -190,7 +190,7 @@ func.func @scatter_memref_dynamic(
     }
   return
 }
-// CHECK-LABEL: func @scatter_memref_dynamic(
+// CHECK-LABEL: func.func @scatter_memref_dynamic(
 //  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]: memref<?x?xf32>
 //  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]: memref<?x1xi32>
 //  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]: memref<?x?xf32>
@@ -216,7 +216,7 @@ func.func @scatter_memref_static(
     }
   return
 }
-// CHECK-LABEL: func @scatter_memref_static(
+// CHECK-LABEL: func.func @scatter_memref_static(
 //  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]: memref<128x3xf32>
 //  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]: memref<48x1xi32>
 //  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]: memref<48x3xf32>
@@ -242,7 +242,7 @@ func.func @scatter_memref_multi_index_depth(
     }
   return
 }
-// CHECK-LABEL: func @scatter_memref_multi_index_depth(
+// CHECK-LABEL: func.func @scatter_memref_multi_index_depth(
 //  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]: memref<1x128x3xf32>
 //  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]: memref<48x2xi32>
 //  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]: memref<48x3xf32>
@@ -267,7 +267,7 @@ func.func @scatter_update_scalar_1D(
     } -> tensor<8xi32>
   return %0 : tensor<8xi32>
 }
-// CHECK-LABEL: func @scatter_update_scalar_1D(
+// CHECK-LABEL: func.func @scatter_update_scalar_1D(
 //  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]
@@ -292,7 +292,7 @@ func.func @scatter_update_scalar_2D(
     } -> tensor<4x3xi32>
   return %0 : tensor<4x3xi32>
 }
-// CHECK-LABEL: func @scatter_update_scalar_2D(
+// CHECK-LABEL: func.func @scatter_update_scalar_2D(
 //  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]
@@ -317,7 +317,7 @@ func.func @scatter_update_slice_2D(
     } -> tensor<4x3xi32>
   return %0 : tensor<4x3xi32>
 }
-// CHECK-LABEL: func @scatter_update_slice_2D(
+// CHECK-LABEL: func.func @scatter_update_slice_2D(
 //  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]
@@ -339,7 +339,7 @@ func.func @fft_tensor(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>)
   : tensor<1024xf32>, tensor<1024xf32>
   return %0#0, %0#1 : tensor<1024xf32>, tensor<1024xf32>
 }
-// CHECK-LABEL: func @fft_tensor(
+// CHECK-LABEL: func.func @fft_tensor(
 //  CHECK-SAME:   %[[REAL:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[IMAG:[a-zA-Z0-9_]+]]
 //       CHECK:   %[[CST:.+]] = arith.constant 1 : index
@@ -358,7 +358,7 @@ func.func @fft_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32>) {
     outs(%arg0, %arg1: memref<1024xf32>, memref<1024xf32>)
   return
 }
-// CHECK-LABEL: func @fft_memref(
+// CHECK-LABEL: func.func @fft_memref(
 //  CHECK-SAME:   %[[REAL:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[IMAG:[a-zA-Z0-9_]+]]
 //       CHECK:   %[[CST:.+]] = arith.constant 1 : index
@@ -378,7 +378,7 @@ func.func @fft_tensor_coef(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
   : tensor<1024xf32>, tensor<1024xf32>
   return %0#0, %0#1 : tensor<1024xf32>, tensor<1024xf32>
 }
-// CHECK-LABEL: func @fft_tensor_coef(
+// CHECK-LABEL: func.func @fft_tensor_coef(
 //  CHECK-SAME:   %[[REAL:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[IMAG:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[COEF_REAL:[a-zA-Z0-9_]+]]
@@ -400,7 +400,7 @@ func.func @fft_memref_coef(%arg0: memref<1024xf32>, %arg1: memref<1024xf32>,
     outs(%arg0, %arg1: memref<1024xf32>, memref<1024xf32>)
   return
 }
-// CHECK-LABEL: func @fft_memref_coef(
+// CHECK-LABEL: func.func @fft_memref_coef(
 //  CHECK-SAME:   %[[REAL:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[IMAG:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[COEF_REAL:[a-zA-Z0-9_]+]]
@@ -423,7 +423,7 @@ func.func @fft_tensor_coef_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf
   : tensor<1024xf32>, tensor<1024xf32>
   return %0#0, %0#1 : tensor<1024xf32>, tensor<1024xf32>
 }
-// CHECK-LABEL: func @fft_tensor_coef_stage_5(
+// CHECK-LABEL: func.func @fft_tensor_coef_stage_5(
 //  CHECK-SAME:   %[[REAL:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[IMAG:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[COEF_REAL:[a-zA-Z0-9_]+]]
@@ -445,7 +445,7 @@ func.func @reverse_tensor(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
          outs(%init : tensor<3x5xi32>) : tensor<3x5xi32>
   return %0 : tensor<3x5xi32>
 }
-// CHECK-LABEL: func @reverse_tensor
+// CHECK-LABEL: func.func @reverse_tensor
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<3x5xi32>
 //       CHECK:   %[[INIT:.+]] = linalg.init_tensor [3, 5]
 //       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.reverse
@@ -462,7 +462,7 @@ func.func @reverse_memref(%arg0: memref<3x5xi32>, %arg1: memref<3x5xi32>) {
     outs(%arg1 : memref<3x5xi32>)
   return
 }
-// CHECK-LABEL: func @reverse_memref
+// CHECK-LABEL: func.func @reverse_memref
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: memref<3x5xi32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: memref<3x5xi32>
 //       CHECK:   iree_linalg_ext.reverse
@@ -484,7 +484,7 @@ func.func @reverse_dynamic_tensor(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
          outs(%init : tensor<?x?xi32>) : tensor<?x?xi32>
   return %0 : tensor<?x?xi32>
 }
-// CHECK-LABEL: func @reverse_dynamic_tensor
+// CHECK-LABEL: func.func @reverse_dynamic_tensor
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xi32>
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
@@ -510,7 +510,7 @@ func.func @reverse_static_dynamic_tensor(%arg0: tensor<3x5xi32>) -> tensor<?x?xi
          outs(%init : tensor<?x?xi32>) : tensor<?x?xi32>
   return %0 : tensor<?x?xi32>
 }
-// CHECK-LABEL: func @reverse_static_dynamic_tensor
+// CHECK-LABEL: func.func @reverse_static_dynamic_tensor
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<3x5xi32>
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
@@ -532,7 +532,7 @@ func.func @reverse_multi_dims(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
          outs(%init : tensor<3x5xi32>) : tensor<3x5xi32>
   return %0 : tensor<3x5xi32>
 }
-// CHECK-LABEL: func @reverse_multi_dims
+// CHECK-LABEL: func.func @reverse_multi_dims
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<3x5xi32>
 //       CHECK:   %[[INIT:.+]] = linalg.init_tensor [3, 5]
 //       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.reverse
@@ -556,7 +556,7 @@ func.func @topk_tensor(%input_values: tensor<20x10x8x4xf32>, %input_indices: ten
   return %0#0, %0#1 : tensor<20x10x3x4xf32>, tensor<20x10x3x4xi32>
 }
 
-// CHECK-LABEL: func @topk_tensor
+// CHECK-LABEL: func.func @topk_tensor
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<20x10x8x4xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: tensor<20x10x8x4xi32>
 //       CHECK:   %[[OUT_VALUES:.+]] = linalg.init_tensor [20, 10, 3, 4]
@@ -581,7 +581,7 @@ func.func @topk_memref(%input_values: memref<4x10xf32>, %input_indices: memref<4
         }
   return
 }
-// CHECK-LABEL: func @topk_memref
+// CHECK-LABEL: func.func @topk_memref
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: memref<4x10xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: memref<4x10xi32>
 //  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9]+]]: memref<4x3xf32>
@@ -605,7 +605,7 @@ func.func @topk_dynamic_tensor(%input_values: tensor<?x?xf32>, %input_indices: t
         } -> tensor<?x?xf32>, tensor<?x?xi32>
   return %0#0, %0#1 : tensor<?x?xf32>, tensor<?x?xi32>
 }
-// CHECK-LABEL: func @topk_dynamic_tensor
+// CHECK-LABEL: func.func @topk_dynamic_tensor
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xi32>
 //  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?xf32>
@@ -619,7 +619,7 @@ func.func @topk_dynamic_tensor(%input_values: tensor<?x?xf32>, %input_indices: t
 
 // -----
 
-// CHECK-LABEL: func @static_tile
+// CHECK-LABEL: func.func @static_tile
 func.func @static_tile(%chunk_size: index, %in: tensor<?xf32>, %out: tensor<?xf32>, %out2: tensor<?xf32>) -> (tensor<?xf32>) {
   %c0 = arith.constant 0: index
   //%d0 = tensor.dim %out, %c0: tensor<?xf32>
@@ -649,7 +649,7 @@ func.func @static_tile(%chunk_size: index, %in: tensor<?xf32>, %out: tensor<?xf3
 
 // -----
 
-// CHECK-LABEL: func @simple_example
+// CHECK-LABEL: func.func @simple_example
 func.func @simple_example(%in: tensor<100xf32>, %out: tensor<100xf32>) -> (tensor<100xf32>) {
   %num_threads = arith.constant 100 : index
   %result = iree_linalg_ext.in_parallel %num_threads -> tensor<100xf32> {

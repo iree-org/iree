@@ -163,7 +163,7 @@ func.func @up_propagate_for() -> i32 {
   return %1 : i32
 }
 
-// CHECK-LABEL: func @up_propagate
+// CHECK-LABEL: func.func @up_propagate
 func.func @up_propagate() -> i32 {
   // CHECK-NEXT:  %c0_i32 = arith.constant 0 : i32
   %0 = arith.constant 0 : i32
@@ -194,7 +194,7 @@ func.func @up_propagate() -> i32 {
 
 /// The same test as above except that we are testing on a cfg embedded within
 /// an operation region.
-// CHECK-LABEL: func @up_propagate_region
+// CHECK-LABEL: func.func @up_propagate_region
 func.func @up_propagate_region() -> i32 {
   // CHECK-NEXT: %0 = "foo.region"
   %0 = "foo.region"() ({

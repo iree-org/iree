@@ -1,6 +1,6 @@
 // RUN: iree-dialects-opt --canonicalize --split-input-file %s | FileCheck %s
 
-// CHECK-LABEL: func @tensor.cast(
+// CHECK-LABEL: func.func @tensor.cast(
 func.func @tensor.cast(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
   %init = linalg.init_tensor [3, 5] : tensor<3x5xi32>
 
@@ -20,7 +20,7 @@ func.func @tensor.cast(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
   return %1: tensor<3x5xi32>
 }
 
-// CHECK-LABEL: func @canonicalize_insert_slice_indices(
+// CHECK-LABEL: func.func @canonicalize_insert_slice_indices(
 //  CHECK-SAME:     %[[arg0:.*]]: tensor<?x?xf32>, %[[arg1:.*]]: tensor<?x?xf32>,
 //  CHECK-SAME:     %[[idx:.*]]: index
 func.func @canonicalize_insert_slice_indices(

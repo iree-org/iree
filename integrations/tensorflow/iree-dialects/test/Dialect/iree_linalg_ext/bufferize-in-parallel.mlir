@@ -1,13 +1,13 @@
-// RUN: iree-dialects-opt %s --linalg-interp-transforms --canonicalize | FileCheck %s
+// RUN: iree-dialects-opt %s --linalg-transform-interp --canonicalize | FileCheck %s
 
-// CHECK-LABEL: func @parallel_insert_slice_no_conflict(
+// CHECK-LABEL: func.func @parallel_insert_slice_no_conflict(
 //  CHECK-SAME:     %[[idx:.*]]: index, %[[idx2:.*]]: index,
 //  CHECK-SAME:     %[[arg1:.*]]: memref<?xf32, #{{.*}}>,
 //  CHECK-SAME:     %[[arg2:.*]]: memref<?xf32, #{{.*}}>
 func.func @parallel_insert_slice_no_conflict(
     %idx: index, %idx2: index,
-    %arg1: tensor<?xf32> {bufferization.writable = true},
-    %arg2: tensor<?xf32> {bufferization.writable = true}) -> (tensor<?xf32>, f32)
+    %arg1: tensor<?xf32> {bufferization.writable=true},
+    %arg2: tensor<?xf32> {bufferization.writable=true}) -> (tensor<?xf32>, f32)
 {
   %cst = arith.constant 4.200000e+01 : f32
   %c0 = arith.constant 0 : index
@@ -35,18 +35,14 @@ func.func @parallel_insert_slice_no_conflict(
   return %2, %f : tensor<?xf32>, f32
 }
 
-// -----
-
-module {
-
-// CHECK-LABEL: func @parallel_insert_slice_with_conflict(
+// CHECK-LABEL: func.func @parallel_insert_slice_with_conflict(
 //  CHECK-SAME:     %[[idx:.*]]: index, %[[idx2:.*]]: index,
 //  CHECK-SAME:     %[[arg1:.*]]: memref<?xf32, #{{.*}}>,
 //  CHECK-SAME:     %[[arg2:.*]]: memref<?xf32, #{{.*}}>
 func.func @parallel_insert_slice_with_conflict(
     %idx: index, %idx2: index,
-    %arg1: tensor<?xf32> {bufferization.writable = true},
-    %arg2: tensor<?xf32> {bufferization.writable = true}) -> (f32, f32)
+    %arg1: tensor<?xf32> {bufferization.writable=true},
+    %arg2: tensor<?xf32> {bufferization.writable=true}) -> (f32, f32)
 {
   %cst = arith.constant 4.200000e+01 : f32
   %c0 = arith.constant 0 : index
@@ -90,14 +86,16 @@ func.func @parallel_insert_slice_with_conflict(
   return %f2, %f : f32, f32
 }
 
-pdl.pattern @pdl_target_2 : benefit(1) {
-  %0 = operation "func"
-  // TODO: we don't want this, but it is the required terminator for pdl.pattern
-  rewrite %0 with "iree_linalg_transform.apply"
-}
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  pdl.pattern @pdl_target_2 : benefit(1) {
+    %0 = operation "func"
+    // TODO: we don't want this, but it is the required terminator for pdl.pattern
+    rewrite %0 with "transform.dialect"
+  }
 
-iree_linalg_transform.sequence {
-  bufferize
-}
-
+  transform.structured.canonicalized_sequence %arg0 {
+  ^bb0(%arg1: !pdl.operation):
+    bufferize
+  }
 }
