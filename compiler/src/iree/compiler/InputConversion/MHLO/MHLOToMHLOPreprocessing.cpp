@@ -460,9 +460,11 @@ class TransposeReshapeGenericDotGeneral
     // Copy over unknown attributes as we currently rely on it to let user tune
     // lowering parameters.
     ArrayRef<StringRef> odsAttrs = op.getAttributeNames();
-    for (NamedAttribute kv : op->getAttrs())
-      if (!llvm::is_contained(odsAttrs, kv.getName().getValue()))
+    for (NamedAttribute kv : op->getAttrs()) {
+      if (!llvm::is_contained(odsAttrs, kv.getName().getValue())) {
         newOp->setAttr(kv.getName(), kv.getValue());
+      }
+    }
 
     Value result = newOp.getResult();
     if (needReshapeResult) {
