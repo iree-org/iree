@@ -27,8 +27,8 @@ using namespace mlir::iree_compiler::IREE::Input;
 static ParseResult parseSymbolVisibility(OpAsmParser &parser,
                                          StringAttr &symVisibilityAttr) {
   StringRef symVisibility;
-  parser.parseOptionalKeyword(&symVisibility, {"public", "private", "nested"});
-  if (!symVisibility.empty()) {
+  if (succeeded(parser.parseOptionalKeyword(&symVisibility,
+                                            {"public", "private", "nested"}))) {
     symVisibilityAttr = parser.getBuilder().getStringAttr(symVisibility);
   }
   return success();
