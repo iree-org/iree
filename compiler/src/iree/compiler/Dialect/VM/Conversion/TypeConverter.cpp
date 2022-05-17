@@ -50,22 +50,13 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
   });
 
   // Convert integer types.
-  addConversion([this](IntegerType integerType) -> Optional<Type> {
-    if (integerType.isInteger(32)) {
-      // i32 is always supported by the runtime.
+  addConversion([](IntegerType integerType) -> Optional<Type> {
+    if (integerType.isInteger(32) || integerType.isInteger(64)) {
+      // i32 and i64 are always supported by the runtime.
       return integerType;
     } else if (integerType.getIntOrFloatBitWidth() < 32) {
       // Promote i1/i8/i16 -> i32.
       return IntegerType::get(integerType.getContext(), 32);
-    } else if (integerType.isInteger(64)) {
-      if (targetOptions_.i64Extension) {
-        // i64 is supported by the VM, use directly.
-        return integerType;
-      } else if (targetOptions_.truncateUnsupportedIntegers) {
-        // i64 is not supported and we still want to compile, so truncate to i32
-        // (unsafe if all bits are actually required!).
-        return IntegerType::get(integerType.getContext(), 32);
-      }
     }
     return llvm::None;
   });

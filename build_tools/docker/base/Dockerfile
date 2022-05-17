@@ -57,12 +57,12 @@ WORKDIR /install-cmake
 # to get the /usr/share path.
 # See https://github.com/moby/moby/issues/41383
 ARG CMAKE_MAJOR_VERSION=3
-ARG CMAKE_MINOR_VERSION=17
-ARG CMAKE_PATCH_VERSION=5
+ARG CMAKE_MINOR_VERSION=21
+ARG CMAKE_PATCH_VERSION=6
 
 ENV CMAKE_VERSION="${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}.${CMAKE_PATCH_VERSION}"
 
-# Install CMake v3.13, which is ahead of apt-get's version (3.10.2).
+# Install our CMake version, which may be ahead of apt-get's version.
 RUN wget "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION?}/cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" \
     && chmod +x "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" \
     && "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" --skip-license --prefix=/usr/  \
@@ -102,7 +102,10 @@ RUN apt-get update \
     python3-pip \
     python3-setuptools \
     python3-distutils \
-  && python3 -m pip install --upgrade pip \
+    python3-venv \
+    python3.7-venv \
+  && python3 -m pip install --upgrade pip>=21.3 \
+  && python3 -m pip install --upgrade setuptools \
   && python3 -m pip install \
     numpy==1.19.4 absl-py==0.12.0 requests PyYAML==5.4.1 wheel==0.36.2 \
     pybind11==2.9.0

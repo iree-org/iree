@@ -51,8 +51,6 @@ def VM_Dialect : Dialect {
 // Mandatory:
 include "iree/compiler/Dialect/VM/IR/VMOpcodesCore.td"
 // Optional:
-include "iree/compiler/Dialect/VM/IR/VMOpcodesI64.td"
-// Optional:
 include "iree/compiler/Dialect/VM/IR/VMOpcodesF32.td"
 // Optional:
 include "iree/compiler/Dialect/VM/IR/VMOpcodesF64.td"
@@ -244,8 +242,6 @@ def VM_DebugOnly : NativeOpTrait<"IREE::VM::DebugOnly">;
 // that execution order before and after the barrier op remains the same.
 def VM_FullBarrier : NativeOpTrait<"IREE::VM::FullBarrier">;
 
-// Operations with this trait require the VM i64 extension.
-def VM_ExtI64 : NativeOpTrait<"IREE::VM::ExtI64">;
 // Operations with this trait require the VM f32 extension.
 def VM_ExtF32 : NativeOpTrait<"IREE::VM::ExtF32">;
 // Operations with this trait require the VM f64 extension.

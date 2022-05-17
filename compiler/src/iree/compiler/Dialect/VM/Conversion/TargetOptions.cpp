@@ -20,18 +20,11 @@ void TargetOptions::bindOptions(OptionsBinder &binder) {
   binder.opt<int>("iree-vm-target-index-bits", indexBits,
                   llvm::cl::desc("Bit width of index types."),
                   llvm::cl::cat(vmTargetOptionsCategory));
-  binder.opt<bool>("iree-vm-target-extension-i64", i64Extension,
-                   llvm::cl::desc("Support i64 target opcode extensions."),
-                   llvm::cl::cat(vmTargetOptionsCategory));
   binder.opt<bool>("iree-vm-target-extension-f32", f32Extension,
                    llvm::cl::desc("Support f32 target opcode extensions."),
                    llvm::cl::cat(vmTargetOptionsCategory));
   binder.opt<bool>("iree-vm-target-extension-f64", f64Extension,
                    llvm::cl::desc("Support f64 target opcode extensions."),
-                   llvm::cl::cat(vmTargetOptionsCategory));
-  binder.opt<bool>("iree-vm-target-truncate-unsupported-integers",
-                   truncateUnsupportedIntegers,
-                   llvm::cl::desc("Truncate i64 to i32 when unsupported."),
                    llvm::cl::cat(vmTargetOptionsCategory));
   binder.opt<bool>("iree-vm-target-truncate-unsupported-floats",
                    truncateUnsupportedFloats,

@@ -143,20 +143,19 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   }
 
   if (!testLoweringConfiguration && translationInfo.hasValue()) {
-    OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
     switch (translationInfo.getValue().getDispatchLoweringPassPipeline()) {
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute:
-        addGPUSimpleDistributePassPipeline(nestedModulePM);
+        addGPUSimpleDistributePassPipeline(executableLoweringPipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize:
-        addGPUVectorizationPassPipeline(nestedModulePM);
+        addGPUVectorizationPassPipeline(executableLoweringPipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
-        addGPUMatmulSimtPassPipeline(nestedModulePM);
+        addGPUMatmulSimtPassPipeline(executableLoweringPipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
         addGPUMatmulTensorCorePassPipeline(
-            nestedModulePM,
+            executableLoweringPipeline,
             translationInfo.getValue().getSoftwarePipelineDepth());
         break;
       default:

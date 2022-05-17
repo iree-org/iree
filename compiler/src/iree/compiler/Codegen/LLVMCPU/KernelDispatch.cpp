@@ -571,7 +571,10 @@ static LogicalResult setRootConfig(
   // TODO(dcaballe): Find better configurations for RISC-V backends.
   if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
     SmallVector<int64_t> tileSizes = {8, 32, 16};
-    if (disableMatmulPadPipeline) {
+    // There are hard-coded configurations in DoubleTilingPadExpert, so it only
+    // works for linalg.matmul cases. We can relax it once we have better
+    // scheduling, e.g., transform dialect.
+    if (disableMatmulPadPipeline || numLoops != 3) {
       return setMatmulNoPadRootConfig(entryPointFn, contractionOp,
                                       flowTileSizes, tileSizes, vectorSize);
     }

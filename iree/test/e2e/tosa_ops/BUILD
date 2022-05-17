@@ -126,12 +126,6 @@ iree_check_single_backend_test_suite(
     srcs = VMVX_SRCS,
     compiler_flags = [
         "--iree-input-type=tosa",
-        # tosa.apply_scale currently expands to i64 math, requiring this
-        # extension. Nothing else about the tests require it, though, and we
-        # really should not be emulating it with 64-bit math. Having this
-        # prevents any of these tests from being executed on a runtime compiled
-        # without the VM's I64 extension.
-        "-iree-vm-target-extension-i64",
     ],
     driver = "vmvx",
     target_backend = "vmvx",
