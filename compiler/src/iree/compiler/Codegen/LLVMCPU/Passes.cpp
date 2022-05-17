@@ -289,9 +289,9 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
     options.pad = true;
     options.anchorOpName = "linalg.matmul";
     options.hoistPaddings = SmallVector<int64_t>{2, 3, 0};
-    passManager.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
-    passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    passManager.addNestedPass<func::FuncOp>(createCSEPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
   // Fold dim(pad) away before vectorization.

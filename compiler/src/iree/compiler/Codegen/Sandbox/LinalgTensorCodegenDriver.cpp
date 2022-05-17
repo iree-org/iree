@@ -297,12 +297,8 @@ void LinalgFusePass::runOnOperation() {
       .vectorizeIf(vectorize, "", nullptr, vectorizePadding);
 
   // Created a nested OpPassManager and run.
-  // XXX(hanchung): Do not run LinalgStrategyEnablePass when padding is enabled.
-  // This aligns the Sandbox behavior. Otherwise, CSE and canonicalizer will
-  // mess up fold/nofold pad ops.
-  // Note that Sandbox uses dialect approach, so there are slight difference.
   OpPassManager dynamicPM(func::FuncOp::getOperationName());
-  strategy.configurePassPipeline(dynamicPM, funcOp.getContext(), !pad);
+  strategy.configurePassPipeline(dynamicPM, funcOp.getContext());
 
   if (failed(runPipeline(dynamicPM, funcOp))) {
     return signalPassFailure();
