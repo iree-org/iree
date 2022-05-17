@@ -125,6 +125,7 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRLinalg
+    MLIRLinalgStructuredOpsIncGenLib
     MLIRTensor
   PUBLIC
 )

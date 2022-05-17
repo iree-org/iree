@@ -200,6 +200,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgInterfaces",
         "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:LinalgStructuredOpsIncGen",
         "@llvm-project//mlir:TensorDialect",
     ],
 )
