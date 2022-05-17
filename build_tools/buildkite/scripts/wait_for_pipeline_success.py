@@ -67,6 +67,7 @@ def parse_args() -> argparse.Namespace:
   )
   parser.add_argument(
       "--output-build-json",
+      default="build.json",
       help="Output path of the build object in JSON, which contains the details"
       " of the successful build.")
   return parser.parse_args()
@@ -81,16 +82,14 @@ def main(args):
   build_number = get_build_number(build)
   url = bk.get_url_for_build(build_number)
   print(f"Waiting on {linkify(url)}")
-  state = bk.wait_for_build(build_number)
-  if state != buildkite.BuildState.PASSED:
+  build = bk.wait_for_build(build_number)
+  if get_build_state(build) != buildkite.BuildState.PASSED:
     print(f"Build was not successful: {linkify(url)}")
     sys.exit(1)
   print(f"Build completed successfully: {linkify(url)}")
 
-  if args.output_build_json:
-    build = bk.get_build_by_number(build_number)
-    with open(args.output_build_json, "w") as f:
-      json.dump(build, f)
+  with open(args.output_build_json, "w") as f:
+    json.dump(build, f)
 
 
 if __name__ == "__main__":

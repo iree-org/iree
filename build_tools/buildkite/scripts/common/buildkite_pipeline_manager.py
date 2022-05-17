@@ -8,9 +8,9 @@
 import os
 import time
 
-from typing import Iterable, List, Optional, Union
+from typing import List, Optional
 from pybuildkite import buildkite
-from common.buildkite_utils import ArtifactObject, BuildObject, get_build_number, get_build_state, linkify
+from common.buildkite_utils import BuildObject, get_build_number, get_build_state, linkify
 
 # Fake build to return when running locally.
 FAKE_PASSED_BUILD = dict(number=42, state="passed")
@@ -129,7 +129,7 @@ class BuildkitePipelineManager(object):
         pull_request_repository=self._pull_request_repository,
     )
 
-  def wait_for_build(self, build_number: int) -> buildkite.BuildState:
+  def wait_for_build(self, build_number: int) -> BuildObject:
     # We want to override the previous output when logging about waiting, so
     # this doesn't print a bunch of unhelpful log lines. Carriage return takes
     # us back to the beginning of the line, but it doesn't override previous
@@ -145,7 +145,6 @@ class BuildkitePipelineManager(object):
     while True:
       build = self.get_build_by_number(build_number)
       state = get_build_state(build)
-      wait_time = int(round(time.monotonic() - start))
       if state in [
           buildkite.BuildState.PASSED,
           buildkite.BuildState.FAILED,
@@ -156,8 +155,9 @@ class BuildkitePipelineManager(object):
         output_str = f"Build finished in state '{state.name}'"
         min_line_length = max(min_line_length, len(output_str))
         print(output_str.ljust(min_line_length))
-        return state
+        return build
 
+      wait_time = int(round(time.monotonic() - start))
       output_str = (
           f"Waiting for build {build_number} to complete. Waited {wait_time}"
           f" seconds. Currently in state '{state.name}':"
@@ -169,20 +169,3 @@ class BuildkitePipelineManager(object):
 
   def get_url_for_build(self, build_number: int) -> str:
     return f"https://buildkite.com/{self._organization}/{self._pipeline}/builds/{build_number}"
-
-  def list_artifacts_for_build(self, build_number: int) -> List[ArtifactObject]:
-    return self._buildkite.artifacts().list_artifacts_for_build(
-        self._organization, self._pipeline, build_number)
-
-  def download_artifact(
-      self,
-      build_number: int,
-      artifact,
-      as_stream: bool = False) -> Union[bytes, Iterable[bytes]]:
-    return self._buildkite.artifacts().download_artifact(
-        self._organization,
-        self._pipeline,
-        build_number,
-        job=artifact["job_id"],
-        artifact=artifact["id"],
-        as_stream=as_stream)

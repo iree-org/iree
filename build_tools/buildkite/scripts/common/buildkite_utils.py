@@ -10,8 +10,6 @@ from pybuildkite import buildkite
 
 # Type signature of Buildkite build object.
 BuildObject = Dict[str, Any]
-# Type signature of Buildkite artifact object.
-ArtifactObject = Dict[str, Any]
 
 
 def get_build_number(build: BuildObject) -> int:
