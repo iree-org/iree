@@ -6,9 +6,9 @@
 
 # Tests for common transforms.
 
-load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
-load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
     default_visibility = ["//visibility:public"],

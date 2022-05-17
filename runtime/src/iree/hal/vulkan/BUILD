@@ -6,7 +6,7 @@
 
 # HAL implementation using Vulkan and (likely) SPIR-V executables.
 
-load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],

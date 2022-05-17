@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
 load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
 # load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library")

@@ -6,7 +6,7 @@
 
 # Common types and utilities used in the IREE codebase.
 
-load("//iree:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
