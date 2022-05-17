@@ -8,16 +8,13 @@
 # following prefixes textually, so avoid doing any systematic construction that would break the
 # matching.
 #
-#  "@absl_py//absl/"
 #  "@bazel_skylib//"
 #  "@com_google_benchmark//"
 #  "@cpuinfo//"
-#  "@cuda//"
 #  "@com_github_dvidelabs_flatcc//"
 #  "@com_google_googletest//"
 #  "@llvm-project//"
 #  "@mlir-hlo//"
-#  "@iree_pybind11//"
 #  "@spirv_cross//"
 #  "@vulkan_headers//"
 #  "@com_github_yaml_libyaml//"

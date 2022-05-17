@@ -163,7 +163,7 @@ iree_runtime_cc_library(
     srcs = ["logging.cc"],
     hdrs = ["logging.h"],
     linkopts = select({
-        "//iree:iree_is_android": [
+        "//build_tools/bazel:iree_is_android": [
             "-llog",
         ],
         "//conditions:default": [],
