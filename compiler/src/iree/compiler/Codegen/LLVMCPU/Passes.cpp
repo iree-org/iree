@@ -112,12 +112,17 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
   }
 
   // Verify that the translation info is using the right pipeline.
-  auto pipeline =
-      IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
-  StringRef pipelineName = stringifyEnum(pipeline);
-  if (translationInfo.getDispatchLoweringPassPipeline() != pipeline) {
+  if (translationInfo.getDispatchLoweringPassPipeline() !=
+          IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert &&
+      translationInfo.getDispatchLoweringPassPipeline() !=
+          IREE::Codegen::DispatchLoweringPassPipeline::
+              CPUDoubleTilingPadExpert) {
     return op->emitOpError("expected pipeline in translation_info to be ")
-           << pipelineName;
+           << stringifyEnum(IREE::Codegen::DispatchLoweringPassPipeline::
+                                CPUDoubleTilingExpert)
+           << " or "
+           << stringifyEnum(IREE::Codegen::DispatchLoweringPassPipeline::
+                                CPUDoubleTilingPadExpert);
   }
 
   // Verify that the workload per workgroup is not set.
@@ -133,8 +138,8 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
 
   if (loweringConfig.getTileSizes().size() !=
       static_cast<unsigned>(StrategyTilingLevel::NumStrategyTileLevels)) {
-    return op->emitOpError("expected three tiling sizes for ")
-           << pipelineName << ", got " << loweringConfig.getTileSizes().size();
+    return op->emitOpError("expected three tiling sizes, got ")
+           << loweringConfig.getTileSizes().size();
   }
 
   IREE::Flow::PartitionableLoopsInterface interfaceOp =

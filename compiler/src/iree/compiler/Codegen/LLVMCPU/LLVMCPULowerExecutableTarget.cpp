@@ -178,6 +178,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       LogicalResult verificationStatus = success();
       switch (translationInfo.getValue().getDispatchLoweringPassPipeline()) {
         case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert:
+        case IREE::Codegen::DispatchLoweringPassPipeline::
+            CPUDoubleTilingPadExpert:
           verificationStatus = verifyLoweringConfiguration(
               moduleOp, translationInfo.getValue(),
               verifyDoubleTilingExpertPassPipelineConfig);
