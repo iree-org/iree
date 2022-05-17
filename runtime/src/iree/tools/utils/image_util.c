@@ -56,10 +56,10 @@ iree_status_t iree_tools_utils_load_pixel_data_impl(
     case 2: {  // Assume tensor <height x width>
       if (img_dims[2] != 1 || (shape[0] != img_dims[1]) ||
           (shape[1] != img_dims[0])) {
-        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                "image size: %dx%dx%d, expected: %dx%d",
-                                img_dims[0], img_dims[1], img_dims[2], shape[1],
-                                shape[0]);
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "image size: %dx%dx%d, expected: %" PRIdim "x%" PRIdim, img_dims[0],
+            img_dims[1], img_dims[2], shape[1], shape[0]);
       }
       break;
     }
@@ -67,7 +67,8 @@ iree_status_t iree_tools_utils_load_pixel_data_impl(
       if (shape[0] != img_dims[1] || shape[1] != img_dims[0] ||
           shape[2] != img_dims[2]) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                "image size: %dx%dx%d, expected: %dx%dx%d",
+                                "image size: %dx%dx%d, expected: %" PRIdim
+                                "x%" PRIdim "x%" PRIdim,
                                 img_dims[0], img_dims[1], img_dims[2], shape[1],
                                 shape[0], shape[2]);
       }
@@ -77,7 +78,8 @@ iree_status_t iree_tools_utils_load_pixel_data_impl(
       if (shape[1] != img_dims[1] || shape[2] != img_dims[0] ||
           shape[3] != img_dims[2]) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                "image size: %dx%dx%d, expected: %dx%dx%d",
+                                "image size: %dx%dx%d, expected: %" PRIdim
+                                "x%" PRIdim "x%" PRIdim,
                                 img_dims[0], img_dims[1], img_dims[2], shape[2],
                                 shape[1], shape[3]);
       }

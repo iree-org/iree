@@ -81,8 +81,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_offset(
   for (iree_host_size_t i = 0; i < indices_count; ++i) {
     if (IREE_UNLIKELY(indices[i] >= shape[i])) {
       return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                              "index[%zu] out of bounds: %d >= %d", i,
-                              indices[i], shape[i]);
+                              "index[%zu] out of bounds: %" PRIdim
+                              " >= %" PRIdim,
+                              i, indices[i], shape[i]);
     }
     iree_device_size_t axis_offset = indices[i];
     for (iree_host_size_t j = i + 1; j < shape_rank; ++j) {

@@ -46,18 +46,27 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_shape(
   iree_string_view_t rhs = value;
   while (iree_string_view_split(rhs, 'x', &lhs, &rhs) &&
          !iree_string_view_is_empty(lhs)) {
-    int32_t dim_value = 0;
-    if (!iree_string_view_atoi_int32(lhs, &dim_value)) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "shape[%zu] invalid value '%.*s' of '%.*s'",
-                              dim_index, (int)lhs.size, lhs.data,
-                              (int)value.size, value.data);
-    }
-    if (dim_value < 0) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "shape[%zu] unsupported value %d of '%.*s'",
-                              dim_index, dim_value, (int)value.size,
-                              value.data);
+    iree_hal_dim_t dim_value = 0;
+    if (sizeof(iree_hal_dim_t) == 32) {
+      int32_t parsed_value = 0;
+      if (!iree_string_view_atoi_int32(lhs, &parsed_value) ||
+          parsed_value < 0) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "shape[%zu] invalid value '%.*s' of '%.*s'",
+                                dim_index, (int)lhs.size, lhs.data,
+                                (int)value.size, value.data);
+      }
+      dim_value = parsed_value;
+    } else {
+      int64_t parsed_value = 0;
+      if (!iree_string_view_atoi_int64(lhs, &parsed_value) ||
+          parsed_value < 0) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "shape[%zu] invalid value '%.*s' of '%.*s'",
+                                dim_index, (int)lhs.size, lhs.data,
+                                (int)value.size, value.data);
+      }
+      dim_value = parsed_value;
     }
     out_shape[dim_index++] = dim_value;
   }
@@ -78,9 +87,10 @@ iree_hal_format_shape(const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
   }
   iree_host_size_t buffer_length = 0;
   for (iree_host_size_t i = 0; i < shape_rank; ++i) {
-    int n = snprintf(buffer ? buffer + buffer_length : NULL,
-                     buffer ? buffer_capacity - buffer_length : 0,
-                     (i < shape_rank - 1) ? "%dx" : "%d", shape[i]);
+    int n =
+        snprintf(buffer ? buffer + buffer_length : NULL,
+                 buffer ? buffer_capacity - buffer_length : 0,
+                 (i < shape_rank - 1) ? "%" PRIdim "x" : "%" PRIdim, shape[i]);
     if (IREE_UNLIKELY(n < 0)) {
       return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                               "snprintf failed to write dimension %zu", i);

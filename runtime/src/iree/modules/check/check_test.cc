@@ -73,10 +73,10 @@ class CheckTest : public ::testing::Test {
   }
 
   void CreateInt32BufferView(iree::span<const int32_t> contents,
-                             iree::span<const int32_t> shape,
+                             iree::span<const iree_hal_dim_t> shape,
                              iree_hal_buffer_view_t** out_buffer_view) {
-    size_t num_elements = 1;
-    for (int32_t dim : shape) {
+    iree_hal_dim_t num_elements = 1;
+    for (iree_hal_dim_t dim : shape) {
       num_elements *= dim;
     }
     ASSERT_EQ(contents.size(), num_elements);
@@ -95,10 +95,10 @@ class CheckTest : public ::testing::Test {
   }
 
   void CreateFloat16BufferView(iree::span<const uint16_t> contents,
-                               iree::span<const int32_t> shape,
+                               iree::span<const iree_hal_dim_t> shape,
                                iree_hal_buffer_view_t** out_buffer_view) {
-    size_t num_elements = 1;
-    for (int32_t dim : shape) {
+    iree_hal_dim_t num_elements = 1;
+    for (iree_hal_dim_t dim : shape) {
       num_elements *= dim;
     }
     ASSERT_EQ(contents.size(), num_elements);
@@ -117,10 +117,10 @@ class CheckTest : public ::testing::Test {
   }
 
   void CreateFloat32BufferView(iree::span<const float> contents,
-                               iree::span<const int32_t> shape,
+                               iree::span<const iree_hal_dim_t> shape,
                                iree_hal_buffer_view_t** out_buffer_view) {
-    size_t num_elements = 1;
-    for (int32_t dim : shape) {
+    iree_hal_dim_t num_elements = 1;
+    for (iree_hal_dim_t dim : shape) {
       num_elements *= dim;
     }
     ASSERT_EQ(contents.size(), num_elements);
@@ -139,10 +139,10 @@ class CheckTest : public ::testing::Test {
   }
 
   void CreateFloat64BufferView(iree::span<const double> contents,
-                               iree::span<const int32_t> shape,
+                               iree::span<const iree_hal_dim_t> shape,
                                iree_hal_buffer_view_t** out_buffer_view) {
-    size_t num_elements = 1;
-    for (int32_t dim : shape) {
+    iree_hal_dim_t num_elements = 1;
+    for (iree_hal_dim_t dim : shape) {
       num_elements *= dim;
     }
     ASSERT_EQ(contents.size(), num_elements);
@@ -239,7 +239,7 @@ TEST_F(CheckTest, ExpectFalseNotOneFailure) {
 TEST_F(CheckTest, ExpectAllTrueSuccess) {
   vm::ref<iree_hal_buffer_view_t> input_buffer_view;
   int32_t contents[] = {1};
-  int32_t shape[] = {1};
+  iree_hal_dim_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
   IREE_ASSERT_OK(Invoke("expect_all_true", {input_buffer_view}));
@@ -248,7 +248,7 @@ TEST_F(CheckTest, ExpectAllTrueSuccess) {
 TEST_F(CheckTest, ExpectAllTrue3DTrueSuccess) {
   vm::ref<iree_hal_buffer_view_t> input_buffer_view;
   int32_t contents[] = {1, 2, 3, 4, 5, 6, 7, 8};
-  int32_t shape[] = {2, 2, 2};
+  iree_hal_dim_t shape[] = {2, 2, 2};
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
   IREE_ASSERT_OK(Invoke("expect_all_true", {input_buffer_view}));
@@ -257,7 +257,7 @@ TEST_F(CheckTest, ExpectAllTrue3DTrueSuccess) {
 TEST_F(CheckTest, ExpectAllTrueFailure) {
   vm::ref<iree_hal_buffer_view_t> input_buffer_view;
   int32_t contents[] = {0};
-  int32_t shape[] = {1};
+  iree_hal_dim_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
   EXPECT_NONFATAL_FAILURE(
@@ -267,7 +267,7 @@ TEST_F(CheckTest, ExpectAllTrueFailure) {
 TEST_F(CheckTest, ExpectAllTrueSingleElementFailure) {
   vm::ref<iree_hal_buffer_view_t> input_buffer_view;
   int32_t contents[] = {1, 2, 3, 0, 4};
-  int32_t shape[] = {5};
+  iree_hal_dim_t shape[] = {5};
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
   EXPECT_NONFATAL_FAILURE(
@@ -278,7 +278,7 @@ TEST_F(CheckTest, ExpectAllTrueSingleElementFailure) {
 TEST_F(CheckTest, ExpectAllTrue3DSingleElementFailure) {
   vm::ref<iree_hal_buffer_view_t> input_buffer_view;
   int32_t contents[] = {1, 2, 3, 4, 5, 6, 0, 8};
-  int32_t shape[] = {2, 2, 2};
+  iree_hal_dim_t shape[] = {2, 2, 2};
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
   EXPECT_NONFATAL_FAILURE(
@@ -289,7 +289,7 @@ TEST_F(CheckTest, ExpectAllTrue3DSingleElementFailure) {
 TEST_F(CheckTest, ExpectEqSameBufferSuccess) {
   vm::ref<iree_hal_buffer_view_t> input_buffer_view;
   int32_t contents[] = {1};
-  int32_t shape[] = {1};
+  iree_hal_dim_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
   IREE_ASSERT_OK(Invoke("expect_eq", {input_buffer_view, input_buffer_view}));
@@ -299,7 +299,7 @@ TEST_F(CheckTest, ExpectEqIdenticalBufferSuccess) {
   vm::ref<iree_hal_buffer_view_t> lhs;
   vm::ref<iree_hal_buffer_view_t> rhs;
   int32_t contents[] = {1};
-  int32_t shape[] = {1};
+  iree_hal_dim_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_eq", {lhs, rhs}));
@@ -309,7 +309,7 @@ TEST_F(CheckTest, ExpectEqIdentical3DBufferSuccess) {
   vm::ref<iree_hal_buffer_view_t> lhs;
   vm::ref<iree_hal_buffer_view_t> rhs;
   int32_t contents[] = {1, 2, 3, 4, 5, 6, 7, 8};
-  int32_t shape[] = {2, 2, 2};
+  iree_hal_dim_t shape[] = {2, 2, 2};
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_eq", {lhs, rhs}));
@@ -319,8 +319,8 @@ TEST_F(CheckTest, ExpectEqDifferentShapeFailure) {
   vm::ref<iree_hal_buffer_view_t> lhs;
   vm::ref<iree_hal_buffer_view_t> rhs;
   int32_t contents[] = {1, 2, 3, 4};
-  int32_t lhs_shape[] = {2, 2};
-  int32_t rhs_shape[] = {4};
+  iree_hal_dim_t lhs_shape[] = {2, 2};
+  iree_hal_dim_t rhs_shape[] = {4};
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, lhs_shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, rhs_shape, &rhs));
   EXPECT_NONFATAL_FAILURE(IREE_ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
@@ -332,7 +332,7 @@ TEST_F(CheckTest, ExpectEqDifferentElementTypeFailure) {
   vm::ref<iree_hal_buffer_view_t> rhs;
   int32_t lhs_contents[] = {1, 2, 3, 4};
   float rhs_contents[] = {1, 2, 3, 4};
-  int32_t shape[] = {2, 2};
+  iree_hal_dim_t shape[] = {2, 2};
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));
   EXPECT_NONFATAL_FAILURE(IREE_ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
@@ -344,7 +344,7 @@ TEST_F(CheckTest, ExpectEqDifferentContentsFailure) {
   vm::ref<iree_hal_buffer_view_t> rhs;
   int32_t lhs_contents[] = {1};
   int32_t rhs_contents[] = {2};
-  int32_t shape[] = {1};
+  iree_hal_dim_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(rhs_contents, shape, &rhs));
   EXPECT_NONFATAL_FAILURE(IREE_ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
@@ -356,8 +356,8 @@ TEST_F(CheckTest, ExpectEqDifferentEverythingFullMessageFailure) {
   vm::ref<iree_hal_buffer_view_t> rhs;
   int32_t lhs_contents[] = {1, 2, 3, 4, 5, 6};
   float rhs_contents[] = {1, 2, 3, 42};
-  int32_t lhs_shape[] = {2, 3};
-  int32_t rhs_shape[] = {2, 2};
+  iree_hal_dim_t lhs_shape[] = {2, 3};
+  iree_hal_dim_t rhs_shape[] = {2, 2};
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(lhs_contents, lhs_shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(
       CreateFloat32BufferView(rhs_contents, rhs_shape, &rhs));
@@ -376,7 +376,7 @@ TEST_F(CheckTest, ExpectEqDifferentContents3DFullMessageFailure) {
   vm::ref<iree_hal_buffer_view_t> rhs;
   int32_t lhs_contents[] = {1, 2, 3, 4, 5, 6, 7, 8};
   int32_t rhs_contents[] = {1, 2, 3, 42, 5, 6, 7, 8};
-  int32_t shape[] = {2, 2, 2};
+  iree_hal_dim_t shape[] = {2, 2, 2};
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(rhs_contents, shape, &rhs));
   EXPECT_NONFATAL_FAILURE(
@@ -391,7 +391,7 @@ TEST_F(CheckTest, ExpectEqDifferentContents3DFullMessageFailure) {
 TEST_F(CheckTest, ExpectAlmostEqSameBufferSuccess) {
   vm::ref<iree_hal_buffer_view_t> input_buffer_view;
   float contents[] = {1};
-  int32_t shape[] = {1};
+  iree_hal_dim_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(
       CreateFloat32BufferView(contents, shape, &input_buffer_view));
   IREE_ASSERT_OK(
@@ -402,7 +402,7 @@ TEST_F(CheckTest, ExpectAlmostEqIdenticalBufferSuccess) {
   vm::ref<iree_hal_buffer_view_t> lhs;
   vm::ref<iree_hal_buffer_view_t> rhs;
   float contents[] = {1};
-  int32_t shape[] = {1};
+  iree_hal_dim_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs}));
@@ -413,7 +413,7 @@ TEST_F(CheckTest, ExpectAlmostEqNearIdenticalBufferSuccess) {
   vm::ref<iree_hal_buffer_view_t> rhs;
   float lhs_contents[] = {1.0f, 1.99999f, 0.00001f, 4.0f};
   float rhs_contents[] = {1.00001f, 2.0f, 0.0f, 4.0f};
-  int32_t shape[] = {4};
+  iree_hal_dim_t shape[] = {4};
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs}));
@@ -423,7 +423,7 @@ TEST_F(CheckTest, ExpectAlmostEqIdentical3DBufferSuccess) {
   vm::ref<iree_hal_buffer_view_t> lhs;
   vm::ref<iree_hal_buffer_view_t> rhs;
   float contents[] = {1, 2, 3, 4, 5, 6, 7, 8};
-  int32_t shape[] = {2, 2, 2};
+  iree_hal_dim_t shape[] = {2, 2, 2};
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs}));
@@ -433,8 +433,8 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentShapeFailure) {
   vm::ref<iree_hal_buffer_view_t> lhs;
   vm::ref<iree_hal_buffer_view_t> rhs;
   float contents[] = {1, 2, 3, 4};
-  int32_t lhs_shape[] = {2, 2};
-  int32_t rhs_shape[] = {4};
+  iree_hal_dim_t lhs_shape[] = {2, 2};
+  iree_hal_dim_t rhs_shape[] = {4};
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, lhs_shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, rhs_shape, &rhs));
   EXPECT_NONFATAL_FAILURE(
@@ -447,8 +447,8 @@ TEST_F(CheckTest, ExpectAlmostEqSmallerLhsElementCountFailure) {
   vm::ref<iree_hal_buffer_view_t> bigger;
   float smaller_contents[] = {1, 2};
   float bigger_contents[] = {1, 2, 3, 4};
-  int32_t smaller_shape[] = {2};
-  int32_t bigger_shape[] = {4};
+  iree_hal_dim_t smaller_shape[] = {2};
+  iree_hal_dim_t bigger_shape[] = {4};
   ASSERT_NO_FATAL_FAILURE(
       CreateFloat32BufferView(smaller_contents, smaller_shape, &smaller));
   ASSERT_NO_FATAL_FAILURE(
@@ -463,8 +463,8 @@ TEST_F(CheckTest, ExpectAlmostEqSmallerRhsElementCountFailure) {
   vm::ref<iree_hal_buffer_view_t> bigger;
   float smaller_contents[] = {1, 2};
   float bigger_contents[] = {1, 2, 3, 4};
-  int32_t smaller_shape[] = {2};
-  int32_t bigger_shape[] = {4};
+  iree_hal_dim_t smaller_shape[] = {2};
+  iree_hal_dim_t bigger_shape[] = {4};
   ASSERT_NO_FATAL_FAILURE(
       CreateFloat32BufferView(smaller_contents, smaller_shape, &smaller));
   ASSERT_NO_FATAL_FAILURE(
@@ -479,7 +479,7 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentElementTypeFailure) {
   vm::ref<iree_hal_buffer_view_t> rhs;
   double lhs_contents[] = {1, 2, 3, 4};
   float rhs_contents[] = {1, 2, 3, 4};
-  int32_t shape[] = {2, 2};
+  iree_hal_dim_t shape[] = {2, 2};
   ASSERT_NO_FATAL_FAILURE(CreateFloat64BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));
   EXPECT_NONFATAL_FAILURE(
@@ -492,7 +492,7 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentContentsFailure) {
   vm::ref<iree_hal_buffer_view_t> rhs;
   float lhs_contents[] = {1};
   float rhs_contents[] = {2};
-  int32_t shape[] = {1};
+  iree_hal_dim_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));
   EXPECT_NONFATAL_FAILURE(
@@ -505,8 +505,8 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentEverythingFullMessageFailure) {
   vm::ref<iree_hal_buffer_view_t> rhs;
   double lhs_contents[] = {1, 2, 3, 4, 5, 6};
   float rhs_contents[] = {1, 2, 3, 42};
-  int32_t lhs_shape[] = {2, 3};
-  int32_t rhs_shape[] = {2, 2};
+  iree_hal_dim_t lhs_shape[] = {2, 3};
+  iree_hal_dim_t rhs_shape[] = {2, 2};
   ASSERT_NO_FATAL_FAILURE(
       CreateFloat64BufferView(lhs_contents, lhs_shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(
@@ -528,7 +528,7 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentContents3DFullMessageFailure) {
   vm::ref<iree_hal_buffer_view_t> rhs;
   float lhs_contents[] = {1, 2, 3, 4, 5, 6, 7, 8};
   float rhs_contents[] = {1, 2, 3, 42, 5, 6, 7, 8};
-  int32_t shape[] = {2, 2, 2};
+  iree_hal_dim_t shape[] = {2, 2, 2};
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));
   EXPECT_NONFATAL_FAILURE(
@@ -544,7 +544,7 @@ TEST_F(CheckTest, ExpectAlmostEqIdenticalBufferF16Success) {
   vm::ref<iree_hal_buffer_view_t> lhs;
   vm::ref<iree_hal_buffer_view_t> rhs;
   uint16_t contents[] = {iree_math_f32_to_f16(1.f)};
-  int32_t shape[] = {1};
+  iree_hal_dim_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs}));
@@ -559,7 +559,7 @@ TEST_F(CheckTest, ExpectAlmostEqNearIdenticalBufferF16Success) {
   uint16_t rhs_contents[] = {
       iree_math_f32_to_f16(1.00001f), iree_math_f32_to_f16(2.0f),
       iree_math_f32_to_f16(0.0f), iree_math_f32_to_f16(4.0f)};
-  int32_t shape[] = {4};
+  iree_hal_dim_t shape[] = {4};
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(rhs_contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs}));
@@ -570,7 +570,7 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentContentsF16Failure) {
   vm::ref<iree_hal_buffer_view_t> rhs;
   uint16_t lhs_contents[] = {iree_math_f32_to_f16(1.f)};
   uint16_t rhs_contents[] = {iree_math_f32_to_f16(2.f)};
-  int32_t shape[] = {1};
+  iree_hal_dim_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(rhs_contents, shape, &rhs));
   EXPECT_NONFATAL_FAILURE(

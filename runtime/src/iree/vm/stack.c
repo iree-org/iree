@@ -320,10 +320,10 @@ static iree_status_t iree_vm_stack_grow(iree_vm_stack_t* stack,
     new_capacity *= IREE_VM_STACK_GROWTH_FACTOR;
   } while (new_capacity < minimum_capacity);
   if (new_capacity > IREE_VM_STACK_MAX_SIZE) {
-    return iree_make_status(
-        IREE_STATUS_RESOURCE_EXHAUSTED,
-        "new stack size would exceed maximum size: %zu > %d", new_capacity,
-        IREE_VM_STACK_MAX_SIZE);
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "new stack size would exceed maximum size: %" PRIhsz
+                            " > %d",
+                            new_capacity, IREE_VM_STACK_MAX_SIZE);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);

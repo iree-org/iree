@@ -64,8 +64,9 @@ func.func @messageToTensorReturnDim(%arg0 : !custom.message) -> index {
   // CHECK: %[[VIEW:.+]] = vm.call @custom.message_to_buffer(%arg0) {nosideeffects} : (!vm.ref<!custom.message>) -> !vm.ref<!hal.buffer_view>
   // CHECK: %{{.+}} = vm.const.i32.zero
   // CHECK: %[[ZERO:.+]] = vm.const.i32.zero
-  // CHECK: %[[DIM:.+]] = vm.call @hal.buffer_view.dim(%[[VIEW]], %[[ZERO]])
-  // CHECK: vm.return %[[DIM]]
+  // CHECK: %[[DIM64:.+]] = vm.call @hal.buffer_view.dim(%[[VIEW]], %[[ZERO]])
+  // CHECK: %[[DIM32:.+]] = vm.trunc.i64.i32 %[[DIM64]]
+  // CHECK: vm.return %[[DIM32]]
   return %1 : index
 }
 

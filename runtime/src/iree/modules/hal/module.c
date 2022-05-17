@@ -312,7 +312,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_map_byte_buffer,  //
       offset + length > buffer_length) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "byte range out of bounds (requested %" PRIdsz
-                            "-%" PRIdsz " of available %zu)",
+                            "-%" PRIdsz " of available %" PRIhsz ")",
                             offset, (offset + length - 1), buffer_length);
   }
 
@@ -396,7 +396,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_wrap_byte_buffer,  //
       offset + length > buffer_length) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "byte range out of bounds (requested %" PRIdsz
-                            "-%" PRIdsz " of available %zu)",
+                            "-%" PRIdsz " of available %" PRIhsz ")",
                             offset, (offset + length - 1), buffer_length);
   }
 
@@ -527,7 +527,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_subspan,  //
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_subspan(source_buffer, source_offset, length,
                               &subspan_buffer),
-      "invalid subspan of an existing buffer (source_offset=%d, length=%d)",
+      "invalid subspan of an existing buffer (source_offset=%" PRIdsz
+      ", length=%" PRIdsz ")",
       source_offset, length);
   rets->r0 = iree_hal_buffer_move_ref(subspan_buffer);
   return iree_ok_status();
@@ -578,11 +579,11 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_store,  //
                             "store length byte count %d exceeds max", length);
   } else if (target_offset + length >
              iree_hal_buffer_byte_length(target_buffer)) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "store out of bounds (target_offset=%d, length=%d into max %" PRIdsz
-        ")",
-        target_offset, length, iree_hal_buffer_byte_length(target_buffer));
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "store out of bounds (target_offset=%" PRIdsz
+                            ", length=%d into max %" PRIdsz ")",
+                            target_offset, length,
+                            iree_hal_buffer_byte_length(target_buffer));
   }
 
   return iree_hal_device_transfer_h2d(
@@ -721,21 +722,22 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_assert,  //
       iree_hal_buffer_view_shape_dims(buffer_view);
   iree_status_t shape_status = iree_ok_status();
   if (actual_shape_rank != expected_shape_rank) {
-    shape_status =
-        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                         "%.*s shape rank mismatch; expected %zu but have %zu",
-                         (int)message_str.size, message_str.data,
-                         expected_shape_rank, actual_shape_rank);
+    shape_status = iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "%.*s shape rank mismatch; expected %" PRIhsz " but have %" PRIhsz,
+        (int)message_str.size, message_str.data, expected_shape_rank,
+        actual_shape_rank);
   }
   if (iree_status_is_ok(shape_status)) {
     for (iree_host_size_t i = 0; i < actual_shape_rank; ++i) {
       if (actual_shape_dims[i] == expected_shape_dims[i]) continue;
       // Dimension mismatch.
-      shape_status = iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "%.*s shape dimension %zu mismatch; expected %d but have %d",
-          (int)message_str.size, message_str.data, i, expected_shape_dims[i],
-          actual_shape_dims[i]);
+      shape_status =
+          iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                           "%.*s shape dimension %" PRIhsz
+                           " mismatch; expected %" PRIdim " but have %" PRIdim,
+                           (int)message_str.size, message_str.data, i,
+                           expected_shape_dims[i], actual_shape_dims[i]);
       break;
     }
   }
@@ -1033,9 +1035,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_push_descriptor_set,  //
   iree_host_size_t binding_count = args->a3_count;
   if (IREE_UNLIKELY(binding_count >
                     IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT)) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "binding count %zu > %zu",
-                            binding_count,
-                            IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT);
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE, "binding count %" PRIhsz " > %" PRIhsz,
+        binding_count, IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT);
   }
   iree_hal_descriptor_set_binding_t* bindings =
       (iree_hal_descriptor_set_binding_t*)iree_alloca(
@@ -1126,9 +1128,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_create,  //
   iree_host_size_t binding_count = args->a2_count;
   if (IREE_UNLIKELY(binding_count >
                     IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT)) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "binding count %zu > %zu",
-                            binding_count,
-                            IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT);
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE, "binding count %" PRIhsz " > %" PRIhsz,
+        binding_count, IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT);
   }
   iree_hal_descriptor_set_binding_t* bindings =
       (iree_hal_descriptor_set_binding_t*)iree_alloca(
@@ -1163,9 +1165,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_layout_create,  //
   iree_host_size_t binding_count = args->a2_count;
   if (IREE_UNLIKELY(binding_count >
                     IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT)) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "binding count %zu > %zu",
-                            binding_count,
-                            IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT);
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE, "binding count %" PRIhsz " > %" PRIhsz,
+        binding_count, IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT);
   }
   iree_hal_descriptor_set_layout_binding_t* bindings =
       (iree_hal_descriptor_set_layout_binding_t*)iree_alloca(
