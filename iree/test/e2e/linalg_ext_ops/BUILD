@@ -20,6 +20,7 @@ iree_check_single_backend_test_suite(
         [
             "reverse.mlir",
             "scan.mlir",
+            "sort.mlir",
             "top-k.mlir",
         ],
         include = ["*.mlir"],
@@ -43,6 +44,7 @@ iree_check_single_backend_test_suite(
         [
             "reverse.mlir",
             "scan.mlir",
+            "sort.mlir",
             "top-k.mlir",
         ],
         include = ["*.mlir"],
@@ -58,6 +60,7 @@ iree_check_single_backend_test_suite(
         [
             "reverse.mlir",
             "scan.mlir",
+            "sort.mlir",
             "top-k.mlir",
         ],
         include = ["*.mlir"],
@@ -74,6 +77,7 @@ iree_check_single_backend_test_suite(
             "reverse.mlir",
             # Top-k test disabled due to miscompile on vulkan.
             #    "top-k.mlir",
+            "sort.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
@@ -90,6 +94,7 @@ iree_check_single_backend_test_suite(
 test_suite(
     name = "check",
     tests = [
+        ":check_cuda",
         ":check_dylib-llvm-aot_dylib",
         ":check_vmvx_vmvx",
         ":check_vulkan-spirv_vulkan",
