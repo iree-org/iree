@@ -12,6 +12,7 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
 #define IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
 
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -27,10 +28,12 @@ namespace iree_compiler {
 /// `hal.executable.entry_point` op for this operation. The method takes a
 /// callback function, which computes the workgroup count (x,y,z) given the
 /// workload along (x,y,z).
+/// Returns a new `hal.executable.entry_point` op. MLIR semantics requires
+/// creation of new ops when a region is added.
 using WorkgroupCountRegionBuilder = std::function<std::array<Value, 3>(
     OpBuilder &b, Location loc, Value device, std::array<Value, 3> workload)>;
-LogicalResult defineWorkgroupCountRegion(
-    OpBuilder &builder, func::FuncOp funcOp,
+FailureOr<IREE::HAL::ExecutableEntryPointOp> defineWorkgroupCountRegion(
+    OpBuilder &builder, IREE::HAL::ExecutableEntryPointOp entryPointOp,
     WorkgroupCountRegionBuilder regionBuilder);
 
 /// Insert patterns to perform folding of AffineMinOp by matching the pattern
