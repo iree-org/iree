@@ -44,6 +44,20 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+static std::string translateModuleToObj(llvm::Module &module,
+                                        llvm::TargetMachine &targetMachine) {
+  std::string targetObj;
+  {
+    llvm::raw_string_ostream stream(targetObj);
+    llvm::buffer_ostream pstream(stream);
+    llvm::legacy::PassManager codegenPasses;
+    targetMachine.addPassesToEmitFile(codegenPasses, pstream, nullptr,
+                                      llvm::CGFT_ObjectFile);
+    codegenPasses.run(module);
+  }
+  return targetObj;
+}
+
 static std::string translateModuleToISA(llvm::Module &module,
                                         llvm::TargetMachine &targetMachine) {
   std::string targetISA;
@@ -52,12 +66,11 @@ static std::string translateModuleToISA(llvm::Module &module,
     llvm::buffer_ostream pstream(stream);
     llvm::legacy::PassManager codegenPasses;
     targetMachine.addPassesToEmitFile(codegenPasses, pstream, nullptr,
-                                      llvm::CGFT_ObjectFile);
+                                      llvm::CGFT_AssemblyFile);
     codegenPasses.run(module);
   }
   return targetISA;
 }
-
 class ROCMTargetBackend final : public TargetBackend {
  public:
   std::string name() const override { return "rocm"; }
@@ -177,8 +190,8 @@ class ROCMTargetBackend final : public TargetBackend {
 
     // Serialize hsaco kernel into the binary that we will embed in the
     // final flatbuffer.
-    std::string targetISA = translateModuleToISA(*llvmModule, *targetMachine);
-    std::string targetHSACO = createHsaco(targetISA, libraryName);
+    std::string targetObj = translateModuleToObj(*llvmModule, *targetMachine);
+    std::string targetHSACO = createHsaco(targetObj, libraryName);
     if (!options.dumpBinariesPath.empty()) {
       dumpDataToPath(options.dumpBinariesPath, options.dumpBaseName,
                      variantOp.getName(), ".hsaco", targetHSACO);
@@ -213,6 +226,12 @@ class ROCMTargetBackend final : public TargetBackend {
         variantOp.getLoc(), variantOp.sym_name(),
         variantOp.target().getFormat(),
         builder.getBufferAttr(executableBuilder.getContext()));
+
+    if (!options.dumpIntermediatesPath.empty()) {
+      std::string targetISA = translateModuleToISA(*llvmModule, *targetMachine);
+      dumpDataToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                     variantOp.getName(), ".rocmasm", targetISA);
+    }
 
     return success();
   }
