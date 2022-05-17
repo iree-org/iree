@@ -264,7 +264,7 @@ struct ResourceAllocaOpPattern
 
     auto allocateOp = rewriter.create<IREE::HAL::AllocatorAllocateOp>(
         allocaOp.getLoc(), bufferType, allocator, memoryTypes, bufferUsage,
-        allocaOp.storage_size());
+        adaptor.storage_size());
 
     // TODO(benvanik): stream ordered allocations.
     auto resolvedTimepoint =

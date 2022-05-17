@@ -29,13 +29,19 @@ class AllocatorMapOpConversion
       ConversionPatternRewriter &rewriter) const override {
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, importOp.getName(),
-        ArrayRef<Type>{getTypeConverter()->convertType(op.getType())},
-        ArrayRef<Value>{adaptor.allocator(),
-                        rewriter.createOrFold<IREE::VM::ConstI32Op>(
-                            op.getLoc(), op.memory_typesAttr()),
-                        rewriter.createOrFold<IREE::VM::ConstI32Op>(
-                            op.getLoc(), op.buffer_usageAttr()),
-                        adaptor.source(), adaptor.offset(), adaptor.length()});
+        ArrayRef<Type>{
+            getTypeConverter()->convertType(op.getType()),
+        },
+        ArrayRef<Value>{
+            adaptor.allocator(),
+            rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(),
+                                                        op.memory_typesAttr()),
+            rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(),
+                                                        op.buffer_usageAttr()),
+            adaptor.source(),
+            castToImportType(adaptor.offset(), rewriter.getI64Type(), rewriter),
+            castToImportType(adaptor.length(), rewriter.getI64Type(), rewriter),
+        });
     copyImportAttrs(importOp, callOp);
     return success();
   }
@@ -60,7 +66,9 @@ class AllocatorTryMapOpConversion
       ConversionPatternRewriter &rewriter) const override {
     auto callOp = rewriter.create<IREE::VM::CallOp>(
         op.getLoc(), importOp.getName(),
-        ArrayRef<Type>{getTypeConverter()->convertType(op.result().getType())},
+        ArrayRef<Type>{
+            getTypeConverter()->convertType(op.result().getType()),
+        },
         ArrayRef<Value>{
             adaptor.allocator(),
             rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), /*try=*/1),
@@ -69,8 +77,8 @@ class AllocatorTryMapOpConversion
             rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(),
                                                         op.buffer_usageAttr()),
             adaptor.source(),
-            adaptor.offset(),
-            adaptor.length(),
+            castToImportType(adaptor.offset(), rewriter.getI64Type(), rewriter),
+            castToImportType(adaptor.length(), rewriter.getI64Type(), rewriter),
         });
     copyImportAttrs(importOp, callOp);
     auto result = callOp.results().front();
