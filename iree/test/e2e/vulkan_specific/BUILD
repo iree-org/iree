@@ -30,11 +30,32 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "add_f16.mlir",
+            "dot_f16.mlir",
             "gemm.mlir",
         ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],
     driver = "vulkan",
+    target_backend = "vulkan-spirv",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_vulkan-spirv_vulkan_f16",
+    srcs = [
+        "add_f16.mlir",
+        "dot_f16.mlir",
+    ],
+    compiler_flags = [
+        "--iree-input-type=mhlo",
+        "--iree-vulkan-target-triple=valhall-unknown-android11",
+    ],
+    driver = "vulkan",
+    tags = [
+        "manual",
+        "notap",
+        "vulkan_uses_vk_khr_shader_float16_int8",
+    ],
     target_backend = "vulkan-spirv",
 )
 
