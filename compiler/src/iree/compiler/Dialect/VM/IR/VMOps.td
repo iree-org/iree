@@ -377,8 +377,7 @@ def VM_GlobalI32Op : VM_GlobalOp<"global.i32",
 }
 
 def VM_GlobalI64Op : VM_GlobalOp<"global.i64",
-                                 VM_ConstantIntegerValueAttr<I64>,
-                                 [VM_ExtI64]> {
+                                 VM_ConstantIntegerValueAttr<I64>> {
   let summary = [{64-bit integer global declaration}];
   let description = [{
     Defines a global value that is treated as a scalar literal at runtime.
@@ -579,7 +578,6 @@ def VM_GlobalLoadI32Op :
 
 def VM_GlobalLoadI64Op :
     VM_GlobalLoadPrimitiveOp<I64, "global.load.i64", VM_OPC_GlobalLoadI64, [
-      VM_ExtI64,
       DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
     ]> {
   let summary = [{global 64-bit integer load operation}];
@@ -610,8 +608,7 @@ def VM_GlobalStoreI32Op :
 }
 
 def VM_GlobalStoreI64Op :
-    VM_GlobalStorePrimitiveOp<I64, "global.store.i64", VM_OPC_GlobalStoreI64,
-                              [VM_ExtI64]> {
+    VM_GlobalStorePrimitiveOp<I64, "global.store.i64", VM_OPC_GlobalStoreI64> {
   let summary = [{global 64-bit integer store operation}];
 }
 
@@ -636,8 +633,7 @@ def VM_GlobalLoadIndirectI32Op :
 
 def VM_GlobalLoadIndirectI64Op :
     VM_GlobalLoadIndirectPrimitiveOp<I64, "global.load.indirect.i64",
-                                     VM_OPC_GlobalLoadIndirectI64,
-                                     [VM_ExtI64]> {
+                                     VM_OPC_GlobalLoadIndirectI64> {
   let summary = [{global 64-bit integer load operation}];
   let hasCanonicalizer = 1;
 }
@@ -653,7 +649,7 @@ def VM_GlobalLoadIndirectF32Op :
 def VM_GlobalLoadIndirectF64Op :
     VM_GlobalLoadIndirectPrimitiveOp<F64, "global.load.indirect.f64",
                                      VM_OPC_GlobalLoadIndirectF64,
-                                     [VM_ExtI64]> {
+                                     [VM_ExtF64]> {
   let summary = [{global 64-bit floating-point load operation}];
   let hasCanonicalizer = 1;
 }
@@ -667,8 +663,7 @@ def VM_GlobalStoreIndirectI32Op :
 
 def VM_GlobalStoreIndirectI64Op :
     VM_GlobalStoreIndirectPrimitiveOp<I64, "global.store.indirect.i64",
-                                      VM_OPC_GlobalStoreIndirectI64,
-                                      [VM_ExtI64]> {
+                                      VM_OPC_GlobalStoreIndirectI64> {
   let summary = [{global 64-bit integer store operation}];
   let hasCanonicalizer = 1;
 }
@@ -817,7 +812,6 @@ def VM_ConstI32Op :
 def VM_ConstI64Op :
     VM_ConstantPrimitiveOp<I64, 64, "const.i64", VM_OPC_ConstI64,
                            "int64_t", [
-        VM_ExtI64,
         DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
     ]> {
   let summary = [{64-bit integer constant operation}];
@@ -886,7 +880,6 @@ def VM_ConstI32ZeroOp :
 def VM_ConstI64ZeroOp :
     VM_ConstantPrimitiveZeroOp<I64, "const.i64.zero", VM_OPC_ConstI64Zero,
                                "int64_t", [
-      VM_ExtI64,
       DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
     ]> {
   let summary = [{64-bit integer constant zero operation}];
@@ -906,7 +899,7 @@ def VM_ConstF32ZeroOp :
 def VM_ConstF64ZeroOp :
     VM_ConstantPrimitiveZeroOp<F64, "const.f64.zero", VM_OPC_ConstF64Zero,
                                "double", [
-      VM_ExtI64,
+      VM_ExtF64,
       DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
     ]> {
   let summary = [{64-bit floating-point constant zero operation}];
@@ -1260,8 +1253,7 @@ def VM_BufferFillI32Op :
   let summary = [{fills the buffer with the given repeating 32-bit value}];
 }
 def VM_BufferFillI64Op :
-    VM_BufferFillOp<I64, "buffer.fill.i64", VM_OPC_BufferFillI64,
-                    [VM_ExtI64]> {
+    VM_BufferFillOp<I64, "buffer.fill.i64", VM_OPC_BufferFillI64> {
   let summary = [{fills the buffer with the given repeating 64-bit value}];
 }
 def VM_BufferFillF32Op :
@@ -1362,8 +1354,7 @@ def VM_BufferLoadI32Op :
   let summary = [{32-bit integer load}];
 }
 def VM_BufferLoadI64Op :
-    VM_BufferLoadOp<I64, "buffer.load.i64", VM_OPC_BufferLoadI64,
-                    [VM_ExtI64]> {
+    VM_BufferLoadOp<I64, "buffer.load.i64", VM_OPC_BufferLoadI64> {
   let summary = [{64-bit integer load}];
 }
 def VM_BufferLoadF32Op :
@@ -1390,8 +1381,7 @@ def VM_BufferStoreI32Op :
   let summary = [{32-bit integer store}];
 }
 def VM_BufferStoreI64Op :
-    VM_BufferStoreOp<I64, "buffer.store.i64", VM_OPC_BufferStoreI64,
-                     [VM_ExtI64]> {
+    VM_BufferStoreOp<I64, "buffer.store.i64", VM_OPC_BufferStoreI64> {
   let summary = [{64-bit integer store}];
 }
 def VM_BufferStoreF32Op :
@@ -1577,7 +1567,7 @@ def VM_ListGetI32Op :
     VM_ListGetPrimitiveOp<I32, "list.get.i32", VM_OPC_ListGetI32>;
 
 def VM_ListGetI64Op :
-    VM_ListGetPrimitiveOp<I64, "list.get.i64", VM_OPC_ListGetI64, [VM_ExtI64]>;
+    VM_ListGetPrimitiveOp<I64, "list.get.i64", VM_OPC_ListGetI64>;
 
 def VM_ListGetF32Op :
     VM_ListGetPrimitiveOp<F32, "list.get.f32", VM_OPC_ListGetF32, [VM_ExtF32]>;
@@ -1589,7 +1579,7 @@ def VM_ListSetI32Op :
     VM_ListSetPrimitiveOp<I32, "list.set.i32", VM_OPC_ListSetI32>;
 
 def VM_ListSetI64Op :
-    VM_ListSetPrimitiveOp<I64, "list.set.i64", VM_OPC_ListSetI64, [VM_ExtI64]>;
+    VM_ListSetPrimitiveOp<I64, "list.set.i64", VM_OPC_ListSetI64>;
 
 def VM_ListSetF32Op :
     VM_ListSetPrimitiveOp<F32, "list.set.f32", VM_OPC_ListSetF32, [VM_ExtF32]>;
@@ -1705,8 +1695,7 @@ def VM_SelectI32Op : VM_SelectPrimitiveOp<I32, "select.i32", VM_OPC_SelectI32> {
   let hasFolder = 1;
 }
 
-def VM_SelectI64Op : VM_SelectPrimitiveOp<I64, "select.i64", VM_OPC_SelectI64,
-                                          [VM_ExtI64]> {
+def VM_SelectI64Op : VM_SelectPrimitiveOp<I64, "select.i64", VM_OPC_SelectI64> {
   let summary = [{integer select operation}];
   let hasFolder = 1;
 }
@@ -1840,8 +1829,7 @@ def VM_SwitchI32Op : VM_SwitchIntegerOp<I32, "switch.i32", VM_OPC_SwitchI32> {
   let hasFolder = 1;
 }
 
-def VM_SwitchI64Op : VM_SwitchIntegerOp<I64, "switch.i64", VM_OPC_SwitchI64,
-                                        [VM_ExtI64]> {
+def VM_SwitchI64Op : VM_SwitchIntegerOp<I64, "switch.i64", VM_OPC_SwitchI64> {
   let summary = [{integer switch operation}];
   let hasFolder = 1;
 }
@@ -1987,8 +1975,7 @@ def VM_AddI32Op :
 }
 
 def VM_AddI64Op :
-    VM_BinaryArithmeticOp<I64, "add.i64", VM_OPC_AddI64,
-                          [VM_ExtI64, Commutative]> {
+    VM_BinaryArithmeticOp<I64, "add.i64", VM_OPC_AddI64, [Commutative]> {
   let summary = [{integer add operation}];
   let hasFolder = 1;
 }
@@ -2000,7 +1987,7 @@ def VM_SubI32Op :
 }
 
 def VM_SubI64Op :
-    VM_BinaryArithmeticOp<I64, "sub.i64", VM_OPC_SubI64, [VM_ExtI64]> {
+    VM_BinaryArithmeticOp<I64, "sub.i64", VM_OPC_SubI64> {
   let summary = [{integer subtract operation}];
   let hasFolder = 1;
 }
@@ -2013,8 +2000,7 @@ def VM_MulI32Op :
 }
 
 def VM_MulI64Op :
-    VM_BinaryArithmeticOp<I64, "mul.i64", VM_OPC_MulI64,
-                          [VM_ExtI64, Commutative]> {
+    VM_BinaryArithmeticOp<I64, "mul.i64", VM_OPC_MulI64, [Commutative]> {
   let summary = [{integer multiplication operation}];
   let hasFolder = 1;
   let hasCanonicalizer = 1;
@@ -2027,7 +2013,7 @@ def VM_DivI32SOp :
 }
 
 def VM_DivI64SOp :
-    VM_BinaryArithmeticOp<I64, "div.i64.s", VM_OPC_DivI64S, [VM_ExtI64]> {
+    VM_BinaryArithmeticOp<I64, "div.i64.s", VM_OPC_DivI64S> {
   let summary = [{signed integer division operation}];
   let hasFolder = 1;
 }
@@ -2039,7 +2025,7 @@ def VM_DivI32UOp :
 }
 
 def VM_DivI64UOp :
-    VM_BinaryArithmeticOp<I64, "div.i64.u", VM_OPC_DivI64U, [VM_ExtI64]> {
+    VM_BinaryArithmeticOp<I64, "div.i64.u", VM_OPC_DivI64U> {
   let summary = [{unsigned integer division operation}];
   let hasFolder = 1;
 }
@@ -2051,7 +2037,7 @@ def VM_RemI32SOp :
 }
 
 def VM_RemI64SOp :
-    VM_BinaryArithmeticOp<I64, "rem.i64.s", VM_OPC_RemI64S, [VM_ExtI64]> {
+    VM_BinaryArithmeticOp<I64, "rem.i64.s", VM_OPC_RemI64S> {
   let summary = [{signed integer division remainder operation}];
   let hasFolder = 1;
 }
@@ -2063,7 +2049,7 @@ def VM_RemI32UOp :
 }
 
 def VM_RemI64UOp :
-    VM_BinaryArithmeticOp<I64, "rem.i64.u", VM_OPC_RemI64U, [VM_ExtI64]> {
+    VM_BinaryArithmeticOp<I64, "rem.i64.u", VM_OPC_RemI64U> {
   let summary = [{unsigned integer division remainder operation}];
   let hasFolder = 1;
 }
@@ -2076,7 +2062,7 @@ def VM_FMAI32Op :
 }
 
 def VM_FMAI64Op :
-    VM_TernaryArithmeticOp<I64, "fma.i64", VM_OPC_FMAI64, [VM_ExtI64]> {
+    VM_TernaryArithmeticOp<I64, "fma.i64", VM_OPC_FMAI64> {
   let summary = [{integer fused-multiply add operation (a*b+c)}];
   let hasFolder = 1;
   let hasCanonicalizer = 1;
@@ -2358,50 +2344,43 @@ def VM_NotI32Op :
 }
 
 def VM_NotI64Op :
-    VM_UnaryArithmeticOp<I64, "not.i64", VM_OPC_NotI64,
-                          [VM_ExtI64]> {
+    VM_UnaryArithmeticOp<I64, "not.i64", VM_OPC_NotI64> {
   let summary = [{integer binary not operation}];
   let hasFolder = 1;
 }
 
 def VM_AndI32Op :
-    VM_BinaryArithmeticOp<I32, "and.i32", VM_OPC_AndI32,
-                          [Commutative]> {
+    VM_BinaryArithmeticOp<I32, "and.i32", VM_OPC_AndI32, [Commutative]> {
   let summary = [{integer binary and operation}];
   let hasFolder = 1;
 }
 
 def VM_AndI64Op :
-    VM_BinaryArithmeticOp<I64, "and.i64", VM_OPC_AndI64,
-                          [VM_ExtI64, Commutative]> {
+    VM_BinaryArithmeticOp<I64, "and.i64", VM_OPC_AndI64, [Commutative]> {
   let summary = [{integer binary and operation}];
   let hasFolder = 1;
 }
 
 def VM_OrI32Op :
-    VM_BinaryArithmeticOp<I32, "or.i32", VM_OPC_OrI32,
-                          [Commutative]> {
+    VM_BinaryArithmeticOp<I32, "or.i32", VM_OPC_OrI32, [Commutative]> {
   let summary = [{integer binary or operation}];
   let hasFolder = 1;
 }
 
 def VM_OrI64Op :
-    VM_BinaryArithmeticOp<I64, "or.i64", VM_OPC_OrI64,
-                          [VM_ExtI64, Commutative]> {
+    VM_BinaryArithmeticOp<I64, "or.i64", VM_OPC_OrI64, [Commutative]> {
   let summary = [{integer binary or operation}];
   let hasFolder = 1;
 }
 
 def VM_XorI32Op :
-    VM_BinaryArithmeticOp<I32, "xor.i32", VM_OPC_XorI32,
-                          [Commutative]> {
+    VM_BinaryArithmeticOp<I32, "xor.i32", VM_OPC_XorI32, [Commutative]> {
   let summary = [{integer binary exclusive-or operation}];
   let hasFolder = 1;
 }
 
 def VM_XorI64Op :
-    VM_BinaryArithmeticOp<I64, "xor.i64", VM_OPC_XorI64,
-                          [VM_ExtI64, Commutative]> {
+    VM_BinaryArithmeticOp<I64, "xor.i64", VM_OPC_XorI64, [Commutative]> {
   let summary = [{integer binary exclusive-or operation}];
   let hasFolder = 1;
 }
@@ -2443,8 +2422,7 @@ def VM_ShlI32Op : VM_ShiftArithmeticOp<I32, "shl.i32", VM_OPC_ShlI32> {
   let hasFolder = 1;
 }
 
-def VM_ShlI64Op : VM_ShiftArithmeticOp<I64, "shl.i64", VM_OPC_ShlI64,
-                                       [VM_ExtI64]> {
+def VM_ShlI64Op : VM_ShiftArithmeticOp<I64, "shl.i64", VM_OPC_ShlI64> {
   let summary = [{integer shift left operation}];
   let hasFolder = 1;
 }
@@ -2454,8 +2432,7 @@ def VM_ShrI32SOp : VM_ShiftArithmeticOp<I32, "shr.i32.s", VM_OPC_ShrI32S> {
   let hasFolder = 1;
 }
 
-def VM_ShrI64SOp : VM_ShiftArithmeticOp<I64, "shr.i64.s", VM_OPC_ShrI64S,
-                                        [VM_ExtI64]> {
+def VM_ShrI64SOp : VM_ShiftArithmeticOp<I64, "shr.i64.s", VM_OPC_ShrI64S> {
   let summary = [{signed integer (arithmetic) shift right operation}];
   let hasFolder = 1;
 }
@@ -2465,8 +2442,7 @@ def VM_ShrI32UOp : VM_ShiftArithmeticOp<I32, "shr.i32.u", VM_OPC_ShrI32U> {
   let hasFolder = 1;
 }
 
-def VM_ShrI64UOp : VM_ShiftArithmeticOp<I64, "shr.i64.u", VM_OPC_ShrI64U,
-                                        [VM_ExtI64]> {
+def VM_ShrI64UOp : VM_ShiftArithmeticOp<I64, "shr.i64.u", VM_OPC_ShrI64U> {
   let summary = [{unsigned integer (logical) shift right operation}];
   let hasFolder = 1;
 }
@@ -2524,22 +2500,19 @@ def VM_TruncI32I16Op :
 }
 
 def VM_TruncI64I8Op :
-    VM_ConversionPseudoOp<I64, I32, "trunc.i64.i8",
-                          [VM_ExtI64]> {
+    VM_ConversionPseudoOp<I64, I32, "trunc.i64.i8"> {
   let summary = [{integer truncate to 8 bits}];
   let hasFolder = 1;
 }
 
 def VM_TruncI64I16Op :
-    VM_ConversionPseudoOp<I64, I32, "trunc.i64.i16",
-                          [VM_ExtI64]> {
+    VM_ConversionPseudoOp<I64, I32, "trunc.i64.i16"> {
   let summary = [{integer truncate to 16 bits}];
   let hasFolder = 1;
 }
 
 def VM_TruncI64I32Op :
-    VM_ConversionOp<I64, I32, "trunc.i64.i32", VM_OPC_TruncI64I32,
-                    [VM_ExtI64]> {
+    VM_ConversionOp<I64, I32, "trunc.i64.i32", VM_OPC_TruncI64I32> {
   let summary = [{integer truncate to 32 bits}];
   let hasFolder = 1;
 }
@@ -2576,43 +2549,37 @@ def VM_ExtI16I32UOp :
 }
 
 def VM_ExtI8I64SOp :
-    VM_ConversionPseudoOp<I32, I64, "ext.i8.i64.s",
-                          [VM_ExtI64]> {
+    VM_ConversionPseudoOp<I32, I64, "ext.i8.i64.s"> {
   let summary = [{integer sign extend 8 bits to 64 bits}];
   let hasFolder = 1;
 }
 
 def VM_ExtI8I64UOp :
-    VM_ConversionPseudoOp<I32, I64, "ext.i8.i64.u",
-                          [VM_ExtI64]> {
+    VM_ConversionPseudoOp<I32, I64, "ext.i8.i64.u"> {
   let summary = [{integer zero extend 8 bits to 64 bits}];
   let hasFolder = 1;
 }
 
 def VM_ExtI16I64SOp :
-    VM_ConversionPseudoOp<I32, I64, "ext.i16.i64.s",
-                          [VM_ExtI64]> {
+    VM_ConversionPseudoOp<I32, I64, "ext.i16.i64.s"> {
   let summary = [{integer sign extend 16 bits to 64 bits}];
   let hasFolder = 1;
 }
 
 def VM_ExtI16I64UOp :
-    VM_ConversionPseudoOp<I32, I64, "ext.i16.i64.u",
-                          [VM_ExtI64]> {
+    VM_ConversionPseudoOp<I32, I64, "ext.i16.i64.u"> {
   let summary = [{integer zero extend 16 bits to 64 bits}];
   let hasFolder = 1;
 }
 
 def VM_ExtI32I64SOp :
-    VM_ConversionOp<I32, I64, "ext.i32.i64.s", VM_OPC_ExtI32I64S,
-                    [VM_ExtI64]> {
+    VM_ConversionOp<I32, I64, "ext.i32.i64.s", VM_OPC_ExtI32I64S> {
   let summary = [{integer sign extend 32 bits to 64 bits}];
   let hasFolder = 1;
 }
 
 def VM_ExtI32I64UOp :
-    VM_ConversionOp<I32, I64, "ext.i32.i64.u", VM_OPC_ExtI32I64U,
-                    [VM_ExtI64]> {
+    VM_ConversionOp<I32, I64, "ext.i32.i64.u", VM_OPC_ExtI32I64U> {
   let summary = [{integer zero extend 32 bits to 64 bits}];
   let hasFolder = 1;
 }
@@ -2791,7 +2758,6 @@ def VM_CmpEQI32Op :
 
 def VM_CmpEQI64Op :
     VM_BinaryComparisonOp<I64, "cmp.eq.i64", VM_OPC_CmpEQI64, [
-        VM_ExtI64,
         Commutative,
         DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
     ]> {
@@ -2812,7 +2778,7 @@ def VM_CmpNEI32Op :
 
 def VM_CmpNEI64Op :
     VM_BinaryComparisonOp<I64, "cmp.ne.i64", VM_OPC_CmpNEI64, [
-        VM_ExtI64, Commutative,
+        Commutative,
         DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
     ]> {
   let summary = [{integer inequality comparison operation}];
@@ -2831,7 +2797,6 @@ def VM_CmpLTI32SOp :
 
 def VM_CmpLTI64SOp :
     VM_BinaryComparisonOp<I64, "cmp.lt.i64.s", VM_OPC_CmpLTI64S, [
-        VM_ExtI64,
         DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
     ]> {
   let summary = [{signed integer less-than comparison operation}];
@@ -2850,7 +2815,6 @@ def VM_CmpLTI32UOp :
 
 def VM_CmpLTI64UOp :
     VM_BinaryComparisonOp<I64, "cmp.lt.i64.u", VM_OPC_CmpLTI64U, [
-        VM_ExtI64,
         DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
     ]> {
   let summary = [{unsigned integer less-than comparison operation}];
@@ -2869,7 +2833,6 @@ def VM_CmpLTEI32SOp :
 
 def VM_CmpLTEI64SOp :
     VM_BinaryComparisonPseudoOp<I64, "cmp.lte.i64.s", [
-        VM_ExtI64,
         DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
     ]> {
   let summary = [{signed integer less-than-or-equal comparison operation}];
@@ -2888,7 +2851,6 @@ def VM_CmpLTEI32UOp :
 
 def VM_CmpLTEI64UOp :
     VM_BinaryComparisonPseudoOp<I64, "cmp.lte.i64.u", [
-        VM_ExtI64,
         DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
     ]> {
   let summary = [{unsigned integer less-than-or-equal comparison operation}];
@@ -2907,7 +2869,6 @@ def VM_CmpGTI32SOp :
 
 def VM_CmpGTI64SOp :
     VM_BinaryComparisonPseudoOp<I64, "cmp.gt.i64.s", [
-        VM_ExtI64,
         DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
     ]> {
   let summary = [{signed integer greater-than comparison operation}];
@@ -2926,7 +2887,6 @@ def VM_CmpGTI32UOp :
 
 def VM_CmpGTI64UOp :
     VM_BinaryComparisonPseudoOp<I64, "cmp.gt.i64.u", [
-        VM_ExtI64,
         DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
     ]> {
   let summary = [{unsigned integer greater-than comparison operation}];
@@ -2945,7 +2905,6 @@ def VM_CmpGTEI32SOp :
 
 def VM_CmpGTEI64SOp :
     VM_BinaryComparisonPseudoOp<I64, "cmp.gte.i64.s", [
-        VM_ExtI64,
         DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
     ]> {
   let summary = [{signed integer greater-than-or-equal comparison operation}];
@@ -2964,7 +2923,6 @@ def VM_CmpGTEI32UOp :
 
 def VM_CmpGTEI64UOp :
     VM_BinaryComparisonPseudoOp<I64, "cmp.gte.i64.u", [
-        VM_ExtI64,
         DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
     ]> {
   let summary = [{unsigned integer greater-than-or-equal comparison operation}];
@@ -2985,7 +2943,6 @@ def VM_CmpNZI32Op :
 
 def VM_CmpNZI64Op :
     VM_UnaryComparisonOp<I64, "cmp.nz.i64", VM_OPC_CmpNZI64, [
-        VM_ExtI64,
         DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
     ]> {
   let summary = [{integer non-zero comparison operation}];

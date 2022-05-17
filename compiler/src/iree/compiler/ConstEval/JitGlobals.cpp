@@ -127,9 +127,8 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
         compilePipeline("builtin.module") {
     // Invoke IREE compilation flow.
     options->executableOptions.targets.push_back("vmvx");
-    options->targetOptions.i64Extension = true;
     options->targetOptions.f32Extension = true;
-    options->targetOptions.f64Extension = true;
+    options->targetOptions.f64Extension = false;  // not yet implemented
 
     buildIREEVMTransformPassPipeline(
         options->bindingOptions, options->inputOptions,

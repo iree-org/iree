@@ -20,16 +20,11 @@ struct TargetOptions {
   // Target size of `index` when converted to an integer in bits.
   int indexBits = 32;
 
-  // Whether the i64 extension is enabled in the target VM.
-  bool i64Extension = true;
   // Whether the f32 extension is enabled in the target VM.
   bool f32Extension = true;
   // Whether the f64 extension is enabled in the target VM.
   bool f64Extension = false;
 
-  // Whether to truncate i64 types to i32 when the i64 extension is not
-  // enabled.
-  bool truncateUnsupportedIntegers = true;
   // Whether to truncate f64 types to f32 when the f64 extension is not
   // enabled.
   bool truncateUnsupportedFloats = true;
