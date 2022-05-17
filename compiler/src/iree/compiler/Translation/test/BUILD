@@ -28,7 +28,6 @@ iree_lit_test_suite(
     cfg = "//compiler:lit.cfg.py",
     tools = [
         "//tools:iree-compile",
-        "//tools:iree-translate",
         "@llvm-project//llvm:FileCheck",
     ],
 )

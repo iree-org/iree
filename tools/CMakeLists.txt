@@ -187,23 +187,11 @@ if(IREE_BUILD_COMPILER)
 
   iree_cc_binary(
     NAME
-      iree-translate
-    SRCS
-      "iree-translate-main.cc"
-    DEPS
-      iree::compiler::Tools::iree_translate_lib
-    DATA
-      ${IREE_LLD_TARGET}
-    HOSTONLY
-  )
-
-  iree_cc_binary(
-    NAME
       iree-compile
     SRCS
       "iree-compile-main.cc"
     DEPS
-      iree::compiler::Tools::iree_translate_lib
+      iree::compiler::Tools::iree_compile_lib
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY

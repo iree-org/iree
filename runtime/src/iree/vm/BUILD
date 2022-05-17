@@ -271,8 +271,8 @@ iree_bytecode_module(
     testonly = True,
     src = "bytecode_module_benchmark.mlir",
     c_identifier = "iree_vm_bytecode_module_benchmark_module",
-    flags = ["--iree-vm-ir-to-bytecode-module"],
-    translate_tool = "//tools:iree-translate",
+    flags = ["--compile-mode=vm"],
+    translate_tool = "//tools:iree-compile",
 )
 
 cc_binary_benchmark(
@@ -291,8 +291,8 @@ iree_bytecode_module(
     testonly = True,
     src = "bytecode_module_size_benchmark.mlir",
     c_identifier = "iree_vm_bytecode_module_size_benchmark_module",
-    flags = ["--iree-vm-ir-to-bytecode-module"],
-    translate_tool = "//tools:iree-translate",
+    flags = ["--compile-mode=vm"],
+    translate_tool = "//tools:iree-compile",
 )
 
 iree_cmake_extra_content(

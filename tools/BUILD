@@ -229,19 +229,10 @@ cc_binary(
 )
 
 cc_binary(
-    name = "iree-translate",
-    srcs = ["iree-translate-main.cc"],
-    tags = ["hostonly"],
-    deps = [
-        "//compiler/src/iree/compiler/Tools:iree_translate_lib",
-    ],
-)
-
-cc_binary(
     name = "iree-compile",
     srcs = ["iree-compile-main.cc"],
     tags = ["hostonly"],
     deps = [
-        "//compiler/src/iree/compiler/Tools:iree_translate_lib",
+        "//compiler/src/iree/compiler/Tools:iree_compile_lib",
     ],
 )

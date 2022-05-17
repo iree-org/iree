@@ -188,29 +188,24 @@ cc_library(
 )
 
 cc_library(
-    name = "iree_translate_lib",
+    name = "iree_compile_lib",
     srcs = [
         "iree_compile_lib.cc",
-        "iree_translate_lib.cc",
     ],
-    hdrs = ["iree_translate_lib.h"],
+    hdrs = ["iree_compile_lib.h"],
     deps = [
         ":init_llvmir_translations",
         ":init_passes_and_dialects",
         ":init_targets",
-        ":init_translations",
         "//compiler/src/iree/compiler/Codegen",
         "//compiler/src/iree/compiler/ConstEval",
         "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",
         "//compiler/src/iree/compiler/Dialect/VM/Target/Bytecode",
         "//compiler/src/iree/compiler/Dialect/VM/Target/C",
         "//compiler/src/iree/compiler/Pipelines",
-        "//compiler/src/iree/compiler/Translation:HALExecutable",
-        "//compiler/src/iree/compiler/Translation:IREEVM",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LLVMToLLVMIRTranslation",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFTransforms",
