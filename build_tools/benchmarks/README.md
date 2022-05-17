@@ -1,7 +1,7 @@
 # IREE Benchmark Suites Tool
 
 This directory contains the tools to run IREE benchmark suites and generate
-reports. More information about benchmark suites can be found [here](benchmarks/README.md).
+reports. More information about benchmark suites can be found [here](/benchmarks/README.md).
 
 ## Benchmark Tools
 
@@ -20,7 +20,7 @@ IREE_NORMAL_TOOL_DIR="/path/to/IREE tool dir". It is usually "$IREE_BUILD_DIR/ir
 IREE_TRACED_TOOL_DIR="/path/to/IREE tool dir built with IREE_ENABLE_RUNTIME_TRACING=ON".
 ```
 
-See details about `IREE_ENABLE_RUNTIME_TRACING` [here](docs/developers/developing_iree/profiling_with_tracy.md).
+See details about `IREE_ENABLE_RUNTIME_TRACING` [here](/docs/developers/developing_iree/profiling_with_tracy.md).
 
 **Run all benchmarks**
 ```sh
