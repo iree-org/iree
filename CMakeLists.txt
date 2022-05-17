@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-cmake_minimum_required(VERSION 3.17...3.22)
+cmake_minimum_required(VERSION 3.21...3.23)
 
 # LLVM requires CMP0116 for tblgen: https://reviews.llvm.org/D101083
 # CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
@@ -292,22 +292,13 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # the Python libraries are not available. When possible, limit to just
   # Development.Module.
   # See https://pybind11.readthedocs.io/en/stable/compiling.html#findpython-mode
-  if(CMAKE_VERSION VERSION_LESS "3.18.0")
-    message(WARNING
-      "This version of CMake is not compatible with statically built Python "
-      "installations. If Python fails to detect below this may apply to you. "
-      "Recommend upgrading to at least CMake 3.18. "
-      "Detected current version: ${CMAKE_VERSION}"
-    )
-    find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
-  else()
-    # Configuring the Development.Module is flaky in multi-project setups.
-    # "Bootstrapping" by first looking for the optional Development component
-    # seems to be robust generally.
-    # See: https://reviews.llvm.org/D118148
-    find_package(Python3 COMPONENTS Interpreter Development)
-    find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
-  endif()
+  #
+  # Configuring the Development.Module is flaky in multi-project setups.
+  # "Bootstrapping" by first looking for the optional Development component
+  # seems to be robust generally.
+  # See: https://reviews.llvm.org/D118148
+  find_package(Python3 COMPONENTS Interpreter Development)
+  find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
 elseif(IREE_BUILD_COMPILER OR IREE_BUILD_TESTS)
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
 endif()
