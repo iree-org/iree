@@ -88,7 +88,7 @@ def OptimizeVectorTransfer :
 }
 
 def InsertDistributionInfo :
-    Pass<"iree-codegen-insert-distribution-info", "func::FuncOp"> {
+    Pass<"iree-codegen-insert-distribution-info", "IREE::HAL::ExecutableVariantOp"> {
   let summary = "Insert the workgroup count region and translation info";
   let constructor = "mlir::iree_compiler::createInsertDistributionInfoPass()";
 }

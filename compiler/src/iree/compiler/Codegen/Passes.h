@@ -125,7 +125,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass();
 
 /// Pass to insert workgroup count region and update translation info.
-std::unique_ptr<OperationPass<func::FuncOp>> createInsertDistributionInfoPass();
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createInsertDistributionInfoPass();
 
 /// Pass to tile and distribute to workgroups.
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -327,7 +328,8 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize);
-void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm);
+void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
+                                        unsigned pipelineDepth);
 
 /// Simple lowering only distributute linalg ops on blocks and threads. This
 /// will result in scalar operations. Expects pass manager to be a module-level

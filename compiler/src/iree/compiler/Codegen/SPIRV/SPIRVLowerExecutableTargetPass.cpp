@@ -96,21 +96,22 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
   }
 
   if (!testLoweringConfiguration && passPipeline.hasValue()) {
-    OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
     switch (*passPipeline) {
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute:
-        addSPIRVTileAndDistributePassPipeline(nestedModulePM);
+        addSPIRVTileAndDistributePassPipeline(executableLoweringPipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize:
-        addSPIRVTileAndVectorizePassPipeline(nestedModulePM);
+        addSPIRVTileAndVectorizePassPipeline(executableLoweringPipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::
           SPIRVVectorizeToCooperativeOps:
-        addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(nestedModulePM);
+        addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(
+            executableLoweringPipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::
           SPIRVVectorizeWithWorkgroupMemory:
-        addSPIRVTileAndVectorizeWithWorkgroupMemoryPassPipeline(nestedModulePM);
+        addSPIRVTileAndVectorizeWithWorkgroupMemoryPassPipeline(
+            executableLoweringPipeline);
         break;
       default:
         variantOp.emitOpError("Unsupported pipeline on GPU target.");

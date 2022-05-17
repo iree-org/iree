@@ -108,7 +108,13 @@ class IREEBufferizeOp
     mlir::iree_compiler::addIREEComprehensiveBufferizePasses(
         pm, allocationFn, deallocationFn, memcpyFn);
     WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
-      if (failed(pm.run(moduleOp))) return WalkResult::interrupt();
+      if (failed(pm.run(moduleOp))) {
+        getOperation()->emitError()
+            << "failed to bufferize ModuleOp:\n"
+            << *(moduleOp.getOperation()) << "\nunder top-level:\n"
+            << *state.getTopLevel();
+        return WalkResult::interrupt();
+      }
       return WalkResult::advance();
     });
     return failure(res.wasInterrupted());
@@ -153,7 +159,11 @@ class IREESetNumWorkgroupToOneOp
   LogicalResult apply(transform::TransformResults &results,
                       transform::TransformState &state) {
     auto variantOp = dyn_cast<HAL::ExecutableVariantOp>(state.getTopLevel());
-    if (!variantOp) return failure();
+    if (!variantOp) {
+      return getOperation()->emitError()
+             << "top-level op is not a HAL::ExecutableVariantOp: "
+             << *state.getTopLevel();
+    }
     return iree_compiler::setNumWorkgroupsImpl(variantOp, {});
   }
 
