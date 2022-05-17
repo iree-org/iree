@@ -30,6 +30,7 @@ iree_lit_test_suite(
     "outline_constants.mlir"
     "pack_allocations.mlir"
     "pack_constants.mlir"
+    "pack_dispatch_operands.mlir"
     "propagate_subviews.mlir"
     "propagate_timepoints.mlir"
     "refine_usage.mlir"

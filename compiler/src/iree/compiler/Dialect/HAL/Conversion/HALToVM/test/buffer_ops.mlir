@@ -54,7 +54,7 @@ func.func @buffer_load_i32(%buffer: !hal.buffer) -> i32 {
 func.func @buffer_load_i64(%buffer: !hal.buffer) -> i64 {
   %c64 = arith.constant 64 : index
 
-  // CHECK-DAG: %[[OFFSET_HI:.+]] = vm.add.i32 %c64, %c4
+  // CHECK-DAG: %[[OFFSET_HI:.+]] = vm.add.i64 %c64, %c4
   // CHECK-DAG: %[[HI_I32:.+]] = vm.call @hal.buffer.load(%[[BUFFER]], %[[OFFSET_HI]], %c4) : (!vm.ref<!hal.buffer>, i64, i32) -> i32
   // CHECK-DAG: %[[HI_EXT:.+]] = vm.ext.i32.i64.u %[[HI_I32]]
   // CHECK-DAG: %[[HI_I64:.+]] = vm.shl.i64 %[[HI_EXT]], %c32
@@ -127,7 +127,7 @@ func.func @buffer_store_i64(%buffer: !hal.buffer, %value: i64) {
 
   // CHECK-DAG: %[[VALUE_HI_I64:.+]] = vm.shr.i64.u %[[VALUE]], %c32
   // CHECK-DAG: %[[VALUE_HI:.+]] = vm.trunc.i64.i32 %[[VALUE_HI_I64]]
-  // CHECK-DAG: %[[OFFSET_HI:.+]] = vm.add.i32 %c64, %c4
+  // CHECK-DAG: %[[OFFSET_HI:.+]] = vm.add.i64 %c64, %c4
   // CHECK: vm.call @hal.buffer.store(%[[VALUE_HI]], %[[BUFFER]], %[[OFFSET_HI]], %c4) : (i32, !vm.ref<!hal.buffer>, i64, i32) -> ()
 
   hal.buffer.store<%buffer : !hal.buffer>[%c64] value(%value : i64)

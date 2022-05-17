@@ -60,7 +60,8 @@ func.func @resourceConstants() -> (!stream.resource<constant>, !stream.resource<
   max_allocation_size = 16,
   min_buffer_offset_alignment = 16,
   max_buffer_range = 1073741824,
-  min_buffer_range_alignment = 16
+  min_buffer_range_alignment = 16,
+  index_bits = 32
 }>
 
 // CHECK: #composite_of_16b0 = #util.composite<16xi8, [

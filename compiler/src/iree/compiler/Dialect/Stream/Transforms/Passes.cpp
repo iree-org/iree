@@ -234,17 +234,8 @@ void buildStreamOptimizationPassPipeline(
   //----------------------------------------------------------------------------
 
   if (transformOptions.optimizeBindings) {
+    // Fuse bindings together and add operands for their subview ranges.
     passManager.addPass(IREE::Stream::createFuseDispatchBindingsPass());
-
-    // Folding operands requires that CSE folds the inputs that we check for.
-    passManager.addPass(mlir::createCSEPass());
-    passManager.addPass(IREE::Stream::createFoldUniformOperandsPass());
-
-    // Only want to specialize after we've added all the operands we need above.
-    // TODO(benvanik): make codegen more efficient with the specialized
-    // constants. The lookup tables inserted are currently extremely slow on
-    // some backends.
-    // passManager.addPass(IREE::Stream::createSpecializeDispatchesPass());
 
     // TODO(benvanik): canonicalize bindings: we should sort the bindings by
     // the block argument order of the parent stream.cmd.execute. This will get
@@ -253,6 +244,25 @@ void buildStreamOptimizationPassPipeline(
     // make partitioning the bindings easier. Note we need to update both the
     // dispatches and the dispatch function argument order.
   }
+
+  // Pack dispatch operands on stream.executable into i32 values.
+  // We do this prior to exiting the pipeline as here we can still easily
+  // add/remove operands.
+  passManager.addPass(IREE::Stream::createPackDispatchOperandsPass());
+
+  // Folding operands requires that CSE folds the inputs that we check for.
+  passManager.addPass(mlir::createCSEPass());
+  passManager.addPass(IREE::Stream::createFoldUniformOperandsPass());
+
+  // Only want to specialize after we've added all the operands we need above.
+  // TODO(benvanik): make codegen more efficient with the specialized
+  // constants. The lookup tables inserted are currently extremely slow on
+  // some backends.
+  // passManager.addPass(IREE::Stream::createSpecializeDispatchesPass());
+
+  // TODO(benvanik): when we spill push constants spill to staging buffers.
+  // Need to know push constant limit but that could be specified as a stream
+  // option (max operand count).
 
   //----------------------------------------------------------------------------
   // Annotations to aid future lowering pipelines

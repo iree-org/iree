@@ -6,6 +6,9 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
+#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -15,12 +18,12 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
 
-#define DEBUG_TYPE "iree-hal-pack-dispatch-operands"
+#define DEBUG_TYPE "iree-stream-pack-dispatch-operands"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
-namespace HAL {
+namespace Stream {
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -48,6 +51,11 @@ namespace {
 // that but so far in most programs that's rare. Lots of dynamic shapes or
 // detensorized parameters may change that.
 
+// TODO(#8043): handle host/device size bit width mismatches; if the host is
+// 32 and device is 64 we don't need to pass the known-zero hi word. We need to
+// check for this specifically as during this pass we won't know that the index
+// type is range limited otherwise.
+
 // TODO(benvanik): rework this to actually pack. We could pack multiple operands
 // together (i16 + i8 + i8 -> i32). We'd probably also want to apply some struct
 // packing rules to ensure alignment. This current implementation just looks for
@@ -60,11 +68,14 @@ namespace {
 // Converts stream.cmd.dispatch operands into their packed representation. This
 // will add/remove/reorder operands and must mirrored in a consistent manner
 // with argument changes in the executable function (handled below).
-static void updateDispatchOp(IREE::Stream::CmdDispatchOp dispatchOp) {
+static void updateDispatchOp(IREE::Stream::CmdDispatchOp dispatchOp,
+                             IREE::Stream::ExecutableExportOp exportOp) {
   // Insert ops outside of the execution region.
   auto parentOp = dispatchOp->getParentOfType<IREE::Stream::CmdExecuteOp>();
   assert(parentOp && "dispatch ops must be within an execution region");
   OpBuilder builder(parentOp);
+
+  auto resourceConfig = IREE::Stream::ResourceConfigAttr::lookup(exportOp);
 
   auto loc = dispatchOp.getLoc();
   SmallVector<Value> newOperands;
@@ -82,7 +93,7 @@ static void updateDispatchOp(IREE::Stream::CmdDispatchOp dispatchOp) {
       // this as a global setting as well as have some heuristics for deriving
       // from target devices.
       operand = builder.createOrFold<arith::IndexCastOp>(
-          loc, builder.getI32Type(), operand);
+          loc, builder.getIntegerType(resourceConfig.getIndexBits()), operand);
     }
 
     // bf16 -> i16, f32 -> i32, f64 -> i64 ...
@@ -141,15 +152,14 @@ static void updateExportFuncOp(mlir::func::FuncOp funcOp) {
   auto streamAlignmentAttr = builder.getStringAttr("stream.alignment");
   auto streamValuesAttr = builder.getStringAttr("stream.values");
 
+  auto resourceConfig = IREE::Stream::ResourceConfigAttr::lookup(funcOp);
+
   // NOTE: we have !stream.binding mixed in here; we only want to look at
   // primitives.
 
   // NOTE: we do the packing in a reverse sequence so that we can reuse type
   // expansion; if we did f64->i64->i32+i32 above we need to do
   // i32+i32->i64->f64 here.
-
-  // index is always i32 today - if it's i64 we need to expand it below.
-  bool isIndexI32 = true;
 
   // i32+i32->i64 is the only case that adds arguments today so to keep things
   // simple we do that first. This ensures we have single SSA values for arg
@@ -161,7 +171,7 @@ static void updateExportFuncOp(mlir::func::FuncOp funcOp) {
        llvm::enumerate(llvm::to_vector<4>(funcOp.getArgumentTypes()))) {
     auto targetType = it.value();
     if (!targetType.isIntOrIndexOrFloat() ||
-        (targetType.isIndex() && isIndexI32) ||
+        (targetType.isIndex() && resourceConfig.getIndexBits() <= 32) ||
         (targetType.isIntOrFloat() &&
          targetType.getIntOrFloatBitWidth() <= 32)) {
       // Pass through/no change.
@@ -187,15 +197,21 @@ static void updateExportFuncOp(mlir::func::FuncOp funcOp) {
     auto loc = loArg.getLoc();
     auto loArgI64 =
         builder.create<arith::ExtUIOp>(loc, builder.getI64Type(), loArg);
-    auto arg = builder.create<arith::OrIOp>(
+    Operation *argOp = builder.create<arith::OrIOp>(
         loc, loArgI64,
         builder.create<arith::ShLIOp>(
             loc,
             builder.create<arith::ExtUIOp>(loc, builder.getI64Type(), hiArg),
             builder.create<arith::ConstantIntOp>(loc, 32, 64)));
 
+    // If going to index we need to insert a cast as the type changes.
+    if (targetType.isIndex()) {
+      argOp = builder.create<arith::IndexCastOp>(loc, targetType,
+                                                 argOp->getResult(0));
+    }
+
     // Replace all subsequent uses with the new reconstituted value.
-    loArg.replaceAllUsesExcept(arg, loArgI64);
+    loArg.replaceAllUsesExcept(argOp->getResult(0), loArgI64);
 
     // Take the existing potential values, if present, and fix them up.
     // If we had a `stream.values = [0xAA...BB... : i64]` then we can
@@ -209,7 +225,7 @@ static void updateExportFuncOp(mlir::func::FuncOp funcOp) {
           oldArgAttrs[it.index()].dyn_cast_or_null<DictionaryAttr>();
       if (auto alignmentAttr =
               oldArgAttr.getAs<IntegerAttr>(streamAlignmentAttr)) {
-        arg->setAttr(streamAlignmentAttr, alignmentAttr);
+        argOp->setAttr(streamAlignmentAttr, alignmentAttr);
       }
       if (auto valuesAttr = oldArgAttr.getAs<ArrayAttr>(streamValuesAttr)) {
         // Attach the original potential value set to the new arg value.
@@ -217,7 +233,7 @@ static void updateExportFuncOp(mlir::func::FuncOp funcOp) {
         // easily understandable i64 types instead of having to reconstruct it
         // from the i32 values and the combining operations (which MLIR doesn't
         // do today).
-        arg->setAttr(streamValuesAttr, valuesAttr);
+        argOp->setAttr(streamValuesAttr, valuesAttr);
       }
     }
     newArgAttrs.push_back(nullptr);
@@ -298,26 +314,16 @@ static void updateExportFuncOp(mlir::func::FuncOp funcOp) {
 //===----------------------------------------------------------------------===//
 
 class PackDispatchOperandsPass
-    : public PassWrapper<PackDispatchOperandsPass, OperationPass<ModuleOp>> {
+    : public PackDispatchOperandsBase<PackDispatchOperandsPass> {
  public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PackDispatchOperandsPass)
-
-  PackDispatchOperandsPass() = default;
-
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::arith::ArithmeticDialect>();
     registry.insert<IREE::Stream::StreamDialect>();
   }
 
-  StringRef getArgument() const override {
-    return "iree-hal-pack-dispatch-operands";
-  }
-
-  StringRef getDescription() const override {
-    return "Packs stream.executable operands into i32 push constants.";
-  }
-
   void runOnOperation() override {
+    SymbolTable symbolTable(getOperation());
+
     // Convert all public function signatures and manipulate the arguments.
     for (auto executableOp :
          getOperation().getOps<IREE::Stream::ExecutableOp>()) {
@@ -331,7 +337,10 @@ class PackDispatchOperandsPass
 
     // Walk the module and update all dispatch operands.
     getOperation()->walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
-      updateDispatchOp(dispatchOp);
+      auto exportOp =
+          symbolTable.lookupNearestSymbolFrom<IREE::Stream::ExecutableExportOp>(
+              dispatchOp, dispatchOp.entry_point());
+      updateDispatchOp(dispatchOp, exportOp);
       return WalkResult::advance();
     });
   }
@@ -343,11 +352,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createPackDispatchOperandsPass() {
   return std::make_unique<PackDispatchOperandsPass>();
 }
 
-static PassRegistration<PackDispatchOperandsPass> pass([] {
-  return std::make_unique<PackDispatchOperandsPass>();
-});
-
-}  // namespace HAL
+}  // namespace Stream
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
