@@ -191,31 +191,31 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       bool lowerToVectors = !isVMVXBackend(variantOp);
       bool lowerToAVX2 = hasAVX2Features(variantOp);
       if (!testLoweringConfiguration) {
-        OpPassManager &nestedModulePM =
-            executableLoweringPipeline.nest<ModuleOp>();
         switch (translationInfo.getValue().getDispatchLoweringPassPipeline()) {
           case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
           case IREE::Codegen::DispatchLoweringPassPipeline::None:
-            addCPUDefaultPassPipeline(nestedModulePM);
+            addCPUDefaultPassPipeline(executableLoweringPipeline);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::CPUBufferOpsDefault:
-            addCPUBufferOpsDefaultPipeline(nestedModulePM);
+            addCPUBufferOpsDefaultPipeline(executableLoweringPipeline);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUBufferOpsTileAndVectorize:
-            addCPUBufferOpsTileAndVectorizePipeline(nestedModulePM);
+            addCPUBufferOpsTileAndVectorizePipeline(executableLoweringPipeline);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingExpert:
-            addDoubleTilingExpertPassPipeline(nestedModulePM, lowerToAVX2);
+            addDoubleTilingExpertPassPipeline(executableLoweringPipeline,
+                                              lowerToAVX2);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingPadExpert:
-            addDoubleTilingPadExpertPassPipeline(nestedModulePM);
+            addDoubleTilingPadExpertPassPipeline(executableLoweringPipeline);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUConvTileAndDecomposeExpert:
-            addConvTileAndDecomposeExpertPassPipeline(nestedModulePM);
+            addConvTileAndDecomposeExpertPassPipeline(
+                executableLoweringPipeline);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               LinalgTransformInterpCodegen:
@@ -223,7 +223,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUTileFuseAndVectorize:
-            addTileFuseAndVectorizePassPipeline(nestedModulePM, lowerToVectors);
+            addTileFuseAndVectorizePassPipeline(executableLoweringPipeline,
+                                                lowerToVectors);
             break;
           default:
             variantOp.emitOpError("Unsupported pipeline on CPU target.");

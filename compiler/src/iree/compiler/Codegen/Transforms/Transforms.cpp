@@ -27,13 +27,9 @@ namespace iree_compiler {
 
 namespace {}  // namespace
 
-LogicalResult defineWorkgroupCountRegion(
-    OpBuilder &builder, func::FuncOp funcOp,
+FailureOr<IREE::HAL::ExecutableEntryPointOp> defineWorkgroupCountRegion(
+    OpBuilder &builder, IREE::HAL::ExecutableEntryPointOp entryPointOp,
     WorkgroupCountRegionBuilder regionBuilder) {
-  IREE::HAL::ExecutableEntryPointOp entryPointOp = getEntryPoint(funcOp);
-  if (!entryPointOp) {
-    return funcOp.emitOpError("unable to find corresponding entry point op");
-  }
   Location loc = entryPointOp.getLoc();
 
   OpBuilder::InsertionGuard guard(builder);
@@ -69,7 +65,7 @@ LogicalResult defineWorkgroupCountRegion(
       regionBuilder(builder, loc, device, workload);
   builder.create<IREE::HAL::ReturnOp>(loc, workgroupCount);
   entryPointOp.erase();
-  return success();
+  return clonedOp;
 }
 
 }  // namespace iree_compiler

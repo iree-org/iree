@@ -49,9 +49,9 @@ static SmallVector<int64_t> getWorkloadPerWorkgroup(
 /// loops are known.
 /// IREE considers it without interchange at Flow level, so the arguments are
 /// not interchanged. In this context, we interchange the final yield values.
-static LogicalResult defineWorkgroupCountRegion(
-    func::FuncOp entryPointFn, ArrayRef<int64_t> workloadPerWorkgroup,
-    ArrayRef<int64_t> interchange) {
+static FailureOr<IREE::HAL::ExecutableEntryPointOp> defineWorkgroupCountRegion(
+    IREE::HAL::ExecutableEntryPointOp entryPointOp,
+    ArrayRef<int64_t> workloadPerWorkgroup, ArrayRef<int64_t> interchange) {
   // TODO(hanchung): Look into partitionable loops to see if the configuraion
   // is reasonable. The loops are paritioned at Flow level, any interchange on
   // non-paritioned loops might triggers issues. It's not easy to check
@@ -59,14 +59,14 @@ static LogicalResult defineWorkgroupCountRegion(
   // make partitionable loops also part of the lowering config. Otherwise, the
   // logic should be considered everywhere.
   if (interchange.size() > kNumMaxParallelDims) {
-    return entryPointFn.emitOpError(
+    return entryPointOp.emitOpError(
                "expected the number of loops is not greater than")
            << kNumMaxParallelDims;
   }
 
   if (workloadPerWorkgroup.size() > kNumMaxParallelDims) {
     // For now error out here.
-    return entryPointFn.emitOpError(
+    return entryPointOp.emitOpError(
                "expected workload per workgroup to be less than or equal to ")
            << kNumMaxParallelDims;
   }
@@ -93,31 +93,28 @@ static LogicalResult defineWorkgroupCountRegion(
     }
     return res;
   };
-  OpBuilder builder(entryPointFn.getContext());
-  return defineWorkgroupCountRegion(builder, entryPointFn, regionBuilder);
+  OpBuilder builder(entryPointOp.getContext());
+  return defineWorkgroupCountRegion(builder, entryPointOp, regionBuilder);
 }
 
 /// Update the workload_per_wg value on the TranslationInfoAttr.
 // TODO(ravishankarm): The workload_per_wg field should be deprecated. This
 // is just transition before all dependencies on it can be removed.
 static LogicalResult updateTranslationInfoAttr(
-    func::FuncOp entryPointFn, ArrayRef<int64_t> workloadPerWorkgroup) {
-  auto entryPointOp = getEntryPoint(entryPointFn);
-  if (!entryPointOp) {
-    return entryPointFn.emitOpError("expected entry point function");
-  }
+    IREE::HAL::ExecutableEntryPointOp entryPointOp,
+    ArrayRef<int64_t> workloadPerWorkgroup) {
   IREE::Codegen::DispatchLoweringPassPipeline passPipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault;
   if (auto translationInfo = getTranslationInfo(entryPointOp)) {
     // Expect the `workload_per_wg` to be empty.
     if (!translationInfo.getWorkloadPerWorkgroupVals().empty()) {
-      return entryPointFn.emitOpError(
+      return entryPointOp.emitOpError(
           "expected workload_per_wg to be empty at this stage");
     }
     passPipeline = translationInfo.getDispatchLoweringPassPipeline();
   }
   auto newTranslationInfoAttr = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn.getContext(), passPipeline, workloadPerWorkgroup);
+      entryPointOp.getContext(), passPipeline, workloadPerWorkgroup);
   setTranslationInfo(entryPointOp, newTranslationInfoAttr);
   return success();
 }
@@ -135,39 +132,52 @@ struct InsertDistributionInfoPass
 }  // namespace
 
 void InsertDistributionInfoPass::runOnOperation() {
-  func::FuncOp funcOp = getOperation();
-  if (!isEntryPoint(funcOp)) return;
+  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
+  ModuleOp innerModule = variantOp.getInnerModule();
+  llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> allEntryPoints =
+      getAllEntryPoints(innerModule);
+  for (func::FuncOp funcOp : innerModule.getOps<func::FuncOp>()) {
+    auto entryPointOp = allEntryPoints.lookup(funcOp.getName());
+    if (!entryPointOp) continue;
 
-  SmallVector<Operation *> computeOps;
-  SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
-  if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
-    return signalPassFailure();
-  }
-  if (!tiledLoops.empty()) {
-    // The entry point already has distribution to workgroups. Do nothing.
-    return;
-  }
-  if (computeOps.empty()) {
-    // Ignore other operations.
-    return;
-  }
+    SmallVector<Operation *> computeOps;
+    SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
+    if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
+      return signalPassFailure();
+    }
+    if (!tiledLoops.empty()) {
+      // The entry point already has distribution to workgroups. Do nothing.
+      return;
+    }
+    if (computeOps.empty()) {
+      // Ignore other operations.
+      return;
+    }
 
-  // Get the tile sizes to use from lowering configuration if set.
-  SmallVector<int64_t> tileSizes, interchange;
-  if (failed(getDistributionTileConfigFromLoweringConfig(computeOps, tileSizes,
-                                                         interchange))) {
-    return signalPassFailure();
-  }
-  SmallVector<int64_t> workloadPerWorkroup = getWorkloadPerWorkgroup(tileSizes);
+    // Get the tile sizes to use from lowering configuration if set.
+    SmallVector<int64_t> tileSizes, interchange;
+    if (failed(getDistributionTileConfigFromLoweringConfig(
+            computeOps, tileSizes, interchange))) {
+      return signalPassFailure();
+    }
+    SmallVector<int64_t> workloadPerWorkroup =
+        getWorkloadPerWorkgroup(tileSizes);
 
-  if (failed(defineWorkgroupCountRegion(funcOp, workloadPerWorkroup,
-                                        interchange)) ||
-      failed(updateTranslationInfoAttr(funcOp, workloadPerWorkroup))) {
-    return signalPassFailure();
+    FailureOr<IREE::HAL::ExecutableEntryPointOp> newEntryPointOp =
+        defineWorkgroupCountRegion(entryPointOp, workloadPerWorkroup,
+                                   interchange);
+    if (failed(newEntryPointOp)) {
+      return signalPassFailure();
+    }
+
+    if (failed(updateTranslationInfoAttr(newEntryPointOp.getValue(),
+                                         workloadPerWorkroup))) {
+      return signalPassFailure();
+    }
   }
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createInsertDistributionInfoPass() {
   return std::make_unique<InsertDistributionInfoPass>();
 }
