@@ -282,9 +282,10 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
   }
 
   paddingDims = {2};
-  pad("linalg.matmul", paddingDims, {1, 1, 0});
-
-  if (clEnableHoistPadding) {
+  if (!clEnableHoistPadding) {
+    pad("linalg.matmul", paddingDims);
+  } else {
+    pad("linalg.matmul", paddingDims, /*packPaddings=*/{1, 1, 0});
     LinalgFusePassOptions options;
     options.pad = true;
     options.anchorOpName = "linalg.matmul";
