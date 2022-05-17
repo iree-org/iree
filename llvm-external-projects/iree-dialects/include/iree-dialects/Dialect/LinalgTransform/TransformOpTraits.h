@@ -64,9 +64,9 @@ LogicalResult applyTransformToEach(ArrayRef<Operation *> targets,
     if (!specificOp)
       return failure();
 
-    //auto result = transform(specificOp);
-    //if (failed(appendTransformResultToVector(result, results)))
-    //  return failure();
+    // auto result = transform(specificOp);
+    // if (failed(appendTransformResultToVector(result, results)))
+    //   return failure();
   }
   return success();
 }
