@@ -611,7 +611,7 @@ iree_status_t iree_vm_bytecode_disasm_op(
       uint16_t result_reg = VM_ParseResultRegI64("result");
       EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-          b, " = vm.const.i64 %" PRId64 "  // 0x%08" PRIX64 "", value, value));
+          b, " = vm.const.i64 %" PRId64 "  // 0x%016" PRIX64 "", value, value));
       break;
     }
 
@@ -1365,8 +1365,8 @@ iree_status_t iree_vm_bytecode_disasm_op(
       EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.ext.i32.i64.s "));
-      EMIT_I64_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
+      EMIT_I32_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
       break;
     }
     DISASM_OP(CORE, ExtI32I64U) {
@@ -1375,8 +1375,8 @@ iree_status_t iree_vm_bytecode_disasm_op(
       EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.ext.i32.i64.u "));
-      EMIT_I64_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
+      EMIT_I32_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
       break;
     }
 
@@ -1658,7 +1658,7 @@ iree_status_t iree_vm_bytecode_disasm_op(
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_cstring(b, "= vm.import.exists @"));
+          iree_string_builder_append_cstring(b, " = vm.import.exists @"));
       int is_import = (function_ordinal & 0x80000000u) != 0;
       if (IREE_UNLIKELY(!is_import)) {
         IREE_RETURN_IF_ERROR(iree_string_builder_append_format(

@@ -260,10 +260,10 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_fill_elements(
       }
     } break;
     default:
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "invalid element length %d; expected one of [1, 2, 4, 8]",
-          (int)element_length);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "invalid element length %" PRIhsz
+                              "; expected one of [1, 2, 4, 8]",
+                              element_length);
   }
   return iree_ok_status();
 }

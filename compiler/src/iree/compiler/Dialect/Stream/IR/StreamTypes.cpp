@@ -59,6 +59,10 @@ static llvm::cl::opt<uint64_t> clResourceMaxRange(
     llvm::cl::desc("Maximum range of a resource binding; may be less than the "
                    "max allocation size."),
     llvm::cl::init(INT64_MAX));
+static llvm::cl::opt<unsigned> clResourceIndexBits(
+    "iree-stream-resource-index-bits",
+    llvm::cl::desc("Bit width of indices used to reference resource offsets."),
+    llvm::cl::init(32));
 
 //===----------------------------------------------------------------------===//
 // #stream.resource_config<...>
@@ -72,6 +76,7 @@ Attribute ResourceConfigAttr::parse(AsmParser &p, Type type) {
   int64_t minBufferOffsetAlignment = 0;
   int64_t maxBufferRange = 0;
   int64_t minBufferRangeAlignment = 0;
+  int64_t indexBits = 32;
   while (failed(p.parseOptionalRBrace())) {
     StringRef key;
     int64_t value = 0;
@@ -87,6 +92,8 @@ Attribute ResourceConfigAttr::parse(AsmParser &p, Type type) {
       maxBufferRange = value;
     } else if (key == "min_buffer_range_alignment") {
       minBufferRangeAlignment = value;
+    } else if (key == "index_bits") {
+      indexBits = value;
     }
     (void)p.parseOptionalComma();
   }
@@ -94,7 +101,7 @@ Attribute ResourceConfigAttr::parse(AsmParser &p, Type type) {
 
   return ResourceConfigAttr::get(p.getContext(), maxAllocationSize,
                                  minBufferOffsetAlignment, maxBufferRange,
-                                 minBufferRangeAlignment);
+                                 minBufferRangeAlignment, indexBits);
 }
 
 void ResourceConfigAttr::print(AsmPrinter &p) const {
@@ -104,7 +111,8 @@ void ResourceConfigAttr::print(AsmPrinter &p) const {
   os << "min_buffer_offset_alignment = " << getMinBufferOffsetAlignment()
      << ", ";
   os << "max_buffer_range = " << getMaxBufferRange() << ", ";
-  os << "min_buffer_range_alignment = " << getMinBufferRangeAlignment();
+  os << "min_buffer_range_alignment = " << getMinBufferRangeAlignment() << ", ";
+  os << "index_bits = " << getIndexBits();
   os << "}>";
 }
 
@@ -121,7 +129,8 @@ ResourceConfigAttr ResourceConfigAttr::intersectBufferConstraints(
                rhs.getMinBufferOffsetAlignment()),
       std::min(lhs.getMaxBufferRange(), rhs.getMaxBufferRange()),
       std::max(lhs.getMinBufferRangeAlignment(),
-               rhs.getMinBufferRangeAlignment()));
+               rhs.getMinBufferRangeAlignment()),
+      std::max(lhs.getIndexBits(), rhs.getIndexBits()));
 }
 
 // static
@@ -132,7 +141,7 @@ ResourceConfigAttr ResourceConfigAttr::getDefaultHostConstraints(
   // only use this during testing by ensuring affinities are always assigned.
   return ResourceConfigAttr::get(
       context, clResourceMaxAllocationSize, clResourceMinOffsetAlignment,
-      clResourceMaxRange, clResourceMinOffsetAlignment);
+      clResourceMaxRange, clResourceMinOffsetAlignment, clResourceIndexBits);
 }
 
 // TODO(benvanik): find a way to go affinity -> resource config.

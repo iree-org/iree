@@ -250,7 +250,9 @@ def Stream_ResourceConfigAttr :
     "int64_t":$maxBufferRange,
     // The minimum required alignment, in bytes, for size ranges of resources
     // bindings.
-    "int64_t":$minBufferRangeAlignment
+    "int64_t":$minBufferRangeAlignment,
+    // Number of bits in `index` values as passed across device boundaries.
+    "int64_t":$indexBits
   );
 
   let valueType = NoneType;

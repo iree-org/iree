@@ -243,7 +243,8 @@ static iree_status_t get_matrix_shape(iree_hal_buffer_view_t* buffer_view,
   dims[1] = iree_hal_buffer_view_shape_dim(buffer_view, 1);
   if (!(dims[0] > 0 && dims[1] > 0)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "expected matrix dims to be positive, got %dx%d",
+                            "expected matrix dims to be positive, got %" PRIdim
+                            "x%" PRIdim,
                             dims[0], dims[1]);
   }
   return iree_ok_status();
@@ -271,7 +272,8 @@ static iree_status_t get_matmul_sizes(
         result_dims[0] == *m_size && result_dims[1] == *n_size)) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "mismatched matrix shapes in matmul: %dx%d * %dx%d + %dx%d -> %dx%d",
+        "mismatched matrix shapes in matmul: %" PRIdim "x%" PRIdim " * %" PRIdim
+        "x%" PRIdim " + %" PRIdim "x%" PRIdim " -> %" PRIdim "x%" PRIdim,
         lhs_dims[0], lhs_dims[1], rhs_dims[0], rhs_dims[1], acc_dims[0],
         acc_dims[1], result_dims[0], result_dims[1]);
   }
@@ -597,7 +599,7 @@ static iree_status_t check_matmul_failure(
   }
   fprintf(file,
           "\n\nerror: the actual and expected result matrices disagree "
-          "at row %d, column %d.\n\n",
+          "at row %" PRIdim ", column %" PRIdim ".\n\n",
           row, col);
   char actual_value_buf[32];
   char expected_value_buf[32];
@@ -614,10 +616,10 @@ static iree_status_t check_matmul_failure(
   iree_hal_dim_t context = 8;
   const char* context_env = getenv("IREE_MATMUL_TEST_SHOW_CONTEXT");
   if (context_env) {
-    if (1 != sscanf(context_env, "%d", &context)) {
+    if (1 != sscanf(context_env, "%" PRIdim, &context)) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "Failed to parse IREE_MATMUL_TEST_SHOW_CONTEXT "
-                              "as \"%%d\". Got \"%s\"",
+                              "as \"%%" PRIdim "\". Got \"%s\"",
                               context_env);
     }
   }
@@ -953,8 +955,8 @@ static iree_status_t print_matmul_shape(FILE* file,
   iree_hal_dim_t rhs_dims[2] = {0};
   IREE_RETURN_IF_ERROR(get_matrix_shape(lhs, lhs_dims));
   IREE_RETURN_IF_ERROR(get_matrix_shape(rhs, rhs_dims));
-  fprintf(file, "Matmul shape (MxKxN): %dx%dx%d\n", lhs_dims[0], lhs_dims[1],
-          rhs_dims[1]);
+  fprintf(file, "Matmul shape (MxKxN): %" PRIdim "x%" PRIdim "x%" PRIdim "\n",
+          lhs_dims[0], lhs_dims[1], rhs_dims[1]);
   return iree_ok_status();
 }
 

@@ -106,13 +106,13 @@ class HalAllocator : public ApiRefCounted<HalAllocator, iree_hal_allocator_t> {
 
 struct HalShape {
  public:
-  static HalShape FromIntVector(std::vector<int32_t> indices) {
+  static HalShape FromIntVector(std::vector<iree_hal_dim_t> indices) {
     HalShape s;
     s.s = {indices.begin(), indices.end()};
     return s;
   }
 
-  std::vector<int32_t> s;
+  std::vector<iree_hal_dim_t> s;
 };
 
 class HalBufferView
@@ -184,7 +184,7 @@ class HalMappedMemory {
   }
 
   py::buffer_info ToBufferInfo() {
-    std::vector<int32_t> shape(iree_hal_buffer_view_shape_rank(bv_));
+    std::vector<iree_hal_dim_t> shape(iree_hal_buffer_view_shape_rank(bv_));
     CheckApiStatus(
         iree_hal_buffer_view_shape(bv_, shape.size(), shape.data(), nullptr),
         "Error getting buffer view shape");

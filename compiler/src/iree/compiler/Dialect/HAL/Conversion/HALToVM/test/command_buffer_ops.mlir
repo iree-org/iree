@@ -45,7 +45,7 @@ func.func @command_buffer_fill_buffer_i8(
   %c200 = arith.constant 200 : index
   // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 1
   // CHECK-DAG: %[[EXTEND:.+]] = vm.ext.i8.i32.u %arg2 : i32 -> i32
-  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %[[EXTEND]], %[[PATTERN_LENGTH]]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, i32, i32, i32) -> ()
+  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %[[EXTEND]], %[[PATTERN_LENGTH]]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i64, i64, i32, i32) -> ()
   hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
       target(%arg1 : !hal.buffer)[%c100, %c200]
       pattern(%arg2 : i8)
@@ -64,7 +64,7 @@ func.func @command_buffer_fill_buffer_i16(
   %c200 = arith.constant 200 : index
   // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 2
   // CHECK-DAG: %[[EXTEND:.+]] = vm.ext.i16.i32.u %arg2 : i32 -> i32
-  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %[[EXTEND]], %[[PATTERN_LENGTH]]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, i32, i32, i32) -> ()
+  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %[[EXTEND]], %[[PATTERN_LENGTH]]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i64, i64, i32, i32) -> ()
   hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
       target(%arg1 : !hal.buffer)[%c100, %c200]
       pattern(%arg2 : i16)
@@ -82,7 +82,7 @@ func.func @command_buffer_fill_buffer_i32(
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
   // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 4
-  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %arg2, %[[PATTERN_LENGTH]]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, i32, i32, i32) -> ()
+  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %arg2, %[[PATTERN_LENGTH]]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i64, i64, i32, i32) -> ()
   hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
       target(%arg1 : !hal.buffer)[%c100, %c200]
       pattern(%arg2 : i32)
@@ -99,7 +99,7 @@ func.func @command_buffer_copy_buffer(
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
   %c300 = arith.constant 300 : index
-  // CHECK: vm.call @hal.command_buffer.copy_buffer(%arg0, %arg1, %c100, %arg1, %c200, %c300) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, !vm.ref<!hal.buffer>, i32, i32) -> ()
+  // CHECK: vm.call @hal.command_buffer.copy_buffer(%arg0, %arg1, %c100, %arg1, %c200, %c300) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i64, !vm.ref<!hal.buffer>, i64, i64) -> ()
   hal.command_buffer.copy_buffer<%arg0 : !hal.command_buffer>
       source(%arg1 : !hal.buffer)[%c100]
       target(%arg1 : !hal.buffer)[%c200]
@@ -117,11 +117,11 @@ func.func @command_buffer_bind_descriptor_set(
 ) {
   %c0 = arith.constant 0 : index
   %c100 = arith.constant 100 : index
-  // CHECK: vm.call.variadic @hal.command_buffer.bind_descriptor_set(%arg0, %arg1, %zero, %arg2, []) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!hal.descriptor_set>, i32 ...)
+  // CHECK: vm.call.variadic @hal.command_buffer.bind_descriptor_set(%arg0, %arg1, %zero, %arg2, []) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!hal.descriptor_set>, i64 ...)
   hal.command_buffer.bind_descriptor_set<%arg0 : !hal.command_buffer>
       layout(%arg1 : !hal.executable_layout)[%c0]
       set(%arg2 : !hal.descriptor_set)
-  // CHECK: vm.call.variadic @hal.command_buffer.bind_descriptor_set(%arg0, %arg1, %zero, %arg2, [%c100]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!hal.descriptor_set>, i32 ...)
+  // CHECK: vm.call.variadic @hal.command_buffer.bind_descriptor_set(%arg0, %arg1, %zero, %arg2, [%c100]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!hal.descriptor_set>, i64 ...)
   hal.command_buffer.bind_descriptor_set<%arg0 : !hal.command_buffer>
       layout(%arg1 : !hal.executable_layout)[%c0]
       set(%arg2 : !hal.descriptor_set)
@@ -155,7 +155,7 @@ func.func @command_buffer_dispatch_indirect(
   %arg2: !hal.buffer
 ) {
   %c100 = arith.constant 100 : index
-  // CHECK: vm.call @hal.command_buffer.dispatch.indirect(%arg0, %arg1, %zero, %arg2, %c100) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, !vm.ref<!hal.buffer>, i32) -> ()
+  // CHECK: vm.call @hal.command_buffer.dispatch.indirect(%arg0, %arg1, %zero, %arg2, %c100) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, !vm.ref<!hal.buffer>, i64) -> ()
   hal.command_buffer.dispatch.indirect<%arg0 : !hal.command_buffer>
       target(%arg1 : !hal.executable)[0]
       workgroups(%arg2 : !hal.buffer)[%c100]

@@ -71,9 +71,6 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createMemoizeDeviceQueriesPass();
 // Executable translation
 //===----------------------------------------------------------------------===//
 
-// Packs stream.executable operands into i32 push constants.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createPackDispatchOperandsPass();
-
 // Defines hal.executables and hal.interfaces for flow.executable ops based on
 // usage within the module. Target backends are queried to check for support and
 // device placements are made.
@@ -164,7 +161,6 @@ inline void registerHALPasses() {
   createMaterializeInterfacesPass();
   createMaterializeResourceCachesPass(targetOptions);
   createMemoizeDeviceQueriesPass();
-  createPackDispatchOperandsPass();
   createResolveEntryPointOrdinalsPass();
   createSerializeExecutablesPass();
   createSerializeTargetExecutablesPass("");

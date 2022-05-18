@@ -38,6 +38,9 @@ class BufferLoadOpConversion
           op, "half-width floats not supported on the host (yet)");
     }
 
+    auto sourceOffset = castToImportType(adaptor.source_offset(),
+                                         rewriter.getI64Type(), rewriter);
+
     // 32-bit values are loaded directly, 64-bit are combined from 32 | 32.
     Value value;
     if (validByteWidth <= 4) {
@@ -45,8 +48,7 @@ class BufferLoadOpConversion
           op.getLoc(), validByteWidth, 32);
       auto callOp = rewriter.create<IREE::VM::CallOp>(
           op.getLoc(), SymbolRefAttr::get(importOp), importType.getResults(),
-          ArrayRef<Value>{adaptor.source_buffer(), adaptor.source_offset(),
-                          byteWidth});
+          ArrayRef<Value>{adaptor.source_buffer(), sourceOffset, byteWidth});
       copyImportAttrs(importOp, callOp);
       value = callOp.getResult(0);
     } else {
@@ -55,8 +57,8 @@ class BufferLoadOpConversion
 
       // value = (i64(hi) << 32) | i64(lo)
       auto hiOffset = rewriter.createOrFold<arith::AddIOp>(
-          op.getLoc(), adaptor.source_offset(),
-          rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 4));
+          op.getLoc(), sourceOffset,
+          rewriter.create<IREE::VM::ConstI64Op>(op.getLoc(), 4));
       auto hiCallOp = rewriter.create<IREE::VM::CallOp>(
           op.getLoc(), SymbolRefAttr::get(importOp), importType.getResults(),
           ArrayRef<Value>{adaptor.source_buffer(), hiOffset, halfByteWidth});
@@ -70,7 +72,7 @@ class BufferLoadOpConversion
 
       auto loCallOp = rewriter.create<IREE::VM::CallOp>(
           op.getLoc(), SymbolRefAttr::get(importOp), importType.getResults(),
-          ArrayRef<Value>{adaptor.source_buffer(), adaptor.source_offset(),
+          ArrayRef<Value>{adaptor.source_buffer(), sourceOffset,
                           halfByteWidth});
       auto lo = rewriter.create<arith::ExtUIOp>(
           op.getLoc(),
@@ -117,6 +119,9 @@ class BufferStoreOpConversion
           op, "half-width floats not supported on the host (yet)");
     }
 
+    auto targetOffset = castToImportType(adaptor.target_offset(),
+                                         rewriter.getI64Type(), rewriter);
+
     // f32 -> i32, etc
     auto value = adaptor.value();
     if (elementType.isa<FloatType>()) {
@@ -132,8 +137,8 @@ class BufferStoreOpConversion
           op.getLoc(), validByteWidth, 32);
       auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
           op, SymbolRefAttr::get(importOp), importType.getResults(),
-          ArrayRef<Value>{value, adaptor.target_buffer(),
-                          adaptor.target_offset(), byteWidth});
+          ArrayRef<Value>{value, adaptor.target_buffer(), targetOffset,
+                          byteWidth});
       copyImportAttrs(importOp, callOp);
     } else {
       auto halfByteWidth =
@@ -141,7 +146,7 @@ class BufferStoreOpConversion
 
       auto lo = rewriter.createOrFold<arith::TruncIOp>(
           op.getLoc(), rewriter.getI32Type(), value);
-      auto loOffset = adaptor.target_offset();
+      auto loOffset = targetOffset;
       auto loCallOp = rewriter.create<IREE::VM::CallOp>(
           op.getLoc(), SymbolRefAttr::get(importOp), importType.getResults(),
           ArrayRef<Value>{lo, adaptor.target_buffer(), loOffset,
@@ -154,8 +159,8 @@ class BufferStoreOpConversion
               op.getLoc(), value,
               rewriter.create<arith::ConstantIntOp>(op.getLoc(), 32, 64)));
       auto hiOffset = rewriter.createOrFold<arith::AddIOp>(
-          op.getLoc(), adaptor.target_offset(),
-          rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 4));
+          op.getLoc(), targetOffset,
+          rewriter.create<IREE::VM::ConstI64Op>(op.getLoc(), 4));
       auto hiCallOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
           op, SymbolRefAttr::get(importOp), importType.getResults(),
           ArrayRef<Value>{hi, adaptor.target_buffer(), hiOffset,

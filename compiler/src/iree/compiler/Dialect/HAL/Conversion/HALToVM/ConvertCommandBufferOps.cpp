@@ -35,8 +35,9 @@ class CommandBufferFillBufferOpConversion
     SmallVector<Value, 8> callOperands = {
         adaptor.command_buffer(),
         adaptor.target_buffer(),
-        adaptor.target_offset(),
-        adaptor.length(),
+        castToImportType(adaptor.target_offset(), rewriter.getI64Type(),
+                         rewriter),
+        castToImportType(adaptor.length(), rewriter.getI64Type(), rewriter),
     };
 
     // Record the original pattern length then extend it to a 32 bit integer.
@@ -102,8 +103,10 @@ class CommandBufferPushDescriptorSetOpConversion
     for (size_t i = 0; i < adaptor.binding_ordinals().size(); ++i) {
       callOperands.push_back(adaptor.binding_ordinals()[i]);
       callOperands.push_back(adaptor.binding_buffers()[i]);
-      callOperands.push_back(adaptor.binding_offsets()[i]);
-      callOperands.push_back(adaptor.binding_lengths()[i]);
+      callOperands.push_back(castToImportType(adaptor.binding_offsets()[i],
+                                              rewriter.getI64Type(), rewriter));
+      callOperands.push_back(castToImportType(adaptor.binding_lengths()[i],
+                                              rewriter.getI64Type(), rewriter));
     }
 
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(

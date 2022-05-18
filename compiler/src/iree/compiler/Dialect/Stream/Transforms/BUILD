@@ -29,6 +29,7 @@ iree_compiler_cc_library(
         "OutlineConstants.cpp",
         "PackAllocations.cpp",
         "PackConstants.cpp",
+        "PackDispatchOperands.cpp",
         "PassDetail.h",
         "Passes.cpp",
         "PropagateSubviews.cpp",
