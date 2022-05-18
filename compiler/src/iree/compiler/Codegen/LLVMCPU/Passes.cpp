@@ -400,6 +400,9 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
   }
 
   // Add the sandbox single tiling expert to vectorize.
+  // We can't do the vectorization in the tiling expert above due to an issue in
+  // codegen strategy pipeline. Since we are moving to the transform dialect, we
+  // choose to have a workaround here by splitting them into two stages.
   {
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
