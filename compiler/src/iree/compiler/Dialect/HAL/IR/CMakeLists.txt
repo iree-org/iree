@@ -133,7 +133,7 @@ iree_tablegen_doc(
   TD_FILE
     "HALOps.td"
   OUTS
-    --gen-dialect-doc HALDialect.md
+    --gen-dialect-doc --dialect=hal HALDialect.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

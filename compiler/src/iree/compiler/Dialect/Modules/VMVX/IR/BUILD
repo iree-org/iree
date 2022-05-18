@@ -140,7 +140,9 @@ iree_tablegen_doc(
     name = "VMVXDialecDocGen",
     tbl_outs = [
         (
-            ["--gen-dialect-doc"],
+            [
+                "--gen-dialect-doc",
+            ],
             "VMVXDialect.md",
         ),
     ],

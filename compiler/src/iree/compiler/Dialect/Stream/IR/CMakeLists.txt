@@ -106,7 +106,7 @@ iree_tablegen_doc(
   TD_FILE
     "StreamOps.td"
   OUTS
-    --gen-dialect-doc StreamDialect.md
+    --gen-dialect-doc --dialect=stream StreamDialect.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

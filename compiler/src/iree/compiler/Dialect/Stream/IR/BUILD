@@ -171,7 +171,10 @@ iree_tablegen_doc(
     name = "StreamDialectDocGen",
     tbl_outs = [
         (
-            ["--gen-dialect-doc"],
+            [
+                "--gen-dialect-doc",
+                "--dialect=stream",
+            ],
             "StreamDialect.md",
         ),
     ],

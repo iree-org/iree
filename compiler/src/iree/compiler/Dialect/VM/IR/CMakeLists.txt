@@ -110,7 +110,7 @@ iree_tablegen_doc(
   TD_FILE
     "VMOps.td"
   OUTS
-    --gen-dialect-doc VMDialect.md
+    --gen-dialect-doc --dialect=vm VMDialect.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
