@@ -90,8 +90,8 @@ public:
   /// only result to correspond to the list of individual results.
   LogicalResult apply(TransformResults &transformResults,
                       TransformState &state) {
-    using TransformOpType = typename llvm::function_traits<decltype(
-        &OpTy::applyToOne)>::template arg_t<0>;
+    using TransformOpType = typename llvm::function_traits<
+        decltype(&OpTy::applyToOne)>::template arg_t<0>;
     ArrayRef<Operation *> targets =
         state.getPayloadOps(this->getOperation()->getOperand(0));
     SmallVector<Operation *> results;
