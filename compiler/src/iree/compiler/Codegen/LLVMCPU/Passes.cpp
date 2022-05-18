@@ -387,14 +387,23 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  // Add the sandbox single tiling expert to tile and vectorize.
+  // Add the sandbox single tiling expert to tile.
   {
     LinalgSingleTilingExpertPassOptions options;
     options.decomposeToLowerDimOp = true;
-    options.vectorize = true;
-    options.vectorizePadding = true;
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLinalgSingleTilingExpertPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
+
+  // Add the sandbox single tiling expert to vectorize.
+  {
+    LinalgSingleTilingExpertPassOptions options;
+    options.vectorize = true;
+    options.vectorizePadding = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
