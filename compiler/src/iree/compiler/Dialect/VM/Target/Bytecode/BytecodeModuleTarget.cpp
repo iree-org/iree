@@ -121,6 +121,27 @@ struct ZIPEndOfCentralDirectoryRecord {
   // comment (variable size)
 };
 static_assert(sizeof(ZIPEndOfCentralDirectoryRecord) == 22, "bad packing");
+struct ZIPEndOfCentralDirectoryRecord64 {
+  ulittle32_t signature;  // 0x06064B50
+  ulittle64_t sizeOfEOCD64Minus12;
+  ulittle16_t versionMadeBy;
+  ulittle16_t versionRequired;
+  ulittle32_t diskNumber;
+  ulittle32_t startDiskNumber;
+  ulittle64_t entriesOnDisk;
+  ulittle64_t entryCount;
+  ulittle64_t directorySize;
+  ulittle64_t directoryOffset;
+  // comment (variable size up to EOCD64)
+};
+static_assert(sizeof(ZIPEndOfCentralDirectoryRecord64) == 56, "bad packing");
+struct ZIPEndOfCentralDirectoryLocator64 {
+  ulittle32_t signature;  // 0x07064B50
+  ulittle32_t recordDiskNumber;
+  ulittle64_t recordOffset;
+  ulittle32_t diskCount;
+};
+static_assert(sizeof(ZIPEndOfCentralDirectoryLocator64) == 20, "bad packing");
 struct ZIPCentralDirectoryRecord {
   ulittle32_t signature;  // 0x02014B50
   ulittle16_t versionMadeBy;
@@ -165,6 +186,19 @@ struct ZIPExtraFieldHeader {
   ulittle16_t size;
 };
 static_assert(sizeof(ZIPExtraFieldHeader) == 4, "bad packing");
+struct ZIP64LocalExtraField {
+  ZIPExtraFieldHeader header;
+  ulittle64_t uncompressedSize;
+  ulittle64_t compressedSize;
+};
+static_assert(sizeof(ZIP64LocalExtraField) == 20, "bad packing");
+struct ZIP64CentralExtraField {
+  ZIPExtraFieldHeader header;
+  ulittle64_t uncompressedSize;
+  ulittle64_t compressedSize;
+  ulittle64_t localHeaderOffset;
+};
+static_assert(sizeof(ZIP64CentralExtraField) == 28, "bad packing");
 LLVM_PACKED_END
 
 // A ZIP file reference into the flatbuffer output data.
@@ -175,7 +209,7 @@ struct ZIPFileRef {
   // Name of the file used within the ZIP archive.
   std::string fileName;
   // Total size, in bytes, of the file uncompressed.
-  uint32_t totalSize;
+  uint64_t totalSize;
   // CRC32 of the file.
   uint32_t crc32;
   // Extra field padding (total).
@@ -229,34 +263,46 @@ static ZIPFileRef appendZIPLocalFileHeader(IREE::VM::RodataOp rodataOp,
 
   // header + file name + extra field header
   size_t totalHeaderLength = sizeof(ZIPLocalFileHeader) + fileName.size() +
+                             sizeof(ZIP64LocalExtraField) +
                              sizeof(ZIPExtraFieldHeader);
 
   // Append local file header.
   auto *header = reinterpret_cast<ZIPLocalFileHeader *>(
       flatcc_builder_start_struct(fbb, totalHeaderLength, 1));
   header->signature = 0x04034B50u;
-  header->versionToExtract = 0;
+  header->versionToExtract = 0x2Du;  // 4.5 (for zip64)
   header->generalPurposeFlag = 0;
   header->compressionMethod = 0;  // COMP_STORED
   header->lastModifiedTime = 0;
   header->lastModifiedDate = 0;
   header->crc32 = crc32;
-  header->compressedSize = static_cast<uint32_t>(rodataSize);
-  header->uncompressedSize = static_cast<uint32_t>(rodataSize);
+  header->compressedSize = 0xFFFFFFFFu;
+  header->uncompressedSize = 0xFFFFFFFFu;
   header->fileNameLength = static_cast<uint16_t>(fileName.size());
-  header->extraFieldLength = sizeof(ZIPExtraFieldHeader) + vectorPrefixLength;
+  header->extraFieldLength = sizeof(ZIP64LocalExtraField) +
+                             sizeof(ZIPExtraFieldHeader) + vectorPrefixLength;
   char *fileNamePtr = reinterpret_cast<char *>(header + 1);
   memcpy(fileNamePtr, fileName.data(), fileName.size());
-  auto *extraField =
-      reinterpret_cast<ZIPExtraFieldHeader *>(fileNamePtr + fileName.size());
-  extraField->id = 0xFECAu;
-  extraField->size = static_cast<uint16_t>(vectorPrefixLength);
+
+  auto *zip64Extra =
+      reinterpret_cast<ZIP64LocalExtraField *>(fileNamePtr + fileName.size());
+  zip64Extra->header.id = 0x0001u;
+  zip64Extra->header.size =
+      static_cast<uint16_t>(sizeof(*zip64Extra) - sizeof(ZIPExtraFieldHeader));
+  zip64Extra->compressedSize = static_cast<uint64_t>(rodataSize);
+  zip64Extra->uncompressedSize = static_cast<uint64_t>(rodataSize);
+
+  auto *paddingExtra = reinterpret_cast<ZIPExtraFieldHeader *>(
+      (uint8_t *)zip64Extra + sizeof(*zip64Extra));
+  paddingExtra->id = 0xFECAu;
+  paddingExtra->size = static_cast<uint16_t>(vectorPrefixLength);
+
   flatcc_builder_ref_t relativeHeaderOffset = flatcc_builder_end_struct(fbb);
 
   ZIPFileRef fileRef;
   fileRef.localHeaderOffset = relativeHeaderOffset;
   fileRef.fileName = std::move(fileName);
-  fileRef.totalSize = static_cast<uint32_t>(rodataSize);
+  fileRef.totalSize = static_cast<uint64_t>(rodataSize);
   fileRef.crc32 = crc32;
   fileRef.paddingLength = static_cast<uint16_t>(vectorPrefixLength);
   return fileRef;
@@ -283,37 +329,72 @@ static void appendZIPCentralDirectory(ArrayRef<ZIPFileRef> zipFileRefs,
     // Fixed-size header.
     ZIPCentralDirectoryRecord cdr;
     cdr.signature = 0x02014B50u;
-    cdr.versionMadeBy = 798;
-    cdr.versionToExtract = 20;
+    cdr.versionMadeBy = 0x031E;
+    cdr.versionToExtract = 0x2Du;  // 4.5 (for zip64)
     cdr.generalPurposeFlags = 0;
     cdr.compressionMethod = 0;  // COMP_STORED
     cdr.lastModifiedTime = 0;
     cdr.lastModifiedDate = 0;
     cdr.crc32 = zipFileRef.crc32;
-    cdr.compressedSize = zipFileRef.totalSize;
-    cdr.uncompressedSize = zipFileRef.totalSize;
+    cdr.compressedSize = 0xFFFFFFFFu;
+    cdr.uncompressedSize = 0xFFFFFFFFu;
     cdr.fileNameLength = static_cast<uint16_t>(zipFileRef.fileName.size());
-    cdr.extraFieldLength =
-        sizeof(ZIPExtraFieldHeader) + zipFileRef.paddingLength;
+    cdr.extraFieldLength = sizeof(ZIP64CentralExtraField);
     cdr.fileCommentLength = 0;
     cdr.diskStartNumber = 0;
     cdr.internalFileAttributes = 0;
     cdr.externalFileAttributes = 0;
-    cdr.localHeaderOffset = static_cast<uint32_t>(
-        endOffset + zipFileRef.localHeaderOffset - kZIPMagicLocalOffset);
+    cdr.localHeaderOffset = 0xFFFFFFFFu;
     output.write(reinterpret_cast<const char *>(&cdr), sizeof(cdr));
     output.write(zipFileRef.fileName.data(), zipFileRef.fileName.size());
-    ZIPExtraFieldHeader extraField;
-    extraField.id = 0xFECAu;
-    extraField.size = zipFileRef.paddingLength;
-    output.write(reinterpret_cast<const char *>(&extraField),
-                 sizeof(extraField));
-    output.write_zeros(extraField.size);
+
+    // Zip64 extension for 64-bit offsets/lengths.
+    // The -1 values above tell the extractor to use the values in this field
+    // instead. For simplicity we always use these regardless of whether we
+    // need to or not - we aren't optimizing for size when in this mode.
+    ZIP64CentralExtraField zip64Extra;
+    zip64Extra.header.id = 0x0001u;
+    zip64Extra.header.size =
+        static_cast<uint16_t>(sizeof(zip64Extra) - sizeof(ZIPExtraFieldHeader));
+    zip64Extra.localHeaderOffset = static_cast<uint64_t>(
+        endOffset + zipFileRef.localHeaderOffset - kZIPMagicLocalOffset + 2);
+    zip64Extra.compressedSize = zipFileRef.totalSize;
+    zip64Extra.uncompressedSize = zipFileRef.totalSize;
+    output.write(reinterpret_cast<const char *>(&zip64Extra),
+                 sizeof(zip64Extra));
   }
   uint64_t centralDirectoryEndOffset = output.tell();
 
+  // Append the central directory record.
+  ZIPEndOfCentralDirectoryRecord64 endOfCDR64;
+  endOfCDR64.signature = 0x06064B50u;
+  endOfCDR64.sizeOfEOCD64Minus12 = sizeof(endOfCDR64) - 12;
+  endOfCDR64.versionMadeBy = 0x002Du;
+  endOfCDR64.versionRequired = 0x002Du;  // 4.5 (for zip64)
+  endOfCDR64.diskNumber = 0;
+  endOfCDR64.startDiskNumber = 0;
+  endOfCDR64.entriesOnDisk = static_cast<uint64_t>(zipFileRefs.size());
+  endOfCDR64.entryCount = static_cast<uint64_t>(zipFileRefs.size());
+  endOfCDR64.directorySize = static_cast<uint64_t>(centralDirectoryEndOffset -
+                                                   centralDirectoryStartOffset);
+  endOfCDR64.directoryOffset =
+      static_cast<uint64_t>(centralDirectoryStartOffset);
+  output.write(reinterpret_cast<const char *>(&endOfCDR64), sizeof(endOfCDR64));
+
+  // End of central directory locator; must be at the end of the file.
+  ZIPEndOfCentralDirectoryLocator64 locator;
+  locator.signature = 0x07064B50u;
+  locator.recordDiskNumber = 0;
+  locator.recordOffset = centralDirectoryEndOffset;
+  locator.diskCount = 1;
+  output.write(reinterpret_cast<const char *>(&locator), sizeof(locator));
+
   // Append the final ZIP file footer.
-  // NOTE: this must come at the very end of the file.
+  // NOTE: this must come at the very end of the file. Even though we have the
+  // EOCD64 record above this is still required for extractors to recognize the
+  // file as a zip file. The offset of -1 will cause incompatible extractors
+  // (like on MS-DOS I guess?) to fail and compatible ones to look for the
+  // locator.
   ZIPEndOfCentralDirectoryRecord endOfCDR;
   endOfCDR.signature = 0x06054B50u;
   endOfCDR.diskNumber = 0;
@@ -322,7 +403,7 @@ static void appendZIPCentralDirectory(ArrayRef<ZIPFileRef> zipFileRefs,
   endOfCDR.entryCount = static_cast<uint16_t>(zipFileRefs.size());
   endOfCDR.directorySize = static_cast<uint32_t>(centralDirectoryEndOffset -
                                                  centralDirectoryStartOffset);
-  endOfCDR.directoryOffset = static_cast<uint32_t>(centralDirectoryStartOffset);
+  endOfCDR.directoryOffset = 0xFFFFFFFF;
   endOfCDR.commentLength = 0;
   output.write(reinterpret_cast<const char *>(&endOfCDR), sizeof(endOfCDR));
 }
