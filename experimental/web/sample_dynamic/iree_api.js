@@ -86,6 +86,14 @@ function ireeLoadProgram(vmfbPathOrBuffer) {
   });
 }
 
+// Inspects a program, asynchronously.
+function ireeInspectProgram(programState) {
+  return _callIntoWorker({
+    'messageType': 'inspectProgram',
+    'payload': programState,
+  });
+}
+
 // Unloads a program, asynchronously.
 function ireeUnloadProgram(programState) {
   return _callIntoWorker({
@@ -96,14 +104,19 @@ function ireeUnloadProgram(programState) {
 
 // Calls a function on a loaded program, asynchronously.
 //
-// Returns a semicolon delimited list of formatted outputs on success.
-function ireeCallFunction(programState, functionName, inputs) {
+// Returns a parsed JSON object on success:
+// {
+//   "total_invoke_time_ms": [number],
+//   "outputs": [semicolon delimited list of formatted outputs]
+// }
+function ireeCallFunction(programState, functionName, inputs, iterations) {
   return _callIntoWorker({
     'messageType': 'callFunction',
     'payload': {
       'programState': programState,
       'functionName': functionName,
       'inputs': inputs,
+      'iterations': iterations !== undefined ? iterations : 1,
     },
   });
 }

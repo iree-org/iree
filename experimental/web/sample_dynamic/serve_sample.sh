@@ -10,5 +10,6 @@ BUILD_DIR=${ROOT_DIR?}/build-emscripten
 BINARY_DIR=${BUILD_DIR}/experimental/web/sample_dynamic
 
 echo "=== Running local webserver, open at http://localhost:8000/ ==="
+echo "    For benchmarks, open http://localhost:8000/benchmarks.html"
 
 python3 ${ROOT_DIR?}/build_tools/scripts/local_web_server.py --directory ${BINARY_DIR}

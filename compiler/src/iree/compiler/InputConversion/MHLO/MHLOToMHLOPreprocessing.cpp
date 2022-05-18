@@ -33,15 +33,6 @@ namespace MHLO {
 
 namespace {
 
-/// Returns true if the given `attr` is a splat of the given `value`.
-static bool isSplatValue(DenseIntElementsAttr attr, uint64_t value) {
-  return attr.isSplat() && attr.getSplatValue<uint64_t>() == value;
-}
-
-static bool isAllZero(DenseIntElementsAttr attr) {
-  return isSplatValue(attr, 0);
-}
-
 static bool isIota(ArrayRef<int64_t> array) {
   for (auto it : llvm::enumerate(array)) {
     if (it.index() != it.value()) {
@@ -49,15 +40,6 @@ static bool isIota(ArrayRef<int64_t> array) {
     }
   }
   return true;
-}
-
-/// Returns true if the conv op has padding attribute, and that it has
-/// non-zero entries.
-static bool hasPadding(mhlo::ConvOp op) {
-  Optional<DenseIntElementsAttr> padding = op.padding();
-  if (!padding) return false;
-  return llvm::any_of(padding.getValue(),
-                      [](APInt v) -> bool { return !v.isNullValue(); });
 }
 
 static DenseIntElementsAttr make1DElementsAttr(OpBuilder &b,
@@ -314,14 +296,6 @@ bool isConsecutive(ArrayRef<int64_t> array) {
   return true;
 }
 
-SmallVector<int64_t> extract1DVector(DenseIntElementsAttr elements) {
-  SmallVector<int64_t> ret;
-  for (const APInt &element : elements) {
-    ret.push_back(element.getLimitedValue());
-  }
-  return ret;
-}
-
 // Rewrites mhlo.dot_general so lhs contraction dimensions are innermost and rhs
 // contraction dimensions are dims right after batch dimension. The pattern
 // inserts transposes so the dot_general always has the form:
@@ -453,10 +427,20 @@ class TransposeReshapeGenericDotGeneral
             ? RankedTensorType::get(newShape, resultType.getElementType())
             : op.getType();
 
-    Value result = rewriter.create<mhlo::DotGeneralOp>(
-        op.getLoc(), newResultType, lhs, rhs, dimensionNumbers,
-        op.precision_configAttr());
+    auto newOp = rewriter.create<mhlo::DotGeneralOp>(op.getLoc(), newResultType,
+                                                     lhs, rhs, dimensionNumbers,
+                                                     op.precision_configAttr());
 
+    // Copy over unknown attributes as we currently rely on it to let user tune
+    // lowering parameters.
+    ArrayRef<StringRef> odsAttrs = op.getAttributeNames();
+    for (NamedAttribute kv : op->getAttrs()) {
+      if (!llvm::is_contained(odsAttrs, kv.getName().getValue())) {
+        newOp->setAttr(kv.getName(), kv.getValue());
+      }
+    }
+
+    Value result = newOp.getResult();
     if (needReshapeResult) {
       result =
           rewriter.create<mhlo::ReshapeOp>(op.getLoc(), resultType, result);

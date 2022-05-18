@@ -52,40 +52,50 @@ def VM_OPC_GlobalLoadI32         : VM_OPC<0x00, "GlobalLoadI32">;
 def VM_OPC_GlobalStoreI32        : VM_OPC<0x01, "GlobalStoreI32">;
 def VM_OPC_GlobalLoadIndirectI32 : VM_OPC<0x02, "GlobalLoadIndirectI32">;
 def VM_OPC_GlobalStoreIndirectI32: VM_OPC<0x03, "GlobalStoreIndirectI32">;
-def VM_OPC_GlobalLoadRef         : VM_OPC<0x04, "GlobalLoadRef">;
-def VM_OPC_GlobalStoreRef        : VM_OPC<0x05, "GlobalStoreRef">;
-def VM_OPC_GlobalLoadIndirectRef : VM_OPC<0x06, "GlobalLoadIndirectRef">;
-def VM_OPC_GlobalStoreIndirectRef: VM_OPC<0x07, "GlobalStoreIndirectRef">;
+def VM_OPC_GlobalLoadI64         : VM_OPC<0x04, "GlobalLoadI64">;
+def VM_OPC_GlobalStoreI64        : VM_OPC<0x05, "GlobalStoreI64">;
+def VM_OPC_GlobalLoadIndirectI64 : VM_OPC<0x06, "GlobalLoadIndirectI64">;
+def VM_OPC_GlobalStoreIndirectI64: VM_OPC<0x07, "GlobalStoreIndirectI64">;
+def VM_OPC_GlobalLoadRef         : VM_OPC<0x08, "GlobalLoadRef">;
+def VM_OPC_GlobalStoreRef        : VM_OPC<0x09, "GlobalStoreRef">;
+def VM_OPC_GlobalLoadIndirectRef : VM_OPC<0x0A, "GlobalLoadIndirectRef">;
+def VM_OPC_GlobalStoreIndirectRef: VM_OPC<0x0B, "GlobalStoreIndirectRef">;
 
 // Constants:
-def VM_OPC_ConstI32Zero          : VM_OPC<0x08, "ConstI32Zero">;
-def VM_OPC_ConstI32              : VM_OPC<0x09, "ConstI32">;
-def VM_OPC_ConstRefZero          : VM_OPC<0x0A, "ConstRefZero">;
-def VM_OPC_ConstRefRodata        : VM_OPC<0x0B, "ConstRefRodata">;
+def VM_OPC_ConstI32Zero          : VM_OPC<0x0C, "ConstI32Zero">;
+def VM_OPC_ConstI32              : VM_OPC<0x0D, "ConstI32">;
+def VM_OPC_ConstI64Zero          : VM_OPC<0x0E, "ConstI64Zero">;
+def VM_OPC_ConstI64              : VM_OPC<0x0F, "ConstI64">;
+def VM_OPC_ConstRefZero          : VM_OPC<0x10, "ConstRefZero">;
+def VM_OPC_ConstRefRodata        : VM_OPC<0x11, "ConstRefRodata">;
 
 // List operations:
-def VM_OPC_ListAlloc             : VM_OPC<0x10, "ListAlloc">;
-def VM_OPC_ListReserve           : VM_OPC<0x11, "ListReserve">;
-def VM_OPC_ListSize              : VM_OPC<0x12, "ListSize">;
-def VM_OPC_ListResize            : VM_OPC<0x13, "ListResize">;
-def VM_OPC_ListGetI32            : VM_OPC<0x14, "ListGetI32">;
-def VM_OPC_ListSetI32            : VM_OPC<0x15, "ListSetI32">;
-def VM_OPC_ListGetRef            : VM_OPC<0x16, "ListGetRef">;
-def VM_OPC_ListSetRef            : VM_OPC<0x17, "ListSetRef">;
-// RESERVED: 0x18 push.i32
-// RESERVED: 0x19 pop.i32
-// RESERVED: 0x1A copy to other list
-// RESERVED: 0x1B slice clone into new list
-// RESERVED: 0x1C read byte buffer?
-// RESERVED: 0x1D write byte buffer?
+def VM_OPC_ListAlloc             : VM_OPC<0x12, "ListAlloc">;
+def VM_OPC_ListReserve           : VM_OPC<0x13, "ListReserve">;
+def VM_OPC_ListSize              : VM_OPC<0x14, "ListSize">;
+def VM_OPC_ListResize            : VM_OPC<0x15, "ListResize">;
+def VM_OPC_ListGetI32            : VM_OPC<0x16, "ListGetI32">;
+def VM_OPC_ListSetI32            : VM_OPC<0x17, "ListSetI32">;
+def VM_OPC_ListGetI64            : VM_OPC<0x18, "ListGetI64">;
+def VM_OPC_ListSetI64            : VM_OPC<0x19, "ListSetI64">;
+def VM_OPC_ListGetRef            : VM_OPC<0x1A, "ListGetRef">;
+def VM_OPC_ListSetRef            : VM_OPC<0x1B, "ListSetRef">;
+// RESERVED: push.i32
+// RESERVED: pop.i32
+// RESERVED: copy to other list
+// RESERVED: slice clone into new list
+// RESERVED: read byte buffer?
+// RESERVED: write byte buffer?
 
 // Conditional assignment:
-def VM_OPC_SelectI32             : VM_OPC<0x1E, "SelectI32">;
-def VM_OPC_SelectRef             : VM_OPC<0x1F, "SelectRef">;
-def VM_OPC_SwitchI32             : VM_OPC<0x20, "SwitchI32">;
+def VM_OPC_SelectI32             : VM_OPC<0x1C, "SelectI32">;
+def VM_OPC_SelectI64             : VM_OPC<0x1D, "SelectI64">;
+def VM_OPC_SelectRef             : VM_OPC<0x1E, "SelectRef">;
+def VM_OPC_SwitchI32             : VM_OPC<0x1F, "SwitchI32">;
+def VM_OPC_SwitchI64             : VM_OPC<0x20, "SwitchI64">;
 def VM_OPC_SwitchRef             : VM_OPC<0x21, "SwitchRef">;
 
-// Integer arithmetic:
+// 32-bit integer arithmetic:
 def VM_OPC_AddI32                : VM_OPC<0x22, "AddI32">;
 def VM_OPC_SubI32                : VM_OPC<0x23, "SubI32">;
 def VM_OPC_MulI32                : VM_OPC<0x24, "MulI32">;
@@ -95,90 +105,110 @@ def VM_OPC_RemI32S               : VM_OPC<0x27, "RemI32S">;
 def VM_OPC_RemI32U               : VM_OPC<0x28, "RemI32U">;
 def VM_OPC_FMAI32                : VM_OPC<0x29, "FMAI32">;
 
-// Integer bit manipulation:
-def VM_OPC_NotI32                : VM_OPC<0x30, "NotI32">;
-def VM_OPC_AndI32                : VM_OPC<0x31, "AndI32">;
-def VM_OPC_OrI32                 : VM_OPC<0x32, "OrI32">;
-def VM_OPC_XorI32                : VM_OPC<0x33, "XorI32">;
+// 64-bit integer arithmetic:
+def VM_OPC_AddI64                : VM_OPC<0x2A, "AddI64">;
+def VM_OPC_SubI64                : VM_OPC<0x2B, "SubI64">;
+def VM_OPC_MulI64                : VM_OPC<0x2C, "MulI64">;
+def VM_OPC_DivI64S               : VM_OPC<0x2D, "DivI64S">;
+def VM_OPC_DivI64U               : VM_OPC<0x2E, "DivI64U">;
+def VM_OPC_RemI64S               : VM_OPC<0x2F, "RemI64S">;
+def VM_OPC_RemI64U               : VM_OPC<0x30, "RemI64U">;
+def VM_OPC_FMAI64                : VM_OPC<0x31, "FMAI64">;
 
-// Bitwise shifts and rotates:
-def VM_OPC_ShlI32                : VM_OPC<0x34, "ShlI32">;
-def VM_OPC_ShrI32S               : VM_OPC<0x35, "ShrI32S">;
-def VM_OPC_ShrI32U               : VM_OPC<0x36, "ShrI32U">;
+// 32-bit integer bit manipulation:
+def VM_OPC_NotI32                : VM_OPC<0x32, "NotI32">;
+def VM_OPC_AndI32                : VM_OPC<0x33, "AndI32">;
+def VM_OPC_OrI32                 : VM_OPC<0x34, "OrI32">;
+def VM_OPC_XorI32                : VM_OPC<0x35, "XorI32">;
+
+// 64-bit integer bit manipulation:
+def VM_OPC_NotI64                : VM_OPC<0x36, "NotI64">;
+def VM_OPC_AndI64                : VM_OPC<0x37, "AndI64">;
+def VM_OPC_OrI64                 : VM_OPC<0x38, "OrI64">;
+def VM_OPC_XorI64                : VM_OPC<0x39, "XorI64">;
+
+// 32-bit bitwise shifts and rotates:
+def VM_OPC_ShlI32                : VM_OPC<0x3A, "ShlI32">;
+def VM_OPC_ShrI32S               : VM_OPC<0x3B, "ShrI32S">;
+def VM_OPC_ShrI32U               : VM_OPC<0x3C, "ShrI32U">;
+
+// 64-bit bitwise shifts and rotates:
+def VM_OPC_ShlI64                : VM_OPC<0x3D, "ShlI64">;
+def VM_OPC_ShrI64S               : VM_OPC<0x3E, "ShrI64S">;
+def VM_OPC_ShrI64U               : VM_OPC<0x3F, "ShrI64U">;
 
 // Casting and type conversion/emulation:
-def VM_OPC_TruncI32I8            : VM_OPC<0x37, "TruncI32I8">;
-def VM_OPC_TruncI32I16           : VM_OPC<0x38, "TruncI32I16">;
-def VM_OPC_ExtI8I32S             : VM_OPC<0x39, "ExtI8I32S">;
-def VM_OPC_ExtI8I32U             : VM_OPC<0x3A, "ExtI8I32U">;
-def VM_OPC_ExtI16I32S            : VM_OPC<0x3B, "ExtI16I32S">;
-def VM_OPC_ExtI16I32U            : VM_OPC<0x3C, "ExtI16I32U">;
+def VM_OPC_TruncI32I8            : VM_OPC<0x40, "TruncI32I8">;
+def VM_OPC_TruncI32I16           : VM_OPC<0x41, "TruncI32I16">;
+def VM_OPC_TruncI64I32           : VM_OPC<0x42, "TruncI64I32">;
+def VM_OPC_ExtI8I32S             : VM_OPC<0x43, "ExtI8I32S">;
+def VM_OPC_ExtI8I32U             : VM_OPC<0x44, "ExtI8I32U">;
+def VM_OPC_ExtI16I32S            : VM_OPC<0x45, "ExtI16I32S">;
+def VM_OPC_ExtI16I32U            : VM_OPC<0x46, "ExtI16I32U">;
+def VM_OPC_ExtI32I64S            : VM_OPC<0x47, "ExtI32I64S">;
+def VM_OPC_ExtI32I64U            : VM_OPC<0x48, "ExtI32I64U">;
 
 // Reduction arithmetic:
 
 // Comparison ops:
-def VM_OPC_CmpEQI32              : VM_OPC<0x40, "CmpEQI32">;
-def VM_OPC_CmpNEI32              : VM_OPC<0x41, "CmpNEI32">;
-def VM_OPC_CmpLTI32S             : VM_OPC<0x42, "CmpLTI32S">;
-def VM_OPC_CmpLTI32U             : VM_OPC<0x43, "CmpLTI32U">;
+def VM_OPC_CmpEQI32              : VM_OPC<0x49, "CmpEQI32">;
+def VM_OPC_CmpNEI32              : VM_OPC<0x4A, "CmpNEI32">;
+def VM_OPC_CmpLTI32S             : VM_OPC<0x4B, "CmpLTI32S">;
+def VM_OPC_CmpLTI32U             : VM_OPC<0x4C, "CmpLTI32U">;
 def VM_OPC_CmpNZI32              : VM_OPC<0x4D, "CmpNZI32">;
-def VM_OPC_CmpEQRef              : VM_OPC<0x4A, "CmpEQRef">;
-def VM_OPC_CmpNERef              : VM_OPC<0x4B, "CmpNERef">;
-def VM_OPC_CmpNZRef              : VM_OPC<0x4C, "CmpNZRef">;
+def VM_OPC_CmpEQI64              : VM_OPC<0x4E, "CmpEQI64">;
+def VM_OPC_CmpNEI64              : VM_OPC<0x4F, "CmpNEI64">;
+def VM_OPC_CmpLTI64S             : VM_OPC<0x50, "CmpLTI64S">;
+def VM_OPC_CmpLTI64U             : VM_OPC<0x51, "CmpLTI64U">;
+def VM_OPC_CmpNZI64              : VM_OPC<0x52, "CmpNZI64">;
+def VM_OPC_CmpEQRef              : VM_OPC<0x53, "CmpEQRef">;
+def VM_OPC_CmpNERef              : VM_OPC<0x54, "CmpNERef">;
+def VM_OPC_CmpNZRef              : VM_OPC<0x55, "CmpNZRef">;
 
 // Control flow:
-def VM_OPC_Branch                : VM_OPC<0x50, "Branch">;
-def VM_OPC_CondBranch            : VM_OPC<0x51, "CondBranch">;
-def VM_OPC_Call                  : VM_OPC<0x52, "Call">;
-def VM_OPC_CallVariadic          : VM_OPC<0x53, "CallVariadic">;
-def VM_OPC_Return                : VM_OPC<0x54, "Return">;
-def VM_OPC_Fail                  : VM_OPC<0x55, "Fail">;
-def VM_OPC_ImportResolved        : VM_OPC<0x56, "ImportResolved">;
+def VM_OPC_Branch                : VM_OPC<0x56, "Branch">;
+def VM_OPC_CondBranch            : VM_OPC<0x57, "CondBranch">;
+def VM_OPC_Call                  : VM_OPC<0x58, "Call">;
+def VM_OPC_CallVariadic          : VM_OPC<0x59, "CallVariadic">;
+def VM_OPC_Return                : VM_OPC<0x5A, "Return">;
+def VM_OPC_Fail                  : VM_OPC<0x5B, "Fail">;
+def VM_OPC_ImportResolved        : VM_OPC<0x5C, "ImportResolved">;
 
 // Async/fiber ops:
-def VM_OPC_Yield                 : VM_OPC<0x60, "Yield">;
+def VM_OPC_Yield                 : VM_OPC<0x5D, "Yield">;
 
 // Debugging:
-def VM_OPC_Trace                 : VM_OPC<0x7C, "Trace">;
-def VM_OPC_Print                 : VM_OPC<0x7D, "Print">;
-def VM_OPC_CondBreak             : VM_OPC<0x7E, "CondBreak">;
-def VM_OPC_Break                 : VM_OPC<0x7F, "Break">;
+def VM_OPC_Trace                 : VM_OPC<0x5E, "Trace">;
+def VM_OPC_Print                 : VM_OPC<0x5F, "Print">;
+def VM_OPC_CondBreak             : VM_OPC<0x60, "CondBreak">;
+def VM_OPC_Break                 : VM_OPC<0x61, "Break">;
 
 // Buffer load/store:
-// NOTE: though not used today the opcodes are chosen to allow for bit magic to
-// reduce dispatch overhead:
-//                bit 3             bit 2          bit 1-0
-//        +------------+-----------------+----------------+
-//  0xB...| load/store | unsigned/signed | byte count - 1 |
-//        +------------+-----------------+----------------+
-def VM_OPC_BufferLoadI8U         : VM_OPC<0xB0, "BufferLoadI8U">;
-def VM_OPC_BufferLoadI8S         : VM_OPC<0xB4, "BufferLoadI8S">;
-def VM_OPC_BufferLoadI16U        : VM_OPC<0xB1, "BufferLoadI16U">;
-def VM_OPC_BufferLoadI16S        : VM_OPC<0xB5, "BufferLoadI16S">;
-def VM_OPC_BufferLoadI32         : VM_OPC<0xB3, "BufferLoadI32">;
-def VM_OPC_BufferStoreI8         : VM_OPC<0xB8, "BufferStoreI8">;
-def VM_OPC_BufferStoreI16        : VM_OPC<0xB9, "BufferStoreI16">;
-def VM_OPC_BufferStoreI32        : VM_OPC<0xBB, "BufferStoreI32">;
+def VM_OPC_BufferLoadI8U         : VM_OPC<0x62, "BufferLoadI8U">;
+def VM_OPC_BufferLoadI8S         : VM_OPC<0x63, "BufferLoadI8S">;
+def VM_OPC_BufferLoadI16U        : VM_OPC<0x64, "BufferLoadI16U">;
+def VM_OPC_BufferLoadI16S        : VM_OPC<0x65, "BufferLoadI16S">;
+def VM_OPC_BufferLoadI32         : VM_OPC<0x66, "BufferLoadI32">;
+def VM_OPC_BufferLoadI64         : VM_OPC<0x67, "BufferLoadI64">;
+def VM_OPC_BufferStoreI8         : VM_OPC<0x68, "BufferStoreI8">;
+def VM_OPC_BufferStoreI16        : VM_OPC<0x69, "BufferStoreI16">;
+def VM_OPC_BufferStoreI32        : VM_OPC<0x6A, "BufferStoreI32">;
+def VM_OPC_BufferStoreI64        : VM_OPC<0x6B, "BufferStoreI64">;
 
 // Buffer manipulation:
-def VM_OPC_BufferAlloc           : VM_OPC<0xC0, "BufferAlloc">;
-def VM_OPC_BufferClone           : VM_OPC<0xC1, "BufferClone">;
-def VM_OPC_BufferLength          : VM_OPC<0xC2, "BufferLength">;
-def VM_OPC_BufferCopy            : VM_OPC<0xC6, "BufferCopy">;
-def VM_OPC_BufferCompare         : VM_OPC<0xC7, "BufferCompare">;
-// NOTE: lower 2 bits are byte count - 1.
-//          b3  b2          bit 1-0
-//        +---+---+----------------+
-//  0xC...| 1 | 1 | byte count - 1 |
-//        +---+---+----------------+
-def VM_OPC_BufferFillI8          : VM_OPC<0xCC, "BufferFillI8">;
-def VM_OPC_BufferFillI16         : VM_OPC<0xCD, "BufferFillI16">;
-def VM_OPC_BufferFillI32         : VM_OPC<0xCF, "BufferFillI32">;
+def VM_OPC_BufferAlloc           : VM_OPC<0x6C, "BufferAlloc">;
+def VM_OPC_BufferClone           : VM_OPC<0x6D, "BufferClone">;
+def VM_OPC_BufferLength          : VM_OPC<0x6E, "BufferLength">;
+def VM_OPC_BufferCopy            : VM_OPC<0x6F, "BufferCopy">;
+def VM_OPC_BufferCompare         : VM_OPC<0x70, "BufferCompare">;
+def VM_OPC_BufferFillI8          : VM_OPC<0x71, "BufferFillI8">;
+def VM_OPC_BufferFillI16         : VM_OPC<0x72, "BufferFillI16">;
+def VM_OPC_BufferFillI32         : VM_OPC<0x73, "BufferFillI32">;
+def VM_OPC_BufferFillI64         : VM_OPC<0x74, "BufferFillI64">;
 
 // Extension prefixes:
-def VM_OPC_PrefixExtI64          : VM_OPC<0xE0, "PrefixExtI64">;
-def VM_OPC_PrefixExtF32          : VM_OPC<0xE1, "PrefixExtF32">;
-def VM_OPC_PrefixExtF64          : VM_OPC<0xE2, "PrefixExtF64">;
+def VM_OPC_PrefixExtF32          : VM_OPC<0xE0, "PrefixExtF32">;
+def VM_OPC_PrefixExtF64          : VM_OPC<0xE1, "PrefixExtF64">;
 
 // Runtime enum iree_vm_core_op_t:
 def VM_CoreOpcodeAttr :
@@ -192,6 +222,10 @@ def VM_CoreOpcodeAttr :
     VM_OPC_GlobalStoreI32,
     VM_OPC_GlobalLoadIndirectI32,
     VM_OPC_GlobalStoreIndirectI32,
+    VM_OPC_GlobalLoadI64,
+    VM_OPC_GlobalStoreI64,
+    VM_OPC_GlobalLoadIndirectI64,
+    VM_OPC_GlobalStoreIndirectI64,
     VM_OPC_GlobalLoadRef,
     VM_OPC_GlobalStoreRef,
     VM_OPC_GlobalLoadIndirectRef,
@@ -199,6 +233,8 @@ def VM_CoreOpcodeAttr :
 
     VM_OPC_ConstI32Zero,
     VM_OPC_ConstI32,
+    VM_OPC_ConstI64Zero,
+    VM_OPC_ConstI64,
     VM_OPC_ConstRefZero,
     VM_OPC_ConstRefRodata,
 
@@ -208,12 +244,16 @@ def VM_CoreOpcodeAttr :
     VM_OPC_ListResize,
     VM_OPC_ListGetI32,
     VM_OPC_ListSetI32,
+    VM_OPC_ListGetI64,
+    VM_OPC_ListSetI64,
     VM_OPC_ListGetRef,
     VM_OPC_ListSetRef,
 
     VM_OPC_SelectI32,
+    VM_OPC_SelectI64,
     VM_OPC_SelectRef,
     VM_OPC_SwitchI32,
+    VM_OPC_SwitchI64,
     VM_OPC_SwitchRef,
 
     VM_OPC_AddI32,
@@ -225,25 +265,53 @@ def VM_CoreOpcodeAttr :
     VM_OPC_RemI32U,
     VM_OPC_FMAI32,
 
+    VM_OPC_AddI64,
+    VM_OPC_SubI64,
+    VM_OPC_MulI64,
+    VM_OPC_DivI64S,
+    VM_OPC_DivI64U,
+    VM_OPC_RemI64S,
+    VM_OPC_RemI64U,
+    VM_OPC_FMAI64,
+
     VM_OPC_NotI32,
     VM_OPC_AndI32,
     VM_OPC_OrI32,
     VM_OPC_XorI32,
+
+    VM_OPC_NotI64,
+    VM_OPC_AndI64,
+    VM_OPC_OrI64,
+    VM_OPC_XorI64,
+
     VM_OPC_ShlI32,
     VM_OPC_ShrI32S,
     VM_OPC_ShrI32U,
+
+    VM_OPC_ShlI64,
+    VM_OPC_ShrI64S,
+    VM_OPC_ShrI64U,
+
     VM_OPC_TruncI32I8,
     VM_OPC_TruncI32I16,
+    VM_OPC_TruncI64I32,
     VM_OPC_ExtI8I32S,
     VM_OPC_ExtI8I32U,
     VM_OPC_ExtI16I32S,
     VM_OPC_ExtI16I32U,
+    VM_OPC_ExtI32I64S,
+    VM_OPC_ExtI32I64U,
 
     VM_OPC_CmpEQI32,
     VM_OPC_CmpNEI32,
     VM_OPC_CmpLTI32S,
     VM_OPC_CmpLTI32U,
     VM_OPC_CmpNZI32,
+    VM_OPC_CmpEQI64,
+    VM_OPC_CmpNEI64,
+    VM_OPC_CmpLTI64S,
+    VM_OPC_CmpLTI64U,
+    VM_OPC_CmpNZI64,
     VM_OPC_CmpEQRef,
     VM_OPC_CmpNERef,
     VM_OPC_CmpNZRef,
@@ -266,9 +334,11 @@ def VM_CoreOpcodeAttr :
     VM_OPC_BufferLoadI16U,
     VM_OPC_BufferLoadI16S,
     VM_OPC_BufferLoadI32,
+    VM_OPC_BufferLoadI64,
     VM_OPC_BufferStoreI8,
     VM_OPC_BufferStoreI16,
     VM_OPC_BufferStoreI32,
+    VM_OPC_BufferStoreI64,
 
     VM_OPC_BufferAlloc,
     VM_OPC_BufferClone,
@@ -276,11 +346,11 @@ def VM_CoreOpcodeAttr :
     VM_OPC_BufferFillI8,
     VM_OPC_BufferFillI16,
     VM_OPC_BufferFillI32,
+    VM_OPC_BufferFillI64,
     VM_OPC_BufferCopy,
     VM_OPC_BufferCompare,
 
     // Extension opcodes (0xE0-0xFF):
-    VM_OPC_PrefixExtI64,  // VM_ExtI64OpcodeAttr
     VM_OPC_PrefixExtF32,  // VM_ExtF32OpcodeAttr
     VM_OPC_PrefixExtF64,  // VM_ExtF64OpcodeAttr
   ]>;

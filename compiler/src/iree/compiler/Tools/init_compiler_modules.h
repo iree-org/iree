@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_TOOLS_INIT_COMPILER_MODULES_H_
-#define IREE_TOOLS_INIT_COMPILER_MODULES_H_
+#ifndef IREE_COMPILER_TOOLS_INIT_COMPILER_MODULES_H_
+#define IREE_COMPILER_TOOLS_INIT_COMPILER_MODULES_H_
 
 #include "iree/compiler/Dialect/Modules/Check/IR/CheckDialect.h"
 
@@ -22,4 +22,4 @@ inline void registerIreeCompilerModuleDialects(DialectRegistry &registry) {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_TOOLS_INIT_COMPILER_MODULES_H_
+#endif  // IREE_COMPILER_TOOLS_INIT_COMPILER_MODULES_H_

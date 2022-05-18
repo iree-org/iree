@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(func.func(iree-spirv-tile,iree-spirv-vectorize))))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize, workload_per_wg = [64, 8]>
+#translation = #iree_codegen.translation_info<SPIRVVectorize workload_per_wg = [64, 8]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -65,7 +65,7 @@ hal.executable private @matmul_static_shape_f16 {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize, workload_per_wg = [64, 8]>
+#translation = #iree_codegen.translation_info<SPIRVVectorize workload_per_wg = [64, 8]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,

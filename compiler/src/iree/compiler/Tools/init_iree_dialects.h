@@ -9,8 +9,8 @@
 //
 // Based on MLIR's InitAllDialects but for IREE dialects.
 
-#ifndef IREE_TOOLS_INIT_IREE_DIALECTS_H_
-#define IREE_TOOLS_INIT_IREE_DIALECTS_H_
+#ifndef IREE_COMPILER_TOOLS_INIT_IREE_DIALECTS_H_
+#define IREE_COMPILER_TOOLS_INIT_IREE_DIALECTS_H_
 
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -63,4 +63,4 @@ inline void registerIreeDialects(DialectRegistry &registry) {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_TOOLS_INIT_IREE_DIALECTS_H_
+#endif  // IREE_COMPILER_TOOLS_INIT_IREE_DIALECTS_H_

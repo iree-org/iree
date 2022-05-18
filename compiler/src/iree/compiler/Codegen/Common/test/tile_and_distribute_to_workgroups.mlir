@@ -328,7 +328,7 @@ hal.executable private @preset_config_matmul_tensors {
   ]>
 ]>
 #executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm", "system-elf-x86_64">
-#translation = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize, workload_per_wg = [64, 64]>
+#translation = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize workload_per_wg = [64, 64]>
 hal.executable public @copy_op {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
     hal.executable.entry_point public @copy_op layout(#executable_layout) {translation_info = #translation}

@@ -9,8 +9,8 @@
 //
 // Based on MLIR's InitAllPasses but for IREE passes.
 
-#ifndef IREE_TOOLS_INIT_IREE_PASSES_H_
-#define IREE_TOOLS_INIT_IREE_PASSES_H_
+#ifndef IREE_COMPILER_TOOLS_INIT_IREE_PASSES_H_
+#define IREE_COMPILER_TOOLS_INIT_IREE_PASSES_H_
 
 #include <cstdlib>
 
@@ -66,4 +66,4 @@ inline void registerAllIreePasses() {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_TOOLS_INIT_IREE_PASSES_H_
+#endif  // IREE_COMPILER_TOOLS_INIT_IREE_PASSES_H_

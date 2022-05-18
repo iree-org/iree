@@ -295,114 +295,6 @@ Value BufferViewType::inferSizeFromValue(Location loc, Value value,
 }
 
 //===----------------------------------------------------------------------===//
-// Struct types
-//===----------------------------------------------------------------------===//
-
-BufferConstraintsAttr intersectBufferConstraints(BufferConstraintsAttr lhs,
-                                                 BufferConstraintsAttr rhs) {
-  if (!lhs) return rhs;
-  if (!rhs) return lhs;
-  Builder b(lhs.getContext());
-  return BufferConstraintsAttr::get(
-      b.getIndexAttr(std::min(lhs.max_allocation_size().getSExtValue(),
-                              rhs.max_allocation_size().getSExtValue())),
-      b.getIndexAttr(
-          std::max(lhs.min_buffer_offset_alignment().getSExtValue(),
-                   rhs.min_buffer_offset_alignment().getSExtValue())),
-      b.getIndexAttr(std::min(lhs.max_buffer_range().getSExtValue(),
-                              rhs.max_buffer_range().getSExtValue())),
-      b.getIndexAttr(
-          std::max(lhs.min_buffer_range_alignment().getSExtValue(),
-                   rhs.min_buffer_range_alignment().getSExtValue())));
-}
-
-// TODO(benvanik): runtime buffer constraint queries from the allocator.
-// We can add folders for those when the allocator is strongly-typed with
-// #hal.buffer_constraints and otherwise leave them for runtime queries.
-BufferConstraintsAdaptor::BufferConstraintsAdaptor(Location loc,
-                                                   Value allocator)
-    : loc_(loc), allocator_(allocator) {
-  // Picked to represent what we kind of want on CPU today.
-  uint64_t maxAllocationSize = 1 * 1024 * 1024 * 1024ull;
-  uint64_t minBufferOffsetAlignment = 16ull;
-  uint64_t maxBufferRange = 1 * 1024 * 1024 * 1024ull;
-  uint64_t minBufferRangeAlignment = 16ull;
-  Builder b(loc.getContext());
-  bufferConstraints_ = BufferConstraintsAttr::get(
-      b.getIndexAttr(maxAllocationSize),
-      b.getIndexAttr(minBufferOffsetAlignment), b.getIndexAttr(maxBufferRange),
-      b.getIndexAttr(minBufferRangeAlignment));
-}
-
-Value BufferConstraintsAdaptor::getMaxAllocationSize(OpBuilder &builder) {
-  return builder.createOrFold<mlir::arith::ConstantOp>(
-      loc_, bufferConstraints_.max_allocation_sizeAttr());
-}
-
-Value BufferConstraintsAdaptor::getMinBufferOffsetAlignment(
-    OpBuilder &builder) {
-  return builder.createOrFold<mlir::arith::ConstantOp>(
-      loc_, bufferConstraints_.min_buffer_offset_alignmentAttr());
-}
-
-Value BufferConstraintsAdaptor::getMaxBufferRange(OpBuilder &builder) {
-  return builder.createOrFold<mlir::arith::ConstantOp>(
-      loc_, bufferConstraints_.max_buffer_rangeAttr());
-}
-
-Value BufferConstraintsAdaptor::getMinBufferRangeAlignment(OpBuilder &builder) {
-  return builder.createOrFold<mlir::arith::ConstantOp>(
-      loc_, bufferConstraints_.min_buffer_range_alignmentAttr());
-}
-
-//===----------------------------------------------------------------------===//
-// Attribute printing and parsing
-//===----------------------------------------------------------------------===//
-
-// static
-Attribute BufferConstraintsAttr::parse(AsmParser &p) {
-  auto b = p.getBuilder();
-  if (failed(p.parseLess())) return {};
-
-  IntegerAttr maxAllocationSizeAttr;
-  IntegerAttr minBufferOffsetAlignmentAttr;
-  IntegerAttr maxBufferRangeAttr;
-  IntegerAttr minBufferRangeAlignmentAttr;
-  if (failed(p.parseKeyword("max_allocation_size")) || failed(p.parseEqual()) ||
-      failed(p.parseAttribute(maxAllocationSizeAttr, b.getIndexType())) ||
-      failed(p.parseComma()) ||
-      failed(p.parseKeyword("min_buffer_offset_alignment")) ||
-      failed(p.parseEqual()) ||
-      failed(
-          p.parseAttribute(minBufferOffsetAlignmentAttr, b.getIndexType())) ||
-      failed(p.parseComma()) || failed(p.parseKeyword("max_buffer_range")) ||
-      failed(p.parseEqual()) ||
-      failed(p.parseAttribute(maxBufferRangeAttr, b.getIndexType())) ||
-      failed(p.parseComma()) ||
-      failed(p.parseKeyword("min_buffer_range_alignment")) ||
-      failed(p.parseEqual()) ||
-      failed(p.parseAttribute(minBufferRangeAlignmentAttr, b.getIndexType()))) {
-    return {};
-  }
-
-  if (failed(p.parseGreater())) return {};
-  return BufferConstraintsAttr::get(
-      maxAllocationSizeAttr, minBufferOffsetAlignmentAttr, maxBufferRangeAttr,
-      minBufferRangeAlignmentAttr);
-}
-
-void BufferConstraintsAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<";
-  os << "max_allocation_size = " << max_allocation_size() << ", ";
-  os << "min_buffer_offset_alignment = " << min_buffer_offset_alignment()
-     << ", ";
-  os << "max_buffer_range = " << max_buffer_range() << ", ";
-  os << "min_buffer_range_alignment = " << min_buffer_range_alignment();
-  os << ">";
-}
-
-//===----------------------------------------------------------------------===//
 // #hal.device.target
 //===----------------------------------------------------------------------===//
 
@@ -456,17 +348,6 @@ Attribute DeviceTargetAttr::getMatchExpression() {
   return DeviceMatchIDAttr::get(*this);
 }
 
-BufferConstraintsAttr DeviceTargetAttr::getBufferConstraints() {
-  BufferConstraintsAttr constraintsAttr;
-  auto configAttr = getConfiguration();
-  if (configAttr) {
-    constraintsAttr =
-        configAttr.getAs<BufferConstraintsAttr>("buffer_constraints");
-  }
-  return constraintsAttr ? constraintsAttr
-                         : getDefaultHostBufferConstraints(getContext());
-}
-
 SmallVector<ExecutableTargetAttr, 4> DeviceTargetAttr::getExecutableTargets() {
   SmallVector<ExecutableTargetAttr, 4> resultAttrs;
   auto configAttr = getConfiguration();
@@ -497,37 +378,6 @@ SmallVector<IREE::HAL::DeviceTargetAttr, 4> DeviceTargetAttr::lookup(
     op = op->getParentOp();
   }
   return {};  // No devices found; let caller decide what to do.
-}
-
-// static
-BufferConstraintsAttr DeviceTargetAttr::getDefaultHostBufferConstraints(
-    MLIRContext *context) {
-  // Picked to represent what we kind of want on CPU today.
-  uint64_t maxAllocationSize = 1 * 1024 * 1024 * 1024ull;
-  uint64_t minBufferOffsetAlignment = 16ull;
-  uint64_t maxBufferRange = 1 * 1024 * 1024 * 1024ull;
-  uint64_t minBufferRangeAlignment = 16ull;
-  Builder b(context);
-  return BufferConstraintsAttr::get(b.getIndexAttr(maxAllocationSize),
-                                    b.getIndexAttr(minBufferOffsetAlignment),
-                                    b.getIndexAttr(maxBufferRange),
-                                    b.getIndexAttr(minBufferRangeAlignment));
-}
-
-// static
-BufferConstraintsAttr DeviceTargetAttr::lookupConservativeBufferConstraints(
-    Operation *op) {
-  BufferConstraintsAttr resultAttr = {};
-  for (auto targetAttr : IREE::HAL::DeviceTargetAttr::lookup(op)) {
-    auto configAttr = targetAttr.getConfiguration();
-    if (!configAttr) continue;
-    auto targetConstraintsAttr =
-        configAttr.getAs<BufferConstraintsAttr>("buffer_constraints");
-    if (!targetConstraintsAttr) continue;
-    resultAttr = intersectBufferConstraints(resultAttr, targetConstraintsAttr);
-  }
-  return resultAttr ? resultAttr
-                    : getDefaultHostBufferConstraints(op->getContext());
 }
 
 // static
@@ -818,7 +668,6 @@ Value DeviceMatchExecutableFormatAttr::buildConditionExpression(
 #include "iree/compiler/Dialect/HAL/IR/HALTypeInterfaces.cpp.inc"
 
 void HALDialect::registerAttributes() {
-  addAttributes<BufferConstraintsAttr>();
   addAttributes<
 #define GET_ATTRDEF_LIST
 #include "iree/compiler/Dialect/HAL/IR/HALAttrs.cpp.inc"  // IWYU pragma: keep
@@ -844,25 +693,17 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
   OptionalParseResult parseResult =
       generatedAttributeParser(parser, mnemonic, type, genAttr);
   if (parseResult.hasValue()) return genAttr;
-  if (mnemonic == BufferConstraintsAttr::getKindName()) {
-    return BufferConstraintsAttr::parse(parser);
-  }
   parser.emitError(parser.getNameLoc())
       << "unknown HAL attribute: " << mnemonic;
   return {};
 }
 
 void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
-  TypeSwitch<Attribute>(attr)
-      .Case<BufferConstraintsAttr>([&](auto typedAttr) {
-        p << typedAttr.getKindName();
-        typedAttr.print(p);
-      })
-      .Default([&](Attribute) {
-        if (failed(generatedAttributePrinter(attr, p))) {
-          assert(false && "unhandled HAL attribute kind");
-        }
-      });
+  TypeSwitch<Attribute>(attr).Default([&](Attribute) {
+    if (failed(generatedAttributePrinter(attr, p))) {
+      assert(false && "unhandled HAL attribute kind");
+    }
+  });
 }
 
 //===----------------------------------------------------------------------===//

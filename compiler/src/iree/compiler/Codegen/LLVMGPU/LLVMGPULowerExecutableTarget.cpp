@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/Dialect/NVGPU/NVGPUDialect.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -37,7 +38,8 @@ class LLVMGPULowerExecutableTargetPass
     registry
         .insert<IREE::Codegen::IREECodegenDialect, IREE::HAL::HALDialect,
                 linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect,
-                vector::VectorDialect, gpu::GPUDialect, scf::SCFDialect>();
+                vector::VectorDialect, gpu::GPUDialect, nvgpu::NVGPUDialect,
+                scf::SCFDialect>();
   }
 
   LLVMGPULowerExecutableTargetPass() = default;
@@ -141,19 +143,20 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   }
 
   if (!testLoweringConfiguration && translationInfo.hasValue()) {
-    OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
     switch (translationInfo.getValue().getDispatchLoweringPassPipeline()) {
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute:
-        addGPUSimpleDistributePassPipeline(nestedModulePM);
+        addGPUSimpleDistributePassPipeline(executableLoweringPipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize:
-        addGPUVectorizationPassPipeline(nestedModulePM);
+        addGPUVectorizationPassPipeline(executableLoweringPipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
-        addGPUMatmulSimtPassPipeline(nestedModulePM);
+        addGPUMatmulSimtPassPipeline(executableLoweringPipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
-        addGPUMatmulTensorCorePassPipeline(nestedModulePM);
+        addGPUMatmulTensorCorePassPipeline(
+            executableLoweringPipeline,
+            translationInfo.getValue().getSoftwarePipelineDepth());
         break;
       default:
         variantOp.emitOpError("Unsupported pipeline on GPU target.");

@@ -25,7 +25,6 @@ td_library(
             "VMOpcodesCore.td",
             "VMOpcodesF32.td",
             "VMOpcodesF64.td",
-            "VMOpcodesI64.td",
             "VMOps.td",
         ],
         include = ["*.td"],

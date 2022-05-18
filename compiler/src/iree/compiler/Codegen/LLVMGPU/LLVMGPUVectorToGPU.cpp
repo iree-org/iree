@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/Dialect/NVGPU/NVGPUDialect.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
@@ -77,19 +78,21 @@ static void createAsyncGroups(func::FuncOp funcOp) {
     for (vector::TransferWriteOp writeOp : group) {
       builder.setInsertionPoint(writeOp);
       auto readOp = writeOp.getVector().getDefiningOp<vector::TransferReadOp>();
-      Value token = builder.create<gpu::DeviceAsyncCopyOp>(
-          writeOp.getLoc(), gpu::DeviceAsyncTokenType::get(funcOp.getContext()),
+      Value token = builder.create<nvgpu::DeviceAsyncCopyOp>(
+          writeOp.getLoc(),
+          nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()),
           writeOp.getSource(), writeOp.getIndices(), readOp.getSource(),
           readOp.getIndices(),
-          builder.getIndexAttr(readOp.getVectorType().getNumElements()));
+          builder.getIndexAttr(readOp.getVectorType().getNumElements()),
+          /*bypassL1=*/builder.getUnitAttr());
       tokens.push_back(token);
     }
     // Create the group and wait for it right after.
-    Value groupToken = builder.create<gpu::DeviceAsyncCreateGroupOp>(
-        funcOp.getLoc(), gpu::DeviceAsyncTokenType::get(funcOp.getContext()),
+    Value groupToken = builder.create<nvgpu::DeviceAsyncCreateGroupOp>(
+        funcOp.getLoc(), nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()),
         tokens);
-    builder.create<gpu::DeviceAsyncWaitOp>(funcOp.getLoc(), groupToken,
-                                           nullptr);
+    builder.create<nvgpu::DeviceAsyncWaitOp>(funcOp.getLoc(), groupToken,
+                                             nullptr);
     // Clean up old stores.
     for (vector::TransferWriteOp writeOp : group) writeOp.erase();
   }
@@ -219,7 +222,8 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
 struct LLVMGPUVectorToGPUPass
     : public LLVMGPUVectorToGPUBase<LLVMGPUVectorToGPUPass> {
   void getDependentDialects(DialectRegistry& registry) const override {
-    registry.insert<gpu::GPUDialect, AffineDialect, memref::MemRefDialect>();
+    registry.insert<gpu::GPUDialect, nvgpu::NVGPUDialect, AffineDialect,
+                    memref::MemRefDialect>();
   }
 
   void runOnOperation() override {

@@ -58,6 +58,8 @@ iree_cc_library(
     MLIRMemRef
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
+    MLIRNVGPU
+    MLIRNVGPUToNVVM
     MLIRNVVMIR
     MLIRPass
     MLIRROCDLIR

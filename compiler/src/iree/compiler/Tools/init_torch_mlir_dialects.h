@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_TOOLS_INIT_TORCH_MLIR_DIALECTS_H_
-#define IREE_TOOLS_INIT_TORCH_MLIR_DIALECTS_H_
+#ifndef IREE_COMPILER_TOOLS_INIT_TORCH_MLIR_DIALECTS_H_
+#define IREE_COMPILER_TOOLS_INIT_TORCH_MLIR_DIALECTS_H_
 
 #include "mlir/IR/Dialect.h"
 #include "torch-mlir-dialects/Dialect/TMTensor/IR/TMTensorDialect.h"
@@ -19,4 +19,4 @@ inline void registerTorchMLIRDialects(DialectRegistry &registry) {
 
 }  // namespace mlir
 
-#endif  // IREE_TOOLS_INIT_TORCH_MLIR_DIALECTS_H_
+#endif  // IREE_COMPILER_TOOLS_INIT_TORCH_MLIR_DIALECTS_H_

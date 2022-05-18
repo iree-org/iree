@@ -274,7 +274,6 @@ static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
 // dispatched instruction: `instruction_start = pc - OFFSET`
 #define VM_PC_OFFSET_CORE 1
 #define VM_PC_OFFSET_EXT_I32 2
-#define VM_PC_OFFSET_EXT_I64 2
 #define VM_PC_OFFSET_EXT_F32 2
 #define VM_PC_OFFSET_EXT_F64 2
 
@@ -305,14 +304,6 @@ static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
       DECLARE_DISPATCH_CORE_OPC, DECLARE_DISPATCH_CORE_RSV)};
 
 #define DECLARE_DISPATCH_EXT_RSV(ordinal) &&_dispatch_unhandled,
-#if IREE_VM_EXT_I64_ENABLE
-#define DECLARE_DISPATCH_EXT_I64_OPC(ordinal, name) &&_dispatch_EXT_I64_##name,
-#define DEFINE_DISPATCH_TABLE_EXT_I64()                                       \
-  static const void* kDispatchTable_EXT_I64[256] = {IREE_VM_OP_EXT_I64_TABLE( \
-      DECLARE_DISPATCH_EXT_I64_OPC, DECLARE_DISPATCH_EXT_RSV)};
-#else
-#define DEFINE_DISPATCH_TABLE_EXT_I64()
-#endif  // IREE_VM_EXT_I64_ENABLE
 #if IREE_VM_EXT_F32_ENABLE
 #define DECLARE_DISPATCH_EXT_F32_OPC(ordinal, name) &&_dispatch_EXT_F32_##name,
 #define DEFINE_DISPATCH_TABLE_EXT_F32()                                       \
@@ -320,7 +311,7 @@ static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
       DECLARE_DISPATCH_EXT_F32_OPC, DECLARE_DISPATCH_EXT_RSV)};
 #else
 #define DEFINE_DISPATCH_TABLE_EXT_F32()
-#endif  // IREE_VM_EXT_I64_ENABLE
+#endif  // IREE_VM_EXT_F32_ENABLE
 #if IREE_VM_EXT_F64_ENABLE
 #define DECLARE_DISPATCH_EXT_F64_OPC(ordinal, name) &&_dispatch_EXT_F64_##name,
 #define DEFINE_DISPATCH_TABLE_EXT_F64()                                       \
@@ -328,11 +319,10 @@ static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
       DECLARE_DISPATCH_EXT_F64_OPC, DECLARE_DISPATCH_EXT_RSV)};
 #else
 #define DEFINE_DISPATCH_TABLE_EXT_F64()
-#endif  // IREE_VM_EXT_I64_ENABLE
+#endif  // IREE_VM_EXT_F64_ENABLE
 
 #define DEFINE_DISPATCH_TABLES()   \
   DEFINE_DISPATCH_TABLE_CORE();    \
-  DEFINE_DISPATCH_TABLE_EXT_I64(); \
   DEFINE_DISPATCH_TABLE_EXT_F32(); \
   DEFINE_DISPATCH_TABLE_EXT_F64();
 
@@ -408,11 +398,26 @@ static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
     *result = op_func(operand);                       \
   });
 
+#define DISPATCH_OP_CORE_UNARY_I64(op_name, op_func)  \
+  DISPATCH_OP(CORE, op_name, {                        \
+    int64_t operand = VM_DecOperandRegI64("operand"); \
+    int64_t* result = VM_DecResultRegI64("result");   \
+    *result = op_func(operand);                       \
+  });
+
 #define DISPATCH_OP_CORE_BINARY_I32(op_name, op_func) \
   DISPATCH_OP(CORE, op_name, {                        \
     int32_t lhs = VM_DecOperandRegI32("lhs");         \
     int32_t rhs = VM_DecOperandRegI32("rhs");         \
     int32_t* result = VM_DecResultRegI32("result");   \
+    *result = op_func(lhs, rhs);                      \
+  });
+
+#define DISPATCH_OP_CORE_BINARY_I64(op_name, op_func) \
+  DISPATCH_OP(CORE, op_name, {                        \
+    int64_t lhs = VM_DecOperandRegI64("lhs");         \
+    int64_t rhs = VM_DecOperandRegI64("rhs");         \
+    int64_t* result = VM_DecResultRegI64("result");   \
     *result = op_func(lhs, rhs);                      \
   });
 
@@ -425,28 +430,13 @@ static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
     *result = op_func(a, b, c);                        \
   });
 
-#define DISPATCH_OP_EXT_I64_UNARY_I64(op_name, op_func) \
-  DISPATCH_OP(EXT_I64, op_name, {                       \
-    int64_t operand = VM_DecOperandRegI64("operand");   \
-    int64_t* result = VM_DecResultRegI64("result");     \
-    *result = op_func(operand);                         \
-  });
-
-#define DISPATCH_OP_EXT_I64_BINARY_I64(op_name, op_func) \
-  DISPATCH_OP(EXT_I64, op_name, {                        \
-    int64_t lhs = VM_DecOperandRegI64("lhs");            \
-    int64_t rhs = VM_DecOperandRegI64("rhs");            \
-    int64_t* result = VM_DecResultRegI64("result");      \
-    *result = op_func(lhs, rhs);                         \
-  });
-
-#define DISPATCH_OP_EXT_I64_TERNARY_I64(op_name, op_func) \
-  DISPATCH_OP(EXT_I64, op_name, {                         \
-    int64_t a = VM_DecOperandRegI64("a");                 \
-    int64_t b = VM_DecOperandRegI64("b");                 \
-    int64_t c = VM_DecOperandRegI64("c");                 \
-    int64_t* result = VM_DecResultRegI64("result");       \
-    *result = op_func(a, b, c);                           \
+#define DISPATCH_OP_CORE_TERNARY_I64(op_name, op_func) \
+  DISPATCH_OP(CORE, op_name, {                         \
+    int64_t a = VM_DecOperandRegI64("a");              \
+    int64_t b = VM_DecOperandRegI64("b");              \
+    int64_t c = VM_DecOperandRegI64("c");              \
+    int64_t* result = VM_DecResultRegI64("result");    \
+    *result = op_func(a, b, c);                        \
   });
 
 #define DISPATCH_OP_EXT_F32_UNARY_F32(op_name, op_func) \

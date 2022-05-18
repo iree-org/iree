@@ -236,6 +236,11 @@ table BytecodeModuleDef {
   // bytecode_data.
   function_descriptors:[FunctionDescriptor];
 
+  // Bytecode version required by the embedded bytecode data.
+  // Two 16-bit ints representing major and minor version, with minor versions
+  // being backwards compatible.
+  bytecode_version:uint32;
+
   // Bytecode contents. One large buffer containing all of the function op data.
   bytecode_data:[uint8];
 

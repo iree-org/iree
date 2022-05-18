@@ -167,14 +167,14 @@ system.
 ```mlir
 // Main user module compiled by IREE:
 module @model {
-  func @predict() {
+  func.func @predict() {
     %4 = call @my_custom_module::@some_func(%3) : (tensor<?xf32>) -> i32
     ...
   }
 }
 // External module that will be available at runtime:
 module @my_custom_module {
-  func @some_func(%input: tensor<?xf32>) -> i32  // note empty for extern
+  func.func @some_func(%input: tensor<?xf32>) -> i32  // note empty for extern
 }
 ```
 

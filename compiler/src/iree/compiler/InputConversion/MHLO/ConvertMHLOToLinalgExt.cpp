@@ -106,14 +106,6 @@ static bool isInBodyOfLinalgExtOps(Operation *op) {
              ->getLoadedDialect<IREE::LinalgExt::IREELinalgExtDialect>();
 }
 
-static SmallVector<int64_t> extract1DVector(DenseIntElementsAttr elements) {
-  SmallVector<int64_t> ret;
-  for (const APInt &element : elements) {
-    ret.push_back(element.getLimitedValue());
-  }
-  return ret;
-}
-
 //===----------------------------------------------------------------------===//
 // Region operations lowering.
 //===----------------------------------------------------------------------===//
