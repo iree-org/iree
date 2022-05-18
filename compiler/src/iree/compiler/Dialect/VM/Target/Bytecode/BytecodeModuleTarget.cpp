@@ -687,7 +687,7 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   auto rodataSegmentRefs = llvm::to_vector<8>(
       llvm::map_range(rodataContentRefs, [&](auto rodataContentRef) {
         iree_vm_RodataSegmentDef_start(fbb);
-        iree_vm_RodataSegmentDef_data_add(fbb, rodataContentRef);
+        iree_vm_RodataSegmentDef_embedded_data_add(fbb, rodataContentRef);
         return iree_vm_RodataSegmentDef_end(fbb);
       }));
   SmallVector<iree_vm_RwdataSegmentDef_ref_t, 8> rwdataSegmentRefs;

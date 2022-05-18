@@ -100,6 +100,18 @@ static iree_status_t iree_vm_bytecode_module_resolve_types(
   return status;
 }
 
+// Computes the total length of the flatbuffer and the base offset for any
+// concatenated rodata.
+static iree_host_size_t iree_vm_bytecode_module_flatbuffer_rodata_offset(
+    iree_const_byte_span_t flatbuffer_data) {
+  if (flatbuffer_data.data_length < sizeof(flatbuffers_uoffset_t)) return 0;
+  size_t external_rodata_offset = 0;
+  flatbuffers_read_size_prefix((void*)flatbuffer_data.data,
+                               &external_rodata_offset);
+  external_rodata_offset += sizeof(flatbuffers_uoffset_t);
+  return iree_host_align(external_rodata_offset, 128);
+}
+
 // Verifies the structure of the flatbuffer so that we can avoid doing so during
 // runtime. There are still some conditions we must be aware of (such as omitted
 // names on functions with internal linkage), however we shouldn't need to
@@ -124,6 +136,8 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
                             flatcc_verify_error_string(verify_ret));
   }
 
+  const iree_host_size_t external_rodata_offset =
+      iree_vm_bytecode_module_flatbuffer_rodata_offset(flatbuffer_data);
   iree_vm_BytecodeModuleDef_table_t module_def =
       iree_vm_BytecodeModuleDef_as_root(flatbuffer_data.data);
 
@@ -144,6 +158,27 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
     if (flatbuffers_string_len(full_name) <= 0) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "types[%zu] missing name", i);
+    }
+  }
+
+  iree_vm_RodataSegmentDef_vec_t rodata_segments =
+      iree_vm_BytecodeModuleDef_rodata_segments(module_def);
+  for (size_t i = 0; i < iree_vm_RodataSegmentDef_vec_len(rodata_segments);
+       ++i) {
+    iree_vm_RodataSegmentDef_table_t segment =
+        iree_vm_RodataSegmentDef_vec_at(rodata_segments, i);
+    if (iree_vm_RodataSegmentDef_embedded_data_is_present(segment)) {
+      continue;  // embedded data is verified by FlatBuffers
+    }
+    uint64_t rodata_offset =
+        iree_vm_RodataSegmentDef_external_data_offset(segment);
+    uint64_t rodata_length =
+        iree_vm_RodataSegmentDef_external_data_length(segment);
+    uint64_t rodata_end =
+        external_rodata_offset + rodata_offset + rodata_length;
+    if (rodata_end >= flatbuffer_data.data_length) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "rodata[%zu] external reference out of range", i);
     }
   }
 
@@ -727,19 +762,32 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   // Perform layout to get the pointers into the storage for each nested table.
   iree_vm_bytecode_module_layout_state(module_def, state);
 
-  // Setup rodata segments to point directly at the flatbuffer memory.
+  // Setup rodata segments to point directly at the FlatBuffer memory.
+  const iree_host_size_t external_rodata_offset =
+      iree_vm_bytecode_module_flatbuffer_rodata_offset(module->flatbuffer_data);
   iree_vm_RodataSegmentDef_vec_t rodata_segments =
       iree_vm_BytecodeModuleDef_rodata_segments(module_def);
   for (int i = 0; i < state->rodata_ref_count; ++i) {
     iree_vm_RodataSegmentDef_table_t segment =
         iree_vm_RodataSegmentDef_vec_at(rodata_segments, i);
+    iree_byte_span_t byte_span = iree_byte_span_empty();
+    if (iree_vm_RodataSegmentDef_embedded_data_is_present(segment)) {
+      // Data is embedded in the FlatBuffer.
+      byte_span = iree_make_byte_span(
+          (uint8_t*)iree_vm_RodataSegmentDef_embedded_data(segment),
+          flatbuffers_uint8_vec_len(
+              iree_vm_RodataSegmentDef_embedded_data(segment)));
+    } else {
+      // Data is concatenated with the FlatBuffer at some relative offset.
+      // Note that we've already verified the referenced range is in bounds.
+      byte_span = iree_make_byte_span(
+          (uint8_t*)module->flatbuffer_data.data + external_rodata_offset +
+              iree_vm_RodataSegmentDef_external_data_offset(segment),
+          iree_vm_RodataSegmentDef_external_data_length(segment));
+    }
     iree_vm_buffer_t* ref = &state->rodata_ref_table[i];
-    iree_vm_buffer_initialize(
-        IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE,
-        iree_make_byte_span(
-            (uint8_t*)iree_vm_RodataSegmentDef_data(segment),
-            flatbuffers_uint8_vec_len(iree_vm_RodataSegmentDef_data(segment))),
-        iree_allocator_null(), ref);
+    iree_vm_buffer_initialize(IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE, byte_span,
+                              iree_allocator_null(), ref);
   }
 
   *out_module_state = (iree_vm_module_state_t*)state;
