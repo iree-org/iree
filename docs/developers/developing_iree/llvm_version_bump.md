@@ -271,3 +271,39 @@ is less room for error).
 
 Undoing a sequence of cherry-picks is done by integrating to a new upstream
 version, presumably one that includes the commits.
+
+## Tips for reproducing failures locally
+
+To repro failures in `iree/e2e/`:
+
+```bash
+cmake --build . --target iree-test-deps
+ctest -R iree/e2e
+```
+
+To run all the tests in `llvm-external-projects/iree-dialects`:
+
+```bash
+cmake --build . --target check-iree-dialects
+```
+
+To triage IREE gcc build issues, we can look into logs in `iree-build-configurations` and get the gcc version. E.g.,
+
+```bash
+export CC=gcc-9
+export CXX=g++-9
+mkdir build && cd build
+
+# Note that the below command disable cuda backend.
+cmake -G Ninja -DIREE_ENABLE_LLD=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo -DIREE_BUILD_DOCS=ON -DIREE_BUILD_PYTHON_BINDINGS=ON -DIREE_ENABLE_ASSERTIONS=ON -DIREE_HAL_DRIVER_CUDA=OFF -DIREE_TARGET_BACKEND_CUDA=OFF ..
+```
+
+To repro failures in CI `bazel_linux_x86-swiftshader_core`, we can follow the [doc](https://github.com/google/iree/blob/main/docs/developers/get_started/building_with_bazel_linux.md) to build IREE using bazel. E.g.,
+
+```bash
+export CC=clang
+export CXX=clang++
+python configure_bazel.py
+cd integrations/tensorflow
+bazel test ...
+```
