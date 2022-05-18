@@ -116,7 +116,7 @@ VMVX_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
-        "clz.mlir", # https://github.com/google/iree/issues/9152
+        "clz.mlir",  # https://github.com/google/iree/issues/9152
         "reduce.mlir",  # Currently flakey https://github.com/google/iree/issues/5885
     ],
 )
@@ -175,7 +175,7 @@ VULKAN_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
-        "clz.mlir", # https://github.com/google/iree/issues/9152
+        "clz.mlir",  # https://github.com/google/iree/issues/9152
     ],
 )
 
