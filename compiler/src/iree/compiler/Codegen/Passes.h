@@ -235,6 +235,9 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUUnfuseFMAOpsPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createVectorContractCustomKernelsPass();
 
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUCanonicalizeVectorOpsPass();
+
 //------------------------------------------------------------------------------
 // LLVMCPU Codegen specific patterns.
 //------------------------------------------------------------------------------

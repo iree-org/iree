@@ -236,6 +236,12 @@ def LLVMCPUUnfuseFMAOps :
   let constructor = "mlir::iree_compiler::createLLVMCPUUnfuseFMAOpsPass()";
 }
 
+def LLVMCPUCanonicalizeVectorOps :
+    Pass<"iree-llvmcpu-canonicalize-vector-pass", "func::FuncOp"> {
+  let summary = "TODO";
+  let constructor = "mlir::iree_compiler::createLLVMCPUCanonicalizeVectorOpsPass()";
+}
+
 def VectorContractCustomKernels :
     Pass<"iree-llvmcpu-vector-contract-custom-kernels", "func::FuncOp"> {
   let summary = "Enable custom kernels (inline assembly or intrinsics) for some vector.contract ops";
