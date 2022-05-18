@@ -698,7 +698,8 @@ static ParseResult parseTileOp(OpAsmParser &parser, OperationState &result,
                                StringRef sizesAttrName) {
   OpAsmParser::UnresolvedOperand targetOperand;
   SMLoc opLoc;
-  parser.getCurrentLocation(&opLoc);
+  if (parser.getCurrentLocation(&opLoc))
+    return failure();
   if (parser.parseOperand(targetOperand))
     return parser.emitError(opLoc, "expected `target` operand");
   if (parser.parseOptionalAttrDict(result.attributes))
