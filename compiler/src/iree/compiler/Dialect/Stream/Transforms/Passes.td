@@ -205,6 +205,14 @@ def AnnotateDispatchArguments :
   }];
 }
 
+def PackDispatchOperands :
+    Pass<"iree-stream-pack-dispatch-operands", "mlir::ModuleOp"> {
+  let summary = "Packs stream dispatch operands into i32 push constants.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createPackDispatchOperandsPass()
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Diagnostics
 //===----------------------------------------------------------------------===//

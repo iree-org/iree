@@ -37,6 +37,16 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     ConversionPatternRewriter &rewriter);
 }  // namespace detail
 
+// Casts |value| to |targetType| ala static_cast for when the declared type
+// differs from the type provided by the input dialect.
+Value castToImportType(Value value, Type targetType,
+                       ConversionPatternRewriter &rewriter);
+
+// Casts |value| to |targetType| ala static_cast for when the declared return
+// type of an import does not match the required output type.
+Value castFromImportType(Value value, Type targetType,
+                         ConversionPatternRewriter &rewriter);
+
 // Copies known attributes from the |importOp| to the |callOp|.
 // This allows for passes to quickly query the properties of the import such as
 // nosideeffects.
@@ -58,11 +68,7 @@ Optional<SmallVector<Value>> rewriteToCall(
   state.addAttribute("callee", SymbolRefAttr::get(importOp));
 
   auto importType = importOp.getFunctionType();
-  for (auto resultType : operation->getResultTypes()) {
-    if (failed(typeConverter.convertType(resultType, state.types))) {
-      return None;
-    }
-  }
+  state.addTypes(importType.getResults());
 
   SmallVector<uint16_t, 4> segmentSizes;
   int inputSetIndex = 0;
@@ -88,7 +94,10 @@ Optional<SmallVector<Value>> rewriteToCall(
           llvm::to_vector<4>(adaptor.getODSOperands(inputSetIndex));
       ++inputSetIndex;
 
-      state.addOperands(newOperands);
+      for (auto &operand : newOperands) {
+        state.addOperands(castToImportType(operand, inputType, rewriter));
+      }
+
       if (importOp.isFuncArgumentVariadic(input.index())) {
         segmentSizes.push_back(newOperands.size());
       } else {
@@ -112,7 +121,17 @@ Optional<SmallVector<Value>> rewriteToCall(
 
   auto *callOp = rewriter.create(state);
   copyImportAttrs(importOp, callOp);
-  return SmallVector<Value>(callOp->getResults());
+
+  SmallVector<Value> results;
+  for (auto resultToType :
+       llvm::zip(callOp->getResults(), operation->getResultTypes())) {
+    auto result = std::get<0>(resultToType);
+    auto targetType = std::get<1>(resultToType);
+    targetType = typeConverter.convertType(targetType);
+    if (!targetType) return None;
+    results.push_back(castFromImportType(result, targetType, rewriter));
+  }
+  return results;
 }
 
 // Utility for op to vm.call conversion.

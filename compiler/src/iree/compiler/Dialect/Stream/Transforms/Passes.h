@@ -155,6 +155,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createSpecializeDispatchesPass();
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createAnnotateDispatchArgumentsPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createPackDispatchOperandsPass();
 
 //===----------------------------------------------------------------------===//
 // Diagnostics

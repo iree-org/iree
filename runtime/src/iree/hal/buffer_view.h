@@ -152,7 +152,8 @@ enum iree_hal_encoding_types_t {
 typedef uint32_t iree_hal_encoding_type_t;
 
 // A dimension within a shape.
-typedef int32_t iree_hal_dim_t;
+typedef iree_device_size_t iree_hal_dim_t;
+#define PRIdim PRIdsz
 
 //===----------------------------------------------------------------------===//
 // iree_hal_buffer_view_t

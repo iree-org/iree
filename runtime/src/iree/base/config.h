@@ -67,7 +67,8 @@
 //    submitting work for a 64-bit device, and using a 32-bit size_t for device
 //    pointers would truncate bits and prevent round-tripping.
 //
-// The specific values for these can be overridden with configuration settings:
+// The specific values for these can be overridden with configuration settings.
+// The related iree_hal_dim_t is tied to the device size by default.
 
 #if !defined(IREE_HOST_SIZE_T)
 #define IREE_HOST_SIZE_T size_t
@@ -82,8 +83,8 @@ typedef IREE_HOST_SIZE_T iree_host_size_t;
   (sizeof(iree_host_size_t) == 4 ? UINT32_MAX : UINT64_MAX)
 
 #if !defined(IREE_DEVICE_SIZE_T)
-#define IREE_DEVICE_SIZE_T uint64_t
-#define PRIdsz PRIu64
+#define IREE_DEVICE_SIZE_T size_t
+#define PRIdsz "zu"
 #endif  // !IREE_DEVICE_SIZE_T
 
 // Size, in bytes, of a buffer on remote devices.

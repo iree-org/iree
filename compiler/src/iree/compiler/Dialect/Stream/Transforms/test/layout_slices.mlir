@@ -4,7 +4,8 @@
   max_allocation_size = 1073741824,
   min_buffer_offset_alignment = 16,
   max_buffer_range = 1073741824,
-  min_buffer_range_alignment = 16
+  min_buffer_range_alignment = 16,
+  index_bits = 32
 }>
 
 // CHECK-LABEL: @layoutStatic
@@ -32,7 +33,8 @@ func.func @layoutStatic() -> (index, index, index, index, index, index, index)
   max_allocation_size = 1073741824,
   min_buffer_offset_alignment = 16,
   max_buffer_range = 1073741824,
-  min_buffer_range_alignment = 16
+  min_buffer_range_alignment = 16,
+  index_bits = 32
 }>
 
 // CHECK-LABEL: @layoutDynamic
@@ -62,7 +64,8 @@ func.func @layoutDynamic(%size_a: index, %size_b: index) -> (index, index, index
   max_allocation_size = 1073741824,
   min_buffer_offset_alignment = 16,
   max_buffer_range = 1073741824,
-  min_buffer_range_alignment = 16
+  min_buffer_range_alignment = 16,
+  index_bits = 32
 }>
 
 // CHECK-LABEL: @layoutMixedStaticDynamic

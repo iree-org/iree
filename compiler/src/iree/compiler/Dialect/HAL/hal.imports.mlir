@@ -25,7 +25,7 @@ vm.import @allocator.allocate(
   %allocator : !vm.ref<!hal.allocator>,
   %memory_types : i32,
   %buffer_usage : i32,
-  %allocation_size : i32
+  %allocation_size : i64
 ) -> !vm.ref<!hal.buffer>
 
 // Maps a host byte buffer into a device buffer.
@@ -37,8 +37,8 @@ vm.import @allocator.map.byte_buffer(
   %memory_types : i32,
   %buffer_usage : i32,
   %source : !vm.buffer,
-  %offset : i32,
-  %length : i32
+  %offset : i64,
+  %length : i64
 ) -> !vm.ref<!hal.buffer>
 
 // TODO(benvanik): remove wrap.
@@ -49,8 +49,8 @@ vm.import @allocator.wrap.byte_buffer(
   %memory_types : i32,
   %buffer_usage : i32,
   %source : !vm.buffer,
-  %offset : i32,
-  %length : i32
+  %offset : i64,
+  %length : i64
 ) -> !vm.ref<!hal.buffer>
 
 //===----------------------------------------------------------------------===//
@@ -62,7 +62,7 @@ vm.import @buffer.assert(
   %buffer : !vm.ref<!hal.buffer>,
   %message : !vm.buffer,
   %allocator : !vm.ref<!hal.allocator>,
-  %minimum_length : i32,
+  %minimum_length : i64,
   %memory_types : i32,
   %buffer_usage : i32
 )
@@ -70,21 +70,26 @@ vm.import @buffer.assert(
 // Returns a reference to a subspan of the buffer.
 vm.import @buffer.subspan(
   %source_buffer : !vm.ref<!hal.buffer>,
-  %source_offset : i32,
-  %length : i32
+  %source_offset : i64,
+  %length : i64
 ) -> !vm.ref<!hal.buffer>
 attributes {nosideeffects}
 
 // Returns the byte length of the buffer (may be less than total allocation).
 vm.import @buffer.length(
   %buffer : !vm.ref<!hal.buffer>
-) -> i32
+) -> i64
 attributes {nosideeffects}
+
+// TODO(benvanik): remove load/store and instead return a mapped !vm.buffer.
+// This will let us perform generic VM buffer operations directly on the HAL
+// buffer memory. The tricky part is ensuring the mapping lifetime or adding
+// an invalidation mechanism.
 
 // Loads a value from a buffer by mapping it.
 vm.import @buffer.load(
   %source_buffer : !vm.ref<!hal.buffer>,
-  %source_offset : i32,
+  %source_offset : i64,
   %length : i32
 ) -> i32
 
@@ -92,7 +97,7 @@ vm.import @buffer.load(
 vm.import @buffer.store(
   %value : i32,
   %target_buffer : !vm.ref<!hal.buffer>,
-  %target_offset : i32,
+  %target_offset : i64,
   %length : i32
 )
 
@@ -105,7 +110,7 @@ vm.import @buffer_view.create(
   %buffer : !vm.ref<!hal.buffer>,
   %element_type : i32,
   %encoding_type : i32,
-  %shape : i32 ...
+  %shape : i64 ...
 ) -> !vm.ref<!hal.buffer_view>
 attributes {nosideeffects}
 
@@ -115,7 +120,7 @@ vm.import @buffer_view.assert(
   %message : !vm.buffer,
   %element_type : i32,
   %encoding_type : i32,
-  %shape : i32 ...
+  %shape : i64 ...
 )
 
 // Returns the backing buffer of the buffer view.
@@ -127,7 +132,7 @@ attributes {nosideeffects}
 // Returns the allocated size of a shaped buffer view in bytes.
 vm.import @buffer_view.byte_length(
   %buffer_view : !vm.ref<!hal.buffer_view>
-) -> i32
+) -> i64
 attributes {nosideeffects}
 
 // Returns the element type of the buffer view.
@@ -152,7 +157,7 @@ attributes {nosideeffects}
 vm.import @buffer_view.dim(
   %buffer_view : !vm.ref<!hal.buffer_view>,
   %index : i32
-) -> i32
+) -> i64
 attributes {nosideeffects}
 
 // Prints out the content of buffer views.
@@ -208,8 +213,8 @@ vm.import @command_buffer.execution_barrier(
 vm.import @command_buffer.fill_buffer(
   %command_buffer : !vm.ref<!hal.command_buffer>,
   %target_buffer : !vm.ref<!hal.buffer>,
-  %target_offset : i32,
-  %length : i32,
+  %target_offset : i64,
+  %length : i64,
   %pattern : i32,
   %pattern_length: i32
 )
@@ -218,10 +223,10 @@ vm.import @command_buffer.fill_buffer(
 vm.import @command_buffer.copy_buffer(
   %command_buffer : !vm.ref<!hal.command_buffer>,
   %source_buffer : !vm.ref<!hal.buffer>,
-  %source_offset : i32,
+  %source_offset : i64,
   %target_buffer : !vm.ref<!hal.buffer>,
-  %target_offset : i32,
-  %length : i32
+  %target_offset : i64,
+  %length : i64
 )
 
 // Pushes constants for consumption by dispatches.
@@ -238,7 +243,7 @@ vm.import @command_buffer.push_descriptor_set(
   %executable_layout : !vm.ref<!hal.executable_layout>,
   %set : i32,
   // <binding, buffer, offset, length>
-  %bindings : tuple<i32, !vm.ref<!hal.buffer>, i32, i32>...
+  %bindings : tuple<i32, !vm.ref<!hal.buffer>, i64, i64>...
 )
 
 // Binds a descriptor set to the given set number.
@@ -247,7 +252,7 @@ vm.import @command_buffer.bind_descriptor_set(
   %executable_layout : !vm.ref<!hal.executable_layout>,
   %set : i32,
   %descriptor_set : !vm.ref<!hal.descriptor_set>,
-  %dynamic_offsets : i32 ...
+  %dynamic_offsets : i64 ...
 )
 
 // Dispatches an execution request.
@@ -267,7 +272,7 @@ vm.import @command_buffer.dispatch.indirect(
   %executable : !vm.ref<!hal.executable>,
   %entry_point : i32,
   %workgroups_buffer : !vm.ref<!hal.buffer>,
-  %workgroups_offset : i32
+  %workgroups_offset : i64
 )
 
 //===----------------------------------------------------------------------===//
@@ -279,7 +284,7 @@ vm.import @descriptor_set.create(
   %device : !vm.ref<!hal.device>,
   %set_layout : !vm.ref<!hal.descriptor_set_layout>,
   // <binding, buffer, offset, length>
-  %bindings : tuple<i32, !vm.ref<!hal.buffer>, i32, i32>...
+  %bindings : tuple<i32, !vm.ref<!hal.buffer>, i64, i64>...
 ) -> !vm.ref<!hal.descriptor_set>
 
 //===----------------------------------------------------------------------===//
@@ -348,7 +353,7 @@ attributes {nosideeffects}
 // Returns a semaphore from the device pool with the given initial value.
 vm.import @semaphore.create(
   %device : !vm.ref<!hal.device>,
-  %initial_value : i32
+  %initial_value : i64
 ) -> !vm.ref<!hal.semaphore>
 attributes {nosideeffects}
 
@@ -359,13 +364,13 @@ attributes {nosideeffects}
 // specified value via `hal.semaphore.await`.
 vm.import @semaphore.query(
   %semaphore : !vm.ref<!hal.semaphore>
-) -> (i32, i32)
+) -> (i32, i64)
 
 // Signals the semaphore to the given payload value.
 // The call is ignored if the current payload value exceeds |new_value|.
 vm.import @semaphore.signal(
   %semaphore : !vm.ref<!hal.semaphore>,
-  %new_value : i32
+  %new_value : i64
 )
 
 // Signals the semaphore with a failure. The |status| will be returned from
@@ -383,7 +388,7 @@ vm.import @semaphore.fail(
 // indicating failure.
 vm.import @semaphore.await(
   %semaphore : !vm.ref<!hal.semaphore>,
-  %min_value : i32
+  %min_value : i64
 ) -> i32
 // TODO(benvanik): yield point trait.
 

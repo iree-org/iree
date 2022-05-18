@@ -438,11 +438,6 @@ void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
       createOptimizeVectorTransferPass());
 }
 
-void addCPUBufferOpsDefaultPipeline(OpPassManager &passManager) {
-  addTileAndDistributePasses(passManager,
-                             /*convertToDestinationPassingStyle=*/false);
-}
-
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager,
                              /*convertToDestinationPassingStyle=*/true);

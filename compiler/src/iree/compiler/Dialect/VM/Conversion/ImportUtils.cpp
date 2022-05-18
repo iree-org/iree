@@ -60,6 +60,39 @@ LogicalResult appendImportModule(StringRef importModuleSrc,
   return success();
 }
 
+Value castToImportType(Value value, Type targetType,
+                       ConversionPatternRewriter &rewriter) {
+  auto sourceType = value.getType();
+  if (sourceType == targetType) return value;
+  if (targetType.isSignedInteger() || targetType.isSignlessInteger()) {
+    if (targetType.getIntOrFloatBitWidth() >
+        sourceType.getIntOrFloatBitWidth()) {
+      return rewriter.create<mlir::arith::ExtSIOp>(value.getLoc(), targetType,
+                                                   value);
+    } else {
+      return rewriter.create<mlir::arith::TruncIOp>(value.getLoc(), targetType,
+                                                    value);
+    }
+  } else if (targetType.isUnsignedInteger()) {
+    if (targetType.getIntOrFloatBitWidth() >
+        sourceType.getIntOrFloatBitWidth()) {
+      return rewriter.create<mlir::arith::ExtUIOp>(value.getLoc(), targetType,
+                                                   value);
+    } else {
+      return rewriter.create<mlir::arith::TruncIOp>(value.getLoc(), targetType,
+                                                    value);
+    }
+  } else {
+    return value;
+  }
+}
+
+Value castFromImportType(Value value, Type targetType,
+                         ConversionPatternRewriter &rewriter) {
+  // Right now the to-import and from-import types are the same.
+  return castToImportType(value, targetType, rewriter);
+}
+
 void copyImportAttrs(IREE::VM::ImportOp importOp, Operation *callOp) {
   if (importOp->hasAttr("nosideeffects")) {
     callOp->setAttr("nosideeffects", UnitAttr::get(importOp.getContext()));
