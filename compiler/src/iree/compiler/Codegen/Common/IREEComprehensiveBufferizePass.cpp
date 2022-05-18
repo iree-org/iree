@@ -104,9 +104,11 @@ class IREEComprehensiveBufferizePass
 
 static bool isaTensor(Type t) { return t.isa<TensorType>(); };
 
-static LogicalResult initTensorElimination(Operation *op) {
+static LogicalResult initTensorElimination(
+    Operation *op, OneShotBufferizationOptions options) {
   // Analyze IR.
-  OneShotBufferizationOptions options;
+  options.testAnalysisOnly = false;
+  options.printConflicts = false;
   OneShotAnalysisState state(op, options);
   if (failed(analyzeOp(op, state))) return failure();
 
@@ -126,11 +128,6 @@ static LogicalResult initTensorElimination(Operation *op) {
 void IREEComprehensiveBufferizePass::runOnOperation() {
   ModuleOp moduleOp = getOperation();
 
-  if (failed(initTensorElimination(moduleOp.getOperation()))) {
-    signalPassFailure();
-    return;
-  }
-
   OneShotBufferizationOptions options;
   options.allocationFn = allocationFn;
   options.deallocationFn = deallocationFn;
@@ -138,7 +135,17 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   options.testAnalysisOnly = testAnalysisOnly;
   options.printConflicts = printConflicts;
   options.alwaysAliasingWithDest = true;
+
+  // bufferization.to_memref is used to bufferize constants in IREE. IREE has
+  // it's own logic to handle constants. We'd like to leave the arith.constant
+  // as is and insert bufferization.to_memref to convert the tensor to memref.
   options.denyOperationInFilter(arith::ConstantOp::getOperationName());
+  options.denyOperationInFilter(bufferization::ToMemrefOp::getOperationName());
+
+  if (failed(initTensorElimination(moduleOp.getOperation(), options))) {
+    return signalPassFailure();
+  }
+
   addPostAnalysisTransformations(options);
 
   if (failed(bufferization::runOneShotBufferize(moduleOp, options))) {
