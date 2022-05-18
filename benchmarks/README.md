@@ -108,7 +108,7 @@ build_tools/benchmarks/run_benchmarks_on_linux.py \
 The benchmark results will be saved in `results.json`. You can use
 `build_tools/benchmarks/diff_local_benchmarks.py` script to compare two local
 benchmark results and generate the report. More details can be found
-[here](build_tools/benchmarks/README.md).
+[here](/build_tools/benchmarks/README.md).
 
 #### Importing the models only
 
