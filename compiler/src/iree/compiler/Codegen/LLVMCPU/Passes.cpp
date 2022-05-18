@@ -410,9 +410,10 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
+  // Transform vector transfer ops and fold them away when possible.
   {
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMCPUCanonicalizeVectorOpsPass());
+        createLLVMCPUEliminateVectorTransferOpsPass());
   }
 
   addCPUIREEComprehensiveBufferizePasses(nestedModulePM);

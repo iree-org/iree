@@ -236,10 +236,10 @@ def LLVMCPUUnfuseFMAOps :
   let constructor = "mlir::iree_compiler::createLLVMCPUUnfuseFMAOpsPass()";
 }
 
-def LLVMCPUCanonicalizeVectorOps :
-    Pass<"iree-llvmcpu-canonicalize-vector-pass", "func::FuncOp"> {
-  let summary = "TODO";
-  let constructor = "mlir::iree_compiler::createLLVMCPUCanonicalizeVectorOpsPass()";
+def LLVMCPUEliminateVectorTransferOps :
+    Pass<"iree-llvmcpu-eliminate-vector-transfer-pass", "func::FuncOp"> {
+  let summary = "Transforms and eliminates foldable vector transfer ops";
+  let constructor = "mlir::iree_compiler::createLLVMCPUEliminateVectorTransferOpsPass()";
 }
 
 def VectorContractCustomKernels :

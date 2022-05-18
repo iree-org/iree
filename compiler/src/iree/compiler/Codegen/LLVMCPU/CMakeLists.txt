@@ -18,8 +18,8 @@ iree_cc_library(
   SRCS
     "ConvertToLLVM.cpp"
     "KernelDispatch.cpp"
-    "LLVMCPUCanonicalizeVectorOps.cpp"
     "LLVMCPUCheckIRBeforeLLVMConversion.cpp"
+    "LLVMCPUEliminateVectorTransferOps.cpp"
     "LLVMCPULowerExecutableTarget.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
     "LLVMCPUTileFuseAndVectorizeLinalgTensorOps.cpp"

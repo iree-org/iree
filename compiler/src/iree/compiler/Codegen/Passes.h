@@ -235,8 +235,9 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUUnfuseFMAOpsPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createVectorContractCustomKernelsPass();
 
+// Transforms and eliminates foldable vector transfer ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUCanonicalizeVectorOpsPass();
+createLLVMCPUEliminateVectorTransferOpsPass();
 
 //------------------------------------------------------------------------------
 // LLVMCPU Codegen specific patterns.

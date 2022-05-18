@@ -13,8 +13,9 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-struct LLVMCPUCanonicalizeVectorOpsPass
-    : LLVMCPUCanonicalizeVectorOpsBase<LLVMCPUCanonicalizeVectorOpsPass> {
+struct LLVMCPUEliminateVectorTransferOpsPass
+    : LLVMCPUEliminateVectorTransferOpsBase<
+          LLVMCPUEliminateVectorTransferOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -22,7 +23,7 @@ struct LLVMCPUCanonicalizeVectorOpsPass
 };
 }  // namespace
 
-void LLVMCPUCanonicalizeVectorOpsPass::runOnOperation() {
+void LLVMCPUEliminateVectorTransferOpsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   func::FuncOp funcOp = getOperation();
 
@@ -36,8 +37,8 @@ void LLVMCPUCanonicalizeVectorOpsPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUCanonicalizeVectorOpsPass() {
-  return std::make_unique<LLVMCPUCanonicalizeVectorOpsPass>();
+createLLVMCPUEliminateVectorTransferOpsPass() {
+  return std::make_unique<LLVMCPUEliminateVectorTransferOpsPass>();
 }
 
 }  // namespace iree_compiler
