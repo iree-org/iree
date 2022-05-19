@@ -342,6 +342,8 @@ def VM_Ordinal : SignlessIntegerAttrBase<I32, "ordinal value">;
 // a runtime compiled with 64-bit indices).
 def VM_Ptr : I<32>;
 def VM_Index : I<32>;
+def VM_BufferIndex : I<64>;
+def VM_ListIndex : I<32>;
 
 def VM_CondValue : I<32> {
   let description = [{
