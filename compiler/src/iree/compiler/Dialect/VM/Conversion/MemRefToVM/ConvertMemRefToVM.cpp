@@ -128,7 +128,7 @@ class ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
     auto type = allocaOp.getType().cast<ShapedType>();
     if (!type.hasStaticShape()) {
       return rewriter.notifyMatchFailure(
-          "unable to create buffers for dynamic shapes");
+          allocaOp, "unable to create buffers for dynamic shapes");
     }
 
     int64_t length = type.getSizeInBits();
