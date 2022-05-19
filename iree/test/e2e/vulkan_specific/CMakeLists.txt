@@ -31,6 +31,25 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_vulkan-spirv_vulkan_f16
+  SRCS
+    "add_f16.mlir"
+    "dot_f16.mlir"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  DRIVER
+    "vulkan"
+  COMPILER_FLAGS
+    "--iree-input-type=mhlo"
+    "--iree-vulkan-target-triple=valhall-unknown-android11"
+  LABELS
+    "manual"
+    "notap"
+    "vulkan_uses_vk_khr_shader_float16_int8"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_vulkan-spirv_vulkan_vectorized_conv
   SRCS
     "vectorized_conv.mlir"

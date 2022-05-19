@@ -16,6 +16,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "reverse.mlir"
     "scan.mlir"
+    "sort.mlir"
     "top-k.mlir"
   TARGET_BACKEND
     "cuda"
@@ -35,6 +36,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "reverse.mlir"
     "scan.mlir"
+    "sort.mlir"
     "top-k.mlir"
   TARGET_BACKEND
     "dylib-llvm-aot"
@@ -48,6 +50,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "reverse.mlir"
     "scan.mlir"
+    "sort.mlir"
     "top-k.mlir"
   TARGET_BACKEND
     "vmvx"
@@ -60,6 +63,7 @@ iree_check_single_backend_test_suite(
     check_vulkan-spirv_vulkan
   SRCS
     "reverse.mlir"
+    "sort.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER

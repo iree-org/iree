@@ -41,7 +41,6 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_negative.mlir"
     "dynamic_torch_index_select_scalar.mlir"
     "dynamic_torch_index_select_vector.mlir"
-    "linalg_ext_ops.mlir"
     "linalg_ops.mlir"
     "lowering_config.mlir"
     "strided_slice.mlir"
@@ -78,7 +77,6 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_negative.mlir"
     "dynamic_torch_index_select_scalar.mlir"
     "dynamic_torch_index_select_vector.mlir"
-    "linalg_ext_ops.mlir"
     "linalg_ops.mlir"
     "strided_slice.mlir"
   TARGET_BACKEND
@@ -101,7 +99,6 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_negative.mlir"
     "dynamic_torch_index_select_scalar.mlir"
     "dynamic_torch_index_select_vector.mlir"
-    "linalg_ext_ops.mlir"
     "linalg_ops.mlir"
     "strided_slice.mlir"
   TARGET_BACKEND
@@ -124,7 +121,6 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_negative.mlir"
     "dynamic_torch_index_select_scalar.mlir"
     "dynamic_torch_index_select_vector.mlir"
-    "linalg_ext_ops.mlir"
     "linalg_ops.mlir"
     "strided_slice.mlir"
   TARGET_BACKEND
