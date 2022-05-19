@@ -21,7 +21,6 @@ iree_lit_test_suite(
         # keep sorted
         [
             "check_ir_before_llvm_conversion.mlir",
-            "eliminate_vector_transfer_ops.mlir",
             "hal_interface_bindings.mlir",
             "hal_interface_constants.mlir",
             "hal_interface_workgroup_info.mlir",

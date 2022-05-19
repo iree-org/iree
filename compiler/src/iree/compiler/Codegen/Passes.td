@@ -236,12 +236,6 @@ def LLVMCPUUnfuseFMAOps :
   let constructor = "mlir::iree_compiler::createLLVMCPUUnfuseFMAOpsPass()";
 }
 
-def LLVMCPUEliminateVectorTransferOps :
-    Pass<"iree-llvmcpu-eliminate-vector-transfer-pass", "func::FuncOp"> {
-  let summary = "Transforms and eliminates foldable vector transfer ops";
-  let constructor = "mlir::iree_compiler::createLLVMCPUEliminateVectorTransferOpsPass()";
-}
-
 def VectorContractCustomKernels :
     Pass<"iree-llvmcpu-vector-contract-custom-kernels", "func::FuncOp"> {
   let summary = "Enable custom kernels (inline assembly or intrinsics) for some vector.contract ops";
