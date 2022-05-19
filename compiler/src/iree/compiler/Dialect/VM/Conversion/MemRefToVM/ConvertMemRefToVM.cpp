@@ -118,6 +118,36 @@ class ConvertMemRefGetGlobalOp
   }
 };
 
+class ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
+ public:
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      memref::AllocaOp allocaOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto type = allocaOp.getType().cast<ShapedType>();
+    if (!type.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(
+          "unable to create buffers for dynamic shapes");
+    }
+
+    int64_t length = type.getSizeInBits();
+    if (adaptor.alignment()) {
+      int64_t alignmentInBits = *adaptor.alignment() * 8;
+      length = llvm::divideCeil(length, alignmentInBits) * alignmentInBits;
+    }
+    length = llvm::divideCeil(length, 8);
+
+    auto oldType = allocaOp.getType();
+    auto newType = getTypeConverter()->convertType(oldType);
+    Value size =
+        rewriter.create<IREE::VM::ConstI32Op>(allocaOp.getLoc(), length);
+    rewriter.replaceOpWithNewOp<IREE::VM::BufferAllocOp>(allocaOp, newType,
+                                                         size);
+    return success();
+  }
+};
+
 class ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
@@ -236,9 +266,10 @@ void populateMemRefToVMPatterns(MLIRContext *context,
 
   patterns.insert<FoldAsNoOp<bufferization::ToMemrefOp>>(typeConverter,
                                                          context);
-  patterns.insert<ConvertMemRefGlobalOp, ConvertMemRefGetGlobalOp,
-                  ConvertMemRefLoadOp, ConvertMemRefStoreOp>(typeConverter,
-                                                             context);
+  patterns
+      .insert<ConvertMemRefGlobalOp, ConvertMemRefGetGlobalOp,
+              ConvertMemRefAllocaOp, ConvertMemRefLoadOp, ConvertMemRefStoreOp>(
+          typeConverter, context);
 }
 
 }  // namespace iree_compiler
