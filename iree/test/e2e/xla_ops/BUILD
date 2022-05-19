@@ -355,6 +355,7 @@ iree_check_single_backend_test_suite(
             "pad.mlir",
             "pow.mlir",
             "reduce.mlir",
+            "reduce_window.mlir",
             "remainder.mlir",
             "reshape.mlir",
             "reverse.mlir",
@@ -379,7 +380,6 @@ iree_check_single_backend_test_suite(
         exclude = [
             "bitcast_convert.mlir",
             "exponential_fp16.mlir",
-            "reduce_window.mlir",  # Failed after integration. See issue #9161.
         ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],
