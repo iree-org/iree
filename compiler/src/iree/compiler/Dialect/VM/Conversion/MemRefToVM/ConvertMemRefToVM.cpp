@@ -118,6 +118,8 @@ class ConvertMemRefGetGlobalOp
   }
 };
 
+// TODO(#9165): Support alignment for vm.buffer.alloc. So far we ignore the
+// alignment attribute when lowering the op to VM dialect.
 class ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
