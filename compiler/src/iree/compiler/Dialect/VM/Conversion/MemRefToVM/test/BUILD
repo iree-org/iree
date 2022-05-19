@@ -17,7 +17,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "load_store_ops.mlir",
+            "memref_ops.mlir",
         ],
         include = ["*.mlir"],
     ),
