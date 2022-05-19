@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
@@ -27,10 +28,308 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/FileUtilities.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE;
+
+// TODO: Upstream to ShapeType and reuse.
+static SmallVector<int64_t> getIndicesOfDynamicDims(ShapedType t) {
+  int64_t numDynamicDims = t.getNumDynamicDims();
+  SmallVector<int64_t> res(numDynamicDims);
+  for (int64_t dim = 0; dim != numDynamicDims; ++dim)
+    res[dim] = t.getDynamicDimIndex(dim);
+  return res;
+}
+
+//===---------------------------------------------------------------------===//
+// Patterns for InParallelToFlow rewrite.
+//===---------------------------------------------------------------------===//
+
+struct RewriteExtractSliceAsFlowTensorLoad
+    : public OpRewritePattern<tensor::ExtractSliceOp> {
+  RewriteExtractSliceAsFlowTensorLoad(
+      MLIRContext *context, BlockAndValueMapping bvm,
+
+      DenseMap<Value, SmallVector<Value>> flowTensorToDimsMap)
+      : OpRewritePattern<tensor::ExtractSliceOp>(context),
+        bvm(bvm),
+        flowTensorToDimsMap(flowTensorToDimsMap) {}
+
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
+                                PatternRewriter &rewriter) const override {
+    auto replacement = bvm.lookupOrNull(extractSliceOp.source())
+                           .dyn_cast_or_null<BlockArgument>();
+    if (!replacement) return failure();
+
+    auto dispatchOp =
+        extractSliceOp->getParentOfType<Flow::DispatchWorkgroupsOp>();
+    if (!dispatchOp) return failure();
+
+    Location loc = extractSliceOp.getLoc();
+    // Get bbargs for dynamic dims of replacement.
+    // SmallVector<Value> dynamicDimArgs =
+    //     dispatchOp.getOperandDynamicDims(replacement.getArgNumber());
+    Value loadOp = rewriter.create<Flow::DispatchTensorLoadOp>(
+        loc, extractSliceOp.getType(), replacement,
+        flowTensorToDimsMap.lookup(replacement),
+        extractSliceOp.getMixedOffsets(), extractSliceOp.getMixedSizes(),
+        extractSliceOp.getMixedStrides());
+    rewriter.replaceOp(extractSliceOp, loadOp);
+
+    return success();
+  }
+
+  BlockAndValueMapping bvm;
+  DenseMap<Value, SmallVector<Value>> flowTensorToDimsMap;
+};
+
+// After outlining in dispatch region we can rewrite the dispatch ops with
+// proper captures.
+static LogicalResult legalizeDispatchWorkgroupOperands(
+    PatternRewriter &rewriter, Flow::DispatchWorkgroupsOp dispatchOp,
+    const SmallVector<Value> &tiedResultOperands) {
+  Location loc = dispatchOp.getLoc();
+  Region &region = dispatchOp.body();
+  Block &block = region.front();
+  // Helper function that keeps track of bbArg insertion point.
+  int64_t numResultTensors = block.getNumArguments();
+  auto getArgumentIndexOfFirstResultTensor = [&]() -> int64_t {
+    return block.getNumArguments() - numResultTensors;
+  };
+
+  llvm::SetVector<Value> valuesDefinedAbove;
+  mlir::getUsedValuesDefinedAbove(region, valuesDefinedAbove);
+  if (valuesDefinedAbove.empty()) return success();
+
+  SmallVector<Value> nonTensorOperands, tensorOperands, tensorDimOperands;
+  OpBuilder::InsertionGuard insertionGuard(rewriter);
+  rewriter.setInsertionPointToStart(&block);
+  BlockAndValueMapping bvm;
+  BlockAndValueMapping bvmTensorToFlowTensor;
+
+  // Handle all non-tensor operands:
+  //   - add a new operand and a new bbArg for each
+  //   - add a bvm entry operand -> bbArg for each
+  for (Value v : valuesDefinedAbove) {
+    // Create a new basic block argument for this value.
+    Type valueType = v.getType();
+    if (valueType.isa<RankedTensorType>()) continue;
+    nonTensorOperands.push_back(v);
+    Value bbArg = block.insertArgument(getArgumentIndexOfFirstResultTensor(),
+                                       valueType, loc);
+    bvm.map(v, bbArg);
+    continue;
+  }
+
+  // Handle all tensor operands:
+  //   - add a new operand and a new bbArg for each
+  //   - *do not* add a bvm entry operand -> bbArg yet, these will be replaced
+  //     by a Flow::DispatchTensorLoadOp(bbArg) which cannot yet be constructed.
+  for (Value v : valuesDefinedAbove) {
+    // Create a new basic block argument for this value.
+    Type valueType = v.getType();
+    auto tensorType = valueType.dyn_cast<RankedTensorType>();
+    if (!tensorType) continue;
+    // TODO: Helper Flow::DispatchTensorType::Builder from RankedTensorType.
+    Type flowTensorType = Flow::DispatchTensorType::get(
+        Flow::TensorAccess::ReadOnly, tensorType.getShape(),
+        tensorType.getElementType());
+    Value flowTensor = block.insertArgument(
+        getArgumentIndexOfFirstResultTensor(), flowTensorType, loc);
+    bvmTensorToFlowTensor.map(v, flowTensor);
+    tensorOperands.push_back(v);
+  }
+
+  // Revisit tensor operands to handle all tensor operand dims:
+  //   - add a new tensor.dim + operand + bbArg for each dynamic dimension
+  //   - add a new Flow::DispatchTensorLoadOp
+  //   - add a bvm entry bbArg -> Flow::DispatchTensorLoadOp
+  // Save the newly created index bbArgs for the dynamic dims of each tensor.
+  DenseMap<Value, SmallVector<Value>> flowTensorToDimsMap;
+  for (Value v : tensorOperands) {
+    auto tensorType = v.getType().cast<RankedTensorType>();
+    auto dynamicDims = getIndicesOfDynamicDims(tensorType);
+    {
+      OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPoint(dispatchOp);
+      for (int64_t dim : dynamicDims)
+        tensorDimOperands.push_back(
+            rewriter.create<tensor::DimOp>(loc, v, dim));
+    }
+    SmallVector<Value> dynamicDimArgs;
+    for (int64_t i = 0, e = tensorType.getRank(); i != e; ++i) {
+      dynamicDimArgs.push_back(block.insertArgument(
+          getArgumentIndexOfFirstResultTensor(), rewriter.getIndexType(), loc));
+    }
+    Value repl = rewriter.create<Flow::DispatchTensorLoadOp>(
+        loc, v.getType().cast<RankedTensorType>(),
+        bvmTensorToFlowTensor.lookup(v), dynamicDimArgs);
+
+    flowTensorToDimsMap.insert(
+        std::make_pair(bvmTensorToFlowTensor.lookup(v), dynamicDimArgs));
+    bvm.map(v, repl);
+  }
+
+  // Set the dispatchOp dim and non-dim operands.
+  // Use the xxxMutable interface to avoid needing to update the operands
+  // segment sizes attributes manually.
+  SmallVector<Value> nonDimOperands;
+  llvm::append_range(nonDimOperands, nonTensorOperands);
+  llvm::append_range(nonDimOperands, tensorOperands);
+  dispatchOp.operandsMutable().assign(nonDimOperands);
+  dispatchOp.operand_dimsMutable().assign(tensorDimOperands);
+
+  // Replace all uses of values defined above by entries in the bvm.
+  // Except for those uses that we need to replace specially (i.e. the
+  // tensors flowing into tensor::ExtractSliceOp).
+  for (auto value : valuesDefinedAbove) {
+    value.replaceUsesWithIf(bvm.lookup(value), [&](OpOperand &use) {
+      if (!dispatchOp->isProperAncestor(use.getOwner())) return false;
+      if (!value.getType().isa<RankedTensorType>()) return true;
+      return !isa<tensor::ExtractSliceOp>(use.getOwner());
+    });
+  }
+
+  RewritePatternSet patterns(dispatchOp.getContext());
+  patterns.add<RewriteExtractSliceAsFlowTensorLoad>(
+      dispatchOp.getContext(), bvmTensorToFlowTensor, flowTensorToDimsMap);
+  (void)applyPatternsAndFoldGreedily(dispatchOp, std::move(patterns));
+
+  // Set the tie between results and corresponding BlockArgument.
+  // At this time, all tensors that are inparallel_insert_slice'd into are
+  for (auto en : llvm::enumerate(tiedResultOperands)) {
+    // Each tied result operand .
+    BlockArgument readonlyFlowTensor =
+        bvmTensorToFlowTensor.lookup(en.value()).cast<BlockArgument>();
+    BlockArgument writeonlyFlowTensor =
+        block.getArgument(getArgumentIndexOfFirstResultTensor() + en.index());
+    auto writeOnlyFlowTensorType =
+        writeonlyFlowTensor.getType().cast<Flow::DispatchTensorType>();
+    writeonlyFlowTensor.setType(Flow::DispatchTensorType::get(
+        Flow::TensorAccess::ReadWrite, writeOnlyFlowTensorType.getShape(),
+        writeOnlyFlowTensorType.getElementType()));
+    readonlyFlowTensor.replaceUsesWithIf(
+        writeonlyFlowTensor, [&](OpOperand &use) {
+          return dispatchOp->isProperAncestor(use.getOwner());
+        });
+    dispatchOp.setTiedResultOperandIndex(en.index(),
+                                         readonlyFlowTensor.getArgNumber());
+  }
+
+  return success();
+}
+
+/// Pattern to rewrite a InParallelOp to the Flow dialect.
+// TODO: n-D InParallelOp
+struct InParallelOpToOperandlessFlowRewriter
+    : public OpRewritePattern<LinalgExt::InParallelOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  FailureOr<Flow::DispatchWorkgroupsOp> returningMatchAndRewrite(
+      LinalgExt::InParallelOp inParallelOp, PatternRewriter &rewriter) const;
+
+  LogicalResult matchAndRewrite(LinalgExt::InParallelOp inParallelOp,
+                                PatternRewriter &rewriter) const override {
+    return returningMatchAndRewrite(inParallelOp, rewriter);
+  }
+};
+
+FailureOr<Flow::DispatchWorkgroupsOp>
+InParallelOpToOperandlessFlowRewriter::returningMatchAndRewrite(
+    LinalgExt::InParallelOp inParallelOp, PatternRewriter &rewriter) const {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(inParallelOp);
+
+  // Compute all dynamic results, the dispatch region will need that.
+  // Use the fact that the dest of the ParallelInsertSliceOp are tied to the
+  // results.
+  Location loc = inParallelOp.getLoc();
+  SmallVector<Value> allResultsDynamicDims, tiedResultOperands;
+  for (LinalgExt::ParallelInsertSliceOp insertSliceOp :
+       inParallelOp.getTerminator().yieldingOps()) {
+    Value dest = insertSliceOp.dest();
+    auto dynamicDims =
+        getIndicesOfDynamicDims(dest.getType().cast<ShapedType>());
+    {
+      for (int64_t dim : dynamicDims)
+        allResultsDynamicDims.push_back(
+            rewriter.create<tensor::DimOp>(loc, dest, dim));
+    }
+    tiedResultOperands.push_back(dest);
+  }
+  assert(tiedResultOperands.size() == inParallelOp.getNumResults() &&
+         "Expected as many tiedResultOperands as results of inParallelOp");
+
+  // Add a fake workload of exactly the number of threads.
+  SmallVector<Value> fakeWorkload{inParallelOp.num_threads()};
+  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  fakeWorkload.resize(3, one);
+
+  // Create a dispatch op with just the `flow.return` terminator.
+  auto dispatchOp = rewriter.create<Flow::DispatchWorkgroupsOp>(
+      loc, /*workload=*/fakeWorkload, inParallelOp.getResultTypes(),
+      allResultsDynamicDims,
+      /*operands=*/ArrayRef<Value>{}, /*operandDims=*/ArrayRef<Value>{},
+      /*tiedOperands=*/ArrayRef<int64_t>{});
+  Region &region = dispatchOp.body();
+  Block *block = &region.front();
+  {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointToEnd(block);
+    rewriter.create<Flow::ReturnOp>(loc);
+  }
+
+  // Move the body of inParallel to the dispatchOp.
+  LinalgExt::PerformConcurrentlyOp terminator = inParallelOp.getTerminator();
+  block->getOperations().splice(block->begin(),
+                                inParallelOp.region().front().getOperations());
+
+  // Plug dispatch workgroup id and count values.
+  rewriter.setInsertionPointToStart(block);
+  auto idXOp = rewriter.create<Flow::DispatchWorkgroupIDOp>(loc, 0);
+  inParallelOp.getThreadIndex().replaceAllUsesWith(idXOp);
+  auto countXOp = rewriter.create<Flow::DispatchWorkgroupCountOp>(loc, 0);
+  // inParallelOp.num_threads() is given as an operand to dispatchOp, only
+  // replace uses inside dispatchOp.
+  inParallelOp.num_threads().replaceUsesWithIf(
+      countXOp.getResult(), [&](OpOperand &use) {
+        return dispatchOp->isProperAncestor(use.getOwner());
+      });
+
+  // Rewrite ops in terminator as Flow tensor store ops.
+  auto resultArgs = region.getArguments();
+  int64_t resultIndex = 0;
+  int64_t resultDynamicDimsPos = 0;
+  for (LinalgExt::ParallelInsertSliceOp parallelInsertOp :
+       terminator.yieldingOps()) {
+    unsigned numDynamicDims = parallelInsertOp.yieldedType()
+                                  .cast<RankedTensorType>()
+                                  .getNumDynamicDims();
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(block->getTerminator());
+    rewriter.create<Flow::DispatchTensorStoreOp>(
+        loc, parallelInsertOp.source(), resultArgs[resultIndex++],
+        ArrayRef<Value>(allResultsDynamicDims)
+            .slice(resultDynamicDimsPos, numDynamicDims),
+        parallelInsertOp.getMixedOffsets(), parallelInsertOp.getMixedSizes(),
+        parallelInsertOp.getMixedStrides());
+    resultDynamicDimsPos += numDynamicDims;
+  }
+
+  // Try to legalize the dispatch operands and bbArgs.
+  if (failed(legalizeDispatchWorkgroupOperands(rewriter, dispatchOp,
+                                               tiedResultOperands)))
+    return failure();
+
+  // Drop the inParallel terminator and replace inParallel.
+  rewriter.eraseOp(terminator);
+  rewriter.replaceOp(inParallelOp, dispatchOp.getResults());
+
+  return dispatchOp;
+}
 
 //===---------------------------------------------------------------------===//
 // Patterns for InParallelToHAL rewrite.
@@ -38,10 +337,10 @@ using namespace mlir::iree_compiler::IREE;
 
 /// Pattern to rewrite a InParallelOp to the HAL dialect.
 /// This is written in a way that allows rewriting a single InParallelOp at a
-/// time. Atm this is used in a global rewrite of all InParallelOps in a region
-/// to properly account for ordering requirements (i.e. innermost InParallelOp
-/// need to be rewritten before outermost ones).
-/// In the future, finer-grained single op control may be better.
+/// time. Atm this is used in a global rewrite of all InParallelOps in a
+/// region to properly account for ordering requirements (i.e. innermost
+/// InParallelOp need to be rewritten before outermost ones). In the future,
+/// finer-grained single op control may be better.
 struct InParallelOpToHALRewriter
     : public OpRewritePattern<LinalgExt::InParallelOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -135,7 +434,8 @@ InParallelOpToHALRewriter::returningMatchAndRewrite(
   if (numEnclosingInParallelOps >=
       HAL::ExecutableEntryPointOp::getNumWorkgroupDims()) {
     return inParallelOp->emitError(
-        "Too many InParallelOps, exceeds the maximum number of workgroup dims");
+        "Too many InParallelOps, exceeds the maximum number of workgroup "
+        "dims");
   }
 
   // Custom hal.executable.entry_point.
@@ -254,8 +554,8 @@ BridgeInParallelToFlowAbstractionGap::returningMatchAndRewrite(
         inParallelOp.getTerminator().yieldingOps()[result.getResultNumber()];
     // Replace OpOperand by a clone of the HAL binding subspan op and forward
     // the uses of flow.dispatch.tensor/load.
-    // TODO: check the load is of the full tensor, OTOH this whole process is a
-    // hack that needs to go away ...
+    // TODO: check the load is of the full tensor, OTOH this whole process is
+    // a hack that needs to go away ...
     SmallVector<Flow::DispatchTensorLoadOp> loadsFromSubspan;
     for (Operation *op : subSpanOp.result().getUsers()) {
       auto user = dyn_cast<Flow::DispatchTensorLoadOp>(op);
@@ -456,6 +756,57 @@ class IREESetNumWorkgroupToOneOp
 
 // TODO: Move to tablegen. Until this stabilizes upstream, simple C++ is
 // enough.
+class IREELinalgExtInParallelToFlowOp
+    : public Op<IREELinalgExtInParallelToFlowOp,
+                transform::TransformOpInterface::Trait,
+                MemoryEffectOpInterface::Trait> {
+ public:
+  using Op::Op;
+
+  static ArrayRef<StringRef> getAttributeNames() { return {}; }
+
+  static constexpr llvm::StringLiteral getOperationName() {
+    return llvm::StringLiteral("transform.iree.inparallel_to_flow");
+  }
+
+  Value target() { return nullptr; }
+
+  LogicalResult apply(transform::TransformResults &results,
+                      transform::TransformState &state) {
+    if (state.getTopLevel()
+            ->walk<WalkOrder::PostOrder>([&](LinalgExt::InParallelOp op) {
+              if (failed(functional::applyReturningPatternAt(
+                      InParallelOpToOperandlessFlowRewriter(getContext()), op)))
+                return WalkResult::interrupt();
+              return WalkResult::advance();
+            })
+            .wasInterrupted())
+      return failure();
+    return success();
+  }
+
+  // let assemblyFormat = "attr-dict";
+  static ParseResult parse(OpAsmParser &parser, OperationState &state) {
+    if (parser.parseOptionalAttrDict(state.attributes)) return failure();
+    return success();
+  }
+
+  // let assemblyFormat = "attr-dict";
+  void print(OpAsmPrinter &printer) {
+    printer.printOptionalAttrDict((*this)->getAttrs());
+  }
+
+  // This transform may affect the entirety of the payload IR.
+  void getEffects(SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+    effects.emplace_back(MemoryEffects::Read::get(),
+                         transform::PayloadIRResource::get());
+    effects.emplace_back(MemoryEffects::Write::get(),
+                         transform::PayloadIRResource::get());
+  }
+};
+
+// TODO: Move to tablegen. Until this stabilizes upstream, simple C++ is
+// enough.
 class IREELinalgExtInParallelToHALOp
     : public Op<IREELinalgExtInParallelToHALOp,
                 transform::TransformOpInterface::Trait,
@@ -501,10 +852,10 @@ class IREELinalgExtInParallelToHALOp
     AffineMinOp::getCanonicalizationPatterns(canonicalization, getContext());
     iree_compiler::populateAffineMinSCFCanonicalizationPattern(
         canonicalization);
-    // TODO: Careful. forwarding to Flow is more than a simple canonicalization.
-    // We went through rewrite of Flow/HAL out of the flow.tensor type to avoid
-    // these issues and allow various orderings of parallelism, tensors,
-    // distribution and bufferization.
+    // TODO: Careful. forwarding to Flow is more than a simple
+    // canonicalization. We went through rewrite of Flow/HAL out of the
+    // flow.tensor type to avoid these issues and allow various orderings of
+    // parallelism, tensors, distribution and bufferization.
     Flow::populateFlowDispatchCanonicalizationPatterns(canonicalization,
                                                        getContext());
     return applyPatternsAndFoldGreedily(state.getTopLevel(),
@@ -513,7 +864,7 @@ class IREELinalgExtInParallelToHALOp
 
   // let assemblyFormat = "attr-dict";
   static ParseResult parse(OpAsmParser &parser, OperationState &state) {
-    parser.parseOptionalAttrDict(state.attributes);
+    if (parser.parseOptionalAttrDict(state.attributes)) return failure();
     return success();
   }
 
@@ -542,6 +893,7 @@ class LinalgTransformDialectExtension
     declareDependentDialect<pdl::PDLDialect>();
     // clang-format off
     registerTransformOps<IREEBufferizeOp, 
+                         IREELinalgExtInParallelToFlowOp,
                          IREELinalgExtInParallelToHALOp,
                          IREESetNumWorkgroupToOneOp
                          >();

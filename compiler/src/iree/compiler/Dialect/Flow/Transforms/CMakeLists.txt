@@ -57,6 +57,7 @@ iree_cc_library(
   DEPS
     ::PassesIncGen
     IREELinalgExtDialect
+    IREELinalgExtTransformOps
     IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
@@ -71,12 +72,15 @@ iree_cc_library(
     MLIRMemRef
     MLIRMemRefTransforms
     MLIRPass
+    MLIRPDL
+    MLIRPDLInterp
     MLIRSCF
     MLIRSupport
     MLIRTensor
     MLIRTensorUtils
     MLIRTosa
     MLIRTransformUtils
+    MLIRTransformDialect
     MLIRTransforms
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR

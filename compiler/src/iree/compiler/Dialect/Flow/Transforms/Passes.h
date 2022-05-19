@@ -132,6 +132,11 @@ std::unique_ptr<Pass> createVerifyInputLegalityPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createDispatchLinalgOnTensorsPass();
 
+// Pass to perform dispatch of Linalg on tensor ops by using the transform
+// dialect. Dispatch regions are created as specified by the tr.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createDispatchLinalgOnTensorsTransformDialectPass();
+
 // Captures dynamic shape dimensions required by dispatch operands.
 std::unique_ptr<Pass> createCaptureDispatchDynamicDimsPass();
 

@@ -88,6 +88,11 @@ static llvm::cl::opt<std::string> clMmt4dTargetOptions(
                    "given architecture"),
     llvm::cl::init(""));
 
+static llvm::cl::opt<bool> clEnableLinalgInterpDispatchRegion(
+    "iree-flow-linalg-interp-dispatch",
+    llvm::cl::desc("Use linalg-interp to create some dispatch regions."),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -214,10 +219,18 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(createSplitReductionPass)
       // SplitReductionPass may create reduction dimension that are not the last
       // dimension.
-      .addPass(createInterchangeGenericOpsPass)
+      .addPass(createInterchangeGenericOpsPass);
 
-      // Dispatch region formation.
-      .addPass(createDispatchLinalgOnTensorsPass)
+  // Dispatch region formation.
+  if (!clEnableLinalgInterpDispatchRegion)
+    FunctionLikeNest(passManager).addPass(createDispatchLinalgOnTensorsPass);
+  else {
+    FunctionLikeNest(passManager)
+        .addPass(createDispatchLinalgOnTensorsTransformDialectPass);
+    return;
+  }
+
+  FunctionLikeNest(passManager)
       .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(createCSEPass);
