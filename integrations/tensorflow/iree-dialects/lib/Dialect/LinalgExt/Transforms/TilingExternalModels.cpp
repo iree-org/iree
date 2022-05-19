@@ -144,8 +144,10 @@ struct LinalgOpTilingInterface
       tiledOperands = makeTiledShapes(b, loc, linalgOp, valuesToTile,
                                       tileOffsets, tileSizes, sizeBounds,
                                       /*omitPartialTileCheck=*/false);
+      // Update the destination operands after tiling.
+      tiledDest = ValueRange(tiledOperands).take_back(tiledDest.size());
     } else {
-      // Only tile the inputs, then apped the outputs.
+      // Only tile the inputs, then append the outputs.
       int64_t dim = offsets.size();
       ArrayRef<Value> tileOffsetsRef{tileOffsets.begin(), tileOffsets.end()};
       ArrayRef<Value> tileSizesRef{tileSizes.begin(), tileSizes.end()};

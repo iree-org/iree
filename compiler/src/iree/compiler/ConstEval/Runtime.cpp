@@ -50,8 +50,7 @@ static Attribute createAttributeFromRawData(Location loc,
     bool detectedSplat = false;
     if (DenseElementsAttr::isValidRawBuffer(tensorType, rawBuffer,
                                             detectedSplat)) {
-      return DenseElementsAttr::getFromRawBuffer(tensorType, rawBuffer,
-                                                 detectedSplat);
+      return DenseElementsAttr::getFromRawBuffer(tensorType, rawBuffer);
     } else {
       emitError(loc) << "mapped memory region was not valid for constructing "
                         "tensor of type "

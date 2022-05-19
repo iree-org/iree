@@ -7,6 +7,6 @@ add_mlir_library(IREELinalgTransformTestPasses
   mlir-headers
 
   LINK_LIBS PUBLIC
-  IREELinalgTransformDialectTransforms
+  IREELinalgTransformDialectPasses
   MLIRPass
   )

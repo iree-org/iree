@@ -53,6 +53,15 @@ declare_mlir_dialect_python_bindings(
   DIALECT_NAME iree_pydm
 )
 
+declare_mlir_python_sources(TmpTransformDialect
+  ADD_TO_PARENT IREEDialectsPythonSources.Dialects
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
+  SOURCES
+    dialects/transform.py
+    dialects/_transform_ops_ext.py
+    dialects/_transform_ops_gen.py
+)
+
 ################################################################################
 # Extensions
 ################################################################################
@@ -74,7 +83,7 @@ declare_mlir_python_extension(IREEDialectsPythonExtensions.Main
 # testing.
 ################################################################################
 
-set(_SOURCE_COMPONENTS
+set(_source_components
   # TODO: Core is now implicitly building/registering all dialects, increasing
   # build burden by ~5x. Make it stop.
   MLIRPythonSources.Core
@@ -92,13 +101,15 @@ add_mlir_python_common_capi_library(IREEDialectsAggregateCAPI
   INSTALL_DESTINATION python_packages/iree_dialects/mlir/_mlir_libs
   OUTPUT_DIRECTORY "${IREE_DIALECTS_BINARY_DIR}/python_packages/iree_dialects/iree/compiler/_mlir_libs"
   RELATIVE_INSTALL_ROOT "../../../.."
-  DECLARED_SOURCES ${_SOURCE_COMPONENTS}
+  DECLARED_SOURCES
+    ${_source_components}
 )
 
 add_mlir_python_modules(IREEDialectsPythonModules
   ROOT_PREFIX "${IREE_DIALECTS_BINARY_DIR}/python_packages/iree_dialects/iree/compiler"
   INSTALL_PREFIX "python_packages/iree_dialects/iree/compiler"
-  DECLARED_SOURCES ${_SOURCE_COMPONENTS}
+  DECLARED_SOURCES 
+    ${_source_components}
   COMMON_CAPI_LINK_LIBS
     IREEDialectsAggregateCAPI
   )

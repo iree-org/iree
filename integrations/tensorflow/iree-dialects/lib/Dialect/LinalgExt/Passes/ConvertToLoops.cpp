@@ -110,7 +110,7 @@ struct LinalgExtToLoopsPass
 };
 } // namespace
 
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 IREE::LinalgExt::createLinalgExtToLoopsPass() {
   return std::make_unique<LinalgExtToLoopsPass>();
 }

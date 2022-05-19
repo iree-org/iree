@@ -1,6 +1,5 @@
-add_mlir_library(IREELinalgTransformDialectTransforms
+add_mlir_library(IREELinalgTransformDialectPasses
   ExpertExpansion.cpp
-  TrackingCSE.cpp
   TransformInterpreter.cpp
 
   DEPENDS

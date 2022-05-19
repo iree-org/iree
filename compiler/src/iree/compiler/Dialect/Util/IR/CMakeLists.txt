@@ -96,7 +96,7 @@ iree_tablegen_doc(
   TD_FILE
     "UtilOps.td"
   OUTS
-    --gen-dialect-doc UtilDialect.md
+    --gen-dialect-doc --dialect=util UtilDialect.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -89,7 +89,10 @@ iree_tablegen_doc(
     name = "CheckDialectDocGen",
     tbl_outs = [
         (
-            ["--gen-dialect-doc"],
+            [
+                "--gen-dialect-doc",
+                "--dialect=check",
+            ],
             "CheckDialect.md",
         ),
     ],

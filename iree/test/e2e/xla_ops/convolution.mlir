@@ -411,7 +411,7 @@ func.func @conv2d_1452x2223_dilated_valid() {
 
 func.func @depthwise_conv_non_1_channel_multiplier() {
   %arg0 = util.unfoldable_constant dense<1.0> : tensor<2x4x5x2xf32>
-  %arg1 = util.unfoldable_constant dense<1.0> : tensor<2x2x2x3xf32>
+  %arg1 = util.unfoldable_constant dense<1.0> : tensor<2x2x1x6xf32>
   %res = "mhlo.convolution"(%arg0, %arg1) {
     batch_group_count = 1 : i64,
     dimension_numbers = #mhlo.conv<raw
@@ -428,7 +428,7 @@ func.func @depthwise_conv_non_1_channel_multiplier() {
     feature_group_count = 2 : i64,
     padding = dense<0> : tensor<2x2xi64>,
     rhs_dilation = dense<1> : tensor<2xi64>,
-    window_strides = dense<1> : tensor<2xi64>} : (tensor<2x4x5x2xf32>, tensor<2x2x2x3xf32>) -> tensor<2x3x4x6xf32>
+    window_strides = dense<1> : tensor<2xi64>} : (tensor<2x4x5x2xf32>, tensor<2x2x1x6xf32>) -> tensor<2x3x4x6xf32>
   check.expect_almost_eq_const(%res, dense<4.0> : tensor<2x3x4x6xf32>) : tensor<2x3x4x6xf32>
   return
 }
