@@ -295,7 +295,15 @@ export CXX=g++-9
 mkdir build && cd build
 
 # Note that the below command disable cuda backend.
-cmake -G Ninja -DIREE_ENABLE_LLD=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo -DIREE_BUILD_DOCS=ON -DIREE_BUILD_PYTHON_BINDINGS=ON -DIREE_ENABLE_ASSERTIONS=ON -DIREE_HAL_DRIVER_CUDA=OFF -DIREE_TARGET_BACKEND_CUDA=OFF ..
+cmake -G Ninja \
+  -DIREE_ENABLE_LLD=ON \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+  -DIREE_BUILD_DOCS=ON \
+  -DIREE_BUILD_PYTHON_BINDINGS=ON \
+  -DIREE_ENABLE_ASSERTIONS=ON \
+  -DIREE_HAL_DRIVER_CUDA=OFF \
+  -DIREE_TARGET_BACKEND_CUDA=OFF \
+  ..
 ```
 
 To repro failures in CI `bazel_linux_x86-swiftshader_core`, we can follow the [doc](https://github.com/google/iree/blob/main/docs/developers/get_started/building_with_bazel_linux.md) to build IREE using bazel. E.g.,
