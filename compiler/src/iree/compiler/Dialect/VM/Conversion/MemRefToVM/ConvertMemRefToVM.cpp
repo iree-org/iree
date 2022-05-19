@@ -132,10 +132,6 @@ class ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
     }
 
     int64_t length = type.getSizeInBits();
-    if (adaptor.alignment()) {
-      int64_t alignmentInBits = *adaptor.alignment() * 8;
-      length = llvm::divideCeil(length, alignmentInBits) * alignmentInBits;
-    }
     length = llvm::divideCeil(length, 8);
 
     auto oldType = allocaOp.getType();
