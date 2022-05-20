@@ -6,28 +6,21 @@
 
 agents:
   queue: "orchestration"
-  security: "submitted"
+  security: "trusted"
 
 steps:
-  - label: ":hiking_boot: Bootstrapping postsubmit pipeline"
-    env:
-      PIPELINE_BOOTSTRAPPED: ${PIPELINE_BOOTSTRAPPED:-false}
-    commands: |
-      ./build_tools/buildkite/scripts/bootstrap_pipeline.sh \
-          build_tools/buildkite/pipelines/postsubmit.yml
-
-  - wait
-
   - label: "Updating pipelines"
     concurrency: 1
     concurrency_group: "update-pipelines"
     commands: |
       export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
           --secret=iree-buildkite-privileged)"
-      build_tools/buildkite/scripts/update_pipeline_configuration.py
+      build_tools/buildkite/scripts/update_pipeline_configurations.py
+
+  - wait
 
   - label: "Executing gcmn-test-pipeline"
     commands: |
       export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
-          --secret=iree-buildkite-privileged)"
+          --secret=iree-buildkite-presubmit-pipelines)"
       ./build_tools/buildkite/scripts/wait_for_pipeline_success.py gcmn-test-pipeline
