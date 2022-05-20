@@ -27,9 +27,10 @@ namespace Flow {
 static bool canInsOperandTieWithOutsOperand(OpOperand *insOperand) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(insOperand->getOwner());
   if (!linalgOp) return false;
-  AffineMap insOperandIndexingMap = linalgOp.getTiedIndexingMap(insOperand);
+
   auto canTieWithOutsOperand = [&](OpOperand *outsOperand) {
-    if (linalgOp.getTiedIndexingMap(outsOperand) != insOperandIndexingMap) {
+    auto outputMap = linalgOp.getTiedIndexingMap(outsOperand);
+    if (!outputMap.isPermutation()) {
       return false;
     }
     // TODO(#8411): Until ops are vectorized (always), we need

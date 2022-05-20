@@ -215,6 +215,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // SplitReductionPass may create reduction dimension that are not the last
       // dimension.
       .addPass(createInterchangeGenericOpsPass)
+      .addPass(createInterchangeTransposeGenericOpsPass)
 
       // Dispatch region formation.
       .addPass(createDispatchLinalgOnTensorsPass)
