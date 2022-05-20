@@ -24,7 +24,6 @@ cc_library(
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm:cc",
-        "//samples:defs",
     ],
 )
 

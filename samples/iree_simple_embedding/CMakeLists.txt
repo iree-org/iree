@@ -42,8 +42,6 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-mlir-to-vm-bytecode-module"
     "--iree-hal-target-backends=vmvx"
-  DEPS
-    iree::samples::defs
   PUBLIC
 )
 
@@ -96,8 +94,6 @@ iree_bytecode_module(
     "--iree-llvm-debug-symbols=false"
     "--iree-vm-bytecode-module-strip-source-map=true"
     "--iree-vm-emit-polyglot-zip=false"
-  DEPS
-    iree::samples::defs
   PUBLIC
 )
 
@@ -119,8 +115,6 @@ iree_bytecode_module(
     "--iree-llvm-debug-symbols=false"
     "--iree-vm-bytecode-module-strip-source-map=true"
     "--iree-vm-emit-polyglot-zip=false"
-  DEPS
-    iree::samples::defs
   PUBLIC
 )
 
@@ -142,8 +136,6 @@ iree_bytecode_module(
     "--iree-llvm-debug-symbols=false"
     "--iree-vm-bytecode-module-strip-source-map=true"
     "--iree-vm-emit-polyglot-zip=false"
-  DEPS
-    iree::samples::defs
   PUBLIC
 )
 
@@ -163,8 +155,6 @@ iree_bytecode_module(
     "--iree-llvm-debug-symbols=false"
     "--iree-vm-bytecode-module-strip-source-map=true"
     "--iree-vm-emit-polyglot-zip=false"
-  DEPS
-    iree::samples::defs
   PUBLIC
 )
 
@@ -183,8 +173,6 @@ iree_bytecode_module(
     "--iree-llvm-debug-symbols=false"
     "--iree-vm-bytecode-module-strip-source-map=true"
     "--iree-vm-emit-polyglot-zip=false"
-  DEPS
-    iree::samples::defs
   PUBLIC
 )
 
@@ -260,8 +248,6 @@ iree_bytecode_module(
     "--iree-mlir-to-vm-bytecode-module"
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-llvm-debug-symbols=false"
-  DEPS
-    iree::samples::defs
   PUBLIC
 )
 

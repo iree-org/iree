@@ -11,10 +11,3 @@ package(
 )
 
 exports_files(["lit.cfg.py"])
-
-cc_library(
-    name = "defs",
-    includes = [
-        ".",
-    ],
-)

@@ -27,7 +27,6 @@ iree_cc_library(
     iree::base::cc
     iree::hal
     iree::modules::hal
-    iree::samples::defs
     iree::vm
     iree::vm::cc
   PUBLIC

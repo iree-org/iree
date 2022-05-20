@@ -34,7 +34,6 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::Conversion
-    iree::samples::defs
   PUBLIC
 )
 
@@ -71,7 +70,6 @@ iree_cc_library(
   DEPS
     ::dialect
     MLIRIR
-    iree::samples::defs
   PUBLIC
 )
 
@@ -88,7 +86,6 @@ iree_cc_binary(
     MLIRSupport
     iree::compiler::Tools::init_passes_and_dialects
     iree::compiler::Tools::init_targets
-    iree::samples::defs
 )
 
 iree_cc_binary(
@@ -113,7 +110,6 @@ iree_cc_binary(
     iree::compiler::Tools::init_translations
     iree::compiler::Tools::init_xla_dialects
     iree::compiler::Translation::IREEVM
-    iree::samples::defs
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

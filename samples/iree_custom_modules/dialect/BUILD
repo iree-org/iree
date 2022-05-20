@@ -47,7 +47,6 @@ cc_library(
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/VM/Conversion",
-        "//samples:defs",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
@@ -88,7 +87,6 @@ cc_library(
     hdrs = ["init_dialect.h"],
     deps = [
         ":dialect",
-        "//samples:defs",
         "@llvm-project//mlir:IR",
     ],
 )
@@ -100,7 +98,6 @@ cc_binary(
         ":init_dialect",
         "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
         "//compiler/src/iree/compiler/Tools:init_targets",
-        "//samples:defs",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MlirOptLib",
@@ -122,7 +119,6 @@ cc_binary(
         "//compiler/src/iree/compiler/Tools:init_translations",
         "//compiler/src/iree/compiler/Tools:init_xla_dialects",
         "//compiler/src/iree/compiler/Translation:IREEVM",
-        "//samples:defs",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

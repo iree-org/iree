@@ -10,11 +10,6 @@ if(NOT IREE_TARGET_BACKEND_DYLIB_LLVM_AOT OR
   return()
 endif()
 
-
-# Configures all iree_cc_* targets to take this implicit dep,
-# which provides common includes and copts for this directory.
-set(IREE_IMPLICIT_DEFS_CC_DEPS iree::samples::defs)
-
 # Set iree-compile binary.
 set(_COMPILE_TOOL_EXECUTABLE $<TARGET_FILE:iree_tools_iree-compile>)
 
