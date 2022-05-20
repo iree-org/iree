@@ -19,7 +19,7 @@ steps:
   # pipelines (https://github.com/buildkite/cli/issues/122). This isn't too big
   # a limitation because presumably we're already running with the local file
   # that would be bootstrapped.
-  - label: ":hiking_boot: Bootstrapping pipeline from '${BUILDKITE_COMMIT}'"
+  - label: ":hiking_boot: Bootstrapping pipeline from '${BUILDKITE_COMMIT:0:7}'"
     if: |
       !build.pull_request.repository.fork &&
       ${MUST_BOOTSTRAP:-true} &&
@@ -34,7 +34,7 @@ steps:
 
   # Now that we're bootstrapped, upload the pipeline itself from the main
   # repository and use the current commit for any configuration.
-  - label: ":pipeline: Uploading pipeline from '${BUILDKITE_COMMIT}'"
+  - label: ":pipeline: Uploading pipeline from '${BUILDKITE_COMMIT:0:7}'"
     if: "!build.pull_request.repository.fork"
     env:
       CONFIG_FETCH_REF: ${BUILDKITE_COMMIT}
