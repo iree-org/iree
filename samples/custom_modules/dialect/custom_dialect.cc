@@ -16,7 +16,6 @@
 #include "samples/custom_modules/dialect/conversion_patterns.h"
 #include "samples/custom_modules/dialect/custom.imports.h"
 
-
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {

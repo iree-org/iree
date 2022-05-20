@@ -15,7 +15,6 @@
 #include "mlir/IR/Dialect.h"
 #include "samples/custom_modules/dialect/custom_dialect.h"
 
-
 namespace mlir {
 namespace iree_compiler {
 

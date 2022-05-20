@@ -31,7 +31,6 @@
 #include "mlir/Tools/mlir-translate/Translation.h"
 #include "samples/custom_modules/dialect/init_dialect.h"
 
-
 static llvm::cl::opt<std::string> inputFilename(llvm::cl::Positional,
                                                 llvm::cl::desc("<input file>"),
                                                 llvm::cl::init("-"));

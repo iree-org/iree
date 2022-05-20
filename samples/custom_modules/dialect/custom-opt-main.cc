@@ -18,7 +18,6 @@
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "samples/custom_modules/dialect/init_dialect.h"
 
-
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
 
