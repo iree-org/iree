@@ -29,10 +29,10 @@ iree_lit_test_suite(
         ],
         include = ["*.mlir"],
     ),
+    cfg = "//tools:lit.cfg.py",
     tags = [
         "hostonly",
     ],
-    cfg = "//tools:lit.cfg.py",
     tools = [
         "//tools:iree-benchmark-module",
         "//tools:iree-compile",
@@ -46,10 +46,10 @@ iree_lit_test_suite(
 iree_lit_test_suite(
     name = "benchmark_flags",
     srcs = ["benchmark_flags.txt"],
+    cfg = "//tools:lit.cfg.py",
     tags = [
         "hostonly",
     ],
-    cfg = "//tools:lit.cfg.py",
     tools = [
         "//tools:iree-benchmark-module",
         "//tools:iree-compile",
