@@ -62,10 +62,11 @@ function(iree_cc_binary)
   # Prefix the library with the package name, so we get: iree_package_name
   iree_package_name(_PACKAGE_NAME)
   iree_package_ns(_PACKAGE_NS)
-  set(_NAME_PARTS "")
-  list(APPEND _NAME_PARTS "${_PACKAGE_NAME}")
-  list(APPEND _NAME_PARTS "${_RULE_NAME}")
-  list(JOIN _NAME_PARTS "_" _NAME)
+  if("${_PACKAGE_NAME}" STREQUAL "")
+    set(_NAME "${_RULE_NAME}")
+  else()
+    set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+  endif()
 
   add_executable(${_NAME} "")
 

@@ -69,13 +69,10 @@ def _convert_target_block(name, target):
   if target is None:
     return ""
 
-  # Targets in this context can't be aliases, because CMake. So we first convert
-  # it in the usual way and then syntactically change it back from the pretty
-  # alias name to the underscored variant. Example:
-  #   //iree/tools:iree-translate
-  #   iree::tools::iree-translate
-  #   iree_tools_iree-translate
-  # TODO(scotttodd): update this example, or remove the code if no longer used?
+  # Convert the target name from its Bazel name to the corresponding CMake name.
+  # The specific conversion pattern depends on the target location. In general,
+  # Bazel targets are fully qualified and use slashes in Bazel, while targets
+  # in CMake are rooted on subtrees and use _ (with :: aliases).
   cmake_aliases = bazel_to_cmake_targets.convert_target(target)
   if len(cmake_aliases) != 1:
     raise ValueError(
