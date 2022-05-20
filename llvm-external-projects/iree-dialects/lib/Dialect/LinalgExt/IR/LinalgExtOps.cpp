@@ -1271,7 +1271,7 @@ LogicalResult TopkOp::verify() {
   }
   auto terminatorOp = llvm::dyn_cast<YieldOp>(block.getTerminator());
   if (!terminatorOp || !terminatorOp.getOperand(0).getType().isInteger(1)) {
-    return op->emitOpError("region block must end with a linalg_ext Yield i1!");
+    return op->emitOpError("region block must end with a linalg_ext.yield i1!");
   }
   return success();
 }
