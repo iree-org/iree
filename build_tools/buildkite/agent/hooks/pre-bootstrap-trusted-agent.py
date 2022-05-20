@@ -10,26 +10,33 @@ import json
 import os
 import sys
 
+# An external install because environment file parsing apparently doesn't exist
+# in a built-in package.
+from dotenv import dotenv_values
+
 ALLOWED_PIPELINES = ["presubmit", "postsubmit"]
 ALLOWED_PLUGINS = [
     "github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#24e54e7729",
 ]
 
-
 def main():
   # See https://buildkite.com/docs/agent/v3/hooks#agent-lifecycle-hooks
   buildkite_env_file = os.environ["BUILDKITE_ENV_FILE"]
   buildkite_env = {}
-  with open(buildkite_env_file) as f:
-    for line in f:
-      key, val = line.split("=", maxsplit=1)
-      buildkite_env[key] = val
 
+  buildkite_env = dotenv_values(buildkite_env_file)
+
+  for k, v in buildkite_env.items():
+    print(f"{k}: {v}", file=sys.stderr)
   pipeline = buildkite_env["BUILDKITE_PIPELINE_SLUG"]
   if pipeline not in ALLOWED_PIPELINES:
     print(f"Pipeline '{pipeline}' is not allowed to run on this agent.",
           file=sys.stderr)
     sys.exit(2)
+
+  plugins_var = buildkite_env.get("BUILDKITE_PLUGINS")
+  if plugins_var is None:
+    return
 
   plugins = json.loads(buildkite_env["BUILDKITE_PLUGINS"])
 
