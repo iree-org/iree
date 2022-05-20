@@ -13,6 +13,8 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+exports_files(["lit.cfg.py"])
+
 cc_binary(
     name = "iree-benchmark-module",
     srcs = ["iree-benchmark-module-main.cc"],
