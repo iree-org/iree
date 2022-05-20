@@ -833,16 +833,16 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
       std::string bufferName = moduleName + "_" + rodataOp.getName().str();
 
-      auto bufferVoid = builder.create<emitc::CallOp>(
+      auto rodataPointer = builder.create<emitc::VariableOp>(
+          /*location=*/loc,
+          /*resultType=*/
+          emitc::PointerType::get(emitc::OpaqueType::get(ctx, "const uint8_t")),
+          /*value=*/emitc::OpaqueAttr::get(ctx, bufferName));
+
+      auto bufferVoid = builder.create<emitc::CastOp>(
           /*location=*/loc,
           /*type=*/emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void")),
-          /*callee=*/StringAttr::get(ctx, "EMITC_CAST"),
-          /*args=*/
-          ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, bufferName),
-                               TypeAttr::get(emitc::PointerType::get(
-                                   emitc::OpaqueType::get(ctx, "void")))}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{});
+          /*operand=*/rodataPointer.getResult());
 
       Value bufferSize =
           callSizeof(builder, loc, emitc::OpaqueAttr::get(ctx, bufferName));
@@ -854,7 +854,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
           /*args=*/ArrayAttr{},
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/
-          ArrayRef<Value>{bufferVoid.getResult(0), bufferSize});
+          ArrayRef<Value>{bufferVoid.getResult(), bufferSize});
 
       auto allocator = builder.create<emitc::CallOp>(
           /*location=*/loc,
@@ -3872,7 +3872,7 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
 
       auto messageSizeIntOp = rewriter.create<emitc::CastOp>(
           /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "int"),
+          /*type=*/rewriter.getIntegerType(32),
           /*operand=*/messageSizeOp.getResult(0));
 
       auto messageDataOp = rewriter.create<emitc::CallOp>(
