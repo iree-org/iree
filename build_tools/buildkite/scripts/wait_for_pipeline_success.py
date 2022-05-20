@@ -82,14 +82,15 @@ def main(args):
   url = bk.get_url_for_build(build_number)
   print(f"Waiting on {linkify(url)}")
   build = bk.wait_for_build(build_number)
+  
+  if args.output_build_json:
+    with open(args.output_build_json, "w") as f:
+      json.dump(build, f)
+  
   if get_build_state(build) != buildkite.BuildState.PASSED:
     print(f"Build was not successful: {linkify(url)}")
     sys.exit(1)
   print(f"Build completed successfully: {linkify(url)}")
-
-  with open(args.output_build_json, "w") as f:
-    json.dump(build, f)
-
 
 if __name__ == "__main__":
   main(parse_args())
