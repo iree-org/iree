@@ -110,7 +110,7 @@ $ ../iree-build/iree/tools/iree-opt \
 ```
 
 Custom passes may also be layered on top of `iree-opt`, see
-[samples/iree_custom_modules/dialect](https://github.com/google/iree/blob/main/samples/iree_custom_modules/dialect)
+[samples/custom_modules/dialect](https://github.com/google/iree/blob/main/samples/custom_modules/dialect)
 for a sample.
 
 ### iree-compile
@@ -141,7 +141,7 @@ see "translation" in
 for more information.
 
 Custom translations may also be layered on top of `iree-translate`, see
-[samples/iree_custom_modules/dialect](https://github.com/google/iree/blob/main/samples/iree_custom_modules/dialect)
+[samples/custom_modules/dialect](https://github.com/google/iree/blob/main/samples/custom_modules/dialect)
 for a sample.
 
 ### iree-run-module
