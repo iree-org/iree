@@ -16,8 +16,9 @@ from dotenv import dotenv_values
 
 ALLOWED_PIPELINES = ["presubmit", "postsubmit"]
 ALLOWED_PLUGINS = [
-    "github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#24e54e7729",
+    "https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#24e54e7729",
 ]
+
 
 def main():
   # See https://buildkite.com/docs/agent/v3/hooks#agent-lifecycle-hooks
@@ -26,8 +27,10 @@ def main():
 
   buildkite_env = dotenv_values(buildkite_env_file)
 
+  print("Buildkite environment:", file=sys.stderr)
   for k, v in buildkite_env.items():
     print(f"{k}: {v}", file=sys.stderr)
+
   pipeline = buildkite_env["BUILDKITE_PIPELINE_SLUG"]
   if pipeline not in ALLOWED_PIPELINES:
     print(f"Pipeline '{pipeline}' is not allowed to run on this agent.",
@@ -41,9 +44,16 @@ def main():
   plugins = json.loads(buildkite_env["BUILDKITE_PLUGINS"])
 
   for plugin in plugins:
-    if plugin not in ALLOWED_PLUGINS:
-      print(f"Plugin '{plugin}' is not allowed to run on this agent.",
-            file=sys.stderr)
+    plugin_keys = list(plugin.keys())
+    if len(plugin_keys) != 1:
+      print(f"Got plugin in unexpected format: '{plugin}'", file=sys.stderr)
+      sys.exit(3)
+    plugin_key = plugin_keys[0]
+    if plugin_key not in ALLOWED_PLUGINS:
+      print(
+          f"Plugin with key '{plugin_key}' is not allowed to run on this agent:"
+          f" '{plugin}'",
+          file=sys.stderr)
       sys.exit(2)
 
 
