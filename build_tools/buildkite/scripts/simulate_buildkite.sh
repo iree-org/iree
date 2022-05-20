@@ -6,7 +6,8 @@
 
 set -euo pipefail
 
-export BUILDKITE_ORGANIZATION_SLUG="iree"
+export BUILDKITE_ORGANIZATION_SLUG="local"
+export BUILDKITE_REPO="https://github.com/google/iree"
 export BUILDKITE_COMMIT="$(git rev-parse HEAD)"
 export BUILDKITE_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 export BUILDKITE_BUILD_AUTHOR="$(git log -n 1 --pretty="format:%aN" HEAD)"
