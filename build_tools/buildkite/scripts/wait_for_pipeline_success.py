@@ -68,8 +68,7 @@ def parse_args() -> argparse.Namespace:
   parser.add_argument(
       "--output-build-json",
       default="build.json",
-      help="Output path of the build object in JSON, which contains the details"
-      " of the successful build.")
+      help="Path to which to dump the JSON describing the finished build")
   return parser.parse_args()
 
 
