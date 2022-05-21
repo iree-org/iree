@@ -88,11 +88,14 @@ LogicalResult FlatbufferBuilder::copyToStream(llvm::raw_ostream &output) {
   return success();
 }
 
-LogicalResult FlatbufferBuilder::printJsonToStream(
-    bool pretty, bool includeDefaults, print_json_fn_t print_json_fn,
-    llvm::raw_ostream &output) {
-  // The printer requires direct access to the flatbuffer bytes so clone here.
+LogicalResult FlatbufferBuilder::printJsonToStream(bool pretty,
+                                                   bool includeDefaults,
+                                                   print_json_fn_t printJsonFn,
+                                                   llvm::raw_ostream &output) {
+  // The printer requires direct access to the FlatBuffer bytes so clone here.
   auto bufferData = cloneBufferIntoContiguousBytes(*this);
+  auto moduleData = ArrayRef<uint8_t>(bufferData.data(), bufferData.size())
+                        .drop_front(sizeof(flatbuffers_uoffset_t));
 
   flatcc_json_printer_t printer;
   flatcc_json_printer_init_dynamic_buffer(&printer, /*buffer_size=*/0);
@@ -102,8 +105,8 @@ LogicalResult FlatbufferBuilder::printJsonToStream(
 
   // Print into the dynamically-resizing buffer. May fail if OOM.
   int rv =
-      print_json_fn(&printer, reinterpret_cast<const char *>(bufferData.data()),
-                    bufferData.size());
+      printJsonFn(&printer, reinterpret_cast<const char *>(moduleData.data()),
+                  moduleData.size());
   if (rv == -1) {
     flatcc_json_printer_clear(&printer);
     return failure();

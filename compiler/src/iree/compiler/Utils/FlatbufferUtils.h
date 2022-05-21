@@ -143,7 +143,7 @@ class FlatbufferBuilder {
   // referencing the same bytes; meaning that this can't be used to verify that
   // we are correctly memoizing strings/structures/etc.
   LogicalResult printJsonToStream(bool pretty, bool includeDefaults,
-                                  print_json_fn_t print_json_fn,
+                                  print_json_fn_t printJsonFn,
                                   llvm::raw_ostream &output);
 
  private:

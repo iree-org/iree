@@ -15,7 +15,143 @@
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module_impl.h"
 
-// Perform an strcmp between a flatbuffers string and an IREE string view.
+// Alignment applied to each segment of the archive.
+// All embedded file contents (FlatBuffers, rodata, etc) are aligned to this
+// boundary.
+#define IREE_VM_ARCHIVE_SEGMENT_ALIGNMENT 64
+
+// ZIP local file header (comes immediately before each file in the archive).
+// In order to find the starting offset of the FlatBuffer in a polyglot archive
+// we need to parse this given the variable-length nature of it (we want to
+// be robust to file name and alignment changes).
+//
+// NOTE: all fields are little-endian.
+// NOTE: we don't care about the actual module size here; since we support
+//       streaming archives trying to recover it would require much more
+//       involved processing (we'd need to reference the central directory).
+//       If we wanted to support users repacking ZIPs we'd probably want to
+//       rewrite everything as we store offsets in the FlatBuffer that are
+//       difficult to update after the archive has been produced.
+#define ZIP_LOCAL_FILE_HEADER_SIGNATURE 0x04034B50u
+#if defined(IREE_COMPILER_MSVC)
+#pragma pack(push, 1)
+#endif  // IREE_COMPILER_MSVC
+typedef struct {
+  uint32_t signature;  // ZIP_LOCAL_FILE_HEADER_SIGNATURE
+  uint16_t version;
+  uint16_t general_purpose_flag;
+  uint16_t compression_method;
+  uint16_t last_modified_time;
+  uint16_t last_modified_date;
+  uint32_t crc32;              // 0 for us
+  uint32_t compressed_size;    // 0 for us
+  uint32_t uncompressed_size;  // 0 for us
+  uint16_t file_name_length;
+  uint16_t extra_field_length;
+  // file name (variable size)
+  // extra field (variable size)
+} IREE_ATTRIBUTE_PACKED zip_local_file_header_t;
+#if defined(IREE_COMPILER_MSVC)
+#pragma pack(pop)
+#endif  // IREE_COMPILER_MSVC
+static_assert(sizeof(zip_local_file_header_t) == 30, "bad packing");
+#if !defined(IREE_ENDIANNESS_LITTLE) || !IREE_ENDIANNESS_LITTLE
+#error "little endian required for zip header parsing"
+#endif  // IREE_ENDIANNESS_LITTLE
+
+// Strips any ZIP local file header from |contents| and stores the remaining
+// range in |out_stripped|.
+static iree_status_t iree_vm_bytecode_module_strip_zip_header(
+    iree_const_byte_span_t contents, iree_const_byte_span_t* out_stripped) {
+  // Ensure there's at least some bytes we can check for the header.
+  // Since we're only looking to strip zip stuff here we can check on that.
+  if (!contents.data ||
+      contents.data_length < sizeof(zip_local_file_header_t)) {
+    memmove(out_stripped, &contents, sizeof(contents));
+    return iree_ok_status();
+  }
+
+  // Check to see if there's a zip local header signature.
+  // For a compliant zip file this is expected to start at offset 0.
+  const zip_local_file_header_t* header =
+      (const zip_local_file_header_t*)contents.data;
+  if (header->signature != ZIP_LOCAL_FILE_HEADER_SIGNATURE) {
+    // No signature found, probably not a ZIP.
+    memmove(out_stripped, &contents, sizeof(contents));
+    return iree_ok_status();
+  }
+
+  // Compute the starting offset of the file.
+  // Note that we still don't know (or care) if it's the file we want; actual
+  // FlatBuffer verification happens later on.
+  uint32_t offset =
+      sizeof(*header) + header->file_name_length + header->extra_field_length;
+  if (offset > contents.data_length) {
+    // Is a ZIP but doesn't have enough data; error out with something more
+    // useful than the FlatBuffer verification failing later on given that here
+    // we know this isn't a FlatBuffer.
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "archive self-reports as a zip but does not have "
+                            "enough data to contain a module");
+  }
+
+  *out_stripped = iree_make_const_byte_span(contents.data + offset,
+                                            contents.data_length - offset);
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_parse_header(
+    iree_const_byte_span_t archive_contents,
+    iree_const_byte_span_t* out_flatbuffer_contents,
+    iree_host_size_t* out_rodata_offset) {
+  // Slice off any polyglot zip header we have prior to the base of the module.
+  iree_const_byte_span_t module_contents = iree_const_byte_span_empty();
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_strip_zip_header(
+      archive_contents, &module_contents));
+
+  // Verify there's enough data to safely check the FlatBuffer header.
+  if (!module_contents.data || module_contents.data_length < 16) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "FlatBuffer data is not present or less than 16 bytes (%zu total)",
+        module_contents.data_length);
+  }
+
+  // Read the size prefix from the head of the module contents; this should be
+  // a 4 byte value indicating the total size of the FlatBuffer data.
+  size_t length_prefix = 0;
+  flatbuffers_read_size_prefix((void*)module_contents.data, &length_prefix);
+
+  // Verify the length prefix is within bounds (always <= the remaining module
+  // bytes).
+  size_t length_remaining =
+      module_contents.data_length - sizeof(flatbuffers_uoffset_t);
+  if (length_prefix > length_remaining) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "FlatBuffer length prefix out of bounds (prefix is "
+                            "%zu but only %zu available)",
+                            length_prefix, length_remaining);
+  }
+
+  // Form the range of bytes containing just the FlatBuffer data.
+  iree_const_byte_span_t flatbuffer_contents = iree_make_const_byte_span(
+      module_contents.data + sizeof(flatbuffers_uoffset_t), length_prefix);
+
+  if (out_flatbuffer_contents) {
+    *out_flatbuffer_contents = flatbuffer_contents;
+  }
+  if (out_rodata_offset) {
+    // rodata begins immediately following the FlatBuffer in memory.
+    iree_host_size_t rodata_offset = iree_host_align(
+        (iree_host_size_t)(flatbuffer_contents.data - archive_contents.data) +
+            length_prefix,
+        IREE_VM_ARCHIVE_SEGMENT_ALIGNMENT);
+    *out_rodata_offset = rodata_offset;
+  }
+  return iree_ok_status();
+}
+
+// Perform an strcmp between a FlatBuffers string and an IREE string view.
 static bool iree_vm_flatbuffer_strcmp(flatbuffers_string_t lhs,
                                       iree_string_view_t rhs) {
   size_t lhs_size = flatbuffers_string_len(lhs);
@@ -100,46 +236,27 @@ static iree_status_t iree_vm_bytecode_module_resolve_types(
   return status;
 }
 
-// Computes the total length of the flatbuffer and the base offset for any
-// concatenated rodata.
-static iree_host_size_t iree_vm_bytecode_module_flatbuffer_rodata_offset(
-    iree_const_byte_span_t flatbuffer_data) {
-  if (flatbuffer_data.data_length < sizeof(flatbuffers_uoffset_t)) return 0;
-  size_t external_rodata_offset = 0;
-  flatbuffers_read_size_prefix((void*)flatbuffer_data.data,
-                               &external_rodata_offset);
-  external_rodata_offset += sizeof(flatbuffers_uoffset_t);
-  return iree_host_align(external_rodata_offset, 128);
-}
-
-// Verifies the structure of the flatbuffer so that we can avoid doing so during
+// Verifies the structure of the FlatBuffer so that we can avoid doing so during
 // runtime. There are still some conditions we must be aware of (such as omitted
 // names on functions with internal linkage), however we shouldn't need to
-// bounds check anything within the flatbuffer after this succeeds.
+// bounds check anything within the FlatBuffer after this succeeds.
 static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
-    iree_const_byte_span_t flatbuffer_data) {
-  if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "flatbuffer data is not present or less than 16 bytes (%zu total)",
-        flatbuffer_data.data_length);
-  }
-
+    iree_const_byte_span_t archive_contents,
+    iree_const_byte_span_t flatbuffer_contents,
+    iree_host_size_t archive_rodata_offset) {
   // Run flatcc generated verification. This ensures all pointers are in-bounds
   // and that we can safely walk the file, but not that the actual contents of
-  // the flatbuffer meet our expectations.
+  // the FlatBuffer meet our expectations.
   int verify_ret = iree_vm_BytecodeModuleDef_verify_as_root(
-      flatbuffer_data.data, flatbuffer_data.data_length);
+      flatbuffer_contents.data, flatbuffer_contents.data_length);
   if (verify_ret != flatcc_verify_ok) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "flatbuffer verification failed: %s",
                             flatcc_verify_error_string(verify_ret));
   }
 
-  const iree_host_size_t external_rodata_offset =
-      iree_vm_bytecode_module_flatbuffer_rodata_offset(flatbuffer_data);
   iree_vm_BytecodeModuleDef_table_t module_def =
-      iree_vm_BytecodeModuleDef_as_root(flatbuffer_data.data);
+      iree_vm_BytecodeModuleDef_as_root(flatbuffer_contents.data);
 
   flatbuffers_string_t name = iree_vm_BytecodeModuleDef_name(module_def);
   if (!flatbuffers_string_len(name)) {
@@ -170,13 +287,13 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
     if (iree_vm_RodataSegmentDef_embedded_data_is_present(segment)) {
       continue;  // embedded data is verified by FlatBuffers
     }
-    uint64_t rodata_offset =
+    uint64_t segment_offset =
         iree_vm_RodataSegmentDef_external_data_offset(segment);
-    uint64_t rodata_length =
+    uint64_t segment_length =
         iree_vm_RodataSegmentDef_external_data_length(segment);
-    uint64_t rodata_end =
-        external_rodata_offset + rodata_offset + rodata_length;
-    if (rodata_end >= flatbuffer_data.data_length) {
+    uint64_t segment_end =
+        archive_rodata_offset + segment_offset + segment_length;
+    if (segment_end > archive_contents.data_length) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "rodata[%zu] external reference out of range", i);
     }
@@ -321,10 +438,11 @@ static void iree_vm_bytecode_module_destroy(void* self) {
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_allocator_free(module->flatbuffer_allocator,
-                      (void*)module->flatbuffer_data.data);
-  module->flatbuffer_data = iree_make_const_byte_span(NULL, 0);
-  module->flatbuffer_allocator = iree_allocator_null();
+  module->def = NULL;
+  iree_allocator_free(module->archive_allocator,
+                      (void*)module->archive_contents.data);
+  module->archive_contents = iree_const_byte_span_empty();
+  module->archive_allocator = iree_allocator_null();
 
   iree_allocator_free(module->allocator, module);
 
@@ -763,8 +881,6 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   iree_vm_bytecode_module_layout_state(module_def, state);
 
   // Setup rodata segments to point directly at the FlatBuffer memory.
-  const iree_host_size_t external_rodata_offset =
-      iree_vm_bytecode_module_flatbuffer_rodata_offset(module->flatbuffer_data);
   iree_vm_RodataSegmentDef_vec_t rodata_segments =
       iree_vm_BytecodeModuleDef_rodata_segments(module_def);
   for (int i = 0; i < state->rodata_ref_count; ++i) {
@@ -781,7 +897,8 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
       // Data is concatenated with the FlatBuffer at some relative offset.
       // Note that we've already verified the referenced range is in bounds.
       byte_span = iree_make_byte_span(
-          (uint8_t*)module->flatbuffer_data.data + external_rodata_offset +
+          (uint8_t*)module->archive_contents.data +
+              module->archive_rodata_offset +
               iree_vm_RodataSegmentDef_external_data_offset(segment),
           iree_vm_RodataSegmentDef_external_data_length(segment));
     }
@@ -920,16 +1037,22 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
-    iree_const_byte_span_t flatbuffer_data,
-    iree_allocator_t flatbuffer_allocator, iree_allocator_t allocator,
-    iree_vm_module_t** out_module) {
+    iree_const_byte_span_t archive_contents, iree_allocator_t archive_allocator,
+    iree_allocator_t allocator, iree_vm_module_t** out_module) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
 
+  // Parse and verify the archive header to locate the FlatBuffer.
+  iree_const_byte_span_t flatbuffer_contents = iree_const_byte_span_empty();
+  iree_host_size_t archive_rodata_offset = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_vm_bytecode_module_parse_header(
+              archive_contents, &flatbuffer_contents, &archive_rodata_offset));
+
   IREE_TRACE_ZONE_BEGIN_NAMED(z1, "iree_vm_bytecode_module_flatbuffer_verify");
-  iree_status_t status =
-      iree_vm_bytecode_module_flatbuffer_verify(flatbuffer_data);
+  iree_status_t status = iree_vm_bytecode_module_flatbuffer_verify(
+      archive_contents, flatbuffer_contents, archive_rodata_offset);
   if (!iree_status_is_ok(status)) {
     IREE_TRACE_ZONE_END(z1);
     IREE_TRACE_ZONE_END(z0);
@@ -938,7 +1061,7 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
   IREE_TRACE_ZONE_END(z1);
 
   iree_vm_BytecodeModuleDef_table_t module_def =
-      iree_vm_BytecodeModuleDef_as_root(flatbuffer_data.data);
+      iree_vm_BytecodeModuleDef_as_root(flatbuffer_contents.data);
   if (!module_def) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(
@@ -968,8 +1091,9 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
   module->bytecode_data = iree_make_const_byte_span(
       bytecode_data, flatbuffers_uint8_vec_len(bytecode_data));
 
-  module->flatbuffer_data = flatbuffer_data;
-  module->flatbuffer_allocator = flatbuffer_allocator;
+  module->archive_contents = archive_contents;
+  module->archive_allocator = archive_allocator;
+  module->archive_rodata_offset = archive_rodata_offset;
   module->def = module_def;
 
   module->type_count = iree_vm_TypeDef_vec_len(type_defs);

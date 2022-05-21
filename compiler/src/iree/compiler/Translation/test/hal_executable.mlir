@@ -63,4 +63,4 @@ hal.executable.source public @executable {
 }
 
 // Just check that there's the expected flatbuffers prefix bytes.
-// CHECK: hal.executable.binary public @vmvx_bytecode_fb attributes {data = dense<"0x08000000
+// CHECK: hal.executable.binary public @vmvx_bytecode_fb attributes {data = dense<{{.+}}> : vector<{{.+}}xi8>, format = "vmvx-bytecode-fb"}
