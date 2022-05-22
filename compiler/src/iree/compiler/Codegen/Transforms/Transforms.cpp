@@ -63,7 +63,6 @@ FailureOr<IREE::HAL::ExecutableExportOp> defineWorkgroupCountRegion(
   std::array<Value, 3> workgroupCount =
       regionBuilder(builder, loc, device, workload);
   builder.create<IREE::HAL::ReturnOp>(loc, workgroupCount);
-  exportOp.erase();
   return clonedOp;
 }
 

@@ -29,7 +29,11 @@ namespace iree_compiler {
 /// callback function, which computes the workgroup count (x,y,z) given the
 /// workload along (x,y,z).
 /// Returns a new `hal.executable.export` op. MLIR semantics requires
-/// creation of new ops when a region is added.
+/// creation of new ops when a region is added. At the same time the original
+/// operation is not deleted. Deleting the operation when the builder is
+/// a `PatternRewriter` is undefined behavior. In such cases, the `eraseOp`
+/// method of the `PatternRewriter` is to be used. The caller is incharge
+/// of erasing the original `exportOp`.
 using WorkgroupCountRegionBuilder = std::function<std::array<Value, 3>(
     OpBuilder &b, Location loc, Value device, std::array<Value, 3> workload)>;
 FailureOr<IREE::HAL::ExecutableExportOp> defineWorkgroupCountRegion(
