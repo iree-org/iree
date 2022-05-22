@@ -297,20 +297,6 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
-    // Lower reduction-unrolled vector contract ops. Such contract ops have
-    // their reduction dimensions all be one, so we can convert them into
-    // elementwise ops.
-    {
-      RewritePatternSet patterns(context);
-      auto options =
-          vector::VectorTransformsOptions().setVectorTransformsOptions(
-              vector::VectorContractLowering::ParallelArith);
-      vector::populateVectorContractLoweringPatterns(patterns, options);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
-
     // Lower vector broadcast/transpose and contraction.
     {
       RewritePatternSet patterns(context);
