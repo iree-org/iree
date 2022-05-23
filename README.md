@@ -53,7 +53,9 @@ BuildKite | CMake         | Linux      | x86-64               | Tracing + Standa
 
 ## Architecture Overview
 
-![IREE Architecture](docs/website/docs/assets/images/iree_architecture.svg)
+<!-- TODO(scotttodd): switch to <picture> once better supported? https://github.blog/changelog/2022-05-19-specify-theme-context-for-images-in-markdown-beta/ -->
+![IREE Architecture](docs/website/docs/assets/images/iree_architecture_dark.svg#gh-dark-mode-only)
+![IREE Architecture](docs/website/docs/assets/images/iree_architecture.svg#gh-light-mode-only)
 
 See [our website](https://google.github.io/iree/) for more information.
 
