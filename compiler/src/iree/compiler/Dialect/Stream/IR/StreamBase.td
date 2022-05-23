@@ -103,6 +103,8 @@ def Stream_Dialect : Dialect {
     established in the IR it's possible to induce aliasing of resources without
     breaking execution correctness.
   }];
+  let useDefaultTypePrinterParser = 1;
+  let useDefaultAttributePrinterParser = 1;
 }
 
 //===----------------------------------------------------------------------===//

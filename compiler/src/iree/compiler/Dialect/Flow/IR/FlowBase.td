@@ -62,6 +62,7 @@ def Flow_Dialect : Dialect {
   }];
 
   let useDefaultTypePrinterParser = 0;
+  let useDefaultAttributePrinterParser = 1;
 }
 
 //===----------------------------------------------------------------------===//
