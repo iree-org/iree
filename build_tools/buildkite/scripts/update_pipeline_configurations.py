@@ -7,15 +7,16 @@
 """Updates all Buildkite pipelines with the Buildkite API.
 
 This overwrites the configuration of all the Buildkite pipelines based on the
-pipeline files under . Pipelines
-should be updated this way, not in the UI. Before updating, this checks for a
-specific header in the configuration stored in the API that indicates which
-Buildkite build previously updated it. If the updater was not this same pipeline
-the script fails. If it was a later build in this pipeline, it skips updating
-unless the `--force` flag is passed. This is to avoid situations where an
-earlier build is for some reason running a step after a later build due to race
-conditions or a retry. Buildkite concurrency groups should be used to prevent
-builds from trying to update pipelines simultaneously.
+pipeline files under the `trusted/` and `untrusted/` directories. Pipelines
+should be updated this way, not in the UI. The pipeline configuration uploaded
+is one that bootstraps the appropriate configuration from the repository. Before
+updating, this checks for a specific header in the configuration stored in the
+API that indicates which Buildkite build previously updated it. If the updater
+was not this same pipeline the script fails. If it was a later build in this
+pipeline, it skips updating unless the `--force` flag is passed. This is to
+avoid situations where an earlier build is for some reason running a step after
+a later build due to race conditions or a retry. Buildkite concurrency groups
+should be used to prevent builds from trying to update pipelines simultaneously.
 """
 
 import argparse
@@ -232,7 +233,7 @@ def update_pipelines(bk, pipeline_files, *, organization, running_pipeline,
 
 def parse_args():
   parser = argparse.ArgumentParser(
-      description="Updates the configurations for all Buildkite pipeline.")
+      description="Updates the configurations for all Buildkite pipelines.")
   parser.add_argument(
       "--force",
       action="store_true",
