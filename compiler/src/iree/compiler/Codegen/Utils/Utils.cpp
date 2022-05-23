@@ -33,16 +33,21 @@ namespace iree_compiler {
 // Utility functions to get entry points
 //===----------------------------------------------------------------------===//
 
-bool isEntryPoint(func::FuncOp func) { return func.isPublic(); }
-
-IREE::HAL::ExecutableEntryPointOp getEntryPoint(func::FuncOp funcOp) {
+FailureOr<IREE::HAL::ExecutableEntryPointOp> getEntryPoint(
+    func::FuncOp funcOp) {
   auto variantOp = funcOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  if (!variantOp) return failure();
+
   for (auto op : variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
     if (op.sym_name() == funcOp.getName()) {
       return op;
     }
   }
-  return nullptr;
+  return failure();
+}
+
+bool isEntryPoint(func::FuncOp func) {
+  return func.isPublic() && succeeded(getEntryPoint(func));
 }
 
 llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(

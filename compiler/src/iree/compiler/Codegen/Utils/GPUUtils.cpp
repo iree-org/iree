@@ -59,9 +59,10 @@ llvm::SmallVector<mlir::linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
 
 std::array<int64_t, 3> getWorkgroupSize(mlir::func::FuncOp funcOp) {
   std::array<int64_t, 3> workgroupSize;
-  auto entryPointOp = mlir::iree_compiler::getEntryPoint(funcOp);
+  FailureOr<IREE::HAL::ExecutableEntryPointOp> entryPointOp =
+      mlir::iree_compiler::getEntryPoint(funcOp);
   llvm::Optional<mlir::ArrayAttr> workgroupSizeAttr =
-      entryPointOp.workgroup_size();
+      entryPointOp->workgroup_size();
   assert(workgroupSizeAttr.hasValue());
   for (auto it : llvm::enumerate(workgroupSizeAttr.getValue())) {
     workgroupSize[it.index()] =
