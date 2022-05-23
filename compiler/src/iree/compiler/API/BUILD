@@ -4,9 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# NOTE: This must be BUILD.bazel (not BUILD) because otherwise, you can't
-# build python packages in this directory (which creates "build" directories)
-# on case-inensitive file systems.
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
 
 package(
