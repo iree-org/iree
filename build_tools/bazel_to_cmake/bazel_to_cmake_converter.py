@@ -71,13 +71,14 @@ def _convert_target_block(name, target):
 
   # Convert the target name from its Bazel name to the corresponding CMake name.
   # The specific conversion pattern depends on the target location. In general,
-  # Bazel targets are fully qualified and use slashes in Bazel, while targets
-  # in CMake are rooted on subtrees and use _ (with :: aliases).
+  # Bazel targets are fully qualified and use slashes as delimiters, while
+  # targets in CMake are rooted on subtrees and use _ (with :: aliases).
   cmake_aliases = bazel_to_cmake_targets.convert_target(target)
   if len(cmake_aliases) != 1:
     raise ValueError(
         f"Expected a CMake alias from {target}. Got {cmake_aliases}")
   target = cmake_aliases[0]
+  # Replace aliased :: target names with their explicit _ names.
   target = target.replace("::", "_")
   return _convert_string_arg_block(name, target, quote=False)
 
