@@ -1169,7 +1169,7 @@ for example command-line instructions of some common architectures</p>
 <p>You can replace the MLIR file with the other MLIR model files, following the
 <a href="../cpu-dylib/#compile-the-model">instructions</a></p>
 <h3 id="compiling-the-bare-metal-model-for-static-library-support">Compiling the bare-metal model for static-library support<a class="headerlink" href="#compiling-the-bare-metal-model-for-static-library-support" title="Permanent link">&para;</a></h3>
-<p>See the <a href="https://github.com/google/iree/tree/main/samples/iree_static_library">static_library</a>
+<p>See the <a href="https://github.com/google/iree/tree/main/samples/static_library">static_library</a>
 demo sample for an example and instructions on running a model with IREE's
 <code>static_library_loader</code>.</p>
 <p>By default, the demo targets the host machine when compiling. To produce a
@@ -1195,7 +1195,7 @@ enable the synchronous HAL drivers with <code>set(IREE_HAL_DRIVER_VMVX_SYNC ON)<
 <li><code>set(IREE_BUILD_TESTS OFF)</code>: Disable tests until IREE supports running them on
 bare-metal platforms</li>
 <li><code>set(IREE_BUILD_SAMPLES ON)</code>: Build
-<a href="https://github.com/google/iree/tree/main/samples/iree_simple_embedding">simple_embedding</a>
+<a href="https://github.com/google/iree/tree/main/samples/simple_embedding">simple_embedding</a>
 example</li>
 </ul>
 <div class="admonition todo">
@@ -1227,7 +1227,7 @@ false if the wait failed.</li>
 </ul>
 <h2 id="bare-metal-execution-example">Bare-metal execution example<a class="headerlink" href="#bare-metal-execution-example" title="Permanent link">&para;</a></h2>
 <p>See
-<a href="https://github.com/google/iree/blob/main/samples/iree_simple_embedding/README.md#generic-platform-support">simple_embedding for generic platform</a>
+<a href="https://github.com/google/iree/blob/main/samples/simple_embedding/README.md#generic-platform-support">simple_embedding for generic platform</a>
 to see how to use the IREE runtime library to build/run the IREE model for the
 bare-metal target.</p>
 
