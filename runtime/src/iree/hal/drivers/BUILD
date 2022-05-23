@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("@bazel_skylib//rules:common_settings.bzl", "string_list_flag")
-load("//iree:build_defs.oss.bzl", "iree_runtime_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],

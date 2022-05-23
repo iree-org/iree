@@ -6,7 +6,7 @@
 
 # Utilities for working with IREE MLIR types.
 
-load("//iree:build_defs.oss.bzl", "iree_compiler_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],

@@ -7,7 +7,7 @@
 # Default implementations for HAL types that use the host resources.
 # These are generally just wrappers around host heap memory and host threads.
 
-load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
