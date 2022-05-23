@@ -1,4 +1,5 @@
 // RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target))' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target))' --iree-llvmcpu-enable-hoist-padding --split-input-file %s | FileCheck %s --check-prefix=HOIST-PAD
 
 // Check that this dispatch compiles to vectors and that there are no allocas.
 // By proxy checks that destination passing style kicked in correctly
@@ -80,23 +81,18 @@ hal.executable private @preset_config_matmul  {
     builtin.module {
       func.func @preset_config_matmul() {
         %cst = arith.constant 0.000000e+00 : f32
-        %lhs_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-            : !flow.dispatch.tensor<readonly:128x49xf32>
-        %rhs_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-            : !flow.dispatch.tensor<readonly:49x512xf32>
-        %result_binding = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-            : !flow.dispatch.tensor<writeonly:128x512xf32>
-        %lhs = flow.dispatch.tensor.load %lhs_binding, offsets = [0, 0], sizes = [128, 49], strides = [1, 1]
-            : !flow.dispatch.tensor<readonly:128x49xf32> -> tensor<128x49xf32>
-        %rhs = flow.dispatch.tensor.load %rhs_binding, offsets = [0, 0], sizes = [49, 512], strides = [1, 1]
-            : !flow.dispatch.tensor<readonly:49x512xf32> -> tensor<49x512xf32>
-        %init = linalg.init_tensor [128, 512] : tensor<128x512xf32>
-        %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<128x512xf32>) -> tensor<128x512xf32>
-        %gemm = linalg.matmul {compilation_info = #compilation}
-            ins(%lhs, %rhs : tensor<128x49xf32>, tensor<49x512xf32>)
-            outs(%fill : tensor<128x512xf32>) -> tensor<128x512xf32>
-        flow.dispatch.tensor.store %gemm, %result_binding, offsets = [0, 0], sizes = [128, 512], strides = [1, 1]
-            : tensor<128x512xf32> -> !flow.dispatch.tensor<writeonly:128x512xf32>
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:128x49xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:49x512xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:128x512xf32>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 49], strides = [1, 1] : !flow.dispatch.tensor<readonly:128x49xf32> -> tensor<128x49xf32>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [49, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:49x512xf32> -> tensor<49x512xf32>
+        %5 = linalg.init_tensor [128, 512] : tensor<128x512xf32>
+        %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<128x512xf32>) -> tensor<128x512xf32>
+        %7 = linalg.matmul {compilation_info = #compilation}
+          ins(%3, %4 : tensor<128x49xf32>, tensor<49x512xf32>)
+          outs(%6 : tensor<128x512xf32>) -> tensor<128x512xf32>
+        flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [128, 512], strides = [1, 1] : tensor<128x512xf32> -> !flow.dispatch.tensor<writeonly:128x512xf32>
         return
       }
     }
@@ -104,6 +100,14 @@ hal.executable private @preset_config_matmul  {
 }
 // CHECK: func.func @preset_config_matmul
 // CHECK:   vector.outerproduct
+// HOIST-PAD:         func.func @preset_config_matmul
+// HOIST-PAD-DAG:       %[[BUF1:.+]] = memref.alloca() {{.+}} : memref<3x4x16x32xf32>
+// HOIST-PAD-DAG:       %[[BUF2:.+]] = memref.alloca() {{.+}} : memref<4x8x16xf32>
+// HOIST-PAD-16-DAG:      vector.store {{.+}}, %[[BUF1]]
+// HOIST-PAD-8-DAG:       vector.store {{.+}}, %[[BUF2]]
+// HOIST-PAD-16-DAG:      vector.load %[[BUF1]]
+// HOIST-PAD-8-DAG:       vector.load %[[BUF2]]
+// HOIST-PAD:             vector.outerproduct
 
 // -----
 

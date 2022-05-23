@@ -35,6 +35,10 @@ static llvm::cl::opt<bool> clCheckIRBeforeLLVMConversion(
                    "before conversion to LLVM IR"),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> clEnableHoistPadding(
+    "iree-llvmcpu-enable-hoist-padding",
+    llvm::cl::desc("Flag to enable hoist padding"), llvm::cl::init(false));
+
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
 //===---------------------------------------------------------------------===//
@@ -256,10 +260,12 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  auto pad = [&](std::string anchorOpName, ArrayRef<int64_t> paddingDims) {
+  auto pad = [&](std::string anchorOpName, ArrayRef<int64_t> paddingDims,
+                 ArrayRef<int64_t> packPaddings = {}) {
     LinalgFusePassOptions options;
     options.pad = true;
     options.anchorOpName = anchorOpName;
+    options.packPaddings.assign(packPaddings.begin(), packPaddings.end());
     options.paddingDimensions.assign(paddingDims.begin(), paddingDims.end());
     nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
   };
@@ -281,20 +287,18 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
   }
 
   paddingDims = {2};
-  pad("linalg.matmul", paddingDims);
-
-  // TODO(hanchung): Evaluate if we want to enable hoist paddings.
-  //{
-  // LinalgFusePassOptions options;
-  // options.pad = true;
-  // options.anchorOpName = "linalg.matmul";
-  // options.hoistPaddings = SmallVector<int64_t>{2, 3, 0};
-  // options.transposePaddings = SmallVector<std::string>{"0:1", "0:1",
-  // "0:1"};
-  // nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
-  // nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  // nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
-  //}
+  if (!clEnableHoistPadding) {
+    pad("linalg.matmul", paddingDims);
+  } else {
+    pad("linalg.matmul", paddingDims, /*packPaddings=*/{1, 1, 0});
+    LinalgFusePassOptions options;
+    options.pad = true;
+    options.anchorOpName = "linalg.matmul";
+    options.hoistPaddings = SmallVector<int64_t>{2, 3, 0};
+    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
 
   // Fold dim(pad) away before vectorization.
   nestedModulePM.addPass(memref::createResolveShapedTypeResultDimsPass());
@@ -345,9 +349,6 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
 
   // Add the sandbox single tiling expert to tile and vectorize.
   {
-    // The options are derived from sandbox codegen driver. hoistPadding options
-    // does not work in IREE cases. It's fine to not have it, since it's already
-    // generating the IR as same as sandbox.
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
     options.tilingLevel =
@@ -480,7 +481,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
   // Checking stack allocation before converting to CF dialect is easier.
-  if (clCheckIRBeforeLLVMConversion) {
+  // Do not check allocation if hoist-padding is enabled. It intends to allocate
+  // big stack buffers for better accessing.
+  if (clCheckIRBeforeLLVMConversion && !clEnableHoistPadding) {
     passManager.addPass(createLLVMCPUCheckIRBeforeLLVMConversionPass());
   }
 
