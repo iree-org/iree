@@ -87,6 +87,20 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
     SmallVector<int64_t, 4> nativeSize(contractOp.getIteratorTypes().size(), 1);
     nativeSize[lastParalleldim] = 4;  // Map to vec4 fma operations.
     return nativeSize;
+  } else if (auto reductionOp = dyn_cast<vector::MultiDimReductionOp>(op)) {
+    // Unroll all reduction dimensions by size 1 for vector.multi_reduction.
+    auto srcVectorType = reductionOp.getSourceVectorType();
+    auto nativeSize = llvm::to_vector<4>(srcVectorType.getShape());
+    auto dims = reductionOp.getReductionDims().getAsValueRange<IntegerAttr>();
+    for (const auto &dimAttr : dims) {
+      nativeSize[dimAttr.getZExtValue()] = 1;
+    }
+    return nativeSize;
+  } else if (auto transposeOp = dyn_cast<vector::TransposeOp>(op)) {
+    auto vectorType = transposeOp.getResultType();
+    SmallVector<int64_t, 4> nativeSize(vectorType.getRank(), 1);
+    nativeSize.back() = getComputeVectorSize(vectorType.getShape().back());
+    return nativeSize;
   }
   return llvm::None;
 }
@@ -100,6 +114,10 @@ void populateVectorizationPatterns(RewritePatternSet &patterns) {
   patterns.add<linalg::LinalgVectorizationPattern>(
       patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>(),
       opt);
+  // Additinally pull in patterns to canonicalize transfer ops and to shuffle
+  // broadcast/transpose ops around in order to cancel them or embed into
+  // contract ops. Embedding in the flexible contract ops will help to sustain
+  // the structure through various transformations.
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
   vector::populateVectorReductionToContractPatterns(patterns);
 }
@@ -163,6 +181,34 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
+    // Lower vector.multi_dimension early if any operand is a transpose op.
+    // The lowering itself generates transpose ops. This helps to cancel
+    // transpose ops. vector.multi_reduction is arguably a higher level op and
+    // the lowering also unrolls the multi_reduction op, so it makes sense to
+    // happen before normal unrolling.
+    {
+      SmallVector<Operation *> reductionOps;
+      funcOp.walk([&](vector::MultiDimReductionOp reductionOp) {
+        if (llvm::any_of(reductionOp->getOperands(), [](Value operand) {
+              return operand.getDefiningOp<vector::TransposeOp>();
+            }))
+          reductionOps.push_back(reductionOp);
+        return WalkResult::advance();
+      });
+      RewritePatternSet patterns(context);
+      vector::populateVectorMultiReductionLoweringPatterns(
+          patterns, vector::VectorMultiReductionLowering::InnerParallel);
+      FrozenRewritePatternSet frozenSet(std::move(patterns));
+      applyOpPatternsAndFold(reductionOps, frozenSet,
+                             /*strict=*/false);
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After lowering multi_reduction ops ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
     // Then unroll vectors to native vector size. We try to use 128-bit
     // vectors for memory access and 4/2/1 vector sizes for computation.
     {
@@ -182,7 +228,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
     // Next run canonicalization to cast away leading size-1 dimensions. They
     // can be generated from vector unrolling and generally cause issues to
     // cancel corresponding read/write or insert/extract op pairs. This also
-    // need to happen befor hositing, where we would make certain vectors loop
+    // need to happen before hositing, where we would make certain vectors loop
     // carried. Once that's done, it's hard to handle the leading size-1
     // dimensions across regions.
     {
@@ -251,33 +297,39 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
-    // Lower vector broadcast and contraction.
+    // Lower vector broadcast/transpose and contraction.
     {
       RewritePatternSet patterns(context);
+      auto options = vector::VectorTransformsOptions()
+                         .setVectorTransformsOptions(
+                             vector::VectorContractLowering::OuterProduct)
+                         .setVectorTransposeLowering(
+                             vector::VectorTransposeLowering::EltWise);
       vector::populateVectorBroadcastLoweringPatterns(patterns);
-      vector::populateVectorContractLoweringPatterns(
-          patterns,
-          vector::VectorTransformsOptions().setVectorTransformsOptions(
-              vector::VectorContractLowering::OuterProduct));
+      vector::populateVectorContractLoweringPatterns(patterns, options);
+      vector::populateVectorMultiReductionLoweringPatterns(
+          patterns, vector::VectorMultiReductionLowering::InnerParallel);
+      vector::populateVectorTransposeLoweringPatterns(patterns, options);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
 
     LLVM_DEBUG({
-      llvm::dbgs() << "--- After lowering contract ops ---\n";
+      llvm::dbgs() << "--- After lowering various vector ops ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
 
-    // Cast away leading size-1 dimensions again.
+    // Run all sorts of canonicalization patterns to clean up again.
     {
       RewritePatternSet patterns(context);
-      // We need to pull in casting way leading one dims to allow cancelling
-      // some read/write ops.
       vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
+      vector::InsertOp::getCanonicalizationPatterns(patterns, context);
+      vector::ExtractOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
+      vector::ReductionOp::getCanonicalizationPatterns(patterns, context);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
