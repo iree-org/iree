@@ -149,11 +149,19 @@ pipeline. They are organized into three categories.
 
 Pipelines that are allowed to run steps on trusted agents that have elevated
 privileges. This is enforced by a pre-bootstrap hook deployed to these agents.
+These agents should only run using configurations coming from trusted sources,
+which right now means only commits that have been checked into the main IREE
+repository.
 
 ### Untrusted
 
 Pipelines that are only allowed to run steps on untrusted agents. The only risk
-posed by access to these agents must be
+posed by access to these agents must be an ability to use their compute and
+that of other untrusted agents and write to resources (including caches) used
+only by other untrusted agents. They should not have access to any sensitive
+data or the ability to delete or corrupt unrecoverable artifacts. We should be
+able to turn down all untrusted agents with the only consequence being a
+temporary delay in presubmit builds.
 
 ### Fragment
 
