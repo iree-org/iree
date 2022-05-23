@@ -203,7 +203,10 @@ iree_tablegen_doc(
     name = "HALDialectDocGen",
     tbl_outs = [
         (
-            ["--gen-dialect-doc"],
+            [
+                "--gen-dialect-doc",
+                "--dialect=hal",
+            ],
             "HALDialect.md",
         ),
     ],

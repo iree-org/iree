@@ -1592,8 +1592,9 @@ ParseResult TileOp::parse(OpAsmParser &parser, OperationState &result) {
   if (succeeded(parser.parseOptionalKeyword(TileOp::getTiledDimAttrName()))) {
     outputsOperandsLoc = parser.getCurrentLocation();
     Attribute valueAttr;
-    parser.parseAttribute(valueAttr, TileOp::getTiledDimAttrName(),
-                          result.attributes);
+    if (failed(parser.parseAttribute(valueAttr, TileOp::getTiledDimAttrName(),
+                                     result.attributes)))
+      return failure();
   } else {
     result.attributes.append(TileOp::getTiledDimAttrName(),
                              parser.getBuilder().getI64IntegerAttr(0));

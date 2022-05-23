@@ -172,7 +172,10 @@ iree_tablegen_doc(
     name = "FlowDialectDocGen",
     tbl_outs = [
         (
-            ["--gen-dialect-doc"],
+            [
+                "--gen-dialect-doc",
+                "-dialect=flow",
+            ],
             "FlowDialect.md",
         ),
     ],

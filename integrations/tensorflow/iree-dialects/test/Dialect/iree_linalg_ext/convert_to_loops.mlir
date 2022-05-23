@@ -9,7 +9,7 @@ func.func @sort_1d(%arg0: memref<128xi32>) {
   }
   return
 }
-// CHECK-LABEL: func @sort_1d
+// CHECK-LABEL: func.func @sort_1d
 // CHECK-SAME:    %[[BUF:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C128:.+]] = arith.constant 128 : index
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
@@ -39,7 +39,7 @@ func.func @sort_2d(%arg0: memref<16x32xi32>) {
   }
   return
 }
-// CHECK-LABEL: func @sort_2d
+// CHECK-LABEL: func.func @sort_2d
 // CHECK-SAME:    %[[BUF:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C16:.+]] = arith.constant 16 : index
 // CHECK-DAG:     %[[C32:.+]] = arith.constant 32 : index
@@ -72,7 +72,7 @@ func.func @sort_multi(%arg0: memref<128xf32>, %arg1: memref<128xi32>) {
   }
   return
 }
-// CHECK-LABEL: func @sort_multi
+// CHECK-LABEL: func.func @sort_multi
 // CHECK-SAME:    %[[BUF1:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[BUF2:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C128:.+]] = arith.constant 128 : index
@@ -109,7 +109,7 @@ func.func @scatter_update_scalar_1D(
   }
   return
 }
-// CHECK-LABEL: func @scatter_update_scalar_1D
+// CHECK-LABEL: func.func @scatter_update_scalar_1D
 // CHECK-SAME:    %[[ORIGINAL:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
@@ -136,7 +136,7 @@ func.func @scatter_add_scalar_2D(
   }
   return
 }
-// CHECK-LABEL: func @scatter_add_scalar_2D
+// CHECK-LABEL: func.func @scatter_add_scalar_2D
 // CHECK-SAME:    %[[ORIGINAL:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
@@ -166,7 +166,7 @@ func.func @scatter_update_slice_2D(
   }
   return
 }
-// CHECK:       func @scatter_update_slice_2D
+// CHECK:       func.func @scatter_update_slice_2D
 // CHECK-SAME:    %[[ORIGINAL:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
@@ -197,7 +197,7 @@ func.func @scatter_add_scalar_1D(
   }
   return
 }
-// CHECK-LABEL: func @scatter_add_scalar_1D
+// CHECK-LABEL: func.func @scatter_add_scalar_1D
 // CHECK-SAME:    %[[ORIGINAL:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
@@ -226,7 +226,7 @@ func.func @scatter_add_slice_2D(
   }
   return
 }
-// CHECK:       func @scatter_add_slice_2D
+// CHECK:       func.func @scatter_add_slice_2D
 // CHECK-SAME:    %[[ORIGINAL:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
@@ -255,7 +255,7 @@ func.func @scatter_update_scalar_dynamic_1D(
   }
   return
 }
-// CHECK-LABEL: func @scatter_update_scalar_dynamic_1D
+// CHECK-LABEL: func.func @scatter_update_scalar_dynamic_1D
 // CHECK-SAME:    %[[ORIGINAL:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
@@ -282,7 +282,7 @@ func.func @scatter_add_scalar_dynamic_2D(
   }
   return
 }
-// CHECK-LABEL: func @scatter_add_scalar_dynamic_2D
+// CHECK-LABEL: func.func @scatter_add_scalar_dynamic_2D
 // CHECK-SAME:    %[[ORIGINAL:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
@@ -312,7 +312,7 @@ func.func @scatter_update_slice_dynamic_2D(
   }
   return
 }
-// CHECK:       func @scatter_update_slice_dynamic_2D
+// CHECK:       func.func @scatter_update_slice_dynamic_2D
 // CHECK-SAME:    %[[ORIGINAL:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
@@ -373,7 +373,7 @@ func.func @fft_1D(%real: memref<16xf32>, %imag: memref<16xf32>) {
 }
 // CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
 // CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0) -> (d0)>
-// CHECK:       func @fft_1D
+// CHECK:       func.func @fft_1D
 // CHECK-SAME:    %[[REAL:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[IMAG:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
@@ -431,7 +431,7 @@ func.func @fft_2D(%real: memref<?x16xf32>, %imag: memref<?x16xf32>) {
 }
 // CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 16 + s0 + d1)>
 // CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK:       func @fft_2D(
+// CHECK:       func.func @fft_2D(
 // CHECK-SAME:    %[[REAL:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[IMAG:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
@@ -467,7 +467,7 @@ func.func @fft_2D_coef_buf(%real: memref<?x16xf32>, %imag: memref<?x16xf32>,
 // CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 16 + s0 + d1)>
 // CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0, d1) -> (d1)>
 // CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK:       func @fft_2D_coef_buf
+// CHECK:       func.func @fft_2D_coef_buf
 // CHECK-SAME:    %[[REAL:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[IMAG:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[COEF_REAL:[a-zA-Z0-9]+]]
@@ -516,7 +516,7 @@ func.func @reverse_dim_0(%arg0: memref<?x?xi32>, %arg1: memref<?x?xi32>) {
     outs(%arg1 : memref<?x?xi32>)
   return
 }
-// CHECK-LABEL: func @reverse_dim_0
+// CHECK-LABEL: func.func @reverse_dim_0
 // CHECK-SAME:    %[[IN:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[OUT:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
@@ -541,7 +541,7 @@ func.func @scan_1d_inclusive(%0: memref<128xi32>, %1: memref<128xi32>) {
   }
   return
 }
-// CHECK-LABEL: func @scan_1d_inclusive
+// CHECK-LABEL: func.func @scan_1d_inclusive
 // CHECK-SAME:    %[[BUFI:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[BUFO:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C128:.+]] = arith.constant 128 : index
@@ -574,7 +574,7 @@ func.func @scan_1d_exclusive(%0: memref<128xi32>, %1: memref<128xi32>) {
   }
   return
 }
-// CHECK-LABEL: func @scan_1d_exclusive
+// CHECK-LABEL: func.func @scan_1d_exclusive
 // CHECK-SAME:    %[[BUFI:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[BUFO:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C128:.+]] = arith.constant 128 : index
@@ -607,7 +607,7 @@ func.func @scan_2d(%0: memref<16x32xi32>, %1: memref<16x32xi32>) {
   }
   return
 }
-// CHECK-LABEL: func @scan_2d
+// CHECK-LABEL: func.func @scan_2d
 // CHECK-SAME:    %[[BUFI:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[BUFO:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C16:.+]] = arith.constant 16 : index
@@ -629,3 +629,93 @@ func.func @scan_2d(%0: memref<16x32xi32>, %1: memref<16x32xi32>) {
 // CHECK:               memref.store %[[V4]], %[[BUFO]][%[[ARG1]], %[[ARG2]]]
 // CHECK:               memref.store %[[V4]], %[[ACC]][%[[ARG2]]]
 // CHECK:             }
+
+// -----
+
+func.func @topk_memref(%input_values: memref<2x10xf32>, %input_indices: memref<2x10xi32>, %out_values: memref<2x3xf32>, %out_indices: memref<2x3xi32>) {
+  iree_linalg_ext.topk
+        dimension(1)
+        ins(%input_values, %input_indices : memref<2x10xf32> , memref<2x10xi32>)
+        outs(%out_values, %out_indices : memref<2x3xf32>, memref<2x3xi32>) {
+        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        }
+  return
+}
+
+// CHECK-LABEL: func.func @topk_memref
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG3:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:     %[[C10:.+]] = arith.constant 10 : index
+// CHECK-DAG:     %[[C3:.+]] = arith.constant 3 : index
+// CHECK:         scf.for %[[ARG4:.+]] = %[[C0]] to %[[C2]] step %[[C1]]
+// CHECK:           scf.for %[[ARG5:.+]] = %[[C0]] to %[[C10]] step %[[C1]]
+// CHECK:             %[[D0:.+]] = memref.load %[[ARG0]][%[[ARG4]], %[[ARG5]]]
+// CHECK:             %[[D1:.+]] = memref.load %[[ARG1]][%[[ARG4]], %[[ARG5]]]
+// CHECK:             %[[D2:.+]]:2 = scf.for %[[ARG6:.+]] = %[[C0]] to %[[C3]] step %[[C1]] iter_args(%[[ARG7:.+]] = %[[D0]], %[[ARG8:.+]] = %[[D1]])
+// CHECK:               %[[D3:.+]] = memref.load %[[ARG2]][%[[ARG4]], %[[ARG6]]]
+// CHECK:               %[[D4:.+]] = memref.load %[[ARG3]][%[[ARG4]], %[[ARG6]]]
+// CHECK:               %[[D5:.+]] = arith.cmpf ogt, %[[ARG7]], %[[D3]] : f32
+// CHECK:               %[[D6:.+]] = arith.cmpf ogt, %[[D3]], %[[ARG7]] : f32
+// CHECK:               %[[D7:.+]] = arith.cmpi eq, %[[D5]], %[[D6]] : i1
+// CHECK:               %[[D8:.+]] = arith.cmpi slt, %[[ARG8]], %[[D4]] : i32
+// CHECK:               %[[D9:.+]] = arith.andi %[[D7]], %[[D8]] : i1
+// CHECK:               %[[D10:.+]] = arith.ori %[[D5]], %[[D9]] : i1
+// CHECK:               %[[D11:.+]] = arith.select %[[D5]], %[[ARG7]], %[[D3]] : f32
+// CHECK:               %[[D12:.+]] = arith.select %[[D10]], %[[ARG8]], %[[D4]] : i32
+// CHECK:               memref.store %[[D11]], %[[ARG2]][%[[ARG4]], %[[ARG6]]]
+// CHECK:               memref.store %[[D12]], %[[ARG3]][%[[ARG4]], %[[ARG6]]]
+// CHECK:               %[[D13:.+]] = arith.select %[[D5]], %[[D3]], %[[ARG7]] : f32
+// CHECK:               %[[D14:.+]] = arith.select %[[D10]], %[[D4]], %[[ARG8]] : i32
+// CHECK:               scf.yield %[[D13]], %[[D14]] : f32, i32
+
+// -----
+
+func.func @topk_memref_dynamic(%input_values: memref<?x?xf32>, %input_indices: memref<?x?xi32>, %out_values: memref<?x3xf32>, %out_indices: memref<?x3xi32>) {
+  iree_linalg_ext.topk
+        dimension(1)
+        ins(%input_values, %input_indices : memref<?x?xf32> , memref<?x?xi32>)
+        outs(%out_values, %out_indices : memref<?x3xf32>, memref<?x3xi32>) {
+        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        }
+  return
+}
+
+// CHECK-LABEL: func.func @topk_memref_dynamic
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG3:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C3:.+]] = arith.constant 3 : index
+// CHECK:         %[[D0:.+]] = memref.dim %[[ARG0:.+]], %[[C0]]
+// CHECK:         %[[D1:.+]] = memref.dim %[[ARG0:.+]], %[[C1]]
+// CHECK:         scf.for %[[ARG4:.+]] = %[[C0]] to %[[D0]] step %[[C1]]
+// CHECK:           scf.for %[[ARG5:.+]] = %[[C0]] to %[[D1]] step %[[C1]]
+// CHECK:             %[[D2:.+]] = memref.load %[[ARG0]][%[[ARG4]], %[[ARG5]]]
+// CHECK:             %[[D3:.+]] = memref.load %[[ARG1]][%[[ARG4]], %[[ARG5]]]
+// CHECK:             %[[D4:.+]]:2 = scf.for %[[ARG6:.+]] = %[[C0]] to %[[C3]] step %[[C1]] iter_args(%[[ARG7:.+]] = %[[D2]], %[[ARG8:.+]] = %[[D3]])
+// CHECK:               %[[D5:.+]] = memref.load %[[ARG2]][%[[ARG4]], %[[ARG6]]]
+// CHECK:               %[[D6:.+]] = memref.load %[[ARG3]][%[[ARG4]], %[[ARG6]]]
+// CHECK:               %[[D7:.+]] = arith.cmpf ogt, %[[ARG7]], %[[D5]] : f32
+// CHECK:               %[[D8:.+]] = arith.cmpf ogt, %[[D5]], %[[ARG7]] : f32
+// CHECK:               %[[D9:.+]] = arith.cmpi eq, %[[D7]], %[[D8]] : i1
+// CHECK:               %[[D10:.+]] = arith.cmpi slt, %[[ARG8]], %[[D6]] : i32
+// CHECK:               %[[D11:.+]] = arith.andi %[[D9]], %[[D10]] : i1
+// CHECK:               %[[D12:.+]] = arith.ori %[[D7]], %[[D11]] : i1
+// CHECK:               %[[D13:.+]] = arith.select %[[D7]], %[[ARG7]], %[[D5]] : f32
+// CHECK:               %[[D14:.+]] = arith.select %[[D12]], %[[ARG8]], %[[D6]] : i32
+// CHECK:               memref.store %[[D13]], %[[ARG2]][%[[ARG4]], %[[ARG6]]]
+// CHECK:               memref.store %[[D14]], %[[ARG3]][%[[ARG4]], %[[ARG6]]]
+// CHECK:               %[[D15:.+]] = arith.select %[[D7]], %[[D5]], %[[ARG7]] : f32
+// CHECK:               %[[D16:.+]] = arith.select %[[D12]], %[[D6]], %[[ARG8]] : i32
+// CHECK:               scf.yield %[[D15]], %[[D16]] : f32, i32

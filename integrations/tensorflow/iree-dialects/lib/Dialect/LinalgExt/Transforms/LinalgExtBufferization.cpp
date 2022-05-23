@@ -128,8 +128,8 @@ struct InParallelOpInterface
               loc, destMemref, insertOp.getMixedOffsets(),
               insertOp.getMixedSizes(), insertOp.getMixedStrides());
           // This memcpy will fold away if everything bufferizes in-place.
-          if (failed(createMemCpy(b, insertOp.getLoc(), srcMemref, subview,
-                                  state.getOptions())))
+          if (failed(state.getOptions().createMemCpy(b, insertOp.getLoc(),
+                                                     srcMemref, subview)))
             return WalkResult::interrupt();
           b.eraseOp(insertOp);
           return WalkResult::advance();

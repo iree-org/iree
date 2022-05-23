@@ -255,40 +255,6 @@ class ReorderConvOpOutputDimensions : public OpRewritePattern<mhlo::ConvOp> {
   }
 };
 
-// Adjust the shape of depthwise_conv filter where is applied by mhlo.
-class AdjustDepthwiseFilterShape : public OpRewritePattern<mhlo::ConvOp> {
- public:
-  using OpRewritePattern<mhlo::ConvOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(mhlo::ConvOp op,
-                                PatternRewriter &rewriter) const override {
-    int64_t featureInDim =
-        op.dimension_numbers().getKernelInputFeatureDimension();
-    int64_t featureOutDim =
-        op.dimension_numbers().getKernelOutputFeatureDimension();
-    const auto &kernelShape = op.rhs().getType().cast<ShapedType>().getShape();
-    if (kernelShape[featureInDim] != 1) return failure();
-
-    const auto groupCount = op.feature_group_count();
-    if (groupCount == 1) return failure();
-    if (kernelShape[featureOutDim] % groupCount != 0) return failure();
-
-    SmallVector<int64_t, 4> newShape(kernelShape.begin(), kernelShape.end());
-    newShape[featureInDim] = groupCount;
-    newShape[featureOutDim] /= groupCount;
-    auto loc = op.getLoc();
-    auto elemType = op.rhs().getType().cast<ShapedType>().getElementType();
-    auto reshapeOp = rewriter.create<mhlo::ReshapeOp>(
-        loc, RankedTensorType::get(newShape, elemType), op.rhs());
-    auto resultType = op.getResult().getType();
-    SmallVector<Value, 2> operands = {op.lhs(), reshapeOp.getResult()};
-    auto newOp = rewriter.create<mhlo::ConvOp>(op.getLoc(), resultType,
-                                               operands, op->getAttrs());
-    rewriter.replaceOp(op, newOp.getResult());
-    return success();
-  }
-};
-
 bool isConsecutive(ArrayRef<int64_t> array) {
   for (int i = 1; i < array.size(); ++i) {
     if (array[i] - array[i - 1] != 1) return false;
@@ -792,8 +758,7 @@ struct MHLOToMHLOPreprocessingPass
     mhlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
     mhlo::PopulateComplexLoweringPatterns(context, &patterns);
     mhlo::PopulateGatherToTorchIndexSelectPatterns(context, &patterns);
-    patterns.insert<AdjustDepthwiseFilterShape, ScatterRank0Value,
-                    ExpandRngNormal, MulCastOfBool>(context);
+    patterns.insert<ScatterRank0Value, ExpandRngNormal, MulCastOfBool>(context);
 
     // dot_general canoncalization patterns.
     mhlo::PopulateGeneralDotOpLoweringPatterns(&patterns, context);

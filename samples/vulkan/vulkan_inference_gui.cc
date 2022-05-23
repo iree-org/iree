@@ -352,7 +352,7 @@ extern "C" int iree_main(int argc, char** argv) {
 
         // Write inputs into mappable buffers.
         IREE_DLOG(INFO) << "Creating I/O buffers...";
-        constexpr int32_t kElementCount = 4;
+        constexpr iree_hal_dim_t kElementCount = 4;
         iree_hal_allocator_t* allocator =
             iree_hal_device_allocator(iree_vk_device);
         iree_hal_memory_type_t input_memory_type =

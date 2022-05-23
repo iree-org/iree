@@ -141,22 +141,13 @@ struct FusionOfTensorOpsPass
 
     // For fusion by collapsing, do so if the reshape is blocking tile and fuse.
     linalg::ControlFusionFn fuseByCollapsingControlFn =
-        [](const OpResult &producer, const OpOperand &consumer) {
-          // Check the case where the producer is an expanding reshape op.
+        [](const OpResult &producer, OpOperand &consumer) {
           auto reshapeOp = dyn_cast<tensor::ExpandShapeOp>(producer.getOwner());
           if (!reshapeOp) return true;
 
-          auto genericOp = cast<linalg::GenericOp>(consumer.getOwner());
-
-          // If the op can alraedy be fused with a producer by tile + fuse, do
-          // nothing.
-          for (OpOperand *operand : genericOp.getInputOperands()) {
-            if (areLinalgOpsFusableUsingTileAndFuse(*operand)) {
-              return false;
-            }
-          }
-          return true;
+          return reshapeOp.src().getDefiningOp<linalg::LinalgOp>() != nullptr;
         };
+
     RewritePatternSet collapsingReshapePatterns(&getContext());
     linalg::populateFoldReshapeOpsByCollapsingPatterns(
         collapsingReshapePatterns, fuseByCollapsingControlFn);

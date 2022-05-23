@@ -43,11 +43,19 @@ func.func @i16i16.i32() {
   return
 }
 
-func.func @large() {
+func.func @large_unaligned() {
   %lhs = util.unfoldable_constant dense<1.0> : tensor<250x1024xf32>
   %rhs = util.unfoldable_constant dense<0.4> : tensor<1024x500xf32>
   %res = "mhlo.dot"(%lhs, %rhs) : (tensor<250x1024xf32>, tensor<1024x500xf32>) -> tensor<250x500xf32>
   check.expect_almost_eq_const(%res, dense<409.596> : tensor<250x500xf32>) : tensor<250x500xf32>
+  return
+}
+
+func.func @large_aligned() {
+  %lhs = util.unfoldable_constant dense<1.0> : tensor<2048x1024xf32>
+  %rhs = util.unfoldable_constant dense<0.4> : tensor<1024x512xf32>
+  %res = "mhlo.dot"(%lhs, %rhs) : (tensor<2048x1024xf32>, tensor<1024x512xf32>) -> tensor<2048x512xf32>
+  check.expect_almost_eq_const(%res, dense<409.596> : tensor<2048x512xf32>) : tensor<2048x512xf32>
   return
 }
 

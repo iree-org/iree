@@ -1,13 +1,13 @@
-// RUN: iree-dialects-opt %s --linalg-interp-transforms --split-input-file | FileCheck %s
+// RUN: iree-dialects-opt %s --linalg-transform-interp --split-input-file | FileCheck %s
 
 // CHECK-DAG: #[[$SUB_MAP:.*]] = affine_map<(d0)[s0, s1] -> (-d0 + s1, s0)>
 // CHECK-DAG: #[[$ID1_MAP:.*]] = affine_map<(d0) -> (d0)>
 
 module {
-  // CHECK-LABEL: func @static_tile
+  // CHECK-LABEL: func.func @static_tile
   //  CHECK-SAME:   %[[CHUNK_SIZE:[0-9a-z]+]]: index
   //  CHECK-SAME:   %[[IN:[0-9a-z]+]]: tensor<?xf32>
-  func @static_tile(%chunk_size: index, %in: tensor<?xf32>, %out: tensor<?xf32>, %out2: tensor<?xf32>) -> (tensor<?xf32>) {
+  func.func @static_tile(%chunk_size: index, %in: tensor<?xf32>, %out: tensor<?xf32>, %out2: tensor<?xf32>) -> (tensor<?xf32>) {
     %c0 = arith.constant 0: index
 
     // CHECK: %[[M:.*]] = tensor.dim %{{.*}}, %{{.*}} : tensor<?xf32>
@@ -45,14 +45,19 @@ module {
     }
     return %0#0: tensor<?xf32>
   }
-  pdl.pattern @match_iree_linalg_ext_tile : benefit(1) {
-    %0 = operands
-    %1 = types
-    %2 = operation "iree_linalg_ext.tile"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
-    rewrite %2 with "iree_linalg_transform.apply"
-  }
-  iree_linalg_transform.sequence {
-    %0 = match @match_iree_linalg_ext_tile
-    %1 = rewrite_iree_linalg_ext_tile_to_scf_for %0
+
+  transform.with_pdl_patterns {
+  ^bb0(%arg0: !pdl.operation):
+    pdl.pattern @match_iree_linalg_ext_tile : benefit(1) {
+      %0 = operands
+      %1 = types
+      %2 = operation "iree_linalg_ext.tile"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      rewrite %2 with "transform.dialect"
+    }
+    transform.structured.canonicalized_sequence %arg0 {
+    ^bb0(%arg1: !pdl.operation):
+      %0 = pdl_match @match_iree_linalg_ext_tile in %arg1
+      %1 = rewrite_iree_linalg_ext_tile_to_scf_for %0
+    }
   }
 }

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="func.func(iree-flow-dispatch-linalg-on-tensors-pass), cse, canonicalize, cse" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --iree-flow-enable-multi-result-dispatches --pass-pipeline="func.func(iree-flow-dispatch-linalg-on-tensors-pass), cse, canonicalize, cse" %s | FileCheck %s
 
 func.func @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
              %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
@@ -354,20 +354,24 @@ func.func @keep_original_producer_uses(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>,
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //  CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG: %[[D0:.+]] = tensor.dim %[[ARG2]], %[[C0]]
-//  CHECK-DAG: %[[D1:.+]] = tensor.dim %[[ARG2]], %[[C1]]
-//      CHECK: %[[origCC:.+]] = flow.dispatch.workgroups[%[[D1]], %[[D0]], %[[C1]]](%[[ARG2]], %[[D0]], %[[D1]])
+//  CHECK-DAG: %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG: %[[D1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+//  CHECK-DAG: %[[D2:.+]] = tensor.dim %[[ARG2]], %[[C0]]
+//  CHECK-DAG: %[[D3:.+]] = tensor.dim %[[ARG2]], %[[C1]]
+//  CHECK-DAG: %[[D4:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG: %[[D5:.+]] = tensor.dim %[[ARG1]], %[[C0]]
+//      CHECK: %[[origCC:.+]]:2 = flow.dispatch.workgroups[%[[D1]], %[[D0]], %[[C1]]]
+// CHECK-SAME:     (%[[ARG2]], %[[D2]], %[[D3]], %[[ARG0]], %[[D0]], %[[D4]], %[[ARG1]], %[[D5]], %[[D1]])
 // CHECK-NEXT:   %[[ARG2_CAPTURE:.+]]: !flow.dispatch.tensor<readwrite:?x?xf32>
-//      CHECK:   %[[LOAD:.+]] = flow.dispatch.tensor.load %[[ARG2_CAPTURE]], {{.*}}
+// CHECK-SAME:   %[[RESULT_CAPTURE:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
+//      CHECK:   %[[LOAD:.+]] = flow.dispatch.tensor.load %[[ARG2_CAPTURE]]
 //      CHECK:   %[[STOREVAL:.+]] = linalg.generic
 // CHECK-SAME:     outs(%[[LOAD]] : tensor<?x?xf32>)
-//      CHECK:   flow.dispatch.tensor.store %[[STOREVAL]], %[[ARG2_CAPTURE]], {{.*}}
-//      CHECK:   flow.return
-//  CHECK-NOT: linalg.generic
-//      CHECK: %[[D:.*]] = flow.dispatch.workgroups
-//      CHECK:     linalg.matmul
-//      CHECK:     flow.return
-//      CHECK: return %[[D]], %[[origCC]]
+//      CHECK:   %[[GEMM:.+]] = linalg.matmul
+// CHECK-SAME:     outs(%[[STOREVAL]] : tensor<?x?xf32>)
+//  CHECK-DAG:   flow.dispatch.tensor.store %[[STOREVAL]], %[[ARG2_CAPTURE]]
+//  CHECK-DAG:   flow.dispatch.tensor.store %[[GEMM]], %[[RESULT_CAPTURE]]
+//      CHECK: return %[[origCC]]#0, %[[origCC]]#1
 
 // -----
 
@@ -1376,3 +1380,63 @@ func.func @generic_tensor_insert(%arg0 : tensor<?x?xf32>,
 // CHECK-SAME:         offsets = [%[[DEST_OFFSET_Y_CAPTURE]], %[[DEST_OFFSET_X_CAPTURE]]]
 // CHECK-SAME:         sizes = [%[[SLICE_SIZE_CAPTURE]], 1]
 // CHECK-SAME:         strides = [%[[DEST_STRIDE_Y_CAPTURE]], %[[DEST_STRIDE_X_CAPTURE]]]
+
+// -----
+
+#map0 = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1)>
+func.func @multi_use_producer_fusion(%arg0 : tensor<?x8xf32>, %arg1 : tensor<8x?xf32>,
+    %arg2 : tensor<?xf32>) -> (tensor<?x?xf32>, tensor<?x?xf32>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %zero = arith.constant 0.0 : f32
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x8xf32>
+  %d1 = tensor.dim %arg1, %c1 : tensor<8x?xf32>
+  %init = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
+  %fill = linalg.fill ins(%zero : f32) outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %matmul = linalg.matmul ins(%arg0, %arg1 : tensor<?x8xf32>, tensor<8x?xf32>)
+      outs(%fill : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %generic = linalg.generic {
+      indexing_maps = [#map0, #map1, #map0],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%matmul, %arg2 : tensor<?x?xf32>, tensor<?xf32>) outs(%init : tensor<?x?xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32, %b2 : f32):
+      %0 = arith.addf %b0, %b1 : f32
+      linalg.yield %0 : f32
+    } -> tensor<?x?xf32>
+  return %matmul, %generic : tensor<?x?xf32>, tensor<?x?xf32>
+}
+//      CHECK: func @multi_use_producer_fusion
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x8xf32>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<8x?xf32>
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?xf32>
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+//  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG2]], %[[C0]]
+//      CHECK:   %[[DISPATCH:.+]]:2 = flow.dispatch.workgroups[%[[D1]], %[[D0]], %[[C1]]]
+// CHECK-SAME:       (%[[D0]], %[[D1]], %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[D2]])
+// CHECK-NEXT:     %[[D0_CAPTURE:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[D1_CAPTURE:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[ARG0_CAPTURE:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:?x8xf32>
+// CHECK-SAME:     %[[ARG1_CAPTURE:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:8x?xf32>
+// CHECK-SAME:     %[[ARG2_CAPTURE:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:?xf32>
+// CHECK-SAME:     %[[D2_CAPTURE:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[RESULT0:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
+// CHECK-SAME:     %[[RESULT1:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
+//  CHECK-DAG:     %[[LHS:.+]] = flow.dispatch.tensor.load %[[ARG0_CAPTURE]]
+//  CHECK-DAG:     %[[RHS:.+]] = flow.dispatch.tensor.load %[[ARG1_CAPTURE]]
+//  CHECK-DAG:     %[[BIAS:.+]] = flow.dispatch.tensor.load %[[ARG2_CAPTURE]]
+//  CHECK-DAG:     %[[INIT:.+]] = linalg.init_tensor [%[[D0_CAPTURE]], %[[D1_CAPTURE]]]
+//      CHECK:     %[[FILL:.+]] = linalg.fill
+// CHECK-SAME:         outs(%[[INIT]] :
+//      CHECK:     %[[MATMUL:.+]] = linalg.matmul
+// CHECK-SAME:         ins(%[[LHS]], %[[RHS]] :
+// CHECK-SAME:         outs(%[[FILL]] :
+//      CHECK:     %[[GENERIC:.+]] = linalg.generic
+// CHECK-SAME:         ins(%[[MATMUL]], %[[BIAS]] :
+// CHECK-SAME:         outs(%[[INIT]] :
+//  CHECK-DAG:     flow.dispatch.tensor.store %[[GENERIC]], %[[RESULT0]]
+//  CHECK-DAG:     flow.dispatch.tensor.store %[[MATMUL]], %[[RESULT1]]
+//      CHECK:   return %[[DISPATCH]]#1, %[[DISPATCH]]#0

@@ -106,7 +106,7 @@ iree_tablegen_doc(
   TD_FILE
     "FlowOps.td"
   OUTS
-    --gen-dialect-doc FlowDialect.md
+    --gen-dialect-doc -dialect=flow FlowDialect.md
 )
 
 iree_cc_library(

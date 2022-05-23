@@ -28,7 +28,6 @@ using mlir::bufferization::AnalysisState;
 using mlir::bufferization::BufferizableOpInterface;
 using mlir::bufferization::BufferizationAliasInfo;
 using mlir::bufferization::BufferizationState;
-using mlir::bufferization::createMemCpy;
 using mlir::bufferization::DialectAnalysisState;
 using mlir::bufferization::OneShotBufferizationOptions;
 using mlir::bufferization::PostAnalysisStepFn;
@@ -159,8 +158,8 @@ struct DispatchTensorStoreOpInterface
 
     // If everything bufferized inplace, no copy is needed. We wrote to the
     // target buffer already. The copy folds away in that case.
-    if (failed(createMemCpy(rewriter, storeOp->getLoc(), srcMemref, subView,
-                            state.getOptions())))
+    if (failed(state.getOptions().createMemCpy(rewriter, storeOp->getLoc(),
+                                               srcMemref, subView)))
       return failure();
 
     rewriter.eraseOp(storeOp);

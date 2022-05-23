@@ -333,7 +333,7 @@ public:
     static_assert(OpTy::template hasTrait<OpTrait::OneOperand>(),
                   "expected single-operand op");
     static_assert(OpTy::template hasTrait<OpTrait::OneResult>() ||
-                      OpTy::template hasTrait<OpTrait::ZeroResult>(),
+                      OpTy::template hasTrait<OpTrait::ZeroResults>(),
                   "expected zero- or single-result op");
     return success();
   }
