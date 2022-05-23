@@ -39,6 +39,7 @@ def IREECodegen_Dialect : Dialect {
         StringRef mnemonic, Type type, Attribute &value) const;
     LogicalResult printCodegenAttrs(Attribute attr, DialectAsmPrinter &p) const;
   }];
+  let useDefaultAttributePrinterParser = 1;
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREECODEGEN_DIALECT
