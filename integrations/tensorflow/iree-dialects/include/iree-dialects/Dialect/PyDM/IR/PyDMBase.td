@@ -32,6 +32,7 @@ def IREEPyDM_Dialect : Dialect {
   }];
   let cppNamespace = "::mlir::iree_compiler::IREE::PYDM";
   let hasConstantMaterializer = 1;
+  let useDefaultTypePrinterParser = 1;
 }
 
 class IREEPyDM_Op<string mnemonic, list<Trait> traits = []> :
