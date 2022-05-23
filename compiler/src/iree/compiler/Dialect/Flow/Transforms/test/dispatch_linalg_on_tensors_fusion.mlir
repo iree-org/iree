@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="func.func(iree-flow-dispatch-linalg-on-tensors-pass)" --canonicalize -cse %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --iree-flow-enable-multi-result-dispatches --pass-pipeline="func.func(iree-flow-dispatch-linalg-on-tensors-pass)" --canonicalize -cse %s | FileCheck %s
 
 func.func @fuse_conv2d_elementwise(%input: tensor<1x225x225x16xf32>, %filter: tensor<3x3x16x32xf32>, %offset: tensor<32xf32>) -> tensor<1x112x112x32xf32> {
   %cst = arith.constant 0.000000e+00 : f32
@@ -43,7 +43,7 @@ func.func @fuse_conv2d_elementwise(%input: tensor<1x225x225x16xf32>, %filter: te
 
 // -----
 
-func.func @dont_fuse_conv2d_with_multiple_uses(%input: tensor<1x225x225x16xf32>, %filter: tensor<3x3x16x32xf32>, %offset: tensor<32xf32>)
+func.func @fuse_conv2d_with_multiple_uses(%input: tensor<1x225x225x16xf32>, %filter: tensor<3x3x16x32xf32>, %offset: tensor<32xf32>)
   -> (tensor<1x112x112x32xf32>, tensor<1x112x112x32xf32>) {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
@@ -68,13 +68,15 @@ func.func @dont_fuse_conv2d_with_multiple_uses(%input: tensor<1x225x225x16xf32>,
   return %3, %2 : tensor<1x112x112x32xf32>, tensor<1x112x112x32xf32>
 }
 
-// CHECK-LABLE: func.func @dont_fuse_conv2d_with_multiple_uses
-
-// CHECK: flow.dispatch.workgroups
-// CHECK:   linalg.conv_2d_nhwc_hwcf
-
-// CHECK: flow.dispatch.workgroups
-// CHECK:   linalg.generic
+// CHECK-LABEL: func.func @fuse_conv2d_with_multiple_uses
+//       CHECK:   %[[DISPATCH:.+]]:2 = flow.dispatch.workgroups
+//  CHECK-NEXT:       %[[OUT1:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
+//  CHECK-SAME:       %[[OUT2:.+]]: !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
+//       CHECK:     %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//   CHECK-DAG:     flow.dispatch.tensor.store %[[GENERIC]], %[[OUT1]]
+//   CHECK-DAG:     flow.dispatch.tensor.store %[[CONV]], %[[OUT2]]
+//       CHECK:   return %[[DISPATCH]]#0, %[[DISPATCH]]#1
 
 // -----
 

@@ -58,17 +58,11 @@ bool areLinalgOpsFusableUsingTileAndFuse(OpOperand &use) {
   // 2. Consumer is elementwise parallel.
   if (consumer.getNumLoops() != consumer.getNumParallelLoops()) return false;
 
-  // 3. Producer has a single use.
-  // TODO(ravishankarm): Could be relaxed if dominance information
-  // is used to fuse with consumer, and both results become outputs of the
-  // dispatch.
-  if (!producer->hasOneUse()) return false;
-
-  // 4. In consumer the result of producer is accessed using identity indexing.
+  // 3. In consumer the result of producer is accessed using identity indexing.
   AffineMap consumerIndexingMap = consumer.getTiedIndexingMap(&use);
   if (!consumerIndexingMap.isIdentity()) return false;
 
-  // 5. In-place bufferization requirements (for now) require that the use in
+  // 4. In-place bufferization requirements (for now) require that the use in
   // the consumer can re-use the buffer for a result.
   return canInsOperandTieWithOutsOperand(&use);
 }
