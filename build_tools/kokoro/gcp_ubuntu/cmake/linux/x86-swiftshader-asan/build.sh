@@ -120,7 +120,7 @@ label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 # These tests currently have asan failures
 # TODO(#5715): Fix these
 declare -a excluded_tests=(
-  "iree/samples/iree_simple_embedding/simple_embedding_vulkan_test"
+  "iree/samples/simple_embedding/simple_embedding_vulkan_test"
 )
 
 # Prefix with `^` anchor
