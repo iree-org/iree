@@ -60,7 +60,8 @@ to low-level parallel pipelined hardware/API like
 dense computation on the hardware in the form of hardware/API-specific binaries
 like [SPIR-V](https://www.khronos.org/spir/).
 
-![IREE Architecture](assets/images/iree_architecture.svg)
+![IREE Architecture](assets/images/iree_architecture_dark.svg#gh-dark-mode-only)
+![IREE Architecture](assets/images/iree_architecture.svg#gh-light-mode-only)
 
 ## Workflow overview
 
