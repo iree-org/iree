@@ -39,7 +39,6 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "KernelConfig.h",
-        "MemorySpace.h",
         "Utils.h",
     ],
     deps = [

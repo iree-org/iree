@@ -16,7 +16,6 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Codegen/SPIRV/MemorySpace.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
@@ -25,6 +24,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Transforms/Passes.h"
+#include "mlir/Dialect/SPIRV/Transforms/SPIRVConversion.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
@@ -36,13 +36,26 @@
 namespace mlir {
 namespace iree_compiler {
 
-static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
-                                   ArrayRef<int64_t> staticShape,
-                                   Type elementType,
-                                   ArrayRef<Value> dynamicSizes) {
+static Value allocateWorkgroupMemory(OpBuilder &builder, Location loc,
+                                     ArrayRef<int64_t> staticShape,
+                                     Type elementType,
+                                     ArrayRef<Value> dynamicSizes) {
+  auto storageClass = SPIRVTypeConverter::getMemorySpaceForStorageClass(
+      spirv::StorageClass::Workgroup);
   MemRefType allocType =
-      MemRefType::get(staticShape, elementType, {}, getWorkgroupMemorySpace());
+      MemRefType::get(staticShape, elementType, {}, storageClass);
   return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes);
+}
+
+static Value allocateFunctionMemory(OpBuilder &builder, Location loc,
+                                    ArrayRef<int64_t> staticShape,
+                                    Type elementType,
+                                    ArrayRef<Value> dynamicSizes) {
+  auto storageClass = SPIRVTypeConverter::getMemorySpaceForStorageClass(
+      spirv::StorageClass::Function);
+  MemRefType allocType =
+      MemRefType::get(staticShape, elementType, {}, storageClass);
+  return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes);
 }
 
 //===----------------------------------------------------------------------===//
@@ -177,7 +190,7 @@ void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
 
   // Bufferize and distribute.
-  addSPIRVBufferizePasses(nestedModulePM, gpuAllocationFunction);
+  addSPIRVBufferizePasses(nestedModulePM, allocateFunctionMemory);
 
   // Generate loop nests for all remaining ops and remove trivial loops.
   addLoopMaterializationPasses(nestedModulePM);
@@ -193,7 +206,7 @@ void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm) {
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
 
-  addLinalgBufferizePasses(nestedModulePM, gpuAllocationFunction);
+  addLinalgBufferizePasses(nestedModulePM, allocateWorkgroupMemory);
 
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
@@ -222,7 +235,7 @@ void addSPIRVTileAndVectorizeWithWorkgroupMemoryPassPipeline(
   addTileAndDistributeToWorkgroupsPasses(pm);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
-  addLinalgBufferizePasses(nestedModulePM, gpuAllocationFunction);
+  addLinalgBufferizePasses(nestedModulePM, allocateWorkgroupMemory);
 
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
@@ -254,7 +267,7 @@ void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
 
-  addLinalgBufferizePasses(nestedModulePM, gpuAllocationFunction);
+  addLinalgBufferizePasses(nestedModulePM, allocateWorkgroupMemory);
 
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());

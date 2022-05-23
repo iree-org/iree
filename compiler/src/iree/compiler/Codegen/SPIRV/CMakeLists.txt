@@ -15,7 +15,6 @@ iree_cc_library(
     SPIRV
   HDRS
     "KernelConfig.h"
-    "MemorySpace.h"
     "Utils.h"
   SRCS
     "AMDConfig.cpp"
