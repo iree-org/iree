@@ -1233,7 +1233,7 @@ run the tests, then report the status back to your host machine.</p>
   -o /tmp/simple_abs_vmvx.vmfb
 </code></pre></div>
 <p>Push the Android runtime tools to the device, along with any flatbuffer files:</p>
-<div class="highlight"><pre><span></span><code>adb push ../iree-build-android/iree/tools/iree-run-module /data/local/tmp/
+<div class="highlight"><pre><span></span><code>adb push ../iree-build-android/tools/iree-run-module /data/local/tmp/
 adb shell chmod +x /data/local/tmp/iree-run-module
 adb push /tmp/simple_abs_vmvx.vmfb /data/local/tmp/
 </code></pre></div>

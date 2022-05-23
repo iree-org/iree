@@ -1334,7 +1334,7 @@ architecture. If no architecture is specified then we will default to
 </div>
 <div class="tabbed-block">
 <p>In the build directory:</p>
-<div class="highlight"><pre><span></span><code>iree/tools/iree-compile <span class="se">\</span>
+<div class="highlight"><pre><span></span><code>tools/iree-compile <span class="se">\</span>
     --iree-mlir-to-vm-bytecode-module <span class="se">\</span>
 <span class="hll">    --iree-hal-target-backends<span class="o">=</span>rocm <span class="se">\</span>
 </span><span class="hll">    --iree-rocm-target-chip<span class="o">=</span>&lt;...&gt; <span class="se">\</span>
@@ -1381,7 +1381,7 @@ Here are a table of commonly used architecture</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="4:2"><input checked="checked" id="__tabbed_4_1" name="__tabbed_4" type="radio" /><input id="__tabbed_4_2" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="__tabbed_4_1">Nvidia/CUDA</label><label for="__tabbed_4_2">AMD/ROCm</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code>iree/tools/iree-run-module <span class="se">\</span>
+<div class="highlight"><pre><span></span><code>tools/iree-run-module <span class="se">\</span>
 <span class="hll">    --driver<span class="o">=</span>cuda <span class="se">\</span>
 </span>    --module_file<span class="o">=</span>mobilenet-cuda.vmfb <span class="se">\</span>
     --entry_function<span class="o">=</span>predict <span class="se">\</span>
@@ -1389,7 +1389,7 @@ Here are a table of commonly used architecture</p>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code>iree/tools/iree-run-module <span class="se">\</span>
+<div class="highlight"><pre><span></span><code>tools/iree-run-module <span class="se">\</span>
 <span class="hll">    --driver<span class="o">=</span>rocm <span class="se">\</span>
 </span>    --module_file<span class="o">=</span>mobilenet-rocm.vmfb <span class="se">\</span>
     --entry_function<span class="o">=</span>predict <span class="se">\</span>

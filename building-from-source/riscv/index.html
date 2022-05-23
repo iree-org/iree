@@ -1290,7 +1290,7 @@ ${HOME}/riscv/qemu/linux/RISCV/bin/qemu-riscv64.</p>
 <div class="highlight"><pre><span></span><code><span class="si">${</span><span class="nv">QEMU_BIN</span><span class="si">}</span> <span class="se">\</span>
   -cpu rv64 <span class="se">\</span>
   -L <span class="si">${</span><span class="nv">RISCV_TOOLCHAIN_ROOT</span><span class="si">}</span>/sysroot/ <span class="se">\</span>
-  ../iree-build-riscv/iree/tools/iree-run-module <span class="se">\</span>
+  ../iree-build-riscv/tools/iree-run-module <span class="se">\</span>
   --driver<span class="o">=</span>vmvx <span class="se">\</span>
   --module_file<span class="o">=</span>/tmp/simple_abs_vmvx.vmfb <span class="se">\</span>
   --entry_function<span class="o">=</span>abs <span class="se">\</span>
@@ -1317,7 +1317,7 @@ ${HOME}/riscv/qemu/linux/RISCV/bin/qemu-riscv64.</p>
 <p>The SIMD code can be generated following the
 <a href="../../deployment-configurations/cpu-dylib/">IREE dynamic library CPU HAL driver flow</a>
 with the additional command-line flags</p>
-<div class="highlight"><pre><span></span><code>iree/tools/iree-compile <span class="se">\</span>
+<div class="highlight"><pre><span></span><code>tools/iree-compile <span class="se">\</span>
   --iree-mlir-to-vm-bytecode-module <span class="se">\</span>
 <span class="hll">  --iree-hal-target-backends<span class="o">=</span>dylib-llvm-aot <span class="se">\</span>
 </span><span class="hll">  --iree-llvm-target-triple<span class="o">=</span>riscv64 <span class="se">\</span>
@@ -1331,7 +1331,7 @@ with the additional command-line flags</p>
 <div class="highlight"><pre><span></span><code><span class="si">${</span><span class="nv">QEMU_BIN</span><span class="si">}</span> <span class="se">\</span>
 <span class="hll">  -cpu rv64,x-v<span class="o">=</span>true,x-k<span class="o">=</span>true,vlen<span class="o">=</span><span class="m">256</span>,elen<span class="o">=</span><span class="m">64</span>,vext_spec<span class="o">=</span>v1.0 <span class="se">\</span>
 </span>  -L <span class="si">${</span><span class="nv">RISCV_TOOLCHAIN_ROOT</span><span class="si">}</span>/sysroot/ <span class="se">\</span>
-  ../iree-build-riscv/iree/tools/iree-run-module <span class="se">\</span>
+  ../iree-build-riscv/tools/iree-run-module <span class="se">\</span>
 <span class="hll">  --driver<span class="o">=</span>dylib <span class="se">\</span>
 </span>  --module_file<span class="o">=</span>mobilenet-dylib.vmfb <span class="se">\</span>
   --entry_function<span class="o">=</span>predict <span class="se">\</span>

@@ -1284,7 +1284,7 @@ compiled in by default on all platforms.</p>
 configuring for the host.</p>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
-<p><code>iree-compile</code> is under <code>iree-build/iree/tools/</code> directory. You may want to
+<p><code>iree-compile</code> is under <code>iree-build/tools/</code> directory. You may want to
 include this path in your system's <code>PATH</code> environment variable.</p>
 </div>
 <h2 id="compile-and-run-the-model">Compile and run the model<a class="headerlink" href="#compile-and-run-the-model" title="Permanent link">&para;</a></h2>
@@ -1315,7 +1315,7 @@ IREE's TensorFlow importer.</p>
 <h3 id="run-the-model">Run the model<a class="headerlink" href="#run-the-model" title="Permanent link">&para;</a></h3>
 <h4 id="run-using-the-command-line">Run using the command-line<a class="headerlink" href="#run-using-the-command-line" title="Permanent link">&para;</a></h4>
 <p>In the build directory, run the following command:</p>
-<div class="highlight"><pre><span></span><code>iree/tools/iree-run-module <span class="se">\</span>
+<div class="highlight"><pre><span></span><code>tools/iree-run-module <span class="se">\</span>
 <span class="hll">    --driver<span class="o">=</span>dylib <span class="se">\</span>
 </span>    --module_file<span class="o">=</span>mobilenet-dylib.vmfb <span class="se">\</span>
     --entry_function<span class="o">=</span>predict <span class="se">\</span>
