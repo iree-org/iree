@@ -50,7 +50,7 @@ static bool isRankZeroOrOneMemRef(Type type) {
 // Returns the offset, in bytes, of an index within a linearized dense buffer.
 // Expects that the |memrefValue| has been linearized already.
 static Value getBufferOffset(Location loc, Value memrefValue,
-                             ValueRange indices, Type indiceType,
+                             ValueRange indices, Type indexType,
                              ConversionPatternRewriter &rewriter) {
   auto memrefType = memrefValue.getType().cast<ShapedType>();
   if (memrefType.getRank() == 0) {
@@ -69,7 +69,7 @@ static Value getBufferOffset(Location loc, Value memrefValue,
   // Rank 1 memrefs are just offset by their element width by the offset.
   Value offset = rewriter.createOrFold<AffineApplyOp>(
       loc, scalingExpr, ArrayRef<Value>{indices.front()});
-  return rewriter.create<arith::IndexCastOp>(loc, indiceType, offset);
+  return rewriter.create<arith::IndexCastOp>(loc, indexType, offset);
 }
 
 class ConvertMemRefGlobalOp : public OpConversionPattern<memref::GlobalOp> {
@@ -132,9 +132,9 @@ class ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
     }
     auto oldType = loadOp.result().getType();
     auto newType = getTypeConverter()->convertType(oldType);
-    auto byteOffset = getBufferOffset(
-        loadOp.getLoc(), loadOp.memref(), loadOp.indices(),
-        getTypeConverter()->convertType(rewriter.getIndexType()), rewriter);
+    auto byteOffset =
+        getBufferOffset(loadOp.getLoc(), loadOp.memref(), loadOp.indices(),
+                        rewriter.getI64Type(), rewriter);
     if (auto integerType = oldType.dyn_cast<IntegerType>()) {
       if (integerType.isInteger(1) || integerType.isInteger(8)) {
         if (integerType.isSigned() || integerType.isSignless()) {
@@ -189,9 +189,9 @@ class ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
           "only rank-0 and rank-1 memrefs are supported; flatten first");
     }
     auto oldType = storeOp.value().getType();
-    auto byteOffset = getBufferOffset(
-        storeOp.getLoc(), storeOp.memref(), storeOp.indices(),
-        getTypeConverter()->convertType(rewriter.getIndexType()), rewriter);
+    auto byteOffset =
+        getBufferOffset(storeOp.getLoc(), storeOp.memref(), storeOp.indices(),
+                        rewriter.getI64Type(), rewriter);
     if (oldType.isInteger(1) || oldType.isInteger(8)) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreI8Op>(
           storeOp, adaptor.memref(), byteOffset, adaptor.value());

@@ -224,6 +224,8 @@ static inline const iree_vm_register_remap_list_t* VM_DecBranchOperandsImpl(
 #define VM_DecOperandRegI64(name)                           \
   *((int64_t*)&regs.i32[OP_I16(0) & (regs.i32_mask & ~1)]); \
   pc += kRegSize;
+#define VM_DecOperandRegI64HostSize(name) \
+  (iree_host_size_t) VM_DecOperandRegI64(name)
 #define VM_DecOperandRegF32(name)                  \
   *((float*)&regs.i32[OP_I16(0) & regs.i32_mask]); \
   pc += kRegSize;

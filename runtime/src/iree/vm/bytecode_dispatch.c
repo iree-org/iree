@@ -906,7 +906,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     //===------------------------------------------------------------------===//
 
     DISPATCH_OP(CORE, BufferAlloc, {
-      uint32_t length = VM_DecOperandRegI32("length");
+      iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
       bool result_is_move;
       iree_vm_ref_t* result_ref = VM_DecResultRegRef("result", &result_is_move);
       iree_vm_buffer_t* buffer = NULL;
@@ -925,8 +925,8 @@ iree_status_t iree_vm_bytecode_dispatch(
       if (IREE_UNLIKELY(!source)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "source is null");
       }
-      uint32_t offset = VM_DecOperandRegI32("offset");
-      uint32_t length = VM_DecOperandRegI32("length");
+      iree_host_size_t offset = VM_DecOperandRegI64HostSize("offset");
+      iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
       bool result_is_move;
       iree_vm_ref_t* result_ref = VM_DecResultRegRef("result", &result_is_move);
       iree_vm_buffer_t* result = NULL;
@@ -945,8 +945,8 @@ iree_status_t iree_vm_bytecode_dispatch(
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "buffer is null");
       }
-      uint32_t* result = VM_DecResultRegI32("result");
-      *result = (uint32_t)iree_vm_buffer_length(buffer);
+      uint64_t* result = VM_DecResultRegI64("result");
+      *result = (uint64_t)iree_vm_buffer_length(buffer);
     });
 
     DISPATCH_OP(CORE, BufferCopy, {
@@ -959,7 +959,8 @@ iree_status_t iree_vm_bytecode_dispatch(
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "source_buffer is null");
       }
-      uint32_t source_offset = VM_DecOperandRegI32("source_offset");
+      iree_host_size_t source_offset =
+          VM_DecOperandRegI64HostSize("source_offset");
       bool target_buffer_is_move;
       iree_vm_ref_t* target_buffer_ref =
           VM_DecOperandRegRef("target_buffer", &target_buffer_is_move);
@@ -969,8 +970,9 @@ iree_status_t iree_vm_bytecode_dispatch(
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "target_buffer is null");
       }
-      uint32_t target_offset = VM_DecOperandRegI32("target_offset");
-      uint32_t length = VM_DecOperandRegI32("length");
+      iree_host_size_t target_offset =
+          VM_DecOperandRegI64HostSize("target_offset");
+      iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
       IREE_RETURN_IF_ERROR(iree_vm_buffer_copy_bytes(
           source_buffer, source_offset, target_buffer, target_offset, length));
     });
@@ -984,7 +986,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "lhs_buffer is null");
       }
-      uint32_t lhs_offset = VM_DecOperandRegI32("lhs_offset");
+      iree_host_size_t lhs_offset = VM_DecOperandRegI64HostSize("lhs_offset");
       bool rhs_buffer_is_move;
       iree_vm_ref_t* rhs_buffer_ref =
           VM_DecOperandRegRef("rhs_buffer", &rhs_buffer_is_move);
@@ -993,8 +995,8 @@ iree_status_t iree_vm_bytecode_dispatch(
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "rhs_buffer is null");
       }
-      uint32_t rhs_offset = VM_DecOperandRegI32("rhs_offset");
-      uint32_t length = VM_DecOperandRegI32("length");
+      iree_host_size_t rhs_offset = VM_DecOperandRegI64HostSize("rhs_offset");
+      iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
       uint32_t* result_ptr = VM_DecResultRegI32("result");
       bool result = false;
       IREE_RETURN_IF_ERROR(iree_vm_buffer_compare_bytes(
@@ -1014,8 +1016,8 @@ iree_status_t iree_vm_bytecode_dispatch(
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "buffer is null");
       }
-      uint32_t offset = VM_DecOperandRegI32("target_offset");
-      uint32_t length = VM_DecOperandRegI32("length");
+      iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
+      iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
       uint8_t value = (uint8_t)VM_DecOperandRegI32("value");
       IREE_RETURN_IF_ERROR(iree_vm_buffer_fill_elements(
           buffer, offset, length / sizeof(uint8_t), sizeof(uint8_t), &value));
@@ -1028,8 +1030,8 @@ iree_status_t iree_vm_bytecode_dispatch(
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "buffer is null");
       }
-      uint32_t offset = VM_DecOperandRegI32("target_offset");
-      uint32_t length = VM_DecOperandRegI32("length");
+      iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
+      iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
       uint16_t value = (uint16_t)VM_DecOperandRegI32("value");
       IREE_RETURN_IF_ERROR(iree_vm_buffer_fill_elements(
           buffer, offset, length / sizeof(uint16_t), sizeof(uint16_t), &value));
@@ -1042,8 +1044,8 @@ iree_status_t iree_vm_bytecode_dispatch(
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "buffer is null");
       }
-      uint32_t offset = VM_DecOperandRegI32("target_offset");
-      uint32_t length = VM_DecOperandRegI32("length");
+      iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
+      iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
       uint32_t value = VM_DecOperandRegI32("value");
       IREE_RETURN_IF_ERROR(iree_vm_buffer_fill_elements(
           buffer, offset, length / sizeof(uint32_t), sizeof(uint32_t), &value));
@@ -1056,8 +1058,8 @@ iree_status_t iree_vm_bytecode_dispatch(
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "buffer is null");
       }
-      uint32_t offset = VM_DecOperandRegI32("target_offset");
-      uint32_t length = VM_DecOperandRegI32("length");
+      iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
+      iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
       uint64_t value = VM_DecOperandRegI64("value");
       IREE_RETURN_IF_ERROR(iree_vm_buffer_fill_elements(
           buffer, offset, length / sizeof(uint64_t), sizeof(uint64_t), &value));
@@ -1076,7 +1078,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "source_buffer is null");
       }
-      uint32_t offset = VM_DecOperandRegI32("source_offset");
+      iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
       uint32_t* result_ptr = VM_DecResultRegI32("result");
       uint8_t result_x8 = 0;
       IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(
@@ -1092,7 +1094,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "source_buffer is null");
       }
-      uint32_t offset = VM_DecOperandRegI32("source_offset");
+      iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
       uint32_t* result_ptr = VM_DecResultRegI32("result");
       int8_t result_x8 = 0;
       IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(
@@ -1108,7 +1110,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "source_buffer is null");
       }
-      uint32_t offset = VM_DecOperandRegI32("source_offset");
+      iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
       uint32_t* result_ptr = VM_DecResultRegI32("result");
       uint16_t result_x16 = 0;
       IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(
@@ -1124,7 +1126,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "source_buffer is null");
       }
-      uint32_t offset = VM_DecOperandRegI32("source_offset");
+      iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
       uint32_t* result_ptr = VM_DecResultRegI32("result");
       int16_t result_x16 = 0;
       IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(
@@ -1140,7 +1142,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "source_buffer is null");
       }
-      uint32_t offset = VM_DecOperandRegI32("source_offset");
+      iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
       uint32_t* result = VM_DecResultRegI32("result");
       IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(buffer, offset, result,
                                                         1, sizeof(*result)));
@@ -1154,7 +1156,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "source_buffer is null");
       }
-      uint32_t offset = VM_DecOperandRegI32("source_offset");
+      iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
       uint64_t* result = VM_DecResultRegI64("result");
       IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(buffer, offset, result,
                                                         1, sizeof(*result)));
@@ -1172,7 +1174,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "target_buffer is null");
       }
-      uint32_t offset = VM_DecOperandRegI32("target_offset");
+      iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
       uint8_t value = (uint8_t)VM_DecOperandRegI32("value");
       IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(&value, buffer, offset,
                                                          1, sizeof(uint8_t)));
@@ -1186,7 +1188,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "target_buffer is null");
       }
-      uint32_t offset = VM_DecOperandRegI32("target_offset");
+      iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
       uint16_t value = (uint16_t)VM_DecOperandRegI32("value");
       IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(&value, buffer, offset,
                                                          1, sizeof(uint16_t)));
@@ -1200,7 +1202,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "target_buffer is null");
       }
-      uint32_t offset = VM_DecOperandRegI32("target_offset");
+      iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
       uint32_t value = VM_DecOperandRegI32("value");
       IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(&value, buffer, offset,
                                                          1, sizeof(uint32_t)));
@@ -1214,7 +1216,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "target_buffer is null");
       }
-      uint32_t offset = VM_DecOperandRegI32("target_offset");
+      iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
       uint64_t value = (uint64_t)VM_DecOperandRegI64("value");
       IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(&value, buffer, offset,
                                                          1, sizeof(uint64_t)));
@@ -2051,8 +2053,8 @@ iree_status_t iree_vm_bytecode_dispatch(
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                   "buffer is null");
         }
-        uint32_t offset = VM_DecOperandRegI32("target_offset");
-        uint32_t length = VM_DecOperandRegI32("length");
+        iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
+        iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
         float value = VM_DecOperandRegF32("value");
         IREE_RETURN_IF_ERROR(iree_vm_buffer_fill_elements(
             buffer, offset, length / sizeof(float), sizeof(float), &value));
@@ -2067,7 +2069,7 @@ iree_status_t iree_vm_bytecode_dispatch(
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                   "source_buffer is null");
         }
-        uint32_t offset = VM_DecOperandRegI32("source_offset");
+        iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
         float* result = VM_DecResultRegF32("result");
         IREE_RETURN_IF_ERROR(iree_vm_buffer_read_elements(
             buffer, offset, result, 1, sizeof(*result)));
@@ -2082,7 +2084,7 @@ iree_status_t iree_vm_bytecode_dispatch(
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                   "target_buffer is null");
         }
-        uint32_t offset = VM_DecOperandRegI32("target_offset");
+        iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
         float value = VM_DecOperandRegF32("value");
         IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(
             &value, buffer, offset, 1, sizeof(float)));

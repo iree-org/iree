@@ -137,7 +137,7 @@ class ExecutableCreateOpConversion
     auto constantBufferLoc = rewriter.getFusedLoc(constantLocs);
     auto constantBuffer = rewriter.create<IREE::VM::BufferAllocOp>(
         constantBufferLoc, bufferRefType,
-        rewriter.create<IREE::VM::ConstI32Op>(
+        rewriter.create<IREE::VM::ConstI64Op>(
             constantBufferLoc, constantCount * sizeof(uint32_t)));
 
     // Store each constant into it.
@@ -149,7 +149,7 @@ class ExecutableCreateOpConversion
       auto constantLoc = constantValue.value().getLoc();
       rewriter.create<IREE::VM::BufferStoreI32Op>(
           constantLoc, constantBuffer,
-          rewriter.create<IREE::VM::ConstI32Op>(constantLoc,
+          rewriter.create<IREE::VM::ConstI64Op>(constantLoc,
                                                 constantValue.index()),
           constantValue.value());
     }
