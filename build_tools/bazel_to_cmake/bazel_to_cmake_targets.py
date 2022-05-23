@@ -258,6 +258,11 @@ def convert_target(target):
   if m:
     return ["iree::samples::" + _convert_bazel_path(m.group(1))]
 
+  # Map //tools/(.*) -> \1
+  m = re.match("^//tools[/|:](.+)", target)
+  if m:
+    return [_convert_bazel_path(m.group(1))]
+
   # Default (legacy) rewrite.
   if not target.startswith("@"):
     return [_convert_bazel_path(target)]

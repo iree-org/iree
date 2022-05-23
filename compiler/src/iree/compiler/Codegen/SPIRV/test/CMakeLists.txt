@@ -44,7 +44,7 @@ iree_lit_test_suite(
     "vectorize_tensor_pad.mlir"
   TOOLS
     FileCheck
-    iree::tools::iree-opt
+    iree-opt
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

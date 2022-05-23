@@ -48,8 +48,8 @@ iree_lit_test_suite(
     cfg = "//compiler:lit.cfg.py",
     data = ["linalg_transform_spec.mlir"],
     tools = [
-        "//iree/tools:iree-compile",
-        "//iree/tools:iree-opt",
+        "//tools:iree-compile",
+        "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",
     ],
 )

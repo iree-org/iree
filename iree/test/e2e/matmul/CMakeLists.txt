@@ -19,7 +19,7 @@ iree_generated_trace_runner_test(
     "--lhs_rhs_type=i8"
     "--shapes=small"
   TRACE_RUNNER
-    iree_tools_iree-e2e-matmul-test
+    iree-e2e-matmul-test
   TARGET_BACKENDS
     "dylib-llvm-aot"
     "vmvx"
@@ -37,7 +37,7 @@ iree_generated_trace_runner_test(
     "--lhs_rhs_type=f32"
     "--shapes=small"
   TRACE_RUNNER
-    iree_tools_iree-e2e-matmul-test
+    iree-e2e-matmul-test
   TARGET_BACKENDS
     "dylib-llvm-aot"
     "vmvx"
@@ -55,7 +55,7 @@ iree_generated_trace_runner_test(
     "--lhs_rhs_type=i8"
     "--shapes=small"
   TRACE_RUNNER
-    iree_tools_iree-e2e-matmul-test
+    iree-e2e-matmul-test
   TARGET_BACKENDS
     "dylib-llvm-aot"
   DRIVERS
@@ -77,7 +77,7 @@ iree_generated_trace_runner_test(
     "--lhs_rhs_type=f32"
     "--shapes=small"
   TRACE_RUNNER
-    iree_tools_iree-e2e-matmul-test
+    iree-e2e-matmul-test
   TARGET_BACKENDS
     "dylib-llvm-aot"
   DRIVERS
@@ -97,7 +97,7 @@ iree_generated_trace_runner_test(
     "--lhs_rhs_type=i8"
     "--shapes=large"
   TRACE_RUNNER
-    iree_tools_iree-e2e-matmul-test
+    iree-e2e-matmul-test
   TARGET_BACKENDS
     "dylib-llvm-aot"
   DRIVERS
@@ -119,7 +119,7 @@ iree_generated_trace_runner_test(
     "--lhs_rhs_type=f32"
     "--shapes=large"
   TRACE_RUNNER
-    iree_tools_iree-e2e-matmul-test
+    iree-e2e-matmul-test
   TARGET_BACKENDS
     "dylib-llvm-aot"
   DRIVERS
@@ -139,7 +139,7 @@ iree_generated_trace_runner_test(
     "--lhs_rhs_type=i8"
     "--shapes=small"
   TRACE_RUNNER
-    iree_tools_iree-e2e-matmul-test
+    iree-e2e-matmul-test
   TARGET_BACKENDS
     "dylib-llvm-aot"
   DRIVERS
@@ -162,7 +162,7 @@ iree_generated_trace_runner_test(
     "--lhs_rhs_type=f32"
     "--shapes=small"
   TRACE_RUNNER
-    iree_tools_iree-e2e-matmul-test
+    iree-e2e-matmul-test
   TARGET_BACKENDS
     "dylib-llvm-aot"
   DRIVERS
@@ -184,7 +184,7 @@ iree_generated_trace_runner_test(
     "--shapes=gpu_large"
     "--compilation_info=LLVMGPUMatmulSimt"
   TRACE_RUNNER
-    iree_tools_iree-e2e-matmul-test
+    iree-e2e-matmul-test
   TARGET_BACKENDS
     "cuda"
   DRIVERS
@@ -207,7 +207,7 @@ iree_generated_trace_runner_test(
     "--shapes=gpu_large"
     "--compilation_info=LLVMGPUMatmulTensorCore"
   TRACE_RUNNER
-    iree_tools_iree-e2e-matmul-test
+    iree-e2e-matmul-test
   TARGET_BACKENDS
     "cuda"
   DRIVERS
@@ -231,7 +231,7 @@ iree_generated_trace_runner_test(
     "--lhs_rhs_type=f32"
     "--shapes=large"
   TRACE_RUNNER
-    iree_tools_iree-e2e-matmul-test
+    iree-e2e-matmul-test
   TARGET_BACKENDS
     "cuda"
     "dylib-llvm-aot"
@@ -258,7 +258,7 @@ iree_generated_trace_runner_test(
     "--shapes=gpu_large"
     "--compilation_info=SPIRVVectorize"
   TRACE_RUNNER
-    iree_tools_iree-e2e-matmul-test
+    iree-e2e-matmul-test
   TARGET_BACKENDS
     "vulkan-spirv"
   DRIVERS
@@ -279,7 +279,7 @@ iree_generated_trace_runner_test(
     "--shapes=gpu_large"
     "--compilation_info=SPIRVVectorize"
   TRACE_RUNNER
-    iree_tools_iree-e2e-matmul-test
+    iree-e2e-matmul-test
   TARGET_BACKENDS
     "vulkan-spirv"
   DRIVERS

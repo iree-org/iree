@@ -5,8 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Tests for end-to-end IREE support of specific features to prevent regression.
-# These should focus on support by IREE itself, not for issues with specific runner tools. Place
-# those tests in iree/tools/test/
+# These should focus on support by IREE itself, not for issues with specific runner tools.
+# Place those tests in tools/test/
 
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
@@ -58,8 +58,8 @@ iree_lit_test_suite(
     ),
     tags = ["hostonly"],
     tools = [
-        "//iree/tools:iree-opt",
-        "//iree/tools:iree-run-mlir",
+        "//tools:iree-opt",
+        "//tools:iree-run-mlir",
         "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
     ],

@@ -8,7 +8,7 @@ supports.
 # Background
 
 The main bytecode testing tool
-[iree-run-module](https://github.com/google/iree/tree/main/iree/tools/iree-run-module-main.cc)
+[iree-run-module](https://github.com/google/iree/tree/main/tools/iree-run-module-main.cc)
 requires a proper operating system support to set up the runtime environment to
 execute an IREE bytecode module. For embedded systems, the support such as file
 system or multi-thread asynchronous control may not be available. This sample

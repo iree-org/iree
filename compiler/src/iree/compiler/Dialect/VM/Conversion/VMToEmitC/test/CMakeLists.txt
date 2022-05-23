@@ -45,7 +45,7 @@ iree_lit_test_suite(
     "type_conversion.mlir"
   TOOLS
     FileCheck
-    iree::tools::iree-opt
+    iree-opt
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -62,28 +62,35 @@ function(iree_cc_binary)
   # Prefix the library with the package name, so we get: iree_package_name
   iree_package_name(_PACKAGE_NAME)
   iree_package_ns(_PACKAGE_NS)
-  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
-
-  add_executable(${_NAME} "")
-  # Alias the iree_package_name binary to iree::package::name.
-  # This lets us more clearly map to Bazel and makes it possible to
-  # disambiguate the underscores in paths vs. the separators.
-  add_executable(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
-
-  # If the binary name matches the package then treat it as a default. For
-  # example, foo/bar/ library 'bar' would end up as 'foo::bar'. This isn't
-  # likely to be common for binaries, but is consistent with the behavior for
-  # libraries and in Bazel.
-  iree_package_dir(_PACKAGE_DIR)
-  if(${_RULE_NAME} STREQUAL ${_PACKAGE_DIR})
-    add_executable(${_PACKAGE_NS} ALIAS ${_NAME})
+  if("${_PACKAGE_NAME}" STREQUAL "")
+    set(_NAME "${_RULE_NAME}")
+  else()
+    set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
   endif()
 
-  # Finally, since we have so few binaries and we also want to support
-  # installing from a separate host build, binaries get an unqualified global
-  # alias. This means binary names must be unique across the whole project.
-  # (We could consider making this configurable).
-  add_executable(${_RULE_NAME} ALIAS ${_NAME})
+  add_executable(${_NAME} "")
+
+  if(NOT "${_PACKAGE_NS}" STREQUAL "")
+    # Alias the iree_package_name binary to iree::package::name.
+    # This lets us more clearly map to Bazel and makes it possible to
+    # disambiguate the underscores in paths vs. the separators.
+    add_executable(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
+
+    # If the binary name matches the package then treat it as a default. For
+    # example, foo/bar/ library 'bar' would end up as 'foo::bar'. This isn't
+    # likely to be common for binaries, but is consistent with the behavior for
+    # libraries and in Bazel.
+    iree_package_dir(_PACKAGE_DIR)
+    if("${_RULE_NAME}" STREQUAL "${_PACKAGE_DIR}")
+      add_executable(${_PACKAGE_NS} ALIAS ${_NAME})
+    endif()
+
+    # Finally, since we have so few binaries and we also want to support
+    # installing from a separate host build, binaries get an unqualified global
+    # alias. This means binary names must be unique across the whole project.
+    # (We could consider making this configurable).
+    add_executable(${_RULE_NAME} ALIAS ${_NAME})
+  endif()
 
   set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
   if(_RULE_SRCS)

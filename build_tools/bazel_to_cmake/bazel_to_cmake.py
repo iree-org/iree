@@ -79,9 +79,8 @@ def parse_arguments():
   group.add_argument(
       "--root_dir",
       nargs="+",
-      help=
-      "Converts all BUILD files under a root directory (defaults to iree, runtime)",
-      default=["compiler", "iree", "runtime", "samples"])
+      help="Converts all BUILD files under a root directory",
+      default=["compiler", "iree", "runtime", "samples", "tools"])
 
   args = parser.parse_args()
 

@@ -115,7 +115,7 @@ benchmark a static left-hand-side batched matmul using `MatrixOpsStaticModule`
 on VMVX run:
 
 ```shell
-$ iree/tools/iree-benchmark-module \
+$ tools/iree-benchmark-module \
   --module_file=/tmp/iree/modules/MatrixOpsStaticModule/iree_vmvx/compiled.vmfb \
   --driver=vmvx \
   --entry_function=matmul_lhs_batch \
@@ -192,10 +192,10 @@ your environment to cross-compile to Android can be found
 ```shell
 # After following the instructions above up to 'Build all targets', the
 # iree-benchmark-module binary should be in the following directory:
-$ ls build-android/iree/tools/
+$ ls build-android/tools/
 
 # Copy the benchmarking binary to phone.
-$ adb push build-android/iree/tools/iree-benchmark-module /data/local/tmp
+$ adb push build-android/tools/iree-benchmark-module /data/local/tmp
 ```
 
 ### 4.2 Push the IREE's compilation / benchmarking artifacts to the device

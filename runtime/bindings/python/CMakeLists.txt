@@ -77,25 +77,25 @@ iree_py_library(
 
 iree_symlink_tool(
   TARGET runtime
-  FROM_TOOL_TARGET iree_tools_iree-benchmark-module
+  FROM_TOOL_TARGET iree-benchmark-module
   TO_EXE_NAME iree-benchmark-module
 )
 
 iree_symlink_tool(
   TARGET runtime
-  FROM_TOOL_TARGET iree_tools_iree-benchmark-trace
+  FROM_TOOL_TARGET iree-benchmark-trace
   TO_EXE_NAME iree-benchmark-trace
 )
 
 iree_symlink_tool(
   TARGET runtime
-  FROM_TOOL_TARGET iree_tools_iree-run-trace
+  FROM_TOOL_TARGET iree-run-trace
   TO_EXE_NAME iree-run-trace
 )
 
 iree_symlink_tool(
   TARGET runtime
-  FROM_TOOL_TARGET iree_tools_iree-run-module
+  FROM_TOOL_TARGET iree-run-module
   TO_EXE_NAME iree-run-module
 )
 
@@ -200,10 +200,10 @@ install(
 cmake_language(DEFER DIRECTORY "${IREE_SOURCE_DIR}"
   CALL install
   TARGETS
-    iree_tools_iree-benchmark-module
-    iree_tools_iree-benchmark-trace
-    iree_tools_iree-run-module
-    iree_tools_iree-run-trace
+    iree-benchmark-module
+    iree-benchmark-trace
+    iree-run-module
+    iree-run-trace
     ${_EXTRA_INSTALL_TOOL_TARGETS}
   DESTINATION "${_INSTALL_DIR}/iree/runtime"
   COMPONENT "${_INSTALL_COMPONENT}"

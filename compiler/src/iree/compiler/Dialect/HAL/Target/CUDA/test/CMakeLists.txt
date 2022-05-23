@@ -13,5 +13,5 @@ iree_lit_test_suite(
     "smoketest.mlir"
   TOOLS
     FileCheck
-    iree::tools::iree-opt
+    iree-opt
 )

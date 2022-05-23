@@ -116,7 +116,7 @@ Run the RISC-V emulation:
 ${QEMU_BIN} \
   -cpu rv64 \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
-  ../iree-build-riscv/iree/tools/iree-run-module \
+  ../iree-build-riscv/tools/iree-run-module \
   --driver=vmvx \
   --module_file=/tmp/simple_abs_vmvx.vmfb \
   --entry_function=abs \
@@ -145,7 +145,7 @@ The SIMD code can be generated following the
 with the additional command-line flags
 
 ```shell hl_lines="3 4 5 6 7 8"
-iree/tools/iree-compile \
+tools/iree-compile \
   --iree-mlir-to-vm-bytecode-module \
   --iree-hal-target-backends=dylib-llvm-aot \
   --iree-llvm-target-triple=riscv64 \
@@ -162,7 +162,7 @@ Then run on the RISC-V QEMU:
 ${QEMU_BIN} \
   -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
-  ../iree-build-riscv/iree/tools/iree-run-module \
+  ../iree-build-riscv/tools/iree-run-module \
   --driver=dylib \
   --module_file=mobilenet-dylib.vmfb \
   --entry_function=predict \

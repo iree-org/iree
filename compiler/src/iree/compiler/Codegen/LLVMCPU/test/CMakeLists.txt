@@ -35,8 +35,8 @@ iree_lit_test_suite(
     "verify_linalg_transform_legality.mlir"
   TOOLS
     FileCheck
-    iree::tools::iree-compile
-    iree::tools::iree-opt
+    iree-compile
+    iree-opt
   DATA
     linalg_transform_spec.mlir
 )

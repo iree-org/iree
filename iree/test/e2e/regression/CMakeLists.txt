@@ -23,8 +23,8 @@ iree_lit_test_suite(
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck
-    iree::tools::iree-opt
-    iree::tools::iree-run-mlir
+    iree-opt
+    iree-run-mlir
   LABELS
     "hostonly"
 )

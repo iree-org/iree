@@ -53,6 +53,8 @@
 
 # Other Top-Level Directories
 /docs/ @ScottTodd
+/samples/ @ScottTodd
+/tools/ @benvanik @GMNGeoffrey
 
 
 # Main IREE directories
@@ -80,6 +82,4 @@
 /runtime/src/iree/hal/vulkan/ @antiagainst @ScottTodd
 
 # Other IREE directories
-/samples/ @ScottTodd
 /iree/test/ @ghost
-/iree/tools/ @benvanik @GMNGeoffrey

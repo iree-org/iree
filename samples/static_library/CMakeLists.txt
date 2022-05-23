@@ -11,7 +11,7 @@ if(NOT IREE_TARGET_BACKEND_DYLIB_LLVM_AOT OR
 endif()
 
 # Set iree-compile binary.
-set(_COMPILE_TOOL_EXECUTABLE $<TARGET_FILE:iree_tools_iree-compile>)
+set(_COMPILE_TOOL_EXECUTABLE $<TARGET_FILE:iree-compile>)
 
 ## Example with VM bytecode module.
 # Setup args for iree-compile.

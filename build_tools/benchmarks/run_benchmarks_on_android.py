@@ -18,13 +18,13 @@ Example usages:
 
   # Without trace generation
   python3 run_benchmarks.py \
-    --normal_benchmark_tool_dir=/path/to/normal/android/target/iree/tools/dir \
+    --normal_benchmark_tool_dir=/path/to/normal/android/target/tools/dir \
     /path/to/host/build/dir
 
   # With trace generation
   python3 run_benchmarks.py \
-    --normal_benchmark_tool_dir=/path/to/normal/android/target/iree/tools/dir \
-    --traced_benchmark_tool_dir=/path/to/tracy/android/target/iree/tools/dir \
+    --normal_benchmark_tool_dir=/path/to/normal/android/target/tools/dir \
+    --traced_benchmark_tool_dir=/path/to/tracy/android/target/tools/dir \
     --trace_capture_tool=/path/to/host/build/tracy/capture \
     /path/to/host/build/dir
 """

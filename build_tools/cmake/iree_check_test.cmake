@@ -161,7 +161,7 @@ function(iree_check_test)
        "${_MODULE_FILE_NAME}"
   )
 
-  set(_RUNNER_TARGET "iree_tools_iree-check-module")
+  set(_RUNNER_TARGET "iree-check-module")
 
   # A target specifically for the test. We could combine this with the above,
   # but we want that one to get pulled into iree_bytecode_module.
