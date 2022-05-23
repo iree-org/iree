@@ -34,6 +34,7 @@ iree_check_single_backend_test_suite(
         # keep sorted
         [
             "extract_slice.mlir",
+            "pad.mlir",
             "tensor_insert_slice.mlir",
         ],
         include = ["*.mlir"],
@@ -51,6 +52,7 @@ iree_check_single_backend_test_suite(
         # keep sorted
         [
             "extract_slice.mlir",
+            "pad.mlir",
             "tensor_insert_slice.mlir",
         ],
         include = ["*.mlir"],
@@ -75,6 +77,7 @@ iree_check_single_backend_test_suite(
         # keep sorted
         [
             "extract_slice.mlir",
+            "pad.mlir",
             "tensor_insert_slice.mlir",
         ],
         include = ["*.mlir"],

@@ -29,6 +29,7 @@ iree_check_single_backend_test_suite(
     check_dylib-llvm-aot_dylib
   SRCS
     "extract_slice.mlir"
+    "pad.mlir"
     "tensor_insert_slice.mlir"
   TARGET_BACKEND
     "dylib-llvm-aot"
@@ -41,6 +42,7 @@ iree_check_single_backend_test_suite(
     check_cuda
   SRCS
     "extract_slice.mlir"
+    "pad.mlir"
     "tensor_insert_slice.mlir"
   TARGET_BACKEND
     "cuda"
@@ -59,6 +61,7 @@ iree_check_single_backend_test_suite(
     check_vulkan-spirv_vulkan
   SRCS
     "extract_slice.mlir"
+    "pad.mlir"
     "tensor_insert_slice.mlir"
   TARGET_BACKEND
     "vulkan-spirv"

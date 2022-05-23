@@ -893,15 +893,36 @@ struct CreateDispatchRegionOp : Base<OpType> {
 // Heuristics for fusing dispatchble ops with root ops using tile + fuse.
 //===----------------------------------------------------------------------===//
 
-/// Checks if the producer and consumer LinalgOps can be fused.
-static bool areFusableLinalgOps(OpOperand &use) {
-  return areLinalgOpsFusableUsingTileAndFuse(use);
-}
-
 /// Returns true if this is a fusable use.
 static bool isFusableWithConsumer(OpOperand &use) {
+  Operation *producer = use.get().getDefiningOp();
+  if (!producer) return false;
+
+  Operation *consumer = use.getOwner();
+
   // Check for linalg producer -> consumer fusion with tile + fuse.
-  return areFusableLinalgOps(use);
+  if (isa<linalg::LinalgOp>(producer) && isa<linalg::LinalgOp>(consumer) &&
+      areLinalgOpsFusableUsingTileAndFuse(use)) {
+    return true;
+  }
+
+  // Can fuse with a `tensor.insert_slice` consumer if this is not part of
+  // a concat chain.
+  if (auto insertSliceOp = dyn_cast<tensor::InsertSliceOp>(consumer)) {
+    // If the `dest` is a result of a `tensor.insert_slice`, do not fuse.
+    if (insertSliceOp.dest().getDefiningOp<tensor::InsertSliceOp>()) {
+      return false;
+    }
+    // If the result of `tensor.insert_slice` is used as `dest` of a
+    // `tensor.insert_slice` do not fuse.
+    if (llvm::any_of(insertSliceOp->getUsers(), [&](Operation *user) {
+          return isa<tensor::InsertSliceOp>(user);
+        })) {
+      return false;
+    }
+    return true;
+  }
+  return false;
 }
 
 /// For all uses of an operation, finds the use that dominates all other uses.
