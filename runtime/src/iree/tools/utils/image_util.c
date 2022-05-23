@@ -10,7 +10,7 @@
 
 #include "iree/base/internal/flags.h"
 #include "iree/base/tracing.h"
-#include "stb_image.h"
+#include "third_party/stblib/stb_image.h"
 
 iree_status_t iree_tools_utils_pixel_rescaled_to_buffer(
     const uint8_t* pixel_data, iree_host_size_t buffer_length,
