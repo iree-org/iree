@@ -76,16 +76,13 @@ static void addCPUIREEComprehensiveBufferizePasses(OpPassManager &passManager) {
                                       memcpyFn);
 }
 
-static void addTileAndDistributePasses(OpPassManager &pm,
-                                       bool convertToDestinationStyle) {
+static void addTileAndDistributePasses(OpPassManager &pm) {
   pm.addPass(createInsertDistributionInfoPass());
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
       createTileAndDistributeToWorkgroupsPass());
-  if (convertToDestinationStyle) {
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createConvertToDestinationPassingStylePass());
-  }
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createConvertToDestinationPassingStylePass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createFoldAffineMinInDistributedLoopsPass());
   nestedModulePM.addPass(createCanonicalizerPass());
@@ -216,8 +213,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
 //===---------------------------------------------------------------------===//
 
 void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
-  addTileAndDistributePasses(passManager,
-                             /*convertToDestinationPassingStyle=*/false);
+  addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   {
@@ -247,8 +243,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
 }
 
 void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
-  addTileAndDistributePasses(passManager,
-                             /*convertToDestinationPassingStyle=*/true);
+  addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   {
@@ -330,8 +325,7 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
 
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
                                        bool lowerToAVX2) {
-  addTileAndDistributePasses(passManager,
-                             /*convertToDestinationPassingStyle=*/true);
+  addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   // Run LinalgFusePass firstly in case that we have fill + matmul + generic
@@ -376,8 +370,7 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
 }
 
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
-  addTileAndDistributePasses(passManager,
-                             /*convertToDestinationPassingStyle=*/true);
+  addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   // Run LinalgFusePass firstly in case that we have fill + conv + generic
@@ -424,8 +417,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
 
 void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
                                          bool lowerToVectors) {
-  addTileAndDistributePasses(passManager,
-                             /*convertToDestinationPassingStyle=*/true);
+  addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
@@ -445,8 +437,7 @@ void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
 }
 
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
-  addTileAndDistributePasses(passManager,
-                             /*convertToDestinationPassingStyle=*/true);
+  addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addCPUIREEComprehensiveBufferizePasses(nestedModulePM);
 }
