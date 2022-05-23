@@ -113,7 +113,7 @@ When first introducing a new Buildkite pipeline, it will not be registered with
 Buildkite yet. The presubmit pipeline therefore cannot trigger a run of this
 pipeline. To enable testing of new pipelines, we have a special
 [unregistered pipeline](https://buildkite.com/iree/unregistered). This pipeline
-just uploads another pipeline fail based on an environment variable. When a
+just uploads another pipeline file based on an environment variable. When a
 pipeline with the given name doesn't exist,
 [wait_for_pipeline_success.py](scripts/wait_for_pipeline_success.py) instead
 invokes the "unregistered" pipeline, which runs the given pipeline
