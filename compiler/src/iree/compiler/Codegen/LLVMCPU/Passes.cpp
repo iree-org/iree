@@ -44,34 +44,31 @@ static llvm::cl::opt<bool> clEnableHoistPadding(
 //===---------------------------------------------------------------------===//
 
 // Allocation callbacks to use with upstream comprehensive bufferization
-static FailureOr<Value> cpuComprehensiveBufferizeAllocationFn(
-    OpBuilder &builder, Location loc, MemRefType memRefType,
-    ValueRange dynamicSizes, unsigned alignment) {
+static FailureOr<Value> cpuAllocationFn(OpBuilder &builder, Location loc,
+                                        MemRefType memRefType,
+                                        ValueRange dynamicSizes,
+                                        unsigned alignment) {
   return builder
       .create<memref::AllocaOp>(loc, memRefType, dynamicSizes,
                                 builder.getI64IntegerAttr(alignment))
       .getResult();
 }
 
-static LogicalResult cpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
-                                                             Location loc,
-                                                             Value allocation) {
+static LogicalResult cpuDeallocationFn(OpBuilder &builder, Location loc,
+                                       Value allocation) {
   return success();
 }
 
-static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
-                                                     Location loc, Value from,
-                                                     Value to) {
+static LogicalResult cpuCopyFn(OpBuilder &builder, Location loc, Value from,
+                               Value to) {
   createLinalgCopyOp(builder, loc, from, to);
   return success();
 }
 
-static void addCPUIREEComprehensiveBufferizePasses(OpPassManager &passManager) {
-  BufferizationOptions::AllocationFn allocationFn =
-      cpuComprehensiveBufferizeAllocationFn;
-  BufferizationOptions::DeallocationFn deallocationFn =
-      cpuComprehensiveBufferizeDeallocationFn;
-  BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
+static void addBufferizePasses(OpPassManager &passManager) {
+  BufferizationOptions::AllocationFn allocationFn = cpuAllocationFn;
+  BufferizationOptions::DeallocationFn deallocationFn = cpuDeallocationFn;
+  BufferizationOptions::MemCpyFn memcpyFn = cpuCopyFn;
   addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
                                       memcpyFn);
 }
@@ -308,7 +305,7 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  addCPUIREEComprehensiveBufferizePasses(nestedModulePM);
+  addBufferizePasses(nestedModulePM);
 
   // Run IREE specific passes before vector lowering expert.
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -353,7 +350,7 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  addCPUIREEComprehensiveBufferizePasses(nestedModulePM);
+  addBufferizePasses(nestedModulePM);
 
   // Run IREE specific passes before vector lowering expert.
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -400,7 +397,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  addCPUIREEComprehensiveBufferizePasses(nestedModulePM);
+  addBufferizePasses(nestedModulePM);
 
   // Run IREE specific passes before vector lowering expert.
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -427,7 +424,7 @@ void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
-  addCPUIREEComprehensiveBufferizePasses(nestedModulePM);
+  addBufferizePasses(nestedModulePM);
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
@@ -439,7 +436,7 @@ void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  addCPUIREEComprehensiveBufferizePasses(nestedModulePM);
+  addBufferizePasses(nestedModulePM);
 }
 
 void addLinalgTransformInterpPasses(OpPassManager &passManager) {

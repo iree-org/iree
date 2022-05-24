@@ -36,16 +36,47 @@ static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
   return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes);
 }
 
+static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
+                                        MemRefType memRefType,
+                                        ValueRange dynamicSizes,
+                                        unsigned alignment) {
+  MemRefType allocType = MemRefType::get(memRefType.getShape(),
+                                         memRefType.getElementType(), {}, 3);
+  return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes)
+      .getResult();
+}
+
+static LogicalResult gpuDeallocationFn(OpBuilder &builder, Location loc,
+                                       Value allocation) {
+  return success();
+}
+
+static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
+                               Value to) {
+  createLinalgCopyOp(builder, loc, from, to);
+  return success();
+}
+
+static void addBufferizePasses(OpPassManager &passManager) {
+  BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
+  BufferizationOptions::DeallocationFn deallocationFn = gpuDeallocationFn;
+  BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
+                                      memcpyFn);
+}
+
 static void tileAndBufferize(OpPassManager &pm) {
   pm.addPass(createInsertDistributionInfoPass());
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
       createTileAndDistributeToWorkgroupsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createConvertToDestinationPassingStylePass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
-  addLinalgBufferizePasses(nestedModulePM, gpuAllocationFunction);
+  addBufferizePasses(nestedModulePM);
 
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());

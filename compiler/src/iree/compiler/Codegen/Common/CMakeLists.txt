@@ -40,7 +40,6 @@ iree_cc_library(
     "GPUPipelining.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "InsertDistributionInfoPass.cpp"
-    "LinalgBufferizePass.cpp"
     "MemrefCopyToLinalg.cpp"
     "OptimizeVectorTransferPass.cpp"
     "PolynomialApproximationPass.cpp"
