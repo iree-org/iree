@@ -52,6 +52,8 @@ steps:
             - config:
                 - url: ${BUILDKITE_REPO}
                   ref: main
+    env:
+      CONFIG_FETCH_REF: "main"
     commands: |
         buildkite-agent pipeline upload \
           build_tools/buildkite/pipelines/trusted/${BUILDKITE_PIPELINE_SLUG}.yml
