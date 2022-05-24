@@ -58,7 +58,7 @@ static FailureOr<Value> gpuAllocateFunctionMemoryFn(OpBuilder &builder,
                                                     ValueRange dynamicSizes,
                                                     unsigned alignment) {
   auto storageClass = SPIRVTypeConverter::getMemorySpaceForStorageClass(
-      spirv::StorageClass::Workgroup);
+      spirv::StorageClass::Function);
   MemRefType allocType = MemRefType::get(
       memRefType.getShape(), memRefType.getElementType(), {}, storageClass);
   return builder
