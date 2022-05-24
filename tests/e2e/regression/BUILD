@@ -56,6 +56,7 @@ iree_lit_test_suite(
             "lowering_config.mlir",
         ] + BACKEND_TESTS,
     ),
+    cfg = "//tests:lit.cfg.py",
     tags = ["hostonly"],
     tools = [
         "//tools:iree-opt",

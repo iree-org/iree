@@ -19,6 +19,7 @@ iree_lit_test_suite(
     srcs = [
         "tensor_cast.mlir",
     ],
+    cfg = "//tests:lit.cfg.py",
     tags = ["hostonly"],
     tools = [
         "//tools:iree-benchmark-module",
