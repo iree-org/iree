@@ -18,10 +18,10 @@ steps:
   # that would be bootstrapped.
   - label: ":hiking_boot: Bootstrapping pipeline from '${BUILDKITE_COMMIT:0:7}'"
     if: |
-      ${MUST_BOOTSTRAP:-true} == 'true' &&
+      '${MUST_BOOTSTRAP:-true}' == 'true' &&
       organization.slug != 'local'
     env:
-      MUST_BOOTSTRAP: false
+      MUST_BOOTSTRAP: "false"
     commands: |
         buildkite-agent pipeline upload --replace \
           build_tools/buildkite/pipelines/fragment/bootstrap-untrusted.yml
