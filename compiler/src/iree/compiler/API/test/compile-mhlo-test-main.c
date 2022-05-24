@@ -14,7 +14,7 @@
 
 #include <stdio.h>
 
-#include "iree/base/string_builder.h"
+#include "iree/base/api.h"
 #include "iree/compiler/API/Compiler.h"
 
 static void bytecode_builder_callback(MlirStringRef str, void* userdata) {

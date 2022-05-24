@@ -18,7 +18,7 @@ iree_cc_binary(
   DEPS
     IREECompilerCAPILib
     MLIRCAPIIR
-    iree::base::api
+    iree::base
 )
 
 iree_native_test(

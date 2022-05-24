@@ -17,7 +17,7 @@ cc_binary(
     srcs = ["compile-mhlo-test-main.c"],
     deps = [
         "//compiler/src/iree/compiler/API:CAPI",
-        "//runtime/src/iree/base:api",
+        "//runtime/src/iree/base",
         "@llvm-project//mlir:CAPIIR",
     ],
 )
