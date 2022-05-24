@@ -152,7 +152,7 @@ iree_lit_test_suite(
     srcs = glob(["*.mlir"]),
     tools = [
         "@llvm-project//llvm:FileCheck",
-        "//iree/tools:iree-opt",
+        "//tools:iree-opt",
     ],
 )
 ```
@@ -168,7 +168,7 @@ iree_lit_test_suite(
     "arithmetic_ops.mlir"
   DATA
     FileCheck
-    iree::tools::iree-opt
+    iree-opt
 )
 ```
 

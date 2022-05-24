@@ -1061,7 +1061,7 @@ def VM_BufferAllocOp :
   }];
 
   let arguments = (ins
-    VM_Index:$length
+    VM_BufferIndex:$length
   );
   let results = (outs
     VM_RefOf<VM_BufferType>:$result
@@ -1090,8 +1090,8 @@ def VM_BufferCloneOp :
 
   let arguments = (ins
     VM_RefOf<VM_BufferType>:$source_buffer,
-    VM_Index:$source_offset,
-    VM_Index:$length
+    VM_BufferIndex:$source_offset,
+    VM_BufferIndex:$length
   );
   let results = (outs
     VM_RefOf<VM_BufferType>:$result
@@ -1125,7 +1125,7 @@ def VM_BufferLengthOp :
     VM_RefOf<VM_BufferType>:$buffer
   );
   let results = (outs
-    VM_Index:$result
+    VM_BufferIndex:$result
   );
 
   let assemblyFormat = [{
@@ -1152,10 +1152,10 @@ def VM_BufferCopyOp :
 
   let arguments = (ins
     VM_RefOf<VM_BufferType>:$source_buffer,
-    VM_Index:$source_offset,
+    VM_BufferIndex:$source_offset,
     VM_RefOf<VM_BufferType>:$target_buffer,
-    VM_Index:$target_offset,
-    VM_Index:$length
+    VM_BufferIndex:$target_offset,
+    VM_BufferIndex:$length
   );
 
   let assemblyFormat = [{
@@ -1185,10 +1185,10 @@ def VM_BufferCompareOp :
 
   let arguments = (ins
     VM_RefOf<VM_BufferType>:$lhs_buffer,
-    VM_Index:$lhs_offset,
+    VM_BufferIndex:$lhs_offset,
     VM_RefOf<VM_BufferType>:$rhs_buffer,
-    VM_Index:$rhs_offset,
-    VM_Index:$length
+    VM_BufferIndex:$rhs_offset,
+    VM_BufferIndex:$length
   );
   let results = (outs
     VM_CondValue:$result
@@ -1221,8 +1221,8 @@ class VM_BufferFillOp<Type type, string mnemonic, VM_OPC opcode,
 
   let arguments = (ins
     VM_RefOf<VM_BufferType>:$target_buffer,
-    VM_Index:$target_offset,
-    VM_Index:$length,
+    VM_BufferIndex:$target_offset,
+    VM_BufferIndex:$length,
     AnyTypeOf<[type, I32]>:$value
   );
 
@@ -1281,7 +1281,7 @@ class VM_BufferLoadOp<Type type, string mnemonic, VM_OPC opcode,
 
   let arguments = (ins
     VM_RefOf<VM_BufferType>:$source_buffer,
-    VM_Index:$source_offset
+    VM_BufferIndex:$source_offset
   );
   let results = (outs
     AnyTypeOf<[type, I32]>:$result
@@ -1314,7 +1314,7 @@ class VM_BufferStoreOp<Type type, string mnemonic, VM_OPC opcode,
 
   let arguments = (ins
     VM_RefOf<VM_BufferType>:$target_buffer,
-    VM_Index:$target_offset,
+    VM_BufferIndex:$target_offset,
     AnyTypeOf<[type, I32]>:$value
   );
 
@@ -1415,7 +1415,7 @@ def VM_ListAllocOp :
   }];
 
   let arguments = (ins
-    VM_Index:$initial_capacity
+    VM_ListIndex:$initial_capacity
   );
   let results = (outs
     VM_AnyList:$result
@@ -1443,7 +1443,7 @@ def VM_ListReserveOp :
 
   let arguments = (ins
     VM_AnyList:$list,
-    VM_Index:$minimum_capacity
+    VM_ListIndex:$minimum_capacity
   );
 
   let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($minimum_capacity) `)`";
@@ -1469,7 +1469,7 @@ def VM_ListSizeOp :
     VM_AnyList:$list
   );
   let results = (outs
-    VM_Index:$result
+    VM_ListIndex:$result
   );
 
   let assemblyFormat = "operands attr-dict `:` `(` type($list) `)` `->` type($result)";
@@ -1495,7 +1495,7 @@ def VM_ListResizeOp :
 
   let arguments = (ins
     VM_AnyList:$list,
-    VM_Index:$new_size
+    VM_ListIndex:$new_size
   );
 
   let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($new_size) `)`";
@@ -1520,7 +1520,7 @@ class VM_ListGetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
 
   let arguments = (ins
     VM_ListOf<VM_PrimitiveType>:$list,
-    VM_Index:$index
+    VM_ListIndex:$index
   );
   let results = (outs
     type:$result
@@ -1549,7 +1549,7 @@ class VM_ListSetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
 
   let arguments = (ins
     VM_ListOf<VM_PrimitiveType>:$list,
-    VM_Index:$index,
+    VM_ListIndex:$index,
     type:$value
   );
 
@@ -1600,7 +1600,7 @@ def VM_ListGetRefOp :
 
   let arguments = (ins
     VM_AnyList:$list,
-    VM_Index:$index
+    VM_ListIndex:$index
   );
   let results = (outs
     VM_AnyRef:$result
@@ -1631,7 +1631,7 @@ def VM_ListSetRefOp :
 
   let arguments = (ins
     VM_AnyList:$list,
-    VM_Index:$index,
+    VM_ListIndex:$index,
     VM_AnyRef:$value
   );
 

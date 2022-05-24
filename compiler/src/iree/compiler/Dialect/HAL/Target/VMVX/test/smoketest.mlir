@@ -60,7 +60,8 @@ stream.executable public @add_dispatch_0 {
 //  CHECK-NEXT:           %slt = vm.cmp.lt.i32.s %[[IDX]], %{{.+}} : i32
 //  CHECK-NEXT:           vm.cond_br %slt, ^bb2, ^bb3
 //  CHECK-NEXT:         ^bb2:  // pred: ^bb1
-//       CHECK:           %[[BYTE_OFFSET:.+]] = vm.mul.i32 %{{.+}}, %c4 : i32
+//       CHECK:           %[[BYTE_OFFSET_32:.+]] = vm.mul.i32 %{{.+}}, %c4 : i32
+//  CHECK-NEXT:           %[[BYTE_OFFSET:.+]] = vm.ext.i32.i64.u %[[BYTE_OFFSET_32]]
 //  CHECK-NEXT:           %[[LHS:.+]] = vm.buffer.load.f32 %[[LHS_BUF]][%[[BYTE_OFFSET]]] : !vm.buffer -> f32
 //  CHECK-NEXT:           %[[RHS:.+]] = vm.buffer.load.f32 %[[RHS_BUF]][%[[BYTE_OFFSET]]] : !vm.buffer -> f32
 //  CHECK-NEXT:           %[[RET:.+]] = vm.add.f32 %[[LHS]], %[[RHS]] : f32

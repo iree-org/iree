@@ -100,14 +100,14 @@ build:debug --compilation_mode=dbg --copt=/O2 --per_file_copt=iree@/Od --strip=n
 Build all of IREE's 'tools' directory:
 
 ```powershell
-> bazel build iree/tools/...
+> bazel build tools/...
 ```
 
 Check out what was built:
 
 ```powershell
 > dir bazel-bin\iree\tools\
-> .\bazel-bin\iree\tools\iree-compile.exe --help
+> .\bazel-bin\tools\iree-compile.exe --help
 ```
 
 Translate a
@@ -115,5 +115,5 @@ Translate a
 and execute a function in the compiled module:
 
 ```powershell
-> .\bazel-bin\iree\tools\iree-run-mlir.exe .\iree\samples\models\simple_abs.mlir --function-input="f32=-2" --iree-hal-target-backends=vmvx -print-mlir
+> .\bazel-bin\tools\iree-run-mlir.exe .\iree\samples\models\simple_abs.mlir --function-input="f32=-2" --iree-hal-target-backends=vmvx --print-mlir
 ```

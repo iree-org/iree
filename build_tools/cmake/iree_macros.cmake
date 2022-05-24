@@ -80,14 +80,15 @@ function(iree_package_ns PACKAGE_NS)
     set(_PACKAGE "iree::samples::${CMAKE_MATCH_1}")
   elseif(_RELATIVE_PATH MATCHES "^samples$")
     set(_PACKAGE "iree::samples")
+  elseif(_RELATIVE_PATH MATCHES "^tools$")
+    # tools/ -> "" (empty string), e.g. iree-opt -> iree-opt
+    set(_PACKAGE "")
   else()
-    # Default to pass-through. Examples:
-    #   iree/compiler/API
-    #   iree/tools
+    # Default to pass-through.
     set(_PACKAGE "${_RELATIVE_PATH}")
   endif()
 
-  string(REPLACE "/" "::" _PACKAGE_NS ${_PACKAGE})
+  string(REPLACE "/" "::" _PACKAGE_NS "${_PACKAGE}")
 
   if(_DEBUG_IREE_PACKAGE_NAME)
     message(STATUS "iree_package_ns(): map ${_RELATIVE_PATH} -> ${_PACKAGE_NS}")
@@ -102,7 +103,7 @@ endfunction()
 #   iree_base
 function(iree_package_name PACKAGE_NAME)
   iree_package_ns(_PACKAGE_NS)
-  string(REPLACE "::" "_" _PACKAGE_NAME ${_PACKAGE_NS})
+  string(REPLACE "::" "_" _PACKAGE_NAME "${_PACKAGE_NS}")
   set(${PACKAGE_NAME} ${_PACKAGE_NAME} PARENT_SCOPE)
 endfunction()
 
@@ -122,7 +123,7 @@ endfunction()
 #   base
 function(iree_package_dir PACKAGE_DIR)
   iree_package_ns(_PACKAGE_NS)
-  string(FIND ${_PACKAGE_NS} "::" _END_OFFSET REVERSE)
+  string(FIND "${_PACKAGE_NS}" "::" _END_OFFSET REVERSE)
   math(EXPR _END_OFFSET "${_END_OFFSET} + 2")
   string(SUBSTRING ${_PACKAGE_NS} ${_END_OFFSET} -1 _PACKAGE_DIR)
   set(${PACKAGE_DIR} ${_PACKAGE_DIR} PARENT_SCOPE)

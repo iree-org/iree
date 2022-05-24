@@ -21,7 +21,7 @@ In order to perform capture and analysis with AGI, you will need a full Android
 app. In IREE we have a simple Android native app wrapper to help package
 IREE core libraries together with a specific VM bytecode invocation into an
 Android app. The wrapper and its documentation are placed at
-[`iree/tools/android/run_module_app/`](https://github.com/google/iree/tree/main/iree/tools/android/run_module_app).
+[`tools/android/run_module_app/`](https://github.com/google/iree/tree/main/tools/android/run_module_app).
 
 For example, to package a module compiled from the following `mhlo-dot.mlir` as
 an Android app:
@@ -35,7 +35,7 @@ func @dot(%lhs: tensor<2x4xf32>, %rhs: tensor<4x2xf32>) -> tensor<2x2xf32> {
 
 ```shell
 # First translate into a VM bytecode module
-$ /path/to/iree/build/iree/tools/iree-compile -- \
+$ /path/to/iree/build/tools/iree-compile -- \
   --iree-input-type=mhlo \
   --iree-mlir-to-vm-bytecode-module \
   --iree-hal-target-backends=vulkan-spirv \
@@ -43,7 +43,7 @@ $ /path/to/iree/build/iree/tools/iree-compile -- \
   -o /tmp/mhlo-dot.vmfb
 
 # Then package the Android app
-$ /path/to/iree/source/iree/tools/android/run_module_app/build_apk.sh \
+$ /path/to/iree/source/tools/android/run_module_app/build_apk.sh \
   ./build-apk \
   --driver vulkan \
   --module_file /tmp/mhlo-dot.vmfb \

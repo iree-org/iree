@@ -15,8 +15,8 @@ package(
 cc_library(
     name = "default_linkopts",
     linkopts = select({
-        "//iree:iree_is_msvc": [],
-        "//iree:iree_is_android": [
+        "//build_tools/bazel:iree_is_msvc": [],
+        "//build_tools/bazel:iree_is_android": [
             # Android provides its own pthreads support with no linking required.
         ],
         "//conditions:default": [
@@ -29,8 +29,8 @@ cc_library(
 cc_library(
     name = "dl",
     linkopts = select({
-        "//iree:iree_is_msvc": [],
-        "//iree:iree_is_android": [
+        "//build_tools/bazel:iree_is_msvc": [],
+        "//build_tools/bazel:iree_is_android": [
             "-ldl",
         ],
         "//conditions:default": [

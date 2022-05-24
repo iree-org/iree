@@ -120,7 +120,7 @@ Invoke the host compiler tools to produce a bytecode module flatbuffer:
 Push the Android runtime tools to the device, along with any flatbuffer files:
 
 ``` shell
-adb push ../iree-build-android/iree/tools/iree-run-module /data/local/tmp/
+adb push ../iree-build-android/tools/iree-run-module /data/local/tmp/
 adb shell chmod +x /data/local/tmp/iree-run-module
 adb push /tmp/simple_abs_vmvx.vmfb /data/local/tmp/
 ```

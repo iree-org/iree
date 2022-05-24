@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "check_ir_before_llvm_conversion.mlir"
+    "convert_to_llvm.mlir"
     "hal_interface_bindings.mlir"
     "hal_interface_constants.mlir"
     "hal_interface_workgroup_info.mlir"
@@ -35,8 +36,8 @@ iree_lit_test_suite(
     "verify_linalg_transform_legality.mlir"
   TOOLS
     FileCheck
-    iree::tools::iree-compile
-    iree::tools::iree-opt
+    iree-compile
+    iree-opt
   DATA
     linalg_transform_spec.mlir
 )

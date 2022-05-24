@@ -35,7 +35,6 @@ struct RewriteLinalgDestructiveUpdatesPass
 void RewriteLinalgDestructiveUpdatesPass::runOnOperation() {
   MLIRContext *context = &getContext();
   func::FuncOp funcOp = getOperation();
-  if (!isEntryPoint(funcOp)) return;
 
   // Rewrite destructive updates and ensure no remaining store remains to the
   // full output.

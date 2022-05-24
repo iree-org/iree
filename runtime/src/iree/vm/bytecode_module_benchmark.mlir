@@ -80,15 +80,18 @@ vm.module @bytecode_module_benchmark {
   // Measures the cost of lots of buffer loads.
   vm.export @buffer_reduce
   vm.func @buffer_reduce(%count : i32) -> i32 {
-    %c0 = vm.const.i32.zero
+    %c0 = vm.const.i64.zero
+    %c0_i32 = vm.const.i32.zero
     %c1 = vm.const.i32 1
     %c4 = vm.const.i32 4
     %max = vm.mul.i32 %count, %c4 : i32
-    %buf = vm.buffer.alloc %max : !vm.buffer
-    vm.buffer.fill.i32 %buf, %c0, %max, %c1 : i32 -> !vm.buffer
-    vm.br ^loop(%c0, %c0 : i32, i32)
+    %max_i64 = vm.ext.i32.i64.u %max : i32 -> i64
+    %buf = vm.buffer.alloc %max_i64 : !vm.buffer
+    vm.buffer.fill.i32 %buf, %c0, %max_i64, %c1 : i32 -> !vm.buffer
+    vm.br ^loop(%c0_i32, %c0_i32 : i32, i32)
   ^loop(%i : i32, %sum : i32):
-    %element = vm.buffer.load.i32 %buf[%i] : !vm.buffer -> i32
+    %i_i64 = vm.ext.i32.i64.u %i : i32 -> i64
+    %element = vm.buffer.load.i32 %buf[%i_i64] : !vm.buffer -> i32
     %new_sum = vm.add.i32 %sum, %element : i32
     %ip4 = vm.add.i32 %i, %c4 : i32
     %cmp = vm.cmp.lt.i32.s %ip4, %max : i32
@@ -101,29 +104,31 @@ vm.module @bytecode_module_benchmark {
   // NOTE: unrolled 8x, requires %count to be % 8 = 0.
   vm.export @buffer_reduce_unrolled
   vm.func @buffer_reduce_unrolled(%count : i32) -> i32 {
-    %c0 = vm.const.i32.zero
+    %c0 = vm.const.i64.zero
     %c1 = vm.const.i32 1
-    %c4 = vm.const.i32 4
-    %max = vm.mul.i32 %count, %c4 : i32
+    %c4 = vm.const.i64 4
+    %count_i64 = vm.ext.i32.i64.u %count : i32 -> i64
+    %max = vm.mul.i64 %count_i64, %c4 : i64
     %buf = vm.buffer.alloc %max : !vm.buffer
     vm.buffer.fill.i32 %buf, %c0, %max, %c1 : i32 -> !vm.buffer
-    vm.br ^loop(%c0, %c0 : i32, i32)
-  ^loop(%i0 : i32, %sum : i32):
-    // TODO(#5544): add addression modes to load/store.
+    %sum_init = vm.const.i32.zero
+    vm.br ^loop(%c0, %sum_init : i64, i32)
+  ^loop(%i0 : i64, %sum : i32):
+    // TODO(#5544): add addressing modes to load/store.
     %e0 = vm.buffer.load.i32 %buf[%i0] : !vm.buffer -> i32
-    %i1 = vm.add.i32 %i0, %c4 : i32
+    %i1 = vm.add.i64 %i0, %c4 : i64
     %e1 = vm.buffer.load.i32 %buf[%i1] : !vm.buffer -> i32
-    %i2 = vm.add.i32 %i1, %c4 : i32
+    %i2 = vm.add.i64 %i1, %c4 : i64
     %e2 = vm.buffer.load.i32 %buf[%i2] : !vm.buffer -> i32
-    %i3 = vm.add.i32 %i2, %c4 : i32
+    %i3 = vm.add.i64 %i2, %c4 : i64
     %e3 = vm.buffer.load.i32 %buf[%i3] : !vm.buffer -> i32
-    %i4 = vm.add.i32 %i3, %c4 : i32
+    %i4 = vm.add.i64 %i3, %c4 : i64
     %e4 = vm.buffer.load.i32 %buf[%i4] : !vm.buffer -> i32
-    %i5 = vm.add.i32 %i4, %c4 : i32
+    %i5 = vm.add.i64 %i4, %c4 : i64
     %e5 = vm.buffer.load.i32 %buf[%i5] : !vm.buffer -> i32
-    %i6 = vm.add.i32 %i5, %c4 : i32
+    %i6 = vm.add.i64 %i5, %c4 : i64
     %e6 = vm.buffer.load.i32 %buf[%i6] : !vm.buffer -> i32
-    %i7 = vm.add.i32 %i6, %c4 : i32
+    %i7 = vm.add.i64 %i6, %c4 : i64
     %e7 = vm.buffer.load.i32 %buf[%i7] : !vm.buffer -> i32
     // If we do reductions like this we could add a horizontal-add op.
     %new_sum0 = vm.add.i32 %sum, %e0 : i32
@@ -134,9 +139,9 @@ vm.module @bytecode_module_benchmark {
     %new_sum5 = vm.add.i32 %new_sum4, %e5 : i32
     %new_sum6 = vm.add.i32 %new_sum5, %e6 : i32
     %new_sum7 = vm.add.i32 %new_sum6, %e7 : i32
-    %next_i = vm.add.i32 %i7, %c4 : i32
-    %cmp = vm.cmp.lt.i32.s %next_i, %max : i32
-    vm.cond_br %cmp, ^loop(%next_i, %new_sum7 : i32, i32), ^loop_exit(%new_sum7 : i32)
+    %next_i = vm.add.i64 %i7, %c4 : i64
+    %cmp = vm.cmp.lt.i64.s %next_i, %max : i64
+    vm.cond_br %cmp, ^loop(%next_i, %new_sum7 : i64, i32), ^loop_exit(%new_sum7 : i32)
   ^loop_exit(%result : i32):
     vm.return %result : i32
   }

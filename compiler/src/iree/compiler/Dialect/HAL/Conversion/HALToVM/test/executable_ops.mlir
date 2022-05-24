@@ -98,13 +98,13 @@ func.func @executableConstants(
   // CHECK-DAG: %[[BINARY:.+]] = vm.const.ref.rodata @exe_binary : !vm.buffer
 
   // CHECK: %[[CONSTANTS:.+]] = vm.buffer.alloc %c12 : !vm.buffer
-  // CHECK-DAG: %[[INDEX0:.+]] = vm.const.i32 0
+  // CHECK-DAG: %[[INDEX0:.+]] = vm.const.i64 0
   // CHECK-DAG: vm.buffer.store.i32 %[[CONSTANT0]], %[[CONSTANTS]][%[[INDEX0]]] : i32 -> !vm.buffer
 
   // NOTE: there is no INDEX1 as the value is constant zero and is elided.
   %c0 = arith.constant 0 : i32
 
-  // CHECK-DAG: %[[INDEX2:.+]] = vm.const.i32 2
+  // CHECK-DAG: %[[INDEX2:.+]] = vm.const.i64 2
   // CHECK-DAG: vm.buffer.store.i32 %[[CONSTANT1]], %[[CONSTANTS]][%[[INDEX2]]] : i32 -> !vm.buffer
 
   // CHECK: %[[EXE:.+]] = vm.call.variadic @hal.executable.create(

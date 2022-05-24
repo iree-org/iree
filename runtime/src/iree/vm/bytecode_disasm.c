@@ -650,22 +650,22 @@ iree_status_t iree_vm_bytecode_disasm_op(
     //===------------------------------------------------------------------===//
 
     DISASM_OP(CORE, BufferAlloc) {
-      uint16_t length_reg = VM_ParseOperandRegI32("length");
+      uint16_t length_reg = VM_ParseOperandRegI64("length");
       bool result_is_move;
       uint16_t result_reg = VM_ParseResultRegRef("result", &result_is_move);
       EMIT_REF_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.buffer.alloc "));
-      EMIT_I32_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[length_reg]);
+      EMIT_I64_REG_NAME(length_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       break;
     }
 
     DISASM_OP(CORE, BufferClone) {
       bool source_is_move;
       uint16_t source_reg = VM_ParseOperandRegRef("source", &source_is_move);
-      uint16_t offset_reg = VM_ParseOperandRegI32("offset");
-      uint16_t length_reg = VM_ParseOperandRegI32("length");
+      uint16_t offset_reg = VM_ParseOperandRegI64("offset");
+      uint16_t length_reg = VM_ParseOperandRegI64("length");
       bool result_is_move;
       uint16_t result_reg = VM_ParseResultRegRef("result", &result_is_move);
       EMIT_REF_REG_NAME(result_reg);
@@ -674,19 +674,19 @@ iree_status_t iree_vm_bytecode_disasm_op(
       EMIT_REF_REG_NAME(source_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[source_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[offset_reg]);
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[length_reg]);
+      EMIT_I64_REG_NAME(length_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       break;
     }
 
     DISASM_OP(CORE, BufferLength) {
       bool buffer_is_move;
       uint16_t buffer_reg = VM_ParseOperandRegRef("buffer", &buffer_is_move);
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+      uint16_t result_reg = VM_ParseResultRegI64("result");
+      EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.buffer.length "));
       EMIT_REF_REG_NAME(buffer_reg);
@@ -698,28 +698,28 @@ iree_status_t iree_vm_bytecode_disasm_op(
       bool source_buffer_is_move;
       uint16_t source_buffer_reg =
           VM_ParseOperandRegRef("source_buffer", &source_buffer_is_move);
-      uint16_t source_offset_reg = VM_ParseOperandRegI32("source_offset");
+      uint16_t source_offset_reg = VM_ParseOperandRegI64("source_offset");
       bool target_buffer_is_move;
       uint16_t target_buffer_reg =
           VM_ParseOperandRegRef("target_buffer", &target_buffer_is_move);
-      uint16_t target_offset_reg = VM_ParseOperandRegI32("target_offset");
-      uint16_t length_reg = VM_ParseOperandRegI32("length");
+      uint16_t target_offset_reg = VM_ParseOperandRegI64("target_offset");
+      uint16_t length_reg = VM_ParseOperandRegI64("length");
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.copy "));
       EMIT_REF_REG_NAME(source_buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[source_buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(source_offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[source_offset_reg]);
+      EMIT_I64_REG_NAME(source_offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[source_offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
       EMIT_REF_REG_NAME(target_buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[target_buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(target_offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[target_offset_reg]);
+      EMIT_I64_REG_NAME(target_offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[target_offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[length_reg]);
+      EMIT_I64_REG_NAME(length_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       break;
     }
 
@@ -727,12 +727,12 @@ iree_status_t iree_vm_bytecode_disasm_op(
       bool lhs_buffer_is_move;
       uint16_t lhs_buffer_reg =
           VM_ParseOperandRegRef("lhs_buffer", &lhs_buffer_is_move);
-      uint16_t lhs_offset_reg = VM_ParseOperandRegI32("lhs_offset");
+      uint16_t lhs_offset_reg = VM_ParseOperandRegI64("lhs_offset");
       bool rhs_buffer_is_move;
       uint16_t rhs_buffer_reg =
           VM_ParseOperandRegRef("rhs_buffer", &rhs_buffer_is_move);
-      uint16_t rhs_offset_reg = VM_ParseOperandRegI32("rhs_offset");
-      uint16_t length_reg = VM_ParseOperandRegI32("length");
+      uint16_t rhs_offset_reg = VM_ParseOperandRegI64("rhs_offset");
+      uint16_t length_reg = VM_ParseOperandRegI64("length");
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
@@ -740,17 +740,17 @@ iree_status_t iree_vm_bytecode_disasm_op(
       EMIT_REF_REG_NAME(lhs_buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[lhs_buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(lhs_offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[lhs_offset_reg]);
+      EMIT_I64_REG_NAME(lhs_offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[lhs_offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
       EMIT_REF_REG_NAME(rhs_buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[rhs_buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(rhs_offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[rhs_offset_reg]);
+      EMIT_I64_REG_NAME(rhs_offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[rhs_offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[length_reg]);
+      EMIT_I64_REG_NAME(length_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       break;
     }
 
@@ -758,19 +758,19 @@ iree_status_t iree_vm_bytecode_disasm_op(
       bool buffer_is_move;
       uint16_t buffer_reg =
           VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
-      uint16_t offset_reg = VM_ParseOperandRegI32("target_offset");
-      uint16_t length_reg = VM_ParseOperandRegI32("length");
+      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
+      uint16_t length_reg = VM_ParseOperandRegI64("length");
       uint16_t value_reg = VM_ParseOperandRegI32("value");
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.fill.i8 "));
       EMIT_REF_REG_NAME(buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[offset_reg]);
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[length_reg]);
+      EMIT_I64_REG_NAME(length_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
       EMIT_I32_REG_NAME(value_reg);
       EMIT_OPTIONAL_VALUE_I32((uint8_t)regs->i32[value_reg]);
@@ -780,19 +780,19 @@ iree_status_t iree_vm_bytecode_disasm_op(
       bool buffer_is_move;
       uint16_t buffer_reg =
           VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
-      uint16_t offset_reg = VM_ParseOperandRegI32("target_offset");
-      uint16_t length_reg = VM_ParseOperandRegI32("length");
+      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
+      uint16_t length_reg = VM_ParseOperandRegI64("length");
       uint16_t value_reg = VM_ParseOperandRegI32("value");
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.fill.i16 "));
       EMIT_REF_REG_NAME(buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[offset_reg] / sizeof(uint16_t));
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_REF_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[length_reg] / sizeof(uint16_t));
+      EMIT_I64_REG_NAME(length_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
       EMIT_I32_REG_NAME(value_reg);
       EMIT_OPTIONAL_VALUE_I32((uint16_t)regs->i32[value_reg]);
@@ -802,19 +802,19 @@ iree_status_t iree_vm_bytecode_disasm_op(
       bool buffer_is_move;
       uint16_t buffer_reg =
           VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
-      uint16_t offset_reg = VM_ParseOperandRegI32("target_offset");
-      uint16_t length_reg = VM_ParseOperandRegI32("length");
+      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
+      uint16_t length_reg = VM_ParseOperandRegI64("length");
       uint16_t value_reg = VM_ParseOperandRegI32("value");
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.fill.i32 "));
       EMIT_REF_REG_NAME(buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[offset_reg] / sizeof(uint32_t));
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_REF_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[length_reg] / sizeof(uint32_t));
+      EMIT_I64_REG_NAME(length_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
       EMIT_I32_REG_NAME(value_reg);
       EMIT_OPTIONAL_VALUE_I32(regs->i32[value_reg]);
@@ -825,19 +825,19 @@ iree_status_t iree_vm_bytecode_disasm_op(
       bool buffer_is_move;
       uint16_t buffer_reg =
           VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
-      uint16_t offset_reg = VM_ParseOperandRegI32("target_offset");
-      uint16_t length_reg = VM_ParseOperandRegI32("length");
+      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
+      uint16_t length_reg = VM_ParseOperandRegI64("length");
       uint16_t value_reg = VM_ParseOperandRegI64("value");
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.fill.i64 "));
       EMIT_REF_REG_NAME(buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[offset_reg] / sizeof(uint64_t));
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_REF_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[length_reg] / sizeof(uint64_t));
+      EMIT_I64_REG_NAME(length_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
       EMIT_I64_REG_NAME(value_reg);
       EMIT_OPTIONAL_VALUE_I64(regs->i32[value_reg]);
@@ -848,7 +848,7 @@ iree_status_t iree_vm_bytecode_disasm_op(
       bool buffer_is_move;
       uint16_t buffer_reg =
           VM_ParseOperandRegRef("source_buffer", &buffer_is_move);
-      uint16_t offset_reg = VM_ParseOperandRegI32("source_offset");
+      uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
@@ -856,15 +856,15 @@ iree_status_t iree_vm_bytecode_disasm_op(
       EMIT_REF_REG_NAME(buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[offset_reg]);
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
     DISASM_OP(CORE, BufferLoadI8S) {
       bool buffer_is_move;
       uint16_t buffer_reg =
           VM_ParseOperandRegRef("source_buffer", &buffer_is_move);
-      uint16_t offset_reg = VM_ParseOperandRegI32("source_offset");
+      uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
@@ -872,15 +872,15 @@ iree_status_t iree_vm_bytecode_disasm_op(
       EMIT_REF_REG_NAME(buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[offset_reg]);
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
     DISASM_OP(CORE, BufferLoadI16U) {
       bool buffer_is_move;
       uint16_t buffer_reg =
           VM_ParseOperandRegRef("source_buffer", &buffer_is_move);
-      uint16_t offset_reg = VM_ParseOperandRegI32("source_offset");
+      uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
@@ -888,15 +888,15 @@ iree_status_t iree_vm_bytecode_disasm_op(
       EMIT_REF_REG_NAME(buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[offset_reg] / sizeof(uint16_t));
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
     DISASM_OP(CORE, BufferLoadI16S) {
       bool buffer_is_move;
       uint16_t buffer_reg =
           VM_ParseOperandRegRef("source_buffer", &buffer_is_move);
-      uint16_t offset_reg = VM_ParseOperandRegI32("source_offset");
+      uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
@@ -904,15 +904,15 @@ iree_status_t iree_vm_bytecode_disasm_op(
       EMIT_REF_REG_NAME(buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[offset_reg] / sizeof(uint16_t));
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
     DISASM_OP(CORE, BufferLoadI32) {
       bool buffer_is_move;
       uint16_t buffer_reg =
           VM_ParseOperandRegRef("source_buffer", &buffer_is_move);
-      uint16_t offset_reg = VM_ParseOperandRegI32("source_offset");
+      uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
@@ -920,15 +920,15 @@ iree_status_t iree_vm_bytecode_disasm_op(
       EMIT_REF_REG_NAME(buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[offset_reg] / sizeof(uint32_t));
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
     DISASM_OP(CORE, BufferLoadI64) {
       bool buffer_is_move;
       uint16_t buffer_reg =
           VM_ParseOperandRegRef("source_buffer", &buffer_is_move);
-      uint16_t offset_reg = VM_ParseOperandRegI32("source_offset");
+      uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
       uint16_t result_reg = VM_ParseResultRegI64("result");
       EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
@@ -936,8 +936,8 @@ iree_status_t iree_vm_bytecode_disasm_op(
       EMIT_REF_REG_NAME(buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[offset_reg] / sizeof(uint64_t));
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
 
@@ -945,7 +945,7 @@ iree_status_t iree_vm_bytecode_disasm_op(
       bool buffer_is_move;
       uint16_t buffer_reg =
           VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
-      uint16_t offset_reg = VM_ParseOperandRegI32("target_offset");
+      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
       uint16_t value_reg = VM_ParseOperandRegI32("value");
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.store.i8 "));
@@ -955,15 +955,15 @@ iree_status_t iree_vm_bytecode_disasm_op(
       EMIT_REF_REG_NAME(buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[offset_reg]);
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
     DISASM_OP(CORE, BufferStoreI16) {
       bool buffer_is_move;
       uint16_t buffer_reg =
           VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
-      uint16_t offset_reg = VM_ParseOperandRegI32("target_offset");
+      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
       uint16_t value_reg = VM_ParseOperandRegI32("value");
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.store.i16 "));
@@ -973,15 +973,15 @@ iree_status_t iree_vm_bytecode_disasm_op(
       EMIT_REF_REG_NAME(buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[offset_reg] / sizeof(uint16_t));
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
     DISASM_OP(CORE, BufferStoreI32) {
       bool buffer_is_move;
       uint16_t buffer_reg =
           VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
-      uint16_t offset_reg = VM_ParseOperandRegI32("target_offset");
+      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
       uint16_t value_reg = VM_ParseOperandRegI32("value");
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.store.i32 "));
@@ -991,15 +991,15 @@ iree_status_t iree_vm_bytecode_disasm_op(
       EMIT_REF_REG_NAME(buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[offset_reg] / sizeof(uint32_t));
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
     DISASM_OP(CORE, BufferStoreI64) {
       bool buffer_is_move;
       uint16_t buffer_reg =
           VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
-      uint16_t offset_reg = VM_ParseOperandRegI32("target_offset");
+      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
       uint16_t value_reg = VM_ParseOperandRegI64("value");
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.store.i64 "));
@@ -1009,8 +1009,8 @@ iree_status_t iree_vm_bytecode_disasm_op(
       EMIT_REF_REG_NAME(buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[offset_reg] / sizeof(uint32_t));
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
 
@@ -2060,19 +2060,19 @@ iree_status_t iree_vm_bytecode_disasm_op(
       bool buffer_is_move;
       uint16_t buffer_reg =
           VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
-      uint16_t offset_reg = VM_ParseOperandRegI32("target_offset");
-      uint16_t length_reg = VM_ParseOperandRegI32("length");
+      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
+      uint16_t length_reg = VM_ParseOperandRegI64("length");
       uint16_t value_reg = VM_ParseOperandRegF32("value");
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.fill.f32 "));
       EMIT_REF_REG_NAME(buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[offset_reg] / sizeof(float));
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_REF_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[length_reg] / sizeof(float));
+      EMIT_I64_REG_NAME(length_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
       EMIT_F32_REG_NAME(value_reg);
       EMIT_OPTIONAL_VALUE_F32(regs->i32[value_reg]);
@@ -2083,7 +2083,7 @@ iree_status_t iree_vm_bytecode_disasm_op(
       bool buffer_is_move;
       uint16_t buffer_reg =
           VM_ParseOperandRegRef("source_buffer", &buffer_is_move);
-      uint16_t offset_reg = VM_ParseOperandRegI32("source_offset");
+      uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
       uint16_t result_reg = VM_ParseResultRegF32("result");
       EMIT_F32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
@@ -2091,8 +2091,8 @@ iree_status_t iree_vm_bytecode_disasm_op(
       EMIT_REF_REG_NAME(buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[offset_reg] / sizeof(float));
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
 
@@ -2100,7 +2100,7 @@ iree_status_t iree_vm_bytecode_disasm_op(
       bool buffer_is_move;
       uint16_t buffer_reg =
           VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
-      uint16_t offset_reg = VM_ParseOperandRegI32("target_offset");
+      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
       uint16_t value_reg = VM_ParseOperandRegF32("value");
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.store.f32 "));
@@ -2110,8 +2110,8 @@ iree_status_t iree_vm_bytecode_disasm_op(
       EMIT_REF_REG_NAME(buffer_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[offset_reg] / sizeof(uint32_t));
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
 

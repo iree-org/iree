@@ -21,6 +21,8 @@ def Util_Dialect : Dialect {
   let summary = [{
     A dialect used for types common across IREE subdialects.
   }];
+  let useDefaultTypePrinterParser = 1;
+  let useDefaultAttributePrinterParser = 1;
 }
 
 //===----------------------------------------------------------------------===//

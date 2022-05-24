@@ -56,7 +56,7 @@ function generate_dylib_vmfb {
 }
 
 generate_dylib_vmfb mhlo \
-  "${ROOT_DIR?}/iree/tools/test/iree-run-module.mlir" \
+  "${ROOT_DIR?}/tools/test/iree-run-module.mlir" \
   -o "${BUILD_RISCV_DIR?}/iree-run-module-llvm_aot.vmfb"
 
 wget -P "${BUILD_RISCV_DIR?}/" https://github.com/tensorflow/tflite-micro/raw/aeac6f39e5c7475cea20c54e86d41e3a38312546/tensorflow/lite/micro/models/person_detect.tflite

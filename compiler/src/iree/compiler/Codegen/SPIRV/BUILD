@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//iree:build_defs.oss.bzl", "iree_compiler_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -39,7 +39,6 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "KernelConfig.h",
-        "MemorySpace.h",
         "Utils.h",
     ],
     deps = [

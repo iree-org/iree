@@ -18,7 +18,7 @@ iree_lit_test_suite(
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck
-    iree::tools::iree-run-mlir
+    iree-run-mlir
   DATA
     iree::test::e2e::linalg_transform::linalg_transform_spec.mlir
   LABELS

@@ -15,7 +15,7 @@ listed below. Here we assume:
 ```sh
 IREE_BUILD_DIR="/path/to/IREE build root dir". It should contain the "benchmark_suites" directory built with the target "iree-benchmark-suites".
 
-IREE_NORMAL_TOOL_DIR="/path/to/IREE tool dir". It is usually "$IREE_BUILD_DIR/iree/tools".
+IREE_NORMAL_TOOL_DIR="/path/to/IREE tool dir". It is usually "$IREE_BUILD_DIR/tools".
 
 IREE_TRACED_TOOL_DIR="/path/to/IREE tool dir built with IREE_ENABLE_RUNTIME_TRACING=ON".
 ```

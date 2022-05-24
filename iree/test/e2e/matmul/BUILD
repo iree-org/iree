@@ -30,7 +30,7 @@ py_binary(
         ("dylib-llvm-aot", "dylib"),
         ("vmvx", "vmvx"),
     ],
-    trace_runner = "//iree/tools:iree-e2e-matmul-test",
+    trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
     "f32",
@@ -55,7 +55,7 @@ py_binary(
                                        "aarch64:+dotprod",
                                        "aarch64:+i8mm",
                                    ] if lhs_rhs_type == "i8" else []),
-    trace_runner = "//iree/tools:iree-e2e-matmul-test",
+    trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
     "f32",
@@ -79,7 +79,7 @@ py_binary(
                                        "aarch64:+dotprod",
                                        "aarch64:+i8mm",
                                    ] if lhs_rhs_type == "i8" else []),
-    trace_runner = "//iree/tools:iree-e2e-matmul-test",
+    trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
     "f32",
@@ -107,7 +107,7 @@ py_binary(
                                        "aarch64:+dotprod",
                                        "aarch64:+i8mm",
                                    ] if lhs_rhs_type == "i8" else []),
-    trace_runner = "//iree/tools:iree-e2e-matmul-test",
+    trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
     "f32",
@@ -134,7 +134,7 @@ py_binary(
     target_backends_and_drivers = [
         ("cuda", "cuda"),
     ],
-    trace_runner = "//iree/tools:iree-e2e-matmul-test",
+    trace_runner = "//tools:iree-e2e-matmul-test",
 ) for compilation_info in [
     "LLVMGPUMatmulSimt",
 ]]
@@ -162,7 +162,7 @@ py_binary(
     target_backends_and_drivers = [
         ("cuda", "cuda"),
     ],
-    trace_runner = "//iree/tools:iree-e2e-matmul-test",
+    trace_runner = "//tools:iree-e2e-matmul-test",
 ) for compilation_info in [
     "LLVMGPUMatmulTensorCore",
 ]]
@@ -189,7 +189,7 @@ py_binary(
         ("cuda", "cuda"),
         ("dylib-llvm-aot", "dylib"),
     ],
-    trace_runner = "//iree/tools:iree-e2e-matmul-test",
+    trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "f32",
 ]]
@@ -211,7 +211,7 @@ py_binary(
     target_backends_and_drivers = [
         ("vulkan-spirv", "vulkan"),
     ],
-    trace_runner = "//iree/tools:iree-e2e-matmul-test",
+    trace_runner = "//tools:iree-e2e-matmul-test",
 ) for vulkan_target in [
     "valhall-unknown-android11",
     "ampere-unknown-linux",

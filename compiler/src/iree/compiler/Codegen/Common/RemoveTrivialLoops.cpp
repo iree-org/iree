@@ -154,11 +154,12 @@ class RemoveSingleIterationLoopPass final
     : public RemoveSingleIterationLoopBase<RemoveSingleIterationLoopPass> {
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
-    auto entryPointOp = getEntryPoint(funcOp);
-    if (!entryPointOp) return;
+    FailureOr<IREE::HAL::ExecutableEntryPointOp> entryPointOp =
+        getEntryPoint(funcOp);
+    if (failed(entryPointOp)) return;
 
-    SmallVector<int64_t> workgroupSize = getWorkgroupSize(entryPointOp);
-    SmallVector<int64_t> numWorkgroups = getNumWorkgroup(funcOp, entryPointOp);
+    SmallVector<int64_t> workgroupSize = getWorkgroupSize(*entryPointOp);
+    SmallVector<int64_t> numWorkgroups = getNumWorkgroup(funcOp, *entryPointOp);
 
     if (failed(removeOneTripTiledLoops(funcOp, workgroupSize, numWorkgroups))) {
       return signalPassFailure();

@@ -50,7 +50,6 @@
 #define EMITC_ARRAY_ELEMENT_ADDRESS(array, index) &(array)[index]
 
 // Unary operations
-#define EMITC_CAST(arg, type) ((type)(arg))
 #define EMITC_NOT(arg) (!(arg))
 
 // Binary operations

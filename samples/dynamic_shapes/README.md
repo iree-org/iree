@@ -73,7 +73,7 @@ them.
 
     ```
     cmake -B ../iree-build/ -DCMAKE_BUILD_TYPE=RelWithDebInfo .
-    cmake --build ../iree-build/ --target iree_tools_iree-compile
+    cmake --build ../iree-build/ --target iree-compile
     ```
 
 3. Compile the `dynamic_shapes.mlir` file using `iree-compile`. The
@@ -81,7 +81,7 @@ them.
     configuration has the best support for dynamic shapes:
 
     ```
-    ../iree-build/iree/tools/iree-compile \
+    ../iree-build/tools/iree-compile \
         --iree-mlir-to-vm-bytecode-module \
         --iree-hal-target-backends=dylib-llvm-aot \
         --iree-input-type=mhlo \

@@ -19,8 +19,8 @@ iree_lit_test_suite(
     "streams.mlir"
   TOOLS
     FileCheck
-    iree::tools::iree-compile
-    iree::tools::iree-translate
+    iree-compile
+    iree-translate
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

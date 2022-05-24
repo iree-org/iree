@@ -235,7 +235,7 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_vm_bytecode_module_benchmark_module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
   FLAGS
     "--iree-vm-ir-to-bytecode-module"
   TESTONLY
@@ -263,7 +263,7 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_vm_bytecode_module_size_benchmark_module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
   FLAGS
     "--iree-vm-ir-to-bytecode-module"
   TESTONLY

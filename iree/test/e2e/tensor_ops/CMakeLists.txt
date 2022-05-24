@@ -17,9 +17,9 @@ iree_lit_test_suite(
     "tensor_cast.mlir"
   TOOLS
     FileCheck
-    iree::tools::iree-benchmark-module
-    iree::tools::iree-compile
-    iree::tools::iree-run-mlir
+    iree-benchmark-module
+    iree-compile
+    iree-run-mlir
   LABELS
     "hostonly"
 )

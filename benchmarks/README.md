@@ -101,7 +101,7 @@ Once you built the `iree-benchmark-suites` target, you will have a
 
 ```sh
 build_tools/benchmarks/run_benchmarks_on_linux.py \
-  --normal_benchmark_tool_dir=$IREE_BUILD_DIR/iree/tools \
+  --normal_benchmark_tool_dir=$IREE_BUILD_DIR/tools \
   --output results.json $IREE_BUILD_DIR
 ```
 

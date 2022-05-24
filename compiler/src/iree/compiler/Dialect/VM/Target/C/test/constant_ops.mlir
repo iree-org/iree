@@ -24,7 +24,8 @@ vm.module @rodata_ops {
   // CHECK-LABEL: static iree_status_t rodata_ops_alloc_state(
   // CHECK: [[STATE:[^ ]*]] = NULL;
 
-  // CHECK: [[VOID_PTR_1:[^ ]*]] = EMITC_CAST(rodata_ops_buffer_1, void*);
+  // CHECK: [[BUFFER_PTR_1:[^ ]*]] = rodata_ops_buffer_1;
+  // CHECK-NEXT: [[VOID_PTR_1:[^ ]*]] = (void*) [[BUFFER_PTR_1]];
   // CHECK-NEXT: [[SIZE_1:[^ ]*]] = sizeof(rodata_ops_buffer_1);
   // CHECK-NEXT: [[BYTE_SPAN_1:[^ ]*]] = iree_make_byte_span([[VOID_PTR_1]], [[SIZE_1]]);
   // CHECK-NEXT: [[ALLOCATOR_1:[^ ]*]] = iree_allocator_null();
@@ -32,7 +33,8 @@ vm.module @rodata_ops {
   // CHECK-NEXT: [[BUFFER_1:[^ ]*]] = EMITC_ARRAY_ELEMENT_ADDRESS([[BUFFERS_1]], 0);
   // CHECK-NEXT: iree_vm_buffer_initialize(IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE, [[BYTE_SPAN_1]], [[ALLOCATOR_1]], [[BUFFER_1]]);
 
-  // CHECK: [[VOID_PTR_2:[^ ]*]] = EMITC_CAST(rodata_ops_buffer_2, void*);
+  // CHECK: [[BUFFER_PTR_2:[^ ]*]] = rodata_ops_buffer_2;
+  // CHECK-NEXT: [[VOID_PTR_2:[^ ]*]] = (void*) [[BUFFER_PTR_2]];
   // CHECK-NEXT: [[SIZE_2:[^ ]*]] = sizeof(rodata_ops_buffer_2);
   // CHECK-NEXT: [[BYTE_SPAN_2:[^ ]*]] = iree_make_byte_span([[VOID_PTR_2]], [[SIZE_2]]);
   // CHECK-NEXT: [[ALLOCATOR_2:[^ ]*]] = iree_allocator_null();

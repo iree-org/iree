@@ -62,7 +62,7 @@ subsequent commands analyzing the profile. Example:
 
 ```shell
 perf record -o /tmp/perf.data \
-  ./iree/tools/iree-benchmark-module \
+  ./tools/iree-benchmark-module \
     --driver=dylib \
     ... command-line arguments of iree-benchmark-module as usual ...
 ```
@@ -72,7 +72,7 @@ by, with the `-e` flag. For instance, to sample by L1 cache misses, one may do:
 
 ```shell
 perf record -o /tmp/perf.data -e L1-dcache-load-misses \
-  ./iree/tools/iree-benchmark-module \
+  ./tools/iree-benchmark-module \
     --driver=dylib \
     ... command-line arguments of iree-benchmark-module as usual ...
 ```

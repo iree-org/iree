@@ -73,7 +73,7 @@ Ensure that the `IREE_TARGET_BACKEND_DYLIB_LLVM_AOT` CMake option is `ON` when
 configuring for the host.
 
 !!! tip
-    `iree-compile` is under `iree-build/iree/tools/` directory. You may want to
+    `iree-compile` is under `iree-build/tools/` directory. You may want to
     include this path in your system's `PATH` environment variable.
 
 ## Compile and run the model
@@ -118,7 +118,7 @@ IREE's TensorFlow importer.
 In the build directory, run the following command:
 
 ``` shell hl_lines="2"
-iree/tools/iree-run-module \
+tools/iree-run-module \
     --driver=dylib \
     --module_file=mobilenet-dylib.vmfb \
     --entry_function=predict \

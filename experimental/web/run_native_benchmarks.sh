@@ -27,8 +27,8 @@ cd "${TARGET_DIR}"
 ###############################################################################
 
 # Either build from source (setting this path), or use from the python packages.
-# IREE_BENCHMARK_MODULE_PATH=~/code/iree-build/iree/tools/iree-benchmark-module
-# IREE_BENCHMARK_MODULE_PATH="D:\dev\projects\iree-build\iree\tools\iree-benchmark-module"
+# IREE_BENCHMARK_MODULE_PATH=~/code/iree-build/tools/iree-benchmark-module
+# IREE_BENCHMARK_MODULE_PATH="D:\dev\projects\iree-build\tools\iree-benchmark-module"
 IREE_BENCHMARK_MODULE_PATH=iree-benchmark-module
 
 echo "Benchmarking DeepLabV3..."

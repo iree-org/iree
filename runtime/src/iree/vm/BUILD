@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
 load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
 # load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library")
@@ -210,7 +210,7 @@ iree_runtime_cc_library(
 #     tbl_outs = [
 #         (["--gen-iree-vm-op-table-defs"], "bytecode_op_table.h"),
 #     ],
-#     tblgen = "//iree/tools:iree-tblgen",
+#     tblgen = "//tools:iree-tblgen",
 #     td_file = "//iree/compiler/Dialect/VM/IR:VMOps.td",
 #     td_srcs = [
 #         "//iree/compiler/Dialect/Util/IR:td_files",
@@ -272,7 +272,7 @@ iree_bytecode_module(
     src = "bytecode_module_benchmark.mlir",
     c_identifier = "iree_vm_bytecode_module_benchmark_module",
     flags = ["--iree-vm-ir-to-bytecode-module"],
-    translate_tool = "//iree/tools:iree-translate",
+    translate_tool = "//tools:iree-translate",
 )
 
 cc_binary_benchmark(
@@ -292,7 +292,7 @@ iree_bytecode_module(
     src = "bytecode_module_size_benchmark.mlir",
     c_identifier = "iree_vm_bytecode_module_size_benchmark_module",
     flags = ["--iree-vm-ir-to-bytecode-module"],
-    translate_tool = "//iree/tools:iree-translate",
+    translate_tool = "//tools:iree-translate",
 )
 
 iree_cmake_extra_content(

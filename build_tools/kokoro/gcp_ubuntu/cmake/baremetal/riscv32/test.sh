@@ -22,7 +22,7 @@ elf_module_test_binary
 popd > /dev/null
 
 echo "Test simple_embedding binaries"
-pushd "${BUILD_RISCV_DIR?}/samples/iree_simple_embedding" > /dev/null
+pushd "${BUILD_RISCV_DIR?}/samples/simple_embedding" > /dev/null
 
 "${QEMU_RV32_BIN?}" -cpu rv32,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
 simple_embedding_embedded_sync

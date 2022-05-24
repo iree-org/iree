@@ -21,6 +21,7 @@ iree_lit_test_suite(
         # keep sorted
         [
             "check_ir_before_llvm_conversion.mlir",
+            "convert_to_llvm.mlir",
             "hal_interface_bindings.mlir",
             "hal_interface_constants.mlir",
             "hal_interface_workgroup_info.mlir",
@@ -48,8 +49,8 @@ iree_lit_test_suite(
     cfg = "//compiler:lit.cfg.py",
     data = ["linalg_transform_spec.mlir"],
     tools = [
-        "//iree/tools:iree-compile",
-        "//iree/tools:iree-opt",
+        "//tools:iree-compile",
+        "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",
     ],
 )

@@ -37,14 +37,16 @@ iree_lit_test_suite(
     "tile_and_vectorize_conv.mlir"
     "tile_and_vectorize_matmul.mlir"
     "tile_and_vectorize_to_cooperative_ops.mlir"
+    "tile_linalg_ops.mlir"
     "vector_to_cooperative_matrix.mlir"
     "vectorize_elementwise_ops.mlir"
     "vectorize_load_store.mlir"
     "vectorize_matmul.mlir"
+    "vectorize_reduction.mlir"
     "vectorize_tensor_pad.mlir"
   TOOLS
     FileCheck
-    iree::tools::iree-opt
+    iree-opt
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -20,7 +20,7 @@ vm.module @control_flow_module {
   // CHECK-NEXT: int32_t [[C:[^ ]*]];
   // CHECK-NEXT: int32_t [[D:[^ ]*]];
   // CHECK-NEXT: [[COND_NZ]] = vm_cmp_nz_i32([[COND]]);
-  // CHECK-NEXT: [[COND_BOOL]] = EMITC_CAST([[COND_NZ]], bool);
+  // CHECK-NEXT: [[COND_BOOL]] = (bool) [[COND_NZ]];
   // CHECK-NEXT: if ([[COND_BOOL]]) {
   // CHECK-NEXT: [[C]] = [[A]];
   // CHECK-NEXT: [[D]] = [[A]];

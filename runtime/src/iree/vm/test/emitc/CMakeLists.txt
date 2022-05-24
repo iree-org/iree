@@ -54,7 +54,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -67,7 +67,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -80,7 +80,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -93,7 +93,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -106,7 +106,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -119,7 +119,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -132,7 +132,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -145,7 +145,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -158,7 +158,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -171,7 +171,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -184,7 +184,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -197,7 +197,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -210,7 +210,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -223,7 +223,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -236,7 +236,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -249,7 +249,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -262,7 +262,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -275,7 +275,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -288,7 +288,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -301,7 +301,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -314,7 +314,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -327,7 +327,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 iree_c_module(
@@ -340,7 +340,7 @@ iree_c_module(
   FLAGS
     "--iree-vm-ir-to-c-module"
   TRANSLATE_TOOL
-    iree_tools_iree-translate
+    iree-translate
 )
 
 endif()

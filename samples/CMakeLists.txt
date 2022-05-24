@@ -5,12 +5,3 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 iree_add_all_subdirs()
-
-iree_cc_library(
-  NAME
-    defs
-  INCLUDES
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_BINARY_DIR}
-  PUBLIC
-)

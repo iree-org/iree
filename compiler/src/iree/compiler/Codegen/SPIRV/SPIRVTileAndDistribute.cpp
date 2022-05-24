@@ -136,8 +136,7 @@ class SPIRVTileAndDistributePass
 void SPIRVTileAndDistributePass::runOnOperation() {
   MLIRContext *context = &getContext();
   func::FuncOp funcOp = getOperation();
-  auto entryPointOp = getEntryPoint(funcOp);
-  if (!entryPointOp) return;
+  if (!isEntryPoint(funcOp)) return;
 
   {  // Tile and distribute to invocations.
     RewritePatternSet invocationTilingPatterns(context);

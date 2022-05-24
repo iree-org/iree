@@ -629,7 +629,7 @@ endif()
 add_subdirectory(runtime)
 
 # tools/ can depend on compiler/ and runtime/
-add_subdirectory(iree/tools)
+add_subdirectory(tools)
 
 if(IREE_BUILD_TRACY)
   if(NOT CMAKE_SYSTEM_NAME MATCHES "Linux")
@@ -641,7 +641,7 @@ if(IREE_BUILD_TRACY)
   endif()
 endif()
 
-# Order constraint: The python bindings install tools targets from iree/tools
+# Order constraint: The python bindings install tools targets from tools/
 # and tracy, and must come after it.
 if(IREE_BUILD_PYTHON_BINDINGS)
   # Write out a .env file to make IDEs and developers happy.
