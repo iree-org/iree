@@ -120,12 +120,12 @@ def should_update(bk, *, organization, configuration, existing_pipeline,
 
   if previous_organization != organization:
     print(f"Build was previously updated by a pipeline from a different"
-          f"organization '{previous_organization}' not current organization"
+          f" organization '{previous_organization}' not current organization"
           f" '{organization}'")
     sys.exit(5)
   if previous_pipeline != running_pipeline:
-    print(f"Build was previously updated by a pipeline different pipeline"
-          f"'{previous_pipeline}' not current pipeline '{running_pipeline}'")
+    print(f"Build was previously updated by a different pipeline"
+          f" '{previous_pipeline}' not current pipeline '{running_pipeline}'")
     sys.exit(5)
 
   if previous_build_number > running_build_number:
