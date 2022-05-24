@@ -126,7 +126,7 @@ int main(int argc, char** argv) {
 
   // Compiles MLIR to VM bytecode.
   bool status = iree_compile_mlir_to_bytecode(
-      mlir_code, iree_make_cstring_view("dylib"), &bytecode_builder);
+      mlir_code, iree_make_cstring_view("vmvx"), &bytecode_builder);
   if (!status) {
     iree_string_builder_deinitialize(&bytecode_builder);
     fprintf(stderr, "failed to compiler MLIR code\n");

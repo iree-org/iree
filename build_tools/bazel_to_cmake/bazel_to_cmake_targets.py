@@ -13,6 +13,7 @@ EXPLICIT_TARGET_MAPPING = {
     "//build_tools:default_linkopts": [],
     "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
     "//compiler/src:defs": [],
+    "//compiler/src/iree/compiler/API:CAPI": ["IREECompilerCAPILib"],
     "//runtime/src:runtime_defines": [],
 
     # IREE llvm-external-projects
