@@ -1,0 +1,59 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Pipeline configuration to upload to the UI for trusted pipelines
+
+agents:
+  queue: "orchestration"
+  security: "trusted"
+
+steps:
+  # TODO: investigate enabling presubmit config testing from trusted forks.
+  # If running from the main repository, bootstrap the checked-in bootstrap
+  # pipeline. This replaces the rest of the steps (which are waiting on this
+  # one).
+  # Skip when running locally because Buildkite cli doesn't support replacing
+  # pipelines (https://github.com/buildkite/cli/issues/122). This isn't too big
+  # a limitation because presumably we're already running with the local file
+  # that would be bootstrapped.
+  - label: ":hiking_boot: Bootstrapping pipeline from '${BUILDKITE_COMMIT:0:7}'"
+    if: |
+      !build.pull_request.repository.fork &&
+      ${MUST_BOOTSTRAP:-true} &&
+      organization.slug != 'local'
+    env:
+      MUST_BOOTSTRAP: false
+    commands: |
+        buildkite-agent pipeline upload --replace \
+          build_tools/buildkite/pipelines/fragment/bootstrap-trusted.yml
+
+  - wait
+
+  # Now that we're bootstrapped, upload the pipeline itself from the main
+  # repository and use the current commit for any configuration.
+  - label: ":pipeline: Uploading pipeline from '${BUILDKITE_COMMIT:0:7}'"
+    if: "!build.pull_request.repository.fork"
+    env:
+      CONFIG_FETCH_REF: ${BUILDKITE_COMMIT}
+    commands: |
+        buildkite-agent pipeline upload \
+          build_tools/buildkite/pipelines/trusted/${BUILDKITE_PIPELINE_SLUG}.yml
+
+  # If we're coming from a fork, pipelines will be checked out from the main
+  # branch
+  - label: ":pipeline: Uploading pipeline from 'main'"
+    if: "build.pull_request.repository.fork"
+    plugins:
+      - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#24e54e7729:
+          repos:
+            - config:
+                - url: ${BUILDKITE_REPO}
+                  ref: main
+    env:
+      CONFIG_FETCH_REF: "main"
+    commands: |
+        buildkite-agent pipeline upload \
+          build_tools/buildkite/pipelines/trusted/${BUILDKITE_PIPELINE_SLUG}.yml

@@ -1,0 +1,34 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+agents:
+  queue: "orchestration"
+  security: "untrusted"
+
+
+steps:
+  # Bootstrap the checked-in bootstrap pipeline. This replaces the rest of the
+  # steps (which are waiting on this one).
+  # Skip when running locally because Buildkite cli doesn't support replacing
+  # pipelines (https://github.com/buildkite/cli/issues/122). This isn't too big
+  # a limitation because presumably we're already running with the local file
+  # that would be bootstrapped.
+  - label: ":hiking_boot: Bootstrapping pipeline from '${BUILDKITE_COMMIT:0:7}'"
+    if: |
+      ${MUST_BOOTSTRAP:-true} &&
+      organization.slug != 'local'
+    env:
+      MUST_BOOTSTRAP: false
+    commands: |
+        buildkite-agent pipeline upload --replace \
+          build_tools/buildkite/pipelines/fragment/bootstrap-untrusted.yml
+
+  - wait
+
+  - label: ":pipeline: Uploading pipeline from '${BUILDKITE_COMMIT:0:7}'"
+    commands: |
+        buildkite-agent pipeline upload \
+          build_tools/buildkite/pipelines/untrusted/${BUILDKITE_PIPELINE_SLUG}.yml
