@@ -257,6 +257,11 @@ def convert_target(target):
   if m:
     return ["iree::samples::" + _convert_bazel_path(m.group(1))]
 
+  # Map //tests/(.*) -> iree::tests::\1
+  m = re.match("^//tests[/|:](.+)", target)
+  if m:
+    return ["iree::tests::" + _convert_bazel_path(m.group(1))]
+
   # Map //tools/(.*) -> \1
   m = re.match("^//tools[/|:](.+)", target)
   if m:
