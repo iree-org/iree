@@ -422,13 +422,14 @@ class ScatterRank0Value : public OpRewritePattern<mhlo::ScatterOp> {
 
   LogicalResult matchAndRewrite(mhlo::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
-    auto operand = op.operand();
+    auto operands = op.operands();
     auto indices = op.scatter_indices();
     auto updates = op.updates();
+    if (operands.size() != 1 || updates.size() != 1) return failure();
 
-    auto operandTy = operand.getType().dyn_cast<RankedTensorType>();
+    auto operandTy = operands[0].getType().dyn_cast<RankedTensorType>();
     auto indicesTy = indices.getType().dyn_cast<RankedTensorType>();
-    auto updatesTy = updates.getType().dyn_cast<RankedTensorType>();
+    auto updatesTy = updates[0].getType().dyn_cast<RankedTensorType>();
     if (!operandTy || !indicesTy || !updatesTy) return failure();
 
     if (indicesTy.getRank() != 1 || !indicesTy.hasStaticShape() ||
@@ -484,7 +485,7 @@ class ScatterRank0Value : public OpRewritePattern<mhlo::ScatterOp> {
         /*indexVectorDim=*/1);
 
     auto newScatter = rewriter.create<mhlo::ScatterOp>(
-        loc, op.getType(), operand, reshapedIndices, reshapedUpdates,
+        loc, op.getType(), operands, reshapedIndices, reshapedUpdates,
         newDimNumbers, op.indices_are_sorted(), op.unique_indices());
 
     Region &region = newScatter.update_computation();

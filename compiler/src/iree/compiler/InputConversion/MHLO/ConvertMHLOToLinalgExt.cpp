@@ -276,12 +276,13 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
       mhlo::ScatterOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
     if (!hasCanonicalDimensionNumbers(op)) return failure();
+    if (op.operands().size() != 1 || op.updates().size() != 1) return failure();
 
     ImplicitLocOpBuilder b(op.getLoc(), rewriter);
 
-    Value original = adaptor.operand();
+    Value original = adaptor.operands()[0];
     Value indices = adaptor.scatter_indices();
-    Value updates = adaptor.updates();
+    Value updates = adaptor.updates()[0];
 
     if (failed(collapseBatchDimsIfNeeded(indices, updates, b))) {
       return failure();
