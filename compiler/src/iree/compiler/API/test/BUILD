@@ -8,6 +8,7 @@ load("//build_tools/bazel:native_binary.bzl", "native_test")
 
 package(
     default_visibility = ["//visibility:public"],
+    features = ["-layering_check"],  # disabled for string_builder.h include
     licenses = ["notice"],  # Apache 2.0
 )
 
