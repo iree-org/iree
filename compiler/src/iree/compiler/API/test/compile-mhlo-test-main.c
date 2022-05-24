@@ -12,9 +12,10 @@
 // be the first user of the combined MLIR+IREE CAPI:
 // https://github.com/google/iree/pull/8582
 
-#include <iree/base/string_builder.h>
-#include <iree/compiler/API/Compiler.h>
 #include <stdio.h>
+
+#include "iree/base/string_builder.h"
+#include "iree/compiler/API/Compiler.h"
 
 static void bytecode_builder_callback(MlirStringRef str, void* userdata) {
   iree_string_builder_t* builder = (iree_string_builder_t*)userdata;

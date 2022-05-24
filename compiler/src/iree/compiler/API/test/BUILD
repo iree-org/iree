@@ -8,7 +8,7 @@ load("//build_tools/bazel:native_binary.bzl", "native_test")
 
 package(
     default_visibility = ["//visibility:public"],
-    features = ["-layering_check"],  # disabled for string_builder.h include
+    features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
@@ -17,7 +17,7 @@ cc_binary(
     srcs = ["compile-mhlo-test-main.c"],
     deps = [
         "//compiler/src/iree/compiler/API:CAPI",
-        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:api",
         "@llvm-project//mlir:CAPIIR",
     ],
 )
