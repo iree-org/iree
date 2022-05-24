@@ -147,3 +147,68 @@ hal.executable private @check_buffer_ops_vectorization {
 // CHECK:      func.func @check_buffer_ops_vectorization
 // CHECK:        vector.load
 // CHECK-NEXT:   vector.store
+
+// -----
+
+hal.executable private @vectorize_fill_conv2d_generic {
+  hal.executable.variant public @embedded_elf_x86_64, target = #hal.executable.target<
+    "llvm", "embedded-elf-x86_64", {
+      cpu_features = "",
+      data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+      native_vector_size = 16 : index,
+      target_triple = "x86_64-unknown-unknown-eabi-elf"
+    }> {
+    hal.executable.entry_point public @vectorize_fill_conv2d_generic ordinal(0) layout(
+      #hal.executable.layout<push_constants = 0, sets = [
+        #hal.descriptor_set.layout<0, bindings = [
+          #hal.descriptor_set.binding<0, storage_buffer>,
+          #hal.descriptor_set.binding<1, storage_buffer>,
+          #hal.descriptor_set.binding<2, storage_buffer>]
+        >]>
+      )
+    builtin.module {
+      func.func @vectorize_fill_conv2d_generic() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %cst_0 = arith.constant 3.000000e+00 : f32
+        %cst_1 = arith.constant 6.000000e+00 : f32
+        %cst_2 = arith.constant 0.166666672 : f32
+        %cst_3 = arith.constant dense<0.0> : tensor<16xf32>
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:1x225x225x3xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:3x3x3x16xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:1x112x112x16xf32>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 225, 225, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x225x225x3xf32> -> tensor<1x225x225x3xf32>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [3, 3, 3, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:3x3x3x16xf32> -> tensor<3x3x3x16xf32>
+        %5 = linalg.init_tensor [1, 112, 112, 16] : tensor<1x112x112x16xf32>
+        %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<1x112x112x16xf32>) -> tensor<1x112x112x16xf32>
+        %7 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%3, %4 : tensor<1x225x225x3xf32>, tensor<3x3x3x16xf32>) outs(%6 : tensor<1x112x112x16xf32>) -> tensor<1x112x112x16xf32>
+        %8 = linalg.generic {
+          indexing_maps = [
+            affine_map<(d0, d1, d2, d3) -> (d3)>,
+            affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+            affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+            iterator_types = ["parallel", "parallel", "parallel", "parallel"
+          ]} ins(%cst_3, %7 : tensor<16xf32>, tensor<1x112x112x16xf32>) outs(%5 : tensor<1x112x112x16xf32>) {
+        ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
+          %9 = arith.addf %arg0, %arg1 : f32
+          %10 = arith.addf %9, %cst_0 : f32
+          %11 = arith.cmpf olt, %10, %cst : f32
+          %12 = arith.select %11, %cst, %10 : f32
+          %13 = arith.cmpf olt, %cst_1, %10 : f32
+          %14 = arith.select %13, %cst_1, %12 : f32
+          %15 = arith.mulf %9, %14 : f32
+          %16 = arith.mulf %15, %cst_2 : f32
+          linalg.yield %16 : f32
+        } -> tensor<1x112x112x16xf32>
+        flow.dispatch.tensor.store %8, %2, offsets = [0, 0, 0, 0], sizes = [1, 112, 112, 16], strides = [1, 1, 1, 1] : tensor<1x112x112x16xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x16xf32>
+        return
+      }
+    }
+  }
+}
+
+// CHECK:      func.func @vectorize_fill_conv2d_generic
+// CHECK-NOT:    linalg.fill
+// CHECK:        vector.outerproduct %{{.+}}, %{{.+}}, %{{.+}} {kind = #vector.kind<add>}
+// CHECK-NOT:    linalg.generic
+// CHECK:        arith.cmpf olt, %{{.+}}, %{{.+}} : vector<4x8xf32>
