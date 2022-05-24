@@ -1,0 +1,51 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Note: this runs on trusted agents, since we want the authorization checks to
+# themselves be run on trusted agents. The pipeline itself is uploaded from
+# the main repository via bootstrap-trusted.yml and it fetches the scripts only
+# from the main repository.
+agents:
+  queue: "orchestration"
+  security: "trusted"
+
+steps:
+  - label: "Launch x86_64 benchmark pipeline"
+    plugins:
+      - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#24e54e7729:
+          repos:
+            - config:
+                - url: ${BUILDKITE_REPO}
+                  ref: ${CONFIG_FETCH_REF}
+    commands:
+      - "git clean -fdx"
+      - |
+        export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
+            --secret=iree-buildkite-presubmit-pipelines)"
+        ./build_tools/buildkite/scripts/wait_for_pipeline_success.py \
+            --output-build-json=build.json jerry-benchmark-x86-64
+      - |
+        mkdir benchmark-results-x86_64
+        buildkite-agent artifact download "benchmark-results-*.json" \
+            benchmark-results-x86_64/ --build \
+            $(cat build.json | python -c "import json,sys;print(json.load(sys.stdin)['id'])")
+    artifact_paths:
+      - "benchmark-results-x86_64/*.json"
+
+  - label: ":lower_left_crayon: Comment benchmark results on pull request"
+    plugins:
+      - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#24e54e7729:
+          repos:
+            - config:
+                - url: ${BUILDKITE_REPO}
+                  ref: ${CONFIG_FETCH_REF}
+    commands:
+      - git clean -fdx
+      - |
+        buildkite-agent artifact download "benchmark-results-*/*.json" .
+        ./build_tools/benchmarks/post_benchmarks_as_pr_comment.py \
+            --verbose --query-base \
+            benchmark-results-*/*.json"
