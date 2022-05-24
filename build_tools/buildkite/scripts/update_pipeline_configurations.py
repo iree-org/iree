@@ -175,7 +175,7 @@ def update_pipeline(bk, *, organization, pipeline_slug, configuration,
                                  trusted=trusted)
 
   bk.pipelines().update_pipeline(organization=organization,
-                                 pipeline_slug=pipeline_slug,
+                                 pipeline=pipeline_slug,
                                  configuration=configuration)
   print("...updated successfully")
 
