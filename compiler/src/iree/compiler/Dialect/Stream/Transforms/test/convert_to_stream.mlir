@@ -67,7 +67,7 @@ func.func @custom_ops(%arg0: tensor<4x8xf32>) -> tensor<8x4xf32> {
 // -----
 
 // This is the while test, which exercises flow control and readbacks but is
-// still simple enough to reason about: iree/test/e2e/tosa_ops/while.mlir
+// still simple enough to reason about: tests/e2e/tosa_ops/while.mlir
 // This test is also nice because it contains a check test op, which requires
 // stream/tensor interop.
 
