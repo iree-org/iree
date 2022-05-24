@@ -483,9 +483,9 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
     Location loc = op.getLoc();
     Value operand = adaptor.operand();
 
-    auto inputValuesType = operand.getType().dyn_cast<RankedTensorType>();
-    auto outputValuesType = op.getResultTypes()[0].dyn_cast<ShapedType>();
-    auto outputIndicesType = op.getResultTypes()[1].dyn_cast<ShapedType>();
+    auto inputValuesType = operand.getType().dyn_cast<ShapedType>();
+    auto outputValuesType = op.values().getType().dyn_cast<ShapedType>();
+    auto outputIndicesType = op.indices().getType().dyn_cast<ShapedType>();
     if (!inputValuesType || !outputValuesType || !outputIndicesType) {
       return failure();
     }
