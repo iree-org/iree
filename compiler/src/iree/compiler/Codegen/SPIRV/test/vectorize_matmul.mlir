@@ -65,16 +65,16 @@ func.func @matmul_2x128x4() {
 //       CHECK:       %[[RHS_3_VECTOR:.+]] = vector.transfer_read %[[RHS_TILE]][%[[C3]], %[[C0]]], %[[PAD]]
 //       CHECK:       %[[LHS_0_SCALAR:.+]] = vector.extract %[[LHS_VECTOR]][0]
 //       CHECK:       %[[LHS_0_VECTOR:.+]] = vector.splat %[[LHS_0_SCALAR]] : vector<4xf32>
-//       CHECK:       %[[FMA_0:.+]] = vector.fma %[[RHS_0_VECTOR]], %[[LHS_0_VECTOR]], %[[ZERO]] : vector<4xf32>
+//       CHECK:       %[[FMA_0:.+]] = vector.fma %[[LHS_0_VECTOR]], %[[RHS_0_VECTOR]], %[[ZERO]] : vector<4xf32>
 //       CHECK:       %[[LHS_1_SCALAR:.+]] = vector.extract %[[LHS_VECTOR]][1]
 //       CHECK:       %[[LHS_1_VECTOR:.+]] = vector.splat %[[LHS_1_SCALAR]] : vector<4xf32>
-//       CHECK:       %[[FMA_1:.+]] = vector.fma %[[RHS_1_VECTOR]], %[[LHS_1_VECTOR]], %[[FMA_0]] : vector<4xf32>
+//       CHECK:       %[[FMA_1:.+]] = vector.fma %[[LHS_1_VECTOR]], %[[RHS_1_VECTOR]], %[[FMA_0]] : vector<4xf32>
 //       CHECK:       %[[LHS_2_SCALAR:.+]] = vector.extract %[[LHS_VECTOR]][2]
 //       CHECK:       %[[LHS_2_VECTOR:.+]] = vector.splat %[[LHS_2_SCALAR]] : vector<4xf32>
-//       CHECK:       %[[FMA_2:.+]] = vector.fma %[[RHS_2_VECTOR]], %[[LHS_2_VECTOR]], %[[FMA_1]] : vector<4xf32>
+//       CHECK:       %[[FMA_2:.+]] = vector.fma %[[LHS_2_VECTOR]], %[[RHS_2_VECTOR]], %[[FMA_1]] : vector<4xf32>
 //       CHECK:       %[[LHS_3_SCALAR:.+]] = vector.extract %[[LHS_VECTOR]][3]
 //       CHECK:       %[[LHS_3_VECTOR:.+]] = vector.splat %[[LHS_3_SCALAR]] : vector<4xf32>
-//       CHECK:       %[[FMA_3:.+]] = vector.fma %[[RHS_3_VECTOR]], %[[LHS_3_VECTOR]], %[[FMA_2]] : vector<4xf32>
+//       CHECK:       %[[FMA_3:.+]] = vector.fma %[[LHS_3_VECTOR]], %[[RHS_3_VECTOR]], %[[FMA_2]] : vector<4xf32>
 //       CHECK:       vector.transfer_write %[[FMA_3]], %[[ACC_TILE]][%[[IV_Y]], %[[IV_X]]]
 
 // -----
