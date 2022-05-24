@@ -28,14 +28,6 @@ static llvm::cl::opt<unsigned> logSwizzleTile(
     "iree-codegen-log-swizzle-tile", llvm::cl::desc("log swizzle tile value"),
     llvm::cl::init(0));
 
-static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
-                                   ArrayRef<int64_t> staticShape,
-                                   Type elementType,
-                                   ArrayRef<Value> dynamicSizes) {
-  MemRefType allocType = MemRefType::get(staticShape, elementType, {}, 3);
-  return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes);
-}
-
 static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
                                         MemRefType memRefType,
                                         ValueRange dynamicSizes,
