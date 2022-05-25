@@ -29,6 +29,8 @@ import urllib
 import requests
 from pybuildkite import buildkite
 
+from common.buildkite_utils import get_pipeline
+
 GIT_REPO = "https://github.com/google/iree"
 PIPELINE_ROOT_PATH = "build_tools/buildkite/pipelines"
 TRUSTED_BOOTSTRAP_PIPELINE_PATH = os.path.join(PIPELINE_ROOT_PATH, "fragment",
@@ -50,16 +52,6 @@ def get_git_root():
                         check=True,
                         stdout=subprocess.PIPE,
                         text=True).stdout.strip()
-
-
-def get_existing_pipeline(bk, *, organization, pipeline_slug):
-  try:
-    pipeline = bk.pipelines().get_pipeline(organization, pipeline_slug)
-  except requests.exceptions.HTTPError as e:
-    if e.response.status_code == 404:
-      return None
-    raise e
-  return pipeline
 
 
 def prepend_header(configuration, *, organization, running_pipeline,
@@ -86,6 +78,7 @@ def should_update(bk, *, organization, configuration, existing_pipeline,
   trimmed_previous_configuration_lines = previous_configuration_lines[
       len(UPDATE_INFO_HEADER.splitlines()):]
   if trimmed_previous_configuration_lines == configuration.splitlines():
+    print("Configuration has not changed. Not updating")
     return False
 
   first_line = previous_configuration_lines[0].strip()
@@ -192,9 +185,9 @@ def update_pipelines(bk, pipeline_files, *, organization, running_pipeline,
       with open(TRUSTED_BOOTSTRAP_PIPELINE_PATH
                 if trusted else UNTRUSTED_BOOTSTRAP_PIPELINE_PATH) as f:
         configuration = f.read()
-      existing_pipeline = get_existing_pipeline(bk,
-                                                organization=organization,
-                                                pipeline_slug=pipeline_slug)
+      existing_pipeline = get_pipeline(bk,
+                                       organization=organization,
+                                       pipeline_slug=pipeline_slug)
       if existing_pipeline is None:
         print(f"Creating for: '{pipeline_file}'...")
         create_pipeline(bk,
