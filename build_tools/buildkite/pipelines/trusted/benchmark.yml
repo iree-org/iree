@@ -13,7 +13,7 @@ agents:
   security: "trusted"
 
 steps:
-  - label: "Launch x86_64 benchmark pipeline"
+  - label: "Launch Linux benchmark pipeline"
     plugins:
       - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#24e54e7729:
           repos:
@@ -26,14 +26,14 @@ steps:
         export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
             --secret=iree-buildkite-presubmit-pipelines)"
         ./build_tools/buildkite/scripts/wait_for_pipeline_success.py \
-            --output-build-json=build.json jerry-benchmark-x86-64
+            --output-build-json=build.json jerry-benchmark-linux
       - |
-        mkdir benchmark-results-x86_64
+        mkdir benchmark-results-linux
         buildkite-agent artifact download "benchmark-results-*.json" \
-            benchmark-results-x86_64/ --build \
+            benchmark-results-linux/ --build \
             $(cat build.json | python -c "import json,sys;print(json.load(sys.stdin)['id'])")
     artifact_paths:
-      - "benchmark-results-x86_64/*.json"
+      - "benchmark-results-linux/*.json"
 
   - label: ":lower_left_crayon: Comment benchmark results on pull request"
     plugins:
