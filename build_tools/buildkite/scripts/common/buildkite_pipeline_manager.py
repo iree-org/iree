@@ -7,13 +7,18 @@
 
 import os
 import time
-
 from typing import List, Optional
+
 from pybuildkite import buildkite
-from common.buildkite_utils import BuildObject, get_build_number, get_build_state, linkify
+
+from common.buildkite_utils import (BuildObject, get_build_number,
+                                    get_build_state, linkify, pipeline_exists)
 
 # Fake build to return when running locally.
 FAKE_PASSED_BUILD = dict(number=42, state="passed")
+
+# The special pipeline that runs unregistered pipelines
+UNREGISTERED_PIPELINE_NAME = "unregistered"
 
 
 class BuildkitePipelineManager(object):
@@ -46,6 +51,17 @@ class BuildkitePipelineManager(object):
     self._pull_request_base_branch = pull_request_base_branch
     self._pull_request_id = pull_request_id
     self._pull_request_repository = pull_request_repository
+    self._env = {
+        # Indicate the name of the pipeline to trigger. This is used by the
+        # 'unregistered' pipeline to upload the correct pipeline file.
+        "REQUESTED_PIPELINE": pipeline,
+    }
+    # If the pipeline doesn't exist, then we run it on the "unregistered"
+    # pipeline, which leverages the REQUESTED_PIPELINE env variable.
+    if not pipeline_exists(self._buildkite,
+                           organization=self._organization,
+                           pipeline=self._pipeline):
+      self._pipeline = UNREGISTERED_PIPELINE_NAME
 
   @staticmethod
   def from_environ(pipeline: str):
@@ -110,6 +126,10 @@ class BuildkitePipelineManager(object):
                                                         build_number)
 
   def get_latest_build(self) -> Optional[BuildObject]:
+    # Builds of the unregistered pipeline are not necessarily performing the
+    # same work.
+    if self._pipeline == UNREGISTERED_PIPELINE_NAME:
+      return None
     all_builds = self.get_builds()
     if not all_builds:
       return None
@@ -127,6 +147,7 @@ class BuildkitePipelineManager(object):
         pull_request_base_branch=self._pull_request_base_branch,
         pull_request_id=self._pull_request_id,
         pull_request_repository=self._pull_request_repository,
+        env=self._env,
     )
 
   def wait_for_build(self, build_number: int) -> BuildObject:
@@ -139,7 +160,7 @@ class BuildkitePipelineManager(object):
     # on my machine). In that case, the beginning of the line is partway through
     # the previous print, although it at least starts on a new line. Better
     # suggestions welcome.
-    min_line_length = 0
+    max_line_length = 0
     # We don't need great precision
     start = time.monotonic()
     while True:
@@ -153,8 +174,8 @@ class BuildkitePipelineManager(object):
           buildkite.BuildState.NOT_RUN,
       ]:
         output_str = f"Build finished in state '{state.name}'"
-        min_line_length = max(min_line_length, len(output_str))
-        print(output_str.ljust(min_line_length))
+        max_line_length = max(max_line_length, len(output_str))
+        print(output_str.ljust(max_line_length))
         return build
 
       wait_time = int(round(time.monotonic() - start))
@@ -162,8 +183,8 @@ class BuildkitePipelineManager(object):
           f"Waiting for build {build_number} to complete. Waited {wait_time}"
           f" seconds. Currently in state '{state.name}':"
           f" {linkify(self.get_url_for_build(build_number))}")
-      min_line_length = max(min_line_length, len(output_str))
-      print(output_str.ljust(min_line_length), "\r", end="", flush=True)
+      max_line_length = max(max_line_length, len(output_str))
+      print(output_str.ljust(max_line_length), "\r", end="", flush=True)
       # Yes, polling is unfortunately the best we can do here :-(
       time.sleep(5)
 
