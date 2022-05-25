@@ -58,7 +58,7 @@ python configure_bazel.py
 cd integrations/tensorflow
 bazel build -c opt iree_tf_compiler:iree-import-tflite
 
-IREE_COMPILE_PATH="${SOURCE_DIR}/iree-build/iree/tools/iree-compile"
+IREE_COMPILE_PATH="${SOURCE_DIR}/iree-build/tools/iree-compile"
 
 TFLITE_MODEL_DIR="${ROOT_DIR}/models/tflite"
 IREE_MODEL_DIR="${ROOT_DIR}/models/iree"
@@ -129,7 +129,7 @@ cmake -GNinja -B ../iree-build-android/ \
   -DIREE_BUILD_COMPILER=OFF \
   .
 cmake --build ../iree-build-android/
-cp "${SOURCE_DIR}/iree-build-android/iree/tools/iree-benchmark-module" "${ROOT_DIR}/"
+cp "${SOURCE_DIR}/iree-build-android/tools/iree-benchmark-module" "${ROOT_DIR}/"
 
 # Cross-compile TFLite benchmark binary.
 sudo apt-get install libgles2-mesa-dev

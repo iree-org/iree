@@ -6,10 +6,10 @@
 
 #!/bin/bash
 
-set -euo pipefail
+set -eu pipefail
 
 # Install Bazel. From https://www.tensorflow.org/install/source
-#npm install -g @bazel/bazelisk
+npm install -g @bazel/bazelisk
 
 # Create root dir.
 ROOT_DIR=/tmp/mobilebert_benchmarks
@@ -89,7 +89,7 @@ echo "Compiling ${MODEL_NAME}_mmt4d.vmfb for dylib..."
   "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
   --o "${IREE_MODEL_DIR}/dylib/${MODEL_NAME}_mmt4d.vmfb"
 
-cp "${SOURCE_DIR}/iree-build/iree/tools/iree-benchmark-module" "${ROOT_DIR}/"
+cp "${SOURCE_DIR}/iree-build/tools/iree-benchmark-module" "${ROOT_DIR}/"
 
 # Build TFLite benchmark.
 sudo apt-get install libgles2-mesa-dev
