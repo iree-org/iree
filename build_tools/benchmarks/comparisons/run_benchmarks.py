@@ -111,6 +111,7 @@ def main(args):
     if not args.disable_gpu:
       benchmark_desktop_gpu(args.device_name, command_factory, results_path)
   else:
+    assert(args.mode == "mobile")
     results_path = os.path.join(args.output_dir, "results.csv")
     with open(results_path, "w") as f:
       f.write(

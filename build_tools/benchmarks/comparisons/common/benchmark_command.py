@@ -4,27 +4,34 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import abc
 import re
 
 from typing import Optional
 
 
-class BenchmarkCommand:
+class BenchmarkCommand(abc.ABC):
   """Abstracts a benchmark command."""
 
   def __init__(self, benchmark_binary: str, model_name: str,
-      taskset: Optional[str] = None):
+               num_threads: int, num_runs: int, driver: Optional[str] = None,
+               taskset: Optional[str] = None):
     self.benchmark_binary = benchmark_binary
     self.model_name = model_name
     self.taskset = taskset
-    self.num_threads = 1
-    self.num_runs = 50
-    self.driver = "cpu"
+    self.num_threads = num_threads
+    self.num_runs = num_runs
+    self.driver = driver
     self.args = []
 
+  @property
+  @abc.abstractmethod
+  def runtime(self):
+    pass
+
+  @abc.abstractmethod
   def parse_latency_from_output(self, output: str) -> float:
-    print("Warning! No parser defined.")
-    return 0
+    pass
 
   def generate_benchmark_command(self) -> list[str]:
     """Returns a list of strings that correspond to the command to be run."""
@@ -32,10 +39,7 @@ class BenchmarkCommand:
     if self.taskset:
       command.append("taskset")
       command.append(str(self.taskset))
-      command.append(self.benchmark_binary)
-    else:
-      command.append(self.benchmark_binary)
-
+    command.append(self.benchmark_binary)
     command.extend(self.args)
     return command
 
@@ -45,21 +49,22 @@ class TFLiteBenchmarkCommand(BenchmarkCommand):
 
   def __init__(self, benchmark_binary: str, model_name: str, model_path: str,
       num_threads: int, num_runs: int, taskset: Optional[str] = None):
-    super().__init__(benchmark_binary, model_name, taskset=taskset)
-    self.runtime = "tflite"
+    super().__init__(benchmark_binary, model_name, num_threads, num_runs, taskset=taskset)
     self.args.append("--graph=" + model_path)
-    self.num_threads = num_threads
-    self.num_runs = num_runs
+    self._latency_large_regex = re.compile(
+        r".*?Inference \(avg\): (\d+.?\d*e\+?\d*).*")
+    self._latency_regex = re.compile(r".*?Inference \(avg\): (\d+).*")
+
+  @property
+  def runtime(self):
+    return "tflite"
 
   def parse_latency_from_output(self, output: str) -> float:
-    latency_large_regex = re.compile(
-        r".*?Inference \(avg\): (\d+.?\d*e\+?\d*).*")
     # First match whether a large number has been recorded e.g. 1.18859e+06.
-    matches = latency_large_regex.search(output)
+    matches = self._latency_large_regex.search(output)
     if not matches:
       # Otherwise, regular number e.g. 71495.6.
-      latency_regex = re.compile(r".*?Inference \(avg\): (\d+).*")
-      matches = latency_regex.search(output)
+      matches = self._latency_regex.search(output)
 
     latency_ms = 0
     if matches:
@@ -69,7 +74,7 @@ class TFLiteBenchmarkCommand(BenchmarkCommand):
     return latency_ms
 
   def generate_benchmark_command(self) -> list[str]:
-    command = super(TFLiteBenchmarkCommand, self).generate_benchmark_command()
+    command = super().generate_benchmark_command()
     if self.driver == "gpu":
       command.append("--use_gpu=true")
     command.append("--num_threads=" + str(self.num_threads))
@@ -82,16 +87,17 @@ class IreeBenchmarkCommand(BenchmarkCommand):
 
   def __init__(self, benchmark_binary: str, model_name: str, model_path: str,
       num_threads: int, num_runs: int, taskset: Optional[str] = None):
-    super().__init__(benchmark_binary, model_name, taskset=taskset)
-    self.runtime = "iree"
+    super().__init__(benchmark_binary, model_name, num_threads, num_runs, taskset=taskset)
     self.args.append("--module_file=" + model_path)
-    self.num_threads = num_threads
-    self.num_runs = num_runs
+    self._latency_regex = re.compile(
+        r".*?BM_main/process_time/real_time_mean\s+(.*?) ms.*")
+
+  @property
+  def runtime(self):
+    return "iree"
 
   def parse_latency_from_output(self, output: str) -> float:
-    latency_regex = re.compile(
-        r".*?BM_main/process_time/real_time_mean\s+(.*?) ms.*")
-    matches = latency_regex.search(output)
+    matches = self._latency_regex.search(output)
     latency_ms = 0
     if matches:
       latency_ms = float(matches.group(1))
@@ -100,7 +106,7 @@ class IreeBenchmarkCommand(BenchmarkCommand):
     return latency_ms
 
   def generate_benchmark_command(self) -> list[str]:
-    command = super(IreeBenchmarkCommand, self).generate_benchmark_command()
+    command = super().generate_benchmark_command()
     command.append("--driver=" + self.driver)
     command.append("--task_topology_group_count=" + str(self.num_threads))
     command.append("--benchmark_repetitions=" + str(self.num_runs))
