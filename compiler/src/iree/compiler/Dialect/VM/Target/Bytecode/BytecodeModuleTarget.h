@@ -51,8 +51,10 @@ struct BytecodeTargetOptions {
   bool stripDebugOps = false;
 
   // Enables the output .vmfb to be inspected as a ZIP file.
-  // This is only useful for debugging and should be disabled otherwise.
-  bool emitPolyglotZip = false;
+  // This is useful for debugging/diagnosing issues as embedded executables can
+  // be extracted and inspected. It adds several KB to the output files and
+  // should be disabled in release builds.
+  bool emitPolyglotZip = true;
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<BytecodeTargetOptions>;
