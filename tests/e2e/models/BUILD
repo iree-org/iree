@@ -38,6 +38,7 @@ iree_lit_test_suite(
             ["*.mlir"],
         exclude = CHECK_FRAMEWORK_TESTS,
     ),
+    cfg = "//tests:lit.cfg.py",
     tags = [
         "hostonly",
         "optonly",  # swiftshader is too slow in dbg

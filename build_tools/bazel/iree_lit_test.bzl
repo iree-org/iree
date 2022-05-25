@@ -10,7 +10,7 @@ load(":lit_test.bzl", "lit_test", "lit_test_suite")
 
 def iree_lit_test(
         name,
-        cfg = "//iree/test:lit.cfg.py",
+        cfg,
         tools = None,
         env = None,
         **kwargs):
@@ -54,7 +54,7 @@ def iree_lit_test(
 
 def iree_lit_test_suite(
         name,
-        cfg = "//iree/test:lit.cfg.py",
+        cfg,
         tools = None,
         env = None,
         **kwargs):

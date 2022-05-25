@@ -211,7 +211,7 @@ $ cmake --build . --target iree-test-deps
 ### Running a Test
 
 For the test
-https://github.com/google/iree/tree/main/iree/test/e2e/xla_ops/floor.mlir
+https://github.com/google/iree/tree/main/tests/e2e/xla_ops/floor.mlir
 compiled for the VMVX target backend and running on the VMVX driver (here they
 match exactly, but in principle there's a many-to-many mapping from backends to
 drivers).
@@ -219,13 +219,13 @@ drivers).
 With CMake, run this from the build directory:
 
 ```shell
-$ ctest -R iree/test/e2e/xla_ops/check_vmvx_vmvx_floor.mlir
+$ ctest -R tests/e2e/xla_ops/check_vmvx_vmvx_floor.mlir
 ```
 
 With Bazel, run this from the repo root:
 
 ```shell
-$ bazel test iree/test/e2e/xla_ops:check_vmvx_vmvx_floor.mlir
+$ bazel test tests/e2e/xla_ops:check_vmvx_vmvx_floor.mlir
 ```
 
 ### Setting test environments
@@ -235,7 +235,7 @@ for running tests as explained in the [Runtime Tests](#runtime-tests) section.
 
 ### Writing a Test
 
-These tests live in `iree/test/e2e`. A single test consists of a `.mlir` source
+These tests live in `tests/e2e`. A single test consists of a `.mlir` source
 file specifying an IREE module where each exported function takes no inputs and
 returns no results and corresponds to a single test case.
 

@@ -15,10 +15,11 @@ package(
 iree_lit_test_suite(
     name = "check_linalg_transform",
     srcs = ["linalg_transform.mlir"],
+    cfg = "//tests:lit.cfg.py",
     # linalg_transform_spec is a an MLIR file that specifies a
     # transformation, it needs to be included as data.
     data = [
-        "//iree/test/e2e/linalg_transform:linalg_transform_spec.mlir",
+        "//tests/e2e/linalg_transform:linalg_transform_spec.mlir",
     ],
     tags = [
         "hostonly",

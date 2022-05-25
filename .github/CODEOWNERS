@@ -56,10 +56,6 @@
 /samples/ @ScottTodd
 /tools/ @benvanik @GMNGeoffrey
 
-
-# Main IREE directories
-/iree/ @benvanik
-
 # Compiler
 /compiler/src/iree/compiler/ @benvanik
 /compiler/src/iree/compiler/Codegen/ @MaheshRavishankar
@@ -74,12 +70,8 @@
 /compiler/src/iree/compiler/InputConversion/MHLO @hanhanW @MaheshRavishankar @rsuderman
 /compiler/src/iree/compiler/InputConversion/TOSA @MaheshRavishankar @rsuderman
 
-
 # Runtime
 /runtime/src/iree/ @benvanik
 /runtime/src/iree/hal/cuda/ @ThomasRaoux
 /runtime/src/iree/hal/cts/ @ScottTodd
 /runtime/src/iree/hal/vulkan/ @antiagainst @ScottTodd
-
-# Other IREE directories
-/iree/test/ @ghost

@@ -605,7 +605,7 @@ add_custom_target(iree-test-deps COMMENT "Building IREE test deps")
 add_subdirectory(build_tools/embed_data/)
 
 # Note: Test deps are not built as part of all (use the iree-test-deps target).
-add_subdirectory(iree/test EXCLUDE_FROM_ALL)
+add_subdirectory(tests EXCLUDE_FROM_ALL)
 
 if(IREE_BUILD_BENCHMARKS)
   find_program(IREE_IMPORT_TFLITE_PATH iree-import-tflite)
