@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --verify-diagnostics --iree-flow-enable-multi-result-dispatches --pass-pipeline="func.func(iree-flow-dispatch-linalg-on-tensors-pass), cse, canonicalize, cse" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --iree-flow-enable-fuse-padding-into-consumer-ops --pass-pipeline="func.func(iree-flow-dispatch-linalg-on-tensors-pass), cse, canonicalize, cse" %s | FileCheck %s
 
 func.func @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
              %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
@@ -1221,10 +1221,10 @@ func.func @no_fuse_quantized(%arg0 : tensor<?x113x113x64xi8>, %arg1 : tensor<3x3
 
 // -----
 
-func.func @fuse_tensor_insert_source_producer(%arg0 : tensor<2x2xf32>) -> tensor<8x10xf32> {
+func.func @dont_fuse_tensor_insert_dest_producer(%arg0 : tensor<2x2xf32>) -> tensor<3x3xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %cst = arith.constant dense<0.0> : tensor<8x10xf32>
+  %cst = arith.constant dense<0.0> : tensor<3x3xf32>
   %init = linalg.init_tensor [2, 2] : tensor<2x2xf32>
   %0 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
@@ -1234,23 +1234,19 @@ func.func @fuse_tensor_insert_source_producer(%arg0 : tensor<2x2xf32>) -> tensor
       %1 = arith.addf %b0, %b0 : f32
       linalg.yield %1 : f32
     } -> tensor<2x2xf32>
-  %1 = tensor.insert_slice %0 into %cst[2, 3] [2, 2] [1, 1]
-      : tensor<2x2xf32> into tensor<8x10xf32>
-  return %1 : tensor<8x10xf32>
+  %1 = tensor.insert_slice %0 into %cst[0, 0] [2, 2] [1, 1]
+      : tensor<2x2xf32> into tensor<3x3xf32>
+  return %1 : tensor<3x3xf32>
 }
-//      CHECK: func.func @fuse_tensor_insert_source_producer
+//      CHECK: func.func @dont_fuse_tensor_insert_dest_producer
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<2x2xf32>
-//      CHECK:   %[[CST:.+]] = arith.constant {{.+}} : tensor<8x10xf32>
-//      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
-// CHECK-SAME:       (%[[ARG0]], %[[CST]])
-// CHECK-NEXT:       %[[ARG1:.+]]: !flow.dispatch.tensor<readonly:2x2xf32>
-// CHECK-SAME:       %[[ARG2:.+]]: !flow.dispatch.tensor<readwrite:8x10xf32>
-//  CHECK-DAG:     %[[C2:.+]] = arith.constant 2 : index
-//  CHECK-DAG:     %[[C3:.+]] = arith.constant 3 : index
-//      CHECK:     %[[GENERIC:.+]] = linalg.generic
-//      CHECK:     flow.dispatch.tensor.store %[[GENERIC]], %[[ARG2]]
-// CHECK-SAME:         offsets = [%[[C2]], %[[C3]]], sizes = [2, 2]
-//      CHECK:   return %[[DISPATCH]]
+//      CHECK:   %[[CST:.+]] = arith.constant {{.+}} : tensor<3x3xf32>
+//      CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
+//      CHECK:     linalg.generic
+//      CHECK:     flow.return
+//      CHECK:   %[[DISPATCH2:.+]] = flow.dispatch.workgroups
+// CHECK-SAME:       (%[[DISPATCH1]], %[[CST]])
+//      CHECK:   return %[[DISPATCH2]]
 
 // -----
 
@@ -1447,25 +1443,75 @@ func.func @multi_use_producer_fusion(%arg0 : tensor<?x8xf32>, %arg1 : tensor<8x?
 
 // -----
 
-func.func @dont_fuse_concat_chain(%arg0 : tensor<10x20xf32>,
-    %arg1 : tensor<10x20xf32>, %arg2 : tensor<10x20xf32>) -> tensor<3x10x20xf32> {
-  %0 = linalg.init_tensor [3, 10, 20] : tensor<3x10x20xf32>
-  %1 = tensor.insert_slice %arg0 into %0[0, 0, 0] [1, 10, 20] [1, 1, 1]
-      : tensor<10x20xf32> into tensor<3x10x20xf32>
-  %2 = tensor.insert_slice %arg1 into %1[1, 0, 0] [1, 10, 20] [1, 1, 1]
-      : tensor<10x20xf32> into tensor<3x10x20xf32>
-  %3 = tensor.insert_slice %arg2 into %2[2, 0, 0] [1, 10, 20] [1, 1, 1]
-      : tensor<10x20xf32> into tensor<3x10x20xf32>
-  return %3 : tensor<3x10x20xf32>
+func.func @pad_op(%arg0 : tensor<?x?xf32>, %low0 : index,
+  %low1: index, %high0 : index, %high1 : index) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0.0 : f32
+  %0 = tensor.pad %arg0 low[%low0, %low1] high[%high0, %high1] {
+    ^bb0(%b0 : index, %b1 : index):
+      tensor.yield %c0 : f32
+  } : tensor<?x?xf32> to tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
 }
-//      CHECK: func.func @dont_fuse_concat_chain
-// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<10x20xf32>
-// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<10x20xf32>
-// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<10x20xf32>
-//      CHECK:   %[[V0:.+]] = flow.tensor.reshape %[[ARG0]]
-//      CHECK:   %[[INSERT0:.+]] = flow.tensor.update %[[V0]]
-//      CHECK:   %[[V1:.+]] = flow.tensor.reshape %[[ARG1]]
-//      CHECK:   %[[INSERT1:.+]] = flow.tensor.update %[[V1]], %[[INSERT0]]
-//      CHECK:   %[[V2:.+]] = flow.tensor.reshape %[[ARG2]]
-//      CHECK:   %[[INSERT2:.+]] = flow.tensor.update %[[V2]], %[[INSERT1]]
-//      CHECK:   return %[[INSERT2]]
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 + s1 + s2)>
+//      CHECK: func.func @pad_op
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[ARG4:[a-zA-Z0-9]+]]: index
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[OUT_D0:.+]] = affine.apply #[[MAP]]()[%[[ARG1]], %[[ARG3]], %[[D0]]]
+//  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG:   %[[OUT_D1:.+]] = affine.apply #[[MAP]]()[%[[ARG2]], %[[ARG4]], %[[D1]]]
+//  CHECK-DAG:   %[[SPLAT:.+]] = flow.tensor.splat %[[CST]] : tensor<?x?xf32>{%[[OUT_D0]], %[[OUT_D1]]}
+//  CHECK-DAG:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
+// CHECK-SAME:       [%[[D1]], %[[D0]], %[[C1]]]
+// CHECK-SAME:       (%[[ARG0]], %[[D0]], %[[D1]], %[[SPLAT]], %[[ARG1]], %[[ARG2]], %[[OUT_D0]], %[[OUT_D1]])
+// CHECK-NEXT:     (%[[ARG5:.+]]: !flow.dispatch.tensor<readonly:?x?xf32>
+// CHECK-SAME:         %[[ARG6:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:         %[[ARG7:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:         %[[ARG8:.+]]: !flow.dispatch.tensor<readwrite:?x?xf32>
+// CHECK-SAME:         %[[ARG9:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:         %[[ARG10:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:         %[[ARG11:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:         %[[ARG12:[a-zA-Z0-9]+]]: index
+//      CHECK:       %[[LOAD:.+]] = flow.dispatch.tensor.load %[[ARG5]]
+// CHECK-SAME:           offsets = [0, 0], sizes = [%[[ARG6]], %[[ARG7]]]
+//      CHECK:       flow.dispatch.tensor.store %[[LOAD]], %[[ARG8]]
+// CHECK-SAME:           offsets = [%[[ARG9]], %[[ARG10]]], sizes = [%[[ARG6]], %[[ARG7]]]
+//      CHECK:   return %[[DISPATCH]]  
+
+// -----
+
+func.func @pad_op_fusion(%arg0 : tensor<?x?xf32>, %low0 : index,
+  %low1: index, %high0 : index, %high1 : index) -> tensor<?x?xf32> {
+  %cst = arith.constant 0.0 : f32
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<?x?xf32>) outs(%arg0 : tensor<?x?xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32):
+      %1 = arith.addf %b0, %b0 : f32
+      linalg.yield %1 : f32
+    } -> tensor<?x?xf32>
+  %1 = tensor.pad %0 low[%low0, %low1] high[%high0, %high1] {
+    ^bb0(%b0 : index, %b1 : index):
+      tensor.yield %cst : f32
+  } : tensor<?x?xf32> to tensor<?x?xf32>
+  return %1 : tensor<?x?xf32>
+}
+//      CHECK: func.func @pad_op_fusion
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
+//      CHECK:   %[[SPLAT:.+]] = flow.tensor.splat
+//      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
+// CHECK-SAME:       (%[[ARG0]]
+// CHECK-SAME:       %[[SPLAT]]
+// CHECK-NEXT:     (%[[ARG5:.+]]: !flow.dispatch.tensor<readonly:?x?xf32>
+// CHECK-SAME:         %[[ARG8:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readwrite:?x?xf32>
+//      CHECK:     %[[LOAD:.+]] = flow.dispatch.tensor.load %[[ARG5]]
+//      CHECK:     %[[GENERIC:.+]] = linalg.generic
+// CHECK-SAME:          ins(%[[LOAD]] :
+//      CHECK:     flow.dispatch.tensor.store %[[GENERIC]], %[[ARG8]]
+//      CHECK:   return %[[DISPATCH]]

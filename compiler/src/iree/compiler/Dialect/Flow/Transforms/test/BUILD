@@ -27,6 +27,7 @@ iree_lit_test_suite(
             "dispatch_linalg_on_tensors_fusion.mlir",
             "expand_tensor_shapes.mlir",
             "export_benchmark_funcs.mlir",
+            "fuse_pad_with_consumer.mlir",
             "infer_numeric_narrowing.mlir",
             "initialize_empty_tensor.mlir",
             "inject_dispatch_tracing.mlir",
