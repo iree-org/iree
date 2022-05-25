@@ -54,7 +54,6 @@
 # Other Top-Level Directories
 /docs/ @ScottTodd
 /samples/ @ScottTodd
-/tests/ @ghost
 /tools/ @benvanik @GMNGeoffrey
 
 # Compiler
