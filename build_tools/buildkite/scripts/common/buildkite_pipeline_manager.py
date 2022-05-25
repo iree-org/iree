@@ -12,7 +12,7 @@ from typing import List, Optional
 from pybuildkite import buildkite
 
 from common.buildkite_utils import (BuildObject, get_build_number,
-                                    get_build_state, linkify, pipeline_exists)
+                                    get_build_state, get_pipeline, linkify)
 
 # Fake build to return when running locally.
 FAKE_PASSED_BUILD = dict(number=42, state="passed")
@@ -58,9 +58,9 @@ class BuildkitePipelineManager(object):
     }
     # If the pipeline doesn't exist, then we run it on the "unregistered"
     # pipeline, which leverages the REQUESTED_PIPELINE env variable.
-    if not pipeline_exists(self._buildkite,
-                           organization=self._organization,
-                           pipeline=self._pipeline):
+    if not get_pipeline(self._buildkite,
+                        organization=self._organization,
+                        pipeline_slug=self._pipeline):
       self._pipeline = UNREGISTERED_PIPELINE_NAME
 
   @staticmethod

@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Pipeline configuration to upload to the UI for trusted pipelines
+# Pipeline configuration to register with Buidlkite for trusted pipelines
 
 agents:
   queue: "orchestration"
