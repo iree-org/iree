@@ -183,7 +183,9 @@ install(
 
 # _runtime.so -> python_packages/iree_runtime/iree/_runtime.so
 install(
-  TARGETS iree_bindings_python_PyExtRt
+  # TODO: Update CMake target/path mangling rules to make this syntactically
+  # rooted on "iree" in some way.
+  TARGETS runtime_bindings_python_PyExtRt
   DESTINATION "${_INSTALL_DIR}/iree"
   COMPONENT "${_INSTALL_COMPONENT}"
 )
