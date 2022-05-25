@@ -53,8 +53,10 @@ endfunction()
 # Sets ${PACKAGE_NS} to the IREE-root relative package name in C++ namespace
 # format (::).
 #
-# Example when called from iree/base/CMakeLists.txt:
-#   iree::base
+# Examples:
+#   compiler/src/iree/compiler/Utils/CMakeLists.txt -> iree::compiler::Utils
+#   runtime/src/iree/base/CMakeLists.txt -> iree::base
+#   tests/e2e/CMakeLists.txt -> iree::tests::e2e
 function(iree_package_ns PACKAGE_NS)
   # Get the relative path of the current dir (i.e. runtime/src/iree/vm).
   string(REPLACE ${IREE_ROOT_DIR} "" _RELATIVE_PATH ${CMAKE_CURRENT_LIST_DIR})
@@ -63,15 +65,9 @@ function(iree_package_ns PACKAGE_NS)
   if(_RELATIVE_PATH MATCHES "^compiler/src/(.*)")
     # compiler/src/iree/compiler -> iree/compiler
     set(_PACKAGE "${CMAKE_MATCH_1}")
-  elseif(_RELATIVE_PATH MATCHES "^compiler/src$")
-    # compiler/src (defs) -> iree::compiler::defs
-    set(_PACKAGE "iree::compiler")
   elseif(_RELATIVE_PATH MATCHES "^runtime/src/(.*)")
     # runtime/src/iree/base -> iree/base
     set(_PACKAGE "${CMAKE_MATCH_1}")
-  elseif(_RELATIVE_PATH MATCHES "^runtime/src$")
-    # runtime/src (defs) -> iree::runtime::defs
-    set(_PACKAGE "iree::runtime")
   elseif(_RELATIVE_PATH MATCHES "^tools$")
     # Special case for tools/ -> "" (empty string)
     # For example, tools/iree-compile -> iree-compile (no namespace)

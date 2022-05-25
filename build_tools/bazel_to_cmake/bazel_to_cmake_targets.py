@@ -230,13 +230,18 @@ def convert_target(target):
     return _convert_llvm_target(target)
   if target.startswith("@llvm-project//mlir"):
     return _convert_mlir_target(target)
-  if target.startswith("//llvm-external-projects/iree-dialects"):
-    return _convert_iree_dialects_target(target)
-
   if target.startswith("@"):
     raise KeyError(f"No conversion found for target '{target}'")
 
+  if target.startswith("//llvm-external-projects/iree-dialects"):
+    return _convert_iree_dialects_target(target)
+
   # IREE root paths map to package names based on explicit rules.
+  #   * compiler/src/iree/ and runtime/src/iree/ are special and get trimmed
+  #     to just 'iree'
+  #   * tools/ is also special so that original (non-aliased) target names
+  #     appear without a namespace
+  #   * other top level directories add back an 'iree' prefix
   # If changing these, make the corresponding change in iree_macros.cmake
   # (iree_package_ns function).
 
@@ -261,5 +266,5 @@ def convert_target(target):
   if target.startswith(":") or ":" not in target:
     return [_convert_to_cmake_path(target)]
 
-  # Default rewrite.
+  # Default rewrite: prefix with "iree::", without pruning the path.
   return ["iree::" + _convert_to_cmake_path(target)]

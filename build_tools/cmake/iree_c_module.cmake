@@ -70,12 +70,12 @@ function(iree_c_module)
     HDRS "${_RULE_H_FILE_OUTPUT}"
     SRCS "${IREE_SOURCE_DIR}/runtime/src/iree/vm/module_impl_emitc.c"
     INCLUDES "${CMAKE_CURRENT_BINARY_DIR}"
-    COPTS 
+    COPTS
       "-DEMITC_IMPLEMENTATION=\"${_RULE_H_FILE_OUTPUT}\""
       "${_TESTONLY_ARG}"
     DEPS
       # Include paths and options for the runtime sources.
-      iree::runtime::defs
+      iree::runtime::src::defs
   )
 
   set(_GEN_TARGET "${_NAME}_gen")
