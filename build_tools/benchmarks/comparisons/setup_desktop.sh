@@ -9,10 +9,11 @@
 set -euo pipefail
 
 # Install Bazel. From https://www.tensorflow.org/install/source
-npm install -g @bazel/bazelisk
+#npm install -g @bazel/bazelisk
 
 # Create root dir.
 ROOT_DIR=/tmp/mobilebert_benchmarks
+rm -rf "${ROOT_DIR}"
 mkdir "${ROOT_DIR}"
 mkdir "${ROOT_DIR}/models"
 mkdir "${ROOT_DIR}/models/tflite"
@@ -26,6 +27,7 @@ wget https://storage.googleapis.com/iree-model-artifacts/mobilebert_float_384_gp
 
 # Build IREE source.
 SOURCE_DIR=/tmp/github
+rm -rf "${SOURCE_DIR}"
 mkdir "${SOURCE_DIR}"
 cd "${SOURCE_DIR}"
 

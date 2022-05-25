@@ -13,8 +13,12 @@ from typing import Optional
 class BenchmarkCommand(abc.ABC):
   """Abstracts a benchmark command."""
 
-  def __init__(self, benchmark_binary: str, model_name: str,
-               num_threads: int, num_runs: int, driver: Optional[str] = None,
+  def __init__(self,
+               benchmark_binary: str,
+               model_name: str,
+               num_threads: int,
+               num_runs: int,
+               driver: Optional[str] = None,
                taskset: Optional[str] = None):
     self.benchmark_binary = benchmark_binary
     self.model_name = model_name
@@ -47,9 +51,18 @@ class BenchmarkCommand(abc.ABC):
 class TFLiteBenchmarkCommand(BenchmarkCommand):
   """Represents a TFLite benchmark command."""
 
-  def __init__(self, benchmark_binary: str, model_name: str, model_path: str,
-      num_threads: int, num_runs: int, taskset: Optional[str] = None):
-    super().__init__(benchmark_binary, model_name, num_threads, num_runs, taskset=taskset)
+  def __init__(self,
+               benchmark_binary: str,
+               model_name: str,
+               model_path: str,
+               num_threads: int,
+               num_runs: int,
+               taskset: Optional[str] = None):
+    super().__init__(benchmark_binary,
+                     model_name,
+                     num_threads,
+                     num_runs,
+                     taskset=taskset)
     self.args.append("--graph=" + model_path)
     self._latency_large_regex = re.compile(
         r".*?Inference \(avg\): (\d+.?\d*e\+?\d*).*")
@@ -85,9 +98,18 @@ class TFLiteBenchmarkCommand(BenchmarkCommand):
 class IreeBenchmarkCommand(BenchmarkCommand):
   """Represents an IREE benchmark command."""
 
-  def __init__(self, benchmark_binary: str, model_name: str, model_path: str,
-      num_threads: int, num_runs: int, taskset: Optional[str] = None):
-    super().__init__(benchmark_binary, model_name, num_threads, num_runs, taskset=taskset)
+  def __init__(self,
+               benchmark_binary: str,
+               model_name: str,
+               model_path: str,
+               num_threads: int,
+               num_runs: int,
+               taskset: Optional[str] = None):
+    super().__init__(benchmark_binary,
+                     model_name,
+                     num_threads,
+                     num_runs,
+                     taskset=taskset)
     self.args.append("--module_file=" + model_path)
     self._latency_regex = re.compile(
         r".*?BM_main/process_time/real_time_mean\s+(.*?) ms.*")

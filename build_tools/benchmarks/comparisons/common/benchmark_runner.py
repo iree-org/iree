@@ -25,7 +25,8 @@ def run_command(benchmark_command: BenchmarkCommand) -> list[float]:
   """
   command = benchmark_command.generate_benchmark_command()
   print("\n\nRunning command:\n" + " ".join(command))
-  benchmark_process = subprocess.Popen(command, stdout=subprocess.PIPE,
+  benchmark_process = subprocess.Popen(command,
+                                       stdout=subprocess.PIPE,
                                        stderr=subprocess.STDOUT)
 
   # Keep a record of the highest VmHWM corresponding VmRSS and RssFile values.
@@ -33,8 +34,8 @@ def run_command(benchmark_command: BenchmarkCommand) -> list[float]:
   vmrss = 0
   rssfile = 0
   while benchmark_process.poll() is None:
-    pid_status = subprocess.run([
-        "cat", "/proc/" + str(benchmark_process.pid) + "/status"],
+    pid_status = subprocess.run(
+        ["cat", "/proc/" + str(benchmark_process.pid) + "/status"],
         capture_output=True)
     output = pid_status.stdout.decode()
     vmhwm_matches = _VMHWM_REGEX.search(output)
@@ -53,8 +54,8 @@ def run_command(benchmark_command: BenchmarkCommand) -> list[float]:
   stdout_data, _ = benchmark_process.communicate()
 
   if benchmark_process.returncode != 0:
-    print("Warning! Benchmark command failed with return code: " + str(
-        benchmark_process.returncode))
+    print("Warning! Benchmark command failed with return code: " +
+          str(benchmark_process.returncode))
     return [0, 0, 0, 0]
   else:
     print(stdout_data.decode())

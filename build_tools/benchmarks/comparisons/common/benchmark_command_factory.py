@@ -19,6 +19,6 @@ class BenchmarkCommandFactory(abc.ABC):
   """
 
   @abc.abstractmethod
-  def generate_benchmark_commands(self, device: str, driver: str) -> list[
-    BenchmarkCommand]:
+  def generate_benchmark_commands(self, device: str,
+                                  driver: str) -> list[BenchmarkCommand]:
     pass
