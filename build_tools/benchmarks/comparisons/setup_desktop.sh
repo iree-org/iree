@@ -76,18 +76,6 @@ echo "Compiling ${MODEL_NAME}.vmfb for dylib..."
   --iree-vm-emit-polyglot-zip=false \
   "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
   --o "${IREE_MODEL_DIR}/dylib/${MODEL_NAME}.vmfb"
-# Build mm4td for x86.
-echo "Compiling ${MODEL_NAME}_mmt4d.vmfb for dylib..."
-"${IREE_COMPILE_PATH}" --iree-input-type=tosa --iree-mlir-to-vm-bytecode-module \
-  --iree-llvm-target-cpu-features=host \
-  --iree-hal-target-backends=dylib-llvm-aot \
-  --iree-llvm-debug-symbols=false \
-  --iree-vm-bytecode-module-strip-source-map=true \
-  --iree-vm-emit-polyglot-zip=false \
-  "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod" \
-  --iree-llvm-target-cpu-features=+dotprod \
-  "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
-  --o "${IREE_MODEL_DIR}/dylib/${MODEL_NAME}_mmt4d.vmfb"
 
 cp "${SOURCE_DIR}/iree-build/tools/iree-benchmark-module" "${ROOT_DIR}/"
 
