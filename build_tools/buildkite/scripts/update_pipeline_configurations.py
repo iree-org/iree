@@ -135,7 +135,7 @@ def should_update(bk, *, organization, configuration, existing_pipeline,
 
 def create_pipeline(bk, *, organization, pipeline_slug, configuration,
                     running_pipeline, running_build_number, running_commit,
-                    trusted):
+                    trusted, dry_run):
   configuration = prepend_header(configuration,
                                  organization=organization,
                                  running_pipeline=running_pipeline,
@@ -164,14 +164,15 @@ def create_pipeline(bk, *, organization, pipeline_slug, configuration,
       },
   }
 
-  pipelines_api.client.post(pipelines_api.path.format("iree"), body=data)
+  if not dry_run:
+    pipelines_api.client.post(pipelines_api.path.format("iree"), body=data)
 
   print("...created successfully")
 
 
 def update_pipeline(bk, *, organization, pipeline_slug, configuration,
                     running_pipeline, running_build_number, running_commit,
-                    trusted):
+                    trusted, dry_run):
   configuration = prepend_header(configuration,
                                  organization=organization,
                                  running_pipeline=running_pipeline,
@@ -179,14 +180,16 @@ def update_pipeline(bk, *, organization, pipeline_slug, configuration,
                                  running_commit=running_commit,
                                  trusted=trusted)
 
-  bk.pipelines().update_pipeline(organization=organization,
-                                 pipeline=pipeline_slug,
-                                 configuration=configuration)
+  if not dry_run:
+    bk.pipelines().update_pipeline(organization=organization,
+                                   pipeline=pipeline_slug,
+                                   configuration=configuration)
   print("...updated successfully")
 
 
 def update_pipelines(bk, pipeline_files, *, organization, running_pipeline,
-                     running_build_number, running_commit, trusted, force):
+                     running_build_number, running_commit, trusted, force,
+                     dry_run):
   if force:
     print("Was passed force, so not checking existing pipeline configurations.")
   first_error = None
@@ -209,7 +212,8 @@ def update_pipelines(bk, pipeline_files, *, organization, running_pipeline,
                         running_pipeline=running_pipeline,
                         running_build_number=running_build_number,
                         running_commit=running_commit,
-                        trusted=trusted)
+                        trusted=trusted,
+                        dry_run=dry_run)
 
         continue
       print(f"Updating for: '{pipeline_file}'...")
@@ -228,6 +232,7 @@ def update_pipelines(bk, pipeline_files, *, organization, running_pipeline,
             running_build_number=running_build_number,
             running_commit=running_commit,
             trusted=trusted,
+            dry_run=dry_run,
         )
     except Exception as e:
       if first_error is None:
@@ -249,6 +254,9 @@ def parse_args():
       help=(f"Force updates for all pipelines without checking the existing"
             f" configuration. Use with caution. Can also be set via the"
             f" environment variable {FORCE_UPDATE_ENV_VAR}."))
+  parser.add_argument("--dry-run",
+                      action="store_true",
+                      help="Don't actually update or create any pipelines.")
   parser.add_argument(
       "pipelines",
       type=str,
@@ -299,7 +307,8 @@ def main(args):
                                  running_build_number=running_build_number,
                                  running_commit=running_commit,
                                  trusted=True,
-                                 force=args.force)
+                                 force=args.force,
+                                 dry_run=args.dry_run)
   first_error = (first_error or
                  update_pipelines(bk,
                                   untrusted_pipeline_files,
@@ -308,7 +317,8 @@ def main(args):
                                   running_build_number=running_build_number,
                                   running_commit=running_commit,
                                   trusted=False,
-                                  force=args.force))
+                                  force=args.force,
+                                  dry_run=args.dry_run))
 
   if first_error is not None:
     print("Encountered errors. Stack of first error:")
