@@ -12,9 +12,10 @@
 // be the first user of the combined MLIR+IREE CAPI:
 // https://github.com/google/iree/pull/8582
 
-#include <iree/base/string_builder.h>
-#include <iree/compiler/API/Compiler.h>
 #include <stdio.h>
+
+#include "iree/base/api.h"
+#include "iree/compiler/API/Compiler.h"
 
 static void bytecode_builder_callback(MlirStringRef str, void* userdata) {
   iree_string_builder_t* builder = (iree_string_builder_t*)userdata;
@@ -126,7 +127,7 @@ int main(int argc, char** argv) {
 
   // Compiles MLIR to VM bytecode.
   bool status = iree_compile_mlir_to_bytecode(
-      mlir_code, iree_make_cstring_view("dylib"), &bytecode_builder);
+      mlir_code, iree_make_cstring_view("vmvx"), &bytecode_builder);
   if (!status) {
     iree_string_builder_deinitialize(&bytecode_builder);
     fprintf(stderr, "failed to compiler MLIR code\n");
