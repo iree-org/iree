@@ -38,6 +38,10 @@ TRUSTED_BOOTSTRAP_PIPELINE_PATH = os.path.join(PIPELINE_ROOT_PATH, "fragment",
 UNTRUSTED_BOOTSTRAP_PIPELINE_PATH = os.path.join(PIPELINE_ROOT_PATH, "fragment",
                                                  "bootstrap-untrusted.yml")
 
+IREE_TEAM_REST_UUID = "1a2cbc72-2c8e-4375-821e-e3dfa1db96b5"
+
+FORCE_UPDATE_ENV_VAR = "IREE_FORCE_BUILDKITE_PIPELINE_UPDATE"
+
 BUILD_URL_PREAMBLE = "# Automatically updated by Buildkite pipeline"
 
 UPDATE_INFO_HEADER = f"""{BUILD_URL_PREAMBLE} {{build_url}}
@@ -147,7 +151,15 @@ def create_pipeline(bk, *, organization, pipeline_slug, configuration,
       "name": pipeline_slug,
       "repository": GIT_REPO,
       "configuration": configuration,
+      "visibility": "public",
+      # With the rest API, we can only give "Full Access", so this is limited to
+      # the IREE team. I'm talking to Buildkite support about this limitation.
+      # It also means that the iree-buildkite-submitted-bot is currently added
+      # to the IREE team rather than only being in its own team, as originally
+      # intended.
+      "team_uuids": [IREE_TEAM_REST_UUID],
       "provider_settings": {
+          # We don't want any automatic triggering from GitHub webhooks.
           "trigger_mode": "none"
       },
   }
