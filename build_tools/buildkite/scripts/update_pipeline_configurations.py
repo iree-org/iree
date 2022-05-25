@@ -196,7 +196,7 @@ def update_pipelines(bk, pipeline_files, *, organization, running_pipeline,
                                                 organization=organization,
                                                 pipeline_slug=pipeline_slug)
       if existing_pipeline is None:
-        print(f"Creating from: '{pipeline_file}'...")
+        print(f"Creating for: '{pipeline_file}'...")
         create_pipeline(bk,
                         organization=organization,
                         pipeline_slug=pipeline_slug,
@@ -207,7 +207,7 @@ def update_pipelines(bk, pipeline_files, *, organization, running_pipeline,
                         trusted=trusted)
 
         continue
-      print(f"Updating from: '{pipeline_file}'...")
+      print(f"Updating for: '{pipeline_file}'...")
       if force or should_update(bk,
                                 organization=organization,
                                 configuration=configuration,
@@ -271,14 +271,17 @@ def main(args):
 
   git_root = get_git_root()
   os.chdir(git_root)
-  glob_pattern = os.path.join(PIPELINE_ROOT_PATH, "*.yml")
 
-  trusted_pipeline_files = ((
-      os.path.join(PIPELINE_ROOT_PATH, "trusted", f"{p}.yml")
-      for p in args.pipelines) if args.pipelines else glob.iglob(glob_pattern))
-  untrusted_pipeline_files = ((
-      os.path.join(PIPELINE_ROOT_PATH, "untrusted", f"{p}.yml")
-      for p in args.pipelines) if args.pipelines else glob.iglob(glob_pattern))
+  trusted_pipeline_files = glob.iglob(
+      os.path.join(PIPELINE_ROOT_PATH, "trusted", "*.yml"))
+  untrusted_pipeline_files = glob.iglob(
+      os.path.join(PIPELINE_ROOT_PATH, "untrusted", "*.yml"))
+
+  if args.pipelines:
+    trusted_pipeline_files = (
+        p for p in trusted_pipeline_files if p in args.pipelines)
+    untrusted_pipeline_files = (
+        p for p in untrusted_pipeline_files if p in args.pipelines)
 
   first_error = update_pipelines(bk,
                                  trusted_pipeline_files,
