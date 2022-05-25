@@ -122,10 +122,11 @@ class MobilebertFP32CommandFactory(BenchmarkCommandFactory):
       model_mmt4d_name = self._model_name + "_mmt4d"
       iree_mmt4d_model_path = os.path.join(self._base_dir, "models", "iree",
                                            driver, model_mmt4d_name + ".vmfb")
-      iree_mmt4d_mobilebert = IreeMobilebertFP32(self._iree_benchmark_binary_path,
-                                                 model_mmt4d_name,
-                                                 iree_mmt4d_model_path,
-                                                 driver=driver)
+      iree_mmt4d_mobilebert = IreeMobilebertFP32(
+          self._iree_benchmark_binary_path,
+          model_mmt4d_name,
+          iree_mmt4d_model_path,
+          driver=driver)
       commands.append(iree_mmt4d_mobilebert)
 
     return commands
