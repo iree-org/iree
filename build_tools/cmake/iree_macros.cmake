@@ -60,10 +60,6 @@ function(iree_package_ns PACKAGE_NS)
   string(REPLACE ${IREE_ROOT_DIR} "" _RELATIVE_PATH ${CMAKE_CURRENT_LIST_DIR})
   string(SUBSTRING ${_RELATIVE_PATH} 1 -1 _RELATIVE_PATH)
 
-  # If changing the directory/package mapping rules, please also implement
-  # the corresponding rule in:
-  #   build_tools/bazel_to_cmake/bazel_to_cmake_targets.py
-  # Some sub-trees form their own roots for package purposes. Rewrite them.
   if(_RELATIVE_PATH MATCHES "^compiler/src/(.*)")
     # compiler/src/iree/compiler -> iree/compiler
     set(_PACKAGE "${CMAKE_MATCH_1}")
@@ -76,24 +72,13 @@ function(iree_package_ns PACKAGE_NS)
   elseif(_RELATIVE_PATH MATCHES "^runtime/src$")
     # runtime/src (defs) -> iree::runtime::defs
     set(_PACKAGE "iree::runtime")
-  elseif(_RELATIVE_PATH MATCHES "^runtime/bindings/(.*)")
-    set(_PACKAGE "iree::bindings::${CMAKE_MATCH_1}")
-  elseif(_RELATIVE_PATH MATCHES "^build_tools/(.*)")
-    set(_PACKAGE "iree::build_tools::${CMAKE_MATCH_1}")
-  elseif(_RELATIVE_PATH MATCHES "^samples/(.*)")
-    set(_PACKAGE "iree::samples::${CMAKE_MATCH_1}")
-  elseif(_RELATIVE_PATH MATCHES "^samples$")
-    set(_PACKAGE "iree::samples")
-  elseif(_RELATIVE_PATH MATCHES "^tests/(.*)")
-    set(_PACKAGE "iree::tests::${CMAKE_MATCH_1}")
-  elseif(_RELATIVE_PATH MATCHES "^tools/test$")
-    set(_PACKAGE "iree::tools::test")
   elseif(_RELATIVE_PATH MATCHES "^tools$")
-    # tools/ -> "" (empty string), e.g. iree-opt -> iree-opt
+    # Special case for tools/ -> "" (empty string)
+    # For example, tools/iree-compile -> iree-compile (no namespace)
     set(_PACKAGE "")
   else()
-    # Default to pass-through.
-    set(_PACKAGE "${_RELATIVE_PATH}")
+    # Default to prefixing with iree/
+    set(_PACKAGE "iree/${_RELATIVE_PATH}")
   endif()
 
   string(REPLACE "/" "::" _PACKAGE_NS "${_PACKAGE}")

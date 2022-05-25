@@ -197,15 +197,15 @@ def _convert_iree_dialects_target(target):
   return [target.rsplit(":")[-1]]
 
 
-def _convert_bazel_path(bazel_path: str) -> str:
-  # Bazel `:api`            -> CMake `::api`
+def _convert_to_cmake_path(bazel_path_fragment: str) -> str:
+  cmake_path = bazel_path_fragment
   # Bazel `//iree/base`     -> CMake `iree::base`
   # Bazel `//iree/base:foo` -> CMake `iree::base::foo`
-  if bazel_path.startswith("//"):
-    bazel_path = bazel_path[len("//"):]
-  bazel_path = bazel_path.replace(":", "::")  # iree/base::foo or ::foo
-  bazel_path = bazel_path.replace("/", "::")  # iree::base
-  return bazel_path
+  if cmake_path.startswith("//"):
+    cmake_path = cmake_path[len("//"):]
+  cmake_path = cmake_path.replace(":", "::")  # iree/base::foo or ::foo
+  cmake_path = cmake_path.replace("/", "::")  # iree::base
+  return cmake_path
 
 
 def convert_target(target):
@@ -233,6 +233,9 @@ def convert_target(target):
   if target.startswith("//llvm-external-projects/iree-dialects"):
     return _convert_iree_dialects_target(target)
 
+  if target.startswith("@"):
+    raise KeyError(f"No conversion found for target '{target}'")
+
   # IREE root paths map to package names based on explicit rules.
   # If changing these, make the corresponding change in iree_macros.cmake
   # (iree_package_ns function).
@@ -240,35 +243,23 @@ def convert_target(target):
   # Map //compiler/src/iree/(.*) -> iree::\1 (i.e. iree::compiler::\1)
   m = re.match("^//compiler/src/iree/(.+)", target)
   if m:
-    return ["iree::" + _convert_bazel_path(m.group(1))]
+    return ["iree::" + _convert_to_cmake_path(m.group(1))]
 
   # Map //runtime/src/iree/(.*) -> iree::\1
   m = re.match("^//runtime/src/iree/(.+)", target)
   if m:
-    return ["iree::" + _convert_bazel_path(m.group(1))]
-
-  # Map //runtime/bindings/(.*) -> iree::bindings::\1
-  m = re.match("^//runtime/bindings/(.+)", target)
-  if m:
-    return ["iree::bindings::" + _convert_bazel_path(m.group(1))]
-
-  # Map //samples/(.*) -> iree::samples::\1
-  m = re.match("^//samples[/|:](.+)", target)
-  if m:
-    return ["iree::samples::" + _convert_bazel_path(m.group(1))]
-
-  # Map //tests/(.*) -> iree::tests::\1
-  m = re.match("^//tests[/|:](.+)", target)
-  if m:
-    return ["iree::tests::" + _convert_bazel_path(m.group(1))]
+    return ["iree::" + _convert_to_cmake_path(m.group(1))]
 
   # Map //tools/(.*) -> \1
   m = re.match("^//tools[/|:](.+)", target)
   if m:
-    return [_convert_bazel_path(m.group(1))]
+    return [_convert_to_cmake_path(m.group(1))]
 
-  # Default (legacy) rewrite.
-  if not target.startswith("@"):
-    return [_convert_bazel_path(target)]
+  # Pass through package-relative targets
+  #   :target_name
+  #   file_name.txt
+  if target.startswith(":") or ":" not in target:
+    return [_convert_to_cmake_path(target)]
 
-  raise KeyError(f"No conversion found for target '{target}'")
+  # Default rewrite.
+  return ["iree::" + _convert_to_cmake_path(target)]

@@ -183,7 +183,7 @@ install(
 
 # _runtime.so -> python_packages/iree_runtime/iree/_runtime.so
 install(
-  TARGETS iree_bindings_python_PyExtRt
+  TARGETS iree_runtime_bindings_python_PyExtRt
   DESTINATION "${_INSTALL_DIR}/iree"
   COMPONENT "${_INSTALL_COMPONENT}"
 )
