@@ -212,11 +212,13 @@ CompilationInfoAttr CompilationInfoAttr::get(
     MLIRContext *context, TileSizesListTypeRef tileSizes,
     TileSizesListTypeRef interchange, ArrayRef<int64_t> nativeVectorSize,
     DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workloadPerWorkgroup, ArrayRef<int64_t> workgroupSize) {
+    ArrayRef<int64_t> workloadPerWorkgroup, unsigned softwarePipelineDepth,
+    ArrayRef<int64_t> workgroupSize) {
   LoweringConfigAttr configAttr = LoweringConfigAttr::get(
       context, tileSizes, interchange, nativeVectorSize);
   TranslationInfoAttr translationInfoAttr =
-      TranslationInfoAttr::get(context, passPipeline, workloadPerWorkgroup);
+      TranslationInfoAttr::get(context, passPipeline,
+		      workloadPerWorkgroup, softwarePipelineDepth);
   ArrayAttr workgroupSizeAttr = getI64IntegerArrayAttr(context, workgroupSize);
   return get(context, configAttr, translationInfoAttr, workgroupSizeAttr);
 }

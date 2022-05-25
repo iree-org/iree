@@ -225,6 +225,7 @@ def IREECodegen_CompilationInfoAttr :
       "ArrayRef<int64_t>":$nativeVectorSize,
       "DispatchLoweringPassPipeline":$passPipeline,
       "ArrayRef<int64_t>":$workloadPerWorkgroup,
+      "unsigned":$softwarePipelineDepth,
       CArg<"ArrayRef<int64_t>", "{}">:$workgroupSize)>,
     AttrBuilder<(ins "LoweringConfigAttr":$configAttr,
       "TranslationInfoAttr":$translationInfo,
