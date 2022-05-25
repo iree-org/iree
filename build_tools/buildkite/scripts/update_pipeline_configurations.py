@@ -164,6 +164,10 @@ def create_pipeline(bk, *, organization, pipeline_slug, configuration,
       },
   }
 
+  print(f"Creating pipeline {pipeline_slug} with payload:\n"
+        f"```\n"
+        f"{configuration}\n"
+        f"```\n")
   if not dry_run:
     pipelines_api.client.post(pipelines_api.path.format("iree"), body=data)
 
@@ -180,6 +184,10 @@ def update_pipeline(bk, *, organization, pipeline_slug, configuration,
                                  running_commit=running_commit,
                                  trusted=trusted)
 
+  print(f"Updating pipeline {pipeline_slug} with configuration:\n"
+        f"```\n"
+        f"{configuration}\n"
+        f"```\n")
   if not dry_run:
     bk.pipelines().update_pipeline(organization=organization,
                                    pipeline=pipeline_slug,
@@ -187,14 +195,17 @@ def update_pipeline(bk, *, organization, pipeline_slug, configuration,
   print("...updated successfully")
 
 
+def get_slug(pipeline_file):
+  pipeline_slug, _ = os.path.splitext(os.path.basename(pipeline_file))
+  return pipeline_slug
+
+
 def update_pipelines(bk, pipeline_files, *, organization, running_pipeline,
                      running_build_number, running_commit, trusted, force,
                      dry_run):
-  if force:
-    print("Was passed force, so not checking existing pipeline configurations.")
   first_error = None
   for pipeline_file in pipeline_files:
-    pipeline_slug, _ = os.path.splitext(os.path.basename(pipeline_file))
+    pipeline_slug = get_slug(pipeline_file)
 
     try:
       with open(TRUSTED_BOOTSTRAP_PIPELINE_PATH
@@ -296,9 +307,12 @@ def main(args):
 
   if args.pipelines:
     trusted_pipeline_files = (
-        p for p in trusted_pipeline_files if p in args.pipelines)
+        p for p in trusted_pipeline_files if get_slug(p) in args.pipelines)
     untrusted_pipeline_files = (
-        p for p in untrusted_pipeline_files if p in args.pipelines)
+        p for p in untrusted_pipeline_files if get_slug(p) in args.pipelines)
+
+  if args.force:
+    print("Was passed force, so not checking existing pipeline configurations.")
 
   first_error = update_pipelines(bk,
                                  trusted_pipeline_files,
