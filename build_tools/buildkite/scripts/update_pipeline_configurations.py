@@ -237,14 +237,18 @@ def update_pipelines(bk, pipeline_files, *, organization, running_pipeline,
 
 
 def parse_args():
+  force_update = os.environ.get(FORCE_UPDATE_ENV_VAR)
+  force_update = not (force_update is None or force_update == "0" or
+                      force_update.lower() == "false" or force_update == "")
   parser = argparse.ArgumentParser(
       description="Updates the configurations for all Buildkite pipelines.")
   parser.add_argument(
       "--force",
       action="store_true",
-      default=False,
-      help=("Force updates for all pipelines without checking the existing"
-            " configuration. Use with caution."))
+      default=force_update,
+      help=(f"Force updates for all pipelines without checking the existing"
+            f" configuration. Use with caution. Can also be set via the"
+            f" environment variable {FORCE_UPDATE_ENV_VAR}."))
   parser.add_argument(
       "pipelines",
       type=str,
