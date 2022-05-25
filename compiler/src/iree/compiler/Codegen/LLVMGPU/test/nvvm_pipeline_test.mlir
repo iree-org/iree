@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline))' -iree-codegen-llvmgpu-use-mma-sync %s | FileCheck %s -check-prefix=MMASYNC
 
 // Verify that a simple element wise op gets lowered succefully all the way to
 // nvvm/llvm dialect.
@@ -407,7 +408,7 @@ hal.executable @mma_fused {
       %a = linalg.generic {
           indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
           iterator_types = ["parallel", "parallel"]}
-          ins(%m, %d : tensor<2048x512xf32>, tensor<2048x512xf32>) outs(%m : tensor<2048x512xf32>) {
+          ins(%m, %d : tensor<2048x512xf32>, tensor<2048x512xf32>) outs(%init2 : tensor<2048x512xf32>) {
         ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
           %19 = arith.addf %arg3, %arg4 : f32
           linalg.yield %19 : f32
@@ -454,6 +455,49 @@ hal.executable @mma_fused {
 //   CHECK-COUNT-8:   llvm.fadd
 //   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
 
+// mma.sync case:
+//    MMASYNC-LABEL: hal.executable public @mma_fused
+//          MMASYNC:   hal.executable.variant public @cuda
+//      MMASYNC-NOT:   llvm.store
+//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//          MMASYNC:   nvvm.cp.async.commit.group
+//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//          MMASYNC:   nvvm.cp.async.commit.group
+//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//          MMASYNC:   nvvm.cp.async.commit.group
+//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//          MMASYNC:   nvvm.cp.async.commit.group
+//          MMASYNC:   llvm.br
+//          MMASYNC:   nvvm.cp.async.wait.group 3
+//  MMASYNC-COUNT-4:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32)
+//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//          MMASYNC:   nvvm.cp.async.commit.group
+//          MMASYNC:   llvm.br
+//          MMASYNC:   nvvm.cp.async.wait.group 3
+//  MMASYNC-COUNT-4:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32)
+//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//          MMASYNC:   nvvm.cp.async.wait.group 2
+//  MMASYNC-COUNT-4:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32)
+//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//          MMASYNC:   nvvm.cp.async.wait.group 1
+//  MMASYNC-COUNT-4:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32)
+//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//          MMASYNC:   nvvm.cp.async.wait.group 0
+//  MMASYNC-COUNT-4:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32)
+//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//  MMASYNC-COUNT-4:   llvm.store {{.*}} : !llvm.ptr<vector<2xf32>, 3>
+//  MMASYNC-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//  MMASYNC-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+
+// C matrix promotion prevent efficient fusion with matmul consumer, this needs
+// to be fixed to get good performance.
+// MMASYNC-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<vector<8xf32>>
+// MMASYNC-COUNT-32:   llvm.fadd {{.*}} : vector<8xf32>
+// MMASYNC-COUNT-32:   llvm.store {{.*}} : !llvm.ptr<vector<8xf32>>
+
+
+
 // -----
 
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
@@ -489,7 +533,7 @@ hal.executable @mma_fused_fp16 {
       %a = linalg.generic {
           indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
           iterator_types = ["parallel", "parallel"]}
-          ins(%m, %d : tensor<2048x512xf16>, tensor<2048x512xf16>) outs(%m : tensor<2048x512xf16>) {
+          ins(%m, %d : tensor<2048x512xf16>, tensor<2048x512xf16>) outs(%init2 : tensor<2048x512xf16>) {
         ^bb0(%arg3: f16, %arg4: f16, %arg5: f16):  // no predecessors
           %19 = arith.addf %arg3, %arg4 : f16
           linalg.yield %19 : f16
@@ -535,6 +579,41 @@ hal.executable @mma_fused_fp16 {
 //   CHECK-COUNT-1:   nvvm.wmma.mma
 //   CHECK-COUNT-4:   llvm.fadd
 //   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>
+
+// mma.sync case:
+//    MMASYNC-LABEL: hal.executable public @mma_fused_fp16
+//          MMASYNC:   hal.executable.variant public @cuda
+//      MMASYNC-NOT:   llvm.store
+//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//          MMASYNC:   nvvm.cp.async.commit.group
+//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//          MMASYNC:   nvvm.cp.async.commit.group
+//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//          MMASYNC:   nvvm.cp.async.commit.group
+//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//          MMASYNC:   nvvm.cp.async.commit.group
+//          MMASYNC:   llvm.br
+//          MMASYNC:   nvvm.cp.async.wait.group 3
+//  MMASYNC-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32)>
+//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//          MMASYNC:   nvvm.cp.async.commit.group
+//          MMASYNC:   llvm.br
+//          MMASYNC:   nvvm.cp.async.wait.group 3
+//  MMASYNC-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32)>
+//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//          MMASYNC:   nvvm.cp.async.wait.group 2
+//  MMASYNC-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32)>
+//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//          MMASYNC:   nvvm.cp.async.wait.group 1
+//  MMASYNC-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32)>
+//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//          MMASYNC:   nvvm.cp.async.wait.group 0
+//  MMASYNC-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32)>
+//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//  MMASYNC-COUNT-4:   llvm.store {{.*}} : !llvm.ptr<vector<2xf16>, 3>
+//          MMASYNC:   llvm.load {{.*}} : !llvm.ptr<vector<8xf16>, 3>
+//          MMASYNC:   llvm.store {{.*}} : !llvm.ptr<vector<8xf16>>
 
 // -----
 
