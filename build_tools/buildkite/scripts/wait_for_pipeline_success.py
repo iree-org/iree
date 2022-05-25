@@ -12,13 +12,15 @@ triggered (or pre-existing) build succeeds, otherwise fails.
 """
 
 import argparse
-import sys
 import json
+import sys
 from typing import Optional
 
 from pybuildkite import buildkite
+
 from common.buildkite_pipeline_manager import BuildkitePipelineManager
-from common.buildkite_utils import BuildObject, get_build_number, get_build_state, linkify
+from common.buildkite_utils import (BuildObject, get_build_number,
+                                    get_build_state, linkify)
 
 
 def should_create_new_build(bk: BuildkitePipelineManager,

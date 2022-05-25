@@ -143,14 +143,6 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
   IREE::Flow::PartitionableLoopsInterface interfaceOp =
       dyn_cast_or_null<IREE::Flow::PartitionableLoopsInterface>(op);
   if (interfaceOp) {
-    SmallVector<int64_t> firstLevelTileSizes = loweringConfig.getTileSizeVals(
-        static_cast<unsigned>(StrategyTilingLevel::WorkGroupTiles));
-    // This is needed to fuse and distribute all ops together.
-    if (firstLevelTileSizes.size() != interfaceOp.getNumLoops()) {
-      return op->emitOpError(
-          "mismatch between number of loops and first level of tiling");
-    }
-
     llvm::SmallDenseSet<unsigned> pLoopsSet;
     for (auto iteratorType : llvm::enumerate(interfaceOp.getIteratorTypes())) {
       if (iteratorType.value() == getParallelIteratorTypeName()) {
@@ -383,12 +375,10 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  // Add the sandbox single tiling expert to tile and vectorize.
+  // Add the sandbox single tiling expert to tile.
   {
     LinalgSingleTilingExpertPassOptions options;
     options.decomposeToLowerDimOp = true;
-    options.vectorize = true;
-    options.vectorizePadding = true;
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
     nestedModulePM.addNestedPass<func::FuncOp>(
@@ -397,7 +387,25 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
+  // Add the sandbox single tiling expert to vectorize.
+  // We can't do the vectorization in the tiling expert above due to an issue in
+  // codegen strategy pipeline. Since we are moving to the transform dialect, we
+  // choose to have a workaround here by splitting them into two stages.
+  {
+    LinalgSingleTilingExpertPassOptions options;
+    options.vectorize = true;
+    options.vectorizePadding = true;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLinalgSingleTilingExpertPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
+
   addBufferizePasses(nestedModulePM);
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass());
 
   // Run IREE specific passes before vector lowering expert.
   nestedModulePM.addNestedPass<func::FuncOp>(

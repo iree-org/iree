@@ -1606,8 +1606,11 @@ ParseResult TileOp::parse(OpAsmParser &parser, OperationState &result) {
     if (parser.parseArgumentList(args, OpAsmParser::Delimiter::Paren,
                                  /*allowType=*/true))
       return failure();
-    for (OpAsmParser::Argument arg : args)
-      parser.resolveOperand(arg.ssaName, arg.type, result.operands);
+    for (OpAsmParser::Argument arg : args) {
+      if (parser.resolveOperand(arg.ssaName, arg.type, result.operands)) {
+        return failure();
+      }
+    }
   }
   if (parser.parseArrowTypeList(result.types))
     return failure();

@@ -131,10 +131,8 @@ func.func @reduce_multi_inputs_contraction(%a: tensor<2x3x4xf32>, %b: tensor<2x3
 //     CHECK-NOT:   vector.broadcast
 //     CHECK-NOT:   vector.transpose
 //         CHECK:   vector.transfer_read %[[INIT]]{{.+}} : tensor<4xf32>, vector<4xf32>
-//          TODO:   The code generated in the below works but is not efficient; improve it.
-// CHECK-COUNT-24:  arith.mulf {{.+}} : vector<1xf32>
-// XXXXX-COUNT-6:   vector.fma {{.+}} : vector<4xf32>
-//         XXXXX:   vector.transfer_write %{{.+}}, %[[INIT]]{{.+}} : vector<4xf32>, tensor<4xf32>
+// CHECK-COUNT-6:   vector.fma {{.+}} : vector<4xf32>
+//         CHECK:   vector.transfer_write %{{.+}}, %[[INIT]]{{.+}} : vector<4xf32>, tensor<4xf32>
 
 // -----
 
@@ -160,7 +158,5 @@ func.func @reduce_innermost_dim_contraction(%a: tensor<4x12xf32>, %b: tensor<4xf
 //          CEHCK: vector.transfer_read %[[B]]{{.+}} : tensor<4xf32>, vector<4xf32>
 //          CHECK: vector.transfer_read %[[INIT]]{{.+}} : tensor<4xf32>, vector<4xf32>
 // CHECK-COUNT-12: arith.subf {{.+}} : vector<4xf32>
-//           TODO: The code generated in the below works but is not efficient; improve it.
-// CHECK-COUNT-48: arith.mulf {{.+}} : vector<1xf32>
-// XXXXX-COUNT-12: vector.fma {{.+}} : vector<4xf32>
-//          XXXXX: vector.transfer_write %{{.+}}, %[[INIT]]{{.+}} : vector<4xf32>, tensor<4xf32>
+// CHECK-COUNT-12: vector.fma {{.+}} : vector<4xf32>
+//          CHECK: vector.transfer_write %{{.+}}, %[[INIT]]{{.+}} : vector<4xf32>, tensor<4xf32>

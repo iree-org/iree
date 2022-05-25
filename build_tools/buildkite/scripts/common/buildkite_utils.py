@@ -6,6 +6,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 from typing import Any, Dict, Optional
+
+import requests
 from pybuildkite import buildkite
 
 # Type signature of Buildkite build object.
@@ -29,3 +31,13 @@ def linkify(url: str, text: Optional[str] = None):
     text = url
 
   return f"\033]1339;url={url};content={text}\a"
+
+
+def pipeline_exists(bk, *, organization, pipeline):
+  try:
+    bk.pipelines().get_pipeline(organization, pipeline)
+  except requests.exceptions.HTTPError as e:
+    if e.response.status_code == 404:
+      return False
+    raise e
+  return True

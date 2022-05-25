@@ -1,0 +1,41 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Note: this runs on trusted agents, since we want the authorization checks to
+# themselves be run on trusted agents. The pipeline itself is uploaded from
+# the main repository via bootstrap-trusted.yml and it fetches the scripts only
+# from the main repository.
+agents:
+  queue: "orchestration"
+  security: "trusted"
+
+steps:
+  # TODO: Is there a better emoji here?
+  - label: ":face_with_monocle: :admission_tickets: :raised_hand: Checking CLA"
+    plugins:
+      - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#24e54e7729:
+          repos:
+            - config:
+                - url: ${BUILDKITE_REPO}
+                  ref: ${CONFIG_FETCH_REF}
+    commands: |
+      ./build_tools/buildkite/scripts/check_cla.py ${BUILDKITE_COMMIT} \
+          || buildkite-agent pipeline upload \
+              build_tools/buildkite/pipelines/fragment/cla-failure.yml
+
+  - wait
+
+  - label: "Executing gcmn-test-pipeline"
+    plugins:
+      - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#24e54e7729:
+          repos:
+            - config:
+                - url: ${BUILDKITE_REPO}
+                  ref: ${CONFIG_FETCH_REF}
+    commands: |
+      export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
+          --secret=iree-buildkite-presubmit-pipelines)"
+      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py gcmn-test-pipeline
