@@ -8,7 +8,7 @@ on:
 
 jobs:
   add-to-project:
-    name: Add to the master project
+    name: Adding issue to the master project
     runs-on: ubuntu-latest
     steps:
       - uses: actions/add-to-project@main
