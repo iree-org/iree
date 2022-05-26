@@ -1,4 +1,4 @@
-name: Process opened / reopened issues
+name: Process (re)opened issues
 
 on:
   issues:
@@ -7,21 +7,22 @@ on:
       - opened
 
 jobs:
-  label_issues:
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-    steps:
-      - name: Label issues
-        uses: andymckay/labeler@e6c4322d0397f3240f0e7e30a33b5c5df2d39e90
-        with:
-          add-labels: "awaiting-triage"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+#   label_issues:
+#     name: Add awaiting-triage label
+#     runs-on: ubuntu-latest
+#     permissions:
+#       issues: write
+#     steps:
+#       - name: Add awaiting-triage label
+#         uses: andymckay/labeler@e6c4322d0397f3240f0e7e30a33b5c5df2d39e90
+#         with:
+#           add-labels: "awaiting-triage"
+#           repo-token: ${{ secrets.WRITE_ACCESS_TOKEN }}
   add-to-project:
-    name: Add all issues to the master project
+    name: Add to the master project
     runs-on: ubuntu-latest
     steps:
       - uses: actions/add-to-project@main
         with:
           project-url: https://github.com/orgs/google/projects/20
-          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          github-token: ${{ secrets.WRITE_ACCESS_TOKEN }}
