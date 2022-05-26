@@ -8,6 +8,11 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
+# Disable on platforms/architectures where ELF is not supported.
+if(EMSCRIPTEN)
+  return()
+endif()
+
 iree_add_all_subdirs()
 
 iree_cc_library(
