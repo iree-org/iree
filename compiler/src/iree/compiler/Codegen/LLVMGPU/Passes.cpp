@@ -28,6 +28,12 @@ static llvm::cl::opt<unsigned> logSwizzleTile(
     "iree-codegen-log-swizzle-tile", llvm::cl::desc("log swizzle tile value"),
     llvm::cl::init(0));
 
+/// Flag used for the transition from wmma to mma.sync. Once we have better
+/// performance with mma.sync we can drop wmma support and remove this flag.
+llvm::cl::opt<bool> llvmgpuUseMMASync(
+    "iree-codegen-llvmgpu-use-mma-sync",
+    llvm::cl::desc("use mma sync instead of wmma ops"), llvm::cl::init(false));
+
 static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
                                    ArrayRef<int64_t> staticShape,
                                    Type elementType,
@@ -115,6 +121,8 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   // Distribute linalg onto warps within the workgroup.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMGPUTileAndDistribute(/*distributeToWarp=*/true));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
   if (pipelineDepth > 1)
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMGPUMultiBuffering(pipelineDepth));

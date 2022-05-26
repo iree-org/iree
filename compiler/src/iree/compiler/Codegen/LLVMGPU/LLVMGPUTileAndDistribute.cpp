@@ -25,11 +25,15 @@
 #include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
+#include "mlir/Transforms/SideEffectUtils.h"
 
 #define DEBUG_TYPE "iree-llvmgpu-tile-and-distribute"
 
 namespace mlir {
 namespace iree_compiler {
+
+/// Flag defined in Passes.cpp.
+extern llvm::cl::opt<bool> llvmgpuUseMMASync;
 
 /// Patterns for workgroup level tiling. Workgroup tiling is done at the flow
 /// level but we may have extra tiling for the reduction dimension. Therefore we
@@ -56,8 +60,10 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
   MLIRContext *context = patterns.getContext();
 
   linalg::LinalgTransformationFilter filter(
-      ArrayRef<StringAttr>{},
+      ArrayRef<StringAttr>{
+          StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getWorkgroupKTiledMarker()));
+  filter.setMatchByDefault();
   linalg::TilingPatterns<linalg::MatmulOp, linalg::BatchMatmulOp,
                          linalg::GenericOp>::insert(patterns, tilingOptions,
                                                     filter);
@@ -181,7 +187,8 @@ static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
 }
 
 static void populatePromotionPatterns(MLIRContext *context,
-                                      RewritePatternSet &patterns) {
+                                      RewritePatternSet &patterns,
+                                      ArrayRef<int64_t> operandsToPromote) {
   patterns.insert<linalg::LinalgPromotionPattern<linalg::MatmulOp>,
                   linalg::LinalgPromotionPattern<linalg::BatchMatmulOp>,
                   linalg::LinalgPromotionPattern<linalg::GenericOp>>(
@@ -190,17 +197,48 @@ static void populatePromotionPatterns(MLIRContext *context,
           .setAllocationDeallocationFns(allocateWorkgroupMemory,
                                         deallocateWorkgroupMemory)
           .setCopyInOutFns(copyToWorkgroupMemory, copyToWorkgroupMemory)
-          .setOperandsToPromote({0, 1})
+          .setOperandsToPromote(operandsToPromote)
           .setUseFullTileBuffers({false, false}),
       linalg::LinalgTransformationFilter(
           {StringAttr::get(context, getWorkgroupKTiledMarker())},
           StringAttr::get(context, getWorkgroupMemoryMarker()))
+          .setMatchByDefault()
           .addFilter([](Operation *op) {
             auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
             if (!linalgOp) return failure();
             return success(linalg::isaContractionOpInterface(op) &&
                            linalgOp.getNumParallelLoops() >= 2);
           }));
+}
+
+/// Transformation to propagate FillOp + CopyOp to temp allocation.
+/// This is needed because we are doing promotion to shared memory on buffers.
+/// This is a fragile and temporary solution until we move to be able to do this
+/// kind of transformations on tensors.
+static void propagateFillIntoPromotionAlloc(func::FuncOp funcOp) {
+  SmallVector<Operation *> toDelete;
+  funcOp.walk([&toDelete](memref::CopyOp copyOp) {
+    if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) {
+      // Look for a fill Op writing into the copyOp source.
+      Operation *prevOp = copyOp->getPrevNode();
+      while (prevOp) {
+        if (isSideEffectFree(prevOp)) {
+          prevOp = prevOp->getPrevNode();
+          continue;
+        }
+
+        auto fillOp = dyn_cast<linalg::FillOp>(prevOp);
+        if (!fillOp) break;
+        if (fillOp.output() != copyOp.source()) break;
+        // Move the fillOp and change the destination to the copy destination.
+        fillOp->moveBefore(copyOp);
+        fillOp.outputsMutable().assign(copyOp.getTarget());
+        toDelete.push_back(copyOp.getOperation());
+        break;
+      }
+    }
+  });
+  for (Operation *op : toDelete) op->erase();
 }
 
 namespace {
@@ -220,6 +258,19 @@ struct LLVMGPUTileAndDistributePass
     MLIRContext *context = &getContext();
     auto funcOp = getOperation();
     if (!isEntryPoint(funcOp)) return;
+
+    // Promote C matrix and propagate the potential  fill producer into the temp
+    // allocation. This needs to be done before reduction tiling.
+    if (llvmgpuUseMMASync) {
+      RewritePatternSet promotionPatterns(&getContext());
+      populatePromotionPatterns(context, promotionPatterns, {2});
+      if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                              std::move(promotionPatterns)))) {
+        return signalPassFailure();
+      }
+      propagateFillIntoPromotionAlloc(funcOp);
+    }
+
     {
       // Tile again at the workgroup level since redution dimension were
       // ignored. Dimensions already tiled will be ignore since we tile to the
@@ -257,7 +308,7 @@ struct LLVMGPUTileAndDistributePass
     // Only promote to workgroup size if there are multiple warps.
     if (flatWorkgroupSize > kWarpSize) {
       RewritePatternSet promotionPatterns(&getContext());
-      populatePromotionPatterns(context, promotionPatterns);
+      populatePromotionPatterns(context, promotionPatterns, {0, 1});
       if (failed(applyPatternsAndFoldGreedily(funcOp,
                                               std::move(promotionPatterns)))) {
         return signalPassFailure();
