@@ -208,9 +208,9 @@ if(IREE_BUILD_COMPILER)
     HOSTONLY
   )
 
-  iree_cc_library(
+  iree_cc_binary(
     NAME
-      iree_opt_main
+      iree-opt
     SRCS
       "iree-opt-main.cc"
     DEPS
@@ -220,14 +220,6 @@ if(IREE_BUILD_COMPILER)
       MLIRSupport
       iree::compiler::Tools::init_passes_and_dialects
       iree::compiler::Tools::init_targets
-    PUBLIC
-  )
-
-  iree_cc_binary(
-    NAME
-      iree-opt
-    DEPS
-      ::iree_opt_main
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY

@@ -88,9 +88,10 @@ cc_binary(
     ],
 )
 
-cc_library(
-    name = "iree_opt_main",
+cc_binary(
+    name = "iree-opt",
     srcs = ["iree-opt-main.cc"],
+    tags = ["hostonly"],
     deps = [
         "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
         "//compiler/src/iree/compiler/Tools:init_targets",
@@ -98,14 +99,6 @@ cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MlirOptLib",
         "@llvm-project//mlir:Support",
-    ],
-)
-
-cc_binary(
-    name = "iree-opt",
-    tags = ["hostonly"],
-    deps = [
-        ":iree_opt_main",
     ],
 )
 
