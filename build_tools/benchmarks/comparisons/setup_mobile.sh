@@ -37,12 +37,9 @@ rm -rf "${SOURCE_DIR}"
 mkdir "${SOURCE_DIR}"
 cd "${SOURCE_DIR}"
 
-#git clone https://github.com/google/iree.git
-git clone https://github.com/mariecwhite/iree.git
+git clone https://github.com/google/iree.git
 
 cd iree
-git checkout origin/comparisons
-
 cp "${SOURCE_DIR}/iree/build_tools/benchmarks/set_adreno_gpu_scaling_policy.sh" "${ROOT_DIR}/setup/"
 cp "${SOURCE_DIR}/iree/build_tools/benchmarks/set_android_scaling_governor.sh" "${ROOT_DIR}/setup/"
 cp "${SOURCE_DIR}/iree/build_tools/benchmarks/set_pixel6_gpu_scaling_policy.sh" "${ROOT_DIR}/setup/"

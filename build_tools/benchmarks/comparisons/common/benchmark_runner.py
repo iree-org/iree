@@ -54,8 +54,8 @@ def run_command(benchmark_command: BenchmarkCommand) -> list[float]:
   stdout_data, _ = benchmark_process.communicate()
 
   if benchmark_process.returncode != 0:
-    print("Warning! Benchmark command failed with return code: " +
-          str(benchmark_process.returncode))
+    print(f"Warning! Benchmark command failed with return code:"
+          f" {benchmark_process.returncode}")
     return [0, 0, 0, 0]
   else:
     print(stdout_data.decode())

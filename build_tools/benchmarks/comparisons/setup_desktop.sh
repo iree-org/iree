@@ -6,7 +6,7 @@
 
 #!/bin/bash
 
-set -eu pipefail
+set -euo pipefail
 
 # Install Bazel. From https://www.tensorflow.org/install/source
 npm install -g @bazel/bazelisk
@@ -31,11 +31,9 @@ rm -rf "${SOURCE_DIR}"
 mkdir "${SOURCE_DIR}"
 cd "${SOURCE_DIR}"
 
-#git clone https://github.com/google/iree.git
-git clone https://github.com/mariecwhite/iree.git
+git clone https://github.com/google/iree.git
 
 cd iree
-git checkout origin/comparisons
 git submodule update --init
 cmake -GNinja -B ../iree-build/ -S . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DIREE_ENABLE_ASSERTIONS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DIREE_ENABLE_LLD=ON -DIREE_HAL_DRIVER_CUDA=ON -DIREE_TARGET_BACKEND_CUDA=ON
 cmake --build ../iree-build/
