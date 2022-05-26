@@ -7,13 +7,12 @@
 # For now, just import the main IREE bazelrc
 try-import %workspace%/../../build_tools/bazel/iree.bazelrc
 
+# TF uses C++17.
+build:generic_clang --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
+
 # Ignore visibility issues in TensorFlow. They are inconsistently applied
 # to the OSS codebase.
 build --nocheck_visibility
-
-// TF uses C++ 17
-build --cxxopt=-std=c++17
-build --host_cxxopt=-std=c++17
 
 # Flags specific for working around tensorflow warnings.
 build:generic_clang --copt=-Wno-inconsistent-missing-override --host_copt=-Wno-inconsistent-missing-override
