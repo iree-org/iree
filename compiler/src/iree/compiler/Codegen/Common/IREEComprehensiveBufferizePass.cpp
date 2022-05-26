@@ -37,6 +37,7 @@
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -189,6 +190,7 @@ void addIREEComprehensiveBufferizePasses(
     Optional<BufferizationOptions::AllocationFn> allocationFn,
     Optional<BufferizationOptions::DeallocationFn> deallocationFn,
     Optional<BufferizationOptions::MemCpyFn> memCpyFn) {
+  passManager.addPass(createLinalgInitTensorToAllocTensorPass());
   passManager.addPass(createIREEComprehensiveBufferizePass(
       allocationFn, deallocationFn, memCpyFn));
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());

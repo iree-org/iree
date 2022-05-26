@@ -274,7 +274,7 @@ func.func @reverse_dim(%pos: index) -> f32 {
   %input = arith.constant dense<[[1.0, 2.0, 3.0],
                                  [4.0, 5.0, 6.0]]> : tensor<2x3xf32>
 
-  %init = linalg.init_tensor [2, 3] : tensor<2x3xf32>
+  %init = bufferization.alloc_tensor() : tensor<2x3xf32>
   %0 = iree_linalg_ext.reverse
          dimensions(dense<0> : tensor<1xi64>)
          ins(%input : tensor<2x3xf32>)
@@ -291,8 +291,8 @@ func.func @reverse_dim(%pos: index) -> f32 {
 //       CHECK:   memref.alloc
 //       CHECK:   iree_linalg_ext.fft ins(%{{.*}} : index) outs(%{{.*}}, %{{.*}} : memref<1024xf32>, memref<1024xf32>)
 func.func @fft_tensor(%idx: index) -> (tensor<1024xf32>, tensor<1024xf32>) {
-  %t0 = linalg.init_tensor [1024] : tensor<1024xf32>
-  %t1 = linalg.init_tensor [1024] : tensor<1024xf32>
+  %t0 = bufferization.alloc_tensor() : tensor<1024xf32>
+  %t1 = bufferization.alloc_tensor() : tensor<1024xf32>
   %0:2 = iree_linalg_ext.fft
     ins(%idx: index)
     outs(%t0, %t1: tensor<1024xf32>, tensor<1024xf32>)
@@ -387,8 +387,8 @@ func.func @topk() {
   %input_values = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [200, 8], strides = [1, 1] : !flow.dispatch.tensor<readonly:200x8xf32> -> tensor<200x8xf32>
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:200x8xi32>
   %input_indices = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [200, 8], strides = [1, 1] : !flow.dispatch.tensor<readonly:200x8xi32> -> tensor<200x8xi32>
-  %out_values = linalg.init_tensor [200, 3] : tensor<200x3xf32>
-  %out_indices = linalg.init_tensor [200, 3] : tensor<200x3xi32>
+  %out_values = bufferization.alloc_tensor() : tensor<200x3xf32>
+  %out_indices = bufferization.alloc_tensor() : tensor<200x3xi32>
   %2:2 = iree_linalg_ext.topk
         dimension(1)
         ins(%input_values, %input_indices : tensor<200x8xf32> , tensor<200x8xi32>)
