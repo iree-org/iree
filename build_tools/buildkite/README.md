@@ -107,37 +107,6 @@ from another branch on the main repository, bootstrapping instead checks out the
 commit on which it was triggered and instructs the presubmit pipeline to do the
 same.
 
-### Unregistered Pipelines
-
-When first introducing a new Buildkite pipeline, it will not be registered with
-Buildkite yet. The presubmit pipeline therefore cannot trigger a run of this
-pipeline. To enable testing of new pipelines, we have a special
-[unregistered pipeline](https://buildkite.com/iree/unregistered). This pipeline
-just uploads another pipeline file based on an environment variable. When a
-pipeline with the given name doesn't exist,
-[wait_for_pipeline_success.py](scripts/wait_for_pipeline_success.py) instead
-invokes the "unregistered" pipeline, which runs the given pipeline
-configuration. This misses features like grouping of pipeline runs and avoiding
-unnecessary reruns of the same pipeline, but is useful for testing.
-
-## Postsubmits
-
-Since it doesn't have to deal with potentially untrusted code, the
-[Postsubmit pipeline](https://buildkite.com/iree/postsubmit) is much simpler. It
-triggers on each commit to the `main` branch. Bootstrapping uploads
-[postsubmit.yml](pipelines/trusted/postsubmit.yml), which triggers and waits for
-all the specified pipelines to complete on the target commit. In addition, the
-postsubmit build registers pipelines with Buildkite based on the pipeline files
-checked in.
-
-## Idempotency
-
-Both the presubmit and postsubmit pipelines are designed to be idempotent.
-Triggering them again on the same commit will not trigger any new builds, only
-orchestration pipelines. This is one of the reasons we use our own script rather
-than a Buildkite trigger step.
-
-
 ## Pipeline Files
 
 The `pipelines/` directory contains Buildkite
@@ -168,6 +137,57 @@ temporary delay in presubmit builds.
 Buildkite pipelines configurations that are intended to be used dynamically or
 inserted into other pipelines with the `buildkite-agent pipeline upload`
 command. These are not registered with Buildkite.
+
+## Creating a Pipeline
+
+Creating a new pipeline is [almost](#making-pipeline-public) as simple as
+sending a PR containing a new pipeline yaml configuration. Mostly pipelines
+should be created as "untrusted" and invoked with `wait_for_pipeline_success.py`
+from the presubmit and/or postsubmit pipelines.
+
+### Unregistered Pipelines
+
+When first introducing a new Buildkite pipeline, it will not be registered with
+Buildkite yet. The presubmit pipeline therefore cannot trigger a run of this
+pipeline. To enable testing of new pipelines, we have a special
+[unregistered pipeline](https://buildkite.com/iree/unregistered). This pipeline
+just uploads another pipeline file based on an environment variable. When a
+pipeline with the given name doesn't exist,
+[wait_for_pipeline_success.py](scripts/wait_for_pipeline_success.py) instead
+invokes the "unregistered" pipeline, which runs the given pipeline
+configuration. This misses features like grouping of pipeline runs and avoiding
+unnecessary reruns of the same pipeline, but is useful for testing.
+
+### Making Pipeline Public
+
+Due to limitations in the Buildkite REST API, pipelines created via the API
+can't be made publically visible or accessible to be run by our presubmit bots.
+The pipeline will still be created, but it will require manual intervention to
+set all the necessary permissions. It will run normally on postsubmit, but will
+not be visible to the public. It will run on presubmit using the
+["unregistered" pipeline](#unregistered-pipelines). To make it fully accessible,
+you (or a member of the IREE team in the IREE Buildkite organization) must go to
+the pipeline settings page and click "Make Pipeline Public" and then go to the
+Teams subsection of pipeline settings and *only if this is a pipeline under
+untrusted/* give "Build & Read" access to the "Presubmit" team and the
+"Everyone" team.
+
+## Postsubmits
+
+Since it doesn't have to deal with potentially untrusted code, the
+[Postsubmit pipeline](https://buildkite.com/iree/postsubmit) is much simpler. It
+triggers on each commit to the `main` branch. Bootstrapping uploads
+[postsubmit.yml](pipelines/trusted/postsubmit.yml), which triggers and waits for
+all the specified pipelines to complete on the target commit. In addition, the
+postsubmit build registers pipelines with Buildkite based on the pipeline files
+checked in.
+
+## Idempotency
+
+Both the presubmit and postsubmit pipelines are designed to be idempotent.
+Triggering them again on the same commit will not trigger any new builds, only
+orchestration pipelines. This is one of the reasons we use our own script rather
+than a Buildkite trigger step.
 
 ## Agent Configuration
 
