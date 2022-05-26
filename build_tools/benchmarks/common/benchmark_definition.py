@@ -452,3 +452,86 @@ class BenchmarkResults(object):
         BenchmarkRun.from_json_object(b) for b in json_object["benchmarks"]
     ]
     return results
+
+
+@dataclass(frozen=True)
+class CompilationInfo(object):
+  model_name: str
+  model_tags: Sequence[str]
+  model_source: str
+  target_arch: str
+  bench_mode: Sequence[str]
+
+  def __str__(self):
+    if self.model_tags:
+      tags = ",".join(self.model_tags)
+      model_part = f"{self.model_name} [{tags}] ({self.model_source})"
+    else:
+      model_part = f"{self.model_name} ({self.model_source})"
+    bench_mode_str = ",".join(self.bench_mode)
+    return f"{model_part} {self.target_arch} {bench_mode_str}"
+
+  def to_json_object(self) -> Dict[str, Any]:
+    return {
+        "model_name": self.model_name,
+        "model_tags": self.model_tags,
+        "model_source": self.model_source,
+        "target_arch": self.target_arch,
+        "bench_mode": self.bench_mode,
+    }
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return CompilationInfo(model_name=json_object["model_name"],
+                           model_tags=json_object["model_tags"],
+                           model_source=json_object["model_source"],
+                           target_arch=json_object["target_arch"],
+                           bench_mode=json_object["bench_mode"])
+
+
+@dataclass(frozen=True)
+class CompilationStatistics(object):
+  compilation_info: CompilationInfo
+  # Module binary size in bytes.
+  module_size: int
+  # Module compilation time in ms.
+  compilation_time: int
+
+  def to_json_object(self) -> Dict[str, Any]:
+    return {
+        "compilation_info": self.compilation_info.to_json_object(),
+        "module_size": self.module_size,
+        "compilation_time": self.compilation_time,
+    }
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return CompilationStatistics(
+        compilation_info=CompilationInfo.from_json_object(
+            json_object["compilation_info"]),
+        module_size=json_object["module_size"],
+        compilation_time=json_object["compilation_info"])
+
+
+@dataclass(frozen=True)
+class CompilationResults(object):
+  commit: str
+  compilation_statistics: Sequence[CompilationStatistics]
+
+  def to_json_object(self) -> Dict[str, Any]:
+    return {
+        "commit":
+            self.commit,
+        "compilation_statistics": [
+            obj.to_json_object() for obj in self.compilation_statistics
+        ]
+    }
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return CompilationResults(
+        commit=json_object["commit"],
+        compilation_statistics=[
+            CompilationStatistics.from_json_object(obj)
+            for obj in json_object["compilation_statistics"]
+        ])
