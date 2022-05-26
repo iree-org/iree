@@ -39,6 +39,8 @@ UNTRUSTED_BOOTSTRAP_PIPELINE_PATH = os.path.join(PIPELINE_ROOT_PATH, "fragment",
                                                  "bootstrap-untrusted.yml")
 
 IREE_TEAM_REST_UUID = "1a2cbc72-2c8e-4375-821e-e3dfa1db96b5"
+# The team that just contains the postsubmit bot
+PRIVILEGED_TEAM_REST_UUID = "7de7685f-7e10-4bc4-ba66-3478a5c56db4"
 
 FORCE_UPDATE_ENV_VAR = "IREE_FORCE_BUILDKITE_PIPELINE_UPDATE"
 
@@ -151,13 +153,12 @@ def create_pipeline(bk, *, organization, pipeline_slug, configuration,
       "name": pipeline_slug,
       "repository": GIT_REPO,
       "configuration": configuration,
-      "visibility": "public",
       # With the rest API, we can only give "Full Access", so this is limited to
-      # the IREE team. I'm talking to Buildkite support about this limitation.
-      # It also means that the iree-buildkite-submitted-bot is currently added
-      # to the IREE team rather than only being in its own team, as originally
-      # intended.
-      "team_uuids": [IREE_TEAM_REST_UUID],
+      # the IREE team and doesn't give Read & Build access to the "Everyone" and
+      # "Presubmit" teams. I'm talking to Buildkite support about this
+      # limitation. There's a similar problem that the pipeline can't be made
+      # public via the REST API, which requires user intervention in the UI.
+      "team_uuids": [IREE_TEAM_REST_UUID, PRIVILEGED_TEAM_REST_UUID],
       "provider_settings": {
           # We don't want any automatic triggering from GitHub webhooks.
           "trigger_mode": "none"
@@ -225,8 +226,8 @@ def update_pipelines(bk, pipeline_files, *, organization, running_pipeline,
                         running_commit=running_commit,
                         trusted=trusted,
                         dry_run=dry_run)
-
         continue
+
       print(f"Updating for: '{pipeline_file}'...")
       if force or should_update(bk,
                                 organization=organization,
