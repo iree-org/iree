@@ -7,17 +7,6 @@ on:
       - opened
 
 jobs:
-#   label_issues:
-#     name: Add awaiting-triage label
-#     runs-on: ubuntu-latest
-#     permissions:
-#       issues: write
-#     steps:
-#       - name: Add awaiting-triage label
-#         uses: andymckay/labeler@e6c4322d0397f3240f0e7e30a33b5c5df2d39e90
-#         with:
-#           add-labels: "awaiting-triage"
-#           repo-token: ${{ secrets.WRITE_ACCESS_TOKEN }}
   add-to-project:
     name: Add to the master project
     runs-on: ubuntu-latest
