@@ -17,6 +17,7 @@
 namespace mlir {
 namespace iree_compiler {
 
+/// Flag defined in Passes.cpp.
 extern llvm::cl::opt<bool> llvmgpuUseMMASync;
 
 /// Helper to convert copy to shared memory to async copy. This creates groups

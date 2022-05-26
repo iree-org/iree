@@ -32,6 +32,7 @@
 namespace mlir {
 namespace iree_compiler {
 
+/// Flag defined in Passes.cpp.
 extern llvm::cl::opt<bool> llvmgpuUseMMASync;
 
 /// Patterns for workgroup level tiling. Workgroup tiling is done at the flow
