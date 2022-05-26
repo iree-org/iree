@@ -263,7 +263,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     iree_SpirVExecutableDef_start_as_root(builder);
 
     // Serialize the spirv::ModuleOp into the binary that we will embed in the
-    // final flatbuffer.
+    // final FlatBuffer.
     SmallVector<uint32_t, 256> spvBinary;
     if (failed(spirv::serialize(spvModuleOp, spvBinary)) || spvBinary.empty()) {
       return variantOp.emitError() << "failed to serialize spv.module";

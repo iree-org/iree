@@ -34,7 +34,7 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 cd "${ROOT_DIR}"
 
 # BUILD the iree-import-tflite binary for importing models to benchmark from
-# TFLite flatbuffers.
+# TFLite FlatBuffers.
 cd "${ROOT_DIR}/integrations/tensorflow"
 BAZEL_CMD=(bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree-tf.bazelrc)
 BAZEL_BINDIR="$(${BAZEL_CMD[@]} info bazel-bin)"

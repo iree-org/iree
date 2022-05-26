@@ -60,7 +60,7 @@ struct BytecodeTargetOptions {
   using FromFlags = OptionsFromFlags<BytecodeTargetOptions>;
 };
 
-// Translates a vm.module to a bytecode module flatbuffer.
+// Translates a vm.module to a bytecode module FlatBuffer.
 // See iree/schemas/bytecode_module_def.fbs for the description of the
 // serialized module format.
 //

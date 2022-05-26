@@ -33,7 +33,7 @@ class DebugDatabaseBuilder {
   void addFunctionSourceMap(IREE::VM::FuncOp funcOp,
                             FunctionSourceMap sourceMap);
 
-  // Finishes construction of the debug database and emits it to the flatbuffer.
+  // Finishes construction of the debug database and emits it to the FlatBuffer.
   iree_vm_DebugDatabaseDef_ref_t build(FlatbufferBuilder &fbb);
 
  private:

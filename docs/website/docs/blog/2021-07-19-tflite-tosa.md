@@ -9,7 +9,7 @@ IREE can now execute [TensorFlow Lite](https://www.tensorflow.org/lite)
 tensor operations, and a part of [MLIR](https://mlir.llvm.org/) core. TOSA’s
 high-level representation of tensor operations provides a common front-end for
 ingesting models from different frameworks. In this case we ingest a TFLite
-flatbuffer and compile it to TOSA IR, which IREE takes as an input format to
+FlatBuffer and compile it to TOSA IR, which IREE takes as an input format to
 compile to its various backends.
 
 ![Compilation diagram](./2021-07-19-tflite-tosa-compilation-diagram.png){ align=left }
@@ -36,7 +36,7 @@ quantization, along with dynamic shape support.
 TFLite with IREE is available in Python and Java.  We have a
 [colab notebook](https://colab.research.google.com/github/google/iree/blob/main/samples/colab/tflite_text_classification.ipynb)
 that shows how to use IREE’s python bindings and TFLite compiler tools to
-compile a pre-trained TFLite model from a flatbuffer and run using IREE.  We
+compile a pre-trained TFLite model from a FlatBuffer and run using IREE.  We
 also have an
 [Android Java app](https://github.com/not-jenni/iree-android-tflite-demo) that
 was forked from an existing TFLite demo app, swapping out the TFLite library

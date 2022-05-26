@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // Tests for bytecode_module.cc implementations.
-// This means mostly just flatbuffer verification, module interface functions,
+// This means mostly just FlatBuffer verification, module interface functions,
 // etc. bytecode_dispatch_test.cc covers actual dispatch.
 
 #include "iree/vm/bytecode_module.h"
@@ -14,6 +14,6 @@
 
 namespace {
 
-// TODO(benvanik): bytecode_module_test.cc for flatbuffer/module implementation.
+// TODO(benvanik): bytecode_module_test.cc for FlatBuffer/module implementation.
 
 }  // namespace

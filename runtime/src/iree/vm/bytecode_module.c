@@ -251,7 +251,7 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
       flatbuffer_contents.data, flatbuffer_contents.data_length);
   if (verify_ret != flatcc_verify_ok) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "flatbuffer verification failed: %s",
+                            "FlatBuffer verification failed: %s",
                             flatcc_verify_error_string(verify_ret));
   }
 
@@ -1066,7 +1066,7 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "failed getting root from flatbuffer; expected identifier "
+        "failed getting root from FlatBuffer; expected identifier "
         "'" iree_vm_BytecodeModuleDef_file_identifier "' not found");
   }
 

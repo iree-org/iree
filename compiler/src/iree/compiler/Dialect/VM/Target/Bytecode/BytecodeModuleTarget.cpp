@@ -500,7 +500,7 @@ static LogicalResult buildFlatBufferModule(
       }));
 
   // NOTE: we keep the vectors clustered here so that we can hopefully keep the
-  // pages mapped at runtime; vector dereferences in flatbuffers require
+  // pages mapped at runtime; vector dereferences in FlatBuffers require
   // touching these structs to get length/etc and as such we don't want to be
   // gathering from all over the file (with giant rodata chunks and such
   // inbetween) just to perform a bounds check and deference into another part

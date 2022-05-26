@@ -56,7 +56,7 @@ compile_sample() {
     --o ${BINARY_DIR}/$1.vmfb
 }
 
-echo "=== Compiling sample MLIR files to VM flatbuffer outputs (.vmfb) ==="
+echo "=== Compiling sample MLIR files to VM FlatBuffer outputs (.vmfb) ==="
 compile_sample "simple_abs"     "${ROOT_DIR?}/samples/models/simple_abs.mlir"
 compile_sample "fullyconnected" "${ROOT_DIR?}/tests/e2e/models/fullyconnected.mlir"
 compile_sample "collatz"        "${ROOT_DIR?}/tests/e2e/models/collatz.mlir"

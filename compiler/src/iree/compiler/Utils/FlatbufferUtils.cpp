@@ -17,7 +17,7 @@
 namespace mlir {
 namespace iree_compiler {
 
-// Combines all pages of the flatbuffer builder into a single contiguous byte
+// Combines all pages of the FlatBuffer builder into a single contiguous byte
 // buffer and returns the result.
 //
 // NOTE: this is a alloc/copy. We need to have a single contiguous buffer to
@@ -52,7 +52,7 @@ flatbuffers_uint8_vec_ref_t FlatbufferBuilder::streamUint8Vec(
 }
 
 DenseIntElementsAttr FlatbufferBuilder::getBufferAttr(MLIRContext *context) {
-  // We require direct access to the flatbuffer bytes so we can pass them to
+  // We require direct access to the FlatBuffer bytes so we can pass them to
   // the attribute constructor (which needs to inspect them all for uniquing).
   auto bufferData = cloneBufferIntoContiguousBytes(*this);
 
