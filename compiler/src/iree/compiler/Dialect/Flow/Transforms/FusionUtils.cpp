@@ -40,9 +40,9 @@ static bool canInsOperandTieWithOutsOperand(OpOperand *insOperand) {
     auto outputMap = linalgOp.getTiedIndexingMap(outsOperand);
     if (clFuseTranspose) {
       if (!outputMap.isPermutation()) return false;
-    } else {
-      if (linalgOp.getTiedIndexingMap(outsOperand) != insOperandIndexingMap)
-        return false;
+    } else if (linalgOp.getTiedIndexingMap(outsOperand) !=
+               insOperandIndexingMap) {
+      return false;
     }
     // TODO(#8411): Until ops are vectorized (always), we need
     // to check that the elementtype matches for the operands to be tied.

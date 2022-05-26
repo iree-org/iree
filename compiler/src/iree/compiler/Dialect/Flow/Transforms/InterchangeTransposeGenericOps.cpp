@@ -29,11 +29,14 @@ struct TransposeGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
-    if (!genericOp.hasTensorSemantics()) return failure();
+    if (!genericOp.hasTensorSemantics()) {
+      return rewriter.notifyMatchFailure(genericOp, "no tensor semantics");
+    }
 
     // Pattern needs to trigger only on  elementwise ops.
-    if (genericOp.getNumParallelLoops() != genericOp.getNumLoops())
-      return failure();
+    if (genericOp.getNumParallelLoops() != genericOp.getNumLoops()) {
+      return rewriter.notifyMatchFailure(genericOp, "not elementwise");
+    }
 
     Optional<AffineMap> mapForInterchange;
 
@@ -44,16 +47,18 @@ struct TransposeGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
       // check if the generic op has a non-identity map for the operand.
       auto indexingMap = genericOp.getTiedIndexingMap(operand);
       // This is already identity. Nothing to do.
-      if (indexingMap.isIdentity()) return failure();
-
+      if (indexingMap.isIdentity()) {
+        return rewriter.notifyMatchFailure(genericOp, "already normalized");
+      }
       // The map must be a permutation. If not, then look for other operand.
       if (!indexingMap.isPermutation()) continue;
 
       if (!mapForInterchange) mapForInterchange = indexingMap;
     }
 
-    if (!mapForInterchange) return failure();
-
+    if (!mapForInterchange) {
+      return rewriter.notifyMatchFailure(genericOp, "no eligible operands");
+    }
     // make the input indexing maps identity by interchanging.
     auto interchange = llvm::to_vector(llvm::map_range(
         mapForInterchange->getResults(),
