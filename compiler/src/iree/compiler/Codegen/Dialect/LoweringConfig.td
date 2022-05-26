@@ -214,18 +214,8 @@ def IREECodegen_CompilationInfoAttr :
     (`,` `workgroup_size` `=` $workgroupSize^)? `>`
   }];
 
-  // These builders are externally for auto-tuner to generate the attribute.
+  // The builder is externally for auto-tuner to generate the attributes.
   let builders = [
-    AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
-      "TileSizesListTypeRef":$tileInterchange,
-      CArg<"ArrayRef<int64_t>", "{}">:$nativeVectorSize,
-      CArg<"ArrayRef<int64_t>", "{}">:$workgroupSize)>,
-    AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
-      "TileSizesListTypeRef":$tileInterchange,
-      "ArrayRef<int64_t>":$nativeVectorSize,
-      "DispatchLoweringPassPipeline":$passPipeline,
-      "ArrayRef<int64_t>":$workloadPerWorkgroup,
-      CArg<"ArrayRef<int64_t>", "{}">:$workgroupSize)>,
     AttrBuilder<(ins "LoweringConfigAttr":$configAttr,
       "TranslationInfoAttr":$translationInfo,
       "ArrayRef<int64_t>":$workloadPerWorkgroup)>,
