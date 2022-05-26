@@ -16,5 +16,5 @@ agents:
 steps:
   - label: ":pipeline: Uploading unregistered pipeline ${REQUESTED_PIPELINE}"
     commands: |
-      buildkite-agent pipeline upload
+      buildkite-agent pipeline upload \
           "build_tools/buildkite/pipelines/untrusted/${REQUESTED_PIPELINE}.yml"
