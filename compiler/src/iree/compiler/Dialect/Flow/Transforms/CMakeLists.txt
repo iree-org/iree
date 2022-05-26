@@ -55,6 +55,7 @@ iree_cc_library(
     "StripSignednessPass.cpp"
     "TestPartitionableLoopsInterface.cpp"
     "VerifyInputLegality.cpp"
+    "ViewDispatchGraph.cpp"
   DEPS
     ::PassesIncGen
     IREELinalgExtDialect
