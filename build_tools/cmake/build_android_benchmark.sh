@@ -69,7 +69,11 @@ cd build-host
 
 "${CMAKE_BIN}" --build . --target install -- -k 0
 # Also generate artifacts for benchmarking on Android.
-"${CMAKE_BIN}" --build . --target iree-benchmark-suites -- -k 0
+"${CMAKE_BIN}" --build . --target \
+  iree-benchmark-suites-android-arm64-v8a \
+  iree-benchmark-suites-android-adreno \
+  iree-benchmark-suites-android-mali \
+  -- -k 0
 "${CMAKE_BIN}" --build . --target iree-microbenchmark-suites -- -k 0
 # --------------------------------------------------------------------------- #
 

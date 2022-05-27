@@ -136,7 +136,7 @@ set(MOBILENET_V3SMALL_MODULE
 ################################################################################
 # Add benchmarks for all platforms.                                            #
 ################################################################################
-include(android-adreno.cmake)
 include(android-arm64-v8a.cmake)
+include(android-adreno.cmake)
 include(android-mali.cmake)
 include(linux-x86_64.cmake)
