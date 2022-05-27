@@ -9,9 +9,9 @@ on:
 jobs:
   add-to-project:
     name: Adding issue to the IREE GitHub project
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
-      - uses: actions/add-to-project@b56023be57e9c76f06e3844f18a1ab5dec7e7617
+      - uses: actions/add-to-project@7a0820f97673dfefc999713a9a6d6b7ee128bba5  # v0.0.3
         with:
           project-url: https://github.com/orgs/google/projects/20
           github-token: ${{ secrets.WRITE_ACCESS_TOKEN }}
