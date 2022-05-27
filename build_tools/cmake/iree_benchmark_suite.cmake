@@ -293,6 +293,7 @@ function(iree_benchmark_suite)
       endif()
 
       set(_RUN_SPEC_DIR "${_ROOT_ARTIFACTS_DIR}/${_MODULE_DIR_NAME}/${_BENCHMARK_DIR_NAME}")
+      list(JOIN _COMMON_NAME_SEGMENTS "__" _RUN_SPEC_TARGET_SUFFIX)
 
       # Create the command and target for the flagfile spec used to execute
       # the generated artifacts.
@@ -315,11 +316,8 @@ function(iree_benchmark_suite)
         COMMENT "Generating ${_FLAG_FILE}"
       )
 
-      set(_FLAGFILE_GEN_TARGET_NAME_LIST "iree-generate-benchmark-flagfile")
-      list(APPEND _FLAGFILE_GEN_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
-      list(JOIN _FLAGFILE_GEN_TARGET_NAME_LIST "__" _FLAGFILE_GEN_TARGET_NAME)
-      set(_FLAGFILE_GEN_TARGET_NAME "${PACKAGE_NAME}_${_FLAGFILE_GEN_TARGET_NAME}")
-
+      set(_FLAGFILE_GEN_TARGET_NAME
+        "${PACKAGE_NAME}_iree-generate-benchmark-flagfile__${_RUN_SPEC_TARGET_SUFFIX}")
       add_custom_target("${_FLAGFILE_GEN_TARGET_NAME}"
         DEPENDS "${_FLAG_FILE}"
       )
@@ -334,27 +332,37 @@ function(iree_benchmark_suite)
         COMMENT "Generating ${_TOOL_FILE}"
       )
 
-      set(_TOOLFILE_GEN_TARGET_NAME_LIST "iree-generate-benchmark-toolfile")
-      list(APPEND _TOOLFILE_GEN_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
-      list(JOIN _TOOLFILE_GEN_TARGET_NAME_LIST "__" _TOOLFILE_GEN_TARGET_NAME)
+      set(_TOOLFILE_GEN_TARGET_NAME
+        "${PACKAGE_NAME}_iree-generate-benchmark-toolfile__${_RUN_SPEC_TARGET_SUFFIX}")
       add_custom_target("${_TOOLFILE_GEN_TARGET_NAME}"
         DEPENDS "${_TOOL_FILE}"
       )
 
       # Generate a flagfile containing command-line options used to compile the
       # generated artifacts.
-      set(_COMPOPT_FILE "${_RUN_SPEC_DIR}/compilation_flagfile")
-      string(REPLACE ";" "\n" IREE_BENCHMARK_COMPILATION_FLAGS "${_TRANSLATION_ARGS}")
-      configure_file(
-        ${PROJECT_SOURCE_DIR}/build_tools/cmake/benchmark_compilation_flagfile.in
-        ${_COMPOPT_FILE})
+      string(REPLACE ";" "\\n" _BENCHMARK_COMPILATION_FLAGS "${_TRANSLATION_ARGS}")
+      set(_COMPILATION_FLAGFILE "${_RUN_SPEC_DIR}/compilation_flagfile")
+      add_custom_command(
+        OUTPUT "${_COMPILATION_FLAGFILE}"
+        COMMAND ${CMAKE_COMMAND} -E echo -e -- ${_BENCHMARK_COMPILATION_FLAGS} > "${_COMPILATION_FLAGFILE}"
+        WORKING_DIRECTORY "${_RUN_SPEC_DIR}"
+        COMMENT "Generating ${_COMPILATION_FLAGFILE}"
+      )
+
+      set(_COMPILATION_FLAGFILE_GEN_TARGET_NAME
+        "${PACKAGE_NAME}_iree-generate-benchmark-compilation-flagfile__${_RUN_SPEC_TARGET_SUFFIX}")
+      add_custom_target("${_COMPILATION_FLAGFILE_GEN_TARGET_NAME}"
+        DEPENDS "${_COMPILATION_FLAGFILE}"
+      )
 
       # Mark dependency so that we have one target to drive them all.
       add_dependencies(iree-benchmark-suites
+        "${_COMPILATION_FLAGFILE_GEN_TARGET_NAME}"
         "${_FLAGFILE_GEN_TARGET_NAME}"
         "${_TOOLFILE_GEN_TARGET_NAME}"
       )
       add_dependencies("${SUITE_SUB_TARGET}"
+        "${_COMPILATION_FLAGFILE_GEN_TARGET_NAME}"
         "${_FLAGFILE_GEN_TARGET_NAME}"
         "${_TOOLFILE_GEN_TARGET_NAME}"
       )
