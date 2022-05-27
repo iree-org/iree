@@ -80,6 +80,14 @@ function(iree_benchmark_suite)
 
   iree_package_name(PACKAGE_NAME)
 
+  # Add the benchmark suite target for a specific platform.
+  cmake_path(GET CMAKE_CURRENT_LIST_FILE FILENAME _PLATFORM_NAME)
+  cmake_path(REMOVE_EXTENSION _PLATFORM_NAME)
+  set(SUITE_SUB_TARGET "iree-benchmark-suites-${_PLATFORM_NAME}")
+  if(NOT TARGET "${SUITE_SUB_TARGET}")
+    add_custom_target("${SUITE_SUB_TARGET}")
+  endif()
+
   foreach(_MODULE IN LISTS _RULE_MODULES)
     cmake_parse_arguments(
       _MODULE
@@ -234,6 +242,7 @@ function(iree_benchmark_suite)
 
         # Mark dependency so that we have one target to drive them all.
         add_dependencies(iree-benchmark-suites "${_TRANSLATION_TARGET_NAME}")
+        add_dependencies("${SUITE_SUB_TARGET}" "${_TRANSLATION_TARGET_NAME}")
       endif(NOT TARGET "${_TRANSLATION_TARGET_NAME}")
 
       set(_COMPILE_STATS_TRANSLATION_TARGET_NAME
@@ -342,6 +351,10 @@ function(iree_benchmark_suite)
 
       # Mark dependency so that we have one target to drive them all.
       add_dependencies(iree-benchmark-suites
+        "${_FLAGFILE_GEN_TARGET_NAME}"
+        "${_TOOLFILE_GEN_TARGET_NAME}"
+      )
+      add_dependencies("${SUITE_SUB_TARGET}"
         "${_FLAGFILE_GEN_TARGET_NAME}"
         "${_TOOLFILE_GEN_TARGET_NAME}"
       )
