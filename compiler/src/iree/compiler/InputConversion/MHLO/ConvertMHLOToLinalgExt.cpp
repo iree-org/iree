@@ -498,10 +498,9 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
       return rewriter.notifyMatchFailure(
           op, "Output indices must be of integer type.");
     }
-    uint64_t kDim = inputValuesType.getRank() - 1;
 
-    // Create a range of indicies for the input tensor match input shape but
-    // with i32 type.
+    // Create and initialize output tensors for LinalgExt TopK results
+    // Define the output types based on the results of CHLO TopK
     SmallVector<Value> dynSizes;
     for (auto en : llvm::enumerate(inputValuesType.getShape())) {
       if (en.value() == ShapedType::kDynamicSize) {
@@ -509,32 +508,6 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
             rewriter.create<tensor::DimOp>(loc, adaptor.operand(), en.index()));
       }
     }
-
-    Value initAcc = rewriter.create<linalg::InitTensorOp>(
-        loc, dynSizes, inputValuesType.getShape(), indicesElementType);
-
-    // Create the indexing maps for the generic
-    size_t inputRank = inputValuesType.getRank();
-    SmallVector<AffineMap> indexingMaps = {
-        rewriter.getMultiDimIdentityMap(inputRank)};
-    SmallVector<StringRef> iterators(inputRank, "parallel");
-    Value inputIndices =
-        rewriter
-            .create<linalg::GenericOp>(
-                loc, /*resultTensorTypes=*/initAcc.getType(),
-                /*inputs=*/ValueRange{}, /*outputs=*/ValueRange{initAcc},
-                indexingMaps, iterators,
-                [=](OpBuilder &b, Location loc, ValueRange args) {
-                  // Indicies increase along the k dimension
-                  Value index = b.create<linalg::IndexOp>(loc, kDim);
-                  Value intIndex = b.create<arith::IndexCastOp>(
-                      loc, indicesElementType, index);
-                  b.create<linalg::YieldOp>(loc, intIndex);
-                })
-            .getResult(0);
-
-    // Create and initialize output tensors for LinalgExt TopK results
-    // Define the output types based on the results of CHLO TopK
     Value initTensorOutputValues = rewriter.create<mlir::linalg::InitTensorOp>(
         loc, dynSizes, outputValuesType.getShape(), valueElementType);
     Value initTensorOutputIndices = rewriter.create<mlir::linalg::InitTensorOp>(
@@ -562,8 +535,9 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
             .result();
 
     // Replace the CHLO TopK with LinalgExt TopK
+    uint64_t kDim = inputValuesType.getRank() - 1;
     auto topkOp = rewriter.replaceOpWithNewOp<IREE::LinalgExt::TopkOp>(
-        op, op->getResultTypes(), ValueRange{operand, inputIndices},
+        op, op->getResultTypes(), ValueRange{operand},
         ValueRange{negInfTensor, posInfTensor}, kDim);
 
     // Define the region of TopK with a GT comparison
