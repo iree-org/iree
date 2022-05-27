@@ -13,15 +13,16 @@ ARG APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
 
 ######## Basic stuff ########
 # Default compiler environment variables for IREE.
-ENV CC /usr/bin/clang
-ENV CXX /usr/bin/clang++
+# Matches the version of clang installed below.
+ENV CC /usr/bin/clang-9
+ENV CXX /usr/bin/clang++-9
 
 RUN apt-get update \
   && apt-get install -y \
     # For updating IREE's submodules.
     git \
-    # Default compiler and linker.
-    clang \
+    # Install our minimum supported clang version.
+    clang-9 \
     lld-9 \
     # IREE transitive dependencies
     libsdl2-dev \
