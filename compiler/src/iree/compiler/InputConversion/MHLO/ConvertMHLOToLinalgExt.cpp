@@ -487,14 +487,17 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
     auto outputValuesType = op.values().getType().dyn_cast<ShapedType>();
     auto outputIndicesType = op.indices().getType().dyn_cast<ShapedType>();
     if (!inputValuesType || !outputValuesType || !outputIndicesType) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          op, "Input and output must be of ShapedType");
     }
-    // Only handle integer types for indicies. Index type is not supported.
-    if (!outputIndicesType.getElementType().isa<IntegerType>()) {
-      return failure();
-    }
+
     Type valueElementType = outputValuesType.getElementType();
     Type indicesElementType = outputIndicesType.getElementType();
+    // Only handle integer types for indicies. Index type is not supported.
+    if (!indicesElementType.isa<IntegerType>()) {
+      return rewriter.notifyMatchFailure(
+          op, "Output indices must be of integer type.");
+    }
     uint64_t kDim = inputValuesType.getRank() - 1;
 
     // Create a range of indicies for the input tensor match input shape but
@@ -512,8 +515,8 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
 
     // Create the indexing maps for the generic
     size_t inputRank = inputValuesType.getRank();
-    AffineMap mapIdentity = rewriter.getMultiDimIdentityMap(inputRank);
-    SmallVector<AffineMap> indexingMaps = {mapIdentity};
+    SmallVector<AffineMap> indexingMaps = {
+        rewriter.getMultiDimIdentityMap(inputRank)};
     SmallVector<StringRef> iterators(inputRank, "parallel");
     Value inputIndices =
         rewriter
@@ -548,23 +551,24 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
       negInfAttr = rewriter.getFloatAttr(valueElementType, negApFloat);
     }
     Value negInf = rewriter.create<arith::ConstantOp>(loc, negInfAttr);
-    Value zero = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(indicesElementType));
+    Attribute posInfAttr = rewriter.getIntegerAttr(
+        rewriter.getI32Type(), APInt::getSignedMaxValue(32));
+    Value posInf = rewriter.create<arith::ConstantOp>(loc, posInfAttr);
     Value negInfTensor =
         rewriter.create<linalg::FillOp>(loc, negInf, initTensorOutputValues)
             .result();
-    Value zeroTensor =
-        rewriter.create<linalg::FillOp>(loc, zero, initTensorOutputIndices)
+    Value posInfTensor =
+        rewriter.create<linalg::FillOp>(loc, posInf, initTensorOutputIndices)
             .result();
 
     // Replace the CHLO TopK with LinalgExt TopK
     auto topkOp = rewriter.replaceOpWithNewOp<IREE::LinalgExt::TopkOp>(
         op, op->getResultTypes(), ValueRange{operand, inputIndices},
-        ValueRange{negInfTensor, zeroTensor}, kDim);
+        ValueRange{negInfTensor, posInfTensor}, kDim);
 
     // Define the region of TopK with a GT comparison
     SmallVector<Type> types(2, valueElementType);
-    SmallVector<Location> locations{loc, loc};
+    SmallVector<Location> locations(2, loc);
     Block *block = rewriter.createBlock(&topkOp.region(), {}, types, locations);
     {
       OpBuilder::InsertionGuard guard(rewriter);

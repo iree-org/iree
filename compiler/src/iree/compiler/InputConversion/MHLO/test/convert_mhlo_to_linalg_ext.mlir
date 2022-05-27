@@ -564,9 +564,9 @@ func.func @chlo_top_k_int(%arg : tensor<16x16xi32>) -> (tensor<16x8xi32>, tensor
 // CHECK:        %[[D2:.+]] = linalg.init_tensor [16, 8] : tensor<16x8xi32>
 // CHECK:        %[[D3:.+]] = linalg.init_tensor [16, 8] : tensor<16x8xi32>
 // CHECK-DAG:    %[[CNEG:.+]] = arith.constant -2147483648 : i32
-// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : i32
+// CHECK-DAG:    %[[CPOS:.+]] = arith.constant 2147483647 : i32
 // CHECK-DAG:    %[[D4:.+]] = linalg.fill ins(%[[CNEG]] : i32) outs(%[[D2]]
-// CHECK-DAG:    %[[D5:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[D3]]
+// CHECK-DAG:    %[[D5:.+]] = linalg.fill ins(%[[CPOS]] : i32) outs(%[[D3]]
 // CHECK:        %[[D6:.+]]:2 = iree_linalg_ext.topk
 // CHECK-SAME:     dimension(1)
 // CHECK-SAME:     ins(%[[ARG0]], %[[D1]]
@@ -597,9 +597,9 @@ func.func @chlo_top_k_float(%arg : tensor<16x16xf32>) -> (tensor<16x8xf32>, tens
 // CHECK:        %[[D2:.+]] = linalg.init_tensor [16, 8] : tensor<16x8xf32>
 // CHECK:        %[[D3:.+]] = linalg.init_tensor [16, 8] : tensor<16x8xi32>
 // CHECK-DAG:    %[[CNEG:.+]] = arith.constant 0xFF800000 : f32
-// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : i32
+// CHECK-DAG:    %[[CPOS:.+]] = arith.constant 2147483647 : i32
 // CHECK-DAG:    %[[D4:.+]] = linalg.fill ins(%[[CNEG]] : f32) outs(%[[D2]]
-// CHECK-DAG:    %[[D5:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[D3]]
+// CHECK-DAG:    %[[D5:.+]] = linalg.fill ins(%[[CPOS]] : i32) outs(%[[D3]]
 // CHECK:        %[[D6:.+]]:2 = iree_linalg_ext.topk
 // CHECK-SAME:     dimension(1)
 // CHECK-SAME:     ins(%[[ARG0]], %[[D1]]
