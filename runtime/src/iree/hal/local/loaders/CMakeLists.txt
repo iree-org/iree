@@ -10,6 +10,8 @@
 
 iree_add_all_subdirs()
 
+if(NOT EMSCRIPTEN)
+
 iree_cc_library(
   NAME
     embedded_library_loader
@@ -29,6 +31,8 @@ iree_cc_library(
     "IREE_HAL_HAVE_EMBEDDED_LIBRARY_LOADER=1"
   PUBLIC
 )
+
+endif()
 
 iree_cc_library(
   NAME

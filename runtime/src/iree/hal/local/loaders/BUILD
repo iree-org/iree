@@ -15,6 +15,13 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+iree_cmake_extra_content(
+    content = """
+if(NOT EMSCRIPTEN)
+""",
+    inline = True,
+)
+
 iree_runtime_cc_library(
     name = "embedded_library_loader",
     srcs = ["embedded_library_loader.c"],
@@ -31,6 +38,13 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/local:executable_library",
         "//runtime/src/iree/hal/local/elf:elf_module",
     ],
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
 )
 
 iree_runtime_cc_library(
