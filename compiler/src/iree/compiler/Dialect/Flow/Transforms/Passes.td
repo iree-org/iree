@@ -97,6 +97,12 @@ def InterchangeGenericOps :
   let constructor = "mlir::iree_compiler::IREE::Flow::createInterchangeGenericOpsPass()";
 }
 
+def InterchangeTransposeGenericOps :
+    Pass<"iree-flow-interchange-transpose-generic-ops", ""> {
+  let summary = "Interchange transpose generic op loops to make the input indeximg map indentity.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createInterchangeTransposeGenericOpsPass()";
+}
+
 def OptimizeNumerics :
     Pass<"iree-flow-optimize-numerics", ""> {
   let summary = "Optimizes numerics given annotations added via iree-flow-infer-numeric-narrowing";
