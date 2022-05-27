@@ -11,7 +11,7 @@ jobs:
     name: Adding issue to the master project
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/add-to-project@main
+      - uses: actions/add-to-project@b56023be57e9c76f06e3844f18a1ab5dec7e7617
         with:
           project-url: https://github.com/orgs/google/projects/20
           github-token: ${{ secrets.WRITE_ACCESS_TOKEN }}
