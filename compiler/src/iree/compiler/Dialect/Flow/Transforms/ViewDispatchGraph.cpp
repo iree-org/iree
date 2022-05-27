@@ -229,10 +229,25 @@ class PrintOpPass : public ViewDispatchGraphBase<PrintOpPass> {
         for (auto result : op->getResults()) {
           result.printAsOperand(os, state);
         }
-        os << " = ";
-      }
+        os << " = " << op->getName();
 
-      os << op->getName() << "\n";
+        if (auto dispatch = dyn_cast<DispatchOp>(op)) {
+          // print workgroup count
+          os << "[ ";
+          for (auto count : dispatch.workgroup_count()) {
+            count.printAsOperand(os, state);
+            os << " ";
+          }
+          os << "]\n";
+
+          // print dispatch function name
+          os << dispatch.entry_point() << "\n";
+        } else {
+          os << "\n";
+        }
+      } else {
+        os << op->getName() << "\n";
+      }
 
       if (printResultTypes) {
         std::string buf;
