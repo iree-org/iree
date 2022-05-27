@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Arithmetic/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Bufferization/Transforms/AllocTensorElimination.h"
 #include "mlir/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
@@ -29,10 +30,10 @@ using mlir::bufferization::BufferizableOpInterface;
 using mlir::bufferization::BufferizationAliasInfo;
 using mlir::bufferization::BufferizationState;
 using mlir::bufferization::DialectAnalysisState;
+using mlir::bufferization::eliminateAllocTensors;
 using mlir::bufferization::OneShotBufferizationOptions;
 using mlir::bufferization::PostAnalysisStepFn;
 using mlir::bufferization::replaceOpWithNewBufferizedOp;
-using mlir::linalg::eliminateInitTensors;
 
 namespace mlir {
 namespace iree_compiler {
@@ -332,7 +333,7 @@ static LogicalResult inplaceTensorStoreOpAnalysis(
 ///   DispatchTensorStoreOp to the InitTensorOp must have bufferized in-place.
 LogicalResult storeTensorOpAnchoredInitTensorEliminationStep(
     RewriterBase &rewriter, Operation *op, AnalysisState &state) {
-  return eliminateInitTensors(
+  return eliminateAllocTensors(
       rewriter, op, state,
       /*anchorMatchFunc=*/
       [&](OpOperand &operand, SmallVector<Value> &) {

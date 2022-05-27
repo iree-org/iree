@@ -7,6 +7,9 @@
 # For now, just import the main IREE bazelrc
 try-import %workspace%/../../build_tools/bazel/iree.bazelrc
 
+# TF uses C++17.
+build:generic_clang --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
+
 # Ignore visibility issues in TensorFlow. They are inconsistently applied
 # to the OSS codebase.
 build --nocheck_visibility
