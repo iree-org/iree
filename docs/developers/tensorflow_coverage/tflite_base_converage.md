@@ -6,12 +6,12 @@ operation coverage.
 This focuses on lowering to `tosa` operations and may not have support for
 all IREE backends.
 
-*Last Updated: 2022/5/25
+*Last Updated Manually: 2022/5/25
 
 ## TFlite Operation Coverage
 
 | TFLite Operation | Static | Dynamic |
-|:----------:|:--------------------------------------------:|:--------------------------------------------:|
+|:-----------|:--------------------------------------------:|:--------------------------------------------:|
 | Abs | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> |
 | Add | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> |
 | AddN | <span class="success-table-element">✓</span> | <span class="success-table-element">✓</span> |
