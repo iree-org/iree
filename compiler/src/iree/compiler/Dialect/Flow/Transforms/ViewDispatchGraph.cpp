@@ -18,6 +18,7 @@
 #include "llvm/Support/Format.h"
 #include "llvm/Support/GraphWriter.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Operation.h"
@@ -220,6 +221,15 @@ class PrintOpPass : public ViewDispatchGraphBase<PrintOpPass> {
   /// Generate a label for an operation.
   std::string getLabel(Operation *op) {
     return strFromOs([&](raw_ostream &os) {
+      if (isa<DispatchOp>(op)) {
+        AsmState state(op);
+
+        for (auto result : op->getResults()) {
+          result.printAsOperand(os, state);
+        }
+        return;
+      }
+
       // Print operation name and type.
       os << op->getName();
       if (printResultTypes) {
