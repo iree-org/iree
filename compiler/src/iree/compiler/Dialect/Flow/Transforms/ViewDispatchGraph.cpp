@@ -219,6 +219,31 @@ class PrintOpPass : public ViewDispatchGraphBase<PrintOpPass> {
     return Node(nodeId);
   }
 
+  void printOperands(raw_ostream &os, ::mlir::Operation::operand_range operands,
+                     AsmState &state) {
+    for (unsigned i = 0, e = operands.size(); i != e; ++i) {
+      auto operand = operands[i];
+      auto op = operand.getDefiningOp();
+
+      if (isScalarConstantOp(op)) {
+        auto ty = operand.getType();
+        if (ty.isa<IntegerType>()) {
+          os << cast<arith::ConstantIntOp>(op).value();
+        } else if (ty.isa<FloatType>()) {
+          cast<arith::ConstantFloatOp>(op).value().print(os);
+        } else {
+          os << cast<arith::ConstantIndexOp>(op).value();
+        }
+      } else {
+        operand.printAsOperand(os, state);
+      }
+
+      if (i != e - 1) {
+        os << ", ";
+      }
+    }
+  }
+
   /// Generate a label for an operation.
   std::string getLabel(Operation *op) {
     return strFromOs([&](raw_ostream &os) {
@@ -233,22 +258,16 @@ class PrintOpPass : public ViewDispatchGraphBase<PrintOpPass> {
 
         if (auto dispatch = dyn_cast<DispatchOp>(op)) {
           // print workgroup count
-          os << "[ ";
-          for (auto count : dispatch.workgroup_count()) {
-            count.printAsOperand(os, state);
-            os << " ";
-          }
+          os << "[";
+          printOperands(os, dispatch.workgroup_count(), state);
           os << "]\n";
 
           // print entry function name
           os << dispatch.entry_point();
 
           // print entry function args
-          os << "( ";
-          for (auto opr : dispatch.operands()) {
-            opr.printAsOperand(os, state);
-            os << " ";
-          }
+          os << "(";
+          printOperands(os, dispatch.operands(), state);
           os << ")\n";
 
         } else {
@@ -300,17 +319,22 @@ class PrintOpPass : public ViewDispatchGraphBase<PrintOpPass> {
     });
   }
 
+  bool isScalarConstantOp(Operation *op) {
+    if (auto constOp = dyn_cast<mlir::arith::ConstantOp>(op))
+      if (constOp.getResult().getType().isIntOrIndexOrFloat()) return true;
+
+    return false;
+  }
+
   /// Process an operation. If the operation has regions, emit a cluster.
   /// Otherwise, emit a node.
   Node processOperation(Operation *op) {
     Node node;
 
-    if (auto constOp = dyn_cast<mlir::arith::ConstantOp>(op)) {
-      if (constOp.getResult().getType().isIntOrIndexOrFloat()) {
-        // don't handle scalar constant because it creates too many edges
-        // from a single constant.
-        return node;
-      }
+    if (isScalarConstantOp(op)) {
+      // don't handle scalar constant because it creates too many edges
+      // from a single constant.
+      return node;
     }
 
     if (op->getNumRegions() > 0) {
