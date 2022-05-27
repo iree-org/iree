@@ -1,0 +1,17 @@
+name: Process (re)opened issues
+
+on:
+  issues:
+    types:
+      - reopened
+      - opened
+
+jobs:
+  add-to-project:
+    name: Adding issue to the IREE GitHub project
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/add-to-project@b56023be57e9c76f06e3844f18a1ab5dec7e7617
+        with:
+          project-url: https://github.com/orgs/google/projects/20
+          github-token: ${{ secrets.WRITE_ACCESS_TOKEN }}
