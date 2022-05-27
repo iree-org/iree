@@ -9,6 +9,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/schemas/bytecode_module_def_json_printer.h"
+#include "iree/vm/bytecode_module.h"
 
 // Today we just print to JSON. We could do something more useful (size
 // analysis, etc), but JSON should be enough.
@@ -22,20 +23,25 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  iree_file_contents_t* flatbuffer_contents = NULL;
+  iree_file_contents_t* file_contents = NULL;
   IREE_CHECK_OK(iree_file_read_contents(argv[1], iree_allocator_system(),
-                                        &flatbuffer_contents));
+                                        &file_contents));
+
+  iree_const_byte_span_t flatbuffer_contents = iree_const_byte_span_empty();
+  IREE_CHECK_OK(iree_vm_bytecode_module_parse_header(
+      file_contents->const_buffer, &flatbuffer_contents,
+      /*out_rodata_offset=*/NULL));
 
   // Print direct to stdout.
   flatcc_json_printer_t printer;
   flatcc_json_printer_init(&printer, /*fp=*/NULL);
   flatcc_json_printer_set_skip_default(&printer, true);
-  bytecode_module_def_print_json(
-      &printer, (const char*)flatbuffer_contents->const_buffer.data,
-      flatbuffer_contents->const_buffer.data_length);
+  bytecode_module_def_print_json(&printer,
+                                 (const char*)flatbuffer_contents.data,
+                                 flatbuffer_contents.data_length);
   flatcc_json_printer_clear(&printer);
 
-  iree_file_contents_free(flatbuffer_contents);
+  iree_file_contents_free(file_contents);
 
   return 0;
 }

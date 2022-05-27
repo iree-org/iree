@@ -130,7 +130,7 @@ You'll need this to determine the flags used to invoke the dispatch.
 2. Extract the executable shared object from the module:
 
 ```
-7z e -aoa -bb0 -y module.vmfb
+unzip module.vmfb
 ```
 
 This (today) results in a single extracted file you pass to the tool:

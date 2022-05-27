@@ -64,6 +64,7 @@
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -118,6 +119,12 @@ static llvm::cl::opt<bool> print_flatbuffer_flag{
     "print-flatbuffer",
     llvm::cl::desc("Prints Flatbuffer text after serialization"),
     llvm::cl::init(false),
+};
+
+static llvm::cl::opt<std::string> output_file_flag{
+    "o",
+    llvm::cl::desc("File path in which to write the compiled module file"),
+    llvm::cl::init(""),
 };
 
 static llvm::cl::list<std::string> function_inputs_flag{
@@ -218,6 +225,9 @@ Status PrepareModule(std::string target_backend,
     mlir_module->dump();
   }
 
+  // NOTE: if we have an output file specified then we could translate into that
+  // for greater efficiency. Today we assume that users aren't passing multi-GB
+  // models through this tool (or if they are they have the memory to run them).
   auto bytecode_options =
       mlir::iree_compiler::IREE::VM::BytecodeTargetOptions::FromFlags::get();
   std::string binary_contents;
@@ -258,6 +268,17 @@ Status PrepareModule(std::string target_backend,
     }
     text_output.flush();
     std::cerr << text_contents << std::endl;
+  }
+  if (!output_file_flag.empty()) {
+    if (llvm::writeToOutput(
+            output_file_flag, [&](llvm::raw_ostream& os) -> llvm::Error {
+              os.write(binary_contents.data(), binary_contents.size());
+              return llvm::Error::success();
+            })) {
+      return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
+                              "unable to write module output to %s",
+                              output_file_flag.c_str());
+    }
   }
 
   *out_module = std::move(binary_contents);

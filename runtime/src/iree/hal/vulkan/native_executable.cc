@@ -147,28 +147,28 @@ static void iree_hal_vulkan_destroy_pipeline(VkDeviceHandle* logical_device,
                                             logical_device->allocator());
 }
 
-// Verifies the structure of the flatbuffer so that we can avoid doing so during
+// Verifies the structure of the FlatBuffer so that we can avoid doing so during
 // runtime. There are still some conditions we must be aware of (such as omitted
 // names on functions with internal linkage), however we shouldn't need to
-// bounds check anything within the flatbuffer after this succeeds.
+// bounds check anything within the FlatBuffer after this succeeds.
 static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
     iree_const_byte_span_t flatbuffer_data,
     iree_host_size_t expected_entry_point_count) {
   if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "flatbuffer data is not present or less than 16 bytes (%zu total)",
+        "FlatBuffer data is not present or less than 16 bytes (%zu total)",
         flatbuffer_data.data_length);
   }
 
   // Run flatcc generated verification. This ensures all pointers are in-bounds
   // and that we can safely walk the file, but not that the actual contents of
-  // the flatbuffer meet our expectations.
+  // the FlatBuffer meet our expectations.
   int verify_ret = iree_SpirVExecutableDef_verify_as_root(
       flatbuffer_data.data, flatbuffer_data.data_length);
   if (verify_ret != flatcc_verify_ok) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "flatbuffer verification failed: %s",
+                            "FlatBuffer verification failed: %s",
                             flatcc_verify_error_string(verify_ret));
   }
 
@@ -231,7 +231,7 @@ iree_status_t iree_hal_vulkan_native_executable_create(
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Verify and fetch the executable flatbuffer wrapper.
+  // Verify and fetch the executable FlatBuffer wrapper.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_spirv_executable_flatbuffer_verify(
               executable_params->executable_data,

@@ -9,14 +9,14 @@ vm.module @constants {
 
   // CHECK: "rodata_segments": [{
 
-  //      CHECK: "data": [
+  //      CHECK: "embedded_data": [
   // CHECK-NEXT:   1,
   // CHECK-NEXT:   2,
   // CHECK-NEXT:   3
   // CHECK-NEXT: ]
   vm.rodata private @dense_i8s dense<[1, 2, 3]> : tensor<3xi8>
 
-  //      CHECK: "data": [
+  //      CHECK: "embedded_data": [
   // CHECK-NEXT:   0,
   // CHECK-NEXT:   0,
   // CHECK-NEXT:   128,
@@ -32,7 +32,7 @@ vm.module @constants {
   // CHECK-NEXT: ]
   vm.rodata private @dense_float32s dense<[1.000000e+00, 2.000000e+00, 3.000000e+00]> : tensor<3xf32>
 
-  //      CHECK: "data": [
+  //      CHECK: "embedded_data": [
   // CHECK-NEXT:   0,
   // CHECK-NEXT:   0,
   // CHECK-NEXT:   128,
@@ -48,7 +48,7 @@ vm.module @constants {
   // CHECK-NEXT: ]
   vm.rodata private @splat_float32s dense<1.000000e+00> : tensor<3xf32>
 
-  //      CHECK: "data": [
+  //      CHECK: "embedded_data": [
   // CHECK-NEXT:   0,
   // CHECK-NEXT:   60,
   // CHECK-NEXT:   0,

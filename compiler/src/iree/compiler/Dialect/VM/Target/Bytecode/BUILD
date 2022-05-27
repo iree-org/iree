@@ -15,6 +15,8 @@ package(
 iree_compiler_cc_library(
     name = "Bytecode",
     srcs = [
+        "ArchiveWriter.cpp",
+        "ArchiveWriter.h",
         "BytecodeEncoder.cpp",
         "BytecodeEncoder.h",
         "BytecodeModuleTarget.cpp",

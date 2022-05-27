@@ -16,6 +16,8 @@ iree_cc_library(
   HDRS
     "BytecodeModuleTarget.h"
   SRCS
+    "ArchiveWriter.cpp"
+    "ArchiveWriter.h"
     "BytecodeEncoder.cpp"
     "BytecodeEncoder.h"
     "BytecodeModuleTarget.cpp"

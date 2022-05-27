@@ -43,7 +43,7 @@ static LogicalResult translateFromMLIRToHALExecutable(
 }
 
 // Translates an MLIR module containing a single hal.executable into a
-// target-specific binary form (such as an ELF file or a flatbuffer containing
+// target-specific binary form (such as an ELF file or a FlatBuffer containing
 // a SPIR-V blob).
 //
 // Exposed via the --iree-mlir-to-hal-executable translation.

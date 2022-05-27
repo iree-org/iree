@@ -189,7 +189,7 @@ class ROCMTargetBackend final : public TargetBackend {
     }
 
     // Serialize hsaco kernel into the binary that we will embed in the
-    // final flatbuffer.
+    // final FlatBuffer.
     std::string targetObj = translateModuleToObj(*llvmModule, *targetMachine);
     std::string targetHSACO = createHsaco(targetObj, libraryName);
     if (!options.dumpBinariesPath.empty()) {

@@ -1,7 +1,7 @@
 # TFLite Integration
 
 IREE supports compiling and running TensorFlow Lite programs stored as [TFLite
-flatbuffers](https://www.tensorflow.org/lite/guide). These files can be
+FlatBuffers](https://www.tensorflow.org/lite/guide). These files can be
 imported into an IREE-compatible format then compiled to a series of backends.
 
 ## Prerequisites
@@ -18,7 +18,7 @@ python -m pip install \
 ## Importing and Compiling
 IREE's tooling is divided into two components: import and compilation.
 
-1. The import tool converts the TFLite flatbuffer to an IREE compatible form,
+1. The import tool converts the TFLite FlatBuffer to an IREE compatible form,
 validating that only IREE compatible operations remain. Containing a combination of TOSA
 and IREE operations.
 2. The compilation stage generates the bytecode module for a list of targets, which can

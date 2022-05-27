@@ -16,13 +16,13 @@
 #include "iree/compiler/Dialect/VM/Analysis/ValueLiveness.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "iree/compiler/Dialect/VM/Target/Bytecode/ArchiveWriter.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeEncoder.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "iree/schemas/bytecode_module_def_builder.h"
-#include "iree/schemas/bytecode_module_def_json_printer.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CRC.h"
 #include "llvm/Support/Endian.h"
@@ -48,145 +48,35 @@ namespace {
 
 using namespace llvm::support;
 
+// All constants are defaulted to 16-byte aligned as that is the maximum
+// (reasonable) alignment of all data types on all platforms. This can be
+// overridden by creators of the rodata with the `alignment` attribute.
+static constexpr int kDefaultRodataAlignment = 16;
+
+// Anything over a few KB should be split out of the FlatBuffer.
+// This limit is rather arbitrary - we could support hundreds of MB of embedded
+// data at the risk of tripping the 31-bit FlatBuffer offset values.
+static constexpr int kMaxEmbeddedDataSize = 4 * 1024;
+
 struct TypeDef {
   Type type;
   std::string full_name;
 };
 
-struct SerializedConstantRef {
-  flatbuffers_uint8_vec_ref_t ref = 0;
-  int64_t totalSize = 0;
-  uint32_t crc32 = 0;
+// A rodata reference.
+// The archive file is empty if the data is to be embedded in the FlatBuffer.
+struct RodataRef {
+  // Source op.
+  IREE::VM::RodataOp rodataOp;
+  // Required alignment computed from the rodata or defaults.
+  uint64_t alignment = kDefaultRodataAlignment;
+  // Total size of the serialized data in bytes.
+  uint64_t totalSize = 0;
+  // Optional reference to the rodata in the file.
+  Optional<ArchiveWriter::File> archiveFile;
 };
 
-// Serializes a constant attribute to the FlatBuffer as a binary blob.
-// Returns the size in bytes of the serialized value and the flatbuffers offset
-// to the uint8 vec containing the data. If |calculateCRC32| is provided then a
-// CRC32 of the data will be computed and returned as well.
-SerializedConstantRef serializeConstant(Location loc, Attribute valueAttr,
-                                        size_t alignment, bool calculateCRC32,
-                                        FlatbufferBuilder &fbb) {
-  flatcc_builder_start_vector(fbb, 1, alignment, FLATBUFFERS_COUNT_MAX(1));
-
-  auto value = valueAttr.dyn_cast<IREE::Util::SerializableAttrInterface>();
-  assert(value && "expected a serializable rodata value");
-
-  // TODO(benvanik): use fbb.streamUint8Vec + value.serializeToStream.
-  // Right now this will allocate a single slab of the entire storage size and
-  // write the contents into it. streamUint8Vec also does the same thing but
-  // we could extend it with custom fbb storage such that we could reserve the
-  // size in the file and then fix it up after we write it. The complication is
-  // that we need the CRC below and thus have to have the bytes in memory at
-  // some point. An interface member for computeCRC() could be useful as even
-  // though slow it would avoid the need to malloc everything. We could also
-  // switch implementations based on calculateCRC32 - models with GB of params
-  // are probably fine not to have nice hackability :)
-  uint64_t actualSize = value.getStorageSize();
-  if (actualSize > SIZE_MAX) {
-    mlir::emitError(loc) << "constant size " << actualSize
-                         << " exceeds native size_t; unable to serialize";
-    return {};
-  }
-  size_t size = static_cast<size_t>(value.getStorageSize());
-  uint8_t *bytePtr = flatbuffers_uint8_vec_extend(fbb, size);
-  if (failed(value.serializeToBuffer(llvm::support::endianness::little,
-                                     ArrayRef<char>((char *)bytePtr, size)))) {
-    return {};
-  }
-
-  uint8_t *dataPtr =
-      reinterpret_cast<uint8_t *>(flatcc_builder_vector_edit(fbb));
-  size_t totalSize = flatcc_builder_vector_count(fbb);
-  uint32_t crc32Value = 0;
-  if (calculateCRC32) {
-    crc32Value = llvm::crc32(0u, ArrayRef<uint8_t>(dataPtr, totalSize));
-  }
-  return SerializedConstantRef{
-      flatbuffers_uint8_vec_end(fbb),
-      static_cast<int64_t>(totalSize),
-      crc32Value,
-  };
-}
-
-LLVM_PACKED_START
-struct ZIPEndOfCentralDirectoryRecord {
-  ulittle32_t signature;  // 0x06054B50
-  ulittle16_t diskNumber;
-  ulittle16_t startDiskNumber;
-  ulittle16_t entriesOnDisk;
-  ulittle16_t entryCount;
-  ulittle32_t directorySize;
-  ulittle32_t directoryOffset;
-  ulittle16_t commentLength;
-  // comment (variable size)
-};
-static_assert(sizeof(ZIPEndOfCentralDirectoryRecord) == 22, "bad packing");
-struct ZIPCentralDirectoryRecord {
-  ulittle32_t signature;  // 0x02014B50
-  ulittle16_t versionMadeBy;
-  ulittle16_t versionToExtract;
-  ulittle16_t generalPurposeFlags;
-  ulittle16_t compressionMethod;
-  ulittle16_t lastModifiedTime;
-  ulittle16_t lastModifiedDate;
-  ulittle32_t crc32;
-  ulittle32_t compressedSize;
-  ulittle32_t uncompressedSize;
-  ulittle16_t fileNameLength;
-  ulittle16_t extraFieldLength;
-  ulittle16_t fileCommentLength;
-  ulittle16_t diskStartNumber;
-  ulittle16_t internalFileAttributes;
-  ulittle32_t externalFileAttributes;
-  ulittle32_t localHeaderOffset;
-  // file name (variable size)
-  // extra field (variable size)
-  // file comment (variable size)
-};
-static_assert(sizeof(ZIPCentralDirectoryRecord) == 46, "bad packing");
-struct ZIPLocalFileHeader {
-  ulittle32_t signature;  // 0x04034B50
-  ulittle16_t versionToExtract;
-  ulittle16_t generalPurposeFlag;
-  ulittle16_t compressionMethod;
-  ulittle16_t lastModifiedTime;
-  ulittle16_t lastModifiedDate;
-  ulittle32_t crc32;
-  ulittle32_t compressedSize;
-  ulittle32_t uncompressedSize;
-  ulittle16_t fileNameLength;
-  ulittle16_t extraFieldLength;
-  // file name (variable size)
-  // extra field (variable size)
-};
-static_assert(sizeof(ZIPLocalFileHeader) == 30, "bad packing");
-struct ZIPExtraFieldHeader {
-  ulittle16_t id;
-  ulittle16_t size;
-};
-static_assert(sizeof(ZIPExtraFieldHeader) == 4, "bad packing");
-LLVM_PACKED_END
-
-// A ZIP file reference into the flatbuffer output data.
-struct ZIPFileRef {
-  // Offset of the local file header in the flatbuffer. Relative to the end of
-  // the file.
-  flatcc_builder_ref_t localHeaderOffset;
-  // Name of the file used within the ZIP archive.
-  std::string fileName;
-  // Total size, in bytes, of the file uncompressed.
-  uint32_t totalSize;
-  // CRC32 of the file.
-  uint32_t crc32;
-  // Extra field padding (total).
-  uint16_t paddingLength;
-};
-
-// TODO(benvanik): figure out why we need to offset all flatbuffer refs by this
-// value in order to get proper absolute file offsets. The current value used
-// here was derived empirically and is like a combination of the flatbuffer
-// file prefix and some alignment.
-static constexpr int kZIPMagicLocalOffset = 90;
+}  // namespace
 
 // Gets a file extension based on the given |mimeType| that can be used to help
 // applications guess the file type of embedded data.
@@ -204,130 +94,37 @@ static StringRef mimeTypeToFileExtension(StringRef mimeType) {
       .Default(".bin");
 }
 
-// Appends a ZIP local file header at the current location.
-// The header is a prefix to the actual rodata contents. ZIP requires that the
-// payload start immediately after the header but we have the flatbuffer header
-// there. To skip over the flatbuffer data we pad out the header with a dummy
-// extra data field that lets us control the length.
-//
-//  [zip local file header] + 4 byte suffix length
-//  [flatbuffer vector header] (4 bytes)
-//  [payload]
-static ZIPFileRef appendZIPLocalFileHeader(IREE::VM::RodataOp rodataOp,
-                                           size_t rodataSize, uint32_t crc32,
-                                           FlatbufferBuilder &fbb) {
-  // Use the mime type to map to a file extension.
-  std::string fileName =
-      (rodataOp.getName() +
-       mimeTypeToFileExtension(rodataOp.mime_type().getValueOr("")))
-          .str();
+// Serializes a constant attribute to the FlatBuffer as a binary blob.
+// Returns the size in bytes of the serialized value and the FlatBuffers offset
+// to the uint8 vec containing the data.
+static flatbuffers_uint8_vec_ref_t serializeEmbeddedData(
+    Location loc, Attribute valueAttr, uint64_t alignment, uint64_t totalSize,
+    FlatbufferBuilder &fbb) {
+  flatcc_builder_start_vector(fbb, 1, alignment, FLATBUFFERS_COUNT_MAX(1));
 
-  // The data is stored in the flatbuffer prefixed with a vector header of
-  // a 32-bit byte count. We need to ignore this when computing the CRC as we
-  // want only the payload to be visible in the ZIP.
-  size_t vectorPrefixLength = sizeof(uint32_t);
-
-  // header + file name + extra field header
-  size_t totalHeaderLength = sizeof(ZIPLocalFileHeader) + fileName.size() +
-                             sizeof(ZIPExtraFieldHeader);
-
-  // Append local file header.
-  auto *header = reinterpret_cast<ZIPLocalFileHeader *>(
-      flatcc_builder_start_struct(fbb, totalHeaderLength, 1));
-  header->signature = 0x04034B50u;
-  header->versionToExtract = 0;
-  header->generalPurposeFlag = 0;
-  header->compressionMethod = 0;  // COMP_STORED
-  header->lastModifiedTime = 0;
-  header->lastModifiedDate = 0;
-  header->crc32 = crc32;
-  header->compressedSize = static_cast<uint32_t>(rodataSize);
-  header->uncompressedSize = static_cast<uint32_t>(rodataSize);
-  header->fileNameLength = static_cast<uint16_t>(fileName.size());
-  header->extraFieldLength = sizeof(ZIPExtraFieldHeader) + vectorPrefixLength;
-  char *fileNamePtr = reinterpret_cast<char *>(header + 1);
-  memcpy(fileNamePtr, fileName.data(), fileName.size());
-  auto *extraField =
-      reinterpret_cast<ZIPExtraFieldHeader *>(fileNamePtr + fileName.size());
-  extraField->id = 0xFECAu;
-  extraField->size = static_cast<uint16_t>(vectorPrefixLength);
-  flatcc_builder_ref_t relativeHeaderOffset = flatcc_builder_end_struct(fbb);
-
-  ZIPFileRef fileRef;
-  fileRef.localHeaderOffset = relativeHeaderOffset;
-  fileRef.fileName = std::move(fileName);
-  fileRef.totalSize = static_cast<uint32_t>(rodataSize);
-  fileRef.crc32 = crc32;
-  fileRef.paddingLength = static_cast<uint16_t>(vectorPrefixLength);
-  return fileRef;
-}
-
-// Appends a ZIP central directory to |output| with the references to all of
-// |zipFileRefs| with offsets applied. |startOffset| and |endOffset| define the
-// absolute offsets into |output| of the flatbuffer data.
-//
-// The technique used here is the same as that used in self-extracting archives:
-// byte offset 0 of the file will contain the native format header (like the
-// flatbuffers file identifier) and a ZIP application will need to scan from the
-// back of the file to find the ZIP central directory. This often means that
-// naming the file .zip will not work: most ZIP applications will try to find
-// a PK header at byte 0.
-static void appendZIPCentralDirectory(ArrayRef<ZIPFileRef> zipFileRefs,
-                                      uint64_t startOffset, uint64_t endOffset,
-                                      llvm::raw_ostream &output) {
-  // Append the central directory, which contains the local file headers with
-  // some extra junk and references back to where the local headers are in the
-  // file.
-  uint64_t centralDirectoryStartOffset = output.tell();
-  for (auto zipFileRef : zipFileRefs) {
-    // Fixed-size header.
-    ZIPCentralDirectoryRecord cdr;
-    cdr.signature = 0x02014B50u;
-    cdr.versionMadeBy = 798;
-    cdr.versionToExtract = 20;
-    cdr.generalPurposeFlags = 0;
-    cdr.compressionMethod = 0;  // COMP_STORED
-    cdr.lastModifiedTime = 0;
-    cdr.lastModifiedDate = 0;
-    cdr.crc32 = zipFileRef.crc32;
-    cdr.compressedSize = zipFileRef.totalSize;
-    cdr.uncompressedSize = zipFileRef.totalSize;
-    cdr.fileNameLength = static_cast<uint16_t>(zipFileRef.fileName.size());
-    cdr.extraFieldLength =
-        sizeof(ZIPExtraFieldHeader) + zipFileRef.paddingLength;
-    cdr.fileCommentLength = 0;
-    cdr.diskStartNumber = 0;
-    cdr.internalFileAttributes = 0;
-    cdr.externalFileAttributes = 0;
-    cdr.localHeaderOffset = static_cast<uint32_t>(
-        endOffset + zipFileRef.localHeaderOffset - kZIPMagicLocalOffset);
-    output.write(reinterpret_cast<const char *>(&cdr), sizeof(cdr));
-    output.write(zipFileRef.fileName.data(), zipFileRef.fileName.size());
-    ZIPExtraFieldHeader extraField;
-    extraField.id = 0xFECAu;
-    extraField.size = zipFileRef.paddingLength;
-    output.write(reinterpret_cast<const char *>(&extraField),
-                 sizeof(extraField));
-    output.write_zeros(extraField.size);
+  if (totalSize > SIZE_MAX) {
+    mlir::emitError(loc) << "constant size " << totalSize
+                         << " exceeds native size_t; unable to serialize";
+    return {};
   }
-  uint64_t centralDirectoryEndOffset = output.tell();
 
-  // Append the final ZIP file footer.
-  // NOTE: this must come at the very end of the file.
-  ZIPEndOfCentralDirectoryRecord endOfCDR;
-  endOfCDR.signature = 0x06054B50u;
-  endOfCDR.diskNumber = 0;
-  endOfCDR.startDiskNumber = 0;
-  endOfCDR.entriesOnDisk = static_cast<uint16_t>(zipFileRefs.size());
-  endOfCDR.entryCount = static_cast<uint16_t>(zipFileRefs.size());
-  endOfCDR.directorySize = static_cast<uint32_t>(centralDirectoryEndOffset -
-                                                 centralDirectoryStartOffset);
-  endOfCDR.directoryOffset = static_cast<uint32_t>(centralDirectoryStartOffset);
-  endOfCDR.commentLength = 0;
-  output.write(reinterpret_cast<const char *>(&endOfCDR), sizeof(endOfCDR));
+  auto value = valueAttr.dyn_cast<IREE::Util::SerializableAttrInterface>();
+  assert(value && "expected a serializable rodata value");
+
+  // Reserve memory in the FlatBuffer for the data.
+  uint8_t *bytePtr =
+      flatbuffers_uint8_vec_extend(fbb, static_cast<size_t>(totalSize));
+
+  // Serialize the constant into the reserved memory.
+  if (failed(value.serializeToBuffer(
+          llvm::support::endianness::little,
+          ArrayRef<char>(reinterpret_cast<char *>(bytePtr),
+                         static_cast<size_t>(totalSize))))) {
+    return {};
+  }
+
+  return flatbuffers_uint8_vec_end(fbb);
 }
-
-}  // namespace
 
 // Finds all types in the module and builds a type table mapping the index in
 // the vector to the type represented by the type ordinal.
@@ -540,15 +337,13 @@ static iree_vm_FunctionSignatureDef_ref_t makeInternalFunctionSignatureDef(
 // has been packed into the top-level table. This results in a messier function
 // here during serialization but a much more trivial (and cache-friendly)
 // representation at runtime.
-static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
-                                           IREE::VM::ModuleOp moduleOp,
-                                           SmallVector<ZIPFileRef> &zipFileRefs,
-                                           bool emitPolyglotZip,
-                                           FlatbufferBuilder &fbb) {
+static LogicalResult buildFlatBufferModule(
+    BytecodeTargetOptions targetOptions, IREE::VM::ModuleOp moduleOp,
+    MutableArrayRef<RodataRef> rodataRefs, FlatbufferBuilder &fbb) {
   // Start the buffer so that we can begin recording data prior to the root
   // table (which we do at the very end). This does not change the layout of the
   // file and is only used to prime the flatcc builder.
-  iree_vm_BytecodeModuleDef_start_as_root(fbb);
+  iree_vm_BytecodeModuleDef_start_as_root_with_size(fbb);
 
   // Debug database is always populated but conditionally written.
   // This allows us to emit the database to a separate file if we want to strip
@@ -566,11 +361,9 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   std::vector<IREE::VM::ImportOp> importFuncOps;
   std::vector<IREE::VM::ExportOp> exportFuncOps;
   std::vector<IREE::VM::FuncOp> internalFuncOps;
-  std::vector<IREE::VM::RodataOp> rodataOps;
   importFuncOps.resize(ordinalCounts.import_funcs());
   exportFuncOps.resize(ordinalCounts.export_funcs());
   internalFuncOps.resize(ordinalCounts.internal_funcs());
-  rodataOps.resize(ordinalCounts.rodatas());
 
   for (auto &op : moduleOp.getBlock().getOperations()) {
     if (auto funcOp = dyn_cast<IREE::VM::FuncOp>(op)) {
@@ -579,55 +372,8 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
       exportFuncOps[exportOp.ordinal().getValue().getLimitedValue()] = exportOp;
     } else if (auto importOp = dyn_cast<IREE::VM::ImportOp>(op)) {
       importFuncOps[importOp.ordinal().getValue().getLimitedValue()] = importOp;
-    } else if (auto rodataOp = dyn_cast<IREE::VM::RodataOp>(op)) {
-      rodataOps[rodataOp.ordinal().getValue().getLimitedValue()] = rodataOp;
     }
   }
-
-  // Serialize read-only data first so that it ends up at the end of the file.
-  // This is where large things like parameters live and we don't want that to
-  // get paged in until it is needed.
-  //
-  // NOTE: flatbuffers are built bottom-up; after each rodata we serialize we
-  // move *backward* in the file and prepend the next, meaning that if we
-  // were to serialize all rodata we'd have it in the opposite order as we do
-  // in the IR. Though this it isn't required for correctness, enabling file
-  // layout planning by preserving the order in the IR is useful.
-  SmallVector<flatbuffers_uint8_vec_ref_t, 8> rodataContentRefs;
-  rodataContentRefs.reserve(rodataOps.size());
-
-  // All constants are defaulted to 16-byte aligned as that is the maximum
-  // (reasonable) alignment of all data types on all platforms. This can be
-  // overridden by creators of the rodata with the `alignment` attribute.
-  static constexpr int kDefaultRodataAlignment = 16;
-
-  for (auto rodataOp : llvm::reverse(rodataOps)) {
-    // Only include rodata entries in the ZIP if they are file-like. This
-    // prevents all of our string tables from getting included.
-    bool includeInZIP = emitPolyglotZip && rodataOp.mime_type().hasValue();
-
-    // Embed the rodata contents.
-    size_t alignment =
-        rodataOp.alignment()
-            ? static_cast<size_t>(rodataOp.alignment().getValue())
-            : 0;
-    if (alignment == 0) alignment = kDefaultRodataAlignment;
-    auto constantRef =
-        serializeConstant(rodataOp.getLoc(), rodataOp.value(), alignment,
-                          /*calculateCRC32=*/includeInZIP, fbb);
-    if (!constantRef.ref) {
-      return rodataOp.emitOpError() << "failed to encode";
-    }
-    rodataContentRefs.push_back(constantRef.ref);
-
-    // Add the ZIP per-file header.
-    if (includeInZIP) {
-      zipFileRefs.push_back(appendZIPLocalFileHeader(
-          rodataOp, constantRef.totalSize, constantRef.crc32, fbb));
-    }
-  }
-  // List of references needs to be swapped forward (we wrote backward).
-  std::reverse(rodataContentRefs.begin(), rodataContentRefs.end());
 
   // Find all types in the module to build the type table.
   // Note that we don't emit it yet as we want to keep it near the top of the
@@ -683,15 +429,38 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   auto functionDescriptorsRef = iree_vm_FunctionDescriptor_vec_create(
       fbb, functionDescriptors.data(), functionDescriptors.size());
 
-  // Serialize metadata that should be near the front of the file.
-  auto rodataSegmentRefs = llvm::to_vector<8>(
-      llvm::map_range(rodataContentRefs, [&](auto rodataContentRef) {
-        iree_vm_RodataSegmentDef_start(fbb);
-        iree_vm_RodataSegmentDef_data_add(fbb, rodataContentRef);
-        return iree_vm_RodataSegmentDef_end(fbb);
-      }));
+  // Serialize embedded read-only data and build the rodata references.
+  //
+  // NOTE: FlatBuffers are built bottom-up; after each rodata we serialize we
+  // move *backward* in the file and prepend the next, meaning that if we
+  // were to serialize all rodata we'd have it in the opposite order as we do
+  // in the IR. Though this it isn't required for correctness, enabling file
+  // layout planning by preserving the order in the IR is useful.
+  SmallVector<iree_vm_RodataSegmentDef_ref_t, 8> rodataSegmentRefs;
+  for (auto &rodataRef : llvm::reverse(rodataRefs)) {
+    flatbuffers_uint8_vec_ref_t embedded_ref = 0;
+    if (!rodataRef.archiveFile.hasValue()) {
+      embedded_ref = serializeEmbeddedData(
+          rodataRef.rodataOp.getLoc(), rodataRef.rodataOp.value(),
+          rodataRef.alignment, rodataRef.totalSize, fbb);
+    }
+    iree_vm_RodataSegmentDef_start(fbb);
+    if (rodataRef.archiveFile.hasValue()) {
+      iree_vm_RodataSegmentDef_external_data_offset_add(
+          fbb, rodataRef.archiveFile->relativeOffset +
+                   rodataRef.archiveFile->prefixLength);
+      iree_vm_RodataSegmentDef_external_data_length_add(
+          fbb, rodataRef.archiveFile->fileLength);
+    } else {
+      iree_vm_RodataSegmentDef_embedded_data_add(fbb, embedded_ref);
+    }
+    rodataSegmentRefs.push_back(iree_vm_RodataSegmentDef_end(fbb));
+  }
+  std::reverse(rodataSegmentRefs.begin(), rodataSegmentRefs.end());
+
+  // NOTE: rwdata is currently unused.
   SmallVector<iree_vm_RwdataSegmentDef_ref_t, 8> rwdataSegmentRefs;
-  // NOTE: rwdata current unused.
+
   auto typeRefs =
       llvm::to_vector<8>(llvm::map_range(typeTable, [&](auto typeDef) {
         auto fullNameRef = fbb.createString(typeDef.full_name);
@@ -699,6 +468,7 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
         iree_vm_TypeDef_full_name_add(fbb, fullNameRef);
         return iree_vm_TypeDef_end(fbb);
       }));
+
   auto importFuncRefs =
       llvm::to_vector<8>(llvm::map_range(importFuncOps, [&](auto importOp) {
         auto fullNameRef = fbb.createString(importOp.getName());
@@ -713,6 +483,7 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
         iree_vm_ImportFunctionDef_flags_add(fbb, flags);
         return iree_vm_ImportFunctionDef_end(fbb);
       }));
+
   auto exportFuncRefs =
       llvm::to_vector<8>(llvm::map_range(exportFuncOps, [&](auto exportOp) {
         auto localNameRef = fbb.createString(exportOp.export_name());
@@ -729,7 +500,7 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
       }));
 
   // NOTE: we keep the vectors clustered here so that we can hopefully keep the
-  // pages mapped at runtime; vector dereferences in flatbuffers require
+  // pages mapped at runtime; vector dereferences in FlatBuffers require
   // touching these structs to get length/etc and as such we don't want to be
   // gathering from all over the file (with giant rodata chunks and such
   // inbetween) just to perform a bounds check and deference into another part
@@ -780,12 +551,7 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
 LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
                                         BytecodeTargetOptions targetOptions,
                                         llvm::raw_ostream &output) {
-  bool emitPolyglotZip =
-      targetOptions.emitPolyglotZip &&
-      targetOptions.outputFormat == BytecodeOutputFormat::kFlatBufferBinary;
   moduleOp.getContext()->getOrLoadDialect<IREE::Util::UtilDialect>();
-
-  uint64_t startOffset = output.tell();
 
   if (failed(canonicalizeModule(targetOptions, moduleOp))) {
     return moduleOp.emitError()
@@ -816,6 +582,7 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
     }
   }
 
+  // Debug-only formats:
   if (targetOptions.outputFormat == BytecodeOutputFormat::kMlirText ||
       targetOptions.outputFormat == BytecodeOutputFormat::kAnnotatedMlirText) {
     // Use the standard MLIR text printer.
@@ -824,52 +591,82 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
     return success();
   }
 
+  // Set up the output archive builder based on output format.
+  std::unique_ptr<ArchiveWriter> archiveWriter;
+  if (targetOptions.emitPolyglotZip &&
+      targetOptions.outputFormat == BytecodeOutputFormat::kFlatBufferBinary) {
+    archiveWriter =
+        std::make_unique<ZIPArchiveWriter>(moduleOp.getLoc(), output);
+  } else if (targetOptions.outputFormat ==
+             BytecodeOutputFormat::kFlatBufferBinary) {
+    archiveWriter =
+        std::make_unique<FlatArchiveWriter>(moduleOp.getLoc(), output);
+  } else if (targetOptions.outputFormat ==
+             BytecodeOutputFormat::kFlatBufferText) {
+    archiveWriter =
+        std::make_unique<JSONArchiveWriter>(moduleOp.getLoc(), output);
+  } else {
+    assert(false && "unhandled output format combination");
+  }
+
+  // Declare all rodata entries we want to end up as external data first. This
+  // allows us to compute offsets if needed without having had to perform
+  // serialization yet. Note that not all rodata ends up as external data: if
+  // it's small (like strings) we can avoid the extra seeks and keep it more
+  // local by embedding it in the FlatBuffer.
+  std::vector<IREE::VM::RodataOp> rodataOps;
+  rodataOps.resize(moduleOp.ordinal_counts().getValue().rodatas());
+  for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
+    rodataOps[rodataOp.ordinal().getValue().getLimitedValue()] = rodataOp;
+  }
+  SmallVector<RodataRef> rodataRefs;
+  rodataRefs.resize(rodataOps.size());
+  for (auto &rodataOp : rodataOps) {
+    auto rodataValue =
+        rodataOp.value().dyn_cast<IREE::Util::SerializableAttrInterface>();
+    assert(rodataValue && "expected a serializable rodata value");
+
+    // Split large rodata out of the FlatBuffer to avoid going over 2GB.
+    // We also route any rodata that has a mime type defined so that it's
+    // easier to work with as a user.
+    uint64_t actualSize = rodataValue.getStorageSize();
+    bool storeExternal =
+        archiveWriter->supportsFiles() &&
+        (rodataOp.mime_type().hasValue() || actualSize >= kMaxEmbeddedDataSize);
+
+    RodataRef rodataRef;
+    rodataRef.rodataOp = rodataOp;
+    rodataRef.alignment = rodataOp.alignment() ? rodataOp.alignment().getValue()
+                                               : kDefaultRodataAlignment;
+    rodataRef.totalSize = static_cast<uint64_t>(actualSize);
+    if (storeExternal) {
+      std::string fileName =
+          (rodataOp.getName() +
+           mimeTypeToFileExtension(rodataOp.mime_type().getValueOr("")))
+              .str();
+      rodataRef.archiveFile = archiveWriter->declareFile(
+          fileName, rodataRef.alignment, rodataRef.totalSize,
+          [=](llvm::raw_ostream &os) {
+            return rodataValue.serializeToStream(
+                llvm::support::endianness::little, os);
+          });
+    }
+    rodataRefs[rodataOp.ordinal().getValue().getLimitedValue()] = rodataRef;
+  }
+
   // NOTE: we order things so that all of the metadata is close to the start of
   // the module header in memory. This ensures that when we map the file only
   // the first few pages need to be accessed to get the metadata and the rest
   // can be large bulk data.
   FlatbufferBuilder fbb;
-  SmallVector<ZIPFileRef> zipFileRefs;
-  if (failed(buildFlatBufferModule(targetOptions, moduleOp, zipFileRefs,
-                                   emitPolyglotZip, fbb))) {
-    return moduleOp.emitError()
-           << "failed to build FlatBuffer BytecodeModuleDef";
+  if (failed(buildFlatBufferModule(targetOptions, moduleOp, rodataRefs, fbb))) {
+    return failure();
   }
-
-  switch (targetOptions.outputFormat) {
-    case BytecodeOutputFormat::kFlatBufferBinary:
-      if (failed(fbb.copyToStream(output))) {
-        return moduleOp.emitError()
-               << "failed to copy flatbuffer emitter contents to output stream "
-                  "- possibly out of memory";
-      }
-      break;
-    case BytecodeOutputFormat::kFlatBufferText: {
-      if (failed(fbb.printJsonToStream(/*pretty=*/true,
-                                       /*includeDefaults=*/false,
-                                       bytecode_module_def_print_json,
-                                       output))) {
-        return moduleOp.emitError()
-               << "failed to print flatbuffer emitter contents to output "
-                  "stream - possibly out of memory, possibly unprintable "
-                  "structure";
-      }
-      break;
-    }
-    default:
-      assert(false && "unimplemented output format");
+  if (failed(archiveWriter->flush(fbb))) {
+    return failure();
   }
-  output.flush();
+  archiveWriter.reset();
 
-  if (emitPolyglotZip) {
-    // Append the ZIP central directory to the end of the output.
-    // We have to do this here as we need to have flushed the flatbuffer
-    // contents to the output so that we have their final absolute addresses.
-    uint64_t endOffset = output.tell();
-    appendZIPCentralDirectory(zipFileRefs, startOffset, endOffset, output);
-  }
-
-  output.flush();
   return success();
 }
 
