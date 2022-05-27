@@ -18,6 +18,7 @@
 #include "llvm/Support/Format.h"
 #include "llvm/Support/GraphWriter.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -221,34 +222,33 @@ class PrintOpPass : public ViewDispatchGraphBase<PrintOpPass> {
   /// Generate a label for an operation.
   std::string getLabel(Operation *op) {
     return strFromOs([&](raw_ostream &os) {
-      if (isa<DispatchOp>(op)) {
-        AsmState state(op);
+      if (op->getNumRegions() == 0) {
+        auto funcOp = op->getParentOfType<func::FuncOp>();
+        AsmState state(funcOp);
 
         for (auto result : op->getResults()) {
           result.printAsOperand(os, state);
         }
-        return;
+        os << " = ";
       }
 
-      // Print operation name and type.
-      os << op->getName();
+      os << op->getName() << "\n";
+
       if (printResultTypes) {
-        os << " : (";
         std::string buf;
         llvm::raw_string_ostream ss(buf);
-        interleaveComma(op->getResultTypes(), ss);
-        os << truncateString(ss.str()) << ")";
-        os << ")";
+        interleave(op->getResultTypes(), ss, "\n");
+        os << ss.str();
       }
 
-      // Print attributes.
-      if (printAttrs) {
-        os << "\n";
-        for (const NamedAttribute &attr : op->getAttrs()) {
-          os << '\n' << attr.getName().getValue() << ": ";
-          emitMlirAttr(os, attr.getValue());
-        }
-      }
+      // // Print attributes.
+      // if (printAttrs) {
+      //   os << "\n";
+      //   for (const NamedAttribute &attr : op->getAttrs()) {
+      //     os << '\n' << attr.getName().getValue() << ": ";
+      //     emitMlirAttr(os, attr.getValue());
+      //   }
+      // }
     });
   }
 
