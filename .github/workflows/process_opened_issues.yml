@@ -9,7 +9,7 @@ on:
 jobs:
   add-to-project:
     name: Adding issue to the IREE GitHub project
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/add-to-project@7a0820f97673dfefc999713a9a6d6b7ee128bba5  # v0.0.3
         with:
