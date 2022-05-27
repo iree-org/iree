@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-FROM gcr.io/iree-oss/android@sha256:3f41b3113e62bd2be0b1069c150bf775a9cb31348b77ae041424e31822d650f2
+FROM gcr.io/iree-oss/android@sha256:e67ce11d45ea0bf35ab5a42554aa9076a6be084c05a7024b17c4924e18ba5fb6
 
 WORKDIR /install-kws
 
@@ -30,3 +30,14 @@ RUN python3 -m pip install --upgrade \
   flax \
   # KWS Dependency
   tensorflow-model-optimization==0.5.1.dev0
+
+# NOTE: 2022-05-27: protobuf 4.21.0, released on May 25, 2022 is incompatible
+# with prior releases. Specifically implicated are the above versions of
+# tensorflow, which seem to include it without a version pin and therefore
+# break out of the box. The next time the above versions are upgraded,
+# try removing this line and then, within the docker image, run:
+#   python3 -c "import tensorflow"
+# If that fails with a stack trace, put this line back.
+# On behalf of Google, we are sorry for the live at head philosophy
+# and shoddy version management leaking into everything. We're victims too.
+RUN python3 -m pip install protobuf==3.20.1 --force-reinstall

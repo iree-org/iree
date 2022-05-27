@@ -280,8 +280,8 @@ under docker, we can find the hash from CI log.
 An example from a log:
 
 ```
-[18:30:23 UTC] docker run --volume=/tmpfs/src/github/iree:/tmpfs/src/github/iree --workdir=/tmpfs/src/github/iree --rm --user=1003:1004 --volume=/tmpfs/fake_etc/group:/etc/group:ro --volume=/tmpfs/fake_etc/passwd:/etc/passwd:ro --volume=/tmpfs/fake_home:/home/kbuilder --volume=/home/kbuilder/.config/gcloud:/home/kbuilder/.config/gcloud:ro gcr.io/iree-oss/frontends-swiftshader@sha256:aeb8de9fb7af3913d385ec6b274320197d61aa7bc51a6e8bc0deba644da3e405 build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build.sh
-Unable to find image 'gcr.io/iree-oss/frontends-swiftshader@sha256:aeb8de9fb7af3913d385ec6b274320197d61aa7bc51a6e8bc0deba644da3e405' locally
+[18:30:23 UTC] docker run --volume=/tmpfs/src/github/iree:/tmpfs/src/github/iree --workdir=/tmpfs/src/github/iree --rm --user=1003:1004 --volume=/tmpfs/fake_etc/group:/etc/group:ro --volume=/tmpfs/fake_etc/passwd:/etc/passwd:ro --volume=/tmpfs/fake_home:/home/kbuilder --volume=/home/kbuilder/.config/gcloud:/home/kbuilder/.config/gcloud:ro gcr.io/iree-oss/frontends-swiftshader@sha256:d44a1f49cbe6672e87a82612160c70b59c3ef3d6d1d0ef4b621d4436ee329d3e build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build.sh
+Unable to find image 'gcr.io/iree-oss/frontends-swiftshader@sha256:d44a1f49cbe6672e87a82612160c70b59c3ef3d6d1d0ef4b621d4436ee329d3e' locally
 sha256:aeb8de9fb7af3913d385ec6b274320197d61aa7bc51a6e8bc0deba644da3e405: Pulling from iree-oss/frontends-swiftshader
 ```
 
@@ -289,7 +289,7 @@ You can find the hash tag from log and run the below command. It makes sure that
 you have the enviroment as same as CI bot and requires less local setup.
 
 ```
-docker run --interactive --tty --rm --volume=$PWD:/src/iree --workdir=/src/iree gcr.io/iree-oss/frontends-swiftshader@sha256:aeb8de9fb7af3913d385ec6b274320197d61aa7bc51a6e8bc0deba644da3e405
+docker run --interactive --tty --rm --volume=$PWD:/src/iree --workdir=/src/iree gcr.io/iree-oss/frontends-swiftshader@sha256:d44a1f49cbe6672e87a82612160c70b59c3ef3d6d1d0ef4b621d4436ee329d3e
 ```
 
 To repro failures in `iree/e2e/`:

@@ -12,10 +12,16 @@
 //===---------------------------------------------------------------------===//
 #include "iree/compiler/Dialect/Flow/Transforms/FusionUtils.h"
 
+#include "llvm/Support/CommandLine.h"
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
+
+static llvm::cl::opt<bool> clFuseTranspose(
+    "iree-flow-fuse-transpose", llvm::cl::desc("Enable fusing transpose"),
+    llvm::cl::init(false));
 
 /// For the fusion of root op -> elementwise operation to be bufferized
 /// in-place without use of extra memory, the result of the root operation
@@ -27,9 +33,15 @@ namespace Flow {
 static bool canInsOperandTieWithOutsOperand(OpOperand *insOperand) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(insOperand->getOwner());
   if (!linalgOp) return false;
+
   AffineMap insOperandIndexingMap = linalgOp.getTiedIndexingMap(insOperand);
+
   auto canTieWithOutsOperand = [&](OpOperand *outsOperand) {
-    if (linalgOp.getTiedIndexingMap(outsOperand) != insOperandIndexingMap) {
+    auto outputMap = linalgOp.getTiedIndexingMap(outsOperand);
+    if (clFuseTranspose) {
+      if (!outputMap.isPermutation()) return false;
+    } else if (linalgOp.getTiedIndexingMap(outsOperand) !=
+               insOperandIndexingMap) {
       return false;
     }
     // TODO(#8411): Until ops are vectorized (always), we need

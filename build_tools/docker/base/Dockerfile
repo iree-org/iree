@@ -13,15 +13,16 @@ ARG APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
 
 ######## Basic stuff ########
 # Default compiler environment variables for IREE.
-ENV CC /usr/bin/clang
-ENV CXX /usr/bin/clang++
+# Matches the version of clang installed below.
+ENV CC /usr/bin/clang-9
+ENV CXX /usr/bin/clang++-9
 
 RUN apt-get update \
   && apt-get install -y \
     # For updating IREE's submodules.
     git \
-    # Default compiler and linker.
-    clang \
+    # Install our minimum supported clang version.
+    clang-9 \
     lld-9 \
     # IREE transitive dependencies
     libsdl2-dev \
@@ -91,6 +92,14 @@ RUN curl -fsSL https://bazel.build/bazel-release.pub.gpg \
 ##############
 
 ######## Python ########
+# Note that we use --ignore-installed when installing packages that may have
+# been auto-installed by the OS package manager (i.e. PyYAML is often an
+# implicit OS-level dep). This should not break so long as we do not
+# subsequently reinstall it on the OS side. Failing to do this will yield a
+# hard error with pip along the lines of:
+#   Cannot uninstall 'PyYAML'. It is a distutils installed project and thus we
+#   cannot accurately determine which files belong to it which would lead to
+#   only a partial uninstall.
 WORKDIR /install-python
 
 RUN apt-get update \
@@ -106,7 +115,7 @@ RUN apt-get update \
     python3.7-venv \
   && python3 -m pip install --upgrade pip>=21.3 \
   && python3 -m pip install --upgrade setuptools \
-  && python3 -m pip install \
+  && python3 -m pip install --ignore-installed \
     numpy==1.19.4 absl-py==0.12.0 requests PyYAML==5.4.1 wheel==0.36.2 \
     pybind11==2.9.0
 
