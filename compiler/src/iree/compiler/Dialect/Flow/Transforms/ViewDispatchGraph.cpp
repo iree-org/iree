@@ -33,7 +33,16 @@ namespace Flow {
 static const StringRef kLineStyleControlFlow = "dashed";
 static const StringRef kLineStyleDataFlow = "solid";
 static const StringRef kShapeNode = "box";
+static const StringRef kShapeBox = "box";
+static const StringRef kShapeTab = "tab";
 static const StringRef kShapeNone = "plain";
+static const StringRef kShapeEllipse = "ellipse";
+
+static StringRef getShape(Operation *op) {
+  if (isa<DispatchOp>(op)) return kShapeBox;
+
+  return kShapeEllipse;
+}
 
 /// Return the size limits for eliding large attributes.
 static int64_t getLargeAttributeSizeLimit() {
@@ -90,10 +99,15 @@ class PrintOpPass : public ViewDispatchGraphBase<PrintOpPass> {
   PrintOpPass(const PrintOpPass &o) : PrintOpPass(o.os.getOStream()) {}
 
   void runOnOperation() override {
-    emitGraph([&]() {
-      processOperation(getOperation());
-      emitAllEdgeStmts();
-    });
+    auto modOp = dyn_cast<ModuleOp>(getOperation());
+    if (!modOp) return;
+
+    for (auto funcOp : modOp.getOps<func::FuncOp>()) {
+      emitGraph([&]() {
+        processOperation(funcOp);
+        emitAllEdgeStmts();
+      });
+    }
   }
 
   /// Create a CFG graph for a region. Used in `Region::viewGraph`.
@@ -208,6 +222,18 @@ class PrintOpPass : public ViewDispatchGraphBase<PrintOpPass> {
   }
 
   /// Emit a node statement.
+  Node emitNodeStmt(Operation *op) {
+    int nodeId = ++counter;
+    AttributeMap attrs;
+    auto label = getLabel(op);
+    auto shape = getShape(op);
+    attrs["label"] = quoteString(escapeString(std::move(label)));
+    attrs["shape"] = shape.str();
+    os << llvm::format("v%i ", nodeId);
+    emitAttrList(os, attrs);
+    os << ";\n";
+    return Node(nodeId);
+  }
   Node emitNodeStmt(std::string label, StringRef shape = kShapeNode) {
     int nodeId = ++counter;
     AttributeMap attrs;
@@ -337,7 +363,10 @@ class PrintOpPass : public ViewDispatchGraphBase<PrintOpPass> {
       return node;
     }
 
-    if (op->getNumRegions() > 0) {
+    if (op->getNumRegions() == 1) {
+      // do not generate a cluster when there is one region.
+      processRegion(op->getRegion(0));
+    } else if (op->getNumRegions() > 0) {
       // Emit cluster for op with regions.
       node = emitClusterStmt(
           [&]() {
@@ -345,7 +374,7 @@ class PrintOpPass : public ViewDispatchGraphBase<PrintOpPass> {
           },
           getLabel(op));
     } else {
-      node = emitNodeStmt(getLabel(op));
+      node = emitNodeStmt(op);
     }
 
     // Insert data flow edges originating from each operand.
