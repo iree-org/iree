@@ -59,7 +59,7 @@ struct TransposeGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
     if (!mapForInterchange) {
       return rewriter.notifyMatchFailure(genericOp, "no eligible operands");
     }
-    // make the input indexing maps identity by interchanging.
+    // Make the input indexing maps identity by interchanging.
     auto interchange = llvm::to_vector(llvm::map_range(
         mapForInterchange->getResults(),
         [](AffineExpr e) { return e.cast<AffineDimExpr>().getPosition(); }));
