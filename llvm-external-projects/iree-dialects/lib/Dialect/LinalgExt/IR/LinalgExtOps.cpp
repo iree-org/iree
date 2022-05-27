@@ -1192,8 +1192,8 @@ Operation *ReverseOp::getTiledImplementation(OpBuilder &builder,
 
 LogicalResult TopkOp::verify() {
   Operation *op = getOperation();
-  if (getNumInputs() != 2) {
-    return op->emitOpError("expected two input operands");
+  if (getNumInputs() != 1 && getNumInputs() != 2) {
+    return op->emitOpError("expected one or two input operands");
   }
   if (getNumOutputs() != 2) {
     return op->emitOpError("expected two output operands");
@@ -1207,25 +1207,36 @@ LogicalResult TopkOp::verify() {
   if (inputValuesType.getElementType() != outputValuesType.getElementType()) {
     return op->emitOpError("expected input/output value types to be identical");
   }
-  // Indices must be int
-  auto inputIndicesType = indices().getType().cast<ShapedType>();
+  // Indices must be int if provided
   auto outputIndicesType = outputIndices().getType().cast<ShapedType>();
-  if (!inputIndicesType.getElementType().isInteger(32) ||
-      !outputIndicesType.getElementType().isInteger(32)) {
-    return op->emitOpError("expected input/output indices types to be int");
+  if (auto inputIndices = indices()) {
+    auto inputIndicesType = inputIndices->getType().cast<ShapedType>();
+    if (!inputIndicesType.getElementType().isInteger(32) ||
+        !outputIndicesType.getElementType().isInteger(32)) {
+      return op->emitOpError("expected input/output indices types to be int32");
+    }
   }
+
   // Ranks must match
-  if (inputValuesType.getRank() != outputValuesType.getRank() ||
-      inputIndicesType.getRank() != outputIndicesType.getRank()) {
+  if (inputValuesType.getRank() != outputValuesType.getRank()) {
     return op->emitOpError("expected input/output to have the same rank");
   }
+  if (auto inputIndices = indices()) {
+    auto inputIndicesType = inputIndices->getType().cast<ShapedType>();
+    if (inputIndicesType.getRank() != outputIndicesType.getRank()) {
+      return op->emitOpError("expected input/output to have the same rank");
+    }
+  }
   // Input indicies and values must have the same shape.
-  if (llvm::any_of(
-          llvm::zip(inputValuesType.getShape(), inputIndicesType.getShape()),
-          [](std::tuple<int64_t, int64_t> s) {
-            return isShapedTypeDimEqual(std::get<0>(s), std::get<1>(s));
-          })) {
-    return op->emitOpError("input indices/values shape must match");
+  if (auto inputIndices = indices()) {
+    auto inputIndicesType = inputIndices->getType().cast<ShapedType>();
+    if (llvm::any_of(
+            llvm::zip(inputValuesType.getShape(), inputIndicesType.getShape()),
+            [](std::tuple<int64_t, int64_t> s) {
+              return isShapedTypeDimEqual(std::get<0>(s), std::get<1>(s));
+            })) {
+      return op->emitOpError("input indices/values shape must match");
+    }
   }
   // Output indicies and values must have the same shape.
   if (llvm::any_of(
@@ -1294,7 +1305,17 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
   Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
   Value one = b.create<arith::ConstantIndexOp>(loc, 1);
   Value initialValue = b.create<memref::LoadOp>(loc, values(), ivs);
-  Value initialIndex = b.create<memref::LoadOp>(loc, indices(), ivs);
+
+  // If the indices tensor is not provided, the value index is derived from the
+  // loop induction variables.
+  Value initialIndex;
+  if (indices()) {
+    initialIndex = b.create<memref::LoadOp>(loc, *indices(), ivs);
+  } else {
+    Value rawInitialIndex = ivs[kDim];
+    initialIndex =
+        b.create<arith::IndexCastOp>(loc, b.getI32Type(), rawInitialIndex);
+  }
 
   // Compute K (ub) from the selected dim of the output
   Value ub = b.create<memref::DimOp>(loc, outputValues(), dimension());
@@ -1397,8 +1418,10 @@ Operation *TopkOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<Value> tiledOperands;
   tiledOperands.emplace_back(
       getSlice(builder, loc, values(), offsets, sizes, strides));
-  tiledOperands.emplace_back(
-      getSlice(builder, loc, indices(), offsets, sizes, strides));
+  if (indices()) {
+    tiledOperands.emplace_back(
+        getSlice(builder, loc, *indices(), offsets, sizes, strides));
+  }
 
   // Replace the tile size for the K dimension to use the output size instead of
   // the input size.
@@ -1412,8 +1435,8 @@ Operation *TopkOp::getTiledImplementation(OpBuilder &builder,
       getSlice(builder, loc, outputs[1], offsets, outputSizes, strides));
   SmallVector<Type, 2> resultTypes;
   if (hasTensorSemantics()) {
-    resultTypes.push_back(tiledOperands[2].getType());
-    resultTypes.push_back(tiledOperands[3].getType());
+    resultTypes.push_back(tiledOperands[tiledOperands.size() - 2].getType());
+    resultTypes.push_back(tiledOperands[tiledOperands.size() - 1].getType());
   }
 
   Operation *tiledTopkOp = cast<LinalgExtOp>(getOperation())
