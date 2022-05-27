@@ -240,8 +240,17 @@ class PrintOpPass : public ViewDispatchGraphBase<PrintOpPass> {
           }
           os << "]\n";
 
-          // print dispatch function name
-          os << dispatch.entry_point() << "\n";
+          // print entry function name
+          os << dispatch.entry_point();
+
+          // print entry function args
+          os << "( ";
+          for (auto opr : dispatch.operands()) {
+            opr.printAsOperand(os, state);
+            os << " ";
+          }
+          os << ")\n";
+
         } else {
           os << "\n";
         }
@@ -296,10 +305,12 @@ class PrintOpPass : public ViewDispatchGraphBase<PrintOpPass> {
   Node processOperation(Operation *op) {
     Node node;
 
-    if (isa<mlir::arith::ConstantOp>(op)) {
-      // don't wanna handle constant because it creates too many edges from a
-      // single constant.
-      return node;
+    if (auto constOp = dyn_cast<mlir::arith::ConstantOp>(op)) {
+      if (constOp.getResult().getType().isIntOrIndexOrFloat()) {
+        // don't handle scalar constant because it creates too many edges
+        // from a single constant.
+        return node;
+      }
     }
 
     if (op->getNumRegions() > 0) {
