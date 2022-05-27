@@ -1279,7 +1279,7 @@ variable. If it is installed with <code>riscv_bootstrap.sh</code>, the path is d
 ${HOME}/riscv/qemu/linux/RISCV/bin/qemu-riscv64.</p>
 <div class="highlight"><pre><span></span><code><span class="nb">export</span> <span class="nv">QEMU_BIN</span><span class="o">=</span>&lt;path to qemu-riscv64 binary&gt;
 </code></pre></div>
-<p>Invoke the host compiler tools to produce a bytecode module flatbuffer:</p>
+<p>Invoke the host compiler tools to produce a bytecode module FlatBuffer:</p>
 <div class="highlight"><pre><span></span><code>../iree-build/install/bin/iree-compile <span class="se">\</span>
   --iree-mlir-to-vm-bytecode-module <span class="se">\</span>
   --iree-hal-target-backends<span class="o">=</span>vmvx <span class="se">\</span>

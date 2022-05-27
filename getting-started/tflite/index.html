@@ -1097,7 +1097,7 @@
 
 <h1 id="tflite-integration">TFLite Integration<a class="headerlink" href="#tflite-integration" title="Permanent link">&para;</a></h1>
 <p>IREE supports compiling and running TensorFlow Lite programs stored as <a href="https://www.tensorflow.org/lite/guide">TFLite
-flatbuffers</a>. These files can be
+FlatBuffers</a>. These files can be
 imported into an IREE-compatible format then compiled to a series of backends.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <p>Install TensorFlow-Lite specific dependencies using pip:</p>
@@ -1109,7 +1109,7 @@ imported into an IREE-compatible format then compiled to a series of backends.</
 <h2 id="importing-and-compiling">Importing and Compiling<a class="headerlink" href="#importing-and-compiling" title="Permanent link">&para;</a></h2>
 <p>IREE's tooling is divided into two components: import and compilation.</p>
 <ol>
-<li>The import tool converts the TFLite flatbuffer to an IREE compatible form,
+<li>The import tool converts the TFLite FlatBuffer to an IREE compatible form,
 validating that only IREE compatible operations remain. Containing a combination of TOSA
 and IREE operations.</li>
 <li>The compilation stage generates the bytecode module for a list of targets, which can
