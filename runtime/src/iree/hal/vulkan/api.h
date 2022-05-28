@@ -152,10 +152,7 @@ typedef struct iree_hal_vulkan_queue_set_t {
 
 // TODO(benvanik): replace with flag list (easier to version).
 enum iree_hal_vulkan_device_flag_bits_t {
-  // Uses timeline semaphore emulation even if native support exists.
-  // May be removed in future versions when timeline semaphores can be assumed
-  // present on all platforms (looking at you, Android ಠ_ಠ).
-  IREE_HAL_VULKAN_DEVICE_FORCE_TIMELINE_SEMAPHORE_EMULATION = 1u << 0,
+  IREE_HAL_VULKAN_DEVICE_FLAG_NONE = 0u,
 };
 typedef uint32_t iree_hal_vulkan_device_flags_t;
 
