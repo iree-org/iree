@@ -197,7 +197,8 @@ install(
 # the end of the root file. While deferred calls are generally fragile, this
 # install is purely a leaf feature (with no other calls depending on its
 # sequencing), so this use is okay.
-cmake_language(DEFER DIRECTORY "${IREE_SOURCE_DIR}"
+cmake_language(EVAL CODE "
+cmake_language(DEFER DIRECTORY \"${IREE_SOURCE_DIR}\"
   CALL install
   TARGETS
     iree-benchmark-module
@@ -205,6 +206,7 @@ cmake_language(DEFER DIRECTORY "${IREE_SOURCE_DIR}"
     iree-run-module
     iree-run-trace
     ${_EXTRA_INSTALL_TOOL_TARGETS}
-  DESTINATION "${_INSTALL_DIR}/iree/runtime"
-  COMPONENT "${_INSTALL_COMPONENT}"
+  DESTINATION \"${_INSTALL_DIR}/iree/runtime\"
+  COMPONENT \"${_INSTALL_COMPONENT}\"
 )
+")
