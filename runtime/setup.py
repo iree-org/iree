@@ -261,9 +261,7 @@ def prepare_installation():
 
     # Build. Since we have restricted to just the runtime, build everything
     # so as to avoid fragility with more targeted selection criteria.
-    subprocess.check_call(
-        ["cmake", "--build", "."],
-        cwd=IREE_BINARY_DIR)
+    subprocess.check_call(["cmake", "--build", "."], cwd=IREE_BINARY_DIR)
     print("Build complete.", file=sys.stderr)
 
   # Install the component we care about.
