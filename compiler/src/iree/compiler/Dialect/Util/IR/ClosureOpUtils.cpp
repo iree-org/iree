@@ -160,9 +160,6 @@ static bool shouldInlineIntoClosure(Value value) {
   if (auto constantOp = dyn_cast<arith::ConstantOp>(definingOp)) {
     // Constants are perfect!
     return isConstantSmall(constantOp);
-  } else if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(definingOp)) {
-    // If the variable is immutable then we can inline the reference to it.
-    return loadOp.isGlobalImmutable();
   }
   return false;
 }
