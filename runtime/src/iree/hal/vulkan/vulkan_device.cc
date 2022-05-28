@@ -620,11 +620,11 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
 
   // Emulate timeline semaphores when the extension is not available and we are
   // ony Vulkan versions prior to 1.2 when they were made core.
-  bool emulate_timeline_semaphores =
-      device_syms->vkGetSemaphoreCounterValue == NULL ||
-      iree_all_bits_set(
-          options->flags,
-          IREE_HAL_VULKAN_DEVICE_FORCE_TIMELINE_SEMAPHORE_EMULATION);
+  bool emulate_timeline_semaphores = false;
+  // device_syms->vkGetSemaphoreCounterValue == NULL ||
+  // iree_all_bits_set(
+  //     options->flags,
+  //     IREE_HAL_VULKAN_DEVICE_FORCE_TIMELINE_SEMAPHORE_EMULATION);
   if (emulate_timeline_semaphores && iree_status_is_ok(status)) {
     status = TimePointSemaphorePool::Create(device->logical_device,
                                             &device->semaphore_pool);
@@ -804,11 +804,11 @@ iree_status_t iree_hal_vulkan_device_create(
   device_create_info.pNext = &features2;
 
   VkPhysicalDeviceTimelineSemaphoreFeatures semaphore_features;
-  bool emulate_timeline_semaphores =
-      !enabled_device_extensions.timeline_semaphore ||
-      iree_all_bits_set(
-          options->flags,
-          IREE_HAL_VULKAN_DEVICE_FORCE_TIMELINE_SEMAPHORE_EMULATION);
+  bool emulate_timeline_semaphores = false;
+  // !enabled_device_extensions.timeline_semaphore ||
+  // iree_all_bits_set(
+  //     options->flags,
+  //     IREE_HAL_VULKAN_DEVICE_FORCE_TIMELINE_SEMAPHORE_EMULATION);
   if (!emulate_timeline_semaphores) {
     memset(&semaphore_features, 0, sizeof(semaphore_features));
     semaphore_features.sType =
