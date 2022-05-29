@@ -210,11 +210,95 @@ struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
   }
 };
 
+// Truncates input operand if it is a constant and is out of range of target
+// type. Otherwise, returns the original operand.
+Value truncateOutOfRangeValue(Value operand,
+                              ConversionPatternRewriter &rewriter,
+                              TypeConverter *typeConverter) {
+  auto constOp = operand.getDefiningOp<arith::ConstantOp>();
+  if (!constOp) {
+    return operand;
+  }
+  auto oldType = operand.getType();
+  auto newType = typeConverter->convertType(oldType);
+  if (oldType == newType) {
+    return operand;
+  }
+  auto intAttr = constOp.getValue().dyn_cast<IntegerAttr>();
+  if (!intAttr) {
+    return operand;
+  }
+  APInt value = intAttr.getValue();
+  APInt newValue = value.truncSSat(newType.getIntOrFloatBitWidth());
+  if (newValue == value) {
+    return operand;
+  }
+  Value truncatedOperand = rewriter.create<arith::ConstantOp>(
+      constOp->getLoc(), IntegerAttr::get(newType, newValue));
+  return truncatedOperand;
+}
+
+// Will be deprecated once upstream patch to add signedness to op trait.
+// Utility function to check that op is signed or not.
+bool isSignedIOp(Operation *op) {
+  if (isa<arith::CeilDivSIOp>(op) || isa<arith::DivSIOp>(op) ||
+      isa<arith::ExtSIOp>(op) || isa<arith::FloorDivSIOp>(op) ||
+      isa<arith::MaxSIOp>(op) || isa<arith::RemSIOp>(op) ||
+      isa<arith::SIToFPOp>(op) || isa<arith::ShRSIOp>(op)) {
+    return true;
+  }
+  if (isa<arith::CmpIOp>(op)) {
+    bool isSigned = op->getAttr("predicate")
+                                .dyn_cast<mlir::arith::CmpIPredicateAttr>()
+                                .getValue() < mlir::arith::CmpIPredicate::ult
+                        ? true
+                        : false;
+    return isSigned;
+  }
+  if (isa<arith::SelectOp>(op)) {
+    for (auto childOp : op->getUsers()) {
+      bool childOpSign = isSignedIOp(childOp);
+      if (childOpSign) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+struct ConvertSignSensitiveArithIOp : public ConversionPattern {
+  ConvertSignSensitiveArithIOp(MLIRContext *context,
+                               TypeConverter &typeConverter)
+      : ConversionPattern(typeConverter, MatchAnyOpTypeTag(),
+                          /*patternBenefit=*/1, context) {}
+
+  LogicalResult matchAndRewrite(
+      Operation *op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    if (!isSignedIOp(op)) return failure();
+    SmallVector<Value, 4> newOperands;
+    bool truncated = false;
+    for (Value oldOperand : op->getOperands()) {
+      Value newOperand = truncateOutOfRangeValue(oldOperand, rewriter,
+                                                 this->getTypeConverter());
+      newOperands.push_back(newOperand);
+      truncated |= (oldOperand != newOperand);
+    }
+    if (!truncated) return failure();
+    OperationState state(op->getLoc(), op->getName().getStringRef(),
+                         newOperands, op->getResultTypes(), op->getAttrs());
+    Operation *newOp = rewriter.create(state);
+    rewriter.replaceOp(op, newOp->getResults());
+    return success();
+  }
+};
+
 template <typename T, typename Converter>
 struct ConvertTypesPass : public PassWrapper<T, OperationPass<mlir::ModuleOp>> {
   void runOnOperation() override {
     MLIRContext *context = &this->getContext();
     RewritePatternSet patterns(context);
+    patterns.insert<ConvertSignSensitiveArithIOp>(context, typeConverter);
     patterns.insert<GenericTypeConversionPattern>(context, typeConverter);
     patterns.insert<ConvertTypeSensitiveArithCastOp<arith::TruncFOp, FloatType,
                                                     std::greater<unsigned>>>(

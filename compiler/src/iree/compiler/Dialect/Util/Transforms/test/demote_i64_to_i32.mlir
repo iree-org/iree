@@ -232,3 +232,16 @@ func.func @arith.extsi(%arg0: i32) -> i64 {
   %0 = arith.extsi %arg0 : i32 to i64
   return %0 : i64
 }
+
+// Check handling of sign-sensitive arith casts.
+
+// CHECK-LABEL:   func.func @arith.cmpi(
+// CHECK-SAME:            %[[ARG0:.*]]: i32) -> i1 {
+// CHECK-DAG: %[[VAL0:.+]] = arith.constant 2147483647 : i32
+// CHECK-DAG: %[[VAL1:.+]] = arith.cmpi sgt, %[[VAL0]], %[[ARG0]] : i32
+// CHECK-DAG: return %[[VAL1]]
+func.func @arith.cmpi(%arg0: i64) -> i1 {
+  %c9223372036854775807_i64 = arith.constant 9223372036854775807 : i64
+  %0 = arith.cmpi sgt, %c9223372036854775807_i64, %arg0 : i64
+  return %0 : i1
+}
