@@ -237,10 +237,51 @@ function(iree_benchmark_suite)
         add_dependencies(iree-benchmark-suites "${_TRANSLATION_TARGET_NAME}")
       endif(NOT TARGET "${_TRANSLATION_TARGET_NAME}")
 
+      set(_COMPILATION_STATS_TRANSLATION_TARGET_NAME
+        "${_TRANSLATION_TARGET_NAME}-compilation-stats"
+      )
+      set(_COMPILATION_STATS_VMFB_FILE
+        "${_VMFB_ARTIFACTS_DIR}/${_MODULE_SOURCE_BASENAME_WITH_HASH}-compilation-stats.vmfb"
+      )
+      if(IREE_ENABLE_COMPILATION_BENCHMARKS AND NOT TARGET "${_COMPILATION_STATS_TRANSLATION_TARGET_NAME}")
+        iree_bytecode_module(
+          NAME
+            "${_COMPILATION_STATS_TRANSLATION_TARGET_NAME}"
+          MODULE_FILE_NAME
+            "${_COMPILATION_STATS_VMFB_FILE}"
+          SRC
+            "${_MODULE_SOURCE}"
+          FLAGS
+            "--iree-vm-emit-polyglot-zip=true"
+            "--iree-llvm-debug-symbols=false"
+            ${_TRANSLATION_ARGS}
+          DEPENDS
+            "${_MODULE_SOURCE_TARGET}"
+          FRIENDLY_NAME
+            "${_FRIENDLY_TARGET_NAME}"
+        )
+
+        # TODO: that add_custom_target should be done by iree_bytecode_module.
+        # Note: at the moment, iree_bytecode_module doesn't do much with its
+        # NAME argument.
+        add_custom_target("${_COMPILATION_STATS_TRANSLATION_TARGET_NAME}"
+          DEPENDS "${_COMPILATION_STATS_VMFB_FILE}"
+        )
+
+        # Mark dependency so that we have one target to drive them all.
+        add_dependencies(iree-benchmark-suites
+          "${_COMPILATION_STATS_TRANSLATION_TARGET_NAME}"
+        )
+      endif()
+
       if(NOT TARGET "${_FRIENDLY_TARGET_NAME}")
         add_custom_target("${_FRIENDLY_TARGET_NAME}")
       endif()
       add_dependencies("${_FRIENDLY_TARGET_NAME}" "${_TRANSLATION_TARGET_NAME}")
+      if(IREE_ENABLE_COMPILATION_BENCHMARKS)
+        add_dependencies("${_FRIENDLY_TARGET_NAME}"
+          "${_COMPILATION_STATS_TRANSLATION_TARGET_NAME}")
+      endif()
 
       set(_RUN_SPEC_DIR "${_ROOT_ARTIFACTS_DIR}/${_MODULE_DIR_NAME}/${_BENCHMARK_DIR_NAME}")
 
