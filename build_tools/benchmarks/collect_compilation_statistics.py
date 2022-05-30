@@ -7,13 +7,15 @@
 """Collect compilation statistics from benchmark suites."""
 
 import argparse
+from dataclasses import dataclass
 import json
 import os
 import re
+import zipfile
 from typing import Dict, Optional
 from pathlib import PurePath
 
-from common.benchmark_definition import CompilationInfo, CompilationResults, CompilationStatistics, get_git_commit_hash
+from common.benchmark_definition import CompilationInfo, CompilationResults, CompilationStatistics, ModuleComponentSizes, get_git_commit_hash
 from common.benchmark_suite import BENCHMARK_SUITE_REL_PATH, BenchmarkSuite
 
 BENCHMARK_FLAGFILE = "flagfile"
@@ -21,6 +23,13 @@ MODULE_DIR = "vmfb"
 MODULE_FILE_EXTENSION = ".vmfb"
 NINJA_LOG_HEADER = "ninja log v5"
 NINJA_BUILD_LOG = ".ninja_log"
+
+VM_COMPONENT_NAME = "module.fb"
+CONST_COMPONENT_NAME = "_const.bin"
+DISPATCH_COMPONENT_PATTERNS = [
+    ".+_embedded_elf_.+\\.so", ".+_vulkan_spirv_fb\\.fb",
+    ".+_vmvx_bytecode_fb\\.bin"
+]
 
 
 def match_module_cmake_target(module_path: str) -> Optional[str]:
@@ -58,6 +67,34 @@ def parse_compilation_time_from_ninja_log(log_path: str) -> Dict[str, int]:
       target_build_time_map[cmake_target] = end_time - start_time
 
   return target_build_time_map
+
+
+def get_module_component_info(module_path: str) -> ModuleComponentSizes:
+  file_size = os.stat(module_path).st_size
+
+  module_zipinfo = zipfile.ZipFile(module_path)
+  size_map = dict(
+      (info.filename, info.file_size) for info in module_zipinfo.infolist())
+  vm_component_size = size_map[VM_COMPONENT_NAME]
+  const_component_size = size_map[CONST_COMPONENT_NAME]
+  identified_names = {VM_COMPONENT_NAME, CONST_COMPONENT_NAME}
+  total_dispatch_component_size = 0
+  for filename, size in size_map.items():
+    for pattern in DISPATCH_COMPONENT_PATTERNS:
+      if re.match(pattern, filename):
+        total_dispatch_component_size += size
+        identified_names.add(filename)
+        break
+
+  if identified_names != set(size_map.keys()):
+    raise AssertionError(
+        f"Unrecognized components in the module: {size_map.keys()}.")
+
+  return ModuleComponentSizes(
+      file_size=file_size,
+      vm_component_size=vm_component_size,
+      const_component_size=const_component_size,
+      total_dispatch_component_size=total_dispatch_component_size)
 
 
 def get_module_path(benchmark_case_dir: str) -> str:
@@ -118,7 +155,7 @@ def main(args: argparse.Namespace):
         category=category)
     for benchmark_case in benchmark_cases:
       module_path = get_module_path(benchmark_case.benchmark_case_dir)
-      module_size = os.stat(module_path).st_size
+      module_component_sizes = get_module_component_info(module_path)
 
       cmake_target = match_module_cmake_target(module_path)
       if cmake_target is None:
@@ -133,7 +170,7 @@ def main(args: argparse.Namespace):
                                          bench_mode=benchmark_case.bench_mode)
       compilation_statistics = CompilationStatistics(
           compilation_info=compilation_info,
-          module_size=module_size,
+          module_component_sizes=module_component_sizes,
           compilation_time=compilation_time)
       compilation_statistics_list.append(compilation_statistics)
 

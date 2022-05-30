@@ -489,18 +489,44 @@ class CompilationInfo(object):
                            bench_mode=json_object["bench_mode"])
 
 
+@dataclass
+class ModuleComponentSizes(object):
+  file_size: int
+  vm_component_size: int
+  const_component_size: int
+  total_dispatch_component_size: int
+
+  def to_json_object(self) -> Dict[str, Any]:
+    return {
+        "file_size": self.file_size,
+        "vm_component_size": self.vm_component_size,
+        "const_component_size": self.const_component_size,
+        "total_dispatch_component": self.total_dispatch_component_size,
+    }
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return ModuleComponentSizes(
+        file_size=json_object["file_size"],
+        vm_component_size=json_object["vm_component_size"],
+        const_component_size=json_object["const_component_size"],
+        total_dispatch_component_size=json_object[
+            "total_dispatch_component_size"],
+    )
+
+
 @dataclass(frozen=True)
 class CompilationStatistics(object):
   compilation_info: CompilationInfo
-  # Module binary size in bytes.
-  module_size: int
+  # Module file and component sizes.
+  module_component_sizes: ModuleComponentSizes
   # Module compilation time in ms.
   compilation_time: int
 
   def to_json_object(self) -> Dict[str, Any]:
     return {
         "compilation_info": self.compilation_info.to_json_object(),
-        "module_size": self.module_size,
+        "module_component_sizes": self.module_component_sizes.to_json_object(),
         "compilation_time": self.compilation_time,
     }
 
@@ -509,7 +535,8 @@ class CompilationStatistics(object):
     return CompilationStatistics(
         compilation_info=CompilationInfo.from_json_object(
             json_object["compilation_info"]),
-        module_size=json_object["module_size"],
+        module_component_sizes=ModuleComponentSizes.from_json_object(
+            json_object["module_component_sizes"]),
         compilation_time=json_object["compilation_info"])
 
 
