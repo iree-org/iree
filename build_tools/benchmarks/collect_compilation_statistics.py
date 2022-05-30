@@ -23,12 +23,13 @@ MODULE_DIR = "vmfb"
 MODULE_FILE_EXTENSION = ".vmfb"
 NINJA_LOG_HEADER = "ninja log v5"
 NINJA_BUILD_LOG = ".ninja_log"
+COMPILATION_STATS_MODULE_SUFFIX = "compilation-stats"
 
 VM_COMPONENT_NAME = "module.fb"
 CONST_COMPONENT_NAME = "_const.bin"
 DISPATCH_COMPONENT_PATTERNS = [
-    ".+_embedded_elf_.+\\.so", ".+_vulkan_spirv_fb\\.fb",
-    ".+_vmvx_bytecode_fb\\.bin"
+    r".+_embedded_elf_.+\.so", r".+_vulkan_spirv_fb\.fb",
+    r".+_vmvx_bytecode_fb\.bin"
 ]
 
 
@@ -98,7 +99,7 @@ def get_module_component_info(module_path: str) -> ModuleComponentSizes:
 
 
 def get_module_path(benchmark_case_dir: str) -> str:
-  """Retrieve the module path from the flag file of a benchmark."""
+  """Retrieve the module path for compilation statistics from the flag file of a benchmark."""
 
   flagfile_path = os.path.join(benchmark_case_dir, BENCHMARK_FLAGFILE)
   module_path = None
@@ -106,7 +107,8 @@ def get_module_path(benchmark_case_dir: str) -> str:
     for line in f:
       match = re.match("--module_file=(.+)", line.strip())
       if match:
-        module_path = match.group(1)
+        module_name, module_ext = os.path.splitext(match.group(1))
+        module_path = f"{module_name}-{COMPILATION_STATS_MODULE_SUFFIX}{module_ext}"
         break
 
   if not module_path:
