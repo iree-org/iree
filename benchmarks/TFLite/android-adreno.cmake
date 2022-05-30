@@ -23,6 +23,9 @@ set(ANDROID_ADRENO_GPU_TRANSLATION_FLAGS
 
 # GPU, Vulkan, Adreno, full-inference
 iree_benchmark_suite(
+  SUITE_NAME
+    "android-adreno"
+
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
@@ -63,6 +66,9 @@ iree_benchmark_suite(
 
 # GPU, Vulkan, Adreno, full-inference
 iree_benchmark_suite(
+  SUITE_NAME
+    "android-adreno"
+
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
@@ -102,6 +108,9 @@ iree_benchmark_suite(
 
 # GPU, Vulkan, Adreno, kernel-execution
 iree_benchmark_suite(
+  SUITE_NAME
+    "android-adreno"
+
   MODULES
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"

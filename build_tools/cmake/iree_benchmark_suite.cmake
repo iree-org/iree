@@ -68,22 +68,20 @@ function(iree_benchmark_suite)
     PARSE_ARGV 0
     _RULE
     ""
-    "DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
+    "SUITE_NAME;DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
     "BENCHMARK_MODES;BENCHMARK_TOOL;MODULES;TRANSLATION_FLAGS;RUNTIME_FLAGS"
   )
 
   iree_validate_required_arguments(
     _RULE
-    "DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
+    "SUITE_NAME;DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
     "BENCHMARK_MODES;BENCHMARK_TOOL;MODULES"
   )
 
   iree_package_name(PACKAGE_NAME)
 
   # Add the benchmark suite target for a specific platform.
-  cmake_path(GET CMAKE_CURRENT_LIST_FILE FILENAME _PLATFORM_NAME)
-  cmake_path(REMOVE_EXTENSION _PLATFORM_NAME)
-  set(SUITE_SUB_TARGET "iree-benchmark-suites-${_PLATFORM_NAME}")
+  set(SUITE_SUB_TARGET "iree-benchmark-suites-${_RULE_SUITE_NAME}")
   if(NOT TARGET "${SUITE_SUB_TARGET}")
     add_custom_target("${SUITE_SUB_TARGET}")
   endif()

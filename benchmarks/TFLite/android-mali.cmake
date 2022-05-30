@@ -23,6 +23,9 @@ set(ANDROID_MALI_GPU_TRANSLATION_FLAGS
 
 # GPU, Vulkan, Mali, full-inference
 iree_benchmark_suite(
+  SUITE_NAME
+    "android-mali"
+
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
@@ -47,6 +50,9 @@ iree_benchmark_suite(
 
 # GPU, Vulkan, Mali, full-inference
 iree_benchmark_suite(
+  SUITE_NAME
+    "android-mali"
+
   MODULES
     "${MOBILEBERT_FP16_MODULE}"
 
@@ -85,6 +91,9 @@ iree_benchmark_suite(
 
 # GPU, Vulkan, Mali, full-inference
 iree_benchmark_suite(
+  SUITE_NAME
+    "android-mali"
+
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
@@ -109,6 +118,9 @@ iree_benchmark_suite(
 )
 
 iree_benchmark_suite(
+  SUITE_NAME
+    "android-mali"
+
   MODULES
     "${MOBILEBERT_FP16_MODULE}"
 
@@ -145,6 +157,9 @@ iree_benchmark_suite(
 
 # GPU, Vulkan, Mali, kernel-execution
 iree_benchmark_suite(
+  SUITE_NAME
+    "android-mali"
+
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
@@ -172,6 +187,9 @@ iree_benchmark_suite(
 )
 
 iree_benchmark_suite(
+  SUITE_NAME
+    "android-mali"
+
   MODULES
     "${MOBILEBERT_FP16_MODULE}"
 
