@@ -167,7 +167,7 @@ def VerifyInputLegality: Pass<"iree-verify-input-legality", ""> {
   let constructor = "mlir::iree_compiler::IREE::Flow::createVerifyInputLegalityPass()";
 }
 
-def ViewDispatchGraph : Pass<"iree-flow-view-dispatch-graph"> {
+def ViewDispatchGraph : Pass<"iree-flow-print-dispatch-graph"> {
   let summary = "Print visualization of dispatches";
   let options = [
     Option<"maxLabelLen", "max-label-len", "unsigned",
