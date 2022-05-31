@@ -37,6 +37,8 @@ steps:
     artifact_paths:
       - "benchmark-results-linux/*.json"
 
+  - wait
+
   - label: ":lower_left_crayon: Comment benchmark results on pull request"
     plugins:
       - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#24e54e7729:
