@@ -13,6 +13,8 @@
 # `iree-benchmark-module`.
 #
 # Parameters:
+#   SUITE_NAME: A group name this benchmark will join. Each group has its own
+#       CMake's benchmark suite target: "iree-benchmark-suites-<SUITE_NAME>".
 #   MODULES: A list for model specification. Due to CMake's lack of data
 #       structures, each module is represented as a list suitable to be parsed
 #       by cmake_parse_arguments:
@@ -80,7 +82,7 @@ function(iree_benchmark_suite)
 
   iree_package_name(PACKAGE_NAME)
 
-  # Add the benchmark suite target for a specific platform.
+  # Add the benchmark suite target.
   set(SUITE_SUB_TARGET "iree-benchmark-suites-${_RULE_SUITE_NAME}")
   if(NOT TARGET "${SUITE_SUB_TARGET}")
     add_custom_target("${SUITE_SUB_TARGET}")
