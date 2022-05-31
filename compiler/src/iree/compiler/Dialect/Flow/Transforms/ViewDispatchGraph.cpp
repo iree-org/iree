@@ -309,15 +309,6 @@ class PrintOpPass : public ViewDispatchGraphBase<PrintOpPass> {
         interleave(op->getResultTypes(), ss, "\n");
         os << ss.str();
       }
-
-      // // Print attributes.
-      // if (printAttrs) {
-      //   os << "\n";
-      //   for (const NamedAttribute &attr : op->getAttrs()) {
-      //     os << '\n' << attr.getName().getValue() << ": ";
-      //     emitMlirAttr(os, attr.getValue());
-      //   }
-      // }
     });
   }
 
