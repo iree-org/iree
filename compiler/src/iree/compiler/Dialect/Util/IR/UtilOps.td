@@ -497,6 +497,7 @@ def Util_GlobalOp : Util_Op<"global", [
 
 def Util_GlobalAddressOp : Util_PureOp<"global.address", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   DeclareOpInterfaceMethods<Util_GlobalAccessorOpInterface>,
 ]> {
   let summary = [{returns an address reference to a global}];
@@ -517,15 +518,15 @@ def Util_GlobalAddressOp : Util_PureOp<"global.address", [
   }];
 
   let extraClassDeclaration = [{
-    IREE::Util::GlobalOp getGlobalOp();
+    IREE::Util::GlobalOp getGlobalOp(SymbolTableCollection &symbolTable);
   }];
-  let hasVerifier = 1;
 }
 
 def Util_GlobalLoadOp : Util_Op<"global.load", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   // HACK: works around the lack of symbol side effects in C++.
   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   DeclareOpInterfaceMethods<Util_GlobalAccessorOpInterface>,
 ]> {
   let summary = [{loads a value from a global variable}];
@@ -552,11 +553,8 @@ def Util_GlobalLoadOp : Util_Op<"global.load", [
   ];
 
   let extraClassDeclaration = [{
-    IREE::Util::GlobalOp getGlobalOp();
-    bool isGlobalImmutable();
+    IREE::Util::GlobalOp getGlobalOp(SymbolTableCollection &symbolTable);
   }];
-
-  let hasVerifier = 1;
 }
 
 def Util_GlobalLoadIndirectOp : Util_Op<"global.load.indirect"> {
@@ -582,6 +580,7 @@ def Util_GlobalLoadIndirectOp : Util_Op<"global.load.indirect"> {
 }
 
 def Util_GlobalStoreOp : Util_Op<"global.store", [
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   DeclareOpInterfaceMethods<Util_GlobalAccessorOpInterface>,
 ]> {
   let summary = [{stores a value into a global variable}];
@@ -599,10 +598,8 @@ def Util_GlobalStoreOp : Util_Op<"global.store", [
   }];
 
   let extraClassDeclaration = [{
-    IREE::Util::GlobalOp getGlobalOp();
+    IREE::Util::GlobalOp getGlobalOp(SymbolTableCollection &symbolTable);
   }];
-
-  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }

@@ -790,8 +790,9 @@ LogicalResult GlobalOp::verify() {
   return success();
 }
 
-IREE::Util::GlobalOp GlobalAddressOp::getGlobalOp() {
-  return SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
+IREE::Util::GlobalOp GlobalAddressOp::getGlobalOp(
+    SymbolTableCollection &symbolTable) {
+  return symbolTable.lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
       getOperation()->getParentOp(), globalAttr());
 }
 
@@ -802,9 +803,10 @@ void GlobalAddressOp::getAsmResultNames(
   setNameFn(result(), Twine("ptr_" + global()).str());
 }
 
-LogicalResult GlobalAddressOp::verify() {
+LogicalResult GlobalAddressOp::verifySymbolUses(
+    SymbolTableCollection &symbolTable) {
   Operation *op = getOperation();
-  auto globalOp = getGlobalOp();
+  auto globalOp = getGlobalOp(symbolTable);
   if (!globalOp) {
     return op->emitOpError() << "undefined global: " << global();
   }
@@ -818,14 +820,13 @@ void GlobalLoadOp::build(OpBuilder &builder, OperationState &state,
   state.attributes.append(attrs.begin(), attrs.end());
 }
 
-IREE::Util::GlobalOp GlobalLoadOp::getGlobalOp() {
-  return SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
+IREE::Util::GlobalOp GlobalLoadOp::getGlobalOp(
+    SymbolTableCollection &symbolTable) {
+  return symbolTable.lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
       getOperation()->getParentOp(), globalAttr());
 }
 
 FlatSymbolRefAttr GlobalLoadOp::getGlobalRefAttr() { return globalAttr(); }
-
-bool GlobalLoadOp::isGlobalImmutable() { return !getGlobalOp().is_mutable(); }
 
 void GlobalLoadOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
@@ -844,9 +845,10 @@ void GlobalLoadOp::getEffects(
   }
 }
 
-LogicalResult GlobalLoadOp::verify() {
+LogicalResult GlobalLoadOp::verifySymbolUses(
+    SymbolTableCollection &symbolTable) {
   Operation *op = getOperation();
-  auto globalOp = getGlobalOp();
+  auto globalOp = getGlobalOp(symbolTable);
   if (!globalOp) {
     return op->emitOpError() << "undefined global: " << global();
   }
@@ -871,16 +873,18 @@ LogicalResult GlobalLoadIndirectOp::verify() {
   return success();
 }
 
-IREE::Util::GlobalOp GlobalStoreOp::getGlobalOp() {
-  return SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
+IREE::Util::GlobalOp GlobalStoreOp::getGlobalOp(
+    SymbolTableCollection &symbolTable) {
+  return symbolTable.lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
       getOperation()->getParentOp(), globalAttr());
 }
 
 FlatSymbolRefAttr GlobalStoreOp::getGlobalRefAttr() { return globalAttr(); }
 
-LogicalResult GlobalStoreOp::verify() {
+LogicalResult GlobalStoreOp::verifySymbolUses(
+    SymbolTableCollection &symbolTable) {
   Operation *op = getOperation();
-  auto globalOp = getGlobalOp();
+  auto globalOp = getGlobalOp(symbolTable);
   if (!globalOp) {
     return op->emitOpError() << "undefined global: " << global();
   }
@@ -892,7 +896,7 @@ LogicalResult GlobalStoreOp::verify() {
   }
   if (!globalOp.isMutable()) {
     // Allow stores to immutable globals in initializers.
-    if (!op->getParentOfType<InitializerOp>()) {
+    if (!op->getParentOfType<IREE::Util::InitializerOp>()) {
       return op->emitOpError() << "global " << global()
                                << " is not mutable and cannot be stored to";
     }
