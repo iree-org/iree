@@ -42,7 +42,9 @@ option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topolog
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." OFF)
-option(IREE_ENABLE_COMPILATION_BENCHMARKS "Builds IREE benchmark suites for compilation statistics." OFF)
+# TODO(pzread): Currently IREE_ENABLE_COMPILATION_BENCHMARKS needs
+# IREE_BUILD_BENCHMARKS. Eventually we will decouple them.
+cmake_dependent_option(IREE_ENABLE_COMPILATION_BENCHMARKS "Builds IREE benchmark suites for compilation statistics." OFF ${IREE_BUILD_BENCHMARKS} OFF)
 option(IREE_BUILD_MICROBENCHMARKS "Builds IREE microbenchmark suites." OFF)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
@@ -581,12 +583,6 @@ if(IREE_BUILD_BENCHMARKS)
   #   * compiling from .mlir files to benchmark-ready .vmfb files
   #   * generating flagfiles for executing the benchmark .vmfb files
   add_custom_target(iree-benchmark-suites)
-endif()
-
-if(IREE_ENABLE_COMPILATION_BENCHMARKS AND NOT IREE_BUILD_BENCHMARKS)
-  # TODO(pzread): Currently IREE_ENABLE_COMPILATION_BENCHMARKS needs
-  # IREE_BUILD_BENCHMARKS. Eventually we will decouple them.
-  message(STATUS "IREE_ENABLE_COMPILATION_BENCHMARKS requires IREE_BUILD_BENCHMARKS to be enabled.")
 endif()
 
 if(IREE_BUILD_MICROBENCHMARKS)
