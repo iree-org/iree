@@ -6,12 +6,9 @@
 
 set -euo pipefail
 
-export BUILDKITE_ORGANIZATION_SLUG="local"
-export BUILDKITE_REPO="https://github.com/google/iree"
-export BUILDKITE_COMMIT="$(git rev-parse HEAD)"
-export BUILDKITE_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-export BUILDKITE_BUILD_AUTHOR="$(git log -n 1 --pretty="format:%aN" HEAD)"
-export BUILDKITE_BUILD_AUTHOR_EMAIL="$(git log -n 1 --pretty="format:%aE" HEAD)"
+SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )";
+
+source "${SCRIPT_DIR}/set_buildkite_env.sh"
 
 bk run \
   --env=BUILDKITE_ORGANIZATION_SLUG="${BUILDKITE_ORGANIZATION_SLUG}" \

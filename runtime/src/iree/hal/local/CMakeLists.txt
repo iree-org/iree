@@ -36,6 +36,8 @@ iree_cc_library(
   PUBLIC
 )
 
+if(NOT EMSCRIPTEN)
+
 iree_cc_binary_benchmark(
   NAME
     executable_library_benchmark
@@ -54,6 +56,8 @@ iree_cc_binary_benchmark(
     iree::testing::benchmark
   TESTONLY
 )
+
+endif()
 
 iree_cc_test(
   NAME

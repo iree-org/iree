@@ -85,6 +85,7 @@ cc_binary(
         "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal/flatcc:debugging",
         "//runtime/src/iree/schemas:bytecode_module_def_c_fbs",
+        "//runtime/src/iree/vm:bytecode_module",
     ],
 )
 

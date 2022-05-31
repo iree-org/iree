@@ -35,8 +35,8 @@ cmake -G Ninja -B ${HOST_BUILD_DIR} \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_SAMPLES=OFF \
-  -DCMAKE_C_COMPILER=clang \
-  -DCMAKE_CXX_COMPILER=clang++ \
+  -DCMAKE_C_COMPILER="${CC:-clang}" \
+  -DCMAKE_CXX_COMPILER="${CXX:-clang++}" \
   -DCMAKE_INSTALL_PREFIX=${HOST_INSTALL_DIR} .
 
 cmake --build ${HOST_BUILD_DIR} --target install

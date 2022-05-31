@@ -32,10 +32,12 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Bufferization/Transforms/AllocTensorElimination.h"
 #include "mlir/Dialect/Bufferization/Transforms/BufferUtils.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -114,8 +116,8 @@ static LogicalResult initTensorElimination(
 
   // Rewrite init_tensors that are anchored on specific ops.
   IRRewriter rewriter(op->getContext());
-  if (failed(linalg::insertSliceAnchoredInitTensorEliminationStep(rewriter, op,
-                                                                  state)))
+  if (failed(bufferization::insertSliceAnchoredAllocTensorEliminationStep(
+          rewriter, op, state)))
     return failure();
   if (failed(
           storeTensorOpAnchoredInitTensorEliminationStep(rewriter, op, state)))
@@ -188,6 +190,7 @@ void addIREEComprehensiveBufferizePasses(
     Optional<BufferizationOptions::AllocationFn> allocationFn,
     Optional<BufferizationOptions::DeallocationFn> deallocationFn,
     Optional<BufferizationOptions::MemCpyFn> memCpyFn) {
+  passManager.addPass(createLinalgInitTensorToAllocTensorPass());
   passManager.addPass(createIREEComprehensiveBufferizePass(
       allocationFn, deallocationFn, memCpyFn));
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());

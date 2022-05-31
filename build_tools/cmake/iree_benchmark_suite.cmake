@@ -20,7 +20,7 @@
 #       - TAGS: comma-separated tags for the input module.
 #       - SOURCE: The input file for the input module. Supported formats are
 #           MLIR files in the IREE input format (which should have a .mlir
-#           extension) or TFLite flatbuffers (with a .tflite extension). In
+#           extension) or TFLite FlatBuffers (with a .tflite extension). In
 #           addition to permitting a source file, this can be a URL ("http://"
 #           or "https://") from which to download the file. This URL should
 #           point to a file in one of the appropriate input formats, optionally

@@ -510,7 +510,7 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
   iree_const_byte_span_t bytecode_module_data =
       executable_params->executable_data;
 
-  // If the caching mode allows for aliasing the existing flatbuffer data then
+  // If the caching mode allows for aliasing the existing FlatBuffer data then
   // we avoid allocations and just pass the pointer on through. The caller
   // ensures that the data remains valid for the duration the executable is
   // loaded. Otherwise, we clone it and let the bytecode module take ownership.

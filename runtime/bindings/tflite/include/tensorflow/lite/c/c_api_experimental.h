@@ -36,7 +36,7 @@ TFL_CAPI_EXPORT extern TfLiteStatus TfLiteInterpreterResetVariableTensors(
 
 /// Adds an op registration for a builtin operator.
 ///
-/// Op registrations are used to map ops referenced in the flatbuffer model
+/// Op registrations are used to map ops referenced in the FlatBuffer model
 /// to executable function pointers (`TfLiteRegistration`s).
 ///
 /// NOTE: The interpreter will make a shallow copy of `registration` internally,
@@ -55,7 +55,7 @@ TFL_CAPI_EXPORT void TfLiteInterpreterOptionsAddBuiltinOp(
 
 /// Adds an op registration for a custom operator.
 ///
-/// Op registrations are used to map ops referenced in the flatbuffer model
+/// Op registrations are used to map ops referenced in the FlatBuffer model
 /// to executable function pointers (`TfLiteRegistration`s).
 ///
 /// NOTE: The interpreter will make a shallow copy of `registration` internally,

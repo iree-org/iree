@@ -112,7 +112,11 @@ static bool SlurpFile(const std::string& file_name, std::string* contents) {
   if (!f.good()) return false;
 
   if (length > kMaxSize) {
-    std::cerr << "File " << file_name << " is too large\n";
+    fprintf(stderr,
+            "File '%s' is too large to embed into a C file (%lld bytes > %lld "
+            "bytes). Consider other methods for packaging and loading on your "
+            "platform, such as using traditional file I/O\n",
+            file_name.c_str(), (long long)length, (long long)kMaxSize);
     return false;
   }
 

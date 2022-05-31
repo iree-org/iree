@@ -100,7 +100,7 @@ ${HOME}/riscv/qemu/linux/RISCV/bin/qemu-riscv64.
 export QEMU_BIN=<path to qemu-riscv64 binary>
 ```
 
-Invoke the host compiler tools to produce a bytecode module flatbuffer:
+Invoke the host compiler tools to produce a bytecode module FlatBuffer:
 
 ``` shell
 ../iree-build/install/bin/iree-compile \

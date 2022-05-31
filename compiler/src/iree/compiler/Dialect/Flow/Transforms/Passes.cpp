@@ -88,6 +88,11 @@ static llvm::cl::opt<std::string> clMmt4dTargetOptions(
                    "given architecture"),
     llvm::cl::init(""));
 
+static llvm::cl::opt<bool> clNormalizeInputIndexingMap(
+    "iree-flow-normalize-input-indexing-map",
+    llvm::cl::desc("Enable normalizing input indexing map to identity"),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -215,6 +220,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // SplitReductionPass may create reduction dimension that are not the last
       // dimension.
       .addPass(createInterchangeGenericOpsPass)
+      // Normalize the input indexing map to make the input indexing map
+      // identity. This helps fusing named linalg op with a generic op with
+      // transpose.
+      .addPredicatedPass(clNormalizeInputIndexingMap,
+                         createInterchangeTransposeGenericOpsPass)
 
       // Dispatch region formation.
       .addPass(createDispatchLinalgOnTensorsPass)

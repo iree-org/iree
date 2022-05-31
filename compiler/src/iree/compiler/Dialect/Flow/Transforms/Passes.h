@@ -105,6 +105,10 @@ std::unique_ptr<Pass> createInitializeEmptyTensorsPass();
 // the most inner loops.
 std::unique_ptr<Pass> createInterchangeGenericOpsPass();
 
+// Create a pass to interchange generic ops to make the input indexing map
+// identity.
+std::unique_ptr<Pass> createInterchangeTransposeGenericOpsPass();
+
 // Create a pass to convert operations to `flow` ops. This pass is currently
 // only used for testing, since the conversion to Flow ops happens within
 // dispatch region formation.

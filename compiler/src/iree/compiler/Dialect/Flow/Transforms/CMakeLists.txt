@@ -43,6 +43,7 @@ iree_cc_library(
     "InitializeEmptyTensors.cpp"
     "InjectDispatchTracing.cpp"
     "InterchangeGenericOps.cpp"
+    "InterchangeTransposeGenericOps.cpp"
     "OptimizeNumerics.cpp"
     "OutlineDispatchRegions.cpp"
     "PadLinalgOps.cpp"

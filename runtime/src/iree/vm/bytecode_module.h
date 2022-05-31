@@ -16,14 +16,22 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Creates a VM module from an in-memory ModuleDef FlatBuffer.
-// If a |flatbuffer_allocator| is provided then it will be used to free the
-// |flatbuffer_data| when the module is destroyed and otherwise the ownership of
-// the flatbuffer_data remains with the caller.
+// Creates a VM module from an in-memory ModuleDef FlatBuffer archive.
+// If a |archive_allocator| is provided then it will be used to free the
+// |archive_contents| when the module is destroyed and otherwise the ownership
+// of the memory remains with the caller.
 IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
-    iree_const_byte_span_t flatbuffer_data,
-    iree_allocator_t flatbuffer_allocator, iree_allocator_t allocator,
-    iree_vm_module_t** out_module);
+    iree_const_byte_span_t archive_contents, iree_allocator_t archive_allocator,
+    iree_allocator_t allocator, iree_vm_module_t** out_module);
+
+// Parses the module archive header in |archive_contents|.
+// The subrange containing the FlatBuffer data is returned as well as the
+// offset where external rodata begins. Note that archives may have
+// non-contiguous layouts!
+IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_parse_header(
+    iree_const_byte_span_t archive_contents,
+    iree_const_byte_span_t* out_flatbuffer_contents,
+    iree_host_size_t* out_rodata_offset);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -860,7 +860,7 @@ MLIR's transformation pipeline. Instead of embedding `vm.call` ops that are
 dispatched at runtime to things like the HAL we can instead lower to
 `llvm::CallInst` to runtime-resolved function pointers. This still enables all
 of the flexibility of heterogeneous/runtime-determined devices, pluggable
-diagnostics, and backend composition without any need for flatbuffers or the VM
+diagnostics, and backend composition without any need for FlatBuffers or the VM
 bytecode interpreter.
 
 The VM was designed to make such a lowering easy and the C-style struct-based

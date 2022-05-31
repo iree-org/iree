@@ -24,9 +24,6 @@ IREE_FLAG(bool, vulkan_debug_utils, true,
 IREE_FLAG(int32_t, vulkan_default_index, 0,
           "Index of the default Vulkan device.");
 
-IREE_FLAG(bool, vulkan_force_timeline_semaphore_emulation, false,
-          "Uses timeline semaphore emulation even if native support exists.");
-
 IREE_FLAG(bool, vulkan_tracing, true,
           "Enables Vulkan tracing (if IREE tracing is enabled).");
 
@@ -44,7 +41,7 @@ static iree_status_t iree_hal_vulkan_create_driver_with_flags(
 // TODO(benvanik): make this a flag - it's useful for testing the same binary
 // against multiple versions of Vulkan.
 #if defined(IREE_PLATFORM_ANDROID)
-  // TODO(#4494): let's see when we can always enable timeline semaphores.
+  // TODO(#4494): always enable 1.2
   driver_options.api_version = VK_API_VERSION_1_1;
 #else
   driver_options.api_version = VK_API_VERSION_1_2;
@@ -63,11 +60,6 @@ static iree_status_t iree_hal_vulkan_create_driver_with_flags(
   }
 
   driver_options.default_device_index = FLAG_vulkan_default_index;
-
-  if (FLAG_vulkan_force_timeline_semaphore_emulation) {
-    driver_options.device_options.flags |=
-        IREE_HAL_VULKAN_DEVICE_FORCE_TIMELINE_SEMAPHORE_EMULATION;
-  }
 
   // Load the Vulkan library. This will fail if the library cannot be found or
   // does not have the expected functions.
