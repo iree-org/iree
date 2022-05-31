@@ -34,7 +34,7 @@ steps:
       - "tar -xzvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "tar -xzvf iree-android-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "tar -xzvf tracy-capture-80f6a93d.tgz"
-      - "python3 build_tools/benchmarks/run_benchmarks_on_android.py --pin-cpu-freq --pin-gpu-freq --normal_benchmark_tool_dir=build-android/tools/ --traced_benchmark_tool_dir=build-android-trace/tools/ --trace_capture_tool=tracy-capture -o benchmark-results-pixel-4-${BUILDKITE_BUILD_NUMBER}.json --capture_tarball=trace-captures-pixel-4-${BUILDKITE_BUILD_NUMBER}.tgz --verbose build-host/"
+      - "python3 build_tools/benchmarks/run_benchmarks_on_android.py --pin-cpu-freq --pin-gpu-freq --normal_benchmark_tool_dir=build-android/tools/ --traced_benchmark_tool_dir=build-android-trace/tools/ --trace_capture_tool=tracy-capture -o benchmark-results-pixel-4-${BUILDKITE_BUILD_NUMBER}.json --capture_tarball=trace-captures-pixel-4-${BUILDKITE_BUILD_NUMBER}.tgz --driver_filter_regex='(?!vulkan).*' --verbose build-host/"
     if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark')"
     agents:
       - "android-soc=snapdragon-855"

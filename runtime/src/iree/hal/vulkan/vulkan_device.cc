@@ -22,7 +22,6 @@
 #include "iree/hal/vulkan/direct_command_buffer.h"
 #include "iree/hal/vulkan/direct_command_queue.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
-#include "iree/hal/vulkan/emulated_semaphore.h"
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/native_descriptor_set.h"
@@ -31,9 +30,7 @@
 #include "iree/hal/vulkan/native_executable_layout.h"
 #include "iree/hal/vulkan/native_semaphore.h"
 #include "iree/hal/vulkan/nop_executable_cache.h"
-#include "iree/hal/vulkan/serializing_command_queue.h"
 #include "iree/hal/vulkan/status_util.h"
-#include "iree/hal/vulkan/timepoint_util.h"
 #include "iree/hal/vulkan/tracing.h"
 #include "iree/hal/vulkan/util/arena.h"
 #include "iree/hal/vulkan/util/ref_ptr.h"
@@ -99,20 +96,21 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
   ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
           VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
 
+  // VK_KHR_timeline_semaphore:
+  // Required as IREE's primary synchronization primitive, but the extension
+  // was promoted to core in Vulkan 1.2.
+  ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+          VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
+
   //===--------------------------------------------------------------------===//
   // Vulkan forward-compatibility shims
   //===--------------------------------------------------------------------===//
   // These are shims or extensions that are made core later in the spec and can
   // be removed once we require the core version that contains them.
 
-  // VK_KHR_timeline_semaphore:
-  // timeline semaphore support is optional and will be emulated if necessary.
-  ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
-          VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
-
   // VK_LAYER_KHRONOS_timeline_semaphore:
-  // polyfill layer - enable if present instead of our custom emulation. Ignored
-  // if timeline semaphores are supported natively (Vulkan 1.2+).
+  // polyfill layer - enable if present. Ignored if timeline semaphores are
+  // supported natively (Vulkan 1.2+).
   ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_LAYERS_OPTIONAL,
           "VK_LAYER_KHRONOS_timeline_semaphore");
 
@@ -377,10 +375,6 @@ typedef struct iree_hal_vulkan_device_t {
   // buffers can contain inlined data uploads).
   iree_arena_block_pool_t block_pool;
 
-  // Used only for emulated timeline semaphores.
-  TimePointSemaphorePool* semaphore_pool;
-  TimePointFencePool* fence_pool;
-
   BuiltinExecutables* builtin_executables;
 } iree_hal_vulkan_device_t;
 
@@ -429,17 +423,10 @@ static iree_status_t iree_hal_vulkan_create_transient_command_pool(
 static CommandQueue* iree_hal_vulkan_device_create_queue(
     VkDeviceHandle* logical_device,
     iree_hal_command_category_t command_category, uint32_t queue_family_index,
-    uint32_t queue_index, TimePointFencePool* fence_pool) {
+    uint32_t queue_index) {
   VkQueue queue = VK_NULL_HANDLE;
   logical_device->syms()->vkGetDeviceQueue(*logical_device, queue_family_index,
                                            queue_index, &queue);
-
-  // When emulating timeline semaphores we use a special queue that allows us to
-  // sequence the semaphores correctly.
-  if (fence_pool != NULL) {
-    return new SerializingCommandQueue(logical_device, command_category, queue,
-                                       fence_pool);
-  }
 
   return new DirectCommandQueue(logical_device, command_category, queue);
 }
@@ -476,7 +463,7 @@ static iree_status_t iree_hal_vulkan_device_initialize_command_queues(
 
     CommandQueue* queue = iree_hal_vulkan_device_create_queue(
         device->logical_device, IREE_HAL_COMMAND_CATEGORY_ANY,
-        compute_queue_set->queue_family_index, i, device->fence_pool);
+        compute_queue_set->queue_family_index, i);
 
     iree_host_size_t queue_index = device->queue_count++;
     device->queues[queue_index] = queue;
@@ -514,7 +501,7 @@ static iree_status_t iree_hal_vulkan_device_initialize_command_queues(
 
     CommandQueue* queue = iree_hal_vulkan_device_create_queue(
         device->logical_device, IREE_HAL_COMMAND_CATEGORY_TRANSFER,
-        transfer_queue_set->queue_family_index, i, device->fence_pool);
+        transfer_queue_set->queue_family_index, i);
 
     iree_host_size_t queue_index = device->queue_count++;
     device->queues[queue_index] = queue;
@@ -543,8 +530,6 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
     const iree_hal_vulkan_queue_set_t* compute_queue_set,
     const iree_hal_vulkan_queue_set_t* transfer_queue_set,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
-  auto& device_syms = logical_device->syms();
-
   iree_host_size_t compute_queue_count =
       iree_math_count_ones_u64(compute_queue_set->queue_indices);
   iree_host_size_t transfer_queue_count =
@@ -618,22 +603,6 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
         &device->transfer_command_pool);
   }
 
-  // Emulate timeline semaphores when the extension is not available and we are
-  // ony Vulkan versions prior to 1.2 when they were made core.
-  bool emulate_timeline_semaphores =
-      device_syms->vkGetSemaphoreCounterValue == NULL ||
-      iree_all_bits_set(
-          options->flags,
-          IREE_HAL_VULKAN_DEVICE_FORCE_TIMELINE_SEMAPHORE_EMULATION);
-  if (emulate_timeline_semaphores && iree_status_is_ok(status)) {
-    status = TimePointSemaphorePool::Create(device->logical_device,
-                                            &device->semaphore_pool);
-  }
-  if (emulate_timeline_semaphores && iree_status_is_ok(status)) {
-    status =
-        TimePointFencePool::Create(device->logical_device, &device->fence_pool);
-  }
-
   // Initialize queues now that we've completed the rest of the device
   // initialization; this happens last as the queues require the pools allocated
   // above.
@@ -677,8 +646,6 @@ static void iree_hal_vulkan_device_destroy(iree_hal_device_t* base_device) {
   // have been in use.
   delete device->builtin_executables;
   delete device->descriptor_pool_cache;
-  delete device->semaphore_pool;
-  delete device->fence_pool;
 
   // There should be no more buffers live that use the allocator.
   iree_hal_allocator_release(device->device_allocator);
@@ -804,19 +771,12 @@ iree_status_t iree_hal_vulkan_device_create(
   device_create_info.pNext = &features2;
 
   VkPhysicalDeviceTimelineSemaphoreFeatures semaphore_features;
-  bool emulate_timeline_semaphores =
-      !enabled_device_extensions.timeline_semaphore ||
-      iree_all_bits_set(
-          options->flags,
-          IREE_HAL_VULKAN_DEVICE_FORCE_TIMELINE_SEMAPHORE_EMULATION);
-  if (!emulate_timeline_semaphores) {
-    memset(&semaphore_features, 0, sizeof(semaphore_features));
-    semaphore_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
-    semaphore_features.pNext = features2.pNext;
-    features2.pNext = &semaphore_features;
-    semaphore_features.timelineSemaphore = VK_TRUE;
-  }
+  memset(&semaphore_features, 0, sizeof(semaphore_features));
+  semaphore_features.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
+  semaphore_features.pNext = features2.pNext;
+  features2.pNext = &semaphore_features;
+  semaphore_features.timelineSemaphore = VK_TRUE;
 
   VkPhysicalDeviceHostQueryResetFeaturesEXT host_query_reset_features;
   if (enabled_device_extensions.host_query_reset) {
@@ -1081,11 +1041,6 @@ static iree_status_t iree_hal_vulkan_device_create_semaphore(
     iree_hal_device_t* base_device, uint64_t initial_value,
     iree_hal_semaphore_t** out_semaphore) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
-  if (device->semaphore_pool != NULL) {
-    return iree_hal_vulkan_emulated_semaphore_create(
-        device->logical_device, device->semaphore_pool, device->queue_count,
-        device->queues, initial_value, out_semaphore);
-  }
   return iree_hal_vulkan_native_semaphore_create(device->logical_device,
                                                  initial_value, out_semaphore);
 }
@@ -1123,10 +1078,6 @@ static iree_status_t iree_hal_vulkan_device_wait_semaphores(
   VkSemaphoreWaitFlags wait_flags = 0;
   if (wait_mode == IREE_HAL_WAIT_MODE_ANY) {
     wait_flags |= VK_SEMAPHORE_WAIT_ANY_BIT;
-  }
-  if (device->semaphore_pool != NULL) {
-    return iree_hal_vulkan_emulated_semaphore_multi_wait(
-        device->logical_device, semaphore_list, timeout, wait_flags);
   }
   return iree_hal_vulkan_native_semaphore_multi_wait(
       device->logical_device, semaphore_list, timeout, wait_flags);

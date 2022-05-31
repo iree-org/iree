@@ -182,7 +182,7 @@ TEST_P(semaphore_test, WaitAllAndAllSignaled) {
 }
 
 // Tests IREE_HAL_WAIT_MODE_ANY.
-// **Fails using timeline semaphore emulation**
+// **Fails on the CPU / 'local' HAL **
 TEST_P(semaphore_test, DISABLED_WaitAny) {
   iree_hal_semaphore_t* semaphore_a = NULL;
   iree_hal_semaphore_t* semaphore_b = NULL;
