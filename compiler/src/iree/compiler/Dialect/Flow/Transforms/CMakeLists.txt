@@ -50,12 +50,12 @@ iree_cc_library(
     "PadTensorToSubTensorInsert.cpp"
     "PassDetail.h"
     "Passes.cpp"
+    "PrintDispatchGraph.cpp"
     "SplitReduction.cpp"
     "StripAndSplatConstantVariables.cpp"
     "StripSignednessPass.cpp"
     "TestPartitionableLoopsInterface.cpp"
     "VerifyInputLegality.cpp"
-    "ViewDispatchGraph.cpp"
   DEPS
     ::PassesIncGen
     IREELinalgExtDialect

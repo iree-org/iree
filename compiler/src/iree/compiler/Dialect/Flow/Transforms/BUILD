@@ -54,6 +54,7 @@ iree_compiler_cc_library(
         "PadTensorToSubTensorInsert.cpp",
         "PassDetail.h",
         "Passes.cpp",
+        "PrintDispatchGraph.cpp",
         "SplitReduction.cpp",
         "StripAndSplatConstantVariables.cpp",
         "StripSignednessPass.cpp",
