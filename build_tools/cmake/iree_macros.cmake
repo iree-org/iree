@@ -62,6 +62,10 @@ function(iree_package_ns PACKAGE_NS)
   string(REPLACE ${IREE_ROOT_DIR} "" _RELATIVE_PATH ${CMAKE_CURRENT_LIST_DIR})
   string(SUBSTRING ${_RELATIVE_PATH} 1 -1 _RELATIVE_PATH)
 
+  # If changing the directory/package mapping rules, please also implement
+  # the corresponding rule in:
+  #   build_tools/bazel_to_cmake/bazel_to_cmake_targets.py
+  # Some sub-trees form their own roots for package purposes. Rewrite them.
   if(_RELATIVE_PATH MATCHES "^compiler/src/(.*)")
     # compiler/src/iree/compiler -> iree/compiler
     set(_PACKAGE "${CMAKE_MATCH_1}")
