@@ -9,6 +9,7 @@ set(LIBS
   IREELinalgTransformDialect
   IREELinalgTransformDialectPasses
   IREELinalgTransformTestPasses
+  IREELinalgExtTransformTestPasses
   IREETransformsTestPasses
   IREEPyDMDialect
   IREEPyDMPasses

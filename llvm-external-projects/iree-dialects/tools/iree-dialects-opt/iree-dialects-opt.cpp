@@ -41,6 +41,7 @@ namespace mlir {
 namespace test_ext {
 /// Test passes, do not deserve an include.
 void registerTestLinalgTransformWrapScope();
+void registerTestLinalgExtTransformSplitReduction();
 void registerTestListenerPasses();
 } // namespace test_ext
 } // namespace mlir
@@ -60,13 +61,13 @@ int main(int argc, char **argv) {
       // Upstream dialects
       mlir::async::AsyncDialect,
       mlir::arith::ArithmeticDialect,
-      mlir::AffineDialect, 
+      mlir::AffineDialect,
       mlir::cf::ControlFlowDialect,
-      mlir::func::FuncDialect, 
-      mlir::linalg::LinalgDialect, 
+      mlir::func::FuncDialect,
+      mlir::linalg::LinalgDialect,
       mlir::memref::MemRefDialect,
-      mlir::pdl::PDLDialect, 
-      mlir::pdl_interp::PDLInterpDialect, 
+      mlir::pdl::PDLDialect,
+      mlir::pdl_interp::PDLInterpDialect,
       mlir::scf::SCFDialect,
       mlir::tensor::TensorDialect,
       mlir::transform::TransformDialect
@@ -84,6 +85,7 @@ int main(int argc, char **argv) {
   mlir::linalg::transform::registerDropSchedulePass();
   // Local test passes.
   mlir::test_ext::registerTestLinalgTransformWrapScope();
+  mlir::test_ext::registerTestLinalgExtTransformSplitReduction();
   mlir::test_ext::registerTestListenerPasses();
 
   // External models.

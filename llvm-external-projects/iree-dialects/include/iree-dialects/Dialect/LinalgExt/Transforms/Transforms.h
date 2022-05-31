@@ -193,6 +193,26 @@ private:
   SmallVector<int64_t> operandsToFuse;
 };
 
+struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  TopkOpSplitReduction(MLIRContext *context,
+                       linalg::LinalgTransformationFilter f)
+      : OpRewritePattern<TopkOp>(context), filter(std::move(f)) {}
+
+  FailureOr<TopkOp>
+  returningMatchAndRewrite(TopkOp topkOp, PatternRewriter &rewriter,
+                           linalg::LinalgTransformationFilter filter) const;
+
+  LogicalResult matchAndRewrite(TopkOp topkOp,
+                                PatternRewriter &rewriter) const override {
+    return returningMatchAndRewrite(topkOp, rewriter, filter);
+  }
+
+private:
+  linalg::LinalgTransformationFilter filter;
+};
+
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler
