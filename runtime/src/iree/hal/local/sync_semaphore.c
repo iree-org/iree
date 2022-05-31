@@ -195,6 +195,16 @@ static void iree_hal_sync_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
 iree_status_t iree_hal_sync_semaphore_multi_signal(
     iree_hal_sync_semaphore_state_t* shared_state,
     const iree_hal_semaphore_list_t* semaphore_list) {
+  IREE_ASSERT_ARGUMENT(shared_state);
+  IREE_ASSERT_ARGUMENT(semaphore_list);
+  if (semaphore_list->count == 0) {
+    return iree_ok_status();
+  } else if (semaphore_list->count == 1) {
+    // Fast-path for a single semaphore.
+    return iree_hal_semaphore_signal(semaphore_list->semaphores[0],
+                                     semaphore_list->payload_values[0]);
+  }
+
   // Try to signal all semaphores, stopping if we encounter any issues.
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
