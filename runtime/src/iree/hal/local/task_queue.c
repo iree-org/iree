@@ -550,7 +550,7 @@ iree_status_t iree_hal_task_queue_submit_and_wait(
     // TODO(benvanik): get a wait_handle we can pass to
     // iree_task_executor_donate_caller - it'll flush + do work.
     iree_task_executor_flush(queue->executor);
-    status = iree_hal_task_queue_wait_idle(queue, timeout);
+    status = iree_hal_semaphore_wait(wait_semaphore, wait_value, timeout);
   }
 
   IREE_TRACE_ZONE_END(z0);
