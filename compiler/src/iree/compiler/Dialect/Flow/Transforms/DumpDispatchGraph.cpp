@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===------------------- ViewDispatchGraph.cpp ----------------------------===//
+//===------------------- DumpDispatchGraph.cpp ----------------------------===//
 //
-// Generate a dot file for a dispatch graph
+// Generate a graphviz graph for dispatches
 //
 //===----------------------------------------------------------------------===//
 
@@ -93,7 +93,7 @@ struct Node {
 /// This pass generates a Graphviz dataflow visualization of an MLIR operation.
 /// Note: See https://www.graphviz.org/doc/info/lang.html for more information
 /// about the Graphviz DOT language.
-class PrintOpPass : public PrintDispatchGraphBase<PrintOpPass> {
+class PrintOpPass : public DumpDispatchGraphBase<PrintOpPass> {
  public:
   PrintOpPass(raw_ostream &os) : os(os) {}
   PrintOpPass(const PrintOpPass &o) : PrintOpPass(o.os.getOStream()) {}
@@ -412,24 +412,8 @@ class PrintOpPass : public PrintDispatchGraphBase<PrintOpPass> {
 
 }  // namespace
 
-std::unique_ptr<Pass> createPrintDispatchGraphPass(raw_ostream &os) {
+std::unique_ptr<Pass> createDumpDispatchGraphPass(raw_ostream &os) {
   return std::make_unique<PrintOpPass>(os);
-}
-
-/// Generate a CFG for a region and show it in a window.
-static void llvmViewGraph(Region &region, const Twine &name) {
-  int fd;
-  std::string filename = llvm::createGraphFilename(name.str(), fd);
-  {
-    llvm::raw_fd_ostream os(fd, /*shouldClose=*/true);
-    if (fd == -1) {
-      llvm::errs() << "error opening file '" << filename << "' for writing\n";
-      return;
-    }
-    PrintOpPass pass(os);
-    pass.emitRegionCFG(region);
-  }
-  llvm::DisplayGraph(filename, /*wait=*/false, llvm::GraphProgram::DOT);
 }
 
 }  // namespace Flow

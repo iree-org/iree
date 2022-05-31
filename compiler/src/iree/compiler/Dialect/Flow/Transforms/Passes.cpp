@@ -95,13 +95,13 @@ static llvm::cl::opt<bool> clNormalizeInputIndexingMap(
     llvm::cl::desc("Enable normalizing input indexing map to identity"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clViewDispatchGraph(
-    "iree-flow-view-dispatch-graph",
-    llvm::cl::desc("Print visualization of dispatches"), llvm::cl::init(false));
+static llvm::cl::opt<bool> clDumpDispatchGraph(
+    "iree-flow-dump-dispatch-graph",
+    llvm::cl::desc("Dump a dot graph for dispatches"), llvm::cl::init(false));
 
-static llvm::cl::opt<std::string> clDispatchGraphFile(
-    "iree-flow-dispatch-graph-file",
-    llvm::cl::desc("Output file name for dispatch graph"),
+static llvm::cl::opt<std::string> clDumpDispatchGraphOutputFile(
+    "iree-flow-dump-dispatch-graph-output-file",
+    llvm::cl::desc("Output file name for a dispatch graph dump"),
     llvm::cl::init("dispatch.dot"));
 
 namespace mlir {
@@ -251,14 +251,15 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
 
   /// Print the dispatch graph in the Graphviz format.
-  if (clViewDispatchGraph) {
+  if (clDumpDispatchGraph) {
     std::string errorMessage;
-    static auto dotFile = openOutputFile(clDispatchGraphFile, &errorMessage);
+    static auto dotFile =
+        openOutputFile(clDumpDispatchGraphOutputFile, &errorMessage);
     if (!dotFile) {
       llvm::errs() << errorMessage << "\n";
     } else {
       passManager.addPass(
-          IREE::Flow::createPrintDispatchGraphPass(dotFile->os()));
+          IREE::Flow::createDumpDispatchGraphPass(dotFile->os()));
       dotFile->keep();
     }
   }

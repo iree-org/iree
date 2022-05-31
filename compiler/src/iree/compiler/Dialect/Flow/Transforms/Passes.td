@@ -144,7 +144,7 @@ def PadTensorToSubTensorInsert :
   let constructor = "mlir::iree_compiler::IREE::Flow::createPadTensorToSubTensorInsertPass()";
 }
 
-def PrintDispatchGraph : Pass<"iree-flow-print-dispatch-graph"> {
+def DumpDispatchGraph : Pass<"iree-flow-dump-dispatch-graph-pass"> {
   let summary = "Print visualization of dispatches";
   let options = [
     Option<"maxLabelLen", "max-label-len", "unsigned",
@@ -158,7 +158,7 @@ def PrintDispatchGraph : Pass<"iree-flow-print-dispatch-graph"> {
     Option<"printResultTypes", "print-result-types", "bool",
             /*default=*/"true", "Print result types of operations">
   ];
-  let constructor = "mlir::iree_compiler::IREE::Flow::createPrintDispatchGraphPass()";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createDumpDispatchGraphPass()";
 }
 
 def SplitReduction :
