@@ -256,9 +256,9 @@ if(IREE_BUILD_COMPILER)
       iree::compiler::Dialect::HAL::Target
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
+      iree::compiler::Pipelines
       iree::compiler::Tools::init_passes_and_dialects
       iree::compiler::Tools::init_targets
-      iree::compiler::Translation::IREEVM
       iree::hal
       iree::hal::drivers
       iree::modules::hal

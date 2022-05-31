@@ -31,7 +31,7 @@
 #include "iree/compiler/InputConversion/TMTensor/Passes.h"
 #endif
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
-#include "iree/compiler/Translation/IREEVM.h"
+#include "iree/compiler/Pipelines/Pipelines.h"
 
 namespace mlir {
 namespace iree_compiler {

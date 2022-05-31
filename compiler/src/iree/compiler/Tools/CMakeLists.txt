@@ -77,8 +77,7 @@ iree_cc_library(
     iree::compiler::InputConversion::TMTensor
     iree::compiler::InputConversion::TOSA
     iree::compiler::ConstEval
-    iree::compiler::Translation::HALExecutable
-    iree::compiler::Translation::IREEVM
+    iree::compiler::Pipelines
   PUBLIC
 )
 
@@ -204,17 +203,6 @@ if(IREE_BUILD_TORCH_MLIR_SUPPORT)
     PUBLIC
   )
 endif()
-
-iree_cc_library(
-  NAME
-    init_translations
-  HDRS
-    "init_translations.h"
-  DEPS
-    iree::compiler::Translation::HALExecutable
-    iree::compiler::Translation::IREEVM
-    MLIRSPIRVTranslateRegistration
-)
 
 iree_cc_library(
   NAME

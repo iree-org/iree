@@ -40,8 +40,8 @@ cc_library(
         "//compiler/src/iree/compiler/InputConversion/MHLO",
         "//compiler/src/iree/compiler/InputConversion/TMTensor",
         "//compiler/src/iree/compiler/InputConversion/TOSA",
+        "//compiler/src/iree/compiler/Pipelines",
         "//compiler/src/iree/compiler/Translation:HALExecutable",
-        "//compiler/src/iree/compiler/Translation:IREEVM",
         "//llvm-external-projects/iree-dialects:IREEInputDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
@@ -139,18 +139,6 @@ cc_library(
         "//compiler/src/iree/compiler/Dialect/HAL/Target/ROCM",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/VMVX",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
-    ],
-)
-
-cc_library(
-    name = "init_translations",
-    hdrs = [
-        "init_translations.h",
-    ],
-    deps = [
-        "//compiler/src/iree/compiler/Translation:HALExecutable",
-        "//compiler/src/iree/compiler/Translation:IREEVM",
-        "@llvm-project//mlir:SPIRVTranslateRegistration",
     ],
 )
 
