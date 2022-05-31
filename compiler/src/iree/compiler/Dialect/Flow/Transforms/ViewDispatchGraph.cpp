@@ -93,7 +93,7 @@ struct Node {
 /// This pass generates a Graphviz dataflow visualization of an MLIR operation.
 /// Note: See https://www.graphviz.org/doc/info/lang.html for more information
 /// about the Graphviz DOT language.
-class PrintOpPass : public ViewDispatchGraphBase<PrintOpPass> {
+class PrintOpPass : public PrintDispatchGraphBase<PrintOpPass> {
  public:
   PrintOpPass(raw_ostream &os) : os(os) {}
   PrintOpPass(const PrintOpPass &o) : PrintOpPass(o.os.getOStream()) {}
