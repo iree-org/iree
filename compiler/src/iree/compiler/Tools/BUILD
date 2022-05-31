@@ -41,7 +41,6 @@ cc_library(
         "//compiler/src/iree/compiler/InputConversion/TMTensor",
         "//compiler/src/iree/compiler/InputConversion/TOSA",
         "//compiler/src/iree/compiler/Pipelines",
-        "//compiler/src/iree/compiler/Translation:HALExecutable",
         "//llvm-external-projects/iree-dialects:IREEInputDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
