@@ -1269,9 +1269,9 @@ LogicalResult TopkOp::verify() {
       block.getArgument(1).getType() != inputValuesType.getElementType()) {
     return op->emitOpError("region block types must match input");
   }
-  auto terminatorOp = llvm::cast<YieldOp>(block.getTerminator());
+  auto terminatorOp = llvm::dyn_cast<YieldOp>(block.getTerminator());
   if (!terminatorOp || !terminatorOp.getOperand(0).getType().isInteger(1)) {
-    return op->emitOpError("region block must end with a Yield i1!");
+    return op->emitOpError("region block must end with a linalg_ext.yield i1!");
   }
   return success();
 }
