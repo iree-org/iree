@@ -10,6 +10,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/utils/semaphore_base.h"
 #include "iree/hal/vulkan/dynamic_symbol_tables.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/status_util.h"
@@ -38,7 +39,7 @@
 using namespace iree::hal::vulkan;
 
 typedef struct iree_hal_vulkan_native_semaphore_t {
-  iree_hal_resource_t resource;
+  iree_hal_semaphore_t base;
   VkDeviceHandle* logical_device;
   VkSemaphore handle;
   iree_atomic_intptr_t failure_status;
@@ -84,13 +85,13 @@ iree_status_t iree_hal_vulkan_native_semaphore_create(
   iree_status_t status = iree_allocator_malloc(
       logical_device->host_allocator(), sizeof(*semaphore), (void**)&semaphore);
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_vulkan_native_semaphore_vtable,
-                                 &semaphore->resource);
+    iree_hal_semaphore_initialize(&iree_hal_vulkan_native_semaphore_vtable,
+                                  &semaphore->base);
     semaphore->logical_device = logical_device;
     semaphore->handle = handle;
     iree_atomic_store_intptr(&semaphore->failure_status, 0,
                              iree_memory_order_release);
-    *out_semaphore = (iree_hal_semaphore_t*)semaphore;
+    *out_semaphore = &semaphore->base;
   } else {
     logical_device->syms()->vkDestroySemaphore(*logical_device, handle,
                                                logical_device->allocator());
@@ -107,11 +108,14 @@ static void iree_hal_vulkan_native_semaphore_destroy(
   iree_allocator_t host_allocator = semaphore->logical_device->host_allocator();
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_free((iree_status_t)iree_atomic_load_intptr(
+  iree_status_ignore((iree_status_t)iree_atomic_load_intptr(
       &semaphore->failure_status, iree_memory_order_acquire));
+
   semaphore->logical_device->syms()->vkDestroySemaphore(
       *semaphore->logical_device, semaphore->handle,
       semaphore->logical_device->allocator());
+
+  iree_hal_semaphore_deinitialize(&semaphore->base);
   iree_allocator_free(host_allocator, semaphore);
 
   IREE_TRACE_ZONE_END(z0);
@@ -130,12 +134,14 @@ static iree_status_t iree_hal_vulkan_native_semaphore_query(
       iree_hal_vulkan_native_semaphore_cast(base_semaphore);
   *out_value = 0;
 
+  // Query from Vulkan source-of-truth.
   uint64_t value = 0;
   IREE_RETURN_IF_ERROR(VK_RESULT_TO_STATUS(
       semaphore->logical_device->syms()->vkGetSemaphoreCounterValue(
           *semaphore->logical_device, semaphore->handle, &value),
       "vkGetSemaphoreCounterValue"));
 
+  // If the semaphore failed then clone the status so we can report it.
   if (value > IREE_HAL_VULKAN_SEMAPHORE_MAX_VALUE) {
     iree_status_t failure_status = (iree_status_t)iree_atomic_load_intptr(
         &semaphore->failure_status, iree_memory_order_acquire);
@@ -143,8 +149,15 @@ static iree_status_t iree_hal_vulkan_native_semaphore_query(
       return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                               "overflowed timeline semaphore max value");
     }
+    iree_hal_semaphore_notify(&semaphore->base, value,
+                              iree_status_code(failure_status));
     return iree_status_clone(failure_status);
   }
+
+  // Notify timepoints on the query as we aren't notified by Vulkan when a
+  // device-side signal occurs. This helps us keep latencies lower by flushing
+  // timepoints without needing waits at the risk of making queries slower.
+  iree_hal_semaphore_notify(&semaphore->base, value, IREE_STATUS_OK);
 
   *out_value = value;
   return iree_ok_status();
@@ -160,16 +173,23 @@ static iree_status_t iree_hal_vulkan_native_semaphore_signal(
   signal_info.pNext = NULL;
   signal_info.semaphore = semaphore->handle;
   signal_info.value = new_value;
-  return VK_RESULT_TO_STATUS(
-      semaphore->logical_device->syms()->vkSignalSemaphore(
-          *semaphore->logical_device, &signal_info),
-      "vkSignalSemaphore");
+  iree_status_t status =
+      VK_RESULT_TO_STATUS(semaphore->logical_device->syms()->vkSignalSemaphore(
+                              *semaphore->logical_device, &signal_info),
+                          "vkSignalSemaphore");
+
+  // Notify of semaphore reaching a new timepoint.
+  iree_hal_semaphore_notify(&semaphore->base, new_value,
+                            iree_status_code(status));
+
+  return status;
 }
 
 static void iree_hal_vulkan_native_semaphore_fail(
     iree_hal_semaphore_t* base_semaphore, iree_status_t status) {
   iree_hal_vulkan_native_semaphore_t* semaphore =
       iree_hal_vulkan_native_semaphore_cast(base_semaphore);
+  iree_status_code_t status_code = iree_status_code(status);
 
   // Try to set our local status - we only preserve the first failure so only
   // do this if we are going from a valid semaphore to a failed one.
@@ -191,6 +211,9 @@ static void iree_hal_vulkan_native_semaphore_fail(
   // failing and the caller will likely be tearing everything down anyway.
   semaphore->logical_device->syms()->vkSignalSemaphore(
       *semaphore->logical_device, &signal_info);
+
+  // Notify of semaphore failure.
+  iree_hal_semaphore_notify(&semaphore->base, signal_info.value, status_code);
 }
 
 iree_status_t iree_hal_vulkan_native_semaphore_multi_wait(
@@ -242,6 +265,19 @@ iree_status_t iree_hal_vulkan_native_semaphore_multi_wait(
       *logical_device, &wait_info, timeout_ns);
 
   IREE_TRACE_ZONE_END(z0);
+
+  // Poll semaphores and notify of state changes.
+  // We aren't notified of device-side signals by Vulkan and need to check to
+  // see if any signals were made.
+  //
+  // TODO(benvanik): on success optimize this to notify of reaching the new
+  // values instead of a full poll; it'll avoid a bunch of additional API
+  // queries.
+  for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
+    uint64_t value = 0;
+    iree_status_ignore(iree_hal_vulkan_native_semaphore_query(
+        semaphore_list->semaphores[i], &value));
+  }
 
   if (result == VK_SUCCESS) {
     return iree_ok_status();

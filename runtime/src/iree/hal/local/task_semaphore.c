@@ -14,6 +14,7 @@
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/wait_handle.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/utils/semaphore_base.h"
 
 // Sentinel used the semaphore has failed and an error status is set.
 #define IREE_HAL_TASK_SEMAPHORE_FAILURE_VALUE UINT64_MAX
@@ -30,100 +31,18 @@
 // in the arena associated with the submission, but could be on the stack of a
 // synchronously waiting thread.
 typedef struct iree_hal_task_timepoint_t {
-  struct iree_hal_task_timepoint_t* next;
-  struct iree_hal_task_timepoint_t* prev;
-  uint64_t payload_value;
+  iree_hal_semaphore_timepoint_t base;
   iree_event_t event;
 } iree_hal_task_timepoint_t;
 
-// A doubly-linked FIFO list of timepoints.
-// The order of the timepoints does *not* match increasing payload values but
-// instead the order they were added to the list.
-//
-// Note that the timepoints are not owned by the list - this just nicely
-// stitches together timepoints for the semaphore.
-typedef struct iree_hal_task_timepoint_list_t {
-  iree_hal_task_timepoint_t* head;
-  iree_hal_task_timepoint_t* tail;
-} iree_hal_task_timepoint_list_t;
-
-static void iree_hal_task_timepoint_list_initialize(
-    iree_hal_task_timepoint_list_t* out_list) {
-  memset(out_list, 0, sizeof(*out_list));
-}
-
-// Moves |source_list| into |out_target_list|.
-// |source_list| will be reset and the prior contents of |out_target_list| will
-// be discarded.
-static void iree_hal_task_timepoint_list_move(
-    iree_hal_task_timepoint_list_t* source_list,
-    iree_hal_task_timepoint_list_t* out_target_list) {
-  memcpy(out_target_list, source_list, sizeof(*out_target_list));
-  memset(source_list, 0, sizeof(*source_list));
-}
-
-// Appends a timepoint to the end of the timepoint list.
-static void iree_hal_task_timepoint_list_append(
-    iree_hal_task_timepoint_list_t* list,
-    iree_hal_task_timepoint_t* timepoint) {
-  timepoint->next = NULL;
-  timepoint->prev = list->tail;
-  if (list->tail != NULL) {
-    list->tail->next = timepoint;
-    list->tail = timepoint;
-  } else {
-    list->head = timepoint;
-    list->tail = timepoint;
-  }
-}
-
-// Erases a timepoint from the list.
-static void iree_hal_task_timepoint_list_erase(
-    iree_hal_task_timepoint_list_t* list,
-    iree_hal_task_timepoint_t* timepoint) {
-  if (timepoint->prev != NULL) timepoint->prev->next = timepoint->next;
-  if (timepoint == list->head) list->head = timepoint->next;
-  if (timepoint == list->tail) list->tail = timepoint->prev;
-  timepoint->prev = NULL;
-  timepoint->next = NULL;
-}
-
-// Scans the |pending_list| for all timepoints that are satisfied by the
-// timeline having reached |payload_value|. Each satisfied timepoint will be
-// moved to |out_ready_list|.
-static void iree_hal_task_timepoint_list_take_ready(
-    iree_hal_task_timepoint_list_t* pending_list, uint64_t payload_value,
-    iree_hal_task_timepoint_list_t* out_ready_list) {
-  iree_hal_task_timepoint_list_initialize(out_ready_list);
-  iree_hal_task_timepoint_t* next = pending_list->head;
-  while (next != NULL) {
-    iree_hal_task_timepoint_t* timepoint = next;
-    next = timepoint->next;
-    bool is_satisfied = timepoint->payload_value <= payload_value;
-    if (!is_satisfied) continue;
-
-    // Remove from pending list.
-    iree_hal_task_timepoint_list_erase(pending_list, timepoint);
-
-    // Add to ready list.
-    iree_hal_task_timepoint_list_append(out_ready_list, timepoint);
-  }
-}
-
-// Notifies all of the timepoints in the |ready_list| that their condition has
-// been satisfied. |ready_list| will be reset as ownership of the events is
-// held by the originator.
-static void iree_hal_task_timepoint_list_notify_ready(
-    iree_hal_task_timepoint_list_t* ready_list) {
-  iree_hal_task_timepoint_t* next = ready_list->head;
-  while (next != NULL) {
-    iree_hal_task_timepoint_t* timepoint = next;
-    next = timepoint->next;
-    timepoint->next = NULL;
-    timepoint->prev = NULL;
-    iree_event_set(&timepoint->event);
-  }
-  iree_hal_task_timepoint_list_initialize(ready_list);
+// Handles timepoint callbacks when either the timepoint is reached or it fails.
+// We set the event in either case and let the waiters deal with the fallout.
+static iree_status_t iree_hal_task_semaphore_timepoint_callback(
+    void* user_data, iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_status_code_t status_code) {
+  iree_hal_task_timepoint_t* timepoint = (iree_hal_task_timepoint_t*)user_data;
+  iree_event_set(&timepoint->event);
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -131,7 +50,7 @@ static void iree_hal_task_timepoint_list_notify_ready(
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_task_semaphore_t {
-  iree_hal_resource_t resource;
+  iree_hal_semaphore_t base;
   iree_allocator_t host_allocator;
   iree_event_pool_t* event_pool;
 
@@ -147,15 +66,6 @@ typedef struct iree_hal_task_semaphore_t {
 
   // OK or the status passed to iree_hal_semaphore_fail. Owned by the semaphore.
   iree_status_t failure_status;
-
-  // In-process notification signaled when the semaphore value changes. This is
-  // used exclusively for wait-ones to avoid going to the kernel for a full wait
-  // handle operation.
-  iree_notification_t notification;
-
-  // A list of all reserved timepoints waiting for the semaphore to reach a
-  // certain payload value.
-  iree_hal_task_timepoint_list_t timepoint_list;
 } iree_hal_task_semaphore_t;
 
 static const iree_hal_semaphore_vtable_t iree_hal_task_semaphore_vtable;
@@ -178,18 +88,16 @@ iree_status_t iree_hal_task_semaphore_create(
   iree_status_t status = iree_allocator_malloc(
       host_allocator, sizeof(*semaphore), (void**)&semaphore);
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_task_semaphore_vtable,
-                                 &semaphore->resource);
+    iree_hal_semaphore_initialize(&iree_hal_task_semaphore_vtable,
+                                  &semaphore->base);
     semaphore->host_allocator = host_allocator;
     semaphore->event_pool = event_pool;
 
     iree_slim_mutex_initialize(&semaphore->mutex);
     semaphore->current_value = initial_value;
     semaphore->failure_status = iree_ok_status();
-    iree_notification_initialize(&semaphore->notification);
-    iree_hal_task_timepoint_list_initialize(&semaphore->timepoint_list);
 
-    *out_semaphore = (iree_hal_semaphore_t*)semaphore;
+    *out_semaphore = &semaphore->base;
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -203,9 +111,10 @@ static void iree_hal_task_semaphore_destroy(
   iree_allocator_t host_allocator = semaphore->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_free(semaphore->failure_status);
-  iree_notification_deinitialize(&semaphore->notification);
   iree_slim_mutex_deinitialize(&semaphore->mutex);
+  iree_status_ignore(semaphore->failure_status);
+
+  iree_hal_semaphore_deinitialize(&semaphore->base);
   iree_allocator_free(host_allocator, semaphore);
 
   IREE_TRACE_ZONE_END(z0);
@@ -249,18 +158,10 @@ static iree_status_t iree_hal_task_semaphore_signal(
 
   semaphore->current_value = new_value;
 
-  // Scan for all timepoints that are now satisfied and move them to our local
-  // ready list. This way we can notify them without needing to continue holding
-  // the semaphore lock.
-  iree_hal_task_timepoint_list_t ready_list;
-  iree_hal_task_timepoint_list_take_ready(&semaphore->timepoint_list, new_value,
-                                          &ready_list);
-
-  iree_notification_post(&semaphore->notification, IREE_ALL_WAITERS);
   iree_slim_mutex_unlock(&semaphore->mutex);
 
-  // Notify all waiters - note that this must happen outside the lock.
-  iree_hal_task_timepoint_list_notify_ready(&ready_list);
+  // Notify timepoints - note that this must happen outside the lock.
+  iree_hal_semaphore_notify(&semaphore->base, new_value, IREE_STATUS_OK);
 
   return iree_ok_status();
 }
@@ -269,6 +170,7 @@ static void iree_hal_task_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
                                          iree_status_t status) {
   iree_hal_task_semaphore_t* semaphore =
       iree_hal_task_semaphore_cast(base_semaphore);
+  const iree_status_code_t status_code = iree_status_code(status);
 
   iree_slim_mutex_lock(&semaphore->mutex);
 
@@ -285,17 +187,11 @@ static void iree_hal_task_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
   semaphore->current_value = IREE_HAL_TASK_SEMAPHORE_FAILURE_VALUE;
   semaphore->failure_status = status;
 
-  // Take the whole timepoint list as we'll be signaling all of them. Since
-  // we hold the lock no other timepoints can be created while we are cleaning
-  // up.
-  iree_hal_task_timepoint_list_t ready_list;
-  iree_hal_task_timepoint_list_move(&semaphore->timepoint_list, &ready_list);
-
-  iree_notification_post(&semaphore->notification, IREE_ALL_WAITERS);
   iree_slim_mutex_unlock(&semaphore->mutex);
 
-  // Notify all waiters - note that this must happen outside the lock.
-  iree_hal_task_timepoint_list_notify_ready(&ready_list);
+  // Notify timepoints - note that this must happen outside the lock.
+  iree_hal_semaphore_notify(&semaphore->base,
+                            IREE_HAL_TASK_SEMAPHORE_FAILURE_VALUE, status_code);
 }
 
 // Acquires a timepoint waiting for the given value.
@@ -303,13 +199,16 @@ static void iree_hal_task_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
 // timepoint has been reached (or it is cancelled by the caller).
 static iree_status_t iree_hal_task_semaphore_acquire_timepoint(
     iree_hal_task_semaphore_t* semaphore, uint64_t minimum_value,
-    iree_hal_task_timepoint_t* out_timepoint) {
-  memset(out_timepoint, 0, sizeof(*out_timepoint));
-  out_timepoint->payload_value = minimum_value;
+    iree_timeout_t timeout, iree_hal_task_timepoint_t* out_timepoint) {
   IREE_RETURN_IF_ERROR(
       iree_event_pool_acquire(semaphore->event_pool, 1, &out_timepoint->event));
-  iree_hal_task_timepoint_list_append(&semaphore->timepoint_list,
-                                      out_timepoint);
+  iree_hal_semaphore_acquire_timepoint(
+      &semaphore->base, minimum_value, timeout,
+      (iree_hal_semaphore_callback_t){
+          .fn = iree_hal_task_semaphore_timepoint_callback,
+          .user_data = out_timepoint,
+      },
+      &out_timepoint->base);
   return iree_ok_status();
 }
 
@@ -325,15 +224,13 @@ static void iree_hal_task_semaphore_wait_cmd_cleanup(
     iree_task_t* task, iree_status_code_t status_code) {
   iree_hal_task_semaphore_wait_cmd_t* cmd =
       (iree_hal_task_semaphore_wait_cmd_t*)task;
-  iree_event_pool_release(cmd->semaphore->event_pool, 1, &cmd->timepoint.event);
   if (IREE_UNLIKELY(status_code != IREE_STATUS_OK)) {
     // Abort the timepoint. Note that this is not designed to be fast as
     // semaphore failure is an exceptional case.
-    iree_slim_mutex_lock(&cmd->semaphore->mutex);
-    iree_hal_task_timepoint_list_erase(&cmd->semaphore->timepoint_list,
-                                       &cmd->timepoint);
-    iree_slim_mutex_unlock(&cmd->semaphore->mutex);
+    iree_hal_semaphore_cancel_timepoint(&cmd->semaphore->base,
+                                        &cmd->timepoint.base);
   }
+  iree_event_pool_release(cmd->semaphore->event_pool, 1, &cmd->timepoint.event);
 }
 
 iree_status_t iree_hal_task_semaphore_enqueue_timepoint(
@@ -348,13 +245,16 @@ iree_status_t iree_hal_task_semaphore_enqueue_timepoint(
   iree_status_t status = iree_ok_status();
   if (semaphore->current_value >= minimum_value) {
     // Fast path: already satisfied.
+  } else if (!iree_status_is_ok(semaphore->failure_status)) {
+    // Semaphore failed; can't enqueue timepoints (they'll reject immediately).
+    status = iree_status_clone(semaphore->failure_status);
   } else {
     // Slow path: acquire a system wait handle and perform a full wait.
     iree_hal_task_semaphore_wait_cmd_t* cmd = NULL;
     status = iree_arena_allocate(arena, sizeof(*cmd), (void**)&cmd);
     if (iree_status_is_ok(status)) {
       status = iree_hal_task_semaphore_acquire_timepoint(
-          semaphore, minimum_value, &cmd->timepoint);
+          semaphore, minimum_value, iree_infinite_timeout(), &cmd->timepoint);
     }
     if (iree_status_is_ok(status)) {
       iree_task_wait_initialize(issue_task->scope,
@@ -398,8 +298,8 @@ static iree_status_t iree_hal_task_semaphore_wait(
 
   // Slow path: acquire a timepoint while we hold the lock.
   iree_hal_task_timepoint_t timepoint;
-  iree_status_t status =
-      iree_hal_task_semaphore_acquire_timepoint(semaphore, value, &timepoint);
+  iree_status_t status = iree_hal_task_semaphore_acquire_timepoint(
+      semaphore, value, timeout, &timepoint);
 
   iree_slim_mutex_unlock(&semaphore->mutex);
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) return status;
@@ -409,11 +309,10 @@ static iree_status_t iree_hal_task_semaphore_wait(
   // the deadline is reached before satisfied then we have to clean it up.
   status = iree_wait_one(&timepoint.event, deadline_ns);
   if (!iree_status_is_ok(status)) {
-    iree_slim_mutex_lock(&semaphore->mutex);
-    iree_hal_task_timepoint_list_erase(&semaphore->timepoint_list, &timepoint);
-    iree_slim_mutex_unlock(&semaphore->mutex);
+    iree_hal_semaphore_cancel_timepoint(&semaphore->base, &timepoint.base);
   }
   iree_event_pool_release(semaphore->event_pool, 1, &timepoint.event);
+
   return status;
 }
 
@@ -463,7 +362,7 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
         // Slow path: get a native wait handle for the timepoint.
         iree_hal_task_timepoint_t* timepoint = &timepoints[timepoint_count++];
         status = iree_hal_task_semaphore_acquire_timepoint(
-            semaphore, semaphore_list->payload_values[i], timepoint);
+            semaphore, semaphore_list->payload_values[i], timeout, timepoint);
         if (iree_status_is_ok(status)) {
           status = iree_wait_set_insert(wait_set, timepoint->event);
         }
@@ -482,12 +381,12 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
     }
   }
 
-  if (timepoints != NULL) {
-    // TODO(benvanik): if we flip the API to multi-acquire events from the pool
-    // above then we can multi-release here too.
-    for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
-      iree_event_pool_release(event_pool, 1, &timepoints[i].event);
-    }
+  // TODO(benvanik): if we flip the API to multi-acquire events from the pool
+  // above then we can multi-release here too.
+  for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
+    iree_hal_semaphore_cancel_timepoint(timepoints[i].base.semaphore,
+                                        &timepoints[i].base);
+    iree_event_pool_release(event_pool, 1, &timepoints[i].event);
   }
   iree_wait_set_free(wait_set);
   iree_arena_deinitialize(&arena);

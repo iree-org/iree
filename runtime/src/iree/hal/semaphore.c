@@ -105,6 +105,7 @@ iree_status_t iree_hal_semaphore_wait_source_ctl(
       iree_wait_primitive_t* out_wait_primitive =
           (iree_wait_primitive_t*)inout_ptr;
       memset(out_wait_primitive, 0, sizeof(*out_wait_primitive));
+      (void)target_type;
       return iree_make_status(IREE_STATUS_UNAVAILABLE,
                               "requested wait primitive type %d is unavailable",
                               (int)target_type);

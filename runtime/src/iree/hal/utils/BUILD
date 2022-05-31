@@ -75,3 +75,29 @@ iree_runtime_cc_test(
         "//runtime/src/iree/testing:gtest_main",
     ],
 )
+
+iree_runtime_cc_library(
+    name = "semaphore_base",
+    srcs = ["semaphore_base.c"],
+    hdrs = ["semaphore_base.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:synchronization",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "semaphore_base_test",
+    srcs = ["semaphore_base_test.cc"],
+    deps = [
+        ":semaphore_base",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:wait_handle",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
