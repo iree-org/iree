@@ -22,11 +22,13 @@ steps:
                   ref: ${CONFIG_FETCH_REF}
     commands:
       - "git clean -fdx"
+      # TODO(pzread): Replace the jerry-benchmark-linux with the formal one.
       - |
         export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
             --secret=iree-buildkite-presubmit-pipelines)"
         ./build_tools/buildkite/scripts/wait_for_pipeline_success.py \
             --output-build-json=build.json jerry-benchmark-linux
+      # TODO(pzread): Add jq to the agents and replace the python command.
       - |
         mkdir benchmark-results-linux
         buildkite-agent artifact download "benchmark-results-*.json" \
@@ -43,8 +45,11 @@ steps:
                 - url: ${BUILDKITE_REPO}
                   ref: ${CONFIG_FETCH_REF}
     commands:
-      - git clean -fdx
+      - "git clean -fdx"
       - |
+        export GITHUB_TOKEN="$(gcloud secrets versions access latest \
+            --secret=iree-github-token)" \
+        export IREE_DASHBOARD_URL="https://perf.iree.dev" \
         buildkite-agent artifact download "benchmark-results-*/*.json" .
         ./build_tools/benchmarks/post_benchmarks_as_pr_comment.py \
             --verbose --query-base \
