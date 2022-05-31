@@ -200,7 +200,7 @@ endfunction()
 #   in the CMAKE_CURRENT_BINARY_DIR.
 # PACKAGE_DIRS: Python package paths to be added to PYTHONPATH.
 function(iree_local_py_test)
-  if(NOT IREE_BUILD_TESTS OR ANDROID)
+  if(NOT IREE_BUILD_TESTS OR ANDROID OR EMSCRIPTEN)
     return()
   endif()
 

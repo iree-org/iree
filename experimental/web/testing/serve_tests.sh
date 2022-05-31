@@ -8,7 +8,6 @@
 ROOT_DIR=$(git rev-parse --show-toplevel)
 BUILD_DIR=${ROOT_DIR?}/build-emscripten
 
-echo "=== Running local webserver, open at http://localhost:8000/ ==="
-echo "    http://localhost:8000/experimental/web/testing/index.html?testName=math_test.js&testPath=/runtime/src/iree/base/internal/"
+echo "=== Running local webserver, open http://localhost:8000/experimental/web/testing/index.html ==="
 
 python3 ${ROOT_DIR?}/build_tools/scripts/local_web_server.py --directory ${BUILD_DIR}
