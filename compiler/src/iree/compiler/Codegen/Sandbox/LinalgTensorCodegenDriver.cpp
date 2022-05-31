@@ -173,6 +173,7 @@ struct LinalgSingleTilingExpertPass
     this->generalize = options.generalize;
     this->iteratorInterchange = options.iteratorInterchange;
     this->decomposeToLowerDimOp = options.decomposeToLowerDimOp;
+    this->peel = options.peel;
     this->vectorize = options.vectorize;
     this->vectorizePadding = options.vectorizePadding;
     this->tilingLevel = options.tilingLevel;
@@ -305,6 +306,45 @@ void LinalgFusePass::runOnOperation() {
   }
 }
 
+/// Return true if 'loop' is a tiled loop that distributes work among threads.
+/// We currently check whether the loop control depends on any of the interface
+/// workgroup operations. This may lead to some false positives that may prevent
+/// peeling of loops that we could peel. We shouldn't need this check when we
+/// move to the Transform dialect.
+static bool isDistributionLoop(scf::ForOp loop) {
+  SmallVector<Value, 4> loopBounds;
+  SmallVector<Operation *> defWorkList;
+  DenseSet<Operation *> visited;
+  defWorkList.push_back(loop.getLowerBound().getDefiningOp());
+  defWorkList.push_back(loop.getUpperBound().getDefiningOp());
+  defWorkList.push_back(loop.getStep().getDefiningOp());
+  while (!defWorkList.empty()) {
+    Operation *def = defWorkList.pop_back_val();
+    if (!def) {
+      continue;
+    }
+
+    // Skip visited operations that are not distribution loops.
+    if (visited.contains(def)) {
+      continue;
+    }
+
+    // Loop with bounds fed by InterfaceWorkgroup*Ops are distribution loops.
+    if (isa<iree_compiler::IREE::HAL::InterfaceWorkgroupIDOp>(def) ||
+        isa<iree_compiler::IREE::HAL::InterfaceWorkgroupCountOp>(def) ||
+        isa<iree_compiler::IREE::HAL::InterfaceWorkgroupSizeOp>(def))
+      return true;
+
+    visited.insert(def);
+
+    // Add definition operands to the worklist.
+    llvm::transform(def->getOperands(), std::back_inserter(defWorkList),
+                    [](Value operand) { return operand.getDefiningOp(); });
+  }
+
+  return false;
+}
+
 void LinalgSingleTilingExpertPass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
 
@@ -351,6 +391,30 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
       SmallVector<int64_t>{hoistPaddings.begin(), hoistPaddings.end()});
   paddingOptions.setTransposePaddings(transposePaddingVectors);
 
+  // Gather tiled loops that aren't distribution loops from previous tiling
+  // stages.
+  LinalgPeelOptions peelingOptions;
+  peelingOptions.loopsToPeelComputationFunction =
+      [&](OpBuilder &builder, Operation *op,
+          SmallVectorImpl<scf::ForOp> &loopsToPeel) {
+        if (!tilingOptions.tileSizeComputationFunction) return;
+
+        auto maxNumLoopsToPeel =
+            tilingOptions.tileSizeComputationFunction(builder, op).size();
+
+        Operation *currentOp = op;
+        for (int i = 0; i < maxNumLoopsToPeel; ++i) {
+          currentOp = currentOp->getParentOfType<scf::ForOp>();
+          auto loop = llvm::cast_or_null<scf::ForOp>(currentOp);
+          if (!loop || isDistributionLoop(loop)) {
+            break;
+          }
+          loopsToPeel.push_back(loop);
+        }
+
+        std::reverse(loopsToPeel.begin(), loopsToPeel.end());
+      };
+
   CodegenStrategy strategy;
   StringRef genericOpName = GenericOp::getOperationName();
   strategy.tileIf(doTiling, anchorOpName, tilingOptions)
@@ -358,6 +422,7 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
       .decomposeIf(decomposeToLowerDimOp)
       .generalizeIf(generalize, anchorOpName)
       .interchangeIf(!iteratorInterchange.empty(), iteratorInterchange)
+      .peelIf(peel, generalize ? genericOpName : anchorOpName, peelingOptions)
       .vectorizeIf(vectorize, generalize ? genericOpName : anchorOpName,
                    nullptr, vectorizePadding);
 
@@ -421,6 +486,7 @@ void LinalgVectorLoweringPass::runOnOperation() {
           .enableTransferPartialRewrite(vectorLoweringStage >= 2 &&
                                         vectorTransferSplit !=
                                             vector::VectorTransferSplit::None)
+
           // Set the maximum vector load / store rank.
           .setMaxTransferRank(maxTransferRank)
           // Lower vector.transfer to vector.transfer of max rank.

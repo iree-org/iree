@@ -342,6 +342,7 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
   // Add the sandbox single tiling expert to tile and vectorize.
   {
     LinalgSingleTilingExpertPassOptions options;
+    options.peel = true;
     options.vectorize = true;
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);

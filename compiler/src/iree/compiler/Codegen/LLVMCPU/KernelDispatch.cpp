@@ -73,7 +73,7 @@ static llvm::cl::opt<bool> useLinalgTransformInterp(
 static llvm::cl::opt<bool> disableMatmulPadPipeline(
     "iree-codegen-disable-matmul-pad-pipeline",
     llvm::cl::desc("disable padding options in Matmul codegen"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
