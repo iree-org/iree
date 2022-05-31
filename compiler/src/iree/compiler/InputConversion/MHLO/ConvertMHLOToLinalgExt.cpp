@@ -525,7 +525,7 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
     }
     Value negInf = rewriter.create<arith::ConstantOp>(loc, negInfAttr);
     Attribute posInfAttr = rewriter.getIntegerAttr(
-        rewriter.getI32Type(), APInt::getSignedMaxValue(32));
+        indicesElementType, APInt::getSignedMaxValue(32));
     Value posInf = rewriter.create<arith::ConstantOp>(loc, posInfAttr);
     Value negInfTensor =
         rewriter.create<linalg::FillOp>(loc, negInf, initTensorOutputValues)
