@@ -1,4 +1,4 @@
-// RUN: iree-translate --iree-vm-ir-to-c-module --iree-vm-c-module-optimize=false %s | FileCheck %s
+// RUN: iree-compile --compile-mode=vm --output-format=vm-c --iree-vm-c-module-optimize=false %s | FileCheck %s
 
 vm.module @global_ops {
   // check the generated state struct
