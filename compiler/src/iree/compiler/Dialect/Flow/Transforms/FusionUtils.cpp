@@ -19,9 +19,10 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-static llvm::cl::opt<bool> clFuseTranspose(
-    "iree-flow-fuse-transpose", llvm::cl::desc("Enable fusing transpose"),
-    llvm::cl::init(false));
+static llvm::cl::opt<bool> clEnsureInplaceableConsumer(
+    "iree-flow-ensure-inplaceable-consumer",
+    llvm::cl::desc("Ensure the consumer is inplaceable for fusion."),
+    llvm::cl::init(true));
 
 /// For the fusion of root op -> elementwise operation to be bufferized
 /// in-place without use of extra memory, the result of the root operation
@@ -37,11 +38,7 @@ static bool canInsOperandTieWithOutsOperand(OpOperand *insOperand) {
   AffineMap insOperandIndexingMap = linalgOp.getTiedIndexingMap(insOperand);
 
   auto canTieWithOutsOperand = [&](OpOperand *outsOperand) {
-    auto outputMap = linalgOp.getTiedIndexingMap(outsOperand);
-    if (clFuseTranspose) {
-      if (!outputMap.isPermutation()) return false;
-    } else if (linalgOp.getTiedIndexingMap(outsOperand) !=
-               insOperandIndexingMap) {
+    if (linalgOp.getTiedIndexingMap(outsOperand) != insOperandIndexingMap) {
       return false;
     }
     // TODO(#8411): Until ops are vectorized (always), we need
@@ -76,7 +73,7 @@ bool areLinalgOpsFusableUsingTileAndFuse(OpOperand &use) {
 
   // 4. In-place bufferization requirements (for now) require that the use in
   // the consumer can re-use the buffer for a result.
-  return canInsOperandTieWithOutsOperand(&use);
+  return !clEnsureInplaceableConsumer || canInsOperandTieWithOutsOperand(&use);
 }
 
 }  // namespace Flow
