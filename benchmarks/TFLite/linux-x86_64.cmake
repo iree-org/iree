@@ -24,7 +24,7 @@ set(LINUX_X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS
 
 # CPU, Dylib-Sync, x86_64, full-inference
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "linux-x86_64"
 
   MODULES
@@ -51,7 +51,7 @@ iree_benchmark_suite(
 
 # CPU, Dylib, 1 thread, x86_64, full-inference
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "linux-x86_64"
 
   MODULES
@@ -80,7 +80,7 @@ iree_benchmark_suite(
 
 # CPU, Dylib, 4 threads, x86_64, full-inference
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "linux-x86_64"
 
   MODULES
@@ -109,7 +109,7 @@ iree_benchmark_suite(
 
 # CPU, Dylib, 8 threads, x86_64, full-inference
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "linux-x86_64"
 
   MODULES

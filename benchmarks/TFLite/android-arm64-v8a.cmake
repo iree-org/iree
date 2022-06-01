@@ -22,7 +22,7 @@ set(ANDROID_CPU_TRANSLATION_FLAGS
 
 # CPU, Dylib-Sync, big/little-core, full-inference
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-arm64-v8a"
 
   MODULES
@@ -51,7 +51,7 @@ iree_benchmark_suite(
 
 # CPU, Dylib, 1 through 4 threads, big/little-core, full-inference.
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-arm64-v8a"
 
   MODULES
@@ -83,7 +83,7 @@ iree_benchmark_suite(
 # TODO(#7792): Re-enable these when we are able to run different benchmarks
 # depending on use-case (presubmit, postsubmit, nightly, etc.)
 # iree_benchmark_suite(
-#   SUITE_NAME
+#   GROUP_NAME
 #     "android-arm64-v8a"
 #
 #   MODULES
@@ -112,7 +112,7 @@ iree_benchmark_suite(
 # )
 
 # iree_benchmark_suite(
-#   SUITE_NAME
+#   GROUP_NAME
 #     "android-arm64-v8a"
 #
 #   MODULES
@@ -141,7 +141,7 @@ iree_benchmark_suite(
 # )
 
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-arm64-v8a"
 
   MODULES
@@ -191,7 +191,7 @@ iree_benchmark_suite(
 # At the moment we use that for fp32 models. We would change that when new
 # devices support relevant fp32 SIMD extensions beyond that (e.g. +f32mm).
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-arm64-v8a"
 
   MODULES
@@ -223,7 +223,7 @@ iree_benchmark_suite(
 # TODO: add a +i8mm variant, supported by new devices already. No rush: our i8mm
 # kernel is currently naive, not ready for benchmarking.
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-arm64-v8a"
 
   MODULES
@@ -254,7 +254,7 @@ iree_benchmark_suite(
 # At the moment we use that for fp32 models. We would change that when new
 # devices support relevant fp32 SIMD extensions beyond that (e.g. f32mm).
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-arm64-v8a"
 
   MODULES
@@ -288,7 +288,7 @@ iree_benchmark_suite(
 # TODO: add a +i8mm variant, supported by new devices already. No rush: our i8mm
 # kernel is currently naive, not ready for benchmarking.
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-arm64-v8a"
 
   MODULES
@@ -316,7 +316,7 @@ iree_benchmark_suite(
 # TODO(#7792): Re-enable these when we are able to run different benchmarks
 # depending on use-case (presubmit, postsubmit, nightly, etc.)
 # iree_benchmark_suite(
-#  SUITE_NAME
+#  GROUP_NAME
 #    "android-arm64-v8a"
 #
 #   MODULES
@@ -346,7 +346,7 @@ iree_benchmark_suite(
 # )
 
 # iree_benchmark_suite(
-#  SUITE_NAME
+#  GROUP_NAME
 #    "android-arm64-v8a"
 #
 #   MODULES
@@ -380,7 +380,7 @@ iree_benchmark_suite(
 # At the moment we use that for fp32 models. We would change that when new
 # devices support relevant fp32 SIMD extensions beyond that (e.g. f32mm).
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-arm64-v8a"
 
   MODULES
@@ -415,7 +415,7 @@ iree_benchmark_suite(
 # TODO: add a +i8mm variant, supported by new devices already. No rush: our i8mm
 # kernel is currently naive, not ready for benchmarking.
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-arm64-v8a"
 
   MODULES
@@ -447,7 +447,7 @@ iree_benchmark_suite(
 # performance change may be coming from (e.g. if it's in vmvx as well, it's
 # probably not a codegen issue).
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-arm64-v8a"
 
   MODULES

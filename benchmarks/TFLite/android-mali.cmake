@@ -23,7 +23,7 @@ set(ANDROID_MALI_GPU_TRANSLATION_FLAGS
 
 # GPU, Vulkan, Mali, full-inference
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-mali"
 
   MODULES
@@ -50,7 +50,7 @@ iree_benchmark_suite(
 
 # GPU, Vulkan, Mali, full-inference
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-mali"
 
   MODULES
@@ -91,7 +91,7 @@ iree_benchmark_suite(
 
 # GPU, Vulkan, Mali, full-inference
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-mali"
 
   MODULES
@@ -118,7 +118,7 @@ iree_benchmark_suite(
 )
 
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-mali"
 
   MODULES
@@ -153,7 +153,7 @@ iree_benchmark_suite(
 
 # GPU, Vulkan, Mali, kernel-execution
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-mali"
 
   MODULES
@@ -183,7 +183,7 @@ iree_benchmark_suite(
 )
 
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-mali"
 
   MODULES

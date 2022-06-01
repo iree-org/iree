@@ -13,8 +13,8 @@
 # `iree-benchmark-module`.
 #
 # Parameters:
-#   SUITE_NAME: A group name this benchmark will join. Each group has its own
-#       CMake's benchmark suite target: "iree-benchmark-suites-<SUITE_NAME>".
+#   GROUP_NAME: A group name this benchmark will join. Each group has its own
+#       CMake's benchmark suite target: "iree-benchmark-suites-<GROUP_NAME>".
 #   MODULES: A list for model specification. Due to CMake's lack of data
 #       structures, each module is represented as a list suitable to be parsed
 #       by cmake_parse_arguments:
@@ -70,20 +70,20 @@ function(iree_benchmark_suite)
     PARSE_ARGV 0
     _RULE
     ""
-    "SUITE_NAME;DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
+    "GROUP_NAME;DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
     "BENCHMARK_MODES;BENCHMARK_TOOL;MODULES;TRANSLATION_FLAGS;RUNTIME_FLAGS"
   )
 
   iree_validate_required_arguments(
     _RULE
-    "SUITE_NAME;DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
+    "GROUP_NAME;DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
     "BENCHMARK_MODES;BENCHMARK_TOOL;MODULES"
   )
 
   iree_package_name(PACKAGE_NAME)
 
   # Add the benchmark suite target.
-  set(SUITE_SUB_TARGET "iree-benchmark-suites-${_RULE_SUITE_NAME}")
+  set(SUITE_SUB_TARGET "iree-benchmark-suites-${_RULE_GROUP_NAME}")
   if(NOT TARGET "${SUITE_SUB_TARGET}")
     add_custom_target("${SUITE_SUB_TARGET}")
   endif()

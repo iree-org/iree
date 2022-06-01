@@ -23,7 +23,7 @@ set(ANDROID_ADRENO_GPU_TRANSLATION_FLAGS
 
 # GPU, Vulkan, Adreno, full-inference
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-adreno"
 
   MODULES
@@ -66,7 +66,7 @@ iree_benchmark_suite(
 
 # GPU, Vulkan, Adreno, full-inference
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-adreno"
 
   MODULES
@@ -108,7 +108,7 @@ iree_benchmark_suite(
 
 # GPU, Vulkan, Adreno, kernel-execution
 iree_benchmark_suite(
-  SUITE_NAME
+  GROUP_NAME
     "android-adreno"
 
   MODULES
