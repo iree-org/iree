@@ -340,11 +340,15 @@ function(iree_benchmark_suite)
 
       # Generate a flagfile containing command-line options used to compile the
       # generated artifacts.
-      string(REPLACE ";" "\\n" _BENCHMARK_COMPILATION_FLAGS "${_TRANSLATION_ARGS}")
       set(_COMPILATION_FLAGFILE "${_RUN_SPEC_DIR}/compilation_flagfile")
+      # Generate the flagfile with python command. We can't use "file" because
+      # it can't be part of a target's dependency and generated lazily.
       add_custom_command(
         OUTPUT "${_COMPILATION_FLAGFILE}"
-        COMMAND ${CMAKE_COMMAND} -E echo -e -- ${_BENCHMARK_COMPILATION_FLAGS} > "${_COMPILATION_FLAGFILE}"
+        COMMAND
+          "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/scripts/generate_compilation_flagfile.py"
+            --output "${_COMPILATION_FLAGFILE}"
+            -- ${_TRANSLATION_ARGS}
         WORKING_DIRECTORY "${_RUN_SPEC_DIR}"
         COMMENT "Generating ${_COMPILATION_FLAGFILE}"
       )
