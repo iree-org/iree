@@ -129,9 +129,9 @@ cc_binary(
         "//compiler/src/iree/compiler/Dialect/HAL/Target",
         "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",
         "//compiler/src/iree/compiler/Dialect/VM/Target/Bytecode",
+        "//compiler/src/iree/compiler/Pipelines",
         "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
         "//compiler/src/iree/compiler/Tools:init_targets",
-        "//compiler/src/iree/compiler/Translation:IREEVM",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base:logging",
@@ -229,19 +229,10 @@ cc_binary(
 )
 
 cc_binary(
-    name = "iree-translate",
-    srcs = ["iree-translate-main.cc"],
-    tags = ["hostonly"],
-    deps = [
-        "//compiler/src/iree/compiler/Tools:iree_translate_lib",
-    ],
-)
-
-cc_binary(
     name = "iree-compile",
     srcs = ["iree-compile-main.cc"],
     tags = ["hostonly"],
     deps = [
-        "//compiler/src/iree/compiler/Tools:iree_translate_lib",
+        "//compiler/src/iree/compiler/Tools:iree_compile_lib",
     ],
 )

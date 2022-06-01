@@ -31,7 +31,10 @@
 #include "iree/compiler/InputConversion/TMTensor/Passes.h"
 #endif
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
-#include "iree/compiler/Translation/IREEVM.h"
+#include "iree/compiler/Pipelines/Pipelines.h"
+
+// TODO: Remove these once rolled up into explicit registration.
+#include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -62,6 +65,12 @@ inline void registerAllIreePasses() {
   IREE::VM::registerVMTestPasses();
   IREE::VMVX::registerVMVXPasses();
   registerIREEVMTransformPassPipeline();
+
+  // We have some dangling passes that don't use explicit
+  // registration and that we need to force instantiation
+  // of in order to register.
+  // TODO: Eliminate these.
+  IREE::VM::createConvertVMToEmitCPass();
 }
 }  // namespace iree_compiler
 }  // namespace mlir

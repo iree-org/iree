@@ -69,6 +69,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Dialect::VM::Analysis
+    iree::compiler::Dialect::VM::Conversion::VMToEmitC
     iree::compiler::Dialect::VM::IR
     iree::compiler::Dialect::VM::Transforms
     iree::compiler::Dialect::Vulkan::IR
@@ -77,8 +78,7 @@ iree_cc_library(
     iree::compiler::InputConversion::TMTensor
     iree::compiler::InputConversion::TOSA
     iree::compiler::ConstEval
-    iree::compiler::Translation::HALExecutable
-    iree::compiler::Translation::IREEVM
+    iree::compiler::Pipelines
   PUBLIC
 )
 
@@ -207,28 +207,15 @@ endif()
 
 iree_cc_library(
   NAME
-    init_translations
+    iree_compile_lib
   HDRS
-    "init_translations.h"
-  DEPS
-    iree::compiler::Translation::HALExecutable
-    iree::compiler::Translation::IREEVM
-    MLIRSPIRVTranslateRegistration
-)
-
-iree_cc_library(
-  NAME
-    iree_translate_lib
-  HDRS
-    "iree_translate_lib.h"
+    "iree_compile_lib.h"
   SRCS
     "iree_compile_lib.cc"
-    "iree_translate_lib.cc"
   DEPS
     ::init_llvmir_translations
     ::init_passes_and_dialects
     ::init_targets
-    ::init_translations
     LLVMSupport
     MLIRIR
     MLIRSCFTransforms
@@ -236,15 +223,12 @@ iree_cc_library(
     MLIRPass
     MLIRSupport
     MLIRTargetLLVMIRExport
-    MLIRTranslateLib
     iree::compiler::Codegen::Codegen
     iree::compiler::ConstEval
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Target::init_targets
     iree::compiler::Dialect::VM::Target::C
     iree::compiler::Pipelines
-    iree::compiler::Translation::HALExecutable
-    iree::compiler::Translation::IREEVM
     iree::compiler::Utils
   PUBLIC
 )

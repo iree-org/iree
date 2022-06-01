@@ -46,9 +46,9 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
+#include "iree/compiler/Pipelines/Pipelines.h"
 #include "iree/compiler/Tools/init_dialects.h"
 #include "iree/compiler/Tools/init_targets.h"
-#include "iree/compiler/Translation/IREEVM.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
@@ -519,10 +519,16 @@ extern "C" int main(int argc, char** argv) {
   mlir::iree_compiler::registerAllDialects(registry);
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
-  mlir::iree_compiler::registerIREEVMTranslationFlags();
   mlir::registerLLVMDialectTranslation(registry);
   // Make sure command line options are registered.
+  // Flag options structs (must resolve prior to CLI parsing).
+  (void)mlir::iree_compiler::BindingOptions::FromFlags::get();
+  (void)mlir::iree_compiler::InputDialectOptions::FromFlags::get();
+  (void)mlir::iree_compiler::HighLevelOptimizationOptions::FromFlags::get();
+  (void)mlir::iree_compiler::SchedulingOptions::FromFlags::get();
   (void)mlir::iree_compiler::IREE::HAL::TargetOptions::FromFlags::get();
+  (void)mlir::iree_compiler::IREE::VM::TargetOptions::FromFlags::get();
+  (void)mlir::iree_compiler::IREE::VM::BytecodeTargetOptions::FromFlags::get();
 
   // Register MLIRContext command-line options like
   // -mlir-print-op-on-diagnostic.

@@ -1,4 +1,7 @@
-// RUN: iree-translate --split-input-file --mlir-print-ir-after=iree-hal-serialize-executables --iree-mlir-to-hal-executable --iree-hal-target-backends=vmvx %s --o=/dev/null 2>&1 | FileCheck %s
+// RUN: iree-compile --compile-mode=hal-executable \
+// RUN:   --mlir-print-ir-after=iree-hal-serialize-executables \
+// RUN:   --iree-hal-target-backends=vmvx %s \
+// RUN:   --o=/dev/null 2>&1 | FileCheck %s
 
 // Each entry point has a layout specification indicating the total number of
 // push constants available and the descriptor sets and their bindings.
