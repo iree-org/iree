@@ -98,8 +98,7 @@ all built tests through
 [CTest](https://gitlab.kitware.com/cmake/community/-/wikis/doc/ctest/Testing-With-CTest):
 
 ``` shell
-cd ../iree-build-android/
-ctest --output-on-failure
+ctest --test-dir ../iree-build-android/ --output-on-failure
 ```
 
 This will automatically upload build artifacts to the connected Android device,

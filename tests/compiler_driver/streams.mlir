@@ -1,4 +1,7 @@
-// RUN: iree-compile --split-input-file --iree-hal-target-backends=vmvx --iree-mlir-to-vm-bytecode-module --iree-vm-bytecode-module-output-format=flatbuffer-text %s --mlir-print-ir-after=iree-vm-ordinal-allocation 2>&1 | FileCheck %s
+// RUN: iree-compile --split-input-file --iree-hal-target-backends=vmvx \
+// RUN:   --output-format=vm-bytecode \
+// RUN:   --iree-vm-bytecode-module-output-format=flatbuffer-text %s \
+// RUN:   --mlir-print-ir-after=iree-vm-ordinal-allocation 2>&1 | FileCheck %s
 
 // This file has a few test programs that show how to mix `flow` dispatches into
 // those created by the `linalg` dispatch region formation: the idea is to use

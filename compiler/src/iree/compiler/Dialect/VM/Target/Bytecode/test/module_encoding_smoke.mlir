@@ -1,4 +1,5 @@
-// RUN: iree-translate --split-input-file --iree-vm-ir-to-bytecode-module --iree-vm-bytecode-module-output-format=flatbuffer-text %s | FileCheck %s
+// RUN: iree-compile --split-input-file --compile-mode=vm \
+// RUN: --iree-vm-bytecode-module-output-format=flatbuffer-text %s | FileCheck %s
 
 // CHECK: "name": "simple_module"
 vm.module @simple_module {

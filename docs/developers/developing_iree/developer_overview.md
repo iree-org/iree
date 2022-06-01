@@ -127,23 +127,6 @@ $ ../iree-build/tools/iree-compile \
   -o /tmp/simple_abs_vmvx.vmfb
 ```
 
-# iree-translate
-
-This is the IREE equivalent of MLIR's translation tool, which is used for
-testing translations between supported formats. It is used by various unit
-tests which are testing these features in isolation (outside of the main
-compiler driver).
-
-See
-[mlir-translate](https://github.com/llvm/llvm-project/tree/master/mlir/tools/mlir-translate),
-see "translation" in
-[MLIR's Glossary](https://mlir.llvm.org/getting_started/Glossary/#translation)
-for more information.
-
-Custom translations may also be layered on top of `iree-translate`, see
-[samples/custom_modules/dialect](https://github.com/google/iree/blob/main/samples/custom_modules/dialect)
-for a sample.
-
 ### iree-run-module
 
 The `iree-run-module` program takes an already translated IREE module as input

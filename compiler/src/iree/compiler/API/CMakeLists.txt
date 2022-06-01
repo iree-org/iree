@@ -59,7 +59,7 @@ add_mlir_public_c_api_library(IREECompilerCAPILib
     iree::compiler::Tools::init_targets
 
     # Tools.
-    iree::compiler::Tools::iree_translate_lib
+    iree::compiler::Tools::iree_compile_lib
 
     ${_OPTIONAL_LINK_LIBS}
 )
