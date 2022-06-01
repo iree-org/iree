@@ -5,7 +5,12 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Generates a compilation flagfile for iree-compiler."""
+"""Generates a compilation flagfile for iree-compiler.
+
+This tool is added due to CMake's incapabilities on generating files with
+multiple lines. CMake's configure_file doesn't work in our case as it can't be
+triggered from a target.
+"""
 
 import argparse
 

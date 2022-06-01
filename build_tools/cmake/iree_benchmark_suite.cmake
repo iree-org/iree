@@ -345,7 +345,8 @@ function(iree_benchmark_suite)
       # generated artifacts.
       set(_COMPILATION_FLAGFILE "${_RUN_SPEC_DIR}/compilation_flagfile")
       # Generate the flagfile with python command. We can't use "file" because
-      # it can't be part of a target's dependency and generated lazily.
+      # it can't be part of a target's dependency and generated lazily. And
+      # "cmake -E echo" doesn't work with newlines.
       add_custom_command(
         OUTPUT "${_COMPILATION_FLAGFILE}"
         COMMAND
