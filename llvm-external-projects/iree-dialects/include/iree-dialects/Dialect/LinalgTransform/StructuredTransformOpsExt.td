@@ -81,29 +81,6 @@ def GeneralizeOp : Op<Transform_Dialect, "structured2.generalize",
   }];
 }
 
-def InterchangeOp : Op<Transform_Dialect, "structured2.interchange",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     TransformEachOpTrait,
-     TransformOpInterface]> {
-  let description = [{Interchanges the iterators of the operations pointed to
-  by the target handle using the iterator interchange attribute.}];
-
-  let arguments =
-    (ins PDL_Operation:$target,
-         DefaultValuedAttr<I64ArrayAttr, "{}">:$iterator_interchange);
-  let results = (outs PDL_Operation:$transformed);
-
-  let assemblyFormat = "$target attr-dict";
-  let hasVerifier = 1;
-  let cppNamespace = "transform_ext";
-
-  let extraClassDeclaration = [{
-    ::mlir::FailureOr<::mlir::linalg::LinalgOp> applyToOne(
-        ::mlir::linalg::LinalgOp target);
-  }];
-}
-
 def PadOp : Op<Transform_Dialect, "structured2.pad",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,

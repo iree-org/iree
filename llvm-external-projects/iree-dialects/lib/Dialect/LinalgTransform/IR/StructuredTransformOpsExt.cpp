@@ -803,49 +803,6 @@ FailureOr<LinalgOp> transform_ext::GeneralizeOp::applyToOne(LinalgOp target) {
 }
 
 //===---------------------------------------------------------------------===//
-// InterchangeOp
-//===---------------------------------------------------------------------===//
-
-FailureOr<LinalgOp> transform_ext::InterchangeOp::applyToOne(LinalgOp target) {
-  SmallVector<unsigned> interchangeVector =
-      extractUIntArray(getIteratorInterchange());
-  // Exit early if no transformation is needed.
-  if (interchangeVector.empty())
-    return target;
-
-  auto genericTarget = dyn_cast<GenericOp>(target.getOperation());
-  if (!genericTarget) {
-    InFlightDiagnostic diag = emitOpError()
-                              << "applies to " << GenericOp::getOperationName()
-                              << " ops";
-    diag.attachNote(target.getLoc()) << "attempted to apply to this op";
-    return diag;
-  }
-
-  GenericOpInterchangePattern pattern(getContext(), interchangeVector);
-  SimpleRewriter rewriter(getContext());
-  rewriter.setInsertionPoint(target);
-  FailureOr<GenericOp> result =
-      pattern.returningMatchAndRewrite(genericTarget, rewriter);
-  if (failed(result))
-    return failure();
-  return cast<LinalgOp>(result->getOperation());
-}
-
-LogicalResult transform_ext::InterchangeOp::verify() {
-  SmallVector<unsigned> permutation =
-      extractUIntArray(getIteratorInterchange());
-  auto sequence = llvm::to_vector(llvm::seq<unsigned>(0, permutation.size()));
-  if (!std::is_permutation(sequence.begin(), sequence.end(),
-                           permutation.begin(), permutation.end())) {
-    return emitOpError()
-           << "expects iterator_interchange to be a permutation, found "
-           << getIteratorInterchange();
-  }
-  return success();
-}
-
-//===---------------------------------------------------------------------===//
 // PadOp
 //===---------------------------------------------------------------------===//
 
