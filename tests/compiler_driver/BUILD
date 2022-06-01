@@ -25,7 +25,7 @@ iree_lit_test_suite(
         ],
         include = ["*.mlir"],
     ),
-    cfg = "//compiler:lit.cfg.py",
+    cfg = "//tests:lit.cfg.py",
     tools = [
         "//tools:iree-compile",
         "@llvm-project//llvm:FileCheck",

@@ -521,7 +521,14 @@ extern "C" int main(int argc, char** argv) {
   mlir::iree_compiler::registerVMTargets();
   mlir::registerLLVMDialectTranslation(registry);
   // Make sure command line options are registered.
+  // Flag options structs (must resolve prior to CLI parsing).
+  (void)mlir::iree_compiler::BindingOptions::FromFlags::get();
+  (void)mlir::iree_compiler::InputDialectOptions::FromFlags::get();
+  (void)mlir::iree_compiler::HighLevelOptimizationOptions::FromFlags::get();
+  (void)mlir::iree_compiler::SchedulingOptions::FromFlags::get();
   (void)mlir::iree_compiler::IREE::HAL::TargetOptions::FromFlags::get();
+  (void)mlir::iree_compiler::IREE::VM::TargetOptions::FromFlags::get();
+  (void)mlir::iree_compiler::IREE::VM::BytecodeTargetOptions::FromFlags::get();
 
   // Register MLIRContext command-line options like
   // -mlir-print-op-on-diagnostic.
