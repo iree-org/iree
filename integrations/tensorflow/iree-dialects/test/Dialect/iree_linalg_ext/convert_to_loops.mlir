@@ -719,3 +719,47 @@ func.func @topk_memref_dynamic(%input_values: memref<?x?xf32>, %input_indices: m
 // CHECK:               %[[D15:.+]] = arith.select %[[D7]], %[[D5]], %[[ARG7]] : f32
 // CHECK:               %[[D16:.+]] = arith.select %[[D12]], %[[D6]], %[[ARG8]] : i32
 // CHECK:               scf.yield %[[D15]], %[[D16]] : f32, i32
+
+// -----
+
+func.func @topk_memref_optional(%input_values: memref<2x10xf32>, %out_values: memref<2x3xf32>, %out_indices: memref<2x3xi32>) {
+  iree_linalg_ext.topk
+        dimension(1)
+        ins(%input_values : memref<2x10xf32>)
+        outs(%out_values, %out_indices : memref<2x3xf32>, memref<2x3xi32>) {
+        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        }
+  return
+}
+
+// CHECK-LABEL: func.func @topk_memref
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:     %[[C10:.+]] = arith.constant 10 : index
+// CHECK-DAG:     %[[C3:.+]] = arith.constant 3 : index
+// CHECK:         scf.for %[[ARG3:.+]] = %[[C0]] to %[[C2]] step %[[C1]]
+// CHECK:           scf.for %[[ARG4:.+]] = %[[C0]] to %[[C10]] step %[[C1]]
+// CHECK:             %[[D0:.+]] = memref.load %[[ARG0]][%[[ARG3]], %[[ARG4]]]
+// CHECK:             %[[D1:.+]] = arith.index_cast %[[ARG4]] : index to i32
+// CHECK:             %[[D2:.+]]:2 = scf.for %[[ARG5:.+]] = %[[C0]] to %[[C3]] step %[[C1]] iter_args(%[[ARG6:.+]] = %[[D0]], %[[ARG7:.+]] = %[[D1]])
+// CHECK:               %[[D3:.+]] = memref.load %[[ARG1]][%[[ARG3]], %[[ARG5]]]
+// CHECK:               %[[D4:.+]] = memref.load %[[ARG2]][%[[ARG3]], %[[ARG5]]]
+// CHECK:               %[[D5:.+]] = arith.cmpf ogt, %[[ARG6]], %[[D3]] : f32
+// CHECK:               %[[D6:.+]] = arith.cmpf ogt, %[[D3]], %[[ARG6]] : f32
+// CHECK:               %[[D7:.+]] = arith.cmpi eq, %[[D5]], %[[D6]] : i1
+// CHECK:               %[[D8:.+]] = arith.cmpi slt, %[[ARG7]], %[[D4]] : i32
+// CHECK:               %[[D9:.+]] = arith.andi %[[D7]], %[[D8]] : i1
+// CHECK:               %[[D10:.+]] = arith.ori %[[D5]], %[[D9]] : i1
+// CHECK:               %[[D11:.+]] = arith.select %[[D5]], %[[ARG6]], %[[D3]] : f32
+// CHECK:               %[[D12:.+]] = arith.select %[[D10]], %[[ARG7]], %[[D4]] : i32
+// CHECK:               memref.store %[[D11]], %[[ARG1]][%[[ARG3]], %[[ARG5]]]
+// CHECK:               memref.store %[[D12]], %[[ARG2]][%[[ARG3]], %[[ARG5]]]
+// CHECK:               %[[D13:.+]] = arith.select %[[D5]], %[[D3]], %[[ARG6]] : f32
+// CHECK:               %[[D14:.+]] = arith.select %[[D10]], %[[D4]], %[[ARG7]] : i32
+// CHECK:               scf.yield %[[D13]], %[[D14]] : f32, i32
