@@ -21,7 +21,7 @@ namespace Flow {
 
 static llvm::cl::opt<bool> clFuseTranspose(
     "iree-flow-fuse-transpose", llvm::cl::desc("Enable fusing transpose"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 /// For the fusion of root op -> elementwise operation to be bufferized
 /// in-place without use of extra memory, the result of the root operation

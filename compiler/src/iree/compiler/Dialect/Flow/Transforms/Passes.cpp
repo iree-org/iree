@@ -91,7 +91,7 @@ static llvm::cl::opt<std::string> clMmt4dTargetOptions(
 static llvm::cl::opt<bool> clNormalizeInputIndexingMap(
     "iree-flow-normalize-input-indexing-map",
     llvm::cl::desc("Enable normalizing input indexing map to identity"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 namespace mlir {
 namespace iree_compiler {
