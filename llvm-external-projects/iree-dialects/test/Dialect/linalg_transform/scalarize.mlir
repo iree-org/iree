@@ -27,7 +27,7 @@ transform.with_pdl_patterns {
     // This test checks the proper handling of the scalarize dims attribute.
     // The first dimension does not divide but we can always scalarize a `?` into `1`
     // and enable vectorization of a lower-rank op this way.
-    %tiled_linalg_op_0 = transform.structured.scalarize %tiled_linalg_op
-    transform.structured.vectorize {vectorize_padding = false}
+    %tiled_linalg_op_0 = transform.structured2.scalarize %tiled_linalg_op
+    transform.structured2.vectorize {vectorize_padding = false}
   }
 }

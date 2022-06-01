@@ -30,7 +30,7 @@ transform.with_pdl_patterns {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg1
     %1, %loops:3 = transform.structured.tile %0 {sizes = [4, 4, 4]}
-    %2 = transform.structured.vectorize %1 {vectorize_padding = true}
+    %2 = transform.structured2.vectorize %1 {vectorize_padding = true}
     bufferize
     lower_vectors { multireduction_lowering = "innerreduce"}
     lower_to_llvm

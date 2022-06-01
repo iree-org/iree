@@ -42,7 +42,7 @@ def CanonicalizedSequenceOp
 
 //===----------------------------------------------------------------------===//
 
-def ScalarizeOp : Op<Transform_Dialect, "structured.scalarize",
+def ScalarizeOp : Op<Transform_Dialect, "structured2.scalarize",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformEachOpTrait,
@@ -89,7 +89,7 @@ def FuseOp : Op<Transform_Dialect, "structured.fuse",
   let cppNamespace = "transform_ext";
 }
 
-def GeneralizeOp : Op<Transform_Dialect, "structured.generalize",
+def GeneralizeOp : Op<Transform_Dialect, "structured2.generalize",
     [FunctionalStyleTransformOpTrait, 
      MemoryEffectsOpInterface,
      TransformOpInterface,
@@ -109,7 +109,7 @@ def GeneralizeOp : Op<Transform_Dialect, "structured.generalize",
   }];
 }
 
-def InterchangeOp : Op<Transform_Dialect, "structured.interchange",
+def InterchangeOp : Op<Transform_Dialect, "structured2.interchange",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformEachOpTrait,
@@ -132,7 +132,7 @@ def InterchangeOp : Op<Transform_Dialect, "structured.interchange",
   }];
 }
 
-def PadOp : Op<Transform_Dialect, "structured.pad",
+def PadOp : Op<Transform_Dialect, "structured2.pad",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformEachOpTrait,
@@ -181,7 +181,7 @@ def DecomposeOp : Op<Transform_Dialect, "structured.decompose",
   let cppNamespace = "transform_ext";
 }
 
-def VectorizeOp : Op<Transform_Dialect, "structured.vectorize",
+def VectorizeOp : Op<Transform_Dialect, "structured2.vectorize",
      [DeclareOpInterfaceMethods<TransformOpInterface>,
       FunctionalStyleMultiOperandMultiResultTransformOpTrait,
       MemoryEffectsOpInterface]> {
