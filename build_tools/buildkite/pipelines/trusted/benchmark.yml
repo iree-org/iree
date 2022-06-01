@@ -4,10 +4,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Note: this runs on trusted agents, since we want the authorization checks to
-# themselves be run on trusted agents. The pipeline itself is uploaded from
-# the main repository via bootstrap-trusted.yml and it fetches the scripts only
-# from the main repository.
+# Note: this runs on trusted agents, since it needs access to post a PR
+# comment. The pipeline itself is uploaded from the main repository via
+# bootstrap-trusted.yml and it fetches the scripts only from the main
+# repository.
 agents:
   queue: "orchestration"
   security: "trusted"
