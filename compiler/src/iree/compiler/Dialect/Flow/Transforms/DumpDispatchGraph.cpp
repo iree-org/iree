@@ -357,7 +357,7 @@ class PrintOpPass : public DumpDispatchGraphBase<PrintOpPass> {
     if (op->getNumRegions() == 1) {
       // do not generate a cluster when there is one region.
       processRegion(op->getRegion(0));
-    } else if (op->getNumRegions() > 0) {
+    } else if (op->getNumRegions() > 1) {
       // Emit cluster for op with regions.
       node = emitClusterStmt(
           [&]() {
