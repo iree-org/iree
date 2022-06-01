@@ -23,9 +23,7 @@ include(CMakeParseArguments)
 #
 # Note:
 # iree_cc_binary will create a binary called ${PACKAGE_NAME}_${NAME}, e.g.
-# iree_base_foo with two alias (readonly) targets, a qualified
-# ${PACKAGE_NS}::${NAME} and an unqualified ${NAME}. Thus NAME must be globally
-# unique in the project.
+# iree_base_foo with an alias to ${PACKAGE_NS}::${NAME}.
 #
 # Usage:
 # iree_cc_library(
@@ -84,12 +82,6 @@ function(iree_cc_binary)
     if("${_RULE_NAME}" STREQUAL "${_PACKAGE_DIR}")
       add_executable(${_PACKAGE_NS} ALIAS ${_NAME})
     endif()
-
-    # Finally, since we have so few binaries and we also want to support
-    # installing from a separate host build, binaries get an unqualified global
-    # alias. This means binary names must be unique across the whole project.
-    # (We could consider making this configurable).
-    add_executable(${_RULE_NAME} ALIAS ${_NAME})
   endif()
 
   set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")

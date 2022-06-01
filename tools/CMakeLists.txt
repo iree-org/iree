@@ -4,7 +4,17 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Doesn't use bazel_to_cmake because of various special logic throughout.
+# Tools IREE provides for compiling, executing, and benchmarking programs, as
+# well as other utilities.
+#
+# Only binary targets and their associated main files should go in this
+# directory. Library targets and header files should be placed in the
+# appropriate subtree, e.g. `compiler/src/iree/compiler/Tools/`.
+#
+# Programs with a dependency on the compiler are not designed to run on device
+# platforms (e.g. Android), so they are tagged "hostonly".
+#
+# This file does not use bazel_to_cmake because of special logic throughout.
 
 # TODO(#6353): Tools has thread dependencies in gtest, benchmark, yaml, etc.
 # This should be split between runtime/compiler with optional threading support.
@@ -197,9 +207,9 @@ if(IREE_BUILD_COMPILER)
     HOSTONLY
   )
 
-  iree_cc_library(
+  iree_cc_binary(
     NAME
-      iree_opt_main
+      iree-opt
     SRCS
       "iree-opt-main.cc"
     DEPS
@@ -209,14 +219,6 @@ if(IREE_BUILD_COMPILER)
       MLIRSupport
       iree::compiler::Tools::init_passes_and_dialects
       iree::compiler::Tools::init_targets
-    PUBLIC
-  )
-
-  iree_cc_binary(
-    NAME
-      iree-opt
-    DEPS
-      ::iree_opt_main
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY

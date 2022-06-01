@@ -15,5 +15,6 @@ iree_cc_library(
 
 # Configures all iree_cc_* targets to take this implicit dep,
 # which provides common includes and copts for the tree.
-set(IREE_IMPLICIT_DEFS_CC_DEPS iree::compiler::defs)
+set(IREE_IMPLICIT_DEFS_CC_DEPS iree::compiler::src::defs)
+
 add_subdirectory(iree/compiler)
