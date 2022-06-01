@@ -46,7 +46,8 @@ class Convert1x1ConvolutionMatmulOp
     bool inputDynWidthHeight = inputShape[1] == ShapedType::kDynamicSize &&
                                inputShape[2] == ShapedType::kDynamicSize;
 
-    // We cannot collapse if the width and heigh are dynamic.
+    // We cannot merge the width and height if they are both dynamic as we
+    // cannot expand them back to their dynamic values.
     if (inputDynWidthHeight) return failure();
 
     if (filterShape[0] != 1 || filterShape[1] != 1) return failure();
