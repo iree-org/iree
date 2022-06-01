@@ -81,35 +81,6 @@ def GeneralizeOp : Op<Transform_Dialect, "structured2.generalize",
   }];
 }
 
-def PadOp : Op<Transform_Dialect, "structured2.pad",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     TransformEachOpTrait,
-     TransformOpInterface]> {
-  let description = [{Pads the operations pointed to by the target handle
-  using the options provides as operation attributes.}];
-
-  let arguments =
-    (ins PDL_Operation:$target,
-         DefaultValuedAttr<ArrayAttr, "{}">:$padding_values,
-         DefaultValuedAttr<I64ArrayAttr, "{}">:$padding_dimensions,
-         DefaultValuedAttr<I64ArrayAttr, "{}">:$pack_paddings,
-         DefaultValuedAttr<I64ArrayAttr, "{}">:$hoist_paddings,
-         DefaultValuedAttr<
-          TypedArrayAttrBase<I64ArrayAttr, "array of arrays of i64">,
-          "{}">:$transpose_paddings);
-  let results = (outs PDL_Operation:$transformed);
-
-  let assemblyFormat = "$target attr-dict";
-  let hasVerifier = 1;
-  let cppNamespace = "transform_ext";
-
-  let extraClassDeclaration = [{
-    ::mlir::FailureOr<::mlir::linalg::LinalgOp> applyToOne(
-        ::mlir::linalg::LinalgOp target);
-  }];
-}
-
 def BufferizeOp : Op<Transform_Dialect, "bufferize",
     [DeclareOpInterfaceMethods<TransformOpInterface>, 
      FunctionalStyleMultiOperandMultiResultTransformOpTrait,
