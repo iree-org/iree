@@ -77,7 +77,7 @@ transform.with_pdl_patterns {
     %0 = pdl_match @pdl_target_attrA in %arg1
     transform.structured.tile %0 {sizes = [4, 4, 4]}
     %1 = pdl_match @pdl_target_attrC in %arg1
-    transform.structured.vectorize %1
+    transform.structured2.vectorize %1
   }
 }
 
@@ -116,7 +116,7 @@ transform.with_pdl_patterns {
   transform.structured.canonicalized_sequence %arg0 {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg1
-    transform.structured.vectorize %0
+    transform.structured2.vectorize %0
   }
 }
 
@@ -141,5 +141,5 @@ func.func @vectorize_all(
 
 transform.structured.canonicalized_sequence {
 ^bb0(%arg0: !pdl.operation):
-  transform.structured.vectorize
+  transform.structured2.vectorize
 }

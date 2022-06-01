@@ -27,7 +27,7 @@ transform.with_pdl_patterns {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @target_pattern in %arg1
     // expected-error@below {{failed to apply}}
-    transform.structured.vectorize %0
+    transform.structured2.vectorize %0
   }
 }
 
@@ -144,7 +144,7 @@ transform.with_pdl_patterns {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg1
     // expected-error @below {{failed to apply}}
-    transform.structured.vectorize
+    transform.structured2.vectorize
     transform.structured.tile %0 {sizes = [32, 32, 32]}
   }
 }
