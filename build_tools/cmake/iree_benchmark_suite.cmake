@@ -281,6 +281,9 @@ function(iree_benchmark_suite)
         add_dependencies(iree-benchmark-suites
           "${_COMPILE_STATS_TRANSLATION_TARGET_NAME}"
         )
+        add_dependencies("${SUITE_SUB_TARGET}"
+          "${_COMPILE_STATS_TRANSLATION_TARGET_NAME}"
+        )
       endif()
 
       if(NOT TARGET "${_FRIENDLY_TARGET_NAME}")
