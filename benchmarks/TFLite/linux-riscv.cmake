@@ -38,6 +38,9 @@ set(LINUX_RV32_GENERIC_CPU_TRANSLATION_FLAGS
 
 # CPU, Dylib-Sync, RV64-Generic, full-inference
 iree_benchmark_suite(
+  GROUP_NAME
+    "linux-riscv"
+
   MODULES
     "${MOBILEBERT_FP32_MODULE}"
 
