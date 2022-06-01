@@ -150,10 +150,6 @@ iree_benchmark_suite(
 # INTERNAL; VK_ERROR_DEVICE_LOST; vkQueueSubmit; while invoking native function
 # hal.ex.submit_and_wait; while calling import;
 # ```
-# With current kernel performance and timeouts on Adreno Pixel 4, this means we
-# have no kernel benchmark for the DeepLabV3 and MobileBert models
-# TODO: Add kernel-execution config for DEEPLABV3_FP32_MODULE and
-# MOBILEBERT_FP32_MODULE when they can run with at least 8 repetitions.
 
 # GPU, Vulkan, Mali, kernel-execution
 iree_benchmark_suite(
