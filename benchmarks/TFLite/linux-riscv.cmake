@@ -22,7 +22,7 @@ set(LINUX_RV64_GENERIC_CPU_TRANSLATION_FLAGS
   "--iree-llvm-target-cpu=generic-rv64"
   "--iree-llvm-target-abi=lp64d"
   "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+v"
-  "--riscv-v-vector-bits-min=256"
+  "--riscv-v-vector-bits-min=512"
   "--riscv-v-fixed-length-vector-lmul-max=8"
 )
 
@@ -39,12 +39,7 @@ set(LINUX_RV32_GENERIC_CPU_TRANSLATION_FLAGS
 # CPU, Dylib-Sync, RV64-Generic, full-inference
 iree_benchmark_suite(
   MODULES
-    "${DEEPLABV3_FP32_MODULE}"
-    "${MOBILESSD_FP32_MODULE}"
-    "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
-    "${MOBILENET_V2_MODULE}"
-    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"
