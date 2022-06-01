@@ -450,10 +450,10 @@ func.func @type_mismatch(%1 : tensor<1xf32>, %out : tensor<200xf32>) -> () {
 // -----
 
 func.func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
-  // expected-error@+1 {{expected two input operands}}
+  // expected-error@+1 {{expected one or two input operands}}
   %0:2 = iree_linalg_ext.topk
         dimension(1)
-        ins(%input_indices : tensor<2x10xi32>)
+        ins(%input_indices, %input_indices, %input_indices : tensor<2x10xi32>, tensor<2x10xi32>, tensor<2x10xi32>)
         outs(%out_values, %out_indices : tensor<2x3xf32>, tensor<2x3xi32>) {
         ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32

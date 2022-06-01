@@ -619,6 +619,33 @@ func.func @topk_dynamic_tensor(%input_values: tensor<?x?xf32>, %input_indices: t
 
 // -----
 
+func.func @topk_tensor_optional(%input_values: tensor<20x10x8x4xf32>) -> (tensor<20x10x3x4xf32>, tensor<20x10x3x4xi32>) {
+  %out_values = linalg.init_tensor [20, 10, 3, 4] : tensor<20x10x3x4xf32>
+  %out_indices = linalg.init_tensor [20, 10, 3, 4] : tensor<20x10x3x4xi32>
+  %0:2 = iree_linalg_ext.topk
+        dimension(2)
+        ins(%input_values : tensor<20x10x8x4xf32>)
+        outs(%out_values, %out_indices : tensor<20x10x3x4xf32>, tensor<20x10x3x4xi32>) {
+        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        } -> tensor<20x10x3x4xf32>, tensor<20x10x3x4xi32>
+  return %0#0, %0#1 : tensor<20x10x3x4xf32>, tensor<20x10x3x4xi32>
+}
+
+// CHECK-LABEL: func.func @topk_tensor
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<20x10x8x4xf32>
+//       CHECK:   %[[OUT_VALUES:.+]] = linalg.init_tensor [20, 10, 3, 4]
+//       CHECK:   %[[OUT_INDICES:.+]] = linalg.init_tensor [20, 10, 3, 4]
+//       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.topk
+//  CHECK-SAME:      dimension(2)
+//  CHECK-SAME:      ins(%[[ARG0]]
+//  CHECK-SAME:      outs(%[[OUT_VALUES]], %[[OUT_INDICES]]
+//       CHECK:      iree_linalg_ext.yield
+//       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
 // CHECK-LABEL: func.func @static_tile
 func.func @static_tile(%chunk_size: index, %in: tensor<?xf32>, %out: tensor<?xf32>, %out2: tensor<?xf32>) -> (tensor<?xf32>) {
   %c0 = arith.constant 0: index
