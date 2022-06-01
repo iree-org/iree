@@ -247,6 +247,8 @@ class DumpDispatchGraphPass
     return Node(nodeId);
   }
 
+  void printDispatchBody(raw_ostream &os, DispatchOp *op, AsmState &state) {}
+
   void printOperands(raw_ostream &os, ::mlir::Operation::operand_range operands,
                      AsmState &state) {
     for (unsigned i = 0, e = operands.size(); i != e; ++i) {
@@ -297,6 +299,8 @@ class DumpDispatchGraphPass
           os << "(";
           printOperands(os, dispatch.operands(), state);
           os << ")\n";
+
+          printDispatchBody(os, dispatch, state);
 
         } else {
           os << "\n";
