@@ -202,6 +202,12 @@ def ConvertToLLVM :
   let constructor = "mlir::iree_compiler::createConvertToLLVMPass()";
 }
 
+def LLVMCPUCheckLinalgVectorized :
+    Pass<"iree-llvmcpu-check-linalg-vectorized", "func::FuncOp"> {
+  let summary = "Checks all Linalg ops are vectorized";
+  let constructor = "mlir::iree_compiler::createLLVMCPUCheckLinalgVectorizedPass()";
+}
+
 def LLVMCPUCheckIRBeforeLLVMConversion :
     Pass<"iree-llvmcpu-check-ir-before-llvm-conversion", "ModuleOp"> {
   let summary = "Checks CPU backend specific IR constraints (like no allocas)";
