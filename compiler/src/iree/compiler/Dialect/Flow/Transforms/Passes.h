@@ -189,6 +189,10 @@ std::unique_ptr<Pass> createSplitReductionPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createStripAndSplatConstantVariablesPass();
 
+/// Creates a pass to dump a graph for dispatches
+std::unique_ptr<Pass> createDumpDispatchGraphPass(
+    raw_ostream &os = llvm::errs());
+
 //===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//

@@ -10,11 +10,13 @@
 
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
+#include "llvm/Support/ToolOutputFile.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
+#include "mlir/Support/FileUtilities.h"
 #include "mlir/Transforms/Passes.h"
 
 // TODO(ravishankarm): Change to a pipeline option.
@@ -92,6 +94,15 @@ static llvm::cl::opt<bool> clNormalizeInputIndexingMap(
     "iree-flow-normalize-input-indexing-map",
     llvm::cl::desc("Enable normalizing input indexing map to identity"),
     llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clDumpDispatchGraph(
+    "iree-flow-dump-dispatch-graph",
+    llvm::cl::desc("Dump a dot graph for dispatches"), llvm::cl::init(false));
+
+static llvm::cl::opt<std::string> clDumpDispatchGraphOutputFile(
+    "iree-flow-dump-dispatch-graph-output-file",
+    llvm::cl::desc("Output file name for a dispatch graph dump"),
+    llvm::cl::init("dispatch.dot"));
 
 namespace mlir {
 namespace iree_compiler {
@@ -238,6 +249,20 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // Module pass to outline the dispatch regions into their own functions
   // wrapped in executables.
   passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
+
+  /// Print the dispatch graph in the Graphviz format.
+  if (clDumpDispatchGraph) {
+    std::string errorMessage;
+    static auto dotFile =
+        openOutputFile(clDumpDispatchGraphOutputFile, &errorMessage);
+    if (!dotFile) {
+      llvm::errs() << errorMessage << "\n";
+    } else {
+      passManager.addPass(
+          IREE::Flow::createDumpDispatchGraphPass(dotFile->os()));
+      dotFile->keep();
+    }
+  }
 
   // Strip assertions from executables. We could support them with a bunch of
   // work but our generated executables are designed to be safe in the face of
