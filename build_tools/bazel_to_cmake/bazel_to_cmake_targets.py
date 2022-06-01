@@ -237,10 +237,9 @@ def convert_target(target):
     return _convert_iree_dialects_target(target)
 
   # IREE root paths map to package names based on explicit rules.
-  #   * compiler/src/iree/ and runtime/src/iree/ are special and get trimmed
-  #     to just 'iree'
-  #   * tools/ is also special so that original (non-aliased) target names
-  #     appear without a namespace
+  #   * src/iree/ directories (compiler/src/iree/ and runtime/src/iree/)
+  #     creating their own root paths by trimming down to just "iree"
+  #   * tools/ uses an empty root, for binary targets names like "iree-compile"
   #   * other top level directories add back an 'iree' prefix
   # If changing these, make the corresponding change in iree_macros.cmake
   # (iree_package_ns function).
