@@ -731,26 +731,6 @@ public:
 };
 } // namespace
 
-//===----------------------------------------------------------------------===//
-// ScalarizeOp
-//===----------------------------------------------------------------------===//
-
-FailureOr<LinalgOp> transform_ext::ScalarizeOp::applyToOne(LinalgOp target) {
-  LinalgTilingOptions tilingOptions;
-  tilingOptions.scalarizeDynamicDims();
-  // Tiling with "scalarize_dyn_dims" actually sets the same lambda as the tile
-  // sizes and asserts that it is not already set.
-  SmallVector<int64_t> emptyTileSizes;
-  LinalgTilingPattern pattern(getContext(), tilingOptions);
-  SimpleRewriter rewriter(getContext());
-  rewriter.setInsertionPoint(target);
-  FailureOr<TiledLinalgOp> result =
-      pattern.returningMatchAndRewrite(target, rewriter);
-  if (failed(result))
-    return failure();
-  return result->op;
-}
-
 //===---------------------------------------------------------------------===//
 // FuseOp
 //===---------------------------------------------------------------------===//

@@ -42,34 +42,6 @@ def CanonicalizedSequenceOp
 
 //===----------------------------------------------------------------------===//
 
-def ScalarizeOp : Op<Transform_Dialect, "structured2.scalarize",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     TransformEachOpTrait,
-     TransformOpInterface]> {
-  let description = [{Indicates that ops of a specific kind in the given
-    function should be scalarized (i.e. their dynamic dimensions tiled by 1).
-
-    This operation returns the tiled op but not the loops.
-
-    We make this design choice because it is hard to know ahead of time the
-    number of loops that will be produced (it depends on the number of
-    dynamic dimensions after multiple transformations have been applied).
-  }];
-
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$result);
-
-  let assemblyFormat = "$target attr-dict";
-
-  let extraClassDeclaration = [{
-    ::mlir::FailureOr<::mlir::linalg::LinalgOp> applyToOne(
-        ::mlir::linalg::LinalgOp target);
-  }];
-
-  let cppNamespace = "transform_ext";
-}
-
 def FuseOp : Op<Transform_Dialect, "structured.fuse",
     [FunctionalStyleMultiOperandMultiResultTransformOpTrait, 
      MemoryEffectsOpInterface,
