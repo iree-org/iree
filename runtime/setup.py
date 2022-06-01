@@ -259,23 +259,21 @@ def prepare_installation():
     else:
       print(f"Not re-configuring (already configured)", file=sys.stderr)
 
-    # Build.
-    subprocess.check_call(
-        ["cmake", "--build", ".", "--target", "runtime/bindings/python/all"],
-        cwd=IREE_BINARY_DIR)
+    # Build. Since we have restricted to just the runtime, build everything
+    # so as to avoid fragility with more targeted selection criteria.
+    subprocess.check_call(["cmake", "--build", "."], cwd=IREE_BINARY_DIR)
     print("Build complete.", file=sys.stderr)
 
-  # Install the directory we care about.
-  install_subdirectory = os.path.join(IREE_BINARY_DIR, "runtime", "bindings",
-                                      "python")
+  # Install the component we care about.
   install_args = [
       "-DCMAKE_INSTALL_DO_STRIP=ON",
       f"-DCMAKE_INSTALL_PREFIX={CMAKE_INSTALL_DIR_ABS}/",
+      f"-DCMAKE_INSTALL_COMPONENT=IreePythonPackage-runtime",
       "-P",
-      os.path.join(install_subdirectory, "cmake_install.cmake"),
+      os.path.join(IREE_BINARY_DIR, "cmake_install.cmake"),
   ]
   print(f"Installing with: {install_args}", file=sys.stderr)
-  subprocess.check_call(["cmake"] + install_args, cwd=install_subdirectory)
+  subprocess.check_call(["cmake"] + install_args, cwd=IREE_BINARY_DIR)
 
   # Write version.py directly into install dir.
   version_py_file = os.path.join(CMAKE_INSTALL_DIR_ABS, "python_packages",

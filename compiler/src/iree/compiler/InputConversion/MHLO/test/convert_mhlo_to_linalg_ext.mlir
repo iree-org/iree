@@ -542,3 +542,51 @@ func.func @reverse_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 // CHECK-SAME:     ins(%[[IN]] : tensor<?x?xi32>)
 // CHECK-SAME:     outs(%[[INIT]] : tensor<?x?xi32>) : tensor<?x?xi32>
 // CHECK:        return %[[REV]]
+
+// -----
+
+func.func @chlo_top_k_int(%arg : tensor<16x16xi32>) -> (tensor<16x8xi32>, tensor<16x8xi32>) {
+  %1:2 = chlo.top_k(%arg, k=8) : tensor<16x16xi32> -> (tensor<16x8xi32>, tensor<16x8xi32>)
+  return %1#0, %1#1 : tensor<16x8xi32>, tensor<16x8xi32>
+}
+
+// CHECK:       func.func @chlo_top_k_int
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK:        %[[D2:.+]] = linalg.init_tensor [16, 8] : tensor<16x8xi32>
+// CHECK:        %[[D3:.+]] = linalg.init_tensor [16, 8] : tensor<16x8xi32>
+// CHECK-DAG:    %[[CNEG:.+]] = arith.constant -2147483648 : i32
+// CHECK-DAG:    %[[CPOS:.+]] = arith.constant 2147483647 : i32
+// CHECK-DAG:    %[[D4:.+]] = linalg.fill ins(%[[CNEG]] : i32) outs(%[[D2]]
+// CHECK-DAG:    %[[D5:.+]] = linalg.fill ins(%[[CPOS]] : i32) outs(%[[D3]]
+// CHECK:        %[[D6:.+]]:2 = iree_linalg_ext.topk
+// CHECK-SAME:     dimension(1)
+// CHECK-SAME:     ins(%[[ARG0]]
+// CHECK-SAME:     outs(%[[D4]], %[[D5]]
+// CHECK:        ^bb0(%[[ARG1:.+]]: i32, %[[ARG2:.+]]: i32)
+// CHECK:        %[[D7:.+]] = arith.cmpi sge, %[[ARG1]], %[[ARG2]] : i32
+// CHECK:        iree_linalg_ext.yield %[[D7]] : i1
+// CHECK:        return %[[D6]]#0, %[[D6]]#1
+
+// -----
+
+func.func @chlo_top_k_float(%arg : tensor<16x16xf32>) -> (tensor<16x8xf32>, tensor<16x8xi32>) {
+  %1:2 = chlo.top_k(%arg, k=8) : tensor<16x16xf32> -> (tensor<16x8xf32>, tensor<16x8xi32>)
+  return %1#0, %1#1 : tensor<16x8xf32>, tensor<16x8xi32>
+}
+
+// CHECK:       func.func @chlo_top_k_float
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK:        %[[D2:.+]] = linalg.init_tensor [16, 8] : tensor<16x8xf32>
+// CHECK:        %[[D3:.+]] = linalg.init_tensor [16, 8] : tensor<16x8xi32>
+// CHECK-DAG:    %[[CNEG:.+]] = arith.constant 0xFF800000 : f32
+// CHECK-DAG:    %[[CPOS:.+]] = arith.constant 2147483647 : i32
+// CHECK-DAG:    %[[D4:.+]] = linalg.fill ins(%[[CNEG]] : f32) outs(%[[D2]]
+// CHECK-DAG:    %[[D5:.+]] = linalg.fill ins(%[[CPOS]] : i32) outs(%[[D3]]
+// CHECK:        %[[D6:.+]]:2 = iree_linalg_ext.topk
+// CHECK-SAME:     dimension(1)
+// CHECK-SAME:     ins(%[[ARG0]]
+// CHECK-SAME:     outs(%[[D4]], %[[D5]]
+// CHECK:        ^bb0(%[[ARG1:.+]]: f32, %[[ARG2:.+]]: f32)
+// CHECK:        %[[D7:.+]] = arith.cmpf ogt, %[[ARG1]], %[[ARG2]] : f32
+// CHECK:        iree_linalg_ext.yield %[[D7]] : i1
+// CHECK:        return %[[D6]]#0, %[[D6]]#1

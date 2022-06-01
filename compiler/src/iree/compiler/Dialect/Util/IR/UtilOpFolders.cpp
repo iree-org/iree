@@ -447,7 +447,9 @@ struct InlineConstantGlobalInitializer
     op.walk([&](GlobalStoreOp storeOp) {
       Attribute valueAttr;
       if (!matchPattern(storeOp.value(), m_Constant(&valueAttr))) return;
-      auto globalOp = storeOp.getGlobalOp();
+      auto globalOp =
+          SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
+              storeOp->getParentOp(), storeOp.globalAttr());
       rewriter.updateRootInPlace(globalOp, [&]() {
         if (valueAttr && !valueAttr.isa<UnitAttr>()) {
           globalOp.initial_valueAttr(valueAttr);

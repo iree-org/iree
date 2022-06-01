@@ -144,7 +144,7 @@ class VMVXTargetBackend final : public TargetBackend {
         std::move(moduleData));
 
     // Add the binary data to the target executable.
-    // NOTE: this snapshots the flatbuffer builder data at the time it is called
+    // NOTE: this snapshots the FlatBuffer builder data at the time it is called
     // and future changes to the target op will not be observed.
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         variantOp.getLoc(), variantOp.sym_name(),

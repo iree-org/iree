@@ -99,14 +99,14 @@ $ ../iree-build/tools/iree-opt \
 
 For a more complex example, here's how to run IREE's complete transformation
 pipeline targeting the VMVX backend on the
-[fullyconnected.mlir](https://github.com/google/iree/blob/main/iree/test/e2e/models/fullyconnected.mlir)
+[fullyconnected.mlir](https://github.com/google/iree/blob/main/tests/e2e/models/fullyconnected.mlir)
 model file:
 
 ```shell
 $ ../iree-build/tools/iree-opt \
   --iree-transformation-pipeline \
   --iree-hal-target-backends=vmvx \
-  $PWD/iree/test/e2e/models/fullyconnected.mlir
+  $PWD/tests/e2e/models/fullyconnected.mlir
 ```
 
 Custom passes may also be layered on top of `iree-opt`, see
@@ -126,23 +126,6 @@ $ ../iree-build/tools/iree-compile \
   $PWD/samples/models/simple_abs.mlir \
   -o /tmp/simple_abs_vmvx.vmfb
 ```
-
-# iree-translate
-
-This is the IREE equivalent of MLIR's translation tool, which is used for
-testing translations between supported formats. It is used by various unit
-tests which are testing these features in isolation (outside of the main
-compiler driver).
-
-See
-[mlir-translate](https://github.com/llvm/llvm-project/tree/master/mlir/tools/mlir-translate),
-see "translation" in
-[MLIR's Glossary](https://mlir.llvm.org/getting_started/Glossary/#translation)
-for more information.
-
-Custom translations may also be layered on top of `iree-translate`, see
-[samples/custom_modules/dialect](https://github.com/google/iree/blob/main/samples/custom_modules/dialect)
-for a sample.
 
 ### iree-run-module
 
@@ -175,7 +158,7 @@ $ ../iree-build/tools/iree-compile \
   --iree-input-type=mhlo \
   --iree-mlir-to-vm-bytecode-module \
   --iree-hal-target-backends=vmvx \
-  $PWD/iree/test/e2e/xla_ops/abs.mlir \
+  $PWD/tests/e2e/xla_ops/abs.mlir \
   -o /tmp/abs.vmfb
 ```
 

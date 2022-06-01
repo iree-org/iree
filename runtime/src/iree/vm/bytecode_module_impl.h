@@ -69,9 +69,16 @@ typedef struct iree_vm_bytecode_module_t {
   // Allocator this module was allocated with and must be freed with.
   iree_allocator_t allocator;
 
-  // Underlying FlatBuffer data and allocator (which may be null).
-  iree_const_byte_span_t flatbuffer_data;
-  iree_allocator_t flatbuffer_allocator;
+  // Underlying archive data and allocator (which may be null).
+  iree_const_byte_span_t archive_contents;
+  iree_allocator_t archive_allocator;
+
+  // Offset into the archive data where external read-only data begins.
+  // This is added to any relative rodata reference in the FlatBuffer to get the
+  // aligned physical offset where content is located.
+  iree_host_size_t archive_rodata_offset;
+
+  // Loaded FlatBuffer module pointing into the archive contents.
   iree_vm_BytecodeModuleDef_table_t def;
 
   // Type table mapping module type IDs to registered VM types.

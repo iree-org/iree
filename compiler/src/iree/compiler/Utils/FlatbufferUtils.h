@@ -36,7 +36,7 @@ namespace iree_compiler {
 //
 // Usage:
 //   FlatbufferBuilder builder;
-//   // NOTE: flatbuffers are built bottoms-up so we first generate our [uint8]:
+//   // NOTE: FlatBuffers are built bottoms-up so we first generate our [uint8]:
 //   auto dataRef = builder.streamUint8Vec(...);
 //   // ... and then start the table that references it:
 //   my_type_start_as_root(builder);
@@ -99,7 +99,7 @@ class FlatbufferBuilder {
   }
 
   // Provides a raw_ostream that |fn| can use to directly stream into a [uint8]
-  // in the flatbuffer builder.
+  // in the FlatBuffer builder.
   //
   // Usage:
   //   auto ref = builder.streamUint8Vec([&](llvm::raw_ostream &stream) {
@@ -121,14 +121,14 @@ class FlatbufferBuilder {
   //
   // This is reduces a significant large allocation that can happen when trying
   // to stitch together all of the pages that were allocated in the emitter as
-  // the flatbuffer was constructed; here we can just walk over each page and
+  // the FlatBuffer was constructed; here we can just walk over each page and
   // write it out in order without any allocations.
   LogicalResult copyToStream(llvm::raw_ostream &output);
 
   using print_json_fn_t = int (*)(flatcc_json_printer_t *ctx, const char *buf,
                                   size_t bufsiz);
 
-  // Prints the flatbuffer in its canonical JSON format to the given stream.
+  // Prints the FlatBuffer in its canonical JSON format to the given stream.
   // The builder is left unmodified.
   //
   // |pretty| enables newlines and indentation; somewhat useful for lit testing
@@ -143,16 +143,16 @@ class FlatbufferBuilder {
   // referencing the same bytes; meaning that this can't be used to verify that
   // we are correctly memoizing strings/structures/etc.
   LogicalResult printJsonToStream(bool pretty, bool includeDefaults,
-                                  print_json_fn_t print_json_fn,
+                                  print_json_fn_t printJsonFn,
                                   llvm::raw_ostream &output);
 
  private:
   flatcc_builder_t builder;
 };
 
-// Allows streaming bytes directly into a flatbuffer `[uint8]` field.
+// Allows streaming bytes directly into a FlatBuffer `[uint8]` field.
 // The ostream runs in buffered mode and routes all writes into pages
-// allocated by the flatbuffer builder as we grow the output.
+// allocated by the FlatBuffer builder as we grow the output.
 //
 // Usage:
 //   flatbuffers_uint8_vec_start(builder);

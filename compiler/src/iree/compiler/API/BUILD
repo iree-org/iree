@@ -77,7 +77,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Tools:init_llvmir_translations",
         "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
         "//compiler/src/iree/compiler/Tools:init_targets",
-        "//compiler/src/iree/compiler/Tools:iree_translate_lib",
+        "//compiler/src/iree/compiler/Tools:iree_compile_lib",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//lld:COFF",
         "@llvm-project//lld:Common",

@@ -70,7 +70,7 @@ These steps help reproduce the failures in TFLite models.
    $ iree-import-tflite --help
    ```
 
-3. Download the TFLite flatbuffer for the failing benchmarks. The location can
+3. Download the TFLite FlatBuffer for the failing benchmarks. The location can
    be found from [this CMakeLists.txt file](./TFLite/CMakeLists.txt).
 
 4. Import the TFLite model into MLIR format using:

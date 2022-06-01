@@ -20,7 +20,7 @@ set(IREE_ALL_CTS_TESTS
   PARENT_SCOPE
 )
 
-# These tests use executables produced by the iree-translate compiler tool.
+# These tests use executables produced by the iree-compile compiler tool.
 # If the compiler is disabled or a HAL driver implementation is not yet
 # connected to a functional compiler target, these tests can be skipped.
 set(IREE_EXECUTABLE_CTS_TESTS

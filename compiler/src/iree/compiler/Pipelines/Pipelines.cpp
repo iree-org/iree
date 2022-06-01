@@ -103,5 +103,29 @@ void buildIREEVMTransformPassPipeline(
   passManager.addPass(IREE::Util::createDropCompilerHintsPass());
 }
 
+void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
+  // Note that the production compiler will provide hooks here that enable
+  // additional, whole-program related features, whereas this pipeline will
+  // only use the defaults. In practice, this means that things like const
+  // jitting are not supported by this pipeline.
+  static IREEVMPipelineHooks defaultHooks;
+
+  buildIREEVMTransformPassPipeline(
+      BindingOptions::FromFlags::get(), InputDialectOptions::FromFlags::get(),
+      HighLevelOptimizationOptions::FromFlags::get(),
+      SchedulingOptions::FromFlags::get(),
+      IREE::HAL::TargetOptions::FromFlags::get(),
+      IREE::VM::TargetOptions::FromFlags::get(), defaultHooks, passManager);
+}
+
+void registerIREEVMTransformPassPipeline() {
+  PassPipelineRegistration<> transformPassPipeline(
+      "iree-transformation-pipeline",
+      "Runs the full IREE input to VM transformation pipeline",
+      [](OpPassManager &passManager) {
+        buildDefaultIREEVMTransformPassPipeline(passManager);
+      });
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

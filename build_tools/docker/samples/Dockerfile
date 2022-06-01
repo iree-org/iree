@@ -9,7 +9,7 @@
 #   * Vulkan (using SwiftShader)
 #   * Python (including `venv` and common pip packages needed for Colab)
 
-FROM gcr.io/iree-oss/swiftshader@sha256:88ac65bb86014b131d4081c456e480453dce2ce3b5de3319193fb698596df0ce
+FROM gcr.io/iree-oss/swiftshader@sha256:d27bd8ffdffa7abcd02970408b2665b2a7b1e8238e5b3561672633bd3e52652e
 
 # Install additional packages often used in notebooks.
 # Installing these at the system level helps with caching, since venvs can
@@ -26,5 +26,16 @@ RUN python3 -m pip install --ignore-installed \
     numpy \
     matplotlib \
     bottleneck \
-    tensorflow==2.5.0 \
+    tensorflow==2.8.0 \
     tensorflow_hub==0.12.0
+
+# NOTE: 2022-05-27: protobuf 4.21.0, released on May 25, 2022 is incompatible
+# with prior releases. Specifically implicated are the above versions of
+# tensorflow, which seem to include it without a version pin and therefore
+# break out of the box. The next time the above versions are upgraded,
+# try removing this line and then, within the docker image, run:
+#   python3 -c "import tensorflow"
+# If that fails with a stack trace, put this line back.
+# On behalf of Google, we are sorry for the live at head philosophy
+# and shoddy version management leaking into everything. We're victims too.
+RUN python3 -m pip install protobuf==3.20.1 --force-reinstall

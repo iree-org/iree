@@ -1,4 +1,4 @@
-// RUN: iree-translate --split-input-file --iree-vm-ir-to-c-module --iree-vm-c-module-optimize=false %s | FileCheck %s
+// RUN: iree-compile --split-input-file --compile-mode=vm --output-format=vm-c --iree-vm-c-module-optimize=false %s | FileCheck %s
 
 vm.module @rodata_ops {
   // Check the generated arrays

@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Tools/iree_compile_lib.h"
+
 #include <functional>
 #include <memory>
 #include <string>
@@ -16,7 +18,6 @@
 #include "iree/compiler/Tools/init_llvmir_translations.h"
 #include "iree/compiler/Tools/init_passes.h"
 #include "iree/compiler/Tools/init_targets.h"
-#include "iree/compiler/Tools/iree_translate_lib.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "llvm/ADT/StringRef.h"
@@ -55,6 +56,20 @@ enum class OutputFormat {
   vm_asm,
   vm_bytecode,
   vm_c,
+  // Non-user exposed output format for use with --compile-mode=hal-executable.
+  hal_executable,
+};
+
+enum class CompileMode {
+  // IREE's full compilation pipeline.
+  std,
+  // Compile from VM IR (currently this does nothing but may do more in the
+  // future).
+  vm,
+  // Translates an MLIR module containing a single hal.executable into a
+  // target-specific binary form (such as an ELF file or a flatbuffer containing
+  // a SPIR-V blob).
+  hal_executable,
 };
 
 IREEVMPipelineHooks &getHooks() {
@@ -127,6 +142,18 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
 #endif
           clEnumValN(OutputFormat::vm_asm, "vm-asm", "IREE VM MLIR Assembly")),
       llvm::cl::init(OutputFormat::none), llvm::cl::cat(mainOptions));
+
+  llvm::cl::opt<CompileMode> compileMode(
+      "compile-mode", llvm::cl::desc("IREE compilation mode"),
+      llvm::cl::values(
+          clEnumValN(CompileMode::std, "std", "Standard compilation"),
+          clEnumValN(CompileMode::vm, "vm", "Compile from VM IR"),
+          clEnumValN(
+              CompileMode::hal_executable, "hal-executable",
+              "Compile an MLIR module containing a single hal.executable into "
+              "a target-specific binary form (such as an ELF file or a "
+              "flatbuffer containing a SPIR-V blob)")),
+      llvm::cl::init(CompileMode::std), llvm::cl::cat(mainOptions));
 
   llvm::cl::opt<bool> legacyTranslateToCModule(
       "iree-mlir-to-vm-c-module",
@@ -208,12 +235,43 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     mlir::applyPassManagerCLOptions(passManager);
     mlir::applyDefaultTimingPassManagerCLOptions(passManager);
     passManager.addInstrumentation(std::make_unique<PassTracing>());
-    buildIREEVMTransformPassPipeline(bindingOptions, inputOptions,
-                                     highLevelOptimizationOptions,
-                                     schedulingOptions, halTargetOptions,
-                                     vmTargetOptions, getHooks(), passManager);
+
+    switch (compileMode) {
+      case CompileMode::std:
+        buildIREEVMTransformPassPipeline(
+            bindingOptions, inputOptions, highLevelOptimizationOptions,
+            schedulingOptions, halTargetOptions, vmTargetOptions, getHooks(),
+            passManager);
+
+        break;
+      case CompileMode::vm:
+        break;
+      case CompileMode::hal_executable: {
+        // Override the output format.
+        outputFormat = OutputFormat::hal_executable;
+        auto executableOps =
+            llvm::to_vector<4>(module->getOps<IREE::HAL::ExecutableOp>());
+        auto sourceOps =
+            llvm::to_vector<4>(module->getOps<IREE::HAL::ExecutableSourceOp>());
+        size_t usableOpCount = executableOps.size() + sourceOps.size();
+        if (usableOpCount != 1) {
+          return module->emitError()
+                 << "HAL executable translation requires "
+                    "exactly 1 top level hal.executable/hal.executable.source "
+                    "op";
+        }
+        auto executableOptions = IREE::HAL::TargetOptions::FromFlags::get();
+        IREE::HAL::buildHALTransformPassPipeline(passManager,
+                                                 executableOptions);
+        break;
+      }
+      default:
+        llvm::errs() << "INTERNAL ERROR: unknown compile mode\n";
+        return failure();
+    }
+
     if (failed(passManager.run(module.get()))) {
-      llvm::errs() << "compilation from source to vm failed\n";
+      llvm::errs() << "compilation failed\n";
       return failure();
     }
 
@@ -230,6 +288,23 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
         return mlir::iree_compiler::IREE::VM::translateModuleToC(
             module.get(), cTargetOptions, os);
 #endif
+      case OutputFormat::hal_executable: {
+        // Extract the serialized binary representation from the executable.
+        auto executableOp =
+            *(module->getOps<IREE::HAL::ExecutableOp>().begin());
+        auto binaryOps = llvm::to_vector<4>(
+            executableOp.getOps<IREE::HAL::ExecutableBinaryOp>());
+        if (binaryOps.size() != 1) {
+          return executableOp.emitError() << "executable translation failed to "
+                                             "produce exactly 1 binary for "
+                                             "the input executable";
+        }
+        auto binaryOp = binaryOps.front();
+        auto rawData = binaryOp.data().getRawData();
+        os.write(rawData.data(), rawData.size());
+        return success();
+        break;
+      }
       default:
         llvm::errs() << "INTERNAL ERROR: Unknown output format\n";
         return failure();

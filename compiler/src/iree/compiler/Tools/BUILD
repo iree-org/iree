@@ -33,6 +33,7 @@ cc_library(
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/Util/Transforms",
         "//compiler/src/iree/compiler/Dialect/VM/Analysis",
+        "//compiler/src/iree/compiler/Dialect/VM/Conversion/VMToEmitC",
         "//compiler/src/iree/compiler/Dialect/VM/IR",
         "//compiler/src/iree/compiler/Dialect/VM/Transforms",
         "//compiler/src/iree/compiler/Dialect/Vulkan/IR",
@@ -40,8 +41,7 @@ cc_library(
         "//compiler/src/iree/compiler/InputConversion/MHLO",
         "//compiler/src/iree/compiler/InputConversion/TMTensor",
         "//compiler/src/iree/compiler/InputConversion/TOSA",
-        "//compiler/src/iree/compiler/Translation:HALExecutable",
-        "//compiler/src/iree/compiler/Translation:IREEVM",
+        "//compiler/src/iree/compiler/Pipelines",
         "//llvm-external-projects/iree-dialects:IREEInputDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
@@ -143,18 +143,6 @@ cc_library(
 )
 
 cc_library(
-    name = "init_translations",
-    hdrs = [
-        "init_translations.h",
-    ],
-    deps = [
-        "//compiler/src/iree/compiler/Translation:HALExecutable",
-        "//compiler/src/iree/compiler/Translation:IREEVM",
-        "@llvm-project//mlir:SPIRVTranslateRegistration",
-    ],
-)
-
-cc_library(
     name = "init_xla_dialects",
     hdrs = [
         "init_xla_dialects.h",
@@ -188,29 +176,24 @@ cc_library(
 )
 
 cc_library(
-    name = "iree_translate_lib",
+    name = "iree_compile_lib",
     srcs = [
         "iree_compile_lib.cc",
-        "iree_translate_lib.cc",
     ],
-    hdrs = ["iree_translate_lib.h"],
+    hdrs = ["iree_compile_lib.h"],
     deps = [
         ":init_llvmir_translations",
         ":init_passes_and_dialects",
         ":init_targets",
-        ":init_translations",
         "//compiler/src/iree/compiler/Codegen",
         "//compiler/src/iree/compiler/ConstEval",
         "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",
         "//compiler/src/iree/compiler/Dialect/VM/Target/Bytecode",
         "//compiler/src/iree/compiler/Dialect/VM/Target/C",
         "//compiler/src/iree/compiler/Pipelines",
-        "//compiler/src/iree/compiler/Translation:HALExecutable",
-        "//compiler/src/iree/compiler/Translation:IREEVM",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LLVMToLLVMIRTranslation",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFTransforms",

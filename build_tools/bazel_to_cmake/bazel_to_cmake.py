@@ -80,7 +80,7 @@ def parse_arguments():
       "--root_dir",
       nargs="+",
       help="Converts all BUILD files under a root directory",
-      default=["compiler", "iree", "runtime", "samples", "tools"])
+      default=["compiler", "iree", "runtime", "samples", "tests", "tools"])
 
   args = parser.parse_args()
 

@@ -38,6 +38,12 @@ void buildIREEVMTransformPassPipeline(
     IREE::VM::TargetOptions targetOptions, IREEVMPipelineHooks &hooks,
     OpPassManager &passManager);
 
+// Builds the above with options initialized from flags.
+void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager);
+
+// Registration hooks.
+void registerIREEVMTransformPassPipeline();
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

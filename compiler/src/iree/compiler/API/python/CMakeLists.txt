@@ -79,12 +79,7 @@ set(_SOURCE_COMPONENTS
   IREECompilerAPIPythonExtensions
   IREECompilerAPIPythonTools
 
-  # TODO: Core is now implicitly building/registering all dialects, increasing
-  # build burden by ~5x. Make it stop.
   MLIRPythonSources.Core
-
-  # Passes should also be disaggregated.
-  MLIRPythonSources.Passes
 
   # Core dialects (constrained to IREE input dialects).
   MLIRPythonSources.Dialects.arith

@@ -98,8 +98,7 @@ all built tests through
 [CTest](https://gitlab.kitware.com/cmake/community/-/wikis/doc/ctest/Testing-With-CTest):
 
 ``` shell
-cd ../iree-build-android/
-ctest --output-on-failure
+ctest --test-dir ../iree-build-android/ --output-on-failure
 ```
 
 This will automatically upload build artifacts to the connected Android device,
@@ -107,7 +106,7 @@ run the tests, then report the status back to your host machine.
 
 ## Running tools directly
 
-Invoke the host compiler tools to produce a bytecode module flatbuffer:
+Invoke the host compiler tools to produce a bytecode module FlatBuffer:
 
 ``` shell
 ../iree-build/install/bin/iree-compile \
@@ -117,7 +116,7 @@ Invoke the host compiler tools to produce a bytecode module flatbuffer:
   -o /tmp/simple_abs_vmvx.vmfb
 ```
 
-Push the Android runtime tools to the device, along with any flatbuffer files:
+Push the Android runtime tools to the device, along with any FlatBuffer files:
 
 ``` shell
 adb push ../iree-build-android/tools/iree-run-module /data/local/tmp/

@@ -108,7 +108,7 @@ def Util_GlobalAccessorOpInterface : OpInterface<"GlobalAccessorOpInterface"> {
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        Returns the body region of the closure (may have multiple blocks).
+        Returns the global symbol accessed by the op.
       }],
       /*retTy=*/"FlatSymbolRefAttr",
       /*methodName=*/"getGlobalRefAttr",

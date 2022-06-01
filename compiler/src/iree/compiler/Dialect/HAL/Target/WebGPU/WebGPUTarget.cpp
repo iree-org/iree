@@ -173,7 +173,7 @@ class WebGPUTargetBackend : public TargetBackend {
                      variantOp.getName(), ".wgsl", wgsl.getValue());
     }
 
-    // Pack the WGSL and metadata into a flatbuffer.
+    // Pack the WGSL and metadata into a FlatBuffer.
     FlatbufferBuilder builder;
     iree_WGSLExecutableDef_start_as_root(builder);
 

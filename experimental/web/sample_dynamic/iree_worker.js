@@ -50,7 +50,7 @@ function loadProgramBuffer(id, programDataBuffer) {
       programDataView.length * programDataView.BYTES_PER_ELEMENT);
   Module.HEAP8.set(programDataView, programDataWasmBuffer);
 
-  // Note: we transfer ownership of the flatbuffer data here, so there is
+  // Note: we transfer ownership of the FlatBuffer data here, so there is
   // no need to call `Module._free(programDataWasmBuffer)` later.
   const programState = wasmLoadProgramFn(
       sampleState, programDataWasmBuffer, programDataBuffer.byteLength);

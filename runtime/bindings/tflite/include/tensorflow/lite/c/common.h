@@ -539,7 +539,7 @@ typedef struct TfLiteNode {
   // a structure defined in builtin_op_data.h
   void* builtin_data;
 
-  // Custom initial data. This is the opaque data provided in the flatbuffer.
+  // Custom initial data. This is the opaque data provided in the FlatBuffer.
   // WARNING: This is an experimental interface that is subject to change.
   const void* custom_initial_data;
   int custom_initial_data_size;
@@ -626,7 +626,7 @@ typedef struct TfLiteNode {
   // a structure defined in builtin_op_data.h
   void* builtin_data;
 
-  // Custom initial data. This is the opaque data provided in the flatbuffer.
+  // Custom initial data. This is the opaque data provided in the FlatBuffer.
   // WARNING: This is an experimental interface that is subject to change.
   const void* custom_initial_data;
   int custom_initial_data_size;

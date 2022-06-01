@@ -94,13 +94,20 @@ union CompressionTypeDef {
 }
 
 // Read-only data segment.
+// The data may be embedded directly in the FlatBuffer or point to a reference
+// relative to the FlatBuffer in memory.
 table RodataSegmentDef {
   // The compression format used for the data, including required decompression
   // arguments. Omitted if the data is uncompressed.
   compression_type:CompressionTypeDef;
 
   // Contents in a format defined by CompressionTypeDef.
-  data:[uint8];
+  embedded_data:[uint8];
+
+  // Offset of the data following the FlatBuffer (rounded up to 64B).
+  // The offset is relative to the size of the FlatBuffer.
+  external_data_offset:uint64;
+  external_data_length:uint64;
 }
 
 // Read-write data segment.

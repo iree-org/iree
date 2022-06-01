@@ -56,9 +56,9 @@ iree_bytecode_module(
   SRC
     "arithmetic_ops.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -68,9 +68,9 @@ iree_bytecode_module(
   SRC
     "arithmetic_ops_f32.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -80,9 +80,9 @@ iree_bytecode_module(
   SRC
     "arithmetic_ops_i64.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -92,9 +92,9 @@ iree_bytecode_module(
   SRC
     "assignment_ops.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -104,9 +104,9 @@ iree_bytecode_module(
   SRC
     "assignment_ops_f32.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -116,9 +116,9 @@ iree_bytecode_module(
   SRC
     "assignment_ops_i64.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -128,9 +128,9 @@ iree_bytecode_module(
   SRC
     "buffer_ops.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -140,9 +140,9 @@ iree_bytecode_module(
   SRC
     "call_ops.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -152,9 +152,9 @@ iree_bytecode_module(
   SRC
     "comparison_ops.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -164,9 +164,9 @@ iree_bytecode_module(
   SRC
     "comparison_ops_f32.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -176,9 +176,9 @@ iree_bytecode_module(
   SRC
     "comparison_ops_i64.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -188,9 +188,9 @@ iree_bytecode_module(
   SRC
     "control_flow_ops.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -200,9 +200,9 @@ iree_bytecode_module(
   SRC
     "conversion_ops.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -212,9 +212,9 @@ iree_bytecode_module(
   SRC
     "conversion_ops_f32.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -224,9 +224,9 @@ iree_bytecode_module(
   SRC
     "conversion_ops_i64.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -236,9 +236,9 @@ iree_bytecode_module(
   SRC
     "global_ops.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -248,9 +248,9 @@ iree_bytecode_module(
   SRC
     "global_ops_f32.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -260,9 +260,9 @@ iree_bytecode_module(
   SRC
     "global_ops_i64.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -272,9 +272,9 @@ iree_bytecode_module(
   SRC
     "list_ops.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -284,9 +284,9 @@ iree_bytecode_module(
   SRC
     "list_ops_i64.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -296,9 +296,9 @@ iree_bytecode_module(
   SRC
     "list_variant_ops.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -308,9 +308,9 @@ iree_bytecode_module(
   SRC
     "ref_ops.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -320,9 +320,9 @@ iree_bytecode_module(
   SRC
     "shift_ops.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 
@@ -332,9 +332,9 @@ iree_bytecode_module(
   SRC
     "shift_ops_i64.mlir"
   TRANSLATE_TOOL
-    iree-translate
+    iree-compile
   FLAGS
-    "--iree-vm-ir-to-bytecode-module"
+    "--compile-mode=vm"
   PUBLIC
 )
 

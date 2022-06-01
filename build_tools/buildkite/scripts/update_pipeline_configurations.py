@@ -29,12 +29,20 @@ import urllib
 import requests
 from pybuildkite import buildkite
 
+from common.buildkite_utils import get_pipeline
+
 GIT_REPO = "https://github.com/google/iree"
 PIPELINE_ROOT_PATH = "build_tools/buildkite/pipelines"
 TRUSTED_BOOTSTRAP_PIPELINE_PATH = os.path.join(PIPELINE_ROOT_PATH, "fragment",
                                                "bootstrap-trusted.yml")
 UNTRUSTED_BOOTSTRAP_PIPELINE_PATH = os.path.join(PIPELINE_ROOT_PATH, "fragment",
                                                  "bootstrap-untrusted.yml")
+
+IREE_TEAM_REST_UUID = "1a2cbc72-2c8e-4375-821e-e3dfa1db96b5"
+# The team that just contains the postsubmit bot
+PRIVILEGED_TEAM_REST_UUID = "7de7685f-7e10-4bc4-ba66-3478a5c56db4"
+
+FORCE_UPDATE_ENV_VAR = "IREE_FORCE_BUILDKITE_PIPELINE_UPDATE"
 
 BUILD_URL_PREAMBLE = "# Automatically updated by Buildkite pipeline"
 
@@ -50,16 +58,6 @@ def get_git_root():
                         check=True,
                         stdout=subprocess.PIPE,
                         text=True).stdout.strip()
-
-
-def get_existing_pipeline(bk, *, organization, pipeline_slug):
-  try:
-    pipeline = bk.pipelines().get_pipeline(organization, pipeline_slug)
-  except requests.exceptions.HTTPError as e:
-    if e.response.status_code == 404:
-      return None
-    raise e
-  return pipeline
 
 
 def prepend_header(configuration, *, organization, running_pipeline,
@@ -86,6 +84,7 @@ def should_update(bk, *, organization, configuration, existing_pipeline,
   trimmed_previous_configuration_lines = previous_configuration_lines[
       len(UPDATE_INFO_HEADER.splitlines()):]
   if trimmed_previous_configuration_lines == configuration.splitlines():
+    print("Configuration has not changed. Not updating")
     return False
 
   first_line = previous_configuration_lines[0].strip()
@@ -138,7 +137,7 @@ def should_update(bk, *, organization, configuration, existing_pipeline,
 
 def create_pipeline(bk, *, organization, pipeline_slug, configuration,
                     running_pipeline, running_build_number, running_commit,
-                    trusted):
+                    trusted, dry_run):
   configuration = prepend_header(configuration,
                                  organization=organization,
                                  running_pipeline=running_pipeline,
@@ -154,19 +153,31 @@ def create_pipeline(bk, *, organization, pipeline_slug, configuration,
       "name": pipeline_slug,
       "repository": GIT_REPO,
       "configuration": configuration,
+      # With the rest API, we can only give "Full Access", so this is limited to
+      # the IREE team and doesn't give Read & Build access to the "Everyone" and
+      # "Presubmit" teams. I'm talking to Buildkite support about this
+      # limitation. There's a similar problem that the pipeline can't be made
+      # public via the REST API, which requires user intervention in the UI.
+      "team_uuids": [IREE_TEAM_REST_UUID, PRIVILEGED_TEAM_REST_UUID],
       "provider_settings": {
+          # We don't want any automatic triggering from GitHub webhooks.
           "trigger_mode": "none"
       },
   }
 
-  pipelines_api.client.post(pipelines_api.path.format("iree"), body=data)
+  print(f"Creating pipeline {pipeline_slug} with payload:\n"
+        f"```\n"
+        f"{configuration}\n"
+        f"```\n")
+  if not dry_run:
+    pipelines_api.client.post(pipelines_api.path.format("iree"), body=data)
 
   print("...created successfully")
 
 
 def update_pipeline(bk, *, organization, pipeline_slug, configuration,
                     running_pipeline, running_build_number, running_commit,
-                    trusted):
+                    trusted, dry_run):
   configuration = prepend_header(configuration,
                                  organization=organization,
                                  running_pipeline=running_pipeline,
@@ -174,27 +185,36 @@ def update_pipeline(bk, *, organization, pipeline_slug, configuration,
                                  running_commit=running_commit,
                                  trusted=trusted)
 
-  bk.pipelines().update_pipeline(organization=organization,
-                                 pipeline=pipeline_slug,
-                                 configuration=configuration)
+  print(f"Updating pipeline {pipeline_slug} with configuration:\n"
+        f"```\n"
+        f"{configuration}\n"
+        f"```\n")
+  if not dry_run:
+    bk.pipelines().update_pipeline(organization=organization,
+                                   pipeline=pipeline_slug,
+                                   configuration=configuration)
   print("...updated successfully")
 
 
+def get_slug(pipeline_file):
+  pipeline_slug, _ = os.path.splitext(os.path.basename(pipeline_file))
+  return pipeline_slug
+
+
 def update_pipelines(bk, pipeline_files, *, organization, running_pipeline,
-                     running_build_number, running_commit, trusted, force):
-  if force:
-    print("Was passed force, so not checking existing pipeline configurations.")
+                     running_build_number, running_commit, trusted, force,
+                     dry_run):
   first_error = None
   for pipeline_file in pipeline_files:
-    pipeline_slug, _ = os.path.splitext(os.path.basename(pipeline_file))
+    pipeline_slug = get_slug(pipeline_file)
 
     try:
       with open(TRUSTED_BOOTSTRAP_PIPELINE_PATH
                 if trusted else UNTRUSTED_BOOTSTRAP_PIPELINE_PATH) as f:
         configuration = f.read()
-      existing_pipeline = get_existing_pipeline(bk,
-                                                organization=organization,
-                                                pipeline_slug=pipeline_slug)
+      existing_pipeline = get_pipeline(bk,
+                                       organization=organization,
+                                       pipeline_slug=pipeline_slug)
       if existing_pipeline is None:
         print(f"Creating for: '{pipeline_file}'...")
         create_pipeline(bk,
@@ -204,9 +224,10 @@ def update_pipelines(bk, pipeline_files, *, organization, running_pipeline,
                         running_pipeline=running_pipeline,
                         running_build_number=running_build_number,
                         running_commit=running_commit,
-                        trusted=trusted)
-
+                        trusted=trusted,
+                        dry_run=dry_run)
         continue
+
       print(f"Updating for: '{pipeline_file}'...")
       if force or should_update(bk,
                                 organization=organization,
@@ -223,6 +244,7 @@ def update_pipelines(bk, pipeline_files, *, organization, running_pipeline,
             running_build_number=running_build_number,
             running_commit=running_commit,
             trusted=trusted,
+            dry_run=dry_run,
         )
     except Exception as e:
       if first_error is None:
@@ -232,14 +254,21 @@ def update_pipelines(bk, pipeline_files, *, organization, running_pipeline,
 
 
 def parse_args():
+  force_update = os.environ.get(FORCE_UPDATE_ENV_VAR)
+  force_update = not (force_update is None or force_update == "0" or
+                      force_update.lower() == "false" or force_update == "")
   parser = argparse.ArgumentParser(
       description="Updates the configurations for all Buildkite pipelines.")
   parser.add_argument(
       "--force",
       action="store_true",
-      default=False,
-      help=("Force updates for all pipelines without checking the existing"
-            " configuration. Use with caution."))
+      default=force_update,
+      help=(f"Force updates for all pipelines without checking the existing"
+            f" configuration. Use with caution. Can also be set via the"
+            f" environment variable {FORCE_UPDATE_ENV_VAR}."))
+  parser.add_argument("--dry-run",
+                      action="store_true",
+                      help="Don't actually update or create any pipelines.")
   parser.add_argument(
       "pipelines",
       type=str,
@@ -279,9 +308,12 @@ def main(args):
 
   if args.pipelines:
     trusted_pipeline_files = (
-        p for p in trusted_pipeline_files if p in args.pipelines)
+        p for p in trusted_pipeline_files if get_slug(p) in args.pipelines)
     untrusted_pipeline_files = (
-        p for p in untrusted_pipeline_files if p in args.pipelines)
+        p for p in untrusted_pipeline_files if get_slug(p) in args.pipelines)
+
+  if args.force:
+    print("Was passed force, so not checking existing pipeline configurations.")
 
   first_error = update_pipelines(bk,
                                  trusted_pipeline_files,
@@ -290,7 +322,8 @@ def main(args):
                                  running_build_number=running_build_number,
                                  running_commit=running_commit,
                                  trusted=True,
-                                 force=args.force)
+                                 force=args.force,
+                                 dry_run=args.dry_run)
   first_error = (first_error or
                  update_pipelines(bk,
                                   untrusted_pipeline_files,
@@ -299,7 +332,8 @@ def main(args):
                                   running_build_number=running_build_number,
                                   running_commit=running_commit,
                                   trusted=False,
-                                  force=args.force))
+                                  force=args.force,
+                                  dry_run=args.dry_run))
 
   if first_error is not None:
     print("Encountered errors. Stack of first error:")

@@ -55,5 +55,5 @@ Changes to the TOSA specification require submitting a proposal on TOSA's
 
 [TensorFlow lite](https://www.tensorflow.org/lite) is a model format and
 execution system for performing on device inference. IREE supports TFLite
-flatbuffers translation into [TOSA](#tosa) operations and compilation
+FlatBuffers translation into [TOSA](#tosa) operations and compilation
 into the LinAlg dialect.

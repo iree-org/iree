@@ -133,7 +133,7 @@ class VmModule : public ApiRefCounted<VmModule, iree_vm_module_t> {
   py::object get_stashed_flatbuffer_blob() { return stashed_flatbuffer_blob; }
 
  private:
-  // If the module was created from a flatbuffer blob, we stash it here.
+  // If the module was created from a FlatBuffer blob, we stash it here.
   py::object stashed_flatbuffer_blob = py::none();
 };
 

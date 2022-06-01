@@ -41,11 +41,11 @@ cd build-emscripten
 # Configure using Emscripten's CMake wrapper, then build.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \
   -DIREE_HOST_BINARY_ROOT=$PWD/../build-host/install \
+  -DIREE_BUILD_COMPILER=OFF \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
   -DIREE_HAL_DRIVER_VMVX=ON \
-  -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_BUILD_TESTS=OFF \
+  -DIREE_ENABLE_CPUINFO=OFF \
+  -DIREE_BUILD_TESTS=ON \
   -DIREE_BUILD_SAMPLES=ON
 
-# TODO(scotttodd): expand this list of targets
-"${CMAKE_BIN?}" --build . --target iree_samples_simple_embedding_simple_embedding_vmvx_sync -- -k 0
+"${CMAKE_BIN?}" --build . -- -k 0

@@ -17,6 +17,9 @@
 namespace mlir {
 namespace iree_compiler {
 
+/// Flag defined in Passes.cpp.
+extern llvm::cl::opt<bool> llvmgpuUseMMASync;
+
 /// Helper to convert copy to shared memory to async copy. This creates groups
 /// of consecutive copies and emit wait operation right after.
 static void createAsyncGroups(func::FuncOp funcOp) {
@@ -84,7 +87,7 @@ static void createAsyncGroups(func::FuncOp funcOp) {
           writeOp.getSource(), writeOp.getIndices(), readOp.getSource(),
           readOp.getIndices(),
           builder.getIndexAttr(readOp.getVectorType().getNumElements()),
-          /*bypassL1=*/builder.getUnitAttr());
+          /*bypassL1=*/llvmgpuUseMMASync ? builder.getUnitAttr() : UnitAttr());
       tokens.push_back(token);
     }
     // Create the group and wait for it right after.
@@ -235,10 +238,13 @@ struct LLVMGPUVectorToGPUPass
       return signalPassFailure();
     }
     RewritePatternSet patterns(funcOp.getContext());
-    populatePrepareVectorToMMAPatterns(patterns);
+    populatePrepareVectorToMMAPatterns(patterns, llvmgpuUseMMASync);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
 
-    convertVectorToMMAOps(funcOp);
+    if (llvmgpuUseMMASync)
+      (void)convertVectorToNVVMCompatibleMMASync(funcOp);
+    else
+      convertVectorToMMAOps(funcOp);
     createAsyncGroups(funcOp);
   }
 };

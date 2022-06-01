@@ -155,7 +155,7 @@ VmModule VmModule::FromFlatbufferBlob(py::object flatbuffer_blob_object) {
     iree_allocator_free(deallocator, raw_ptr);
   }
 
-  CheckApiStatus(status, "Error creating vm module from flatbuffer");
+  CheckApiStatus(status, "Error creating vm module from FlatBuffer");
   auto py_module = VmModule::StealFromRawPtr(module);
   py_module.stashed_flatbuffer_blob = flatbuffer_blob_object;
   return py_module;

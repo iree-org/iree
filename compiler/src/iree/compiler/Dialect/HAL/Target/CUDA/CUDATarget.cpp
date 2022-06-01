@@ -281,7 +281,7 @@ class CUDATargetBackend final : public TargetBackend {
     iree_CUDAExecutableDef_start_as_root(builder);
 
     // Serialize cuda kernel into the binary that we will embed in the
-    // final flatbuffer.
+    // final FlatBuffer.
     std::string targetISA = translateModuleToISA(*llvmModule, *targetMachine);
     if (dumpPtx) {
       llvm::dbgs() << targetISA;

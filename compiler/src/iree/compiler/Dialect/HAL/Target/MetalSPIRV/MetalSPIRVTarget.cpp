@@ -106,7 +106,7 @@ class MetalSPIRVTargetBackend : public TargetBackend {
 
     // 3. Compile MSL to MTLLibrary.
     // TODO(antiagainst): provide the option to compile the shaders into a
-    // library and embed in the flatbuffer. Metal provides APIs for compiling
+    // library and embed in the FlatBuffer. Metal provides APIs for compiling
     // shader sources into a MTLLibrary at run-time, but does not provie
     // a way to serialize the generated MTLLibrary. The only way available is
     // to use command-line tools like `metal` and `metallib`. Likely we need
@@ -121,7 +121,7 @@ class MetalSPIRVTargetBackend : public TargetBackend {
       }
     }
 
-    // 4. Pack the MTLLibrary and metadata into a flatbuffer.
+    // 4. Pack the MTLLibrary and metadata into a FlatBuffer.
     FlatbufferBuilder builder;
     iree_MetalExecutableDef_start_as_root(builder);
 

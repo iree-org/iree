@@ -1,4 +1,4 @@
-// RUN: iree-translate --iree-vm-ir-to-c-module %s | FileCheck %s
+// RUN: iree-compile --compile-mode=vm --output-format=vm-c %s | FileCheck %s
 
 // CHECK: #include "iree/vm/ops.h"
 vm.module @empty_module {

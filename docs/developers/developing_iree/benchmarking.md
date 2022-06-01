@@ -112,7 +112,7 @@ $ build/tools/iree-compile \
   --iree-mlir-to-vm-bytecode-module \
   --iree-flow-export-benchmark-funcs \
   --iree-hal-target-backends=vmvx \
-  iree/test/e2e/models/fullyconnected.mlir \
+  tests/e2e/models/fullyconnected.mlir \
   -o /tmp/fullyconnected.vmfb
 ```
 

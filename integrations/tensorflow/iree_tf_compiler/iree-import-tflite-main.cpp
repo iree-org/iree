@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
       /*use_external_constant=*/false, inputArrays, outputArrays);
   if (!module) {
     // Error should have emitted.
-    llvm::errs() << "Unable to import TFLite flatbuffer to MLIR Module\n";
+    llvm::errs() << "Unable to import TFLite FlatBuffer to MLIR Module\n";
     return 2;
   }
 

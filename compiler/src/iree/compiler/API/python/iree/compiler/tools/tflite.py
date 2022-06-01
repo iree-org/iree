@@ -140,10 +140,10 @@ def build_import_command_line(input_path: str, tfs: TempFileSaver,
 
 
 def compile_file(fb_path: str, **kwargs):
-  """Compiles a TFLite flatbuffer file to an IREE binary.
+  """Compiles a TFLite FlatBuffer file to an IREE binary.
 
   Args:
-    fb_path: Path to the flatbuffer.
+    fb_path: Path to the FlatBuffer.
     **kwargs: Keyword args corresponding to ImportOptions or CompilerOptions.
   Returns:
     A bytes-like object with the compiled output or None if output_file=
@@ -168,7 +168,7 @@ def compile_file(fb_path: str, **kwargs):
 
 
 def compile_str(fb_content: bytes, **kwargs):
-  """Compiles in-memory TFLite flatbuffer to an IREE binary.
+  """Compiles in-memory TFLite FlatBuffer to an IREE binary.
 
   Args:
     fb_content: Flatbuffer content as bytes.
