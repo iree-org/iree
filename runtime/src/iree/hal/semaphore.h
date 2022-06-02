@@ -93,8 +93,8 @@ iree_hal_semaphore_signal(iree_hal_semaphore_t* semaphore, uint64_t new_value);
 IREE_API_EXPORT void iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore,
                                              iree_status_t status);
 
-// Blocks the caller until the semaphore reaches or exceedes the specified
-// payload value or the |timeout| elapses.
+// Blocks the caller until the semaphore reaches or exceeds the specified
+// payload |value| or the |timeout| elapses.
 //
 // Returns success if the wait is successful and the semaphore has met or
 // exceeded the required payload value.
@@ -108,6 +108,11 @@ IREE_API_EXPORT void iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore,
 // failed and get the status.
 IREE_API_EXPORT iree_status_t iree_hal_semaphore_wait(
     iree_hal_semaphore_t* semaphore, uint64_t value, iree_timeout_t timeout);
+
+// Returns a wait source reference to |semaphore| after it reaches or exceeds
+// the specified payload |value|.
+IREE_API_EXPORT iree_wait_source_t
+iree_hal_semaphore_await(iree_hal_semaphore_t* semaphore, uint64_t value);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_semaphore_t implementation details

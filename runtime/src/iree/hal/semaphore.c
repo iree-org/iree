@@ -71,3 +71,57 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_wait(
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
+
+iree_status_t iree_hal_semaphore_wait_source_ctl(
+    iree_wait_source_t wait_source, iree_wait_source_command_t command,
+    const void* params, void** inout_ptr) {
+  iree_hal_semaphore_t* semaphore = (iree_hal_semaphore_t*)wait_source.self;
+  const uint64_t target_value = wait_source.data;
+  switch (command) {
+    case IREE_WAIT_SOURCE_COMMAND_QUERY: {
+      iree_status_code_t* out_wait_status_code = (iree_status_code_t*)inout_ptr;
+      uint64_t current_value = 0;
+      iree_status_t status =
+          iree_hal_semaphore_query(semaphore, &current_value);
+      if (!iree_status_is_ok(status)) {
+        *out_wait_status_code = iree_status_code(status);
+        iree_status_ignore(status);
+      } else {
+        *out_wait_status_code = current_value < target_value
+                                    ? IREE_STATUS_DEFERRED
+                                    : IREE_STATUS_OK;
+      }
+      return iree_ok_status();
+    }
+    case IREE_WAIT_SOURCE_COMMAND_WAIT_ONE: {
+      const iree_timeout_t timeout =
+          ((const iree_wait_source_wait_params_t*)params)->timeout;
+      return iree_hal_semaphore_wait(semaphore, target_value, timeout);
+    }
+    case IREE_WAIT_SOURCE_COMMAND_EXPORT: {
+      const iree_wait_primitive_type_t target_type =
+          ((const iree_wait_source_export_params_t*)params)->target_type;
+      // TODO(benvanik): support exporting semaphores to real wait handles.
+      iree_wait_primitive_t* out_wait_primitive =
+          (iree_wait_primitive_t*)inout_ptr;
+      memset(out_wait_primitive, 0, sizeof(*out_wait_primitive));
+      (void)target_type;
+      return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "requested wait primitive type %d is unavailable",
+                              (int)target_type);
+    }
+    default:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "unimplemented wait_source command");
+  }
+}
+
+IREE_API_EXPORT iree_wait_source_t
+iree_hal_semaphore_await(iree_hal_semaphore_t* semaphore, uint64_t value) {
+  IREE_ASSERT_ARGUMENT(semaphore);
+  return (iree_wait_source_t){
+      .self = semaphore,
+      .data = value,
+      .ctl = iree_hal_semaphore_wait_source_ctl,
+  };
+}
