@@ -24,8 +24,27 @@ namespace IREE {
 namespace LinalgExt {
 
 struct TilingResult {
-  TileOp tileOp;
+  Operation *tileOp;
   Operation *tiledOp;
+};
+
+/// Pattern to tile a TilingInterface op using a scf::ForeachThreadOp.
+struct ForeachThreadTilingPattern
+    : public OpInterfaceRewritePattern<TilingInterface> {
+  ForeachThreadTilingPattern(MLIRContext *context,
+                             linalg::LinalgTilingOptions opt)
+      : OpInterfaceRewritePattern<TilingInterface>(context), options(opt) {}
+
+  FailureOr<TilingResult>
+  returningMatchAndRewrite(TilingInterface op, PatternRewriter &rewriter) const;
+
+  LogicalResult matchAndRewrite(TilingInterface op,
+                                PatternRewriter &rewriter) const override {
+    return returningMatchAndRewrite(op, rewriter);
+  }
+
+private:
+  linalg::LinalgTilingOptions options;
 };
 
 /// Pattern to tile a TilingInterface op using a TileOp.

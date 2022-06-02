@@ -101,3 +101,11 @@ Value mlir::iree_compiler::IREE::LinalgExt::createMatchingSubsetInsertOp(
       subsetExtractOp.strides(), subsetExtractOp.static_offsets(),
       subsetExtractOp.static_sizes(), subsetExtractOp.static_strides());
 }
+
+void mlir::iree_compiler::IREE::LinalgExt::createMatchingParallelSubsetInsertOp(
+    OpBuilder &b, Location loc, tensor::ExtractSliceOp subsetExtractOp,
+    Value source, Value dest) {
+  b.create<scf::ParallelInsertSliceOp>(
+      loc, source, dest, subsetExtractOp.getMixedOffsets(),
+      subsetExtractOp.getMixedSizes(), subsetExtractOp.getMixedStrides());
+}

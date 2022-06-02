@@ -35,6 +35,27 @@ def FuseProducersOp : Op<Transform_Dialect, "fuse_producers",
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
 }
 
+def TileToForeachOp :
+    Op<Transform_Dialect, "tile_to_foreach_thread_op",
+      [DeclareOpInterfaceMethods<TransformOpInterface>,
+       FunctionalStyleMultiOperandMultiResultTransformOpTrait,
+       MemoryEffectsOpInterface]> {
+  let description = [{Tile a linalg op to `scf.foreach_thread`.}];
+
+  let summary = [{
+    0 should be used as a tile size to skip tiling a particular dimension.
+    This is a commonly used convention in Linalg.
+    }];
+
+  let arguments = (ins PDL_Operation:$target,
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$num_threads);
+  let results = (outs PDL_Operation:$tiled_op,
+                      PDL_Operation:$tile_op);
+
+  let assemblyFormat = "$target attr-dict";
+  let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
+}
+
 def TileToLinalgExtTileOp :
     Op<Transform_Dialect, "tile_to_iree_linalg_ext_tile_op",
       [FunctionalStyleMultiOperandMultiResultTransformOpTrait,

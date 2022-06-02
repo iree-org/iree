@@ -65,6 +65,12 @@ Value createMatchingSubsetInsertOp(OpBuilder &b, Location loc,
                                    tensor::ExtractSliceOp subsetExtractOp,
                                    Value source, Value dest);
 
+/// Create the parallel insertion terminator version of
+/// `createMatchingSubsetInsertOp`.
+void createMatchingParallelSubsetInsertOp(
+    OpBuilder &b, Location loc, tensor::ExtractSliceOp subsetExtractOp,
+    Value source, Value dest);
+
 struct AffineValueExpr {
   explicit AffineValueExpr(AffineExpr e) : e(e) {}
   AffineValueExpr bind(Value v) {
@@ -105,7 +111,7 @@ struct AffineBuilder {
         vals);
   }
   Value max(ValueRange vals) {
-    return b.createOrFold<AffineMinOp>(
+    return b.createOrFold<AffineMaxOp>(
         loc, AffineMap::getMultiDimIdentityMap(vals.size(), b.getContext()),
         vals);
   }
