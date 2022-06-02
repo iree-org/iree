@@ -71,7 +71,7 @@ createBufferizeCopyOnlyDispatchesPass();
 /// backends that require linearized access.
 std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass();
 
-/// Creates a pass to to fold `affine.min` ops in tiled and distributed loops.
+/// Creates a pass to fold `affine.min` ops in tiled and distributed loops.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createFoldAffineMinInDistributedLoopsPass();
 
