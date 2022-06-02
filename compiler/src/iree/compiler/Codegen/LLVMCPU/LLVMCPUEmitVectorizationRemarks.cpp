@@ -21,8 +21,14 @@ struct LLVMCPUEmitVectorizationRemarksPass
 
 void LLVMCPUEmitVectorizationRemarksPass::runOnOperation() {
   auto funcOp = getOperation();
-  funcOp.walk(
-      [&](linalg::LinalgOp op) { op.emitWarning("op is not vectorized"); });
+  bool dump = false;
+  funcOp.walk([&](linalg::LinalgOp op) {
+    op.emitWarning("op is not vectorized");
+    dump = true;
+  });
+  if (dump) {
+    funcOp.emitWarning("found one or more ops not vectorized");
+  }
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
