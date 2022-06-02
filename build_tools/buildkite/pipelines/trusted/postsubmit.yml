@@ -21,6 +21,9 @@ steps:
 
   - label: "Executing build-runtime-cmake"
     commands: |
+      export BUILDKITE_ANNOTATION_CONTEXT="$${BUILDKITE_STEP_ID}"
       export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
           --secret=iree-buildkite-presubmit-pipelines)"
-      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py build-runtime-cmake
+      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py \
+        --annotate \
+        build-runtime-cmake
