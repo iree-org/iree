@@ -121,6 +121,11 @@ static void iree_hal_vulkan_native_semaphore_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
+bool iree_hal_vulkan_native_semaphore_isa(iree_hal_semaphore_t* semaphore) {
+  return iree_hal_resource_is(&semaphore->resource,
+                              &iree_hal_vulkan_native_semaphore_vtable);
+}
+
 VkSemaphore iree_hal_vulkan_native_semaphore_handle(
     iree_hal_semaphore_t* base_semaphore) {
   iree_hal_vulkan_native_semaphore_t* semaphore =

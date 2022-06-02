@@ -120,6 +120,11 @@ static void iree_hal_task_semaphore_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
+bool iree_hal_task_semaphore_isa(iree_hal_semaphore_t* semaphore) {
+  return iree_hal_resource_is(&semaphore->resource,
+                              &iree_hal_task_semaphore_vtable);
+}
+
 static iree_status_t iree_hal_task_semaphore_query(
     iree_hal_semaphore_t* base_semaphore, uint64_t* out_value) {
   iree_hal_task_semaphore_t* semaphore =
