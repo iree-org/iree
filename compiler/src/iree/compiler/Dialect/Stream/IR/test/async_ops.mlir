@@ -122,6 +122,16 @@ func.func @asyncDispatch(%arg0: !stream.resource<*>, %arg1: index) -> !stream.re
 
 // -----
 
+// CHECK-LABEL: @asyncDispatchNoWorkload
+func.func @asyncDispatchNoWorkload(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %c4 = arith.constant 4 : index
+  // CHECK: = stream.async.dispatch @executable::@dispatch(%arg0, %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
+  %0 = stream.async.dispatch @executable::@dispatch(%arg0, %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
 // CHECK-LABEL: @asyncExecute
 func.func @asyncExecute(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.timepoint) -> (!stream.resource<*>, !stream.timepoint) {
   // CHECK: = stream.async.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<*>{%arg1}) -> %arg0{%arg1} {

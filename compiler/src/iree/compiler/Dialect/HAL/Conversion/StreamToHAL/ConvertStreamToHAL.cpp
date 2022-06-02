@@ -700,7 +700,7 @@ struct CmdDispatchOpPattern
                              {SymbolRefAttr::get(entryPointOp->getParentOp()),
                               SymbolRefAttr::get(entryPointOp)});
       auto caseWorkgroupCount = entryPointOp.calculateWorkgroupCount(
-          loc, device, adaptor.workgroup_count(), caseBuilder);
+          loc, device, adaptor.workload(), caseBuilder);
       caseBuilder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
           loc, commandBuffer, entryPointSymRef, caseWorkgroupCount[0],
           caseWorkgroupCount[1], caseWorkgroupCount[2]);

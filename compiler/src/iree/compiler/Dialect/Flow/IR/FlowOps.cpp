@@ -419,13 +419,13 @@ llvm::SmallBitVector DispatchTensorStoreOp::getDroppedDims() {
 //===----------------------------------------------------------------------===//
 
 void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
-                                 ValueRange workgroupCount,
-                                 TypeRange resultTypes, ValueRange resultDims,
-                                 ValueRange operands, ValueRange operandDims,
+                                 ValueRange workload, TypeRange resultTypes,
+                                 ValueRange resultDims, ValueRange operands,
+                                 ValueRange operandDims,
                                  ArrayRef<int64_t> tiedOperands,
                                  ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);
-  state.addOperands(workgroupCount);
+  state.addOperands(workload);
   state.addOperands(operands);
   state.addOperands(operandDims);
   state.addOperands(resultDims);
@@ -436,17 +436,18 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
   state.attributes.erase("operand_segment_sizes");
   state.addAttribute("operand_segment_sizes",
                      builder.getI32VectorAttr({
-                         static_cast<int32_t>(workgroupCount.size()),
+                         static_cast<int32_t>(workload.size()),
                          static_cast<int32_t>(operands.size()),
                          static_cast<int32_t>(operandDims.size()),
                          static_cast<int32_t>(resultDims.size()),
                      }));
 
-  auto *body = state.addRegion();
-  assert(body->begin() == body->end());
+  auto *workgroupBody = state.addRegion();
+  assert(workgroupBody->begin() == workgroupBody->end());
   {
+    // createBlock implicitly moves IP, RAII away...
     OpBuilder::InsertionGuard g(builder);
-    builder.createBlock(body);  // createBlock implicitly moves IP, RAII away...
+    builder.createBlock(workgroupBody);
   }
 
   llvm::BitVector operandAliases(llvm::size(operands), false);
@@ -459,7 +460,6 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
       resultAliases[resultIndex] = true;
     }
   }
-
   for (auto operand : llvm::enumerate(operands)) {
     Type type = operand.value().getType();
     if (auto tensorType = type.dyn_cast<TensorType>()) {
@@ -468,7 +468,7 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
                                          : TensorAccess::ReadOnly,
                                      tensorType);
     }
-    body->addArgument(type, operand.value().getLoc());
+    workgroupBody->addArgument(type, operand.value().getLoc());
   }
   for (auto resultType : llvm::enumerate(resultTypes)) {
     if (resultAliases[resultType.index()]) {
@@ -479,9 +479,9 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
     if (auto tensorType = type.dyn_cast<TensorType>()) {
       type = DispatchTensorType::get(TensorAccess::WriteOnly, tensorType);
     }
-    body->addArgument(type, state.location);
+    workgroupBody->addArgument(type, state.location);
   }
-  assert(std::next(body->begin()) == body->end());
+  assert(std::next(workgroupBody->begin()) == workgroupBody->end());
 }
 
 static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
@@ -529,9 +529,6 @@ static void printDispatchWorkgroupBody(OpAsmPrinter &p, Operation *op,
 
 LogicalResult DispatchWorkgroupsOp::verify() {
   Operation *op = getOperation();
-  if (workgroup_count().empty()) {
-    return op->emitOpError() << "at least one workgroup dimension is required";
-  }
 
   if (failed(verifyOpDynamicDims(getOperation(), operands(), operand_dims())) ||
       failed(verifyOpDynamicDims(getOperation(), results(), result_dims()))) {
@@ -606,7 +603,7 @@ static TensorAccess refineTensorAccess(Value value, DispatchTensorType type) {
 
 IREE::Util::ValueAccess DispatchWorkgroupsOp::getOperandAccess(
     unsigned operandIndex) {
-  BlockArgument arg = body().front().getArgument(operandIndex);
+  BlockArgument arg = workgroup_body().front().getArgument(operandIndex);
   if (auto tensorType = arg.getType().dyn_cast<DispatchTensorType>()) {
     auto tensorAccess = refineTensorAccess(arg, tensorType);
     return IREE::Util::ValueAccess(
@@ -625,7 +622,8 @@ IREE::Util::ValueAccess DispatchWorkgroupsOp::getOperandAccess(
 IREE::Util::ValueAccess DispatchWorkgroupsOp::getResultAccess(
     unsigned resultIndex) {
   unsigned startIndex = getBody()->getNumArguments() - getNumResults();
-  BlockArgument arg = body().front().getArgument(startIndex + resultIndex);
+  BlockArgument arg =
+      workgroup_body().front().getArgument(startIndex + resultIndex);
   if (auto tensorType = arg.getType().dyn_cast<DispatchTensorType>()) {
     auto tensorAccess = refineTensorAccess(arg, tensorType);
     return IREE::Util::ValueAccess(
@@ -686,9 +684,8 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
       excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
 
   auto newOp = rewriter.create<DispatchWorkgroupsOp>(
-      getLoc(), workgroup_count(), newResultTypes, newResultDims,
-      newOperandsValues, newOperandDims, newTiedOperandIndices,
-      getOperation()->getAttrs());
+      getLoc(), workload(), newResultTypes, newResultDims, newOperandsValues,
+      newOperandDims, newTiedOperandIndices, getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
 
@@ -718,11 +715,6 @@ DispatchWorkgroupsOp::getTiedOperandsIndexAndLength() {
 // flow.dispatch.workgroup.*
 //===----------------------------------------------------------------------===//
 
-void DispatchWorkgroupRankOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "workgroup_rank");
-}
-
 static void getAsmResultNamesForDispatchWorkgroupInfoOp(
     StringRef prefix, const APInt &dimension, Value result,
     function_ref<void(Value, StringRef)> setNameFn) {
@@ -748,15 +740,10 @@ void DispatchWorkgroupSizeOp::getAsmResultNames(
 }
 
 LogicalResult verifyDispatchWorkgroupInfoOp(Operation *op, uint64_t dimension) {
-  size_t dimCount = 0;
-  if (auto dispatchOp = op->getParentOfType<DispatchWorkgroupsOp>()) {
-    dimCount = dispatchOp.workgroup_count().size();
-  }
-  if (dimCount != 0 && (dimension < 0 || dimension >= dimCount)) {
+  if (dimension < 0 || dimension >= 3) {
     return op->emitOpError()
            << "dimension " << dimension
-           << " out of bounds of dispatch dimensions; expected [0, "
-           << (dimCount - 1) << ")";
+           << " out of bounds of dispatch dimensions; expected [0, 3)";
   }
   return success();
 }
@@ -782,10 +769,10 @@ LogicalResult ExecutableOp::verify() {
 //===----------------------------------------------------------------------===//
 
 void DispatchEntryOp::build(OpBuilder &builder, OperationState &state,
-                            StringRef sym_name, FlatSymbolRefAttr function_ref,
-                            IntegerAttr workgroup_rank) {
+                            StringRef sym_name,
+                            FlatSymbolRefAttr function_ref) {
   build(builder, state, /*sym_visibility=*/nullptr,
-        builder.getStringAttr(sym_name), function_ref, workgroup_rank);
+        builder.getStringAttr(sym_name), function_ref);
 }
 
 ParseResult DispatchEntryOp::parse(OpAsmParser &parser,
@@ -839,7 +826,7 @@ void DispatchEntryOp::print(OpAsmPrinter &p) {
 //===----------------------------------------------------------------------===//
 
 void DispatchOp::build(OpBuilder &builder, OperationState &state,
-                       DispatchEntryOp entryPoint, ValueRange workgroupCount,
+                       DispatchEntryOp entryPoint, ValueRange workload,
                        TypeRange resultTypes, ValueRange resultDims,
                        ValueRange operands, ValueRange operandDims,
                        ArrayAttr tiedOperands,
@@ -853,7 +840,7 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
       SymbolRefAttr::get(builder.getContext(), executableOpSymName,
                          {SymbolRefAttr::get(entryPoint)}));
 
-  state.addOperands(workgroupCount);
+  state.addOperands(workload);
   state.addTypes(resultTypes);
   state.addOperands(operands);
   state.addOperands(operandDims);
@@ -865,7 +852,7 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
   state.attributes.erase("operand_segment_sizes");
   state.addAttribute("operand_segment_sizes",
                      builder.getI32VectorAttr({
-                         static_cast<int32_t>(workgroupCount.size()),
+                         static_cast<int32_t>(workload.size()),
                          static_cast<int32_t>(operands.size()),
                          static_cast<int32_t>(operandDims.size()),
                          static_cast<int32_t>(resultDims.size()),
@@ -879,11 +866,12 @@ FunctionType DispatchOp::getEntryPointType() {
   return FunctionType::get(getContext(), argTypes, getResultTypes());
 }
 
+std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
+  return getODSOperandIndexAndLength(1);  // $operands
+}
+
 LogicalResult DispatchOp::verify() {
   Operation *op = getOperation();
-  if (workgroup_count().empty()) {
-    return op->emitOpError() << "at least one workgroup dimension is required";
-  }
   if (failed(verifyOpDynamicDims(op, operands(), operand_dims())) ||
       failed(verifyOpDynamicDims(op, results(), result_dims()))) {
     return failure();
@@ -891,8 +879,22 @@ LogicalResult DispatchOp::verify() {
   return success();
 }
 
-std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
-  return getODSOperandIndexAndLength(1);  // $operands
+LogicalResult DispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+  Operation *op = getOperation();
+  auto entryPointOp = symbolTable.lookupNearestSymbolFrom(op, entry_point());
+  if (!entryPointOp) {
+    // TODO(benvanik): there are a lot of tests that are assuming this is not
+    // verified. We'll need to go add dummy executables for all of them. Today
+    // we just bail on the verifier if the symbol isn't found.
+    //
+    // Should be:
+    //   return op->emitOpError() << "undefined entry point: " << entry_point();
+    return success();
+  }
+
+  // TODO(benvanik): verify that the target function has matching operands.
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//

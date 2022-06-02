@@ -1,8 +1,7 @@
 // RUN: iree-opt --allow-unregistered-dialect --split-input-file --iree-flow-outline-dispatch-regions %s | FileCheck %s
 
 //      CHECK: flow.executable private @staticShapeDispatch_dispatch_0
-// CHECK-NEXT:   flow.dispatch.entry public @staticShapeDispatch_dispatch_0 attributes {
-// CHECK-SAME:       workgroup_rank = 2 : index}
+// CHECK-NEXT:   flow.dispatch.entry public @staticShapeDispatch_dispatch_0
 //      CHECK: func.func @staticShapeDispatch_dispatch_0(
 // CHECK-SAME:     %[[ARG:.+]]: !flow.dispatch.tensor<readonly:8x4xf32>,
 // CHECK-SAME:     %[[RET:.+]]: !flow.dispatch.tensor<writeonly:4x8xf32>) {
@@ -37,13 +36,11 @@ func.func @staticShapeDispatch(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
 // -----
 
 //      CHECK: flow.executable private @dispatchFnMuli_dispatch_0
-// CHECK-NEXT:   flow.dispatch.entry public @dispatchFnMuli_dispatch_0 attributes {
-// CHECK-SAME:       workgroup_rank = 2 : index}
+// CHECK-NEXT:   flow.dispatch.entry public @dispatchFnMuli_dispatch_0
 //      CHECK: func.func @dispatchFnMuli_dispatch_0(
 
 //      CHECK: flow.executable private @dispatchFnMuli_dispatch_1
-// CHECK-NEXT:   flow.dispatch.entry public @dispatchFnMuli_dispatch_1 attributes {
-// CHECK-SAME:       workgroup_rank = 2 : index}
+// CHECK-NEXT:   flow.dispatch.entry public @dispatchFnMuli_dispatch_1
 //      CHECK: func.func @dispatchFnMuli_dispatch_1(
 
 // CHECK-LABEL: func.func @dispatchFnMuli(
@@ -114,8 +111,7 @@ func.func @dispatchFn2(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
 // -----
 
 //      CHECK: flow.executable private @dynamicShapeDispatch_dispatch_0
-// CHECK-NEXT:   flow.dispatch.entry public @dynamicShapeDispatch_dispatch_0 attributes {
-// CHECK-SAME:       workgroup_rank = 2 : index}
+// CHECK-NEXT:   flow.dispatch.entry public @dynamicShapeDispatch_dispatch_0
 //      CHECK: func.func @dynamicShapeDispatch_dispatch_0(
 // CHECK-SAME:     %[[ARG_TENSOR:.+]]: !flow.dispatch.tensor<readonly:7x?x24x?xf32>,
 // CHECK-SAME:     %[[DIM1_CAPTURE:.+]]: index, %[[DIM3_CAPTURE:.+]]: index,

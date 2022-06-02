@@ -1049,7 +1049,7 @@ LogicalResult BuiltinSplatI64Op::convertBuiltinOp(OpBuilder &builder) {
   auto count =
       builder.createOrFold<arith::DivUIOp>(getLoc(), result_size(), c8);
   auto one = builder.create<arith::ConstantIndexOp>(getLoc(), 1);
-  Value workgroupCount[3] = {
+  Value workload[3] = {
       count,
       one,
       one,
@@ -1069,7 +1069,7 @@ LogicalResult BuiltinSplatI64Op::convertBuiltinOp(OpBuilder &builder) {
       result().getType(),
   };
   auto dispatchOp = builder.create<IREE::Stream::AsyncDispatchOp>(
-      getLoc(), resultTypes, workgroupCount,
+      getLoc(), resultTypes, workload,
       SymbolRefAttr::get(
           builder.getStringAttr("__builtin_splat_i64"),
           FlatSymbolRefAttr::get(builder.getContext(), "__builtin_splat_i64")),
@@ -1115,7 +1115,7 @@ LogicalResult BuiltinFillI64Op::convertBuiltinOp(OpBuilder &builder) {
   auto count =
       builder.createOrFold<arith::DivUIOp>(getLoc(), target_length(), c8);
   auto one = builder.create<arith::ConstantIndexOp>(getLoc(), 1);
-  Value workgroupCount[3] = {
+  Value workload[3] = {
       count,
       one,
       one,
@@ -1139,7 +1139,7 @@ LogicalResult BuiltinFillI64Op::convertBuiltinOp(OpBuilder &builder) {
       result().getType(),
   };
   auto dispatchOp = builder.create<IREE::Stream::AsyncDispatchOp>(
-      getLoc(), resultTypes, workgroupCount,
+      getLoc(), resultTypes, workload,
       SymbolRefAttr::get(
           builder.getStringAttr("__builtin_fill_i64"),
           FlatSymbolRefAttr::get(builder.getContext(), "__builtin_fill_i64")),

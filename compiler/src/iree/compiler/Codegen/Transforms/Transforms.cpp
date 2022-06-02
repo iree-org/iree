@@ -54,10 +54,9 @@ FailureOr<IREE::HAL::ExecutableEntryPointOp> defineWorkgroupCountRegion(
   Block *entryBlock = builder.createBlock(&region);
   // Add 3 index arguments for the workload.
   auto indexType = builder.getIndexType();
-  assert(IREE::HAL::ExecutableEntryPointOp::getNumWorkgroupDims() == 3 &&
-         "expected 3 dims");
   auto device =
       entryBlock->addArgument(builder.getType<IREE::HAL::DeviceType>(), loc);
+  // NOTE: this code currently assumes workloads are always defined as 3D.
   std::array<Value, 3> workload = {entryBlock->addArgument(indexType, loc),
                                    entryBlock->addArgument(indexType, loc),
                                    entryBlock->addArgument(indexType, loc)};

@@ -3,7 +3,7 @@
 // CHECK: stream.executable private @executable
 flow.executable private @executable {
   // CHECK: stream.executable.export public @dispatch
-  flow.dispatch.entry public @dispatch attributes {workgroup_rank = 3 : index}
+  flow.dispatch.entry public @dispatch
   builtin.module {
     // CHECK: func.func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding, %[[ARG0_DIM0:.+]]: index, %[[ARG1_DIM1:.+]]: index)
     func.func @dispatch(%arg0: !flow.dispatch.tensor<readonly:?x4xf32>, %arg1: !flow.dispatch.tensor<writeonly:4x?xf32>,
@@ -74,7 +74,7 @@ func.func @custom_ops(%arg0: tensor<4x8xf32>) -> tensor<8x4xf32> {
 // CHECK: stream.executable private @while_test_dispatch_0
 flow.executable private @while_test_dispatch_0 {
   // CHECK: stream.executable.export public @dispatch
-  flow.dispatch.entry public @dispatch attributes {workgroup_rank = 3 : index}
+  flow.dispatch.entry public @dispatch
   // CHECK: builtin.module
   builtin.module {
     // CHECK: func.func @dispatch(%[[BINDING0:.+]]: !stream.binding, %[[BINDING1:.+]]: !stream.binding)
@@ -100,7 +100,7 @@ flow.executable private @while_test_dispatch_0 {
 
 // CHECK: stream.executable private @while_test_dispatch_1
 flow.executable private @while_test_dispatch_1 {
-  flow.dispatch.entry public @dispatch attributes {workgroup_rank = 3 : index}
+  flow.dispatch.entry public @dispatch
   builtin.module  {
     func.func @dispatch(%arg0: !flow.dispatch.tensor<readonly:i32>, %arg1: !flow.dispatch.tensor<writeonly:i32>) {
       %c2_i32 = arith.constant 2 : i32

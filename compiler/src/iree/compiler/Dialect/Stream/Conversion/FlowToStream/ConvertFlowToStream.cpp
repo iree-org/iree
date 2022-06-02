@@ -296,7 +296,7 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
     }
 
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncDispatchOp>(
-        op, resultTypes, adaptor.workgroup_count(), adaptor.entry_point(),
+        op, resultTypes, adaptor.workload(), adaptor.entry_point(),
         dispatchOperands, dispatchOperandSizes, resultSizes,
         adaptor.tied_operandsAttr(),
         /*affinity=*/nullptr);

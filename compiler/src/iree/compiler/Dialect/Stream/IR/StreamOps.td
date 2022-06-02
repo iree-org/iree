@@ -1841,7 +1841,7 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   }];
 
   let arguments = (ins
-    Variadic<Index>:$workgroup_count,
+    Variadic<Index>:$workload,
     SymbolRefAttr:$entry_point,
     Variadic<AnyTypeOf<[
       Stream_AnyStreamResource,
@@ -1858,7 +1858,8 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
-    $entry_point `[` $workgroup_count `]` ``
+    $entry_point
+    (`[` $workload^ `]`)? ``
     `(` $operands `)` attr-dict `:`
     custom<ShapedFunctionType>(ref($operands),
                                type($operands), $operand_sizes,
@@ -2298,7 +2299,7 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
   }];
 
   let arguments = (ins
-    Variadic<Index>:$workgroup_count,
+    Variadic<Index>:$workload,
     SymbolRefAttr:$entry_point,
     Variadic<Stream_PrimitiveType>:$operands,
     Variadic<Stream_AnyStreamResource>:$resources,
@@ -2310,7 +2311,8 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
   let results = (outs);
 
   let assemblyFormat = [{
-    $entry_point `[` $workgroup_count `]` ``
+    $entry_point
+    (`[` $workload^ `]`)? ``
     (`(` $operands^ `:` type($operands) `)`)? `{`
     custom<DispatchResources>($resources, type($resources), $resource_sizes,
                               $resource_offsets, $resource_lengths,

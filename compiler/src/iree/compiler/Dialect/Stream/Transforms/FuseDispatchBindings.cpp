@@ -296,9 +296,9 @@ static void updateDispatchSite(IREE::Stream::CmdDispatchOp dispatchOp,
   // Replace the old dispatch op with a new one.
   OpBuilder builder(dispatchOp);
   auto newOp = builder.create<IREE::Stream::CmdDispatchOp>(
-      dispatchOp.getLoc(), dispatchOp.workgroup_count(),
-      dispatchOp.entry_pointAttr(), newOperands, newResources, newResourceSizes,
-      newOffsets, newLengths, builder.getArrayAttr(newAccesses));
+      dispatchOp.getLoc(), dispatchOp.workload(), dispatchOp.entry_pointAttr(),
+      newOperands, newResources, newResourceSizes, newOffsets, newLengths,
+      builder.getArrayAttr(newAccesses));
   (void)newOp;
   LLVM_DEBUG({
     llvm::dbgs() << "updated dispatch:\n";

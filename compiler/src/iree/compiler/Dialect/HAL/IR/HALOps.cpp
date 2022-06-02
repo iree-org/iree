@@ -731,11 +731,14 @@ LogicalResult ExecutableEntryPointOp::verify() {
     return op.emitOpError() << "expected a single region block";
   }
   bool validArguments = true;
-  if (body->getNumArguments() != /*device*/ 1 + getNumWorkgroupDims()) {
+  if (body->getNumArguments() == 0) {
+    // Need at least a !hal.device.
     validArguments = false;
   } else if (!body->getArgument(0).getType().isa<IREE::HAL::DeviceType>()) {
+    // !hal.device must come first.
     validArguments = false;
   } else {
+    // All remaining arguments need to be of type index (today).
     for (BlockArgument &blockArg : body->getArguments().drop_front(1)) {
       if (!blockArg.getType().isa<IndexType>()) {
         validArguments = false;
@@ -745,10 +748,10 @@ LogicalResult ExecutableEntryPointOp::verify() {
   }
   if (!validArguments) {
     return op.emitOpError(
-        "expected workgroup_count_region to take (%device: !hal.device, "
-        "%workload_x: index, %workload_y: index, %workload_z: index");
+        "expected workgroup_count to take (%device: !hal.device, "
+        "%workload_0: index, %workload_1: index, ...");
   }
-  // Check that the last statement in the block is `hal.yield` operation.
+  // Check that the last statement in the block is `hal.return` operation.
   // TODO(ravishankarm): The SingleBlockImplicitTerminator<"HAL::ReturnOp">
   // should generate this check, but it doesnt.
   auto returnOp = dyn_cast<ReturnOp>(body->getTerminator());

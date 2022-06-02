@@ -1536,16 +1536,11 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     An entry point exported by the executable with statically-available
     information describing the IO interface it uses and other dispatch metadata.
 
-    The `workgroup_count_region` region represents the computation that returns
-    the number of workgroups to use.
-    The arguments to the region represents the workload along x, y and z.
+    The `calculate_workgroup_count` region represents the computation that
+    returns the number of workgroups to use in the 3D grid dispatch.
+    The arguments to the region represents the workload as captured by each
+    dispatch.
     It returns the number of workgroups along x, y, and z.
-
-    TODO(ravishankarm): In reality there is no need to define what the
-    arguments represent. They could be any values that are needed to
-    compute the number of workgroups. Its unclear what these are in
-    general and how to plumb them through. So for now just accepting
-    the workload along x, y, and z.
   }];
 
   let arguments = (ins
