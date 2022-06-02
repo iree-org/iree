@@ -51,3 +51,4 @@ def annotate_build(annotation=None, style=None, context=None):
     cmd.extend(["--context", context])
   if annotation is not None:
     cmd.append(annotation)
+  subprocess.run(cmd, check=True)
