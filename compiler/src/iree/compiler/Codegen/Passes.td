@@ -202,10 +202,11 @@ def ConvertToLLVM :
   let constructor = "mlir::iree_compiler::createConvertToLLVMPass()";
 }
 
-def LLVMCPUCheckLinalgVectorized :
-    Pass<"iree-llvmcpu-check-linalg-vectorized", "func::FuncOp"> {
-  let summary = "Checks all Linalg ops are vectorized";
-  let constructor = "mlir::iree_compiler::createLLVMCPUCheckLinalgVectorizedPass()";
+def LLVMCPUEmitVectorizationRemarks :
+    Pass<"iree-llvmcpu-emit-vectorization-remarks", "func::FuncOp"> {
+  let summary = "Emit vectorization remarks on Linalg ops";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUEmitVectorizationRemarksPass()";
 }
 
 def LLVMCPUCheckIRBeforeLLVMConversion :

@@ -35,8 +35,8 @@ static llvm::cl::opt<bool> clCheckIRBeforeLLVMConversion(
                    "before conversion to LLVM IR"),
     llvm::cl::init(true));
 
-static llvm::cl::opt<bool> clCheckLinalgVectorized(
-    "iree-codegen-check-linalg-vectorized",
+static llvm::cl::opt<bool> clCheckLinalgVectorization(
+    "iree-llvmcpu-check-linalg-vectorization",
     llvm::cl::desc(
         "Runs the pass to check if all the Linalg ops are vectorized"),
     llvm::cl::init(false));
@@ -474,9 +474,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 
   // Linalg -> SCF
   passManager.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
-  if (clCheckLinalgVectorized) {
+  if (clCheckLinalgVectorization) {
     passManager.addNestedPass<func::FuncOp>(
-        createLLVMCPUCheckLinalgVectorizedPass());
+        createLLVMCPUEmitVectorizationRemarksPass());
   }
   passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());

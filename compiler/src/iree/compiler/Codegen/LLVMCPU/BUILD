@@ -18,7 +18,7 @@ iree_compiler_cc_library(
         "ConvertToLLVM.cpp",
         "KernelDispatch.cpp",
         "LLVMCPUCheckIRBeforeLLVMConversion.cpp",
-        "LLVMCPUCheckLinalgVectorized.cpp",
+        "LLVMCPUEmitVectorizationRemarks.cpp",
         "LLVMCPULowerExecutableTarget.cpp",
         "LLVMCPUSynchronizeSymbolVisibility.cpp",
         "LLVMCPUTileFuseAndVectorizeLinalgTensorOps.cpp",

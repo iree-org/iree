@@ -13,25 +13,21 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-struct LLVMCPUCheckLinalgVectorizedPass
-    : LLVMCPUCheckLinalgVectorizedBase<LLVMCPUCheckLinalgVectorizedPass> {
+struct LLVMCPUEmitVectorizationRemarksPass
+    : LLVMCPUEmitVectorizationRemarksBase<LLVMCPUEmitVectorizationRemarksPass> {
   void runOnOperation() override;
 };
 }  // namespace
 
-void LLVMCPUCheckLinalgVectorizedPass::runOnOperation() {
+void LLVMCPUEmitVectorizationRemarksPass::runOnOperation() {
   auto funcOp = getOperation();
-  auto walkResult = funcOp.walk([&](linalg::LinalgOp op) -> WalkResult {
-    return WalkResult::interrupt();
-  });
-  if (walkResult.wasInterrupted()) {
-    funcOp.emitWarning("one or more operations were found not vectorized");
-  }
+  funcOp.walk(
+      [&](linalg::LinalgOp op) { op.emitWarning("op is not vectorized"); });
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUCheckLinalgVectorizedPass() {
-  return std::make_unique<LLVMCPUCheckLinalgVectorizedPass>();
+createLLVMCPUEmitVectorizationRemarksPass() {
+  return std::make_unique<LLVMCPUEmitVectorizationRemarksPass>();
 }
 
 }  // namespace iree_compiler
