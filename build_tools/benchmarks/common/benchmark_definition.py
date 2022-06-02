@@ -501,7 +501,7 @@ class ModuleComponentSizes(object):
         "file_size": self.file_size,
         "vm_component_size": self.vm_component_size,
         "const_component_size": self.const_component_size,
-        "total_dispatch_component": self.total_dispatch_component_size,
+        "total_dispatch_component_size": self.total_dispatch_component_size,
     }
 
   @staticmethod

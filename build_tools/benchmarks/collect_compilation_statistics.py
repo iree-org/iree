@@ -23,7 +23,7 @@ MODULE_DIR = "vmfb"
 MODULE_FILE_EXTENSION = ".vmfb"
 NINJA_LOG_HEADER = "ninja log v5"
 NINJA_BUILD_LOG = ".ninja_log"
-COMPILATION_STATS_MODULE_SUFFIX = "compilation-stats"
+COMPILATION_STATS_MODULE_SUFFIX = "compile-stats"
 
 VM_COMPONENT_NAME = "module.fb"
 CONST_COMPONENT_NAME = "_const.bin"
