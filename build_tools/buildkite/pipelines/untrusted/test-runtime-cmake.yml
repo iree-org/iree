@@ -1,0 +1,49 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+steps:
+  - label: "Waiting for build-runtime-cmake"
+    key: build-runtime-cmake
+    agents:
+      queue: "orchestration"
+      security: "untrusted"
+    commands: |
+      export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
+          --secret=iree-buildkite-presubmit-pipelines)"
+      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py \
+        --output-build-json=build.json \
+        build-runtime-cmake
+      # TODO: install jq on the buildkite agents to replace inline python.
+      buildkite-agent meta-data set \
+        "build-runtime-cmake-build-id" \
+        "$(cat build.json | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")"
+
+
+  # TODO: better emoji here
+  - label: ":hammer_and_wrench: Test the runtime only"
+    agents:
+      queue: "cpu"
+      security: "untrusted"
+    depends_on: "build-runtime-cmake"
+    env:
+      IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
+    commands: |
+      BUILD_RUNTIME_CMAKE_BUILD_ID="$(buildkite-agent meta-data get "build-runtime-cmake-build-id")"
+      RUNTIME_BUILD_DIR="build-runtime-$${BUILD_RUNTIME_CMAKE_BUILD_ID}"
+      RUNTIME_BUILD_ARCHIVE="$${RUNTIME_BUILD_DIR}.tgz"
+      buildkite-agent artifact download \
+        --build "$${BUILD_RUNTIME_CMAKE_BUILD_ID}" \
+        "$${RUNTIME_BUILD_ARCHIVE}" \
+        ./
+      tar -xzf "$${RUNTIME_BUILD_ARCHIVE}"
+      docker run --user="$(id -u):$(id -g)" \
+        --volume="$$PWD:$$IREE_DOCKER_WORKDIR" \
+        --workdir="$$IREE_DOCKER_WORKDIR" \
+        --env IREE_VULKAN_DISABLE=1 \
+        --rm \
+        gcr.io/iree-oss/base@sha256:32a501b23abeae69eb33e5e78295312f5df28bacabc799dffe218764a66ed28e \
+        ./build_tools/cmake/ctest_all.sh \
+        "$${RUNTIME_BUILD_DIR}"
