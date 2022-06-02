@@ -292,8 +292,17 @@ class DumpDispatchGraphPass
           printOperands(os, dispatch.workload(), state);
           os << "]\n";
 
-          // print entry function name
-          os << dispatch.entry_point();
+          // Print entry function name, if there is only one entry function,
+          // then the name space and the entry function names are the same,
+          // and we can just print the function name to save space.
+          auto entryPoint = dispatch.entry_point();
+          auto rootName = entryPoint.getRootReference();
+          auto leafName = entryPoint.getLeafReference();
+          if (rootName == leafName) {
+            os << leafName;
+          } else {
+            os << entryPoint;  // print the full name
+          }
 
           // print entry function args
           os << "(";
