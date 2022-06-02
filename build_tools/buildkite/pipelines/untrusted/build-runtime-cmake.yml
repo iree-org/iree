@@ -7,7 +7,7 @@
 steps:
   - label: ":hammer_and_wrench: Build the runtime only"
     agents:
-      queue: "build"
+      queue: "cpu"
       security: "untrusted"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
