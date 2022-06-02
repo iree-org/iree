@@ -60,7 +60,7 @@ cd build-host
   -DIREE_BUILD_SAMPLES=OFF
 
 "${CMAKE_BIN}" --build . --target install -- -k 0
-"${CMAKE_BIN}" --build . --target iree-benchmark-suites -- -k 0
+"${CMAKE_BIN}" --build . --target iree-benchmark-suites-linux-x86_64 -- -k 0
 "${CMAKE_BIN}" --build . --target iree-microbenchmark-suites -- -k 0
 # --------------------------------------------------------------------------- #
 

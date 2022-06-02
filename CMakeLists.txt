@@ -41,8 +41,6 @@ option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topolog
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
-option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." OFF)
-option(IREE_BUILD_MICROBENCHMARKS "Builds IREE microbenchmark suites." OFF)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
@@ -60,6 +58,14 @@ option(IREE_BUILD_BINDINGS_TFLITE_JAVA "Builds the IREE TFLite Java bindings wit
 
 # Default python bindings to enabled for some features.
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
+
+# Properties building and controlling benchmark suites.
+option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." OFF)
+# TODO(pzread): Currently IREE_ENABLE_COMPILATION_BENCHMARKS needs
+# IREE_BUILD_BENCHMARKS. Eventually we will decouple them.
+cmake_dependent_option(IREE_ENABLE_COMPILATION_BENCHMARKS "Builds IREE benchmark suites for compilation statistics." OFF ${IREE_BUILD_BENCHMARKS} OFF)
+
+option(IREE_BUILD_MICROBENCHMARKS "Builds IREE microbenchmark suites." OFF)
 
 #-------------------------------------------------------------------------------
 # Experimental project flags

@@ -32,7 +32,6 @@ using mlir::bufferization::BufferizationState;
 using mlir::bufferization::DialectAnalysisState;
 using mlir::bufferization::eliminateAllocTensors;
 using mlir::bufferization::OneShotBufferizationOptions;
-using mlir::bufferization::PostAnalysisStepFn;
 using mlir::bufferization::replaceOpWithNewBufferizedOp;
 
 namespace mlir {
@@ -46,9 +45,6 @@ namespace {
 /// Flow dialect-specific bufferization state.
 struct FlowBufferizationState : public DialectAnalysisState {
   DenseMap<Value, Value> subspan_to_buffer;
-
-  /// DispatchTensorStoreOps that do not require a copy.
-  DenseSet<Operation *> store_ops_without_copy;
 };
 }  // namespace
 
@@ -311,19 +307,6 @@ static bool isValueEquivalentToAnInplaceTensorLoadOp(
   return foundOp;
 }
 
-static LogicalResult inplaceTensorStoreOpAnalysis(
-    Operation *op, AnalysisState &state, BufferizationAliasInfo &aliasInfo,
-    SmallVector<Operation *> &newOps) {
-  FlowBufferizationState &flowState = getFlowBufferizationState(state);
-  op->walk([&](IREE::Flow::DispatchTensorStoreOp storeOp) {
-    // If a store op's dest is eqivalent to a load op's source, no copy is
-    // needed for the store op. All writes already happened inplace.
-    if (isValueEquivalentToAnInplaceTensorLoadOp(aliasInfo, storeOp))
-      flowState.store_ops_without_copy.insert(storeOp);
-  });
-  return success();
-}
-
 /// Try to eliminate InitTensorOps that are eventually fed into a
 /// DispatchTensorStoreOp. Such InitTensorOps are replaced with matching
 /// DispatchTensorLoadOps. Two conditions must be met:
@@ -351,9 +334,7 @@ LogicalResult storeTensorOpAnchoredInitTensorEliminationStep(
       });
 }
 
-static LogicalResult createSubSpanBuffers(Operation *op, AnalysisState &state,
-                                          BufferizationAliasInfo &aliasInfo,
-                                          SmallVector<Operation *> &newOps) {
+LogicalResult createSubSpanBuffers(Operation *op, AnalysisState &state) {
   FlowBufferizationState &flowState = getFlowBufferizationState(state);
 
   op->walk([&](Operation *op) {
@@ -431,11 +412,6 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
         IREE::LinalgExt::TopkOp::attachInterface<
             LinalgExtOpInterface<IREE::LinalgExt::TopkOp>>(*ctx);
       });
-}
-
-void addPostAnalysisTransformations(OneShotBufferizationOptions &options) {
-  options.addPostAnalysisStep(createSubSpanBuffers);
-  options.addPostAnalysisStep(inplaceTensorStoreOpAnalysis);
 }
 
 }  // namespace iree_compiler

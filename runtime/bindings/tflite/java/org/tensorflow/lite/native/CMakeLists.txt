@@ -20,7 +20,7 @@ target_link_libraries(${_NAME}
   PUBLIC
     iree::base
     iree::base::logging
-    runtime::bindings::tflite::shim
+    iree::runtime::bindings::tflite::shim
 )
 
 target_link_options(${_NAME}

@@ -28,6 +28,6 @@ transform.with_pdl_patterns {
     // The first dimension does not divide but we can always scalarize a `?` into `1`
     // and enable vectorization of a lower-rank op this way.
     %tiled_linalg_op_0 = transform.structured.scalarize %tiled_linalg_op
-    transform.structured.vectorize {vectorize_padding = false}
+    transform.structured2.vectorize {vectorize_padding = false}
   }
 }

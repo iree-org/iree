@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-flow-fuse-transpose --split-input-file --verify-diagnostics --pass-pipeline="func.func(iree-flow-interchange-transpose-generic-ops,iree-flow-dispatch-linalg-on-tensors-pass)" --canonicalize -cse %s | FileCheck %s
+// RUN: iree-opt --iree-flow-ensure-inplaceable-consumer=false --split-input-file --verify-diagnostics --pass-pipeline="func.func(iree-flow-interchange-transpose-generic-ops,iree-flow-dispatch-linalg-on-tensors-pass)" --canonicalize -cse %s | FileCheck %s
 
 func.func @fuse_batch_matmul_transpose(%a: tensor<4x384x384xf32>, %b: tensor<4x384x32xf32>) -> tensor<384x4x32xf32> {
   %cst = arith.constant 0.000000e+00 : f32
