@@ -38,4 +38,6 @@ steps:
     commands: |
       export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
           --secret=iree-buildkite-presubmit-pipelines)"
-      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py build-runtime-cmake
+      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py \
+        --annotate \
+        build-runtime-cmake
