@@ -63,7 +63,11 @@ static Optional<std::pair<AffineExpr, AffineExpr>> getWorkgroupRange(
   if (auto idOp =
           processorValue.getDefiningOp<IREE::HAL::InterfaceWorkgroupIDOp>()) {
     OpBuilder builder(processorValue.getContext());
+
+    // Can't infer the range when workroupCount is unknown.
     unsigned index = idOp.dimension().getZExtValue();
+    if (!workgroupCount[index]) return llvm::None;
+
     AffineExpr zero = builder.getAffineConstantExpr(0);
     AffineExpr ubExpr = builder.getAffineConstantExpr(workgroupCount[index]);
     return std::make_pair(zero, ubExpr - 1);
@@ -71,7 +75,11 @@ static Optional<std::pair<AffineExpr, AffineExpr>> getWorkgroupRange(
   if (auto dimOp = processorValue
                        .getDefiningOp<IREE::HAL::InterfaceWorkgroupCountOp>()) {
     OpBuilder builder(processorValue.getContext());
+
+    // Can't infer the range when workroupCount is unknown.
     unsigned index = dimOp.dimension().getZExtValue();
+    if (!workgroupCount[index]) return llvm::None;
+
     AffineExpr bound = builder.getAffineConstantExpr(workgroupCount[index]);
     return std::make_pair(bound, bound);
   }

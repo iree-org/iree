@@ -15,16 +15,16 @@ transform.structured.canonicalized_sequence {
   %3 = transform.structured.pad %2 {pack_paddings = [1, 1, 0]}
   // CHECK: transform.structured.decompose
   transform.structured.decompose
-  // CHECK: %{{.*}} = transform.structured.vectorize %[[PADDED]] {vectorize_padding = true}
-  %4 = transform.structured.vectorize %3 {vectorize_padding = true}
+  // CHECK: %{{.*}} = transform.structured2.vectorize %[[PADDED]] {vectorize_padding = true}
+  %4 = transform.structured2.vectorize %3 {vectorize_padding = true}
   // CHECK: %[[OPS2:.*]] = pdl_match @{{.*}}
   %5 = pdl_match @match2 in %arg0
-  // CHECK: %{{.*}} = transform.structured.vectorize %[[OPS2]]
-  transform.structured.vectorize %5
+  // CHECK: %{{.*}} = transform.structured2.vectorize %[[OPS2]]
+  transform.structured2.vectorize %5
   // CHECK-NOT: %
-  // CHECK: transform.structured.vectorize
+  // CHECK: transform.structured2.vectorize
   // CHECK-NOT: %
-  transform.structured.vectorize
+  transform.structured2.vectorize
   // CHECK: bufferize
   bufferize
   // CHECK: lower_vectors {multireduction_lowering = "innerreduce"}

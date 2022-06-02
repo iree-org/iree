@@ -13,6 +13,8 @@
 # `iree-benchmark-module`.
 #
 # Parameters:
+#   GROUP_NAME: A group name this benchmark will join. Each group has its own
+#       CMake's benchmark suite target: "iree-benchmark-suites-<GROUP_NAME>".
 #   MODULES: A list for model specification. Due to CMake's lack of data
 #       structures, each module is represented as a list suitable to be parsed
 #       by cmake_parse_arguments:
@@ -68,17 +70,23 @@ function(iree_benchmark_suite)
     PARSE_ARGV 0
     _RULE
     ""
-    "DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
+    "GROUP_NAME;DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
     "BENCHMARK_MODES;BENCHMARK_TOOL;MODULES;TRANSLATION_FLAGS;RUNTIME_FLAGS"
   )
 
   iree_validate_required_arguments(
     _RULE
-    "DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
+    "GROUP_NAME;DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
     "BENCHMARK_MODES;BENCHMARK_TOOL;MODULES"
   )
 
   iree_package_name(PACKAGE_NAME)
+
+  # Add the benchmark suite target.
+  set(SUITE_SUB_TARGET "iree-benchmark-suites-${_RULE_GROUP_NAME}")
+  if(NOT TARGET "${SUITE_SUB_TARGET}")
+    add_custom_target("${SUITE_SUB_TARGET}")
+  endif()
 
   foreach(_MODULE IN LISTS _RULE_MODULES)
     cmake_parse_arguments(
@@ -234,6 +242,7 @@ function(iree_benchmark_suite)
 
         # Mark dependency so that we have one target to drive them all.
         add_dependencies(iree-benchmark-suites "${_TRANSLATION_TARGET_NAME}")
+        add_dependencies("${SUITE_SUB_TARGET}" "${_TRANSLATION_TARGET_NAME}")
       endif(NOT TARGET "${_TRANSLATION_TARGET_NAME}")
 
       set(_COMPILE_STATS_TRANSLATION_TARGET_NAME
@@ -272,6 +281,9 @@ function(iree_benchmark_suite)
         add_dependencies(iree-benchmark-suites
           "${_COMPILE_STATS_TRANSLATION_TARGET_NAME}"
         )
+        add_dependencies("${SUITE_SUB_TARGET}"
+          "${_COMPILE_STATS_TRANSLATION_TARGET_NAME}"
+        )
       endif()
 
       if(NOT TARGET "${_FRIENDLY_TARGET_NAME}")
@@ -284,6 +296,7 @@ function(iree_benchmark_suite)
       endif()
 
       set(_RUN_SPEC_DIR "${_ROOT_ARTIFACTS_DIR}/${_MODULE_DIR_NAME}/${_BENCHMARK_DIR_NAME}")
+      list(JOIN _COMMON_NAME_SEGMENTS "__" _RUN_SPEC_TARGET_SUFFIX)
 
       # Create the command and target for the flagfile spec used to execute
       # the generated artifacts.
@@ -306,11 +319,8 @@ function(iree_benchmark_suite)
         COMMENT "Generating ${_FLAG_FILE}"
       )
 
-      set(_FLAGFILE_GEN_TARGET_NAME_LIST "iree-generate-benchmark-flagfile")
-      list(APPEND _FLAGFILE_GEN_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
-      list(JOIN _FLAGFILE_GEN_TARGET_NAME_LIST "__" _FLAGFILE_GEN_TARGET_NAME)
-      set(_FLAGFILE_GEN_TARGET_NAME "${PACKAGE_NAME}_${_FLAGFILE_GEN_TARGET_NAME}")
-
+      set(_FLAGFILE_GEN_TARGET_NAME
+        "${PACKAGE_NAME}_iree-generate-benchmark-flagfile__${_RUN_SPEC_TARGET_SUFFIX}")
       add_custom_target("${_FLAGFILE_GEN_TARGET_NAME}"
         DEPENDS "${_FLAG_FILE}"
       )
@@ -325,23 +335,42 @@ function(iree_benchmark_suite)
         COMMENT "Generating ${_TOOL_FILE}"
       )
 
-      set(_TOOLFILE_GEN_TARGET_NAME_LIST "iree-generate-benchmark-toolfile")
-      list(APPEND _TOOLFILE_GEN_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
-      list(JOIN _TOOLFILE_GEN_TARGET_NAME_LIST "__" _TOOLFILE_GEN_TARGET_NAME)
+      set(_TOOLFILE_GEN_TARGET_NAME
+        "${PACKAGE_NAME}_iree-generate-benchmark-toolfile__${_RUN_SPEC_TARGET_SUFFIX}")
       add_custom_target("${_TOOLFILE_GEN_TARGET_NAME}"
         DEPENDS "${_TOOL_FILE}"
       )
 
       # Generate a flagfile containing command-line options used to compile the
       # generated artifacts.
-      set(_COMPOPT_FILE "${_RUN_SPEC_DIR}/compilation_flagfile")
-      string(REPLACE ";" "\n" IREE_BENCHMARK_COMPILATION_FLAGS "${_TRANSLATION_ARGS}")
-      configure_file(
-        ${PROJECT_SOURCE_DIR}/build_tools/cmake/benchmark_compilation_flagfile.in
-        ${_COMPOPT_FILE})
+      set(_COMPILATION_FLAGFILE "${_RUN_SPEC_DIR}/compilation_flagfile")
+      # Generate the flagfile with python command. We can't use "file" because
+      # it can't be part of a target's dependency and generated lazily. And
+      # "cmake -E echo" doesn't work with newlines.
+      add_custom_command(
+        OUTPUT "${_COMPILATION_FLAGFILE}"
+        COMMAND
+          "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/scripts/generate_compilation_flagfile.py"
+            --output "${_COMPILATION_FLAGFILE}"
+            -- ${_TRANSLATION_ARGS}
+        WORKING_DIRECTORY "${_RUN_SPEC_DIR}"
+        COMMENT "Generating ${_COMPILATION_FLAGFILE}"
+      )
+
+      set(_COMPILATION_FLAGFILE_GEN_TARGET_NAME
+        "${PACKAGE_NAME}_iree-generate-benchmark-compilation-flagfile__${_RUN_SPEC_TARGET_SUFFIX}")
+      add_custom_target("${_COMPILATION_FLAGFILE_GEN_TARGET_NAME}"
+        DEPENDS "${_COMPILATION_FLAGFILE}"
+      )
 
       # Mark dependency so that we have one target to drive them all.
       add_dependencies(iree-benchmark-suites
+        "${_COMPILATION_FLAGFILE_GEN_TARGET_NAME}"
+        "${_FLAGFILE_GEN_TARGET_NAME}"
+        "${_TOOLFILE_GEN_TARGET_NAME}"
+      )
+      add_dependencies("${SUITE_SUB_TARGET}"
+        "${_COMPILATION_FLAGFILE_GEN_TARGET_NAME}"
         "${_FLAGFILE_GEN_TARGET_NAME}"
         "${_TOOLFILE_GEN_TARGET_NAME}"
       )

@@ -35,7 +35,7 @@ transform.with_pdl_patterns {
     %0 = pdl_match @target_pattern in %arg1
     %1, %loops1:3 = transform.structured.tile %0 {interchange = [0, 2, 1], sizes = [3, 5, 14]}
     %2, %loops2:3 = transform.structured.tile %1 {sizes = [3, 5, 2]}
-    %3 = transform.structured.vectorize %2 {vectorize_padding = true}
+    %3 = transform.structured2.vectorize %2 {vectorize_padding = true}
   }
 }
 
@@ -76,6 +76,6 @@ transform.with_pdl_patterns {
     %0 = pdl_match @target_pattern in %arg1
     %1, %loops1:3 = transform.structured.tile %0 {interchange = [2, 1, 0], sizes = [3, 5, 14]}
     %2, %loops2:3 = transform.structured.tile %1 {sizes = [3, 5, 2]}
-    %3 = transform.structured.vectorize %2 {vectorize_padding = true}
+    %3 = transform.structured2.vectorize %2 {vectorize_padding = true}
   }
 }
