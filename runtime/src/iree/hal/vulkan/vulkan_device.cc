@@ -1045,6 +1045,20 @@ static iree_status_t iree_hal_vulkan_device_create_semaphore(
                                                  initial_value, out_semaphore);
 }
 
+static iree_hal_semaphore_compatibility_t
+iree_hal_vulkan_device_query_semaphore_compatibility(
+    iree_hal_device_t* base_device, iree_hal_semaphore_t* semaphore) {
+  if (iree_hal_vulkan_native_semaphore_isa(semaphore)) {
+    // Fast-path for semaphores related to this device.
+    // TODO(benvanik): ensure the creating devices are compatible in cases where
+    // multiple devices are used.
+    return IREE_HAL_SEMAPHORE_COMPATIBILITY_ALL;
+  }
+  // TODO(benvanik): semaphore APIs for querying allowed export formats. We
+  // can check device caps to see what external semaphore types are supported.
+  return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
+}
+
 static iree_status_t iree_hal_vulkan_device_queue_submit(
     iree_hal_device_t* base_device,
     iree_hal_command_category_t command_categories,
@@ -1110,6 +1124,8 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.create_executable_layout=*/
     iree_hal_vulkan_device_create_executable_layout,
     /*.create_semaphore=*/iree_hal_vulkan_device_create_semaphore,
+    /*.query_semaphore_compatibility=*/
+    iree_hal_vulkan_device_query_semaphore_compatibility,
     /*.transfer_range=*/iree_hal_device_submit_transfer_range_and_wait,
     /*.queue_submit=*/iree_hal_vulkan_device_queue_submit,
     /*.submit_and_wait=*/
