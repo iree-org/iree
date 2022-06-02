@@ -19,8 +19,8 @@ steps:
 
   - wait
 
-  - label: "Executing test-pipeline"
+  - label: "Executing build-runtime-cmake"
     commands: |
       export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
           --secret=iree-buildkite-presubmit-pipelines)"
-      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py test-pipeline
+      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py build-runtime-cmake
