@@ -1,0 +1,22 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+steps:
+  - label: ":hammer_and_wrench: Build the runtime only"
+    agents:
+      queue: "build"
+      security: "untrusted"
+    env:
+      IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
+    commands: |
+      git submodule sync
+      git submodule update --init --jobs 8 --depth 1
+      docker run --user="$(id -u):$(id -g)" \
+        --volume="$$PWD:$$IREE_DOCKER_WORKDIR" \
+        --workdir="$$IREE_DOCKER_WORKDIR" \
+        --rm \
+        gcr.io/iree-oss/base@sha256:32a501b23abeae69eb33e5e78295312f5df28bacabc799dffe218764a66ed28e \
+        ./build_tools/cmake/build_runtime.sh

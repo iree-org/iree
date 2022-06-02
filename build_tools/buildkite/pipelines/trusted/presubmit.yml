@@ -28,7 +28,7 @@ steps:
 
   - wait
 
-  - label: "Executing test-pipeline"
+  - label: "Executing build-runtime-cmake"
     plugins:
       - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#24e54e7729:
           repos:
@@ -38,4 +38,4 @@ steps:
     commands: |
       export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
           --secret=iree-buildkite-presubmit-pipelines)"
-      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py test-pipeline
+      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py build-runtime-cmake
