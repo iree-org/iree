@@ -69,9 +69,8 @@ public:
       return signalPassFailure();
     }
 
-    transform::TransformState state(topLevel->getRegion(0), topLevel);
-
     if (clTransformFileName.empty()) {
+      transform::TransformState state(topLevel->getRegion(0), topLevel);
       Block &body = topLevel->getRegion(0).front();
       for (auto op : body.getOps<transform::TransformOpInterface>()) {
         if (failed(state.applyTransform(op)))
@@ -92,6 +91,8 @@ public:
     sourceMgr.AddNewSourceBuffer(std::move(memoryBuffer), llvm::SMLoc());
     OwningOpRef<ModuleOp> transformModule(
         parseSourceFile<ModuleOp>(sourceMgr, &getContext()));
+    transform::TransformState state(
+        transformModule->getOperation()->getRegion(0), topLevel);
     for (auto op : transformModule->getBody()
                        ->getOps<transform::TransformOpInterface>()) {
       if (failed(state.applyTransform(op)))
