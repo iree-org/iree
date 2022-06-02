@@ -27,16 +27,28 @@ class Convert1x1ConvolutionMatmulOp
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
                                 PatternRewriter &rewriter) const override {
-    ShapedType inputShapeType =
-        convOp.getInputOperand(0)->get().getType().cast<ShapedType>();
-    ShapedType filterShapeType =
-        convOp.getInputOperand(1)->get().getType().cast<ShapedType>();
-    ShapedType outputShapeType =
-        convOp.getOutputOperand(0)->get().getType().cast<ShapedType>();
+    RankedTensorType inputShapeType =
+        convOp.getInputOperand(0)->get().getType().dyn_cast<RankedTensorType>();
+    RankedTensorType filterShapeType =
+        convOp.getInputOperand(1)->get().getType().dyn_cast<RankedTensorType>();
+    RankedTensorType outputShapeType = convOp.getOutputOperand(0)
+                                           ->get()
+                                           .getType()
+                                           .dyn_cast<RankedTensorType>();
+
+    if (!inputShapeType || !filterShapeType || !outputShapeType)
+      return failure();
 
     auto inputShape = inputShapeType.getShape();
     auto filterShape = filterShapeType.getShape();
     auto outputShape = outputShapeType.getShape();
+
+    bool inputDynWidthHeight = inputShape[1] == ShapedType::kDynamicSize &&
+                               inputShape[2] == ShapedType::kDynamicSize;
+
+    // We cannot merge the width and height if they are both dynamic as we
+    // cannot expand them back to their dynamic values.
+    if (inputDynWidthHeight) return failure();
 
     if (filterShape[0] != 1 || filterShape[1] != 1) return failure();
 
@@ -55,16 +67,22 @@ class Convert1x1ConvolutionMatmulOp
     SmallVector<ReassociationIndices, 4> reassociationIndices = {{0, 1, 2},
                                                                  {3}};
 
-    auto reshapedInputType =
-        RankedTensorType::get({inputShape[1] * inputShape[2], inputShape[3]},
-                              inputShapeType.getElementType());
+    auto combineDims = [](int64_t a, int64_t b) {
+      if (a == ShapedType::kDynamicSize || b == ShapedType::kDynamicSize)
+        return ShapedType::kDynamicSize;
+      return a * b;
+    };
+
+    auto reshapedInputType = RankedTensorType::get(
+        {combineDims(inputShape[1], inputShape[2]), inputShape[3]},
+        inputShapeType.getElementType());
 
     auto reshapedFilterType = RankedTensorType::get(
         {filterShape[2], filterShape[3]}, filterShapeType.getElementType());
 
-    auto reshapedOutputType =
-        RankedTensorType::get({outputShape[1] * outputShape[2], outputShape[3]},
-                              outputShapeType.getElementType());
+    auto reshapedOutputType = RankedTensorType::get(
+        {combineDims(outputShape[1], outputShape[2]), outputShape[3]},
+        outputShapeType.getElementType());
 
     Value input = convOp.getInputOperand(0)->get();
     Value filter = convOp.getInputOperand(1)->get();

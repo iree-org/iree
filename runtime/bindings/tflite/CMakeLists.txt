@@ -53,9 +53,9 @@ iree_cc_test(
     "smoke_test.cc"
   DEPS
     ::shim
-    runtime::bindings::tflite::testdata::add_dynamic_c
-    runtime::bindings::tflite::testdata::add_multi_c
-    runtime::bindings::tflite::testdata::add_static_c
+    iree::runtime::bindings::tflite::testdata::add_dynamic_c
+    iree::runtime::bindings::tflite::testdata::add_multi_c
+    iree::runtime::bindings::tflite::testdata::add_static_c
     iree::testing::gtest
     iree::testing::gtest_main
 )

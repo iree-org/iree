@@ -44,6 +44,6 @@ transform.with_pdl_patterns {
     %1, %loops1:3 = transform.structured.tile %0 {interchange = [0, 2, 1], sizes = [32, 32, 32]}
     %2, %loops2:3 = transform.structured.tile %1 {interchange = [0, 1, 2], sizes = [4, 4, 1]}
     %3 = transform.structured.pad %2 {padding_values=[0.0 : f32, 0.0 : f32, 0.0 : f32], pack_paddings = [1, 1, 1], hoist_paddings = [6, 6, 0], transpose_paddings = [[1, 0], [0, 1]]}
-    %4 = transform.structured.vectorize %3  {vectorize_padding = true}
+    %4 = transform.structured2.vectorize %3  {vectorize_padding = true}
   }
 }

@@ -4,8 +4,15 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Misc tools used to optimize, translate, and evaluate IREE.
-# Compiler tooling, like the compiler, is not designed to run on device and is tagged as "hostonly".
+# Tools IREE provides for compiling, executing, and benchmarking programs, as
+# well as other utilities.
+#
+# Only binary targets and their associated main files should go in this
+# directory. Library targets and header files should be placed in the
+# appropriate subtree, e.g. `compiler/src/iree/compiler/Tools/`.
+#
+# Programs with a dependency on the compiler are not designed to run on device
+# platforms (e.g. Android), so they are tagged "hostonly".
 
 package(
     default_visibility = ["//visibility:public"],
@@ -89,9 +96,10 @@ cc_binary(
     ],
 )
 
-cc_library(
-    name = "iree_opt_main",
+cc_binary(
+    name = "iree-opt",
     srcs = ["iree-opt-main.cc"],
+    tags = ["hostonly"],
     deps = [
         "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
         "//compiler/src/iree/compiler/Tools:init_targets",
@@ -99,14 +107,6 @@ cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MlirOptLib",
         "@llvm-project//mlir:Support",
-    ],
-)
-
-cc_binary(
-    name = "iree-opt",
-    tags = ["hostonly"],
-    deps = [
-        ":iree_opt_main",
     ],
 )
 

@@ -144,6 +144,23 @@ def PadTensorToSubTensorInsert :
   let constructor = "mlir::iree_compiler::IREE::Flow::createPadTensorToSubTensorInsertPass()";
 }
 
+def DumpDispatchGraph : Pass<"iree-flow-dump-dispatch-graph-pass"> {
+  let summary = "Print visualization of dispatches";
+  let options = [
+    Option<"maxLabelLen", "max-label-len", "unsigned",
+            /*default=*/"20", "Limit attribute/type length to number of chars">,
+    Option<"printAttrs", "print-attrs", "bool",
+           /*default=*/"true", "Print attributes of operations">,
+    Option<"printControlFlowEdges", "print-control-flow-edges", "bool",
+           /*default=*/"false", "Print control flow edges">,
+    Option<"printDataFlowEdges", "print-data-flow-edges", "bool",
+           /*default=*/"true", "Print data flow edges">,
+    Option<"printResultTypes", "print-result-types", "bool",
+            /*default=*/"true", "Print result types of operations">
+  ];
+  let constructor = "mlir::iree_compiler::IREE::Flow::createDumpDispatchGraphPass()";
+}
+
 def SplitReduction :
     Pass<"iree-flow-split-reduction-ops", ""> {
   let summary = "Split reduction dimension to increase parallelism.";

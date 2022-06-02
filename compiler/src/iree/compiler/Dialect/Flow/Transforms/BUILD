@@ -39,6 +39,7 @@ iree_compiler_cc_library(
         "ConvertLinalgMatmulToMmt4D.cpp",
         "DeduplicateExecutables.cpp",
         "DispatchLinalgOnTensors.cpp",
+        "DumpDispatchGraph.cpp",
         "ExpandTensorShapes.cpp",
         "ExportBenchmarkFuncs.cpp",
         "FusionOfTensorOps.cpp",

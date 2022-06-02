@@ -817,6 +817,7 @@ void registerLLVMAOTTargetBackends(
 #define LLVM_INITIALIZE_TARGET_PowerPC()
 #define LLVM_INITIALIZE_TARGET_Sparc()
 #define LLVM_INITIALIZE_TARGET_SystemZ()
+#define LLVM_INITIALIZE_TARGET_VE()
 #define LLVM_INITIALIZE_TARGET_XCore()
 
 #define LLVM_TARGET(TargetName) LLVM_INITIALIZE_TARGET_##TargetName()

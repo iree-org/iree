@@ -14,23 +14,14 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
 
-def TargetableSingleOperandTransformOp
-    : NativeOpTrait<"TargetableSingleOperandOpTrait"> {
-  let cppNamespace = "::mlir::transform";
-}
-
-def FunctionalStyleTransformOp
-    : NativeOpTrait<"FunctionalStyleTransformOpTrait"> {
-  let cppNamespace = "::mlir::transform";
-}
-
-def PayloadTransformOp
-    : NativeOpTrait<"PayloadTransformOpTrait"> {
+def FunctionalStyleMultiOperandMultiResultTransformOpTrait
+    : NativeOpTrait<"FunctionalStyleMultiOperandMultiResultTransformOpTrait"> {
   let cppNamespace = "::mlir::transform";
 }
 
 def FuseProducersOp : Op<Transform_Dialect, "fuse_producers",
-    [FunctionalStyleTransformOp, MemoryEffectsOpInterface,
+    [FunctionalStyleMultiOperandMultiResultTransformOpTrait, 
+     MemoryEffectsOpInterface,
      DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{Fuses the producers for the operands to fuse.}];
 
@@ -46,7 +37,8 @@ def FuseProducersOp : Op<Transform_Dialect, "fuse_producers",
 
 def TileToLinalgExtTileOp :
     Op<Transform_Dialect, "tile_to_iree_linalg_ext_tile_op",
-      [FunctionalStyleTransformOp, MemoryEffectsOpInterface,
+      [FunctionalStyleMultiOperandMultiResultTransformOpTrait,
+       MemoryEffectsOpInterface,
        DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{Tile a linalg op with linalg_ext.tile op along a single
   dimension.}];
@@ -69,7 +61,8 @@ def TileToLinalgExtTileOp :
 
 def FuseIntoContainingOp :
     Op<Transform_Dialect, "fuse_into_containing_op",
-      [FunctionalStyleTransformOp, MemoryEffectsOpInterface,
+      [FunctionalStyleMultiOperandMultiResultTransformOpTrait,
+       MemoryEffectsOpInterface,
        DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{Fuse a producer into a containing operation.}];
 
@@ -87,8 +80,10 @@ def FuseIntoContainingOp :
 
 def RewriteLinalgExtTileToScfForOp :
   Op<Transform_Dialect, "rewrite_iree_linalg_ext_tile_to_scf_for",
-    [FunctionalStyleTransformOp, MemoryEffectsOpInterface,
-     TransformOpInterface, TargetableSingleOperandTransformOp]> {
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformOpInterface,
+     TransformEachOpTrait]> {
 
   let description = [{Rewrite linalg_ext.tile op to scf.for.}];
   let arguments = (ins PDL_Operation:$target);
@@ -105,8 +100,10 @@ def RewriteLinalgExtTileToScfForOp :
 
 def RewriteLinalgExtTileToInParallelOp :
   Op<Transform_Dialect, "rewrite_iree_linalg_ext_tile_to_in_parallel",
-    [FunctionalStyleTransformOp, MemoryEffectsOpInterface,
-     TransformOpInterface, TargetableSingleOperandTransformOp]> {
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
 
   let description = [{Rewrite linalg_ext.tile op to linalg_ext.in_parallel.}];
   let arguments = (ins PDL_Operation:$target);
@@ -123,8 +120,10 @@ def RewriteLinalgExtTileToInParallelOp :
 
 def RewriteLinalgExtInParallelToAsyncOp :
   Op<Transform_Dialect, "rewrite_iree_linalg_ext_in_parallel_to_async",
-    [FunctionalStyleTransformOp, MemoryEffectsOpInterface,
-     TransformOpInterface, TargetableSingleOperandTransformOp]> {
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
 
   let description = [{Rewrite linalg_ext.in_parallel op to the async dialect.}];
   let arguments = (ins PDL_Operation:$target);
@@ -141,7 +140,9 @@ def RewriteLinalgExtInParallelToAsyncOp :
 
 def RewriteLinalgExtInParallelToHALOp :
   Op<Transform_Dialect, "rewrite_iree_linalg_ext_in_parallel_to_hal",
-    [FunctionalStyleTransformOp, MemoryEffectsOpInterface,
+    // Cannot use FunctionalStyleTransformOpTrait: this returns 0 results atm.
+    [FunctionalStyleMultiOperandMultiResultTransformOpTrait,
+     MemoryEffectsOpInterface,
      DeclareOpInterfaceMethods<TransformOpInterface>]> {
 
   let description = [{Rewrite linalg_ext.in_parallel op to use HAL ops.}];
@@ -156,8 +157,10 @@ def RewriteLinalgExtInParallelToHALOp :
 
 def RewriteLinalgExtInParallelToScfForOp :
   Op<Transform_Dialect, "rewrite_iree_linalg_ext_in_parallel_to_scf_for",
-    [FunctionalStyleTransformOp, MemoryEffectsOpInterface,
-     TransformOpInterface, TargetableSingleOperandTransformOp]> {
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
 
   let description = [{Rewrite linalg_ext.in_parallel to a sequential scf.for.
 
