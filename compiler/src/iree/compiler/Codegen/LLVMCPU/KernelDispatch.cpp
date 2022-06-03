@@ -266,6 +266,7 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
 template <bool mustDivisable>
 static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
                               int64_t vectorSizeVal) {
+  //printf("%d %d %d %d\n", (int)lb, (int)ub, (int)maxSize, (int)vectorSizeVal);
   if (ub == ShapedType::kDynamicSize || lb == ShapedType::kDynamicSize) {
     return maxSize;
   }
@@ -612,6 +613,8 @@ static LogicalResult setRootConfig(
     }
     maxTileSizes[0] = 288;
     maxTileSizes[1] = 128;
+    minTileSizes[0] = 8;
+    minTileSizes[1] = 32;
     flowTileSizes = getDefaultDistributedLevelTileSizes<false>(
         linalgOp, minTileSizes, maxTileSizes);
     return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
