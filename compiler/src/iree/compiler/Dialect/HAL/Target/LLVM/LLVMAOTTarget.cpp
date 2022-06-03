@@ -220,6 +220,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     // Perform the translation in a separate context to avoid any
     // multi-threading issues.
     llvm::LLVMContext context;
+    context.setOpaquePointers(false);
 
     // We name our files after the executable name so that they are easy to
     // track both during compilation (logs/artifacts/etc), as outputs (final
@@ -741,6 +742,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     // Set the native vector size. This creates a dummy llvm module just to
     // build the TTI the right way.
     llvm::LLVMContext llvmContext;
+    llvmContext.setOpaquePointers(false);
     auto llvmModule =
         std::make_unique<llvm::Module>("dummy_module", llvmContext);
     llvm::Type *voidType = llvm::Type::getVoidTy(llvmContext);
