@@ -119,6 +119,7 @@ static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs,
   // Equivalent!
   return true;
 }
+
 static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
                                        BlockAndValueMapping &parentMapping) {
   // Check operation metadata for early-exit opportunities.
@@ -191,37 +192,6 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
   return true;
 }
 
-bool areExecutablesEquivalent(ExecutableOp lhs, ExecutableOp rhs) {
-  auto lhsModule = lhs.getInnerModule();
-  auto rhsModule = rhs.getInnerModule();
-
-  // Must have the same number of entry point ops, with the same attributes.
-  // Entry point op symbol names are expected to differ, that won't affect
-  // equivalence.
-  if (!compare_ranges(lhsModule.getOps<ExecutableExportOp>(),
-                      rhsModule.getOps<ExecutableExportOp>(),
-                      [](ExecutableExportOp lhs, ExecutableExportOp rhs) {
-                        return lhs->getAttrs() == rhs->getAttrs();
-                      })) {
-    return false;  // dispatch entry mismatch
-  }
-
-  // Walk all functions and ensure equivalent.
-  if (!compare_ranges(lhsModule.getOps<mlir::func::FuncOp>(),
-                      rhsModule.getOps<mlir::func::FuncOp>(),
-                      [](mlir::func::FuncOp lhs, mlir::func::FuncOp rhs) {
-                        if (lhs.getFunctionType() != rhs.getFunctionType())
-                          return false;
-                        if (lhs->getAttrs() != rhs->getAttrs()) return false;
-                        return isStructurallyEquivalentTo(lhs.getRegion(),
-                                                          rhs.getRegion());
-                      })) {
-    return false;  // dispatch entry mismatch
-  }
-
-  return true;
-}
-
 // Replaces each usage of an entry point with its original symbol name with a
 // new symbol name.
 void replaceEntryPointUses(
@@ -259,9 +229,8 @@ class DeduplicateExecutablesPass
 
       for (int j = 0; j < i; ++j) {
         auto referenceExecutableOp = executableOps[j];
-        if (!isStructurallyEquivalentTo(
-                duplicateExecutableOp.getBodyRegion(),
-                referenceExecutableOp.getBodyRegion())) {
+        if (!isStructurallyEquivalentTo(duplicateExecutableOp.body(),
+                                        referenceExecutableOp.body())) {
           continue;
         }
 

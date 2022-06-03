@@ -1,5 +1,24 @@
 // RUN: iree-opt --split-input-file --iree-stream-conversion --canonicalize %s | FileCheck %s
 
+// CHECK-LABEL: @workgroup_count_region
+flow.executable private @workgroup_count_region {
+  // CHECK-NEXT: stream.executable.export public @dispatch
+  flow.executable.export public @dispatch
+      // CHECK-SAME: workgroups(%[[ARG0:.+]]: index) -> (index, index, index) {
+      workgroups(%arg0: index) -> (index, index, index) {
+        // CHECK-NEXT: stream.return %[[ARG0]], %[[ARG0]], %[[ARG0]] : index, index, index
+        flow.return %arg0, %arg0, %arg0 : index, index, index
+      }
+  builtin.module {
+    // CHECK: func.func @dispatch()
+    func.func @dispatch() {
+      return
+    }
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @rank_0_binding
 flow.executable private @rank_0_binding {
   flow.executable.export public @dispatch

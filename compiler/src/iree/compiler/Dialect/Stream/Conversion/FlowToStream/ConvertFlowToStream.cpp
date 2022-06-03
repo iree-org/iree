@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -364,6 +365,19 @@ static bool insertBindingOp(BlockArgument arg,
   return true;
 }
 
+// Replaces flow.return ops with stream.return ops.
+// We do this outside of conversion to bypass dynamic recursive legality checks.
+// If we remove the recursive legality check - which requires not passing
+// through any flow ops inside of the executable - we'll be able to get rid of
+// this.
+static void convertReturnOps(Region &region) {
+  region.walk([](IREE::Flow::ReturnOp oldOp) {
+    OpBuilder(oldOp).create<IREE::Stream::ReturnOp>(oldOp.getLoc(),
+                                                    oldOp.operands());
+    oldOp.erase();
+  });
+}
+
 struct ConvertExecutableOp
     : public OpConversionPattern<IREE::Flow::ExecutableOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -380,8 +394,13 @@ struct ConvertExecutableOp
     // flow.executable.export -> stream.executable.export
     for (auto exportOp : flowOp.getOps<IREE::Flow::ExecutableExportOp>()) {
       auto newOp = rewriter.create<IREE::Stream::ExecutableExportOp>(
-          entryOp.getLoc(), entryOp.sym_name(), entryOp.function_refAttr());
-      newOp->setDialectAttrs(entryOp->getDialectAttrs());
+          exportOp.getLoc(), exportOp.sym_name(), exportOp.function_refAttr());
+      newOp->setDialectAttrs(exportOp->getDialectAttrs());
+      if (!exportOp.workgroup_count().empty()) {
+        mlir::BlockAndValueMapping mapper;
+        exportOp.workgroup_count().cloneInto(&newOp.workgroup_count(), mapper);
+        convertReturnOps(newOp.workgroup_count());
+      }
     }
 
     // Move the original nested module body into the new executable directly.
@@ -432,6 +451,16 @@ struct ConvertExecutableOp
   }
 };
 
+struct ConvertReturnOp : public OpConversionPattern<IREE::Flow::ReturnOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Flow::ReturnOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::Stream::ReturnOp>(op, adaptor.operands());
+    return success();
+  }
+};
+
 }  // namespace
 
 void populateFlowToStreamConversionPatterns(MLIRContext *context,
@@ -444,6 +473,7 @@ void populateFlowToStreamConversionPatterns(MLIRContext *context,
       typeConverter, context);
   patterns.insert<ConvertDispatchOp>(typeConverter, context);
   patterns.insert<ConvertExecutableOp>(typeConverter, context);
+  patterns.insert<ConvertReturnOp>(typeConverter, context);
 }
 
 void populateFlowToStreamConversionPatterns(MLIRContext *context,

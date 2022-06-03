@@ -1552,7 +1552,7 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     OptionalAttr<IndexAttr>:$workgroup_local_memory
   );
 
-  let regions = (region AnyRegion:$workgroup_count_region);
+  let regions = (region AnyRegion:$workgroup_count);
 
   let builders = [
     OpBuilder<(ins
@@ -1576,8 +1576,8 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     static int64_t getNumWorkgroupDims() { return 3; }
 
     Block* getWorkgroupCountBody() {
-      if (workgroup_count_region().empty()) return nullptr;
-      return &workgroup_count_region().front();
+      if (workgroup_count().empty()) return nullptr;
+      return &workgroup_count().front();
     }
 
     // Calculates an XYZ workgroup count based on the given |workload|.

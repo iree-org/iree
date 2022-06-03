@@ -50,7 +50,7 @@ FailureOr<IREE::HAL::ExecutableExportOp> defineWorkgroupCountRegion(
       clonedOp->setAttr(attr.getName(), attr.getValue());
     }
   }
-  Region &region = clonedOp.workgroup_count_region();
+  Region &region = clonedOp.workgroup_count();
   Block *entryBlock = builder.createBlock(&region);
   // Add 3 index arguments for the workload.
   auto indexType = builder.getIndexType();

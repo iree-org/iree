@@ -262,8 +262,12 @@ static LogicalResult declareEntryPointOps(
       // Clone the workgroup count calculation function.
       if (!exportOp.workgroup_count().empty()) {
         mlir::BlockAndValueMapping mapper;
-        exportOp.workgroup_count().front().cloneInto(
-            &newExportOp.workgroup_count(), mapper);
+        exportOp.workgroup_count().cloneInto(&newExportOp.workgroup_count(),
+                                             mapper);
+        // Insert the !hal.device argument.
+        Type deviceType = targetBuilder.getType<IREE::HAL::DeviceType>();
+        newExportOp.workgroup_count().insertArgument(0u, deviceType,
+                                                     newExportOp.getLoc());
       }
 
       // Clone the updated interface-based function into the target.
@@ -287,6 +291,15 @@ static LogicalResult declareEntryPointOps(
 //===----------------------------------------------------------------------===//
 
 namespace {
+
+struct ConvertReturnPattern : public OpRewritePattern<IREE::Stream::ReturnOp> {
+  using OpRewritePattern<IREE::Stream::ReturnOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::Stream::ReturnOp op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::HAL::ReturnOp>(op, op.operands());
+    return success();
+  }
+};
 
 template <typename SrcOp, typename DstOp>
 struct ConvertDispatchWorkgroupInfoPattern final
@@ -328,6 +341,7 @@ struct InlineConstantWorkgroupSizePattern
 static LogicalResult convertFlowInfoOps(IREE::HAL::ExecutableOp executableOp) {
   RewritePatternSet patterns(executableOp.getContext());
   patterns.insert<
+      ConvertReturnPattern,
       ConvertDispatchWorkgroupInfoPattern<IREE::Flow::DispatchWorkgroupIDOp,
                                           IREE::HAL::InterfaceWorkgroupIDOp>,
       ConvertDispatchWorkgroupInfoPattern<IREE::Flow::DispatchWorkgroupCountOp,

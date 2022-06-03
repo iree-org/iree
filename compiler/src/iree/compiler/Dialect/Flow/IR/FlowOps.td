@@ -553,6 +553,10 @@ def FLOW_ExecutableExportOp : FLOW_Op<"executable.export", [
   let description = [{
     Specifies an exported function with an externally-visible alias. Multiple
     exports can reference the same internal function.
+
+    Each entry point can have a unique workgroup count calculation region.
+    This region takes the workload parameters passed to each flow.dispatch and
+    produces an XYZ workgroup count for the 3D grid dispatch.
   }];
 
   let arguments = (ins
@@ -561,11 +565,22 @@ def FLOW_ExecutableExportOp : FLOW_Op<"executable.export", [
     FlatSymbolRefAttr:$function_ref
   );
 
+  let regions = (region AnyRegion:$workgroup_count);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    custom<SymbolAlias>($sym_name, $function_ref)
+    custom<WorkgroupCountRegion>($workgroup_count)
+    attr-dict-with-keyword
+  }];
+
   let builders = [
     OpBuilder<(ins
       "StringRef":$sym_name,
       "FlatSymbolRefAttr":$function_ref)>,
   ];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//

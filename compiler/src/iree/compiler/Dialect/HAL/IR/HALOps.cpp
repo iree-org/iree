@@ -716,9 +716,9 @@ void ExecutableExportOp::print(OpAsmPrinter &p) {
   p << ")";
   p.printOptionalAttrDict(op->getAttrs(),
                           /*elidedAttrs=*/{"sym_name", "layout", "ordinal"});
-  if (workgroup_count_region().empty()) return;
+  if (workgroup_count().empty()) return;
   p << " ";
-  p.printRegion(workgroup_count_region());
+  p.printRegion(workgroup_count());
 }
 
 LogicalResult ExecutableExportOp::verify() {
@@ -727,7 +727,7 @@ LogicalResult ExecutableExportOp::verify() {
   // When there is no body, nothing to verify.
   if (!body) return success();
 
-  if (!llvm::hasSingleElement(workgroup_count_region())) {
+  if (!llvm::hasSingleElement(workgroup_count())) {
     return op.emitOpError() << "expected a single region block";
   }
   bool validArguments = true;
@@ -824,6 +824,7 @@ static std::array<Value, 3> calculateWorkgroupCountFromRegion(
     builder.clone(op, bvm);
   }
   auto returnOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
+  assert(returnOp.getNumOperands() == 3 && "must return xyz");
   return {
       bvm.lookup(returnOp.operands()[0]),
       bvm.lookup(returnOp.operands()[1]),

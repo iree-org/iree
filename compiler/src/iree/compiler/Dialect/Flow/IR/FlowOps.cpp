@@ -52,6 +52,34 @@ static void createArgs(ArrayRef<OpAsmParser::UnresolvedOperand> operands,
   }
 }
 
+// Verifies that a dispatch |op|'s |workload| matches that of the |exportOp|.
+static LogicalResult verifyDispatchWorkload(
+    Operation *op, IREE::Flow::ExecutableExportOp exportOp,
+    ValueRange workload) {
+  // If the target has a workgroup count computation function we can verify that
+  // the workload here matches what is expected.
+  if (!exportOp.workgroup_count().empty()) {
+    auto &workgroupCount = exportOp.workgroup_count();
+    if (workgroupCount.getNumArguments() != workload.size()) {
+      return op->emitOpError()
+             << "workload mismatch; entry point expects "
+             << workgroupCount.getNumArguments()
+             << " arguments but dispatch provides " << workload.size();
+    }
+    for (auto it : llvm::enumerate(llvm::zip(workgroupCount.getArgumentTypes(),
+                                             workload.getTypes()))) {
+      auto expectedType = std::get<0>(it.value());
+      auto actualType = std::get<1>(it.value());
+      if (expectedType != actualType) {
+        return op->emitOpError() << "workload operand " << it.index()
+                                 << " type mismatch; expected " << expectedType
+                                 << " but passed " << actualType;
+      }
+    }
+  }
+  return success();
+}
+
 // Verifies that |dynamicDims| contains the appropriate number of dims for all
 // of the dynamic dimensions in |values|.
 static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
@@ -149,6 +177,70 @@ static Optional<BlockArgument> getBindingArgument(Value v) {
     return getBindingArgument(loadOp.source());
   }
   return llvm::None;
+}
+
+//===----------------------------------------------------------------------===//
+// custom<WorkgroupCountRegion>($body)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseWorkgroupCountRegion(OpAsmParser &parser,
+                                             Region &body) {
+  if (failed(parser.parseOptionalKeyword("workgroups"))) {
+    // Omitted.
+    return success();
+  }
+
+  SmallVector<OpAsmParser::Argument> args;
+  if (failed(parser.parseArgumentList(args, AsmParser::Delimiter::Paren,
+                                      /*allowType=*/true,
+                                      /*allowAttrs=*/true))) {
+    return failure();
+  }
+
+  // Return types must be 3 dimensions (workgroup count XYZ).
+  SmallVector<Type> returnTypes;
+  if (failed(parser.parseArrowTypeList(returnTypes))) {
+    return failure();
+  }
+  if (returnTypes.size() != 3 ||
+      !llvm::all_of(returnTypes, [](Type type) { return type.isIndex(); })) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "workgroup count region must return the XYZ dimension counts";
+  }
+
+  // Parse region contents.
+  if (failed(parser.parseRegion(body, args, /*enableNameShadowing=*/false))) {
+    return failure();
+  }
+
+  // Verify the return types match.
+  for (auto returnOp : body.getOps<IREE::Flow::ReturnOp>()) {
+    for (auto it : llvm::zip(returnTypes, returnOp.getOperandTypes())) {
+      if (std::get<0>(it) != std::get<1>(it)) {
+        return returnOp.emitOpError()
+               << "operands do not match expected region return types";
+      }
+    }
+  }
+
+  return success();
+}
+
+static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
+                                      Region &body) {
+  if (body.empty()) return;
+  p << "workgroups(";
+  auto args = body.getArguments();
+  for (unsigned i = 0; i < args.size(); ++i) {
+    if (i > 0) p << ", ";
+    p.printRegionArgument(args[i]);
+  }
+  p << ")";
+  Type indexType = IndexType::get(body.getContext());
+  p.printArrowTypeList(TypeRange{indexType, indexType, indexType});
+  p << " ";
+  p.printRegion(body, /*printEntryBlockArgs=*/false,
+                /*printBlockTerminators=*/true);
 }
 
 //===----------------------------------------------------------------------===//
@@ -775,50 +867,20 @@ void ExecutableExportOp::build(OpBuilder &builder, OperationState &state,
         builder.getStringAttr(sym_name), function_ref);
 }
 
-ParseResult ExecutableExportOp::parse(OpAsmParser &parser,
-                                      OperationState &result) {
-  StringAttr visibilityAttr;
-  if (failed(parseSymbolVisibility(parser, visibilityAttr))) {
-    return failure();
-  }
-
-  FlatSymbolRefAttr functionRefAttr;
-  if (failed(parser.parseAttribute(functionRefAttr, "function_ref",
-                                   result.attributes))) {
-    return failure();
-  }
-
-  if (succeeded(parser.parseOptionalKeyword("as"))) {
-    StringAttr exportNameAttr;
-    if (failed(parser.parseLParen()) ||
-        failed(parser.parseAttribute(exportNameAttr, "sym_name",
-                                     result.attributes)) ||
-        failed(parser.parseRParen())) {
-      return failure();
+LogicalResult ExecutableExportOp::verify() {
+  // Workgroup count region is optional.
+  if (!workgroup_count().empty()) {
+    // Verify the return ops all provide XYZ values.
+    for (auto returnOp : workgroup_count().getOps<IREE::Flow::ReturnOp>()) {
+      if (returnOp.getNumOperands() != 3 ||
+          !llvm::all_of(returnOp.getOperandTypes(),
+                        [](Type type) { return type.isIndex(); })) {
+        return returnOp.emitOpError()
+               << "workgroup count region must return the XYZ dimension counts";
+      }
     }
-  } else {
-    result.addAttribute("sym_name", parser.getBuilder().getStringAttr(
-                                        functionRefAttr.getValue()));
   }
-
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result.attributes))) {
-    return failure();
-  }
-
   return success();
-}
-
-void ExecutableExportOp::print(OpAsmPrinter &p) {
-  p << ' ';
-  Operation *op = getOperation();
-  printSymbolVisibility(p, op, op->getAttrOfType<StringAttr>("sym_visibility"));
-  p << ' ';
-  p.printSymbolName(function_ref());
-  if (sym_name() != function_ref()) {
-    p << " as(\"" << sym_name() << "\")";
-  }
-  p.printOptionalAttrDictWithKeyword(
-      op->getAttrs(), /*elidedAttrs=*/{"function_ref", "sym_name"});
 }
 
 //===----------------------------------------------------------------------===//
@@ -892,6 +954,11 @@ LogicalResult DispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Should be:
     //   return op->emitOpError() << "undefined entry point: " << entry_point();
     return success();
+  }
+
+  // Verify that the workload parameters captured match the target export.
+  if (failed(verifyDispatchWorkload(op, exportOp, workload()))) {
+    return failure();
   }
 
   // TODO(benvanik): verify that the target function has matching operands.

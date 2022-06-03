@@ -263,7 +263,6 @@ flow.executable @attributes_ex_0 {
     }
   }
 }
-
 // CHECK-LABEL: flow.executable public @attributes_ex_1
 flow.executable @attributes_ex_1 {
   flow.executable.export @attributes_entry_1
@@ -293,6 +292,48 @@ flow.executable @attributes_ex_2 {
         "mhlo.return"(%3) : (tensor<i32>) -> ()
       }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x4xi32>, tensor<i32>) -> tensor<1xi32>
       return %1 : tensor<1xi32>
+    }
+  }
+}
+
+// -----
+
+// Executable contents are the same but the workgroup count function of ex_1
+// differs and should prevent it from deduplicating.
+// Ideally we'd still deduplicate but add another export.
+
+// CHECK-LABEL: flow.executable public @workgroup_count_ex_0
+flow.executable @workgroup_count_ex_0 {
+  flow.executable.export @workgroup_count_entry_0 workgroups(%arg0: index) -> (index, index, index) {
+    flow.return %arg0, %arg0, %arg0 : index, index, index
+  }
+  builtin.module {
+    func.func @workgroup_count_entry_0(%input: tensor<1xi32>) -> tensor<1xi32> {
+      return %input : tensor<1xi32>
+    }
+  }
+}
+
+// CHECK-LABEL: flow.executable public @workgroup_count_ex_1
+flow.executable @workgroup_count_ex_1 {
+  flow.executable.export @workgroup_count_entry_1 workgroups(%arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
+    flow.return %arg0, %arg1, %arg2 : index, index, index
+  }
+  builtin.module {
+    func.func @workgroup_count_entry_1(%input: tensor<1xi32>) -> tensor<1xi32> {
+      return %input : tensor<1xi32>
+    }
+  }
+}
+// Duplicate of @workgroup_count_ex_0
+// CHECK-NOT: flow.executable public @workgroup_count_ex_2
+flow.executable @workgroup_count_ex_2 {
+  flow.executable.export @workgroup_count_entry_2 workgroups(%arg0: index) -> (index, index, index) {
+    flow.return %arg0, %arg0, %arg0 : index, index, index
+  }
+  builtin.module {
+    func.func @workgroup_count_entry_2(%input: tensor<1xi32>) -> tensor<1xi32> {
+      return %input : tensor<1xi32>
     }
   }
 }
