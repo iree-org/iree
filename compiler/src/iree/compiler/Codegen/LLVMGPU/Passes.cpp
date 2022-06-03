@@ -175,10 +175,6 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
 }
 
 static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
-  // Pad allocations with dynamic dimension before lowering of SCF and affine.
-  pm.addNestedPass<func::FuncOp>(createLLVMGPUPadDynamicAlloc());
-
-  pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -190,6 +186,14 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<func::FuncOp>(createCSEPass());
+
+  // Pad allocations with dynamic dimension before lowering of SCF and affine
+  // but after linalg lowering.
+  pm.addNestedPass<func::FuncOp>(createLLVMGPUPadDynamicAlloc());
+
+  pm.addPass(createLowerAffinePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   // Handled tensor-type constants.
   pm.addPass(arith::createConstantBufferizePass());
