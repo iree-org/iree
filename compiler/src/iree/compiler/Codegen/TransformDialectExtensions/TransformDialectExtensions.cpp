@@ -28,6 +28,19 @@
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE;
 
+iree_compiler::IREE::transform_dialect::TransformDialectExtensions::
+    TransformDialectExtensions() {
+  registerTransformOps<
+#define GET_OP_LIST
+#include "iree/compiler/Codegen/TransformDialectExtensions/TransformDialectExtensionsOps.cpp.inc"
+      >();
+}
+
+void mlir::iree_compiler::registerLinalgTransformDialectExtension(
+    DialectRegistry &registry) {
+  registry.addExtensions<transform_dialect::TransformDialectExtensions>();
+}
+
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
 // TODO: register the bufferization behavior in a target-specific way.
@@ -74,138 +87,41 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
 // IREE-specific transformations defined outside of iree_linalg_transform.
 //===---------------------------------------------------------------------===//
 
-// Note: with the recent TypeID changes, hiding these classes inside an
-// anonymous namespace would require specific `MLIR_DECLARE_EXPLICIT_TYPE_ID`
-// for each class.
-
-// namespace {
-
-// TODO: Move to tablegen. Until this stabilizes upstream, simple C++ is enough.
-class IREEBufferizeOp
-    : public Op<IREEBufferizeOp, transform::TransformOpInterface::Trait,
-                MemoryEffectOpInterface::Trait> {
- public:
-  using Op::Op;
-
-  static ArrayRef<StringRef> getAttributeNames() { return {}; }
-
-  static constexpr llvm::StringLiteral getOperationName() {
-    return llvm::StringLiteral("transform.iree.bufferize");
-  }
-
-  Value target() { return nullptr; }
-
-  LogicalResult apply(transform::TransformResults &results,
-                      transform::TransformState &state) {
-    PassManager pm(getContext());
-    // Bufferize the dispatch.
-    using mlir::bufferization::BufferizationOptions;
-    BufferizationOptions::AllocationFn allocationFn =
-        cpuComprehensiveBufferizeAllocationFn;
-    BufferizationOptions::DeallocationFn deallocationFn =
-        cpuComprehensiveBufferizeDeallocationFn;
-    BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
-    mlir::iree_compiler::addIREEComprehensiveBufferizePasses(
-        pm, allocationFn, deallocationFn, memcpyFn);
-    WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
-      if (failed(pm.run(moduleOp))) {
-        getOperation()->emitError()
-            << "failed to bufferize ModuleOp:\n"
-            << *(moduleOp.getOperation()) << "\nunder top-level:\n"
-            << *state.getTopLevel();
-        return WalkResult::interrupt();
-      }
-      return WalkResult::advance();
-    });
-    return failure(res.wasInterrupted());
-  }
-
-  // let assemblyFormat = "attr-dict";
-  static ParseResult parse(OpAsmParser &parser, OperationState &state) {
-    return parser.parseOptionalAttrDict(state.attributes);
-  }
-
-  // let assemblyFormat = "attr-dict";
-  void print(OpAsmPrinter &printer) {
-    printer.printOptionalAttrDict((*this)->getAttrs());
-  }
-
-  // This transform may affect the entirety of the payload IR.
-  void getEffects(SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-    effects.emplace_back(MemoryEffects::Read::get(),
-                         transform::PayloadIRResource::get());
-    effects.emplace_back(MemoryEffects::Write::get(),
-                         transform::PayloadIRResource::get());
-  }
-};
-
-// TODO: Move to tablegen. Until this stabilizes upstream, simple C++ is enough.
-class IREESetNumWorkgroupToOneOp
-    : public Op<IREESetNumWorkgroupToOneOp,
-                transform::TransformOpInterface::Trait,
-                MemoryEffectOpInterface::Trait> {
- public:
-  using Op::Op;
-
-  static ArrayRef<StringRef> getAttributeNames() { return {}; }
-
-  static constexpr llvm::StringLiteral getOperationName() {
-    return llvm::StringLiteral("transform.iree.set_num_workgroups_to_one");
-  }
-
-  Value target() { return nullptr; }
-
-  LogicalResult apply(transform::TransformResults &results,
-                      transform::TransformState &state) {
-    auto variantOp = dyn_cast<HAL::ExecutableVariantOp>(state.getTopLevel());
-    if (!variantOp) {
-      return getOperation()->emitError()
-             << "top-level op is not a HAL::ExecutableVariantOp: "
-             << *state.getTopLevel();
+LogicalResult transform_dialect::IREEBufferizeOp::apply(
+    transform::TransformResults &results, transform::TransformState &state) {
+  PassManager pm(getContext());
+  // Bufferize the dispatch.
+  using mlir::bufferization::BufferizationOptions;
+  BufferizationOptions::AllocationFn allocationFn =
+      cpuComprehensiveBufferizeAllocationFn;
+  BufferizationOptions::DeallocationFn deallocationFn =
+      cpuComprehensiveBufferizeDeallocationFn;
+  BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
+  mlir::iree_compiler::addIREEComprehensiveBufferizePasses(
+      pm, allocationFn, deallocationFn, memcpyFn);
+  WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
+    if (failed(pm.run(moduleOp))) {
+      getOperation()->emitError()
+          << "failed to bufferize ModuleOp:\n"
+          << *(moduleOp.getOperation()) << "\nunder top-level:\n"
+          << *state.getTopLevel();
+      return WalkResult::interrupt();
     }
-    return iree_compiler::setNumWorkgroupsImpl(variantOp, {});
-  }
-
-  // let assemblyFormat = "attr-dict";
-  static ParseResult parse(OpAsmParser &parser, OperationState &state) {
-    return parser.parseOptionalAttrDict(state.attributes);
-  }
-
-  // let assemblyFormat = "attr-dict";
-  void print(OpAsmPrinter &printer) {
-    printer.printOptionalAttrDict((*this)->getAttrs());
-  }
-
-  // This transform may affect the entirety of the payload IR.
-  void getEffects(SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-    effects.emplace_back(MemoryEffects::Read::get(),
-                         transform::PayloadIRResource::get());
-    effects.emplace_back(MemoryEffects::Write::get(),
-                         transform::PayloadIRResource::get());
-  }
-};
-
-/// Test extension of the Transform dialect. Registers additional ops and
-/// declares PDL as dependent dialect since the additional ops are using PDL
-/// types for operands and results.
-class LinalgTransformDialectExtension
-    : public mlir::transform::TransformDialectExtension<
-          LinalgTransformDialectExtension> {
- public:
-  LinalgTransformDialectExtension() {
-    declareDependentDialect<pdl::PDLDialect>();
-    registerTransformOps<IREEBufferizeOp, IREESetNumWorkgroupToOneOp>();
-    // TODO: hook up to Tablegen.
-    //     registerTransformOps<
-    // #define GET_OP_LIST
-    // #include "LinalgTransformDialectExtension.cpp.inc"
-    //         >();
-  }
-};
-
-// } // namespace anonymous
-
-void mlir::iree_compiler::registerLinalgTransformDialectExtension(
-    DialectRegistry &registry) {
-  registry.addExtensions<LinalgTransformDialectExtension>();
+    return WalkResult::advance();
+  });
+  return failure(res.wasInterrupted());
 }
+
+LogicalResult transform_dialect::IREESetNumWorkgroupToOneOp::apply(
+    transform::TransformResults &results, transform::TransformState &state) {
+  auto variantOp = dyn_cast<HAL::ExecutableVariantOp>(state.getTopLevel());
+  if (!variantOp) {
+    return getOperation()->emitError()
+           << "top-level op is not a HAL::ExecutableVariantOp: "
+           << *state.getTopLevel();
+  }
+  return iree_compiler::setNumWorkgroupsImpl(variantOp, {});
+}
+
+#define GET_OP_CLASSES
+#include "iree/compiler/Codegen/TransformDialectExtensions/TransformDialectExtensionsOps.cpp.inc"
