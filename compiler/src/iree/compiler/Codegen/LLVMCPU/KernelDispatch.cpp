@@ -232,7 +232,7 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
     int64_t currSize = distributedTileSizes[index];
     int64_t newSize = std::min<int64_t>(currSize * 2, workload[index]);
     if (workload[index] == ShapedType::kDynamicSize ||
-        currSize >= maxTileSizes[index] || currSize >= workload[index]) {
+        newSize >= maxTileSizes[index] || newSize >= workload[index]) {
       currDim--;
       continue;
     }
@@ -610,8 +610,8 @@ static LogicalResult setRootConfig(
       return setMatmulNoPadRootConfig(entryPointFn, contractionOp,
                                       flowTileSizes, tileSizes, vectorSize);
     }
-    //maxTileSizes[0] = 288;
-    //maxTileSizes[1] = 128;
+    maxTileSizes[0] = 288;
+    maxTileSizes[1] = 128;
     flowTileSizes = getDefaultDistributedLevelTileSizes<false>(
         linalgOp, minTileSizes, maxTileSizes);
     return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
