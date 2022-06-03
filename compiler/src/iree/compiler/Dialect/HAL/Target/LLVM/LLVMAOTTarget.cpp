@@ -304,12 +304,14 @@ class LLVMAOTTargetBackend final : public TargetBackend {
 
       // Tag the function parameters in case they got removed during conversion.
       // (%arg0: environment, %arg1: dispatch_state, %arg2: workgroup_state)
+      static const char *structNames[] = {
+          "iree_hal_executable_environment_v0_t",
+          "iree_hal_executable_dispatch_state_v0_t",
+          "iree_hal_executable_workgroup_state_v0_t"};
       for (unsigned i = 0; i <= 2; ++i) {
         llvmFunc->addParamAttr(
             i, llvm::Attribute::getWithByRefType(
-                   context, llvmFunc->getArg(i)
-                                ->getType()
-                                ->getNonOpaquePointerElementType()));
+                   context, llvm::StructType::create(context, structNames[i])));
         llvmFunc->addParamAttr(i, llvm::Attribute::NonNull);
         llvmFunc->addParamAttr(i, llvm::Attribute::NoAlias);
         llvmFunc->addParamAttr(i, align16);
