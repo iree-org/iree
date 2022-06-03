@@ -26,7 +26,7 @@ hal.executable private @conv_pointwise_112x112x32 {
         max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>,
         subgroup_size = 32 : i32}>
     }> {
-    hal.executable.entry_point public @conv_pointwise_112x112x32 layout(#executable_layout)
+    hal.executable.export public @conv_pointwise_112x112x32 layout(#executable_layout)
     builtin.module {
       func.func @conv_pointwise_112x112x32() {
         %c0 = arith.constant 0 : index
@@ -64,7 +64,7 @@ hal.executable private @conv_pointwise_112x112x32 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 4, 32], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
-//      CHECK: hal.executable.entry_point public @conv_pointwise_112x112x32
+//      CHECK: hal.executable.export public @conv_pointwise_112x112x32
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 2 : index]
 //      CHECK: func.func @conv_pointwise_112x112x32()

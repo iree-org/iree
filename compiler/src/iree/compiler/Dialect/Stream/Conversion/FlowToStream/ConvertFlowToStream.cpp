@@ -377,7 +377,7 @@ struct ConvertExecutableOp
     streamOp->setDialectAttrs(flowOp->getDialectAttrs());
     rewriter.setInsertionPointToStart(&streamOp.body().front());
 
-    // flow.executable.export -> stream.executable.entry_point
+    // flow.executable.export -> stream.executable.export
     for (auto exportOp : flowOp.getOps<IREE::Flow::ExecutableExportOp>()) {
       auto newOp = rewriter.create<IREE::Stream::ExecutableExportOp>(
           entryOp.getLoc(), entryOp.sym_name(), entryOp.function_refAttr());

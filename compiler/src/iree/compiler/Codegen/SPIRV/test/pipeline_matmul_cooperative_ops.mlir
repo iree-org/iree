@@ -29,7 +29,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
           max_compute_workgroup_invocations = 1024 : i32,
           max_compute_workgroup_size = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
           subgroup_size = 32 : i32}>}> {
-    hal.executable.entry_point public @matmul_256x1024x128_div_sub layout(#executable_layout)
+    hal.executable.export public @matmul_256x1024x128_div_sub layout(#executable_layout)
     builtin.module  {
       func.func @matmul_256x1024x128_div_sub() {
         %c0 = arith.constant 0 : index

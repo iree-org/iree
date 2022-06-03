@@ -82,11 +82,11 @@ LogicalResult setNumWorkgroupsImpl(IREE::HAL::ExecutableVariantOp variantOp,
   MLIRContext *context = variantOp.getContext();
   ModuleOp module = variantOp.getInnerModule();
 
-  llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
+  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(module);
   for (auto funcOp : module.getOps<func::FuncOp>()) {
-    auto entryPointOp = entryPoints.lookup(funcOp.getName());
-    if (!entryPointOp) continue;
+    auto exportOp = exportOps.lookup(funcOp.getName());
+    if (!exportOp) continue;
 
     SmallVector<int64_t, 4> currWorkloadPerWorkgroup;
 
@@ -95,7 +95,7 @@ LogicalResult setNumWorkgroupsImpl(IREE::HAL::ExecutableVariantOp variantOp,
       currWorkloadPerWorkgroup.assign(workloadPerWorkgroup.begin(),
                                       workloadPerWorkgroup.end());
     } else if (IREE::Codegen::TranslationInfoAttr translationInfo =
-                   getTranslationInfo(entryPointOp)) {
+                   getTranslationInfo(exportOp)) {
       currWorkloadPerWorkgroup = translationInfo.getWorkloadPerWorkgroupVals();
     }
 
@@ -110,7 +110,7 @@ LogicalResult setNumWorkgroupsImpl(IREE::HAL::ExecutableVariantOp variantOp,
 
     // The workgroup count region might already be set by op-specific
     // configuration logic. If so, just return to avoid overwriting that.
-    if (!entryPointOp.workgroup_count_region().empty()) continue;
+    if (!exportOp.workgroup_count().empty()) continue;
 
     WorkgroupCountRegionBuilder regionBuilder;
     if (currWorkloadPerWorkgroup.empty()) {
@@ -141,8 +141,7 @@ LogicalResult setNumWorkgroupsImpl(IREE::HAL::ExecutableVariantOp variantOp,
     }
 
     OpBuilder builder(context);
-    if (failed(
-            defineWorkgroupCountRegion(builder, entryPointOp, regionBuilder))) {
+    if (failed(defineWorkgroupCountRegion(builder, exportOp, regionBuilder))) {
       return failure();
     }
   }

@@ -17,7 +17,7 @@ hal.executable @matmul_128x256x64 {
        max_compute_workgroup_invocations = 1024 : i32,
        max_compute_workgroup_size = dense<[65535, 65535, 65535]> : vector<3xi32>,
        subgroup_size = 32 : i32}>}> {
-    hal.executable.entry_point public @matmul_128x256x64 ordinal(0) layout(#executable_layout)
+    hal.executable.export public @matmul_128x256x64 ordinal(0) layout(#executable_layout)
     builtin.module {
       func.func @matmul_128x256x64() {
         %cst = arith.constant 0.000000e+00 : f32

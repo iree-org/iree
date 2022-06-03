@@ -49,8 +49,7 @@ static LogicalResult materializeExecutableFromSourceOp(
 
   // With this hand-authored path all variants have the same layout and entry
   // points and we can just clone them.
-  auto sourceEntryPointOps =
-      sourceOp.getOps<IREE::HAL::ExecutableEntryPointOp>();
+  auto sourceEntryPointOps = sourceOp.getOps<IREE::HAL::ExecutableExportOp>();
   auto sourceModuleOp = sourceOp.getInnerModule();
 
   // Materialize all of the hal.executable.variant ops for all backends we are
@@ -219,7 +218,8 @@ static void annotateDispatchSite(IREE::Stream::CmdDispatchOp dispatchOp,
 }
 
 // Adds the entry point ops with assigned ordinals for each entry function.
-// The entry points will all use the provided |interfaceOp|.
+// The entry points will all use the provided |interfaceOp| and be exported with
+// hal.executable.export ops.
 static LogicalResult declareEntryPointOps(
     IREE::Stream::ExecutableOp sourceExecutableOp,
     IREE::HAL::ExecutableOp targetExecutableOp,
@@ -228,7 +228,7 @@ static LogicalResult declareEntryPointOps(
       targetExecutableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>();
   OpBuilder executableBuilder(&targetExecutableOp.getBlock().front());
 
-  // For each exported function create a HAL entry point and dispatch thunk.
+  // For each exported function create a HAL export decl and dispatch thunk.
   int nextOrdinal = 0;
   for (auto exportOp :
        sourceExecutableOp.body().getOps<IREE::Stream::ExecutableExportOp>()) {
@@ -253,11 +253,18 @@ static LogicalResult declareEntryPointOps(
     for (auto variantOp : variantOps) {
       // Declare the entry point on the target.
       OpBuilder targetBuilder(&variantOp.getBlock().front());
-      targetBuilder.create<IREE::HAL::ExecutableEntryPointOp>(
+      auto newExportOp = targetBuilder.create<IREE::HAL::ExecutableExportOp>(
           exportOp.getLoc(),
           targetBuilder.getStringAttr(exportOp.function_ref()),
           targetBuilder.getIndexAttr(ordinal), layoutAttr, ArrayAttr{},
           IntegerAttr{});
+
+      // Clone the workgroup count calculation function.
+      if (!exportOp.workgroup_count().empty()) {
+        mlir::BlockAndValueMapping mapper;
+        exportOp.workgroup_count().front().cloneInto(
+            &newExportOp.workgroup_count(), mapper);
+      }
 
       // Clone the updated interface-based function into the target.
       auto targetFuncOp = baseFuncOp.clone();
@@ -301,11 +308,11 @@ struct InlineConstantWorkgroupSizePattern
     // Lookup the entry point matching the parent.
     auto funcOp = sizeOp->getParentOfType<mlir::func::FuncOp>();
     auto variantOp = funcOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-    auto entryPointOp = dyn_cast<IREE::HAL::ExecutableEntryPointOp>(
+    auto exportOp = dyn_cast<IREE::HAL::ExecutableExportOp>(
         SymbolTable::lookupSymbolIn(variantOp, funcOp.getName()));
-    assert(entryPointOp &&
+    assert(exportOp &&
            "must have an entry point corresponding to the parent func");
-    auto workgroupSizeAttr = entryPointOp.workgroup_sizeAttr();
+    auto workgroupSizeAttr = exportOp.workgroup_sizeAttr();
     if (!workgroupSizeAttr) return failure();
 
     uint64_t dimIdx = sizeOp.dimension().getZExtValue();

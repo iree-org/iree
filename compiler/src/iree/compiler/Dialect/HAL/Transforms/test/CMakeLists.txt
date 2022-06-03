@@ -24,7 +24,7 @@ iree_lit_test_suite(
     "materialize_interfaces.mlir"
     "materialize_resource_caches.mlir"
     "memoize_device_queries.mlir"
-    "resolve_entry_point_ordinals.mlir"
+    "resolve_export_ordinals.mlir"
     "verify_target_environment.mlir"
   TOOLS
     FileCheck

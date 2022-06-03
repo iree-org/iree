@@ -162,20 +162,20 @@ static IREE::Util::GlobalOp appendGlobalBuffer(
   return globalOp;
 }
 
-// Appends a function calling the given |entryPointOp| with |dispatchParams|.
+// Appends a function calling the given |exportOp| with |dispatchParams|.
 // This will add a global value for the resources required.
 //
 // Expects the runner to pass an i32 value indicating the number of dispatches
 // to be made in one submission.
-static void appendDispatchBenchmark(
-    IREE::HAL::ExecutableOp executableOp,
-    IREE::HAL::ExecutableVariantOp variantOp,
-    IREE::HAL::ExecutableEntryPointOp entryPointOp,
-    DispatchParams dispatchParams, OpBuilder &moduleBuilder) {
+static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
+                                    IREE::HAL::ExecutableVariantOp variantOp,
+                                    IREE::HAL::ExecutableExportOp exportOp,
+                                    DispatchParams dispatchParams,
+                                    OpBuilder &moduleBuilder) {
   auto loc = FusedLoc::get(executableOp.getContext(), dispatchParams.locs);
 
   std::string baseName = (executableOp.getName() + "_" + variantOp.getName() +
-                          "_" + entryPointOp.getName())
+                          "_" + exportOp.getName())
                              .str();
   if (!dispatchParams.workload.empty()) {
     baseName += "_" + std::to_string(dispatchParams.workload[0]);
@@ -228,7 +228,7 @@ static void appendDispatchBenchmark(
   funcBuilder.create<IREE::HAL::CommandBufferBeginOp>(loc, commandBuffer);
 
   // Get the layout required to set up the dispatches.
-  auto layoutAttr = entryPointOp.layoutAttr();
+  auto layoutAttr = exportOp.layoutAttr();
   auto executableLayout =
       funcBuilder
           .create<IREE::HAL::ExecutableLayoutLookupOp>(
@@ -281,7 +281,7 @@ static void appendDispatchBenchmark(
       llvm::map_range(dispatchParams.workload,
                       [&](unsigned dim) { return indexSet.get(dim); }));
   auto workgroupCount =
-      entryPointOp.calculateWorkgroupCount(loc, device, workload, funcBuilder);
+      exportOp.calculateWorkgroupCount(loc, device, workload, funcBuilder);
 
   // Loop around dispatches based on batch size.
   // Note that we insert a barrier between each dispatch - we could make this
@@ -290,12 +290,12 @@ static void appendDispatchBenchmark(
       loc, indexSet.get(0), batchSizeArg, indexSet.get(1), ValueRange{},
       [&](OpBuilder &forBuilder, Location loc, Value iv, ValueRange iters) {
         // Dispatch.
-        auto symbolRefAttr = SymbolRefAttr::get(
-            executableOp.getNameAttr(),
-            {
-                SymbolRefAttr::get(variantOp.getNameAttr()),
-                SymbolRefAttr::get(entryPointOp.getNameAttr()),
-            });
+        auto symbolRefAttr =
+            SymbolRefAttr::get(executableOp.getNameAttr(),
+                               {
+                                   SymbolRefAttr::get(variantOp.getNameAttr()),
+                                   SymbolRefAttr::get(exportOp.getNameAttr()),
+                               });
         forBuilder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
             loc, commandBuffer, symbolRefAttr, workgroupCount[0],
             workgroupCount[1], workgroupCount[2]);
@@ -349,15 +349,14 @@ static mlir::OwningOpRef<mlir::ModuleOp> buildBenchmarkModule(
   // Add functions to test each entry point with its various dispatch
   // parameters.
   bool hasAnyBenchmarks = false;
-  for (auto entryPointOp :
-       variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
-    auto symbolRefAttr = SymbolRefAttr::get(
-        executableOp.getNameAttr(),
-        {FlatSymbolRefAttr::get(entryPointOp.getNameAttr())});
+  for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+    auto symbolRefAttr =
+        SymbolRefAttr::get(executableOp.getNameAttr(),
+                           {FlatSymbolRefAttr::get(exportOp.getNameAttr())});
     auto dispatchParamsSet = dispatchParamsMap.find(symbolRefAttr);
     if (dispatchParamsSet != dispatchParamsMap.end()) {
       for (auto &dispatchParams : dispatchParamsSet->second) {
-        appendDispatchBenchmark(executableOp, variantOp, entryPointOp,
+        appendDispatchBenchmark(executableOp, variantOp, exportOp,
                                 dispatchParams, moduleBuilder);
         hasAnyBenchmarks = true;
       }
@@ -425,7 +424,7 @@ class DumpExecutableBenchmarksPass
       llvm::sys::fs::create_directories(path);
     }
 
-    // Produce one file per executable containing all entry points.
+    // Produce one file per executable containing all exported entry points.
     for (auto executableOp : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
       for (auto variantOp :
            executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {

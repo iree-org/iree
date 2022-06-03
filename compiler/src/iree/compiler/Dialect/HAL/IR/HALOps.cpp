@@ -656,11 +656,11 @@ LogicalResult ExecutableOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// hal.executable.entry_point
+// hal.executable.export
 //===----------------------------------------------------------------------===//
 
-ParseResult ExecutableEntryPointOp::parse(OpAsmParser &parser,
-                                          OperationState &result) {
+ParseResult ExecutableExportOp::parse(OpAsmParser &parser,
+                                      OperationState &result) {
   StringAttr visibilityAttr;
   if (failed(parseSymbolVisibility(parser, visibilityAttr))) {
     return failure();
@@ -700,7 +700,7 @@ ParseResult ExecutableEntryPointOp::parse(OpAsmParser &parser,
   return success();
 }
 
-void ExecutableEntryPointOp::print(OpAsmPrinter &p) {
+void ExecutableExportOp::print(OpAsmPrinter &p) {
   Operation *op = getOperation();
   p << ' ';
   printSymbolVisibility(p, op, op->getAttrOfType<StringAttr>("sym_visibility"));
@@ -721,8 +721,8 @@ void ExecutableEntryPointOp::print(OpAsmPrinter &p) {
   p.printRegion(workgroup_count_region());
 }
 
-LogicalResult ExecutableEntryPointOp::verify() {
-  ExecutableEntryPointOp op = *this;
+LogicalResult ExecutableExportOp::verify() {
+  ExecutableExportOp op = *this;
   Block *body = getWorkgroupCountBody();
   // When there is no body, nothing to verify.
   if (!body) return success();
@@ -835,7 +835,7 @@ static std::array<Value, 3> calculateWorkgroupCountFromRegion(
 // The provided N-dimensional |workload| is the total number of invocations
 // required as calculated by the generic workload logic (basically, number of
 // output elements in tensors).
-std::array<Value, 3> ExecutableEntryPointOp::calculateWorkgroupCount(
+std::array<Value, 3> ExecutableExportOp::calculateWorkgroupCount(
     Location loc, Value device, ValueRange workload, OpBuilder &builder) {
   Block *body = getWorkgroupCountBody();
   if (body) {
@@ -848,7 +848,7 @@ std::array<Value, 3> ExecutableEntryPointOp::calculateWorkgroupCount(
 
 // Calculates the workgroup size (x, y, z). These are the dimension numbers
 // for a single workgroup.
-std::array<Value, 3> ExecutableEntryPointOp::calculateWorkgroupSize(
+std::array<Value, 3> ExecutableExportOp::calculateWorkgroupSize(
     Location loc, Value device, ValueRange workload, OpBuilder &builder) {
   // When no workgroup size is specified we just assume [1,1,1].
   // This yields a workgroup count that models the extents of the workload.

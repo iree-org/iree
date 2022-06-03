@@ -1523,7 +1523,7 @@ def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
   let assemblyFormat = "attr-dict";
 }
 
-def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
+def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     Symbol,
     ParentOneOf<[
       "IREE::HAL::ExecutableSourceOp",

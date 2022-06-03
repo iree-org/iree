@@ -10,7 +10,7 @@
 
 hal.executable private @dispatch_0 {
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_0 ordinal(0) layout(#executable_layout)
+    hal.executable.export @dispatch_0 ordinal(0) layout(#executable_layout)
     builtin.module {
       vm.module @module {
         vm.func @dispatch_0() {
@@ -23,7 +23,7 @@ hal.executable private @dispatch_0 {
 }
 hal.executable private @dispatch_1 {
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_1 ordinal(0) layout(#executable_layout)
+    hal.executable.export @dispatch_1 ordinal(0) layout(#executable_layout)
     builtin.module {
       vm.module @module {
         vm.func @dispatch_1() {
@@ -36,7 +36,7 @@ hal.executable private @dispatch_1 {
 }
 hal.executable private @dispatch_2 {
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_2 ordinal(0) layout(#executable_layout)
+    hal.executable.export @dispatch_2 ordinal(0) layout(#executable_layout)
     builtin.module {
       vm.module @module {
         vm.func @dispatch_2() {
@@ -73,9 +73,9 @@ util.initializer {
 // CHECK-NOT: hal.executable private @dispatch_2
 // CHECK:       hal.executable private @vmvx_linked {
 // CHECK-NEXT:    hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
-// CHECK-NEXT:      hal.executable.entry_point public @dispatch_0 ordinal(0)
-// CHECK-NEXT:      hal.executable.entry_point public @dispatch_1 ordinal(1)
-// CHECK-NEXT:      hal.executable.entry_point public @dispatch_2 ordinal(2)
+// CHECK-NEXT:      hal.executable.export public @dispatch_0 ordinal(0)
+// CHECK-NEXT:      hal.executable.export public @dispatch_1 ordinal(1)
+// CHECK-NEXT:      hal.executable.export public @dispatch_2 ordinal(2)
 // CHECK-NEXT:      module {
 // CHECK-NEXT:        vm.module public @linked_module {
 // CHECK-NEXT:          vm.func @dispatch_0() {
@@ -121,7 +121,7 @@ util.initializer {
 
 hal.executable private @dispatch_0 {
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_0 ordinal(0) layout(#executable_layout)
+    hal.executable.export @dispatch_0 ordinal(0) layout(#executable_layout)
     builtin.module {
       vm.module @module {
         vm.rodata public @rodata_a dense<[0]> : tensor<1xi32>
@@ -143,7 +143,7 @@ hal.executable private @dispatch_0 {
 }
 hal.executable private @dispatch_1 {
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_1 ordinal(0) layout(#executable_layout)
+    hal.executable.export @dispatch_1 ordinal(0) layout(#executable_layout)
     builtin.module {
       vm.module @module {
         // Conflict with a public symbol, this should be renamed when linked.

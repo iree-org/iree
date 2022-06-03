@@ -142,7 +142,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   // TODO(benvanik): move translation down to here.
 
-  // After all executables are translated and before resolving entry point
+  // After all executables are translated and before resolving export
   // ordinals, we allow the backends to link executables together. For example,
   // the LLVM AOT backend may combine all executable targets for the same
   // architecture into a single executable and link it as a shared library.
@@ -150,10 +150,10 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
     passManager.addPass(createLinkExecutablesPass());
   }
 
-  // Resolve entry point ordinals from nested symbol references prior to
+  // Resolve export ordinals from nested symbol references prior to
   // serialization. As this pass creates lookup ops it should run before
   // MaterializeResourceCachesPass.
-  passManager.addPass(createResolveEntryPointOrdinalsPass());
+  passManager.addPass(createResolveExportOrdinalsPass());
 
   // Gather cachable resources such as executables and descriptor sets and
   // cache them at initialization-time.

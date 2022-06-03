@@ -49,8 +49,8 @@ static SmallVector<int64_t> getWorkloadPerWorkgroup(
 /// loops are known.
 /// IREE considers it without interchange at Flow level, so the arguments are
 /// not interchanged. In this context, we interchange the final yield values.
-static FailureOr<IREE::HAL::ExecutableEntryPointOp> defineWorkgroupCountRegion(
-    IREE::HAL::ExecutableEntryPointOp entryPointOp,
+static FailureOr<IREE::HAL::ExecutableExportOp> defineWorkgroupCountRegion(
+    IREE::HAL::ExecutableExportOp exportOp,
     ArrayRef<int64_t> workloadPerWorkgroup, ArrayRef<int64_t> interchange) {
   // TODO(hanchung): Look into partitionable loops to see if the configuraion
   // is reasonable. The loops are paritioned at Flow level, any interchange on
@@ -59,14 +59,14 @@ static FailureOr<IREE::HAL::ExecutableEntryPointOp> defineWorkgroupCountRegion(
   // make partitionable loops also part of the lowering config. Otherwise, the
   // logic should be considered everywhere.
   if (interchange.size() > kNumMaxParallelDims) {
-    return entryPointOp.emitOpError(
+    return exportOp.emitOpError(
                "expected the number of loops is not greater than")
            << kNumMaxParallelDims;
   }
 
   if (workloadPerWorkgroup.size() > kNumMaxParallelDims) {
     // For now error out here.
-    return entryPointOp.emitOpError(
+    return exportOp.emitOpError(
                "expected workload per workgroup to be less than or equal to ")
            << kNumMaxParallelDims;
   }
@@ -93,29 +93,29 @@ static FailureOr<IREE::HAL::ExecutableEntryPointOp> defineWorkgroupCountRegion(
     }
     return res;
   };
-  OpBuilder builder(entryPointOp.getContext());
-  return defineWorkgroupCountRegion(builder, entryPointOp, regionBuilder);
+  OpBuilder builder(exportOp.getContext());
+  return defineWorkgroupCountRegion(builder, exportOp, regionBuilder);
 }
 
 /// Update the workload_per_wg value on the TranslationInfoAttr.
 // TODO(ravishankarm): The workload_per_wg field should be deprecated. This
 // is just transition before all dependencies on it can be removed.
 static LogicalResult updateTranslationInfoAttr(
-    IREE::HAL::ExecutableEntryPointOp entryPointOp,
+    IREE::HAL::ExecutableExportOp exportOp,
     ArrayRef<int64_t> workloadPerWorkgroup) {
   IREE::Codegen::DispatchLoweringPassPipeline passPipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault;
-  if (auto translationInfo = getTranslationInfo(entryPointOp)) {
+  if (auto translationInfo = getTranslationInfo(exportOp)) {
     // Expect the `workload_per_wg` to be empty.
     if (!translationInfo.getWorkloadPerWorkgroupVals().empty()) {
-      return entryPointOp.emitOpError(
+      return exportOp.emitOpError(
           "expected workload_per_wg to be empty at this stage");
     }
     passPipeline = translationInfo.getDispatchLoweringPassPipeline();
   }
   auto newTranslationInfoAttr = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointOp.getContext(), passPipeline, workloadPerWorkgroup);
-  setTranslationInfo(entryPointOp, newTranslationInfoAttr);
+      exportOp.getContext(), passPipeline, workloadPerWorkgroup);
+  setTranslationInfo(exportOp, newTranslationInfoAttr);
   return success();
 }
 
@@ -134,11 +134,11 @@ struct InsertDistributionInfoPass
 void InsertDistributionInfoPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   ModuleOp innerModule = variantOp.getInnerModule();
-  llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> allEntryPoints =
+  llvm::StringMap<IREE::HAL::ExecutableExportOp> allEntryPoints =
       getAllEntryPoints(innerModule);
   for (func::FuncOp funcOp : innerModule.getOps<func::FuncOp>()) {
-    auto entryPointOp = allEntryPoints.lookup(funcOp.getName());
-    if (!entryPointOp) continue;
+    auto exportOp = allEntryPoints.lookup(funcOp.getName());
+    if (!exportOp) continue;
 
     SmallVector<Operation *> computeOps;
     SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
@@ -163,9 +163,8 @@ void InsertDistributionInfoPass::runOnOperation() {
     SmallVector<int64_t> workloadPerWorkroup =
         getWorkloadPerWorkgroup(tileSizes);
 
-    FailureOr<IREE::HAL::ExecutableEntryPointOp> newEntryPointOp =
-        defineWorkgroupCountRegion(entryPointOp, workloadPerWorkroup,
-                                   interchange);
+    FailureOr<IREE::HAL::ExecutableExportOp> newEntryPointOp =
+        defineWorkgroupCountRegion(exportOp, workloadPerWorkroup, interchange);
     if (failed(newEntryPointOp)) {
       return signalPassFailure();
     }

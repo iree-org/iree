@@ -671,19 +671,18 @@ struct CmdDispatchOpPattern
                                                    device, rewriter);
     for (auto variantOp :
          executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
-      auto entryPointOps =
-          variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>();
-      auto entryPointIt = llvm::find_if(
-          entryPointOps, [&](IREE::HAL::ExecutableEntryPointOp op) {
+      auto exportOps = variantOp.getOps<IREE::HAL::ExecutableExportOp>();
+      auto exportIt =
+          llvm::find_if(exportOps, [&](IREE::HAL::ExecutableExportOp op) {
             return op.getNameAttr() ==
                    dispatchOp.entry_point().getLeafReference();
           });
-      if (entryPointIt == entryPointOps.end()) {
+      if (exportIt == exportOps.end()) {
         return variantOp.emitError()
                << "hal.executable.variant is missing the flow entry point for "
                << dispatchOp.entry_point();
       }
-      auto entryPointOp = *entryPointIt;
+      auto exportOp = *exportIt;
 
       auto *region = switchRewriter.addConditionRegion(
           variantOp.target().getMatchExpression());
@@ -692,17 +691,17 @@ struct CmdDispatchOpPattern
 
       // Record push constants and buffer bindings.
       recordParameters(loc, device, commandBuffer, dispatchOp, adaptor,
-                       entryPointOp.layout(), caseBuilder);
+                       exportOp.layout(), caseBuilder);
 
       // Dispatch with a target-specific workgroup count.
-      auto entryPointSymRef =
+      auto exportSymRef =
           SymbolRefAttr::get(caseBuilder.getContext(), executableOp.getName(),
-                             {SymbolRefAttr::get(entryPointOp->getParentOp()),
-                              SymbolRefAttr::get(entryPointOp)});
-      auto caseWorkgroupCount = entryPointOp.calculateWorkgroupCount(
+                             {SymbolRefAttr::get(exportOp->getParentOp()),
+                              SymbolRefAttr::get(exportOp)});
+      auto caseWorkgroupCount = exportOp.calculateWorkgroupCount(
           loc, device, adaptor.workload(), caseBuilder);
       caseBuilder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
-          loc, commandBuffer, entryPointSymRef, caseWorkgroupCount[0],
+          loc, commandBuffer, exportSymRef, caseWorkgroupCount[0],
           caseWorkgroupCount[1], caseWorkgroupCount[2]);
 
       caseBuilder.create<IREE::HAL::ReturnOp>(loc);

@@ -9,7 +9,7 @@
 hal.executable private @push_constant {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
-    hal.executable.entry_point @push_constant layout(#executable_layout) {
+    hal.executable.export @push_constant layout(#executable_layout) {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module {
@@ -43,7 +43,7 @@ hal.executable private @push_constant {
 hal.executable private @resource_bindings_in_same_func {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
-    hal.executable.entry_point @resource_bindings_in_same_func layout(#executable_layout) {
+    hal.executable.export @resource_bindings_in_same_func layout(#executable_layout) {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module {
@@ -98,10 +98,10 @@ hal.executable private @resource_bindings_in_same_func {
 hal.executable private @resource_bindings_in_multi_entry_func {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
-    hal.executable.entry_point @resource_bindings_in_entry_func1 layout(#executable_layout) {
+    hal.executable.export @resource_bindings_in_entry_func1 layout(#executable_layout) {
       workgroup_size = [32: index, 1: index, 1: index]
     }
-    hal.executable.entry_point @resource_bindings_in_entry_func2 layout(#executable_layout) {
+    hal.executable.export @resource_bindings_in_entry_func2 layout(#executable_layout) {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module {
@@ -154,7 +154,7 @@ hal.executable private @resource_bindings_in_multi_entry_func {
 hal.executable private @interface_binding {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
-    hal.executable.entry_point @interface_binding layout(#executable_layout) {
+    hal.executable.export @interface_binding layout(#executable_layout) {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module {
@@ -197,7 +197,7 @@ hal.executable private @interface_binding {
 hal.executable private @interface_wg_id {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
-    hal.executable.entry_point @interface_wg_id layout(#executable_layout) {
+    hal.executable.export @interface_wg_id layout(#executable_layout) {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module {
@@ -232,7 +232,7 @@ hal.executable private @interface_wg_id {
 hal.executable private @interface_wg_count {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
-    hal.executable.entry_point @interface_wg_count layout(#executable_layout) {
+    hal.executable.export @interface_wg_count layout(#executable_layout) {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module {

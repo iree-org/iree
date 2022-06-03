@@ -15,7 +15,7 @@ module attributes {hal.device.targets = [
 ]} {
 
 hal.executable.source public @ex {
-  hal.executable.entry_point public @entry layout(#hal.executable.layout<push_constants = 1, sets = [
+  hal.executable.export public @entry layout(#hal.executable.layout<push_constants = 1, sets = [
     #hal.descriptor_set.layout<0, bindings = [
       #hal.descriptor_set.binding<0, storage_buffer>
     ]>,
@@ -41,11 +41,11 @@ hal.executable.source public @ex {
 
 // CHECK: hal.executable public @ex
 // CHECK:   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64
-// CHECK:     hal.executable.entry_point public @entry layout(#executable_layout)
+// CHECK:     hal.executable.export public @entry layout(#executable_layout)
 // CHECK:     builtin.module
 // CHECK-NEXT:  func.func @entry()
 // CHECK:   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64
-// CHECK:     hal.executable.entry_point public @entry layout(#executable_layout)
+// CHECK:     hal.executable.export public @entry layout(#executable_layout)
 // CHECK:     builtin.module
 // CHECK-NEXT:  func.func @entry()
 

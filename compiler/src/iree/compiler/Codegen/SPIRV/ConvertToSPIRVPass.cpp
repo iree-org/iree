@@ -168,10 +168,10 @@ struct HALInterfaceLoadConstantConverter final
     // TODO(#1519): this conversion should look up the entry point information
     // to get the total push constant count.
     auto variantOp = loadOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-    auto entryPointOps = llvm::to_vector<1>(
-        variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>());
-    assert(entryPointOps.size() == 1);
-    auto layoutAttr = entryPointOps.front().layout();
+    auto exportOps =
+        llvm::to_vector<1>(variantOp.getOps<IREE::HAL::ExecutableExportOp>());
+    assert(exportOps.size() == 1);
+    auto layoutAttr = exportOps.front().layout();
 
     uint64_t elementCount = layoutAttr.getPushConstants();
     unsigned index = loadOp.index().getZExtValue();
@@ -303,18 +303,18 @@ void ConvertToSPIRVPass::runOnOperation() {
   MLIRContext *context = &getContext();
   ModuleOp moduleOp = getOperation();
 
-  llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
+  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
   for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
-    auto entryPointOp = entryPoints.lookup(funcOp.getName());
-    if (!entryPointOp) continue;
+    auto exportOp = exportOps.lookup(funcOp.getName());
+    if (!exportOp) continue;
     // TODO(ravishankarm): This needs to be removed after ConvertToGPU is
     // deprecated. All passes must set the `workgroup_size` on the
-    // `hal.executable.entry_point` directly and not on the function.
+    // `hal.executable.export` directly and not on the function.
     if (funcOp->hasAttr(spirv::getEntryPointABIAttrName())) continue;
-    SmallVector<int64_t> workgroupSize = getWorkgroupSize(entryPointOp);
+    SmallVector<int64_t> workgroupSize = getWorkgroupSize(exportOp);
     if (workgroupSize.empty()) {
-      entryPointOp.emitOpError(
+      exportOp.emitOpError(
           "expected workgroup_size attribute to be set for SPIR-V lowering");
       return signalPassFailure();
     }

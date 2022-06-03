@@ -13,7 +13,7 @@
 ]>
 
 hal.executable.source public @executable {
-  hal.executable.entry_point public @abs layout(#executable_layout)
+  hal.executable.export public @abs layout(#executable_layout)
 
   builtin.module {
     func.func @abs() {

@@ -131,7 +131,7 @@ static LogicalResult outlineDispatchWorkgroupsOp(
   executableOp.getOperation()->moveBefore(parentFuncOp);
   executableOp.setPrivate();
 
-  // Add executable entry point pointing at the function.
+  // Add an export pointing at the entry point function.
   OpBuilder builder(executableOp.body());
   auto exportOp = builder.create<ExecutableExportOp>(
       regionOp.getLoc(), workgroupFuncOp.getName(),
