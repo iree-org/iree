@@ -10,14 +10,27 @@
 
 iree_add_all_subdirs()
 
+iree_tablegen_library(
+  NAME
+    TransformDialectExtensionsOpGen
+  TD_FILE
+    "TransformDialectExtensionsOps.td"
+  OUTS
+    --gen-op-decls TransformDialectExtensionsOps.h.inc
+    --gen-op-defs TransformDialectExtensionsOps.cpp.inc
+)
+
 iree_cc_library(
   NAME
     TransformDialectExtensions
   HDRS
     "TransformDialectExtensions.h"
+    "TransformDialectExtensionsOps.h.inc"
   SRCS
     "TransformDialectExtensions.cpp"
+    "TransformDialectExtensionsOps.cpp.inc"
   DEPS
+    ::TransformDialectExtensionsOpGen
     IREEDialectsTransforms
     IREELinalgExtDialect
     IREELinalgExtTransforms
