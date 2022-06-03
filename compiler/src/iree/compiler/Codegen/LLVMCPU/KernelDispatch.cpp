@@ -178,6 +178,9 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
   SmallVector<int64_t> distributedTileSizes(numDims, 1);
   SmallVector<int64_t> numWorkgroupsPerDim(numDims, 1);
   SmallVector<int64_t> workload(numDims, 1);
+
+  size_t numDistributableLoops =
+      llvm::count_if(maxTileSizes, [](int64_t v) { return v > 0; });
   for (auto i : llvm::seq<size_t>(0, numDims)) {
     if (maxTileSizes[i] == 0 || ShapedType::isDynamic(lbs[i]) ||
         ShapedType::isDynamic(ubs[i])) {
@@ -189,7 +192,9 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
     assert(lbs[i] <= ubs[i]);
     workload[i] = ubs[i] - lbs[i];
     int64_t candidateTileSize = 1;
-    int64_t targetSize = std::min(workload[i] / 2, maxTileSizes[i]);
+    int64_t targetSize = std::min<int64_t>(
+        workload[i] / (clNumberOfRuntimeThreads / numDistributableLoops),
+        maxTileSizes[i]);
     int64_t vectorSize = vectorSizeHints[i];
     if (vectorSize > 1) {
       // Pick the factor of dim which is closest to the target tile size and
@@ -225,14 +230,15 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
   while (numWorkgroups > numWorkgroupsLimit && currDim > 0) {
     unsigned index = currDim - 1;
     int64_t currSize = distributedTileSizes[index];
-    if (currSize >= maxTileSizes[index] ||
-        workload[index] == ShapedType::kDynamicSize ||
-        currSize >= workload[index]) {
+    int64_t newSize = std::min<int64_t>(currSize * 2, workload[index]);
+    if (workload[index] == ShapedType::kDynamicSize ||
+        currSize >= maxTileSizes[index] || currSize >= workload[index]) {
       currDim--;
       continue;
     }
-    int64_t newSize = std::min<int64_t>(currSize * 2, maxTileSizes[index]);
+
     int64_t vectorSize = vectorSizeHints[index];
+
     // Chech if it's the ideal size with vector size hint. And skip if the new
     // size will break the ideal size.
     if (vectorSize > 1 &&
@@ -257,6 +263,7 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
 
 /// Adjusts the workload per workgroup to be a multiple of vector size to ensure
 /// that the op vectorizes.
+template <bool mustDivisable>
 static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
                               int64_t vectorSizeVal) {
   if (ub == ShapedType::kDynamicSize || lb == ShapedType::kDynamicSize) {
@@ -269,10 +276,20 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
       return i;
     }
   }
+  if (!mustDivisable) {
+    // do not allow too many workgroup.
+    int64_t start = std::min(maxSize, dim);
+    int64_t end = start / 2;
+    for (int64_t i = start; i >= end; --i) {
+      if (dim % i == 0) {
+        return i;
+      }
+    }
+    return maxSize;
+  }
   // If it can't be a multiple of vectorSizeVal, let's choose a factor of dim
   // sizes heuristically.
   int64_t start = std::min(maxSize, dim);
-  start = std::min(start, vectorSizeVal * 2);
   for (int64_t i = start; i > 0; --i) {
     if (dim % i == 0) {
       return i;
@@ -287,6 +304,7 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
 /// empty, each hint should be 1 or the vector size. On the dimensions where the
 /// hints != 1, it will try to find the tile sizes which are multipliers of the
 /// hints.
+template<bool mustDivisable>
 static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
     ArrayRef<unsigned> partitionableLoops, ArrayRef<int64_t> lbs,
     ArrayRef<int64_t> ubs, ArrayRef<int64_t> minTileSizes,
@@ -319,11 +337,12 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
   // size to make it vectorizable.
   for (auto i : llvm::seq<unsigned>(0, distributedTileSizes.size())) {
     if (!distributedTileSizes[i]) continue;
-    distributedTileSizes[i] = getMaxTileSize(
+    distributedTileSizes[i] = getMaxTileSize<mustDivisable>(
         lbs[i], ubs[i], distributedTileSizes[i], minTileSizes[i]);
   }
   return distributedTileSizes;
 }
+template<bool mustDivisable>
 static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
     linalg::LinalgOp linalgOp, ArrayRef<int64_t> minTileSizes,
     ArrayRef<int64_t> maxTileSizes, ArrayRef<int64_t> vectorSizeHints = {}) {
@@ -334,8 +353,8 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
   auto loops =
       cast<IREE::Flow::PartitionableLoopsInterface>(linalgOp.getOperation())
           .getPartitionableLoops(kNumMaxParallelDims);
-  return getDefaultDistributedLevelTileSizes(loops, lbs, ubs, minTileSizes,
-                                             maxTileSizes, vectorSizeHints);
+  return getDefaultDistributedLevelTileSizes<mustDivisable>(
+      loops, lbs, ubs, minTileSizes, maxTileSizes, vectorSizeHints);
 }
 
 /// Splits the tile sizes in `parallelSizes` into `reductionSizes` for the
@@ -399,8 +418,9 @@ static LogicalResult setDefaultRootConfig(
     }
   }
 
-  SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
-      partitionableLoops, lbs, ubs, minTileSizes, maxTileSizes);
+  SmallVector<int64_t> flowTileSizes =
+      getDefaultDistributedLevelTileSizes<true>(partitionableLoops, lbs, ubs,
+                                                minTileSizes, maxTileSizes);
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(flowTileSizes));
   return setOpConfigAndEntryPointFnTranslation(
@@ -435,12 +455,24 @@ static LogicalResult setMatmulPadRootConfig(
   SmallVector<int64_t> reductionTileSizes;
   reductionTileSizes.append(nLoops - 1, 0);
   reductionTileSizes.push_back(
-      getMaxTileSize(0, K, target2ndTileSizes[2], vectorSize));
+      getMaxTileSize<true>(0, K, target2ndTileSizes[2], vectorSize));
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
+
+  auto shape = linalgOp.getStaticLoopRanges();
+  printf("Case %d %d %d\n", (int)shape[0], (int)shape[1], (int)shape[2]);
+  printf("1st:");
+  for (auto i : flowTileSizes) printf(" %d", (int)i);
+  puts("");
+  //printf("2st:");
+  //for (auto i : parallelTileSizes) printf(" %d", (int)i);
+  //puts("");
+  //printf("3st:");
+  //for (auto i : reductionTileSizes) printf(" %d", (int)i);
+  //puts("");
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
@@ -460,11 +492,11 @@ static LogicalResult setMatmulNoPadRootConfig(
   int64_t nLoops = linalgOp.getNumLoops();
   if (nLoops >= 3) {
     parallelTileSizes.append(nLoops - 3, 1);
-    parallelTileSizes.push_back(getMaxTileSize(
+    parallelTileSizes.push_back(getMaxTileSize<true>(
         0, flowTileSizes[nLoops - 3], target2ndTileSizes[0], vectorSize));
   }
   if (nLoops >= 2) {
-    parallelTileSizes.push_back(getMaxTileSize(
+    parallelTileSizes.push_back(getMaxTileSize<true>(
         0, flowTileSizes[nLoops - 2], target2ndTileSizes[1], vectorSize));
   }
   parallelTileSizes.push_back(0);
@@ -474,7 +506,7 @@ static LogicalResult setMatmulNoPadRootConfig(
   SmallVector<int64_t> reductionTileSizes;
   reductionTileSizes.append(nLoops - 1, 0);
   reductionTileSizes.push_back(
-      getMaxTileSize(0, K, target2ndTileSizes[2], vectorSize));
+      getMaxTileSize<true>(0, K, target2ndTileSizes[2], vectorSize));
 
   setAlwaysVectorizeSizes(linalgOp, parallelTileSizes, reductionTileSizes);
 
@@ -499,21 +531,21 @@ static LogicalResult setARMRootConfig(func::FuncOp entryPointFn,
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
   if (nLoops >= 3) {
     l1TileSizes.append(nLoops - 3, 1);
-    l1TileSizes.push_back(getMaxTileSize(0, flowTileSizes[nLoops - 3],
+    l1TileSizes.push_back(getMaxTileSize<true>(0, flowTileSizes[nLoops - 3],
                                          5 * vectorSize, vectorSize));
     vectorTileSizes.append(nLoops - 3, 1);
     vectorTileSizes.push_back(vectorSize);
   }
   if (nLoops >= 2) {
     l1TileSizes.push_back(
-        getMaxTileSize(0, flowTileSizes[nLoops - 2], vectorSize, vectorSize));
+        getMaxTileSize<true>(0, flowTileSizes[nLoops - 2], vectorSize, vectorSize));
     vectorTileSizes.push_back(vectorSize);
   }
 
   // L1/vector tile size for k dimensions.
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
   int64_t K = lhsShapedType.getShape().back();
-  l1TileSizes.push_back(getMaxTileSize(0, K, 16 * vectorSize, vectorSize));
+  l1TileSizes.push_back(getMaxTileSize<true>(0, K, 16 * vectorSize, vectorSize));
   vectorTileSizes.push_back(vectorSize);
   TileSizesListType tileSizes;
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
@@ -565,7 +597,8 @@ static LogicalResult setRootConfig(
     maxTileSizes[0] = 1;
   }
   SmallVector<int64_t> flowTileSizes =
-      getDefaultDistributedLevelTileSizes(linalgOp, minTileSizes, maxTileSizes);
+      getDefaultDistributedLevelTileSizes<true>(linalgOp, minTileSizes,
+                                                maxTileSizes);
 
   // TODO(dcaballe): Find better configurations for RISC-V backends.
   if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
@@ -577,6 +610,10 @@ static LogicalResult setRootConfig(
       return setMatmulNoPadRootConfig(entryPointFn, contractionOp,
                                       flowTileSizes, tileSizes, vectorSize);
     }
+    //maxTileSizes[0] = 288;
+    //maxTileSizes[1] = 128;
+    flowTileSizes = getDefaultDistributedLevelTileSizes<false>(
+        linalgOp, minTileSizes, maxTileSizes);
     return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
                                   tileSizes, vectorSize);
   }
@@ -689,8 +726,8 @@ static void setX86WorkgroupTileSizes(
   for (auto loopNum : llvm::seq<unsigned>(0, numLoops)) {
     if (flowTileSizes[loopNum]) {
       workgroupTileSizes[loopNum] =
-          getMaxTileSize(0, flowTileSizes[loopNum], minTileSizes[loopNum],
-                         minTileSizes[loopNum]);
+          getMaxTileSize<true>(0, flowTileSizes[loopNum], minTileSizes[loopNum],
+                               minTileSizes[loopNum]);
     } else {
       // If the flow level tile size is zero, and static loop range is 0 as
       // well, set the tile sizes here to zero as well.
@@ -750,8 +787,9 @@ static LogicalResult setDefaultGenericOpRootConfig(
   }
 
   // Set the flow level tiling to the default.
-  SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
-      genericOp, minTileSizes, maxTileSizes);
+  SmallVector<int64_t> flowTileSizes =
+      getDefaultDistributedLevelTileSizes<true>(genericOp, minTileSizes,
+                                                maxTileSizes);
 
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
@@ -820,8 +858,9 @@ static LogicalResult setTransposeLikeOpRootConfig(
       [](int64_t tileSize) { return tileSize > 1; }, 8);
 
   // Set the flow level tiling to the default.
-  SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
-      genericOp, minTileSizes, maxTileSizes);
+  SmallVector<int64_t> flowTileSizes =
+      getDefaultDistributedLevelTileSizes<true>(genericOp, minTileSizes,
+                                                maxTileSizes);
 
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
@@ -877,8 +916,9 @@ static LogicalResult setConvRootConfig(
   vectorSizeHints[3] = vectorSize;
 
   // Set the flow level tiling to the default.
-  SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
-      convOp, minTileSizes, maxTileSizes, vectorSizeHints);
+  SmallVector<int64_t> flowTileSizes =
+      getDefaultDistributedLevelTileSizes<true>(convOp, minTileSizes,
+                                                maxTileSizes, vectorSizeHints);
 
   // Shapes of N, OH, OW, OC, KH, KW, (IC)
   SmallVector<int64_t, 4> shapes = convOp.getStaticLoopRanges();
@@ -890,7 +930,7 @@ static LogicalResult setConvRootConfig(
     // The ops will be decomposed to lower-rank named ops.
     if (parallelTileSizes[i] != 1) {
       parallelTileSizes[i] =
-          getMaxTileSize(0, tileSize, parallelTileSizes[i], vectorSize);
+          getMaxTileSize<true>(0, tileSize, parallelTileSizes[i], vectorSize);
     }
   }
   SmallVector<int64_t> reductionTileSizes;
