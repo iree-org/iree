@@ -64,8 +64,6 @@ iree_cc_binary(
     "device_embedded_sync.c"
     "simple_embedding.c"
   DEPS
-    ::simple_embedding_test_bytecode_module_dylib_arm_32_c
-    ::simple_embedding_test_bytecode_module_dylib_arm_64_c
     ::simple_embedding_test_bytecode_module_dylib_riscv_32_c
     ::simple_embedding_test_bytecode_module_dylib_riscv_64_c
     ::simple_embedding_test_bytecode_module_dylib_x86_64_c
@@ -139,43 +137,6 @@ iree_bytecode_module(
   PUBLIC
 )
 
-iree_bytecode_module(
-  NAME
-    simple_embedding_test_bytecode_module_dylib_arm_32
-  SRC
-    "simple_embedding_test.mlir"
-  C_IDENTIFIER
-    "iree_samples_simple_embedding_test_module_dylib_arm_32"
-  FLAGS
-    "--iree-input-type=mhlo"
-    "--iree-mlir-to-vm-bytecode-module"
-    "--iree-hal-target-backends=dylib-llvm-aot"
-    "--iree-llvm-target-triple=armv7a-pc-linux-elf"
-    "--iree-llvm-target-float-abi=hard"
-    "--iree-llvm-debug-symbols=false"
-    "--iree-vm-bytecode-module-strip-source-map=true"
-    "--iree-vm-emit-polyglot-zip=false"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
-    simple_embedding_test_bytecode_module_dylib_arm_64
-  SRC
-    "simple_embedding_test.mlir"
-  C_IDENTIFIER
-    "iree_samples_simple_embedding_test_module_dylib_arm_64"
-  FLAGS
-    "--iree-input-type=mhlo"
-    "--iree-mlir-to-vm-bytecode-module"
-    "--iree-hal-target-backends=dylib-llvm-aot"
-    "--iree-llvm-target-triple=aarch64-pc-linux-elf"
-    "--iree-llvm-debug-symbols=false"
-    "--iree-vm-bytecode-module-strip-source-map=true"
-    "--iree-vm-emit-polyglot-zip=false"
-  PUBLIC
-)
-
 iree_native_test(
   NAME
     "simple_embedding_embedded_sync_test"
@@ -192,7 +153,6 @@ iree_cc_binary(
     "device_dylib.c"
     "simple_embedding.c"
   DEPS
-    ::simple_embedding_test_bytecode_module_dylib_arm_64_c
     ::simple_embedding_test_bytecode_module_dylib_riscv_64_c
     ::simple_embedding_test_bytecode_module_dylib_x86_64_c
     iree::base
