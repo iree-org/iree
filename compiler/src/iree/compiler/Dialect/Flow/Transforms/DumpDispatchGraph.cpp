@@ -247,7 +247,33 @@ class DumpDispatchGraphPass
     return Node(nodeId);
   }
 
-  void printDispatchBody(raw_ostream &os, DispatchOp *op, AsmState &state) {}
+  void printDispatchBody(raw_ostream &os, DispatchOp dispatchOp,
+                         AsmState &state) {
+    // Find the entry point function from the dispatch entry point symbol
+    // attribute.
+    auto entryPoint = dispatchOp.entry_point();
+    auto executableOp = cast<ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
+        dispatchOp, entryPoint.getRootReference()));
+    if (!executableOp) return;
+
+    auto calleeNameAttr = entryPoint.getLeafReference();
+    auto innerModule = executableOp.getInnerModule();
+    auto funcOps = innerModule.getOps<func::FuncOp>();
+    auto funcIt = llvm::find_if(funcOps, [&](func::FuncOp op) {
+      return op.getNameAttr() == calleeNameAttr;
+    });
+    if (funcIt == funcOps.end()) return;
+
+    auto callee = *funcIt;
+
+    // Iterate the operations of the function body and print important
+    // operation.
+    for (auto &block : callee.getBlocks()) {
+      for (auto &op : block.getOperations()) {
+        os << op.getName() << "\n";
+      }
+    }
+  }
 
   void printOperands(raw_ostream &os, ::mlir::Operation::operand_range operands,
                      AsmState &state) {
