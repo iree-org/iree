@@ -79,6 +79,7 @@ cc_binary(
         "simple_embedding.c",
     ],
     deps = [
+        ":simple_embedding_test_bytecode_module_dylib_arm_64_c",
         ":simple_embedding_test_bytecode_module_dylib_riscv_32_c",
         ":simple_embedding_test_bytecode_module_dylib_riscv_64_c",
         ":simple_embedding_test_bytecode_module_dylib_x86_64_c",
@@ -144,6 +145,21 @@ iree_bytecode_module(
     ],
 )
 
+iree_bytecode_module(
+    name = "simple_embedding_test_bytecode_module_dylib_arm_64",
+    src = "simple_embedding_test.mlir",
+    c_identifier = "iree_samples_simple_embedding_test_module_dylib_arm_64",
+    flags = [
+        "--iree-input-type=mhlo",
+        "--iree-mlir-to-vm-bytecode-module",
+        "--iree-hal-target-backends=dylib-llvm-aot",
+        "--iree-llvm-target-triple=aarch64-pc-linux-elf",
+        "--iree-llvm-debug-symbols=false",
+        "--iree-vm-bytecode-module-strip-source-map=true",
+        "--iree-vm-emit-polyglot-zip=false",
+    ],
+)
+
 native_test(
     name = "simple_embedding_embedded_sync_test",
     src = ":simple_embedding_embedded_sync",
@@ -163,6 +179,7 @@ cc_binary(
         "simple_embedding.c",
     ],
     deps = [
+        ":simple_embedding_test_bytecode_module_dylib_arm_64_c",
         ":simple_embedding_test_bytecode_module_dylib_riscv_64_c",
         ":simple_embedding_test_bytecode_module_dylib_x86_64_c",
         "//runtime/src/iree/base",
