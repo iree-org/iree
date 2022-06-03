@@ -13,12 +13,14 @@
 #include <utility>
 
 #include "PassDetail.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/GraphWriter.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -247,8 +249,66 @@ class DumpDispatchGraphPass
     return Node(nodeId);
   }
 
-  void printDispatchBody(raw_ostream &os, DispatchOp dispatchOp,
-                         AsmState &state) {
+  void printResults(raw_ostream &os, Operation *op, AsmState &state) {
+    for (auto result : op->getResults()) {
+      result.printAsOperand(os, state);
+    }
+  }
+
+  void printResultsAndName(raw_ostream &os, Operation *op, AsmState &state) {
+    printResults(os, op, state);
+    os << " = " << op->getName();
+  }
+
+  void printDispatchTensorLoad(raw_ostream &os, DispatchTensorLoadOp op,
+                               AsmState &state) {
+    printResultsAndName(os, op.getOperation(), state);
+    os << " ";
+    op.source().printAsOperand(os, state);
+    os << " -> " << op.result().getType();
+    os << "\n";
+  }
+
+  void printDispatchTensorStore(raw_ostream &os, DispatchTensorStoreOp op,
+                                AsmState &state) {
+    os << op->getName() << " ";
+    op.value().printAsOperand(os, state);
+    os << ", ";
+    op.target().printAsOperand(os, state);
+    os << "\n";
+  }
+
+  void printGeneric(raw_ostream &os, linalg::GenericOp op, AsmState &state) {
+    printResultsAndName(os, op.getOperation(), state);
+    os << "\n";
+  }
+
+  void annotateOperation(raw_ostream &os, Operation *op, AsmState &state) {
+    // A scalar constant op will be printed directly when printing the
+    // operand.
+    if (isScalarConstantOp(op)) return;
+
+    if (isa<func::ReturnOp>(op)) return;
+
+    if (auto load = dyn_cast<DispatchTensorLoadOp>(op)) {
+      printDispatchTensorLoad(os, load, state);
+      return;
+    }
+
+    if (auto store = dyn_cast<DispatchTensorStoreOp>(op)) {
+      printDispatchTensorStore(os, store, state);
+      return;
+    }
+
+    if (auto generic = dyn_cast<linalg::GenericOp>(op)) {
+      printGeneric(os, generic, state);
+      return;
+    }
+
+    os << *op << "\n";
+  }
+
+  void printDispatchBody(raw_ostream &os, DispatchOp &dispatchOp) {
     // Find the entry point function from the dispatch entry point symbol
     // attribute.
     auto entryPoint = dispatchOp.entry_point();
@@ -266,19 +326,23 @@ class DumpDispatchGraphPass
 
     auto callee = *funcIt;
 
+    AsmState state(callee);
+
     // Iterate the operations of the function body and print important
     // operation.
     for (auto &block : callee.getBlocks()) {
       for (auto &op : block.getOperations()) {
-        os << op.getName() << "\n";
+        annotateOperation(os, &op, state);
       }
     }
   }
 
   void printOperands(raw_ostream &os, ::mlir::Operation::operand_range operands,
                      AsmState &state) {
-    for (unsigned i = 0, e = operands.size(); i != e; ++i) {
-      auto operand = operands[i];
+    auto numOperands = operands.size();
+
+    for (auto it : llvm::enumerate(operands)) {
+      auto operand = it.value();
       auto op = operand.getDefiningOp();
 
       if (isScalarConstantOp(op)) {
@@ -294,7 +358,7 @@ class DumpDispatchGraphPass
         operand.printAsOperand(os, state);
       }
 
-      if (i != e - 1) {
+      if (it.index() != numOperands - 1) {
         os << ", ";
       }
     }
@@ -306,10 +370,7 @@ class DumpDispatchGraphPass
       if (op->getNumRegions() == 0) {
         auto funcOp = op->getParentOfType<func::FuncOp>();
         AsmState state(funcOp);
-
-        for (auto result : op->getResults()) {
-          result.printAsOperand(os, state);
-        }
+        printResults(os, op, state);
         os << " = " << op->getName();
 
         if (auto dispatch = dyn_cast<DispatchOp>(op)) {
@@ -335,7 +396,7 @@ class DumpDispatchGraphPass
           printOperands(os, dispatch.operands(), state);
           os << ")\n";
 
-          printDispatchBody(os, dispatch, state);
+          printDispatchBody(os, dispatch);
 
         } else {
           os << "\n";
