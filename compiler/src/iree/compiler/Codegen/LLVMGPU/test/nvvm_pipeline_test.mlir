@@ -762,3 +762,41 @@ hal.executable @mma_fused_fp16 {
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
 //   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
+
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+  hal.executable public @pooling_dynamic {
+    hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
+      hal.executable.entry_point public @pooling_dynamic ordinal(0) layout(#executable_layout)
+      builtin.module {
+        func.func @pooling_dynamic() {
+          %c1_i64 = arith.constant 1 : i64
+          %c2_i64 = arith.constant 2 : i64
+          %cst = arith.constant 0.000000e+00 : f32
+          %0 = hal.interface.constant.load[0] : i32
+          %s = arith.index_cast %0 : i32 to index
+          %14 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%s) alignment(64) : !flow.dispatch.tensor<readonly:?x2048x?x?xf32>{%s, %s, %s}
+          %15 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%s) alignment(64) : !flow.dispatch.tensor<writeonly:?x2048x1x1xf32>{%s}
+          %16 = flow.dispatch.tensor.load %14, offsets = [0, 0, 0, 0], sizes = [%s, 2048, %s, %s], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:?x2048x?x?xf32>{%s, %s, %s} -> tensor<?x2048x?x?xf32>
+          %19 = linalg.init_tensor [%s, 2048, 1, 1] : tensor<?x2048x1x1xf32>
+          %38 = linalg.init_tensor [%s, %s] : tensor<?x?xf32>
+          %39 = linalg.fill ins(%cst : f32) outs(%19 : tensor<?x2048x1x1xf32>) -> tensor<?x2048x1x1xf32>
+          %40 = linalg.pooling_nchw_sum {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%16, %38 : tensor<?x2048x?x?xf32>, tensor<?x?xf32>) outs(%39 : tensor<?x2048x1x1xf32>) -> tensor<?x2048x1x1xf32>
+          flow.dispatch.tensor.store %40, %15, offsets = [0, 0, 0, 0], sizes = [%s, 2048, 1, 1], strides = [1, 1, 1, 1] : tensor<?x2048x1x1xf32> -> !flow.dispatch.tensor<writeonly:?x2048x1x1xf32>{%s}
+          return
+        }
+      }
+    }
+  }
+
+// Just check that compilation succeed. 
+//     CHECK-LABEL: hal.executable public @pooling_dynamic
+//           CHECK:   hal.executable.variant public @cuda
