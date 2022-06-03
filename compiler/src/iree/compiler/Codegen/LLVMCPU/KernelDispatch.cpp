@@ -230,13 +230,13 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
   while (numWorkgroups > numWorkgroupsLimit && currDim > 0) {
     unsigned index = currDim - 1;
     int64_t currSize = distributedTileSizes[index];
-    int64_t newSize = std::min<int64_t>(currSize * 2, workload[index]);
     if (workload[index] == ShapedType::kDynamicSize ||
-        newSize >= maxTileSizes[index] || newSize >= workload[index]) {
+        currSize >= maxTileSizes[index] || currSize >= workload[index]) {
       currDim--;
       continue;
     }
 
+    int64_t newSize = std::min<int64_t>(currSize * 2, workload[index]);
     int64_t vectorSize = vectorSizeHints[index];
 
     // Chech if it's the ideal size with vector size hint. And skip if the new
