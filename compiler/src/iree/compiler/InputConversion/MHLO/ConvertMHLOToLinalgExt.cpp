@@ -277,12 +277,16 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
       mhlo::ScatterOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
     if (!hasCanonicalDimensionNumbers(op)) return failure();
+    if (llvm::size(op.operands()) != 1)
+      return op.emitError("NYI variadic operands scatter");
+    if (llvm::size(op.updates()) != 1)
+      return op.emitError("NYI variadic updates scatter");
 
     ImplicitLocOpBuilder b(op.getLoc(), rewriter);
 
-    Value original = adaptor.operand();
+    Value original = adaptor.operands().front();
     Value indices = adaptor.scatter_indices();
-    Value updates = adaptor.updates();
+    Value updates = adaptor.updates().front();
 
     if (failed(collapseBatchDimsIfNeeded(indices, updates, b))) {
       return failure();
