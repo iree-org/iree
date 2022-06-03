@@ -16,7 +16,7 @@ func.func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 }
 
 // CHECK-LABEL: flow.executable private @hloElementwiseOps_dispatch_0 {
-//  CHECK-NEXT:   flow.dispatch.entry public @hloElementwiseOps_dispatch_0
+//  CHECK-NEXT:   flow.executable.export public @hloElementwiseOps_dispatch_0
 //  CHECK-NEXT:   module {
 //  CHECK-NEXT:     func.func @hloElementwiseOps_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:4xf32>, %arg1: !flow.dispatch.tensor<writeonly:4xf32>) {
 //       CHECK:       %{{.+}} = linalg.generic
@@ -40,13 +40,13 @@ func.func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 }
 
 // CHECK-LABEL: flow.executable private @interleavedDot_dispatch_0 {
-//  CHECK-NEXT:   flow.dispatch.entry public @interleavedDot_dispatch_0
+//  CHECK-NEXT:   flow.executable.export public @interleavedDot_dispatch_0
 //  CHECK-NEXT:   module {
 //  CHECK-NEXT:     func.func @interleavedDot_dispatch_0
 //       CHECK:       %{{.+}} = linalg.generic
 //       CHECK:         %{{.+}} = arith.addf %{{.+}}, %{{.+}} : f32
 //       CHECK: flow.executable private @interleavedDot_dispatch_1 {
-//  CHECK-NEXT:   flow.dispatch.entry public @interleavedDot_dispatch_1
+//  CHECK-NEXT:   flow.executable.export public @interleavedDot_dispatch_1
 //  CHECK-NEXT:   module {
 //  CHECK-NEXT:     func.func @interleavedDot_dispatch_1
 //       CHECK:       %{{.+}} = linalg.matmul
@@ -74,7 +74,7 @@ func.func @reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
 }
 
 // CHECK-LABEL: flow.executable private @reduction_dispatch_0 {
-//  CHECK-NEXT:   flow.dispatch.entry public @reduction_dispatch_0
+//  CHECK-NEXT:   flow.executable.export public @reduction_dispatch_0
 //  CHECK-NEXT:   module {
 //  CHECK-NEXT:     func.func @reduction_dispatch_0
 //       CHECK:       %{{.+}} = linalg.generic

@@ -765,18 +765,18 @@ LogicalResult ExecutableOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// flow.dispatch.entry
+// flow.executable.export
 //===----------------------------------------------------------------------===//
 
-void DispatchEntryOp::build(OpBuilder &builder, OperationState &state,
-                            StringRef sym_name,
-                            FlatSymbolRefAttr function_ref) {
+void ExecutableExportOp::build(OpBuilder &builder, OperationState &state,
+                               StringRef sym_name,
+                               FlatSymbolRefAttr function_ref) {
   build(builder, state, /*sym_visibility=*/nullptr,
         builder.getStringAttr(sym_name), function_ref);
 }
 
-ParseResult DispatchEntryOp::parse(OpAsmParser &parser,
-                                   OperationState &result) {
+ParseResult ExecutableExportOp::parse(OpAsmParser &parser,
+                                      OperationState &result) {
   StringAttr visibilityAttr;
   if (failed(parseSymbolVisibility(parser, visibilityAttr))) {
     return failure();
@@ -808,7 +808,7 @@ ParseResult DispatchEntryOp::parse(OpAsmParser &parser,
   return success();
 }
 
-void DispatchEntryOp::print(OpAsmPrinter &p) {
+void ExecutableExportOp::print(OpAsmPrinter &p) {
   p << ' ';
   Operation *op = getOperation();
   printSymbolVisibility(p, op, op->getAttrOfType<StringAttr>("sym_visibility"));
@@ -826,19 +826,19 @@ void DispatchEntryOp::print(OpAsmPrinter &p) {
 //===----------------------------------------------------------------------===//
 
 void DispatchOp::build(OpBuilder &builder, OperationState &state,
-                       DispatchEntryOp entryPoint, ValueRange workload,
+                       ExecutableExportOp exportOp, ValueRange workload,
                        TypeRange resultTypes, ValueRange resultDims,
                        ValueRange operands, ValueRange operandDims,
                        ArrayAttr tiedOperands,
                        ArrayRef<NamedAttribute> attributes) {
   StringRef executableOpSymName =
-      entryPoint->getParentOp()
+      exportOp->getParentOp()
           ->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
           .getValue();
   state.addAttribute(
       "entry_point",
       SymbolRefAttr::get(builder.getContext(), executableOpSymName,
-                         {SymbolRefAttr::get(entryPoint)}));
+                         {SymbolRefAttr::get(exportOp)}));
 
   state.addOperands(workload);
   state.addTypes(resultTypes);
@@ -881,8 +881,10 @@ LogicalResult DispatchOp::verify() {
 
 LogicalResult DispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   Operation *op = getOperation();
-  auto entryPointOp = symbolTable.lookupNearestSymbolFrom(op, entry_point());
-  if (!entryPointOp) {
+  auto exportOp =
+      symbolTable.lookupNearestSymbolFrom<IREE::Flow::ExecutableExportOp>(
+          op, entry_point());
+  if (!exportOp) {
     // TODO(benvanik): there are a lot of tests that are assuming this is not
     // verified. We'll need to go add dummy executables for all of them. Today
     // we just bail on the verifier if the symbol isn't found.

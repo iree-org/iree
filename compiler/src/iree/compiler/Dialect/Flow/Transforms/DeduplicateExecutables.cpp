@@ -198,9 +198,9 @@ bool areExecutablesEquivalent(ExecutableOp lhs, ExecutableOp rhs) {
   // Must have the same number of entry point ops, with the same attributes.
   // Entry point op symbol names are expected to differ, that won't affect
   // equivalence.
-  if (!compare_ranges(lhsModule.getOps<DispatchEntryOp>(),
-                      rhsModule.getOps<DispatchEntryOp>(),
-                      [](DispatchEntryOp lhs, DispatchEntryOp rhs) {
+  if (!compare_ranges(lhsModule.getOps<ExecutableExportOp>(),
+                      rhsModule.getOps<ExecutableExportOp>(),
+                      [](ExecutableExportOp lhs, ExecutableExportOp rhs) {
                         return lhs->getAttrs() == rhs->getAttrs();
                       })) {
     return false;  // dispatch entry mismatch
@@ -269,17 +269,18 @@ class DeduplicateExecutablesPass
         duplicateExecutableOps.push_back(duplicateExecutableOp);
 
         // Record entry point reference replacements.
-        for (auto entryOpPair : llvm::zip(
-                 duplicateExecutableOp.getBlock().getOps<DispatchEntryOp>(),
-                 referenceExecutableOp.getBlock().getOps<DispatchEntryOp>())) {
+        for (auto exportOpPair : llvm::zip(
+                 duplicateExecutableOp.getBlock().getOps<ExecutableExportOp>(),
+                 referenceExecutableOp.getBlock()
+                     .getOps<ExecutableExportOp>())) {
           auto oldSymbolRefAttr = SymbolRefAttr::get(
               builder.getContext(), duplicateExecutableOp.getName(),
               {SymbolRefAttr::get(builder.getContext(),
-                                  std::get<0>(entryOpPair).sym_name())});
+                                  std::get<0>(exportOpPair).sym_name())});
           auto newSymbolRefAttr = SymbolRefAttr::get(
               builder.getContext(), referenceExecutableOp.getName(),
               {SymbolRefAttr::get(builder.getContext(),
-                                  std::get<1>(entryOpPair).sym_name())});
+                                  std::get<1>(exportOpPair).sym_name())});
           entryPointRefReplacements[oldSymbolRefAttr] = newSymbolRefAttr;
         }
 

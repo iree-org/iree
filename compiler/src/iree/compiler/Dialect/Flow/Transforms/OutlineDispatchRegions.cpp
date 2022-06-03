@@ -62,7 +62,7 @@ static ExecutableOp createExecutable(Location loc, StringRef executableName,
 // Converts a dispatch region op into a dispatch op to the outlined region.
 static LogicalResult convertToDispatchOp(DispatchWorkgroupsOp regionOp,
                                          ExecutableOp executableOp,
-                                         DispatchEntryOp entryPointOp) {
+                                         ExecutableExportOp exportOp) {
   // Insert at the same place as the original region.
   OpBuilder builder(regionOp);
 
@@ -70,7 +70,7 @@ static LogicalResult convertToDispatchOp(DispatchWorkgroupsOp regionOp,
   // Note that we copy the tied operand indices from the workgroups op - it
   // lines up 1:1 with the dispatch once we've outlined things.
   auto dispatchOp = builder.create<DispatchOp>(
-      regionOp.getLoc(), entryPointOp, regionOp.workload(),
+      regionOp.getLoc(), exportOp, regionOp.workload(),
       regionOp.getResultTypes(), regionOp.result_dims(), regionOp.operands(),
       regionOp.operand_dims(), regionOp.tied_operandsAttr());
 
@@ -133,12 +133,12 @@ static LogicalResult outlineDispatchWorkgroupsOp(
 
   // Add executable entry point pointing at the function.
   OpBuilder builder(executableOp.body());
-  auto entryPointOp = builder.create<DispatchEntryOp>(
+  auto exportOp = builder.create<ExecutableExportOp>(
       regionOp.getLoc(), workgroupFuncOp.getName(),
       SymbolRefAttr::get(workgroupFuncOp));
 
   // Finally convert the dispatch region into a dispatch to the outlined func.
-  return convertToDispatchOp(regionOp, executableOp, entryPointOp);
+  return convertToDispatchOp(regionOp, executableOp, exportOp);
 }
 
 }  // namespace

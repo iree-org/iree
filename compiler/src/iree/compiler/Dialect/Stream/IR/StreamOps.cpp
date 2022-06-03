@@ -2036,7 +2036,7 @@ LogicalResult ExecutableOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// stream.executable.entry
+// stream.executable.export
 //===----------------------------------------------------------------------===//
 
 void ExecutableExportOp::build(OpBuilder &builder, OperationState &state,

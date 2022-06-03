@@ -545,7 +545,7 @@ def FLOW_ExecutableEndOp : FLOW_Op<"executable_end", [
   let assemblyFormat = "attr-dict";
 }
 
-def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
+def FLOW_ExecutableExportOp : FLOW_Op<"executable.export", [
   HasParent<"IREE::Flow::ExecutableOp">,
   Symbol,
 ]> {
@@ -605,13 +605,13 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins
-      "DispatchEntryOp":$entryPoint, "ValueRange":$workload,
+      "ExecutableExportOp":$entryPoint, "ValueRange":$workload,
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
       "ValueRange":$operands, "ValueRange":$operandDims,
       "ArrayAttr":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
     OpBuilder<(ins
-      "DispatchEntryOp":$entryPoint, "ValueRange":$workload,
+      "ExecutableExportOp":$entryPoint, "ValueRange":$workload,
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
       "ValueRange":$operands, "ValueRange":$operandDims,
       "ArrayRef<int64_t>":$tiedOperands,

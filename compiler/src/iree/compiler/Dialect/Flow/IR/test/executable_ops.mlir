@@ -9,8 +9,8 @@ flow.executable @dispatch_ex {
       return
     }
   }
-  // CHECK: flow.dispatch.entry public @dispatch0
-  flow.dispatch.entry @dispatch0
-  // CHECK: flow.dispatch.entry public @dispatch0 as("dispatch0_alias")
-  flow.dispatch.entry @dispatch0 as("dispatch0_alias")
+  // CHECK: flow.executable.export public @dispatch0
+  flow.executable.export @dispatch0
+  // CHECK: flow.executable.export public @dispatch0 as("dispatch0_alias")
+  flow.executable.export @dispatch0 as("dispatch0_alias")
 }

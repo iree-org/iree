@@ -6,7 +6,7 @@ flow.executable @ex0 {
       return %arg0 : tensor<4xf32>
     }
   }
-  flow.dispatch.entry @dispatch_fn
+  flow.executable.export @dispatch_fn
 }
 
 // CHECK-LABEL: @dispatch

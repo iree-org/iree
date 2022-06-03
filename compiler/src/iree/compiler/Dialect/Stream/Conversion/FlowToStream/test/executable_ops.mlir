@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @rank_0_binding
 flow.executable private @rank_0_binding {
-  flow.dispatch.entry public @dispatch
+  flow.executable.export public @dispatch
   builtin.module {
     // CHECK: func.func @dispatch(%[[INPUT:.+]]: !stream.binding)
     func.func @dispatch(%input: !flow.dispatch.tensor<readonly:i64>) {
@@ -19,7 +19,7 @@ flow.executable private @rank_0_binding {
 
 // CHECK-LABEL: @static_bindings
 flow.executable private @static_bindings {
-  flow.dispatch.entry public @dispatch
+  flow.executable.export public @dispatch
   builtin.module {
     // CHECK: func.func @dispatch(%[[INPUT:.+]]: !stream.binding, %[[OUTPUT:.+]]: !stream.binding)
     func.func @dispatch(%input: !flow.dispatch.tensor<readonly:1x4xf32>, %output: !flow.dispatch.tensor<writeonly:4xf32>) {
@@ -41,7 +41,7 @@ flow.executable private @static_bindings {
 
 // CHECK-LABEL: @dynamic_bindings
 flow.executable private @dynamic_bindings {
-  flow.dispatch.entry public @dispatch
+  flow.executable.export public @dispatch
   builtin.module {
     // CHECK: func.func @dispatch(%[[DIM:.+]]: index, %[[INPUT:.+]]: !stream.binding, %[[OUTPUT:.+]]: !stream.binding)
     func.func @dispatch(%dim: index, %input: !flow.dispatch.tensor<readonly:1x?xf32>, %output: !flow.dispatch.tensor<writeonly:?xf32>) {
@@ -63,7 +63,7 @@ flow.executable private @dynamic_bindings {
 
 // CHECK-LABEL: @indirect_dynamic_bindings
 flow.executable private @indirect_dynamic_bindings {
-  flow.dispatch.entry public @dispatch
+  flow.executable.export public @dispatch
   builtin.module {
     // CHECK: func.func @dispatch(%[[DIM_TENSOR:.+]]: !stream.binding, %[[INPUT:.+]]: !stream.binding, %[[OUTPUT:.+]]: !stream.binding)
     func.func @dispatch(%dim_tensor: !flow.dispatch.tensor<readonly:i64>, %input: !flow.dispatch.tensor<readonly:1x?xf32>, %output: !flow.dispatch.tensor<writeonly:?xf32>) {
@@ -93,7 +93,7 @@ flow.executable private @indirect_dynamic_bindings {
 
 // CHECK-LABEL: @nested_bindings
 flow.executable private @nested_bindings {
-  flow.dispatch.entry public @dispatch
+  flow.executable.export public @dispatch
   builtin.module {
     // CHECK: func.func @dispatch(%[[DIM:.+]]: index, %[[INPUT:.+]]: !stream.binding, %[[OUTPUT:.+]]: !stream.binding)
     func.func @dispatch(%dim: index, %input: !flow.dispatch.tensor<readonly:1x?xf32>, %output: !flow.dispatch.tensor<writeonly:?xf32>) {
