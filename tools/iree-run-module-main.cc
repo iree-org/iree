@@ -72,6 +72,8 @@ IREE_FLAG_CALLBACK(
     "  2x2xi32=1 2 3 4\n"
     "Optionally, brackets may be used to separate the element values:\n"
     "  2x2xi32=[[1 2][3 4]]\n"
+    "Raw binary files can be read to provide buffer contents:\n"
+    "  2x2xi32=@some/file.bin\n"
     "Each occurrence of the flag indicates an input in the order they were\n"
     "specified on the command line.");
 
