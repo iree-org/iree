@@ -211,7 +211,11 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   RewritePatternSet resolveDimOps(context);
   memref::populateResolveRankedShapeTypeResultDimsPatterns(resolveDimOps);
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(resolveDimOps)))) {
-    return signalPassFailure();
+    // TODO: Upstream patterns generate new ops even on failing pattern
+    // matching. That causes the canonicalization to not converge after the
+    // default numbers of runs and thus fail. Fix upstream pattern and re-enable
+    // the check.
+    // return signalPassFailure();
   }
 }
 
