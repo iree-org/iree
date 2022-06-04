@@ -27,44 +27,43 @@ namespace iree_compiler {
 
 namespace {}  // namespace
 
-FailureOr<IREE::HAL::ExecutableEntryPointOp> defineWorkgroupCountRegion(
-    OpBuilder &builder, IREE::HAL::ExecutableEntryPointOp entryPointOp,
+FailureOr<IREE::HAL::ExecutableExportOp> defineWorkgroupCountRegion(
+    OpBuilder &builder, IREE::HAL::ExecutableExportOp exportOp,
     WorkgroupCountRegionBuilder regionBuilder) {
-  Location loc = entryPointOp.getLoc();
+  Location loc = exportOp.getLoc();
 
   OpBuilder::InsertionGuard guard(builder);
   // Create the cloned operation but with a single region.
-  builder.setInsertionPoint(entryPointOp);
+  builder.setInsertionPoint(exportOp);
 
-  auto clonedOp = builder.create<IREE::HAL::ExecutableEntryPointOp>(
-      loc, entryPointOp.sym_nameAttr(), entryPointOp.ordinalAttr(),
-      entryPointOp.layoutAttr(), entryPointOp.workgroup_sizeAttr(),
-      entryPointOp.workgroup_local_memoryAttr());
+  auto clonedOp = builder.create<IREE::HAL::ExecutableExportOp>(
+      loc, exportOp.sym_nameAttr(), exportOp.ordinalAttr(),
+      exportOp.layoutAttr(), exportOp.workgroup_sizeAttr(),
+      exportOp.workgroup_local_memoryAttr());
   // Copy over all attributes
-  for (auto attr : entryPointOp->getAttrs()) {
-    if (attr.getName() != entryPointOp.sym_nameAttrName() &&
-        attr.getName() != entryPointOp.ordinalAttrName() &&
-        attr.getName() != entryPointOp.layoutAttr() &&
-        attr.getName() != entryPointOp.workgroup_sizeAttrName() &&
-        attr.getName() != entryPointOp.workgroup_local_memoryAttrName()) {
+  for (auto attr : exportOp->getAttrs()) {
+    if (attr.getName() != exportOp.sym_nameAttrName() &&
+        attr.getName() != exportOp.ordinalAttrName() &&
+        attr.getName() != exportOp.layoutAttr() &&
+        attr.getName() != exportOp.workgroup_sizeAttrName() &&
+        attr.getName() != exportOp.workgroup_local_memoryAttrName()) {
       clonedOp->setAttr(attr.getName(), attr.getValue());
     }
   }
-  Region &region = clonedOp.workgroup_count_region();
+  Region &region = clonedOp.workgroup_count();
   Block *entryBlock = builder.createBlock(&region);
   // Add 3 index arguments for the workload.
   auto indexType = builder.getIndexType();
-  assert(IREE::HAL::ExecutableEntryPointOp::getNumWorkgroupDims() == 3 &&
-         "expected 3 dims");
   auto device =
       entryBlock->addArgument(builder.getType<IREE::HAL::DeviceType>(), loc);
+  // NOTE: this code currently assumes workloads are always defined as 3D.
   std::array<Value, 3> workload = {entryBlock->addArgument(indexType, loc),
                                    entryBlock->addArgument(indexType, loc),
                                    entryBlock->addArgument(indexType, loc)};
   std::array<Value, 3> workgroupCount =
       regionBuilder(builder, loc, device, workload);
   builder.create<IREE::HAL::ReturnOp>(loc, workgroupCount);
-  entryPointOp.erase();
+  exportOp.erase();
   return clonedOp;
 }
 

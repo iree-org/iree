@@ -408,7 +408,7 @@ static void dumpExecutionCSVTable(const UsageInfo &usageInfo,
   os << "; ";
   prettyPrintOpBreadcrumb(executeOp, os);
   os << "\n";
-  os << R"("Depth","Command","Symbol","Length","Invocations","X","Y","Z","Operands","Resources")";
+  os << R"("Depth","Command","Symbol","Length","Invocations","Workload","Operands","Resources")";
   os << "\n";
   std::function<void(Operation *)> dumpRow;
   int depth = 0;
@@ -427,28 +427,37 @@ static void dumpExecutionCSVTable(const UsageInfo &usageInfo,
         .Case<IREE::Stream::CmdFillOp>([&](auto op) {
           APInt length;
           matchPattern(op.target_length(), m_ConstantInt(&length));
-          os << llvm::formatv(R"({0},"fill",,{1},,,,,,)", depth, length);
+          os << llvm::formatv(R"({0},"fill",,{1},,,,)", depth, length);
           os << "\n";
         })
         .Case<IREE::Stream::CmdCopyOp>([&](auto op) {
           APInt length;
           matchPattern(op.length(), m_ConstantInt(&length));
-          os << llvm::formatv(R"({0},"copy",,{1},,,,,,)", depth, length);
+          os << llvm::formatv(R"({0},"copy",,{1},,,,)", depth, length);
           os << "\n";
         })
         .Case<IREE::Stream::CmdDispatchOp>([&](auto op) {
-          auto workload = op.workgroup_count();
-          APInt workloadX;
-          APInt workloadY;
-          APInt workloadZ;
-          matchPattern(workload[0], m_ConstantInt(&workloadX));
-          matchPattern(workload[1], m_ConstantInt(&workloadY));
-          matchPattern(workload[2], m_ConstantInt(&workloadZ));
-          os << llvm::formatv(
-              R"({0},"dispatch","{1}",,{2},{3},{4},{5},{6},{7})", depth,
-              op.entry_point(), workloadX * workloadY * workloadZ, workloadX,
-              workloadY, workloadZ, op.operands().size(),
-              op.resources().size());
+          auto workload = op.workload();
+          SmallString<32> workloadStr;
+          for (unsigned i = 0; i < workload.size(); ++i) {
+            if (i > 0) workloadStr.append(";");
+            APInt dimValue;
+            if (matchPattern(workload[i], m_ConstantInt(&dimValue))) {
+              dimValue.toString(workloadStr, 10, /*signed=*/true);
+            } else {
+              workloadStr.append("?");
+            }
+          }
+          APInt workloadSum = APInt(64, 1);
+          for (auto dim : workload) {
+            APInt dimValue;
+            if (matchPattern(dim, m_ConstantInt(&dimValue))) {
+              workloadSum *= dimValue;
+            }
+          }
+          os << llvm::formatv(R"({0},"dispatch","{1}",,{2},"{3}",{4},{5})",
+                              depth, op.entry_point(), workloadSum, workloadStr,
+                              op.operands().size(), op.resources().size());
           os << "\n";
         });
   };

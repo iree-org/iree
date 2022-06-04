@@ -102,27 +102,27 @@ class WebGPUTargetBackend : public TargetBackend {
     // For each executable entry point op, rename the entry point symbol using
     // that convention and keep track of the mapping between entry point
     // ordinals to which shader module they reference.
-    auto entryPointOps = llvm::to_vector<4>(
-        variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>());
-    llvm::SmallVector<uint32_t, 4> entryPointOrdinals(entryPointOps.size());
+    auto exportOps =
+        llvm::to_vector<4>(variantOp.getOps<IREE::HAL::ExecutableExportOp>());
+    llvm::SmallVector<uint32_t, 4> entryPointOrdinals(exportOps.size());
     SymbolTableCollection symbolTable;
     SymbolUserMap symbolUsers(symbolTable, variantOp);
-    for (auto entryPointOp : entryPointOps) {
+    for (auto exportOp : exportOps) {
       auto entryPointFunc = dyn_cast<spirv::FuncOp>(
-          SymbolTable::lookupSymbolIn(spvModuleOp, entryPointOp.sym_name()));
+          SymbolTable::lookupSymbolIn(spvModuleOp, exportOp.sym_name()));
 
-      std::string symbolName = llvm::formatv("d{0}", entryPointOp.ordinal());
+      std::string symbolName = llvm::formatv("d{0}", exportOp.ordinal());
       mlir::StringAttr nameAttr =
           mlir::StringAttr::get(variantOp->getContext(), symbolName);
 
       symbolUsers.replaceAllUsesWith(entryPointFunc, nameAttr);
-      entryPointOp.setName(symbolName);  // Same symbol reference? Not in table?
+      exportOp.setName(symbolName);  // Same symbol reference? Not in table?
       SymbolTable::setSymbolName(entryPointFunc, symbolName);
 
       // We only have one shader module right now, so all point to index 0.
       // TODO(#7824): Support multiple shader modules per executable.
       uint64_t ordinal =
-          entryPointOp.ordinal().getValueOr(APInt(64, 0)).getZExtValue();
+          exportOp.ordinal().getValueOr(APInt(64, 0)).getZExtValue();
       entryPointOrdinals[ordinal] = 0;
     }
 

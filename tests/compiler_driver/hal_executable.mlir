@@ -21,7 +21,7 @@ hal.executable.source public @executable {
   // Exported functions are declared with the layout they use and may optionally
   // contain other information - though when hand-authoring that's usually
   // omitted.
-  hal.executable.entry_point public @mul layout(#executable_layout)
+  hal.executable.export public @mul layout(#executable_layout)
 
   // The inner module defining the executable. This may have any number of
   // private functions and only those with declared entry points will be

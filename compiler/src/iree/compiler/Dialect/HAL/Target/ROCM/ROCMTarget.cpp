@@ -130,9 +130,9 @@ class ROCMTargetBackend final : public TargetBackend {
     }
 
     // Collect all the entry point names.
-    llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPointOps;
-    for (auto op : variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
-      entryPointOps[op.sym_name()] = op;
+    llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps;
+    for (auto op : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+      exportOps[op.sym_name()] = op;
     }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
@@ -140,9 +140,8 @@ class ROCMTargetBackend final : public TargetBackend {
       auto *llvmFunc = llvmModule->getFunction(func.getName());
       if (llvmFunc->isDeclaration()) continue;
       std::array<int32_t, 3> workgroup_size;
-      auto entryPointOp = entryPointOps[func.getName()];
-      if (Optional<ArrayAttr> workgroupSizeAttr =
-              entryPointOp.workgroup_size()) {
+      auto exportOp = exportOps[func.getName()];
+      if (Optional<ArrayAttr> workgroupSizeAttr = exportOp.workgroup_size()) {
         for (auto it : llvm::enumerate(workgroupSizeAttr.getValue())) {
           workgroup_size[it.index()] = it.value().cast<IntegerAttr>().getInt();
           flatWgSize *= it.value().cast<IntegerAttr>().getInt();
@@ -204,7 +203,7 @@ class ROCMTargetBackend final : public TargetBackend {
 
     auto entryPointNames = llvm::to_vector<8>(llvm::map_range(
         variantOp.getBlock()
-            .getOps<iree_compiler::IREE::HAL::ExecutableEntryPointOp>(),
+            .getOps<iree_compiler::IREE::HAL::ExecutableExportOp>(),
         [&](auto op) { return op.getName(); }));
     auto entryPointsRef = builder.createStringVec(entryPointNames);
 

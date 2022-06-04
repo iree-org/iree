@@ -22,7 +22,7 @@
   >]>
 hal.executable private @check_no_cse {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.entry_point public @check_no_cse ordinal(0) layout(#executable_layout5)
+    hal.executable.export public @check_no_cse ordinal(0) layout(#executable_layout5)
     builtin.module {
       func.func @check_no_cse() {
         %cst = arith.constant 3.840000e+02 : f32
@@ -77,7 +77,7 @@ hal.executable private @check_no_cse {
 ]>
 hal.executable private @preset_config_matmul  {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.entry_point @preset_config_matmul layout(#executable_layout)
+    hal.executable.export @preset_config_matmul layout(#executable_layout)
     builtin.module {
       func.func @preset_config_matmul() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -123,7 +123,7 @@ hal.executable private @preset_config_matmul  {
   >]>
 hal.executable private @check_buffer_ops_vectorization {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.entry_point public @check_buffer_ops_vectorization ordinal(0) layout(#executable_layout)
+    hal.executable.export public @check_buffer_ops_vectorization ordinal(0) layout(#executable_layout)
     builtin.module {
       func.func @check_buffer_ops_vectorization() {
         %c0 = arith.constant 0 : index
@@ -158,7 +158,7 @@ hal.executable private @vectorize_fill_conv2d_generic {
       native_vector_size = 16 : index,
       target_triple = "x86_64-unknown-unknown-eabi-elf"
     }> {
-    hal.executable.entry_point public @vectorize_fill_conv2d_generic ordinal(0) layout(
+    hal.executable.export public @vectorize_fill_conv2d_generic ordinal(0) layout(
       #hal.executable.layout<push_constants = 0, sets = [
         #hal.descriptor_set.layout<0, bindings = [
           #hal.descriptor_set.binding<0, storage_buffer>,

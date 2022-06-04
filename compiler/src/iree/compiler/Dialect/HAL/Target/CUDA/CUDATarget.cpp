@@ -213,9 +213,9 @@ class CUDATargetBackend final : public TargetBackend {
     }
 
     // Collect all the entry point names.
-    llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPointOps;
-    for (auto op : variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
-      entryPointOps[op.sym_name()] = op;
+    llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps;
+    for (auto op : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+      exportOps[op.sym_name()] = op;
     }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     std::vector<std::string> entryPointNames;
@@ -229,14 +229,12 @@ class CUDATargetBackend final : public TargetBackend {
       entryPointNames.emplace_back(llvmFunc->getName());
       std::array<int32_t, 3> workgroup_size;
       uint32_t workgroupLocalMemory = 0;
-      auto entryPointOp = entryPointOps[func.getName()];
-      if (auto workgroupLocalMemoryAttr =
-              entryPointOp.workgroup_local_memory()) {
+      auto exportOp = exportOps[func.getName()];
+      if (auto workgroupLocalMemoryAttr = exportOp.workgroup_local_memory()) {
         workgroupLocalMemory =
             workgroupLocalMemoryAttr.getValue().getSExtValue();
       }
-      if (Optional<ArrayAttr> workgroupSizeAttr =
-              entryPointOp.workgroup_size()) {
+      if (Optional<ArrayAttr> workgroupSizeAttr = exportOp.workgroup_size()) {
         for (auto it : llvm::enumerate(workgroupSizeAttr.getValue())) {
           workgroup_size[it.index()] = it.value().cast<IntegerAttr>().getInt();
         }

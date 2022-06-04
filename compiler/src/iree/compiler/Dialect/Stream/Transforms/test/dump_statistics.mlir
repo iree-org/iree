@@ -14,6 +14,10 @@
 // CHECK-CSV: ; Aggregate Statistics
 // CHECK-CSV: "Constants","Constant Size","Variables","Variable Size","Awaits","Submissions","Transient Size","Fills","Copies","Dispatches","Executables"
 // CHECK-CSV: 1,0,0,0,2,3,0,0,2,3,2
+// CHECK-CSV: ; Execution
+// CHECK-CSV: "Depth","Command","Symbol","Length","Invocations","Workload","Operands","Resources"
+// CHECK-CSV: 0,"copy",,192,,,,
+// CHECK-CSV: 0,"dispatch","@func_a_ex_0::@dispatch_0",,4,"4;1;1",0,3
 
 util.global private mutable @_constant__timepoint = #stream.timepoint<immediate>
 util.global private @_constant : !stream.resource<constant>

@@ -1,26 +1,5 @@
 // RUN: iree-opt --allow-unregistered-dialect --split-input-file --canonicalize %s | iree-opt --allow-unregistered-dialect --split-input-file | FileCheck %s
 
-// CHECK-LABEL: @workgroupRankFolding
-func.func @workgroupRankFolding(%arg0 : tensor<?x4xf32>) -> tensor<4x?xf32> {
-  %c128 = arith.constant 128 : index
-  %x = arith.constant 100 : index
-  %y = arith.constant 50 : index
-  // CHECK: flow.dispatch.workgroups
-  %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<?x4xf32>{%c128}) -> (tensor<4x?xf32>{%c128}) = (
-    %arg0_capture: !flow.dispatch.tensor<readonly:?x4xf32>,
-    %ret0: !flow.dispatch.tensor<writeonly:4x?xf32>
-  ) {
-    // CHECK: %[[RANK:.+]] = arith.constant 2 : index
-    %workgroup_rank = flow.dispatch.workgroup.rank : index
-    // CHECK-NEXT: "test.sink"(%[[RANK]])
-    "test.sink"(%workgroup_rank) : (index) -> ()
-    flow.return
-  }
-  return %0 : tensor<4x?xf32>
-}
-
-// -----
-
 // CHECK-LABEL: @inlineWithTiedResults1
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<1x4xf32>)
 func.func @inlineWithTiedResults1(%arg0: tensor<1x4xf32>) -> tensor<1x4xf32> {

@@ -50,6 +50,34 @@ static void createArgs(ArrayRef<OpAsmParser::UnresolvedOperand> operands,
   }
 }
 
+// Verifies that a dispatch |op|'s |workload| matches that of the |exportOp|.
+static LogicalResult verifyDispatchWorkload(
+    Operation *op, IREE::Stream::ExecutableExportOp exportOp,
+    ValueRange workload) {
+  // If the target has a workgroup count computation function we can verify that
+  // the workload here matches what is expected.
+  if (!exportOp.workgroup_count().empty()) {
+    auto &workgroupCount = exportOp.workgroup_count();
+    if (workgroupCount.getNumArguments() != workload.size()) {
+      return op->emitOpError()
+             << "workload mismatch; entry point expects "
+             << workgroupCount.getNumArguments()
+             << " arguments but dispatch provides " << workload.size();
+    }
+    for (auto it : llvm::enumerate(llvm::zip(workgroupCount.getArgumentTypes(),
+                                             workload.getTypes()))) {
+      auto expectedType = std::get<0>(it.value());
+      auto actualType = std::get<1>(it.value());
+      if (expectedType != actualType) {
+        return op->emitOpError() << "workload operand " << it.index()
+                                 << " type mismatch; expected " << expectedType
+                                 << " but passed " << actualType;
+      }
+    }
+  }
+  return success();
+}
+
 // Verifies that |dynamicDims| contains the appropriate number of dims for all
 // of the dynamic dimensions in |values|.
 static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
@@ -509,36 +537,67 @@ static void printConstantValueList(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
-// custom<SymbolAlias>($sym_name, $alias)
+// custom<WorkgroupCountRegion>($body)
 //===----------------------------------------------------------------------===//
-//  @foo            sym_name: @foo, alias: @foo
-//  @foo as @bar    sym_name: @bar, alias: @foo
 
-static ParseResult parseSymbolAlias(OpAsmParser &parser, StringAttr &sym_name,
-                                    FlatSymbolRefAttr &alias) {
-  if (failed(parser.parseAttribute(alias))) {
+static ParseResult parseWorkgroupCountRegion(OpAsmParser &parser,
+                                             Region &body) {
+  if (failed(parser.parseOptionalKeyword("workgroups"))) {
+    // Omitted.
+    return success();
+  }
+
+  SmallVector<OpAsmParser::Argument> args;
+  if (failed(parser.parseArgumentList(args, AsmParser::Delimiter::Paren,
+                                      /*allowType=*/true,
+                                      /*allowAttrs=*/true))) {
     return failure();
   }
-  if (succeeded(parser.parseOptionalKeyword("as"))) {
-    if (failed(parser.parseLParen()) ||
-        failed(parser.parseAttribute(sym_name)) ||
-        failed(parser.parseRParen())) {
-      return failure();
-    }
-  } else {
-    sym_name = StringAttr::get(parser.getContext(), alias.getValue());
+
+  // Return types must be 3 dimensions (workgroup count XYZ).
+  SmallVector<Type> returnTypes;
+  if (failed(parser.parseArrowTypeList(returnTypes))) {
+    return failure();
   }
+  if (returnTypes.size() != 3 ||
+      !llvm::all_of(returnTypes, [](Type type) { return type.isIndex(); })) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "workgroup count region must return the XYZ dimension counts";
+  }
+
+  // Parse region contents.
+  if (failed(parser.parseRegion(body, args, /*enableNameShadowing=*/false))) {
+    return failure();
+  }
+
+  // Verify the return types match.
+  for (auto returnOp : body.getOps<IREE::Stream::ReturnOp>()) {
+    for (auto it : llvm::zip(returnTypes, returnOp.getOperandTypes())) {
+      if (std::get<0>(it) != std::get<1>(it)) {
+        return returnOp.emitOpError()
+               << "operands do not match expected region return types";
+      }
+    }
+  }
+
   return success();
 }
 
-static void printSymbolAlias(OpAsmPrinter &p, Operation *op,
-                             StringAttr sym_name, FlatSymbolRefAttr alias) {
-  p.printAttributeWithoutType(alias);
-  if (sym_name.getValue() != alias.getValue()) {
-    p << " as(\"";
-    p.printSymbolName(sym_name.getValue());
-    p << "\")";
+static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
+                                      Region &body) {
+  if (body.empty()) return;
+  p << "workgroups(";
+  auto args = body.getArguments();
+  for (unsigned i = 0; i < args.size(); ++i) {
+    if (i > 0) p << ", ";
+    p.printRegionArgument(args[i]);
   }
+  p << ")";
+  Type indexType = IndexType::get(body.getContext());
+  p.printArrowTypeList(TypeRange{indexType, indexType, indexType});
+  p << " ";
+  p.printRegion(body, /*printEntryBlockArgs=*/false,
+                /*printBlockTerminators=*/true);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1049,7 +1108,7 @@ LogicalResult BuiltinSplatI64Op::convertBuiltinOp(OpBuilder &builder) {
   auto count =
       builder.createOrFold<arith::DivUIOp>(getLoc(), result_size(), c8);
   auto one = builder.create<arith::ConstantIndexOp>(getLoc(), 1);
-  Value workgroupCount[3] = {
+  Value workload[3] = {
       count,
       one,
       one,
@@ -1069,7 +1128,7 @@ LogicalResult BuiltinSplatI64Op::convertBuiltinOp(OpBuilder &builder) {
       result().getType(),
   };
   auto dispatchOp = builder.create<IREE::Stream::AsyncDispatchOp>(
-      getLoc(), resultTypes, workgroupCount,
+      getLoc(), resultTypes, workload,
       SymbolRefAttr::get(
           builder.getStringAttr("__builtin_splat_i64"),
           FlatSymbolRefAttr::get(builder.getContext(), "__builtin_splat_i64")),
@@ -1115,7 +1174,7 @@ LogicalResult BuiltinFillI64Op::convertBuiltinOp(OpBuilder &builder) {
   auto count =
       builder.createOrFold<arith::DivUIOp>(getLoc(), target_length(), c8);
   auto one = builder.create<arith::ConstantIndexOp>(getLoc(), 1);
-  Value workgroupCount[3] = {
+  Value workload[3] = {
       count,
       one,
       one,
@@ -1139,7 +1198,7 @@ LogicalResult BuiltinFillI64Op::convertBuiltinOp(OpBuilder &builder) {
       result().getType(),
   };
   auto dispatchOp = builder.create<IREE::Stream::AsyncDispatchOp>(
-      getLoc(), resultTypes, workgroupCount,
+      getLoc(), resultTypes, workload,
       SymbolRefAttr::get(
           builder.getStringAttr("__builtin_fill_i64"),
           FlatSymbolRefAttr::get(builder.getContext(), "__builtin_fill_i64")),
@@ -1365,6 +1424,32 @@ LogicalResult AsyncDispatchOp::verify() {
       failed(verifyOpValueSizes(op, op.results(), op.result_sizes()))) {
     return failure();
   }
+  return success();
+}
+
+LogicalResult AsyncDispatchOp::verifySymbolUses(
+    SymbolTableCollection &symbolTable) {
+  Operation *op = getOperation();
+  auto exportOp =
+      symbolTable.lookupNearestSymbolFrom<IREE::Stream::ExecutableExportOp>(
+          op, entry_point());
+  if (!exportOp) {
+    // TODO(benvanik): there are a lot of tests that are assuming this is not
+    // verified. We'll need to go add dummy executables for all of them. Today
+    // we just bail on the verifier if the symbol isn't found.
+    //
+    // Should be:
+    //   return op->emitOpError() << "undefined entry point: " << entry_point();
+    return success();
+  }
+
+  // Verify that the workload parameters captured match the target export.
+  if (failed(verifyDispatchWorkload(op, exportOp, workload()))) {
+    return failure();
+  }
+
+  // TODO(benvanik): verify that the target function has matching operands.
+
   return success();
 }
 
@@ -1676,6 +1761,32 @@ LogicalResult CmdDispatchOp::verify() {
     return op->emitOpError() << "dispatch with " << resourceCount
                              << " resources has mismatched associated ranges";
   }
+  return success();
+}
+
+LogicalResult CmdDispatchOp::verifySymbolUses(
+    SymbolTableCollection &symbolTable) {
+  Operation *op = getOperation();
+  auto exportOp =
+      symbolTable.lookupNearestSymbolFrom<IREE::Stream::ExecutableExportOp>(
+          op, entry_point());
+  if (!exportOp) {
+    // TODO(benvanik): there are a lot of tests that are assuming this is not
+    // verified. We'll need to go add dummy executables for all of them. Today
+    // we just bail on the verifier if the symbol isn't found.
+    //
+    // Should be:
+    //   return op->emitOpError() << "undefined entry point: " << entry_point();
+    return success();
+  }
+
+  // Verify that the workload parameters captured match the target export.
+  if (failed(verifyDispatchWorkload(op, exportOp, workload()))) {
+    return failure();
+  }
+
+  // TODO(benvanik): verify that the target function has matching operands.
+
   return success();
 }
 
@@ -2036,7 +2147,7 @@ LogicalResult ExecutableOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// stream.executable.entry
+// stream.executable.export
 //===----------------------------------------------------------------------===//
 
 void ExecutableExportOp::build(OpBuilder &builder, OperationState &state,
@@ -2044,6 +2155,22 @@ void ExecutableExportOp::build(OpBuilder &builder, OperationState &state,
                                FlatSymbolRefAttr function_ref) {
   build(builder, state, /*sym_visibility=*/nullptr,
         builder.getStringAttr(sym_name), function_ref);
+}
+
+LogicalResult ExecutableExportOp::verify() {
+  // Workgroup count region is optional.
+  if (!workgroup_count().empty()) {
+    // Verify the return ops all provide XYZ values.
+    for (auto returnOp : workgroup_count().getOps<IREE::Stream::ReturnOp>()) {
+      if (returnOp.getNumOperands() != 3 ||
+          !llvm::all_of(returnOp.getOperandTypes(),
+                        [](Type type) { return type.isIndex(); })) {
+        return returnOp.emitOpError()
+               << "workgroup count region must return the XYZ dimension counts";
+      }
+    }
+  }
+  return success();
 }
 
 ::mlir::func::FuncOp ExecutableExportOp::getFunctionRef() {
@@ -2067,6 +2194,15 @@ LogicalResult BindingSubspanOp::verify() {
   }
 
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.return
+//===----------------------------------------------------------------------===//
+
+MutableOperandRange ReturnOp::getMutableSuccessorOperands(
+    Optional<unsigned> index) {
+  return operandsMutable();
 }
 
 //===----------------------------------------------------------------------===//

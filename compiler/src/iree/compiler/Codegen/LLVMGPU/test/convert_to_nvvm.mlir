@@ -12,7 +12,7 @@
 ]>
 hal.executable @abs_ex_dispatch_0 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @abs_ex_dispatch_0 layout(#executable_layout)
+    hal.executable.export @abs_ex_dispatch_0 layout(#executable_layout)
     builtin.module {
       func.func @abs_ex_dispatch_0() {
         %c0 = arith.constant 0 : index
@@ -61,7 +61,7 @@ hal.executable @abs_ex_dispatch_0 {
 ]>
 hal.executable @abs_dynamic {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @abs_dynamic layout(#executable_layout)
+    hal.executable.export @abs_dynamic layout(#executable_layout)
     builtin.module {
       func.func @abs_dynamic() {
         %c0 = arith.constant 0 : index
@@ -113,7 +113,7 @@ hal.executable @abs_dynamic {
 ]>
 hal.executable @dead_symbol {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @dead_symbol layout(#executable_layout)
+    hal.executable.export @dead_symbol layout(#executable_layout)
     builtin.module {
       func.func @dead_symbol() {
         %c0 = arith.constant 0 : index
@@ -151,7 +151,7 @@ hal.executable @dead_symbol {
 ]>
 hal.executable @mixed_type {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @mixed_type layout(#executable_layout)
+    hal.executable.export @mixed_type layout(#executable_layout)
     builtin.module {
       func.func @mixed_type() {
         %c0 = arith.constant 0 : index
@@ -196,7 +196,7 @@ hal.executable @mixed_type {
 ]>
 hal.executable @shared_memory_lowering {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @shared_memory_lowering layout(#executable_layout)
+    hal.executable.export @shared_memory_lowering layout(#executable_layout)
     builtin.module {
       func.func @shared_memory_lowering() {
         %c0 = arith.constant 0 : index

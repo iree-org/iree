@@ -13,7 +13,7 @@
 #map4 = affine_map<(d0)[s0] -> (s0, -d0 + 128)>
 hal.executable private @mmt4d_384x384x512_4x1x4_dispatch_0 {
   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64_ {
-    hal.executable.entry_point public @mmt4d_384x384x512_4x1x4_dispatch_0 layout(#executable_layout)
+    hal.executable.export public @mmt4d_384x384x512_4x1x4_dispatch_0 layout(#executable_layout)
     builtin.module  {
       func.func @mmt4d_384x384x512_4x1x4_dispatch_0() {
         %c0 = arith.constant 0 : index

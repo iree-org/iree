@@ -13,7 +13,7 @@ hal.executable private @static_1d_sort {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @static_1d_sort layout(#executable_layout)
+    hal.executable.export @static_1d_sort layout(#executable_layout)
     builtin.module {
       func.func @static_1d_sort() {
         %c0 = arith.constant 0 : index
@@ -35,7 +35,7 @@ hal.executable private @static_1d_sort {
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = []>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
-//       CHECK: hal.executable.entry_point public @static_1d_sort
+//       CHECK: hal.executable.export public @static_1d_sort
 //  CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [1 : index, 1 : index, 1 : index]
 //       CHECK: func.func @static_1d_sort()
@@ -58,7 +58,7 @@ hal.executable private @static_3d_sort {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @static_3d_sort layout(#executable_layout)
+    hal.executable.export @static_3d_sort layout(#executable_layout)
     builtin.module {
       func.func @static_3d_sort() {
         %c64 = arith.constant 64 : index
@@ -84,7 +84,7 @@ hal.executable private @static_3d_sort {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 0, 16], [1, 0, 1]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
-//      CHECK: hal.executable.entry_point public @static_3d_sort
+//      CHECK: hal.executable.export public @static_3d_sort
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
 //      CHECK: func.func @static_3d_sort()
@@ -107,7 +107,7 @@ hal.executable private @static_1d_fft_stage2 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @static_1d_fft_stage2 layout(#executable_layout)
+    hal.executable.export @static_1d_fft_stage2 layout(#executable_layout)
     builtin.module {
       func.func @static_1d_fft_stage2() {
         %c0 = arith.constant 0 : index
@@ -129,7 +129,7 @@ hal.executable private @static_1d_fft_stage2 {
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4]{{\]}}>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
-//       CHECK: hal.executable.entry_point public @static_1d_fft_stage2
+//       CHECK: hal.executable.export public @static_1d_fft_stage2
 //  CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
 //       CHECK: func.func @static_1d_fft_stage2()
@@ -152,7 +152,7 @@ hal.executable private @static_3d_fft_stage3 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @static_3d_fft_stage3 layout(#executable_layout)
+    hal.executable.export @static_3d_fft_stage3 layout(#executable_layout)
     builtin.module {
       func.func @static_3d_fft_stage3() {
         %c0 = arith.constant 0 : index
@@ -178,7 +178,7 @@ hal.executable private @static_3d_fft_stage3 {
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 8]{{\]}}>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
-//       CHECK: hal.executable.entry_point public @static_3d_fft_stage3
+//       CHECK: hal.executable.export public @static_3d_fft_stage3
 //  CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
 //       CHECK: func.func @static_3d_fft_stage3()

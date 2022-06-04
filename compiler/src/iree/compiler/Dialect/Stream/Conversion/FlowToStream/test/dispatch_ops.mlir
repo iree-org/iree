@@ -1,5 +1,18 @@
 // RUN: iree-opt --split-input-file --iree-stream-conversion --canonicalize %s | FileCheck %s
 
+// CHECK-LABEL: @dispatchNoWorkload
+//  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index, %[[DIM1:.+]]: index, %[[DIM3:.+]]: index)
+func.func @dispatchNoWorkload(%input: tensor<7x?x24x?xf32>, %dim1: index, %dim3: index) -> tensor<?x?x1024xf32> {
+  //      CHECK: %[[RESULT_SIZE:.+]] = stream.tensor.sizeof tensor<?x?x1024xf32>{%[[DIM1]], %[[DIM3]]}
+  //      CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex::@entry(%[[INPUT]]) :
+  // CHECK-SAME:     (!stream.resource<*>{%[[INPUT_SIZE]]}) -> !stream.resource<*>{%[[RESULT_SIZE]]}
+  %0 = flow.dispatch @ex::@entry(%input) : (tensor<7x?x24x?xf32>{%dim1, %dim3}) -> tensor<?x?x1024xf32>{%dim1, %dim3}
+  // return %[[RESULT]], %[[RESULT_SIZE]] : !stream.resource<*>, index
+  return %0 : tensor<?x?x1024xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @dispatch
 //  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index, %[[DIM1:.+]]: index, %[[DIM3:.+]]: index)
 func.func @dispatch(%input: tensor<7x?x24x?xf32>, %dim1: index, %dim3: index) -> tensor<?x?x1024xf32> {

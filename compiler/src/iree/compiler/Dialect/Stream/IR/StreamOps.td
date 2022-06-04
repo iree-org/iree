@@ -1825,6 +1825,7 @@ def Stream_AsyncStoreOp : Stream_PureOp<"async.store", [
 
 def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
@@ -1841,7 +1842,7 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   }];
 
   let arguments = (ins
-    Variadic<Index>:$workgroup_count,
+    Variadic<Index>:$workload,
     SymbolRefAttr:$entry_point,
     Variadic<AnyTypeOf<[
       Stream_AnyStreamResource,
@@ -1858,7 +1859,8 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
-    $entry_point `[` $workgroup_count `]` ``
+    $entry_point
+    (`[` $workload^ `]`)? ``
     `(` $operands `)` attr-dict `:`
     custom<ShapedFunctionType>(ref($operands),
                                type($operands), $operand_sizes,
@@ -2285,6 +2287,7 @@ def Stream_CmdCopyOp : Stream_Op<"cmd.copy", [
 
 def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
   AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   Stream_CmdPhaseOp,
   Stream_StreamableOp,
   Stream_SubviewEffectOp,
@@ -2298,7 +2301,7 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
   }];
 
   let arguments = (ins
-    Variadic<Index>:$workgroup_count,
+    Variadic<Index>:$workload,
     SymbolRefAttr:$entry_point,
     Variadic<Stream_PrimitiveType>:$operands,
     Variadic<Stream_AnyStreamResource>:$resources,
@@ -2310,7 +2313,8 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
   let results = (outs);
 
   let assemblyFormat = [{
-    $entry_point `[` $workgroup_count `]` ``
+    $entry_point
+    (`[` $workload^ `]`)? ``
     (`(` $operands^ `:` type($operands) `)`)? `{`
     custom<DispatchResources>($resources, type($resources), $resource_sizes,
                               $resource_offsets, $resource_lengths,
@@ -2783,6 +2787,10 @@ def Stream_ExecutableExportOp : Stream_Op<"executable.export", [
   let description = [{
     Specifies an exported function with an externally-visible alias. Multiple
     exports can reference the same internal function.
+
+    Each entry point can have a unique workgroup count calculation region.
+    This region takes the workload parameters passed to each flow.dispatch and
+    produces an XYZ workgroup count for the 3D grid dispatch.
   }];
 
   let arguments = (ins
@@ -2791,9 +2799,12 @@ def Stream_ExecutableExportOp : Stream_Op<"executable.export", [
     FlatSymbolRefAttr:$function_ref
   );
 
+  let regions = (region AnyRegion:$workgroup_count);
+
   let assemblyFormat = [{
     custom<SymbolVisibility>($sym_visibility)
     custom<SymbolAlias>($sym_name, $function_ref)
+    custom<WorkgroupCountRegion>($workgroup_count)
     attr-dict-with-keyword
   }];
 
@@ -2807,6 +2818,8 @@ def Stream_ExecutableExportOp : Stream_Op<"executable.export", [
   let extraClassDeclaration = [{
     ::mlir::func::FuncOp getFunctionRef();
   }];
+
+  let hasVerifier = 1;
 }
 
 def Stream_BindingSubspanOp : Stream_PureOp<"binding.subspan", [
@@ -2844,6 +2857,32 @@ def Stream_BindingSubspanOp : Stream_PureOp<"binding.subspan", [
 // Misc
 //===----------------------------------------------------------------------===//
 
+def Stream_ReturnOp : Stream_Op<"return", [
+  ParentOneOf<[
+    "IREE::Stream::ExecutableExportOp",
+  ]>,
+  NoSideEffect,
+  DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface, [
+    "getMutableSuccessorOperands",
+  ]>,
+  ReturnLike,
+  Terminator,
+]> {
+  let summary = [{returns results from a region}];
+  let description = [{
+    The values returned are copied by-value.
+  }];
+
+  let arguments = (ins
+    Variadic<AnyType>:$operands
+  );
+
+  let assemblyFormat = [{
+    attr-dict
+    $operands `:` type($operands)
+  }];
+}
+
 def Stream_YieldOp : Stream_Op<"yield", [
   ParentOneOf<[
     "IREE::Stream::AsyncExecuteOp",
@@ -2856,6 +2895,7 @@ def Stream_YieldOp : Stream_Op<"yield", [
   DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface, [
     "getMutableSuccessorOperands",
   ]>,
+  ReturnLike,
   Terminator,
   SameVariadicOperandSize,
   Util_SizeAwareOp,

@@ -296,10 +296,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       } break;
     }
     auto align16 = llvm::Attribute::getWithAlignment(context, llvm::Align(16));
-    for (auto entryPointOp :
-         variantOp.getBlock().getOps<ExecutableEntryPointOp>()) {
+    for (auto exportOp : variantOp.getBlock().getOps<ExecutableExportOp>()) {
       // Find the matching function in the LLVM module.
-      auto *llvmFunc = llvmModule->getFunction(entryPointOp.getName());
+      auto *llvmFunc = llvmModule->getFunction(exportOp.getName());
       llvmFunc->setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
       llvmFunc->setDSOLocal(true);
 
@@ -319,11 +318,11 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       // Optionally entry points may specify that they require workgroup local
       // memory. We fetch that value here and plumb it through so the runtime
       // knows how much memory to reserve and pass in.
-      int64_t localMemorySize = entryPointOp.workgroup_local_memory()
+      int64_t localMemorySize = exportOp.workgroup_local_memory()
                                     .getValueOr(APInt(64, 0))
                                     .getSExtValue();
 
-      libraryBuilder.addExport(entryPointOp.getName(), "",
+      libraryBuilder.addExport(exportOp.getName(), "",
                                LibraryBuilder::DispatchAttrs{localMemorySize},
                                llvmFunc);
     }

@@ -365,7 +365,7 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
       loc, workload, resultTypes, resultDynamicDims,
       /*operands=*/ArrayRef<Value>{}, /*operandDims=*/ArrayRef<Value>{},
       /*tiedOperands=*/ArrayRef<int64_t>{});
-  Region &region = dispatchOp.body();
+  Region &region = dispatchOp.workgroup_body();
   Block *block = &region.front();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToEnd(block);
@@ -722,7 +722,7 @@ static void tryToTieOperandsAndResults(
 static LogicalResult legalizeDispatchWorkgroupOperands(
     IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   Location loc = dispatchOp.getLoc();
-  Region &region = dispatchOp.body();
+  Region &region = dispatchOp.workgroup_body();
   Block &block = region.front();
   OpBuilder b = OpBuilder::atBlockBegin(&block);
 
