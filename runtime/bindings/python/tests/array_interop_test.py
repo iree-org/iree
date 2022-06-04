@@ -16,9 +16,10 @@ class DeviceHalTest(unittest.TestCase):
 
   def setUp(self):
     super().setUp()
-    self.driver = iree.runtime.HalDriver.create("local-task")
-    self.device = self.driver.create_default_device()
+    self.device = iree.runtime.get_device_by_name("local-task")
     self.allocator = self.device.allocator
+    # Make sure device setup maintains proper references.
+    gc.collect()
 
   def testGcShutdownFiasco(self):
     init_ary = np.zeros([3, 4], dtype=np.int32) + 2
@@ -29,8 +30,6 @@ class DeviceHalTest(unittest.TestCase):
     self.allocator = None
     gc.collect()
     self.device = None
-    gc.collect()
-    self.driver = None
     gc.collect()
 
     # Now drop the ary and make sure nothing crashes (which would indicate

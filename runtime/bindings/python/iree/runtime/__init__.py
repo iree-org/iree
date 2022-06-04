@@ -42,6 +42,12 @@ from ._binding import (
 from .array_interop import *
 from .benchmark import *
 from .system_api import *
+from .system_setup import (
+    get_device_by_name,
+    get_first_device_by_name,
+    get_driver,
+    query_available_drivers,
+)
 from .function import *
 from .tracing import *
 

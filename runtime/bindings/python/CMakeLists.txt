@@ -67,6 +67,7 @@ iree_py_library(
     "iree/runtime/flags.py"
     "iree/runtime/function.py"
     "iree/runtime/system_api.py"
+    "iree/runtime/system_setup.py"
     "iree/runtime/tracing.py"
     "iree/runtime/scripts/iree_benchmark_trace/__main__.py"
     "iree/runtime/scripts/iree_run_trace/__main__.py"
@@ -145,6 +146,13 @@ iree_py_test(
     system_api_test
   SRCS
     "tests/system_api_test.py"
+)
+
+iree_py_test(
+  NAME
+    system_setup_test
+  SRCS
+    "tests/system_setup_test.py"
 )
 
 iree_py_test(
