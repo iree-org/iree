@@ -189,7 +189,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
 
   // Pad allocations with dynamic dimension before lowering of SCF and affine
   // but after linalg lowering.
-  pm.addNestedPass<func::FuncOp>(createLLVMGPUPadDynamicAlloc());
+  pm.addNestedPass<func::FuncOp>(createPadDynamicAlloc());
 
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());

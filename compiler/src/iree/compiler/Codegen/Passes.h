@@ -167,6 +167,9 @@ std::unique_ptr<OperationPass<func::FuncOp>> createGPUPipeliningPass(
 std::unique_ptr<OperationPass<func::FuncOp>> createWorkGroupSwizzle(
     unsigned swizzleLogTile = 0);
 
+/// Pad dynamic alloc op to convert them into static one.
+std::unique_ptr<OperationPass<func::FuncOp>> createPadDynamicAlloc();
+
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//
@@ -371,9 +374,6 @@ createLLVMGPUReduceSharedMemoryBankConflicts();
 
 /// Converts vector ops to gpu dialect.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU();
-
-/// Pad dynamic alloc op to convert them into static one.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUPadDynamicAlloc();
 
 //------------------------------------------------------------------------------
 // SPIR-V Passes
