@@ -29,10 +29,9 @@ namespace iree {
 // Buffers should be in the IREE standard shaped buffer format:
 //   [shape]xtype=[value]
 // described in iree/hal/api.h
-// Uses |allocator| to allocate the buffers.
-// Uses descriptors in |descs| for type information and validation.
+// Uses |device_allocator| to allocate the buffers.
 // The returned variant list must be freed by the caller.
-Status ParseToVariantList(iree_hal_allocator_t* allocator,
+Status ParseToVariantList(iree_hal_allocator_t* device_allocator,
                           iree::span<const std::string> input_strings,
                           iree_vm_list_t** out_list);
 
@@ -43,7 +42,6 @@ Status ParseToVariantList(iree_hal_allocator_t* allocator,
 //   [shape]xtype=[value]
 // described in
 // https://github.com/google/iree/tree/main/iree/hal/api.h
-// Uses descriptors in |descs| for type information and validation.
 Status PrintVariantList(iree_vm_list_t* variant_list, size_t max_element_count,
                         std::ostream* os);
 inline Status PrintVariantList(iree_vm_list_t* variant_list, std::ostream* os) {
