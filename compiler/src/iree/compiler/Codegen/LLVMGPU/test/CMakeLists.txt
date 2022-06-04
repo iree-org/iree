@@ -21,7 +21,6 @@ iree_lit_test_suite(
     "illegal_configuration.mlir"
     "legalize.mlir"
     "nvvm_pipeline_test.mlir"
-    "pad_dynamic_alloc.mlir"
     "reduce_bank_conflicts.mlir"
     "rocdl_pipeline_test.mlir"
     "tensorcore_vectorization.mlir"

@@ -49,8 +49,7 @@ static LogicalResult padAlloc(memref::AllocOp allocOp) {
 
 namespace {
 
-struct LLVMGPUPadDynamicAllocPass
-    : public LLVMGPUPadDynamicAllocBase<LLVMGPUPadDynamicAllocPass> {
+struct PadDynamicAllocPass : public PadDynamicAllocBase<PadDynamicAllocPass> {
   void runOnOperation() override {
     auto funcOp = getOperation();
     SmallVector<memref::AllocOp> sharedMemAllocs;
@@ -68,8 +67,8 @@ struct LLVMGPUPadDynamicAllocPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUPadDynamicAlloc() {
-  return std::make_unique<LLVMGPUPadDynamicAllocPass>();
+std::unique_ptr<OperationPass<func::FuncOp>> createPadDynamicAlloc() {
+  return std::make_unique<PadDynamicAllocPass>();
 }
 
 }  // namespace iree_compiler

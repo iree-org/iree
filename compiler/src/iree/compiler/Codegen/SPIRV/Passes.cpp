@@ -147,6 +147,9 @@ static void addSPIRVLoweringPasses(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  // Pad allocations with dynamic dimension before lowering of affine ops.
+  pm.addNestedPass<func::FuncOp>(createPadDynamicAlloc());
+
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());

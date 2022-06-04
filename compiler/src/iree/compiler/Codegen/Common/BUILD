@@ -51,6 +51,7 @@ iree_compiler_cc_library(
         "LinalgBufferizePass.cpp",
         "MemrefCopyToLinalg.cpp",
         "OptimizeVectorTransferPass.cpp",
+        "PadDynamicAlloc.cpp",
         "PolynomialApproximationPass.cpp",
         "RemoveTrivialLoops.cpp",
         "RewriteLinalgDestructiveUpdatesPass.cpp",
