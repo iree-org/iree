@@ -775,7 +775,7 @@ hal.executable @mma_fused_fp16 {
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
   hal.executable public @pooling_dynamic {
     hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
-      hal.executable.entry_point public @pooling_dynamic ordinal(0) layout(#executable_layout)
+      hal.executable.export public @pooling_dynamic ordinal(0) layout(#executable_layout)
       builtin.module {
         func.func @pooling_dynamic() {
           %c1_i64 = arith.constant 1 : i64
@@ -797,6 +797,6 @@ hal.executable @mma_fused_fp16 {
     }
   }
 
-// Just check that compilation succeed. 
+// Just check that compilation succeed.
 //     CHECK-LABEL: hal.executable public @pooling_dynamic
 //           CHECK:   hal.executable.variant public @cuda
