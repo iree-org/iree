@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 
 namespace mlir {
@@ -54,12 +53,8 @@ struct PadDynamicAllocPass : public PadDynamicAllocBase<PadDynamicAllocPass> {
     auto funcOp = getOperation();
     SmallVector<memref::AllocOp> sharedMemAllocs;
     // Collect all the alloc operations.
-    funcOp.walk([&](memref::AllocOp allocOp) {
-      if (allocOp.getType().getMemorySpaceAsInt() ==
-          gpu::GPUDialect::getWorkgroupAddressSpace()) {
-        sharedMemAllocs.push_back(allocOp);
-      }
-    });
+    funcOp.walk(
+        [&](memref::AllocOp allocOp) { sharedMemAllocs.push_back(allocOp); });
     for (memref::AllocOp alloc : sharedMemAllocs) {
       if (failed(padAlloc(alloc))) return signalPassFailure();
     }
