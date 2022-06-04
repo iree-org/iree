@@ -279,8 +279,19 @@ class DumpDispatchGraphPass
   }
 
   void printGeneric(raw_ostream &os, linalg::GenericOp op, AsmState &state) {
+    printLinalgInsOuts(os, op, state);
+
+    // TODO: print out the operations inside
+  }
+
+  template <typename T>
+  void printLinalgInsOuts(raw_ostream &os, T op, AsmState &state) {
     printResultsAndName(os, op.getOperation(), state);
-    os << "\n";
+    os << " " << op.iterator_types() << "(";
+    printOperands(os, op.inputs(), state);
+    os << ") -> (";
+    printOperands(os, op.outputs(), state);
+    os << ")\n";
   }
 
   void annotateOperation(raw_ostream &os, Operation *op, AsmState &state) {
@@ -302,6 +313,16 @@ class DumpDispatchGraphPass
 
     if (auto generic = dyn_cast<linalg::GenericOp>(op)) {
       printGeneric(os, generic, state);
+      return;
+    }
+
+    if (auto linalgOp = dyn_cast<linalg::MatmulOp>(op)) {
+      printLinalgInsOuts(os, linalgOp, state);
+      return;
+    }
+
+    if (auto linalgOp = dyn_cast<linalg::BatchMatmulOp>(op)) {
+      printLinalgInsOuts(os, linalgOp, state);
       return;
     }
 
