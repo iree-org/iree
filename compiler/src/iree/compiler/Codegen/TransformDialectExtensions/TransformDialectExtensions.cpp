@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Pass/PassManager.h"
@@ -32,6 +33,9 @@
 
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE;
+
+#define DEBUG_TYPE "transform-dialect-extensions"
+#define DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
 iree_compiler::IREE::transform_dialect::TransformDialectExtensions::
     TransformDialectExtensions() {
@@ -58,6 +62,110 @@ static SmallVector<int64_t> getIndicesOfDynamicDims(ShapedType t) {
 //===---------------------------------------------------------------------===//
 // Patterns for ForeachThreadOpToFlow rewrite.
 //===---------------------------------------------------------------------===//
+
+/// Iteratively populate the computations that define `foreachThreadOp`'s
+/// getNumThreads into the workgroup_count region of `dispatchOp` and set the
+/// `dispatchOp` workload operands to the values required above.
+/// Assumes the Flow::DispatchWorkgroupsOp is built with an empty region.
+static void populateWorkgroupCountComputingRegion(
+    PatternRewriter &rewriter, scf::ForeachThreadOp foreachThreadOp,
+    Flow::DispatchWorkgroupsOp dispatchOp) {
+  Location loc = foreachThreadOp.getLoc();
+  OpBuilder::InsertionGuard g(rewriter);
+  Region &r = dispatchOp.workgroup_count();
+  assert(r.empty() && "expected block-less workgroup_count region");
+  Block *block = rewriter.createBlock(&r);
+  rewriter.setInsertionPointToStart(block);
+  SmallVector<Value> workgroupCount{foreachThreadOp.getNumThreads()};
+  // Resize to `3` to match IREE's assumptions.
+  workgroupCount.resize(3, rewriter.create<arith::ConstantIndexOp>(loc, 1));
+  auto returnOp = rewriter.create<Flow::ReturnOp>(loc, workgroupCount);
+
+  // Start filling the region.
+  // Create a worklist of the Operations creating the values returned.
+  // Iteratively pull the first operation that is not dominated by any others
+  // and add the operations defining it to the worklist unless either:
+  //   1. the operation consumes any tensor, we avoid pulling tensor arguments
+  //      into the workgroup count region.
+  //   2. the operation is null (i.e. the operand is a block argument), in which
+  //      case we just pass the block argument without trying to analyze
+  //      further.
+  //   3. the operation has already been seen, in which case we avoid
+  //      reprocessing.
+  {
+    BlockAndValueMapping bvm;
+    auto parentFuncOp = foreachThreadOp->getParentOfType<func::FuncOp>();
+    DominanceInfo domInfo(parentFuncOp);
+    llvm::SmallPtrSet<Operation *, 16> worklist;
+    for (auto v : foreachThreadOp.getNumThreads()) {
+      if (auto *op = v.getDefiningOp()) {
+        LLVM_DEBUG(DBGS() << "Initial WL op: " << *op << "\n");
+        worklist.insert(op);
+      }
+    }
+
+    // Keep a set of seen ops to avoid reprocessing.
+    llvm::SmallPtrSet<Operation *, 16> seen = worklist;
+    while (!worklist.empty()) {
+      auto nextOpIter = llvm::find_if(worklist, [&](Operation *op1) {
+        LLVM_DEBUG(DBGS() << "Consider WL op: " << *op1 << "\n");
+        // Bail as soon as we see a non-IndexType producing op.
+        // TODO: do we want to relax this and only forbid TensorType/ShapedType?
+        if (llvm::any_of(op1->getOperandTypes(),
+                         [](Type t) { return !t.isa<IndexType>(); }))
+          return false;
+        bool res = llvm::all_of(worklist, [&](Operation *op2) {
+          LLVM_DEBUG(DBGS()
+                     << "\tProperly dominated by op: " << *op2 << " ? -> "
+                     << domInfo.properlyDominates(op2, op1) << "\n");
+          return !domInfo.properlyDominates(op2, op1);
+        });
+        LLVM_DEBUG(DBGS() << "Use op: " << *op1 << " ? -> " << res << "\n");
+        return res;
+      });
+      if (nextOpIter == worklist.end()) break;
+      Operation *op = *nextOpIter;
+      LLVM_DEBUG(DBGS() << "Clone op into region: " << *op << "\n");
+      worklist.erase(op);
+
+      rewriter.setInsertionPointToStart(block);
+      Operation *newOp = rewriter.clone(*op, bvm);
+      for (Value v : newOp->getOperands()) {
+        if (auto *op = v.getDefiningOp()) {
+          // If the op has not yet been seen, add it to the worklist.
+          if (seen.insert(op).second) {
+            LLVM_DEBUG(DBGS() << "Add WL op: " << *op << "\n");
+            worklist.insert(op);
+          }
+        }
+      }
+    }
+    rewriter.setInsertionPoint(returnOp);
+    rewriter.clone(*returnOp, bvm);
+    rewriter.eraseOp(returnOp);
+  }
+  LLVM_DEBUG(DBGS() << "Done with WL");
+
+  // Anything still defined above at this point becomes a block argument.
+  llvm::SetVector<Value> workloadValues;
+  mlir::getUsedValuesDefinedAbove(r, workloadValues);
+  block->addArguments(ValueRange(workloadValues.getArrayRef()).getTypes(),
+                      SmallVector<Location>(workloadValues.size(), loc));
+
+  // Perform RAUWIf.
+  BlockAndValueMapping bvm;
+  bvm.map(workloadValues, block->getArguments());
+  for (auto mapEntry : bvm.getValueMap()) {
+    assert(mapEntry.first.getType() == mapEntry.second.getType() &&
+           "must have the same type");
+    mapEntry.first.replaceUsesWithIf(mapEntry.second, [&](OpOperand &use) {
+      return r.isAncestor(use.getOwner()->getParentRegion());
+    });
+  }
+
+  // Properly set the workload base on the result of the outlining.
+  dispatchOp.workloadMutable().assign(ValueRange(workloadValues.getArrayRef()));
+}
 
 /// Rewrite ParallelInsertSlice ops in `performConcurrentlyOp` as Flow
 /// DispatchTensorStoreOps.
@@ -126,16 +234,15 @@ static void rewriteExtractSlices(PatternRewriter &rewriter,
 
 /// Pattern to rewrite a ForeachThreadOp into a Flow::DispatchWorkGroupsOp.
 /// This rewrite proceeds in a few steps:
-///   - Step 1: Compute the result types and their result dynamic dim
-///   operands.
+///   - Step 1: Compute the result types and their result dynamic dim operands.
 ///     This first step takes advantage of the ops contained in the
 ///     ForeachThreadOp terminator and that are tied to the results.
-///   - Step 2: Get values defined above and separate them between
-///   non-tensors,
+///   - Step 2: Get values defined above and separate them between non-tensors,
 ///     tensors and introduce appropriate tensor dims.
-///   - Step 3: Compute workgroupCount.
-///   - Step 4: Create ordered vectors of operands to pass to the builder and
+///   - Step 3: Create ordered vectors of operands to pass to the builder and
 ///     build the dispatchOp.
+///   - Step 4: Populate the workgroupCount region of the dispatchOp and set
+///     the workload operands to the values defined above.
 ///   - Step 5: Fixup dispatchOp bbArgs and terminator.
 ///   - Step 6: Move the body of foreachThreadOp to the dispatchOp.
 ///   - Step 7: Set up bvm for RAUWIf. In particular, tensor operands become
@@ -209,16 +316,9 @@ ForeachThreadToFlowDispatchWorkgroupsRewriter::returningMatchAndRewrite(
       tensorDynamicDims.push_back(rewriter.create<tensor::DimOp>(loc, v, dim));
   }
 
-  // Step 3. Compute workgroupCount.
-  // TODO: this should actually be workLoad information.
-  // Also this will require special handling during codegen to set up the
-  // HAL::EntryPointOp correctly (atm only 1x1x1 is supported).
-  SmallVector<Value> workgroupCount{foreachThreadOp.getNumThreads()};
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-  workgroupCount.resize(3, one);
-
-  // Step 4. Create ordered vectors of operands to pass to the builder and
-  // build the dispatchOp.
+  // Step 3. Create ordered vectors of operands to pass to the builder and
+  // build the dispatchOp. The dispatchOp is created with an empty workload
+  // which is populated next.
   SmallVector<Value> nonDimOperands;
   llvm::append_range(nonDimOperands, nonTensorOperands);
   llvm::append_range(nonDimOperands, tensorOperands);
@@ -239,13 +339,17 @@ ForeachThreadToFlowDispatchWorkgroupsRewriter::returningMatchAndRewrite(
   // clang-format off
   auto dispatchOp = rewriter.create<Flow::DispatchWorkgroupsOp>(
       loc,
-      /*workgroupCount=*/workgroupCount,
+      /*workload=*/ValueRange{},
       /*resultTypes=*/foreachThreadOp.getResultTypes(),
       /*resultDims=*/resultTensorsDynamicDims.getArrayRef(),
       /*operands=*/nonDimOperands,
       /*operandDims=*/allTensorDynamicDims,
       /*tiedOperands=*/llvm::to_vector<4>(tiedOperandsSequence));
   // clang-format on
+
+  // Step 4. Outline the compute workload region and set up the workload
+  // operands.
+  populateWorkgroupCountComputingRegion(rewriter, foreachThreadOp, dispatchOp);
 
   // Step 5. Fixup dispatchOp bbArgs and terminator.
   // TODO: Ideally the builder would have created the proper bbArgs and the
