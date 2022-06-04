@@ -116,6 +116,8 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   // math dialect elementry functions -> polynomial form.
   pm.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
+  pm.addNestedPass<func::FuncOp>(createPadDynamicAlloc());
+
   // Fold load/store from/to subview ops into the original memref when possible.
   // In SPIR-V we don't use memref descriptor so it's not possible to handle
   // subview ops.
@@ -146,9 +148,6 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
 static void addSPIRVLoweringPasses(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-
-  // Pad allocations with dynamic dimension before lowering of affine ops.
-  pm.addNestedPass<func::FuncOp>(createPadDynamicAlloc());
 
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
