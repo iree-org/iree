@@ -41,6 +41,8 @@ CUcontext iree_hal_cuda_device_context(iree_hal_device_t* device);
 iree_hal_cuda_dynamic_symbols_t* iree_hal_cuda_device_dynamic_symbols(
     iree_hal_device_t* device);
 
+iree_status_t iree_cuda_set_current_thread(iree_hal_device_t* device);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
