@@ -23,6 +23,8 @@ iree_status_t iree_hal_cuda_device_create(
     iree_hal_cuda_dynamic_symbols_t* syms, CUdevice device,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
+iree_status_t iree_cuda_set_current_thread(iree_hal_device_t* device);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
