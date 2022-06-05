@@ -64,6 +64,14 @@ static iree_hal_cuda_device_t* iree_hal_cuda_device_cast(
   return (iree_hal_cuda_device_t*)base_value;
 }
 
+iree_status_t iree_cuda_set_current_thread(iree_hal_device_t* device){
+  iree_hal_cuda_device_t* cuda_device = iree_hal_cuda_device_cast(device);
+  CUDA_RETURN_IF_ERROR(cuda_device->context_wrapper.syms,
+                       cuCtxSetCurrent(cuda_device->context_wrapper.cu_context),
+                       "cuCtxSetCurrent");
+  return iree_ok_status();
+}
+
 void iree_hal_cuda_device_params_initialize(
     iree_hal_cuda_device_params_t* out_params) {
   out_params->arena_block_size = 32 * 1024;
