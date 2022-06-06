@@ -168,6 +168,7 @@ void InsertDistributionInfoPass::runOnOperation() {
     if (failed(newEntryPointOp)) {
       return signalPassFailure();
     }
+    exportOp.erase();
 
     if (failed(updateTranslationInfoAttr(newEntryPointOp.getValue(),
                                          workloadPerWorkroup))) {

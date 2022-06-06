@@ -32,6 +32,7 @@ iree_cc_library(
     "CleanupBufferAllocViewPass.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "DestructiveUpdateUtils.cpp"
+    "DistributeToWorkgroupsPass.cpp"
     "FlattenMemRefSubspanPass.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
     "FoldTensorExtractOpPass.cpp"

@@ -27,6 +27,17 @@ def ConvertToDestinationPassingStyle :
   let constructor = "mlir::iree_compiler::createConvertToDestinationPassingStylePass()";
 }
 
+def DistributeToWorkgroups :
+  Pass<"iree-codegen-distribute-to-workgroups", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Distribute a computation to workgroups";
+  let constructor = "mlir::iree_compiler::createDistributeToWorkgroupsPass()";
+  let options = [
+    ListOption<"tileSizes", "tile-sizes", "int64_t",
+               "List of tile sizes to use for distributing the computation",
+               "llvm::cl::ZeroOrMore">
+  ];
+}
+
 def FlattenMemRefSubspan :
   Pass<"iree-codegen-flatten-memref-subspan", "ModuleOp"> {
   let summary =
