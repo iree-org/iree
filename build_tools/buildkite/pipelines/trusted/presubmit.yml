@@ -22,6 +22,7 @@ steps:
                 - url: ${BUILDKITE_REPO}
                   ref: ${CONFIG_FETCH_REF}
     commands: |
+      echo "$${NOT_SET}"
       ./build_tools/buildkite/scripts/check_cla.py ${BUILDKITE_COMMIT} \
           || buildkite-agent pipeline upload \
               build_tools/buildkite/pipelines/fragment/cla-failure.yml
