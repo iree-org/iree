@@ -16,5 +16,3 @@ set -o errexit
 set -o nounset
 # Fail if any command in a pipe fails (not just the last one)
 set -o pipefail
-
-echo "${NOT_SET}"
