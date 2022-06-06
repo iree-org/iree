@@ -1,0 +1,14 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Some configuration for *all* buildkite jobs that check out this repository.
+
+# Exit if any command fails
+set -e
+# Error if an undefined variable is used
+set -u
+# Fail if any command in a pipe fails (not just the last one)
+set -o pipefail
