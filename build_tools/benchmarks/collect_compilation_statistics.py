@@ -4,7 +4,10 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Collect compilation statistics from benchmark suites."""
+"""Collect compilation statistics from benchmark suites.
+
+The benchmark suites need to be built with IREE_ENABLE_COMPILATION_BENCHMARKS.
+"""
 
 import argparse
 from dataclasses import dataclass
