@@ -266,8 +266,10 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
   }
   int64_t dim = ub - lb;
   if (dim < vectorSizeVal) return dim;
-  for (int64_t i = std::min(maxSize, dim); i > 0; --i) {
-    if (dim % i == 0 && i % vectorSizeVal == 0) {
+
+  int64_t scaledUB = std::min(maxSize, dim) / vectorSizeVal * vectorSizeVal;
+  for (int64_t i = scaledUB; i > 0; i -= vectorSizeVal) {
+    if (dim % i == 0) {
       return i;
     }
   }
