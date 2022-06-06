@@ -51,8 +51,8 @@ emcmake "${CMAKE_BIN?}" -G Ninja .. \
 
 echo "Building default targets"
 echo "------------------------"
-"$CMAKE_BIN" --build . -- -k 0
+"${CMAKE_BIN?}" --build . -- -k 0
 
 echo "Building test deps"
 echo "------------------"
-"$CMAKE_BIN" --build . --target iree-test-deps -- -k 0
+"${CMAKE_BIN?}" --build . --target iree-test-deps -- -k 0

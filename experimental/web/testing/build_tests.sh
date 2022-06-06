@@ -77,7 +77,10 @@ python3 ${SOURCE_DIR?}/parse_test_list.py \
 # Substitute {{TEST_LIST}} in the template for the contents of test_list.html
 #   https://unix.stackexchange.com/a/49438
 #   https://unix.stackexchange.com/a/141398
-sed -e '/{{TEST_LIST}}/ {' -e 'r test_list.html' -e 'd' -e '}' \
+sed -e '/{{TEST_LIST}}/ {' \
+    -e 'r test_list.html' \
+    -e 'd' \
+    -e '}' \
     ${SOURCE_DIR?}/index_template.html \
     > ${BINARY_DIR}/index.html
 
