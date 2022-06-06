@@ -17,7 +17,7 @@ hal.executable @conv_112x112x512 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point public @conv_112x112x512 layout(#executable_layout)
+    hal.executable.export public @conv_112x112x512 layout(#executable_layout)
     builtin.module {
       func.func @conv_112x112x512() {
         %c0 = arith.constant 0 : index
@@ -46,7 +46,7 @@ hal.executable @conv_112x112x512 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 1, 4, 64], [0, 1, 4, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
-//      CHECK: hal.executable.entry_point public @conv_112x112x512
+//      CHECK: hal.executable.export public @conv_112x112x512
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
 //      CHECK: func.func @conv_112x112x512()
@@ -72,7 +72,7 @@ hal.executable @conv_112x112x32 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point public @conv_112x112x32 layout(#executable_layout)
+    hal.executable.export public @conv_112x112x32 layout(#executable_layout)
     builtin.module {
       func.func @conv_112x112x32() {
         %c0 = arith.constant 0 : index
@@ -100,7 +100,7 @@ hal.executable @conv_112x112x32 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 1, 8, 32], [0, 1, 4, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
-//      CHECK: hal.executable.entry_point public @conv_112x112x32
+//      CHECK: hal.executable.export public @conv_112x112x32
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
 //      CHECK: func.func @conv_112x112x32()
@@ -126,7 +126,7 @@ hal.executable @conv_16x16x16 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point public @conv_16x16x16 layout(#executable_layout)
+    hal.executable.export public @conv_16x16x16 layout(#executable_layout)
     builtin.module {
       func.func @conv_16x16x16() {
         %c0 = arith.constant 0 : index
@@ -153,7 +153,7 @@ hal.executable @conv_16x16x16 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 4, 16], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
-//      CHECK: hal.executable.entry_point public @conv_16x16x16
+//      CHECK: hal.executable.export public @conv_16x16x16
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [4 : index, 2 : index, 2 : index]
 //      CHECK: func.func @conv_16x16x16()
@@ -179,7 +179,7 @@ hal.executable @dwconv_28x28x144 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point public @dwconv_28x28x144 layout(#executable_layout)
+    hal.executable.export public @dwconv_28x28x144 layout(#executable_layout)
     builtin.module {
       func.func @dwconv_28x28x144() {
         %c0 = arith.constant 0 : index
@@ -207,7 +207,7 @@ hal.executable @dwconv_28x28x144 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 4, 16], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
-//      CHECK: hal.executable.entry_point public @dwconv_28x28x144
+//      CHECK: hal.executable.export public @dwconv_28x28x144
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [4 : index, 2 : index, 2 : index]
 //      CHECK: func.func @dwconv_28x28x144()
@@ -233,7 +233,7 @@ hal.executable @dwconv_1x2x8 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point public @dwconv_1x2x8 layout(#executable_layout)
+    hal.executable.export public @dwconv_1x2x8 layout(#executable_layout)
     builtin.module {
       func.func @dwconv_1x2x8() {
         %c0 = arith.constant 0 : index
@@ -262,7 +262,7 @@ hal.executable @dwconv_1x2x8 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 1, 2, 8], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
-//      CHECK: hal.executable.entry_point public @dwconv_1x2x8
+//      CHECK: hal.executable.export public @dwconv_1x2x8
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [2 : index, 2 : index, 1 : index]
 //      CHECK: func.func @dwconv_1x2x8()

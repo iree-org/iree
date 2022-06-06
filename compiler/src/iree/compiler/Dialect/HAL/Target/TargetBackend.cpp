@@ -203,19 +203,18 @@ LogicalResult TargetBackend::linkExecutablesInto(
 
       // Clone entry point ops and queue remapping ordinals and updating
       // symbol refs.
-      for (auto entryPointOp :
-           variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+      for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
         auto newEntryPointOp =
-            linkedTargetBuilder.create<IREE::HAL::ExecutableEntryPointOp>(
-                entryPointOp.getLoc(), entryPointOp.sym_nameAttr(),
+            linkedTargetBuilder.create<IREE::HAL::ExecutableExportOp>(
+                exportOp.getLoc(), exportOp.sym_nameAttr(),
                 builder.getIndexAttr(nextEntryPointOrdinal++),
-                entryPointOp.layout(), ArrayAttr{}, IntegerAttr{});
+                exportOp.layout(), ArrayAttr{}, IntegerAttr{});
 
         // Add to replacement table for fixing up dispatch calls referencing
         // this entry point.
         auto oldSymbolRefAttr = SymbolRefAttr::get(
             builder.getContext(), sourceExecutableOp.getName(),
-            {SymbolRefAttr::get(variantOp), SymbolRefAttr::get(entryPointOp)});
+            {SymbolRefAttr::get(variantOp), SymbolRefAttr::get(exportOp)});
         auto newSymbolRefAttr = SymbolRefAttr::get(
             builder.getContext(), linkedExecutableOp.getName(),
             {SymbolRefAttr::get(linkedTargetOp),
@@ -242,7 +241,7 @@ LogicalResult TargetBackend::linkExecutablesInto(
   replaceEntryPointUses(moduleOp, entryPointRefReplacements);
 
   // Remove if we didn't add anything.
-  if (linkedTargetOp.getOps<IREE::HAL::ExecutableEntryPointOp>().empty()) {
+  if (linkedTargetOp.getOps<IREE::HAL::ExecutableExportOp>().empty()) {
     linkedTargetOp.erase();
     linkedExecutableOp.erase();
   }

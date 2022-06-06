@@ -185,6 +185,12 @@ def WorkGroupSwizzle :
   ];
 }
 
+def PadDynamicAlloc :
+    Pass<"iree-codegen-pad-dynamic-alloc", "func::FuncOp"> {
+  let summary = "Pass to pad dynamic alloc into static one.";
+  let constructor = "mlir::iree_compiler::createPadDynamicAlloc()";
+}
+
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------
@@ -320,12 +326,6 @@ def LLVMGPUVectorToGPU :
     Pass<"iree-llvmgpu-vector-to-gpu", "func::FuncOp"> {
   let summary = "Pass to convert vector to gpu.";
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorToGPU()";
-}
-
-def LLVMGPUPadDynamicAlloc :
-    Pass<"iree-llvmgpu-pad-dynamic-alloc", "func::FuncOp"> {
-  let summary = "Pass to pad dynamic alloc into static one.";
-  let constructor = "mlir::iree_compiler::createLLVMGPUPadDynamicAlloc()";
 }
 
 //------------------------------------------------------------------------------

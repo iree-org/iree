@@ -12,7 +12,7 @@
 ]>
 hal.executable @abs_ex_dispatch_0 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @abs_ex_dispatch_0 layout(#executable_layout)
+    hal.executable.export @abs_ex_dispatch_0 layout(#executable_layout)
     builtin.module {
       func.func @abs_ex_dispatch_0() {
         %c0 = arith.constant 0 : index

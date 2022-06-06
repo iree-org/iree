@@ -17,7 +17,7 @@ hal.executable @matmul_1024x2048x512 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @matmul_1024x2048x512 layout(#executable_layout)
+    hal.executable.export @matmul_1024x2048x512 layout(#executable_layout)
     builtin.module {
       func.func @matmul_1024x2048x512() {
         %c0 = arith.constant 0 : index
@@ -43,7 +43,7 @@ hal.executable @matmul_1024x2048x512 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[8, 32], [4, 4], [0, 0, 4]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
-//      CHECK: hal.executable.entry_point public @matmul_1024x2048x512
+//      CHECK: hal.executable.export public @matmul_1024x2048x512
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
 //      CHECK: func.func @matmul_1024x2048x512()
@@ -69,7 +69,7 @@ hal.executable @matmul_3136x24x96 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @matmul_3136x24x96 layout(#executable_layout)
+    hal.executable.export @matmul_3136x24x96 layout(#executable_layout)
     builtin.module {
       func.func @matmul_3136x24x96() {
         %c0 = arith.constant 0 : index
@@ -96,7 +96,7 @@ hal.executable @matmul_3136x24x96 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 8], [4, 4], [0, 0, 4]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
-//      CHECK: hal.executable.entry_point public @matmul_3136x24x96
+//      CHECK: hal.executable.export public @matmul_3136x24x96
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [2 : index, 8 : index, 1 : index]
 //      CHECK: func.func @matmul_3136x24x96()
@@ -122,7 +122,7 @@ hal.executable @matmul_196x64x192 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @matmul_196x64x192 layout(#executable_layout)
+    hal.executable.export @matmul_196x64x192 layout(#executable_layout)
     builtin.module {
       func.func @matmul_196x64x192() {
         %c0 = arith.constant 0 : index
@@ -150,7 +150,7 @@ hal.executable @matmul_196x64x192 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 32], [2, 4], [0, 0, 8]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
-//      CHECK: hal.executable.entry_point public @matmul_196x64x192
+//      CHECK: hal.executable.export public @matmul_196x64x192
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
 //      CHECK: func.func @matmul_196x64x192()
@@ -176,7 +176,7 @@ hal.executable @matmul_12544x96x16 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @matmul_12544x96x16 layout(#executable_layout)
+    hal.executable.export @matmul_12544x96x16 layout(#executable_layout)
     builtin.module {
       func.func @matmul_12544x96x16() {
         %c0 = arith.constant 0 : index
@@ -197,7 +197,7 @@ hal.executable @matmul_12544x96x16 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[8, 32], [4, 4], [0, 0, 4]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
-//      CHECK: hal.executable.entry_point public @matmul_12544x96x16
+//      CHECK: hal.executable.export public @matmul_12544x96x16
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
 //      CHECK: func.func @matmul_12544x96x16()
@@ -223,7 +223,7 @@ hal.executable @matmul_49x160x576 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @matmul_49x160x576 layout(#executable_layout)
+    hal.executable.export @matmul_49x160x576 layout(#executable_layout)
     builtin.module {
       func.func @matmul_49x160x576() {
         %c0 = arith.constant 0 : index
@@ -251,7 +251,7 @@ hal.executable @matmul_49x160x576 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 32], [1, 4], [0, 0, 8]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
-//      CHECK: hal.executable.entry_point public @matmul_49x160x576
+//      CHECK: hal.executable.export public @matmul_49x160x576
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 1 : index, 1 : index]
 //      CHECK: func.func @matmul_49x160x576()
@@ -278,7 +278,7 @@ hal.executable @matmul_1x1024x576 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @matmul_1x1024x576 layout(#executable_layout)
+    hal.executable.export @matmul_1x1024x576 layout(#executable_layout)
     builtin.module {
       func.func @matmul_1x1024x576() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -308,7 +308,7 @@ hal.executable @matmul_1x1024x576 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 256], [1, 4], [0, 0, 8]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
-//      CHECK: hal.executable.entry_point public @matmul_1x1024x576
+//      CHECK: hal.executable.export public @matmul_1x1024x576
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
 //      CHECK: func.func @matmul_1x1024x576()
@@ -334,7 +334,7 @@ hal.executable @batch_matmul_4x384x384 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @batch_matmul_4x384x384 layout(#executable_layout)
+    hal.executable.export @batch_matmul_4x384x384 layout(#executable_layout)
     builtin.module {
       func.func @batch_matmul_4x384x384() {
         %c0 = arith.constant 0 : index
@@ -363,7 +363,7 @@ hal.executable @batch_matmul_4x384x384 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 12, 32], [1, 6, 4], [0, 0, 0, 4]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
-//      CHECK: hal.executable.entry_point public @batch_matmul_4x384x384
+//      CHECK: hal.executable.export public @batch_matmul_4x384x384
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
 //      CHECK: func.func @batch_matmul_4x384x384()
@@ -389,7 +389,7 @@ hal.executable @batch_matmul_4x2x8 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @batch_matmul_4x2x8 layout(#executable_layout)
+    hal.executable.export @batch_matmul_4x2x8 layout(#executable_layout)
     builtin.module {
       func.func @batch_matmul_4x2x8() {
         %c0 = arith.constant 0 : index
@@ -418,7 +418,7 @@ hal.executable @batch_matmul_4x2x8 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 2, 8], [1, 1, 4], [0, 0, 0, 8]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
-//      CHECK: hal.executable.entry_point public @batch_matmul_4x2x8
+//      CHECK: hal.executable.export public @batch_matmul_4x2x8
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [2 : index, 2 : index, 1 : index]
 //      CHECK: func.func @batch_matmul_4x2x8()

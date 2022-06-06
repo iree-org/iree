@@ -6,9 +6,9 @@
 hal.executable @ex {
   // CHECK: hal.executable.variant public @backend, target = #executable_target_format
   hal.executable.variant @backend, target = #executable_target_format {
-    // CHECK-DAG: hal.executable.entry_point public @entry0 ordinal(0) layout(#executable_layout) {
+    // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#executable_layout) {
     // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
-    hal.executable.entry_point @entry0 ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [
+    hal.executable.export @entry0 ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [
       #hal.descriptor_set.layout<0, bindings = [
         #hal.descriptor_set.binding<0, storage_buffer>,
         #hal.descriptor_set.binding<1, storage_buffer>
@@ -34,9 +34,9 @@ hal.executable @ex {
 hal.executable @ex_with_workgroup_count_region {
   // CHECK: hal.executable.variant public @backend, target = #executable_target_format
   hal.executable.variant @backend, target = #executable_target_format {
-    // CHECK-DAG: hal.executable.entry_point public @entry0 ordinal(0) layout(#executable_layout) {
+    // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#executable_layout) {
     // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
-    hal.executable.entry_point @entry0 ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [
+    hal.executable.export @entry0 ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [
       #hal.descriptor_set.layout<0, bindings = [
         #hal.descriptor_set.binding<0, storage_buffer>,
         #hal.descriptor_set.binding<1, storage_buffer>

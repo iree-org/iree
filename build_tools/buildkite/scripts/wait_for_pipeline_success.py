@@ -19,8 +19,8 @@ from typing import Optional
 from pybuildkite import buildkite
 
 from common.buildkite_pipeline_manager import BuildkitePipelineManager
-from common.buildkite_utils import (BuildObject, get_build_number,
-                                    get_build_state, linkify)
+from common.buildkite_utils import (BuildObject, annotate_build, ansi_linkify,
+                                    get_build_number, get_build_state)
 
 
 def should_create_new_build(bk: BuildkitePipelineManager,
@@ -68,6 +68,12 @@ def parse_args() -> argparse.Namespace:
       choices=["force", "failed", "bad"],
   )
   parser.add_argument(
+      "--annotate",
+      action="store_true",
+      help=("Whether to annotate the build with the `buildkite-agent annotate`."
+            " command. Enables linkified context to be added to the build UI."),
+  )
+  parser.add_argument(
       "--output-build-json",
       help="Path to which to dump the JSON describing the finished build")
   return parser.parse_args()
@@ -81,7 +87,14 @@ def main(args):
     build = bk.create_build()
   build_number = get_build_number(build)
   url = bk.get_url_for_build(build_number)
-  print(f"Waiting on {linkify(url)}")
+  ansi_link = ansi_linkify(url)
+  markdown_link = f"[{args.pipeline}]({url})"
+  print(f"Waiting on {ansi_link}")
+  if args.annotate:
+    # Don't explicitly set the context, so it can be set with an environment
+    # variable.
+    annotate_build(annotation=f"Waiting for {markdown_link}", style="info")
+
   build = bk.wait_for_build(build_number)
 
   if args.output_build_json:
@@ -89,9 +102,13 @@ def main(args):
       json.dump(build, f)
 
   if get_build_state(build) != buildkite.BuildState.PASSED:
-    print(f"Build was not successful: {linkify(url)}")
+    print(f"Build was not successful: {ansi_link}")
+    if args.annotate:
+      annotate_build(annotation=f"Failed: {markdown_link}", style="error")
     sys.exit(1)
-  print(f"Build completed successfully: {linkify(url)}")
+  print(f"Build completed successfully: {ansi_link}")
+  if args.annotate:
+    annotate_build(annotation=f"Passed: {markdown_link}", style="success")
 
 
 if __name__ == "__main__":

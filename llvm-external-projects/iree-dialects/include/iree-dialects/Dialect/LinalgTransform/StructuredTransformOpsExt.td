@@ -91,7 +91,7 @@ def BufferizeOp : Op<Transform_Dialect, "bufferize",
   let cppNamespace = "transform_ext";
 }
 
-def DecomposeOp : Op<Transform_Dialect, "structured.decompose",
+def DecomposeOp : Op<Transform_Dialect, "structured2.decompose",
     [DeclareOpInterfaceMethods<TransformOpInterface>,
      MemoryEffectsOpInterface,
      FunctionalStyleMultiOperandMultiResultTransformOpTrait]> {

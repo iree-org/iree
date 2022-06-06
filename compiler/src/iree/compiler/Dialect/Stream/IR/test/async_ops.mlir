@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file %s --verify-diagnostics | FileCheck %s
 
 // CHECK-LABEL: @asyncAlloca
 func.func @asyncAlloca(%arg0: index) -> !stream.resource<transient> {
@@ -117,6 +117,61 @@ func.func @asyncDispatch(%arg0: !stream.resource<*>, %arg1: index) -> !stream.re
   %c4 = arith.constant 4 : index
   // CHECK: = stream.async.dispatch @executable::@dispatch[%c1, %c2, %c3](%arg0, %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
   %0 = stream.async.dispatch @executable::@dispatch[%c1, %c2, %c3](%arg0, %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
+stream.executable private @executable {
+  stream.executable.export public @dispatch workgroups(%arg0: index, %arg1: index) -> (index, index, index) {
+    stream.return %arg0, %arg1, %arg0 : index, index, index
+  }
+  builtin.module {
+    func.func @dispatch() {
+      return
+    }
+  }
+}
+
+// CHECK-LABEL: @asyncDispatchWithWorkgroupCount
+func.func @asyncDispatchWithWorkgroupCount(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c4 = arith.constant 4 : index
+  // CHECK: = stream.async.dispatch @executable::@dispatch[%c1, %c2](%arg0, %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
+  %0 = stream.async.dispatch @executable::@dispatch[%c1, %c2](%arg0, %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
+stream.executable private @executable {
+  stream.executable.export public @dispatch workgroups(%arg0: index) -> (index, index, index) {
+    stream.return %arg0, %arg0, %arg0 : index, index, index
+  }
+  builtin.module {
+    func.func @dispatch() {
+      return
+    }
+  }
+}
+
+func.func @asyncDispatchWithInvalidWorkload(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c4 = arith.constant 4 : index
+  // expected-error @+1 {{op workload mismatch; entry point expects 1 arguments but dispatch provides 2}}
+  %0 = stream.async.dispatch @executable::@dispatch[%c1, %c2](%arg0, %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @asyncDispatchNoWorkload
+func.func @asyncDispatchNoWorkload(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %c4 = arith.constant 4 : index
+  // CHECK: = stream.async.dispatch @executable::@dispatch(%arg0, %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
+  %0 = stream.async.dispatch @executable::@dispatch(%arg0, %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
   return %0 : !stream.resource<*>
 }
 

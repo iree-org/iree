@@ -81,6 +81,7 @@ iree_cc_library(
     iree::hal
     iree::hal::utils::buffer_transfer
     iree::hal::utils::resource_set
+    iree::hal::utils::semaphore_base
     iree::hal::vulkan::builtin
     iree::hal::vulkan::util::arena
     iree::hal::vulkan::util::intrusive_list

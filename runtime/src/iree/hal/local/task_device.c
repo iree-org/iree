@@ -304,6 +304,21 @@ static iree_status_t iree_hal_task_device_create_semaphore(
       device->host_allocator, out_semaphore);
 }
 
+static iree_hal_semaphore_compatibility_t
+iree_hal_task_device_query_semaphore_compatibility(
+    iree_hal_device_t* base_device, iree_hal_semaphore_t* semaphore) {
+  if (iree_hal_task_semaphore_isa(semaphore)) {
+    // Fast-path for semaphores related to this device.
+    // TODO(benvanik): ensure the creating devices are compatible as if
+    // independent task systems are used things may not work right (ownership
+    // confusion).
+    return IREE_HAL_SEMAPHORE_COMPATIBILITY_ALL;
+  }
+  // For now we support all semaphore types as we only need wait sources and
+  // all semaphores can be wrapped in those.
+  return IREE_HAL_SEMAPHORE_COMPATIBILITY_ALL;
+}
+
 static iree_status_t iree_hal_task_device_queue_submit(
     iree_hal_device_t* base_device,
     iree_hal_command_category_t command_categories,
@@ -369,6 +384,8 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .create_executable_cache = iree_hal_task_device_create_executable_cache,
     .create_executable_layout = iree_hal_task_device_create_executable_layout,
     .create_semaphore = iree_hal_task_device_create_semaphore,
+    .query_semaphore_compatibility =
+        iree_hal_task_device_query_semaphore_compatibility,
     .transfer_range = iree_hal_device_transfer_mappable_range,
     .queue_submit = iree_hal_task_device_queue_submit,
     .submit_and_wait = iree_hal_task_device_submit_and_wait,

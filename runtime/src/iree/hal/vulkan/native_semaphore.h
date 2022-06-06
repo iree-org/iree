@@ -22,6 +22,9 @@ iree_status_t iree_hal_vulkan_native_semaphore_create(
     iree::hal::vulkan::VkDeviceHandle* logical_device, uint64_t initial_value,
     iree_hal_semaphore_t** out_semaphore);
 
+// Returns true if |semaphore| is a Vulkan native semaphore.
+bool iree_hal_vulkan_native_semaphore_isa(iree_hal_semaphore_t* semaphore);
+
 // Returns the Vulkan timeline semaphore handle.
 VkSemaphore iree_hal_vulkan_native_semaphore_handle(
     iree_hal_semaphore_t* semaphore);

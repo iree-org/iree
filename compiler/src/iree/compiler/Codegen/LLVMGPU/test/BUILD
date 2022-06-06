@@ -24,7 +24,6 @@ iree_lit_test_suite(
             "distribute_to_thread.mlir",
             "gpu_set_num_workgroups.mlir",
             "nvvm_pipeline_test.mlir",
-            "pad_dynamic_alloc.mlir",
             "reduce_bank_conflicts.mlir",
             "rocdl_pipeline_test.mlir",
             "illegal_configuration.mlir",

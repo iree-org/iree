@@ -656,11 +656,11 @@ LogicalResult ExecutableOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// hal.executable.entry_point
+// hal.executable.export
 //===----------------------------------------------------------------------===//
 
-ParseResult ExecutableEntryPointOp::parse(OpAsmParser &parser,
-                                          OperationState &result) {
+ParseResult ExecutableExportOp::parse(OpAsmParser &parser,
+                                      OperationState &result) {
   StringAttr visibilityAttr;
   if (failed(parseSymbolVisibility(parser, visibilityAttr))) {
     return failure();
@@ -700,7 +700,7 @@ ParseResult ExecutableEntryPointOp::parse(OpAsmParser &parser,
   return success();
 }
 
-void ExecutableEntryPointOp::print(OpAsmPrinter &p) {
+void ExecutableExportOp::print(OpAsmPrinter &p) {
   Operation *op = getOperation();
   p << ' ';
   printSymbolVisibility(p, op, op->getAttrOfType<StringAttr>("sym_visibility"));
@@ -716,26 +716,29 @@ void ExecutableEntryPointOp::print(OpAsmPrinter &p) {
   p << ")";
   p.printOptionalAttrDict(op->getAttrs(),
                           /*elidedAttrs=*/{"sym_name", "layout", "ordinal"});
-  if (workgroup_count_region().empty()) return;
+  if (workgroup_count().empty()) return;
   p << " ";
-  p.printRegion(workgroup_count_region());
+  p.printRegion(workgroup_count());
 }
 
-LogicalResult ExecutableEntryPointOp::verify() {
-  ExecutableEntryPointOp op = *this;
+LogicalResult ExecutableExportOp::verify() {
+  ExecutableExportOp op = *this;
   Block *body = getWorkgroupCountBody();
   // When there is no body, nothing to verify.
   if (!body) return success();
 
-  if (!llvm::hasSingleElement(workgroup_count_region())) {
+  if (!llvm::hasSingleElement(workgroup_count())) {
     return op.emitOpError() << "expected a single region block";
   }
   bool validArguments = true;
-  if (body->getNumArguments() != /*device*/ 1 + getNumWorkgroupDims()) {
+  if (body->getNumArguments() == 0) {
+    // Need at least a !hal.device.
     validArguments = false;
   } else if (!body->getArgument(0).getType().isa<IREE::HAL::DeviceType>()) {
+    // !hal.device must come first.
     validArguments = false;
   } else {
+    // All remaining arguments need to be of type index (today).
     for (BlockArgument &blockArg : body->getArguments().drop_front(1)) {
       if (!blockArg.getType().isa<IndexType>()) {
         validArguments = false;
@@ -745,10 +748,10 @@ LogicalResult ExecutableEntryPointOp::verify() {
   }
   if (!validArguments) {
     return op.emitOpError(
-        "expected workgroup_count_region to take (%device: !hal.device, "
-        "%workload_x: index, %workload_y: index, %workload_z: index");
+        "expected workgroup_count to take (%device: !hal.device, "
+        "%workload_0: index, %workload_1: index, ...");
   }
-  // Check that the last statement in the block is `hal.yield` operation.
+  // Check that the last statement in the block is `hal.return` operation.
   // TODO(ravishankarm): The SingleBlockImplicitTerminator<"HAL::ReturnOp">
   // should generate this check, but it doesnt.
   auto returnOp = dyn_cast<ReturnOp>(body->getTerminator());
@@ -821,6 +824,7 @@ static std::array<Value, 3> calculateWorkgroupCountFromRegion(
     builder.clone(op, bvm);
   }
   auto returnOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
+  assert(returnOp.getNumOperands() == 3 && "must return xyz");
   return {
       bvm.lookup(returnOp.operands()[0]),
       bvm.lookup(returnOp.operands()[1]),
@@ -832,7 +836,7 @@ static std::array<Value, 3> calculateWorkgroupCountFromRegion(
 // The provided N-dimensional |workload| is the total number of invocations
 // required as calculated by the generic workload logic (basically, number of
 // output elements in tensors).
-std::array<Value, 3> ExecutableEntryPointOp::calculateWorkgroupCount(
+std::array<Value, 3> ExecutableExportOp::calculateWorkgroupCount(
     Location loc, Value device, ValueRange workload, OpBuilder &builder) {
   Block *body = getWorkgroupCountBody();
   if (body) {
@@ -845,7 +849,7 @@ std::array<Value, 3> ExecutableEntryPointOp::calculateWorkgroupCount(
 
 // Calculates the workgroup size (x, y, z). These are the dimension numbers
 // for a single workgroup.
-std::array<Value, 3> ExecutableEntryPointOp::calculateWorkgroupSize(
+std::array<Value, 3> ExecutableExportOp::calculateWorkgroupSize(
     Location loc, Value device, ValueRange workload, OpBuilder &builder) {
   // When no workgroup size is specified we just assume [1,1,1].
   // This yields a workgroup count that models the extents of the workload.

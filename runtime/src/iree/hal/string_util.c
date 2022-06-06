@@ -183,6 +183,54 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element_type(
                               : iree_ok_status();
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_parse_shape_and_element_type(
+    iree_string_view_t value, iree_host_size_t shape_capacity,
+    iree_hal_dim_t* out_shape, iree_host_size_t* out_shape_rank,
+    iree_hal_element_type_t* out_element_type) {
+  *out_shape_rank = 0;
+  *out_element_type = IREE_HAL_ELEMENT_TYPE_NONE;
+
+  // Strip whitespace that may come along (linefeeds/etc).
+  value = iree_string_view_trim(value);
+  value = iree_string_view_strip_prefix(value, IREE_SV("\""));
+  value = iree_string_view_strip_suffix(value, IREE_SV("\""));
+  if (iree_string_view_is_empty(value)) {
+    // Empty lines are invalid; need at least the shape/type information.
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "empty string input");
+  }
+
+  // The part of the string corresponding to the shape, e.g. 1x2x3.
+  iree_string_view_t shape_str = iree_string_view_empty();
+  // The part of the string corresponding to the type, e.g. f32
+  iree_string_view_t type_str = iree_string_view_empty();
+  // The part of the string corresponding to the buffer data, e.g. 1 2 3 4 5 6
+  // We ignore this.
+  iree_string_view_t data_str = iree_string_view_empty();
+
+  iree_string_view_t shape_and_type_str = value;
+  iree_string_view_split(value, '=', &shape_and_type_str, &data_str);
+  iree_host_size_t last_x_index = iree_string_view_find_last_of(
+      shape_and_type_str, IREE_SV("x"), IREE_STRING_VIEW_NPOS);
+  if (last_x_index == IREE_STRING_VIEW_NPOS) {
+    // Scalar.
+    type_str = shape_and_type_str;
+  } else {
+    // Has a shape.
+    shape_str = iree_string_view_substr(shape_and_type_str, 0, last_x_index);
+    type_str = iree_string_view_substr(shape_and_type_str, last_x_index + 1,
+                                       IREE_STRING_VIEW_NPOS);
+  }
+
+  // AxBxC...
+  IREE_RETURN_IF_ERROR(iree_hal_parse_shape(shape_str, shape_capacity,
+                                            out_shape, out_shape_rank));
+
+  // f32, i32, etc
+  IREE_RETURN_IF_ERROR(iree_hal_parse_element_type(type_str, out_element_type));
+
+  return iree_ok_status();
+}
+
 // Parses a string of two character pairs representing hex numbers into bytes.
 static void iree_hal_hex_string_to_bytes(const char* from, uint8_t* to,
                                          ptrdiff_t num) {

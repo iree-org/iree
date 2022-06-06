@@ -82,4 +82,33 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+iree_cc_library(
+  NAME
+    semaphore_base
+  HDRS
+    "semaphore_base.h"
+  SRCS
+    "semaphore_base.c"
+  DEPS
+    iree::base
+    iree::base::internal::synchronization
+    iree::base::tracing
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    semaphore_base_test
+  SRCS
+    "semaphore_base_test.cc"
+  DEPS
+    ::semaphore_base
+    iree::base
+    iree::base::internal::wait_handle
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

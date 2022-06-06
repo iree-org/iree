@@ -239,6 +239,13 @@ static iree_status_t iree_hal_sync_device_create_semaphore(
                                         device->host_allocator, out_semaphore);
 }
 
+static iree_hal_semaphore_compatibility_t
+iree_hal_sync_device_query_semaphore_compatibility(
+    iree_hal_device_t* base_device, iree_hal_semaphore_t* semaphore) {
+  // The synchronous submission queue handles all semaphores as if host-side.
+  return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
+}
+
 static iree_status_t iree_hal_sync_device_queue_submit(
     iree_hal_device_t* base_device,
     iree_hal_command_category_t command_categories,
@@ -316,6 +323,8 @@ static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
     .create_executable_cache = iree_hal_sync_device_create_executable_cache,
     .create_executable_layout = iree_hal_sync_device_create_executable_layout,
     .create_semaphore = iree_hal_sync_device_create_semaphore,
+    .query_semaphore_compatibility =
+        iree_hal_sync_device_query_semaphore_compatibility,
     .transfer_range = iree_hal_device_transfer_mappable_range,
     .queue_submit = iree_hal_sync_device_queue_submit,
     .submit_and_wait = iree_hal_sync_device_submit_and_wait,

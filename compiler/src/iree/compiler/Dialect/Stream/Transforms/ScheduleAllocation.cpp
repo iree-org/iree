@@ -609,9 +609,9 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
   }
 
   builder.create<IREE::Stream::CmdDispatchOp>(
-      asyncOp.getLoc(), asyncOp.workgroup_count(), asyncOp.entry_point(),
-      newOperands, newResources, newResourceSizes, newResourceOffsets,
-      newResourceLengths, builder.getArrayAttr(newResourceAccesses));
+      asyncOp.getLoc(), asyncOp.workload(), asyncOp.entry_point(), newOperands,
+      newResources, newResourceSizes, newResourceOffsets, newResourceLengths,
+      builder.getArrayAttr(newResourceAccesses));
   asyncOp.erase();
   return success();
 }

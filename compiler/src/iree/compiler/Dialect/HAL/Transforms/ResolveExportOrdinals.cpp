@@ -23,20 +23,20 @@ class ResolveCommandBufferDispatchOrdinals
                                 PatternRewriter &rewriter) const override {
     auto symbol = SymbolTable::lookupNearestSymbolFrom(op, op.entry_point());
     assert(symbol && "missing ExecutableEntryPoint symbol");
-    auto entryPointOp = cast<IREE::HAL::ExecutableEntryPointOp>(symbol);
+    auto exportOp = cast<IREE::HAL::ExecutableExportOp>(symbol);
 
     // Lookup the device for our command buffer, then the executable from the
-    // entry point's nested reference.
+    // exports nested reference.
     auto device = rewriter.createOrFold<IREE::HAL::CommandBufferDeviceOp>(
         op.getLoc(), IREE::HAL::DeviceType::get(rewriter.getContext()),
         op.command_buffer());
     auto executableOp = dyn_cast<IREE::HAL::ExecutableOp>(
-        entryPointOp->getParentOp()->getParentOp());
+        exportOp->getParentOp()->getParentOp());
     auto executable = rewriter.createOrFold<IREE::HAL::ExecutableLookupOp>(
         op.getLoc(), device, executableOp.sym_name());
 
     rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferDispatchOp>(
-        op, op.command_buffer(), executable, entryPointOp.ordinalAttr(),
+        op, op.command_buffer(), executable, exportOp.ordinalAttr(),
         op.workgroup_x(), op.workgroup_y(), op.workgroup_z());
     return success();
   }
@@ -53,35 +53,34 @@ class ResolveCommandBufferDispatchIndirectOrdinals
       PatternRewriter &rewriter) const override {
     auto symbol = SymbolTable::lookupNearestSymbolFrom(op, op.entry_point());
     assert(symbol && "missing ExecutableEntryPoint symbol");
-    auto entryPointOp = cast<IREE::HAL::ExecutableEntryPointOp>(symbol);
+    auto exportOp = cast<IREE::HAL::ExecutableExportOp>(symbol);
 
     // Lookup the device for our command buffer, then the executable from the
-    // entry point's nested reference.
+    // exports nested reference.
     auto device = rewriter.createOrFold<IREE::HAL::CommandBufferDeviceOp>(
         op.getLoc(), IREE::HAL::DeviceType::get(rewriter.getContext()),
         op.command_buffer());
     auto executableOp = dyn_cast<IREE::HAL::ExecutableOp>(
-        entryPointOp->getParentOp()->getParentOp());
+        exportOp->getParentOp()->getParentOp());
     auto executable = rewriter.createOrFold<IREE::HAL::ExecutableLookupOp>(
         op.getLoc(), device, executableOp.sym_name());
 
     rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferDispatchIndirectOp>(
-        op, op.command_buffer(), executable, entryPointOp.ordinalAttr(),
+        op, op.command_buffer(), executable, exportOp.ordinalAttr(),
         op.workgroups_buffer(), op.workgroups_offset());
     return success();
   }
 };
 
-class ResolveEntryPointOrdinalsPass
-    : public PassWrapper<ResolveEntryPointOrdinalsPass,
-                         OperationPass<ModuleOp>> {
+class ResolveExportOrdinalsPass
+    : public PassWrapper<ResolveExportOrdinalsPass, OperationPass<ModuleOp>> {
  public:
   StringRef getArgument() const override {
-    return "iree-hal-resolve-entry-point-ordinals";
+    return "iree-hal-resolve-export-ordinals";
   }
 
   StringRef getDescription() const override {
-    return "Resolves hal.executable.entry_point references to ordinals";
+    return "Resolves hal.executable.export references to ordinals";
   }
 
   void runOnOperation() override {
@@ -96,11 +95,11 @@ class ResolveEntryPointOrdinalsPass
   }
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createResolveEntryPointOrdinalsPass() {
-  return std::make_unique<ResolveEntryPointOrdinalsPass>();
+std::unique_ptr<OperationPass<ModuleOp>> createResolveExportOrdinalsPass() {
+  return std::make_unique<ResolveExportOrdinalsPass>();
 }
 
-static PassRegistration<ResolveEntryPointOrdinalsPass> pass;
+static PassRegistration<ResolveExportOrdinalsPass> pass;
 
 }  // namespace HAL
 }  // namespace IREE

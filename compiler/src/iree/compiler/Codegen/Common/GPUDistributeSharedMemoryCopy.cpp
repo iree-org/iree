@@ -211,10 +211,9 @@ class GPUDistributeSharedMemoryCopyPass
   }
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
-    FailureOr<IREE::HAL::ExecutableEntryPointOp> entryPointOp =
-        getEntryPoint(funcOp);
-    if (failed(entryPointOp)) return;
-    auto workgroupSize = getWorkgroupSize(entryPointOp.getValue());
+    FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
+    if (failed(exportOp)) return;
+    auto workgroupSize = getWorkgroupSize(exportOp.getValue());
     workgroupSize.resize(3, 1);
     MLIRContext *context = &getContext();
     SmallVector<linalg::GenericOp> copiesToWorkgroupMem;

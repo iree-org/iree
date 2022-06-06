@@ -136,6 +136,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base/internal:synchronization",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/utils:buffer_transfer",
+        "//runtime/src/iree/hal/utils:semaphore_base",
     ],
 )
 
@@ -190,6 +191,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/utils:buffer_transfer",
         "//runtime/src/iree/hal/utils:resource_set",
+        "//runtime/src/iree/hal/utils:semaphore_base",
         "//runtime/src/iree/task",
     ],
 )

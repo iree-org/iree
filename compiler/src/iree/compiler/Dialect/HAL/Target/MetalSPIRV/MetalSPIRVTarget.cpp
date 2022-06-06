@@ -76,8 +76,8 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     // names for constructing pipeline states. Get an ordered list of the entry
     // point names.
     SmallVector<StringRef, 8> entryPointNames;
-    spvModuleOp.walk([&](spirv::EntryPointOp entryPointOp) {
-      entryPointNames.push_back(entryPointOp.fn());
+    spvModuleOp.walk([&](spirv::EntryPointOp exportOp) {
+      entryPointNames.push_back(exportOp.fn());
     });
 
     // 1. Serialize the spirv::ModuleOp into binary format.

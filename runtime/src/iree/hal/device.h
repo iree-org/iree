@@ -109,6 +109,48 @@ static inline iree_hal_transfer_buffer_t iree_hal_make_device_transfer_buffer(
   return transfer_buffer;
 }
 
+// A bitfield indicating compatible semaphore behavior for a device.
+enum iree_hal_semaphore_compatibility_bits_t {
+  // Indicates (in the absence of other bits) the semaphore is not compatible
+  // with the device at all. Any attempts to use the semaphore for any usage
+  // will fail.
+  IREE_HAL_SEMAPHORE_COMPATIBILITY_NONE = 0u,
+
+  // Indicates the device can perform a host-side wait on the semaphore.
+  // The semaphore can be used as part of a submission at the cost of additional
+  // host-device synchronization.
+  IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_WAIT = 1u << 0,
+
+  // Indicates the device can perform a device-side wait on the semaphore.
+  // The device can efficiently pipeline submissions when waiting without
+  // host (or user-mode) involvement.
+  IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_WAIT = 1u << 1,
+
+  // Indicates the device can perform a host-side signal of the semaphore.
+  // The semaphore can be used as part of a submission at the cost of additional
+  // host-device synchronization.
+  IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_SIGNAL = 1u << 2,
+
+  // Indicates the device can perform a device-side signal of the semaphore.
+  // The device can efficiently pipeline submissions when signaling without
+  // host (or user-mode) involvement.
+  IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_SIGNAL = 1u << 3,
+
+  // Semaphore is compatible with host-side emulation. Usage is allowed but will
+  // prevent the pipelining of submissions on the device-side.
+  IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY =
+      IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_WAIT |
+      IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_SIGNAL,
+
+  // Semaphore is compatible for all usage with the device.
+  IREE_HAL_SEMAPHORE_COMPATIBILITY_ALL =
+      IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_WAIT |
+      IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_WAIT |
+      IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_SIGNAL |
+      IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_SIGNAL,
+};
+typedef uint32_t iree_hal_semaphore_compatibility_t;
+
 // A list of semaphores and their corresponding payloads.
 // When signaling each semaphore will be set to the new payload value provided.
 // When waiting each semaphore must reach or exceed the payload value.
@@ -207,6 +249,11 @@ iree_status_t iree_hal_device_trim(iree_hal_device_t* device);
 IREE_API_EXPORT iree_status_t iree_hal_device_query_i32(
     iree_hal_device_t* device, iree_string_view_t category,
     iree_string_view_t key, int32_t* out_value);
+
+// Queries in what ways the given |semaphore| may be used with |device|.
+IREE_API_EXPORT iree_hal_semaphore_compatibility_t
+iree_hal_device_query_semaphore_compatibility(iree_hal_device_t* device,
+                                              iree_hal_semaphore_t* semaphore);
 
 // Synchronously copies data from |source| into |target|.
 //
@@ -404,6 +451,10 @@ typedef struct iree_hal_device_vtable_t {
   iree_status_t(IREE_API_PTR* create_semaphore)(
       iree_hal_device_t* device, uint64_t initial_value,
       iree_hal_semaphore_t** out_semaphore);
+
+  iree_hal_semaphore_compatibility_t(
+      IREE_API_PTR* query_semaphore_compatibility)(
+      iree_hal_device_t* device, iree_hal_semaphore_t* semaphore);
 
   iree_status_t(IREE_API_PTR* transfer_range)(
       iree_hal_device_t* device, iree_hal_transfer_buffer_t source,

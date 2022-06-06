@@ -108,15 +108,13 @@ class VMVXTargetBackend final : public TargetBackend {
                                     OpBuilder &executableBuilder) override {
     // Add reflection information used at runtime specific to the HAL interface.
     SymbolTable symbolTable(variantOp.getInnerModule());
-    for (auto entryPointOp :
-         variantOp.getBlock().getOps<ExecutableEntryPointOp>()) {
-      auto funcOp =
-          symbolTable.lookup<IREE::VM::FuncOp>(entryPointOp.getName());
+    for (auto exportOp : variantOp.getBlock().getOps<ExecutableExportOp>()) {
+      auto funcOp = symbolTable.lookup<IREE::VM::FuncOp>(exportOp.getName());
 
       // Optionally entry points may specify that they require workgroup local
       // memory. We fetch that value here and plumb it through so the runtime
       // knows how much memory to reserve and pass in.
-      auto localMemorySizeAttr = entryPointOp.workgroup_local_memoryAttr();
+      auto localMemorySizeAttr = exportOp.workgroup_local_memoryAttr();
       if (localMemorySizeAttr) {
         funcOp.setReflectionAttr("local_memory", localMemorySizeAttr);
       }

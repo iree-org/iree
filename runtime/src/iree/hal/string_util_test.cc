@@ -35,7 +35,7 @@ using Shape = std::vector<iree_hal_dim_t>;
 StatusOr<Shape> ParseShape(const std::string& value) {
   Shape shape(6);
   iree_host_size_t actual_rank = 0;
-  iree_status_t status;
+  iree_status_t status = iree_ok_status();
   do {
     status =
         iree_hal_parse_shape(iree_string_view_t{value.data(), value.size()},
@@ -50,7 +50,7 @@ StatusOr<Shape> ParseShape(const std::string& value) {
 StatusOr<std::string> FormatShape(iree::span<const iree_hal_dim_t> value) {
   std::string buffer(16, '\0');
   iree_host_size_t actual_length = 0;
-  iree_status_t status;
+  iree_status_t status = iree_ok_status();
   do {
     status =
         iree_hal_format_shape(value.data(), value.size(), buffer.size() + 1,
@@ -77,7 +77,7 @@ StatusOr<iree_hal_element_type_t> ParseElementType(const std::string& value) {
 StatusOr<std::string> FormatElementType(iree_hal_element_type_t value) {
   std::string buffer(16, '\0');
   iree_host_size_t actual_length = 0;
-  iree_status_t status;
+  iree_status_t status = iree_ok_status();
   do {
     status = iree_hal_format_element_type(value, buffer.size() + 1, &buffer[0],
                                           &actual_length);
@@ -85,6 +85,34 @@ StatusOr<std::string> FormatElementType(iree_hal_element_type_t value) {
   } while (iree_status_is_out_of_range(status));
   IREE_RETURN_IF_ERROR(status);
   return std::move(buffer);
+}
+
+struct ShapeAndType {
+  Shape shape;
+  iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
+  ShapeAndType() = default;
+  ShapeAndType(Shape shape, iree_hal_element_type_t element_type)
+      : shape(std::move(shape)), element_type(element_type) {}
+};
+static bool operator==(const ShapeAndType& lhs,
+                       const ShapeAndType& rhs) noexcept {
+  return lhs.shape == rhs.shape && lhs.element_type == rhs.element_type;
+}
+
+// Parses a serialized set of shape dimensions and an element type.
+StatusOr<ShapeAndType> ParseShapeAndElementType(const std::string& value) {
+  Shape shape(6);
+  iree_host_size_t actual_rank = 0;
+  iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
+  iree_status_t status = iree_ok_status();
+  do {
+    status = iree_hal_parse_shape_and_element_type(
+        iree_string_view_t{value.data(), value.size()}, shape.size(),
+        shape.data(), &actual_rank, &element_type);
+    shape.resize(actual_rank);
+  } while (iree_status_is_out_of_range(status));
+  IREE_RETURN_IF_ERROR(std::move(status));
+  return ShapeAndType(std::move(shape), element_type);
 }
 
 // Parses a serialized element of |element_type| to its in-memory form.
@@ -591,6 +619,50 @@ TEST(ElementTypeStringUtilTest, FormatElementType) {
   EXPECT_THAT(FormatElementType(iree_hal_make_element_type(
                   IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE, 4)),
               IsOkAndHolds(Eq("f4")));
+}
+
+TEST(StringUtilTest, ParseShapeAndElementType) {
+  EXPECT_THAT(
+      ParseShapeAndElementType("1xi8"),
+      IsOkAndHolds(Eq(ShapeAndType(Shape{1}, IREE_HAL_ELEMENT_TYPE_INT_8))));
+  EXPECT_THAT(ParseShapeAndElementType("1x2xi16"),
+              IsOkAndHolds(
+                  Eq(ShapeAndType(Shape{1, 2}, IREE_HAL_ELEMENT_TYPE_INT_16))));
+  EXPECT_THAT(
+      ParseShapeAndElementType("1x2x3x4x5x6x7x8x9xi32=invalid stuff here"),
+      IsOkAndHolds(Eq(ShapeAndType(Shape{1, 2, 3, 4, 5, 6, 7, 8, 9},
+                                   IREE_HAL_ELEMENT_TYPE_INT_32))));
+}
+
+TEST(StringUtilTest, ParseShapeAndElementTypeInvalid) {
+  EXPECT_THAT(ParseShapeAndElementType(""),
+              StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseShapeAndElementType("0"),
+              StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseShapeAndElementType("="),
+              StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseShapeAndElementType("abc"),
+              StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseShapeAndElementType("1xf"),
+              StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseShapeAndElementType("1xff23"),
+              StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseShapeAndElementType("1xn3"),
+              StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseShapeAndElementType("x"),
+              StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseShapeAndElementType("x1"),
+              StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseShapeAndElementType("1x"),
+              StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseShapeAndElementType("x1x2="),
+              StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseShapeAndElementType("1xx2"),
+              StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseShapeAndElementType("1x2x"),
+              StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseShapeAndElementType("0x-1"),
+              StatusIs(StatusCode::kInvalidArgument));
 }
 
 TEST(ElementStringUtilTest, ParseElement) {

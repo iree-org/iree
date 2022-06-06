@@ -23,14 +23,88 @@
 
 namespace iree {
 
-Status ParseToVariantList(iree_hal_allocator_t* allocator,
+// Creates a HAL buffer view with the given |metadata| and reads the contents
+// from the file at |file_path|.
+//
+// The file contents are directly read in to memory with no processing.
+static iree_status_t CreateBufferViewFromFile(
+    iree_string_view_t metadata, iree_string_view_t file_path,
+    iree_hal_allocator_t* device_allocator,
+    iree_hal_buffer_view_t** out_buffer_view) {
+  *out_buffer_view = NULL;
+
+  // Parse shape and element type used to allocate the buffer view.
+  iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
+  iree_host_size_t shape_rank = 0;
+  iree_status_t shape_result = iree_hal_parse_shape_and_element_type(
+      metadata, 0, NULL, &shape_rank, &element_type);
+  if (!iree_status_is_ok(shape_result) &&
+      !iree_status_is_out_of_range(shape_result)) {
+    return shape_result;
+  } else if (shape_rank > 128) {
+    return iree_make_status(
+        IREE_STATUS_RESOURCE_EXHAUSTED,
+        "a shape rank of %zu is just a little bit excessive, eh?", shape_rank);
+  }
+  shape_result = iree_status_ignore(shape_result);
+  iree_hal_dim_t* shape =
+      (iree_hal_dim_t*)iree_alloca(shape_rank * sizeof(iree_hal_dim_t));
+  IREE_RETURN_IF_ERROR(iree_hal_parse_shape_and_element_type(
+      metadata, shape_rank, shape, &shape_rank, &element_type));
+
+  // TODO(benvanik): allow specifying the encoding.
+  iree_hal_encoding_type_t encoding_type =
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
+
+  // Open the file for reading.
+  std::string file_path_str(file_path.data, file_path.size);
+  FILE* file = std::fopen(file_path_str.c_str(), "rb");
+  if (!file) {
+    return iree_make_status(iree_status_code_from_errno(errno),
+                            "failed to open file '%.*s'", (int)file_path.size,
+                            file_path.data);
+  }
+
+  iree_hal_buffer_params_t buffer_params = {0};
+  buffer_params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+  buffer_params.usage =
+      IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER;
+  struct read_params_t {
+    FILE* file;
+  } read_params = {
+      file,
+  };
+  iree_status_t status = iree_hal_buffer_view_generate_buffer(
+      device_allocator, shape, shape_rank, element_type, encoding_type,
+      buffer_params,
+      +[](iree_hal_buffer_mapping_t* mapping, void* user_data) {
+        auto* read_params = reinterpret_cast<read_params_t*>(user_data);
+        size_t bytes_read =
+            std::fread(mapping->contents.data, 1, mapping->contents.data_length,
+                       read_params->file);
+        if (bytes_read != mapping->contents.data_length) {
+          return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                  "file contents truncated; expected %zu bytes "
+                                  "based on buffer view size",
+                                  mapping->contents.data_length);
+        }
+        return iree_ok_status();
+      },
+      &read_params, out_buffer_view);
+
+  std::fclose(file);
+
+  return status;
+}
+
+Status ParseToVariantList(iree_hal_allocator_t* device_allocator,
                           iree::span<const std::string> input_strings,
                           iree_vm_list_t** out_list) {
   *out_list = NULL;
   vm::ref<iree_vm_list_t> variant_list;
-  IREE_RETURN_IF_ERROR(
-      iree_vm_list_create(/*element_type=*/nullptr, input_strings.size(),
-                          iree_allocator_system(), &variant_list));
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(
+      /*element_type=*/nullptr, input_strings.size(),
+      iree_hal_allocator_host_allocator(device_allocator), &variant_list));
   for (size_t i = 0; i < input_strings.size(); ++i) {
     iree_string_view_t input_view = iree_string_view_trim(iree_make_string_view(
         input_strings[i].data(), input_strings[i].size()));
@@ -43,9 +117,22 @@ Status ParseToVariantList(iree_hal_allocator_t* allocator,
       bool is_storage_reference = iree_string_view_consume_prefix(
           &input_view, iree_make_cstring_view("&"));
       iree_hal_buffer_view_t* buffer_view = nullptr;
-      IREE_RETURN_IF_ERROR(
-          iree_hal_buffer_view_parse(input_view, allocator, &buffer_view),
-          "parsing value '%.*s'", (int)input_view.size, input_view.data);
+      bool has_at = iree_string_view_find_char(input_view, '@', 0) !=
+                    IREE_STRING_VIEW_NPOS;
+      if (has_at) {
+        // Referencing an external file; split into the portion used to
+        // initialize the buffer view and the file contents.
+        iree_string_view_t metadata, file_path;
+        iree_string_view_split(input_view, '@', &metadata, &file_path);
+        iree_string_view_consume_suffix(&metadata, iree_make_cstring_view("="));
+        IREE_RETURN_IF_ERROR(CreateBufferViewFromFile(
+            metadata, file_path, device_allocator, &buffer_view));
+      } else {
+        IREE_RETURN_IF_ERROR(iree_hal_buffer_view_parse(
+                                 input_view, device_allocator, &buffer_view),
+                             "parsing value '%.*s'", (int)input_view.size,
+                             input_view.data);
+      }
       if (is_storage_reference) {
         // Storage buffer reference; just take the storage for the buffer view -
         // it'll still have whatever contents were specified (or 0) but we'll

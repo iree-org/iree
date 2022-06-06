@@ -25,9 +25,6 @@ func.func @complexWorkgroupsUsage(
 
     // Query symbolic workgroup info:
 
-    // CHECK: flow.dispatch.workgroup.rank : index
-    %workgroup_rank = flow.dispatch.workgroup.rank : index
-
     // CHECK-DAG: flow.dispatch.workgroup.id[0] : index
     // CHECK-DAG: flow.dispatch.workgroup.id[1] : index
     // CHECK-DAG: flow.dispatch.workgroup.count[0] : index

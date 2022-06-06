@@ -48,6 +48,14 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element_type(
     iree_hal_element_type_t element_type, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length);
 
+// Parses a shape and type from a `[shape]x[type]` string |value|.
+// Behaves the same as calling iree_hal_parse_shape and
+// iree_hal_parse_element_type. Ignores any training `=`.
+IREE_API_EXPORT iree_status_t iree_hal_parse_shape_and_element_type(
+    iree_string_view_t value, iree_host_size_t shape_capacity,
+    iree_hal_dim_t* out_shape, iree_host_size_t* out_shape_rank,
+    iree_hal_element_type_t* out_element_type);
+
 // Parses a serialized element of |element_type| to its in-memory form.
 // |data_ptr| must be at least large enough to contain the bytes of the element.
 // For example, "1.2" of type IREE_HAL_ELEMENT_TYPE_FLOAT32 will write the 4

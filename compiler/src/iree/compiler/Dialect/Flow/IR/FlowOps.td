@@ -34,12 +34,12 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
   ]>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{a dispatch of workgroups across an n-dimension grid}];
+  let summary = [{a dispatch of workgroups across a 3-dimensional grid}];
   let description = [{
-    Dispatches some number of workgroups across an n-dimensional grid. The
+    Dispatches some number of workgroups across a 3-dimensional grid. The
     body region will be invoked for each workgroup with a unique
     `flow.dispatch.workgroup.id` in the range of
-    `[0, flow.dispatch.workgroup.count)` (along each dimension).
+    `[0, flow.dispatch.workgroup.count)` (along each dimension XYZ).
 
     From the outside the dispatch operation has value semantics: some tensors
     (and optionally other primitive types) are consumed and one or more new
@@ -61,17 +61,16 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     and even several different variants for a particular target device
     (differing workgroup sizes, etc).
 
-    Because of the general nature of the op in this dialect the workgroup count
-    provided to the `flow.dispatch.workgroups` op is in an abstract untiled
-    domain. Unlike when lowering to the HAL dialect the number of dimensions is
-    unbounded and does not yet have the workgroup size factored into it. As the
-    dispatch is lowered the workgroup count range will be converted into a 3D
-    XYZ grid space and divided up by the workgroup size chosen for particular
-    target devices.
+    Because at this point in the layering devices have not yet been selected the
+    workgroup count cannot be fully evaluated. Instead workload parameters are
+    captured that are then passed to a function that when later evaluated
+    computes the actual workgroup count based on target information. The
+    workload is not limited to the 3D XYZ grid dispatch of the workgroup count
+    and can contain any number of parameters used to compute it.
   }];
 
   let arguments = (ins
-    Variadic<FLOW_Dim>:$workgroup_count,
+    Variadic<FLOW_Dim>:$workload,
     Variadic<AnyType>:$operands,
     FLOW_ShapeDynamicDims:$operand_dims,
     FLOW_ShapeDynamicDims:$result_dims,
@@ -81,10 +80,10 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     Variadic<AnyType>:$results
   );
 
-  let regions = (region AnyRegion:$body);
+  let regions = (region AnyRegion:$workgroup_body);
 
   let assemblyFormat = [{
-    `[` $workgroup_count `]` ``
+    (`[` $workload^ `]`)? ``
     `(` $operands `)` `:`
     custom<ShapedFunctionType>(ref($operands),
                                type($operands), $operand_dims,
@@ -94,13 +93,13 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     `=` `\n` ` ` ` ` ` `
     custom<DispatchWorkgroupBody>(ref(type($operands)),
                                   ref(type($results)),
-                                  $body)
+                                  $workgroup_body)
   }];
 
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins
-      "ValueRange":$workgroupCount,
+      "ValueRange":$workload,
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
       "ValueRange":$operands, "ValueRange":$operandDims,
       "ArrayRef<int64_t>":$tiedOperands,
@@ -108,8 +107,6 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
   ];
 
   let extraClassDeclaration = [{
-    size_t getWorkgroupRank() { return workgroup_count().size(); }
-
     FunctionType getDispatchType() {
       return FunctionType::get(
           getContext(),
@@ -119,10 +116,10 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     }
 
     /// Returns the index of the args() operand in the Operation operands list.
-    unsigned mapArgOperandToOpOperand(unsigned i) { return i + workgroup_count().size(); };
+    unsigned mapArgOperandToOpOperand(unsigned i) { return i + workload().size(); };
 
     ValueRange getOperandDynamicDims(unsigned idx) {
-      return IREE::Util::findVariadicDynamicDims(idx - workgroup_count().size(), operands(), operand_dims());
+      return IREE::Util::findVariadicDynamicDims(idx - workload().size(), operands(), operand_dims());
     }
     ValueRange getResultDynamicDims(unsigned idx) {
       return IREE::Util::findVariadicDynamicDims(idx, results(), result_dims());
@@ -133,27 +130,6 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
   let hasCanonicalizer = 1;
 }
 
-def FLOW_DispatchWorkgroupRankOp : FLOW_PureOp<"dispatch.workgroup.rank", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-]> {
-  let summary = [{returns the rank of the workgroup dimensions}];
-  let description = [{
-    The number of workgroup dimensions used during dispatch, bounding the
-    `flow.dispatch.workgroup.*` query functions.
-
-    ```mlir
-    %rank = flow.dispatch.workgroup.rank : index
-    ```
-  }];
-
-  let arguments = (ins);
-  let results = (outs FLOW_Dim:$result);
-
-  let assemblyFormat = "attr-dict `:` type($result)";
-
-  let hasFolder = 1;
-}
-
 def FLOW_DispatchWorkgroupIDOp : FLOW_PureOp<"dispatch.workgroup.id", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
@@ -162,13 +138,14 @@ def FLOW_DispatchWorkgroupIDOp : FLOW_PureOp<"dispatch.workgroup.id", [
     The global workgroup ID of the current workgroup in the range of
     `[0, flow.dispatch.workgroup.count)` along each dimension.
 
+    Represented as a 3D grid classically written as XYZ.
     Corresponds to the `WorkgroupId` SPIR-V built-in and the `blockIdx` CUDA
-    built-in variable, only in the flow dialect the number of dimensions is not
-    restricted to 3 (XYZ).
+    built-in variable.
 
     ```mlir
     %x = flow.dispatch.workgroup.id[0] : index
     %y = flow.dispatch.workgroup.id[1] : index
+    %z = flow.dispatch.workgroup.id[2] : index
     ```
   }];
 
@@ -197,13 +174,14 @@ def FLOW_DispatchWorkgroupCountOp : FLOW_PureOp<"dispatch.workgroup.count", [
   let description = [{
     The total number of workgroups along each dimension in the dispatch grid.
 
+    Represented as a 3D grid classically written as XYZ.
     Corresponds to the `NumWorkgroups` SPIR-V built-in and the `gridDim` CUDA
-    built-in variable, only in the flow dialect the number of dimensions is not
-    restricted to 3 (XYZ).
+    built-in variable.
 
     ```mlir
     %x = flow.dispatch.workgroup.count[0] : index
     %y = flow.dispatch.workgroup.count[1] : index
+    %z = flow.dispatch.workgroup.count[2] : index
     ```
   }];
 
@@ -239,13 +217,14 @@ def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
     still possible to use the symbolic workgroup size inside of dispatch
     executables as a placeholder for the resolved value once in the HAL.
 
+    Represented as a 3D grid classically written as XYZ.
     Corresponds to the `WorkgroupSize` SPIR-V built-in and the `blockDim` CUDA
-    built-in variable, only in the flow dialect the number of dimensions is not
-    restricted to 3 (XYZ).
+    built-in variable.
 
     ```mlir
     %x = flow.dispatch.workgroup.size[0] : index
     %y = flow.dispatch.workgroup.size[1] : index
+    %z = flow.dispatch.workgroup.size[2] : index
     ```
   }];
 
@@ -566,7 +545,7 @@ def FLOW_ExecutableEndOp : FLOW_Op<"executable_end", [
   let assemblyFormat = "attr-dict";
 }
 
-def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
+def FLOW_ExecutableExportOp : FLOW_Op<"executable.export", [
   HasParent<"IREE::Flow::ExecutableOp">,
   Symbol,
 ]> {
@@ -574,21 +553,34 @@ def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
   let description = [{
     Specifies an exported function with an externally-visible alias. Multiple
     exports can reference the same internal function.
+
+    Each entry point can have a unique workgroup count calculation region.
+    This region takes the workload parameters passed to each flow.dispatch and
+    produces an XYZ workgroup count for the 3D grid dispatch.
   }];
 
   let arguments = (ins
     OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
-    FlatSymbolRefAttr:$function_ref,
-    OptionalAttr<IndexAttr>:$workgroup_rank
+    FlatSymbolRefAttr:$function_ref
   );
+
+  let regions = (region AnyRegion:$workgroup_count);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    custom<SymbolAlias>($sym_name, $function_ref)
+    custom<WorkgroupCountRegion>($workgroup_count)
+    attr-dict-with-keyword
+  }];
 
   let builders = [
     OpBuilder<(ins
       "StringRef":$sym_name,
-      "FlatSymbolRefAttr":$function_ref,
-      "IntegerAttr":$workgroup_rank)>,
+      "FlatSymbolRefAttr":$function_ref)>,
   ];
+
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -598,20 +590,23 @@ def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
 def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   AttrSizedOperandSegments,
   FLOW_StreamableOp,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedOperandsIndexAndLength",
   ]>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{a dispatch of workgroups across an n-dimension grid}];
+  let summary = [{a dispatch of workgroups across a grid}];
   let description = [{
-    Dispatches workgroups across an n-dimensional grid defined by the specified
-    workgroup count. The workgroup count may be dynamic and any dimension may be
-    set to 0 to neuter the dispatch (no workgroup will execute).
+    Dispatches workgroups across an grid defined by the captured workload
+    parameters carrying the information required to compute the workgroup count
+    at runtime. The function for converting the workload into a 3D workgroup
+    count is attached to the dispatch entry point and may contain
+    arbitrary host logic.
   }];
 
   let arguments = (ins
-    Variadic<FLOW_Dim>:$workgroup_count,
+    Variadic<FLOW_Dim>:$workload,
     SymbolRefAttr:$entry_point,
     Variadic<AnyType>:$operands,
     FLOW_ShapeDynamicDims:$operand_dims,
@@ -625,19 +620,19 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins
-      "DispatchEntryOp":$entryPoint, "ValueRange":$workgroupCount,
+      "ExecutableExportOp":$entryPoint, "ValueRange":$workload,
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
       "ValueRange":$operands, "ValueRange":$operandDims,
       "ArrayAttr":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
     OpBuilder<(ins
-      "DispatchEntryOp":$entryPoint, "ValueRange":$workgroupCount,
+      "ExecutableExportOp":$entryPoint, "ValueRange":$workload,
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
       "ValueRange":$operands, "ValueRange":$operandDims,
       "ArrayRef<int64_t>":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes),
       [{
-        build($_builder, $_state, entryPoint, workgroupCount,
+        build($_builder, $_state, entryPoint, workload,
               resultTypes, resultDims, operands, operandDims,
               $_builder.getIndexArrayAttr(tiedOperands),
               attributes);
@@ -652,7 +647,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
     bool isTransfer() { return false; }
 
     ValueRange getOperandDynamicDims(unsigned idx) {
-      return IREE::Util::findVariadicDynamicDims(idx - workgroup_count().size(), operands(), operand_dims());
+      return IREE::Util::findVariadicDynamicDims(idx - workload().size(), operands(), operand_dims());
     }
     ValueRange getResultDynamicDims(unsigned idx) {
       return IREE::Util::findVariadicDynamicDims(idx, results(), result_dims());
@@ -660,7 +655,8 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   }];
 
   let assemblyFormat = [{
-    $entry_point `[` $workgroup_count `]` ``
+    $entry_point
+    (`[` $workload^ `]`)? ``
     `(` $operands `)` attr-dict `:`
     custom<ShapedFunctionType>(ref($operands),
                                type($operands), $operand_dims,
@@ -708,7 +704,7 @@ def FLOW_TensorTieShapeOp : FLOW_PureOp<"tensor.tie_shape", [
   let description = [{
     Metadata op used to tie tensors with their runtime-computed dynamic
     dimensions. This only exists transiently in the IR as a witness to shape
-    calculations and is removed during lowering. 
+    calculations and is removed during lowering.
   }];
 
   let arguments = (ins

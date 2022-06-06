@@ -619,7 +619,7 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
 //===----------------------------------------------------------------------===//
 
 LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
-  llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPointOps =
+  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(module);
   spirv::TargetEnvAttr targetEnvAttr = getSPIRVTargetEnvAttr(module);
   if (!targetEnvAttr) {
@@ -631,8 +631,8 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
 
   for (auto funcOp : module.getOps<func::FuncOp>()) {
-    auto entryPointOp = entryPointOps.lookup(funcOp.getName());
-    if (!entryPointOp) continue;
+    auto exportOp = exportOps.lookup(funcOp.getName());
+    if (!exportOp) continue;
 
     SmallVector<Operation *> computeOps;
     SmallVector<LoopTilingAndDistributionInfo> tiledLoops;

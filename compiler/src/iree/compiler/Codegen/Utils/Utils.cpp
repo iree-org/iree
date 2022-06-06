@@ -33,12 +33,11 @@ namespace iree_compiler {
 // Utility functions to get entry points
 //===----------------------------------------------------------------------===//
 
-FailureOr<IREE::HAL::ExecutableEntryPointOp> getEntryPoint(
-    func::FuncOp funcOp) {
+FailureOr<IREE::HAL::ExecutableExportOp> getEntryPoint(func::FuncOp funcOp) {
   auto variantOp = funcOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   if (!variantOp) return failure();
 
-  for (auto op : variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+  for (auto op : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
     if (op.sym_name() == funcOp.getName()) {
       return op;
     }
@@ -50,14 +49,14 @@ bool isEntryPoint(func::FuncOp func) {
   return func.isPublic() && succeeded(getEntryPoint(func));
 }
 
-llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
+llvm::StringMap<IREE::HAL::ExecutableExportOp> getAllEntryPoints(
     ModuleOp module) {
   auto variantOp = module->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-  llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPointOps;
-  for (auto op : variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
-    entryPointOps[op.sym_name()] = op;
+  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps;
+  for (auto op : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+    exportOps[op.sym_name()] = op;
   }
-  return entryPointOps;
+  return exportOps;
 }
 
 /// Returns the StringAttr with the name `stringAttr` in the configuration of
