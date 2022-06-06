@@ -51,19 +51,19 @@ iree_runtime_cc_library(
                "//runtime/src/iree/base",
                "//runtime/src/iree/base:tracing",
            ] + select({
-               ":dylib_enabled": ["//runtime/src/iree/hal/dylib/registration"],
+               ":dylib_enabled": ["//runtime/src/iree/hal/drivers/dylib/registration"],
                "//conditions:default": [],
            }) +
            select({
-               ":dylib-sync_enabled": ["//runtime/src/iree/hal/dylib/registration:sync"],
+               ":dylib-sync_enabled": ["//runtime/src/iree/hal/drivers/dylib_sync/registration"],
                "//conditions:default": [],
            }) +
            select({
-               ":vmvx_enabled": ["//runtime/src/iree/hal/vmvx/registration"],
+               ":vmvx_enabled": ["//runtime/src/iree/hal/drivers/vmvx/registration"],
                "//conditions:default": [],
            }) +
            select({
-               ":vmvx-sync_enabled": ["//runtime/src/iree/hal/vmvx/registration:sync"],
+               ":vmvx-sync_enabled": ["//runtime/src/iree/hal/drivers/vmvx_sync/registration"],
                "//conditions:default": [],
            }) +
            select({

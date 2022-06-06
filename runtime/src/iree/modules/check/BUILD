@@ -39,7 +39,7 @@ iree_runtime_cc_test(
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:span",
         "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/vmvx/registration",
+        "//runtime/src/iree/hal/drivers/vmvx/registration",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",

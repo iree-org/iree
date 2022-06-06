@@ -40,7 +40,7 @@ if(IREE_HAL_DRIVER_VMVX)
       iree::base::internal
       iree::base::internal::span
       iree::hal
-      iree::hal::vmvx::registration
+      iree::hal::drivers::vmvx::registration
       iree::modules::hal
       iree::testing::gtest
       iree::testing::gtest_main

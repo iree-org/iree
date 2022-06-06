@@ -13,19 +13,19 @@
 #endif  // IREE_HAL_HAVE_CUDA_DRIVER_MODULE
 
 #if defined(IREE_HAL_HAVE_DYLIB_DRIVER_MODULE)
-#include "iree/hal/dylib/registration/driver_module.h"
+#include "iree/hal/drivers/dylib/registration/driver_module.h"
 #endif  // IREE_HAL_HAVE_DYLIB_DRIVER_MODULE
 
 #if defined(IREE_HAL_HAVE_DYLIB_SYNC_DRIVER_MODULE)
-#include "iree/hal/dylib/registration/driver_module_sync.h"
+#include "iree/hal/drivers/dylib_sync/registration/driver_module.h"
 #endif  // IREE_HAL_HAVE_DYLIB_SYNC_DRIVER_MODULE
 
 #if defined(IREE_HAL_HAVE_VMVX_DRIVER_MODULE)
-#include "iree/hal/vmvx/registration/driver_module.h"
+#include "iree/hal/drivers/vmvx/registration/driver_module.h"
 #endif  // IREE_HAL_HAVE_VMVX_DRIVER_MODULE
 
 #if defined(IREE_HAL_HAVE_VMVX_SYNC_DRIVER_MODULE)
-#include "iree/hal/vmvx/registration/driver_module_sync.h"
+#include "iree/hal/drivers/vmvx_sync/registration/driver_module.h"
 #endif  // IREE_HAL_HAVE_VMVX_SYNC_DRIVER_MODULE
 
 #if defined(IREE_HAL_HAVE_VULKAN_DRIVER_MODULE)

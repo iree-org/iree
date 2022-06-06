@@ -4,19 +4,12 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
-)
-
-iree_cmake_extra_content(
-    content = """
-if(IREE_HAL_DRIVER_DYLIB)
-""",
-    inline = True,
 )
 
 iree_runtime_cc_library(
@@ -36,36 +29,4 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/local/loaders:system_library_loader",
         "//runtime/src/iree/task:api",
     ],
-)
-
-iree_cmake_extra_content(
-    content = """
-endif()
-
-if(IREE_HAL_DRIVER_DYLIB_SYNC)
-""",
-    inline = True,
-)
-
-iree_runtime_cc_library(
-    name = "sync",
-    srcs = ["driver_module_sync.c"],
-    hdrs = ["driver_module_sync.h"],
-    defines = [
-        "IREE_HAL_HAVE_DYLIB_SYNC_DRIVER_MODULE=1",
-    ],
-    deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/local",
-        "//runtime/src/iree/hal/local:sync_driver",
-        "//runtime/src/iree/hal/local/loaders:embedded_library_loader",
-    ],
-)
-
-iree_cmake_extra_content(
-    content = """
-endif()
-""",
-    inline = True,
 )

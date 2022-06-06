@@ -55,7 +55,7 @@ iree_cc_test(
     ::vm_util
     iree::base
     iree::hal
-    iree::hal::vmvx::registration
+    iree::hal::drivers::vmvx::registration
     iree::modules::hal
     iree::testing::gtest
     iree::testing::gtest_main

@@ -71,7 +71,7 @@ Include headers:
 // with those for the specific HAL drivers your application uses.
 // Functionality extensions can be used via custom modules.
 #include "iree/modules/hal/module.h"
-#include "iree/hal/dylib/registration/driver_module.h"
+#include "iree/hal/drivers/dylib/registration/driver_module.h"
 #include "iree/vm/bytecode_module.h"
 ```
 

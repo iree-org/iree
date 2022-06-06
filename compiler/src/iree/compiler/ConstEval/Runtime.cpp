@@ -8,7 +8,7 @@
 
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/hal/api.h"
-#include "iree/hal/vmvx/registration/driver_module.h"
+#include "iree/hal/drivers/vmvx/registration/driver_module.h"
 #include "iree/modules/hal/module.h"
 #include "iree/vm/ref_cc.h"
 #include "mlir/IR/BuiltinOps.h"

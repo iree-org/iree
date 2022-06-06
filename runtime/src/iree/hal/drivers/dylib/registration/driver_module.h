@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_DYLIB_REGISTRATION_DRIVER_MODULE_H_
-#define IREE_HAL_DYLIB_REGISTRATION_DRIVER_MODULE_H_
+#ifndef IREE_HAL_DRIVERS_DYLIB_REGISTRATION_DRIVER_MODULE_H_
+#define IREE_HAL_DRIVERS_DYLIB_REGISTRATION_DRIVER_MODULE_H_
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
@@ -23,4 +23,4 @@ iree_hal_dylib_driver_module_register(iree_hal_driver_registry_t* registry);
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_DYLIB_REGISTRATION_DRIVER_MODULE_H_
+#endif  // IREE_HAL_DRIVERS_DYLIB_REGISTRATION_DRIVER_MODULE_H_
