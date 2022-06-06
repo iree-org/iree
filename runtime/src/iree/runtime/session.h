@@ -168,7 +168,7 @@ IREE_API_EXPORT iree_status_t
 iree_runtime_session_append_bytecode_module_from_file(
     iree_runtime_session_t* session, const char* file_path);
 
-// Sets |out_function| to to an exported function with the fully-qualified name
+// Sets |out_function| to an exported function with the fully-qualified name
 // of |full_name| or returns IREE_STATUS_NOT_FOUND. The function reference is
 // valid for the lifetime of |session|.
 //

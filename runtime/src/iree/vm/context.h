@@ -99,7 +99,7 @@ IREE_API_EXPORT iree_status_t iree_vm_context_resolve_module_state(
     const iree_vm_context_t* context, iree_vm_module_t* module,
     iree_vm_module_state_t** out_module_state);
 
-// Sets |out_function| to to an exported function with the fully-qualified name
+// Sets |out_function| to an exported function with the fully-qualified name
 // of |full_name| or returns IREE_STATUS_NOT_FOUND. The function reference is
 // valid for the lifetime of |context|.
 IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(
