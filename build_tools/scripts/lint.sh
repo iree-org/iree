@@ -120,9 +120,14 @@ else
   echo "'yamllint' not found. Skipping check"
 fi
 
+# Just a newline
+echo ""
+
 if (( "${FINAL_RET}" != 0 )); then
   echo "Encountered failures. Check error messages and changes to the working" \
        "directory and git index (which may contain fixes) and try again."
+else
+  echo "Lint checks were successful."
 fi
 
 exit "${FINAL_RET}"

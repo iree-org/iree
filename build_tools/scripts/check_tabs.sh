@@ -33,7 +33,16 @@ if (( ${#files[@]} == 0 )); then
   exit 0
 fi;
 
-diff="$(grep --with-filename --line-number --perl-regexp --binary-files=without-match '\t' "${files[@]}")"
+# find is necessary to filter out symlinks
+diff="$(\
+  find ${files[@]} -type f | \
+  grep \
+  --with-filename \
+  --line-number \
+  --perl-regexp \
+  --binary-files=without-match \
+  '\t' \
+)"
 
 grep_exit="$?"
 
