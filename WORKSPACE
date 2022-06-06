@@ -46,14 +46,6 @@ llvm_disable_optional_support_deps()
 ###############################################################################
 
 ###############################################################################
-# Find and configure the Vulkan SDK, if installed.
-load("//build_tools/third_party/vulkan_sdk:repo.bzl", "vulkan_sdk_setup")
-
-maybe(
-    vulkan_sdk_setup,
-    name = "vulkan_sdk",
-)
-###############################################################################
 # All other IREE submodule dependencies
 
 load("//build_tools/bazel:workspace.bzl", "configure_iree_submodule_deps")

@@ -93,60 +93,16 @@ applications that solely rely on headless compute. For graphics-focused tools,
 we need to wrap IREE's logic inside a dummy rendering loop in order to provide
 the necessary markers for these tools to perform capture and analysis.
 
-IREE provides an `iree-run-module-vulkan-gui` binary that can invoke a specific
-bytecode module within a proper GUI application. The graphics side is leveraging
-[Dear ImGui](https://github.com/ocornut/imgui); it calls into IREE
-synchronously during rendering each frame and prints the bytecode invocation
-results to the screen.
-
-To build `iree-run-module-vulkan-gui`:
-
-```shell
-# Using Bazel
-$ bazel build //iree/testing/vulkan:iree-run-module-vulkan-gui
-
-# Using CMake
-$ cmake --build /path/to/build/dir --target iree-run-module-vulkan-gui
-```
-
-The generated binary should be invoked in a console environment and it takes
-the same command-line options as the main
-[`iree-run-module`](./developer-overview.md#iree-run-module), except the
-`--driver` option. You can use `--help` to learn them all. The binary will
-launch a GUI window for use with Vulkan tools.
-
 ### AMD
 
 For AMD GPUs, [Radeon GPU Profiler](https://gpuopen.com/rgp/) (RGP) is the tool
 to understand fine details of how IREE GPU performs. See the
 [documentation](https://radeon-gpuprofiler.readthedocs.io/en/latest/) for
-details. In general the steps to get started are:
-
-* Download and install AMD RGP from https://gpuopen.com/rgp/.
-* Compile `iree-run-module-vulkan-gui` as said in the above.
-* Open "Radeon Developer Panel" and connect to the local
-  "Radeon Developer Service".
-* Start `iree-run-module-vulkan-gui` from console with proper VM bytecode module
-  invocation.
-* You should see it in the "Applications" panel of "Radeon Developer Panel".
-  Click "Capture profile" to capture.
-
-Afterwards you can analyze the profile with RGP. Viewing the profile does not
-need the GPU anymore; it can be opened by a RGP application installed anywhere.
+details.
 
 ### NVIDIA
 
 For NVIDIA GPUs, [NVIDIA Nsight Graphics](https://developer.nvidia.com/nsight-graphics)
 is the tool to understand fine details of how IREE GPU performs. See the
 [documentation](https://docs.nvidia.com/nsight-graphics/UserGuide/index.html)
-for details. In general the steps to get started are:
-
-* Download and install NVIDIA Nsight Graphics from https://developer.nvidia.com/nsight-graphics.
-* Compile `iree-run-module-vulkan-gui` as said in the above.
-* Open NVIDIA Nsight Graphics, select "Quick Launch" on the welcome page.
-* Fill out the "Application Executable" and "Command Line Arguments" to point
-  to `iree-run-module-vulkan-gui` and a specific VM bytecode module and its
-  invocation information.
-* Select an "Activity" ("Frame Profiler" and "GPU Trace" are particularly
-  interesting) and launch.
-* Capture any frame to perform analysis.
+for details.
