@@ -11,8 +11,8 @@ from typing import List, Optional
 
 from pybuildkite import buildkite
 
-from common.buildkite_utils import (BuildObject, get_build_number,
-                                    get_build_state, get_pipeline, ansi_linkify)
+from common.buildkite_utils import (BuildObject, ansi_linkify, get_build_number,
+                                    get_build_state, get_pipeline)
 
 # Fake build to return when running locally.
 FAKE_PASSED_BUILD = dict(number=42, state="passed")
@@ -37,6 +37,8 @@ class BuildkitePipelineManager(object):
       pull_request_base_branch: Optional[str] = None,
       pull_request_id: Optional[str] = None,
       pull_request_repository: Optional[str] = None,
+      triggering_pipeline: Optional[str] = None,
+      triggering_build_number: Optional[str] = None,
   ):
     self._buildkite = buildkite.Buildkite()
     self._buildkite.set_access_token(access_token)
@@ -55,6 +57,8 @@ class BuildkitePipelineManager(object):
         # Indicate the name of the pipeline to trigger. This is used by the
         # 'unregistered' pipeline to upload the correct pipeline file.
         "REQUESTED_PIPELINE": pipeline,
+        "BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG": triggering_pipeline,
+        "BUILDKITE_TRIGGERED_FROM_BUILD_NUMBER": triggering_build_number,
     }
     # If the pipeline doesn't exist, then we run it on the "unregistered"
     # pipeline, which leverages the REQUESTED_PIPELINE env variable.
@@ -89,6 +93,8 @@ class BuildkitePipelineManager(object):
     pull_request_base_branch = os.environ.get(
         "BUILDKITE_PULL_REQUEST_BASE_BRANCH")
     pull_request_repository = os.environ.get("BUILDKITE_PULL_REQUEST_REPO")
+    triggering_pipeline = os.environ.get("BUILDKITE_PIPELINE_SLUG")
+    triggering_build_number = os.environ.get("BUILDKITE_BUILD_NUMBER")
 
     return BuildkitePipelineManager(
         access_token=access_token,
@@ -102,6 +108,8 @@ class BuildkitePipelineManager(object):
         pull_request_id=pull_request_id,
         pull_request_base_branch=pull_request_base_branch,
         pull_request_repository=pull_request_repository,
+        triggering_pipeline=triggering_pipeline,
+        triggering_build_number=triggering_build_number,
     )
 
   def get_builds(self) -> List[BuildObject]:
