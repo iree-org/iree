@@ -304,7 +304,7 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
 /// empty, each hint should be 1 or the vector size. On the dimensions where the
 /// hints != 1, it will try to find the tile sizes which are multipliers of the
 /// hints.
-template<bool allowIncompleteTile>
+template <bool allowIncompleteTile>
 static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
     ArrayRef<unsigned> partitionableLoops, ArrayRef<int64_t> lbs,
     ArrayRef<int64_t> ubs, ArrayRef<int64_t> minTileSizes,
@@ -342,7 +342,7 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
   }
   return distributedTileSizes;
 }
-template<bool allowIncompleteTile>
+template <bool allowIncompleteTile>
 static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
     linalg::LinalgOp linalgOp, ArrayRef<int64_t> minTileSizes,
     ArrayRef<int64_t> maxTileSizes, ArrayRef<int64_t> vectorSizeHints = {}) {
@@ -475,7 +475,8 @@ static LogicalResult setMatmulNoPadRootConfig(
   reductionTileSizes.push_back(getMaxTileSize</*allowIncompleteTile=*/false>(
       0, K, workgroupTileSizes.back(), vectorSize));
 
-  setAlwaysVectorizeSizes(op.getOperation(), parallelTileSizes, reductionTileSizes);
+  setAlwaysVectorizeSizes(op.getOperation(), parallelTileSizes,
+                          reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
@@ -794,8 +795,8 @@ static LogicalResult setDefaultGenericOpRootConfig(
 
   // Set the flow level tiling to the default.
   SmallVector<int64_t> flowTileSizes =
-      getDefaultDistributedLevelTileSizes</*allowIncompleteTile=*/false>(genericOp, minTileSizes,
-                                                maxTileSizes);
+      getDefaultDistributedLevelTileSizes</*allowIncompleteTile=*/false>(
+          genericOp, minTileSizes, maxTileSizes);
 
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
@@ -865,8 +866,8 @@ static LogicalResult setTransposeLikeOpRootConfig(
 
   // Set the flow level tiling to the default.
   SmallVector<int64_t> flowTileSizes =
-      getDefaultDistributedLevelTileSizes</*allowIncompleteTile=*/false>(genericOp, minTileSizes,
-                                                maxTileSizes);
+      getDefaultDistributedLevelTileSizes</*allowIncompleteTile=*/false>(
+          genericOp, minTileSizes, maxTileSizes);
 
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
@@ -923,8 +924,8 @@ static LogicalResult setConvRootConfig(
 
   // Set the flow level tiling to the default.
   SmallVector<int64_t> flowTileSizes =
-      getDefaultDistributedLevelTileSizes</*allowIncompleteTile=*/false>(convOp, minTileSizes,
-                                                maxTileSizes, vectorSizeHints);
+      getDefaultDistributedLevelTileSizes</*allowIncompleteTile=*/false>(
+          convOp, minTileSizes, maxTileSizes, vectorSizeHints);
 
   // Shapes of N, OH, OW, OC, KH, KW, (IC)
   SmallVector<int64_t, 4> shapes = convOp.getStaticLoopRanges();
