@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "dispatch_workgroups.mlir"
     "dispatch_workgroups_folding.mlir"
     "executable_ops.mlir"
+    "resolve_dim_ops.mlir"
     "tensor_folding.mlir"
     "tensor_ops.mlir"
     "types.mlir"

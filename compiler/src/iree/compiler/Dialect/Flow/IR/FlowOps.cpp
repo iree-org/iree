@@ -431,15 +431,15 @@ LogicalResult DispatchTensorLoadOp::reifyResultShapes(
   SmallVector<Value> shape;
   if (!mixedSizes.empty()) {
     // Slicing out a tile; return the size sliced.
-    shape = llvm::to_vector<6>(llvm::map_range(
-        getMixedSizes(), [&](OpFoldResult valueOrAttr) -> Value {
-          if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-            return b.create<arith::ConstantIndexOp>(
-                getLoc(), attr.cast<IntegerAttr>().getInt());
-          } else {
-            return valueOrAttr.dyn_cast<Value>();
-          }
-        }));
+    shape.reserve(mixedSizes.size());
+    auto droppedDims = getDroppedDims();
+    for (auto mixedSize : llvm::enumerate(mixedSizes)) {
+      if (droppedDims.test(mixedSize.index())) {
+        continue;
+      }
+      shape.push_back(
+          getValueOrCreateConstantIndexOp(b, getLoc(), mixedSize.value()));
+    }
   } else {
     // Result size matches the source size (no slicing).
     unsigned dynamicIdx = 0;
