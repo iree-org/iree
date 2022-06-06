@@ -6,9 +6,15 @@
 
 # Some configuration for *all* buildkite jobs that check out this repository.
 
+set -x
+
+echo "${BASH_SOURCE?}"
+
 # Exit if any command fails
 set -o errexit
 # Error if an undefined variable is used
 set -o nounset
 # Fail if any command in a pipe fails (not just the last one)
 set -o pipefail
+
+echo "${NOT_SET}"
