@@ -213,6 +213,9 @@ createVerifyLinalgTransformLegalityPass();
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
 
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUEmitVectorizationRemarksPass();
+
 /// Checks CPU backend specific IR constraints (like no stack allocations)
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMCPUCheckIRBeforeLLVMConversionPass();
