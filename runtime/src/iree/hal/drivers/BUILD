@@ -67,11 +67,11 @@ iree_runtime_cc_library(
                "//conditions:default": [],
            }) +
            select({
-               ":vulkan_enabled": ["//runtime/src/iree/hal/vulkan/registration"],
+               ":vulkan_enabled": ["//runtime/src/iree/hal/drivers/vulkan/registration"],
                "//conditions:default": [],
            }) +
            select({
-               ":cuda_enabled": ["//runtime/src/iree/hal/cuda/registration"],
+               ":cuda_enabled": ["//runtime/src/iree/hal/drivers/cuda/registration"],
                "//conditions:default": [],
            }),
 )

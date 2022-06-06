@@ -10,7 +10,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/cuda/registration/driver_module.h"
+#include "iree/hal/drivers/cuda/registration/driver_module.h"
 
 // Compiled module embedded here to avoid file IO:
 #include "samples/simple_embedding/simple_embedding_test_bytecode_module_cuda_c.h"

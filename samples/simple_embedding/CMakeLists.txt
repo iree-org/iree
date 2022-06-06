@@ -230,7 +230,7 @@ iree_cc_binary(
     ::simple_embedding_test_bytecode_module_vulkan_c
     iree::base
     iree::hal
-    iree::hal::vulkan::registration
+    iree::hal::drivers::vulkan::registration
     iree::modules::hal
     iree::vm
     iree::vm::bytecode_module

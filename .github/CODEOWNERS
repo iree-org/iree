@@ -72,6 +72,6 @@
 
 # Runtime
 /runtime/src/iree/ @benvanik
-/runtime/src/iree/hal/cuda/ @ThomasRaoux
 /runtime/src/iree/hal/cts/ @ScottTodd
-/runtime/src/iree/hal/vulkan/ @antiagainst @ScottTodd
+/runtime/src/iree/hal/drivers/cuda/ @ThomasRaoux
+/runtime/src/iree/hal/drivers/vulkan/ @antiagainst @ScottTodd
