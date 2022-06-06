@@ -13,8 +13,7 @@ a single .js + .wasm bundle.
 2. Install the Emscripten SDK by
    [following these directions](https://emscripten.org/docs/getting_started/downloads.html)
 3. Initialize your Emscripten environment (e.g. run `emsdk_env.bat`)
-4. From this directory, run `bash ./build_sample.sh`
-    * You may need to set the path to your host tools install
+4. From this directory, run `bash ./build_sample.sh [path to install] && bash ./serve_sample.sh`
 5. Open the localhost address linked in the script output
 
 To rebuild most parts of the sample (C runtime, sample HTML, CMake config,

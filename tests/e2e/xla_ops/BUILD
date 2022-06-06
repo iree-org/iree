@@ -462,6 +462,7 @@ iree_check_single_backend_test_suite(
     compiler_flags = [
         "--iree-input-type=mhlo",
         "--iree-llvm-target-triple=wasm32-unknown-emscripten",
+        "--iree-llvm-target-cpu-features=+atomics,+bulk-memory",  # required to use shared memory
     ],
     # driver = "wasm",  # No driver yet, only test compilation.
     target_backend = "dylib-llvm-aot",

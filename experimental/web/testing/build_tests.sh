@@ -34,7 +34,7 @@ SOURCE_DIR=${ROOT_DIR}/experimental/web/testing
 BUILD_DIR=${ROOT_DIR?}/build-emscripten
 mkdir -p ${BUILD_DIR}
 
-BINARY_DIR=${BUILD_DIR}/experimental/web/testing/
+BINARY_DIR=${BUILD_DIR}/experimental/web/testing
 mkdir -p ${BINARY_DIR}
 
 INSTALL_ROOT="${1:-${ROOT_DIR}/build-host/install}"
@@ -45,23 +45,49 @@ INSTALL_ROOT="${1:-${ROOT_DIR}/build-host/install}"
 
 echo "=== Building web artifacts using Emscripten ==="
 
-pushd ${ROOT_DIR?}/build-emscripten
+pushd ${ROOT_DIR?}/build-emscripten > /dev/null
 
 # Configure using Emscripten's CMake wrapper, then build.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \
-  -DCMAKE_BUILD_TYPE=Debug \
-  -DIREE_HOST_BINARY_ROOT=${INSTALL_ROOT} \
-  -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_HAL_DRIVER_DEFAULTS=OFF \
-  -DIREE_BUILD_SAMPLES=OFF \
-  -DIREE_ENABLE_CPUINFO=OFF \
-  -DIREE_BUILD_TESTS=ON
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DIREE_HOST_BINARY_ROOT=${INSTALL_ROOT} \
+    -DIREE_BUILD_COMPILER=OFF \
+    -DIREE_HAL_DRIVER_DEFAULTS=OFF \
+    -DIREE_HAL_DRIVER_VMVX=ON \
+    -DIREE_HAL_DRIVER_VMVX_SYNC=ON \
+    -DIREE_BUILD_SAMPLES=OFF \
+    -DIREE_ENABLE_CPUINFO=OFF \
+    -DIREE_BUILD_TESTS=ON
 
-"${CMAKE_BIN?}" --build .
+echo "=== Building default targets ==="
+"${CMAKE_BIN}" --build . -- -k 0
 
-popd
+echo "=== Building test deps ==="
+"${CMAKE_BIN?}" --build . --target iree-test-deps -- -k 0
+
+echo "=== Generating list of tests ==="
+
+# TODO(scotttodd): Move this parsing and substitution into CMake?
+ctest --show-only=json-v1 > ctest_dump.json
+python3 ${SOURCE_DIR?}/parse_test_list.py \
+    --ctest_dump=ctest_dump.json \
+    --build_dir=. \
+    --output_format=html \
+    -o test_list.html
+# Substitute {{TEST_LIST}} in the template for the contents of test_list.html
+#   https://unix.stackexchange.com/a/49438
+#   https://unix.stackexchange.com/a/141398
+sed -e '/{{TEST_LIST}}/ {' \
+    -e 'r test_list.html' \
+    -e 'd' \
+    -e '}' \
+    ${SOURCE_DIR?}/index_template.html \
+    > ${BINARY_DIR}/index.html
+
+popd > /dev/null
 
 echo "=== Copying static files to the build directory ==="
 
-cp ${SOURCE_DIR?}/index.html ${BINARY_DIR}
+cp ${SOURCE_DIR?}/test-runner.html ${BINARY_DIR}
+cp ${SOURCE_DIR?}/*.js ${BINARY_DIR}
 cp ${ROOT_DIR?}/docs/website/overrides/ghost.svg ${BINARY_DIR}
