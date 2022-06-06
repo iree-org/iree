@@ -11,12 +11,13 @@ IREE_ENABLE_COMPILATION_BENCHMARKS.
 """
 
 import argparse
-from dataclasses import dataclass
 import json
 import os
 import re
 import zipfile
-from typing import Dict, Optional
+
+from dataclasses import asdict
+from typing import BinaryIO, Dict, Optional, TextIO
 from pathlib import PurePath
 
 from common.benchmark_definition import CompilationInfo, CompilationResults, CompilationStatistics, ModuleComponentSizes, get_git_commit_hash
@@ -52,32 +53,36 @@ def match_module_cmake_target(module_path: str) -> Optional[str]:
   return os.path.join(*path_parts)
 
 
-def parse_compilation_time_from_ninja_log(log_path: str) -> Dict[str, int]:
-  """Retrieve the compilation time from the Ninja build log."""
+def parse_compilation_time_from_ninja_log(log: TextIO) -> Dict[str, int]:
+  """Retrieve the compilation time from the Ninja build log.
+  
+  Returns:
+    Map of target name and compilation time in milliseconds.
+  """
 
   target_build_time_map = {}
-  with open(log_path, "r") as f:
-    header = f.readline()
-    if NINJA_LOG_HEADER not in header:
-      raise NotImplementedError(f"Unsupported ninja log version: {header}")
+  header = log.readline()
+  if NINJA_LOG_HEADER not in header:
+    raise NotImplementedError(f"Unsupported ninja log version: {header}")
 
-    for line in f:
-      start_time, end_time, _, target, _ = line.strip().split("\t")
-      cmake_target = match_module_cmake_target(target)
-      if cmake_target is None:
-        continue
+  for line in log:
+    start_time, end_time, _, target, _ = line.strip().split("\t")
+    cmake_target = match_module_cmake_target(target)
+    if cmake_target is None:
+      continue
 
-      start_time = int(start_time)
-      end_time = int(end_time)
-      target_build_time_map[cmake_target] = end_time - start_time
+    start_time = int(start_time)
+    end_time = int(end_time)
+    target_build_time_map[cmake_target] = end_time - start_time
 
   return target_build_time_map
 
 
-def get_module_component_info(module_path: str) -> ModuleComponentSizes:
-  module_zipinfo = zipfile.ZipFile(module_path)
+def get_module_component_info(module: BinaryIO,
+                              module_file_size: int) -> ModuleComponentSizes:
+  module_zipfile = zipfile.ZipFile(module)
   size_map = dict(
-      (info.filename, info.file_size) for info in module_zipinfo.infolist())
+      (info.filename, info.file_size) for info in module_zipfile.infolist())
   vm_component_size = size_map[VM_COMPONENT_NAME]
   const_component_size = size_map[CONST_COMPONENT_NAME]
   identified_names = {VM_COMPONENT_NAME, CONST_COMPONENT_NAME}
@@ -90,37 +95,31 @@ def get_module_component_info(module_path: str) -> ModuleComponentSizes:
         break
 
   if identified_names != set(size_map.keys()):
-    raise AssertionError(
+    raise RuntimeError(
         f"Unrecognized components in the module: {size_map.keys()}.")
 
   return ModuleComponentSizes(
-      file_size=os.stat(module_path).st_size,
+      file_size=module_file_size,
       vm_component_size=vm_component_size,
       const_component_size=const_component_size,
       total_dispatch_component_size=total_dispatch_component_size)
 
 
-def get_module_path(benchmark_case_dir: str) -> str:
+def get_module_path(flag_file: TextIO) -> Optional[str]:
   """Retrieve the module path for compilation statistics from the flag file."""
 
-  flagfile_path = os.path.join(benchmark_case_dir, BENCHMARK_FLAGFILE)
   module_path = None
-  with open(flagfile_path, "r") as f:
-    for line in f:
-      match = re.match("--module_file=(.+)", line.strip())
-      if match:
-        module_name, module_ext = os.path.splitext(match.group(1))
-        module_path = f"{module_name}-{COMPILATION_STATS_MODULE_SUFFIX}{module_ext}"
-        break
+  for line in flag_file:
+    match = re.match("--module_file=(.+)", line.strip())
+    if match:
+      module_name, module_ext = os.path.splitext(match.group(1))
+      module_path = f"{module_name}-{COMPILATION_STATS_MODULE_SUFFIX}{module_ext}"
+      break
 
-  if not module_path:
-    raise AssertionError(
-        f"Can't find the module file in the flagfile: {flagfile_path}")
-
-  return os.path.abspath(os.path.join(benchmark_case_dir, module_path))
+  return module_path
 
 
-def parse_argument():
+def parse_arguments():
   """Returns an argument parser with common options."""
 
   def check_dir_path(path):
@@ -150,20 +149,33 @@ def main(args: argparse.Namespace):
   benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
       benchmark_suite_dir)
 
-  target_build_time_map = parse_compilation_time_from_ninja_log(
-      os.path.join(args.build_dir, NINJA_BUILD_LOG))
+  with open(os.path.join(args.build_dir, NINJA_BUILD_LOG), "r") as log_file:
+    target_build_time_map = parse_compilation_time_from_ninja_log(log_file)
 
   compilation_statistics_list = []
   for category, _ in benchmark_suite.list_categories():
     benchmark_cases = benchmark_suite.filter_benchmarks_for_category(
         category=category)
     for benchmark_case in benchmark_cases:
-      module_path = get_module_path(benchmark_case.benchmark_case_dir)
-      module_component_sizes = get_module_component_info(module_path)
+      flag_file_path = os.path.join(benchmark_case.benchmark_case_dir,
+                                    BENCHMARK_FLAGFILE)
+      with open(flag_file_path, "r") as flag_file:
+        module_path = get_module_path(flag_file)
+
+      if module_path is None:
+        raise RuntimeError(
+            f"Can't find the module file in the flagfile: {flag_file_path}")
+      module_path = os.path.abspath(
+          os.path.join(benchmark_case.benchmark_case_dir, module_path))
+
+      with open(module_path, "rb") as module_file:
+        module_component_sizes = get_module_component_info(
+            module_file,
+            os.stat(module_path).st_size)
 
       cmake_target = match_module_cmake_target(module_path)
       if cmake_target is None:
-        raise AssertionError(
+        raise RuntimeError(
             f"Module path isn't a module cmake target: {module_path}")
       compilation_time = target_build_time_map[cmake_target]
 
@@ -182,7 +194,7 @@ def main(args: argparse.Namespace):
   compilation_results = CompilationResults(
       commit=commit, compilation_statistics=compilation_statistics_list)
 
-  json_object = compilation_results.to_json_object()
+  json_object = asdict(compilation_results)
   with open(args.output, "w") as f:
     json.dump(json_object, f)
 
@@ -191,4 +203,4 @@ def main(args: argparse.Namespace):
 
 
 if __name__ == "__main__":
-  main(parse_argument())
+  main(parse_arguments())

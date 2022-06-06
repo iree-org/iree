@@ -471,48 +471,21 @@ class CompilationInfo(object):
     bench_mode_str = ",".join(self.bench_mode)
     return f"{model_part} {self.target_arch} {bench_mode_str}"
 
-  def to_json_object(self) -> Dict[str, Any]:
-    return {
-        "model_name": self.model_name,
-        "model_tags": self.model_tags,
-        "model_source": self.model_source,
-        "target_arch": self.target_arch,
-        "bench_mode": self.bench_mode,
-    }
-
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
-    return CompilationInfo(model_name=json_object["model_name"],
-                           model_tags=json_object["model_tags"],
-                           model_source=json_object["model_source"],
-                           target_arch=json_object["target_arch"],
-                           bench_mode=json_object["bench_mode"])
+    return CompilationInfo(**json_object)
 
 
-@dataclass
+@dataclass(frozen=True)
 class ModuleComponentSizes(object):
   file_size: int
   vm_component_size: int
   const_component_size: int
   total_dispatch_component_size: int
 
-  def to_json_object(self) -> Dict[str, Any]:
-    return {
-        "file_size": self.file_size,
-        "vm_component_size": self.vm_component_size,
-        "const_component_size": self.const_component_size,
-        "total_dispatch_component_size": self.total_dispatch_component_size,
-    }
-
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
-    return ModuleComponentSizes(
-        file_size=json_object["file_size"],
-        vm_component_size=json_object["vm_component_size"],
-        const_component_size=json_object["const_component_size"],
-        total_dispatch_component_size=json_object[
-            "total_dispatch_component_size"],
-    )
+    return ModuleComponentSizes(**json_object)
 
 
 @dataclass(frozen=True)
@@ -522,13 +495,6 @@ class CompilationStatistics(object):
   module_component_sizes: ModuleComponentSizes
   # Module compilation time in ms.
   compilation_time: int
-
-  def to_json_object(self) -> Dict[str, Any]:
-    return {
-        "compilation_info": self.compilation_info.to_json_object(),
-        "module_component_sizes": self.module_component_sizes.to_json_object(),
-        "compilation_time": self.compilation_time,
-    }
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
@@ -544,15 +510,6 @@ class CompilationStatistics(object):
 class CompilationResults(object):
   commit: str
   compilation_statistics: Sequence[CompilationStatistics]
-
-  def to_json_object(self) -> Dict[str, Any]:
-    return {
-        "commit":
-            self.commit,
-        "compilation_statistics": [
-            obj.to_json_object() for obj in self.compilation_statistics
-        ]
-    }
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
