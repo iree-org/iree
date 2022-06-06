@@ -13,12 +13,14 @@
 #include <utility>
 
 #include "PassDetail.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/GraphWriter.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -64,7 +66,38 @@ static std::string strFromOs(function_ref<void(raw_ostream &)> func) {
 
 /// Escape special characters such as '\n' and quotation marks.
 static std::string escapeString(std::string str) {
-  return strFromOs([&](raw_ostream &os) { os.write_escaped(str); });
+  return strFromOs([&](raw_ostream &os) {
+    for (unsigned char c : str) {
+      switch (c) {
+        case '\\':
+          os << '\\' << '\\';
+          break;
+        case '\t':
+          os << '\\' << 't';
+          break;
+        case '\n':
+          os << '\\' << 'n';
+          break;
+        case '"':
+          os << '\\' << '"';
+          break;
+        case '\r':  // translate "carriage return" as "\l"
+          os << '\\' << 'l';
+          break;
+        default:
+          if (llvm::isPrint(c)) {
+            os << c;
+            break;
+          }
+
+          // Always use a full 3-character octal escape.
+          os << '\\';
+          os << char('0' + ((c >> 6) & 7));
+          os << char('0' + ((c >> 3) & 7));
+          os << char('0' + ((c >> 0) & 7));
+      }
+    }
+  });
 }
 
 /// Put quotation marks around a given string.
@@ -247,10 +280,123 @@ class DumpDispatchGraphPass
     return Node(nodeId);
   }
 
+  void printResults(raw_ostream &os, Operation *op, AsmState &state) {
+    for (auto result : op->getResults()) {
+      result.printAsOperand(os, state);
+    }
+  }
+
+  void printResultsAndName(raw_ostream &os, Operation *op, AsmState &state) {
+    printResults(os, op, state);
+    os << " = " << op->getName();
+  }
+
+  void printDispatchTensorLoad(raw_ostream &os, DispatchTensorLoadOp op,
+                               AsmState &state) {
+    printResultsAndName(os, op.getOperation(), state);
+    os << " ";
+    op.source().printAsOperand(os, state);
+    os << " -> " << op.result().getType();
+    os << "\r";
+  }
+
+  void printDispatchTensorStore(raw_ostream &os, DispatchTensorStoreOp op,
+                                AsmState &state) {
+    os << op->getName() << " ";
+    op.value().printAsOperand(os, state);
+    os << ", ";
+    op.target().printAsOperand(os, state);
+    os << "\r";
+  }
+
+  void printGeneric(raw_ostream &os, linalg::GenericOp op, AsmState &state) {
+    printLinalgInsOuts(os, op, state);
+    for (Operation &operation : *op.getBlock()) {
+      os.indent(8);
+      annotateOperation(os, &operation, state);
+    }
+  }
+
+  template <typename T>
+  void printLinalgInsOuts(raw_ostream &os, T op, AsmState &state) {
+    printResultsAndName(os, op.getOperation(), state);
+    os << " " << op.iterator_types() << "(";
+    printOperands(os, op.inputs(), state);
+    os << ") -> (";
+    printOperands(os, op.outputs(), state);
+    os << ")\r";
+  }
+
+  void annotateOperation(raw_ostream &os, Operation *op, AsmState &state) {
+    // A scalar constant op will be printed directly when printing the
+    // operand.
+    if (isScalarConstantOp(op)) return;
+
+    if (isa<func::ReturnOp>(op)) return;
+
+    if (auto load = dyn_cast<DispatchTensorLoadOp>(op)) {
+      printDispatchTensorLoad(os, load, state);
+      return;
+    }
+
+    if (auto store = dyn_cast<DispatchTensorStoreOp>(op)) {
+      printDispatchTensorStore(os, store, state);
+      return;
+    }
+
+    if (auto generic = dyn_cast<linalg::GenericOp>(op)) {
+      printGeneric(os, generic, state);
+      return;
+    }
+
+    if (auto linalgOp = dyn_cast<linalg::MatmulOp>(op)) {
+      printLinalgInsOuts(os, linalgOp, state);
+      return;
+    }
+
+    if (auto linalgOp = dyn_cast<linalg::BatchMatmulOp>(op)) {
+      printLinalgInsOuts(os, linalgOp, state);
+      return;
+    }
+
+    os << *op << "\r";
+  }
+
+  void printDispatchBody(raw_ostream &os, DispatchOp &dispatchOp) {
+    // Find the entry point function from the dispatch entry point symbol
+    // attribute.
+    auto entryPoint = dispatchOp.entry_point();
+    auto executableOp = cast<ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
+        dispatchOp, entryPoint.getRootReference()));
+    if (!executableOp) return;
+
+    auto calleeNameAttr = entryPoint.getLeafReference();
+    auto innerModule = executableOp.getInnerModule();
+    auto funcOps = innerModule.getOps<func::FuncOp>();
+    auto funcIt = llvm::find_if(funcOps, [&](func::FuncOp op) {
+      return op.getNameAttr() == calleeNameAttr;
+    });
+    if (funcIt == funcOps.end()) return;
+
+    auto callee = *funcIt;
+
+    AsmState state(callee);
+
+    // Iterate the operations of the function body and print important
+    // operation.
+    for (auto &block : callee.getBlocks()) {
+      for (auto &op : block.getOperations()) {
+        annotateOperation(os, &op, state);
+      }
+    }
+  }
+
   void printOperands(raw_ostream &os, ::mlir::Operation::operand_range operands,
                      AsmState &state) {
-    for (unsigned i = 0, e = operands.size(); i != e; ++i) {
-      auto operand = operands[i];
+    auto numOperands = operands.size();
+
+    for (auto it : llvm::enumerate(operands)) {
+      auto operand = it.value();
       auto op = operand.getDefiningOp();
 
       if (isScalarConstantOp(op)) {
@@ -266,7 +412,7 @@ class DumpDispatchGraphPass
         operand.printAsOperand(os, state);
       }
 
-      if (i != e - 1) {
+      if (it.index() != numOperands - 1) {
         os << ", ";
       }
     }
@@ -278,10 +424,7 @@ class DumpDispatchGraphPass
       if (op->getNumRegions() == 0) {
         auto funcOp = op->getParentOfType<func::FuncOp>();
         AsmState state(funcOp);
-
-        for (auto result : op->getResults()) {
-          result.printAsOperand(os, state);
-        }
+        printResults(os, op, state);
         os << " = " << op->getName();
 
         if (auto dispatch = dyn_cast<DispatchOp>(op)) {
@@ -290,13 +433,24 @@ class DumpDispatchGraphPass
           printOperands(os, dispatch.workload(), state);
           os << "]\n";
 
-          // print entry function name
-          os << dispatch.entry_point();
+          // Print entry function name, if there is only one entry function,
+          // then the name space and the entry function names are the same,
+          // and we can just print the function name to save space.
+          auto entryPoint = dispatch.entry_point();
+          auto rootName = entryPoint.getRootReference();
+          auto leafName = entryPoint.getLeafReference();
+          if (rootName == leafName) {
+            os << leafName;
+          } else {
+            os << entryPoint;  // print the full name
+          }
 
           // print entry function args
           os << "(";
           printOperands(os, dispatch.operands(), state);
           os << ")\n";
+
+          printDispatchBody(os, dispatch);
 
         } else {
           os << "\n";
