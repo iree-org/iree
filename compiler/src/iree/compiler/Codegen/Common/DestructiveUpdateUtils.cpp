@@ -343,14 +343,12 @@ LogicalResult rewriteDestructiveUpdateInPlace<tensor::InsertSliceOp>(
   return failure();
 }
 
-// Return true if any control flow is found in the DispatchWorkgroupsOp besides
-// scf::ForOp.
+// Return true if any control flow is found in the workgroup besides scf::ForOp.
 static bool hasNonScfForControlFlow(func::FuncOp funcOp) {
   return funcOp
       ->walk([&](Operation *op) {
         if (isa<BranchOpInterface>(op) || isa<RegionBranchOpInterface>(op)) {
-          if (!isa<scf::ForOp, scf::IfOp>(op) && !isa<linalg::LinalgOp>(op) &&
-              !isa<IREE::Flow::DispatchWorkgroupsOp>(op))
+          if (!isa<scf::ForOp, scf::IfOp>(op) && !isa<linalg::LinalgOp>(op))
             return WalkResult::interrupt();
         }
         return WalkResult::advance();

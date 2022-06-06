@@ -9,7 +9,7 @@
 ]>
 hal.executable @add_dispatch_0 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-  hal.executable.entry_point @add_dispatch_0 layout(#executable_layout)
+  hal.executable.export @add_dispatch_0 layout(#executable_layout)
   builtin.module {
     func.func @add_dispatch_0() {
       %c0 = arith.constant 0 : index
@@ -33,7 +33,7 @@ hal.executable @add_dispatch_0 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[256]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorize>
-//      CHECK: hal.executable.entry_point public @add_dispatch_0
+//      CHECK: hal.executable.export public @add_dispatch_0
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-SAME:     workgroup_size = [64 : index, 1 : index, 1 : index]
 //      CHECK: func.func @add_dispatch_0
@@ -51,7 +51,7 @@ hal.executable @add_dispatch_0 {
 ]>
 hal.executable private @dot_dispatch_1  {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @dot_dispatch_1 layout(#executable_layout)
+    hal.executable.export @dot_dispatch_1 layout(#executable_layout)
     builtin.module {
       func.func @dot_dispatch_1() {
         %c0 = arith.constant 0 : index
@@ -71,7 +71,7 @@ hal.executable private @dot_dispatch_1  {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 2, 4]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
-//      CHECK: hal.executable.entry_point public @dot_dispatch_1
+//      CHECK: hal.executable.export public @dot_dispatch_1
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-SAME:     workgroup_size = [2 : index, 4 : index, 1 : index]
 //      CHECK: func.func @dot_dispatch_1
@@ -90,7 +90,7 @@ hal.executable private @dot_dispatch_1  {
 ]>
 hal.executable @reduction_dispatch {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @predict_dispatch_153 layout(#executable_layout)
+    hal.executable.export @predict_dispatch_153 layout(#executable_layout)
     builtin.module {
       func.func @predict_dispatch_153() {
         %c0 = arith.constant 0 : index
@@ -115,7 +115,7 @@ hal.executable @reduction_dispatch {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUDistribute>
-//      CHECK: hal.executable.entry_point public @predict_dispatch_153
+//      CHECK: hal.executable.export public @predict_dispatch_153
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.fill
 // CHECK-SAME:   lowering_config = #[[CONFIG]]
@@ -131,7 +131,7 @@ hal.executable @reduction_dispatch {
 ]>
 hal.executable private @reduction_aligned2 {
   hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point public @reduction_aligned2 ordinal(0) layout(#executable_layout)
+    hal.executable.export public @reduction_aligned2 ordinal(0) layout(#executable_layout)
     builtin.module {
       func.func @reduction_aligned2() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -159,7 +159,7 @@ hal.executable private @reduction_aligned2 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 128, 4]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorize>
-//      CHECK: hal.executable.entry_point public @reduction_aligned2
+//      CHECK: hal.executable.export public @reduction_aligned2
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.fill
 // CHECK-SAME:   lowering_config = #[[CONFIG]]
@@ -176,7 +176,7 @@ hal.executable private @reduction_aligned2 {
 ]>
 hal.executable @copy_as_generic {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @copy_as_generic layout(#executable_layout)
+    hal.executable.export @copy_as_generic layout(#executable_layout)
     builtin.module {
       func.func @copy_as_generic() {
         %c0 = arith.constant 0 : index
@@ -197,7 +197,7 @@ hal.executable @copy_as_generic {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorize>
-//      CHECK: hal.executable.entry_point public @copy_as_generic
+//      CHECK: hal.executable.export public @copy_as_generic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -212,7 +212,7 @@ hal.executable @copy_as_generic {
 ]>
 hal.executable private @static_1d_fft_stage2 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @static_1d_fft_stage2 layout(#executable_layout)
+    hal.executable.export @static_1d_fft_stage2 layout(#executable_layout)
     builtin.module {
       func.func @static_1d_fft_stage2() {
         %c0 = arith.constant 0 : index
@@ -234,7 +234,7 @@ hal.executable private @static_1d_fft_stage2 {
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4]{{\]}}>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUDistribute>
-//       CHECK: hal.executable.entry_point public @static_1d_fft_stage2
+//       CHECK: hal.executable.export public @static_1d_fft_stage2
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: iree_linalg_ext.fft
 //  CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -249,7 +249,7 @@ hal.executable private @static_1d_fft_stage2 {
 ]>
 hal.executable private @static_3d_fft_stage3 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @static_3d_fft_stage3 layout(#executable_layout)
+    hal.executable.export @static_3d_fft_stage3 layout(#executable_layout)
     builtin.module {
       func.func @static_3d_fft_stage3() {
         %c0 = arith.constant 0 : index
@@ -274,7 +274,7 @@ hal.executable private @static_3d_fft_stage3 {
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 8]{{\]}}>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUDistribute>
-//       CHECK: hal.executable.entry_point public @static_3d_fft_stage3
+//       CHECK: hal.executable.export public @static_3d_fft_stage3
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: iree_linalg_ext.fft
 //  CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -294,7 +294,7 @@ hal.executable private @static_3d_fft_stage3 {
 ]>
 hal.executable @user_config {
 hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb"> {
-  hal.executable.entry_point public @_lowering_config_test_dispatch_1 layout(#executable_layout)
+  hal.executable.export public @_lowering_config_test_dispatch_1 layout(#executable_layout)
   builtin.module {
     func.func @_lowering_config_test_dispatch_1() {
       %cst = arith.constant 0.000000e+00 : f32
@@ -321,7 +321,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb">
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 128, 64]{{\]}}
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulSimt workload_per_wg = [256, 32]>
-//      CHECK: hal.executable.entry_point public @_lowering_config_test_dispatch_1
+//      CHECK: hal.executable.export public @_lowering_config_test_dispatch_1
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-SAME:     workgroup_size = [16 : index, 8 : index, 1 : index]
 //      CHECK: linalg.fill
@@ -341,7 +341,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb">
 ]>
 hal.executable private @sort_op {
   hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
-    hal.executable.entry_point public @sort_op layout(#executable_layout)
+    hal.executable.export public @sort_op layout(#executable_layout)
     builtin.module {
       func.func @sort_op() {
         %c1 = arith.constant 1 : index
@@ -370,7 +370,7 @@ hal.executable private @sort_op {
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64]{{\]}}>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUDistribute>
-//       CHECK: hal.executable.entry_point public @sort_op
+//       CHECK: hal.executable.export public @sort_op
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: iree_linalg_ext.sort
 //  CHECK-SAME:     lowering_config = #[[CONFIG]]

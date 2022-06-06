@@ -422,9 +422,14 @@ class ScatterRank0Value : public OpRewritePattern<mhlo::ScatterOp> {
 
   LogicalResult matchAndRewrite(mhlo::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
-    auto operand = op.operand();
-    auto indices = op.scatter_indices();
-    auto updates = op.updates();
+    if (llvm::size(op.operands()) != 1)
+      return op.emitError("NYI variadic operands scatter");
+    if (llvm::size(op.updates()) != 1)
+      return op.emitError("NYI variadic updates scatter");
+
+    Value operand = op.operands().front();
+    Value indices = op.scatter_indices();
+    Value updates = op.updates().front();
 
     auto operandTy = operand.getType().dyn_cast<RankedTensorType>();
     auto indicesTy = indices.getType().dyn_cast<RankedTensorType>();
@@ -484,13 +489,13 @@ class ScatterRank0Value : public OpRewritePattern<mhlo::ScatterOp> {
         /*indexVectorDim=*/1);
 
     auto newScatter = rewriter.create<mhlo::ScatterOp>(
-        loc, op.getType(), operand, reshapedIndices, reshapedUpdates,
+        loc, op.getResultTypes(), operand, reshapedIndices, reshapedUpdates,
         newDimNumbers, op.indices_are_sorted(), op.unique_indices());
 
     Region &region = newScatter.update_computation();
     rewriter.cloneRegionBefore(op.update_computation(), region, region.end());
 
-    rewriter.replaceOp(op, newScatter.getResult());
+    rewriter.replaceOp(op, newScatter.getResults());
 
     return success();
   }

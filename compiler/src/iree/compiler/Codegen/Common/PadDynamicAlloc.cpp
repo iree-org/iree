@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 
 namespace mlir {
@@ -49,18 +48,13 @@ static LogicalResult padAlloc(memref::AllocOp allocOp) {
 
 namespace {
 
-struct LLVMGPUPadDynamicAllocPass
-    : public LLVMGPUPadDynamicAllocBase<LLVMGPUPadDynamicAllocPass> {
+struct PadDynamicAllocPass : public PadDynamicAllocBase<PadDynamicAllocPass> {
   void runOnOperation() override {
     auto funcOp = getOperation();
     SmallVector<memref::AllocOp> sharedMemAllocs;
     // Collect all the alloc operations.
-    funcOp.walk([&](memref::AllocOp allocOp) {
-      if (allocOp.getType().getMemorySpaceAsInt() ==
-          gpu::GPUDialect::getWorkgroupAddressSpace()) {
-        sharedMemAllocs.push_back(allocOp);
-      }
-    });
+    funcOp.walk(
+        [&](memref::AllocOp allocOp) { sharedMemAllocs.push_back(allocOp); });
     for (memref::AllocOp alloc : sharedMemAllocs) {
       if (failed(padAlloc(alloc))) return signalPassFailure();
     }
@@ -68,8 +62,8 @@ struct LLVMGPUPadDynamicAllocPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUPadDynamicAlloc() {
-  return std::make_unique<LLVMGPUPadDynamicAllocPass>();
+std::unique_ptr<OperationPass<func::FuncOp>> createPadDynamicAlloc() {
+  return std::make_unique<PadDynamicAllocPass>();
 }
 
 }  // namespace iree_compiler

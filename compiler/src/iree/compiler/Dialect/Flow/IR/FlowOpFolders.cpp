@@ -405,18 +405,6 @@ void DispatchTensorStoreOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
-// flow.dispatch.workgroup.*
-//===----------------------------------------------------------------------===//
-
-OpFoldResult DispatchWorkgroupRankOp::fold(ArrayRef<Attribute> operands) {
-  if (auto dispatchOp = (*this)->getParentOfType<DispatchWorkgroupsOp>()) {
-    return IntegerAttr::get(IndexType::get(getContext()),
-                            APInt(64, dispatchOp.workgroup_count().size()));
-  }
-  return {};
-}
-
-//===----------------------------------------------------------------------===//
 // Tensor ops
 //===----------------------------------------------------------------------===//
 

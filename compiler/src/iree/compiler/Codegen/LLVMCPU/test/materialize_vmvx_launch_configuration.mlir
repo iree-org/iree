@@ -9,7 +9,7 @@
 ]>
 hal.executable private @matmul_static  {
   hal.executable.variant @vmvx_bytecode_fb, target = <"vmvx", "vmvx-bytecode-fb"> {
-    hal.executable.entry_point public @matmul_static layout(#executable_layout)
+    hal.executable.export public @matmul_static layout(#executable_layout)
     builtin.module {
       func.func @matmul_static() {
         %cst = arith.constant 0.0 : f32
@@ -34,7 +34,7 @@ hal.executable private @matmul_static  {
 
 //  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
-//      CHECK: hal.executable.entry_point public @matmul_static
+//      CHECK: hal.executable.export public @matmul_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -49,7 +49,7 @@ hal.executable private @matmul_static  {
 ]>
 hal.executable @copy_op_dynamic {
   hal.executable.variant @vmvx_bytecode_fb, target = <"vmvx", "vmvx-bytecode-fb"> {
-    hal.executable.entry_point @copy_op_dynamic layout(#executable_layout)
+    hal.executable.export @copy_op_dynamic layout(#executable_layout)
     builtin.module {
       func.func @copy_op_dynamic() {
         %d0 = hal.interface.constant.load[0] : index
@@ -75,7 +75,7 @@ hal.executable @copy_op_dynamic {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
-//      CHECK: hal.executable.entry_point public @copy_op_dynamic
+//      CHECK: hal.executable.export public @copy_op_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
@@ -90,7 +90,7 @@ hal.executable @copy_op_dynamic {
 ]>
 hal.executable private @static_1d_fft_stage2  {
   hal.executable.variant @vmvx_bytecode_fb, target = <"vmvx", "vmvx-bytecode-fb"> {
-    hal.executable.entry_point @static_1d_fft_stage2 layout(#executable_layout)
+    hal.executable.export @static_1d_fft_stage2 layout(#executable_layout)
     builtin.module {
       func.func @static_1d_fft_stage2() {
         %c0 = arith.constant 0 : index
@@ -112,7 +112,7 @@ hal.executable private @static_1d_fft_stage2  {
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64]{{\]}}>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
-//       CHECK: hal.executable.entry_point public @static_1d_fft_stage2
+//       CHECK: hal.executable.export public @static_1d_fft_stage2
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: func.func @static_1d_fft_stage2()
 //       CHECK:   iree_linalg_ext.fft

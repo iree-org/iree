@@ -1,8 +1,8 @@
-// RUN: iree-opt --split-input-file --iree-hal-resolve-entry-point-ordinals %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-hal-resolve-export-ordinals %s | FileCheck %s
 
 hal.executable @exe {
   hal.executable.variant @target, target = <"vmvx", "vmvx-bytecode-fb"> {
-    hal.executable.entry_point @entry ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [
+    hal.executable.export @entry ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [
       #hal.descriptor_set.layout<0, bindings = [
         #hal.descriptor_set.binding<0, storage_buffer>,
         #hal.descriptor_set.binding<1, storage_buffer>
@@ -57,7 +57,7 @@ func.func @dispatch_already_using_ordinals(
 
 hal.executable @exe {
   hal.executable.variant @target, target = <"vmvx", "vmvx-bytecode-fb"> {
-    hal.executable.entry_point @entry ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [
+    hal.executable.export @entry ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [
       #hal.descriptor_set.layout<0, bindings = [
         #hal.descriptor_set.binding<0, storage_buffer>,
         #hal.descriptor_set.binding<1, storage_buffer>

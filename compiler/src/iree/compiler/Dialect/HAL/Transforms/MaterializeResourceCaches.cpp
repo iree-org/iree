@@ -53,10 +53,9 @@ class MaterializeResourceCachesPass
     for (auto executableOp : executableOps) {
       for (auto variantOp :
            executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
-        for (auto entryPointOp :
-             variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
-          defineExecutableLayoutOp(entryPointOp.getLoc(),
-                                   entryPointOp.layout());
+        for (auto exportOp :
+             variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+          defineExecutableLayoutOp(exportOp.getLoc(), exportOp.layout());
         }
       }
     }
@@ -206,10 +205,10 @@ class MaterializeResourceCachesPass
       // Gather each of the executable layouts needed for each entry point in
       // the executable.
       SmallVector<Value, 8> executableLayoutValues;
-      for (auto entryPointOp :
-           executableVariantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
-        auto executableLayoutGlobalOp = defineExecutableLayoutOp(
-            executableOp.getLoc(), entryPointOp.layout());
+      for (auto exportOp :
+           executableVariantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+        auto executableLayoutGlobalOp =
+            defineExecutableLayoutOp(executableOp.getLoc(), exportOp.layout());
         executableLayoutValues.push_back(
             caseBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
                 loc, ExecutableLayoutType::get(loc.getContext()),

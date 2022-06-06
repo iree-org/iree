@@ -14,7 +14,7 @@ hal.executable private @matmul_tensors  {
     native_vector_size = 16 : index,
     target_triple = "aarch64-unknown-unknown-eabi-elf"
   }> {
-    hal.executable.entry_point @matmul_tensors layout(#executable_layout)
+    hal.executable.export @matmul_tensors layout(#executable_layout)
     builtin.module {
       func.func @matmul_tensors() {
         %c0 = arith.constant 0 : index
@@ -46,7 +46,7 @@ hal.executable private @matmul_tensors  {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [16, 4, 64], [4, 4, 4]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
-//      CHECK: hal.executable.entry_point public @matmul_tensors
+//      CHECK: hal.executable.export public @matmul_tensors
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -66,7 +66,7 @@ hal.executable private @batch_matmul_tensors {
     native_vector_size = 16 : index,
     target_triple = "aarch64-unknown-unknown-eabi-elf"
   }> {
-    hal.executable.entry_point @batch_matmul_tensors layout(#executable_layout)
+    hal.executable.export @batch_matmul_tensors layout(#executable_layout)
     builtin.module {
       func.func @batch_matmul_tensors() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -97,7 +97,7 @@ hal.executable private @batch_matmul_tensors {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 64, 0], [1, 16, 4, 64], [1, 4, 4, 4]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
-//      CHECK: hal.executable.entry_point public @batch_matmul_tensors
+//      CHECK: hal.executable.export public @batch_matmul_tensors
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:  linalg.batch_matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -117,7 +117,7 @@ hal.executable private @matmul_static {
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-linux-android30"
   }> {
-    hal.executable.entry_point public @matmul_static layout(#executable_layout)
+    hal.executable.export public @matmul_static layout(#executable_layout)
     builtin.module {
       func.func @matmul_static() {
         %cst = arith.constant 0.0 : f32
@@ -145,7 +145,7 @@ hal.executable private @matmul_static {
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[49, 8, 0], [7, 4, 60], [4, 4, 4]{{\]}}>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
-//       CHECK: hal.executable.entry_point public @matmul_static
+//       CHECK: hal.executable.export public @matmul_static
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.matmul
 //  CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -165,7 +165,7 @@ hal.executable private @restrict_num_workgroups {
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-linux-android30"
   }> {
-    hal.executable.entry_point public @restrict_num_workgroups layout(#executable_layout)
+    hal.executable.export public @restrict_num_workgroups layout(#executable_layout)
     builtin.module {
       func.func @restrict_num_workgroups() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -193,7 +193,7 @@ hal.executable private @restrict_num_workgroups {
 }
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 1, 7, 64, 0, 0], [1, 1, 7, 8, 0, 0], [0, 0, 0, 0, 1, 1]]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
-//       CHECK: hal.executable.entry_point public @restrict_num_workgroups
+//       CHECK: hal.executable.export public @restrict_num_workgroups
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.depthwise_conv_2d_nhwc_hwc
 //  CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -214,7 +214,7 @@ hal.executable private @matmul_aarch_i8_i8_i32_static  {
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-linux-android30"
   }> {
-  hal.executable.entry_point public @matmul_aarch_i8_i8_i32_static layout(#executable_layout)
+  hal.executable.export public @matmul_aarch_i8_i8_i32_static layout(#executable_layout)
     builtin.module {
       func.func @matmul_aarch_i8_i8_i32_static() {
         %c0_i32 = arith.constant 0 : i32
@@ -236,7 +236,7 @@ hal.executable private @matmul_aarch_i8_i8_i32_static  {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [4, 16, 0], [0, 0, 4]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
-//      CHECK: hal.executable.entry_point public @matmul_aarch_i8_i8_i32_static
+//      CHECK: hal.executable.export public @matmul_aarch_i8_i8_i32_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
@@ -256,7 +256,7 @@ hal.executable private @matmul_aarch_i8_i8_i32_dynamic  {
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-linux-android30"
   }> {
-  hal.executable.entry_point public @matmul_aarch_i8_i8_i32_dynamic layout(#executable_layout)
+  hal.executable.export public @matmul_aarch_i8_i8_i32_dynamic layout(#executable_layout)
     builtin.module {
       func.func @matmul_aarch_i8_i8_i32_dynamic() {
         %c0 = arith.constant 0 : index
@@ -286,7 +286,7 @@ hal.executable private @matmul_aarch_i8_i8_i32_dynamic  {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [4, 16, 0], [0, 0, 4]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
-//      CHECK: hal.executable.entry_point public @matmul_aarch_i8_i8_i32_dynamic
+//      CHECK: hal.executable.export public @matmul_aarch_i8_i8_i32_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
 // CHECK-SAME:       lowering_config = #[[CONFIG]]

@@ -13,7 +13,7 @@ hal.executable private @matvec_static  {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.entry_point @matvec_static layout(#executable_layout)
+    hal.executable.export @matvec_static layout(#executable_layout)
     builtin.module {
       func.func @matvec_static() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -34,7 +34,7 @@ hal.executable private @matvec_static  {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 0], [32, 0], [0, 16]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.entry_point public @matvec_static
+//      CHECK: hal.executable.export public @matvec_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matvec
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -54,7 +54,7 @@ hal.executable private @matvec_dynamic  {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.entry_point @matvec_dynamic layout(#executable_layout)
+    hal.executable.export @matvec_dynamic layout(#executable_layout)
     builtin.module {
       func.func @matvec_dynamic() {
         %c0 = arith.constant 0 : index
@@ -83,7 +83,7 @@ hal.executable private @matvec_dynamic  {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 0], [1, 0], [0, 1]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.entry_point public @matvec_dynamic
+//      CHECK: hal.executable.export public @matvec_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matvec
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -103,7 +103,7 @@ hal.executable private @dot_static  {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.entry_point @dot_static layout(#executable_layout)
+    hal.executable.export @dot_static layout(#executable_layout)
     builtin.module {
       func.func @dot_static() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -124,7 +124,7 @@ hal.executable private @dot_static  {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0], [0], [16]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.entry_point public @dot_static
+//      CHECK: hal.executable.export public @dot_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.dot
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -144,7 +144,7 @@ hal.executable private @dot_dynamic  {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.entry_point @dot_dynamic layout(#executable_layout)
+    hal.executable.export @dot_dynamic layout(#executable_layout)
     builtin.module {
       func.func @dot_dynamic() {
         %c0 = arith.constant 0 : index
@@ -169,7 +169,7 @@ hal.executable private @dot_dynamic  {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0], [0], [1]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.entry_point public @dot_dynamic
+//      CHECK: hal.executable.export public @dot_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.dot
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -189,7 +189,7 @@ hal.executable private @add {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.entry_point @add layout(#executable_layout)
+    hal.executable.export @add layout(#executable_layout)
     builtin.module {
       func.func @add() {
         %c0 = arith.constant 0 : index
@@ -219,7 +219,7 @@ hal.executable private @add {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [1, 1], [0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.entry_point public @add
+//      CHECK: hal.executable.export public @add
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -241,7 +241,7 @@ hal.executable private @add4D  {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.entry_point @add4D layout(#executable_layout)
+    hal.executable.export @add4D layout(#executable_layout)
     builtin.module {
       func.func @add4D() {
         %d0 = hal.interface.constant.load[0] : index
@@ -277,7 +277,7 @@ hal.executable private @add4D  {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 64, 64, 64], [1, 1, 1, 1], [0, 0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.entry_point public @add4D
+//      CHECK: hal.executable.export public @add4D
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -297,7 +297,7 @@ hal.executable private @add_static {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.entry_point @add_static layout(#executable_layout)
+    hal.executable.export @add_static layout(#executable_layout)
     builtin.module {
       func.func @add_static() {
         %c0 = arith.constant 0 : index
@@ -318,7 +318,7 @@ hal.executable private @add_static {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 8, 16, 64], [1, 1, 1, 4], [0, 0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.entry_point public @add_static
+//      CHECK: hal.executable.export public @add_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -338,7 +338,7 @@ hal.executable private @add_static {
 ]>
 hal.executable private @preset_config_matmul_tensors  {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.entry_point @preset_config layout(#executable_layout)
+    hal.executable.export @preset_config layout(#executable_layout)
     builtin.module {
       func.func @preset_config() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -367,7 +367,7 @@ hal.executable private @preset_config_matmul_tensors  {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [32, 32, 0], [0, 0, 32]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.entry_point
+//      CHECK: hal.executable.export
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: func.func @preset_config
 //      CHECK:   linalg.matmul
@@ -383,7 +383,7 @@ hal.executable private @preset_config_matmul_tensors  {
 ]>
 hal.executable @copy_op_dynamic {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.entry_point @copy_op_dynamic layout(#executable_layout)
+    hal.executable.export @copy_op_dynamic layout(#executable_layout)
     builtin.module {
       func.func @copy_op_dynamic() {
         %d0 = hal.interface.constant.load[0] : index
@@ -410,7 +410,7 @@ hal.executable @copy_op_dynamic {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [1, 1], [0, 0]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize>
-//      CHECK: hal.executable.entry_point public @copy_op_dynamic
+//      CHECK: hal.executable.export public @copy_op_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
@@ -425,7 +425,7 @@ hal.executable @copy_op_dynamic {
 ]>
 hal.executable private @static_1d_fft_stage2  {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.entry_point @static_1d_fft_stage2 layout(#executable_layout)
+    hal.executable.export @static_1d_fft_stage2 layout(#executable_layout)
     builtin.module {
       func.func @static_1d_fft_stage2() {
         %c0 = arith.constant 0 : index
@@ -447,7 +447,7 @@ hal.executable private @static_1d_fft_stage2  {
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64]{{\]}}>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
-//       CHECK: hal.executable.entry_point public @static_1d_fft_stage2
+//       CHECK: hal.executable.export public @static_1d_fft_stage2
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: func.func @static_1d_fft_stage2()
 //       CHECK:   iree_linalg_ext.fft
@@ -463,7 +463,7 @@ hal.executable private @static_1d_fft_stage2  {
 ]>
 hal.executable private @static_3d_fft_stage3  {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.entry_point @static_3d_fft_stage3 layout(#executable_layout)
+    hal.executable.export @static_3d_fft_stage3 layout(#executable_layout)
     builtin.module {
       func.func @static_3d_fft_stage3() {
         %c3 = arith.constant 3 : index
@@ -484,7 +484,7 @@ hal.executable private @static_3d_fft_stage3  {
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 64]{{\]}}>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
-//       CHECK: hal.executable.entry_point public @static_3d_fft_stage3
+//       CHECK: hal.executable.export public @static_3d_fft_stage3
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: func.func @static_3d_fft_stage3()
 //       CHECK:   iree_linalg_ext.fft
@@ -501,7 +501,7 @@ hal.executable private @static_3d_fft_stage3  {
 ]>
 hal.executable private @outs_fusion {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.entry_point @outs_fusion_fn layout(#executable_layout)
+    hal.executable.export @outs_fusion_fn layout(#executable_layout)
     builtin.module {
       func.func @outs_fusion_fn() {
         %cst = arith.constant 0.0 : f32
@@ -546,7 +546,7 @@ hal.executable private @outs_fusion {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [1, 1, 0], [0, 0, 1]{{\]}}>
 //      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.entry_point public @outs_fusion_fn
+//      CHECK: hal.executable.export public @outs_fusion_fn
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK: func.func @outs_fusion_fn()
 //      CHECK:   linalg.generic
@@ -569,7 +569,7 @@ hal.executable private @conv_dynamic {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.entry_point public @conv_dynamic layout(#executable_layout)
+    hal.executable.export public @conv_dynamic layout(#executable_layout)
     builtin.module {
       func.func @conv_dynamic() {
         %N = hal.interface.constant.load[0] : index
@@ -606,7 +606,7 @@ hal.executable private @conv_dynamic {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 64, 64, 64, 0, 0, 0], [1, 1, 1, 1, 0, 0, 0], [0, 0, 0, 0, 1, 1, 1]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
-//      CHECK: hal.executable.entry_point public @conv_dynamic
+//      CHECK: hal.executable.export public @conv_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.conv_2d_nhwc_hwcf
 //      CHECK:         lowering_config = #[[CONFIG]]
@@ -626,7 +626,7 @@ hal.executable private @conv_static {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.entry_point public @conv_static layout(#executable_layout)
+    hal.executable.export public @conv_static layout(#executable_layout)
     builtin.module {
       func.func @conv_static() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -648,7 +648,7 @@ hal.executable private @conv_static {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 28, 28, 16, 0, 0, 0], [1, 1, 4, 8, 0, 0, 0], [0, 0, 0, 0, 1, 1, 3]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
-//      CHECK: hal.executable.entry_point public @conv_static
+//      CHECK: hal.executable.export public @conv_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.conv_2d_nhwc_hwcf
 
@@ -668,7 +668,7 @@ hal.executable private @depthwise_conv_static {
     native_vector_size = 64 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.entry_point public @depthwise_conv_static layout(#executable_layout)
+    hal.executable.export public @depthwise_conv_static layout(#executable_layout)
     builtin.module {
       func.func @depthwise_conv_static() {
         %cst = arith.constant 0.0 : f32
@@ -695,7 +695,7 @@ hal.executable private @depthwise_conv_static {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 40, 40, 48, 0, 0], [1, 1, 8, 16, 0, 0], [0, 0, 0, 0, 1, 3]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
-//      CHECK: hal.executable.entry_point public @depthwise_conv_static
+//      CHECK: hal.executable.export public @depthwise_conv_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.depthwise_conv_2d_nhwc_hwc
 // CHECK-SAME:       lowering_config  = #[[CONFIG]]
@@ -714,7 +714,7 @@ hal.executable private @generic_static {
     native_vector_size = 64 : index,
     target_triple = "x86_64-pc-linux-gnu"
   }> {
-    hal.executable.entry_point public @generic_static layout(#executable_layout)
+    hal.executable.export public @generic_static layout(#executable_layout)
     builtin.module {
       func.func @generic_static() {
         %input_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
@@ -740,7 +740,7 @@ hal.executable private @generic_static {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 32], [16, 16], [0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.entry_point public @generic_static
+//      CHECK: hal.executable.export public @generic_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
 //      CHECK:       lowering_config = #[[CONFIG]]
@@ -762,7 +762,7 @@ hal.executable private @matmul_static  {
       native_vector_size = 16 : index,
       target_triple = "x86_64-unknown-unknown-eabi-elf"
     }> {
-    hal.executable.entry_point public @matmul_static layout(#executable_layout)
+    hal.executable.export public @matmul_static layout(#executable_layout)
     builtin.module {
       func.func @matmul_static() {
         %cst = arith.constant 0.0 : f32
@@ -787,7 +787,7 @@ hal.executable private @matmul_static  {
 
 //  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 64, 0], [8, 32, 0], [0, 0, 16]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
-//      CHECK: hal.executable.entry_point public @matmul_static
+//      CHECK: hal.executable.export public @matmul_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -810,7 +810,7 @@ hal.executable private @matmul_static  {
 >
 hal.executable private @reduction {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.entry_point public @predict_dispatch_86 ordinal(0) layout(#executable_layout)
+    hal.executable.export public @predict_dispatch_86 ordinal(0) layout(#executable_layout)
     builtin.module  {
       func.func @predict_dispatch_86(%arg0: !flow.dispatch.tensor<readonly:7x7x2048xf32>,
           %arg1: !flow.dispatch.tensor<writeonly:7xf32>) {
@@ -845,7 +845,7 @@ hal.executable private @reduction {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 0, 0], [1, 0, 0], [0, 1, 4]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.entry_point public @predict_dispatch_86
+//      CHECK: hal.executable.export public @predict_dispatch_86
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic {indexing_maps = [#{{.+}}, #{{.+}}], iterator_types = ["parallel", "reduction", "reduction"]}
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -867,7 +867,7 @@ hal.executable private @matmul_i8_i8_i32_static  {
       native_vector_size = 4 : index,
       target_triple = "x86_64-unknown-unknown-eabi-elf"
     }> {
-    hal.executable.entry_point public @matmul_i8_i8_i32_static layout(#executable_layout)
+    hal.executable.export public @matmul_i8_i8_i32_static layout(#executable_layout)
     builtin.module {
       func.func @matmul_i8_i8_i32_static() {
         %c0_i32 = arith.constant 0 : i32
@@ -889,7 +889,7 @@ hal.executable private @matmul_i8_i8_i32_static  {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 128, 0], [8, 32, 0], [0, 0, 16]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
-//      CHECK: hal.executable.entry_point public @matmul_i8_i8_i32_static
+//      CHECK: hal.executable.export public @matmul_i8_i8_i32_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
@@ -914,7 +914,7 @@ hal.executable private @matmul_i8_i8_i32_static  {
 #map1 = affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>
 hal.executable private @gemm_unit_N {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.entry_point public @gemm_unit_N ordinal(0) layout(#executable_layout)
+    hal.executable.export public @gemm_unit_N ordinal(0) layout(#executable_layout)
     builtin.module  {
       func.func @gemm_unit_N() {
         %c0 = arith.constant 0 : index
@@ -942,7 +942,7 @@ hal.executable private @gemm_unit_N {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 0, 0], [8, 32, 0], [0, 0, 16]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
-//      CHECK: hal.executable.entry_point public @gemm_unit_N
+//      CHECK: hal.executable.export public @gemm_unit_N
 // CHECK-SAME:       translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
@@ -965,7 +965,7 @@ hal.executable private @gemm_unit_N {
 >
 hal.executable private @gemm_unit_M_unit_N {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.entry_point public @gemm_unit_M_unit_N ordinal(0) layout(#executable_layout)
+    hal.executable.export public @gemm_unit_M_unit_N ordinal(0) layout(#executable_layout)
     builtin.module  {
       func.func @gemm_unit_M_unit_N() {
         %c0 = arith.constant 0 : index
@@ -989,7 +989,7 @@ hal.executable private @gemm_unit_M_unit_N {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0], [8, 32, 0], [0, 0, 16]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
-//      CHECK: hal.executable.entry_point public @gemm_unit_M_unit_N
+//      CHECK: hal.executable.export public @gemm_unit_M_unit_N
 // CHECK-SAME:       translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
@@ -1012,7 +1012,7 @@ hal.executable private @gemm_unit_M_unit_N {
 >
 hal.executable private @matmul_odd {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.entry_point public @matmul_odd ordinal(0) layout(#executable_layout)
+    hal.executable.export public @matmul_odd ordinal(0) layout(#executable_layout)
     builtin.module {
       func.func @matmul_odd() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -1035,7 +1035,7 @@ hal.executable private @matmul_odd {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[11, 7, 0], [8, 32, 0], [0, 0, 16]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
-//      CHECK: hal.executable.entry_point public @matmul_odd
+//      CHECK: hal.executable.export public @matmul_odd
 // CHECK-SAME:       translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
@@ -1055,7 +1055,7 @@ hal.executable private @generic_unit_dims_dynamic {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.entry_point @generic_unit_dims_dynamic layout(#executable_layout)
+    hal.executable.export @generic_unit_dims_dynamic layout(#executable_layout)
     builtin.module {
       func.func @generic_unit_dims_dynamic() {
         %c0 = arith.constant 0 : index
@@ -1090,7 +1090,7 @@ hal.executable private @generic_unit_dims_dynamic {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0, 0, 64, 64, 0, 64], [0, 1, 0, 0, 1, 1, 0, 1], [0, 0, 0, 0, 0, 0, 0, 0]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.entry_point public @generic_unit_dims_dynamic
+//      CHECK: hal.executable.export public @generic_unit_dims_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -1110,7 +1110,7 @@ hal.executable private @reduce_to_scalar_static {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.entry_point @reduce_to_scalar_static layout(#executable_layout)
+    hal.executable.export @reduce_to_scalar_static layout(#executable_layout)
     builtin.module {
       func.func @reduce_to_scalar_static() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -1133,7 +1133,7 @@ hal.executable private @reduce_to_scalar_static {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0], [0], [4]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.entry_point public @reduce_to_scalar_static
+//      CHECK: hal.executable.export public @reduce_to_scalar_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -1153,7 +1153,7 @@ hal.executable private @reduce_to_scalar_dynamic {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.entry_point @reduce_to_scalar_dynamic layout(#executable_layout)
+    hal.executable.export @reduce_to_scalar_dynamic layout(#executable_layout)
     builtin.module {
       func.func @reduce_to_scalar_dynamic() {
         %c0 = arith.constant 0 : index
@@ -1178,7 +1178,7 @@ hal.executable private @reduce_to_scalar_dynamic {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0], [0], [1]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.entry_point public @reduce_to_scalar_dynamic
+//      CHECK: hal.executable.export public @reduce_to_scalar_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -1198,7 +1198,7 @@ hal.executable private @scalar {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.entry_point @scalar layout(#executable_layout)
+    hal.executable.export @scalar layout(#executable_layout)
     builtin.module {
       func.func @scalar() {
         %c0 = arith.constant 0 : index
@@ -1222,7 +1222,7 @@ hal.executable private @scalar {
   }
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
-//      CHECK: hal.executable.entry_point public @scalar
+//      CHECK: hal.executable.export public @scalar
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 
 // -----
@@ -1245,7 +1245,7 @@ hal.executable private @scalar {
 
 hal.executable private @transpose_8x8 {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.entry_point @transpose_8x8 layout(#executable_layout)
+    hal.executable.export @transpose_8x8 layout(#executable_layout)
     builtin.module {
       func.func @transpose_8x8() {
         %cst = arith.constant 0.000000e+00 : f32

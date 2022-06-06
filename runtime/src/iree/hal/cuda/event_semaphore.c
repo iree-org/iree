@@ -10,11 +10,11 @@
 
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/utils/semaphore_base.h"
 
 typedef struct iree_hal_cuda_semaphore_t {
-  iree_hal_resource_t resource;
+  iree_hal_semaphore_t base;
   iree_hal_cuda_context_wrapper_t* context;
-  uint64_t initial_value;
 } iree_hal_cuda_semaphore_t;
 
 static const iree_hal_semaphore_vtable_t iree_hal_cuda_semaphore_vtable;
@@ -36,11 +36,10 @@ iree_status_t iree_hal_cuda_semaphore_create(
   iree_status_t status = iree_allocator_malloc(
       context->host_allocator, sizeof(*semaphore), (void**)&semaphore);
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_cuda_semaphore_vtable,
-                                 &semaphore->resource);
+    iree_hal_semaphore_initialize(&iree_hal_cuda_semaphore_vtable,
+                                  &semaphore->base);
     semaphore->context = context;
-    semaphore->initial_value = initial_value;
-    *out_semaphore = (iree_hal_semaphore_t*)semaphore;
+    *out_semaphore = &semaphore->base;
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -54,6 +53,7 @@ static void iree_hal_cuda_semaphore_destroy(
   iree_allocator_t host_allocator = semaphore->context->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_hal_semaphore_deinitialize(&semaphore->base);
   iree_allocator_free(host_allocator, semaphore);
 
   IREE_TRACE_ZONE_END(z0);
@@ -68,19 +68,31 @@ static iree_status_t iree_hal_cuda_semaphore_query(
 
 static iree_status_t iree_hal_cuda_semaphore_signal(
     iree_hal_semaphore_t* base_semaphore, uint64_t new_value) {
+  iree_hal_cuda_semaphore_t* semaphore =
+      iree_hal_cuda_semaphore_cast(base_semaphore);
   // TODO: Support semaphores completely. Return OK currently as everything is
   // synchronized for each submit to allow things to run.
+  iree_hal_semaphore_poll(&semaphore->base);
   return iree_ok_status();
 }
 
 static void iree_hal_cuda_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
-                                         iree_status_t status) {}
+                                         iree_status_t status) {
+  iree_hal_cuda_semaphore_t* semaphore =
+      iree_hal_cuda_semaphore_cast(base_semaphore);
+  // TODO: save status and mark timepoint as failed.
+  iree_status_ignore(status);
+  iree_hal_semaphore_poll(&semaphore->base);
+}
 
 static iree_status_t iree_hal_cuda_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
     iree_timeout_t timeout) {
+  iree_hal_cuda_semaphore_t* semaphore =
+      iree_hal_cuda_semaphore_cast(base_semaphore);
   // TODO: Support semaphores completely. Return OK currently as everything is
   // synchronized for each submit to allow things to run.
+  iree_hal_semaphore_poll(&semaphore->base);
   return iree_ok_status();
 }
 

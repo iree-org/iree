@@ -100,7 +100,7 @@ static bool isWorkgroupLoop(const LoopTilingAndDistributionInfo &info) {
 /// Infer the number of workgroups by looking at the tiled loop and the number
 /// of element per workgroups.
 static SmallVector<int64_t> getNumWorkgroup(
-    func::FuncOp funcOp, IREE::HAL::ExecutableEntryPointOp entryPointOp) {
+    func::FuncOp funcOp, IREE::HAL::ExecutableExportOp exportOp) {
   auto allLoops = getTiledAndDistributedLoopInfo(funcOp);
   auto wgLoops =
       llvm::to_vector<3>(llvm::make_filter_range(allLoops, isWorkgroupLoop));
@@ -123,7 +123,7 @@ static SmallVector<int64_t> getNumWorkgroup(
     if (step == 0) return SmallVector<int64_t>();
     workloadSize[tileInfo.processorDistributionDim] = (ub - lb) / step;
   }
-  auto translationInfo = getTranslationInfo(entryPointOp);
+  auto translationInfo = getTranslationInfo(exportOp);
   if (!translationInfo) return SmallVector<int64_t>();
 
   SmallVector<int64_t> workloadPerWorkgroup =
@@ -162,12 +162,11 @@ class RemoveSingleIterationLoopPass final
     : public RemoveSingleIterationLoopBase<RemoveSingleIterationLoopPass> {
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
-    FailureOr<IREE::HAL::ExecutableEntryPointOp> entryPointOp =
-        getEntryPoint(funcOp);
-    if (failed(entryPointOp)) return;
+    FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
+    if (failed(exportOp)) return;
 
-    SmallVector<int64_t> workgroupSize = getWorkgroupSize(*entryPointOp);
-    SmallVector<int64_t> numWorkgroups = getNumWorkgroup(funcOp, *entryPointOp);
+    SmallVector<int64_t> workgroupSize = getWorkgroupSize(*exportOp);
+    SmallVector<int64_t> numWorkgroups = getNumWorkgroup(funcOp, *exportOp);
 
     if (failed(removeOneTripTiledLoops(funcOp, workgroupSize, numWorkgroups))) {
       return signalPassFailure();

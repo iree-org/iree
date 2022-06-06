@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "iree/base/tracing.h"
+#include "iree/hal/utils/semaphore_base.h"
 
 // Sentinel used the semaphore has failed and an error status is set.
 #define IREE_HAL_SYNC_SEMAPHORE_FAILURE_VALUE UINT64_MAX
@@ -37,7 +38,7 @@ void iree_hal_sync_semaphore_state_deinitialize(
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_sync_semaphore_t {
-  iree_hal_resource_t resource;
+  iree_hal_semaphore_t base;
   iree_allocator_t host_allocator;
 
   // Shared across all semaphores.
@@ -77,8 +78,8 @@ iree_status_t iree_hal_sync_semaphore_create(
   iree_status_t status = iree_allocator_malloc(
       host_allocator, sizeof(*semaphore), (void**)&semaphore);
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_sync_semaphore_vtable,
-                                 &semaphore->resource);
+    iree_hal_semaphore_initialize(&iree_hal_sync_semaphore_vtable,
+                                  &semaphore->base);
     semaphore->host_allocator = host_allocator;
     semaphore->shared_state = shared_state;
 
@@ -86,7 +87,7 @@ iree_status_t iree_hal_sync_semaphore_create(
     semaphore->current_value = initial_value;
     semaphore->failure_status = iree_ok_status();
 
-    *out_semaphore = (iree_hal_semaphore_t*)semaphore;
+    *out_semaphore = &semaphore->base;
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -100,8 +101,10 @@ static void iree_hal_sync_semaphore_destroy(
   iree_allocator_t host_allocator = semaphore->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_free(semaphore->failure_status);
   iree_slim_mutex_deinitialize(&semaphore->mutex);
+  iree_status_ignore(semaphore->failure_status);
+
+  iree_hal_semaphore_deinitialize(&semaphore->base);
   iree_allocator_free(host_allocator, semaphore);
 
   IREE_TRACE_ZONE_END(z0);
@@ -132,7 +135,6 @@ static iree_status_t iree_hal_sync_semaphore_signal_unsafe(
     iree_hal_sync_semaphore_t* semaphore, uint64_t new_value) {
   if (new_value <= semaphore->current_value) {
     uint64_t current_value IREE_ATTRIBUTE_UNUSED = semaphore->current_value;
-    iree_slim_mutex_unlock(&semaphore->mutex);
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "semaphore values must be monotonically "
                             "increasing; current_value=%" PRIu64
@@ -152,25 +154,33 @@ static iree_status_t iree_hal_sync_semaphore_signal(
       iree_hal_sync_semaphore_cast(base_semaphore);
 
   iree_slim_mutex_lock(&semaphore->mutex);
+
   iree_status_t status =
       iree_hal_sync_semaphore_signal_unsafe(semaphore, new_value);
-  iree_slim_mutex_unlock(&semaphore->mutex);
-
-  if (iree_status_is_ok(status)) {
-    // Post a global notification so that any waiter will wake.
-    // TODO(#4680): make notifications per-semaphore; would make multi-wait
-    // impossible with iree_notification_t and we'd have to use wait handles.
-    iree_notification_post(&semaphore->shared_state->notification,
-                           IREE_ALL_WAITERS);
+  if (!iree_status_is_ok(status)) {
+    iree_slim_mutex_unlock(&semaphore->mutex);
+    return status;
   }
 
-  return status;
+  iree_slim_mutex_unlock(&semaphore->mutex);
+
+  // Notify timepoints of the new value.
+  iree_hal_semaphore_notify(&semaphore->base, new_value, IREE_STATUS_OK);
+
+  // Post a global notification so that any waiter will wake.
+  // TODO(#4680): make notifications per-semaphore; would make multi-wait
+  // impossible with iree_notification_t and we'd have to use wait handles.
+  iree_notification_post(&semaphore->shared_state->notification,
+                         IREE_ALL_WAITERS);
+
+  return iree_ok_status();
 }
 
 static void iree_hal_sync_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
                                          iree_status_t status) {
   iree_hal_sync_semaphore_t* semaphore =
       iree_hal_sync_semaphore_cast(base_semaphore);
+  const iree_status_code_t status_code = iree_status_code(status);
 
   iree_slim_mutex_lock(&semaphore->mutex);
 
@@ -189,6 +199,10 @@ static void iree_hal_sync_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
 
   iree_slim_mutex_unlock(&semaphore->mutex);
 
+  // Notify timepoints of the failure.
+  iree_hal_semaphore_notify(&semaphore->base,
+                            IREE_HAL_SYNC_SEMAPHORE_FAILURE_VALUE, status_code);
+
   iree_notification_post(&semaphore->shared_state->notification,
                          IREE_ALL_WAITERS);
 }
@@ -196,16 +210,36 @@ static void iree_hal_sync_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
 iree_status_t iree_hal_sync_semaphore_multi_signal(
     iree_hal_sync_semaphore_state_t* shared_state,
     const iree_hal_semaphore_list_t* semaphore_list) {
+  IREE_ASSERT_ARGUMENT(shared_state);
+  IREE_ASSERT_ARGUMENT(semaphore_list);
+  if (semaphore_list->count == 0) {
+    return iree_ok_status();
+  } else if (semaphore_list->count == 1) {
+    // Fast-path for a single semaphore.
+    return iree_hal_semaphore_signal(semaphore_list->semaphores[0],
+                                     semaphore_list->payload_values[0]);
+  }
+
   // Try to signal all semaphores, stopping if we encounter any issues.
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
     iree_hal_sync_semaphore_t* semaphore =
         iree_hal_sync_semaphore_cast(semaphore_list->semaphores[i]);
+
     iree_slim_mutex_lock(&semaphore->mutex);
     status = iree_hal_sync_semaphore_signal_unsafe(
         semaphore, semaphore_list->payload_values[i]);
+    if (!iree_status_is_ok(status)) {
+      iree_slim_mutex_unlock(&semaphore->mutex);
+      break;
+    }
+
     iree_slim_mutex_unlock(&semaphore->mutex);
-    if (!iree_status_is_ok(status)) break;
+
+    // Notify timepoints that the new value has been reached.
+    iree_hal_semaphore_notify(semaphore_list->semaphores[i],
+                              semaphore_list->payload_values[i],
+                              IREE_STATUS_OK);
   }
 
   // Notify all waiters that we've updated semaphores. They'll wake and check
@@ -332,10 +366,13 @@ static iree_status_t iree_hal_sync_semaphore_result_from_state(
     iree_hal_sync_semaphore_t* semaphore =
         iree_hal_sync_semaphore_cast(semaphore_list->semaphores[i]);
     iree_slim_mutex_lock(&semaphore->mutex);
-    if (!iree_status_is_ok(semaphore->failure_status)) {
+    const uint64_t current_value = semaphore->current_value;
+    const iree_status_code_t current_status_code =
+        iree_status_code(semaphore->failure_status);
+    if (current_status_code != IREE_STATUS_OK) {
       // Semaphore has failed.
       any_failed = true;
-    } else if (semaphore->current_value < semaphore_list->payload_values[i]) {
+    } else if (current_value < semaphore_list->payload_values[i]) {
       // Deadline expired before the semaphore was signaled.
       all_signaled = false;
     } else {

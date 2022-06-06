@@ -91,6 +91,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/utils:buffer_transfer",
         "//runtime/src/iree/hal/utils:resource_set",
+        "//runtime/src/iree/hal/utils:semaphore_base",
         "//runtime/src/iree/hal/vulkan/builtin",
         "//runtime/src/iree/hal/vulkan/util:arena",
         "//runtime/src/iree/hal/vulkan/util:intrusive_list",

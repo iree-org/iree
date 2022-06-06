@@ -76,8 +76,8 @@ static LogicalResult verifyLoweringConfiguration(
 
 static LogicalResult verifyEntryPoint(
     ModuleOp moduleOp, IREE::Codegen::TranslationInfoAttr translationInfo,
-    IREE::HAL::ExecutableEntryPointOp entryPointOp) {
-  Optional<mlir::ArrayAttr> workgroupSizeAttr = entryPointOp.workgroup_size();
+    IREE::HAL::ExecutableExportOp exportOp) {
+  Optional<mlir::ArrayAttr> workgroupSizeAttr = exportOp.workgroup_size();
 
   if (workgroupSizeAttr.hasValue()) {
     std::array<int64_t, 3> workgroupSizes;
@@ -116,13 +116,13 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   // TODO(ravishankarm): This is strange that this is not enforced
   // structurally, but something to address later on. For now this restriction
   // is fine.
-  llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
+  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
   Optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
-  for (auto &it : entryPoints) {
-    auto entryPointOp = it.second;
+  for (auto &it : exportOps) {
+    auto exportOp = it.second;
     if (IREE::Codegen::TranslationInfoAttr currTranslationInfo =
-            getTranslationInfo(entryPointOp)) {
+            getTranslationInfo(exportOp)) {
       if (translationInfo) {
         if (currTranslationInfo != translationInfo.getValue()) {
           moduleOp.emitOpError(
@@ -135,8 +135,7 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
 
       // Verify the properties of each entry point based on the target
       // pipeline.
-      if (failed(
-              verifyEntryPoint(moduleOp, currTranslationInfo, entryPointOp))) {
+      if (failed(verifyEntryPoint(moduleOp, currTranslationInfo, exportOp))) {
         return signalPassFailure();
       }
     }

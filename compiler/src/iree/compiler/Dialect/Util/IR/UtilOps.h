@@ -63,6 +63,17 @@ void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
                      Attribute attr);
 
 //===----------------------------------------------------------------------===//
+// custom<SymbolAlias>($sym_name, $alias)
+//===----------------------------------------------------------------------===//
+//  @foo            sym_name: @foo, alias: @foo
+//  @foo as("bar")  sym_name: @bar, alias: @foo
+
+ParseResult parseSymbolAlias(OpAsmParser &parser, StringAttr &sym_name,
+                             FlatSymbolRefAttr &alias);
+void printSymbolAlias(OpAsmPrinter &p, Operation *op, StringAttr sym_name,
+                      FlatSymbolRefAttr alias);
+
+//===----------------------------------------------------------------------===//
 // custom<TypeAlias>($encoding_type, $storage_type)
 //===----------------------------------------------------------------------===//
 // some.op custom<TypeAlias>($encoding_type, $storage_type)

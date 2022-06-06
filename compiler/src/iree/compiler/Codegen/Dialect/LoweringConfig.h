@@ -40,46 +40,44 @@ namespace mlir {
 namespace iree_compiler {
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting iree_codegen.translation_info attribute on the
-// `hal.executable.entry_point`
+// `hal.executable.export`
 // ===----------------------------------------------------------------------===//
 
 /// Gets the translate executable info attribute value associated with
-/// `entryPointOp`. It expects that the attribute is stored using the identifier
+/// `exportOp`. It expects that the attribute is stored using the identifier
 /// `translation_info`.
 IREE::Codegen::TranslationInfoAttr getTranslationInfo(
-    IREE::HAL::ExecutableEntryPointOp entryPointOp);
+    IREE::HAL::ExecutableExportOp exportOp);
 /// Returns the translation info for the `funcOp` (by looking at the entry
 /// point). Returns `nullptr` on failure.
 inline IREE::Codegen::TranslationInfoAttr getTranslationInfo(
     func::FuncOp funcOp) {
-  FailureOr<IREE::HAL::ExecutableEntryPointOp> entryPointOp =
-      getEntryPoint(funcOp);
-  if (failed(entryPointOp)) return nullptr;
-  return getTranslationInfo(*entryPointOp);
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
+  if (failed(exportOp)) return nullptr;
+  return getTranslationInfo(*exportOp);
 }
 
-/// Returns the workgroup size specified on the `entryPointOp`.
-SmallVector<int64_t> getWorkgroupSize(
-    IREE::HAL::ExecutableEntryPointOp entryPointOp);
+/// Returns the workgroup size specified on the `exportOp`.
+SmallVector<int64_t> getWorkgroupSize(IREE::HAL::ExecutableExportOp exportOp);
 
 /// Set the translate executable info with the entry point op. Overwrites the
 /// existing attributes.
 // TODO(ravishankarm, benvanik): Eventually all the information needed for the
 // lowering will be consolidated into a single attribute with richer
 // information.
-void setTranslationInfo(IREE::HAL::ExecutableEntryPointOp entryPointOp,
+void setTranslationInfo(IREE::HAL::ExecutableExportOp exportOp,
                         IREE::Codegen::TranslationInfoAttr translationInfo,
                         ArrayRef<int64_t> workgroupSize = {});
 inline void setTranslationInfo(
     func::FuncOp entryPointFn,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize = {}) {
-  FailureOr<IREE::HAL::ExecutableEntryPointOp> entryPointOp =
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
       getEntryPoint(entryPointFn);
-  return setTranslationInfo(*entryPointOp, translationInfo, workgroupSize);
+  return setTranslationInfo(*exportOp, translationInfo, workgroupSize);
 }
 
-/// Sets the translation info on the `hal.executable.entry_point` op
+/// Sets the translation info on the `hal.executable.export` op
 /// corresponding to the `entryPointFn`. Returns failure if a translation info
 /// is already set on the entry point op and is incompatible with what is being
 /// set.
@@ -88,12 +86,12 @@ inline void setTranslationInfo(
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workloadPerWorkgroup, ArrayRef<int64_t> workgroupSize,
     unsigned softwarePipelineDepth = 0) {
-  FailureOr<IREE::HAL::ExecutableEntryPointOp> entryPointOp =
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
       getEntryPoint(entryPointFn);
   MLIRContext *context = entryPointFn.getContext();
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       context, passPipeline, workloadPerWorkgroup);
-  setTranslationInfo(*entryPointOp, translationInfo, workgroupSize);
+  setTranslationInfo(*exportOp, translationInfo, workgroupSize);
 }
 
 //===----------------------------------------------------------------------===//

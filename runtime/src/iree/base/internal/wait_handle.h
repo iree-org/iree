@@ -232,7 +232,7 @@ void iree_event_set(iree_event_t* event);
 // Resetting an event that is already reset has no effect.
 void iree_event_reset(iree_event_t* event);
 
-// Returns a wait_source reference to |event|.
+// Returns a wait source reference to |event|.
 // The event must be kept live for as long as the reference is live.
 iree_wait_source_t iree_event_await(iree_event_t* event);
 
