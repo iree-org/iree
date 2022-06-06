@@ -256,6 +256,7 @@ void ConstExprHoistingPolicy::initialize() {
 
   // Work iteratively until converged.
   for (int i = 0;; ++i) {
+    (void)i;
     bool madeChange = false;
     for (auto *info : worklist) {
       Decision *decision = getDecision(info);

@@ -14,7 +14,7 @@ hal.executable @copy_as_generic {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @copy_as_generic layout(#executable_layout)
+    hal.executable.export @copy_as_generic layout(#executable_layout)
     builtin.module {
       func.func @copy_as_generic() {
         %c0 = arith.constant 0 : index
@@ -37,7 +37,7 @@ hal.executable @copy_as_generic {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 16], [1, 1]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
-//      CHECK: hal.executable.entry_point public @copy_as_generic
+//      CHECK: hal.executable.export public @copy_as_generic
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -58,7 +58,7 @@ hal.executable @tensor_insert {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 64 : i32}>
     }> {
-    hal.executable.entry_point @copy layout(#executable_layout)
+    hal.executable.export @copy layout(#executable_layout)
     builtin.module {
       func.func @copy() {
         %c0 = arith.constant 0 : index
@@ -81,7 +81,7 @@ hal.executable @tensor_insert {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 2, 32, 1], [0, 1, 1, 1]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
-//      CHECK: hal.executable.entry_point public @copy
+//      CHECK: hal.executable.export public @copy
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -104,7 +104,7 @@ hal.executable @avg_pool {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 32 : i32}>
     }> {
-    hal.executable.entry_point public @avg_pool layout(#executable_layout)
+    hal.executable.export public @avg_pool layout(#executable_layout)
     builtin.module {
       func.func @avg_pool() {
         %c0 = arith.constant 0 : index
@@ -131,7 +131,7 @@ hal.executable @avg_pool {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 2, 2, 8], [0, 1, 1, 1]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
-//      CHECK: hal.executable.entry_point public @avg_pool
+//      CHECK: hal.executable.export public @avg_pool
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.pooling_nhwc_sum
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -154,7 +154,7 @@ hal.executable @avg_pool {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 4 : i32}>
     }> {
-    hal.executable.entry_point public @avg_pool layout(#executable_layout)
+    hal.executable.export public @avg_pool layout(#executable_layout)
     builtin.module {
       func.func @avg_pool() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -188,7 +188,7 @@ hal.executable @avg_pool {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0, 4], [0, 0, 0, 1]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
-//      CHECK: hal.executable.entry_point public @avg_pool
+//      CHECK: hal.executable.export public @avg_pool
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.pooling_nhwc_sum
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -211,7 +211,7 @@ hal.executable @max_pool {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 32 : i32}>
     }> {
-    hal.executable.entry_point public @max_pool layout(#executable_layout)
+    hal.executable.export public @max_pool layout(#executable_layout)
     builtin.module  {
       func.func @max_pool() {
         %cst = arith.constant 0xFF800000 : f32
@@ -239,7 +239,7 @@ hal.executable @max_pool {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 32], [0, 1]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
-//      CHECK: hal.executable.entry_point public @max_pool
+//      CHECK: hal.executable.export public @max_pool
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
 //      CHECK:   linalg.pooling_nhwc_max
@@ -265,7 +265,7 @@ hal.executable @elementwise {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 32 : i32}>
     }> {
-    hal.executable.entry_point public @elementwise layout(#executable_layout)
+    hal.executable.export public @elementwise layout(#executable_layout)
     builtin.module {
       func.func @elementwise() {
         %c0 = arith.constant 0 : index
@@ -295,7 +295,7 @@ hal.executable @elementwise {
 }
 
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
-//      CHECK: hal.executable.entry_point public @elementwise
+//      CHECK: hal.executable.export public @elementwise
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 
 // -----
@@ -318,7 +318,7 @@ hal.executable @dwconv_elementwise {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 32 : i32}>
     }> {
-    hal.executable.entry_point public @dwconv_elementwise layout(#executable_layout)
+    hal.executable.export public @dwconv_elementwise layout(#executable_layout)
     builtin.module  {
       func.func @dwconv_elementwise() {
         %cst = arith.constant opaque<"_", "0xDEADBEEF"> : tensor<3x3x1x4xf32>
@@ -356,7 +356,7 @@ hal.executable @dwconv_elementwise {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 2, 0, 4], [0, 1, 1, 0, 1]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
-//      CHECK: hal.executable.entry_point public @dwconv_elementwise
+//      CHECK: hal.executable.export public @dwconv_elementwise
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -381,7 +381,7 @@ hal.executable @outermost_reduction {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 32 : i32}>
     }> {
-    hal.executable.entry_point @outermost_reduction layout(#executable_layout)
+    hal.executable.export @outermost_reduction layout(#executable_layout)
     builtin.module {
       func.func @outermost_reduction() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -408,7 +408,7 @@ hal.executable @outermost_reduction {
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 128], [1, 4],  [0, 0, 4]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
-// CHECK-LABEL: hal.executable.entry_point public @outermost_reduction
+// CHECK-LABEL: hal.executable.export public @outermost_reduction
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     lowering_config = #[[$CONFIG]]
@@ -432,7 +432,7 @@ hal.executable private @innermost_reduction {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 32 : i32}>
     }> {
-    hal.executable.entry_point public @innermost_reduction ordinal(0) layout(#executable_layout)
+    hal.executable.export public @innermost_reduction ordinal(0) layout(#executable_layout)
     builtin.module {
       func.func @innermost_reduction() {
         %cst = arith.constant -0.000000e+00 : f32
@@ -468,7 +468,7 @@ hal.executable private @innermost_reduction {
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128], [4],  [0, 4]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
-// CHECK-LABEL: hal.executable.entry_point public @innermost_reduction
+// CHECK-LABEL: hal.executable.export public @innermost_reduction
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     lowering_config = #[[$CONFIG]]

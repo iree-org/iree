@@ -103,9 +103,9 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createLinkExecutablesPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createLinkTargetExecutablesPass(
     StringRef target);
 
-// Resolves hal.executable.entry_point references to ordinals.
+// Resolves hal.executable.export references to ordinals.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createResolveEntryPointOrdinalsPass();
+createResolveExportOrdinalsPass();
 
 // Converts hal.executable.variants to one or more hal.executable.binary ops.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
@@ -161,7 +161,7 @@ inline void registerHALPasses() {
   createMaterializeInterfacesPass();
   createMaterializeResourceCachesPass(targetOptions);
   createMemoizeDeviceQueriesPass();
-  createResolveEntryPointOrdinalsPass();
+  createResolveExportOrdinalsPass();
   createSerializeExecutablesPass();
   createSerializeTargetExecutablesPass("");
   createTranslateExecutablesPass();

@@ -204,6 +204,8 @@ static iree_status_t iree_hal_task_queue_issue_cmd(
         status = iree_hal_task_command_buffer_issue(
             cmd->command_buffers[i], &cmd->queue->state,
             cmd->task.header.completion_task, cmd->arena, pending_submission);
+        iree_hal_command_buffer_release(cmd->command_buffers[i]);
+        cmd->command_buffers[i] = NULL;
       } else {
         status = iree_make_status(
             IREE_STATUS_UNIMPLEMENTED,
@@ -222,6 +224,12 @@ static iree_status_t iree_hal_task_queue_issue_cmd(
 static void iree_hal_task_queue_issue_cmd_cleanup(
     iree_task_t* task, iree_status_code_t status_code) {
   iree_hal_task_queue_issue_cmd_t* cmd = (iree_hal_task_queue_issue_cmd_t*)task;
+
+  // Release command buffers; some may have been released after issuing but this
+  // handles leftovers that may appear due to failures.
+  for (iree_host_size_t i = 0; i < cmd->command_buffer_count; ++i) {
+    iree_hal_command_buffer_release(cmd->command_buffers[i]);
+  }
 
   // Reset queue tail issue task if it was us.
   iree_slim_mutex_lock(&cmd->queue->mutex);
@@ -252,8 +260,10 @@ static iree_status_t iree_hal_task_queue_issue_cmd_allocate(
   cmd->queue = queue;
 
   cmd->command_buffer_count = command_buffer_count;
-  memcpy(cmd->command_buffers, command_buffers,
-         cmd->command_buffer_count * sizeof(*cmd->command_buffers));
+  for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
+    cmd->command_buffers[i] = command_buffers[i];
+    iree_hal_command_buffer_retain(cmd->command_buffers[i]);
+  }
 
   *out_cmd = cmd;
   return iree_ok_status();
@@ -540,7 +550,7 @@ iree_status_t iree_hal_task_queue_submit_and_wait(
     // TODO(benvanik): get a wait_handle we can pass to
     // iree_task_executor_donate_caller - it'll flush + do work.
     iree_task_executor_flush(queue->executor);
-    status = iree_hal_task_queue_wait_idle(queue, timeout);
+    status = iree_hal_semaphore_wait(wait_semaphore, wait_value, timeout);
   }
 
   IREE_TRACE_ZONE_END(z0);

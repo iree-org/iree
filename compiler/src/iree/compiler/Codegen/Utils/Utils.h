@@ -33,11 +33,11 @@ static constexpr unsigned kNumMaxParallelDims = 3;
 bool isEntryPoint(func::FuncOp func);
 
 /// Returns a map from function symbol name to corresponding entry point op.
-llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
+llvm::StringMap<IREE::HAL::ExecutableExportOp> getAllEntryPoints(
     ModuleOp module);
 
 /// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
-FailureOr<IREE::HAL::ExecutableEntryPointOp> getEntryPoint(func::FuncOp funcOp);
+FailureOr<IREE::HAL::ExecutableExportOp> getEntryPoint(func::FuncOp funcOp);
 
 /// Methods to get backend information.
 bool isX86(IREE::HAL::ExecutableVariantOp variantOp);

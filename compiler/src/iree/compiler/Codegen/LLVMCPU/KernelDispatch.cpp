@@ -1127,12 +1127,12 @@ static LogicalResult setTranslationInfoAndRootConfig(
 }
 
 LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
-  llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPointOps =
+  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
   for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
-    auto entryPointOp = entryPointOps.lookup(funcOp.getName());
-    if (!entryPointOp) continue;
-    if (getTranslationInfo(entryPointOp)) continue;
+    auto exportOp = exportOps.lookup(funcOp.getName());
+    if (!exportOp) continue;
+    if (getTranslationInfo(exportOp)) continue;
 
     // If using sandbox passes, currently set the workload_per_wg to be
     // empty for single-threaded execution.

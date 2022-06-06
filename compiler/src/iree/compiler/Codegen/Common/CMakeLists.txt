@@ -42,6 +42,7 @@ iree_cc_library(
     "InsertDistributionInfoPass.cpp"
     "MemrefCopyToLinalg.cpp"
     "OptimizeVectorTransferPass.cpp"
+    "PadDynamicAlloc.cpp"
     "PolynomialApproximationPass.cpp"
     "RemoveTrivialLoops.cpp"
     "RewriteLinalgDestructiveUpdatesPass.cpp"

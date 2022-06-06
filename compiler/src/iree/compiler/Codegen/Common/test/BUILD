@@ -31,6 +31,7 @@ iree_lit_test_suite(
             "forop_canonicalization.mlir",
             "insert_distribution_info.mlir",
             "iree_comprehensive_bufferize.mlir",
+            "pad_dynamic_alloc.mlir",
             "remove_dead_allocs.mlir",
             "remove_trivial_loops.mlir",
             "rewrite_linalg_destructive_updates.mlir",

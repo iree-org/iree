@@ -16,7 +16,7 @@ hal.executable private @matmul_riscv  {
       native_vector_size = 0 : index,
       target_triple = "riscv32-unknown-unknown-eabi-elf"
     }> {
-    hal.executable.entry_point public @matmul_riscv layout(#executable_layout)
+    hal.executable.export public @matmul_riscv layout(#executable_layout)
     builtin.module {
       func.func @matmul_riscv() {
         %cst = arith.constant 0.0 : f32
@@ -41,7 +41,7 @@ hal.executable private @matmul_riscv  {
 
 //  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 64, 0], [8, 32, 0], [0, 0, 16]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
-//      CHECK: hal.executable.entry_point public @matmul_riscv
+//      CHECK: hal.executable.export public @matmul_riscv
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]

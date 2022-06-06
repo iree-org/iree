@@ -73,13 +73,13 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
   // TODO(ravishankarm): This is strange that this is not enforced
   // structurally, but something to address later on. For now this restriction
   // is fine.
-  llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
+  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
   Optional<IREE::Codegen::DispatchLoweringPassPipeline> passPipeline;
-  for (auto &it : entryPoints) {
-    auto entryPointOp = it.second;
+  for (auto &it : exportOps) {
+    auto exportOp = it.second;
     if (IREE::Codegen::TranslationInfoAttr translationInfo =
-            getTranslationInfo(entryPointOp)) {
+            getTranslationInfo(exportOp)) {
       IREE::Codegen::DispatchLoweringPassPipeline currPipeline =
           translationInfo.getDispatchLoweringPassPipeline();
       if (passPipeline) {

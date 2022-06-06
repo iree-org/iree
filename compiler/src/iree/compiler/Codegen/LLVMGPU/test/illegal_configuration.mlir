@@ -11,7 +11,7 @@
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @illegal layout(#executable_layout) {
+    hal.executable.export @illegal layout(#executable_layout) {
       translation_info = #translation,
       workgroup_size = [32 : index, 8 : index, 8 : index]
     }
@@ -43,7 +43,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @illegal layout(#executable_layout) {
+    hal.executable.export @illegal layout(#executable_layout) {
       translation_info = #translation,
       workgroup_size = [32 : index, 8 : index, 2 : index]
     }
@@ -75,7 +75,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @illegal layout(#executable_layout) {
+    hal.executable.export @illegal layout(#executable_layout) {
       translation_info = #translation,
       workgroup_size = [64 : index, 2 : index, 10 : index]
     }
@@ -107,7 +107,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @illegal layout(#executable_layout) {
+    hal.executable.export @illegal layout(#executable_layout) {
       translation_info = #translation,
       workgroup_size = [48 : index, 2 : index, 1 : index]
     }
@@ -139,7 +139,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @illegal layout(#executable_layout) {
+    hal.executable.export @illegal layout(#executable_layout) {
       translation_info = #translation,
       workgroup_size = [64 : index, 2 : index, 2 : index]
     }
@@ -171,7 +171,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @illegal layout(#executable_layout) {
+    hal.executable.export @illegal layout(#executable_layout) {
       translation_info = #translation,
       workgroup_size = [64 : index, 2 : index, 1 : index]
     }
@@ -203,7 +203,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @illegal layout(#executable_layout) {
+    hal.executable.export @illegal layout(#executable_layout) {
       translation_info = #translation,
       workgroup_size = [128 : index, 1 : index, 1 : index]
     }
@@ -235,7 +235,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @illegal layout(#executable_layout) {
+    hal.executable.export @illegal layout(#executable_layout) {
       translation_info = #translation,
       workgroup_size = [64 : index, 2 : index, 1 : index]
     }
@@ -267,7 +267,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @illegal layout(#executable_layout) {
+    hal.executable.export @illegal layout(#executable_layout) {
       translation_info = #translation,
       workgroup_size = [64 : index, 2 : index, 1 : index]
     }
@@ -300,7 +300,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @batch_matmul_func  {
   hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
-    hal.executable.entry_point @illegal layout(#executable_layout) {
+    hal.executable.export @illegal layout(#executable_layout) {
       translation_info = #translation,
       workgroup_size = [64 : index, 2 : index, 1 : index]
     }

@@ -25,15 +25,15 @@ namespace iree_compiler {
 
 /// Specifies the number of workgroups to use for a particular entry point
 /// function, by updating the `worgroup_count` region in the
-/// `hal.executable.entry_point` op for this operation. The method takes a
+/// `hal.executable.export` op for this operation. The method takes a
 /// callback function, which computes the workgroup count (x,y,z) given the
 /// workload along (x,y,z).
-/// Returns a new `hal.executable.entry_point` op. MLIR semantics requires
+/// Returns a new `hal.executable.export` op. MLIR semantics requires
 /// creation of new ops when a region is added.
 using WorkgroupCountRegionBuilder = std::function<std::array<Value, 3>(
     OpBuilder &b, Location loc, Value device, std::array<Value, 3> workload)>;
-FailureOr<IREE::HAL::ExecutableEntryPointOp> defineWorkgroupCountRegion(
-    OpBuilder &builder, IREE::HAL::ExecutableEntryPointOp entryPointOp,
+FailureOr<IREE::HAL::ExecutableExportOp> defineWorkgroupCountRegion(
+    OpBuilder &builder, IREE::HAL::ExecutableExportOp exportOp,
     WorkgroupCountRegionBuilder regionBuilder);
 
 /// Insert patterns to perform folding of AffineMinOp by matching the pattern

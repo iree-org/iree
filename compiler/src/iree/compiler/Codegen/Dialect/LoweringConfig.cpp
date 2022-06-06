@@ -264,33 +264,31 @@ LogicalResult IREECodegenDialect::printCodegenAttrs(
 
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting iree_codegen.translation_info attribute on the
-// `hal.executable.entry_point`
+// `hal.executable.export`
 // ===----------------------------------------------------------------------===//
 
 IREE::Codegen::TranslationInfoAttr getTranslationInfo(
-    IREE::HAL::ExecutableEntryPointOp entryPointOp) {
-  return entryPointOp->getAttrOfType<IREE::Codegen::TranslationInfoAttr>(
+    IREE::HAL::ExecutableExportOp exportOp) {
+  return exportOp->getAttrOfType<IREE::Codegen::TranslationInfoAttr>(
       kTranslationInfoAttrName);
 }
 
-SmallVector<int64_t> getWorkgroupSize(
-    IREE::HAL::ExecutableEntryPointOp entryPointOp) {
-  if (Optional<ArrayAttr> workgroupSizeAttrList =
-          entryPointOp.workgroup_size()) {
+SmallVector<int64_t> getWorkgroupSize(IREE::HAL::ExecutableExportOp exportOp) {
+  if (Optional<ArrayAttr> workgroupSizeAttrList = exportOp.workgroup_size()) {
     return getIntegerVals(*workgroupSizeAttrList);
   }
   return {};
 }
 
-void setTranslationInfo(IREE::HAL::ExecutableEntryPointOp entryPointOp,
+void setTranslationInfo(IREE::HAL::ExecutableExportOp exportOp,
                         IREE::Codegen::TranslationInfoAttr translationInfo,
                         ArrayRef<int64_t> workgroupSize) {
-  entryPointOp->setAttr(kTranslationInfoAttrName, translationInfo);
+  exportOp->setAttr(kTranslationInfoAttrName, translationInfo);
   // The workgroup size is set on the entry point op directly.
   if (!workgroupSize.empty()) {
-    MLIRContext *context = entryPointOp->getContext();
+    MLIRContext *context = exportOp->getContext();
     auto attrs = getIndexIntegerArrayAttr(context, workgroupSize);
-    entryPointOp.workgroup_sizeAttr(attrs);
+    exportOp.workgroup_sizeAttr(attrs);
   }
 }
 

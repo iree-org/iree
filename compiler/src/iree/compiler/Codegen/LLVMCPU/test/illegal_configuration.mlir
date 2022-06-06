@@ -11,7 +11,7 @@
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
-    hal.executable.entry_point @illegal layout(#executable_layout)  {
+    hal.executable.export @illegal layout(#executable_layout)  {
       translation_info = #translation
     }
     builtin.module {
@@ -42,7 +42,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
-    hal.executable.entry_point @illegal layout(#executable_layout)  {
+    hal.executable.export @illegal layout(#executable_layout)  {
       translation_info = #translation
     }
     builtin.module {
@@ -73,7 +73,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
-    hal.executable.entry_point @illegal layout(#executable_layout)  {
+    hal.executable.export @illegal layout(#executable_layout)  {
       translation_info = #translation
     }
     builtin.module {
@@ -104,7 +104,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
-    hal.executable.entry_point @illegal layout(#executable_layout)  {
+    hal.executable.export @illegal layout(#executable_layout)  {
       translation_info = #translation
     }
     builtin.module {
@@ -135,7 +135,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
-    hal.executable.entry_point @illegal layout(#executable_layout)  {
+    hal.executable.export @illegal layout(#executable_layout)  {
       translation_info = #translation
     }
     builtin.module {
@@ -168,7 +168,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
-    hal.executable.entry_point @illegal layout(#executable_layout)  {
+    hal.executable.export @illegal layout(#executable_layout)  {
       translation_info = #translation
     }
     builtin.module {

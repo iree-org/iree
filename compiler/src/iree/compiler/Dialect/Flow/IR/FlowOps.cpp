@@ -52,6 +52,34 @@ static void createArgs(ArrayRef<OpAsmParser::UnresolvedOperand> operands,
   }
 }
 
+// Verifies that a dispatch |op|'s |workload| matches that of the |exportOp|.
+static LogicalResult verifyDispatchWorkload(
+    Operation *op, IREE::Flow::ExecutableExportOp exportOp,
+    ValueRange workload) {
+  // If the target has a workgroup count computation function we can verify that
+  // the workload here matches what is expected.
+  if (!exportOp.workgroup_count().empty()) {
+    auto &workgroupCount = exportOp.workgroup_count();
+    if (workgroupCount.getNumArguments() != workload.size()) {
+      return op->emitOpError()
+             << "workload mismatch; entry point expects "
+             << workgroupCount.getNumArguments()
+             << " arguments but dispatch provides " << workload.size();
+    }
+    for (auto it : llvm::enumerate(llvm::zip(workgroupCount.getArgumentTypes(),
+                                             workload.getTypes()))) {
+      auto expectedType = std::get<0>(it.value());
+      auto actualType = std::get<1>(it.value());
+      if (expectedType != actualType) {
+        return op->emitOpError() << "workload operand " << it.index()
+                                 << " type mismatch; expected " << expectedType
+                                 << " but passed " << actualType;
+      }
+    }
+  }
+  return success();
+}
+
 // Verifies that |dynamicDims| contains the appropriate number of dims for all
 // of the dynamic dimensions in |values|.
 static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
@@ -149,6 +177,70 @@ static Optional<BlockArgument> getBindingArgument(Value v) {
     return getBindingArgument(loadOp.source());
   }
   return llvm::None;
+}
+
+//===----------------------------------------------------------------------===//
+// custom<WorkgroupCountRegion>($body)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseWorkgroupCountRegion(OpAsmParser &parser,
+                                             Region &body) {
+  if (failed(parser.parseOptionalKeyword("workgroups"))) {
+    // Omitted.
+    return success();
+  }
+
+  SmallVector<OpAsmParser::Argument> args;
+  if (failed(parser.parseArgumentList(args, AsmParser::Delimiter::Paren,
+                                      /*allowType=*/true,
+                                      /*allowAttrs=*/true))) {
+    return failure();
+  }
+
+  // Return types must be 3 dimensions (workgroup count XYZ).
+  SmallVector<Type> returnTypes;
+  if (failed(parser.parseArrowTypeList(returnTypes))) {
+    return failure();
+  }
+  if (returnTypes.size() != 3 ||
+      !llvm::all_of(returnTypes, [](Type type) { return type.isIndex(); })) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "workgroup count region must return the XYZ dimension counts";
+  }
+
+  // Parse region contents.
+  if (failed(parser.parseRegion(body, args, /*enableNameShadowing=*/false))) {
+    return failure();
+  }
+
+  // Verify the return types match.
+  for (auto returnOp : body.getOps<IREE::Flow::ReturnOp>()) {
+    for (auto it : llvm::zip(returnTypes, returnOp.getOperandTypes())) {
+      if (std::get<0>(it) != std::get<1>(it)) {
+        return returnOp.emitOpError()
+               << "operands do not match expected region return types";
+      }
+    }
+  }
+
+  return success();
+}
+
+static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
+                                      Region &body) {
+  if (body.empty()) return;
+  p << "workgroups(";
+  auto args = body.getArguments();
+  for (unsigned i = 0; i < args.size(); ++i) {
+    if (i > 0) p << ", ";
+    p.printRegionArgument(args[i]);
+  }
+  p << ")";
+  Type indexType = IndexType::get(body.getContext());
+  p.printArrowTypeList(TypeRange{indexType, indexType, indexType});
+  p << " ";
+  p.printRegion(body, /*printEntryBlockArgs=*/false,
+                /*printBlockTerminators=*/true);
 }
 
 //===----------------------------------------------------------------------===//
@@ -419,13 +511,13 @@ llvm::SmallBitVector DispatchTensorStoreOp::getDroppedDims() {
 //===----------------------------------------------------------------------===//
 
 void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
-                                 ValueRange workgroupCount,
-                                 TypeRange resultTypes, ValueRange resultDims,
-                                 ValueRange operands, ValueRange operandDims,
+                                 ValueRange workload, TypeRange resultTypes,
+                                 ValueRange resultDims, ValueRange operands,
+                                 ValueRange operandDims,
                                  ArrayRef<int64_t> tiedOperands,
                                  ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);
-  state.addOperands(workgroupCount);
+  state.addOperands(workload);
   state.addOperands(operands);
   state.addOperands(operandDims);
   state.addOperands(resultDims);
@@ -436,17 +528,18 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
   state.attributes.erase("operand_segment_sizes");
   state.addAttribute("operand_segment_sizes",
                      builder.getI32VectorAttr({
-                         static_cast<int32_t>(workgroupCount.size()),
+                         static_cast<int32_t>(workload.size()),
                          static_cast<int32_t>(operands.size()),
                          static_cast<int32_t>(operandDims.size()),
                          static_cast<int32_t>(resultDims.size()),
                      }));
 
-  auto *body = state.addRegion();
-  assert(body->begin() == body->end());
+  auto *workgroupBody = state.addRegion();
+  assert(workgroupBody->begin() == workgroupBody->end());
   {
+    // createBlock implicitly moves IP, RAII away...
     OpBuilder::InsertionGuard g(builder);
-    builder.createBlock(body);  // createBlock implicitly moves IP, RAII away...
+    builder.createBlock(workgroupBody);
   }
 
   llvm::BitVector operandAliases(llvm::size(operands), false);
@@ -459,7 +552,6 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
       resultAliases[resultIndex] = true;
     }
   }
-
   for (auto operand : llvm::enumerate(operands)) {
     Type type = operand.value().getType();
     if (auto tensorType = type.dyn_cast<TensorType>()) {
@@ -468,7 +560,7 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
                                          : TensorAccess::ReadOnly,
                                      tensorType);
     }
-    body->addArgument(type, operand.value().getLoc());
+    workgroupBody->addArgument(type, operand.value().getLoc());
   }
   for (auto resultType : llvm::enumerate(resultTypes)) {
     if (resultAliases[resultType.index()]) {
@@ -479,9 +571,9 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
     if (auto tensorType = type.dyn_cast<TensorType>()) {
       type = DispatchTensorType::get(TensorAccess::WriteOnly, tensorType);
     }
-    body->addArgument(type, state.location);
+    workgroupBody->addArgument(type, state.location);
   }
-  assert(std::next(body->begin()) == body->end());
+  assert(std::next(workgroupBody->begin()) == workgroupBody->end());
 }
 
 static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
@@ -529,9 +621,6 @@ static void printDispatchWorkgroupBody(OpAsmPrinter &p, Operation *op,
 
 LogicalResult DispatchWorkgroupsOp::verify() {
   Operation *op = getOperation();
-  if (workgroup_count().empty()) {
-    return op->emitOpError() << "at least one workgroup dimension is required";
-  }
 
   if (failed(verifyOpDynamicDims(getOperation(), operands(), operand_dims())) ||
       failed(verifyOpDynamicDims(getOperation(), results(), result_dims()))) {
@@ -606,7 +695,7 @@ static TensorAccess refineTensorAccess(Value value, DispatchTensorType type) {
 
 IREE::Util::ValueAccess DispatchWorkgroupsOp::getOperandAccess(
     unsigned operandIndex) {
-  BlockArgument arg = body().front().getArgument(operandIndex);
+  BlockArgument arg = workgroup_body().front().getArgument(operandIndex);
   if (auto tensorType = arg.getType().dyn_cast<DispatchTensorType>()) {
     auto tensorAccess = refineTensorAccess(arg, tensorType);
     return IREE::Util::ValueAccess(
@@ -625,7 +714,8 @@ IREE::Util::ValueAccess DispatchWorkgroupsOp::getOperandAccess(
 IREE::Util::ValueAccess DispatchWorkgroupsOp::getResultAccess(
     unsigned resultIndex) {
   unsigned startIndex = getBody()->getNumArguments() - getNumResults();
-  BlockArgument arg = body().front().getArgument(startIndex + resultIndex);
+  BlockArgument arg =
+      workgroup_body().front().getArgument(startIndex + resultIndex);
   if (auto tensorType = arg.getType().dyn_cast<DispatchTensorType>()) {
     auto tensorAccess = refineTensorAccess(arg, tensorType);
     return IREE::Util::ValueAccess(
@@ -686,9 +776,8 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
       excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
 
   auto newOp = rewriter.create<DispatchWorkgroupsOp>(
-      getLoc(), workgroup_count(), newResultTypes, newResultDims,
-      newOperandsValues, newOperandDims, newTiedOperandIndices,
-      getOperation()->getAttrs());
+      getLoc(), workload(), newResultTypes, newResultDims, newOperandsValues,
+      newOperandDims, newTiedOperandIndices, getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
 
@@ -718,11 +807,6 @@ DispatchWorkgroupsOp::getTiedOperandsIndexAndLength() {
 // flow.dispatch.workgroup.*
 //===----------------------------------------------------------------------===//
 
-void DispatchWorkgroupRankOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "workgroup_rank");
-}
-
 static void getAsmResultNamesForDispatchWorkgroupInfoOp(
     StringRef prefix, const APInt &dimension, Value result,
     function_ref<void(Value, StringRef)> setNameFn) {
@@ -748,15 +832,10 @@ void DispatchWorkgroupSizeOp::getAsmResultNames(
 }
 
 LogicalResult verifyDispatchWorkgroupInfoOp(Operation *op, uint64_t dimension) {
-  size_t dimCount = 0;
-  if (auto dispatchOp = op->getParentOfType<DispatchWorkgroupsOp>()) {
-    dimCount = dispatchOp.workgroup_count().size();
-  }
-  if (dimCount != 0 && (dimension < 0 || dimension >= dimCount)) {
+  if (dimension < 0 || dimension >= 3) {
     return op->emitOpError()
            << "dimension " << dimension
-           << " out of bounds of dispatch dimensions; expected [0, "
-           << (dimCount - 1) << ")";
+           << " out of bounds of dispatch dimensions; expected [0, 3)";
   }
   return success();
 }
@@ -778,60 +857,30 @@ LogicalResult ExecutableOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// flow.dispatch.entry
+// flow.executable.export
 //===----------------------------------------------------------------------===//
 
-void DispatchEntryOp::build(OpBuilder &builder, OperationState &state,
-                            StringRef sym_name, FlatSymbolRefAttr function_ref,
-                            IntegerAttr workgroup_rank) {
+void ExecutableExportOp::build(OpBuilder &builder, OperationState &state,
+                               StringRef sym_name,
+                               FlatSymbolRefAttr function_ref) {
   build(builder, state, /*sym_visibility=*/nullptr,
-        builder.getStringAttr(sym_name), function_ref, workgroup_rank);
+        builder.getStringAttr(sym_name), function_ref);
 }
 
-ParseResult DispatchEntryOp::parse(OpAsmParser &parser,
-                                   OperationState &result) {
-  StringAttr visibilityAttr;
-  if (failed(parseSymbolVisibility(parser, visibilityAttr))) {
-    return failure();
-  }
-
-  FlatSymbolRefAttr functionRefAttr;
-  if (failed(parser.parseAttribute(functionRefAttr, "function_ref",
-                                   result.attributes))) {
-    return failure();
-  }
-
-  if (succeeded(parser.parseOptionalKeyword("as"))) {
-    StringAttr exportNameAttr;
-    if (failed(parser.parseLParen()) ||
-        failed(parser.parseAttribute(exportNameAttr, "sym_name",
-                                     result.attributes)) ||
-        failed(parser.parseRParen())) {
-      return failure();
+LogicalResult ExecutableExportOp::verify() {
+  // Workgroup count region is optional.
+  if (!workgroup_count().empty()) {
+    // Verify the return ops all provide XYZ values.
+    for (auto returnOp : workgroup_count().getOps<IREE::Flow::ReturnOp>()) {
+      if (returnOp.getNumOperands() != 3 ||
+          !llvm::all_of(returnOp.getOperandTypes(),
+                        [](Type type) { return type.isIndex(); })) {
+        return returnOp.emitOpError()
+               << "workgroup count region must return the XYZ dimension counts";
+      }
     }
-  } else {
-    result.addAttribute("sym_name", parser.getBuilder().getStringAttr(
-                                        functionRefAttr.getValue()));
   }
-
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result.attributes))) {
-    return failure();
-  }
-
   return success();
-}
-
-void DispatchEntryOp::print(OpAsmPrinter &p) {
-  p << ' ';
-  Operation *op = getOperation();
-  printSymbolVisibility(p, op, op->getAttrOfType<StringAttr>("sym_visibility"));
-  p << ' ';
-  p.printSymbolName(function_ref());
-  if (sym_name() != function_ref()) {
-    p << " as(\"" << sym_name() << "\")";
-  }
-  p.printOptionalAttrDictWithKeyword(
-      op->getAttrs(), /*elidedAttrs=*/{"function_ref", "sym_name"});
 }
 
 //===----------------------------------------------------------------------===//
@@ -839,21 +888,21 @@ void DispatchEntryOp::print(OpAsmPrinter &p) {
 //===----------------------------------------------------------------------===//
 
 void DispatchOp::build(OpBuilder &builder, OperationState &state,
-                       DispatchEntryOp entryPoint, ValueRange workgroupCount,
+                       ExecutableExportOp exportOp, ValueRange workload,
                        TypeRange resultTypes, ValueRange resultDims,
                        ValueRange operands, ValueRange operandDims,
                        ArrayAttr tiedOperands,
                        ArrayRef<NamedAttribute> attributes) {
   StringRef executableOpSymName =
-      entryPoint->getParentOp()
+      exportOp->getParentOp()
           ->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
           .getValue();
   state.addAttribute(
       "entry_point",
       SymbolRefAttr::get(builder.getContext(), executableOpSymName,
-                         {SymbolRefAttr::get(entryPoint)}));
+                         {SymbolRefAttr::get(exportOp)}));
 
-  state.addOperands(workgroupCount);
+  state.addOperands(workload);
   state.addTypes(resultTypes);
   state.addOperands(operands);
   state.addOperands(operandDims);
@@ -865,7 +914,7 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
   state.attributes.erase("operand_segment_sizes");
   state.addAttribute("operand_segment_sizes",
                      builder.getI32VectorAttr({
-                         static_cast<int32_t>(workgroupCount.size()),
+                         static_cast<int32_t>(workload.size()),
                          static_cast<int32_t>(operands.size()),
                          static_cast<int32_t>(operandDims.size()),
                          static_cast<int32_t>(resultDims.size()),
@@ -879,11 +928,12 @@ FunctionType DispatchOp::getEntryPointType() {
   return FunctionType::get(getContext(), argTypes, getResultTypes());
 }
 
+std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
+  return getODSOperandIndexAndLength(1);  // $operands
+}
+
 LogicalResult DispatchOp::verify() {
   Operation *op = getOperation();
-  if (workgroup_count().empty()) {
-    return op->emitOpError() << "at least one workgroup dimension is required";
-  }
   if (failed(verifyOpDynamicDims(op, operands(), operand_dims())) ||
       failed(verifyOpDynamicDims(op, results(), result_dims()))) {
     return failure();
@@ -891,8 +941,29 @@ LogicalResult DispatchOp::verify() {
   return success();
 }
 
-std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
-  return getODSOperandIndexAndLength(1);  // $operands
+LogicalResult DispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+  Operation *op = getOperation();
+  auto exportOp =
+      symbolTable.lookupNearestSymbolFrom<IREE::Flow::ExecutableExportOp>(
+          op, entry_point());
+  if (!exportOp) {
+    // TODO(benvanik): there are a lot of tests that are assuming this is not
+    // verified. We'll need to go add dummy executables for all of them. Today
+    // we just bail on the verifier if the symbol isn't found.
+    //
+    // Should be:
+    //   return op->emitOpError() << "undefined entry point: " << entry_point();
+    return success();
+  }
+
+  // Verify that the workload parameters captured match the target export.
+  if (failed(verifyDispatchWorkload(op, exportOp, workload()))) {
+    return failure();
+  }
+
+  // TODO(benvanik): verify that the target function has matching operands.
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//

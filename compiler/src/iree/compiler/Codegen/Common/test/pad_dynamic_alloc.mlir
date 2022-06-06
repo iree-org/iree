@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-llvmgpu-pad-dynamic-alloc %s | FileCheck %s
+// RUN: iree-opt -iree-codegen-pad-dynamic-alloc %s | FileCheck %s
 
 // CHECK-LABEL: dynamic_alloc
 func.func @dynamic_alloc(%id : index) {

@@ -30,6 +30,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
+namespace {
+
 static const StringRef kLineStyleControlFlow = "dashed";
 static const StringRef kLineStyleDataFlow = "solid";
 static const StringRef kShapeNode = "box";
@@ -72,8 +74,6 @@ static std::string quoteString(const std::string &str) {
 
 using AttributeMap = llvm::StringMap<std::string>;
 
-namespace {
-
 /// This struct represents a node in the DOT language. Each node has an
 /// identifier and an optional identifier for the cluster (subgraph) that
 /// contains the node.
@@ -93,10 +93,12 @@ struct Node {
 /// This pass generates a Graphviz dataflow visualization of an MLIR operation.
 /// Note: See https://www.graphviz.org/doc/info/lang.html for more information
 /// about the Graphviz DOT language.
-class PrintOpPass : public DumpDispatchGraphBase<PrintOpPass> {
+class DumpDispatchGraphPass
+    : public DumpDispatchGraphBase<DumpDispatchGraphPass> {
  public:
-  PrintOpPass(raw_ostream &os) : os(os) {}
-  PrintOpPass(const PrintOpPass &o) : PrintOpPass(o.os.getOStream()) {}
+  DumpDispatchGraphPass(raw_ostream &os) : os(os) {}
+  DumpDispatchGraphPass(const DumpDispatchGraphPass &o)
+      : DumpDispatchGraphPass(o.os.getOStream()) {}
 
   void runOnOperation() override {
     auto modOp = dyn_cast<ModuleOp>(getOperation());
@@ -283,9 +285,9 @@ class PrintOpPass : public DumpDispatchGraphBase<PrintOpPass> {
         os << " = " << op->getName();
 
         if (auto dispatch = dyn_cast<DispatchOp>(op)) {
-          // print workgroup count
+          // print workload
           os << "[";
-          printOperands(os, dispatch.workgroup_count(), state);
+          printOperands(os, dispatch.workload(), state);
           os << "]\n";
 
           // print entry function name
@@ -413,7 +415,7 @@ class PrintOpPass : public DumpDispatchGraphBase<PrintOpPass> {
 }  // namespace
 
 std::unique_ptr<Pass> createDumpDispatchGraphPass(raw_ostream &os) {
-  return std::make_unique<PrintOpPass>(os);
+  return std::make_unique<DumpDispatchGraphPass>(os);
 }
 
 }  // namespace Flow

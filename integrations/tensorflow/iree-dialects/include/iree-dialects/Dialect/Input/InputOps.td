@@ -551,21 +551,6 @@ def IREEInput_TensorTraceOp : IREEInput_Op<"tensor.trace", []> {
 
 // TODO: Define dispatch.workgroup op.
 
-def IREEInput_DispatchWorkgroupRankOp : IREEInput_PureOp<"dispatch.workgroup.rank"> {
-  let summary = [{returns the rank of the workgroup dimensions}];
-  let description = [{
-    The number of workgroup dimensions used during dispatch, bounding the
-    `iree_input.dispatch.workgroup.*` query functions.
-
-    ```mlir
-    %rank = iree_input.dispatch.workgroup.rank : index
-    ```
-  }];
-  let arguments = (ins);
-  let results = (outs IREEInput_Dim:$result);
-  let assemblyFormat = "attr-dict `:` type($result)";
-}
-
 def IREEInput_DispatchWorkgroupIDOp : IREEInput_PureOp<"dispatch.workgroup.id"> {
   let summary = [{returns the index of the current workgroup in the grid}];
   let description = [{

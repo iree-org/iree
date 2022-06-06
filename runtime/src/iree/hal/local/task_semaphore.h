@@ -26,6 +26,9 @@ iree_status_t iree_hal_task_semaphore_create(
     iree_event_pool_t* event_pool, uint64_t initial_value,
     iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore);
 
+// Returns true if |semaphore| is a task system semaphore.
+bool iree_hal_task_semaphore_isa(iree_hal_semaphore_t* semaphore);
+
 // Reserves a new timepoint in the timeline for the given minimum payload value.
 // |issue_task| will wait until the timeline semaphore is signaled to at least
 // |minimum_value| before proceeding, with a possible wait task generated and

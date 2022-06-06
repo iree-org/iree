@@ -55,6 +55,7 @@ iree_cc_library(
     iree::base::tracing
     iree::hal
     iree::hal::utils::buffer_transfer
+    iree::hal::utils::semaphore_base
     iree::schemas::rocm_executable_def_c_fbs
   PUBLIC
 )

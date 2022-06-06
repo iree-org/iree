@@ -154,13 +154,13 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     // to invoke separate dynamic pass pipelines on  entry point functions, when
     // the passes might have module level changes. For now this restriction
     // is fine.
-    llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
+    llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
         getAllEntryPoints(moduleOp);
     Optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
-    for (auto &it : entryPoints) {
-      auto entryPointOp = it.second;
+    for (auto &it : exportOps) {
+      auto exportOp = it.second;
       if (IREE::Codegen::TranslationInfoAttr currTranslationInfo =
-              getTranslationInfo(entryPointOp)) {
+              getTranslationInfo(exportOp)) {
         if (translationInfo) {
           if (currTranslationInfo != translationInfo.getValue()) {
             moduleOp.emitOpError(

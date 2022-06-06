@@ -82,10 +82,9 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
   // Add the amount of shared memory required as an attribute.
   auto variantOp = moduleOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   if (variantOp != nullptr) {
-    for (auto entryPointOp :
-         variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
-      entryPointOp->setAttr(entryPointOp.workgroup_local_memoryAttrName(),
-                            builder.getIndexAttr(numberOfBytes));
+    for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+      exportOp->setAttr(exportOp.workgroup_local_memoryAttrName(),
+                        builder.getIndexAttr(numberOfBytes));
     }
   }
 }

@@ -17,7 +17,7 @@
 #translation = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
 hal.executable private @matmul_tensors {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
-    hal.executable.entry_point public @matmul_tensors layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @matmul_tensors layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @matmul_tensors() {
         %0 = hal.interface.constant.load[0] : index
@@ -49,7 +49,7 @@ hal.executable private @matmul_tensors {
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
-//      CHECK: hal.executable.entry_point public @matmul_tensors
+//      CHECK: hal.executable.export public @matmul_tensors
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK: func.func @matmul_tensors()
 //  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
@@ -103,7 +103,7 @@ hal.executable private @matmul_tensors {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @add {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.entry_point public @add layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @add layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @add() {
         %0 = hal.interface.constant.load[0] : index
@@ -136,7 +136,7 @@ hal.executable private @add {
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @add
-//      CHECK: hal.executable.entry_point public @add
+//      CHECK: hal.executable.export public @add
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func.func @add()
 //      CHECK:   scf.for %[[IV0:.+]] =
@@ -163,7 +163,7 @@ hal.executable private @add {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @add4D {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.entry_point public @add4D layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @add4D layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @add4D() {
         %0 = hal.interface.constant.load[0] : index
@@ -196,7 +196,7 @@ hal.executable private @add4D {
   }
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.entry_point public @add4D
+//      CHECK: hal.executable.export public @add4D
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK: func.func @add4D()
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
@@ -224,7 +224,7 @@ hal.executable private @add4D {
 #translation = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
 hal.executable private @batch_matmul_tensors {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
-    hal.executable.entry_point public @batch_matmul_tensors layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @batch_matmul_tensors layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @batch_matmul_tensors() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -254,7 +254,7 @@ hal.executable private @batch_matmul_tensors {
   }
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
-//      CHECK: hal.executable.entry_point public @batch_matmul_tensors
+//      CHECK: hal.executable.export public @batch_matmul_tensors
 //      CHECK: func.func @batch_matmul_tensors()
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
@@ -278,7 +278,7 @@ hal.executable private @batch_matmul_tensors {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @preset_config_matmul_tensors {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
-    hal.executable.entry_point public @preset_config layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @preset_config layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @preset_config() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -304,7 +304,7 @@ hal.executable private @preset_config_matmul_tensors {
   }
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.entry_point public @preset_config
+//      CHECK: hal.executable.export public @preset_config
 //      CHECK: func.func @preset_config()
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
@@ -331,7 +331,7 @@ hal.executable private @preset_config_matmul_tensors {
 #translation = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize workload_per_wg = [64, 64]>
 hal.executable public @copy_op {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
-    hal.executable.entry_point public @copy_op layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @copy_op layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @copy_op() {
         %source_size_y = hal.interface.constant.load[0] : index
@@ -410,7 +410,7 @@ hal.executable public @copy_op {
 #translation = #iree_codegen.translation_info<CPUDefault>
 hal.executable private @static_1d_fft_stage2 {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
-    hal.executable.entry_point public @static_1d_fft_stage2 layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @static_1d_fft_stage2 layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @static_1d_fft_stage2() {
         %c2 = arith.constant 2 : index
@@ -437,7 +437,7 @@ hal.executable private @static_1d_fft_stage2 {
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @static_1d_fft_stage2
-//      CHECK: hal.executable.entry_point public @static_1d_fft_stage2
+//      CHECK: hal.executable.export public @static_1d_fft_stage2
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func.func @static_1d_fft_stage2()
 //      CHECK:   scf.for %[[IV0:.+]] =
@@ -458,7 +458,7 @@ hal.executable private @static_1d_fft_stage2 {
 #translation = #iree_codegen.translation_info<CPUDefault>
 hal.executable private @static_3d_fft_stage3 {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
-    hal.executable.entry_point public @static_3d_fft_stage3 layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @static_3d_fft_stage3 layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @static_3d_fft_stage3() {
         %c3 = arith.constant 3 : index
@@ -477,7 +477,7 @@ hal.executable private @static_3d_fft_stage3 {
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @static_3d_fft_stage3
-//      CHECK: hal.executable.entry_point public @static_3d_fft_stage3
+//      CHECK: hal.executable.export public @static_3d_fft_stage3
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func.func @static_3d_fft_stage3()
 //      CHECK:   scf.for %[[IV0:.+]] =
@@ -506,7 +506,7 @@ hal.executable private @static_3d_fft_stage3 {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @outs_fusion {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
-    hal.executable.entry_point public @outs_fusion_fn layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @outs_fusion_fn layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @outs_fusion_fn() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -570,7 +570,7 @@ hal.executable private @outs_fusion {
 #translation = #iree_codegen.translation_info<CPUDefault>
 hal.executable private @conv {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
-    hal.executable.entry_point public @conv layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @conv layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @conv() {
         %0 = hal.interface.constant.load[0] : index
@@ -605,7 +605,7 @@ hal.executable private @conv {
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @conv
-//      CHECK: hal.executable.entry_point public @conv
+//      CHECK: hal.executable.export public @conv
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func.func @conv()
 //      CHECK:   %[[C0:.+]] = arith.constant 0
@@ -635,7 +635,7 @@ hal.executable private @conv {
 #translation = #iree_codegen.translation_info<CPUDefault>
 hal.executable private @conv_static {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
-    hal.executable.entry_point public @conv_static layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @conv_static layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @conv_static() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -662,7 +662,7 @@ hal.executable private @conv_static {
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @conv_static
-//      CHECK: hal.executable.entry_point public @conv_static
+//      CHECK: hal.executable.export public @conv_static
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func.func @conv_static()
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
@@ -694,7 +694,7 @@ hal.executable private @conv_static {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @generic_static {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
-    hal.executable.entry_point public @generic_static layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @generic_static layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @generic_static() {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
@@ -719,7 +719,7 @@ hal.executable private @generic_static {
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @generic_static
-//      CHECK: hal.executable.entry_point public @generic_static
+//      CHECK: hal.executable.export public @generic_static
 //      CHECK: func.func @generic_static()
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
@@ -743,7 +743,7 @@ hal.executable private @generic_static {
 #translation = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
 hal.executable private @matmul_static {
   hal.executable.variant public @system_elf_arm_64, target = #executable_target_system_elf_arm_64_ {
-    hal.executable.entry_point public @matmul_static layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @matmul_static layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @matmul_static() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -770,7 +770,7 @@ hal.executable private @matmul_static {
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
 //      CHECK: hal.executable private @matmul_static
-//      CHECK: hal.executable.entry_point public @matmul_static
+//      CHECK: hal.executable.export public @matmul_static
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 
 // -----
@@ -790,7 +790,7 @@ hal.executable private @matmul_static {
 #translation = #iree_codegen.translation_info<CPUDefault>
 hal.executable private @restrict_num_workgroups {
   hal.executable.variant public @system_elf_arm_64, target = #executable_target_system_elf_arm_64_ {
-    hal.executable.entry_point public @restrict_num_workgroups layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @restrict_num_workgroups layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @restrict_num_workgroups() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -817,7 +817,7 @@ hal.executable private @restrict_num_workgroups {
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @restrict_num_workgroups
-//      CHECK: hal.executable.entry_point public @restrict_num_workgroups
+//      CHECK: hal.executable.export public @restrict_num_workgroups
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 
 // -----
@@ -840,7 +840,7 @@ hal.executable private @restrict_num_workgroups {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @reduction {
   hal.executable.variant public @reduction, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.entry_point public @reduction ordinal(0) layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @reduction ordinal(0) layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @reduction(%arg0 : !flow.dispatch.tensor<readonly:7x7x2048xf32>,
           %arg1 : !flow.dispatch.tensor<writeonly:7xf32>) {
@@ -873,7 +873,7 @@ hal.executable private @reduction {
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @reduction
-//      CHECK: hal.executable.entry_point public @reduction
+//      CHECK: hal.executable.export public @reduction
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func.func @reduction
 //      CHECK:   scf.for %[[IV0:.+]] =
@@ -902,7 +902,7 @@ hal.executable private @reduction {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @gemm_unit_N {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.entry_point public @gemm_unit_N ordinal(0) layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @gemm_unit_N ordinal(0) layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @gemm_unit_N() {
         %c0 = arith.constant 0 : index
@@ -932,7 +932,7 @@ hal.executable private @gemm_unit_N {
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @gemm_unit_N
-//      CHECK: hal.executable.entry_point public @gemm_unit_N
+//      CHECK: hal.executable.export public @gemm_unit_N
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func.func @gemm_unit_N()
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -963,7 +963,7 @@ hal.executable private @gemm_unit_N {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @gemm_unit_M_unit_N {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.entry_point public @gemm_unit_M_unit_N ordinal(0) layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @gemm_unit_M_unit_N ordinal(0) layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @gemm_unit_M_unit_N() {
         %c0 = arith.constant 0 : index
@@ -991,7 +991,7 @@ hal.executable private @gemm_unit_M_unit_N {
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @gemm_unit_M_unit_N
-//      CHECK: hal.executable.entry_point public @gemm_unit_M_unit_N
+//      CHECK: hal.executable.export public @gemm_unit_M_unit_N
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func.func @gemm_unit_M_unit_N()
 //  CHECK-NOT:   scf.for
@@ -1016,7 +1016,7 @@ hal.executable private @gemm_unit_M_unit_N {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @generic_unit_dims {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.entry_point public @generic_unit_dims layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @generic_unit_dims layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @generic_unit_dims() {
         %0 = hal.interface.constant.load[0] : index
@@ -1046,7 +1046,7 @@ hal.executable private @generic_unit_dims {
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @generic_unit_dims
-//      CHECK: hal.executable.entry_point public @generic_unit_dims
+//      CHECK: hal.executable.export public @generic_unit_dims
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func.func @generic_unit_dims()
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
@@ -1075,7 +1075,7 @@ hal.executable private @generic_unit_dims {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @reduce_to_scalar {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.entry_point public @reduce_to_scalar layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @reduce_to_scalar layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @reduce_to_scalar() {
         %0 = hal.interface.constant.load[0] : index
@@ -1103,7 +1103,7 @@ hal.executable private @reduce_to_scalar {
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @reduce_to_scalar
-//      CHECK: hal.executable.entry_point public @reduce_to_scalar
+//      CHECK: hal.executable.export public @reduce_to_scalar
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func.func @reduce_to_scalar()
 //  CHECK-NOT:   scf.for
@@ -1125,7 +1125,7 @@ hal.executable private @reduce_to_scalar {
 #translation = #iree_codegen.translation_info<CPUDefault>
 hal.executable private @scalar {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.entry_point public @scalar layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @scalar layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @scalar() {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
@@ -1152,7 +1152,7 @@ hal.executable private @scalar {
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @scalar
-//      CHECK: hal.executable.entry_point public @scalar
+//      CHECK: hal.executable.export public @scalar
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func.func @scalar()
 //  CHECK-NOT:   scf.for
@@ -1174,7 +1174,7 @@ hal.executable private @scalar {
 #translation = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
 hal.executable private @rank_reduced_slice {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
-    hal.executable.entry_point public @rank_reduced_slice layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @rank_reduced_slice layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @rank_reduced_slice() {
         %in_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
@@ -1230,7 +1230,7 @@ hal.executable private @rank_reduced_slice {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @matmul_interchange {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.entry_point public @matmul_interchange layout(#executable_layout) {translation_info = #translation}
+    hal.executable.export public @matmul_interchange layout(#executable_layout) {translation_info = #translation}
     builtin.module {
       func.func @matmul_interchange() {
         %0 = hal.interface.constant.load[0] : index
@@ -1260,7 +1260,7 @@ hal.executable private @matmul_interchange {
   }
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.entry_point public @matmul_interchange
+//      CHECK: hal.executable.export public @matmul_interchange
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK: func.func @matmul_interchange()
 //  CHECK-DAG:   %[[D0:.+]] = hal.interface.constant.load[0] : index

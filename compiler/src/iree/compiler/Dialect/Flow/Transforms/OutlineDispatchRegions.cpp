@@ -62,7 +62,7 @@ static ExecutableOp createExecutable(Location loc, StringRef executableName,
 // Converts a dispatch region op into a dispatch op to the outlined region.
 static LogicalResult convertToDispatchOp(DispatchWorkgroupsOp regionOp,
                                          ExecutableOp executableOp,
-                                         DispatchEntryOp entryPointOp) {
+                                         ExecutableExportOp exportOp) {
   // Insert at the same place as the original region.
   OpBuilder builder(regionOp);
 
@@ -70,7 +70,7 @@ static LogicalResult convertToDispatchOp(DispatchWorkgroupsOp regionOp,
   // Note that we copy the tied operand indices from the workgroups op - it
   // lines up 1:1 with the dispatch once we've outlined things.
   auto dispatchOp = builder.create<DispatchOp>(
-      regionOp.getLoc(), entryPointOp, regionOp.workgroup_count(),
+      regionOp.getLoc(), exportOp, regionOp.workload(),
       regionOp.getResultTypes(), regionOp.result_dims(), regionOp.operands(),
       regionOp.operand_dims(), regionOp.tied_operandsAttr());
 
@@ -117,8 +117,8 @@ static mlir::func::FuncOp createWorkgroupFunc(Location loc,
 static LogicalResult outlineDispatchWorkgroupsOp(
     std::string namePrefix, DispatchWorkgroupsOp regionOp) {
   // Convert the region to a free-floating function.
-  auto workgroupFuncOp =
-      createWorkgroupFunc(regionOp.getLoc(), namePrefix, regionOp.body());
+  auto workgroupFuncOp = createWorkgroupFunc(regionOp.getLoc(), namePrefix,
+                                             regionOp.workgroup_body());
   if (!workgroupFuncOp) {
     return failure();
   }
@@ -131,15 +131,14 @@ static LogicalResult outlineDispatchWorkgroupsOp(
   executableOp.getOperation()->moveBefore(parentFuncOp);
   executableOp.setPrivate();
 
-  // Add executable entry point pointing at the function.
+  // Add an export pointing at the entry point function.
   OpBuilder builder(executableOp.body());
-  auto entryPointOp = builder.create<DispatchEntryOp>(
+  auto exportOp = builder.create<ExecutableExportOp>(
       regionOp.getLoc(), workgroupFuncOp.getName(),
-      SymbolRefAttr::get(workgroupFuncOp),
-      builder.getIndexAttr(regionOp.getWorkgroupRank()));
+      SymbolRefAttr::get(workgroupFuncOp));
 
   // Finally convert the dispatch region into a dispatch to the outlined func.
-  return convertToDispatchOp(regionOp, executableOp, entryPointOp);
+  return convertToDispatchOp(regionOp, executableOp, exportOp);
 }
 
 }  // namespace

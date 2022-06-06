@@ -443,13 +443,13 @@ namespace mlir {
 namespace iree_compiler {
 
 LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
-  llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPointOps =
+  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
 
   for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
-    auto entryPointOp = entryPointOps.lookup(funcOp.getName());
-    if (!entryPointOp) continue;
-    if (getTranslationInfo(entryPointOp)) continue;
+    auto exportOp = exportOps.lookup(funcOp.getName());
+    if (!exportOp) continue;
+    if (getTranslationInfo(exportOp)) continue;
     SmallVector<Operation *> computeOps;
     SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
     if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {

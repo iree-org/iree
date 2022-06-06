@@ -17,7 +17,7 @@
 ]>
 hal.executable private @shared_mem_cpy  {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @shared_mem_cpy layout(#executable_layout) {
+    hal.executable.export @shared_mem_cpy layout(#executable_layout) {
       workgroup_size = [32: index, 4: index, 1:index]
     }
     builtin.module {

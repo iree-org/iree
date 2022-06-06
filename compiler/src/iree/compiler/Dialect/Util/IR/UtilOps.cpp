@@ -120,6 +120,37 @@ void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<SymbolAlias>($sym_name, $alias)
+//===----------------------------------------------------------------------===//
+//  @foo            sym_name: @foo, alias: @foo
+//  @foo as("bar")  sym_name: @bar, alias: @foo
+
+ParseResult parseSymbolAlias(OpAsmParser &parser, StringAttr &sym_name,
+                             FlatSymbolRefAttr &alias) {
+  if (failed(parser.parseAttribute(alias))) {
+    return failure();
+  }
+  if (succeeded(parser.parseOptionalKeyword("as"))) {
+    if (failed(parser.parseLParen()) ||
+        failed(parser.parseAttribute(sym_name)) ||
+        failed(parser.parseRParen())) {
+      return failure();
+    }
+  } else {
+    sym_name = StringAttr::get(parser.getContext(), alias.getValue());
+  }
+  return success();
+}
+
+void printSymbolAlias(OpAsmPrinter &p, Operation *op, StringAttr sym_name,
+                      FlatSymbolRefAttr alias) {
+  p.printAttributeWithoutType(alias);
+  if (sym_name.getValue() != alias.getValue()) {
+    p << " as(\"" << sym_name.getValue() << "\")";
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // custom<TypeAlias>($encoding_type, $storage_type)
 //===----------------------------------------------------------------------===//
 // tensor<4xf32>

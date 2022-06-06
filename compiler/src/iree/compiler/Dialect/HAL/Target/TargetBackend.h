@@ -74,30 +74,30 @@ struct TargetOptions {
 //   [[-iree-hal-materialize-interfaces]]
 //   -> hal.executable @my_exe
 //      + hal.executable.variant @spirv-v1.1-mobile filter="spirv-v1.1-mobile*"
-//          hal.executable.entry_point @my_entry
+//          hal.executable.export @my_entry
 //          module { ... }
 //      + hal.executable.variant @spirv-v1.1-desktop
 //      filter="spirv-v1.1-desktop*"
-//          hal.executable.entry_point @my_entry
+//          hal.executable.export @my_entry
 //          module { ... }
 //      + hal.executable.variant @spirv-v1.2-desktop
 //      filter="spirv-v1.2-desktop*"
-//          hal.executable.entry_point @my_entry
+//          hal.executable.export @my_entry
 //          module { ... }
 //   [[-iree-hal-translate-executables]]
 //   -> hal.executable @my_exe
 //      + hal.executable.variant @spirv-v1.1-mobile filter="spirv-v1.1-mobile*"
-//          hal.executable.entry_point @my_entry_1
-//          hal.executable.entry_point @my_entry_2
-//          hal.executable.entry_point @my_entry_3
+//          hal.executable.export @my_entry_1
+//          hal.executable.export @my_entry_2
+//          hal.executable.export @my_entry_3
 //          module { spv.module { ... } }
 //      + hal.executable.variant @spirv-v1.1-desktop
 //      filter="spirv-v1.1-desktop*"
-//          hal.executable.entry_point @my_entry
+//          hal.executable.export @my_entry
 //          module { spv.module { ... } }
 //      + hal.executable.variant @spirv-v1.2-desktop
 //      filter="spirv-v1.2-desktop*"
-//          hal.executable.entry_point @my_entry
+//          hal.executable.export @my_entry
 //          module { spv.module { ... } }
 //   [[-iree-hal-link-executables]]
 //   -> TODO(benvanik): linkage rules.
@@ -148,7 +148,7 @@ class TargetBackend {
   //       hal.interface.binding @arg1, set=0, binding=1, ...
   //     }
   //     hal.executable.variant @target, target="target-backend" {
-  //       hal.executable.entry_point @main interface(@main_io) {
+  //       hal.executable.export @main interface(@main_io) {
   //         ordinal = 0 : index
   //       }
   //       module { ... }
@@ -159,7 +159,7 @@ class TargetBackend {
   //   hal.executable @some_executable {
   //     hal.interface @main_io ...
   //     hal.executable.variant @target, target="target-backend" {
-  //       hal.executable.entry_point @main ...
+  //       hal.executable.export @main ...
   //       module { spv.module { ... } }
   //     }
   //   }
@@ -185,9 +185,9 @@ class TargetBackend {
   //     hal.interface @io_0 { ... }
   //     hal.interface @io_1 { ... }
   //     hal.executable.variant @target, target="target-backend" {
-  //       hal.executable.entry_point @main_dispatch_0 attributes { ... }
-  //       hal.executable.entry_point @main_dispatch_1 attributes { ... }
-  //       hal.executable.entry_point @main_dispatch_2 attributes { ... }
+  //       hal.executable.export @main_dispatch_0 attributes { ... }
+  //       hal.executable.export @main_dispatch_1 attributes { ... }
+  //       hal.executable.export @main_dispatch_2 attributes { ... }
   //       module {
   //         func.func @main_0(...) { ... }
   //         func.func @main_1(...) { ... }
@@ -199,7 +199,7 @@ class TargetBackend {
   //   hal.executable @main_dispatch_0 {
   //     hal.interface @io { ... }
   //     hal.executable.variant @other, target="other" {
-  //       hal.executable.entry_point @main_dispatch_0 attributes { ... }
+  //       hal.executable.export @main_dispatch_0 attributes { ... }
   //       module { ... }
   //     }
   //   }

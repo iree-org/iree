@@ -12,7 +12,7 @@ from typing import List, Optional
 from pybuildkite import buildkite
 
 from common.buildkite_utils import (BuildObject, get_build_number,
-                                    get_build_state, get_pipeline, linkify)
+                                    get_build_state, get_pipeline, ansi_linkify)
 
 # Fake build to return when running locally.
 FAKE_PASSED_BUILD = dict(number=42, state="passed")
@@ -182,7 +182,7 @@ class BuildkitePipelineManager(object):
       output_str = (
           f"Waiting for build {build_number} to complete. Waited {wait_time}"
           f" seconds. Currently in state '{state.name}':"
-          f" {linkify(self.get_url_for_build(build_number))}")
+          f" {ansi_linkify(self.get_url_for_build(build_number))}")
       max_line_length = max(max_line_length, len(output_str))
       print(output_str.ljust(max_line_length), "\r", end="", flush=True)
       # Yes, polling is unfortunately the best we can do here :-(

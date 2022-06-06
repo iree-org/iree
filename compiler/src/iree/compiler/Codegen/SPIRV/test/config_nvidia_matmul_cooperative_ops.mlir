@@ -34,7 +34,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
            max_compute_workgroup_invocations = 1024 : i32,
            max_compute_workgroup_size = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
            subgroup_size = 32 : i32}>}> {
-    hal.executable.entry_point public @matmul_256x1024x128_div_sub layout(#executable_layout)
+    hal.executable.export public @matmul_256x1024x128_div_sub layout(#executable_layout)
     builtin.module {
       func.func @matmul_256x1024x128_div_sub() {
         %c0 = arith.constant 0 : index
@@ -78,7 +78,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 16, 16], [16, 16, 16]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorizeToCooperativeOps>
-//      CHECK: hal.executable.entry_point public @matmul_256x1024x128_div_sub
+//      CHECK: hal.executable.export public @matmul_256x1024x128_div_sub
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
 //      CHECK: func.func @matmul_256x1024x128_div_sub()
@@ -120,7 +120,7 @@ hal.executable public @matmul_256x1024x8 {
            max_compute_workgroup_invocations = 1024 : i32,
            max_compute_workgroup_size = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
            subgroup_size = 32 : i32}>}> {
-    hal.executable.entry_point public @matmul_256x1024x8 layout(#executable_layout)
+    hal.executable.export public @matmul_256x1024x8 layout(#executable_layout)
     builtin.module {
       func.func @matmul_256x1024x8() {
         %c0 = arith.constant 0 : index
@@ -145,5 +145,5 @@ hal.executable public @matmul_256x1024x8 {
 }
 
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize
-//       CHECK: hal.executable.entry_point public @matmul_256x1024x8
+//       CHECK: hal.executable.export public @matmul_256x1024x8
 //  CHECK-SAME:   translation_info = #[[TRANSLATION]]
