@@ -6,7 +6,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Collect compilation statistics from benchmark suites.
 
-The benchmark suites need to be built with IREE_ENABLE_COMPILATION_BENCHMARKS.
+The benchmark suites need to be built with ninja and enable the CMake option
+IREE_ENABLE_COMPILATION_BENCHMARKS.
 """
 
 import argparse
