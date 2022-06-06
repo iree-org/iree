@@ -66,7 +66,38 @@ static std::string strFromOs(function_ref<void(raw_ostream &)> func) {
 
 /// Escape special characters such as '\n' and quotation marks.
 static std::string escapeString(std::string str) {
-  return strFromOs([&](raw_ostream &os) { os.write_escaped(str); });
+  return strFromOs([&](raw_ostream &os) {
+    for (unsigned char c : str) {
+      switch (c) {
+        case '\\':
+          os << '\\' << '\\';
+          break;
+        case '\t':
+          os << '\\' << 't';
+          break;
+        case '\n':
+          os << '\\' << 'n';
+          break;
+        case '"':
+          os << '\\' << '"';
+          break;
+        case '\r':  // translate "carriage return" as "\l"
+          os << '\\' << 'l';
+          break;
+        default:
+          if (llvm::isPrint(c)) {
+            os << c;
+            break;
+          }
+
+          // Always use a full 3-character octal escape.
+          os << '\\';
+          os << char('0' + ((c >> 6) & 7));
+          os << char('0' + ((c >> 3) & 7));
+          os << char('0' + ((c >> 0) & 7));
+      }
+    }
+  });
 }
 
 /// Put quotation marks around a given string.
@@ -266,7 +297,7 @@ class DumpDispatchGraphPass
     os << " ";
     op.source().printAsOperand(os, state);
     os << " -> " << op.result().getType();
-    os << "\n";
+    os << "\r";
   }
 
   void printDispatchTensorStore(raw_ostream &os, DispatchTensorStoreOp op,
@@ -275,13 +306,15 @@ class DumpDispatchGraphPass
     op.value().printAsOperand(os, state);
     os << ", ";
     op.target().printAsOperand(os, state);
-    os << "\n";
+    os << "\r";
   }
 
   void printGeneric(raw_ostream &os, linalg::GenericOp op, AsmState &state) {
     printLinalgInsOuts(os, op, state);
-
-    // TODO: print out the operations inside
+    for (Operation &operation : *op.getBlock()) {
+      os.indent(8);
+      annotateOperation(os, &operation, state);
+    }
   }
 
   template <typename T>
@@ -291,7 +324,7 @@ class DumpDispatchGraphPass
     printOperands(os, op.inputs(), state);
     os << ") -> (";
     printOperands(os, op.outputs(), state);
-    os << ")\n";
+    os << ")\r";
   }
 
   void annotateOperation(raw_ostream &os, Operation *op, AsmState &state) {
@@ -326,7 +359,7 @@ class DumpDispatchGraphPass
       return;
     }
 
-    os << *op << "\n";
+    os << *op << "\r";
   }
 
   void printDispatchBody(raw_ostream &os, DispatchOp &dispatchOp) {
