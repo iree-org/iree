@@ -67,7 +67,7 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
   // here changes our minimum requirements and should be done carefully.
   // Optional extensions here are feature detected by the runtime.
 
-#ifdef IREE_PLATFORM_APPLE
+#if defined(IREE_PLATFORM_APPLE)
   // VK_KHR_portability_subset:
   // For Apple platforms, Vulkan is layered on top of Metal via MoltenVK.
   // It exposes this extension to allow a non-conformant Vulkan implementation
@@ -75,6 +75,14 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
   // be enabled if exists.
   ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_REQUIRED,
           VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+
+  // VK_KHR_portability_enumeration:
+  // Further, since devices which support the VK_KHR_portability_subset
+  // extension are not fully conformant Vulkan implementations, the Vulkan
+  // loader does not report those devices unless the application explicitly
+  // asks for them.
+  ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_REQUIRED,
+          VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
 #endif
 
   // VK_KHR_storage_buffer_storage_class:
