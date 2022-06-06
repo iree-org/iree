@@ -71,8 +71,6 @@ def parse_compilation_time_from_ninja_log(log_path: str) -> Dict[str, int]:
 
 
 def get_module_component_info(module_path: str) -> ModuleComponentSizes:
-  file_size = os.stat(module_path).st_size
-
   module_zipinfo = zipfile.ZipFile(module_path)
   size_map = dict(
       (info.filename, info.file_size) for info in module_zipinfo.infolist())
@@ -92,14 +90,14 @@ def get_module_component_info(module_path: str) -> ModuleComponentSizes:
         f"Unrecognized components in the module: {size_map.keys()}.")
 
   return ModuleComponentSizes(
-      file_size=file_size,
+      file_size=os.stat(module_path).st_size,
       vm_component_size=vm_component_size,
       const_component_size=const_component_size,
       total_dispatch_component_size=total_dispatch_component_size)
 
 
 def get_module_path(benchmark_case_dir: str) -> str:
-  """Retrieve the module path for compilation statistics from the flag file of a benchmark."""
+  """Retrieve the module path for compilation statistics from the flag file."""
 
   flagfile_path = os.path.join(benchmark_case_dir, BENCHMARK_FLAGFILE)
   module_path = None
