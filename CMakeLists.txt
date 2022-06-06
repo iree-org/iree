@@ -29,7 +29,6 @@ include(CMakeDependentOption)
 
 #-------------------------------------------------------------------------------
 # Project component configuration
-# See also: build_tools/cmake/iree_cmake_options.cmake
 #-------------------------------------------------------------------------------
 
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
@@ -43,6 +42,7 @@ option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
+option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
 option(IREE_BUILD_TORCH_MLIR_SUPPORT "Builds support for compiling torch-mlir programs." ON)
 
@@ -55,9 +55,6 @@ set(IREE_RELEASE_REVISION "HEAD" CACHE STRING "Version control revision informat
 
 option(IREE_BUILD_BINDINGS_TFLITE "Builds the IREE TFLite C API compatibility shim" ON)
 option(IREE_BUILD_BINDINGS_TFLITE_JAVA "Builds the IREE TFLite Java bindings with the C API compatibility shim" ON)
-
-# Default python bindings to enabled for some features.
-option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 
 # Properties building and controlling benchmark suites.
 option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." OFF)
@@ -126,6 +123,31 @@ endif()
 if(IREE_HAL_DRIVER_VULKAN)
   message(STATUS "  - vulkan")
 endif()
+
+#-------------------------------------------------------------------------------
+# Compiler Target Options
+# By default, all compiler targets supported by the current platform which do
+# not require external deps are enabled by default. This can be changed with:
+#   -DIREE_TARGET_BACKEND_DEFAULTS=OFF
+#-------------------------------------------------------------------------------
+
+option(IREE_TARGET_BACKEND_DEFAULTS "Sets the default value for all compiler target backends" ON)
+
+# The VMVX backend is always enabled.
+cmake_dependent_option(IREE_TARGET_BACKEND_VMVX "Enables the 'vmvx' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
+
+# Supported default target backends.
+cmake_dependent_option(IREE_TARGET_BACKEND_DYLIB_LLVM_AOT "Enables the 'dylib-llvm-aot' compiler target backend" ${IREE_TARGET_BACKEND_DEFAULTS} ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_METAL_SPIRV "Enables the 'metal-spirv' compiler target backend" ${IREE_TARGET_BACKEND_DEFAULTS} ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_WASM_LLVM_AOT "Enables the 'wasm-llvm-aot' compiler target backend" ${IREE_TARGET_BACKEND_DEFAULTS} ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_VULKAN_SPIRV "Enables the 'vulkan-spirv' compiler target backend" ${IREE_TARGET_BACKEND_DEFAULTS} ${IREE_BUILD_COMPILER} OFF)
+
+# Non-default target backends either have additional dependencies or are
+# experimental/niche in some fashion.
+cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
+# Disable WebGPU by default - it has complex deps and is under development.
+cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
 
 #-------------------------------------------------------------------------------
 # IREE compilation toolchain configuration
@@ -232,7 +254,6 @@ include(sanitizers)
 include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
-include(iree_cmake_options)
 include(iree_external_cmake_options)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
@@ -257,13 +278,6 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
-
-#-------------------------------------------------------------------------------
-# Core options initialization (for options defined in macros in
-# iree_cmake_options.cmake).
-#-------------------------------------------------------------------------------
-
-iree_set_compiler_cmake_options()
 
 #-------------------------------------------------------------------------------
 # IREE compilation flags
