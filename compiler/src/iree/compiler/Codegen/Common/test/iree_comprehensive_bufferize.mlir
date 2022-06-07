@@ -917,14 +917,24 @@ module {
   }
 }
 // CHECK-LABEL: func.func @subtensor_insert()
-//   DISABLE-CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-//   DISABLE-CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//   DISABLE-CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-//   DISABLE-CHECK-DAG:   %[[D0:.+]] = hal.interface.constant.load[0] : index
-//   DISABLE-CHECK-DAG:   %[[D1:.+]] = hal.interface.constant.load[1] : index
-//       DISABLE-CHECK:   linalg.generic {{.*}} ins(%[[ARG1]] {{.*}} outs(%[[RET0]]
-//       DISABLE-CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[RET0]][3, 4] [%[[D0]], %[[D1]]] [1, 1]
-//       DISABLE-CHECK:   linalg.generic {{.*}} ins(%[[ARG0]] {{.*}} outs(%[[SUBVIEW]]
+//   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+//   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+//   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//   CHECK-DAG:   %[[D0:.+]] = hal.interface.constant.load[0] : index
+//   CHECK-DAG:   %[[D1:.+]] = hal.interface.constant.load[1] : index
+//   CHECK-DAG:   %[[D2:.+]] = hal.interface.constant.load[2] : index
+//   CHECK-DAG:   %[[D3:.+]] = hal.interface.constant.load[3] : index
+//   CHECK-DAG:   %[[D4:.+]] = hal.interface.constant.load[4] : index
+//   CHECK-DAG:   %[[D5:.+]] = hal.interface.constant.load[5] : index
+//   CHECK-DAG:   %[[ARG0_DUP:.+]] = memref.subview %[[ARG0]]
+//   CHECK-DAG:   %[[ARG1_DUP:.+]] = memref.subview %[[ARG1]]
+//   CHECK-DAG:   %[[ALLOC:.+]] = memref.alloc(%[[D2]], %[[D3]]) : memref<?x?xi32>
+//       CHECK:   linalg.generic {{.*}} ins(%[[ARG1_DUP]] {{.*}} outs(%[[ALLOC]]
+//       CHECK:   %[[SUB_ALLOC:.+]] = memref.subview %[[ALLOC]]
+//       CHECK:   linalg.generic {{.*}} ins(%[[ARG0_DUP]] {{.*}} outs(%[[SUB_ALLOC]]
+//       CHECK:   %[[RET0_DUP:.+]] = memref.subview %[[RET0]][0, 0] [%[[D4]], %[[D5]]] [1, 1]
+//       CHECK:   linalg.generic {{.*}} ins(%[[ALLOC]] {{.*}} outs(%[[RET0_DUP]]
+//       CHECK:   memref.dealloc %[[ALLOC]]
 
 // -----
 
