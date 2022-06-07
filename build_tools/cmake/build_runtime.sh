@@ -5,30 +5,24 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build IREE's runtime using CMake. Designed for CI, but can be run manually.
-# This uses previously cached build results and does not clear build
-# directories.
+# Build IREE's runtime using CMake. The desired build directory can be passed as
+# the first argument. Otherwise, it uses the environment variable
+# IREE_RUNTIME_BUILD_DIR, defaulting to "build-runtime". Designed for CI, but
+# can be run manually. This reuses the build directory if it already exists.
 
-set -e
-set -x
+set -euo pipefail
 
-ROOT_DIR=$(git rev-parse --show-toplevel)
-cd ${ROOT_DIR?}
+SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-"${CMAKE_BIN?}" --version
-ninja --version
+BUILD_DIR="${1:-}"
 
-if [ -d "build-runtime" ]
-then
-  echo "build-runtime directory already exists. Will use cached results there."
-else
-  echo "build-runtime directory does not already exist. Creating a new one."
-  mkdir build-runtime
+if [[ -z "${BUILD_DIR}" ]]; then
+  BUILD_DIR="${IREE_RUNTIME_BUILD_DIR:-build-runtime}"
 fi
-cd build-runtime
 
-"${CMAKE_BIN?}" -G Ninja .. \
+source "${SCRIPT_DIR}/setup_build.sh"
+
+"${CMAKE_BIN}" -B "${BUILD_DIR}" -G Ninja . \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DIREE_BUILD_COMPILER=OFF
-"${CMAKE_BIN?}" --build . -- -k 0
+"${CMAKE_BIN}" --build "${BUILD_DIR}" -- -k 0
