@@ -284,7 +284,7 @@ def main(args):
   # manager: https://cloud.google.com/secret-manager. Users can create a
   # personal token for running this script locally:
   # https://buildkite.com/docs/apis/managing-api-tokens
-  access_token = os.environ["BUILDKITE_ACCESS_TOKEN"]
+  access_token = os.environ["IREE_BUILDKITE_ACCESS_TOKEN"]
 
   # Buildkite sets these environment variables. See
   # https://buildkite.com/docs/pipelines/environment-variables. If running
