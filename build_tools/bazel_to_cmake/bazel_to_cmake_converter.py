@@ -39,10 +39,10 @@ def _convert_string_arg_block(name, value, quote=True):
     return f"  {name}\n    {value}\n"
 
 timeout_map = {
-    "short" : 60,
-    "moderate" : 300,
-    "long" : 900,
-    "eternal" : 3600,
+    "short": 60,
+    "moderate": 300,
+    "long": 900,
+    "eternal": 3600,
 }
 
 def _convert_timeout_arg_block(name, value):
