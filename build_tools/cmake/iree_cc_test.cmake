@@ -179,7 +179,6 @@ function(iree_cc_test)
     set(_RULE_TIMEOUT 60)
   endif()
   
-
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
