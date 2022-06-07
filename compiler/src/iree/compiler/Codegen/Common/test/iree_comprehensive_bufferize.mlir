@@ -287,22 +287,22 @@ module {
     return
   }
 }
-// CHECK-LABEL: func.func @tile_from_tensor_load()
-//   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-//   CHECK-DAG:   memref.assume_alignment %[[TENSOR_LHS]], 32 : memref<?x?xf32>
-//   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//   CHECK-DAG:   %[[TENSOR_INIT:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-//   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
-//       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
-//       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
-//   CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
-//   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
-//   CHECK-DAG:       %[[INIT:.+]] = memref.subview %[[TENSOR_INIT]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
-//   CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
-//       CHECK:       linalg.generic {{.*}} ins(%[[INIT]] {{.*}} outs(%[[RESULT]]
-//       CHECK:       linalg.matmul
-//  CHECK-SAME:         ins(%[[LHS]], %[[RHS]]
-//  CHECK-SAME:         outs(%[[RESULT]]
+// DISABLE-CHECK-LABEL: func.func @tile_from_tensor_load()
+//   DISABLE-CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+//   DISABLE-CHECK-DAG:   memref.assume_alignment %[[TENSOR_LHS]], 32 : memref<?x?xf32>
+//   DISABLE-CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+//   DISABLE-CHECK-DAG:   %[[TENSOR_INIT:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//   DISABLE-CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
+//       DISABLE-CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
+//       DISABLE-CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
+//   DISABLE-CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
+//   DISABLE-CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
+//   DISABLE-CHECK-DAG:       %[[INIT:.+]] = memref.subview %[[TENSOR_INIT]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//   DISABLE-CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//       DISABLE-CHECK:       linalg.generic {{.*}} ins(%[[INIT]] {{.*}} outs(%[[RESULT]]
+//       DISABLE-CHECK:       linalg.matmul
+//  DISABLE-CHECK-SAME:         ins(%[[LHS]], %[[RHS]]
+//  DISABLE-CHECK-SAME:         outs(%[[RESULT]]
 
 // -----
 
