@@ -42,7 +42,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
       self.__run_benchmark(case_dir=benchmark_case.benchmark_case_dir,
                            tool_name=benchmark_case.benchmark_tool_name,
                            results_filename=benchmark_results_filename,
-                           driver=benchmark_case.driver,
+                           config=benchmark_case.config,
                            taskset=taskset)
 
     if capture_filename:
@@ -52,14 +52,14 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
                          taskset=taskset)
 
   def __run_benchmark(self, case_dir, tool_name: str, results_filename: str,
-                      driver: str, taskset: str):
+                      config: str, taskset: str):
     tool_path = os.path.join(self.config.normal_benchmark_tool_dir, tool_name)
     cmd = ["taskset", taskset, tool_path, f"--flagfile={MODEL_FLAGFILE_NAME}"]
     if tool_name == "iree-benchmark-module":
       cmd.extend(
           get_iree_benchmark_module_arguments(
               results_filename=results_filename,
-              driver=driver,
+              config=config,
               benchmark_min_time=self.config.benchmark_min_time))
 
     result_json = execute_cmd_and_get_output(cmd,

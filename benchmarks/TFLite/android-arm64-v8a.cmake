@@ -45,8 +45,10 @@ iree_benchmark_suite(
     ${ANDROID_CPU_TRANSLATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-dylib-sync"
   DRIVER
-    "dylib-sync"
+    "local-sync"
 )
 
 # CPU, Dylib, 1 through 4 threads, big/little-core, full-inference.
@@ -74,8 +76,10 @@ iree_benchmark_suite(
     ${ANDROID_CPU_TRANSLATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-dylib"
   DRIVER
-    "dylib"
+    "local-task"
   RUNTIME_FLAGS
     "--task_topology_group_count=1"
 )
@@ -105,8 +109,10 @@ iree_benchmark_suite(
 #     ${ANDROID_CPU_TRANSLATION_FLAGS}
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
+#   CONFIG
+#    "iree-dylib"
 #   DRIVER
-#     "dylib"
+#     "local-task"
 #   RUNTIME_FLAGS
 #     "--task_topology_group_count=2"
 # )
@@ -134,8 +140,10 @@ iree_benchmark_suite(
 #     ${ANDROID_CPU_TRANSLATION_FLAGS}
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
+#   CONFIG
+#    "iree-dylib"
 #   DRIVER
-#     "dylib"
+#     "local-task"
 #   RUNTIME_FLAGS
 #     "--task_topology_group_count=3"
 # )
@@ -164,8 +172,10 @@ iree_benchmark_suite(
     ${ANDROID_CPU_TRANSLATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-dylib"
   DRIVER
-    "dylib"
+    "local-task"
   RUNTIME_FLAGS
     "--task_topology_group_count=4"
 )
@@ -214,8 +224,10 @@ iree_benchmark_suite(
     "--iree-flow-mmt4d-target-options=arch=aarch64"
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-dylib-sync"
   DRIVER
-    "dylib-sync"
+    "local-sync"
 )
 
 # CPU, Dylib-Sync, big/little-core, full-inference, +dotprod
@@ -242,8 +254,10 @@ iree_benchmark_suite(
     "--iree-llvm-target-cpu-features=+dotprod"
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-dylib-sync"
   DRIVER
-    "dylib-sync"
+    "local-sync"
 )
 
 # TODO(#7792): Consider re-enabling little-core experimental-flags if we start
@@ -277,8 +291,10 @@ iree_benchmark_suite(
     "--iree-flow-mmt4d-target-options=arch=aarch64"
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-dylib"
   DRIVER
-    "dylib"
+    "local-task"
   RUNTIME_FLAGS
     "--task_topology_group_count=1"
 )
@@ -307,8 +323,10 @@ iree_benchmark_suite(
     "--iree-llvm-target-cpu-features=+dotprod"
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-dylib"
   DRIVER
-    "dylib"
+    "local-task"
   RUNTIME_FLAGS
     "--task_topology_group_count=1"
 )
@@ -339,8 +357,10 @@ iree_benchmark_suite(
 #     "--iree-flow-mmt4d-target-options=arch=aarch64"
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
+#   CONFIG
+#    "iree-dylib"
 #   DRIVER
-#     "dylib"
+#     "local-task"
 #   RUNTIME_FLAGS
 #     "--task_topology_group_count=2"
 # )
@@ -369,8 +389,10 @@ iree_benchmark_suite(
 #     "--iree-flow-mmt4d-target-options=arch=aarch64"
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
+#   CONFIG
+#    "iree-dylib"
 #   DRIVER
-#     "dylib"
+#     "local-task"
 #   RUNTIME_FLAGS
 #     "--task_topology_group_count=3"
 # )
@@ -404,8 +426,10 @@ iree_benchmark_suite(
 
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-dylib"
   DRIVER
-    "dylib"
+    "local-task"
   RUNTIME_FLAGS
     "--task_topology_group_count=4"
 )
@@ -435,8 +459,10 @@ iree_benchmark_suite(
 
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-dylib"
   DRIVER
-    "dylib"
+    "local-task"
   RUNTIME_FLAGS
     "--task_topology_group_count=4"
 )
@@ -464,8 +490,10 @@ iree_benchmark_suite(
     "--iree-input-type=tosa"
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-vmvx"
   DRIVER
-    "vmvx"
+    "local-task"
   RUNTIME_FLAGS
     "--task_topology_group_count=4"
 )

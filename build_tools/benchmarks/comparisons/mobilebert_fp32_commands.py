@@ -48,7 +48,7 @@ class IreeMobilebertFP32(IreeBenchmarkCommand):
                benchmark_binary: str,
                model_name: str,
                model_path: str,
-               driver: str = "dylib",
+               driver: str = "local-task",
                num_threads: int = _DEFAULT_NUM_THREADS,
                num_runs: int = _DEFAULT_NUM_BENCHMARK_RUNS,
                taskset: Optional[str] = None):
@@ -109,7 +109,7 @@ class MobilebertFP32CommandFactory(BenchmarkCommandFactory):
                                              driver="cpu")
 
     # Generate IREE benchmarks.
-    driver = "dylib"
+    driver = "local-task"
     iree_model_path = os.path.join(self._base_dir, "models", "iree", driver,
                                    self._model_name + ".vmfb")
     iree_mobilebert = IreeMobilebertFP32(self._iree_benchmark_binary_path,

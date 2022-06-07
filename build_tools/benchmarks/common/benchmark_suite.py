@@ -35,6 +35,7 @@ import re
 
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
+from common.benchmark_definition import IREE_DRIVERS_INFOS
 
 # All benchmarks' relative path against root build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
@@ -46,11 +47,11 @@ MODEL_TOOLFILE_NAME = "tool"
 @dataclass
 class BenchmarkCase:
   """Represents a benchmark case.
-  
+
     model_name_with_tags: the source model with tags, e.g., 'MobileSSD-fp32'.
     bench_mode: the benchmark mode, e.g., '1-thread,big-core'.
     target_arch: the target CPU/GPU architature, e.g., 'GPU-Adreno'.
-    driver: the IREE driver to run with, e.g., 'dylib'.
+    config: the IREE runtime configuration, e.g., 'dylib'.
     benchmark_case_dir: the path to benchmark case directory.
     benchmark_tool_name: the benchmark tool, e.g., 'iree-benchmark-module'.
   """
@@ -58,7 +59,7 @@ class BenchmarkCase:
   model_name_with_tags: str
   bench_mode: Sequence[str]
   target_arch: str
-  driver: str
+  config: str
   benchmark_case_dir: str
   benchmark_tool_name: str
 
@@ -68,7 +69,7 @@ class BenchmarkSuite(object):
 
   def __init__(self, suite_map: Dict[str, List[BenchmarkCase]]):
     """Construct a benchmark suite.
-    
+
     Args:
       suites: the map of benchmark cases keyed by category directories.
     """
@@ -78,7 +79,7 @@ class BenchmarkSuite(object):
 
   def list_categories(self) -> List[Tuple[str, str]]:
     """Returns all categories and their directories.
-    
+
     Returns:
       A tuple of (category name, category dir).
     """
@@ -91,6 +92,7 @@ class BenchmarkSuite(object):
       self,
       category: str,
       available_drivers: Sequence[str],
+      available_loaders: Sequence[str],
       cpu_target_arch_filter: str,
       gpu_target_arch_filter: str,
       driver_filter: Optional[str] = None,
@@ -100,6 +102,7 @@ class BenchmarkSuite(object):
       Args:
         category: the specific benchmark category.
         available_drivers: list of drivers supported by the tools.
+        available_loaders: list of executable loaders supported by the tools.
         cpu_target_arch_filter: CPU target architecture filter regex.
         gpu_target_arch_filter: GPU target architecture filter regex.
         driver_filter: driver filter regex.
@@ -115,9 +118,16 @@ class BenchmarkSuite(object):
 
     chosen_cases = []
     for benchmark_case in self.suite_map[category_dir]:
-      driver = benchmark_case.driver[len("iree-"):].lower()
-      matched_driver = (driver in available_drivers) and (
-          driver_filter is None or re.match(driver_filter, driver) is not None)
+      config_info = IREE_DRIVERS_INFOS[benchmark_case.config.lower()]
+
+      driver_name = config_info.driver_name
+      matched_driver = (driver_name in available_drivers) and (
+          driver_filter is None or
+          re.match(driver_filter, driver_name) is not None)
+
+      matched_loader = not config_info.loader_name or (config_info.loader_name
+                                                       in available_loaders)
+
       target_arch = benchmark_case.target_arch.lower()
       matched_arch = (re.match(cpu_target_arch_filter,
                                target_arch) is not None or
@@ -132,8 +142,8 @@ class BenchmarkSuite(object):
       matched_model_name = (model_name_filter is None or re.match(
           model_name_filter, model_and_case_name) is not None)
 
-      if (matched_driver and matched_arch and matched_model_name and
-          matched_mode):
+      if (matched_driver and matched_loader and matched_arch and
+          matched_model_name and matched_mode):
         chosen_cases.append(benchmark_case)
 
     return chosen_cases
@@ -152,7 +162,7 @@ class BenchmarkSuite(object):
       if len(segments) != 3 or not segments[0].startswith("iree-"):
         continue
 
-      iree_driver, target_arch, bench_mode = segments
+      config, target_arch, bench_mode = segments
       bench_mode = bench_mode.split(",")
 
       # The path of model_dir is expected to be:
@@ -167,7 +177,7 @@ class BenchmarkSuite(object):
           BenchmarkCase(model_name_with_tags=model_name_with_tags,
                         bench_mode=bench_mode,
                         target_arch=target_arch,
-                        driver=iree_driver,
+                        config=config,
                         benchmark_case_dir=benchmark_case_dir,
                         benchmark_tool_name=tool_name))
 

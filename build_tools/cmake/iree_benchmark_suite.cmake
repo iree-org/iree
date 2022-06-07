@@ -37,6 +37,7 @@
 #   TARGET_ARCHITECTURE: The detailed target backend's architecture.
 #   TRANSLATION_FLAGS: A list of command-line options and their values to
 #       pass to the IREE translation tool for artifact generation.
+#   CONFIG: Benchmark runner configuration name.
 #   DRIVER: The runtime driver.
 #   RUNTIME_FLAGS: A list of command-line options and their values to pass
 #       to the IREE runtime during benchmark exectuion.
@@ -70,13 +71,13 @@ function(iree_benchmark_suite)
     PARSE_ARGV 0
     _RULE
     ""
-    "GROUP_NAME;DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
+    "GROUP_NAME;CONFIG;DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
     "BENCHMARK_MODES;BENCHMARK_TOOL;MODULES;TRANSLATION_FLAGS;RUNTIME_FLAGS"
   )
 
   iree_validate_required_arguments(
     _RULE
-    "GROUP_NAME;DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
+    "GROUP_NAME;CONFIG;DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
     "BENCHMARK_MODES;BENCHMARK_TOOL;MODULES"
   )
 
@@ -178,7 +179,7 @@ function(iree_benchmark_suite)
     string(JOIN "-" _MODULE_DIR_NAME "${_MODULE_NAME}" "${_MODULE_TAGS}")
     foreach(_BENCHMARK_MODE IN LISTS _RULE_BENCHMARK_MODES)
       set(_BENCHMARK_DIR_NAME
-          "iree-${_RULE_DRIVER}__${_RULE_TARGET_ARCHITECTURE}__${_BENCHMARK_MODE}")
+          "${_RULE_CONFIG}__${_RULE_TARGET_ARCHITECTURE}__${_BENCHMARK_MODE}")
 
       # A list of name segments for composing unique CMake target names.
       set(_COMMON_NAME_SEGMENTS "${_MODULE_NAME}")

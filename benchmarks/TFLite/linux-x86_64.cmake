@@ -45,8 +45,10 @@ iree_benchmark_suite(
     ${LINUX_X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-dylib-sync"
   DRIVER
-    "dylib-sync"
+    "local-sync"
 )
 
 # CPU, Dylib, 1 thread, x86_64, full-inference
@@ -72,8 +74,10 @@ iree_benchmark_suite(
     ${LINUX_X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-dylib"
   DRIVER
-    "dylib"
+    "local-task"
   RUNTIME_FLAGS
     "--task_topology_group_count=1"
 )
@@ -101,8 +105,10 @@ iree_benchmark_suite(
     ${LINUX_X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-dylib"
   DRIVER
-    "dylib"
+    "local-task"
   RUNTIME_FLAGS
     "--task_topology_group_count=4"
 )
@@ -130,8 +136,10 @@ iree_benchmark_suite(
     ${LINUX_X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-dylib"
   DRIVER
-    "dylib"
+    "local-task"
   RUNTIME_FLAGS
     "--task_topology_group_count=8"
 )
