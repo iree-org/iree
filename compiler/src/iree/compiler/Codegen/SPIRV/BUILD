@@ -76,6 +76,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MathToSPIRV",
+        "@llvm-project//mlir:MathTransforms",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:MemRefToSPIRV",
         "@llvm-project//mlir:MemRefTransforms",
