@@ -57,12 +57,6 @@ struct TestTopkSplitReductionPass
                                             std::move(patterns)))) {
       return signalPassFailure();
     }
-
-    getOperation()->walk([&](Operation *op) {
-      // if (op->getName().getStringRef() != opToWrap)
-      return;
-      // linalg::transform::wrapInScope(op);
-    });
   }
 
   Pass::Option<int64_t> splitRatio{*this, "split-ratio",

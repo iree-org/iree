@@ -15,11 +15,9 @@
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineExpr.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/STLExtras.h"
 
 using namespace mlir;
@@ -120,16 +118,6 @@ FailureOr<TopkOp> mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction::
   Value valuesExpanded = rewriter.create<tensor::ExpandShapeOp>(
       loc, valuesExpandedType, valuesOrig, reassociationIndices);
 
-  // Expand the input indicies if they exist
-  RankedTensorType indicesExpandedType;
-  Value indicesExpanded;
-  if (auto indicesOrig = topkOp.indices()) {
-    indicesExpandedType =
-        RankedTensorType::get(expandedShape, indicesElementType);
-    indicesExpanded = rewriter.create<tensor::ExpandShapeOp>(
-        loc, indicesExpandedType, *indicesOrig, reassociationIndices);
-  }
-
   // Define the expanded output types
   SmallVector<int64_t> expandedResultShape = expandedShape;
   expandedResultShape[kDimParallel] = k;
@@ -173,15 +161,11 @@ FailureOr<TopkOp> mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction::
           .result();
 
   // Spit reduction topk (first phase)
-  SmallVector<Value> expandedIns = {valuesExpanded};
-  if (topkOp.indices()) {
-    expandedIns.push_back(indicesExpanded);
-  }
   auto parallelTopkOp = rewriter.create<IREE::LinalgExt::TopkOp>(
       loc,
       /* resultTypes= */
       TypeRange{outputValuesExpandedType, outputIndicesExpandedType},
-      /* ins= */ expandedIns,
+      /* ins= */ ValueRange{valuesExpanded},
       /* outs= */ ValueRange{negInfTensor, posInfTensor}, kDimParallel);
   // rewriter.inlineRegionBefore(topkOp.region(), parallelTopkOp.region(),
   // parallelTopkOp.region().end());
