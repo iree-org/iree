@@ -57,7 +57,7 @@ class BuildkitePipelineManager(object):
     self._env = {
         # Indicate the name of the pipeline to trigger. This is used by the
         # 'unregistered' pipeline to upload the correct pipeline file.
-        "IREE_BUILDKITE_IREE_BUILDKITE_REQUESTED_PIPELINE":
+        "IREE_BUILDKITE_REQUESTED_PIPELINE":
             pipeline,
         # Provide information about the pipeline doing the triggering.
         "IREE_BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG":
