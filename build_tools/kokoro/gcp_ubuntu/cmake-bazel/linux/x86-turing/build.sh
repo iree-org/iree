@@ -81,7 +81,10 @@ tests_passed=true
 # Only test drivers that use the GPU, since we run all tests on non-GPU machines
 # as well.
 echo "***** Testing with CTest *****"
-if ! ctest --timeout 900 --output-on-failure \
+if ! ctest \
+   --timeout 900 \
+   --output-on-failure \
+   --no-tests=error \
    --tests-regex "^integrations/tensorflow/|^runtime/bindings/python/" \
    --label-regex "^driver=vulkan$|^driver=cuda$" \
    --label-exclude "^nokokoro$"
