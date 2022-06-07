@@ -50,8 +50,9 @@ class BenchmarkDriverTest(unittest.TestCase):
     self.root_dir = tempfile.TemporaryDirectory()
 
     with open(os.path.join(self.tmp_dir.name, "build_config.txt"), "w") as f:
-      f.write("IREE_HAL_DRIVER_DYLIB=ON\n")
-      f.write("IREE_HAL_DRIVER_DYLIB_SYNC=ON\n")
+      f.write("IREE_HAL_DRIVER_LOCAL_SYNC=ON\n")
+      f.write("IREE_HAL_DRIVER_LOCAL_TASK=ON\n")
+      f.write("IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF=ON\n")
 
     self.config = BenchmarkConfig(
         root_benchmark_dir=self.root_dir.name,
@@ -75,13 +76,13 @@ class BenchmarkDriverTest(unittest.TestCase):
     case1 = BenchmarkCase(model_name_with_tags="DeepNet",
                           bench_mode=["1-thread", "full-inference"],
                           target_arch="CPU-ARM64-v8A",
-                          driver="iree-dylib",
+                          config="iree-dylib",
                           benchmark_case_dir="case1",
                           benchmark_tool_name="tool")
     case2 = BenchmarkCase(model_name_with_tags="DeepNetv2-f32",
                           bench_mode=["full-inference"],
                           target_arch="CPU-ARM64-v8A",
-                          driver="iree-dylib-sync",
+                          config="iree-dylib-sync",
                           benchmark_case_dir="case2",
                           benchmark_tool_name="tool")
     self.benchmark_suite = BenchmarkSuite({

@@ -47,21 +47,30 @@ class DriverInfo:
   It includes the following characteristics:
   - pretty_name: the pretty name, e.g., 'IREE-DyLib'
   - device_type: the targeted device type, e.g., 'CPU'
+  - driver_name: runtime driver flag, e.g., 'local-task'
+  - loader_name: executable loader name, if used
   """
 
   pretty_name: str
   device_type: str
+  driver_name: str
+  loader_name: str
 
 
 # A map for IREE driver names. This allows us to normalize driver names like
 # mapping to more friendly ones and detach to keep driver names used in
 # benchmark presentation stable.
 IREE_DRIVERS_INFOS = {
-    "iree-dylib": DriverInfo("IREE-Dylib", "CPU"),
-    "iree-dylib-sync": DriverInfo("IREE-Dylib-Sync", "CPU"),
-    "iree-vmvx": DriverInfo("IREE-VMVX", "CPU"),
-    "iree-vmvx-sync": DriverInfo("IREE-VMVX-Sync", "CPU"),
-    "iree-vulkan": DriverInfo("IREE-Vulkan", "GPU"),
+    "iree-dylib":
+        DriverInfo("IREE-Dylib", "CPU", "local-task", "embedded-elf"),
+    "iree-dylib-sync":
+        DriverInfo("IREE-Dylib-Sync", "CPU", "local-sync", "embedded-elf"),
+    "iree-vmvx":
+        DriverInfo("IREE-VMVX", "CPU", "local-task", "vmvx-module"),
+    "iree-vmvx-sync":
+        DriverInfo("IREE-VMVX-Sync", "CPU", "local-sync", "vmvx-module"),
+    "iree-vulkan":
+        DriverInfo("IREE-Vulkan", "GPU", "vulkan", ""),
 }
 
 IREE_PRETTY_NAMES_TO_DRIVERS = {
@@ -114,11 +123,11 @@ def get_git_commit_hash(commit: str) -> str:
 
 def get_iree_benchmark_module_arguments(
     results_filename: str,
-    driver: str,
+    config: str,
     benchmark_min_time: Optional[float] = None):
   """Returns the common arguments to run iree-benchmark-module."""
 
-  if driver == "iree-vmvx":
+  if config == "iree-vmvx" or config == "iree-vmvx-sync":
     # VMVX is very unoptimized for now and can take a long time to run.
     # Decrease the repetition for it until it's reasonably fast.
     repetitions = 3

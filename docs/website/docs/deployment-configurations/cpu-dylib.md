@@ -35,8 +35,9 @@ in by default on all platforms.
 
 <!-- TODO(??): a way to verify dylib is compiled in and supported -->
 
-Ensure that the `IREE_HAL_DRIVER_DYLIB` CMake option is `ON` when configuring
-for the target.
+Ensure that the `IREE_HAL_DRIVER_LOCAL_TASK` and
+`IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF` CMake options are `ON` when
+configuring for the target.
 
 ### Get compiler for CPU native instructions
 
@@ -119,7 +120,7 @@ In the build directory, run the following command:
 
 ``` shell hl_lines="2"
 tools/iree-run-module \
-    --driver=dylib \
+    --driver=local-task \
     --module_file=mobilenet-dylib.vmfb \
     --entry_function=predict \
     --function_input="1x224x224x3xf32=0"

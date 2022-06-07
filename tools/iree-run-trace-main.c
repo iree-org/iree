@@ -22,7 +22,7 @@ IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
 IREE_FLAG(bool, print_statistics, false,
           "Prints runtime statistics to stderr on exit.");
 
-IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
+IREE_FLAG(string, driver, "local-task", "Backend driver to use.");
 
 // Runs the trace in |file| using |root_path| as the base for any path lookups
 // required for external files referenced in |file|.

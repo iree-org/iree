@@ -16,7 +16,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if((IREE_HAL_DRIVER_VMVX OR IREE_HAL_DRIVER_VMVX_SYNC) AND
+if(IREE_HAL_DRIVER_LOCAL_SYNC AND IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE AND
    (IREE_TARGET_BACKEND_VMVX OR DEFINED IREE_HOST_BINARY_ROOT))
 """,
     inline = True,
@@ -66,7 +66,7 @@ endif()
 
 iree_cmake_extra_content(
     content = """
-if((IREE_HAL_DRIVER_DYLIB OR IREE_HAL_DRIVER_DYLIB_SYNC) AND
+if(IREE_HAL_DRIVER_LOCAL_SYNC AND IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF AND
    (IREE_TARGET_BACKEND_DYLIB_LLVM_AOT OR DEFINED IREE_HOST_BINARY_ROOT))
 """,
     inline = True,
@@ -184,7 +184,7 @@ native_test(
 
 iree_cmake_extra_content(
     content = """
-if(IREE_HAL_DRIVER_DYLIB)
+if(IREE_HAL_DRIVER_LOCAL_TASK AND IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
 """,
     inline = True,
 )

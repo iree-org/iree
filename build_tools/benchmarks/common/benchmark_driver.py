@@ -83,7 +83,7 @@ class BenchmarkDriver(object):
 
   def run(self) -> None:
     """Execute the benchmark flow.
-  
+
     It performs the following steps:
       1. Enumerate all categories in the benchmark suites.
       2. For each category, enumerate and filter benchmark cases.
@@ -100,12 +100,13 @@ class BenchmarkDriver(object):
 
     cpu_target_arch = self.device_info.get_iree_cpu_arch_name()
     gpu_target_arch = self.device_info.get_iree_gpu_arch_name()
-    drivers = self.__get_available_drivers()
+    drivers, loaders = self.__get_available_drivers_and_loaders()
 
     for category, _ in self.benchmark_suite.list_categories():
       benchmark_cases = self.benchmark_suite.filter_benchmarks_for_category(
           category=category,
           available_drivers=drivers,
+          available_loaders=loaders,
           cpu_target_arch_filter=f"^{cpu_target_arch}$",
           gpu_target_arch_filter=f"^{gpu_target_arch}$",
           driver_filter=self.config.driver_filter,
@@ -216,10 +217,11 @@ class BenchmarkDriver(object):
                          model_tags=model_tags,
                          model_source=category,
                          bench_mode=benchmark_case.bench_mode,
-                         runner=benchmark_case.driver,
+                         runner=benchmark_case.config,
                          device_info=self.device_info)
 
-  def __get_available_drivers(self) -> Sequence[str]:
+  def __get_available_drivers_and_loaders(
+      self) -> Tuple[Sequence[str], Sequence[str]]:
     any_tool_dir = (self.config.normal_benchmark_tool_dir
                     if self.config.normal_benchmark_tool_dir else
                     self.config.trace_capture_config.traced_benchmark_tool_dir)
@@ -228,27 +230,34 @@ class BenchmarkDriver(object):
       config_txt_file_lines = config_txt_file.readlines()
 
     available_drivers = []
+    available_loaders = []
     for line in config_txt_file_lines:
       name, value = line.strip().split("=")
       if value != "ON":
         continue
       if name == "IREE_HAL_DRIVER_CUDA":
         available_drivers.append("cuda")
-      elif name == "IREE_HAL_DRIVER_DYLIB":
-        available_drivers.append("dylib")
-      elif name == "IREE_HAL_DRIVER_DYLIB_SYNC":
-        available_drivers.append("dylib-sync")
+      elif name == "IREE_HAL_DRIVER_LOCAL_SYNC":
+        available_drivers.append("local-sync")
+      elif name == "IREE_HAL_DRIVER_LOCAL_TASK":
+        available_drivers.append("local-task")
       elif name == "IREE_HAL_DRIVER_EXPERIMENTAL_ROCM":
         available_drivers.append("rocm")
-      elif name == "IREE_HAL_DRIVER_VMVX":
-        available_drivers.append("vmvx")
-      elif name == "IREE_HAL_DRIVER_VMVX_SYNC":
-        available_drivers.append("vmvx-sync")
       elif name == "IREE_HAL_DRIVER_VULKAN":
         available_drivers.append("vulkan")
+      elif name == "IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF":
+        available_loaders.append("embedded-elf")
+      elif name == "IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY":
+        available_loaders.append("system-library")
+      elif name == "IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE":
+        available_loaders.append("vmvx-module")
       else:
         continue
+
     if self.verbose:
       available_drivers_str = ', '.join(available_drivers)
       print(f"Available drivers: {available_drivers_str}")
-    return available_drivers
+      available_loaders_str = ', '.join(available_loaders)
+      print(f"Available loaders: {available_loaders_str}")
+
+    return available_drivers, available_loaders

@@ -44,6 +44,8 @@ iree_benchmark_suite(
     ${ANDROID_ADRENO_GPU_TRANSLATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-vulkan"
   DRIVER
     "vulkan"
 )
@@ -88,6 +90,8 @@ iree_benchmark_suite(
     "--iree-flow-enable-fuse-padding-into-consumer-ops"
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-vulkan"
   DRIVER
     "vulkan"
 )
@@ -129,6 +133,8 @@ iree_benchmark_suite(
     "--iree-hal-benchmark-dispatch-repeat-count=16"
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-vulkan"
   DRIVER
     "vulkan"
   RUNTIME_FLAGS

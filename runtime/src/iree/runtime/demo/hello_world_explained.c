@@ -124,7 +124,7 @@ static iree_status_t iree_runtime_demo_run_session(
   // TODO(#5724): move device selection into the compiled modules.
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_runtime_instance_try_create_default_device(
-      instance, iree_make_cstring_view("vmvx"), &device));
+      instance, iree_make_cstring_view("local-task"), &device));
 
   // Set up the session to run the demo module.
   // Sessions are like OS processes and are used to isolate modules from each

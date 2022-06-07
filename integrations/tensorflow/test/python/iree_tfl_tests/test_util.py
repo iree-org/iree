@@ -23,7 +23,7 @@ targets = {
 }
 
 configs = {
-    'llvmaot': 'dylib',
+    'llvmaot': 'local-task',
     'vulkan': 'vulkan',
 }
 

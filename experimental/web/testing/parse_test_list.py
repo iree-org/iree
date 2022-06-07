@@ -74,7 +74,7 @@ def parse_ctest_dump(ctest_dump_path, build_dir):
       # Parse the 'command' list into the source file and its arguments.
       #   /path/to/run_test.bat    # TODO(scotttodd): replace with `node`?
       #   /path/to/test_runner.js  # such as iree-check-module.js or test.js
-      #   arg 1                    # such as --driver=vmvx
+      #   arg 1                    # such as --driver=local-task
       #   arg 2                    # such as check_vmvx_op.mlir_module.vmfb
       test_source_absolute_path = test["command"][1]
       parsed_test["sourceFile"] = get_normalized_relative_path(

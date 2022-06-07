@@ -39,7 +39,7 @@ iree_check_single_backend_test_suite(
   TARGET_BACKEND
     "dylib-llvm-aot"
   DRIVER
-    "dylib"
+    "local-task"
   COMPILER_FLAGS
     "--iree-input-type=mhlo"
 )

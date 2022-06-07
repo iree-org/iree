@@ -71,7 +71,7 @@ Include headers:
 // with those for the specific HAL drivers your application uses.
 // Functionality extensions can be used via custom modules.
 #include "iree/modules/hal/module.h"
-#include "iree/hal/drivers/dylib/registration/driver_module.h"
+#include "iree/hal/drivers/local_task/registration/driver_module.h"
 #include "iree/vm/bytecode_module.h"
 ```
 
@@ -90,7 +90,7 @@ IREE_CHECK_OK(iree_hal_module_register_types());
 // Device drivers are managed through registries.
 // Applications may use multiple registries to more finely control driver
 // lifetimes and visibility.
-IREE_CHECK_OK(iree_hal_dylib_driver_module_register(
+IREE_CHECK_OK(iree_hal_local_task_driver_module_register(
     iree_hal_driver_registry_default()));
 ```
 
@@ -108,13 +108,13 @@ Create a VM instance along with a HAL driver and device:
 iree_vm_instance_t* instance = NULL;
 IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
 
-// We use the CPU "dylib" driver in this example, but could use a different
+// We use the CPU "local-task" driver in this example, but could use a different
 // driver like the GPU "vulkan" driver. The driver(s) used should match with
 // the target(s) specified during compilation.
 iree_hal_driver_t* driver = NULL;
 IREE_CHECK_OK(iree_hal_driver_registry_try_create_by_name(
     iree_hal_driver_registry_default(),
-    iree_string_view_literal("dylib"),
+    iree_string_view_literal("local-task"),
     iree_allocator_system(), &driver));
 
 // Drivers may support multiple devices, such as when a machine has multiple

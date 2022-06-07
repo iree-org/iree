@@ -17,11 +17,6 @@ ALL_DRIVERS = [
     "cuda",
     "local-sync",
     "local-task",
-    # TODO(#9336): remove legacy dylib/vmvx drivers.
-    "dylib",
-    "dylib-sync",
-    "vmvx",
-    "vmvx-sync",
     "vulkan",
 ]
 
@@ -30,10 +25,6 @@ string_list_flag(
     build_setting_default = [
         "local-sync",
         "local-task",
-        "dylib",
-        "dylib-sync",
-        "vmvx",
-        "vmvx-sync",
         "vulkan",
     ],
 )
@@ -65,23 +56,6 @@ iree_runtime_cc_library(
            }) +
            select({
                ":local-task_enabled": ["//runtime/src/iree/hal/drivers/local_task/registration"],
-               "//conditions:default": [],
-           }) +
-           # TODO(#9336): remove legacy dylib/vmvx drivers.
-           select({
-               ":dylib_enabled": ["//runtime/src/iree/hal/drivers/dylib/registration"],
-               "//conditions:default": [],
-           }) +
-           select({
-               ":dylib-sync_enabled": ["//runtime/src/iree/hal/drivers/dylib_sync/registration"],
-               "//conditions:default": [],
-           }) +
-           select({
-               ":vmvx_enabled": ["//runtime/src/iree/hal/drivers/vmvx/registration"],
-               "//conditions:default": [],
-           }) +
-           select({
-               ":vmvx-sync_enabled": ["//runtime/src/iree/hal/drivers/vmvx_sync/registration"],
                "//conditions:default": [],
            }) +
            select({

@@ -54,7 +54,7 @@ iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",
     srcs = CHECK_FRAMEWORK_TESTS,
     compiler_flags = ["--iree-input-type=mhlo"],
-    driver = "dylib",
+    driver = "local-task",
     target_backend = "dylib-llvm-aot",
 )
 
@@ -62,7 +62,7 @@ iree_check_single_backend_test_suite(
 # iree_check_single_backend_test_suite(
 #     name = "check_vmvx_vmvx",
 #     srcs = CHECK_FRAMEWORK_TESTS,
-#     driver = "vmvx",
+#     driver = "local-task",
 #     target_backend = "vmvx",
 # )
 

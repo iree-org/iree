@@ -16,7 +16,7 @@ class DeviceHalTest(unittest.TestCase):
 
   def setUp(self):
     super().setUp()
-    self.driver = iree.runtime.HalDriver.create("vmvx")
+    self.driver = iree.runtime.HalDriver.create("local-task")
     self.device = self.driver.create_default_device()
     self.allocator = self.device.allocator
 

@@ -43,7 +43,7 @@ cc_library(
 
 iree_cmake_extra_content(
     content = """
-if(IREE_HAL_DRIVER_VMVX)
+if(IREE_HAL_DRIVER_LOCAL_SYNC)
 """,
     inline = True,
 )
@@ -55,7 +55,7 @@ cc_test(
         ":vm_util",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/drivers/vmvx/registration",
+        "//runtime/src/iree/hal/drivers/local_sync/registration",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
