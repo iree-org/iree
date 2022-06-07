@@ -56,7 +56,7 @@ function(iree_native_test)
     _RULE
     ""
     "NAME;SRC;DRIVER;TEST_INPUT_FILE_ARG"
-    "ARGS;LABELS;DATA"
+    "ARGS;LABELS;DATA;TIMEOUT"
     ${ARGN}
   )
 
@@ -126,7 +126,12 @@ function(iree_native_test)
     iree_add_test_environment_properties(${_TEST_NAME})
   endif()
 
+  if (NOT DEFINED _RULE_TIMEOUT)
+    set(_RULE_TIMEOUT 60)
+  endif()
+
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
   set_property(TEST ${_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST "${_TEST_NAME}" PROPERTY REQUIRED_FILES "${_RULE_DATA}")
+  set_property(TEST ${_TEST_NAME} PROPERTY TIMEOUT ${_RULE_ARGS})
 endfunction()
