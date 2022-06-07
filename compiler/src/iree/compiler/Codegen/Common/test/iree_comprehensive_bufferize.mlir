@@ -391,6 +391,7 @@ module {
 
 // -----
 
+#map = affine_map<(d0, d1) -> (d0, d1)>
 module {
   func.func @tile_from_pointwise_lhs() {
     %c2 = arith.constant 2 : index
@@ -409,35 +410,43 @@ module {
       scf.for %arg1 = %workgroup_id_x to %c4 step %c4 {
         %7 = flow.dispatch.tensor.load %3, offsets = [%arg0, 0], sizes = [1, 3], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%0, %2} -> tensor<1x3xf32>
         %8 = flow.dispatch.tensor.load %4, offsets = [0, %arg1], sizes = [3, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%2, %1} -> tensor<3x1xf32>
-        %9 = flow.dispatch.tensor.load %5, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%0, %1} -> tensor<1x1xf32>
-        %10 = linalg.matmul ins(%7, %8 : tensor<1x3xf32>, tensor<3x1xf32>) outs(%9 : tensor<1x1xf32>) -> tensor<1x1xf32>
-        flow.dispatch.tensor.store %10, %6, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>{%0, %1}
+        %9 = bufferization.alloc_tensor() : tensor<1x3xf32>
+        %10 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%7 : tensor<1x3xf32>) outs(%9 : tensor<1x3xf32>) {
+        ^bb0(%arg2: f32, %arg3: f32):
+          %13 = arith.addf %arg2, %arg2 : f32
+          linalg.yield %13 : f32
+        } -> tensor<1x3xf32>
+        %11 = flow.dispatch.tensor.load %5, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%0, %1} -> tensor<1x1xf32>
+        %12 = linalg.matmul ins(%10, %8 : tensor<1x3xf32>, tensor<3x1xf32>) outs(%11 : tensor<1x1xf32>) -> tensor<1x1xf32>
+        flow.dispatch.tensor.store %12, %6, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>{%0, %1}
       }
     }
     return
   }
 }
 // CHECK-LABEL: func.func @tile_from_pointwise_lhs()
-//       CHECK:       %[[ALLOC:.+]] = memref.alloc() : memref<1x3xf32>
-//   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-//   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//   CHECK-DAG:   %[[TENSOR_INIT:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-//   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
-//       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
-//       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
-//   CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
-//   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
-//       CHECK:       linalg.generic
-//  CHECK-SAME:         ins(%[[LHS]] :
-//  CHECK-SAME:         outs(%[[ALLOC]]
-//   CHECK-DAG:       %[[INIT:.+]] = memref.subview %[[TENSOR_INIT]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
-//   CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
-//       CHECK:       linalg.generic {{.*}} ins(%[[INIT]] {{.*}} outs(%[[RESULT]]
-//       CHECK:       linalg.matmul
-//  CHECK-SAME:         ins(%[[ALLOC]], %[[RHS]]
-//  CHECK-SAME:         outs(%[[RESULT]]
+//   DISABLE-CHECK-DAG:       %[[ALLOC:.+]] = memref.alloc() : memref<1x3xf32>
+//   DISABLE-CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+//   DISABLE-CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+//   DISABLE-CHECK-DAG:   %[[TENSOR_INIT:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//   DISABLE-CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
+//       DISABLE-CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
+//       DISABLE-CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
+//   DISABLE-CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
+//   DISABLE-CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
+//       DISABLE-CHECK:       linalg.generic
+//  DISABLE-CHECK-SAME:         ins(%[[LHS]] :
+//  DISABLE-CHECK-SAME:         outs(%[[ALLOC]]
+//   DISABLE-CHECK-DAG:       %[[INIT:.+]] = memref.subview %[[TENSOR_INIT]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//   DISABLE-CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//       DISABLE-CHECK:       linalg.generic {{.*}} ins(%[[INIT]] {{.*}} outs(%[[RESULT]]
+//       DISABLE-CHECK:       linalg.matmul
+//  DISABLE-CHECK-SAME:         ins(%[[ALLOC]], %[[RHS]]
+//  DISABLE-CHECK-SAME:         outs(%[[RESULT]]
 
 // -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
 module {
   func.func @tile_from_pointwise_lhs_inplace() {
     %c2 = arith.constant 2 : index
@@ -455,33 +464,40 @@ module {
       scf.for %arg1 = %workgroup_id_x to %c4 step %c4 {
         %6 = flow.dispatch.tensor.load %3, offsets = [%arg0, 0], sizes = [1, 3], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%0, %2} -> tensor<1x3xf32>
         %7 = flow.dispatch.tensor.load %4, offsets = [0, %arg1], sizes = [3, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%2, %1} -> tensor<3x1xf32>
-        %8 = flow.dispatch.tensor.load %5, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [1, 1] : !flow.dispatch.tensor<readwrite:?x?xf32>{%0, %1} -> tensor<1x1xf32>
-        %9 = linalg.matmul ins(%6, %7 : tensor<1x3xf32>, tensor<3x1xf32>) outs(%8 : tensor<1x1xf32>) -> tensor<1x1xf32>
-        flow.dispatch.tensor.store %9, %5, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<readwrite:?x?xf32>{%0, %1}
+        %8 = bufferization.alloc_tensor() : tensor<1x3xf32>
+        %9 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%6 : tensor<1x3xf32>) outs(%8 : tensor<1x3xf32>) {
+        ^bb0(%arg2: f32, %arg3: f32):
+          %12 = arith.addf %arg2, %arg2 : f32
+          linalg.yield %12 : f32
+        } -> tensor<1x3xf32>
+        %10 = flow.dispatch.tensor.load %5, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [1, 1] : !flow.dispatch.tensor<readwrite:?x?xf32>{%0, %1} -> tensor<1x1xf32>
+        %11 = linalg.matmul ins(%9, %7 : tensor<1x3xf32>, tensor<3x1xf32>) outs(%10 : tensor<1x1xf32>) -> tensor<1x1xf32>
+        flow.dispatch.tensor.store %11, %5, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<readwrite:?x?xf32>{%0, %1}
       }
     }
     return
   }
 }
 // CHECK-LABEL: func.func @tile_from_pointwise_lhs_inplace()
-//       CHECK:       %[[ALLOC:.+]] = memref.alloc() : memref<1x3xf32>
-//   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-//   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-//       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
-//       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
-//   CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
-//   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
-//       CHECK:       linalg.generic
-//  CHECK-SAME:         ins(%[[LHS]] :
-//  CHECK-SAME:         outs(%[[ALLOC]]
-//   CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
-//       CHECK:       linalg.matmul
-//  CHECK-SAME:         ins(%[[ALLOC]], %[[RHS]]
-//  CHECK-SAME:         outs(%[[RESULT]]
+//       DISABLE-CHECK:       %[[ALLOC:.+]] = memref.alloc() : memref<1x3xf32>
+//   DISABLE-CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+//   DISABLE-CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+//   DISABLE-CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//       DISABLE-CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
+//       DISABLE-CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
+//   DISABLE-CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
+//   DISABLE-CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
+//       DISABLE-CHECK:       linalg.generic
+//  DISABLE-CHECK-SAME:         ins(%[[LHS]] :
+//  DISABLE-CHECK-SAME:         outs(%[[ALLOC]]
+//   DISABLE-CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//       DISABLE-CHECK:       linalg.matmul
+//  DISABLE-CHECK-SAME:         ins(%[[ALLOC]], %[[RHS]]
+//  DISABLE-CHECK-SAME:         outs(%[[RESULT]]
 
 // -----
 
+#map = affine_map<(d0, d1) -> (d0, d1)>
 module {
   func.func @tile_from_pointwise_outs() {
     %c2 = arith.constant 2 : index
@@ -498,11 +514,17 @@ module {
     %workgroup_id_y = hal.interface.workgroup.id[1] : index
     scf.for %arg0 = %workgroup_id_y to %c2 step %c2 {
       scf.for %arg1 = %workgroup_id_x to %c4 step %c4 {
-        %7 = flow.dispatch.tensor.load %3, offsets = [%arg0, 0], sizes = [1, 3], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%0, %2} -> tensor<1x3xf32>
-        %8 = flow.dispatch.tensor.load %4, offsets = [0, %arg1], sizes = [3, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%2, %1} -> tensor<3x1xf32>
-        %9 = flow.dispatch.tensor.load %5, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%0, %1} -> tensor<1x1xf32>
-        %10 = linalg.matmul ins(%7, %8 : tensor<1x3xf32>, tensor<3x1xf32>) outs(%9 : tensor<1x1xf32>) -> tensor<1x1xf32>
-        flow.dispatch.tensor.store %10, %6, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>{%0, %1}
+        %7 = flow.dispatch.tensor.load %6, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [1, 1] : !flow.dispatch.tensor<writeonly:?x?xf32>{%0, %1} -> tensor<1x1xf32>
+        %8 = flow.dispatch.tensor.load %3, offsets = [%arg0, 0], sizes = [1, 3], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%0, %2} -> tensor<1x3xf32>
+        %9 = flow.dispatch.tensor.load %4, offsets = [0, %arg1], sizes = [3, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%2, %1} -> tensor<3x1xf32>
+        %10 = flow.dispatch.tensor.load %5, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%0, %1} -> tensor<1x1xf32>
+        %11 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%10 : tensor<1x1xf32>) outs(%7 : tensor<1x1xf32>) {
+        ^bb0(%arg2: f32, %arg3: f32):
+          %13 = arith.addf %arg2, %arg2 : f32
+          linalg.yield %13 : f32
+        } -> tensor<1x1xf32>
+        %12 = linalg.matmul ins(%8, %9 : tensor<1x3xf32>, tensor<3x1xf32>) outs(%11 : tensor<1x1xf32>) -> tensor<1x1xf32>
+        flow.dispatch.tensor.store %12, %6, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>{%0, %1}
       }
     }
     return
@@ -560,6 +582,9 @@ module {
     return
   }
 }
+
+// -----
+
 // CHECK-LABEL: func.func @tile_from_pointwise_outs_inplace()
 //   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -605,21 +630,21 @@ module {
   }
 }
 // CHECK-LABEL: func.func @tile_from_matmul_outs()
-//   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-//   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//   CHECK-DAG:   %[[TENSOR_INIT:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-//   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
-//       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
-//       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
-//   CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
-//   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
-//   CHECK-DAG:       %[[INIT:.+]] = memref.subview %[[TENSOR_INIT]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
-//   CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
-//       CHECK:       linalg.generic {{.*}} ins(%[[INIT]] {{.*}} outs(%[[RESULT]]
-//       CHECK:       linalg.matmul
-//  CHECK-SAME:         outs(%[[RESULT]]
-//       CHECK:       linalg.matmul
-//  CHECK-SAME:         outs(%[[RESULT]]
+//   DISABLE-CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+//   DISABLE-CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+//   DISABLE-CHECK-DAG:   %[[TENSOR_INIT:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//   DISABLE-CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
+//       DISABLE-CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
+//       DISABLE-CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
+//   DISABLE-CHECK-DAG:       %[[LHS:.+]] = memref.subview %[[TENSOR_LHS]][%[[IV0]], 0] [1, 3] [1, 1]
+//   DISABLE-CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
+//   DISABLE-CHECK-DAG:       %[[INIT:.+]] = memref.subview %[[TENSOR_INIT]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//   DISABLE-CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
+//       DISABLE-CHECK:       linalg.generic {{.*}} ins(%[[INIT]] {{.*}} outs(%[[RESULT]]
+//       DISABLE-CHECK:       linalg.matmul
+//  DISABLE-CHECK-SAME:         outs(%[[RESULT]]
+//       DISABLE-CHECK:       linalg.matmul
+//  DISABLE-CHECK-SAME:         outs(%[[RESULT]]
 
 // -----
 
@@ -708,37 +733,37 @@ module {
     return
   }
 }
-//   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (-d0 + s0, s1)>
-//   CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0, s1] -> (-d0 + s1, s0)>
+//   DISABLE-CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (-d0 + s0, s1)>
+//   DISABLE-CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0, s1] -> (-d0 + s1, s0)>
 //       CHECK: func.func @bufferize_dynamic()
-//       CHECK:   %[[DIM0:.+]] = hal.interface.constant.load[0] : index
-//       CHECK:   %[[DIM1:.+]] = hal.interface.constant.load[1] : index
-//       CHECK:   %[[DIM2:.+]] = hal.interface.constant.load[2] : index
-//       CHECK:   %[[DIM3:.+]] = hal.interface.constant.load[3] : index
-//       CHECK:   %[[DIM4:.+]] = hal.interface.constant.load[4] : index
-//       CHECK:   %[[DIM5:.+]] = hal.interface.constant.load[5] : index
-//       CHECK:   %[[DIM6:.+]] = hal.interface.constant.load[6] : index
-//       CHECK:   %[[DIM7:.+]] = hal.interface.constant.load[7] : index
-//       CHECK:   %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xf32>{%[[DIM0]], %[[DIM1]]}
-//       CHECK:   %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xf32>{%[[DIM2]], %[[DIM3]]}
-//       CHECK:   %[[INIT:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<?x?xf32>{%[[DIM4]], %[[DIM5]]}
-//       CHECK:   %[[RESULT:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) : memref<?x?xf32>{%[[DIM6]], %[[DIM7]]}
-//   CHECK-DAG:   %[[WGSIZE_X:.+]] = hal.interface.workgroup.size[0]
-//   CHECK-DAG:   %[[WGSIZE_Y:.+]] = hal.interface.workgroup.size[1]
-//       CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
-//       CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
-//       CHECK:       %[[TILE_M:.+]] = affine.min #[[MAP0]](%[[IV0]])[%[[DIM0]], %[[WGSIZE_Y]]]
-//       CHECK:       %[[LHS_TILE:.+]] = memref.subview %[[LHS]][%[[IV0]], 0] [%[[TILE_M]], %[[DIM1]]]
-//       CHECK:       %[[TILE_N:.+]] = affine.min #[[MAP0]](%[[IV1]])[%[[DIM3]], %[[WGSIZE_X]]]
-//   CHECK-DAG:       %[[RHS_TILE:.+]] = memref.subview %[[RHS]][0, %[[IV1]]] [%[[DIM2]], %[[TILE_N]]]
-//       CHECK:       %[[TILE_M_2:.+]] = affine.min #[[MAP2]](%[[IV0]])[%[[WGSIZE_Y]], %[[DIM4]]]
-//       CHECK:       %[[TILE_N_2:.+]] = affine.min #[[MAP2]](%[[IV1]])[%[[WGSIZE_X]], %[[DIM5]]]
-//   CHECK-DAG:       %[[INIT_TILE:.+]] = memref.subview %[[INIT]][%[[IV0]], %[[IV1]]] [%[[TILE_M_2]], %[[TILE_N_2]]]
-//   CHECK-DAG:       %[[RESULT_TILE:.+]] = memref.subview %[[RESULT]][%[[IV0]], %[[IV1]]] [%[[TILE_M_2]], %[[TILE_N_2]]]
-//       CHECK:       linalg.generic {{.*}} ins(%[[INIT_TILE]] {{.*}} outs(%[[RESULT_TILE]]
-//       CHECK:       linalg.matmul
-//  CHECK-SAME:         ins(%[[LHS_TILE]], %[[RHS_TILE]]
-//  CHECK-SAME:         outs(%[[RESULT_TILE]]
+//       DISABLE-CHECK:   %[[DIM0:.+]] = hal.interface.constant.load[0] : index
+//       DISABLE-CHECK:   %[[DIM1:.+]] = hal.interface.constant.load[1] : index
+//       DISABLE-CHECK:   %[[DIM2:.+]] = hal.interface.constant.load[2] : index
+//       DISABLE-CHECK:   %[[DIM3:.+]] = hal.interface.constant.load[3] : index
+//       DISABLE-CHECK:   %[[DIM4:.+]] = hal.interface.constant.load[4] : index
+//       DISABLE-CHECK:   %[[DIM5:.+]] = hal.interface.constant.load[5] : index
+//       DISABLE-CHECK:   %[[DIM6:.+]] = hal.interface.constant.load[6] : index
+//       DISABLE-CHECK:   %[[DIM7:.+]] = hal.interface.constant.load[7] : index
+//       DISABLE-CHECK:   %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xf32>{%[[DIM0]], %[[DIM1]]}
+//       DISABLE-CHECK:   %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xf32>{%[[DIM2]], %[[DIM3]]}
+//       DISABLE-CHECK:   %[[INIT:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<?x?xf32>{%[[DIM4]], %[[DIM5]]}
+//       DISABLE-CHECK:   %[[RESULT:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) : memref<?x?xf32>{%[[DIM6]], %[[DIM7]]}
+//   DISABLE-CHECK-DAG:   %[[WGSIZE_X:.+]] = hal.interface.workgroup.size[0]
+//   DISABLE-CHECK-DAG:   %[[WGSIZE_Y:.+]] = hal.interface.workgroup.size[1]
+//       DISABLE-CHECK:   scf.for %[[IV0:.+]] = {{.+}} {
+//       DISABLE-CHECK:     scf.for %[[IV1:.+]] = {{.+}} {
+//       DISABLE-CHECK:       %[[TILE_M:.+]] = affine.min #[[MAP0]](%[[IV0]])[%[[DIM0]], %[[WGSIZE_Y]]]
+//       DISABLE-CHECK:       %[[LHS_TILE:.+]] = memref.subview %[[LHS]][%[[IV0]], 0] [%[[TILE_M]], %[[DIM1]]]
+//       DISABLE-CHECK:       %[[TILE_N:.+]] = affine.min #[[MAP0]](%[[IV1]])[%[[DIM3]], %[[WGSIZE_X]]]
+//   DISABLE-CHECK-DAG:       %[[RHS_TILE:.+]] = memref.subview %[[RHS]][0, %[[IV1]]] [%[[DIM2]], %[[TILE_N]]]
+//       DISABLE-CHECK:       %[[TILE_M_2:.+]] = affine.min #[[MAP2]](%[[IV0]])[%[[WGSIZE_Y]], %[[DIM4]]]
+//       DISABLE-CHECK:       %[[TILE_N_2:.+]] = affine.min #[[MAP2]](%[[IV1]])[%[[WGSIZE_X]], %[[DIM5]]]
+//   DISABLE-CHECK-DAG:       %[[INIT_TILE:.+]] = memref.subview %[[INIT]][%[[IV0]], %[[IV1]]] [%[[TILE_M_2]], %[[TILE_N_2]]]
+//   DISABLE-CHECK-DAG:       %[[RESULT_TILE:.+]] = memref.subview %[[RESULT]][%[[IV0]], %[[IV1]]] [%[[TILE_M_2]], %[[TILE_N_2]]]
+//       DISABLE-CHECK:       linalg.generic {{.*}} ins(%[[INIT_TILE]] {{.*}} outs(%[[RESULT_TILE]]
+//       DISABLE-CHECK:       linalg.matmul
+//  DISABLE-CHECK-SAME:         ins(%[[LHS_TILE]], %[[RHS_TILE]]
+//  DISABLE-CHECK-SAME:         outs(%[[RESULT_TILE]]
 
 // -----
 
@@ -987,8 +1012,10 @@ module {
 // CHECK-LABEL: func.func @slice()
 //   CHECK-DAG: %[[ARG:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG: %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//       CHECK: %[[SUBVIEW:.+]] = memref.subview %[[ARG]]
-//       CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW]] {{.*}} outs(%[[RETURN]]
+//   CHECK-DAG: %[[SUBVIEW:.+]] = memref.subview %[[ARG]]
+//   CHECK-DAG: %[[SUBVIEW_DUP:.+]] = memref.subview %[[SUBVIEW]]
+//   CHECK-DAG: %[[RETURN_DUP:.+]] = memref.subview %[[RETURN]]
+//       CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW_DUP]] {{.*}} outs(%[[RETURN_DUP]]
 
 // -----
 
@@ -1010,8 +1037,10 @@ module {
 // CHECK-LABEL: func.func @slice_rank_reducing()
 //   CHECK-DAG: %[[ARG:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG: %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//       CHECK: %[[SUBVIEW:.+]] = memref.subview %[[ARG]]
-//       CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW]] {{.*}} outs(%[[RETURN]]
+//   CHECK-DAG: %[[SUBVIEW:.+]] = memref.subview %[[ARG]]
+//   CHECK-DAG: %[[SUBVIEW_DUP:.+]] = memref.subview %[[SUBVIEW]]
+//   CHECK-DAG: %[[RETURN_DUP:.+]] = memref.subview %[[RETURN]]
+//       CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW_DUP]] {{.*}} outs(%[[RETURN_DUP]]
 
 // -----
 
@@ -1042,9 +1071,11 @@ module {
 //   CHECK-DAG: %[[SIZE1:.+]] = hal.interface.constant.load[3] : index
 //   CHECK-DAG: %[[SIZE2:.+]] = hal.interface.constant.load[4] : index
 //   CHECK-DAG: %[[SIZE3:.+]] = hal.interface.constant.load[5] : index
-//       CHECK: %[[SUBVIEW1:.+]] = memref.subview %[[ARG]][%{{.+}}, %{{.+}}, %{{.+}}] [%[[SIZE1]], %[[SIZE2]], %[[SIZE3]]]
-//       CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW1]] {{.*}} outs(%[[RETURN1]]
-//   CHECK-DAG: %[[SUBVIEW2:.+]] = memref.subview %[[ARG]][%{{.+}}, %{{.+}}, %{{.+}}] [%[[SIZE1]], 1, %[[SIZE3]]]
+//   CHECK-DAG: %[[ARG_DUP:.+]] = memref.subview %[[ARG]]
+//   CHECK-DAG: %[[SUBVIEW1:.+]] = memref.subview %[[ARG_DUP]][%{{.+}}, %{{.+}}, %{{.+}}] [%[[SIZE1]], %[[SIZE2]], %[[SIZE3]]]
+//   CHECK-DAG: %[[SUBVIEW2:.+]] = memref.subview %[[ARG_DUP]][%{{.+}}, %{{.+}}, %{{.+}}] [%[[SIZE1]], 1, %[[SIZE3]]]
+//   CHECK-DAG: %[[RETURN1_DUP:.+]] = memref.subview %[[RETURN1]]
+//   CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW1]] {{.*}} outs(%[[RETURN1_DUP]]
 //   CHECK-DAG: %[[RETURNVIEW:.+]] = memref.subview %[[RETURN2]]
 //       CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW2]] {{.*}} outs(%[[RETURNVIEW]]
 
@@ -1083,8 +1114,9 @@ module {
 //   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG:   %[[SUBVIEW_INPUT:.+]] = memref.subview %[[INPUT]]
-//   CHECK-DAG:   %[[SUBVIEW_OUTPUT:.+]] = memref.subview %[[OUTPUT]]
-//       CHECK:   linalg.generic {{.*}} ins(%[[SUBVIEW_INPUT]] {{.*}} outs(%[[SUBVIEW_OUTPUT]]
+//   CHECK-DAG:   %[[SUB_IN_FIXED:.+]] = memref.subview %[[SUBVIEW_INPUT]][1, 0] [1, 4] [1, 1]
+//   CHECK-DAG:   %[[SUB_OUT_FIXED:.+]] = memref.subview %[[OUTPUT]][0, 0] [1, 4] [1, 1]
+//       CHECK:   linalg.generic {{.*}} ins(%[[SUB_IN_FIXED]] {{.*}} outs(%[[SUB_OUT_FIXED]]
 
 // -----
 
@@ -1107,14 +1139,14 @@ module {
   }
 }
 // CHECK-LABEL: func.func @subtensor_insert()
-//   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-//   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-//   CHECK-DAG:   %[[D0:.+]] = hal.interface.constant.load[0] : index
-//   CHECK-DAG:   %[[D1:.+]] = hal.interface.constant.load[1] : index
-//       CHECK:   linalg.generic {{.*}} ins(%[[ARG1]] {{.*}} outs(%[[RET0]]
-//       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[RET0]][3, 4] [%[[D0]], %[[D1]]] [1, 1]
-//       CHECK:   linalg.generic {{.*}} ins(%[[ARG0]] {{.*}} outs(%[[SUBVIEW]]
+//   DISABLE-CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+//   DISABLE-CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+//   DISABLE-CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//   DISABLE-CHECK-DAG:   %[[D0:.+]] = hal.interface.constant.load[0] : index
+//   DISABLE-CHECK-DAG:   %[[D1:.+]] = hal.interface.constant.load[1] : index
+//       DISABLE-CHECK:   linalg.generic {{.*}} ins(%[[ARG1]] {{.*}} outs(%[[RET0]]
+//       DISABLE-CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[RET0]][3, 4] [%[[D0]], %[[D1]]] [1, 1]
+//       DISABLE-CHECK:   linalg.generic {{.*}} ins(%[[ARG0]] {{.*}} outs(%[[SUBVIEW]]
 
 // -----
 
@@ -1242,8 +1274,9 @@ module {
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//   CHECK-DAG:   %[[ARG0_DUP:.+]] = memref.subview %[[ARG0]]
 //       CHECK:   linalg.generic
-//       CHECK:     %[[VAL:.+]] = memref.load %[[ARG0]]
+//       CHECK:     %[[VAL:.+]] = memref.load %[[ARG0_DUP]]
 //       CHECK:     linalg.yield %[[VAL]]
 
 // -----
@@ -1265,7 +1298,7 @@ module {
   }
 }
 // CHECK-LABEL: func.func @pooling_nhwc_sum
-//       CHECK:   %[[WINDOW:.+]] = memref.alloc() : memref<2x3xf32>
+//   CHECK-DAG:   %[[WINDOW:.+]] = memref.alloc() : memref<2x3xf32>
 //   CHECK-DAG:   %[[INIT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<f32>
 //   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<1x4x6x1xf32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<1x2x2x1xf32>
@@ -1333,13 +1366,15 @@ module {
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xf32>
 //   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xf32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<?x?xf32>
+//   CHECK-DAG:   %[[ARG0_DUP:.+]] = memref.subview %[[ARG0]]
+//   CHECK-DAG:   %[[ARG1_DUP:.+]] = memref.subview %[[ARG1]]
 //       CHECK:   scf.for
 //       CHECK:     scf.for
-//   CHECK-DAG:       %[[SV1:.+]] = memref.subview %[[ARG0]]
-//   CHECK-DAG:       %[[SV2:.+]] = memref.subview %[[ARG1]]
+//   CHECK-DAG:       %[[SV1:.+]] = memref.subview %[[ARG0_DUP]]
+//   CHECK-DAG:       %[[SV2:.+]] = memref.subview %[[ARG1_DUP]]
 //   CHECK-DAG:       %[[SV3:.+]] = memref.subview %[[RET0]]
 //       CHECK:       linalg.generic
-//  CHECK-SAME:         ins(%[[SV1]], %[[SV1]], %[[SV2]], %[[SV2]] :
+//  CHECK-SAME:         ins(%[[SV1]], %[[SV2]] :
 //  CHECK-SAME:         outs(%[[SV3]] :
 
 // -----
@@ -1355,7 +1390,9 @@ module {
     %5 = flow.dispatch.tensor.load %4, offsets = [0], sizes = [%2], strides = [1] : !flow.dispatch.tensor<writeonly:?xf32>{%2} -> tensor<?xf32>
     %6 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%0, %1} -> tensor<?x?xf32>
     %7 = tensor.collapse_shape %6 [[0, 1]] : tensor<?x?xf32> into tensor<?xf32>
-    %8 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]} ins(%7 : tensor<?xf32>) outs(%5 : tensor<?xf32>) {
+    %8 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]}
+      ins(%7 : tensor<?xf32>)
+      outs(%5 : tensor<?xf32>) {
     ^bb0(%arg0: f32, %arg1: f32):
       %9 = arith.addf %arg0, %arg0 : f32
       linalg.yield %9 : f32
@@ -1365,12 +1402,12 @@ module {
   }
 }
 // CHECK-LABEL: func.func @reshape_read_only
-//   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-//   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//       CHECK:   %[[RESHAPE:.+]] = memref.collapse_shape %[[INPUT]]
-//       CHECK:   linalg.generic
-//  CHECK-SAME:     ins(%[[RESHAPE]] : memref<?xf32>)
-//  CHECK-SAME:     outs(%[[OUTPUT]] : memref<?xf32>)
+//   DISABLE-CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+//   DISABLE-CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+//       DISABLE-CHECK:   %[[RESHAPE:.+]] = memref.collapse_shape %[[INPUT]]
+//       DISABLE-CHECK:   linalg.generic
+//  DISABLE-CHECK-SAME:     ins(%[[RESHAPE]] : memref<?xf32>)
+//  DISABLE-CHECK-SAME:     outs(%[[OUTPUT]] : memref<?xf32>)
 
 // -----
 
@@ -1407,7 +1444,7 @@ module {
 // CHECK-NEXT: linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME:   outs(%[[OUTPUT]] : memref<1x112x112x32xf32>)
 // CHECK-NEXT: linalg.generic
-// CHECK-SAME:   ins(%[[OUTPUT]], %{{.+}} : memref<1x112x112x32xf32>, memref<32xf32>)
+// CHECK-SAME:   ins(%{{.+}} : memref<32xf32>)
 // CHECK-SAME:   outs(%[[OUTPUT]] : memref<1x112x112x32xf32>)
 
 // -----
@@ -1441,17 +1478,17 @@ module {
   }
 }
 // CHECK-LABEL: func.func @dont_use_buffer_for_operand_when_output_tensor_used()
-//      CHECK: %[[ALLOC:.+]] = memref.alloc
-//      CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
-//      CHECK: linalg.fill
-// CHECK-SAME:     outs(%[[ALLOC]] :
-// CHECK-NEXT: linalg.conv_2d_nhwc_hwcf
-// CHECK-SAME:   outs(%[[ALLOC]] : memref<1x112x112x32xf32>)
-// CHECK-NEXT: linalg.fill
-// CHECK-SAME:     outs(%[[OUTPUT]] :
-// CHECK-NEXT: linalg.generic
-// CHECK-SAME:   ins(%[[ALLOC]], %{{.+}} : memref<1x112x112x32xf32>, memref<32xf32>)
-// CHECK-SAME:   outs(%[[OUTPUT]] : memref<1x112x112x32xf32>)
+//   CHECK-DAG:   %[[ALLOC:.+]] = memref.alloc
+//   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
+//       CHECK:   linalg.fill
+//  CHECK-SAME:       outs(%[[ALLOC]] :
+//  CHECK-NEXT:   linalg.conv_2d_nhwc_hwcf
+//  CHECK-SAME:     outs(%[[ALLOC]] : memref<1x112x112x32xf32>)
+//  CHECK-NEXT:   linalg.fill
+//  CHECK-SAME:       outs(%[[OUTPUT]] :
+//  CHECK-NEXT:   linalg.generic
+//  CHECK-SAME:     ins(%[[ALLOC]], %{{.+}} : memref<1x112x112x32xf32>, memref<32xf32>)
+//  CHECK-SAME:     outs(%[[OUTPUT]] : memref<1x112x112x32xf32>)
 
 // -----
 
@@ -1483,16 +1520,14 @@ module {
 }
 // CHECK-LABEL: func.func @bufferize_cst_output_tensor()
 
-//       CHECK-DAG: %[[CST1:.+]] = arith.constant dense<-2147483648> : tensor<i32>
+//       CHECK-DAG: %[[CST1:.+]] = arith.constant -2147483648 : i32
 //       CHECK-DAG: %[[CST5:.+]] = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
-//       CHECK: %[[CAST1:.+]] = bufferization.to_memref %[[CST1]] : memref<i32>
-//       CHECK: %[[CAST5:.+]] = bufferization.to_memref %[[CST5]] : memref<5xi32>
+//       CHECK: %[[CAST5:.+]] = bufferization.to_memref %[[CST5]] : memref<5xi32, {{.*}}>
 //       CHECK: %[[INPUT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<5xf32>
 //       CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<i32>
-//       CHECK: linalg.generic {{.*}} ins(%[[CAST1]] {{.*}} outs(%[[OUTPUT]]
+//       CHECK: linalg.fill ins(%[[CST1]] : i32) outs(%[[OUTPUT]] : memref<i32>)
 //       CHECK: linalg.generic
-//  CHECK-SAME:   ins(%[[INPUT]], %[[CAST5]] : memref<5xf32>, memref<5xi32>)
-//  CHECK-SAME:   outs(%[[OUTPUT]] : memref<i32>)
+//  CHECK-SAME:   ins(%[[INPUT]], %[[CAST5]] : {{.*}}) outs(%[[OUTPUT]] : memref<i32>)
 
 // -----
 
@@ -1537,9 +1572,9 @@ module {
 //   CHECK-DAG: %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4x32x1024xf32>
 //   CHECK-DAG: %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<4x1024x64xf32>
 //   CHECK-DAG: %[[RESULT:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<4x32x64xf32>
-//       CHECK: %[[LHSV:.+]] = memref.subview %[[LHS]]
-//       CHECK: %[[RHSV:.+]] = memref.subview %[[RHS]]
-//       CHECK: %[[RESULTV:.+]] = memref.subview %[[RESULT]]
+//   CHECK-DAG: %[[LHSV:.+]] = memref.subview %[[LHS]]
+//   CHECK-DAG: %[[RHSV:.+]] = memref.subview %[[RHS]]
+//   CHECK-DAG: %[[RESULTV:.+]] = memref.subview %[[RESULT]]
 //        CHECK: linalg.fill
 //   CHECK-SAME:     ins(%[[ZERO]] :
 //   CHECK-SAME:     outs(%[[RESULTV]] :
@@ -1566,8 +1601,10 @@ module {
 // CHECK-LABEL: func.func @rank_reduced_subtensor_insert()
 //   CHECK-DAG:   %[[ARG:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[RET:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[RET]]
-//       CHECK:   linalg.generic {{.*}} ins(%[[ARG]] {{.*}} outs(%[[SUBVIEW]]
+//       CHECK:   %[[ARG_DUP:.+]] = memref.subview %[[ARG]]
+//       CHECK:   %[[RET_DUP:.+]] = memref.subview %[[RET]]
+//       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[RET_DUP]]
+//       CHECK:   linalg.generic {{.*}} ins(%[[ARG_DUP]] {{.*}} outs(%[[SUBVIEW]]
 
 // -----
 
@@ -1611,20 +1648,20 @@ func.func @bufferize_transfer_op() {
 }
 
 //   CHECK-LABEL: func.func @bufferize_transfer_op()
-//     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-//     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//     CHECK-DAG:   %[[ARG2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-//     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
-//     CHECK-DAG:   %[[ARG0V:.+]] = memref.subview %[[ARG0]]
-//     CHECK-DAG:   %[[ARG1V:.+]] = memref.subview %[[ARG1]]
-//     CHECK-DAG:   %[[ARG2V:.+]] = memref.subview %[[ARG2]]
-// CHECK-COUNT-6:   vector.transfer_read %[[ARG0V]]
-// CHECK-COUNT-3:   vector.transfer_read %[[ARG1V]]
-// CHECK-COUNT-2:   vector.transfer_read %[[ARG2V]]
-//         CHECK:   %[[RET0V:.+]] = memref.subview %[[RET0]]
-//         CHECK:   linalg.generic {{.*}} ins(%[[ARG2V]] {{.*}} outs(%[[RET0V]]
-//         CHECK:   vector.transfer_write %{{.+}}, %[[RET0V]]
-//         CHECK:   vector.transfer_write %{{.+}}, %[[RET0V]]
+//     DISABLE-CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+//     DISABLE-CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+//     DISABLE-CHECK-DAG:   %[[ARG2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//     DISABLE-CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
+//     DISABLE-CHECK-DAG:   %[[ARG0V:.+]] = memref.subview %[[ARG0]]
+//     DISABLE-CHECK-DAG:   %[[ARG1V:.+]] = memref.subview %[[ARG1]]
+//     DISABLE-CHECK-DAG:   %[[ARG2V:.+]] = memref.subview %[[ARG2]]
+// DISABLE-CHECK-COUNT-6:   vector.transfer_read %[[ARG0V]]
+// DISABLE-CHECK-COUNT-3:   vector.transfer_read %[[ARG1V]]
+// DISABLE-CHECK-COUNT-2:   vector.transfer_read %[[ARG2V]]
+//         DISABLE-CHECK:   %[[RET0V:.+]] = memref.subview %[[RET0]]
+//         DISABLE-CHECK:   linalg.generic {{.*}} ins(%[[ARG2V]] {{.*}} outs(%[[RET0V]]
+//         DISABLE-CHECK:   vector.transfer_write %{{.+}}, %[[RET0V]]
+//         DISABLE-CHECK:   vector.transfer_write %{{.+}}, %[[RET0V]]
 
 // -----
 
@@ -1800,9 +1837,9 @@ module {
 //   CHECK-DAG:     %[[ARG0_SV:.+]] = memref.subview %[[ARG0]]
 //   CHECK-DAG:     %[[ARG1_SV:.+]] = memref.subview %[[ARG1]]
 //   CHECK-DAG:     %[[RET0_SV:.+]] = memref.subview %[[RET0]]
+//   CHECK-DAG:     %[[RET1_SV:.+]] = memref.subview %[[RET1]]
 //   CHECK-DAG:     linalg.fill
 //  CHECK-SAME:         outs(%[[RET0_SV]] :
-//   CHECK-DAG:     %[[RET1_SV:.+]] = memref.subview %[[RET1]]
 //   CHECK-DAG:     linalg.fill
 //  CHECK-SAME:         outs(%[[RET1_SV]] :
 //       CHECK:     linalg.generic
@@ -1891,18 +1928,18 @@ module {
 //    CHECK-DAG:        %[[RHS_WORKGROUP_TILE:.+]] = memref.subview %[[RHS]][0, %[[WORKGROUP_J]]] [144, %[[WORKGROUP_J_SIZE]]] [1, 1] : memref<144x370xf32> to memref<144x?xf32
 //    CHECK-DAG:            %[[INIT_WORKGROUP_TILE:.+]] = memref.subview %[[INIT]][%[[WORKGROUP_I]], %[[WORKGROUP_J]]] [%[[WORKGROUP_I_SIZE]], %[[WORKGROUP_J_SIZE]]]
 //    CHECK-DAG:            %[[DST_WORKGROUP_TILE:.+]] = memref.subview %[[DST]][%[[WORKGROUP_I]], %[[WORKGROUP_J]]] [%[[WORKGROUP_I_SIZE]], %[[WORKGROUP_J_SIZE]]]
-//        CHECK:            linalg.generic {{.*}} ins(%[[INIT_WORKGROUP_TILE]] {{.*}} outs(%[[DST_WORKGROUP_TILE]]
-//        CHECK:            scf.for %[[L1_I:.+]] = %{{.*}} to %[[M]] step %[[L1_MN_SIZE]] {
-//        CHECK:              scf.for %[[L1_J:.+]] = %{{.*}} to %[[N]] step %[[L1_MN_SIZE]] {
-//        CHECK:                scf.for %[[L1_K:.+]] = %{{.*}} to %[[K]] step %[[L1_K_SIZE]] {
-//    CHECK-DAG:                    %[[LHS_L1_TILE:.+]] = memref.subview %[[LHS_WORKGROUP_TILE]][%[[L1_I]], %[[L1_K]]]
-//    CHECK-DAG:                    %[[RHS_L1_TILE:.+]] = memref.subview %[[RHS_WORKGROUP_TILE]][%[[L1_K]], %[[L1_J]]]
-//    CHECK-DAG:                    %[[L1_I_SIZE:.+]] = affine.min #{{.*}}(%[[WORKGROUP_I_SIZE]], %[[L1_I]])
-//    CHECK-DAG:                    %[[L1_J_SIZE:.+]] = affine.min #{{.*}}(%[[WORKGROUP_J_SIZE]], %[[L1_J]])
-//    CHECK-DAG:                    %[[DST_L1_TILE:.+]] = memref.subview %[[DST_WORKGROUP_TILE]][%[[L1_I]], %[[L1_J]]]
-//        CHECK:                    linalg.matmul
-//   CHECK-SAME:                    ins(%[[LHS_L1_TILE]], %[[RHS_L1_TILE]]
-//   CHECK-SAME:                    outs(%[[DST_L1_TILE]]
+//        DISABLE-CHECK:            linalg.generic {{.*}} ins(%[[INIT_WORKGROUP_TILE]] {{.*}} outs(%[[DST_WORKGROUP_TILE]]
+//        DISABLE-CHECK:            scf.for %[[L1_I:.+]] = %{{.*}} to %[[M]] step %[[L1_MN_SIZE]] {
+//        DISABLE-CHECK:              scf.for %[[L1_J:.+]] = %{{.*}} to %[[N]] step %[[L1_MN_SIZE]] {
+//        DISABLE-CHECK:                scf.for %[[L1_K:.+]] = %{{.*}} to %[[K]] step %[[L1_K_SIZE]] {
+//    DISABLE-CHECK-DAG:                    %[[LHS_L1_TILE:.+]] = memref.subview %[[LHS_WORKGROUP_TILE]][%[[L1_I]], %[[L1_K]]]
+//    DISABLE-CHECK-DAG:                    %[[RHS_L1_TILE:.+]] = memref.subview %[[RHS_WORKGROUP_TILE]][%[[L1_K]], %[[L1_J]]]
+//    DISABLE-CHECK-DAG:                    %[[L1_I_SIZE:.+]] = affine.min #{{.*}}(%[[WORKGROUP_I_SIZE]], %[[L1_I]])
+//    DISABLE-CHECK-DAG:                    %[[L1_J_SIZE:.+]] = affine.min #{{.*}}(%[[WORKGROUP_J_SIZE]], %[[L1_J]])
+//    DISABLE-CHECK-DAG:                    %[[DST_L1_TILE:.+]] = memref.subview %[[DST_WORKGROUP_TILE]][%[[L1_I]], %[[L1_J]]]
+//        DISABLE-CHECK:                    linalg.matmul
+//   DISABLE-CHECK-SAME:                    ins(%[[LHS_L1_TILE]], %[[RHS_L1_TILE]]
+//   DISABLE-CHECK-SAME:                    outs(%[[DST_L1_TILE]]
 
 // -----
 
@@ -2288,7 +2325,7 @@ module {
 //  CHECK-SAME:                   ins(%[[LHS_SUBVIEW2]], %[[RHS_SUBVIEW2]] :
 //  CHECK-SAME:                   outs(%[[OUT_SUBVIEW3]] :
 //       CHECK:       linalg.generic
-//  CHECK-SAME:           ins(%[[SCALAR]], %[[OUT_SUBVIEW1]] :
+//  CHECK-SAME:           ins(%[[SCALAR]] :
 //  CHECK-SAME:           outs(%[[OUT_SUBVIEW1]] :
 
 // -----
@@ -2358,7 +2395,7 @@ module {
 //  CHECK-SAME:           ins(%[[LHS_SUBVIEW1]], %[[RHS_SUBVIEW1]] :
 //  CHECK-SAME:           outs(%[[OUT_SUBVIEW1]] :
 //       CHECK:       linalg.generic
-//  CHECK-SAME:           ins(%[[SCALAR]], %[[OUT_SUBVIEW1]] :
+//  CHECK-SAME:           ins(%[[SCALAR]] :
 //  CHECK-SAME:           outs(%[[OUT_SUBVIEW1]] :
 
 // -----
@@ -2495,9 +2532,12 @@ module {
 // CHECK-LABEL: func.func @no_op_subview()
 //   CHECK-DAG:   %[[SRC:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[DEST:.+]] = hal.interface.binding.subspan set(0) binding(1)
+//   CHECK-DAG:   %[[SRC_DUP:.+]] = memref.subview %[[SRC]]
+//   CHECK-DAG:   %[[SRC_DUP2:.+]] = memref.subview %[[SRC_DUP]]
+//   CHECK-DAG:   %[[DEST_DUP:.+]] = memref.subview %[[DEST]]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       ins(%[[SRC]] :
-//  CHECK-SAME:       outs(%[[DEST]] :
+//  CHECK-SAME:       ins(%[[SRC_DUP2]] :
+//  CHECK-SAME:       outs(%[[DEST_DUP]] :
 
 // -----
 
@@ -2517,9 +2557,11 @@ module {
 //   CHECK-DAG:   %[[SRC:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[DEST:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[SRC]][0, 0] [1, %{{.+}}]
+//   CHECK-DAG:   %[[SUBVIEW_DUP:.+]] = memref.subview %[[SUBVIEW]]
+//   CHECK-DAG:   %[[DEST_DUP:.+]] = memref.subview %[[DEST]]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       ins(%[[SUBVIEW]] :
-//  CHECK-SAME:       outs(%[[DEST]] :
+//  CHECK-SAME:       ins(%[[SUBVIEW_DUP]] :
+//  CHECK-SAME:       outs(%[[DEST_DUP]] :
 
 // -----
 
