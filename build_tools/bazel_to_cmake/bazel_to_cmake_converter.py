@@ -39,10 +39,10 @@ def _convert_string_arg_block(name, value, quote=True):
     return f"  {name}\n    {value}\n"
 
 timeout_map = {
-  "short" : 60,
-  "moderate" : 300,
-  "long" : 900,
-  "eternal" : 3600,
+    "short" : 60,
+    "moderate" : 300,
+    "long" : 900,
+    "eternal" : 3600,
 }
 
 def _convert_timeout_arg_block(name, value):
@@ -671,7 +671,13 @@ class BuildFileFunctions(object):
                             f"{target_cpu_features_variants_block}"
                             f")\n\n")
 
-  def native_test(self, name, src, args=None, data=None, tags=None, timeout=None):
+  def native_test(self,
+                  name,
+                  src,
+                  args=None,
+                  data=None,
+                  tags=None,
+                  timeout=None):
     if data is not None:
       self._convert_unimplemented_function("native_test", name + " has data")
 
