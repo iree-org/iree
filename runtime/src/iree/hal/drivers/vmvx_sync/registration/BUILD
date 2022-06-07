@@ -17,7 +17,7 @@ iree_runtime_cc_library(
     srcs = ["driver_module.c"],
     hdrs = ["driver_module.h"],
     defines = [
-        "IREE_HAL_HAVE_VMVX_SYNC_DRIVER_MODULE=1",
+        "IREE_HAVE_HAL_VMVX_SYNC_DRIVER_MODULE=1",
     ],
     deps = [
         "//runtime/src/iree/base",

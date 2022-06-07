@@ -4,21 +4,26 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Doesn't use bazel_to_cmake because of custom configuration vars
-
-# TODO(#9336): drop dylib/vmvx and just have these local-* drivers.
-if(IREE_HAL_DRIVER_DYLIB OR IREE_HAL_DRIVER_VMVX)
-  add_subdirectory(local_task)
-endif()
-if(IREE_HAL_DRIVER_DYLIB_SYNC OR IREE_HAL_DRIVER_VMVX_SYNC)
-  add_subdirectory(local_sync)
-endif()
-
 set(IREE_HAL_DRIVER_MODULES)
 if(IREE_HAL_DRIVER_CUDA)
   add_subdirectory(cuda)
   list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::drivers::cuda::registration)
 endif()
+if(IREE_HAL_DRIVER_LOCAL_SYNC OR IREE_HAL_DRIVER_DYLIB_SYNC OR IREE_HAL_DRIVER_VMVX_SYNC)
+  add_subdirectory(local_sync)
+endif()
+if(IREE_HAL_DRIVER_LOCAL_TASK OR IREE_HAL_DRIVER_DYLIB OR IREE_HAL_DRIVER_VMVX)
+  add_subdirectory(local_task)
+endif()
+if(IREE_HAL_DRIVER_VULKAN)
+  add_subdirectory(vulkan)
+  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::drivers::vulkan::registration)
+endif()
+if(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM)
+  list(APPEND IREE_HAL_DRIVER_MODULES experimental::rocm::registration)
+endif()
+
+# TODO(#9336): remove legacy dylib/vmvx drivers.
 if(IREE_HAL_DRIVER_DYLIB)
   add_subdirectory(dylib)
   list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::drivers::dylib::registration)
@@ -34,13 +39,6 @@ endif()
 if(IREE_HAL_DRIVER_VMVX_SYNC)
   add_subdirectory(vmvx_sync)
   list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::drivers::vmvx_sync::registration)
-endif()
-if(IREE_HAL_DRIVER_VULKAN)
-  add_subdirectory(vulkan)
-  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::drivers::vulkan::registration)
-endif()
-if(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM)
-  list(APPEND IREE_HAL_DRIVER_MODULES experimental::rocm::registration)
 endif()
 
 iree_cc_library(

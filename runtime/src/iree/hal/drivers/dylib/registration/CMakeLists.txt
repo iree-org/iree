@@ -27,7 +27,7 @@ iree_cc_library(
     iree::hal::local::loaders::system_library_loader
     iree::task::api
   DEFINES
-    "IREE_HAL_HAVE_DYLIB_DRIVER_MODULE=1"
+    "IREE_HAVE_HAL_DYLIB_DRIVER_MODULE=1"
   PUBLIC
 )
 

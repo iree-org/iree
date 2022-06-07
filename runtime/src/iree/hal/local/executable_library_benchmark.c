@@ -130,21 +130,21 @@ IREE_FLAG_CALLBACK(
     "  # 2 4-byte floating-point values with contents [[1.4], [2.1]]:\n"
     "  --binding=2x1xf32=1.4,2.1");
 
-#if defined(IREE_HAL_HAVE_EMBEDDED_LIBRARY_LOADER)
+#if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY)
 #include "iree/hal/local/loaders/embedded_library_loader.h"
-#endif  // IREE_HAL_HAVE_EMBEDDED_LIBRARY_LOADER
+#endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY
 
 // Creates an executable loader based on the given format flag.
 static iree_status_t iree_hal_executable_library_create_loader(
     iree_allocator_t host_allocator,
     iree_hal_executable_loader_t** out_executable_loader) {
-#if defined(IREE_HAL_HAVE_EMBEDDED_LIBRARY_LOADER)
+#if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY)
   if (strcmp(FLAG_executable_format, "EX_ELF") == 0) {
     return iree_hal_embedded_library_loader_create(
         iree_hal_executable_import_provider_null(), host_allocator,
         out_executable_loader);
   }
-#endif  // IREE_HAL_HAVE_EMBEDDED_LIBRARY_LOADER
+#endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY
   return iree_make_status(
       IREE_STATUS_UNAVAILABLE,
       "no loader available that can handle --executable_format=%s",

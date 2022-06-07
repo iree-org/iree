@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-if(NOT EMSCRIPTEN)
+if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY)
 
 iree_cc_library(
   NAME
@@ -28,7 +28,7 @@ iree_cc_library(
     iree::hal::local::elf::elf_module
     iree::hal::local::executable_library
   DEFINES
-    "IREE_HAL_HAVE_EMBEDDED_LIBRARY_LOADER=1"
+    "IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY=1"
   PUBLIC
 )
 
@@ -49,9 +49,11 @@ iree_cc_library(
     iree::hal::local::executable_environment
     iree::hal::local::executable_library
   DEFINES
-    "IREE_HAL_HAVE_STATIC_LIBRARY_LOADER=1"
+    "IREE_HAVE_HAL_EXECUTABLE_LOADER_STATIC_LIBRARY=1"
   PUBLIC
 )
+
+if(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY)
 
 iree_cc_library(
   NAME
@@ -69,11 +71,13 @@ iree_cc_library(
     iree::hal::local
     iree::hal::local::executable_library
   DEFINES
-    "IREE_HAL_HAVE_SYSTEM_LIBRARY_LOADER=1"
+    "IREE_HAVE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY=1"
   PUBLIC
 )
 
-if(IREE_HAL_DRIVER_VMVX OR IREE_HAL_DRIVER_VMVX_SYNC)
+endif()
+
+if(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
 
 iree_cc_library(
   NAME
@@ -92,7 +96,7 @@ iree_cc_library(
     iree::vm
     iree::vm::bytecode_module
   DEFINES
-    "IREE_HAL_HAVE_VMVX_MODULE_LOADER=1"
+    "IREE_HAVE_HAL_EXECUTABLE_LOADER_VMVX_MODULE=1"
   PUBLIC
 )
 

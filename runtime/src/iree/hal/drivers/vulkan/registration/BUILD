@@ -17,7 +17,7 @@ iree_runtime_cc_library(
     srcs = ["driver_module.cc"],
     hdrs = ["driver_module.h"],
     defines = [
-        "IREE_HAL_HAVE_VULKAN_DRIVER_MODULE=1",
+        "IREE_HAVE_HAL_VULKAN_DRIVER_MODULE=1",
     ],
     deps = [
         "//runtime/src/iree/base",

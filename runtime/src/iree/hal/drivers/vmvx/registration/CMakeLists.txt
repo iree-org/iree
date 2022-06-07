@@ -26,7 +26,7 @@ iree_cc_library(
     iree::task::api
     iree::vm
   DEFINES
-    "IREE_HAL_HAVE_VMVX_DRIVER_MODULE=1"
+    "IREE_HAVE_HAL_VMVX_DRIVER_MODULE=1"
   PUBLIC
 )
 

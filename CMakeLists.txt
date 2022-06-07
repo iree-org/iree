@@ -98,15 +98,56 @@ else()
 endif()
 
 option(IREE_HAL_DRIVER_CUDA "Enables the 'cuda' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA_DEFAULT})
+option(IREE_HAL_DRIVER_LOCAL_SYNC "Enables the 'local-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
+option(IREE_HAL_DRIVER_LOCAL_TASK "Enables the 'local-task' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
+option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
+
+# TODO(#9336): remove legacy driver names.
 option(IREE_HAL_DRIVER_DYLIB "Enables the 'dylib' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_DYLIB_SYNC "Enables the 'dylib-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_VMVX "Enables the 'vmvx' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_VMVX_SYNC "Enables the 'vmvx-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
-option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
 
-message(STATUS "IREE runtime drivers:")
+# TODO(#9336): remove legacy driver names.
+# Existing builds assume that dylib-sync doesn't use the system loader.
+set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY_DEFAULT OFF)
+set(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT OFF)
+set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE_DEFAULT OFF)
+if(IREE_HAL_DRIVER_DYLIB)
+  set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY_DEFAULT ON)
+  set(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT ON)
+endif()
+if(IREE_HAL_DRIVER_DYLIB_SYNC)
+  set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY_DEFAULT ON)
+endif()
+if(IREE_HAL_DRIVER_VMVX OR IREE_HAL_DRIVER_VMVX_SYNC)
+  set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE_DEFAULT ON)
+endif()
+
+# Emscripten builds don't support embedded ELF libraries.
+if(EMSCRIPTEN)
+  set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY_DEFAULT OFF)
+endif()
+
+# If forcing system libraries (for TSAN/debugging tools/etc) then ensure the
+# system library loader is linked in.
+if(IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER)
+  set(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT ON)
+endif()
+
+option(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY "Enables the embedded dynamic library loader for local HAL drivers" ${IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY_DEFAULT})
+option(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY "Enables the system dynamic library loader for local HAL drivers" ${IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT})
+option(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE "Enables the VMVX module loader for local HAL drivers" ${IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE_DEFAULT})
+
+message(STATUS "IREE HAL drivers:")
 if(IREE_HAL_DRIVER_CUDA)
   message(STATUS "  - cuda")
+endif()
+if(IREE_HAL_DRIVER_LOCAL_SYNC)
+  message(STATUS "  - local-sync")
+endif()
+if(IREE_HAL_DRIVER_LOCAL_TASK)
+  message(STATUS "  - local-task")
 endif()
 if(IREE_HAL_DRIVER_DYLIB)
   message(STATUS "  - dylib")
@@ -122,6 +163,17 @@ if(IREE_HAL_DRIVER_VMVX_SYNC)
 endif()
 if(IREE_HAL_DRIVER_VULKAN)
   message(STATUS "  - vulkan")
+endif()
+
+message(STATUS "IREE HAL local executable library loaders:")
+if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY)
+  message(STATUS "  - embedded-library")
+endif()
+if(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY)
+  message(STATUS "  - system-library")
+endif()
+if(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
+  message(STATUS "  - vmvx-module")
 endif()
 
 #-------------------------------------------------------------------------------

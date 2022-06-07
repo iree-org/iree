@@ -24,7 +24,7 @@ iree_cc_library(
     iree::hal::local
     iree::hal::local::loaders::embedded_library_loader
   DEFINES
-    "IREE_HAL_HAVE_DYLIB_SYNC_DRIVER_MODULE=1"
+    "IREE_HAVE_HAL_DYLIB_SYNC_DRIVER_MODULE=1"
   PUBLIC
 )
 

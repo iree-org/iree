@@ -14,12 +14,12 @@ package(
 )
 
 ALL_DRIVERS = [
+    "cuda",
     "dylib",
     "dylib-sync",
     "vmvx",
     "vmvx-sync",
     "vulkan",
-    "cuda",
 ]
 
 string_list_flag(

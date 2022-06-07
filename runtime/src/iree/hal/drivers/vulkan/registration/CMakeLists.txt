@@ -26,7 +26,7 @@ iree_cc_library(
     iree::hal
     iree::hal::drivers::vulkan
   DEFINES
-    "IREE_HAL_HAVE_VULKAN_DRIVER_MODULE=1"
+    "IREE_HAVE_HAL_VULKAN_DRIVER_MODULE=1"
   PUBLIC
 )
 

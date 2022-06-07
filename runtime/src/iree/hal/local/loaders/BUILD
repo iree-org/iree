@@ -4,9 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Default implementations for HAL types that use the host resources.
-# These are generally just wrappers around host heap memory and host threads.
-
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library")
 
 package(
@@ -17,7 +14,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT EMSCRIPTEN)
+if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY)
 """,
     inline = True,
 )
@@ -27,7 +24,7 @@ iree_runtime_cc_library(
     srcs = ["embedded_library_loader.c"],
     hdrs = ["embedded_library_loader.h"],
     defines = [
-        "IREE_HAL_HAVE_EMBEDDED_LIBRARY_LOADER=1",
+        "IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY=1",
     ],
     deps = [
         "//runtime/src/iree/base",
@@ -52,7 +49,7 @@ iree_runtime_cc_library(
     srcs = ["static_library_loader.c"],
     hdrs = ["static_library_loader.h"],
     defines = [
-        "IREE_HAL_HAVE_STATIC_LIBRARY_LOADER=1",
+        "IREE_HAVE_HAL_EXECUTABLE_LOADER_STATIC_LIBRARY=1",
     ],
     deps = [
         "//runtime/src/iree/base",
@@ -64,12 +61,19 @@ iree_runtime_cc_library(
     ],
 )
 
+iree_cmake_extra_content(
+    content = """
+if(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY)
+""",
+    inline = True,
+)
+
 iree_runtime_cc_library(
     name = "system_library_loader",
     srcs = ["system_library_loader.c"],
     hdrs = ["system_library_loader.h"],
     defines = [
-        "IREE_HAL_HAVE_SYSTEM_LIBRARY_LOADER=1",
+        "IREE_HAVE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY=1",
     ],
     deps = [
         "//runtime/src/iree/base",
@@ -84,7 +88,14 @@ iree_runtime_cc_library(
 
 iree_cmake_extra_content(
     content = """
-if(IREE_HAL_DRIVER_VMVX OR IREE_HAL_DRIVER_VMVX_SYNC)
+endif()
+""",
+    inline = True,
+)
+
+iree_cmake_extra_content(
+    content = """
+if(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
 """,
     inline = True,
 )
@@ -94,7 +105,7 @@ iree_runtime_cc_library(
     srcs = ["vmvx_module_loader.c"],
     hdrs = ["vmvx_module_loader.h"],
     defines = [
-        "IREE_HAL_HAVE_VMVX_MODULE_LOADER=1",
+        "IREE_HAVE_HAL_EXECUTABLE_LOADER_VMVX_MODULE=1",
     ],
     deps = [
         "//runtime/src/iree/base",
