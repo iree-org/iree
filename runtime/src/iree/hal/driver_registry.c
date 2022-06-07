@@ -17,7 +17,7 @@
 // iree_hal_driver_registry_t
 //===----------------------------------------------------------------------===//
 
-// 8 factories is enough for anyone, right?
+// ~N factories is enough for anyone, right?
 // But really this is here to prevent the need for dynamically allocated memory.
 // Because it's an implementation detail it's easy to grow in the future if we
 // want to support additional factories.
@@ -27,7 +27,7 @@
 // force all factory storage to be in writeable memory and limit the ability for
 // the same factory to be registered with multiple registries (useful when
 // isolating/sandboxing/multi-versioning).
-#define IREE_HAL_MAX_DRIVER_FACTORY_COUNT 8
+#define IREE_HAL_MAX_DRIVER_FACTORY_COUNT 16
 
 struct iree_hal_driver_registry_t {
   iree_allocator_t host_allocator;
