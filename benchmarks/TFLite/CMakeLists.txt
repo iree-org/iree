@@ -110,6 +110,7 @@ set(MOBILENET_V1_MODULE
   TAGS
     "fp32,imagenet"
   SOURCE
+    # TODO(mariecwhite): Add the source information of where it is mirrored from.
     "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v1_224_1.0_float.tflite"
   ENTRY_FUNCTION
     "main"

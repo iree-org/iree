@@ -61,9 +61,8 @@ iree_benchmark_suite(
 )
 
 # CPU, Dylib-Sync, RV32-Generic, full-inference
-# Note this target is for codegen only, it can't not run the inference without
-# the cross-compile runtime and the emulator
-
+# Note this target is for codegen only. Inference is only possible with
+# the cross-compiled runtime and an emulator.
 iree_benchmark_suite(
   GROUP_NAME
     "linux-riscv"
