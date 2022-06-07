@@ -63,7 +63,7 @@ SmallVector<int64_t> getCollapsedShape(ArrayRef<int64_t> inputShape,
 // The second phase collapses the parallel results into a single final reduce.
 // Topk is run again on the combined output to produce a final output.
 //
-// Currently only topk operations without input indices are supported
+// Currently only topk operations without input indices are supported.
 FailureOr<TopkOp> mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction::
     returningMatchAndRewrite(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
                              PatternRewriter &rewriter,
@@ -148,6 +148,7 @@ FailureOr<TopkOp> mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction::
   Value initTensorOutputIndices = rewriter.create<mlir::linalg::InitTensorOp>(
       loc, dynSizes, outputIndicesExpandedType.getShape(), indicesElementType);
   // Initialize indices to positive infinity and values to negative infinity
+  // for a top (maxk) comparison.
   Attribute negInfAttr;
   if (auto intType = valueElementType.dyn_cast<IntegerType>()) {
     negInfAttr = rewriter.getIntegerAttr(
