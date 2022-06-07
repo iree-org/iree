@@ -1,4 +1,4 @@
-// Copyright 2022 The IREE Authors
+// Copyright 2022right The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -44,8 +44,12 @@ struct TestTopkSplitReductionPass
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
+    mlir::iree_compiler::IREE::LinalgExt::ControlTopkSplitReductionFn
+        splitReductionFn = [=](mlir::iree_compiler::IREE::LinalgExt::TopkOp topkOp) {
+           return splitRatio.getValue();
+           };
     patterns.add<mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction>(
-        patterns.getContext(),
+        patterns.getContext(), splitReductionFn,
         LinalgTransformationFilter(
             ArrayRef<StringAttr>{},
             StringAttr::get(patterns.getContext(), "SPLIT_REDUCTION")));
@@ -61,8 +65,8 @@ struct TestTopkSplitReductionPass
     });
   }
 
-  // Pass::Option<std::string> opToWrap{*this, "opname",
-  //                                    llvm::cl::desc("Op to wrap")};
+  Pass::Option<int64_t> splitRatio{*this, "split-ratio",
+                                     llvm::cl::desc("Split reduction ratio")};
 };
 
 } // namespace

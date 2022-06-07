@@ -26,20 +26,6 @@ using namespace mlir;
 using namespace mlir::iree_compiler::IREE::LinalgExt;
 
 namespace {
-// Maximum parallel workloads to produce
-static constexpr int64_t MAX_M_SPLITS = 64;
-// Min threshold of work per parallel reduction
-static constexpr int64_t MIN_PARALLEL_WORK_SIZE = 128;
-
-bool shouldSplitWork(int64_t reductionDimSize, int64_t k) {
-  return true;
-  // return reductionDimSize / MAX_M_SPLITS > MIN_PARALLEL_WORK_SIZE;
-}
-
-int64_t getMSplitArity(int64_t reductionDimSize, int64_t k) {
-  // TODO: determine this algorithmically?
-  return 3; // Hard coding for now.
-}
 
 SmallVector<int64_t> getExpandedShape(ArrayRef<int64_t> inputShape,
                                           int64_t mSplitArity,
@@ -72,6 +58,7 @@ SmallVector<int64_t> getCollapsedShape(ArrayRef<int64_t> inputShape,
 FailureOr<TopkOp> mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction::
     returningMatchAndRewrite(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
                              PatternRewriter &rewriter,
+                             ControlTopkSplitReductionFn splitReductionFn,
                              linalg::LinalgTransformationFilter filter) const {
   if (failed(filter.checkAndNotify(rewriter, topkOp))) {
     return rewriter.notifyMatchFailure(topkOp, "preconditions not met");
@@ -94,18 +81,25 @@ FailureOr<TopkOp> mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction::
 
   // Determine if we should split the reduction (assuming there is enough work
   // to do). Only static reduction dimensions are supported at the moment.
-  if (valuesOrigType.getDimSize(kDimOrig) == ShapedType::kDynamicSize ||
-      !shouldSplitWork(valuesOrigType.getDimSize(kDimOrig), k)) {
+  if (valuesOrigType.getDimSize(kDimOrig) == ShapedType::kDynamicSize) {
     return rewriter.notifyMatchFailure(
-        topkOp, "insufficient work or dynamic dimension");
+        topkOp, "cannot split dynamic dimension");
   }
 
-  // TODO: handle non-aligned shapes by padding them out to be divisible by
-  // MAX_M_SPLITS
-
   // Define the M number of splits to divide the reduction dimension
-  int64_t mSplitArity =
-      getMSplitArity(valuesOrigType.getDimSize(kDimOrig), k);
+  int64_t mSplitArity = splitReductionFn(topkOp);
+  if (mSplitArity < 1) {
+        return rewriter.notifyMatchFailure(
+        topkOp,
+        "split ratio less than 1");
+  }
+
+  if (valuesOrigType.getDimSize(kDimOrig) % mSplitArity != 0) {
+    return rewriter.notifyMatchFailure(
+        topkOp,
+        "reduction dimension must be perfectly aligned to (divisible by) the "
+        "split ratio");
+  }
 
   // Expand shape of input values for parallel processing
   // Note this assumes we're already aligned at this point
@@ -114,12 +108,12 @@ FailureOr<TopkOp> mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction::
   RankedTensorType valuesExpandedType =
       RankedTensorType::get(expandedShape, valueElementType);
   SmallVector<ReassociationIndices> reassociationIndices;
-  for (int i = 0; i < valuesOrigType.getRank() + 1; ++i) {
+  for (int i = 0; i < valuesOrigType.getRank(); ++i) {
     if (i < splitDimParallel) {
       reassociationIndices.push_back({i});
     } else if (i == splitDimParallel) {
       reassociationIndices.push_back({i, i + 1});
-    } else if (i > kDimParallel) {
+    } else if (i > splitDimParallel) {
       reassociationIndices.push_back({i + 1});
     }
   }
