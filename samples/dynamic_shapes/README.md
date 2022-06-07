@@ -77,7 +77,7 @@ them.
     ```
 
 3. Compile the `dynamic_shapes.mlir` file using `iree-compile`. The
-    [dylib-llvm-aot](https://google.github.io/iree/deployment-configurations/cpu-dylib/)
+    [local CPU](https://google.github.io/iree/deployment-configurations/cpu-local/)
     configuration has the best support for dynamic shapes:
 
     ```
