@@ -37,9 +37,6 @@ steps:
                 - url: ${BUILDKITE_REPO}
                   ref: ${CONFIG_FETCH_REF}
     commands: |
-      export BUILDKITE_ANNOTATION_CONTEXT="$${BUILDKITE_STEP_ID}"
-      export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
-          --secret=iree-buildkite-presubmit-pipelines)"
       ./build_tools/buildkite/scripts/wait_for_pipeline_success.py \
         --annotate \
         build-runtime-cmake
@@ -54,9 +51,6 @@ steps:
                 - url: ${BUILDKITE_REPO}
                   ref: ${CONFIG_FETCH_REF}
     commands: |
-      export BUILDKITE_ANNOTATION_CONTEXT="$${BUILDKITE_STEP_ID}"
-      export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
-          --secret=iree-buildkite-presubmit-pipelines)"
       ./build_tools/buildkite/scripts/wait_for_pipeline_success.py \
         --annotate \
         test-runtime-cmake
