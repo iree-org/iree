@@ -7,6 +7,7 @@ add_mlir_library(IREELinalgExtTransforms
   TileToSequentialFor.cpp
   TileToInParallel.cpp
   Tiling.cpp
+  TilingToForeachThreadOp.cpp
   TilingToTileOp.cpp
   Utils.cpp
 

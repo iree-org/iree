@@ -122,6 +122,30 @@ void LinalgExt::FuseProducersOp::print(OpAsmPrinter &p) {
 }
 
 LogicalResult
+LinalgExt::TileToForeachOp::apply(transform::TransformResults &results,
+                                  transform::TransformState &state) {
+  linalg::LinalgTilingOptions tilingOptions;
+  SmallVector<int64_t> numThreads = extractI64Array(getNumThreads());
+  if (!numThreads.empty())
+    tilingOptions.setTileSizes(numThreads);
+
+  LinalgExt::ForeachThreadTilingPattern pattern(this->getContext(),
+                                                tilingOptions);
+  ArrayRef<Operation *> targets = state.getPayloadOps(getTarget());
+  auto tilingInterfaceOp = dyn_cast<TilingInterface>(targets.front());
+  if (!tilingInterfaceOp)
+    return targets.front()->emitError("Cannot tile op: Not a TilingInterface");
+
+  FailureOr<iree_compiler::IREE::LinalgExt::TilingResult> result =
+      functional::applyReturningPatternAt(pattern, tilingInterfaceOp);
+  if (failed(result))
+    return failure();
+  results.set(getTiledOp().cast<OpResult>(), result->tiledOp);
+  results.set(getTileOp().cast<OpResult>(), result->tileOp);
+  return success();
+}
+
+LogicalResult
 LinalgExt::TileToLinalgExtTileOp::apply(transform::TransformResults &results,
                                         transform::TransformState &state) {
   linalg::LinalgTilingOptions tilingOptions;
@@ -142,7 +166,7 @@ LinalgExt::TileToLinalgExtTileOp::apply(transform::TransformResults &results,
   if (failed(result))
     return failure();
   results.set(getTiledOp().cast<OpResult>(), result->tiledOp);
-  results.set(getTileOp().cast<OpResult>(), result->tileOp.getOperation());
+  results.set(getTileOp().cast<OpResult>(), result->tileOp);
   return success();
 }
 
