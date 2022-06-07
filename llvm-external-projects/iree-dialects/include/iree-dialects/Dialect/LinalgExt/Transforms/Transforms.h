@@ -197,39 +197,30 @@ private:
 /// reduction ratio used to split the reduction dimension. The ratio is applied
 /// to the reduction dimension of TopK. If the ratio value is less or equal to 1
 /// then nothing will be done.
-using ControlTopkSplitReductionFn = std::function<int64_t(TopkOp topkOp)>;
+using TopkSplitReductionControlFn = std::function<int64_t(TopkOp topkOp)>;
 
 struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  TopkOpSplitReduction(MLIRContext *context,
-                      ControlTopkSplitReductionFn fn,
+  TopkOpSplitReduction(MLIRContext *context, TopkSplitReductionControlFn fn,
                        linalg::LinalgTransformationFilter filt)
-      : OpRewritePattern<TopkOp>(context),
-      controlTopkSplitReductionFn(std::move(fn)) ,
-      filter(std::move(filt)) {}
+      : OpRewritePattern<TopkOp>(context), splitReductionFn(std::move(fn)),
+        filter(std::move(filt)) {}
 
-  FailureOr<TopkOp> returningMatchAndRewrite(
-      TopkOp topkOp, PatternRewriter &rewriter,
-      ControlTopkSplitReductionFn splitReductionFn,
-      linalg::LinalgTransformationFilter filter) const;
+  FailureOr<TopkOp>
+  returningMatchAndRewrite(TopkOp topkOp, PatternRewriter &rewriter,
+                           TopkSplitReductionControlFn splitReductionFn,
+                           linalg::LinalgTransformationFilter filter) const;
 
   LogicalResult matchAndRewrite(TopkOp topkOp,
                                 PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(topkOp, rewriter,
-                                    controlTopkSplitReductionFn, filter);
+    return returningMatchAndRewrite(topkOp, rewriter, splitReductionFn, filter);
   }
 
 private:
-  ControlTopkSplitReductionFn controlTopkSplitReductionFn;
+  TopkSplitReductionControlFn splitReductionFn;
   linalg::LinalgTransformationFilter filter;
 };
-
-// /// Patterns to apply `splitReduction` below.
-// void populateSplitReductionPattern(
-//     RewritePatternSet &patterns,
-//     const ControlTopkSplitReductionFn &controlTopkSplitReductionFn,
-//     const linalg::LinalgTransformationFilter &f = LinalgTransformationFilter());
 
 } // namespace LinalgExt
 } // namespace IREE

@@ -44,10 +44,11 @@ struct TestTopkSplitReductionPass
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    mlir::iree_compiler::IREE::LinalgExt::ControlTopkSplitReductionFn
-        splitReductionFn = [=](mlir::iree_compiler::IREE::LinalgExt::TopkOp topkOp) {
-           return splitRatio.getValue();
-           };
+    mlir::iree_compiler::IREE::LinalgExt::TopkSplitReductionControlFn
+        splitReductionFn =
+            [=](mlir::iree_compiler::IREE::LinalgExt::TopkOp topkOp) {
+              return splitRatio.getValue();
+            };
     patterns.add<mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction>(
         patterns.getContext(), splitReductionFn,
         LinalgTransformationFilter(
@@ -60,7 +61,7 @@ struct TestTopkSplitReductionPass
   }
 
   Pass::Option<int64_t> splitRatio{*this, "split-ratio",
-                                     llvm::cl::desc("Split reduction ratio")};
+                                   llvm::cl::desc("Split reduction ratio")};
 };
 
 } // namespace

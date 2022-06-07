@@ -26,13 +26,13 @@ using namespace mlir::iree_compiler::IREE::LinalgExt;
 namespace {
 
 SmallVector<int64_t> getExpandedShape(ArrayRef<int64_t> inputShape,
-                                          int64_t mSplitArity,
-                                          int64_t splitDimParallel) {
+                                      int64_t splitReductionRatio,
+                                      int64_t splitDimParallel) {
   SmallVector<int64_t> ans;
   for (auto elem : llvm::enumerate(inputShape)) {
     if (elem.index() == splitDimParallel) {
-      ans.push_back(mSplitArity);
-      ans.push_back(inputShape[splitDimParallel] / mSplitArity);
+      ans.push_back(splitReductionRatio);
+      ans.push_back(inputShape[splitDimParallel] / splitReductionRatio);
     } else {
       ans.push_back(elem.value());
     }
@@ -41,34 +41,45 @@ SmallVector<int64_t> getExpandedShape(ArrayRef<int64_t> inputShape,
 }
 
 SmallVector<int64_t> getCollapsedShape(ArrayRef<int64_t> inputShape,
-                                           int64_t mSplitArity, int64_t k,
-                                           int64_t kDimOrig) {
+                                       int64_t splitReductionRatio, int64_t k,
+                                       int64_t kDimOrig) {
   SmallVector<int64_t> ans;
   for (auto elem : inputShape) {
     ans.push_back(elem);
   }
-  ans[kDimOrig] = k * mSplitArity;
+  ans[kDimOrig] = k * splitReductionRatio;
   return ans;
 }
 
 } // namespace
 
+// Transforms an applicable standard single reduction TopkOp into a parallel
+// reduction TopkOp with a reduce step following.
+//
+// Handles parallel reductions in 2 phases: A "map" parallel phase and the a
+// single "reduce" reduction phase. The first phase expands the input tensor
+// shape by breaking the reduction dimension into multiple parallel reductions
+// (upping the rank of the input). Topk is run on these dimensions in parallel
+// The second phase collapses the parallel results into a single final reduce.
+// Topk is run again on the combined output to produce a final output.
+//
+// Currently only topk operations without input indices are supported
 FailureOr<TopkOp> mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction::
     returningMatchAndRewrite(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
                              PatternRewriter &rewriter,
-                             ControlTopkSplitReductionFn splitReductionFn,
+                             TopkSplitReductionControlFn splitReductionFn,
                              linalg::LinalgTransformationFilter filter) const {
   if (failed(filter.checkAndNotify(rewriter, topkOp))) {
     return rewriter.notifyMatchFailure(topkOp, "preconditions not met");
   }
   Location loc = topkOp.getLoc();
-  // Original K dimension used for the final combined reduction
+  // Original reduction dimension used for the final combined reduction
   int64_t kDimOrig = topkOp.dimension();
-  // For parallel topk, the dimension that we compute parallel reductions
+  // For parallel topk: the dimension that we compute parallel reductions
   int64_t splitDimParallel = kDimOrig;
-  // For parallel topk, the dimension that we reduce
+  // For parallel topk: the dimension that we reduce
   int64_t kDimParallel = kDimOrig + 1;
-  int64_t k =
+  int64_t kSize =
       topkOp.getResult(0).getType().cast<ShapedType>().getDimSize(kDimOrig);
 
   Value valuesOrig = topkOp.values();
@@ -77,32 +88,30 @@ FailureOr<TopkOp> mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction::
   Type indicesElementType =
       topkOp.getResultTypes()[1].cast<ShapedType>().getElementType();
 
-  // Determine if we should split the reduction (assuming there is enough work
-  // to do). Only static reduction dimensions are supported at the moment.
+  // Determine if we should split the reduction. Requires aligned static shapes
+  // and no input indicies.
   if (valuesOrigType.getDimSize(kDimOrig) == ShapedType::kDynamicSize) {
-    return rewriter.notifyMatchFailure(
-        topkOp, "cannot split dynamic dimension");
+    return rewriter.notifyMatchFailure(topkOp,
+                                       "cannot split dynamic dimension");
   }
-
-  // Define the M number of splits to divide the reduction dimension
-  int64_t mSplitArity = splitReductionFn(topkOp);
-  if (mSplitArity < 1) {
-        return rewriter.notifyMatchFailure(
-        topkOp,
-        "split ratio less than 1");
+  if (topkOp.indices()) {
+    return rewriter.notifyMatchFailure(topkOp,
+                                       "input indices aren't supported");
   }
-
-  if (valuesOrigType.getDimSize(kDimOrig) % mSplitArity != 0) {
+  int64_t splitReductionRatio = splitReductionFn(topkOp);
+  if (splitReductionRatio < 1) {
+    return rewriter.notifyMatchFailure(topkOp, "split ratio less than 1");
+  }
+  if (valuesOrigType.getDimSize(kDimOrig) % splitReductionRatio != 0) {
     return rewriter.notifyMatchFailure(
         topkOp,
         "reduction dimension must be perfectly aligned to (divisible by) the "
         "split ratio");
   }
 
-  // Expand shape of input values for parallel processing
-  // Note this assumes we're already aligned at this point
+  // Expand input values shape for parallel processing
   SmallVector<int64_t> expandedShape = getExpandedShape(
-      valuesOrigType.getShape(), mSplitArity, splitDimParallel);
+      valuesOrigType.getShape(), splitReductionRatio, splitDimParallel);
   RankedTensorType valuesExpandedType =
       RankedTensorType::get(expandedShape, valueElementType);
   SmallVector<ReassociationIndices> reassociationIndices;
@@ -120,7 +129,7 @@ FailureOr<TopkOp> mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction::
 
   // Define the expanded output types
   SmallVector<int64_t> expandedResultShape = expandedShape;
-  expandedResultShape[kDimParallel] = k;
+  expandedResultShape[kDimParallel] = kSize;
   RankedTensorType outputValuesExpandedType =
       RankedTensorType::get(expandedResultShape, valueElementType);
   RankedTensorType outputIndicesExpandedType =
@@ -160,20 +169,18 @@ FailureOr<TopkOp> mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction::
       rewriter.create<linalg::FillOp>(loc, posInf, initTensorOutputIndices)
           .result();
 
-  // Spit reduction topk (first phase)
+  // Parallel topk (first phase)
   auto parallelTopkOp = rewriter.create<IREE::LinalgExt::TopkOp>(
       loc,
       /* resultTypes= */
       TypeRange{outputValuesExpandedType, outputIndicesExpandedType},
       /* ins= */ ValueRange{valuesExpanded},
       /* outs= */ ValueRange{negInfTensor, posInfTensor}, kDimParallel);
-  // rewriter.inlineRegionBefore(topkOp.region(), parallelTopkOp.region(),
-  // parallelTopkOp.region().end());
   rewriter.cloneRegionBefore(topkOp.region(), parallelTopkOp.region(),
                              parallelTopkOp.region().end());
 
-  // Update the output indices from the parallel TopK with the M split offsets.
-  //
+  // Update the output indices from the parallel TopK with the reduction ratio
+  // offsets.
   Value parallelIndices = parallelTopkOp.getResult(1);
   ShapedType parallelIndicesType = parallelIndices.getType().cast<ShapedType>();
   size_t parallelIndicesRank = parallelIndicesType.getRank();
@@ -181,13 +188,14 @@ FailureOr<TopkOp> mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction::
   SmallVector<AffineMap> indexingMaps{mapIdentity};
   SmallVector<StringRef> iterators{parallelIndicesRank, "parallel"};
   Value mSplitVal = rewriter.create<arith::ConstantIntOp>(
-      loc, mSplitArity, parallelIndicesType.getElementType());
+      loc, splitReductionRatio, parallelIndicesType.getElementType());
   Value updatedParallelIndices =
       rewriter
           .create<linalg::GenericOp>(
-              loc, parallelIndicesType /* result type */,
-              ValueRange{} /* inputs */,
-              ValueRange{parallelIndices} /* outputs */, indexingMaps,
+              loc,
+              /* resultType= */ parallelIndicesType,
+              /* inputs= */ ValueRange{},
+              /* outputs= */ ValueRange{parallelIndices}, indexingMaps,
               iterators,
               [=](OpBuilder &b, Location loc, ValueRange args) {
                 Value splitIndex =
@@ -203,33 +211,30 @@ FailureOr<TopkOp> mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction::
           .getResult(0);
 
   // Define the collapsed input shapes
-
   SmallVector<int64_t> collapsedShape = getCollapsedShape(
-      valuesOrigType.getShape(), mSplitArity, k, kDimOrig);
+      valuesOrigType.getShape(), splitReductionRatio, kSize, kDimOrig);
   RankedTensorType valuesCollapsedType =
       RankedTensorType::get(collapsedShape, valueElementType);
   RankedTensorType indicesCollapsedType =
       RankedTensorType::get(collapsedShape, indicesElementType);
 
-  // Collapse shapes for linear reduction
+  // Collapse collapse parallel output for the input of final reduction
   Value valuesCollapsed = rewriter.create<tensor::CollapseShapeOp>(
       loc, valuesCollapsedType, parallelTopkOp.getResults()[0],
       reassociationIndices);
   Value indicesCollapsed = rewriter.create<tensor::CollapseShapeOp>(
       loc, indicesCollapsedType, updatedParallelIndices, reassociationIndices);
 
+  // Combined final topk (second phase)
   auto reductionTopkOp = rewriter.create<IREE::LinalgExt::TopkOp>(
       loc,
       /* resultTypes= */ topkOp->getResultTypes(),
       /* ins= */ ValueRange{valuesCollapsed, indicesCollapsed},
       /* outs= */ topkOp.outputs(), kDimOrig);
-  // rewriter.inlineRegionBefore(topkOp.region(), reductionTopkOp.region(),
-  // reductionTopkOp.region().end());
   rewriter.cloneRegionBefore(topkOp.region(), reductionTopkOp.region(),
                              reductionTopkOp.region().end());
 
   rewriter.replaceOp(topkOp, reductionTopkOp.getResults());
-
   filter.replaceLinalgTransformationFilter(rewriter, parallelTopkOp);
   filter.replaceLinalgTransformationFilter(rewriter, reductionTopkOp);
   return reductionTopkOp;
