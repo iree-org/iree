@@ -12,7 +12,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/local_sync/sync_device.h"
 #include "iree/hal/local/executable_loader.h"
-#include "iree/hal/local/loaders/embedded_library_loader.h"
+#include "iree/hal/local/loaders/embedded_elf_loader.h"
 
 // Compiled module embedded here to avoid file IO:
 #if IREE_ARCH_ARM_32
@@ -34,7 +34,7 @@ iree_status_t create_sample_device(iree_allocator_t host_allocator,
   iree_hal_sync_device_params_initialize(&params);
 
   iree_hal_executable_loader_t* loader = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_embedded_library_loader_create(
+  IREE_RETURN_IF_ERROR(iree_hal_embedded_elf_loader_create(
       iree_hal_executable_import_provider_null(), host_allocator, &loader));
 
   // Use the default host allocator for buffer allocations.

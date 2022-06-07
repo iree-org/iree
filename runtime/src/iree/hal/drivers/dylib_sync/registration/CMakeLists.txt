@@ -22,9 +22,9 @@ iree_cc_library(
     iree::hal
     iree::hal::drivers::local_sync::sync_driver
     iree::hal::local
-    iree::hal::local::loaders::embedded_library_loader
+    iree::hal::local::loaders::embedded_elf_loader
   DEFINES
-    "IREE_HAL_HAVE_DYLIB_SYNC_DRIVER_MODULE=1"
+    "IREE_HAVE_HAL_DYLIB_SYNC_DRIVER_MODULE=1"
   PUBLIC
 )
 

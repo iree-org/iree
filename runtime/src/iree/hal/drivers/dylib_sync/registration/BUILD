@@ -17,13 +17,13 @@ iree_runtime_cc_library(
     srcs = ["driver_module.c"],
     hdrs = ["driver_module.h"],
     defines = [
-        "IREE_HAL_HAVE_DYLIB_SYNC_DRIVER_MODULE=1",
+        "IREE_HAVE_HAL_DYLIB_SYNC_DRIVER_MODULE=1",
     ],
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/local_sync:sync_driver",
         "//runtime/src/iree/hal/local",
-        "//runtime/src/iree/hal/local/loaders:embedded_library_loader",
+        "//runtime/src/iree/hal/local/loaders:embedded_elf_loader",
     ],
 )

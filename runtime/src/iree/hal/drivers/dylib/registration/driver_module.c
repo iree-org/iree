@@ -14,7 +14,7 @@
 #include "iree/hal/drivers/local_task/task_device.h"
 #include "iree/hal/drivers/local_task/task_driver.h"
 #include "iree/hal/local/executable_loader.h"
-#include "iree/hal/local/loaders/embedded_library_loader.h"
+#include "iree/hal/local/loaders/embedded_elf_loader.h"
 #include "iree/hal/local/loaders/system_library_loader.h"
 #include "iree/task/api.h"
 
@@ -61,7 +61,7 @@ static iree_status_t iree_hal_dylib_driver_factory_try_create(
   iree_hal_executable_loader_t* loaders[2] = {NULL, NULL};
   iree_host_size_t loader_count = 0;
   if (iree_status_is_ok(status)) {
-    status = iree_hal_embedded_library_loader_create(
+    status = iree_hal_embedded_elf_loader_create(
         iree_hal_executable_import_provider_null(), host_allocator,
         &loaders[loader_count++]);
   }

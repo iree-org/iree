@@ -7,7 +7,7 @@
 # Default implementations for HAL types that use the host resources.
 # These are generally just wrappers around host heap memory and host threads.
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
 
 package(
@@ -34,13 +34,6 @@ iree_runtime_cc_library(
     hdrs = ["executable_library.h"],
 )
 
-iree_cmake_extra_content(
-    content = """
-if(NOT EMSCRIPTEN)
-""",
-    inline = True,
-)
-
 cc_binary_benchmark(
     name = "executable_library_benchmark",
     srcs = ["executable_library_benchmark.c"],
@@ -53,16 +46,9 @@ cc_binary_benchmark(
         "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/local/loaders:embedded_library_loader",
+        "//runtime/src/iree/hal/local/loaders/registration",
         "//runtime/src/iree/testing:benchmark",
     ],
-)
-
-iree_cmake_extra_content(
-    content = """
-endif()
-""",
-    inline = True,
 )
 
 iree_runtime_cc_test(

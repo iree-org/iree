@@ -25,7 +25,7 @@ iree_cc_library(
     iree::hal::local::loaders::vmvx_module_loader
     iree::vm
   DEFINES
-    "IREE_HAL_HAVE_VMVX_SYNC_DRIVER_MODULE=1"
+    "IREE_HAVE_HAL_VMVX_SYNC_DRIVER_MODULE=1"
   PUBLIC
 )
 

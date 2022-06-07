@@ -73,7 +73,7 @@ iree_cc_binary(
     iree::hal
     iree::hal::drivers::local_sync::sync_driver
     iree::hal::local
-    iree::hal::local::loaders::embedded_library_loader
+    iree::hal::local::loaders::embedded_elf_loader
     iree::modules::hal
     iree::vm
     iree::vm::bytecode_module
@@ -199,7 +199,7 @@ iree_cc_binary(
     iree::hal
     iree::hal::drivers::local_task::task_driver
     iree::hal::local
-    iree::hal::local::loaders::embedded_library_loader
+    iree::hal::local::loaders::embedded_elf_loader
     iree::modules::hal
     iree::task::api
     iree::vm
