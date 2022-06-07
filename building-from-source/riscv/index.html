@@ -1292,7 +1292,7 @@ ${HOME}/riscv/qemu/linux/RISCV/bin/qemu-riscv64.</p>
   -cpu rv64 <span class="se">\</span>
   -L <span class="si">${</span><span class="nv">RISCV_TOOLCHAIN_ROOT</span><span class="si">}</span>/sysroot/ <span class="se">\</span>
   ../iree-build-riscv/tools/iree-run-module <span class="se">\</span>
-  --driver<span class="o">=</span>vmvx <span class="se">\</span>
+  --driver<span class="o">=</span>local-task <span class="se">\</span>
   --module_file<span class="o">=</span>/tmp/simple_abs_vmvx.vmfb <span class="se">\</span>
   --entry_function<span class="o">=</span>abs <span class="se">\</span>
   --function_input<span class="o">=</span><span class="nv">f32</span><span class="o">=</span>-5
@@ -1333,7 +1333,7 @@ with the additional command-line flags</p>
 <span class="hll">  -cpu rv64,x-v<span class="o">=</span>true,x-k<span class="o">=</span>true,vlen<span class="o">=</span><span class="m">256</span>,elen<span class="o">=</span><span class="m">64</span>,vext_spec<span class="o">=</span>v1.0 <span class="se">\</span>
 </span>  -L <span class="si">${</span><span class="nv">RISCV_TOOLCHAIN_ROOT</span><span class="si">}</span>/sysroot/ <span class="se">\</span>
   ../iree-build-riscv/tools/iree-run-module <span class="se">\</span>
-<span class="hll">  --driver<span class="o">=</span>dylib <span class="se">\</span>
+<span class="hll">  --driver<span class="o">=</span>local-task <span class="se">\</span>
 </span>  --module_file<span class="o">=</span>mobilenet-dylib.vmfb <span class="se">\</span>
   --entry_function<span class="o">=</span>predict <span class="se">\</span>
   --function_input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>

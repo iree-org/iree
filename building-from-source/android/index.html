@@ -1238,7 +1238,7 @@ adb shell chmod +x /data/local/tmp/iree-run-module
 adb push /tmp/simple_abs_vmvx.vmfb /data/local/tmp/
 </code></pre></div>
 <p>Run the tool:</p>
-<div class="highlight"><pre><span></span><code>adb shell /data/local/tmp/iree-run-module --driver<span class="o">=</span>vmvx <span class="se">\</span>
+<div class="highlight"><pre><span></span><code>adb shell /data/local/tmp/iree-run-module --driver<span class="o">=</span>local-task <span class="se">\</span>
   --module_file<span class="o">=</span>/data/local/tmp/simple_abs_vmvx.vmfb <span class="se">\</span>
   --entry_function<span class="o">=</span>abs <span class="se">\</span>
   --function_input<span class="o">=</span><span class="s2">&quot;f32=-5&quot;</span>

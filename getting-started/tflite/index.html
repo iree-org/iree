@@ -1163,7 +1163,7 @@ to select alternative targets.</p>
 <span class="n">bytecodeModule</span> <span class="o">=</span> <span class="s2">&quot;/&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">workdir</span><span class="p">,</span> <span class="s2">&quot;iree.vmfb&quot;</span><span class="p">])</span>
 
 <span class="n">backends</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;dylib-llvm-aot&quot;</span><span class="p">]</span>
-<span class="n">config</span> <span class="o">=</span> <span class="s2">&quot;dylib&quot;</span>
+<span class="n">config</span> <span class="o">=</span> <span class="s2">&quot;local-task&quot;</span>
 </code></pre></div>
 <p>The TFLite sample model and input are downloaded locally.</p>
 <div class="highlight"><pre><span></span><code><span class="n">tfliteUrl</span> <span class="o">=</span> <span class="s2">&quot;https://storage.googleapis.com/iree-model-artifacts/tflite-integration-tests/posenet_i8.tflite&quot;</span>
@@ -1185,7 +1185,7 @@ of the model are saved for debugging purposes. This is optional and can be omitt
 </code></pre></div>
 <p>After compilation is completed we configure the VmModule using the dylib configuration and compiled
 IREE module.</p>
-<div class="highlight"><pre><span></span><code><span class="n">config</span> <span class="o">=</span> <span class="n">iree_rt</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="s2">&quot;dylib&quot;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">config</span> <span class="o">=</span> <span class="n">iree_rt</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="s2">&quot;local-task&quot;</span><span class="p">)</span>
 <span class="n">context</span> <span class="o">=</span> <span class="n">iree_rt</span><span class="o">.</span><span class="n">SystemContext</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">)</span>
 <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">bytecodeModule</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
   <span class="n">vm_module</span> <span class="o">=</span> <span class="n">iree_rt</span><span class="o">.</span><span class="n">VmModule</span><span class="o">.</span><span class="n">from_flatbuffer</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>

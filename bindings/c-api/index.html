@@ -1225,7 +1225,7 @@ through the Hardware Abstraction Layer (HAL) interface.</p>
 <span class="c1">// with those for the specific HAL drivers your application uses.</span>
 <span class="c1">// Functionality extensions can be used via custom modules.</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/modules/hal/module.h&quot;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/hal/drivers/dylib/registration/driver_module.h&quot;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/hal/drivers/local_task/registration/driver_module.h&quot;</span><span class="cp"></span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/vm/bytecode_module.h&quot;</span><span class="cp"></span>
 </code></pre></div>
 <p>Check the API version and register components:</p>
@@ -1241,7 +1241,7 @@ through the Hardware Abstraction Layer (HAL) interface.</p>
 <span class="c1">// Device drivers are managed through registries.</span>
 <span class="c1">// Applications may use multiple registries to more finely control driver</span>
 <span class="c1">// lifetimes and visibility.</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_dylib_driver_module_register</span><span class="p">(</span><span class="w"></span>
+<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_local_task_driver_module_register</span><span class="p">(</span><span class="w"></span>
 <span class="w">    </span><span class="n">iree_hal_driver_registry_default</span><span class="p">()));</span><span class="w"></span>
 </code></pre></div>
 <div class="admonition tip">
@@ -1256,13 +1256,13 @@ Applications should propagate errors and handle or report them as desired.</p>
 <span class="n">iree_vm_instance_t</span><span class="o">*</span><span class="w"> </span><span class="n">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
 <span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_instance_create</span><span class="p">(</span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">instance</span><span class="p">));</span><span class="w"></span>
 
-<span class="c1">// We use the CPU &quot;dylib&quot; driver in this example, but could use a different</span>
+<span class="c1">// We use the CPU &quot;local-task&quot; driver in this example, but could use a different</span>
 <span class="c1">// driver like the GPU &quot;vulkan&quot; driver. The driver(s) used should match with</span>
 <span class="c1">// the target(s) specified during compilation.</span>
 <span class="n">iree_hal_driver_t</span><span class="o">*</span><span class="w"> </span><span class="n">driver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
 <span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_driver_registry_try_create_by_name</span><span class="p">(</span><span class="w"></span>
 <span class="w">    </span><span class="n">iree_hal_driver_registry_default</span><span class="p">(),</span><span class="w"></span>
-<span class="w">    </span><span class="n">iree_string_view_literal</span><span class="p">(</span><span class="s">&quot;dylib&quot;</span><span class="p">),</span><span class="w"></span>
+<span class="w">    </span><span class="n">iree_string_view_literal</span><span class="p">(</span><span class="s">&quot;local-task&quot;</span><span class="p">),</span><span class="w"></span>
 <span class="w">    </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">driver</span><span class="p">));</span><span class="w"></span>
 
 <span class="c1">// Drivers may support multiple devices, such as when a machine has multiple</span>

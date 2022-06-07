@@ -1255,8 +1255,9 @@ page if you are cross compiling for Android. The dylib HAL driver is compiled
 in by default on all platforms.</p>
 <!-- TODO(??): a way to verify dylib is compiled in and supported -->
 
-<p>Ensure that the <code>IREE_HAL_DRIVER_DYLIB</code> CMake option is <code>ON</code> when configuring
-for the target.</p>
+<p>Ensure that the <code>IREE_HAL_DRIVER_LOCAL_TASK</code> and
+<code>IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF</code> CMake options are <code>ON</code> when
+configuring for the target.</p>
 <h3 id="get-compiler-for-cpu-native-instructions">Get compiler for CPU native instructions<a class="headerlink" href="#get-compiler-for-cpu-native-instructions" title="Permanent link">&para;</a></h3>
 <!-- TODO(??): vcpkg -->
 
@@ -1317,7 +1318,7 @@ IREE's TensorFlow importer.</p>
 <h4 id="run-using-the-command-line">Run using the command-line<a class="headerlink" href="#run-using-the-command-line" title="Permanent link">&para;</a></h4>
 <p>In the build directory, run the following command:</p>
 <div class="highlight"><pre><span></span><code>tools/iree-run-module <span class="se">\</span>
-<span class="hll">    --driver<span class="o">=</span>dylib <span class="se">\</span>
+<span class="hll">    --driver<span class="o">=</span>local-task <span class="se">\</span>
 </span>    --module_file<span class="o">=</span>mobilenet-dylib.vmfb <span class="se">\</span>
     --entry_function<span class="o">=</span>predict <span class="se">\</span>
     --function_input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
