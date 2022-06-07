@@ -39,6 +39,8 @@ def _convert_string_arg_block(name, value, quote=True):
     return f"  {name}\n    {value}\n"
 
 
+# Match Bazel's timeout values
+# https://docs.bazel.build/versions/main/test-encyclopedia.html
 timeout_map = {
     "short": 60,
     "moderate": 300,
