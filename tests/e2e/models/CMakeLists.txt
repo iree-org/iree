@@ -56,6 +56,8 @@ iree_check_single_backend_test_suite(
     "vulkan"
   COMPILER_FLAGS
     "--iree-input-type=mhlo"
+  TIMEOUT
+    900
 )
 
 iree_check_single_backend_test_suite(
@@ -76,6 +78,8 @@ iree_check_single_backend_test_suite(
     "notsan"
     "noubsan"
     "requires-gpu-nvidia"
+  TIMEOUT
+    900
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -35,7 +35,7 @@ function(iree_lit_test)
     _RULE
     ""
     "NAME;TEST_FILE"
-    "DATA;TOOLS;LABELS"
+    "DATA;TOOLS;LABELS;TIMEOUT"
     ${ARGN}
   )
 
@@ -84,6 +84,7 @@ function(iree_lit_test)
     "TEST_TMPDIR=${IREE_BINARY_DIR}/tmp/${_NAME}_test_tmpdir"
     "LIT_OPTS=-v"
     "FILECHECK_OPTS=--enable-var-scope")
+  set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
   iree_add_test_environment_properties(${_NAME_PATH})
 
   # TODO(gcmn): Figure out how to indicate a dependency on _RULE_DATA being built
@@ -116,9 +117,13 @@ function(iree_lit_test_suite)
     _RULE
     ""
     "NAME"
-    "SRCS;DATA;TOOLS;LABELS"
+    "SRCS;DATA;TOOLS;LABELS;TIMEOUT"
     ${ARGN}
   )
+
+  if (NOT DEFINED _RULE_TIMEOUT)
+    set(_RULE_TIMEOUT 60)
+  endif()
 
   foreach(_TEST_FILE ${_RULE_SRCS})
     get_filename_component(_TEST_BASENAME ${_TEST_FILE} NAME)
@@ -133,6 +138,8 @@ function(iree_lit_test_suite)
         "${_RULE_TOOLS}"
       LABELS
         "${_RULE_LABELS}"
+      TIMEOUT
+        ${_RULE_TIMEOUT}
     )
   endforeach()
 endfunction()

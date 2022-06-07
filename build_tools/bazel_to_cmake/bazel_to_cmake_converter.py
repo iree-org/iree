@@ -39,6 +39,23 @@ def _convert_string_arg_block(name, value, quote=True):
     return f"  {name}\n    {value}\n"
 
 
+# Match Bazel's timeout values
+# https://docs.bazel.build/versions/main/test-encyclopedia.html
+timeout_map = {
+    "short": 60,
+    "moderate": 300,
+    "long": 900,
+    "eternal": 3600,
+}
+
+
+def _convert_timeout_arg_block(name, value):
+  if value is None:
+    return ""
+  value = timeout_map[value]
+  return f"  {name}\n    {value}\n"
+
+
 def _convert_string_list_block(name, values, quote=True, sort=False):
   # Note this deliberately distinguishes between an empty list (argument
   # explicitly specified) and None (argument left as default).
@@ -323,6 +340,7 @@ class BuildFileFunctions(object):
               defines=None,
               data=None,
               deps=None,
+              timeout=None,
               args=None,
               tags=None,
               **kwargs):
@@ -335,6 +353,7 @@ class BuildFileFunctions(object):
     deps_block = _convert_target_list_block("DEPS", deps)
     args_block = _convert_string_list_block("ARGS", args)
     labels_block = _convert_string_list_block("LABELS", tags)
+    timeout_block = _convert_timeout_arg_block("TIMEOUT", timeout)
 
     self.converter.body += (f"iree_cc_test(\n"
                             f"{name_block}"
@@ -346,6 +365,7 @@ class BuildFileFunctions(object):
                             f"{deps_block}"
                             f"{args_block}"
                             f"{labels_block}"
+                            f"{timeout_block}"
                             f")\n\n")
 
   def iree_runtime_cc_test(self, deps=[], **kwargs):
@@ -509,12 +529,14 @@ class BuildFileFunctions(object):
                           tools=None,
                           data=None,
                           tags=None,
+                          timeout=None,
                           **kwargs):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
     tools_block = _convert_target_list_block("TOOLS", tools)
     data_block = _convert_target_list_block("DATA", data)
     labels_block = _convert_string_list_block("LABELS", tags)
+    timeout_block = _convert_timeout_arg_block("TIMEOUT", timeout)
 
     self.converter.body += (f"iree_lit_test_suite(\n"
                             f"{name_block}"
@@ -522,6 +544,7 @@ class BuildFileFunctions(object):
                             f"{tools_block}"
                             f"{data_block}"
                             f"{labels_block}"
+                            f"{timeout_block}"
                             f")\n\n")
 
   def iree_check_single_backend_test_suite(self,
@@ -534,6 +557,7 @@ class BuildFileFunctions(object):
                                            runner_args=None,
                                            tags=None,
                                            target_cpu_features=None,
+                                           timeout=None,
                                            **kwargs):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
@@ -546,6 +570,7 @@ class BuildFileFunctions(object):
     labels_block = _convert_string_list_block("LABELS", tags)
     target_cpu_features_block = _convert_string_arg_block(
         "TARGET_CPU_FEATURES", target_cpu_features)
+    timeout_block = _convert_timeout_arg_block("TIMEOUT", timeout)
 
     self.converter.body += (f"iree_check_single_backend_test_suite(\n"
                             f"{name_block}"
@@ -556,6 +581,7 @@ class BuildFileFunctions(object):
                             f"{runner_args_block}"
                             f"{labels_block}"
                             f"{target_cpu_features_block}"
+                            f"{timeout_block}"
                             f")\n\n")
 
   def iree_check_test_suite(self,
@@ -566,6 +592,7 @@ class BuildFileFunctions(object):
                             runner_args=None,
                             tags=None,
                             target_cpu_features_variants=None,
+                            timeout=None,
                             **kwargs):
     target_backends = None
     drivers = None
@@ -584,6 +611,7 @@ class BuildFileFunctions(object):
     labels_block = _convert_string_list_block("LABELS", tags)
     target_cpu_features_variants_block = _convert_string_list_block(
         "TARGET_CPU_FEATURES_VARIANTS", target_cpu_features_variants)
+    timeout_block = _convert_timeout_arg_block("TIMEOUT", timeout)
 
     self.converter.body += (f"iree_check_test_suite(\n"
                             f"{name_block}"
@@ -594,6 +622,7 @@ class BuildFileFunctions(object):
                             f"{runner_args_block}"
                             f"{labels_block}"
                             f"{target_cpu_features_variants_block}"
+                            f"{timeout_block}"
                             f")\n\n")
 
   def iree_generated_trace_runner_test(self,
@@ -646,7 +675,13 @@ class BuildFileFunctions(object):
                             f"{target_cpu_features_variants_block}"
                             f")\n\n")
 
-  def native_test(self, name, src, args=None, data=None, tags=None):
+  def native_test(self,
+                  name,
+                  src,
+                  args=None,
+                  data=None,
+                  tags=None,
+                  timeout=None):
     if data is not None:
       self._convert_unimplemented_function("native_test", name + " has data")
 
@@ -654,6 +689,7 @@ class BuildFileFunctions(object):
     test_binary_block = _convert_single_target_block("SRC", src)
     args_block = _convert_string_list_block("ARGS", args)
     labels_block = _convert_string_list_block("LABELS", tags)
+    timeout_block = _convert_timeout_arg_block("TIMEOUT", timeout)
 
     self.converter.body += (f"iree_native_test(\n"
                             f"{name_block}"

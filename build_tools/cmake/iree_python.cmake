@@ -208,7 +208,7 @@ function(iree_local_py_test)
     _RULE
     "GENERATED_IN_BINARY_DIR"
     "NAME;SRC"
-    "ARGS;LABELS;PACKAGE_DIRS"
+    "ARGS;LABELS;PACKAGE_DIRS;TIMEOUT"
     ${ARGN}
   )
 
@@ -238,7 +238,12 @@ function(iree_local_py_test)
   list(APPEND _RULE_PACKAGE_DIRS "$ENV{PYTHONPATH}")
   string(JOIN ":" _PYTHONPATH ${_RULE_PACKAGE_DIRS})
 
+  if (NOT DEFINED _RULE_TIMEOUT)
+    set(_RULE_TIMEOUT 60)
+  endif()
+
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
+  set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_ARGS})
   set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
       "PYTHONPATH=${_PYTHONPATH}"
       "TEST_TMPDIR=${IREE_BINARY_DIR}/tmp/${_NAME}_test_tmpdir"
@@ -266,7 +271,7 @@ function(iree_py_test)
     _RULE
     "GENERATED_IN_BINARY_DIR"
     "NAME;SRCS"
-    "ARGS;LABELS"
+    "ARGS;LABELS;TIMEOUT"
     ${ARGN}
   )
 
@@ -284,5 +289,7 @@ function(iree_py_test)
       "${IREE_BINARY_DIR}/runtime/bindings/python"
     GENERATED_IN_BINARY_DIR
       "${_RULE_GENERATED_IN_BINARY_DIR}"
+    TIMEOUT
+      ${_RULE_TIMEOUT}
   )
 endfunction()

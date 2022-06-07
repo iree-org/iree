@@ -60,7 +60,7 @@ function(iree_cc_test)
     _RULE
     ""
     "NAME"
-    "ARGS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;LABELS"
+    "ARGS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;LABELS;TIMEOUT"
     ${ARGN}
   )
 
@@ -175,6 +175,11 @@ function(iree_cc_test)
     iree_add_test_environment_properties(${_NAME_PATH})
   endif(ANDROID)
 
+  if (NOT DEFINED _RULE_TIMEOUT)
+    set(_RULE_TIMEOUT 60)
+  endif()
+  
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
+  set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
 endfunction()

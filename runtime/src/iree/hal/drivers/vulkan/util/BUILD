@@ -68,7 +68,7 @@ iree_runtime_cc_library(
 
 iree_runtime_cc_test(
     name = "ref_ptr_test",
-    size = "small",
+    timeout = "short",
     srcs = ["ref_ptr_test.cc"],
     deps = [
         ":ref_ptr",
