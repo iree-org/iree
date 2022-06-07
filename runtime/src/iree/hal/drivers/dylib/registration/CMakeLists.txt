@@ -23,7 +23,7 @@ iree_cc_library(
     iree::hal
     iree::hal::drivers::local_task::task_driver
     iree::hal::local
-    iree::hal::local::loaders::embedded_library_loader
+    iree::hal::local::loaders::embedded_elf_loader
     iree::hal::local::loaders::system_library_loader
     iree::task::api
   DEFINES

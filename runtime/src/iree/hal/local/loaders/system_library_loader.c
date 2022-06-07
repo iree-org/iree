@@ -477,7 +477,7 @@ static bool iree_hal_system_library_loader_query_support(
     iree_hal_executable_loader_t* base_executable_loader,
     iree_hal_executable_caching_mode_t caching_mode,
     iree_string_view_t executable_format) {
-  return iree_string_view_equal(
+  return iree_string_view_starts_with(
       executable_format,
       iree_make_cstring_view("system-" IREE_PLATFORM_DYLIB_TYPE "-" IREE_ARCH));
 }

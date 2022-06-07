@@ -5,8 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 set(IREE_HAL_EXECUTABLE_LOADER_MODULES)
-if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY)
-  list(APPEND IREE_HAL_EXECUTABLE_LOADER_MODULES iree::hal::local::loaders::embedded_library_loader)
+if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
+  list(APPEND IREE_HAL_EXECUTABLE_LOADER_MODULES iree::hal::local::loaders::embedded_elf_loader)
 endif()
 if(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY)
   list(APPEND IREE_HAL_EXECUTABLE_LOADER_MODULES iree::hal::local::loaders::system_library_loader)

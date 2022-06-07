@@ -14,7 +14,7 @@ package(
 )
 
 ALL_EXECUTABLE_LOADERS = [
-    "embedded-library",
+    "embedded-elf",
     "system-library",
     "vmvx-module",
 ]
@@ -22,7 +22,7 @@ ALL_EXECUTABLE_LOADERS = [
 string_list_flag(
     name = "enabled_executable_loaders",
     build_setting_default = [
-        "embedded-library",
+        "embedded-elf",
         "system-library",
         "vmvx-module",
     ],
@@ -43,16 +43,16 @@ iree_runtime_cc_library(
     srcs = ["init.c"],
     hdrs = ["init.h"],
     deps = [
-               "//runtime/src/iree/base",
-               "//runtime/src/iree/hal/local",
-           ] + select({
-               ":embedded-library_enabled": ["//runtime/src/iree/hal/local/loaders:embedded_library_loader"],
-               "//conditions:default": [],
-           }) + select({
-               ":system-library_enabled": ["//runtime/src/iree/hal/local/loaders:system_library_loader"],
-               "//conditions:default": [],
-           }) + select({
-               ":vmvx-module_enabled": ["//runtime/src/iree/hal/local/loaders:vmvx_module_loader"],
-               "//conditions:default": [],
-           }),
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal/local",
+    ] + select({
+        ":embedded-elf_enabled": ["//runtime/src/iree/hal/local/loaders:embedded_elf_loader"],
+        "//conditions:default": [],
+    }) + select({
+        ":system-library_enabled": ["//runtime/src/iree/hal/local/loaders:system_library_loader"],
+        "//conditions:default": [],
+    }) + select({
+        ":vmvx-module_enabled": ["//runtime/src/iree/hal/local/loaders:vmvx_module_loader"],
+        "//conditions:default": [],
+    }),
 )

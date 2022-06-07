@@ -25,7 +25,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/local_task:task_driver",
         "//runtime/src/iree/hal/local",
-        "//runtime/src/iree/hal/local/loaders:embedded_library_loader",
+        "//runtime/src/iree/hal/local/loaders:embedded_elf_loader",
         "//runtime/src/iree/hal/local/loaders:system_library_loader",
         "//runtime/src/iree/task:api",
     ],

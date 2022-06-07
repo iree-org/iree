@@ -14,17 +14,17 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY)
+if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
 """,
     inline = True,
 )
 
 iree_runtime_cc_library(
-    name = "embedded_library_loader",
-    srcs = ["embedded_library_loader.c"],
-    hdrs = ["embedded_library_loader.h"],
+    name = "embedded_elf_loader",
+    srcs = ["embedded_elf_loader.c"],
+    hdrs = ["embedded_elf_loader.h"],
     defines = [
-        "IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY=1",
+        "IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF=1",
     ],
     deps = [
         "//runtime/src/iree/base",

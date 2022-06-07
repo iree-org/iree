@@ -13,7 +13,7 @@
 #include "iree/hal/drivers/local_sync/sync_device.h"
 #include "iree/hal/drivers/local_sync/sync_driver.h"
 #include "iree/hal/local/executable_loader.h"
-#include "iree/hal/local/loaders/embedded_library_loader.h"
+#include "iree/hal/local/loaders/embedded_elf_loader.h"
 
 // TODO(#4298): remove this driver registration and wrapper.
 // By having a single iree/hal/local/registration that then has the loaders
@@ -52,7 +52,7 @@ static iree_status_t iree_hal_dylib_sync_driver_factory_try_create(
   iree_status_t status = iree_ok_status();
   iree_hal_executable_loader_t* loaders[1] = {NULL};
   if (iree_status_is_ok(status)) {
-    status = iree_hal_embedded_library_loader_create(
+    status = iree_hal_embedded_elf_loader_create(
         iree_hal_executable_import_provider_null(), host_allocator,
         &loaders[0]);
   }

@@ -8,16 +8,16 @@
 
 // NOTE: we register in a specific order to allow for prioritization:
 // - system-library: used when embedded is not desired (TSAN/debugging/etc).
-// - embedded-library: default codegen portable ELF output format.
+// - embedded-elf: default codegen portable ELF output format.
 // - vmvx-module: reference fallback path using the IREE bytecode VM.
 
 #if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY)
 #include "iree/hal/local/loaders/system_library_loader.h"
 #endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY
 
-#if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY)
-#include "iree/hal/local/loaders/embedded_library_loader.h"
-#endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY
+#if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
+#include "iree/hal/local/loaders/embedded_elf_loader.h"
+#endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF
 
 #if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
 #include "iree/hal/local/loaders/vmvx_module_loader.h"
@@ -34,9 +34,9 @@ IREE_API_EXPORT iree_status_t iree_hal_create_all_available_executable_loaders(
 #if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY)
   ++required_capacity;
 #endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY
-#if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY)
+#if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
   ++required_capacity;
-#endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY
+#endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF
 #if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
   ++required_capacity;
 #endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_VMVX_MODULE
@@ -57,13 +57,13 @@ IREE_API_EXPORT iree_status_t iree_hal_create_all_available_executable_loaders(
   }
 #endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY
 
-#if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY)
+#if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
   if (iree_status_is_ok(status)) {
-    status = iree_hal_embedded_library_loader_create(
+    status = iree_hal_embedded_elf_loader_create(
         iree_hal_executable_import_provider_null(), host_allocator,
         &loaders[count++]);
   }
-#endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY
+#endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF
 
 #if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
   if (iree_status_is_ok(status)) {
@@ -85,13 +85,13 @@ IREE_API_EXPORT iree_status_t iree_hal_create_all_available_executable_loaders(
 IREE_API_EXPORT iree_status_t iree_hal_create_executable_loader_by_name(
     iree_string_view_t name, iree_allocator_t host_allocator,
     iree_hal_executable_loader_t** out_executable_loader) {
-#if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY)
+#if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
   if (iree_string_view_starts_with(name, IREE_SV("embedded-elf"))) {
-    return iree_hal_embedded_library_loader_create(
+    return iree_hal_embedded_elf_loader_create(
         iree_hal_executable_import_provider_null(), host_allocator,
         out_executable_loader);
   }
-#endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY
+#endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF
 
 #if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY)
   if (iree_string_view_starts_with(name, IREE_SV("system-library"))) {

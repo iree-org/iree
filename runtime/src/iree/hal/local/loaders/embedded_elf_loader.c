@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/local/loaders/embedded_library_loader.h"
+#include "iree/hal/local/loaders/embedded_elf_loader.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -298,18 +298,18 @@ static const iree_hal_local_executable_vtable_t iree_hal_elf_executable_vtable =
 };
 
 //===----------------------------------------------------------------------===//
-// iree_hal_embedded_library_loader_t
+// iree_hal_embedded_elf_loader_t
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_embedded_library_loader_t {
+typedef struct iree_hal_embedded_elf_loader_t {
   iree_hal_executable_loader_t base;
   iree_allocator_t host_allocator;
-} iree_hal_embedded_library_loader_t;
+} iree_hal_embedded_elf_loader_t;
 
 static const iree_hal_executable_loader_vtable_t
-    iree_hal_embedded_library_loader_vtable;
+    iree_hal_embedded_elf_loader_vtable;
 
-iree_status_t iree_hal_embedded_library_loader_create(
+iree_status_t iree_hal_embedded_elf_loader_create(
     iree_hal_executable_import_provider_t import_provider,
     iree_allocator_t host_allocator,
     iree_hal_executable_loader_t** out_executable_loader) {
@@ -317,13 +317,13 @@ iree_status_t iree_hal_embedded_library_loader_create(
   *out_executable_loader = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_embedded_library_loader_t* executable_loader = NULL;
+  iree_hal_embedded_elf_loader_t* executable_loader = NULL;
   iree_status_t status = iree_allocator_malloc(
       host_allocator, sizeof(*executable_loader), (void**)&executable_loader);
   if (iree_status_is_ok(status)) {
-    iree_hal_executable_loader_initialize(
-        &iree_hal_embedded_library_loader_vtable, import_provider,
-        &executable_loader->base);
+    iree_hal_executable_loader_initialize(&iree_hal_embedded_elf_loader_vtable,
+                                          import_provider,
+                                          &executable_loader->base);
     executable_loader->host_allocator = host_allocator;
     *out_executable_loader = (iree_hal_executable_loader_t*)executable_loader;
   }
@@ -332,10 +332,10 @@ iree_status_t iree_hal_embedded_library_loader_create(
   return status;
 }
 
-static void iree_hal_embedded_library_loader_destroy(
+static void iree_hal_embedded_elf_loader_destroy(
     iree_hal_executable_loader_t* base_executable_loader) {
-  iree_hal_embedded_library_loader_t* executable_loader =
-      (iree_hal_embedded_library_loader_t*)base_executable_loader;
+  iree_hal_embedded_elf_loader_t* executable_loader =
+      (iree_hal_embedded_elf_loader_t*)base_executable_loader;
   iree_allocator_t host_allocator = executable_loader->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -344,20 +344,20 @@ static void iree_hal_embedded_library_loader_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-static bool iree_hal_embedded_library_loader_query_support(
+static bool iree_hal_embedded_elf_loader_query_support(
     iree_hal_executable_loader_t* base_executable_loader,
     iree_hal_executable_caching_mode_t caching_mode,
     iree_string_view_t executable_format) {
-  return iree_string_view_equal(
+  return iree_string_view_starts_with(
       executable_format, iree_make_cstring_view("embedded-elf-" IREE_ARCH));
 }
 
-static iree_status_t iree_hal_embedded_library_loader_try_load(
+static iree_status_t iree_hal_embedded_elf_loader_try_load(
     iree_hal_executable_loader_t* base_executable_loader,
     const iree_hal_executable_params_t* executable_params,
     iree_hal_executable_t** out_executable) {
-  iree_hal_embedded_library_loader_t* executable_loader =
-      (iree_hal_embedded_library_loader_t*)base_executable_loader;
+  iree_hal_embedded_elf_loader_t* executable_loader =
+      (iree_hal_embedded_elf_loader_t*)base_executable_loader;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Perform the load of the ELF and wrap it in an executable handle.
@@ -370,8 +370,8 @@ static iree_status_t iree_hal_embedded_library_loader_try_load(
 }
 
 static const iree_hal_executable_loader_vtable_t
-    iree_hal_embedded_library_loader_vtable = {
-        .destroy = iree_hal_embedded_library_loader_destroy,
-        .query_support = iree_hal_embedded_library_loader_query_support,
-        .try_load = iree_hal_embedded_library_loader_try_load,
+    iree_hal_embedded_elf_loader_vtable = {
+        .destroy = iree_hal_embedded_elf_loader_destroy,
+        .query_support = iree_hal_embedded_elf_loader_query_support,
+        .try_load = iree_hal_embedded_elf_loader_try_load,
 };

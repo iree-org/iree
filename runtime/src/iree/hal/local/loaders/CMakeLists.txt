@@ -10,15 +10,15 @@
 
 iree_add_all_subdirs()
 
-if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY)
+if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
 
 iree_cc_library(
   NAME
-    embedded_library_loader
+    embedded_elf_loader
   HDRS
-    "embedded_library_loader.h"
+    "embedded_elf_loader.h"
   SRCS
-    "embedded_library_loader.c"
+    "embedded_elf_loader.c"
   DEPS
     iree::base
     iree::base::core_headers
@@ -28,7 +28,7 @@ iree_cc_library(
     iree::hal::local::elf::elf_module
     iree::hal::local::executable_library
   DEFINES
-    "IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY=1"
+    "IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF=1"
   PUBLIC
 )
 
