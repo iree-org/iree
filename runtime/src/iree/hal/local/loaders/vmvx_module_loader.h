@@ -24,6 +24,12 @@ iree_status_t iree_hal_vmvx_module_loader_create(
     iree_vm_instance_t* instance, iree_allocator_t host_allocator,
     iree_hal_executable_loader_t** out_executable_loader);
 
+// Creates an executable loader that can load compiled IREE VM bytecode modules
+// using the VMVX module. Uses an isolated VM instance.
+iree_status_t iree_hal_vmvx_module_loader_create_isolated(
+    iree_allocator_t host_allocator,
+    iree_hal_executable_loader_t** out_executable_loader);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

@@ -16,6 +16,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/executable_loader.h"
+#include "iree/hal/local/loaders/registration/init.h"
 #include "iree/hal/local/local_descriptor_set_layout.h"
 #include "iree/hal/local/local_executable.h"
 #include "iree/hal/local/local_executable_layout.h"
@@ -130,27 +131,6 @@ IREE_FLAG_CALLBACK(
     "  # 2 4-byte floating-point values with contents [[1.4], [2.1]]:\n"
     "  --binding=2x1xf32=1.4,2.1");
 
-#if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY)
-#include "iree/hal/local/loaders/embedded_library_loader.h"
-#endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY
-
-// Creates an executable loader based on the given format flag.
-static iree_status_t iree_hal_executable_library_create_loader(
-    iree_allocator_t host_allocator,
-    iree_hal_executable_loader_t** out_executable_loader) {
-#if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY)
-  if (strcmp(FLAG_executable_format, "EX_ELF") == 0) {
-    return iree_hal_embedded_library_loader_create(
-        iree_hal_executable_import_provider_null(), host_allocator,
-        out_executable_loader);
-  }
-#endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_EMBEDDED_LIBRARY
-  return iree_make_status(
-      IREE_STATUS_UNAVAILABLE,
-      "no loader available that can handle --executable_format=%s",
-      FLAG_executable_format);
-}
-
 // NOTE: error handling is here just for better diagnostics: it is not tracking
 // allocations correctly and will leak. Don't use this as an example for how to
 // write robust code.
@@ -161,8 +141,9 @@ static iree_status_t iree_hal_executable_library_run(
 
   // Register the loader used to load (or find) the executable.
   iree_hal_executable_loader_t* executable_loader = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_executable_library_create_loader(
-      host_allocator, &executable_loader));
+  IREE_RETURN_IF_ERROR(iree_hal_create_executable_loader_by_name(
+      iree_make_cstring_view(FLAG_executable_format), host_allocator,
+      &executable_loader));
 
   // Setup the specification used to perform the executable load.
   // This information is normally used to select the appropriate loader but in
@@ -289,9 +270,11 @@ int main(int argc, char** argv) {
   iree_flags_set_usage(
       "executable_library_benchmark",
       "Benchmarks a single entry point within an executable library.\n"
-      "Executable libraries can be found in your temp path when compiling\n"
-      "with `-iree-llvm-keep-linker-artifacts`. The parameters used can be\n"
-      "inferred from the entry point `hal.interface` and dispatches to it.\n"
+      "The parameters used can be inferred from the entry point\n"
+      "`hal.interface` and dispatches to it.\n"
+      "\n"
+      "Executables can be extracted from VMFB files using `unzip` or dumped\n"
+      "during compilation using --iree-hal-dump-executable-binaries-to=path/.\n"
       "\n"
       "Note that this tool is intentionally low level: you must specify all\n"
       "of the push constant/binding parameters precisely as they are expected\n"
@@ -301,7 +284,7 @@ int main(int argc, char** argv) {
       "etc).\n"
       "\n"
       "Example --flagfile:\n"
-      "  --executable_format=EX_ELF\n"
+      "  --executable_format=embedded-elf\n"
       "  --executable_file=iree/hal/local/elf/testdata/"
       "elementwise_mul_x86_64.so\n"
       "  --entry_point=0\n"
@@ -313,7 +296,7 @@ int main(int argc, char** argv) {
       "  --workgroup_size_z=1\n"
       "  --binding=4xf32=1,2,3,4\n"
       "  --binding=4xf32=100,200,300,400\n"
-      "  --binding=4xf32=0,0,0,0);\n"
+      "  --binding=4xf32=0,0,0,0\n"
       "\n");
 
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK, &argc, &argv);

@@ -36,8 +36,6 @@ iree_cc_library(
   PUBLIC
 )
 
-if(NOT EMSCRIPTEN)
-
 iree_cc_binary_benchmark(
   NAME
     executable_library_benchmark
@@ -52,12 +50,10 @@ iree_cc_binary_benchmark(
     iree::base::internal::flags
     iree::base::tracing
     iree::hal
-    iree::hal::local::loaders::embedded_library_loader
+    iree::hal::local::loaders::registration
     iree::testing::benchmark
   TESTONLY
 )
-
-endif()
 
 iree_cc_test(
   NAME

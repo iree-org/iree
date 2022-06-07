@@ -18,10 +18,6 @@
 
 // TODO(#4298): remove this driver registration and wrapper.
 
-// TODO(benvanik): replace with C flags.
-#define IREE_HAL_VMVX_WORKER_COUNT 0
-#define IREE_HAL_MAX_VMVX_WORKER_COUNT 16
-
 #define IREE_HAL_VMVX_SYNC_DRIVER_ID 0x53564D58u  // SVMX
 
 static iree_status_t iree_hal_vmvx_sync_driver_factory_enumerate(

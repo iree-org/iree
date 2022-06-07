@@ -34,13 +34,6 @@ iree_runtime_cc_library(
     hdrs = ["executable_library.h"],
 )
 
-iree_cmake_extra_content(
-    content = """
-if(NOT EMSCRIPTEN)
-""",
-    inline = True,
-)
-
 cc_binary_benchmark(
     name = "executable_library_benchmark",
     srcs = ["executable_library_benchmark.c"],
@@ -53,16 +46,9 @@ cc_binary_benchmark(
         "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/local/loaders:embedded_library_loader",
+        "//runtime/src/iree/hal/local/loaders/registration",
         "//runtime/src/iree/testing:benchmark",
     ],
-)
-
-iree_cmake_extra_content(
-    content = """
-endif()
-""",
-    inline = True,
 )
 
 iree_runtime_cc_test(

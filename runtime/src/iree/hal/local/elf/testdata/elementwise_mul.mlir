@@ -5,7 +5,7 @@
 //
 // Can be run with:
 // iree/hal/local/executable_library_benchmark \
-//    --executable_format=EX_ELF \
+//    --executable_format=embedded-elf \
 //    --executable_file=iree/hal/local/elf/testdata/elementwise_mul_x86_64.so \
 //    --entry_point=0 \
 //    --workgroup_count_x=1 \

@@ -477,6 +477,24 @@ iree_status_t iree_hal_vmvx_module_loader_create(
   return status;
 }
 
+iree_status_t iree_hal_vmvx_module_loader_create_isolated(
+    iree_allocator_t host_allocator,
+    iree_hal_executable_loader_t** out_executable_loader) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_vm_instance_t* instance = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_vm_instance_create(host_allocator, &instance));
+
+  iree_status_t status = iree_hal_vmvx_module_loader_create(
+      instance, host_allocator, out_executable_loader);
+
+  iree_vm_instance_release(instance);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 static void iree_hal_vmvx_module_loader_destroy(
     iree_hal_executable_loader_t* base_executable_loader) {
   iree_hal_vmvx_module_loader_t* executable_loader =

@@ -24,7 +24,7 @@ Start here to ensure you have a working build and see the expected output:
 
 ```
 iree/hal/local/executable_library_benchmark \
-    --executable_format=EX_ELF \
+    --executable_format=embedded-elf \
     --executable_file=iree/hal/local/elf/testdata/elementwise_mul_x86_64.so \
     --entry_point=0 \
     --workgroup_count_x=1 \
@@ -136,7 +136,7 @@ unzip module.vmfb
 This (today) results in a single extracted file you pass to the tool:
 
 ```
---executable_format=EX_ELF
+--executable_format=embedded-elf
 --executable_file=_simple_mul_dispatch_0_llvm_binary_ex_elf.so
 ```
 
