@@ -161,8 +161,6 @@ EXPLICIT_TARGET_MAPPING = {
 
     # Vulkan
     "@vulkan_headers": ["Vulkan::Headers"],
-    # The Bazel target maps to the IMPORTED target defined by FindVulkan().
-    "@vulkan_sdk//:sdk": ["Vulkan::Vulkan"],
     # Misc single targets
     "@com_google_benchmark//:benchmark": ["benchmark"],
     "@com_github_dvidelabs_flatcc//:flatcc": ["flatcc"],

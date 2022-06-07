@@ -39,7 +39,7 @@ llvm::StringMap<IREE::HAL::ExecutableExportOp> getAllEntryPoints(
 /// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
 FailureOr<IREE::HAL::ExecutableExportOp> getEntryPoint(func::FuncOp funcOp);
 
-/// Methods to get backend information.
+/// Methods to get target information.
 bool isX86(IREE::HAL::ExecutableVariantOp variantOp);
 inline bool isX86(func::FuncOp entryPointFn) {
   auto variantOp =
@@ -47,9 +47,12 @@ inline bool isX86(func::FuncOp entryPointFn) {
   return isX86(variantOp);
 }
 
-/// Returns true if the 'op' is or is enclosed in a HAL::ExecutableVarianOp that
-/// contains '+avx2' in its cpu features.
-bool hasAVX2Features(Operation *op);
+bool isAArch64(IREE::HAL::ExecutableVariantOp variantOp);
+inline bool isAArch64(func::FuncOp entryPointFn) {
+  auto variantOp =
+      entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  return isAArch64(variantOp);
+}
 
 bool isRISCV(IREE::HAL::ExecutableVariantOp variantOp);
 inline bool isRISCV(func::FuncOp entryPointFn) {
@@ -57,6 +60,7 @@ inline bool isRISCV(func::FuncOp entryPointFn) {
       entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   return isRISCV(variantOp);
 }
+
 inline bool isVMVXBackend(IREE::HAL::ExecutableVariantOp variantOp) {
   return variantOp.target().getBackend().getValue() == "vmvx";
 }
@@ -65,6 +69,10 @@ inline bool isVMVXBackend(func::FuncOp entryPointFn) {
       entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   return isVMVXBackend(variantOp);
 }
+
+/// Returns true if the 'op' is or is enclosed in a HAL::ExecutableVarianOp that
+/// contains '+avx2' in its cpu features.
+bool hasAVX2Features(Operation *op);
 
 /// Checks if a tensor value is generated from a read-only object, like
 /// and interface binding with read-only attribute or from an `arith.constant`

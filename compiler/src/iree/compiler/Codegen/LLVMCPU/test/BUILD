@@ -22,6 +22,7 @@ iree_lit_test_suite(
         [
             "check_ir_before_llvm_conversion.mlir",
             "convert_to_llvm.mlir",
+            "emit_vectorization_remarks.mlir",
             "hal_interface_bindings.mlir",
             "hal_interface_constants.mlir",
             "hal_interface_workgroup_info.mlir",

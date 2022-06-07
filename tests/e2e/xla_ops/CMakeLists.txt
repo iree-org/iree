@@ -424,6 +424,7 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=wasm32-unknown-emscripten"
+    "--iree-llvm-target-cpu-features=+atomics,+bulk-memory"
 )
 
 iree_check_single_backend_test_suite(

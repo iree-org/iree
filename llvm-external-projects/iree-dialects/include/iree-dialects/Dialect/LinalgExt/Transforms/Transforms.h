@@ -46,6 +46,20 @@ private:
   linalg::LinalgTilingOptions options;
 };
 
+/// Pattern to swap a `TilingInterface` op -> `tensor::ExtractSliceOp`.
+struct SwapTilingInterfaceOp : public OpRewritePattern<tensor::ExtractSliceOp> {
+  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
+
+  FailureOr<Operation *>
+  returningMatchAndRewrite(tensor::ExtractSliceOp sliceOp,
+                           PatternRewriter &rewriter) const;
+
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
+                                PatternRewriter &rewriter) const override {
+    return returningMatchAndRewrite(sliceOp, rewriter);
+  }
+};
+
 /// Pattern to rewrite a TileOp to an scf::ForOp.
 struct TileOpToSCFRewriter : public OpRewritePattern<TileOp> {
   using OpRewritePattern::OpRewritePattern;

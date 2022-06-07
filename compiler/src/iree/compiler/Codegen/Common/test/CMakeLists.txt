@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "convert_to_destination_passing_style.mlir"
     "dead_alloc.mlir"
     "distribute_gpu_shared_memory.mlir"
+    "distribute_to_workgroups.mlir"
     "flatten_memref_subspan.mlir"
     "fold_affine_min_in_distributed_loops.mlir"
     "fold_tensor_extract_op.mlir"

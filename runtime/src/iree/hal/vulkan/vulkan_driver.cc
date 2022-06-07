@@ -234,7 +234,14 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_driver_create(
   VkInstanceCreateInfo create_info;
   create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
   create_info.pNext = NULL;
+#if defined(IREE_PLATFORM_APPLE)
+  // There are no native Vulkan implementations on Apple platforms. Including
+  // this bit allows the Vulkan loader to enumerate MoltenVK, which emulates
+  // Vulkan on top of Metal, as an implementation.
+  create_info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+#else
   create_info.flags = 0;
+#endif
   create_info.pApplicationInfo = &app_info;
   create_info.enabledLayerCount = enabled_layers.count;
   create_info.ppEnabledLayerNames = enabled_layers.values;

@@ -44,8 +44,15 @@ emcmake "${CMAKE_BIN?}" -G Ninja .. \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
   -DIREE_HAL_DRIVER_VMVX=ON \
+  -DIREE_HAL_DRIVER_VMVX_SYNC=ON \
   -DIREE_ENABLE_CPUINFO=OFF \
   -DIREE_BUILD_TESTS=ON \
   -DIREE_BUILD_SAMPLES=ON
 
+echo "Building default targets"
+echo "------------------------"
 "${CMAKE_BIN?}" --build . -- -k 0
+
+echo "Building test deps"
+echo "------------------"
+"${CMAKE_BIN?}" --build . --target iree-test-deps -- -k 0

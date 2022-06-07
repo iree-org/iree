@@ -80,7 +80,7 @@ static bool iree_compile_mlir_to_bytecode(iree_string_view_t mlir_source,
     return false;
   }
 
-  // Run MLIR pass pipeline to lower the high level MLIR code down to to IREE VM
+  // Run MLIR pass pipeline to lower the high level MLIR code down to IREE VM
   // MLIR code.
   MlirPassManager pass = mlirPassManagerCreate(context);
   MlirOpPassManager op_pass = mlirPassManagerGetAsOpPassManager(pass);

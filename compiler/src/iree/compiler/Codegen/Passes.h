@@ -51,12 +51,18 @@ std::unique_ptr<OperationPass<func::FuncOp>> createCleanupBufferAllocViewPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createBufferizeCopyOnlyDispatchesPass();
 
+/// Distributes the computation amongst workgroups. Unlike
+/// `TileAndDistributeToWorkgroupsPass`, just splits the output of the
+/// dispatch such that each workgroups computes a slice of the outpt.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createDistributeToWorkgroupsPass();
+
 /// Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets on
 /// subspan ops to the consumer load/store ops, in preparation for lowering to
 /// backends that require linearized access.
 std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass();
 
-/// Creates a pass to to fold `affine.min` ops in tiled and distributed loops.
+/// Creates a pass to fold `affine.min` ops in tiled and distributed loops.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createFoldAffineMinInDistributedLoopsPass();
 
@@ -195,6 +201,9 @@ createVerifyLinalgTransformLegalityPass();
 
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUEmitVectorizationRemarksPass();
 
 /// Checks CPU backend specific IR constraints (like no stack allocations)
 std::unique_ptr<OperationPass<ModuleOp>>
