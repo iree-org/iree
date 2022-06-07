@@ -22,16 +22,16 @@ hal.executable @matmul_128x256x64 {
       func.func @matmul_128x256x64() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:128x64xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:64x256xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:128x512xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:512x256xf32>
         %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:128x256xf32>
         %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:128x256xf32>
-        %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 64], strides = [1, 1] : !flow.dispatch.tensor<readonly:128x64xf32> -> tensor<128x64xf32>
-        %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [64, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:64x256xf32> -> tensor<64x256xf32>
+        %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:128x512xf32> -> tensor<128x512xf32>
+        %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [512, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:512x256xf32> -> tensor<512x256xf32>
         %6 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [128, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:128x256xf32> -> tensor<128x256xf32>
         %7 = linalg.init_tensor [128, 256] : tensor<128x256xf32>
         %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<128x256xf32>) -> tensor<128x256xf32>
-        %9 = linalg.matmul ins(%4, %5 : tensor<128x64xf32>, tensor<64x256xf32>) outs(%8 : tensor<128x256xf32>) -> tensor<128x256xf32>
+        %9 = linalg.matmul ins(%4, %5 : tensor<128x512xf32>, tensor<512x256xf32>) outs(%8 : tensor<128x256xf32>) -> tensor<128x256xf32>
         %10 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]}
                 ins(%9, %6 : tensor<128x256xf32>, tensor<128x256xf32>) outs(%7 : tensor<128x256xf32>) {
         ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
@@ -45,18 +45,29 @@ hal.executable @matmul_128x256x64 {
   }
 }
 
-// CHECK: spv.GlobalVariable @{{.+}} : !spv.ptr<!spv.struct<(!spv.array<1024 x vector<4xf32>>)>, Workgroup>
-// CHECK: spv.GlobalVariable @{{.+}} : !spv.ptr<!spv.struct<(!spv.array<1024 x vector<4xf32>>)>, Workgroup>
+// CHECK-DAG: spv.GlobalVariable @{{.+}} : !spv.ptr<!spv.struct<(!spv.array<256 x vector<4xf32>>)>, Workgroup>
+// CHECK-DAG: spv.GlobalVariable @{{.+}} : !spv.ptr<!spv.struct<(!spv.array<1024 x vector<4xf32>>)>, Workgroup>
 
 // CHECK-LABEL: spv.func @matmul_128x256x64
 
+//   CHECK-COUNT-5: spv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
+
 //           CHECK: spv.mlir.loop
 //           CHECK:   spv.ControlBarrier Workgroup, Workgroup, "AcquireRelease|WorkgroupMemory"
-//   CHECK-COUNT-4:   spv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
-//   CHECK-COUNT-4:   spv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
+//   CHECK-COUNT-5:   spv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
 //           CHECK:   spv.ControlBarrier Workgroup, Workgroup, "AcquireRelease|WorkgroupMemory"
-// CHECK-COUNT-512:   spv.GLSL.Fma %{{.+}}, %{{.+}}, %{{.+}} : vector<4xf32>
+
+//  CHECK-COUNT-64:   spv.Load "Workgroup" %{{.+}} : vector<4xf32>
+// CHECK-COUNT-128:   spv.GLSL.Fma %{{.+}}, %{{.+}}, %{{.+}} : vector<4xf32>
+//   CHECK-COUNT-5:   spv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //           CHECK:   spv.mlir.merge
-//  CHECK-COUNT-16:   spv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
-//  CHECK-COUNT-16:   spv.FDiv %{{.+}}, %{{.+}} : vector<4xf32>
-//  CHECK-COUNT-16:   spv.Store "StorageBuffer" %{{.+}}, %{{.+}} : vector<4xf32>
+
+//           CHECK: spv.ControlBarrier Workgroup, Workgroup, "AcquireRelease|WorkgroupMemory"
+//   CHECK-COUNT-5: spv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
+//           CHECK: spv.ControlBarrier Workgroup, Workgroup, "AcquireRelease|WorkgroupMemory"
+
+//  CHECK-COUNT-64: spv.Load "Workgroup" %{{.+}} : vector<4xf32>
+// CHECK-COUNT-128: spv.GLSL.Fma %{{.+}}, %{{.+}}, %{{.+}} : vector<4xf32>
+//   CHECK-COUNT-4: spv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
+//   CHECK-COUNT-4: spv.FDiv %{{.+}}, %{{.+}} : vector<4xf32>
+//   CHECK-COUNT-4: spv.Store "StorageBuffer" %{{.+}}, %{{.+}} : vector<4xf32>

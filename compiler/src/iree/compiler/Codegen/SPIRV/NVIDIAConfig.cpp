@@ -141,16 +141,20 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
 LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
                                      Operation *rootOp) {
   int subgroupSize = targetEnv.getResourceLimits().getSubgroup_size();
+
+  // First try to see if we can use tensor cores.
   if (auto matmulOp = dyn_cast<linalg::MatmulOp>(rootOp)) {
-    // First try to see if we can use tensor cores.
     if (failed(setOpConfig(targetEnv, matmulOp))) return failure();
     if (getLoweringConfig(rootOp)) return success();
+  }
 
+  if (isa<linalg::BatchMatmulOp, linalg::MatmulOp>(rootOp)) {
     std::array<int64_t, 2> workgroupXY = {subgroupSize, 8};
-    std::array<int64_t, 3> threadMNK = {16, 4, 32};
-    return setMatmulOpConfig(matmulOp, subgroupSize, workgroupXY, threadMNK,
+    std::array<int64_t, 3> threadMNK = {4, 4, 32};
+    return setMatmulOpConfig(rootOp, subgroupSize, workgroupXY, threadMNK,
                              /*useWorkgroupMemory=*/true);
   }
+
   return success();
 }
 
