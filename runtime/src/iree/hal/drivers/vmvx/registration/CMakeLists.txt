@@ -20,9 +20,9 @@ iree_cc_library(
   DEPS
     iree::base
     iree::hal
+    iree::hal::drivers::local_task::task_driver
     iree::hal::local
     iree::hal::local::loaders::vmvx_module_loader
-    iree::hal::local::task_driver
     iree::task::api
     iree::vm
   DEFINES

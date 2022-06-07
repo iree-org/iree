@@ -22,8 +22,8 @@ iree_runtime_cc_library(
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/local_task:task_driver",
         "//runtime/src/iree/hal/local",
-        "//runtime/src/iree/hal/local:task_driver",
         "//runtime/src/iree/hal/local/loaders:vmvx_module_loader",
         "//runtime/src/iree/task:api",
         "//runtime/src/iree/vm",

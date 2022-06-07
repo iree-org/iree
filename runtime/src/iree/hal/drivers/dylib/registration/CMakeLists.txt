@@ -21,10 +21,10 @@ iree_cc_library(
     iree::base
     iree::base::internal::flags
     iree::hal
+    iree::hal::drivers::local_task::task_driver
     iree::hal::local
     iree::hal::local::loaders::embedded_library_loader
     iree::hal::local::loaders::system_library_loader
-    iree::hal::local::task_driver
     iree::task::api
   DEFINES
     "IREE_HAL_HAVE_DYLIB_DRIVER_MODULE=1"

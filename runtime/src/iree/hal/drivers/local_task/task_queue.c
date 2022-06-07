@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/local/task_queue.h"
+#include "iree/hal/drivers/local_task/task_queue.h"
 
 #include <stddef.h>
 #include <string.h>
 
 #include "iree/base/tracing.h"
-#include "iree/hal/local/task_command_buffer.h"
-#include "iree/hal/local/task_semaphore.h"
+#include "iree/hal/drivers/local_task/task_command_buffer.h"
+#include "iree/hal/drivers/local_task/task_semaphore.h"
 #include "iree/task/submission.h"
 
 // Each submission is turned into a DAG for execution:

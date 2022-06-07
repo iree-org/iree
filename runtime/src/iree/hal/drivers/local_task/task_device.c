@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/local/task_device.h"
+#include "iree/hal/drivers/local_task/task_device.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -12,14 +12,14 @@
 
 #include "iree/base/internal/arena.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/drivers/local_task/task_command_buffer.h"
+#include "iree/hal/drivers/local_task/task_event.h"
+#include "iree/hal/drivers/local_task/task_queue.h"
+#include "iree/hal/drivers/local_task/task_semaphore.h"
 #include "iree/hal/local/local_descriptor_set.h"
 #include "iree/hal/local/local_descriptor_set_layout.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/local/local_executable_layout.h"
-#include "iree/hal/local/task_command_buffer.h"
-#include "iree/hal/local/task_event.h"
-#include "iree/hal/local/task_queue.h"
-#include "iree/hal/local/task_semaphore.h"
 #include "iree/hal/utils/buffer_transfer.h"
 
 typedef struct iree_hal_task_device_t {

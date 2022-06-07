@@ -10,8 +10,6 @@
 
 iree_add_all_subdirs()
 
-if(IREE_HAL_DRIVER_VMVX_SYNC)
-
 iree_cc_library(
   NAME
     registration
@@ -22,15 +20,13 @@ iree_cc_library(
   DEPS
     iree::base
     iree::hal
+    iree::hal::drivers::local_sync::sync_driver
     iree::hal::local
     iree::hal::local::loaders::vmvx_module_loader
-    iree::hal::local::sync_driver
     iree::vm
   DEFINES
     "IREE_HAL_HAVE_VMVX_SYNC_DRIVER_MODULE=1"
   PUBLIC
 )
-
-endif()
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

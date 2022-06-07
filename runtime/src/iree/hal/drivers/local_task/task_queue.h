@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_LOCAL_TASK_QUEUE_H_
-#define IREE_HAL_LOCAL_TASK_QUEUE_H_
+#ifndef IREE_HAL_DRIVERS_LOCAL_TASK_TASK_QUEUE_H_
+#define IREE_HAL_DRIVERS_LOCAL_TASK_TASK_QUEUE_H_
 
 #include <stdint.h>
 
@@ -13,7 +13,7 @@
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/hal/api.h"
-#include "iree/hal/local/task_queue_state.h"
+#include "iree/hal/drivers/local_task/task_queue_state.h"
 #include "iree/task/executor.h"
 #include "iree/task/scope.h"
 #include "iree/task/task.h"
@@ -76,4 +76,4 @@ iree_status_t iree_hal_task_queue_wait_idle(iree_hal_task_queue_t* queue,
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_LOCAL_TASK_QUEUE_H_
+#endif  // IREE_HAL_DRIVERS_LOCAL_TASK_TASK_QUEUE_H_

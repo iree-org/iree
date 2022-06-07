@@ -10,10 +10,10 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/drivers/local_sync/sync_device.h"
+#include "iree/hal/drivers/local_sync/sync_driver.h"
 #include "iree/hal/local/executable_loader.h"
 #include "iree/hal/local/loaders/embedded_library_loader.h"
-#include "iree/hal/local/sync_device.h"
-#include "iree/hal/local/sync_driver.h"
 
 // TODO(#4298): remove this driver registration and wrapper.
 // By having a single iree/hal/local/registration that then has the loaders

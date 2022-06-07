@@ -10,10 +10,10 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/drivers/local_task/task_device.h"
+#include "iree/hal/drivers/local_task/task_driver.h"
 #include "iree/hal/local/executable_loader.h"
 #include "iree/hal/local/loaders/vmvx_module_loader.h"
-#include "iree/hal/local/task_device.h"
-#include "iree/hal/local/task_driver.h"
 #include "iree/task/api.h"
 #include "iree/vm/api.h"
 

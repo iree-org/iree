@@ -10,9 +10,9 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/local_sync/sync_device.h"
 #include "iree/hal/local/executable_loader.h"
 #include "iree/hal/local/loaders/embedded_library_loader.h"
-#include "iree/hal/local/sync_device.h"
 
 // Compiled module embedded here to avoid file IO:
 #if IREE_ARCH_ARM_32

@@ -6,6 +6,14 @@
 
 # Doesn't use bazel_to_cmake because of custom configuration vars
 
+# TODO(#9336): drop dylib/vmvx and just have these local-* drivers.
+if(IREE_HAL_DRIVER_DYLIB OR IREE_HAL_DRIVER_VMVX)
+  add_subdirectory(local_task)
+endif()
+if(IREE_HAL_DRIVER_DYLIB_SYNC OR IREE_HAL_DRIVER_VMVX_SYNC)
+  add_subdirectory(local_sync)
+endif()
+
 set(IREE_HAL_DRIVER_MODULES)
 if(IREE_HAL_DRIVER_CUDA)
   add_subdirectory(cuda)

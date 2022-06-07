@@ -77,8 +77,8 @@ SRCS
 DEPS
   ::simple_mul_c
   iree::runtime
+  iree::hal::drivers::local_sync::sync_driver
   iree::hal::local::loaders::static_library_loader
-  iree::hal::local::sync_driver
   simple_mul
 )
 
@@ -159,8 +159,8 @@ iree_cc_binary(
   DEPS
     ::simple_mul_emitc
     iree::runtime
+    iree::hal::drivers::local_sync::sync_driver
     iree::hal::local::loaders::static_library_loader
-    iree::hal::local::sync_driver
     iree::vm::shims_emitc
     simple_mul_c_module
 )

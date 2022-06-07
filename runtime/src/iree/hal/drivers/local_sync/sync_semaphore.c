@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/local/sync_semaphore.h"
+#include "iree/hal/drivers/local_sync/sync_semaphore.h"
 
 #include <inttypes.h>
 #include <stdbool.h>

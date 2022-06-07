@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/hal/drivers/local_sync/sync_device.h"
 #include "iree/hal/local/loaders/system_library_loader.h"
-#include "iree/hal/local/sync_device.h"
 
 iree_status_t create_device_with_wasm_loader(iree_allocator_t host_allocator,
                                              iree_hal_device_t** out_device) {

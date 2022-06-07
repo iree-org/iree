@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_LOCAL_SYNC_DEVICE_H_
-#define IREE_HAL_LOCAL_SYNC_DEVICE_H_
+#ifndef IREE_HAL_DRIVERS_LOCAL_SYNC_SYNC_DEVICE_H_
+#define IREE_HAL_DRIVERS_LOCAL_SYNC_SYNC_DEVICE_H_
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
@@ -38,4 +38,4 @@ iree_status_t iree_hal_sync_device_create(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_LOCAL_SYNC_DEVICE_H_
+#endif  // IREE_HAL_DRIVERS_LOCAL_SYNC_SYNC_DEVICE_H_

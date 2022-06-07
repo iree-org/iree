@@ -4,13 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_LOCAL_TASK_DRIVER_H_
-#define IREE_HAL_LOCAL_TASK_DRIVER_H_
+#ifndef IREE_HAL_DRIVERS_LOCAL_TASK_TASK_DRIVER_H_
+#define IREE_HAL_DRIVERS_LOCAL_TASK_TASK_DRIVER_H_
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/local_task/task_device.h"
 #include "iree/hal/local/executable_loader.h"
-#include "iree/hal/local/task_device.h"
 #include "iree/task/executor.h"
 
 #ifdef __cplusplus
@@ -32,4 +32,4 @@ iree_status_t iree_hal_task_driver_create(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_LOCAL_TASK_DRIVER_H_
+#endif  // IREE_HAL_DRIVERS_LOCAL_TASK_TASK_DRIVER_H_

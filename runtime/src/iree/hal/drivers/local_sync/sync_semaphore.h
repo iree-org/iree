@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_LOCAL_SYNC_SEMAPHORE_H_
-#define IREE_HAL_LOCAL_SYNC_SEMAPHORE_H_
+#ifndef IREE_HAL_DRIVERS_LOCAL_SYNC_SYNC_SEMAPHORE_H_
+#define IREE_HAL_DRIVERS_LOCAL_SYNC_SYNC_SEMAPHORE_H_
 
 #include <stdint.h>
 
@@ -71,4 +71,4 @@ iree_status_t iree_hal_sync_semaphore_multi_wait(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_LOCAL_SYNC_SEMAPHORE_H_
+#endif  // IREE_HAL_DRIVERS_LOCAL_SYNC_SYNC_SEMAPHORE_H_

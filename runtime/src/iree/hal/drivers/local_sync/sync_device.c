@@ -4,20 +4,20 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/local/sync_device.h"
+#include "iree/hal/drivers/local_sync/sync_device.h"
 
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
 #include "iree/base/tracing.h"
+#include "iree/hal/drivers/local_sync/sync_event.h"
+#include "iree/hal/drivers/local_sync/sync_semaphore.h"
 #include "iree/hal/local/inline_command_buffer.h"
 #include "iree/hal/local/local_descriptor_set.h"
 #include "iree/hal/local/local_descriptor_set_layout.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/local/local_executable_layout.h"
-#include "iree/hal/local/sync_event.h"
-#include "iree/hal/local/sync_semaphore.h"
 #include "iree/hal/utils/buffer_transfer.h"
 
 typedef struct iree_hal_sync_device_t {

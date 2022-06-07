@@ -11,11 +11,11 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
+#include "iree/hal/drivers/local_task/task_device.h"
+#include "iree/hal/drivers/local_task/task_driver.h"
 #include "iree/hal/local/executable_loader.h"
 #include "iree/hal/local/loaders/embedded_library_loader.h"
 #include "iree/hal/local/loaders/system_library_loader.h"
-#include "iree/hal/local/task_device.h"
-#include "iree/hal/local/task_driver.h"
 #include "iree/task/api.h"
 
 // TODO(#4298): remove this driver registration and wrapper.
