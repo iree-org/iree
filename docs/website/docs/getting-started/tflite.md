@@ -77,7 +77,7 @@ tosaIR = "/".join([workdir, "tosa.mlir"])
 bytecodeModule = "/".join([workdir, "iree.vmfb"])
 
 backends = ["dylib-llvm-aot"]
-config = "dylib"
+config = "local-task"
 ```
 
 The TFLite sample model and input are downloaded locally.
@@ -108,7 +108,7 @@ After compilation is completed we configure the VmModule using the dylib configu
 IREE module.
 
 ```python
-config = iree_rt.Config("dylib")
+config = iree_rt.Config("local-task")
 context = iree_rt.SystemContext(config=config)
 with open(bytecodeModule, 'rb') as f:
   vm_module = iree_rt.VmModule.from_flatbuffer(f.read())

@@ -8,7 +8,7 @@
 
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/vmvx/registration/driver_module.h"
+#include "iree/hal/drivers/local_task/registration/driver_module.h"
 #include "iree/modules/hal/module.h"
 #include "iree/vm/ref_cc.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -265,8 +265,8 @@ void CompiledBinary::initialize(void* data, size_t length) {
   // Create driver and device.
   iree_hal_driver_t* driver = nullptr;
   IREE_CHECK_OK(iree_hal_driver_registry_try_create_by_name(
-      runtime.registry, iree_make_cstring_view("vmvx"), iree_allocator_system(),
-      &driver));
+      runtime.registry, iree_make_cstring_view("local-task"),
+      iree_allocator_system(), &driver));
   IREE_CHECK_OK(iree_hal_driver_create_default_device(
       driver, iree_allocator_system(), &device));
   iree_hal_driver_release(driver);
@@ -305,7 +305,7 @@ LogicalResult InMemoryCompiledBinary::translateFromModule(
 Runtime::Runtime() {
   IREE_CHECK_OK(
       iree_hal_driver_registry_allocate(iree_allocator_system(), &registry));
-  IREE_CHECK_OK(iree_hal_vmvx_driver_module_register(registry));
+  IREE_CHECK_OK(iree_hal_local_task_driver_module_register(registry));
   IREE_CHECK_OK(iree_hal_module_register_types());
   IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
 }

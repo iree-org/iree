@@ -49,7 +49,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
     ),
-    driver = "dylib",
+    driver = "local-task",
     target_backend = "dylib-llvm-aot",
 )
 
@@ -65,7 +65,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
     ),
-    driver = "vmvx",
+    driver = "local-task",
     target_backend = "vmvx",
 )
 

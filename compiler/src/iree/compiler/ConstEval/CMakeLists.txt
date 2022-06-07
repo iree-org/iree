@@ -65,7 +65,7 @@ iree_cc_library(
     MLIRIR
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::hal
-    iree::hal::drivers::vmvx::registration
+    iree::hal::drivers::local_task::registration
     iree::modules::hal
     iree::tools::utils::vm_util
     iree::vm

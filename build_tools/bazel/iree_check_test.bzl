@@ -10,9 +10,9 @@ load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:native_binary.bzl", "native_test")
 
 ALL_TARGET_BACKENDS_AND_DRIVERS = [
-    ("vmvx", "vmvx"),
+    ("vmvx", "local-task"),
     ("vulkan-spirv", "vulkan"),
-    ("dylib-llvm-aot", "dylib"),
+    ("dylib-llvm-aot", "local-task"),
 ]
 
 def iree_check_test(

@@ -24,8 +24,8 @@ iree_generated_trace_runner_test(
     "dylib-llvm-aot"
     "vmvx"
   DRIVERS
-    "dylib"
-    "vmvx"
+    "local-task"
+    "local-task"
 )
 
 iree_generated_trace_runner_test(
@@ -42,8 +42,8 @@ iree_generated_trace_runner_test(
     "dylib-llvm-aot"
     "vmvx"
   DRIVERS
-    "dylib"
-    "vmvx"
+    "local-task"
+    "local-task"
 )
 
 iree_generated_trace_runner_test(
@@ -59,7 +59,7 @@ iree_generated_trace_runner_test(
   TARGET_BACKENDS
     "dylib-llvm-aot"
   DRIVERS
-    "dylib"
+    "local-task"
   COMPILER_FLAGS
     "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
   TARGET_CPU_FEATURES_VARIANTS
@@ -81,7 +81,7 @@ iree_generated_trace_runner_test(
   TARGET_BACKENDS
     "dylib-llvm-aot"
   DRIVERS
-    "dylib"
+    "local-task"
   COMPILER_FLAGS
     "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
   TARGET_CPU_FEATURES_VARIANTS
@@ -101,7 +101,7 @@ iree_generated_trace_runner_test(
   TARGET_BACKENDS
     "dylib-llvm-aot"
   DRIVERS
-    "dylib"
+    "local-task"
   COMPILER_FLAGS
     "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
   TARGET_CPU_FEATURES_VARIANTS
@@ -123,7 +123,7 @@ iree_generated_trace_runner_test(
   TARGET_BACKENDS
     "dylib-llvm-aot"
   DRIVERS
-    "dylib"
+    "local-task"
   COMPILER_FLAGS
     "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
   TARGET_CPU_FEATURES_VARIANTS
@@ -143,7 +143,7 @@ iree_generated_trace_runner_test(
   TARGET_BACKENDS
     "dylib-llvm-aot"
   DRIVERS
-    "dylib"
+    "local-task"
   COMPILER_FLAGS
     "--iree-codegen-mmt4d-use-intrinsics"
     "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
@@ -166,7 +166,7 @@ iree_generated_trace_runner_test(
   TARGET_BACKENDS
     "dylib-llvm-aot"
   DRIVERS
-    "dylib"
+    "local-task"
   COMPILER_FLAGS
     "--iree-codegen-mmt4d-use-intrinsics"
     "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
@@ -237,7 +237,7 @@ iree_generated_trace_runner_test(
     "dylib-llvm-aot"
   DRIVERS
     "cuda"
-    "dylib"
+    "local-task"
   COMPILER_FLAGS
     "--iree-flow-split-matmul-reduction=4"
   LABELS

@@ -43,12 +43,12 @@ import numpy as np
 PREFERRED_DRIVER_ENV_KEY = "IREE_DEFAULT_DRIVER"
 
 # Default value for IREE_DRIVER
-DEFAULT_IREE_DRIVER_VALUE = "dylib,vulkan,vmvx"
+DEFAULT_IREE_DRIVER_VALUE = "local-task,vulkan"
 
 # Mapping from IREE target backends to their corresponding drivers.
 TARGET_BACKEND_TO_DRIVER = {
-    "dylib-llvm-aot": "dylib",
-    "vmvx": "vmvx",
+    "dylib-llvm-aot": "local-task",
+    "vmvx": "local-task",
     "vulkan-spirv": "vulkan",
 }
 

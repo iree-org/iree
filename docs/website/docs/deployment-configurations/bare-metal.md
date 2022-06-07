@@ -84,8 +84,8 @@ operating system
 * `set(IREE_BINDINGS_TFLITE OFF)`: Disable the TFLite binding support
 * `set(IREE_ENABLE_THREADING OFF)`: Disable multi-thread library support
 * `set(IREE_HAL_DRIVER_DEFAULTS OFF)`: Disable HAL drivers by default, then
-enable the synchronous HAL drivers with `set(IREE_HAL_DRIVER_VMVX_SYNC ON)` and
-`set(IREE_HAL_DRIVER_DYLIB_SYNC ON)`
+enable the synchronous HAL drivers with `set(IREE_HAL_DRIVER_LOCAL_SYNC ON)`
+* `set(IREE_HAL_EXECUTABLE_LOADER_DEFAULTS OFF)`: Disable HAL executable loaders by default, then enable the CPU codegen and VMVX loaders with `set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF ON)` and `set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE ON)`
 * `set(IREE_BUILD_TESTS OFF)`: Disable tests until IREE supports running them on
 bare-metal platforms
 * `set(IREE_BUILD_SAMPLES ON)`: Build

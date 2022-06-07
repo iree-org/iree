@@ -241,7 +241,7 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],
-    driver = "dylib",
+    driver = "local-task",
     target_backend = "dylib-llvm-aot",
 )
 
@@ -312,7 +312,7 @@ iree_check_single_backend_test_suite(
         ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],
-    driver = "vmvx",
+    driver = "local-task",
     target_backend = "vmvx",
 )
 
@@ -537,7 +537,7 @@ iree_check_single_backend_test_suite(
         "--iree-input-type=mhlo",
         "--iree-llvm-target-cpu-features=host",
     ],
-    driver = "dylib",
+    driver = "local-task",
     # Building and testing must be on the same architecture, which doesn't work
     # with remote execution in general.
     tags = [

@@ -69,7 +69,7 @@ iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",
     srcs = LLVM_SRCS,
     compiler_flags = ["--iree-input-type=tosa"],
-    driver = "dylib",
+    driver = "local-task",
     target_backend = "dylib-llvm-aot",
 )
 
@@ -127,7 +127,7 @@ iree_check_single_backend_test_suite(
     compiler_flags = [
         "--iree-input-type=tosa",
     ],
-    driver = "vmvx",
+    driver = "local-task",
     target_backend = "vmvx",
 )
 

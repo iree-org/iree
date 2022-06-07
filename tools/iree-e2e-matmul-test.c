@@ -24,7 +24,7 @@
 
 IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
 
-IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
+IREE_FLAG(string, driver, "local-task", "Backend driver to use.");
 
 static const char* emoji(bool good) { return good ? "🦄" : "🐞"; }
 

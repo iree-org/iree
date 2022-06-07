@@ -324,7 +324,7 @@ load("//build_tools/bazel:iree_check_test.bzl", "iree_check_test")
 iree_check_test(
     name = "check_vmvx_vmvx_floor.mlir",
     src = "floor.mlir",
-    driver = "vmvx",
+    driver = "local-task",
     target_backend = "vmvx",
 )
 ```
@@ -343,7 +343,7 @@ load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_
 iree_check_single_backend_test_suite(
     name = "check_vmvx_vmvx",
     srcs = glob(["*.mlir"]),
-    driver = "vmvx",
+    driver = "local-task",
     target_backend = "vmvx",
 )
 ```
@@ -363,7 +363,7 @@ iree_check_test_suite(
     srcs = ["success.mlir"],
     # Leave this argument off to run on all supported backend/driver pairs.
     target_backends_and_drivers = [
-        ("vmvx", "vmvx"),
+        ("vmvx", "local-task"),
         ("vulkan-spirv", "vulkan"),
     ],
 )

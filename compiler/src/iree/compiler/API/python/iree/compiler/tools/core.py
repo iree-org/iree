@@ -30,7 +30,7 @@ __all__ = [
 # TODO: Remove these. In the absence of default profiles, though, it is better
 # to centralize.
 DEFAULT_TESTING_BACKENDS = ["dylib-llvm-aot"]
-DEFAULT_TESTING_DRIVER = "dylib"
+DEFAULT_TESTING_DRIVER = "local-task"
 
 
 class InputType(Enum):

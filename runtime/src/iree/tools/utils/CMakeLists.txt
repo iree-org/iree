@@ -44,7 +44,7 @@ iree_cc_library(
   PUBLIC
 )
 
-if(IREE_HAL_DRIVER_VMVX)
+if(IREE_HAL_DRIVER_LOCAL_SYNC)
 
 iree_cc_test(
   NAME
@@ -55,7 +55,7 @@ iree_cc_test(
     ::vm_util
     iree::base
     iree::hal
-    iree::hal::drivers::vmvx::registration
+    iree::hal::drivers::local_sync::registration
     iree::modules::hal
     iree::testing::gtest
     iree::testing::gtest_main

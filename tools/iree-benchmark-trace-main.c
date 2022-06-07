@@ -21,7 +21,7 @@
 #include "iree/tools/utils/yaml_util.h"
 #include "iree/vm/api.h"
 
-IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
+IREE_FLAG(string, driver, "local-task", "Backend driver to use.");
 
 IREE_FLAG(bool, print_statistics, false,
           "Prints runtime statistics to stderr on exit.");

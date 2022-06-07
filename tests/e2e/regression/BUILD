@@ -72,7 +72,7 @@ iree_check_single_backend_test_suite(
         "lowering_config.mlir",
     ] + BACKEND_TESTS,
     compiler_flags = ["--iree-input-type=mhlo"],
-    driver = "dylib",
+    driver = "local-task",
     target_backend = "dylib-llvm-aot",
 )
 
@@ -85,7 +85,7 @@ iree_check_single_backend_test_suite(
         "linalg_quantized_matmul_vs_linalg_matmul.mlir",
     ],
     compiler_flags = ["--iree-input-type=tosa"],
-    driver = "dylib",
+    driver = "local-task",
     target_backend = "dylib-llvm-aot",
 )
 
@@ -93,7 +93,7 @@ iree_check_single_backend_test_suite(
     name = "check_regression_vmvx",
     srcs = BACKEND_TESTS,
     compiler_flags = ["--iree-input-type=mhlo"],
-    driver = "vmvx",
+    driver = "local-task",
     target_backend = "vmvx",
 )
 

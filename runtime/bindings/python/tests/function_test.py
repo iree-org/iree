@@ -44,7 +44,7 @@ class FunctionTest(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
     # Doesn't matter what device. We just need one.
-    config = rt.Config("vmvx")
+    config = rt.Config("local-task")
     cls.device = config.device
 
   def testNoReflectionScalars(self):

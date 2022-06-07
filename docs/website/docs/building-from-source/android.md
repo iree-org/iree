@@ -127,7 +127,7 @@ adb push /tmp/simple_abs_vmvx.vmfb /data/local/tmp/
 Run the tool:
 
 ``` shell
-adb shell /data/local/tmp/iree-run-module --driver=vmvx \
+adb shell /data/local/tmp/iree-run-module --driver=local-task \
   --module_file=/data/local/tmp/simple_abs_vmvx.vmfb \
   --entry_function=abs \
   --function_input="f32=-5"

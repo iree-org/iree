@@ -31,7 +31,7 @@ and then benchmark an exported function in that module:
 ```shell
 $ bazel run //tools:iree-benchmark-module -- \
   --module_file=/tmp/module.fb \
-  --driver=vmvx \
+  --driver=local-task \
   --entry_function=abs \
   --function_input=f32=-2
 ```
@@ -78,7 +78,7 @@ Now we'll actually invoke the binary:
 ```shell
 $ ./bazel-bin/tools/iree-benchmark-module \
   --module_file=/tmp/module.fb \
-  --driver=vmvx \
+  --driver=local-task \
   --entry_function=abs \
   --function_input=f32=-2
 ```
@@ -122,7 +122,7 @@ in that module:
 ```shell
 $ build/tools/iree-benchmark-module
   --module_file=/tmp/fullyconnected.vmfb
-  --driver=vmvx
+  --driver=local-task
 ```
 
 If no `entry_function` is specified, `iree-benchmark-module` will register a

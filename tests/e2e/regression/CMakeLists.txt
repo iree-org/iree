@@ -47,7 +47,7 @@ iree_check_single_backend_test_suite(
   TARGET_BACKEND
     "dylib-llvm-aot"
   DRIVER
-    "dylib"
+    "local-task"
   COMPILER_FLAGS
     "--iree-input-type=mhlo"
 )
@@ -60,7 +60,7 @@ iree_check_single_backend_test_suite(
   TARGET_BACKEND
     "dylib-llvm-aot"
   DRIVER
-    "dylib"
+    "local-task"
   COMPILER_FLAGS
     "--iree-input-type=tosa"
 )
@@ -82,7 +82,7 @@ iree_check_single_backend_test_suite(
   TARGET_BACKEND
     "vmvx"
   DRIVER
-    "vmvx"
+    "local-task"
   COMPILER_FLAGS
     "--iree-input-type=mhlo"
 )

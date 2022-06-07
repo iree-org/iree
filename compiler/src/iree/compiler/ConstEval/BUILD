@@ -75,7 +75,7 @@ iree_compiler_cc_library(
     deps = [
         "//compiler/src/iree/compiler/Dialect/VM/Target/Bytecode",
         "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/drivers/vmvx/registration",
+        "//runtime/src/iree/hal/drivers/local_task/registration",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/tools/utils:vm_util",
         "//runtime/src/iree/vm",
