@@ -95,6 +95,11 @@ bool isX86(IREE::HAL::ExecutableVariantOp variantOp) {
   return triple && triple.getValue().isX86();
 }
 
+bool isAArch64(IREE::HAL::ExecutableVariantOp variantOp) {
+  Optional<llvm::Triple> triple = getTargetTriple(variantOp);
+  return triple && triple.getValue().isAArch64();
+}
+
 // TODO(dcaballe): If we have to check for a significantly large number of
 // features in the future, we may want to consider keeping the TTI instance
 // alive and query subtarget features data structure.
