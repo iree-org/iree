@@ -15,6 +15,9 @@ package(
 
 ALL_DRIVERS = [
     "cuda",
+    "local-sync",
+    "local-task",
+    # TODO(#9336): remove legacy dylib/vmvx drivers.
     "dylib",
     "dylib-sync",
     "vmvx",
@@ -25,6 +28,8 @@ ALL_DRIVERS = [
 string_list_flag(
     name = "enabled_drivers",
     build_setting_default = [
+        "local-sync",
+        "local-task",
         "dylib",
         "dylib-sync",
         "vmvx",
@@ -51,6 +56,19 @@ iree_runtime_cc_library(
                "//runtime/src/iree/base",
                "//runtime/src/iree/base:tracing",
            ] + select({
+               ":cuda_enabled": ["//runtime/src/iree/hal/drivers/cuda/registration"],
+               "//conditions:default": [],
+           }) +
+           select({
+               ":local-sync_enabled": ["//runtime/src/iree/hal/drivers/local_sync/registration"],
+               "//conditions:default": [],
+           }) +
+           select({
+               ":local-task_enabled": ["//runtime/src/iree/hal/drivers/local_task/registration"],
+               "//conditions:default": [],
+           }) +
+           # TODO(#9336): remove legacy dylib/vmvx drivers.
+           select({
                ":dylib_enabled": ["//runtime/src/iree/hal/drivers/dylib/registration"],
                "//conditions:default": [],
            }) +
@@ -68,10 +86,6 @@ iree_runtime_cc_library(
            }) +
            select({
                ":vulkan_enabled": ["//runtime/src/iree/hal/drivers/vulkan/registration"],
-               "//conditions:default": [],
-           }) +
-           select({
-               ":cuda_enabled": ["//runtime/src/iree/hal/drivers/cuda/registration"],
                "//conditions:default": [],
            }),
 )
