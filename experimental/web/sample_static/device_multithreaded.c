@@ -6,8 +6,8 @@
 
 #include <emscripten/threading.h>
 
+#include "iree/hal/drivers/local_task/task_device.h"
 #include "iree/hal/local/loaders/static_library_loader.h"
-#include "iree/hal/local/task_device.h"
 #include "iree/task/api.h"
 #include "mnist_static.h"
 

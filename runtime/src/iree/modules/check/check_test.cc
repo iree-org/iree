@@ -15,7 +15,7 @@
 #include "iree/base/internal/span.h"
 #include "iree/base/status_cc.h"
 #include "iree/hal/api.h"
-#include "iree/hal/vmvx/registration/driver_module.h"
+#include "iree/hal/drivers/vmvx/registration/driver_module.h"
 #include "iree/modules/check/module.h"
 #include "iree/modules/hal/module.h"
 #include "iree/testing/gtest.h"

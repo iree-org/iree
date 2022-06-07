@@ -23,9 +23,9 @@ iree_cc_binary(
     ::simple_embedding_test_bytecode_module_vmvx_c
     iree::base
     iree::hal
+    iree::hal::drivers::local_sync::sync_driver
     iree::hal::local
     iree::hal::local::loaders::vmvx_module_loader
-    iree::hal::local::sync_driver
     iree::modules::hal
     iree::vm
     iree::vm::bytecode_module
@@ -71,9 +71,9 @@ iree_cc_binary(
     ::simple_embedding_test_bytecode_module_dylib_x86_64_c
     iree::base
     iree::hal
+    iree::hal::drivers::local_sync::sync_driver
     iree::hal::local
     iree::hal::local::loaders::embedded_library_loader
-    iree::hal::local::sync_driver
     iree::modules::hal
     iree::vm
     iree::vm::bytecode_module
@@ -197,9 +197,9 @@ iree_cc_binary(
     ::simple_embedding_test_bytecode_module_dylib_x86_64_c
     iree::base
     iree::hal
+    iree::hal::drivers::local_task::task_driver
     iree::hal::local
     iree::hal::local::loaders::embedded_library_loader
-    iree::hal::local::task_driver
     iree::modules::hal
     iree::task::api
     iree::vm
@@ -230,7 +230,7 @@ iree_cc_binary(
     ::simple_embedding_test_bytecode_module_vulkan_c
     iree::base
     iree::hal
-    iree::hal::vulkan::registration
+    iree::hal::drivers::vulkan::registration
     iree::modules::hal
     iree::vm
     iree::vm::bytecode_module

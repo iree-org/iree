@@ -55,7 +55,7 @@ cc_test(
         ":vm_util",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/vmvx/registration",
+        "//runtime/src/iree/hal/drivers/vmvx/registration",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",

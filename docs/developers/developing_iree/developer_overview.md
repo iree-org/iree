@@ -234,4 +234,4 @@ function.
 ### Useful Vulkan driver flags
 
 For IREE's Vulkan runtime driver, there are a few useful flags defined in
-[driver_module.cc](https://github.com/google/iree/blob/main/iree/hal/vulkan/registration/driver_module.cc):
+[driver_module.cc](https://github.com/google/iree/blob/main/iree/hal/drivers/vulkan/registration/driver_module.cc):

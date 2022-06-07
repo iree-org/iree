@@ -10,9 +10,9 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/local_sync/sync_device.h"
 #include "iree/hal/local/executable_loader.h"
 #include "iree/hal/local/loaders/vmvx_module_loader.h"
-#include "iree/hal/local/sync_device.h"
 
 // Compiled module embedded here to avoid file IO:
 #include "samples/simple_embedding/simple_embedding_test_bytecode_module_vmvx_c.h"
