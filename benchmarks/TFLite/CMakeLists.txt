@@ -104,6 +104,20 @@ set(MOBILEBERT_FP16_MODULE
     "1x384xi32,1x384xi32,1x384xi32"
 )
 
+set(MOBILENET_V1_MODULE
+  NAME
+    "MobileNetV1"
+  TAGS
+    "fp32,imagenet"
+  SOURCE
+    # TODO(mariecwhite): Add the source information of where it is mirrored from.
+    "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v1_224_1.0_float.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x224x224x3xf32"
+)
+
 set(MOBILENET_V2_MODULE
   NAME
     "MobileNetV2"
@@ -131,6 +145,20 @@ set(MOBILENET_V3SMALL_MODULE
     "main"
   FUNCTION_INPUTS
     "1x224x224x3xf32"
+)
+
+set(PERSON_DETECT_INT8_MODULE
+  NAME
+    "PersonDetect"
+  TAGS
+    "int8"
+  SOURCE
+    # Mirror of https://github.com/tensorflow/tflite-micro/raw/aeac6f39e5c7475cea20c54e86d41e3a38312546/tensorflow/lite/micro/models/person_detect.tflite
+    "https://storage.googleapis.com/iree-model-artifacts/person_detect.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x96x96x1xi8"
 )
 
 ################################################################################
