@@ -23,7 +23,7 @@ CHECK_FRAMEWORK_TESTS = [
 
 iree_lit_test_suite(
     name = "lit",
-    timeout = "moderate",
+    size = "medium",
     srcs = enforce_glob(
         [
             "collatz.mlir",
