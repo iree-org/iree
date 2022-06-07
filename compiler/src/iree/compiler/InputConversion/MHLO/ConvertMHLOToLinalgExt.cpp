@@ -644,8 +644,7 @@ struct ConvertMHLOToLinalgExtPass
         IREE::Flow::FlowDialect, mlir::cf::ControlFlowDialect,
         mlir::math::MathDialect, mlir::arith::ArithmeticDialect,
         tensor::TensorDialect, complex::ComplexDialect>();
-    target.addIllegalOp<mhlo::SortOp, mhlo::ScatterOp, mhlo::FftOp,
-                        mhlo::ReverseOp>();
+    target.addIllegalOp<mhlo::SortOp, mhlo::FftOp, mhlo::ReverseOp>();
     // FFT conversion creates complex ops which will be converted by the normal
     // MHLO lowering, but these should still be converted if present inside
     // other linalg_ext op regions.
