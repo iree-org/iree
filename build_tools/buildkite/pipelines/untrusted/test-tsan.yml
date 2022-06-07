@@ -1,0 +1,46 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+steps:
+  - label: "Waiting for build-tsan"
+    key: build-tsan
+    agents:
+      queue: "orchestration"
+      security: "untrusted"
+    commands: |
+      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py \
+        --output-build-json=build.json \
+        build-tsan
+      # TODO: install jq on the buildkite agents to replace inline python.
+      buildkite-agent meta-data set \
+        "build-tsan-build-id" \
+        "$(cat build.json | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")"
+
+
+  - label: ":thread: :sewing_needle: Run with ThreadSanitizer"
+    agents:
+      queue: "cpu"
+      security: "untrusted"
+    depends_on: "build-tsan"
+    env:
+      IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
+    commands: |
+      BUILD_TSAN_CMAKE_BUILD_ID="$(buildkite-agent meta-data get "build-tsan-build-id")"
+      TSAN_BUILD_DIR="build-tsan-$${BUILD_TSAN_CMAKE_BUILD_ID}"
+      TSAN_BUILD_ARCHIVE="$${TSAN_BUILD_DIR}.tgz"
+      buildkite-agent artifact download \
+        --build "$${BUILD_TSAN_CMAKE_BUILD_ID}" \
+        "$${TSAN_BUILD_ARCHIVE}" \
+        ./
+      tar -xzf "$${TSAN_BUILD_ARCHIVE}"
+      docker run --user="$(id -u):$(id -g)" \
+        --volume="$$PWD:$$IREE_DOCKER_WORKDIR" \
+        --workdir="$$IREE_DOCKER_WORKDIR" \
+        --env IREE_VULKAN_DISABLE=1 \
+        --rm \
+        gcr.io/iree-oss/base@sha256:32a501b23abeae69eb33e5e78295312f5df28bacabc799dffe218764a66ed28e \
+        ./build_tools/cmake/ctest_all.sh \
+        "$${TSAN_BUILD_DIR}"

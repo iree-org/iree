@@ -54,3 +54,30 @@ steps:
       ./build_tools/buildkite/scripts/wait_for_pipeline_success.py \
         --annotate \
         test-runtime-cmake
+
+  - label: "Executing build-tsan"
+    key: "build-tsan"
+    plugins:
+      - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#24e54e7729:
+          repos:
+            - config:
+                - url: ${BUILDKITE_REPO}
+                  ref: ${CONFIG_FETCH_REF}
+    commands: |
+      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py \
+        --annotate \
+        build-tsan
+
+  - label: "Executing test-tsan"
+    key: "test-tsan"
+    depends_on: "build-tsan"
+    plugins:
+      - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#24e54e7729:
+          repos:
+            - config:
+                - url: ${BUILDKITE_REPO}
+                  ref: ${CONFIG_FETCH_REF}
+    commands: |
+      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py \
+        --annotate \
+        test-tsan
