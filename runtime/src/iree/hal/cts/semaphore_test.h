@@ -96,7 +96,7 @@ TEST_P(semaphore_test, EmptyWait) {
 
 // Tests waiting on a semaphore that has already been signaled.
 // **Never completes when using SwiftShader**
-TEST_P(semaphore_test, DISABLED_WaitAlreadySignaled) {
+TEST_P(semaphore_test, WaitAlreadySignaled) {
   iree_hal_semaphore_t* semaphore = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 2ull, &semaphore));
 
@@ -183,7 +183,7 @@ TEST_P(semaphore_test, WaitAllAndAllSignaled) {
 
 // Tests IREE_HAL_WAIT_MODE_ANY.
 // **Fails on the CPU / 'local' HAL **
-TEST_P(semaphore_test, DISABLED_WaitAny) {
+TEST_P(semaphore_test, WaitAny) {
   iree_hal_semaphore_t* semaphore_a = NULL;
   iree_hal_semaphore_t* semaphore_b = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &semaphore_a));
