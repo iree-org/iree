@@ -68,8 +68,8 @@ iree_cc_binary(
   DEPS
     iree::base
     iree::base::internal::atomic_slist
-    iree::base::internal::file_path
     iree::base::internal::flags
+    iree::base::internal::path
     iree::base::tracing
     iree::hal
     iree::hal::drivers
@@ -145,8 +145,8 @@ iree_cc_binary(
     "iree-run-trace-main.c"
   DEPS
     iree::base
-    iree::base::internal::file_path
     iree::base::internal::flags
+    iree::base::internal::path
     iree::base::tracing
     iree::hal
     iree::hal::drivers
@@ -164,8 +164,8 @@ iree_cc_binary(
     "iree-e2e-matmul-test.c"
   DEPS
     iree::base
-    iree::base::internal::file_path
     iree::base::internal::flags
+    iree::base::internal::path
     iree::base::tracing
     iree::hal
     iree::hal::drivers

@@ -9,8 +9,8 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/file_path.h"
 #include "iree/base/internal/flags.h"
+#include "iree/base/internal/path.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/tools/utils/trace_replay.h"
