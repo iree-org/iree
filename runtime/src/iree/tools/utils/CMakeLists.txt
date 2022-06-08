@@ -79,7 +79,7 @@ iree_cc_library(
     ::yaml_util
     iree::base
     iree::base::internal::file_io
-    iree::base::internal::file_path
+    iree::base::internal::path
     iree::base::tracing
     iree::hal
     iree::modules::hal

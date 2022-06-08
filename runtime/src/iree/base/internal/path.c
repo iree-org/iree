@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/base/internal/file_path.h"
+#include "iree/base/internal/path.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -217,4 +217,75 @@ iree_string_view_t iree_file_path_extension(iree_string_view_t path) {
   iree_string_view_t extension = iree_string_view_empty();
   iree_file_path_split_basename(path, &stem, &extension);
   return extension;
+}
+
+void iree_uri_split(iree_string_view_t uri, iree_string_view_t* out_schema,
+                    iree_string_view_t* out_path,
+                    iree_string_view_t* out_params) {
+  *out_schema = iree_string_view_empty();
+  *out_path = iree_string_view_empty();
+  *out_params = iree_string_view_empty();
+  if (iree_string_view_is_empty(uri)) return;
+
+  // Split on `schema` `:` (anything).
+  iree_string_view_t rhs = iree_string_view_empty();
+  iree_string_view_split(uri, ':', out_schema, &rhs);
+
+  // Strip leading // from the remaining string. The // isn't required but does
+  // make things more URI-like.
+  if (!iree_string_view_consume_prefix(&rhs, IREE_SV("//"))) {
+    rhs = iree_string_view_strip_prefix(rhs, IREE_SV("/"));
+  }
+
+  // Split on `path` `?` `params.
+  iree_string_view_split(rhs, '?', out_path, out_params);
+}
+
+iree_string_view_t iree_uri_schema(iree_string_view_t uri) {
+  iree_string_view_t schema, path, params;
+  iree_uri_split(uri, &schema, &path, &params);
+  return schema;
+}
+
+iree_string_view_t iree_uri_path(iree_string_view_t uri) {
+  iree_string_view_t schema, path, params;
+  iree_uri_split(uri, &schema, &path, &params);
+  return path;
+}
+
+iree_string_view_t iree_uri_params(iree_string_view_t uri) {
+  iree_string_view_t schema, path, params;
+  iree_uri_split(uri, &schema, &path, &params);
+  return params;
+}
+
+bool iree_uri_split_params(iree_string_view_t params, iree_host_size_t capacity,
+                           iree_host_size_t* out_count,
+                           iree_string_pair_t* out_params) {
+  // Cleanup string to remove leading/trailing junk.
+  params = iree_string_view_strip_prefix(params, IREE_SV("&"));
+  params = iree_string_view_strip_suffix(params, IREE_SV("&"));
+  params = iree_string_view_trim(params);
+
+  // Scan once to count; URI parsing should not be on a critical path.
+  iree_host_size_t required_capacity =
+      iree_string_view_is_empty(params) ? 0 : 1;
+  for (iree_host_size_t i = 0; i < params.size; ++i) {
+    if (params.data[i] == '&') ++required_capacity;
+  }
+  *out_count = required_capacity;
+  if (capacity < required_capacity) return false;
+  if (!out_params) return true;
+
+  // Parse each param into a key=value pair.
+  iree_string_view_t remaining = params;
+  iree_host_size_t count = 0;
+  while (!iree_string_view_is_empty(remaining)) {
+    iree_string_view_t key_value;
+    iree_string_view_split(remaining, '&', &key_value, &remaining);
+    iree_string_pair_t* pair = &out_params[count++];
+    iree_string_view_split(key_value, '=', &pair->key, &pair->value);
+  }
+
+  return true;
 }
