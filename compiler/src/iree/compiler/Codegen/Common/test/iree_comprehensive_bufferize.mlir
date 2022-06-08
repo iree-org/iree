@@ -791,9 +791,7 @@ module {
 //   CHECK-DAG: %[[ARG:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG: %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG: %[[SUBVIEW:.+]] = memref.subview %[[ARG]]
-//   CHECK-DAG: %[[SUBVIEW_DUP:.+]] = memref.subview %[[SUBVIEW]]
-//   CHECK-DAG: %[[RETURN_DUP:.+]] = memref.subview %[[RETURN]]
-//       CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW_DUP]] {{.*}} outs(%[[RETURN_DUP]]
+//       CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW]] {{.*}} outs(%[[RETURN]]
 
 // -----
 
@@ -816,9 +814,7 @@ module {
 //   CHECK-DAG: %[[ARG:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG: %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG: %[[SUBVIEW:.+]] = memref.subview %[[ARG]]
-//   CHECK-DAG: %[[SUBVIEW_DUP:.+]] = memref.subview %[[SUBVIEW]]
-//   CHECK-DAG: %[[RETURN_DUP:.+]] = memref.subview %[[RETURN]]
-//       CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW_DUP]] {{.*}} outs(%[[RETURN_DUP]]
+//       CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW]] {{.*}} outs(%[[RETURN]]
 
 // -----
 
@@ -849,13 +845,10 @@ module {
 //   CHECK-DAG: %[[SIZE1:.+]] = hal.interface.constant.load[3] : index
 //   CHECK-DAG: %[[SIZE2:.+]] = hal.interface.constant.load[4] : index
 //   CHECK-DAG: %[[SIZE3:.+]] = hal.interface.constant.load[5] : index
-//   CHECK-DAG: %[[ARG_DUP:.+]] = memref.subview %[[ARG]]
-//   CHECK-DAG: %[[SUBVIEW1:.+]] = memref.subview %[[ARG_DUP]][%{{.+}}, %{{.+}}, %{{.+}}] [%[[SIZE1]], %[[SIZE2]], %[[SIZE3]]]
-//   CHECK-DAG: %[[SUBVIEW2:.+]] = memref.subview %[[ARG_DUP]][%{{.+}}, %{{.+}}, %{{.+}}] [%[[SIZE1]], 1, %[[SIZE3]]]
-//   CHECK-DAG: %[[RETURN1_DUP:.+]] = memref.subview %[[RETURN1]]
-//   CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW1]] {{.*}} outs(%[[RETURN1_DUP]]
-//   CHECK-DAG: %[[RETURNVIEW:.+]] = memref.subview %[[RETURN2]]
-//       CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW2]] {{.*}} outs(%[[RETURNVIEW]]
+//   CHECK-DAG: %[[SUBVIEW1:.+]] = memref.subview %[[ARG]][%{{.+}}, %{{.+}}, %{{.+}}] [%[[SIZE1]], %[[SIZE2]], %[[SIZE3]]]
+//   CHECK-DAG: %[[SUBVIEW2:.+]] = memref.subview %[[ARG]][%{{.+}}, %{{.+}}, %{{.+}}] [%[[SIZE1]], 1, %[[SIZE3]]]
+//       CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW1]] {{.*}} outs(%[[RETURN1]]
+//       CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW2]] {{.*}} outs(%[[RETURN2]]
 
 // -----
 
@@ -891,8 +884,7 @@ module {
 // CHECK-LABEL: func.func @slice_whole_stride_dispatch_0()
 //   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//   CHECK-DAG:   %[[SUBVIEW_INPUT:.+]] = memref.subview %[[INPUT]]
-//   CHECK-DAG:   %[[SUB_IN_FIXED:.+]] = memref.subview %[[SUBVIEW_INPUT]][1, 0] [1, 4] [1, 1]
+//   CHECK-DAG:   %[[SUB_IN_FIXED:.+]] = memref.subview %[[INPUT]][1, 0] [1, 4] [1, 1]
 //   CHECK-DAG:   %[[SUB_OUT_FIXED:.+]] = memref.subview %[[OUTPUT]][0, 0] [1, 4] [1, 1]
 //       CHECK:   linalg.generic {{.*}} ins(%[[SUB_IN_FIXED]] {{.*}} outs(%[[SUB_OUT_FIXED]]
 
@@ -926,14 +918,11 @@ module {
 //   CHECK-DAG:   %[[D3:.+]] = hal.interface.constant.load[3] : index
 //   CHECK-DAG:   %[[D4:.+]] = hal.interface.constant.load[4] : index
 //   CHECK-DAG:   %[[D5:.+]] = hal.interface.constant.load[5] : index
-//   CHECK-DAG:   %[[ARG0_DUP:.+]] = memref.subview %[[ARG0]]
-//   CHECK-DAG:   %[[ARG1_DUP:.+]] = memref.subview %[[ARG1]]
 //   CHECK-DAG:   %[[ALLOC:.+]] = memref.alloc(%[[D2]], %[[D3]]) : memref<?x?xi32>
-//       CHECK:   linalg.generic {{.*}} ins(%[[ARG1_DUP]] {{.*}} outs(%[[ALLOC]]
+//       CHECK:   linalg.generic {{.*}} ins(%[[ARG1]] {{.*}} outs(%[[ALLOC]]
 //       CHECK:   %[[SUB_ALLOC:.+]] = memref.subview %[[ALLOC]]
-//       CHECK:   linalg.generic {{.*}} ins(%[[ARG0_DUP]] {{.*}} outs(%[[SUB_ALLOC]]
-//       CHECK:   %[[RET0_DUP:.+]] = memref.subview %[[RET0]][0, 0] [%[[D4]], %[[D5]]] [1, 1]
-//       CHECK:   linalg.generic {{.*}} ins(%[[ALLOC]] {{.*}} outs(%[[RET0_DUP]]
+//       CHECK:   linalg.generic {{.*}} ins(%[[ARG0]] {{.*}} outs(%[[SUB_ALLOC]]
+//       CHECK:   linalg.generic {{.*}} ins(%[[ALLOC]] {{.*}} outs(%[[RET0]]
 //       CHECK:   memref.dealloc %[[ALLOC]]
 
 // -----
@@ -1062,9 +1051,8 @@ module {
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-//   CHECK-DAG:   %[[ARG0_DUP:.+]] = memref.subview %[[ARG0]]
 //       CHECK:   linalg.generic
-//       CHECK:     %[[VAL:.+]] = memref.load %[[ARG0_DUP]]
+//       CHECK:     %[[VAL:.+]] = memref.load %[[ARG0]]
 //       CHECK:     linalg.yield %[[VAL]]
 
 // -----
@@ -1154,12 +1142,10 @@ module {
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xf32>
 //   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xf32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<?x?xf32>
-//   CHECK-DAG:   %[[ARG0_DUP:.+]] = memref.subview %[[ARG0]]
-//   CHECK-DAG:   %[[ARG1_DUP:.+]] = memref.subview %[[ARG1]]
 //       CHECK:   scf.for
 //       CHECK:     scf.for
-//   CHECK-DAG:       %[[SV1:.+]] = memref.subview %[[ARG0_DUP]]
-//   CHECK-DAG:       %[[SV2:.+]] = memref.subview %[[ARG1_DUP]]
+//   CHECK-DAG:       %[[SV1:.+]] = memref.subview %[[ARG0]]
+//   CHECK-DAG:       %[[SV2:.+]] = memref.subview %[[ARG1]]
 //   CHECK-DAG:       %[[SV3:.+]] = memref.subview %[[RET0]]
 //       CHECK:       linalg.generic
 //  CHECK-SAME:         ins(%[[SV1]], %[[SV2]] :
@@ -1190,12 +1176,12 @@ module {
   }
 }
 // CHECK-LABEL: func.func @reshape_read_only
-//   DISABLE-CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-//   DISABLE-CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//       DISABLE-CHECK:   %[[RESHAPE:.+]] = memref.collapse_shape %[[INPUT]]
-//       DISABLE-CHECK:   linalg.generic
-//  DISABLE-CHECK-SAME:     ins(%[[RESHAPE]] : memref<?xf32>)
-//  DISABLE-CHECK-SAME:     outs(%[[OUTPUT]] : memref<?xf32>)
+//   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+//   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+//       CHECK:   %[[RESHAPE:.+]] = memref.collapse_shape %[[INPUT]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     ins(%[[RESHAPE]] : memref<?xf32>)
+//  CHECK-SAME:     outs(%[[OUTPUT]] : memref<?xf32>)
 
 // -----
 
@@ -1389,10 +1375,8 @@ module {
 // CHECK-LABEL: func.func @rank_reduced_subtensor_insert()
 //   CHECK-DAG:   %[[ARG:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[RET:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//       CHECK:   %[[ARG_DUP:.+]] = memref.subview %[[ARG]]
-//       CHECK:   %[[RET_DUP:.+]] = memref.subview %[[RET]]
-//       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[RET_DUP]]
-//       CHECK:   linalg.generic {{.*}} ins(%[[ARG_DUP]] {{.*}} outs(%[[SUBVIEW]]
+//       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[RET]]
+//       CHECK:   linalg.generic {{.*}} ins(%[[ARG]] {{.*}} outs(%[[SUBVIEW]]
 
 // -----
 
@@ -2169,11 +2153,9 @@ module {
 //   CHECK-DAG:   %[[SRC:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[DEST:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //   CHECK-DAG:   %[[SRC_DUP:.+]] = memref.subview %[[SRC]]
-//   CHECK-DAG:   %[[SRC_DUP2:.+]] = memref.subview %[[SRC_DUP]]
-//   CHECK-DAG:   %[[DEST_DUP:.+]] = memref.subview %[[DEST]]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       ins(%[[SRC_DUP2]] :
-//  CHECK-SAME:       outs(%[[DEST_DUP]] :
+//  CHECK-SAME:       ins(%[[SRC_DUP]] :
+//  CHECK-SAME:       outs(%[[DEST]] :
 
 // -----
 
@@ -2193,11 +2175,9 @@ module {
 //   CHECK-DAG:   %[[SRC:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[DEST:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[SRC]][0, 0] [1, %{{.+}}]
-//   CHECK-DAG:   %[[SUBVIEW_DUP:.+]] = memref.subview %[[SUBVIEW]]
-//   CHECK-DAG:   %[[DEST_DUP:.+]] = memref.subview %[[DEST]]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       ins(%[[SUBVIEW_DUP]] :
-//  CHECK-SAME:       outs(%[[DEST_DUP]] :
+//  CHECK-SAME:       ins(%[[SUBVIEW]] :
+//  CHECK-SAME:       outs(%[[DEST]] :
 
 // -----
 
@@ -2313,10 +2293,8 @@ func.func @scatter_update_scalar_1D() {
 // CHECK-DAG:    %[[INDICES:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<4x1xi32>
 // CHECK-DAG:    %[[ORIGINAL:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : memref<8xi32>
 // CHECK:        scf.for %[[I:.+]] = %{{.+}} to %{{.+}} step %{{.+}}
-// CHECK-DAG:      %[[SUB_UPDATE:.+]] = memref.subview %[[UPDATE]][%[[I]]]
-// CHECK-DAG:      %[[SUB_INDICES:.+]] = memref.subview %[[INDICES]][%[[I]], 0]
 // CHECK:          iree_linalg_ext.scatter
-// CHECK-SAME:     ins(%[[SUB_UPDATE]], %[[SUB_INDICES]]
+// CHECK-SAME:     ins(%[[UPDATE]], %[[INDICES]]
 // CHECK-SAME:     outs(%[[ORIGINAL:.+]]
 
 // -----
@@ -2339,16 +2317,11 @@ func.func @topk() {
         } -> tensor<200x3xf32>, tensor<200x3xi32>
   return
 }
-
-// XXX(hanchung): I don't know why there are memref.cast ops, might be a bug?
-// Since we don't have e2e top-k tests, I can't figure out how it works today.
 // CHECK:      func.func @topk
 // CHECK-DAG:    %[[INPUT_VALUES:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<200x8xf32>
-// CHECK-DAG:    %[[XXX_VALUES:.+]] = memref.cast %[[INPUT_VALUES]] : memref<200x8xf32> to memref<200x8xf32,
 // CHECK-DAG:    %[[INPUT_INDICES:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<200x8xi32>
-// CHECK-DAG:    %[[XXX_INDICES:.+]] = memref.cast %[[INPUT_INDICES]] : memref<200x8xi32> to memref<200x8xi32,
 // CHECK-DAG:    %[[OUTPUT_VALUES:.+]] = memref.alloc() : memref<200x3xf32>
 // CHECK-DAG:    %[[OUTPUT_INDICES:.+]] = memref.alloc() : memref<200x3xi32>
 // CHECK:        iree_linalg_ext.topk
-// CHECK-SAME:     ins(%[[XXX_VALUES]], %[[XXX_INDICES]]
+// CHECK-SAME:     ins(%[[INPUT_VALUES]], %[[INPUT_INDICES]]
 // CHECK-SAME:     outs(%[[OUTPUT_VALUES]], %[[OUTPUT_INDICES]]
