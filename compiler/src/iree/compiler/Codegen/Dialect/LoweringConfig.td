@@ -25,7 +25,7 @@ def CPU_BufferOpsTileAndVectorize
     : I32EnumAttrCase<"CPUBufferOpsTileAndVectorize", 5>;
 
 def Linalg_TransformInterpCodegen
-    : I32EnumAttrCase<"LinalgTransformInterpCodegen", 6>;
+    : I32EnumAttrCase<"TransformDialectInterpreterCodegen", 6>;
 
 def LLVMGPU_SimpleDistribute
     : I32EnumAttrCase<"LLVMGPUDistribute", 7>;

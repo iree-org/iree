@@ -31,4 +31,3 @@ func.func @foo5() -> index {
   %0 = arith.constant 5 : index
   return %0 : index
 }
-

@@ -6,6 +6,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
+#include "iree-dialects/Dialect/LinalgTransform/TransformInterpreterUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
@@ -32,6 +33,9 @@ namespace IREE {
 namespace Flow {
 
 /// Pass declaration.
+/// Interpreter pass that applies transform dialect ops for dispatch region
+/// formation. This needs to be its own pass because the registration mechanism
+/// and ops available are different than for other interpreters.
 struct DispatchWithTransformDialect
     : public DispatchWithTransformDialectBase<DispatchWithTransformDialect> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -87,51 +91,26 @@ struct DispatchWithTransformDialect
 };
 
 LogicalResult DispatchWithTransformDialect::initialize(MLIRContext *context) {
-  if (transformFileName.empty()) {
-    llvm::errs() << "no transform file name specified: " << transformFileName;
+  OwningOpRef<ModuleOp> module;
+  if (failed(transform::parseTransformModuleFromFile(context, transformFileName,
+                                                     module)))
     return failure();
-  }
-  // Parse transformFileName content into a ModuleOp.
-  std::string errorMessage;
-  auto memoryBuffer = mlir::openInputFile(transformFileName, &errorMessage);
-  if (!memoryBuffer) {
-    llvm::errs() << "failed to parse transform file: " << transformFileName;
-    return failure();
-  }
-  // Tell sourceMgr about this buffer, the parser will pick it up.
-  llvm::SourceMgr sourceMgr;
-  sourceMgr.AddNewSourceBuffer(std::move(memoryBuffer), llvm::SMLoc());
-  sharedTransformModule = std::make_shared<OwningOpRef<ModuleOp>>(
-      parseSourceFile<ModuleOp>(sourceMgr, context));
+  sharedTransformModule =
+      std::make_shared<OwningOpRef<ModuleOp>>(std::move(module));
   return success();
 }
 
 void DispatchWithTransformDialect::runOnOperation() {
-  Operation *topLevel = getOperation();
-  if (topLevel->getNumRegions() != 1 ||
-      !llvm::hasSingleElement(topLevel->getRegion(0))) {
-    topLevel->emitError() << "can only run '" << getArgument()
-                          << "' on single-region single-block operations";
+  Operation *target = getOperation();
+  bool parsedTransform = (sharedTransformModule && *sharedTransformModule);
+  assert(parsedTransform || (target->getNumRegions() == 1 &&
+                             target->getRegion(0).getBlocks().size() == 1) &&
+                                "Cannot extract transform from op");
+  Region &transformRegion = parsedTransform
+                                ? (*sharedTransformModule)->getRegion()
+                                : target->getRegion(0);
+  if (failed(transform::applyTransformsInRegion(transformRegion, target)))
     return signalPassFailure();
-  }
-  if (!sharedTransformModule && !*sharedTransformModule) {
-    topLevel->emitError() << "transform module missing for file: "
-                          << transformFileName;
-    return signalPassFailure();
-  }
-
-  // The transform dialect and PDL move IR around, so every thread needs its
-  // local copy of the transform IR.
-  // TODO: filter a relevant subpiece of transform IR based on the current IR
-  // and clone only that.
-  OwningOpRef<ModuleOp> transformIR(
-      cast<ModuleOp>((*sharedTransformModule)->clone()));
-  transform::TransformState state(transformIR->getOperation()->getRegion(0),
-                                  topLevel);
-  for (auto op :
-       transformIR->getBody()->getOps<transform::TransformOpInterface>()) {
-    if (failed(state.applyTransform(op))) return signalPassFailure();
-  }
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>

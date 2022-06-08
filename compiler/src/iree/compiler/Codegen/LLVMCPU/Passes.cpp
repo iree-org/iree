@@ -45,6 +45,12 @@ static llvm::cl::opt<bool> clEnableHoistPadding(
     "iree-llvmcpu-enable-hoist-padding",
     llvm::cl::desc("Flag to enable hoist padding"), llvm::cl::init(false));
 
+// MLIR file containing a top-level module that specifies the transformations to
+// apply to form dispatch regions.
+// Defined externally in KernelDispatch.cpp to control the codegen pass
+// pipeline.
+extern llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName;
+
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
 //===---------------------------------------------------------------------===//
@@ -453,9 +459,10 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   addBufferizePasses(nestedModulePM);
 }
 
-void addLinalgTransformInterpPasses(OpPassManager &passManager) {
-  // Give control to the linalg_transform dialect.
-  passManager.addPass(createLinalgTransformInterpreterPass());
+void addTransformDialectInterpreterPasses(OpPassManager &passManager) {
+  // Give control to the transform dialect.
+  passManager.addPass(createTransformDialectInterpreterPass(
+      clCPUCodegenTransformDialectFileName));
 
   // Dropping the schedule is only needed if we want to embed the transform in
   // the module: we should drop the schedule once applied.
