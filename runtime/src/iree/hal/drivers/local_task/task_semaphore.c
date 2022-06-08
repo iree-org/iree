@@ -388,10 +388,18 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
 
   // TODO(benvanik): if we flip the API to multi-acquire events from the pool
   // above then we can multi-release here too.
+  for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
+    iree_hal_semaphore_t* semaphore = semaphore_list->semaphores[i];
+    iree_slim_mutex_lock(&semaphore->timepoint_mutex);
+  }
   for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
     iree_hal_semaphore_cancel_timepoint(timepoints[i].base.semaphore,
                                         &timepoints[i].base);
     iree_event_pool_release(event_pool, 1, &timepoints[i].event);
+  }
+  for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
+    iree_hal_semaphore_t* semaphore = semaphore_list->semaphores[i];
+    iree_slim_mutex_unlock(&semaphore->timepoint_mutex);
   }
   iree_wait_set_free(wait_set);
   iree_arena_deinitialize(&arena);
