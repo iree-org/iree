@@ -11,8 +11,8 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/file_path.h"
 #include "iree/base/internal/flags.h"
+#include "iree/base/internal/path.h"
 #include "iree/base/target_platform.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/init.h"
@@ -24,7 +24,7 @@
 
 IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
 
-IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
+IREE_FLAG(string, driver, "local-task", "Backend driver to use.");
 
 static const char* emoji(bool good) { return good ? "🦄" : "🐞"; }
 

@@ -42,7 +42,7 @@ iree_check_single_backend_test_suite(
             "tensor_cast.mlir",
         ],
     ),
-    driver = "dylib",
+    driver = "local-task",
     target_backend = "dylib-llvm-aot",
 )
 

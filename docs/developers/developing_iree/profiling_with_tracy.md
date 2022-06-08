@@ -107,8 +107,8 @@ make -C third_party/tracy/profiler/build/unix -j12 release
 
 ## Running the profiled program
 
-Tracing doesn't work properly on VMs (see "Problematic Platforms / Virtual Machines" 
-section 2.1.6.4 of the [manual](#the-tracy-manual)). To get sampling, you should 
+Tracing doesn't work properly on VMs (see "Problematic Platforms / Virtual Machines"
+section 2.1.6.4 of the [manual](#the-tracy-manual)). To get sampling, you should
 run the profiled program on bare metal.
 
 Run your IREE workload as you normally would: now that it's been built with
@@ -126,7 +126,7 @@ Example:
 
 ```shell
 TRACY_NO_EXIT=1 /data/local/tmp/iree-benchmark-module \
-  --driver=dylib \
+  --driver=local-task \
   --module_file=/data/local/tmp/android_module.fbvm \
   --entry_function=serving_default \
   --function_input=1x384xi32 \

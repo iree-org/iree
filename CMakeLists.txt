@@ -70,7 +70,6 @@ option(IREE_BUILD_MICROBENCHMARKS "Builds IREE microbenchmark suites." OFF)
 
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
 option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
-option(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM "Builds the experimental ROCm Backend." OFF)
 
 #-------------------------------------------------------------------------------
 # Derived flags based on primary options
@@ -84,6 +83,10 @@ cmake_dependent_option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ON $
 # not require external deps are enabled by default. This can be changed with:
 #   -DIREE_HAL_DRIVER_DEFAULTS=OFF
 #-------------------------------------------------------------------------------
+
+# External HAL drivers; see runtime/src/iree/hal/drivers/CMakeLists.txt for more
+# information on how to declare external drivers.
+set(IREE_EXTERNAL_HAL_DRIVERS "" CACHE STRING "")
 
 option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL drivers" ON)
 # CUDA support must be explicitly enabled.
@@ -102,27 +105,10 @@ option(IREE_HAL_DRIVER_LOCAL_SYNC "Enables the 'local-sync' runtime HAL driver" 
 option(IREE_HAL_DRIVER_LOCAL_TASK "Enables the 'local-task' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
 
-# TODO(#9336): remove legacy driver names.
-option(IREE_HAL_DRIVER_DYLIB "Enables the 'dylib' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
-option(IREE_HAL_DRIVER_DYLIB_SYNC "Enables the 'dylib-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
-option(IREE_HAL_DRIVER_VMVX "Enables the 'vmvx' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
-option(IREE_HAL_DRIVER_VMVX_SYNC "Enables the 'vmvx-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
-
-# TODO(#9336): remove legacy driver names.
-# Existing builds assume that dylib-sync doesn't use the system loader.
-set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT OFF)
-set(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT OFF)
-set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE_DEFAULT OFF)
-if(IREE_HAL_DRIVER_DYLIB)
-  set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT ON)
-  set(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT ON)
-endif()
-if(IREE_HAL_DRIVER_DYLIB_SYNC)
-  set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT ON)
-endif()
-if(IREE_HAL_DRIVER_VMVX OR IREE_HAL_DRIVER_VMVX_SYNC)
-  set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE_DEFAULT ON)
-endif()
+option(IREE_HAL_EXECUTABLE_LOADER_DEFAULTS "Sets the default value for all runtime HAL executable loaders" ON)
+set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT ${IREE_HAL_EXECUTABLE_LOADER_DEFAULTS})
+set(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT ${IREE_HAL_EXECUTABLE_LOADER_DEFAULTS})
+set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE_DEFAULT ${IREE_HAL_EXECUTABLE_LOADER_DEFAULTS})
 
 # Emscripten builds don't support embedded ELF libraries.
 if(EMSCRIPTEN)
@@ -133,6 +119,15 @@ endif()
 # system library loader is linked in.
 if(IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER)
   set(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT ON)
+endif()
+
+# If no local driver is enabled then we force all the loaders off; this allows
+# for simpler checks that don't need to see if both the driver and loader is
+# available.
+if(NOT IREE_HAL_DRIVER_LOCAL_SYNC AND NOT IREE_HAL_DRIVER_LOCAL_TASK)
+  set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT OFF)
+  set(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT OFF)
+  set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE_DEFAULT OFF)
 endif()
 
 option(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF "Enables the embedded dynamic library loader for local HAL drivers" ${IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT})
@@ -149,20 +144,11 @@ endif()
 if(IREE_HAL_DRIVER_LOCAL_TASK)
   message(STATUS "  - local-task")
 endif()
-if(IREE_HAL_DRIVER_DYLIB)
-  message(STATUS "  - dylib")
-endif()
-if(IREE_HAL_DRIVER_DYLIB_SYNC)
-  message(STATUS "  - dylib-sync")
-endif()
-if(IREE_HAL_DRIVER_VMVX)
-  message(STATUS "  - vmvx")
-endif()
-if(IREE_HAL_DRIVER_VMVX_SYNC)
-  message(STATUS "  - vmvx-sync")
-endif()
 if(IREE_HAL_DRIVER_VULKAN)
   message(STATUS "  - vulkan")
+endif()
+if(IREE_EXTERNAL_HAL_DRIVERS)
+  message(STATUS "  + external: ${IREE_EXTERNAL_HAL_DRIVERS}")
 endif()
 
 message(STATUS "IREE HAL local executable library loaders:")
@@ -175,6 +161,15 @@ endif()
 if(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
   message(STATUS "  - vmvx-module")
 endif()
+
+#-------------------------------------------------------------------------------
+# Experimental ROCM HAL driver
+#-------------------------------------------------------------------------------
+
+set(IREE_EXTERNAL_ROCM_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/rocm")
+set(IREE_EXTERNAL_ROCM_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experimental/rocm")
+set(IREE_EXTERNAL_ROCM_HAL_DRIVER_TARGET "iree::experimental::rocm::registration")
+set(IREE_EXTERNAL_ROCM_HAL_DRIVER_REGISTER "iree_hal_rocm_driver_module_register")
 
 #-------------------------------------------------------------------------------
 # Compiler Target Options
@@ -593,7 +588,9 @@ endif()
 
 add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
 
-add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
+if(IREE_HAL_DRIVER_VULKAN)
+  add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
+endif()
 
 # TODO(scotttodd): Iterate some more and find a better place for this.
 if(NOT CMAKE_CROSSCOMPILING)
@@ -687,11 +684,6 @@ if(IREE_BUILD_BENCHMARKS)
     message(STATUS "iree-import-tflite not found. Some benchmarks may not configure")
   endif()
   add_subdirectory(benchmarks)
-endif()
-
-if(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM)
-  add_subdirectory(build_tools/third_party/rocm EXCLUDE_FROM_ALL)
-  add_subdirectory(experimental/rocm)
 endif()
 
 if(IREE_BUILD_COMPILER)

@@ -34,21 +34,6 @@ LogicalResult verifyLoweringConfiguration(
 // Misc/common conversions
 //------------------------------------------------------------------------------
 
-/// Alias for callback function that allocates workgroup level memory. The
-/// callback expects the static shape and element-type of the result memref
-/// type. Also expects values for the dynamic dimension of the allocated memref,
-/// where each dynamic dimension corresponds to a `ShapedType::kDynamicSize`
-/// value in `staticShape`.
-using WorkgroupMemoryAllocationFn = std::function<Value(
-    OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
-    Type elementType, ArrayRef<Value> dynamicSizes)>;
-
-/// Adds passes to convert tiled+distributed linalg on tensors code to linalg on
-/// buffers.
-void addLinalgBufferizePasses(
-    OpPassManager &passManager,
-    WorkgroupMemoryAllocationFn allocationFn = nullptr);
-
 using bufferization::BufferizationOptions;
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
@@ -98,8 +83,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createForOpCanonicalizationPass();
 /// the default allocator generates an `std.alloc` instruction with the
 /// allocated MemRefType having no stride map (i.e. default row-major striding)
 /// and default memory space.
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgBufferizePass(
-    WorkgroupMemoryAllocationFn allocationFn = nullptr);
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
     Optional<BufferizationOptions::AllocationFn> allocationFn = None,
     Optional<BufferizationOptions::DeallocationFn> deallocationFn = None,

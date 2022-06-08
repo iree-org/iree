@@ -204,7 +204,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     if benchmark_results_filename is not None:
       self.__run_benchmark(android_case_dir=android_case_dir,
                            tool_name=benchmark_case.benchmark_tool_name,
-                           driver=benchmark_case.driver,
+                           config=benchmark_case.config,
                            results_filename=benchmark_results_filename,
                            taskset=taskset)
 
@@ -214,7 +214,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
                          capture_filename=capture_filename,
                          taskset=taskset)
 
-  def __run_benchmark(self, android_case_dir: str, tool_name: str, driver: str,
+  def __run_benchmark(self, android_case_dir: str, tool_name: str, config: str,
                       results_filename: str, taskset: str):
     host_tool_path = os.path.join(self.config.normal_benchmark_tool_dir,
                                   tool_name)
@@ -227,7 +227,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
       cmd.extend(
           get_iree_benchmark_module_arguments(
               results_filename=f"'{os.path.basename(results_filename)}'",
-              driver=driver,
+              config=config,
               benchmark_min_time=self.config.benchmark_min_time))
 
     result_json = adb_execute_and_get_output(cmd,

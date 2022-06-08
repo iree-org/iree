@@ -72,10 +72,11 @@ give control over how worker threads will be created. For example, the
 workers rather than rely on heuristic selection that defaults to one worker
 per detected physical core.
 
-If running on a single thread or system with no threading support, the
-`dylib-sync` HAL driver can be used instead of the more generic `dylib` HAL
-driver. The synchronous driver performs execution inline rather than through
-IREE's task scheduling system.
+If running on a single thread or system with no threading support the
+`local-sync` HAL driver can be used instead of the multithreaded `local-task`
+HAL driver to reduce dependencies and code size. When running with the
+`local-sync` driver all execution happens inline on the thread invoking the
+IREE runtime and will block until it has completed.
 
 ### Do the minimum amount of work: cache queries and reuse buffers
 

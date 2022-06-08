@@ -69,7 +69,7 @@ iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",
     srcs = LLVM_SRCS,
     compiler_flags = ["--iree-input-type=tosa"],
-    driver = "dylib",
+    driver = "local-task",
     target_backend = "dylib-llvm-aot",
 )
 
@@ -83,6 +83,7 @@ VMVX_SRCS = enforce_glob(
         "bitwise_xor.mlir",
         "ceil.mlir",
         "clamp.mlir",
+        "clz.mlir",
         "const.mlir",
         "equal.mlir",
         "exp.mlir",
@@ -116,7 +117,6 @@ VMVX_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
-        "clz.mlir",  # https://github.com/google/iree/issues/9152
         "reduce.mlir",  # Currently flakey https://github.com/google/iree/issues/5885
     ],
 )
@@ -127,7 +127,7 @@ iree_check_single_backend_test_suite(
     compiler_flags = [
         "--iree-input-type=tosa",
     ],
-    driver = "vmvx",
+    driver = "local-task",
     target_backend = "vmvx",
 )
 
@@ -141,6 +141,7 @@ VULKAN_SRCS = enforce_glob(
         "bitwise_xor.mlir",
         "ceil.mlir",
         "clamp.mlir",
+        "clz.mlir",
         "const.mlir",
         "equal.mlir",
         "exp.mlir",
@@ -174,9 +175,6 @@ VULKAN_SRCS = enforce_glob(
         "while.mlir",
     ],
     include = ["*.mlir"],
-    exclude = [
-        "clz.mlir",  # https://github.com/google/iree/issues/9152
-    ],
 )
 
 iree_check_single_backend_test_suite(

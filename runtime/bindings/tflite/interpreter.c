@@ -44,11 +44,11 @@ static iree_status_t _TfLiteInterpreterPrepareHAL(
   // just say "whatever is first" on a query.
   // iree_string_view_t driver_name = driver_infos[0].driver_name;
   // NOTE: currently the sample file is compiled only with vmvx.
-  iree_string_view_t driver_name = iree_make_cstring_view("vmvx");
+  iree_string_view_t driver_name = iree_make_cstring_view("local-task");
 
   // TODO(benvanik): switch to iree_hal_driver_registry_try_create when
   // implemented.
-  iree_status_t status = iree_hal_driver_registry_try_create_by_name(
+  iree_status_t status = iree_hal_driver_registry_try_create(
       driver_registry, driver_name, interpreter->allocator,
       &interpreter->driver);
   iree_allocator_free(interpreter->allocator, driver_infos);

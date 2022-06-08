@@ -32,7 +32,9 @@ android {
                 arguments "-DIREE_BUILD_BINDINGS_TFLITE=ON",
                         "-DIREE_BUILD_BINDINGS_TFLITE_JAVA=ON",
                         "-DIREE_HAL_DRIVER_DEFAULTS=OFF",
-                        "-DIREE_HAL_DRIVER_VMVX=ON",
+                        "-DIREE_HAL_DRIVER_LOCAL_TASK=ON",
+                        "-DIREE_HAL_EXECUTABLE_LOADER_DEFAULTS=OFF",
+                        "-DIREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE=ON",
 
                         // Disable all but the runtime components needed for the
                         // java bindings.
@@ -81,7 +83,9 @@ task cmakeConfigureHost(type: Exec) {
             "-G" , "Ninja",
             "-B", hostBuildDir ,
             "-DIREE_HAL_DRIVER_DEFAULTS=OFF",
-            "-DIREE_HAL_DRIVER_VMVX=ON",
+            "-DIREE_HAL_DRIVER_LOCAL_TASK=ON",
+            "-DIREE_HAL_EXECUTABLE_LOADER_DEFAULTS=OFF",
+            "-DIREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE=ON",
             "-DIREE_BUILD_COMPILER=OFF",
             "-DIREE_BUILD_TESTS=OFF ",
             "-DIREE_BUILD_SAMPLES=OFF",

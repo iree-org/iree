@@ -148,7 +148,7 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
 
     // No existing driver, attempt to create.
     iree_hal_driver_t* driver = NULL;
-    iree_status_t status = iree_hal_driver_registry_try_create_by_name(
+    iree_status_t status = iree_hal_driver_registry_try_create(
         iree_hal_driver_registry_default(),
         iree_make_string_view(driver_name.data(), driver_name.size()),
         iree_allocator_system(), &driver);

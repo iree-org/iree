@@ -895,7 +895,7 @@ class BackendInfo:
       },
       "iree_vmvx": {
           "compiled_module_class": IreeCompiledModule,
-          "driver": "vmvx",
+          "driver": "local-task",
           "compiler_targets": ["vmvx"]
       },
       "iree_vulkan": {
@@ -905,7 +905,7 @@ class BackendInfo:
       },
       "iree_llvmaot": {
           "compiled_module_class": IreeCompiledModule,
-          "driver": "dylib",
+          "driver": "local-task",
           "compiler_targets": ["dylib-llvm-aot"]
       },
   }

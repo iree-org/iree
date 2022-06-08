@@ -56,8 +56,10 @@ iree_benchmark_suite(
     ${LINUX_RV64_GENERIC_CPU_TRANSLATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-dylib-sync"
   DRIVER
-    "dylib-sync"
+    "local-sync"
 )
 
 # CPU, Dylib-Sync, RV32-Generic, full-inference
@@ -80,6 +82,8 @@ iree_benchmark_suite(
     ${LINUX_RV32_GENERIC_CPU_TRANSLATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
+  CONFIG
+    "iree-dylib-sync"
   DRIVER
     "dylib-sync"
 )

@@ -4,14 +4,30 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/base/internal/file_path.h"
+#include "iree/base/internal/path.h"
 
 #include <string>
 
 #include "iree/base/target_platform.h"
 #include "iree/testing/gtest.h"
 
+static bool operator==(const iree_string_pair_t& lhs,
+                       const iree_string_pair_t& rhs) noexcept {
+  return iree_string_view_equal(lhs.key, rhs.key) &&
+         iree_string_view_equal(lhs.value, rhs.value);
+}
+
+static std::ostream& operator<<(std::ostream& os,
+                                const iree_string_pair_t& pair) {
+  return os << std::string(pair.key.data, pair.key.size) << "="
+            << std::string(pair.value.data, pair.value.size);
+}
+
 namespace {
+
+using ::testing::ElementsAreArray;
+using ::testing::Eq;
+using ::testing::IsEmpty;
 
 #define _SV(str) iree_make_cstring_view(str)
 
@@ -165,6 +181,110 @@ TEST(FilePathTest, Extension) {
   EXPECT_SV_EQ(iree_file_path_extension(_SV("foo..bar")), _SV("bar"));
   EXPECT_SV_EQ(iree_file_path_extension(_SV(".bar")), _SV("bar"));
   EXPECT_SV_EQ(iree_file_path_extension(_SV("..bar")), _SV("bar"));
+}
+
+// NOTE: these URI methods are all implemented using the same iree_uri_split and
+// we test each independently because it's easier.
+
+TEST(URITest, Schema) {
+  EXPECT_SV_EQ(iree_uri_schema(_SV("")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_schema(_SV("s")), _SV("s"));
+  EXPECT_SV_EQ(iree_uri_schema(_SV("schema")), _SV("schema"));
+  EXPECT_SV_EQ(iree_uri_schema(_SV("schema:")), _SV("schema"));
+  EXPECT_SV_EQ(iree_uri_schema(_SV("schema:path")), _SV("schema"));
+  EXPECT_SV_EQ(iree_uri_schema(_SV("schema:/")), _SV("schema"));
+  EXPECT_SV_EQ(iree_uri_schema(_SV("schema://")), _SV("schema"));
+  EXPECT_SV_EQ(iree_uri_schema(_SV("schema:///")), _SV("schema"));
+  EXPECT_SV_EQ(iree_uri_schema(_SV("schema:///path")), _SV("schema"));
+  EXPECT_SV_EQ(iree_uri_schema(_SV("schema://path")), _SV("schema"));
+  EXPECT_SV_EQ(iree_uri_schema(_SV("schema://path/")), _SV("schema"));
+  EXPECT_SV_EQ(iree_uri_schema(_SV("schema://path/sub")), _SV("schema"));
+  EXPECT_SV_EQ(iree_uri_schema(_SV("schema://path?")), _SV("schema"));
+  EXPECT_SV_EQ(iree_uri_schema(_SV("schema://path?p")), _SV("schema"));
+  EXPECT_SV_EQ(iree_uri_schema(_SV("schema://path?params")), _SV("schema"));
+  EXPECT_SV_EQ(iree_uri_schema(_SV("schema://path?params??")), _SV("schema"));
+}
+
+TEST(URITest, Path) {
+  EXPECT_SV_EQ(iree_uri_path(_SV("")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_path(_SV("s")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_path(_SV("schema")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_path(_SV("schema:")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_path(_SV("schema:path")), _SV("path"));
+  EXPECT_SV_EQ(iree_uri_path(_SV("schema:/")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_path(_SV("schema://")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_path(_SV("schema:///")), _SV("/"));
+  EXPECT_SV_EQ(iree_uri_path(_SV("schema:///path")), _SV("/path"));
+  EXPECT_SV_EQ(iree_uri_path(_SV("schema://path")), _SV("path"));
+  EXPECT_SV_EQ(iree_uri_path(_SV("schema://path/")), _SV("path/"));
+  EXPECT_SV_EQ(iree_uri_path(_SV("schema://path/sub")), _SV("path/sub"));
+  EXPECT_SV_EQ(iree_uri_path(_SV("schema://path?")), _SV("path"));
+  EXPECT_SV_EQ(iree_uri_path(_SV("schema://path?p")), _SV("path"));
+  EXPECT_SV_EQ(iree_uri_path(_SV("schema://path?params")), _SV("path"));
+  EXPECT_SV_EQ(iree_uri_path(_SV("schema://path?params??")), _SV("path"));
+}
+
+TEST(URITest, Params) {
+  EXPECT_SV_EQ(iree_uri_params(_SV("s")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_params(_SV("")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_params(_SV("schema")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_params(_SV("schema:")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_params(_SV("schema:path")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_params(_SV("schema:/")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_params(_SV("schema://")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_params(_SV("schema:///")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_params(_SV("schema:///path")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_params(_SV("schema://path")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_params(_SV("schema://path/")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_params(_SV("schema://path/sub")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_params(_SV("schema://path?")), _SV(""));
+  EXPECT_SV_EQ(iree_uri_params(_SV("schema://path?p")), _SV("p"));
+  EXPECT_SV_EQ(iree_uri_params(_SV("schema://path?params")), _SV("params"));
+  EXPECT_SV_EQ(iree_uri_params(_SV("schema://path?params??")), _SV("params??"));
+}
+
+using StringPairs = std::vector<iree_string_pair_t>;
+static StringPairs SplitParams(iree_string_view_t params) {
+  StringPairs storage;
+  iree_host_size_t count = 0;
+  while (
+      !iree_uri_split_params(params, storage.size(), &count, storage.data())) {
+    storage.resize(count);
+  }
+  return storage;
+}
+
+#define StringPair iree_make_cstring_pair
+
+TEST(URITest, SplitParams) {
+  EXPECT_THAT(SplitParams(_SV("")), IsEmpty());
+  EXPECT_THAT(SplitParams(_SV("&")), IsEmpty());
+  EXPECT_THAT(SplitParams(_SV("a")), ElementsAreArray({StringPair("a", "")}));
+  EXPECT_THAT(SplitParams(_SV("&a")), ElementsAreArray({StringPair("a", "")}));
+  EXPECT_THAT(SplitParams(_SV("a&")), ElementsAreArray({StringPair("a", "")}));
+  EXPECT_THAT(SplitParams(_SV("&a&")), ElementsAreArray({StringPair("a", "")}));
+  EXPECT_THAT(SplitParams(_SV("a=")), ElementsAreArray({StringPair("a", "")}));
+  EXPECT_THAT(SplitParams(_SV("a=b")),
+              ElementsAreArray({StringPair("a", "b")}));
+  EXPECT_THAT(SplitParams(_SV("a=b&c")), ElementsAreArray({
+                                             StringPair("a", "b"),
+                                             StringPair("c", ""),
+                                         }));
+  EXPECT_THAT(SplitParams(_SV("a=b&c=")), ElementsAreArray({
+                                              StringPair("a", "b"),
+                                              StringPair("c", ""),
+                                          }));
+  EXPECT_THAT(SplitParams(_SV("a=b&c=d")), ElementsAreArray({
+                                               StringPair("a", "b"),
+                                               StringPair("c", "d"),
+                                           }));
+  EXPECT_THAT(SplitParams(_SV("a=b&c=d&e&f&g=h")), ElementsAreArray({
+                                                       StringPair("a", "b"),
+                                                       StringPair("c", "d"),
+                                                       StringPair("e", ""),
+                                                       StringPair("f", ""),
+                                                       StringPair("g", "h"),
+                                                   }));
 }
 
 }  // namespace

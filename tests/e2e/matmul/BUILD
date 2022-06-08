@@ -27,8 +27,8 @@ py_binary(
         "--shapes=small",
     ],
     target_backends_and_drivers = [
-        ("dylib-llvm-aot", "dylib"),
-        ("vmvx", "vmvx"),
+        ("dylib-llvm-aot", "local-task"),
+        ("vmvx", "local-task"),
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
@@ -48,7 +48,7 @@ py_binary(
         "--shapes=small",
     ],
     target_backends_and_drivers = [
-        ("dylib-llvm-aot", "dylib"),
+        ("dylib-llvm-aot", "local-task"),
     ],
     target_cpu_features_variants = ["default"] +
                                    ([
@@ -72,7 +72,7 @@ py_binary(
         "--shapes=large",
     ],
     target_backends_and_drivers = [
-        ("dylib-llvm-aot", "dylib"),
+        ("dylib-llvm-aot", "local-task"),
     ],
     target_cpu_features_variants = ["default"] +
                                    ([
@@ -100,7 +100,7 @@ py_binary(
         "--shapes=%s" % size,
     ],
     target_backends_and_drivers = [
-        ("dylib-llvm-aot", "dylib"),
+        ("dylib-llvm-aot", "local-task"),
     ],
     target_cpu_features_variants = ["default"] +
                                    ([
@@ -187,7 +187,7 @@ py_binary(
     ],
     target_backends_and_drivers = [
         ("cuda", "cuda"),
-        ("dylib-llvm-aot", "dylib"),
+        ("dylib-llvm-aot", "local-task"),
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [

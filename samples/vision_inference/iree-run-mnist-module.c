@@ -26,7 +26,7 @@ iree_status_t Run(const iree_string_view_t image_path) {
   // TODO(#5724): move device selection into the compiled modules.
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_runtime_instance_try_create_default_device(
-      instance, iree_make_cstring_view("dylib"), &device));
+      instance, iree_make_cstring_view("local-task"), &device));
 
   // Create one session per loaded module to hold the module state.
   iree_runtime_session_options_t session_options;

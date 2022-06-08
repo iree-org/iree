@@ -13,7 +13,7 @@ include(CMakeParseArguments)
 #
 # Parameters:
 #   DRIVER_NAME: The name of the driver to test. Used for both target names and
-#       for `iree_hal_driver_registry_try_create_by_name()` within test code.
+#       for `iree_hal_driver_registry_try_create()` within test code.
 #   VARIANT_SUFFIX: Suffix to add to the test names, separate from the driver
 #       name. Useful when specifying multiple configurations using `ARGS` or
 #       other parameters.
@@ -49,16 +49,6 @@ function(iree_hal_cts_test_suite)
     "DEPS;ARGS;INCLUDED_TESTS;EXCLUDED_TESTS;LABELS"
     ${ARGN}
   )
-
-  # Omit tests for which the specified driver is not enabled.
-  string(TOUPPER ${_RULE_DRIVER_NAME} _UPPERCASE_DRIVER)
-  string(REPLACE "-" "_" _NORMALIZED_DRIVER ${_UPPERCASE_DRIVER})
-  if(NOT DEFINED IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
-    message(SEND_ERROR "Unknown driver '${_RULE_DRIVER_NAME}'. Check IREE_HAL_DRIVER_* options.")
-  endif()
-  if(NOT IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
-    return()
-  endif()
 
   list(APPEND _RULE_LABELS "driver=${_RULE_DRIVER_NAME}")
 
@@ -109,7 +99,7 @@ function(iree_hal_cts_test_suite)
         # We should add a new function like `iree_hal_executable()`.
         iree_bytecode_module(
           NAME
-            ${_RULE_COMPILER_TARGET_BACKEND}_${_FILE_NAME}
+            ${_RULE_COMPILER_TARGET_BACKEND}_${_FILE_NAME}_module
           MODULE_FILE_NAME
             "${_RULE_COMPILER_TARGET_BACKEND}_${_FILE_NAME}.bin"
           SRC

@@ -71,12 +71,6 @@ def BufferizeCopyOnlyDispatches :
   let constructor = "mlir::iree_compiler::createBufferizeCopyOnlyDispatchesPass()";
 }
 
-def LinalgBufferize :
-    Pass<"iree-codegen-linalg-bufferize", "func::FuncOp"> {
-  let summary = "Convert from to Linalg ops on tensors to buffers";
-  let constructor = "mlir::iree_compiler::createLinalgBufferizePass(nullptr)";
-}
-
 def IREEComprehensiveBufferize :
     Pass<"iree-codegen-iree-comprehensive-bufferize", "ModuleOp"> {
   let summary = "Convert from to Linalg ops on tensors to buffers";

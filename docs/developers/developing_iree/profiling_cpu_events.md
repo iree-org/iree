@@ -63,7 +63,7 @@ subsequent commands analyzing the profile. Example:
 ```shell
 perf record -o /tmp/perf.data \
   ./tools/iree-benchmark-module \
-    --driver=dylib \
+    --driver=local-task \
     ... command-line arguments of iree-benchmark-module as usual ...
 ```
 
@@ -73,7 +73,7 @@ by, with the `-e` flag. For instance, to sample by L1 cache misses, one may do:
 ```shell
 perf record -o /tmp/perf.data -e L1-dcache-load-misses \
   ./tools/iree-benchmark-module \
-    --driver=dylib \
+    --driver=local-task \
     ... command-line arguments of iree-benchmark-module as usual ...
 ```
 
@@ -150,7 +150,7 @@ First, we record on the device:
 adb shell \
   simpleperf record -e raw-l1d-cache-refill -o /data/local/tmp/perf.data \
     /data/local/tmp/iree-benchmark-module \
-      --driver=dylib \
+      --driver=local-task \
       ... command-line arguments of iree-benchmark-module as usual ...
 ```
 

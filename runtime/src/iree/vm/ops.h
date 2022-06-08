@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/math.h"
 #include "iree/vm/value.h"
 
 //===------------------------------------------------------------------===//
@@ -65,6 +66,9 @@ static inline int32_t vm_not_i32(int32_t operand) {
 static inline int32_t vm_and_i32(int32_t lhs, int32_t rhs) { return lhs & rhs; }
 static inline int32_t vm_or_i32(int32_t lhs, int32_t rhs) { return lhs | rhs; }
 static inline int32_t vm_xor_i32(int32_t lhs, int32_t rhs) { return lhs ^ rhs; }
+static inline int32_t vm_ctlz_i32(int32_t operand) {
+  return (int32_t)iree_math_count_leading_zeros_u32((uint32_t)operand);
+}
 
 //===------------------------------------------------------------------===//
 // Casting and type conversion/emulation
@@ -187,6 +191,9 @@ static inline int64_t vm_not_i64(int64_t operand) {
 static inline int64_t vm_and_i64(int64_t lhs, int64_t rhs) { return lhs & rhs; }
 static inline int64_t vm_or_i64(int64_t lhs, int64_t rhs) { return lhs | rhs; }
 static inline int64_t vm_xor_i64(int64_t lhs, int64_t rhs) { return lhs ^ rhs; }
+static inline int64_t vm_ctlz_i64(int64_t operand) {
+  return (int64_t)iree_math_count_leading_zeros_u64((uint64_t)operand);
+}
 
 //===------------------------------------------------------------------===//
 // ExtI64: Casting and type conversion/emulation

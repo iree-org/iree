@@ -117,7 +117,7 @@ on VMVX run:
 ```shell
 $ tools/iree-benchmark-module \
   --module_file=/tmp/iree/modules/MatrixOpsStaticModule/iree_vmvx/compiled.vmfb \
-  --driver=vmvx \
+  --driver=local-task \
   --entry_function=matmul_lhs_batch \
   --function_input=256x64x32xf32=2 \
   --function_input=32x16xf32=3
@@ -221,7 +221,7 @@ $ adb push /tmp/iree/modules/MatrixOpsStaticModule/iree_vmvx/* \
 ```shell
 $ adb shell /data/local/tmp/iree-benchmark-module \
   --module_file="/data/local/tmp/MatrixOpsStaticModule/iree_vmvx/compiled.vmfb" \
-  --driver=vmvx \
+  --driver=local-task \
   --entry_function=matmul_lhs_batch \
   --function_input=256x64x32xf32=2 \
   --function_input=32x16xf32=3

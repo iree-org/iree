@@ -32,6 +32,7 @@ using mlir::bufferization::BufferizationState;
 using mlir::bufferization::DialectAnalysisState;
 using mlir::bufferization::eliminateAllocTensors;
 using mlir::bufferization::OneShotBufferizationOptions;
+using mlir::bufferization::replaceOpWithBufferizedValues;
 using mlir::bufferization::replaceOpWithNewBufferizedOp;
 
 namespace mlir {
@@ -84,6 +85,17 @@ namespace {
 // IREE specific External models for BufferizableOpInterface.
 //===----------------------------------------------------------------------===//
 
+/// Check if the two tensor types (with their respective dynamic dimension
+/// values) have the same shape.
+static bool equalTensorShape(RankedTensorType tensorType,
+                             ValueRange tensorDynSizes,
+                             IREE::Flow::DispatchTensorType dispatchTensorType,
+                             ValueRange dispatchTensorDynSizes) {
+  return llvm::equal(tensorType.getShape(), dispatchTensorType.getShape()) &&
+         tensorDynSizes.size() == dispatchTensorDynSizes.size() &&
+         llvm::equal(tensorDynSizes, dispatchTensorDynSizes);
+}
+
 struct DispatchTensorLoadOpInterface
     : public BufferizableOpInterface::ExternalModel<
           DispatchTensorLoadOpInterface, IREE::Flow::DispatchTensorLoadOp> {
@@ -101,6 +113,14 @@ struct DispatchTensorLoadOpInterface
     auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
     Value source =
         getSubspanBuffer(loadOp.source(), rewriter, state.getAnalysisState());
+    if (equalTensorShape(
+            loadOp.getType(), loadOp.sizes(),
+            loadOp.source().getType().cast<IREE::Flow::DispatchTensorType>(),
+            loadOp.source_dims())) {
+      // The entire tensor is loaded.
+      replaceOpWithBufferizedValues(rewriter, op, source);
+      return success();
+    }
 
     // Bufferize to subview.
     auto subviewMemRefType = memref::SubViewOp::inferRankReducedResultType(
@@ -137,26 +157,33 @@ struct DispatchTensorStoreOpInterface
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           BufferizationState &state) const {
     auto storeOp = cast<IREE::Flow::DispatchTensorStoreOp>(op);
+    Value target =
+        getSubspanBuffer(storeOp.target(), rewriter, state.getAnalysisState());
+    if (!equalTensorShape(
+            storeOp.value().getType().cast<RankedTensorType>(), storeOp.sizes(),
+            storeOp.target().getType().cast<IREE::Flow::DispatchTensorType>(),
+            storeOp.target_dims())) {
+      // Writing to a part of the tensor.
+      auto subviewMemRefType =
+          memref::SubViewOp::inferRankReducedResultType(
+              storeOp.value().getType().cast<ShapedType>().getRank(),
+              target.getType().cast<MemRefType>(), storeOp.getMixedOffsets(),
+              storeOp.getMixedSizes(), storeOp.getMixedStrides())
+              .cast<MemRefType>();
 
-    const AnalysisState &analysisState = state.getAnalysisState();
-    Value target = getSubspanBuffer(storeOp.target(), rewriter, analysisState);
-    auto subviewMemRefType =
-        memref::SubViewOp::inferRankReducedResultType(
-            storeOp.value().getType().cast<ShapedType>().getRank(),
-            target.getType().cast<MemRefType>(), storeOp.getMixedOffsets(),
-            storeOp.getMixedSizes(), storeOp.getMixedStrides())
-            .cast<MemRefType>();
+      target = rewriter.create<memref::SubViewOp>(
+          storeOp->getLoc(), subviewMemRefType, target,
+          storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
+          storeOp.getMixedStrides());
+    }  // else: Writing the entire tensor, no subview required.
 
-    Value subView = rewriter.create<memref::SubViewOp>(
-        storeOp->getLoc(), subviewMemRefType, target, storeOp.getMixedOffsets(),
-        storeOp.getMixedSizes(), storeOp.getMixedStrides());
     Value srcMemref =
         *state.getBuffer(rewriter, storeOp->getOpOperand(0) /*tensor*/);
 
     // If everything bufferized inplace, no copy is needed. We wrote to the
     // target buffer already. The copy folds away in that case.
     if (failed(state.getOptions().createMemCpy(rewriter, storeOp->getLoc(),
-                                               srcMemref, subView)))
+                                               srcMemref, target)))
       return failure();
 
     rewriter.eraseOp(storeOp);

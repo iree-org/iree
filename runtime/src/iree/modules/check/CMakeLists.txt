@@ -26,8 +26,7 @@ iree_cc_library(
   PUBLIC
 )
 
-# Doesn't use bazel_to_cmake because IREE_HAL_DRIVER_VMVX filtering is custom logic
-if(IREE_HAL_DRIVER_VMVX)
+if(IREE_HAL_DRIVER_LOCAL_TASK)
   iree_cc_test(
     NAME
       check_test
@@ -40,7 +39,7 @@ if(IREE_HAL_DRIVER_VMVX)
       iree::base::internal
       iree::base::internal::span
       iree::hal
-      iree::hal::drivers::vmvx::registration
+      iree::hal::drivers::local_task::registration
       iree::modules::hal
       iree::testing::gtest
       iree::testing::gtest_main

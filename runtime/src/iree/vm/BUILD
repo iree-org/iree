@@ -313,6 +313,7 @@ iree_runtime_cc_library(
     ],
     deps = [
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
     ],
 )
 

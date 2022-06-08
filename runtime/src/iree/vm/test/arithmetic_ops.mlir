@@ -143,4 +143,34 @@ vm.module @arithmetic_ops {
     vm.check.eq %v, %c3, "5^3=6" : i32
     vm.return
   }
+
+  vm.export @test_ctlz_i32_const_zero
+  vm.func @test_ctlz_i32_const_zero() {
+    %c = vm.const.i32 0
+    %cdno = util.do_not_optimize(%c) : i32
+    %actual = vm.ctlz.i32 %cdno : i32
+    %expected = vm.const.i32 32
+    vm.check.eq %actual, %expected, "ctlz(0)=32" : i32
+    vm.return
+  }
+
+  vm.export @test_ctlz_i32_const_1
+  vm.func @test_ctlz_i32_const_1() {
+    %c = vm.const.i32 1
+    %cdno = util.do_not_optimize(%c) : i32
+    %actual = vm.ctlz.i32 %cdno : i32
+    %expected = vm.const.i32 31
+    vm.check.eq %actual, %expected, "ctlz(1)=31" : i32
+    vm.return
+  }
+
+  vm.export @test_ctlz_i32_const_ffffffff
+  vm.func @test_ctlz_i32_const_ffffffff() {
+    %c = vm.const.i32 0xFFFFFFFF
+    %cdno = util.do_not_optimize(%c) : i32
+    %actual = vm.ctlz.i32 %cdno : i32
+    %expected = vm.const.i32 0
+    vm.check.eq %actual, %expected, "ctlz(0xFFFFFFFF)=0" : i32
+    vm.return
+  }
 }

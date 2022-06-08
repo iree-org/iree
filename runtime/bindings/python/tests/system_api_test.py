@@ -42,7 +42,7 @@ class SystemApiTest(unittest.TestCase):
       config = iree.runtime.Config("nothere1,nothere2")
 
   def test_subsequent_driver(self):
-    config = iree.runtime.Config("nothere1,dylib")
+    config = iree.runtime.Config("nothere1,local-task")
 
   def test_empty_dynamic(self):
     ctx = iree.runtime.SystemContext()
@@ -101,7 +101,7 @@ class SystemApiTest(unittest.TestCase):
   def test_tracing_explicit(self):
     with tempfile.TemporaryDirectory() as temp_dir:
       tracer = iree.runtime.Tracer(temp_dir)
-      config = iree.runtime.Config("dylib", tracer=tracer)
+      config = iree.runtime.Config("local-task", tracer=tracer)
       self.verify_tracing(config, temp_dir)
 
   def test_tracing_from_environment(self):
@@ -109,7 +109,7 @@ class SystemApiTest(unittest.TestCase):
     try:
       with tempfile.TemporaryDirectory() as temp_dir:
         os.environ[iree.runtime.TRACE_PATH_ENV_KEY] = temp_dir
-        config = iree.runtime.Config("dylib")
+        config = iree.runtime.Config("local-task")
         self.verify_tracing(config, temp_dir)
     finally:
       if original:

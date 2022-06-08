@@ -27,13 +27,13 @@ class BenchmarkSuiteTest(unittest.TestCase):
     case1 = BenchmarkCase(model_name_with_tags="deepnet",
                           bench_mode=["1-thread", "full-inference"],
                           target_arch="CPU-ARMv8",
-                          driver="iree-dylib",
+                          config="iree-dylib",
                           benchmark_case_dir="case1",
                           benchmark_tool_name="tool")
     case2 = BenchmarkCase(model_name_with_tags="deepnetv2-f32",
                           bench_mode=["full-inference"],
                           target_arch="GPU-Mali",
-                          driver="iree-vulkan",
+                          config="iree-vulkan",
                           benchmark_case_dir="case2",
                           benchmark_tool_name="tool")
     suite = BenchmarkSuite({
@@ -42,7 +42,8 @@ class BenchmarkSuiteTest(unittest.TestCase):
 
     both_benchmarks = suite.filter_benchmarks_for_category(
         category="TFLite",
-        available_drivers=["dylib", "vulkan"],
+        available_drivers=["local-task", "vulkan"],
+        available_loaders=["embedded-elf"],
         cpu_target_arch_filter="cpu-armv8",
         gpu_target_arch_filter="gpu-mali",
         driver_filter=None,
@@ -50,7 +51,8 @@ class BenchmarkSuiteTest(unittest.TestCase):
         model_name_filter="deepnet.*")
     gpu_benchmarks = suite.filter_benchmarks_for_category(
         category="TFLite",
-        available_drivers=["dylib", "vulkan"],
+        available_drivers=["local-task", "vulkan"],
+        available_loaders=["embedded-elf"],
         cpu_target_arch_filter="cpu-unknown",
         gpu_target_arch_filter="gpu-mali",
         driver_filter="vulkan",
@@ -68,6 +70,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
     benchmarks = suite.filter_benchmarks_for_category(
         category="PyTorch",
         available_drivers=[],
+        available_loaders=[],
         cpu_target_arch_filter="ARMv8",
         gpu_target_arch_filter="Mali-G78")
 
@@ -81,13 +84,13 @@ class BenchmarkSuiteTest(unittest.TestCase):
                                         model="DeepNet",
                                         bench_mode=["4-thread", "full"],
                                         target_arch="CPU-ARMv8",
-                                        driver="iree-dylib",
+                                        config="iree-dylib",
                                         tool="run-cpu-bench")
       case2 = BenchmarkSuiteTest.__create_bench(pytorch_dir,
                                                 model="DeepNetv2",
                                                 bench_mode=["full-inference"],
                                                 target_arch="GPU-Mali",
-                                                driver="iree-vulkan",
+                                                config="iree-vulkan",
                                                 tool="run-gpu-bench")
 
       suite = BenchmarkSuite.load_from_benchmark_suite_dir(tmp_dir)
@@ -98,13 +101,14 @@ class BenchmarkSuiteTest(unittest.TestCase):
           suite.filter_benchmarks_for_category(
               category="PyTorch",
               available_drivers=["vulkan"],
+              available_loaders=[],
               cpu_target_arch_filter="cpu-armv8",
               gpu_target_arch_filter="gpu-mali"), [case2])
 
   @staticmethod
   def __create_bench(dir_path: str, model: str, bench_mode: Sequence[str],
-                     target_arch: str, driver: str, tool: str):
-    case_name = f"{driver}__{target_arch}__{','.join(bench_mode)}"
+                     target_arch: str, config: str, tool: str):
+    case_name = f"{config}__{target_arch}__{','.join(bench_mode)}"
     bench_path = os.path.join(dir_path, model, case_name)
     os.makedirs(bench_path)
     with open(os.path.join(bench_path, "tool"), "w") as f:
@@ -113,7 +117,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
     return BenchmarkCase(model_name_with_tags=model,
                          bench_mode=bench_mode,
                          target_arch=target_arch,
-                         driver=driver,
+                         config=config,
                          benchmark_case_dir=bench_path,
                          benchmark_tool_name=tool)
 

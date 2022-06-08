@@ -120,8 +120,8 @@ iree_runtime_cc_library(
     ],
     hdrs = ["dynamic_library.h"],
     deps = [
-        ":file_path",
         ":internal",
+        ":path",
         ":synchronization",
         "//build_tools:default_linkopts",
         "//build_tools:dl",
@@ -149,29 +149,6 @@ iree_runtime_cc_test(
         "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/base:logging",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-iree_runtime_cc_library(
-    name = "file_path",
-    srcs = ["file_path.c"],
-    hdrs = ["file_path.h"],
-    deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "file_path_test",
-    srcs = [
-        "file_path_test.cc",
-    ],
-    deps = [
-        ":file_path",
-        "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
@@ -250,6 +227,29 @@ iree_runtime_cc_library(
     hdrs = ["main.h"],
     deps = [
         "//runtime/src/iree/base:core_headers",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "path",
+    srcs = ["path.c"],
+    hdrs = ["path.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "path_test",
+    srcs = [
+        "path_test.cc",
+    ],
+    deps = [
+        ":path",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 

@@ -1324,6 +1324,7 @@ iree_status_t iree_vm_bytecode_disasm_op(
     DISASM_OP_CORE_BINARY_I32(AndI32, "vm.and.i32");
     DISASM_OP_CORE_BINARY_I32(OrI32, "vm.or.i32");
     DISASM_OP_CORE_BINARY_I32(XorI32, "vm.xor.i32");
+    DISASM_OP_CORE_UNARY_I32(CtlzI32, "vm.ctlz.i32");
 
     DISASM_OP_CORE_BINARY_I64(AddI64, "vm.add.i64");
     DISASM_OP_CORE_BINARY_I64(SubI64, "vm.sub.i64");
@@ -1337,6 +1338,7 @@ iree_status_t iree_vm_bytecode_disasm_op(
     DISASM_OP_CORE_BINARY_I64(AndI64, "vm.and.i64");
     DISASM_OP_CORE_BINARY_I64(OrI64, "vm.or.i64");
     DISASM_OP_CORE_BINARY_I64(XorI64, "vm.xor.i64");
+    DISASM_OP_CORE_UNARY_I64(CtlzI64, "vm.ctlz.i64");
 
     //===------------------------------------------------------------------===//
     // Casting and type conversion/emulation
