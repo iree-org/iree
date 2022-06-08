@@ -1261,9 +1261,6 @@ LogicalResult TopkOp::verify() {
     return op->emitOpError("incompatible input/output shapes");
   }
   // Check region compatibility
-  if (!region().getBlocks().size()) {
-    return op->emitOpError("topk op must have a populated region");
-  }
   Block &block = region().front();
   if (block.getNumArguments() != 2) {
     return op->emitOpError("region block should have 2 arguments");

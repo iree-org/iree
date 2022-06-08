@@ -29,14 +29,12 @@ SmallVector<int64_t> getExpandedShape(ArrayRef<int64_t> inputShape,
                                       int64_t splitReductionRatio,
                                       int64_t splitDimParallel) {
   SmallVector<int64_t> ans;
-  for (auto elem : llvm::enumerate(inputShape)) {
-    if (elem.index() == splitDimParallel) {
-      ans.push_back(splitReductionRatio);
-      ans.push_back(inputShape[splitDimParallel] / splitReductionRatio);
-    } else {
-      ans.push_back(elem.value());
-    }
-  }
+  ans.reserve(inputShape.size() + 1);
+  ans.assign(inputShape.begin(), inputShape.end());
+  ans[splitDimParallel] = splitReductionRatio;
+  ans.insert(std::next(ans.begin(), splitDimParallel + 1),
+             inputShape[splitDimParallel] / splitReductionRatio);
+
   return ans;
 }
 
@@ -180,8 +178,12 @@ FailureOr<TopkOp> mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction::
   rewriter.cloneRegionBefore(topkOp.region(), parallelTopkOp.region(),
                              parallelTopkOp.region().end());
 
-  // Update the output indices from the parallel TopK with the reduction ratio
-  // offsets.
+  // Update the output indices from the parallel TopK with the correct offsets.
+  // Each parallel computation uses implicit indices (starting from 0) during
+  // selection, but the values are part of the large input space split into M =
+  // splitReductionFn() ways. The following linalg.generic adds the appropriate
+  // offset to reflect to values original position. "Updated pos" = "initial
+  // pos" + m * "parallel computation index"
   Value parallelIndices = parallelTopkOp.getResult(1);
   ShapedType parallelIndicesType = parallelIndices.getType().cast<ShapedType>();
   size_t parallelIndicesRank = parallelIndicesType.getRank();
