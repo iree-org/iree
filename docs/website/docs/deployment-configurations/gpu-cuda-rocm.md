@@ -42,7 +42,7 @@ hardware) or ROCm (for AMD hardware) HAL driver.
 Please make sure you have followed the [Getting started][get-started] page
 to build IREE from source, then enable the CUDA HAL driver with the
 `IREE_HAL_DRIVER_CUDA` option or the experimental ROCm HAL driver with the
-`IREE_HAL_DRIVER_EXPERIMENTAL_ROCM` option.
+`IREE_EXTERNAL_HAL_DRIVERS=rocm` option.
 
 #### Download compiler as Python package
 

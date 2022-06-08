@@ -50,16 +50,6 @@ function(iree_hal_cts_test_suite)
     ${ARGN}
   )
 
-  # Omit tests for which the specified driver is not enabled.
-  string(TOUPPER ${_RULE_DRIVER_NAME} _UPPERCASE_DRIVER)
-  string(REPLACE "-" "_" _NORMALIZED_DRIVER ${_UPPERCASE_DRIVER})
-  if(NOT DEFINED IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
-    message(SEND_ERROR "Unknown driver '${_RULE_DRIVER_NAME}'. Check IREE_HAL_DRIVER_* options.")
-  endif()
-  if(NOT IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
-    return()
-  endif()
-
   list(APPEND _RULE_LABELS "driver=${_RULE_DRIVER_NAME}")
 
   # Enable executable tests if a compiler target backend capable of producing
