@@ -30,9 +30,10 @@ include(CMakeParseArguments)
 # FRIENDLY_NAME: Optional. Name to use to display build progress info.
 #
 # Note:
-# By default, iree_bytecode_module will create a library named ${NAME}_c,
-# and alias target iree::${NAME}_c. The iree:: form should always be used.
-# This is to reduce namespace pollution.
+# By default, iree_bytecode_module will create a module target named ${NAME} and
+# a library named ${NAME}_c. The library has an alias target iree::${NAME}_c.
+# The module doesn't have an alias due to a lack of support on custom target.
+# The iree:: form should always be used to reduce namespace pollution.
 function(iree_bytecode_module)
   cmake_parse_arguments(
     _RULE
@@ -111,6 +112,13 @@ function(iree_bytecode_module)
     COMMENT
       "Generating ${_MODULE_FILE_NAME} from ${_FRIENDLY_NAME}"
     VERBATIM
+  )
+
+  # Only add iree_${NAME} as custom target doesn't support aliasing to
+  # iree::${NAME}.
+  iree_package_name(_PACKAGE_NAME)
+  add_custom_target("${_PACKAGE_NAME}_${_RULE_NAME}"
+    DEPENDS "${_MODULE_FILE_NAME}"
   )
 
   if(_RULE_TESTONLY)

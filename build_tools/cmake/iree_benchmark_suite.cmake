@@ -80,7 +80,7 @@ function(iree_benchmark_suite)
     "BENCHMARK_MODES;BENCHMARK_TOOL;MODULES"
   )
 
-  iree_package_name(PACKAGE_NAME)
+  iree_package_name(_PACKAGE_NAME)
 
   # Add the benchmark suite target.
   set(SUITE_SUB_TARGET "iree-benchmark-suites-${_RULE_GROUP_NAME}")
@@ -118,7 +118,7 @@ function(iree_benchmark_suite)
       # Update the source file to the downloaded-to place.
       string(REPLACE "/" ";" _SOURCE_URL_SEGMENTS "${_SOURCE_URL}")
       list(POP_BACK _SOURCE_URL_SEGMENTS _LAST_URL_SEGMENT)
-      set(_DOWNLOAD_TARGET "${PACKAGE_NAME}_iree-download-benchmark-source-${_LAST_URL_SEGMENT}")
+      set(_DOWNLOAD_TARGET "${_PACKAGE_NAME}_iree-download-benchmark-source-${_LAST_URL_SEGMENT}")
 
       # Strip off gzip suffix if present (downloader unzips if necessary)
       string(REGEX REPLACE "\.gz$" "" _SOURCE_FILE_BASENAME "${_LAST_URL_SEGMENT}")
@@ -150,7 +150,7 @@ function(iree_benchmark_suite)
       set(_TFLITE_FILE "${_MODULE_SOURCE}")
       set(_MODULE_SOURCE "${_TFLITE_FILE}.mlir")
       get_filename_component(_TFLITE_FILE_BASENAME "${_TFLITE_FILE}" NAME)
-      set(_TFLITE_IMPORT_TARGET "${PACKAGE_NAME}_iree-import-tflite-${_TFLITE_FILE_BASENAME}")
+      set(_TFLITE_IMPORT_TARGET "${_PACKAGE_NAME}_iree-import-tflite-${_TFLITE_FILE_BASENAME}")
       if(NOT TARGET "${_TFLITE_IMPORT_TARGET}")
         add_custom_command(
           OUTPUT "${_MODULE_SOURCE}"
@@ -214,14 +214,14 @@ function(iree_benchmark_suite)
 
       # Register the target once and share across all benchmarks having the same
       # MLIR source and translation flags.
-      set(
-        _TRANSLATION_TARGET_NAME
-        "${PACKAGE_NAME}_iree-generate-benchmark-artifact-${_MODULE_SOURCE_BASENAME_WITH_HASH}"
+      set(_MODULE_NAME
+        "iree-generate-benchmark-artifact-${_MODULE_SOURCE_BASENAME_WITH_HASH}"
       )
-      if(NOT TARGET "${_TRANSLATION_TARGET_NAME}")
+      set(_MODULE_TARGET_NAME "${_PACKAGE_NAME}_${_MODULE_NAME}")
+      if(NOT TARGET "${_MODULE_TARGET_NAME}")
         iree_bytecode_module(
           NAME
-            "${_TRANSLATION_TARGET_NAME}"
+            "${_MODULE_NAME}"
           MODULE_FILE_NAME
             "${_VMFB_FILE}"
           SRC
@@ -234,27 +234,24 @@ function(iree_benchmark_suite)
             "${_FRIENDLY_TARGET_NAME}"
         )
 
-        # TODO(#9254): that add_custom_target should be done by
-        # iree_bytecode_module.
-        add_custom_target("${_TRANSLATION_TARGET_NAME}"
-          DEPENDS "${_VMFB_FILE}"
-        )
-
         # Mark dependency so that we have one target to drive them all.
-        add_dependencies(iree-benchmark-suites "${_TRANSLATION_TARGET_NAME}")
-        add_dependencies("${SUITE_SUB_TARGET}" "${_TRANSLATION_TARGET_NAME}")
-      endif(NOT TARGET "${_TRANSLATION_TARGET_NAME}")
+        add_dependencies(iree-benchmark-suites "${_MODULE_TARGET_NAME}")
+        add_dependencies("${SUITE_SUB_TARGET}" "${_MODULE_TARGET_NAME}")
+      endif()
 
-      set(_COMPILE_STATS_TRANSLATION_TARGET_NAME
-        "${_TRANSLATION_TARGET_NAME}-compile-stats"
+      set(_COMPILE_STATS_MODULE_NAME
+        "${_MODULE_NAME}-compile-stats"
+      )
+      set(_COMPILE_STATS_MODULE_TARGET_NAME
+        "${_PACKAGE_NAME}_${_COMPILE_STATS_MODULE_NAME}"
       )
       set(_COMPILE_STATS_VMFB_FILE
         "${_VMFB_ARTIFACTS_DIR}/${_MODULE_SOURCE_BASENAME_WITH_HASH}-compile-stats.vmfb"
       )
-      if(IREE_ENABLE_COMPILATION_BENCHMARKS AND NOT TARGET "${_COMPILE_STATS_TRANSLATION_TARGET_NAME}")
+      if(IREE_ENABLE_COMPILATION_BENCHMARKS AND NOT TARGET "${_COMPILE_STATS_MODULE_TARGET_NAME}")
         iree_bytecode_module(
           NAME
-            "${_COMPILE_STATS_TRANSLATION_TARGET_NAME}"
+            "${_COMPILE_STATS_MODULE_NAME}"
           MODULE_FILE_NAME
             "${_COMPILE_STATS_VMFB_FILE}"
           SRC
@@ -271,28 +268,22 @@ function(iree_benchmark_suite)
             "${_FRIENDLY_TARGET_NAME}"
         )
 
-        # TODO(#9254): that add_custom_target should be done by
-        # iree_bytecode_module.
-        add_custom_target("${_COMPILE_STATS_TRANSLATION_TARGET_NAME}"
-          DEPENDS "${_COMPILE_STATS_VMFB_FILE}"
-        )
-
         # Mark dependency so that we have one target to drive them all.
         add_dependencies(iree-benchmark-suites
-          "${_COMPILE_STATS_TRANSLATION_TARGET_NAME}"
+          "${_COMPILE_STATS_MODULE_TARGET_NAME}"
         )
         add_dependencies("${SUITE_SUB_TARGET}"
-          "${_COMPILE_STATS_TRANSLATION_TARGET_NAME}"
+          "${_COMPILE_STATS_MODULE_TARGET_NAME}"
         )
       endif()
 
       if(NOT TARGET "${_FRIENDLY_TARGET_NAME}")
         add_custom_target("${_FRIENDLY_TARGET_NAME}")
       endif()
-      add_dependencies("${_FRIENDLY_TARGET_NAME}" "${_TRANSLATION_TARGET_NAME}")
+      add_dependencies("${_FRIENDLY_TARGET_NAME}" "${_MODULE_TARGET_NAME}")
       if(IREE_ENABLE_COMPILATION_BENCHMARKS)
         add_dependencies("${_FRIENDLY_TARGET_NAME}"
-          "${_COMPILE_STATS_TRANSLATION_TARGET_NAME}")
+          "${_COMPILE_STATS_MODULE_TARGET_NAME}")
       endif()
 
       set(_RUN_SPEC_DIR "${_ROOT_ARTIFACTS_DIR}/${_MODULE_DIR_NAME}/${_BENCHMARK_DIR_NAME}")
@@ -320,7 +311,7 @@ function(iree_benchmark_suite)
       )
 
       set(_FLAGFILE_GEN_TARGET_NAME
-        "${PACKAGE_NAME}_iree-generate-benchmark-flagfile__${_RUN_SPEC_TARGET_SUFFIX}")
+        "${_PACKAGE_NAME}_iree-generate-benchmark-flagfile__${_RUN_SPEC_TARGET_SUFFIX}")
       add_custom_target("${_FLAGFILE_GEN_TARGET_NAME}"
         DEPENDS "${_FLAG_FILE}"
       )
@@ -336,7 +327,7 @@ function(iree_benchmark_suite)
       )
 
       set(_TOOLFILE_GEN_TARGET_NAME
-        "${PACKAGE_NAME}_iree-generate-benchmark-toolfile__${_RUN_SPEC_TARGET_SUFFIX}")
+        "${_PACKAGE_NAME}_iree-generate-benchmark-toolfile__${_RUN_SPEC_TARGET_SUFFIX}")
       add_custom_target("${_TOOLFILE_GEN_TARGET_NAME}"
         DEPENDS "${_TOOL_FILE}"
       )
@@ -358,7 +349,8 @@ function(iree_benchmark_suite)
       )
 
       set(_COMPILATION_FLAGFILE_GEN_TARGET_NAME
-        "${PACKAGE_NAME}_iree-generate-benchmark-compilation-flagfile__${_RUN_SPEC_TARGET_SUFFIX}")
+        "${_PACKAGE_NAME}_iree-generate-benchmark-compilation-flagfile__${_RUN_SPEC_TARGET_SUFFIX}")
+      message("${_COMPILATION_FLAGFILE_GEN_TARGET_NAME}")
       add_custom_target("${_COMPILATION_FLAGFILE_GEN_TARGET_NAME}"
         DEPENDS "${_COMPILATION_FLAGFILE}"
       )
