@@ -335,6 +335,36 @@ vm.module @xor_i32_folds {
 
 // -----
 
+// CHECK-LABEL: @ctlz_i32_folds
+vm.module @ctlz_i32_folds {
+  // CHECK-LABEL: @ctlz_i32_const_zero
+  vm.func @ctlz_i32_const_zero() -> i32 {
+    %c = vm.const.i32 0
+    %0 = vm.ctlz.i32 %c : i32
+    // CHECK: vm.return %c32 : i32
+    vm.return %0 : i32
+  }
+
+  // CHECK-LABEL: @ctlz_i32_const_1
+  vm.func @ctlz_i32_const_1() -> i32 {
+    %c = vm.const.i32 1
+    %0 = vm.ctlz.i32 %c : i32
+    // CHECK: vm.return %c31 : i32
+    vm.return %0 : i32
+  }
+
+
+  // CHECK-LABEL: @ctlz_i32_const_ffffffff
+  vm.func @ctlz_i32_const_ffffffff() -> i32 {
+    %c = vm.const.i32 0xFFFFFFFF
+    %0 = vm.ctlz.i32 %c : i32
+    // CHECK: vm.return %zero : i32
+    vm.return %0 : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @shl_i32_folds
 vm.module @shl_i32_folds {
   // CHECK-LABEL: @shl_i32_0_by_y

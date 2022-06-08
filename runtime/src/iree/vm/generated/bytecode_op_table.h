@@ -124,8 +124,8 @@ typedef enum {
   IREE_VM_OP_CORE_BufferFillI16 = 0x72,
   IREE_VM_OP_CORE_BufferFillI32 = 0x73,
   IREE_VM_OP_CORE_BufferFillI64 = 0x74,
-  IREE_VM_OP_CORE_RSV_0x75,
-  IREE_VM_OP_CORE_RSV_0x76,
+  IREE_VM_OP_CORE_CtlzI32 = 0x75,
+  IREE_VM_OP_CORE_CtlzI64 = 0x76,
   IREE_VM_OP_CORE_RSV_0x77,
   IREE_VM_OP_CORE_RSV_0x78,
   IREE_VM_OP_CORE_RSV_0x79,
@@ -383,8 +383,8 @@ typedef enum {
     OPC(0x72, BufferFillI16) \
     OPC(0x73, BufferFillI32) \
     OPC(0x74, BufferFillI64) \
-    RSV(0x75) \
-    RSV(0x76) \
+    OPC(0x75, CtlzI32) \
+    OPC(0x76, CtlzI64) \
     RSV(0x77) \
     RSV(0x78) \
     RSV(0x79) \
