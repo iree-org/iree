@@ -149,18 +149,6 @@ function(iree_check_test)
       ${_RULE_TARGET_CPU_FEATURES}
   )
 
-  # iree_bytecode_module does not define a target, only a custom command.
-  # We need to create a target that depends on the command to ensure the
-  # module gets built.
-  # TODO(b/146898896): Do this in iree_bytecode_module and avoid having to
-  # reach into the internals.
-  set(_MODULE_TARGET_NAME "${_NAME}_module")
-  add_custom_target(
-    "${_MODULE_TARGET_NAME}"
-     DEPENDS
-       "${_MODULE_FILE_NAME}"
-  )
-
   set(_RUNNER_TARGET "iree-check-module")
 
   # A target specifically for the test. We could combine this with the above,
@@ -168,7 +156,7 @@ function(iree_check_test)
   add_custom_target("${_NAME}" ALL)
   add_dependencies(
     "${_NAME}"
-    "${_MODULE_TARGET_NAME}"
+    "${_NAME}_module"
     "${_RUNNER_TARGET}"
   )
 

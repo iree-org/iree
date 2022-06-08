@@ -99,7 +99,7 @@ function(iree_hal_cts_test_suite)
         # We should add a new function like `iree_hal_executable()`.
         iree_bytecode_module(
           NAME
-            ${_RULE_COMPILER_TARGET_BACKEND}_${_FILE_NAME}
+            ${_RULE_COMPILER_TARGET_BACKEND}_${_FILE_NAME}_module
           MODULE_FILE_NAME
             "${_RULE_COMPILER_TARGET_BACKEND}_${_FILE_NAME}.bin"
           SRC
