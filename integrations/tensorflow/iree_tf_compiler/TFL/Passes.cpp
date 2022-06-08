@@ -52,9 +52,13 @@ void buildTFLImportPassPipeline(OpPassManager &pm) {
   // Convert all TFL ops to TOSA ops
   //----------------------------------------------------------------------------
 
-  mlir::tosa::TOSATFTFLLegalizationPipelineOptions tosaOptions;
   pm.addPass(createLowerGlobalTensorsPass());
+
+  mlir::tosa::TOSATFTFLLegalizationPipelineOptions tosaOptions;
+  // Temporary work-around for https://github.com/google/iree/issues/8974
+  tosaOptions.dequantize_tfl_softmax = true;
   mlir::tosa::createTFTFLtoTOSALegalizationPipeline(pm, tosaOptions);
+
   pm.nest<func::FuncOp>().addPass(mlir::tosa::createStripQuantTypesPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createReconcileUnrealizedCastsPass());
