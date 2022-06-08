@@ -36,26 +36,55 @@
 namespace mlir {
 namespace iree_compiler {
 
-static Value allocateWorkgroupMemory(OpBuilder &builder, Location loc,
-                                     ArrayRef<int64_t> staticShape,
-                                     Type elementType,
-                                     ArrayRef<Value> dynamicSizes) {
+// Allocation callbacks to use with upstream comprehensive bufferization
+static FailureOr<Value> gpuAllocateWorkgroupMemoryFn(OpBuilder &builder,
+                                                     Location loc,
+                                                     MemRefType memRefType,
+                                                     ValueRange dynamicSizes,
+                                                     unsigned alignment) {
   auto storageClass = SPIRVTypeConverter::getMemorySpaceForStorageClass(
       spirv::StorageClass::Workgroup);
-  MemRefType allocType =
-      MemRefType::get(staticShape, elementType, {}, storageClass);
-  return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes);
+  MemRefType allocType = MemRefType::get(
+      memRefType.getShape(), memRefType.getElementType(), {}, storageClass);
+  return builder
+      .create<memref::AllocOp>(loc, allocType, dynamicSizes,
+                               builder.getI64IntegerAttr(alignment))
+      .getResult();
 }
 
-static Value allocateFunctionMemory(OpBuilder &builder, Location loc,
-                                    ArrayRef<int64_t> staticShape,
-                                    Type elementType,
-                                    ArrayRef<Value> dynamicSizes) {
+static FailureOr<Value> gpuAllocateFunctionMemoryFn(OpBuilder &builder,
+                                                    Location loc,
+                                                    MemRefType memRefType,
+                                                    ValueRange dynamicSizes,
+                                                    unsigned alignment) {
   auto storageClass = SPIRVTypeConverter::getMemorySpaceForStorageClass(
       spirv::StorageClass::Function);
-  MemRefType allocType =
-      MemRefType::get(staticShape, elementType, {}, storageClass);
-  return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes);
+  MemRefType allocType = MemRefType::get(
+      memRefType.getShape(), memRefType.getElementType(), {}, storageClass);
+  return builder
+      .create<memref::AllocaOp>(loc, allocType, dynamicSizes,
+                                builder.getI64IntegerAttr(alignment))
+      .getResult();
+}
+
+static LogicalResult gpuDeallocationFn(OpBuilder &builder, Location loc,
+                                       Value allocation) {
+  return success();
+}
+
+static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
+                               Value to) {
+  createLinalgCopyOp(builder, loc, from, to);
+  return success();
+}
+
+static void addBufferizePasses(OpPassManager &passManager,
+                               BufferizationOptions::AllocationFn fn) {
+  BufferizationOptions::AllocationFn allocationFn = fn;
+  BufferizationOptions::DeallocationFn deallocationFn = gpuDeallocationFn;
+  BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
+                                      memcpyFn);
 }
 
 //===----------------------------------------------------------------------===//
@@ -72,18 +101,20 @@ static void addTileAndDistributeToWorkgroupsPasses(
     nestedModulePM.addNestedPass<func::FuncOp>(
         createSPIRVFuseTensorPadWithConsumerPass());
   }
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createConvertToDestinationPassingStylePass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 }
 
-static void addSPIRVBufferizePasses(OpPassManager &passManager,
-                                    WorkgroupMemoryAllocationFn allocationFn) {
+static void addSPIRVBufferizePasses(
+    OpPassManager &passManager,
+    BufferizationOptions::AllocationFn allocationFn) {
   // Resolve dim ops first so that we don't have compute Linalg ops lingering on
   // becuase of dim op usage. This avoids bufferizing those compute ops just for
   // their shape dimensions.
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createLinalgBufferizePass(allocationFn));
+  addBufferizePasses(passManager, allocationFn);
   // Distribute immediately after bufferization to avoid losing attribute
   // annotations in subsequent transformations. This is a bit fragile right now
   // but we expect upstream for loops to eventually recognize distribution as a
@@ -192,7 +223,7 @@ void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
 
   // Bufferize and distribute.
-  addSPIRVBufferizePasses(nestedModulePM, allocateFunctionMemory);
+  addSPIRVBufferizePasses(nestedModulePM, gpuAllocateFunctionMemoryFn);
 
   // Generate loop nests for all remaining ops and remove trivial loops.
   addLoopMaterializationPasses(nestedModulePM);
@@ -208,7 +239,7 @@ void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm) {
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
 
-  addLinalgBufferizePasses(nestedModulePM, allocateWorkgroupMemory);
+  addBufferizePasses(nestedModulePM, gpuAllocateWorkgroupMemoryFn);
 
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
@@ -237,10 +268,7 @@ void addSPIRVTileAndVectorizeWithWorkgroupMemoryPassPipeline(
   addTileAndDistributeToWorkgroupsPasses(pm);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
-  addLinalgBufferizePasses(nestedModulePM, allocateWorkgroupMemory);
-
-  nestedModulePM.addPass(createCanonicalizerPass());
-  nestedModulePM.addPass(createCSEPass());
+  addBufferizePasses(nestedModulePM, gpuAllocateWorkgroupMemoryFn);
 
   // Tile and distribute to GPU invocations.
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVTileAndPromotePass());
@@ -269,7 +297,7 @@ void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
 
-  addLinalgBufferizePasses(nestedModulePM, allocateWorkgroupMemory);
+  addBufferizePasses(nestedModulePM, gpuAllocateWorkgroupMemoryFn);
 
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
