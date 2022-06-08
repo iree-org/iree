@@ -7,7 +7,7 @@ runtime entirely or interface with custom accelerators.
 
 ## Stable configurations
 
-* [CPU - Local](./cpu-local.md) for general purpose CPU deployment
+* [CPU](./cpu.md) for general purpose CPU deployment
 * [CPU - Bare-Metal](./bare-metal.md) with minimal platform dependencies
 * [GPU - Vulkan](./gpu-vulkan.md)
 * [GPU - CUDA/ROCm](./gpu-cuda-rocm.md)

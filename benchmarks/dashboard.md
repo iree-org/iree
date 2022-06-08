@@ -81,11 +81,11 @@ some examples:
 
 This field specifies the IREE HAL driver:
 
-* [`local-task`](https://google.github.io/iree/deployment-configurations/cpu-local/):
+* [`local-task`](https://google.github.io/iree/deployment-configurations/cpu/):
   For CPU via the local task system. Kernels contain CPU native instructions AOT
   compiled using LLVM. This driver issues workloads to the CPU asynchronously
   and supports multithreading.
-* [`local-sync`](https://google.github.io/iree/deployment-configurations/cpu-local/):
+* [`local-sync`](https://google.github.io/iree/deployment-configurations/cpu/):
   For CPU via the local 'sync' device. Kernels contain contain CPU native
   instructions AOT compiled using LLVM. This driver issues workloads to the CPU
   synchronously.

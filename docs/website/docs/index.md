@@ -121,7 +121,7 @@ associated scheduling logic.
 For example, compiling for
 [GPU execution](deployment-configurations/gpu-vulkan.md) using Vulkan generates
 SPIR-V kernels and Vulkan API calls. For
-[CPU execution](deployment-configurations/cpu-local.md), native code with
+[CPU execution](deployment-configurations/cpu.md), native code with
 static or dynamic linkage and the associated function calls are generated.
 
 ### Running models
