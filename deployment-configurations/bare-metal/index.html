@@ -398,8 +398,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../cpu-dylib/" class="md-nav__link">
-        CPU - Dylib
+      <a href="../cpu/" class="md-nav__link">
+        CPU
       </a>
     </li>
   
@@ -1123,13 +1123,12 @@
 
 
 <h1 id="run-on-a-bare-metal-platform">Run on a Bare-Metal Platform<a class="headerlink" href="#run-on-a-bare-metal-platform" title="Permanent link">&para;</a></h1>
-<p>IREE supports CPU model execution on a bare-metal platform. That is, a platform
-without operating system support, and the executable is built with the
-machine-specific linker script and/or the board support package (BSP).</p>
+<p>IREE supports CPU model execution on bare-metal platforms. That is, platforms
+without operating system support, for which executables are built using
+machine-specific linker scripts and/or board support packages (BSPs).</p>
 <p>Bare-metal deployment typically uses IREE's LLVM compiler target much like the
-<a href="../cpu-dylib/">CPU - Dylib</a>
-configuration, but using a limited subset of IREE's CPU HAL driver at runtime to
-load and execute compiled programs.</p>
+<a href="../cpu/">CPU configuration</a>, but using a limited subset of IREE's CPU HAL
+driver code at runtime to load and execute compiled programs.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <p>Out-of-tree bare-metal platform tools and source code for the system should be
 ready, such as</p>
@@ -1139,7 +1138,7 @@ ready, such as</p>
 <li>Firmware libraries</li>
 </ul>
 <p>Please follow the
-<a href="../cpu-dylib/#get-compiler-for-cpu-native-instructions">instructions</a>
+<a href="../cpu/#get-compiler-for-cpu-native-instructions">instructions</a>
 to retrieve the IREE compiler.</p>
 <h2 id="compile-the-model-for-bare-metal">Compile the model for bare-metal<a class="headerlink" href="#compile-the-model-for-bare-metal" title="Permanent link">&para;</a></h2>
 <p>The model can be compiled with the following command (assuming the path to
@@ -1151,7 +1150,7 @@ to retrieve the IREE compiler.</p>
     --iree-llvm-target-triple<span class="o">=</span>x86_64-pc-linux-elf <span class="se">\</span>
     --iree-llvm-debug-symbols<span class="o">=</span><span class="nb">false</span> <span class="se">\</span>
     samples/models/simple_abs.mlir <span class="se">\</span>
-    -o /tmp/simple_abs_dylib.vmfb
+    -o /tmp/simple_abs_cpu.vmfb
 </code></pre></div>
 <p>In which</p>
 <ul>
@@ -1168,7 +1167,7 @@ to retrieve the IREE compiler.</p>
 <p>See <a href="https://github.com/google/iree/blob/main/iree/hal/local/elf/testdata/generate.sh">generate.sh</a>
 for example command-line instructions of some common architectures</p>
 <p>You can replace the MLIR file with the other MLIR model files, following the
-<a href="../cpu-dylib/#compile-the-model">instructions</a></p>
+<a href="../cpu/#compile-the-model">instructions</a></p>
 <h3 id="compiling-the-bare-metal-model-for-static-library-support">Compiling the bare-metal model for static-library support<a class="headerlink" href="#compiling-the-bare-metal-model-for-static-library-support" title="Permanent link">&para;</a></h3>
 <p>See the <a href="https://github.com/google/iree/tree/main/samples/static_library">static_library</a>
 demo sample for an example and instructions on running a model with IREE's

@@ -86,7 +86,7 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://google.github.io/iree/deployment-configurations/cpu-dylib/</loc>
+         <loc>https://google.github.io/iree/deployment-configurations/cpu/</loc>
          <lastmod>2022-06-08</lastmod>
          <changefreq>daily</changefreq>
     </url>
