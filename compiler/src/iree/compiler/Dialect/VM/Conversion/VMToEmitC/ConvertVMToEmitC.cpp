@@ -4854,6 +4854,8 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                                        "vm_or_i32");
   patterns.add<GenericOpConversion<IREE::VM::XorI32Op>>(typeConverter, context,
                                                         "vm_xor_i32");
+  patterns.add<GenericOpConversion<IREE::VM::CtlzI32Op>>(typeConverter, context,
+                                                         "vm_ctlz_i32");
 
   // Casting and type conversion/emulation ops
   patterns.add<GenericOpConversion<IREE::VM::TruncI32I8Op>>(
@@ -5047,6 +5049,8 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                                        "vm_or_i64");
   patterns.add<GenericOpConversion<IREE::VM::XorI64Op>>(typeConverter, context,
                                                         "vm_xor_i64");
+  patterns.add<GenericOpConversion<IREE::VM::CtlzI64Op>>(typeConverter, context,
+                                                         "vm_ctlz_i64");
 
   // ExtI64: Casting and type conversion/emulation ops
   patterns.add<GenericOpConversion<IREE::VM::TruncI64I32Op>>(

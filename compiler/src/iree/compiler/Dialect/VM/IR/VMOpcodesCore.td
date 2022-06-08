@@ -120,12 +120,14 @@ def VM_OPC_NotI32                : VM_OPC<0x32, "NotI32">;
 def VM_OPC_AndI32                : VM_OPC<0x33, "AndI32">;
 def VM_OPC_OrI32                 : VM_OPC<0x34, "OrI32">;
 def VM_OPC_XorI32                : VM_OPC<0x35, "XorI32">;
+def VM_OPC_CtlzI32               : VM_OPC<0x75, "CtlzI32">;
 
 // 64-bit integer bit manipulation:
 def VM_OPC_NotI64                : VM_OPC<0x36, "NotI64">;
 def VM_OPC_AndI64                : VM_OPC<0x37, "AndI64">;
 def VM_OPC_OrI64                 : VM_OPC<0x38, "OrI64">;
 def VM_OPC_XorI64                : VM_OPC<0x39, "XorI64">;
+def VM_OPC_CtlzI64               : VM_OPC<0x76, "CtlzI64">;
 
 // 32-bit bitwise shifts and rotates:
 def VM_OPC_ShlI32                : VM_OPC<0x3A, "ShlI32">;
@@ -278,11 +280,13 @@ def VM_CoreOpcodeAttr :
     VM_OPC_AndI32,
     VM_OPC_OrI32,
     VM_OPC_XorI32,
+    VM_OPC_CtlzI32,
 
     VM_OPC_NotI64,
     VM_OPC_AndI64,
     VM_OPC_OrI64,
     VM_OPC_XorI64,
+    VM_OPC_CtlzI64,
 
     VM_OPC_ShlI32,
     VM_OPC_ShrI32S,

@@ -279,6 +279,7 @@ iree_cc_library(
     "ops.h"
   DEPS
     iree::base
+    iree::base::internal
   PUBLIC
 )
 

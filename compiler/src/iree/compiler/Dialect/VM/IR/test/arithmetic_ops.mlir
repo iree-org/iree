@@ -118,3 +118,14 @@ vm.module @my_module {
     vm.return %0 : i32
   }
 }
+
+// -----
+
+// CHECK-LABEL: @ctlz_i32
+vm.module @my_module {
+  vm.func @ctlz_i32(%arg0 : i32) -> i32 {
+    // CHECK: %0 = vm.ctlz.i32 %arg0 : i32
+    %0 = vm.ctlz.i32 %arg0 : i32
+    vm.return %0 : i32
+  }
+}

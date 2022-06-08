@@ -1233,6 +1233,21 @@ OpFoldResult XorI64Op::fold(ArrayRef<Attribute> operands) {
   return foldXorOp(*this, operands);
 }
 
+template <typename T>
+static OpFoldResult foldCtlzOp(T op, ArrayRef<Attribute> operands) {
+  return constFoldUnaryOp<IntegerAttr>(operands, [](APInt a) {
+    return APInt(a.getBitWidth(), a.countLeadingZeros());
+  });
+}
+
+OpFoldResult CtlzI32Op::fold(ArrayRef<Attribute> operands) {
+  return foldCtlzOp(*this, operands);
+}
+
+OpFoldResult CtlzI64Op::fold(ArrayRef<Attribute> operands) {
+  return foldCtlzOp(*this, operands);
+}
+
 //===----------------------------------------------------------------------===//
 // Native bitwise shifts and rotates
 //===----------------------------------------------------------------------===//
