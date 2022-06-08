@@ -784,25 +784,6 @@ void transform_ext::FuseOp::print(OpAsmPrinter &p) {
 }
 
 //===---------------------------------------------------------------------===//
-// GeneralizeOp
-//===---------------------------------------------------------------------===//
-
-FailureOr<LinalgOp> transform_ext::GeneralizeOp::applyToOne(LinalgOp target) {
-  // Exit early if no transformation is needed.
-  if (isa<GenericOp>(target))
-    return target;
-
-  LinalgGeneralizationPattern pattern(getContext());
-  SimpleRewriter rewriter(getContext());
-  rewriter.setInsertionPoint(target);
-  FailureOr<GenericOp> result =
-      pattern.returningMatchAndRewrite(target, rewriter);
-  if (failed(result))
-    return failure();
-  return cast<LinalgOp>(result->getOperation());
-}
-
-//===---------------------------------------------------------------------===//
 // BufferizeOp
 //===---------------------------------------------------------------------===//
 
@@ -886,24 +867,6 @@ transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
       funcOp.setArgAttr(i, "llvm.noalias", UnitAttr::get(funcOp.getContext()));
     }
   });
-  return success();
-}
-
-//===---------------------------------------------------------------------===//
-// DecomposeOp
-//===---------------------------------------------------------------------===//
-
-LogicalResult
-transform_ext::DecomposeOp::apply(mlir::transform::TransformResults &results,
-                                  mlir::transform::TransformState &state) {
-  RewritePatternSet patterns(getContext());
-  // TODO: make this targetable.
-  populateDecomposeConvolutionPatterns(patterns, LinalgTransformationFilter());
-  if (failed(applyPatternsAndFoldGreedily(state.getTopLevel(),
-                                          std::move(patterns))))
-    return failure();
-
-  // TODO: make this chainable, it isn't in the original codegenstrategy.
   return success();
 }
 

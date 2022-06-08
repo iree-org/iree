@@ -13,8 +13,6 @@ transform.structured.canonicalized_sequence {
   %2, %loops2:3  = transform.structured.tile %1 {sizes = [2, 2, 2]}
   // CHECK: %[[PADDED:.*]] = transform.structured.pad %[[TILED2]] {pack_paddings = [1, 1, 0]}
   %3 = transform.structured.pad %2 {pack_paddings = [1, 1, 0]}
-  // CHECK: transform.structured2.decompose
-  transform.structured2.decompose
   // CHECK: %{{.*}} = transform.structured2.vectorize %[[PADDED]] {vectorize_padding = true}
   %4 = transform.structured2.vectorize %3 {vectorize_padding = true}
   // CHECK: %[[OPS2:.*]] = pdl_match @{{.*}}
