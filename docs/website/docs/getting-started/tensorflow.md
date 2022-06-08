@@ -83,7 +83,7 @@ iree-import-tf
     and v2 if you see one of them gives an empty dump.
 
 Afterwards you can further compile the model in `iree_input.mlir` for
-[CPU](../deployment-configurations/cpu-dylib.md) or
+[CPU](../deployment-configurations/cpu.md) or
 [GPU](../deployment-configurations/gpu-vulkan.md).
 
 <!-- TODO(??): overview of APIs available, code snippets (lift from Colab?) -->

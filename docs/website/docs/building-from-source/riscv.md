@@ -141,7 +141,7 @@ ${QEMU_BIN} \
 [https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh](https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh).
 
 The SIMD code can be generated following the
-[IREE dynamic library CPU HAL driver flow](../deployment-configurations/cpu-dylib.md)
+[IREE CPU flow](../deployment-configurations/cpu.md)
 with the additional command-line flags
 
 ```shell hl_lines="3 4 5 6 7 8"
@@ -153,7 +153,7 @@ tools/iree-compile \
   --iree-llvm-target-abi=lp64d \
   --iree-llvm-target-cpu-features="+m,+a,+f,+d,+v" \
   --riscv-v-vector-bits-min=256 --riscv-v-fixed-length-vector-lmul-max=8 \
-  iree_input.mlir -o mobilenet-dylib.vmfb
+  iree_input.mlir -o mobilenet_cpu.vmfb
 ```
 
 Then run on the RISC-V QEMU:
@@ -164,7 +164,7 @@ ${QEMU_BIN} \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
   ../iree-build-riscv/tools/iree-run-module \
   --driver=local-task \
-  --module_file=mobilenet-dylib.vmfb \
+  --module_file=mobilenet_cpu.vmfb \
   --entry_function=predict \
   --function_input="1x224x224x3xf32=0"
 ```
