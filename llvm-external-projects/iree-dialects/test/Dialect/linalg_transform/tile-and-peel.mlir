@@ -44,7 +44,7 @@ transform.with_pdl_patterns {
     // Note: The order in which the loops are peeled is important. If %loop#2 is
     // peeled first, the partial iteration of %loop#0 will also contain a peeled
     // version of %loop#2.
-    peel_loop %loops#0
-    peel_loop %loops#2
+    transform.loop.peel %loops#0
+    transform.loop.peel %loops#2
   }
 }
