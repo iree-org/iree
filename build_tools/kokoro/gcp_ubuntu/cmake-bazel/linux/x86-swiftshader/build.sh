@@ -78,7 +78,7 @@ if ! ctest \
    --timeout 900 \
    --output-on-failure \
    --no-tests=error \
-   --tests-regex "^integrations/tensorflow/|^runtime/bindings/python/" \
+   --tests-regex "^iree/runtime/bindings/python/" \
    --label-exclude "^nokokoro$|^vulkan_uses_vk_khr_shader_float16_int8$"
 then
    tests_passed=false
