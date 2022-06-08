@@ -35,7 +35,7 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_module_register_types());
 
     iree_hal_driver_t* hal_driver = nullptr;
-    IREE_ASSERT_OK(iree_hal_driver_registry_try_create_by_name(
+    IREE_ASSERT_OK(iree_hal_driver_registry_try_create(
         iree_hal_driver_registry_default(),
         iree_make_cstring_view("local-task"), iree_allocator_system(),
         &hal_driver));

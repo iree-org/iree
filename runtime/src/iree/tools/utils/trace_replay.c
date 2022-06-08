@@ -79,7 +79,7 @@ static iree_status_t iree_trace_replay_create_device(
 
   // Try to create a device from the driver.
   iree_hal_driver_t* driver = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_driver_registry_try_create_by_name(
+  IREE_RETURN_IF_ERROR(iree_hal_driver_registry_try_create(
       iree_hal_driver_registry_default(), driver_name, host_allocator,
       &driver));
   iree_status_t status =

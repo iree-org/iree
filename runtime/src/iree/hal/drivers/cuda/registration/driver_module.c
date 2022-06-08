@@ -14,8 +14,6 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/api.h"
 
-#define IREE_HAL_CUDA_DRIVER_ID 0x43554441u  // CUDA
-
 // Force using CUDA streams until we support command buffer caching to avoid the
 // overhead of graph creation.
 IREE_FLAG(
@@ -33,7 +31,6 @@ static iree_status_t iree_hal_cuda_driver_factory_enumerate(
     iree_host_size_t* out_driver_info_count) {
   // NOTE: we could query supported cuda versions or featuresets here.
   static const iree_hal_driver_info_t driver_infos[1] = {{
-      .driver_id = IREE_HAL_CUDA_DRIVER_ID,
       .driver_name = iree_string_view_literal("cuda"),
       .full_name = iree_string_view_literal("CUDA (dynamic)"),
   }};
@@ -43,15 +40,14 @@ static iree_status_t iree_hal_cuda_driver_factory_enumerate(
 }
 
 static iree_status_t iree_hal_cuda_driver_factory_try_create(
-    void* self, iree_hal_driver_id_t driver_id, iree_allocator_t host_allocator,
+    void* self, iree_string_view_t driver_name, iree_allocator_t host_allocator,
     iree_hal_driver_t** out_driver) {
   IREE_ASSERT_ARGUMENT(out_driver);
   *out_driver = NULL;
-  if (driver_id != IREE_HAL_CUDA_DRIVER_ID) {
+  if (!iree_string_view_equal(driver_name, IREE_SV("cuda"))) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "no driver with ID %016" PRIu64
-                            " is provided by this factory",
-                            driver_id);
+                            "no driver '%.*s' is provided by this factory",
+                            (int)driver_name.size, driver_name.data);
   }
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -67,9 +63,9 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
   iree_hal_cuda_driver_options_initialize(&driver_options);
   driver_options.default_device_index = FLAG_cuda_default_index;
 
-  iree_string_view_t identifier = iree_make_cstring_view("cuda");
-  iree_status_t status = iree_hal_cuda_driver_create(
-      identifier, &default_params, &driver_options, host_allocator, out_driver);
+  iree_status_t status =
+      iree_hal_cuda_driver_create(driver_name, &default_params, &driver_options,
+                                  host_allocator, out_driver);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

@@ -112,7 +112,7 @@ IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
 // driver like the GPU "vulkan" driver. The driver(s) used should match with
 // the target(s) specified during compilation.
 iree_hal_driver_t* driver = NULL;
-IREE_CHECK_OK(iree_hal_driver_registry_try_create_by_name(
+IREE_CHECK_OK(iree_hal_driver_registry_try_create(
     iree_hal_driver_registry_default(),
     iree_string_view_literal("local-task"),
     iree_allocator_system(), &driver));

@@ -53,7 +53,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_create_default_device(
   *out_device = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(driver, create_device)(
-      driver, IREE_HAL_DRIVER_ID_INVALID, host_allocator, out_device);
+      driver, IREE_HAL_DEVICE_ID_INVALID, host_allocator, out_device);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

@@ -22,11 +22,6 @@ extern "C" {
 // Types and Enums
 //===----------------------------------------------------------------------===//
 
-// An opaque factory-specific handle to identify different drivers.
-typedef uint64_t iree_hal_driver_id_t;
-
-#define IREE_HAL_DRIVER_ID_INVALID 0ull
-
 // Describes a driver providing device enumeration and creation.
 // The lifetime of memory referenced by this structure (such as strings) is
 // dependent on where it originated.
@@ -39,9 +34,6 @@ typedef uint64_t iree_hal_driver_id_t;
 //   driver registry lock is held.
 typedef struct iree_hal_driver_info_t {
   IREE_API_UNSTABLE
-
-  // Opaque handle used by factories. Unique across all factories.
-  iree_hal_driver_id_t driver_id;
 
   // Canonical name of the driver as used in command lines, documentation, etc.
   // Examples: 'metal', 'vulkan'
