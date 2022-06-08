@@ -4,10 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-iree_add_all_subdirs()
-
-if(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM)
-
 iree_cc_library(
   NAME
     registration
@@ -20,15 +16,9 @@ iree_cc_library(
     iree::base::cc
     iree::base::core_headers
     iree::base::tracing
+    iree::experimental::rocm
     iree::hal
-    experimental::rocm
-  INCLUDES
-  "${CMAKE_CURRENT_LIST_DIR}/../../.."
   DEFINES
     "IREE_HAVE_HAL_EXPERIMENTAL_ROCM_DRIVER_MODULE=1"
   PUBLIC
 )
-
-endif()
-
-### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

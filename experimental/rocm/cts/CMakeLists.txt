@@ -16,7 +16,7 @@ iree_hal_cts_test_suite(
   EXECUTABLE_FORMAT
     "\"PTXE\""
   DEPS
-    experimental::rocm::registration
+    iree::experimental::rocm::registration
   EXCLUDED_TESTS
     # This test depends on iree_hal_rocm_direct_command_buffer_update_buffer
     # via iree_hal_buffer_view_allocate_buffer, which is not implemented yet.

@@ -70,7 +70,6 @@ option(IREE_BUILD_MICROBENCHMARKS "Builds IREE microbenchmark suites." OFF)
 
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
 option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
-option(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM "Builds the experimental ROCm Backend." OFF)
 
 #-------------------------------------------------------------------------------
 # Derived flags based on primary options
@@ -84,6 +83,10 @@ cmake_dependent_option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ON $
 # not require external deps are enabled by default. This can be changed with:
 #   -DIREE_HAL_DRIVER_DEFAULTS=OFF
 #-------------------------------------------------------------------------------
+
+# External HAL drivers; see runtime/src/iree/hal/drivers/CMakeLists.txt for more
+# information on how to declare external drivers.
+set(IREE_EXTERNAL_HAL_DRIVERS "" CACHE STRING "")
 
 option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL drivers" ON)
 # CUDA support must be explicitly enabled.
@@ -144,6 +147,9 @@ endif()
 if(IREE_HAL_DRIVER_VULKAN)
   message(STATUS "  - vulkan")
 endif()
+if(IREE_EXTERNAL_HAL_DRIVERS)
+  message(STATUS "  + external: ${IREE_EXTERNAL_HAL_DRIVERS}")
+endif()
 
 message(STATUS "IREE HAL local executable library loaders:")
 if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
@@ -155,6 +161,15 @@ endif()
 if(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
   message(STATUS "  - vmvx-module")
 endif()
+
+#-------------------------------------------------------------------------------
+# Experimental ROCM HAL driver
+#-------------------------------------------------------------------------------
+
+set(IREE_EXTERNAL_ROCM_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/rocm")
+set(IREE_EXTERNAL_ROCM_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experimental/rocm")
+set(IREE_EXTERNAL_ROCM_HAL_DRIVER_TARGET "iree::experimental::rocm::registration")
+set(IREE_EXTERNAL_ROCM_HAL_DRIVER_REGISTER "iree_hal_rocm_driver_module_register")
 
 #-------------------------------------------------------------------------------
 # Compiler Target Options
@@ -667,11 +682,6 @@ if(IREE_BUILD_BENCHMARKS)
     message(STATUS "iree-import-tflite not found. Some benchmarks may not configure")
   endif()
   add_subdirectory(benchmarks)
-endif()
-
-if(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM)
-  add_subdirectory(build_tools/third_party/rocm EXCLUDE_FROM_ALL)
-  add_subdirectory(experimental/rocm)
 endif()
 
 if(IREE_BUILD_COMPILER)
