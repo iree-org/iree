@@ -39,6 +39,7 @@
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
@@ -352,6 +353,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   arith::populateArithmeticToSPIRVPatterns(typeConverter, patterns);
   populateFuncToSPIRVPatterns(typeConverter, patterns);
   populateMathToSPIRVPatterns(typeConverter, patterns);
+  populateExpandCtlzPattern(patterns);
 
   // Pull in standard patterns to convert tensor operations to SPIR-V. These are
   // primarily used to handle tensor-type constants and contain a

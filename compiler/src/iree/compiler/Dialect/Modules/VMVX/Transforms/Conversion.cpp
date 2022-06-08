@@ -16,7 +16,10 @@
 #include "mlir/Conversion/TosaToArith/TosaToArith.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
@@ -67,8 +70,10 @@ class ConversionPass
     conversionTarget.addIllegalDialect<tensor::TensorDialect>();
     conversionTarget.addLegalDialect<IREE::Util::UtilDialect>();
     conversionTarget.addLegalDialect<IREE::VMVX::VMVXDialect>();
-    conversionTarget.addLegalDialect<mlir::func::FuncDialect,
-                                     mlir::arith::ArithmeticDialect>();
+    conversionTarget
+        .addLegalDialect<mlir::func::FuncDialect, mlir::scf::SCFDialect,
+                         mlir::arith::ArithmeticDialect>();
+    conversionTarget.addIllegalOp<math::CountLeadingZerosOp>();
     conversionTarget.addLegalDialect<mlir::AffineDialect>();
     conversionTarget.addLegalDialect<memref::MemRefDialect>();
     conversionTarget.addLegalOp<mlir::UnrealizedConversionCastOp>();
@@ -77,6 +82,7 @@ class ConversionPass
     populateHALToVMVXPatterns(context, conversionPatterns, typeConverter);
     populateStandardToVMVXPatterns(context, conversionPatterns, typeConverter);
 
+    populateExpandCtlzPattern(conversionPatterns);
     // Use the default 64-bit lowering for TOSA's ApplyScale operator:
     //   This lowering widens integer types to 64-bit an performs the non-fused
     //   operations, specifically multiply, add, and shift. Bit-widening
