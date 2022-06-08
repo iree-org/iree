@@ -13,7 +13,7 @@ include(CMakeParseArguments)
 #
 # Parameters:
 #   DRIVER_NAME: The name of the driver to test. Used for both target names and
-#       for `iree_hal_driver_registry_try_create_by_name()` within test code.
+#       for `iree_hal_driver_registry_try_create()` within test code.
 #   VARIANT_SUFFIX: Suffix to add to the test names, separate from the driver
 #       name. Useful when specifying multiple configurations using `ARGS` or
 #       other parameters.

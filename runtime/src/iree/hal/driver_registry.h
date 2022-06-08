@@ -68,7 +68,7 @@ typedef struct iree_hal_driver_factory_t {
   //
   // Called with the driver registry lock held; may be called from any thread.
   iree_status_t(IREE_API_PTR* try_create)(void* self,
-                                          iree_hal_driver_id_t driver_id,
+                                          iree_string_view_t driver_name,
                                           iree_allocator_t host_allocator,
                                           iree_hal_driver_t** out_driver);
 } iree_hal_driver_factory_t;
@@ -138,17 +138,6 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
     iree_hal_driver_info_t** out_driver_infos,
     iree_host_size_t* out_driver_info_count);
 
-// Attempts to create a driver registered with the driver registry by a specific
-// ID as returned during enumeration in iree_hal_driver_info_t::driver_id.
-// This can be used to specify the exact driver to create in cases where there
-// may be multiple factories providing drivers with the same name.
-//
-// Thread-safe. May block the caller if the driver is delay-loaded and needs to
-// perform additional loading/verification/etc before returning.
-IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
-    iree_hal_driver_registry_t* registry, iree_hal_driver_id_t driver_id,
-    iree_allocator_t host_allocator, iree_hal_driver_t** out_driver);
-
 // Attempts to create a driver registered with the given canonical driver name.
 // Effectively enumerate + find by name + try_create if found. Factories are
 // searched in most-recently-added order such that it's possible to override
@@ -157,7 +146,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
 //
 // Thread-safe. May block the caller if the driver is delay-loaded and needs to
 // perform additional loading/verification/etc before returning.
-IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create_by_name(
+IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
     iree_hal_driver_registry_t* registry, iree_string_view_t driver_name,
     iree_allocator_t host_allocator, iree_hal_driver_t** out_driver);
 

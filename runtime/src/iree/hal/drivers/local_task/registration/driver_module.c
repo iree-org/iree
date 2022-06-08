@@ -14,14 +14,11 @@
 #include "iree/hal/local/loaders/registration/init.h"
 #include "iree/task/api.h"
 
-#define IREE_HAL_LOCAL_TASK_DRIVER_ID 0x5441534Bu  // TASK
-
 static iree_status_t iree_hal_local_task_driver_factory_enumerate(
     void* self, const iree_hal_driver_info_t** out_driver_infos,
     iree_host_size_t* out_driver_info_count) {
   static const iree_hal_driver_info_t driver_infos[1] = {
       {
-          .driver_id = IREE_HAL_LOCAL_TASK_DRIVER_ID,
           .driver_name = IREE_SVL("local-task"),
           .full_name = IREE_SVL("Local executable execution using the "
                                 "IREE multithreading task system"),
@@ -33,13 +30,12 @@ static iree_status_t iree_hal_local_task_driver_factory_enumerate(
 }
 
 static iree_status_t iree_hal_local_task_driver_factory_try_create(
-    void* self, iree_hal_driver_id_t driver_id, iree_allocator_t host_allocator,
+    void* self, iree_string_view_t driver_name, iree_allocator_t host_allocator,
     iree_hal_driver_t** out_driver) {
-  if (driver_id != IREE_HAL_LOCAL_TASK_DRIVER_ID) {
+  if (!iree_string_view_equal(driver_name, IREE_SV("local-task"))) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "no driver with ID %016" PRIu64
-                            " is provided by this factory",
-                            driver_id);
+                            "no driver '%.*s' is provided by this factory",
+                            (int)driver_name.size, driver_name.data);
   }
 
   iree_hal_task_device_params_t default_params;
@@ -64,8 +60,8 @@ static iree_status_t iree_hal_local_task_driver_factory_try_create(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_task_driver_create(
-        iree_make_cstring_view("local-task"), &default_params, executor,
-        loader_count, loaders, device_allocator, host_allocator, out_driver);
+        driver_name, &default_params, executor, loader_count, loaders,
+        device_allocator, host_allocator, out_driver);
   }
 
   iree_hal_allocator_release(device_allocator);
