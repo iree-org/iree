@@ -1260,7 +1260,7 @@ Applications should propagate errors and handle or report them as desired.</p>
 <span class="c1">// driver like the GPU &quot;vulkan&quot; driver. The driver(s) used should match with</span>
 <span class="c1">// the target(s) specified during compilation.</span>
 <span class="n">iree_hal_driver_t</span><span class="o">*</span><span class="w"> </span><span class="n">driver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_driver_registry_try_create_by_name</span><span class="p">(</span><span class="w"></span>
+<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_driver_registry_try_create</span><span class="p">(</span><span class="w"></span>
 <span class="w">    </span><span class="n">iree_hal_driver_registry_default</span><span class="p">(),</span><span class="w"></span>
 <span class="w">    </span><span class="n">iree_string_view_literal</span><span class="p">(</span><span class="s">&quot;local-task&quot;</span><span class="p">),</span><span class="w"></span>
 <span class="w">    </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">driver</span><span class="p">));</span><span class="w"></span>
