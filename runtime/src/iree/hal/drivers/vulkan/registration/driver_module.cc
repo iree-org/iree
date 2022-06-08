@@ -28,7 +28,7 @@ IREE_FLAG(bool, vulkan_tracing, true,
           "Enables Vulkan tracing (if IREE tracing is enabled).");
 
 static iree_status_t iree_hal_vulkan_create_driver_with_flags(
-    iree_string_view_t identifier, iree_allocator_t allocator,
+    iree_string_view_t identifier, iree_allocator_t host_allocator,
     iree_hal_driver_t** out_driver) {
   IREE_TRACE_SCOPE();
 
@@ -65,10 +65,10 @@ static iree_status_t iree_hal_vulkan_create_driver_with_flags(
   // does not have the expected functions.
   iree_hal_vulkan_syms_t* syms = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_hal_vulkan_syms_create_from_system_loader(allocator, &syms));
+      iree_hal_vulkan_syms_create_from_system_loader(host_allocator, &syms));
 
   iree_status_t status = iree_hal_vulkan_driver_create(
-      identifier, &driver_options, syms, allocator, out_driver);
+      identifier, &driver_options, syms, host_allocator, out_driver);
 
   iree_hal_vulkan_syms_release(syms);
   return status;
@@ -89,7 +89,7 @@ static iree_status_t iree_hal_vulkan_driver_factory_enumerate(
 }
 
 static iree_status_t iree_hal_vulkan_driver_factory_try_create(
-    void* self, iree_hal_driver_id_t driver_id, iree_allocator_t allocator,
+    void* self, iree_hal_driver_id_t driver_id, iree_allocator_t host_allocator,
     iree_hal_driver_t** out_driver) {
   if (driver_id != IREE_HAL_VULKAN_1_X_DRIVER_ID) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
@@ -102,7 +102,7 @@ static iree_status_t iree_hal_vulkan_driver_factory_try_create(
   // can name them here:
   iree_string_view_t identifier = iree_make_cstring_view("vulkan");
 
-  return iree_hal_vulkan_create_driver_with_flags(identifier, allocator,
+  return iree_hal_vulkan_create_driver_with_flags(identifier, host_allocator,
                                                   out_driver);
 }
 
