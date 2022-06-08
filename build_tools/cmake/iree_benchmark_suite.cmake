@@ -214,14 +214,14 @@ function(iree_benchmark_suite)
 
       # Register the target once and share across all benchmarks having the same
       # MLIR source and translation flags.
-      set(_MODULE_NAME
+      set(_TRANSLATION_NAME
         "iree-generate-benchmark-artifact-${_MODULE_SOURCE_BASENAME_WITH_HASH}"
       )
-      set(_MODULE_TARGET_NAME "${_PACKAGE_NAME}_${_MODULE_NAME}")
-      if(NOT TARGET "${_MODULE_TARGET_NAME}")
+      set(_TRANSLATION_TARGET_NAME "${_PACKAGE_NAME}_${_TRANSLATION_NAME}")
+      if(NOT TARGET "${_TRANSLATION_TARGET_NAME}")
         iree_bytecode_module(
           NAME
-            "${_MODULE_NAME}"
+            "${_TRANSLATION_NAME}"
           MODULE_FILE_NAME
             "${_VMFB_FILE}"
           SRC
@@ -235,23 +235,23 @@ function(iree_benchmark_suite)
         )
 
         # Mark dependency so that we have one target to drive them all.
-        add_dependencies(iree-benchmark-suites "${_MODULE_TARGET_NAME}")
-        add_dependencies("${SUITE_SUB_TARGET}" "${_MODULE_TARGET_NAME}")
+        add_dependencies(iree-benchmark-suites "${_TRANSLATION_TARGET_NAME}")
+        add_dependencies("${SUITE_SUB_TARGET}" "${_TRANSLATION_TARGET_NAME}")
       endif()
 
-      set(_COMPILE_STATS_MODULE_NAME
-        "${_MODULE_NAME}-compile-stats"
+      set(_COMPILE_STATS_TRANSLATION_NAME
+        "${_TRANSLATION_NAME}-compile-stats"
       )
-      set(_COMPILE_STATS_MODULE_TARGET_NAME
-        "${_PACKAGE_NAME}_${_COMPILE_STATS_MODULE_NAME}"
+      set(_COMPILE_STATS_TRANSLATION_TARGET_NAME
+        "${_PACKAGE_NAME}_${_COMPILE_STATS_TRANSLATION_NAME}"
       )
       set(_COMPILE_STATS_VMFB_FILE
         "${_VMFB_ARTIFACTS_DIR}/${_MODULE_SOURCE_BASENAME_WITH_HASH}-compile-stats.vmfb"
       )
-      if(IREE_ENABLE_COMPILATION_BENCHMARKS AND NOT TARGET "${_COMPILE_STATS_MODULE_TARGET_NAME}")
+      if(IREE_ENABLE_COMPILATION_BENCHMARKS AND NOT TARGET "${_COMPILE_STATS_TRANSLATION_TARGET_NAME}")
         iree_bytecode_module(
           NAME
-            "${_COMPILE_STATS_MODULE_NAME}"
+            "${_COMPILE_STATS_TRANSLATION_NAME}"
           MODULE_FILE_NAME
             "${_COMPILE_STATS_VMFB_FILE}"
           SRC
@@ -270,20 +270,20 @@ function(iree_benchmark_suite)
 
         # Mark dependency so that we have one target to drive them all.
         add_dependencies(iree-benchmark-suites
-          "${_COMPILE_STATS_MODULE_TARGET_NAME}"
+          "${_COMPILE_STATS_TRANSLATION_TARGET_NAME}"
         )
         add_dependencies("${SUITE_SUB_TARGET}"
-          "${_COMPILE_STATS_MODULE_TARGET_NAME}"
+          "${_COMPILE_STATS_TRANSLATION_TARGET_NAME}"
         )
       endif()
 
       if(NOT TARGET "${_FRIENDLY_TARGET_NAME}")
         add_custom_target("${_FRIENDLY_TARGET_NAME}")
       endif()
-      add_dependencies("${_FRIENDLY_TARGET_NAME}" "${_MODULE_TARGET_NAME}")
+      add_dependencies("${_FRIENDLY_TARGET_NAME}" "${_TRANSLATION_TARGET_NAME}")
       if(IREE_ENABLE_COMPILATION_BENCHMARKS)
         add_dependencies("${_FRIENDLY_TARGET_NAME}"
-          "${_COMPILE_STATS_MODULE_TARGET_NAME}")
+          "${_COMPILE_STATS_TRANSLATION_TARGET_NAME}")
       endif()
 
       set(_RUN_SPEC_DIR "${_ROOT_ARTIFACTS_DIR}/${_MODULE_DIR_NAME}/${_BENCHMARK_DIR_NAME}")
@@ -350,7 +350,6 @@ function(iree_benchmark_suite)
 
       set(_COMPILATION_FLAGFILE_GEN_TARGET_NAME
         "${_PACKAGE_NAME}_iree-generate-benchmark-compilation-flagfile__${_RUN_SPEC_TARGET_SUFFIX}")
-      message("${_COMPILATION_FLAGFILE_GEN_TARGET_NAME}")
       add_custom_target("${_COMPILATION_FLAGFILE_GEN_TARGET_NAME}"
         DEPENDS "${_COMPILATION_FLAGFILE}"
       )
