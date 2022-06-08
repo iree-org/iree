@@ -46,7 +46,7 @@ target_link_libraries(${_NAME}
   ${_MNIST_OBJECT_NAME}
   iree_runtime_runtime
   iree_hal_local_loaders_static_library_loader
-  iree_hal_local_sync_driver
+  iree_hal_drivers_local_sync_sync_driver
 )
 
 target_link_options(${_NAME} PRIVATE
@@ -90,7 +90,7 @@ target_link_libraries(${_NAME}
   ${_MNIST_OBJECT_NAME}
   iree_runtime_runtime
   iree_hal_local_loaders_static_library_loader
-  iree_hal_local_task_driver
+  iree_hal_drivers_local_task_task_driver
   iree_task_api
 )
 

@@ -74,33 +74,32 @@ functions in the compiled programs.
 
    ```
    ../iree-build/samples/variables_and_state/variables-and-state \
-       /path/to/counter_vmvx.vmfb vmvx
+       /path/to/counter_vmvx.vmfb local-task
    ```
 
 ### Changing compilation options
 
 The provided Colab notebook imports the TensorFlow program into MLIR and then
 compiles it further to an IREE VM bytecode module for IREE's reference CPU
-backend named "VMVX". To use a different backend, set compilation options, or
-include source code changes to the compiler, you can compile the imported MLIR
-file using IREE's tools on your own machine.
+executable format named "VMVX". To use a different executable format or backend,
+set compilation options, or include source code changes to the compiler, you can
+compile the imported MLIR file using IREE's tools on your own machine.
 
-For example, to use IREE's `dylib-llvm-aot` target, which is optimized for CPU
-execution using LLVM, refer to the
+For example, to use IREE's `cpu` target, which is optimized for CPU execution
+using LLVM, refer to the
 [documentation](https://google.github.io/iree/deployment-configurations/cpu/)
 and compile the imported `counter.mlir` file using `iree-compile`:
 
 ```
 ../iree-build/tools/iree-compile \
-    --iree-mlir-to-vm-bytecode-module \
-    --iree-hal-target-backends=dylib-llvm-aot \
+    --iree-hal-target-backends=cpu \
     --iree-input-type=mhlo \
-    counter.mlir -o counter_dylib.vmfb
+    counter.mlir -o counter_cpu.vmfb
 ```
 
 then run the program with that new VM bytecode module:
 
 ```
 ../iree-build/samples/variables_and_state/variables-and-state \
-    /path/to/counter_dylib.vmfb dylib
+    /path/to/counter_cpu.vmfb local-task
 ```

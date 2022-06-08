@@ -28,4 +28,4 @@ cmake --build ${BUILD_DIR} --target iree_samples_variables_and_state -- -k 0
 
 # 3. Run the sample binary.
 ${BUILD_DIR}/samples/variables_and_state/variables-and-state \
-  ${ARTIFACTS_DIR}/counter_vmvx.vmfb vmvx
+  ${ARTIFACTS_DIR}/counter_vmvx.vmfb local-task

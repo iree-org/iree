@@ -82,10 +82,9 @@ them.
 
     ```
     ../iree-build/tools/iree-compile \
-        --iree-mlir-to-vm-bytecode-module \
-        --iree-hal-target-backends=dylib-llvm-aot \
+        --iree-hal-target-backends=cpu \
         --iree-input-type=mhlo \
-        dynamic_shapes.mlir -o dynamic_shapes_dylib.vmfb
+        dynamic_shapes.mlir -o dynamic_shapes_cpu.vmfb
     ```
 
 4. Build the `iree_samples_dynamic_shapes` CMake target
@@ -98,5 +97,5 @@ them.
 
    ```
    ../iree-build/samples/dynamic_shapes/dynamic-shapes \
-       /path/to/dynamic_shapes_dylib.vmfb dylib
+       /path/to/dynamic_shapes_cpu.vmfb local-task
    ```
