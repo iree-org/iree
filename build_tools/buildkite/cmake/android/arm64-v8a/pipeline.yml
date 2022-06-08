@@ -5,27 +5,27 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 steps:
-  # - label: "build"
-  #   commands:
-  #     - "git submodule sync && git submodule update --init --jobs 8 --depth 1"
-  #     - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/android@sha256:e67ce11d45ea0bf35ab5a42554aa9076a6be084c05a7024b17c4924e18ba5fb6 build_tools/cmake/build_android.sh arm64-v8a"
-  #     - "tar --exclude='*.o' --exclude='*.a' -czvf build-artifacts.tgz build-android"
-  #   agents:
-  #     - "queue=build"
-  #   env:
-  #     IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
-  #   artifact_paths: "build-artifacts.tgz"
+  - label: "build"
+    commands:
+      - "git submodule sync && git submodule update --init --jobs 8 --depth 1"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/android@sha256:e67ce11d45ea0bf35ab5a42554aa9076a6be084c05a7024b17c4924e18ba5fb6 build_tools/cmake/build_android.sh arm64-v8a"
+      - "tar --exclude='*.o' --exclude='*.a' -czvf build-artifacts.tgz build-android"
+    agents:
+      - "queue=build"
+    env:
+      IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
+    artifact_paths: "build-artifacts.tgz"
 
-  # - wait
+  - wait
 
   - label: "test on Pixel 6 (google-tensor, mali-g78)"
     commands:
-      # - "git clean -fdx"
-      # - "adb shell rm -rf /data/local/tmp/iree"
-      # - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
-      # - "tar xzf build-artifacts.tgz"
-      # - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
-      - "ctest -j 4 --timeout 900 --output-on-failure --no-tests=error"
+      - "git clean -fdx"
+      - "adb shell rm -rf /data/local/tmp/iree"
+      - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
+      - "tar xzf build-artifacts.tgz"
+      - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
+      - "ctest -j 4 --test-dir build-android/ --timeout 900 --output-on-failure --no-tests=error"
     agents:
       - "android-soc=google-tensor"
       - "queue=test-android"
@@ -35,14 +35,14 @@ steps:
 
   - label: "test on Pixel 4 (snapdragon-855, adreno-640)"
     commands:
-      # - "git clean -fdx"
-      # - "adb shell rm -rf /data/local/tmp/iree"
-      # - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
-      # - "tar xzf build-artifacts.tgz"
-      # - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
+      - "git clean -fdx"
+      - "adb shell rm -rf /data/local/tmp/iree"
+      - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
+      - "tar xzf build-artifacts.tgz"
+      - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
       # Pixel 4 ships an old Adreno GPU driver. There are quite a few bugs triggered by our tests.
       # Disable running tests entirely on Pixel 4. Moto Edge X30 gets us covered on Adreno GPU.
-      - "ctest -j 4 --timeout 900 --output-on-failure --no-tests=error --label-exclude \"vulkan\""
+      - "ctest -j 4 --test-dir build-android/ --timeout 900 --output-on-failure --no-tests=error --label-exclude \"vulkan\""
     agents:
       - "android-soc=snapdragon-855"
       - "queue=test-android"
@@ -52,12 +52,12 @@ steps:
 
   - label: "test on Moto Edge X30 (snapdragon-8gen1, adreno-730)"
     commands:
-      # - "git clean -fdx"
-      # - "adb shell rm -rf /data/local/tmp/iree"
-      # - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
-      # - "tar xzf build-artifacts.tgz"
-      # - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
-      - "ctest -j 4 --timeout 900 --output-on-failure --no-tests=error"
+      - "git clean -fdx"
+      - "adb shell rm -rf /data/local/tmp/iree"
+      - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
+      - "tar xzf build-artifacts.tgz"
+      - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
+      - "ctest -j 4 --test-dir build-android/ --timeout 900 --output-on-failure --no-tests=error"
     agents:
       - "android-soc=snapdragon-8gen1"
       - "queue=test-android"
@@ -65,6 +65,6 @@ steps:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     timeout_in_minutes: "30"
 
-# notify:
-#   - email: "bdi-build-cop+buildkite@grotations.appspotmail.com"
-#     if: build.state == "failed"
+notify:
+  - email: "bdi-build-cop+buildkite@grotations.appspotmail.com"
+    if: build.state == "failed"
