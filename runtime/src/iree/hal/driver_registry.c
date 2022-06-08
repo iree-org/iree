@@ -188,7 +188,7 @@ static iree_host_size_t iree_hal_driver_info_copy(
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
-    iree_hal_driver_registry_t* registry, iree_allocator_t allocator,
+    iree_hal_driver_registry_t* registry, iree_allocator_t host_allocator,
     iree_hal_driver_info_t** out_driver_infos,
     iree_host_size_t* out_driver_info_count) {
   IREE_ASSERT_ARGUMENT(registry);
@@ -223,7 +223,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
   iree_host_size_t total_driver_infos_size =
       total_driver_info_count * sizeof(iree_hal_driver_info_t);
   if (iree_status_is_ok(status)) {
-    status = iree_allocator_malloc(allocator,
+    status = iree_allocator_malloc(host_allocator,
                                    total_driver_infos_size + total_storage_size,
                                    (void**)out_driver_infos);
   }
@@ -255,7 +255,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
 
   // Cleanup memory if we failed.
   if (!iree_status_is_ok(status) && *out_driver_infos) {
-    iree_allocator_free(allocator, *out_driver_infos);
+    iree_allocator_free(host_allocator, *out_driver_infos);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -263,7 +263,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
 
 IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
     iree_hal_driver_registry_t* registry, iree_hal_driver_id_t driver_id,
-    iree_allocator_t allocator, iree_hal_driver_t** out_driver) {
+    iree_allocator_t host_allocator, iree_hal_driver_t** out_driver) {
   IREE_ASSERT_ARGUMENT(registry);
   if (driver_id == IREE_HAL_DRIVER_ID_INVALID) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "invalid driver id");
@@ -297,7 +297,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
 
 IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create_by_name(
     iree_hal_driver_registry_t* registry, iree_string_view_t driver_name,
-    iree_allocator_t allocator, iree_hal_driver_t** out_driver) {
+    iree_allocator_t host_allocator, iree_hal_driver_t** out_driver) {
   IREE_ASSERT_ARGUMENT(registry);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_TEXT(z0, driver_name.data, driver_name.size);
@@ -347,7 +347,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create_by_name(
   // example a delay-loaded driver cannot be created even if it was enumerated.
   if (hit_driver_id != IREE_HAL_DRIVER_ID_INVALID) {
     status = hit_factory->try_create(hit_factory->self, hit_driver_id,
-                                     allocator, out_driver);
+                                     host_allocator, out_driver);
   } else {
     status =
         iree_make_status(IREE_STATUS_NOT_FOUND, "no driver '%.*s' registered",

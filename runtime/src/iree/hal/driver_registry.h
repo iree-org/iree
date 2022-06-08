@@ -69,7 +69,7 @@ typedef struct iree_hal_driver_factory_t {
   // Called with the driver registry lock held; may be called from any thread.
   iree_status_t(IREE_API_PTR* try_create)(void* self,
                                           iree_hal_driver_id_t driver_id,
-                                          iree_allocator_t allocator,
+                                          iree_allocator_t host_allocator,
                                           iree_hal_driver_t** out_driver);
 } iree_hal_driver_factory_t;
 
@@ -123,9 +123,9 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_unregister_factory(
     const iree_hal_driver_factory_t* factory);
 
 // Enumerates all drivers from registered factories and returns them as a list.
-// The provided |allocator| will be used to allocate the returned list and after
-// the caller is done with it |out_driver_infos| must be freed with that same
-// allocator by the caller.
+// The provided |host_allocator| will be used to allocate the returned list and
+// after the caller is done with it |out_driver_infos| must be freed with that
+// same allocator by the caller.
 //
 // The set of drivers returned should be considered the superset of those that
 // may be available for successful creation as it's possible that delay-loaded
@@ -134,7 +134,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_unregister_factory(
 // Thread-safe. Note that the factory may be unregistered between the query
 // completing and any attempt to instantiate the driver.
 IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
-    iree_hal_driver_registry_t* registry, iree_allocator_t allocator,
+    iree_hal_driver_registry_t* registry, iree_allocator_t host_allocator,
     iree_hal_driver_info_t** out_driver_infos,
     iree_host_size_t* out_driver_info_count);
 
@@ -147,7 +147,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
 // perform additional loading/verification/etc before returning.
 IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
     iree_hal_driver_registry_t* registry, iree_hal_driver_id_t driver_id,
-    iree_allocator_t allocator, iree_hal_driver_t** out_driver);
+    iree_allocator_t host_allocator, iree_hal_driver_t** out_driver);
 
 // Attempts to create a driver registered with the given canonical driver name.
 // Effectively enumerate + find by name + try_create if found. Factories are
@@ -159,7 +159,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
 // perform additional loading/verification/etc before returning.
 IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create_by_name(
     iree_hal_driver_registry_t* registry, iree_string_view_t driver_name,
-    iree_allocator_t allocator, iree_hal_driver_t** out_driver);
+    iree_allocator_t host_allocator, iree_hal_driver_t** out_driver);
 
 #ifdef __cplusplus
 }  // extern "C"

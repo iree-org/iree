@@ -30,7 +30,7 @@ static iree_status_t iree_hal_rocm_driver_factory_enumerate(
 }
 
 static iree_status_t iree_hal_rocm_driver_factory_try_create(
-    void *self, iree_hal_driver_id_t driver_id, iree_allocator_t allocator,
+    void *self, iree_hal_driver_id_t driver_id, iree_allocator_t host_allocator,
     iree_hal_driver_t **out_driver) {
   IREE_ASSERT_ARGUMENT(out_driver);
   *out_driver = NULL;
@@ -48,7 +48,7 @@ static iree_status_t iree_hal_rocm_driver_factory_try_create(
   iree_hal_rocm_driver_options_t driver_options;
   iree_hal_rocm_driver_options_initialize(&driver_options);
   iree_status_t status = iree_hal_rocm_driver_create(
-      identifier, &driver_options, allocator, out_driver);
+      identifier, &driver_options, host_allocator, out_driver);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
