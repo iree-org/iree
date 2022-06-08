@@ -48,7 +48,7 @@ static iree_status_t _TfLiteInterpreterPrepareHAL(
 
   // TODO(benvanik): switch to iree_hal_driver_registry_try_create when
   // implemented.
-  iree_status_t status = iree_hal_driver_registry_try_create_by_name(
+  iree_status_t status = iree_hal_driver_registry_try_create(
       driver_registry, driver_name, interpreter->allocator,
       &interpreter->driver);
   iree_allocator_free(interpreter->allocator, driver_infos);

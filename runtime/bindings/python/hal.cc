@@ -228,7 +228,7 @@ std::vector<std::string> HalDriver::Query() {
 
 HalDriver HalDriver::Create(const std::string& driver_name) {
   iree_hal_driver_t* driver;
-  CheckApiStatus(iree_hal_driver_registry_try_create_by_name(
+  CheckApiStatus(iree_hal_driver_registry_try_create(
                      iree_hal_driver_registry_default(),
                      {driver_name.data(), driver_name.size()},
                      iree_allocator_system(), &driver),

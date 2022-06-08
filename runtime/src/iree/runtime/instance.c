@@ -153,8 +153,8 @@ IREE_API_EXPORT iree_status_t iree_runtime_instance_try_create_default_device(
       iree_runtime_instance_host_allocator(instance);
   iree_hal_driver_t* driver = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_driver_registry_try_create_by_name(
-              driver_registry, driver_name, host_allocator, &driver));
+      z0, iree_hal_driver_registry_try_create(driver_registry, driver_name,
+                                              host_allocator, &driver));
 
   // Create the default device on that driver.
   iree_status_t status =

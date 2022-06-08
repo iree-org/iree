@@ -96,7 +96,7 @@ static void iree_hal_sync_driver_destroy(iree_hal_driver_t* base_driver) {
 }
 
 static iree_status_t iree_hal_sync_driver_query_available_devices(
-    iree_hal_driver_t* base_driver, iree_allocator_t allocator,
+    iree_hal_driver_t* base_driver, iree_allocator_t host_allocator,
     iree_hal_device_info_t** out_device_infos,
     iree_host_size_t* out_device_info_count) {
   static const iree_hal_device_info_t device_infos[1] = {
@@ -107,7 +107,8 @@ static iree_status_t iree_hal_sync_driver_query_available_devices(
   };
   *out_device_info_count = IREE_ARRAYSIZE(device_infos);
   return iree_allocator_clone(
-      allocator, iree_make_const_byte_span(device_infos, sizeof(device_infos)),
+      host_allocator,
+      iree_make_const_byte_span(device_infos, sizeof(device_infos)),
       (void**)out_device_infos);
 }
 

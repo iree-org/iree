@@ -13,13 +13,10 @@
 #include "iree/hal/drivers/local_sync/sync_driver.h"
 #include "iree/hal/local/loaders/registration/init.h"
 
-#define IREE_HAL_LOCAL_SYNC_DRIVER_ID 0x53594E43u  // SYNC
-
 static iree_status_t iree_hal_local_sync_driver_factory_enumerate(
     void* self, const iree_hal_driver_info_t** out_driver_infos,
     iree_host_size_t* out_driver_info_count) {
   static const iree_hal_driver_info_t default_driver_info = {
-      .driver_id = IREE_HAL_LOCAL_SYNC_DRIVER_ID,
       .driver_name = IREE_SVL("local-sync"),
       .full_name = IREE_SVL("Local executable execution using a lightweight "
                             "inline synchronous queue"),
@@ -30,13 +27,12 @@ static iree_status_t iree_hal_local_sync_driver_factory_enumerate(
 }
 
 static iree_status_t iree_hal_local_sync_driver_factory_try_create(
-    void* self, iree_hal_driver_id_t driver_id, iree_allocator_t host_allocator,
+    void* self, iree_string_view_t driver_name, iree_allocator_t host_allocator,
     iree_hal_driver_t** out_driver) {
-  if (driver_id != IREE_HAL_LOCAL_SYNC_DRIVER_ID) {
+  if (!iree_string_view_equal(driver_name, IREE_SV("local-sync"))) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "no driver with ID %016" PRIu64
-                            " is provided by this factory",
-                            driver_id);
+                            "no driver '%.*s' is provided by this factory",
+                            (int)driver_name.size, driver_name.data);
   }
 
   iree_hal_sync_device_params_t default_params;
@@ -56,8 +52,8 @@ static iree_status_t iree_hal_local_sync_driver_factory_try_create(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_sync_driver_create(
-        iree_make_cstring_view("local-sync"), &default_params, loader_count,
-        loaders, device_allocator, host_allocator, out_driver);
+        driver_name, &default_params, loader_count, loaders, device_allocator,
+        host_allocator, out_driver);
   }
 
   iree_hal_allocator_release(device_allocator);
