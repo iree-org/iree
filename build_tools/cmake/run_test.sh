@@ -12,14 +12,14 @@
 set -x
 set -e
 
-function cleanup() {
-  echo "Cleaning up test environment"
-  rm -rf ${TEST_TMPDIR?}
-}
+# function cleanup() {
+#   echo "Cleaning up test environment"
+#   rm -rf ${TEST_TMPDIR?}
+# }
 
-echo "Creating test environment"
-rm -rf "${TEST_TMPDIR?}" # In case this wasn't cleaned up previously
-mkdir -p "${TEST_TMPDIR?}"
-trap cleanup EXIT
-# Execute whatever we were passed.
+# echo "Creating test environment"
+# rm -rf "${TEST_TMPDIR?}" # In case this wasn't cleaned up previously
+# mkdir -p "${TEST_TMPDIR?}"
+# trap cleanup EXIT
+# # Execute whatever we were passed.
 "$@"

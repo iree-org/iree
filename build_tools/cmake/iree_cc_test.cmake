@@ -58,7 +58,7 @@ function(iree_cc_test)
 
   cmake_parse_arguments(
     _RULE
-    ""
+    "REQUIRES_TMPDIR"
     "NAME"
     "ARGS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;LABELS;TIMEOUT"
     ${ARGN}
@@ -161,6 +161,8 @@ function(iree_cc_test)
     )
     set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
   else(ANDROID)
+
+
     add_test(
       NAME
         ${_NAME_PATH}
@@ -171,14 +173,21 @@ function(iree_cc_test)
         "$<TARGET_FILE:${_NAME}>"
         ${_RULE_ARGS}
       )
-    set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT "TEST_TMPDIR=${IREE_BINARY_DIR}/tmp/${_NAME}_test_tmpdir")
+
+    set(_TEST_TMPDIR "${IREE_FAKE_TEST_TMPDIR}")
+    # if("${IREE_REQUIRES_TMPDIR_TAG}" IN_LIST _RULE_LABELS)
+    set(_TEST_TMPDIR "${IREE_TEST_TMPDIR}/${_NAME_PATH}_test_tmpdir")
+    set_property(GLOBAL APPEND PROPERTY IREE_TEST_TMPDIRS_REQUIRED ${_TEST_TMPDIR})
+    set_property(TEST ${_NAME_PATH} PROPERTY FIXTURES_REQUIRED ${IREE_TEST_TMPDIR_FIXTURE})
+    # endif()
+    set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT "TEST_TMPDIR=${_TEST_TMPDIR}")
     iree_add_test_environment_properties(${_NAME_PATH})
   endif(ANDROID)
 
   if (NOT DEFINED _RULE_TIMEOUT)
     set(_RULE_TIMEOUT 60)
   endif()
-  
+
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_TIMEOUT})

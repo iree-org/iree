@@ -246,7 +246,7 @@ function(iree_local_py_test)
   set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_ARGS})
   set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
       "PYTHONPATH=${_PYTHONPATH}"
-      "TEST_TMPDIR=${IREE_BINARY_DIR}/tmp/${_NAME}_test_tmpdir"
+      "TEST_TMPDIR=${IREE_TEST_FAKE_TMPDIR}/${_NAME}_test_tmpdir"
   )
   iree_add_test_environment_properties(${_NAME_PATH})
 

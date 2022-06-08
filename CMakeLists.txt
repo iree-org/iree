@@ -607,6 +607,16 @@ endif()
 
 if(IREE_BUILD_TESTS)
   enable_testing(iree)
+  set(IREE_REQUIRES_TMPDIR_TAG "requires-tmpdir")
+  set(IREE_TEST_TMPDIR "${IREE_BINARY_DIR}/test_tmpdir")
+  set(IREE_TEST_FAKE_TMPDIR "${IREE_BINARY_DIR}/not_a_test_tmpdir_you_should_not_write_here")
+  set_property(GLOBAL PROPERTY IREE_TEST_TMPDIRS_REQUIRED "")
+  set(IREE_TEST_TMPDIR_FIXTURE iree_test_tmpdirs_fixture)
+  file(WRITE
+      "${IREE_TEST_FAKE_TMPDIR}"
+      "Tests shouldn't be writing here!"
+      " Declare that this test needs a temporary directory"
+      " with the 'requires-tmpdir' tag\n")
 endif()
 
 if(IREE_BUILD_PYTHON_BINDINGS)
@@ -755,4 +765,25 @@ add_subdirectory(build_tools/benchmarks)
 # samples/ can depend on anything, so we include it last
 if(IREE_BUILD_SAMPLES)
   add_subdirectory(samples)
+endif()
+
+if(IREE_BUILD_TESTS)
+  get_property(_TMPDIRS GLOBAL PROPERTY IREE_TEST_TMPDIRS_REQUIRED)
+  add_test(
+    NAME
+      iree_setup_tmpdirs
+    COMMAND
+      cmake -E make_directory ${_TMPDIRS}
+  )
+  set_property(TEST iree_setup_tmpdirs PROPERTY FIXTURES_SETUP ${IREE_TEST_TMPDIR_FIXTURE})
+  set_property(TEST iree_setup_tmpdirs PROPERTY LABELS "fixture")
+
+  add_test(
+    NAME
+      iree_cleanup_tmpdirs
+    COMMAND
+      cmake -E rm -rf ${IREE_TEST_TMPDIR}
+  )
+  set_property(TEST iree_cleanup_tmpdirs PROPERTY FIXTURES_CLEANUP ${IREE_TEST_TMPDIR_FIXTURE})
+  set_property(TEST iree_cleanup_tmpdirs PROPERTY LABELS "fixture")
 endif()
