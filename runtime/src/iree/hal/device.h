@@ -32,7 +32,7 @@ extern "C" {
 // An opaque driver-specific handle to identify different devices.
 typedef uintptr_t iree_hal_device_id_t;
 
-#define IREE_HAL_DEVICE_ID_INVALID 0ull
+#define IREE_HAL_DEVICE_ID_DEFAULT 0ull
 
 // Describes features supported by a device.
 // These flags indicate the availability of features that may be enabled at the

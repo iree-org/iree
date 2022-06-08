@@ -35,8 +35,9 @@ TEST_P(driver_test, QueryAndCreateAvailableDevices) {
                              device_infos[i].name.size)
               << "'";
     iree_hal_device_t* device = NULL;
-    IREE_ASSERT_OK(iree_hal_driver_create_device(
-        driver_, device_infos[i].device_id, iree_allocator_system(), &device));
+    IREE_ASSERT_OK(iree_hal_driver_create_device_by_id(
+        driver_, device_infos[i].device_id, /*param_count=*/0, /*params=*/NULL,
+        iree_allocator_system(), &device));
     iree_string_view_t device_id = iree_hal_device_id(device);
     std::cout << "  Created device with id: '"
               << std::string(device_id.data, device_id.size) << "'";

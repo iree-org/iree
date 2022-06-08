@@ -70,13 +70,62 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_query_available_devices(
     iree_hal_device_info_t** out_device_infos,
     iree_host_size_t* out_device_info_count);
 
-// Creates a device as queried with iree_hal_driver_query_available_devices.
-IREE_API_EXPORT iree_status_t iree_hal_driver_create_device(
-    iree_hal_driver_t* driver, iree_hal_device_id_t device_id,
+// Creates a device with the given |device_ordinal| as enumerated by
+// iree_hal_driver_query_available_devices. The ordering of devices is driver
+// dependent and may vary across driver instances and processes.
+//
+// Optionally takes a list of key-value parameters as defined by the device
+// implementation. The parameters are only used during creation and need not
+// remain live after the function returns.
+IREE_API_EXPORT iree_status_t iree_hal_driver_create_device_by_ordinal(
+    iree_hal_driver_t* driver, iree_host_size_t device_ordinal,
+    iree_host_size_t param_count, const iree_string_pair_t* params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
-// Creates the driver-defined "default" device. This may simply be the first
-// device enumerated.
+// Creates a device with the given |device_id| obtained from
+// iree_hal_driver_query_available_devices. The |device_id| is an opaque value
+// that is stable for the lifetime of the driver but not across driver instances
+// or across processes. Only IDs as queried from the driver may be used. If an
+// ID of `IREE_HAL_DEVICE_ID_DEFAULT` is provided the driver will select a
+// device based on heuristics, flags, the environment, or a die roll.
+//
+// Optionally takes a list of key-value parameters as defined by the device
+// implementation. The parameters are only used during creation and need not
+// remain live after the function returns.
+IREE_API_EXPORT iree_status_t iree_hal_driver_create_device_by_id(
+    iree_hal_driver_t* driver, iree_hal_device_id_t device_id,
+    iree_host_size_t param_count, const iree_string_pair_t* params,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device);
+
+// Creates a device with the given device path specifier.
+// The |device_path| is a driver-dependent string that identifies a particular
+// device or type of device. If the path is omitted the driver will select a
+// device based on heuristics, flags, the environment, or a die roll.
+//
+// Optionally takes a list of key-value parameters as defined by the device
+// implementation. The parameters are only used during creation and need not
+// remain live after the function returns.
+IREE_API_EXPORT iree_status_t iree_hal_driver_create_device_by_path(
+    iree_hal_driver_t* driver, iree_string_view_t driver_name,
+    iree_string_view_t device_path, iree_host_size_t param_count,
+    const iree_string_pair_t* params, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device);
+
+// Creates a device with the given `driver://path?params` URI.
+// The driver specifier is required in the URI but the path and params are
+// optional. The path is a driver-dependent string that identifies a particular
+// device or type of device. If the path is omitted the driver will select a
+// device based on heuristics, flags, the environment, or a die roll.
+//
+// This is equivalent to performing URI parsing and calling
+// iree_hal_driver_create_device_by_path.
+IREE_API_EXPORT iree_status_t iree_hal_driver_create_device_by_uri(
+    iree_hal_driver_t* driver, iree_string_view_t device_uri,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device);
+
+// Creates the driver-defined "default" device.
+// The driver will select a device based on heuristics, flags, the environment,
+// or a die roll.
 IREE_API_EXPORT iree_status_t iree_hal_driver_create_default_device(
     iree_hal_driver_t* driver, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device);
@@ -93,10 +142,15 @@ typedef struct iree_hal_driver_vtable_t {
       iree_hal_device_info_t** out_device_infos,
       iree_host_size_t* out_device_info_count);
 
-  iree_status_t(IREE_API_PTR* create_device)(iree_hal_driver_t* driver,
-                                             iree_hal_device_id_t device_id,
-                                             iree_allocator_t host_allocator,
-                                             iree_hal_device_t** out_device);
+  iree_status_t(IREE_API_PTR* create_device_by_id)(
+      iree_hal_driver_t* driver, iree_hal_device_id_t device_id,
+      iree_host_size_t param_count, const iree_string_pair_t* params,
+      iree_allocator_t host_allocator, iree_hal_device_t** out_device);
+  iree_status_t(IREE_API_PTR* create_device_by_path)(
+      iree_hal_driver_t* driver, iree_string_view_t driver_name,
+      iree_string_view_t device_path, iree_host_size_t param_count,
+      const iree_string_pair_t* params, iree_allocator_t host_allocator,
+      iree_hal_device_t** out_device);
 } iree_hal_driver_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_driver_vtable_t);
 

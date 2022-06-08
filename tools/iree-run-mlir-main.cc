@@ -349,7 +349,10 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
   }
 
   iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(CreateDevice(driver_name.c_str(), &device));
+  IREE_RETURN_IF_ERROR(iree_hal_create_device(
+      iree_hal_driver_registry_default(),
+      iree_make_string_view(driver_name.data(), driver_name.size()),
+      iree_allocator_system(), &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(
       iree_hal_module_create(device, iree_allocator_system(), &hal_module));

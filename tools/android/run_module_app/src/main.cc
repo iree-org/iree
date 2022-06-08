@@ -102,7 +102,10 @@ Status RunModule(const IreeModuleInvocation& invocation) {
       iree_allocator_null(), iree_allocator_system(), &input_module));
 
   iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(CreateDevice(invocation.driver.c_str(), &device));
+  IREE_RETURN_IF_ERROR(iree_hal_create_device(
+      iree_hal_driver_registry_default(),
+      iree_make_string_view(invocation.driver.data(), invocation.driver.size()),
+      iree_allocator_system(), &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(
       iree_hal_module_create(device, iree_allocator_system(), &hal_module));

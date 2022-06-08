@@ -150,6 +150,31 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
     iree_hal_driver_registry_t* registry, iree_string_view_t driver_name,
     iree_allocator_t host_allocator, iree_hal_driver_t** out_driver);
 
+// Attempts to create a device with the given `driver://path?params` URI.
+// Factories are searched in most-recently-added order such that it's possible
+// to override drivers with newer registrations when multiple factories provide
+// for the same driver name.
+//
+// The driver specifier is required in the URI but the path and params are
+// optional. The path is a driver-dependent string that identifies a particular
+// device or type of device. If the path is omitted the driver will select a
+// device based on heuristics, flags, the environment, or a die roll.
+//
+// !!!! WARNING !!!!
+// Each call to this function may create a new driver. Drivers are generally
+// very expensive to create and often taint the process for its lifetime by
+// loading shared libraries, connecting to system resources, etc. Some drivers
+// may only be able to have one instance live at a time or will fail in
+// spectacularly nasty ways if multiple instances are used simultaneously.
+// If creating multiple devices then instead create a driver once and use
+// iree_hal_driver_create_device_by_uri to create the devices.
+//
+// Thread-safe. May block the caller if the driver is delay-loaded and needs to
+// perform additional loading/verification/etc before returning.
+IREE_API_EXPORT iree_status_t iree_hal_create_device(
+    iree_hal_driver_registry_t* registry, iree_string_view_t device_uri,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "iree/base/internal/call_once.h"
+#include "iree/base/internal/path.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/tracing.h"
 
@@ -319,6 +320,37 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
   }
 
   iree_slim_mutex_unlock(&registry->mutex);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_create_device(
+    iree_hal_driver_registry_t* registry, iree_string_view_t device_uri,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
+  IREE_ASSERT_ARGUMENT(registry);
+  IREE_ASSERT_ARGUMENT(out_device);
+  *out_device = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, device_uri.data, device_uri.size);
+
+  // Try to create the driver; the backing driver factory may cache this but
+  // it's not safe to assume the returned driver is going to remain live for
+  // any longer than this function holds a reference.
+  iree_string_view_t driver_name = iree_uri_schema(device_uri);
+  iree_hal_driver_t* driver = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_driver_registry_try_create(registry, driver_name, host_allocator,
+                                          &driver),
+      "creating driver for device '%.*s'", (int)device_uri.size,
+      device_uri.data);
+
+  // Have the driver create the device.
+  iree_status_t status = iree_hal_driver_create_device_by_uri(
+      driver, device_uri, host_allocator, out_device);
+
+  iree_hal_driver_release(driver);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
