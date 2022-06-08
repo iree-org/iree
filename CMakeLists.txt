@@ -34,6 +34,7 @@ include(CMakeDependentOption)
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF)
 option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
+option(IREE_ENABLE_CLANG_TIDY "Builds IREE in with clang tidy enabled on IREE's libraries." OFF)
 
 # TODO(#8469): remove the dependency on cpuinfo entirely.
 option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topology detection." ON)
@@ -671,6 +672,10 @@ add_custom_target(iree-test-deps COMMENT "Building IREE test deps")
 # IREE top-level libraries
 #-------------------------------------------------------------------------------
 
+if(IREE_ENABLE_CLANG_TIDY)
+  set(CMAKE_CXX_CLANG_TIDY clang-tidy -warnings-as-errors=*)
+endif()
+
 add_subdirectory(build_tools/embed_data/)
 
 # Note: Test deps are not built as part of all (use the iree-test-deps target).
@@ -694,6 +699,11 @@ add_subdirectory(runtime)
 
 # tools/ can depend on compiler/ and runtime/
 add_subdirectory(tools)
+
+
+if(IREE_ENABLE_CLANG_TIDY)
+  set(CMAKE_CXX_CLANG_TIDY "")
+endif()
 
 if(IREE_BUILD_TRACY)
   if(NOT CMAKE_SYSTEM_NAME MATCHES "Linux")
