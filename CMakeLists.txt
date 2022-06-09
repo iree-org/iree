@@ -608,7 +608,7 @@ endif()
 if(IREE_BUILD_TESTS)
   enable_testing(iree)
   set(IREE_REQUIRES_TMPDIR_TAG "requires-tmpdir")
-  set(IREE_TEST_TMPDIR "${IREE_BINARY_DIR}/test_tmpdir")
+  set(IREE_TEST_TMPDIR_ROOT "${IREE_BINARY_DIR}/test_tmpdir")
   set(IREE_TEST_FAKE_TMPDIR "${IREE_BINARY_DIR}/not_a_test_tmpdir_you_should_not_write_here")
   set_property(GLOBAL PROPERTY IREE_TEST_TMPDIRS_REQUIRED "")
   set(IREE_TEST_TMPDIR_FIXTURE iree_test_tmpdirs_fixture)
@@ -773,17 +773,15 @@ if(IREE_BUILD_TESTS)
     NAME
       iree_setup_tmpdirs
     COMMAND
-      cmake -E make_directory ${_TMPDIRS}
+      # Yes, we're adding a test that invokes CMake with a script that invokes
+      # multiple CMake commands... This is to keep the fixture to one test
+      # target, which can only have one command.
+      # Thanks to https://stackoverflow.com/q/3065220
+      cmake
+        "-DIREE_TEST_TMPDIR_ROOT=${IREE_TEST_TMPDIR_ROOT}"
+        "-DIREE_TEST_TMPDIRS=${_TMPDIRS}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/build_tools/cmake/setup_tmpdirs.cmake"
   )
   set_property(TEST iree_setup_tmpdirs PROPERTY FIXTURES_SETUP ${IREE_TEST_TMPDIR_FIXTURE})
   set_property(TEST iree_setup_tmpdirs PROPERTY LABELS "fixture")
-
-  add_test(
-    NAME
-      iree_cleanup_tmpdirs
-    COMMAND
-      cmake -E rm -rf ${IREE_TEST_TMPDIR}
-  )
-  set_property(TEST iree_cleanup_tmpdirs PROPERTY FIXTURES_CLEANUP ${IREE_TEST_TMPDIR_FIXTURE})
-  set_property(TEST iree_cleanup_tmpdirs PROPERTY LABELS "fixture")
 endif()
