@@ -149,8 +149,6 @@ iree_cc_test(
     iree::base::logging
     iree::testing::gtest
     iree::testing::gtest_main
-  LABELS
-    "requires-tmpdir"
 )
 
 iree_cc_library(
