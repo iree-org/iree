@@ -25,8 +25,7 @@ steps:
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
       - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
-      - "cd build-android/"
-      - "ctest -j 4 --timeout 900 --output-on-failure"
+      - "ctest -j 4 --test-dir build-android/ --timeout 900 --output-on-failure --no-tests=error"
     agents:
       - "android-soc=google-tensor"
       - "queue=test-android"
@@ -41,10 +40,9 @@ steps:
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
       - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
-      - "cd build-android/"
       # Pixel 4 ships an old Adreno GPU driver. There are quite a few bugs triggered by our tests.
       # Disable running tests entirely on Pixel 4. Moto Edge X30 gets us covered on Adreno GPU.
-      - "ctest -j 4 --timeout 900 --output-on-failure --label-exclude \"vulkan\""
+      - "ctest -j 4 --test-dir build-android/ --timeout 900 --output-on-failure --no-tests=error --label-exclude \"vulkan\""
     agents:
       - "android-soc=snapdragon-855"
       - "queue=test-android"
@@ -59,8 +57,7 @@ steps:
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
       - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
-      - "cd build-android/"
-      - "ctest -j 4 --timeout 900 --output-on-failure"
+      - "ctest -j 4 --test-dir build-android/ --timeout 900 --output-on-failure --no-tests=error"
     agents:
       - "android-soc=snapdragon-8gen1"
       - "queue=test-android"
