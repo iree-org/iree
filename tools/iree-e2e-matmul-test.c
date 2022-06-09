@@ -15,9 +15,9 @@
 #include "iree/base/internal/path.h"
 #include "iree/base/target_platform.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tools/utils/cpu_features.h"
+#include "iree/tools/utils/device_util.h"
 #include "iree/tools/utils/trace_replay.h"
 #include "iree/tools/utils/yaml_util.h"
 #include "iree/vm/api.h"
@@ -1138,7 +1138,7 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
       root_path, instance,
       FLAG_trace_execution ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
                            : IREE_VM_CONTEXT_FLAG_NONE,
-      iree_allocator_system(), &replay));
+      iree_hal_available_driver_registry(), iree_allocator_system(), &replay));
   iree_trace_replay_set_hal_driver_override(
       &replay, iree_make_cstring_view(FLAG_driver));
 
@@ -1205,8 +1205,6 @@ int main(int argc, char** argv) {
   iree_status_t status =
       iree_vm_instance_create(iree_allocator_system(), &instance);
   if (iree_status_is_ok(status)) {
-    IREE_CHECK_OK(iree_hal_register_all_available_drivers(
-        iree_hal_driver_registry_default()));
     status = run_trace_files(argc - 1, argv + 1, instance);
   }
   iree_vm_instance_release(instance);

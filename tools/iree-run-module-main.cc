@@ -18,8 +18,8 @@
 #include "iree/base/status_cc.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
+#include "iree/tools/utils/device_util.h"
 #include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -112,7 +112,7 @@ iree_status_t Run() {
 
   iree_hal_device_t* device = nullptr;
   IREE_RETURN_IF_ERROR(iree_hal_create_device(
-      iree_hal_driver_registry_default(), IREE_SV(FLAG_driver),
+      iree_hal_available_driver_registry(), IREE_SV(FLAG_driver),
       iree_allocator_system(), &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(
@@ -193,8 +193,6 @@ extern "C" int main(int argc, char** argv) {
                  " Use '--' instead.\n";
     return 1;
   }
-  IREE_CHECK_OK(iree_hal_register_all_available_drivers(
-      iree_hal_driver_registry_default()));
   IREE_CHECK_OK(Run());
   return 0;
 }

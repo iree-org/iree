@@ -50,8 +50,8 @@
 #include "iree/compiler/Tools/init_dialects.h"
 #include "iree/compiler/Tools/init_targets.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
+#include "iree/tools/utils/device_util.h"
 #include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -179,7 +179,7 @@ Status GetTargetBackends(std::vector<std::string>* out_target_backends) {
     iree_hal_driver_info_t* driver_infos = NULL;
     iree_host_size_t driver_info_count = 0;
     IREE_RETURN_IF_ERROR(iree_hal_driver_registry_enumerate(
-        iree_hal_driver_registry_default(), host_allocator, &driver_infos,
+        iree_hal_available_driver_registry(), host_allocator, &driver_infos,
         &driver_info_count));
     for (iree_host_size_t i = 0; i < driver_info_count; ++i) {
       target_backends.push_back(std::string(driver_infos[i].driver_name.data,
@@ -350,7 +350,7 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
 
   iree_hal_device_t* device = nullptr;
   IREE_RETURN_IF_ERROR(iree_hal_create_device(
-      iree_hal_driver_registry_default(),
+      iree_hal_available_driver_registry(),
       iree_make_string_view(driver_name.data(), driver_name.size()),
       iree_allocator_system(), &device));
   iree_vm_module_t* hal_module = nullptr;
@@ -556,8 +556,6 @@ extern "C" int main(int argc, char** argv) {
   char** argv_iree_ptr = argv_iree.data();
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc_iree,
                            &argv_iree_ptr);
-  IREE_CHECK_OK(iree_hal_register_all_available_drivers(
-      iree_hal_driver_registry_default()));
 
   auto status = RunFile(input_file_flag, registry);
   if (!status.ok()) {

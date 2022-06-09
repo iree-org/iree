@@ -32,8 +32,8 @@ iree_cc_library(
   DEPS
     ::android_native_app_glue
     iree::base::cc
-    iree::hal::drivers
     iree::modules::hal
+    iree::tools::utils::device_util
     iree::tools::utils::vm_util
     iree::vm
   LINKOPTS

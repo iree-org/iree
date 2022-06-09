@@ -68,8 +68,8 @@
 #include "iree/base/status_cc.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
+#include "iree/tools/utils/device_util.h"
 #include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -316,7 +316,7 @@ class IREEBenchmark {
 
     // Create IREE's device and module.
     IREE_RETURN_IF_ERROR(iree_hal_create_device(
-        iree_hal_driver_registry_default(), IREE_SV(FLAG_driver),
+        iree_hal_available_driver_registry(), IREE_SV(FLAG_driver),
         iree_allocator_system(), &device_));
     IREE_RETURN_IF_ERROR(
         iree_hal_module_create(device_, iree_allocator_system(), &hal_module_));
@@ -427,9 +427,6 @@ int main(int argc, char** argv) {
                                IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
                            &argc, &argv);
   ::benchmark::Initialize(&argc, argv);
-
-  IREE_CHECK_OK(iree_hal_register_all_available_drivers(
-      iree_hal_driver_registry_default()));
 
   iree::IREEBenchmark iree_benchmark;
   iree_status_t status = iree_benchmark.Register();
