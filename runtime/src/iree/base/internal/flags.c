@@ -538,7 +538,9 @@ IREE_FLAG_CALLBACK(iree_flags_parse_flagfile, iree_flags_print_flagfile, NULL,
                    "Parses a newline-separated list of flags from a file.\n"
                    "Flags are parsed at the point where the flagfile is "
                    "specified\nand following flags may override the parsed "
-                   "values.");
+                   "values.\nNOTE: this --help output is a flagfile! Pipe "
+                   "this to a file, tweak the\noptions from their defaults, "
+                   "and pass it back in using --flagfile=.");
 
 #endif  // IREE_FLAGS_ENABLE_FLAG_FILE
 
