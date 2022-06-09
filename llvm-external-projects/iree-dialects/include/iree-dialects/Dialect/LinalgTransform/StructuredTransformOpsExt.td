@@ -61,42 +61,12 @@ def FuseOp : Op<Transform_Dialect, "structured.fuse",
   let cppNamespace = "transform_ext";
 }
 
-def GeneralizeOp : Op<Transform_Dialect, "structured2.generalize",
-    [FunctionalStyleTransformOpTrait, 
-     MemoryEffectsOpInterface,
-     TransformOpInterface,
-     TransformEachOpTrait]> {
-  let description = [{Generalizes the operations pointed to
-  by the target handle.}];
-
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$transformed);
-
-  let assemblyFormat = "$target attr-dict";
-  let cppNamespace = "transform_ext";
-
-  let extraClassDeclaration = [{
-    ::mlir::FailureOr<::mlir::linalg::LinalgOp> applyToOne(
-        ::mlir::linalg::LinalgOp target);
-  }];
-}
-
 def BufferizeOp : Op<Transform_Dialect, "bufferize",
     [DeclareOpInterfaceMethods<TransformOpInterface>, 
      FunctionalStyleMultiOperandMultiResultTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformOpInterface]> {
   let description = [{Indicates that the entire module should be bufferized.}];
-  let assemblyFormat = "attr-dict";
-  let cppNamespace = "transform_ext";
-}
-
-def DecomposeOp : Op<Transform_Dialect, "structured2.decompose",
-    [DeclareOpInterfaceMethods<TransformOpInterface>,
-     MemoryEffectsOpInterface,
-     FunctionalStyleMultiOperandMultiResultTransformOpTrait]> {
-  let description = [{Indicates that ops in the entire module should be
-  decomposed into lower-level components.}];
   let assemblyFormat = "attr-dict";
   let cppNamespace = "transform_ext";
 }
