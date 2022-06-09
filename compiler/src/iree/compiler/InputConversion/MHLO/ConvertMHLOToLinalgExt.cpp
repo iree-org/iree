@@ -123,7 +123,7 @@ struct LinalgExtRegionHLOOpConversion : public OpConversionPattern<OpTy> {
     SmallVector<Value> scalarArgs;
     Type newRetType = getElementTypeOrSelf(
         this->typeConverter->convertType(origRetType.getElementType()));
-    Value result = mhlo::MhloOpToStdScalarOp::map<OpTy>(
+    Value result = mhlo::MhloOpToStdScalarOp::mapOp<OpTy>(
         op, newRetType, adaptor.getOperands(), &rewriter);
     rewriter.replaceOp(op, result);
     return success();
