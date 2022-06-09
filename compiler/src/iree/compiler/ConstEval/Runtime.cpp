@@ -281,8 +281,8 @@ void CompiledBinary::initialize(void* data, size_t length) {
   // Context.
   std::array<iree_vm_module_t*, 2> modules = {hal_module, main_module};
   IREE_CHECK_OK(iree_vm_context_create_with_modules(
-      runtime.instance, IREE_VM_CONTEXT_FLAG_NONE, modules.data(),
-      modules.size(), iree_allocator_system(), &context));
+      runtime.instance, IREE_VM_CONTEXT_FLAG_NONE, modules.size(),
+      modules.data(), iree_allocator_system(), &context));
 }
 
 InMemoryCompiledBinary::~InMemoryCompiledBinary() { deinitialize(); }

@@ -116,8 +116,8 @@ static iree_status_t iree_trace_replay_load_builtin_module(
         (int)name_node->data.scalar.length, name_node->data.scalar.value);
   }
 
-  iree_status_t status =
-      iree_vm_context_register_modules(replay->context, &module, 1);
+  iree_status_t status = iree_vm_context_register_modules(
+      replay->context, /*module_count=*/1, /*modules=*/&module);
   iree_vm_module_release(module);
   return status;
 }
@@ -161,7 +161,8 @@ static iree_status_t iree_trace_replay_load_bytecode_module(
 
   // Register the bytecode module with the context.
   if (iree_status_is_ok(status)) {
-    status = iree_vm_context_register_modules(replay->context, &module, 1);
+    status = iree_vm_context_register_modules(
+        replay->context, /*module_count=*/1, /*modules=*/&module);
   }
 
   iree_vm_module_release(module);
@@ -361,7 +362,7 @@ static iree_status_t iree_trace_replay_parse_hal_shape(
   if (shape_node->type == YAML_SCALAR_NODE) {
     // Short-hand using the canonical shape parser (4x8).
     return iree_hal_parse_shape(iree_yaml_node_as_string(shape_node),
-                                shape_capacity, shape, out_shape_rank);
+                                shape_capacity, out_shape_rank, shape);
   } else if (shape_node->type != YAML_SEQUENCE_NODE) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "(%zu): expected scalar or sequence node for shape",
@@ -668,7 +669,7 @@ static iree_status_t iree_trace_replay_parse_hal_buffer(
 
   iree_device_size_t allocation_size = 0;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_compute_view_size(
-      shape, shape_rank, element_type, encoding_type, &allocation_size));
+      shape_rank, shape, element_type, encoding_type, &allocation_size));
 
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
@@ -750,7 +751,7 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
         .shape_rank = shape_rank,
     };
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_generate_buffer(
-        iree_hal_device_allocator(replay->device), shape, shape_rank,
+        iree_hal_device_allocator(replay->device), shape_rank, shape,
         element_type, encoding_type,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
@@ -760,7 +761,7 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
         iree_trace_replay_generate_hal_buffer_callback, &params, &buffer_view));
   } else {
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_allocate_buffer(
-        iree_hal_device_allocator(replay->device), shape, shape_rank,
+        iree_hal_device_allocator(replay->device), shape_rank, shape,
         element_type, encoding_type,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,

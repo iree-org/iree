@@ -9,9 +9,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-IREE_API_EXPORT iree_status_t iree_bitfield_format(
-    uint32_t value, const iree_bitfield_string_mapping_t* mappings,
-    iree_host_size_t mapping_count, iree_string_builder_t* string_builder) {
+IREE_API_EXPORT iree_status_t
+iree_bitfield_format(uint32_t value, iree_host_size_t mapping_count,
+                     const iree_bitfield_string_mapping_t* mappings,
+                     iree_string_builder_t* string_builder) {
   uint32_t remaining_bits = value;
   int i = 0;
   for (iree_host_size_t mapping_index = 0; mapping_index < mapping_count;
@@ -39,14 +40,15 @@ IREE_API_EXPORT iree_status_t iree_bitfield_format(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_string_view_t iree_bitfield_format_inline(
-    uint32_t value, const iree_bitfield_string_mapping_t* mappings,
-    iree_host_size_t mapping_count, iree_bitfield_string_temp_t* out_temp) {
+IREE_API_EXPORT iree_string_view_t
+iree_bitfield_format_inline(uint32_t value, iree_host_size_t mapping_count,
+                            const iree_bitfield_string_mapping_t* mappings,
+                            iree_bitfield_string_temp_t* out_temp) {
   iree_string_builder_t string_builder;
   iree_string_builder_initialize_with_storage(
       out_temp->buffer, IREE_ARRAYSIZE(out_temp->buffer), &string_builder);
   iree_status_t status =
-      iree_bitfield_format(value, mappings, mapping_count, &string_builder);
+      iree_bitfield_format(value, mapping_count, mappings, &string_builder);
   if (iree_status_is_ok(status)) {
     return iree_string_builder_view(&string_builder);
   }

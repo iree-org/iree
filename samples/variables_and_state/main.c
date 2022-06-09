@@ -48,8 +48,8 @@ iree_status_t counter_set_value(iree_runtime_session_t* session,
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_allocate_buffer(
-        iree_runtime_session_device_allocator(session), /*shape=*/NULL,
-        /*shape_rank=*/0, IREE_HAL_ELEMENT_TYPE_SINT_32,
+        iree_runtime_session_device_allocator(session),
+        /*shape_rank=*/0, /*shape=*/NULL, IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
@@ -81,8 +81,8 @@ iree_status_t counter_add_to_value(iree_runtime_session_t* session, int x) {
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_allocate_buffer(
-        iree_runtime_session_device_allocator(session), /*shape=*/NULL,
-        /*shape_rank=*/0, IREE_HAL_ELEMENT_TYPE_SINT_32,
+        iree_runtime_session_device_allocator(session), /*shape_rank=*/0,
+        /*shape=*/NULL, IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,

@@ -158,12 +158,12 @@ static iree_status_t iree_hal_vulkan_driver_query_extensibility_set(
     iree_hal_vulkan_extensibility_set_t set, iree::Arena* arena,
     iree_hal_vulkan_string_list_t* out_string_list) {
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_query_extensibility_set(
-      requested_features, set, 0, NULL, &out_string_list->count));
+      requested_features, set, 0, &out_string_list->count, NULL));
   out_string_list->values = (const char**)arena->AllocateBytes(
       out_string_list->count * sizeof(out_string_list->values[0]));
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_query_extensibility_set(
-      requested_features, set, out_string_list->count, out_string_list->values,
-      &out_string_list->count));
+      requested_features, set, out_string_list->count, &out_string_list->count,
+      out_string_list->values));
   return iree_ok_status();
 }
 
@@ -377,8 +377,8 @@ static uint8_t* iree_hal_vulkan_populate_device_info(
 
 static iree_status_t iree_hal_vulkan_driver_query_available_devices(
     iree_hal_driver_t* base_driver, iree_allocator_t host_allocator,
-    iree_hal_device_info_t** out_device_infos,
-    iree_host_size_t* out_device_info_count) {
+    iree_host_size_t* out_device_info_count,
+    iree_hal_device_info_t** out_device_infos) {
   iree_hal_vulkan_driver_t* driver = iree_hal_vulkan_driver_cast(base_driver);
 
   // Query all devices from the Vulkan instance.

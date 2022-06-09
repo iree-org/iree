@@ -219,13 +219,14 @@ static void iree_vm_context_release_modules(iree_vm_context_t* context,
 IREE_API_EXPORT iree_status_t iree_vm_context_create(
     iree_vm_instance_t* instance, iree_vm_context_flags_t flags,
     iree_allocator_t allocator, iree_vm_context_t** out_context) {
-  return iree_vm_context_create_with_modules(instance, flags, NULL, 0,
-                                             allocator, out_context);
+  return iree_vm_context_create_with_modules(
+      instance, flags, /*module_count=*/0, /*modules=*/NULL, allocator,
+      out_context);
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_context_create_with_modules(
     iree_vm_instance_t* instance, iree_vm_context_flags_t flags,
-    iree_vm_module_t** modules, iree_host_size_t module_count,
+    iree_host_size_t module_count, iree_vm_module_t** modules,
     iree_allocator_t allocator, iree_vm_context_t** out_context) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(out_context);
@@ -236,7 +237,8 @@ IREE_API_EXPORT iree_status_t iree_vm_context_create_with_modules(
       sizeof(iree_vm_module_state_t*) * module_count;
 
   iree_vm_context_t* context = NULL;
-  iree_allocator_malloc(allocator, context_size, (void**)&context);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(allocator, context_size, (void**)&context));
   iree_atomic_ref_count_init(&context->ref_count);
   context->instance = instance;
   iree_vm_instance_retain(context->instance);
@@ -260,7 +262,7 @@ IREE_API_EXPORT iree_status_t iree_vm_context_create_with_modules(
   context->list.capacity = module_count;
 
   iree_status_t register_status =
-      iree_vm_context_register_modules(context, modules, module_count);
+      iree_vm_context_register_modules(context, module_count, modules);
   if (!iree_status_is_ok(register_status)) {
     iree_vm_context_destroy(context);
     IREE_TRACE_ZONE_END(z0);
@@ -324,8 +326,8 @@ iree_vm_context_flags(const iree_vm_context_t* context) {
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
-    iree_vm_context_t* context, iree_vm_module_t** modules,
-    iree_host_size_t module_count) {
+    iree_vm_context_t* context, iree_host_size_t module_count,
+    iree_vm_module_t** modules) {
   IREE_ASSERT_ARGUMENT(context);
   if (!modules && module_count > 1) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,

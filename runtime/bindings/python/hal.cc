@@ -126,7 +126,7 @@ py::object HalAllocator::AllocateBufferCopy(
   iree_hal_buffer_view_t* hal_buffer_view;
   CheckApiStatus(
       iree_hal_buffer_view_create(
-          hal_buffer, dims.data(), dims.size(), *element_type, encoding_type,
+          hal_buffer, dims.size(), dims.data(), *element_type, encoding_type,
           iree_hal_allocator_host_allocator(raw_ptr()), &hal_buffer_view),
       "Error allocating buffer_view");
   iree_hal_buffer_release(hal_buffer);
@@ -210,12 +210,12 @@ py::str HalBufferView::Repr() {
 //------------------------------------------------------------------------------
 
 std::vector<std::string> HalDriver::Query() {
-  iree_hal_driver_info_t* driver_infos = NULL;
   iree_host_size_t driver_info_count = 0;
+  iree_hal_driver_info_t* driver_infos = NULL;
   CheckApiStatus(
       iree_hal_driver_registry_enumerate(iree_hal_driver_registry_default(),
-                                         iree_allocator_system(), &driver_infos,
-                                         &driver_info_count),
+                                         iree_allocator_system(),
+                                         &driver_info_count, &driver_infos),
       "Error enumerating HAL drivers");
   std::vector<std::string> driver_names(driver_info_count);
   for (iree_host_size_t i = 0; i < driver_info_count; ++i) {

@@ -170,8 +170,8 @@ typedef struct iree_hal_buffer_view_t iree_hal_buffer_view_t;
 // Creates a buffer view with the given |buffer|.
 // |out_buffer_view| must be released by the caller.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
-    iree_hal_buffer_t* buffer, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_hal_buffer_t* buffer, iree_host_size_t shape_rank,
+    const iree_hal_dim_t* shape, iree_hal_element_type_t element_type,
     iree_hal_encoding_type_t encoding_type, iree_allocator_t host_allocator,
     iree_hal_buffer_view_t** out_buffer_view);
 
@@ -248,16 +248,16 @@ iree_hal_buffer_view_byte_length(const iree_hal_buffer_view_t* buffer_view);
 // Calculates a byte offset into the |buffer_view| at the given indices.
 // Requires that the encoding and element type support indexing.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_compute_offset(
-    const iree_hal_buffer_view_t* buffer_view, const iree_hal_dim_t* indices,
-    iree_host_size_t indices_count, iree_device_size_t* out_offset);
+    const iree_hal_buffer_view_t* buffer_view, iree_host_size_t indices_count,
+    const iree_hal_dim_t* indices, iree_device_size_t* out_offset);
 
 // Calculates a byte range into the |buffer_view| of the given contiguous range.
 // Requires that the encoding and element type support indexing.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_compute_range(
-    const iree_hal_buffer_view_t* buffer_view,
-    const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
-    const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
-    iree_device_size_t* out_start_offset, iree_device_size_t* out_length);
+    const iree_hal_buffer_view_t* buffer_view, iree_host_size_t indices_count,
+    const iree_hal_dim_t* start_indices, iree_host_size_t lengths_count,
+    const iree_hal_dim_t* lengths, iree_device_size_t* out_start_offset,
+    iree_device_size_t* out_length);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_buffer_view_t implementation details

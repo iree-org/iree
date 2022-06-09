@@ -97,7 +97,8 @@ IREE_API_EXPORT iree_status_t iree_runtime_session_create_with_device(
     status = iree_hal_module_create(device, host_allocator, &hal_module);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_vm_context_register_modules(session->context, &hal_module, 1);
+    status = iree_vm_context_register_modules(
+        session->context, /*module_count=*/1, /*modules=*/&hal_module);
   }
   if (iree_status_is_ok(status)) {
     status = iree_vm_context_resolve_module_state(session->context, hal_module,
@@ -189,8 +190,9 @@ IREE_API_EXPORT iree_status_t iree_runtime_session_append_module(
   IREE_TRACE_ZONE_APPEND_TEXT(z0, iree_vm_module_name(module).data,
                               iree_vm_module_name(module).size);
 
-  iree_status_t status = iree_vm_context_register_modules(
-      iree_runtime_session_context(session), &module, 1);
+  iree_status_t status =
+      iree_vm_context_register_modules(iree_runtime_session_context(session),
+                                       /*module_count=*/1, /*modules=*/&module);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

@@ -97,8 +97,8 @@ static void iree_hal_sync_driver_destroy(iree_hal_driver_t* base_driver) {
 
 static iree_status_t iree_hal_sync_driver_query_available_devices(
     iree_hal_driver_t* base_driver, iree_allocator_t host_allocator,
-    iree_hal_device_info_t** out_device_infos,
-    iree_host_size_t* out_device_info_count) {
+    iree_host_size_t* out_device_info_count,
+    iree_hal_device_info_t** out_device_infos) {
   static const iree_hal_device_info_t device_infos[1] = {
       {
           .device_id = IREE_HAL_SYNC_DEVICE_ID_DEFAULT,
