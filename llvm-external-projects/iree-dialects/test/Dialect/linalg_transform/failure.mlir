@@ -1,38 +1,5 @@
 // RUN: iree-dialects-opt --linalg-transform-interp --split-input-file --verify-diagnostics --allow-unregistered-dialect %s
 
-// This cannot be vectorized because of dynamic tensor shapes. We expect the
-// pass fail and report an error at the vectorization operation below.
-func.func public @non_vectorizable(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) -> tensor<?xf32> {
-  %0 = linalg.generic {
-      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
-      iterator_types = ["parallel"]}
-    ins(%arg0: tensor<?xf32>) outs(%arg1: tensor<?xf32>) {
-  ^bb0(%arg2: f32, %arg3: f32):
-    %1 = arith.mulf %arg2, %arg2 : f32
-    linalg.yield %1 : f32
-  } -> tensor<?xf32>
-  return %0 : tensor<?xf32>
-}
-
-transform.with_pdl_patterns {
-^bb0(%arg0: !pdl.operation):
-  pdl.pattern @target_pattern : benefit(1) {
-    %0 = operands
-    %1 = types
-    %2 = operation "linalg.generic"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
-    rewrite %2 with "transform.dialect"
-  }
-
-  transform.structured.canonicalized_sequence %arg0 {
-  ^bb1(%arg1: !pdl.operation):
-    %0 = pdl_match @target_pattern in %arg1
-    // expected-error@below {{failed to apply}}
-    transform.structured2.vectorize %0
-  }
-}
-
-// -----
-
 func.func public @no_outlining() {
   // expected-note @below {{target op}}
   "some.operation"() ({}, {}) : () -> ()
@@ -52,41 +19,6 @@ transform.with_pdl_patterns {
     // Make sure we don't crash on wrong operation type.
     // expected-error@below {{failed to outline}}
     transform.loop.outline %0 {func_name = "outlined"}
-  }
-}
-
-// -----
-
-func.func @no_replacement(
-  %arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>,
-  %arg2: tensor<128x128xf32> {linalg.inplaceable = true})
-    -> tensor<128x128xf32> {
-  // expected-error @below {{could not find replacement for tracked op}}
-  %0 = linalg.matmul {test.attrA}
-                     ins(%arg0, %arg1: tensor<128x128xf32>, tensor<128x128xf32>)
-                     outs(%arg2: tensor<128x128xf32>)
-    -> tensor<128x128xf32>
-  return %0 : tensor<128x128xf32>
-}
-
-transform.with_pdl_patterns {
-^bb0(%arg0: !pdl.operation):
-  pdl.pattern @pdl_target : benefit(1) {
-    %args = operands
-    %results = types
-    %0 = operation "linalg.matmul"(%args : !pdl.range<value>) -> (%results : !pdl.range<type>)
-    %1 = pdl.attribute = @no_replacement
-    apply_native_constraint "nestedInFunc"(%0, %1 : !pdl.operation, !pdl.attribute)
-    // TODO: we don't want this, but it is the required terminator for pdl.pattern
-    rewrite %0 with "transform.dialect"
-  }
-
-  transform.structured.canonicalized_sequence %arg0 {
-  ^bb1(%arg1: !pdl.operation):
-    %0 = pdl_match @pdl_target in %arg1
-    // expected-error @below {{failed to apply}}
-    transform.structured2.vectorize
-    transform.structured.tile %0 {sizes = [32, 32, 32]}
   }
 }
 

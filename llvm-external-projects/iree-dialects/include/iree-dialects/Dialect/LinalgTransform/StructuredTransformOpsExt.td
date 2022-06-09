@@ -52,24 +52,6 @@ def BufferizeOp : Op<Transform_Dialect, "bufferize",
   let cppNamespace = "transform_ext";
 }
 
-def VectorizeOp : Op<Transform_Dialect, "structured2.vectorize",
-     [DeclareOpInterfaceMethods<TransformOpInterface>,
-      FunctionalStyleMultiOperandMultiResultTransformOpTrait,
-      MemoryEffectsOpInterface]> {
-  let description = [{Indiactes that vectorization should be performed. If a
-  target handle is provided, only vectorizes the operations pointed to by the
-  handle. Otherwise vectorizes the entire module. Vectorization options are
-  provided as operation attributes.}];
-
-  let arguments = (ins Optional<PDL_Operation>:$target,
-                   DefaultValuedAttr<BoolAttr, "false">:$vectorize_padding
-                  );
-  let results = (outs Optional<PDL_Operation>:$transformed);
-
-  let hasCustomAssemblyFormat = 1;
-  let cppNamespace = "transform_ext";
-}
-
 def LowerVectorsOp : Op<Transform_Dialect, "lower_vectors",
     [DeclareOpInterfaceMethods<TransformOpInterface>, 
      FunctionalStyleMultiOperandMultiResultTransformOpTrait,
