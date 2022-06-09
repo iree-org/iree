@@ -1,3 +1,0 @@
-// RUN: (iree-run-mnist-module %S/mnist_test.png) | FileCheck %s
-// CHECK-LABEL: Detected number
-// CHECK: 4
