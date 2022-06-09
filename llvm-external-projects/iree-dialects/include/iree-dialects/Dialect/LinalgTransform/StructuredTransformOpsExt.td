@@ -42,25 +42,6 @@ def CanonicalizedSequenceOp
 
 //===----------------------------------------------------------------------===//
 
-def FuseOp : Op<Transform_Dialect, "structured.fuse",
-    [FunctionalStyleMultiOperandMultiResultTransformOpTrait, 
-     MemoryEffectsOpInterface,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
-  let description = [{Tiles the operations pointed to by the target handle and
-  fuses their producers greedily using the options provided as attributes.}];
-
-  let arguments =
-    (ins PDL_Operation:$target,
-         DefaultValuedAttr<I64ArrayAttr, "{}">:$tile_sizes,
-         DefaultValuedAttr<I64ArrayAttr, "{}">:$tile_interchange);
-  let results = (outs PDL_Operation:$transformed,
-                      Variadic<PDL_Operation>:$loops);
-
-  let hasCustomAssemblyFormat = 1;
-  let hasVerifier = 1;
-  let cppNamespace = "transform_ext";
-}
-
 def BufferizeOp : Op<Transform_Dialect, "bufferize",
     [DeclareOpInterfaceMethods<TransformOpInterface>, 
      FunctionalStyleMultiOperandMultiResultTransformOpTrait,
