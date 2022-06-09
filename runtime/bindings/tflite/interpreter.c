@@ -34,11 +34,11 @@ static iree_status_t _TfLiteInterpreterPrepareHAL(
   iree_hal_driver_registry_t* driver_registry =
       iree_hal_driver_registry_default();
 
-  iree_hal_driver_info_t* driver_infos = NULL;
   iree_host_size_t driver_info_count = 0;
+  iree_hal_driver_info_t* driver_infos = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_driver_registry_enumerate(
-      driver_registry, interpreter->allocator, &driver_infos,
-      &driver_info_count));
+      driver_registry, interpreter->allocator, &driver_info_count,
+      &driver_infos));
 
   // TODO(benvanik): figure out how we want to emulate device selection; may
   // just say "whatever is first" on a query.
@@ -371,7 +371,7 @@ static iree_status_t _TfLiteInterpreterCreate(
   // IREE functions that will call custom ops through TfLiteRegistrations.
   IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
       interpreter->instance, IREE_VM_CONTEXT_FLAG_NONE,
-      interpreter->all_modules, IREE_ARRAYSIZE(interpreter->all_modules),
+      IREE_ARRAYSIZE(interpreter->all_modules), interpreter->all_modules,
       interpreter->allocator, &interpreter->context));
 
   // Setup all I/O tensors and buffer views.

@@ -129,8 +129,8 @@ static bool iree_hal_cuda_is_valid_device(iree_hal_cuda_driver_t* driver,
 
 static iree_status_t iree_hal_cuda_driver_query_available_devices(
     iree_hal_driver_t* base_driver, iree_allocator_t host_allocator,
-    iree_hal_device_info_t** out_device_infos,
-    iree_host_size_t* out_device_info_count) {
+    iree_host_size_t* out_device_info_count,
+    iree_hal_device_info_t** out_device_infos) {
   iree_hal_cuda_driver_t* driver = iree_hal_cuda_driver_cast(base_driver);
   // Query the number of available CUDA devices.
   int device_count = 0;
@@ -173,10 +173,10 @@ static iree_status_t iree_hal_cuda_driver_select_default_device(
     iree_hal_driver_t* base_driver, iree_hal_cuda_dynamic_symbols_t* syms,
     int default_device_index, iree_allocator_t host_allocator,
     CUdevice* out_device) {
-  iree_hal_device_info_t* out_device_infos;
-  iree_host_size_t device_count;
+  iree_hal_device_info_t* device_infos = NULL;
+  iree_host_size_t device_count = 0;
   IREE_RETURN_IF_ERROR(iree_hal_cuda_driver_query_available_devices(
-      base_driver, host_allocator, &out_device_infos, &device_count));
+      base_driver, host_allocator, &device_count, &device_infos));
   iree_status_t status = iree_ok_status();
   if (device_count == 0) {
     status = iree_make_status(IREE_STATUS_UNAVAILABLE,
@@ -186,9 +186,9 @@ static iree_status_t iree_hal_cuda_driver_select_default_device(
                               "default device %d not found (of %ld enumerated)",
                               default_device_index, device_count);
   } else {
-    *out_device = (CUdevice)out_device_infos[default_device_index].device_id;
+    *out_device = (CUdevice)device_infos[default_device_index].device_id;
   }
-  iree_allocator_free(host_allocator, out_device_infos);
+  iree_allocator_free(host_allocator, device_infos);
   return status;
 }
 

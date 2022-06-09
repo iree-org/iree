@@ -23,10 +23,10 @@ namespace cts {
 class driver_test : public CtsTestBase {};
 
 TEST_P(driver_test, QueryAndCreateAvailableDevices) {
+  iree_host_size_t device_info_count = 0;
   iree_hal_device_info_t* device_infos = NULL;
-  iree_host_size_t device_info_count;
   IREE_ASSERT_OK(iree_hal_driver_query_available_devices(
-      driver_, iree_allocator_system(), &device_infos, &device_info_count));
+      driver_, iree_allocator_system(), &device_info_count, &device_infos));
 
   std::cout << "Driver has " << device_info_count << " device(s)";
   for (iree_host_size_t i = 0; i < device_info_count; ++i) {

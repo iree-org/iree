@@ -610,7 +610,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_create,  //
 
   iree_hal_buffer_view_t* buffer_view = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-      source_buffer, shape_dims, shape_rank, element_type, encoding_type,
+      source_buffer, shape_rank, shape_dims, element_type, encoding_type,
       state->host_allocator, &buffer_view));
   rets->r0 = iree_hal_buffer_view_move_ref(buffer_view);
   return iree_ok_status();
@@ -749,10 +749,10 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_assert,  //
     char expected_shape_str[32];
     iree_host_size_t expected_shape_str_length = 0;
     IREE_RETURN_IF_ERROR(iree_hal_format_shape(
-        actual_shape_dims, actual_shape_rank, sizeof(actual_shape_str),
+        actual_shape_rank, actual_shape_dims, sizeof(actual_shape_str),
         actual_shape_str, &actual_shape_str_length));
     IREE_RETURN_IF_ERROR(iree_hal_format_shape(
-        expected_shape_dims, expected_shape_rank, sizeof(expected_shape_str),
+        expected_shape_rank, expected_shape_dims, sizeof(expected_shape_str),
         expected_shape_str, &expected_shape_str_length));
     shape_status = iree_status_annotate_f(
         shape_status, "expected shape %.*s, actual shape %.*s",

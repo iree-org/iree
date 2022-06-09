@@ -27,8 +27,8 @@ IREE_FLAG(bool, cuda_allow_inline_execution, false,
 IREE_FLAG(int32_t, cuda_default_index, 0, "Index of the default CUDA device.");
 
 static iree_status_t iree_hal_cuda_driver_factory_enumerate(
-    void* self, const iree_hal_driver_info_t** out_driver_infos,
-    iree_host_size_t* out_driver_info_count) {
+    void* self, iree_host_size_t* out_driver_info_count,
+    const iree_hal_driver_info_t** out_driver_infos) {
   // NOTE: we could query supported cuda versions or featuresets here.
   static const iree_hal_driver_info_t driver_infos[1] = {{
       .driver_name = iree_string_view_literal("cuda"),

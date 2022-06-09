@@ -63,7 +63,7 @@ class CheckTest : public ::testing::Test {
   void SetUp() override {
     std::vector<iree_vm_module_t*> modules = {hal_module_, check_module_};
     IREE_ASSERT_OK(iree_vm_context_create_with_modules(
-        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.data(), modules.size(),
+        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.size(), modules.data(),
         iree_allocator_system(), &context_));
     allocator_ = iree_hal_device_allocator(device_);
   }
@@ -88,7 +88,7 @@ class CheckTest : public ::testing::Test {
                    IREE_HAL_BUFFER_USAGE_TRANSFER |
                    IREE_HAL_BUFFER_USAGE_MAPPING;
     IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
-        allocator_, shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_INT_32,
+        allocator_, shape.size(), shape.data(), IREE_HAL_ELEMENT_TYPE_INT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
         iree_make_const_byte_span(contents.data(),
                                   contents.size() * sizeof(int32_t)),
@@ -110,7 +110,7 @@ class CheckTest : public ::testing::Test {
                    IREE_HAL_BUFFER_USAGE_TRANSFER |
                    IREE_HAL_BUFFER_USAGE_MAPPING;
     IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
-        allocator_, shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_FLOAT_16,
+        allocator_, shape.size(), shape.data(), IREE_HAL_ELEMENT_TYPE_FLOAT_16,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
         iree_make_const_byte_span(contents.data(),
                                   contents.size() * sizeof(uint16_t)),
@@ -132,7 +132,7 @@ class CheckTest : public ::testing::Test {
                    IREE_HAL_BUFFER_USAGE_TRANSFER |
                    IREE_HAL_BUFFER_USAGE_MAPPING;
     IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
-        allocator_, shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+        allocator_, shape.size(), shape.data(), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
         iree_make_const_byte_span(contents.data(),
                                   contents.size() * sizeof(float)),
@@ -154,7 +154,7 @@ class CheckTest : public ::testing::Test {
                    IREE_HAL_BUFFER_USAGE_TRANSFER |
                    IREE_HAL_BUFFER_USAGE_MAPPING;
     IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
-        allocator_, shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_FLOAT_64,
+        allocator_, shape.size(), shape.data(), IREE_HAL_ELEMENT_TYPE_FLOAT_64,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
         iree_make_const_byte_span(contents.data(),
                                   contents.size() * sizeof(double)),

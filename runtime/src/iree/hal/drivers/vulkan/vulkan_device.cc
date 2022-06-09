@@ -45,7 +45,7 @@ using namespace iree::hal::vulkan;
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
     iree_hal_vulkan_features_t requested_features,
     iree_hal_vulkan_extensibility_set_t set, iree_host_size_t string_capacity,
-    const char** out_string_values, iree_host_size_t* out_string_count) {
+    iree_host_size_t* out_string_count, const char** out_string_values) {
   *out_string_count = 0;
 
   iree_status_t status = iree_ok_status();
@@ -676,12 +676,12 @@ static iree_status_t iree_hal_vulkan_device_query_extensibility_set(
     iree_hal_vulkan_extensibility_set_t set, iree::Arena* arena,
     iree_hal_vulkan_string_list_t* out_string_list) {
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_query_extensibility_set(
-      requested_features, set, 0, NULL, &out_string_list->count));
+      requested_features, set, 0, &out_string_list->count, NULL));
   out_string_list->values = (const char**)arena->AllocateBytes(
       out_string_list->count * sizeof(out_string_list->values[0]));
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_query_extensibility_set(
-      requested_features, set, out_string_list->count, out_string_list->values,
-      &out_string_list->count));
+      requested_features, set, out_string_list->count, &out_string_list->count,
+      out_string_list->values));
   return iree_ok_status();
 }
 

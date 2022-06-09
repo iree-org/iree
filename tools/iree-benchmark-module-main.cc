@@ -329,7 +329,7 @@ class IREEBenchmark {
     // module.
     std::array<iree_vm_module_t*, 2> modules = {hal_module_, input_module_};
     IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
-        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.data(), modules.size(),
+        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.size(), modules.data(),
         iree_allocator_system(), &context_));
 
     IREE_TRACE_FRAME_MARK_END_NAMED("init");

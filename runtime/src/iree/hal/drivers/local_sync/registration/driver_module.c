@@ -14,8 +14,8 @@
 #include "iree/hal/local/loaders/registration/init.h"
 
 static iree_status_t iree_hal_local_sync_driver_factory_enumerate(
-    void* self, const iree_hal_driver_info_t** out_driver_infos,
-    iree_host_size_t* out_driver_info_count) {
+    void* self, iree_host_size_t* out_driver_info_count,
+    const iree_hal_driver_info_t** out_driver_infos) {
   static const iree_hal_driver_info_t default_driver_info = {
       .driver_name = IREE_SVL("local-sync"),
       .full_name = IREE_SVL("Local executable execution using a lightweight "

@@ -34,7 +34,7 @@ IREE_API_EXPORT iree_string_view_t iree_hal_memory_type_format(
       {IREE_HAL_MEMORY_TYPE_HOST_CACHED, IREE_SVL("HOST_CACHED")},
       {IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE, IREE_SVL("DEVICE_VISIBLE")},
   };
-  return iree_bitfield_format_inline(value, mappings, IREE_ARRAYSIZE(mappings),
+  return iree_bitfield_format_inline(value, IREE_ARRAYSIZE(mappings), mappings,
                                      out_temp);
 }
 
@@ -51,7 +51,7 @@ IREE_API_EXPORT iree_string_view_t iree_hal_memory_access_format(
       {IREE_HAL_MEMORY_ACCESS_MAY_ALIAS, IREE_SVL("MAY_ALIAS")},
       {IREE_HAL_MEMORY_ACCESS_ANY, IREE_SVL("ANY")},
   };
-  return iree_bitfield_format_inline(value, mappings, IREE_ARRAYSIZE(mappings),
+  return iree_bitfield_format_inline(value, IREE_ARRAYSIZE(mappings), mappings,
                                      out_temp);
 }
 
@@ -65,7 +65,7 @@ IREE_API_EXPORT iree_string_view_t iree_hal_buffer_usage_format(
       {IREE_HAL_BUFFER_USAGE_MAPPING, IREE_SVL("MAPPING")},
       {IREE_HAL_BUFFER_USAGE_DISPATCH, IREE_SVL("DISPATCH")},
   };
-  return iree_bitfield_format_inline(value, mappings, IREE_ARRAYSIZE(mappings),
+  return iree_bitfield_format_inline(value, IREE_ARRAYSIZE(mappings), mappings,
                                      out_temp);
 }
 

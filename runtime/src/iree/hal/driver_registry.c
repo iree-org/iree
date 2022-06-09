@@ -190,9 +190,11 @@ static iree_host_size_t iree_hal_driver_info_copy(
 
 IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
     iree_hal_driver_registry_t* registry, iree_allocator_t host_allocator,
-    iree_hal_driver_info_t** out_driver_infos,
-    iree_host_size_t* out_driver_info_count) {
+    iree_host_size_t* out_driver_info_count,
+    iree_hal_driver_info_t** out_driver_infos) {
   IREE_ASSERT_ARGUMENT(registry);
+  IREE_ASSERT_ARGUMENT(out_driver_info_count);
+  IREE_ASSERT_ARGUMENT(out_driver_infos);
   IREE_TRACE_ZONE_BEGIN(z0);
 
   *out_driver_info_count = 0;
@@ -210,7 +212,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
     const iree_hal_driver_info_t* driver_infos = NULL;
     iree_host_size_t driver_info_count = 0;
     status =
-        factory->enumerate(factory->self, &driver_infos, &driver_info_count);
+        factory->enumerate(factory->self, &driver_info_count, &driver_infos);
     if (!iree_status_is_ok(status)) break;
     total_driver_info_count += driver_info_count;
     for (iree_host_size_t j = 0; j < driver_info_count; j++) {
@@ -241,7 +243,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
       const iree_hal_driver_info_t* driver_infos = NULL;
       iree_host_size_t driver_info_count = 0;
       status =
-          factory->enumerate(factory->self, &driver_infos, &driver_info_count);
+          factory->enumerate(factory->self, &driver_info_count, &driver_infos);
       if (!iree_status_is_ok(status)) break;
       for (iree_host_size_t j = 0; j < driver_info_count; j++) {
         string_storage_ptr += iree_hal_driver_info_copy(
@@ -288,7 +290,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
     const iree_hal_driver_info_t* driver_infos = NULL;
     iree_host_size_t driver_info_count = 0;
     status =
-        factory->enumerate(factory->self, &driver_infos, &driver_info_count);
+        factory->enumerate(factory->self, &driver_info_count, &driver_infos);
     if (!iree_status_is_ok(status)) break;
 
     // Scan for the specific driver by name.

@@ -46,17 +46,18 @@ typedef struct iree_bitfield_string_mapping_t {
 //  // Produces the string "A|B":
 //  IREE_RETURN_IF_ERROR(iree_bitfield_format(
 //      MY_BITFIELD_A | MY_BITFIELD_B,
-//      my_bitfield_mappings, IREE_ARRAYSIZE(my_bitfield_mappings),
+//      IREE_ARRAYSIZE(my_bitfield_mappings), my_bitfield_mappings,
 //      &string_builder));
 //
 //  // Produces the string "ALL":
 //  IREE_RETURN_IF_ERROR(iree_bitfield_format(
 //      MY_BITFIELD_A | MY_BITFIELD_B | MY_BITFIELD_C,
-//      my_bitfield_mappings, IREE_ARRAYSIZE(my_bitfield_mappings),
+//      IREE_ARRAYSIZE(my_bitfield_mappings), my_bitfield_mappings,
 //      &string_builder));
-IREE_API_EXPORT iree_status_t iree_bitfield_format(
-    uint32_t value, const iree_bitfield_string_mapping_t* mappings,
-    iree_host_size_t mapping_count, iree_string_builder_t* string_builder);
+IREE_API_EXPORT iree_status_t
+iree_bitfield_format(uint32_t value, iree_host_size_t mapping_count,
+                     const iree_bitfield_string_mapping_t* mappings,
+                     iree_string_builder_t* string_builder);
 
 // Stack storage for iree_bitfield_format_inline temporary strings.
 typedef struct iree_bitfield_string_temp_t {
@@ -72,11 +73,12 @@ typedef struct iree_bitfield_string_temp_t {
 //  iree_bitfield_string_temp_t temp;
 //  iree_string_view_t my_str = iree_bitfield_format_inline(
 //      MY_BITFIELD_A | MY_BITFIELD_B,
-//      my_bitfield_mappings, IREE_ARRAYSIZE(my_bitfield_mappings),
+//      IREE_ARRAYSIZE(my_bitfield_mappings), my_bitfield_mappings,
 //      &temp);
-IREE_API_EXPORT iree_string_view_t iree_bitfield_format_inline(
-    uint32_t value, const iree_bitfield_string_mapping_t* mappings,
-    iree_host_size_t mapping_count, iree_bitfield_string_temp_t* out_temp);
+IREE_API_EXPORT iree_string_view_t
+iree_bitfield_format_inline(uint32_t value, iree_host_size_t mapping_count,
+                            const iree_bitfield_string_mapping_t* mappings,
+                            iree_bitfield_string_temp_t* out_temp);
 
 #ifdef __cplusplus
 }  // extern "C"

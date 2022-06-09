@@ -65,7 +65,7 @@ class CheckModuleTest : public ::testing::Test {
         instance_,
         FLAG_trace_execution ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
                              : IREE_VM_CONTEXT_FLAG_NONE,
-        modules_.data(), modules_.size(), iree_allocator_system(), &context_));
+        modules_.size(), modules_.data(), iree_allocator_system(), &context_));
   }
   void TearDown() override { iree_vm_context_release(context_); }
 

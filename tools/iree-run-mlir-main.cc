@@ -176,11 +176,11 @@ Status GetTargetBackends(std::vector<std::string>* out_target_backends) {
       mlir::iree_compiler::IREE::HAL::TargetOptions::FromFlags::get().targets;
   if (target_backends.empty()) {
     iree_allocator_t host_allocator = iree_allocator_system();
-    iree_hal_driver_info_t* driver_infos = NULL;
     iree_host_size_t driver_info_count = 0;
+    iree_hal_driver_info_t* driver_infos = NULL;
     IREE_RETURN_IF_ERROR(iree_hal_driver_registry_enumerate(
-        iree_hal_available_driver_registry(), host_allocator, &driver_infos,
-        &driver_info_count));
+        iree_hal_available_driver_registry(), host_allocator,
+        &driver_info_count, &driver_infos));
     for (iree_host_size_t i = 0; i < driver_info_count; ++i) {
       target_backends.push_back(std::string(driver_infos[i].driver_name.data,
                                             driver_infos[i].driver_name.size));
@@ -383,7 +383,7 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
             instance,
             trace_execution_flag ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
                                  : IREE_VM_CONTEXT_FLAG_NONE,
-            modules.data(), modules.size(), iree_allocator_system(), &context),
+            modules.size(), modules.data(), iree_allocator_system(), &context),
         "Creating context");
 
     // Invoke the function and print results.

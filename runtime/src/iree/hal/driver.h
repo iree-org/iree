@@ -67,8 +67,8 @@ IREE_API_EXPORT void iree_hal_driver_release(iree_hal_driver_t* driver);
 // allocator by the caller.
 IREE_API_EXPORT iree_status_t iree_hal_driver_query_available_devices(
     iree_hal_driver_t* driver, iree_allocator_t host_allocator,
-    iree_hal_device_info_t** out_device_infos,
-    iree_host_size_t* out_device_info_count);
+    iree_host_size_t* out_device_info_count,
+    iree_hal_device_info_t** out_device_infos);
 
 // Creates a device with the given |device_ordinal| as enumerated by
 // iree_hal_driver_query_available_devices. The ordering of devices is driver
@@ -139,8 +139,8 @@ typedef struct iree_hal_driver_vtable_t {
 
   iree_status_t(IREE_API_PTR* query_available_devices)(
       iree_hal_driver_t* driver, iree_allocator_t host_allocator,
-      iree_hal_device_info_t** out_device_infos,
-      iree_host_size_t* out_device_info_count);
+      iree_host_size_t* out_device_info_count,
+      iree_hal_device_info_t** out_device_infos);
 
   iree_status_t(IREE_API_PTR* create_device_by_id)(
       iree_hal_driver_t* driver, iree_hal_device_id_t device_id,

@@ -25,7 +25,7 @@ extern "C" {
 
 // Calculates the allocation size of a buffer view.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_size(
-    const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
+    iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
     iree_hal_element_type_t element_type,
     iree_hal_encoding_type_t encoding_type,
     iree_device_size_t* out_allocation_size);
@@ -33,19 +33,19 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_size(
 // Calculates a byte offset into a buffer at the given indices.
 // Only works with densely-packed representations.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_offset(
-    const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
+    iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
     iree_hal_element_type_t element_type,
-    iree_hal_encoding_type_t encoding_type, const iree_hal_dim_t* indices,
-    size_t indices_count, iree_device_size_t* out_offset);
+    iree_hal_encoding_type_t encoding_type, iree_host_size_t indices_count,
+    const iree_hal_dim_t* indices, iree_device_size_t* out_offset);
 
 // Calculates a byte range into a buffer of the given contiguous range.
 // Only works with densely-packed representations.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_range(
-    const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
+    iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
     iree_hal_element_type_t element_type,
-    iree_hal_encoding_type_t encoding_type, const iree_hal_dim_t* start_indices,
-    iree_host_size_t indices_count, const iree_hal_dim_t* lengths,
-    iree_host_size_t lengths_count, iree_device_size_t* out_start_offset,
+    iree_hal_encoding_type_t encoding_type, iree_host_size_t indices_count,
+    const iree_hal_dim_t* start_indices, iree_host_size_t lengths_count,
+    const iree_hal_dim_t* lengths, iree_device_size_t* out_start_offset,
     iree_device_size_t* out_length);
 
 //===----------------------------------------------------------------------===//
@@ -59,8 +59,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_range(
 //   2. iree_hal_allocator_allocate_buffer
 //   3. iree_hal_buffer_view_create
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
-    iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_hal_allocator_t* allocator, iree_host_size_t shape_rank,
+    const iree_hal_dim_t* shape, iree_hal_element_type_t element_type,
     iree_hal_encoding_type_t encoding_type,
     iree_hal_buffer_params_t buffer_params, iree_const_byte_span_t initial_data,
     iree_hal_buffer_view_t** out_buffer_view);
@@ -91,8 +91,8 @@ typedef iree_status_t(IREE_API_PTR* iree_hal_buffer_view_generator_callback_t)(
 //   3. iree_hal_buffer_map_range + callback + iree_hal_buffer_unmap_range
 //   4. iree_hal_buffer_view_create
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_generate_buffer(
-    iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_hal_allocator_t* allocator, iree_host_size_t shape_rank,
+    const iree_hal_dim_t* shape, iree_hal_element_type_t element_type,
     iree_hal_encoding_type_t encoding_type,
     iree_hal_buffer_params_t buffer_params,
     iree_hal_buffer_view_generator_callback_t callback, void* user_data,

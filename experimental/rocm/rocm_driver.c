@@ -115,8 +115,8 @@ static uint8_t* iree_hal_rocm_populate_device_info(
 
 static iree_status_t iree_hal_rocm_driver_query_available_devices(
     iree_hal_driver_t* base_driver, iree_allocator_t host_allocator,
-    iree_hal_device_info_t** out_device_infos,
-    iree_host_size_t* out_device_info_count) {
+    iree_host_size_t* out_device_info_count,
+    iree_hal_device_info_t** out_device_infos) {
   iree_hal_rocm_driver_t* driver = iree_hal_rocm_driver_cast(base_driver);
   // Query the number of available ROCM devices.
   int device_count = 0;

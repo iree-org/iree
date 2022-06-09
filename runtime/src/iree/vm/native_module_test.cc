@@ -41,7 +41,7 @@ class VMNativeModuleTest : public ::testing::Test {
     // will be allocated.
     std::vector<iree_vm_module_t*> modules = {module_a, module_b};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
-        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.data(), modules.size(),
+        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.size(), modules.data(),
         iree_allocator_system(), &context_));
 
     // No longer need the modules as the context retains them.

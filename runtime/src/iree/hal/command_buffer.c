@@ -43,7 +43,7 @@ iree_hal_command_buffer_mode_format(iree_hal_command_buffer_mode_t value,
        IREE_SVL("ALLOW_INLINE_EXECUTION")},
       {IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED, IREE_SVL("UNVALIDATED")},
   };
-  return iree_bitfield_format_inline(value, mappings, IREE_ARRAYSIZE(mappings),
+  return iree_bitfield_format_inline(value, IREE_ARRAYSIZE(mappings), mappings,
                                      out_temp);
 }
 
@@ -56,7 +56,7 @@ IREE_API_EXPORT iree_string_view_t iree_hal_command_category_format(
       {IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_SVL("TRANSFER")},
       {IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_SVL("DISPATCH")},
   };
-  return iree_bitfield_format_inline(value, mappings, IREE_ARRAYSIZE(mappings),
+  return iree_bitfield_format_inline(value, IREE_ARRAYSIZE(mappings), mappings,
                                      out_temp);
 }
 

@@ -82,7 +82,7 @@ class VMBytecodeDispatchTest
 
     std::vector<iree_vm_module_t*> modules = {bytecode_module_};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
-        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.data(), modules.size(),
+        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.size(), modules.data(),
         iree_allocator_system(), &context_));
   }
 

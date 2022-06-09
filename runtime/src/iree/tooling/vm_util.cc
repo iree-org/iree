@@ -37,7 +37,7 @@ static iree_status_t CreateBufferViewFromFile(
   iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
   iree_host_size_t shape_rank = 0;
   iree_status_t shape_result = iree_hal_parse_shape_and_element_type(
-      metadata, 0, NULL, &shape_rank, &element_type);
+      metadata, 0, &shape_rank, NULL, &element_type);
   if (!iree_status_is_ok(shape_result) &&
       !iree_status_is_out_of_range(shape_result)) {
     return shape_result;
@@ -50,7 +50,7 @@ static iree_status_t CreateBufferViewFromFile(
   iree_hal_dim_t* shape =
       (iree_hal_dim_t*)iree_alloca(shape_rank * sizeof(iree_hal_dim_t));
   IREE_RETURN_IF_ERROR(iree_hal_parse_shape_and_element_type(
-      metadata, shape_rank, shape, &shape_rank, &element_type));
+      metadata, shape_rank, &shape_rank, shape, &element_type));
 
   // TODO(benvanik): allow specifying the encoding.
   iree_hal_encoding_type_t encoding_type =
@@ -75,7 +75,7 @@ static iree_status_t CreateBufferViewFromFile(
       file,
   };
   iree_status_t status = iree_hal_buffer_view_generate_buffer(
-      device_allocator, shape, shape_rank, element_type, encoding_type,
+      device_allocator, shape_rank, shape, element_type, encoding_type,
       buffer_params,
       +[](iree_hal_buffer_mapping_t* mapping, void* user_data) {
         auto* read_params = reinterpret_cast<read_params_t*>(user_data);

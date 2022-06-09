@@ -83,8 +83,8 @@ static iree_status_t allocate_host_buffer_view_like(
     iree_hal_allocator_t* hal_allocator, iree_hal_buffer_view_t* src,
     iree_hal_buffer_view_t** dst) {
   return iree_hal_buffer_view_allocate_buffer(
-      hal_allocator, iree_hal_buffer_view_shape_dims(src),
-      iree_hal_buffer_view_shape_rank(src),
+      hal_allocator, iree_hal_buffer_view_shape_rank(src),
+      iree_hal_buffer_view_shape_dims(src),
       iree_hal_buffer_view_element_type(src),
       iree_hal_buffer_view_encoding_type(src),
       (iree_hal_buffer_params_t){
@@ -101,8 +101,8 @@ static iree_status_t allocate_device_buffer_view_like(
     iree_hal_allocator_t* hal_allocator, iree_hal_buffer_view_t* src,
     iree_const_byte_span_t initial_data, iree_hal_buffer_view_t** dst) {
   return iree_hal_buffer_view_allocate_buffer(
-      hal_allocator, iree_hal_buffer_view_shape_dims(src),
-      iree_hal_buffer_view_shape_rank(src),
+      hal_allocator, iree_hal_buffer_view_shape_rank(src),
+      iree_hal_buffer_view_shape_dims(src),
       iree_hal_buffer_view_element_type(src),
       iree_hal_buffer_view_encoding_type(src),
       (iree_hal_buffer_params_t){
@@ -778,8 +778,8 @@ static iree_status_t make_device_identity_matrix_like(
     iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
     iree_hal_buffer_view_t* src, iree_hal_buffer_view_t** dst) {
   return iree_hal_buffer_view_generate_buffer(
-      hal_allocator, iree_hal_buffer_view_shape_dims(src),
-      iree_hal_buffer_view_shape_rank(src),
+      hal_allocator, iree_hal_buffer_view_shape_rank(src),
+      iree_hal_buffer_view_shape_dims(src),
       iree_hal_buffer_view_element_type(src),
       iree_hal_buffer_view_encoding_type(src),
       (iree_hal_buffer_params_t){

@@ -126,7 +126,7 @@ iree_status_t Run() {
           instance,
           FLAG_trace_execution ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
                                : IREE_VM_CONTEXT_FLAG_NONE,
-          modules.data(), modules.size(), iree_allocator_system(), &context),
+          modules.size(), modules.data(), iree_allocator_system(), &context),
       "creating context");
 
   std::string function_name = std::string(FLAG_entry_function);

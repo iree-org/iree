@@ -55,8 +55,8 @@ typedef struct iree_hal_driver_factory_t {
   //
   // Called with the driver registry lock held; may be called from any thread.
   iree_status_t(IREE_API_PTR* enumerate)(
-      void* self, const iree_hal_driver_info_t** out_driver_infos,
-      iree_host_size_t* out_driver_info_count);
+      void* self, iree_host_size_t* out_driver_info_count,
+      const iree_hal_driver_info_t** out_driver_infos);
 
   // Tries to create a driver as previously queried with enumerate.
   // |driver_id| is the opaque ID returned from enumeration; note that there may
@@ -135,8 +135,8 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_unregister_factory(
 // completing and any attempt to instantiate the driver.
 IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
     iree_hal_driver_registry_t* registry, iree_allocator_t host_allocator,
-    iree_hal_driver_info_t** out_driver_infos,
-    iree_host_size_t* out_driver_info_count);
+    iree_host_size_t* out_driver_info_count,
+    iree_hal_driver_info_t** out_driver_infos);
 
 // Attempts to create a driver registered with the given canonical driver name.
 // Effectively enumerate + find by name + try_create if found. Factories are

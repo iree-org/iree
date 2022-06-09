@@ -20,15 +20,15 @@ IREE_HAL_API_RETAIN_RELEASE(driver);
 
 IREE_API_EXPORT iree_status_t iree_hal_driver_query_available_devices(
     iree_hal_driver_t* driver, iree_allocator_t host_allocator,
-    iree_hal_device_info_t** out_device_infos,
-    iree_host_size_t* out_device_info_count) {
+    iree_host_size_t* out_device_info_count,
+    iree_hal_device_info_t** out_device_infos) {
   IREE_ASSERT_ARGUMENT(driver);
-  IREE_ASSERT_ARGUMENT(out_device_infos);
   IREE_ASSERT_ARGUMENT(out_device_info_count);
+  IREE_ASSERT_ARGUMENT(out_device_infos);
   *out_device_info_count = 0;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(driver, query_available_devices)(
-      driver, host_allocator, out_device_infos, out_device_info_count);
+      driver, host_allocator, out_device_info_count, out_device_infos);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -45,11 +45,11 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_create_device_by_ordinal(
   IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)device_ordinal);
 
   // Query the devices from the driver.
-  iree_hal_device_info_t* device_infos = NULL;
   iree_host_size_t device_info_count = 0;
+  iree_hal_device_info_t* device_infos = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_driver_query_available_devices(
-              driver, host_allocator, &device_infos, &device_info_count));
+              driver, host_allocator, &device_info_count, &device_infos));
 
   // Get the ID of the Nth device.
   iree_hal_device_id_t device_id = IREE_HAL_DEVICE_ID_DEFAULT;
