@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-execute_process(
-  COMMAND cmake -E rm -rf ${IREE_TEST_TMPDIR_ROOT}
-  COMMAND cmake -E make_directory ${IREE_TEST_TMPDIRS}
+set(CTEST_CUSTOM_PRE_TEST
+    "cmake -E rm -rf @IREE_TEST_TMPDIR_ROOT@"
+    "cmake -E make_directory @IREE_TEST_TMPDIRS_SPACE_SEPARATED@"
 )

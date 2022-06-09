@@ -768,20 +768,7 @@ if(IREE_BUILD_SAMPLES)
 endif()
 
 if(IREE_BUILD_TESTS)
-  get_property(_TMPDIRS GLOBAL PROPERTY IREE_TEST_TMPDIRS_REQUIRED)
-  add_test(
-    NAME
-      iree_setup_tmpdirs
-    COMMAND
-      # Yes, we're adding a test that invokes CMake with a script that invokes
-      # multiple CMake commands... This is to keep the fixture to one test
-      # target, which can only have one command.
-      # Thanks to https://stackoverflow.com/q/3065220
-      cmake
-        "-DIREE_TEST_TMPDIR_ROOT=${IREE_TEST_TMPDIR_ROOT}"
-        "-DIREE_TEST_TMPDIRS=${_TMPDIRS}"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/build_tools/cmake/setup_tmpdirs.cmake"
-  )
-  set_property(TEST iree_setup_tmpdirs PROPERTY FIXTURES_SETUP ${IREE_TEST_TMPDIR_FIXTURE})
-  set_property(TEST iree_setup_tmpdirs PROPERTY LABELS "fixture")
+  get_property(IREE_TEST_TMPDIRS_REQUIRED GLOBAL PROPERTY IREE_TEST_TMPDIRS_REQUIRED)
+  list(JOIN IREE_TEST_TMPDIRS_REQUIRED " " IREE_TEST_TMPDIRS_SPACE_SEPARATED)
+  configure_file("build_tools/cmake/CTestCustom.cmake.in" "CTestCustom.cmake" @ONLY)
 endif()
