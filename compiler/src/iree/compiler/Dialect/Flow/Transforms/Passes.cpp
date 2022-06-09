@@ -110,6 +110,16 @@ static llvm::cl::opt<std::string> clDispatchTransformFileName(
                    "the transformations to apply to form dispatch regions."),
     llvm::cl::init(""));
 
+static llvm::cl::opt<bool> clDumpStatsAfterOutlining(
+    "iree-flow-dump-stats-after-outlining",
+    llvm::cl::desc("Dump operation statistis after outlining dispatches"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<std::string> clDumpStatsAfterOutliningOutputtFile(
+    "iree-flow-dump-stats-after-outlining-output-file",
+    llvm::cl::desc("Output file name for the statistics after outlining"),
+    llvm::cl::init("stats-after-outlining.json"));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -277,6 +287,19 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       passManager.addPass(
           IREE::Flow::createDumpDispatchGraphPass(dotFile->os()));
       dotFile->keep();
+    }
+  }
+
+  if (clDumpStatsAfterOutlining) {
+    std::string errorMessage;
+    static auto outFile =
+        openOutputFile(clDumpStatsAfterOutliningOutputtFile, &errorMessage);
+    if (!outFile) {
+      llvm::errs() << errorMessage << "\n";
+    } else {
+      passManager.addPass(
+          mlir::createPrintOpStatsPass(outFile->os(), /*json=*/true));
+      outFile->keep();
     }
   }
 
