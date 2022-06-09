@@ -38,11 +38,14 @@ hal.executable private @apply_scale_no_vector_feature {
   }
 }
 
-// 32-bit lowering should be used by default if no vector features are provided.
+// 32-bit lowering is used by default if no vector features are provided. Note
+// that the 32-bit lowering generates 64-bit mul operations that are decomposed
+// into 32-bit operations by the LLVM backend.
 // CHECK-LABEL: llvm.func internal @apply_scale_no_vector_feature
 //       CHECK:   %[[MUL:.*]] = llvm.mul %{{.*}}, %{{.*}} : vector<2xi64>
 //  CHECK-NEXT:   %[[SHR:.*]] = llvm.lshr %{{.*}}, %{{.*}} : vector<2xi64>
 //  CHECK-NEXT:   llvm.trunc %[[SHR]] : vector<2xi64> to vector<2xi32>
+//  CHECK-NEXT:   llvm.mul %{{.*}}, %{{.*}}  : vector<2xi32>
 
 // -----
 
@@ -84,7 +87,7 @@ hal.executable private @apply_scale_v {
   }
 }
 
-// 64-bit lowering should be used with '+v'.
+// 64-bit lowering is used with '+v'.
 // CHECK-LABEL: llvm.func internal @apply_scale_v
 //       CHECK:   %[[ADD:.*]] = llvm.add %{{.*}}, %{{.*}} : vector<2xi64>
 //  CHECK-NEXT:   %[[SHR:.*]] = llvm.ashr %[[ADD]], %{{.*}} : vector<2xi64>
@@ -130,7 +133,7 @@ hal.executable private @apply_scale_zve64x {
   }
 }
 
-// 64-bit lowering should be used with '+zve64x'.
+// 64-bit lowering is used with '+zve64x'.
 // CHECK-LABEL: llvm.func internal @apply_scale_zve64x
 //       CHECK:   %[[ADD:.*]] = llvm.add %{{.*}}, %{{.*}} : vector<2xi64>
 //  CHECK-NEXT:   %[[SHR:.*]] = llvm.ashr %[[ADD]], %{{.*}} : vector<2xi64>
@@ -176,7 +179,9 @@ hal.executable private @apply_scale_zve32x {
   }
 }
 
-// 32-bit lowering should be used with '+zve32x'.
+// 32-bit lowering is used with '+zve32x'. Note that the 32-bit lowering
+// generates 64-bit mul operations that are decomposed into 32-bit operations by
+// the LLVM backend.
 // CHECK-LABEL: llvm.func internal @apply_scale_zve32x
 //       CHECK:   %[[MUL:.*]] = llvm.mul %{{.*}}, %{{.*}} : vector<2xi64>
 //  CHECK-NEXT:   %[[SHR:.*]] = llvm.lshr %{{.*}}, %{{.*}} : vector<2xi64>

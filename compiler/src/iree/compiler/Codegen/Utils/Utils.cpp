@@ -45,6 +45,17 @@ FailureOr<IREE::HAL::ExecutableExportOp> getEntryPoint(func::FuncOp funcOp) {
   return failure();
 }
 
+FailureOr<IREE::HAL::ExecutableVariantOp> getExecutableVariantOp(
+    Operation *op) {
+  if (auto result = dyn_cast<IREE::HAL::ExecutableVariantOp>(op)) {
+    return result;
+  }
+  if (auto result = op->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
+    return result;
+  }
+  return failure();
+}
+
 bool isEntryPoint(func::FuncOp func) {
   return func.isPublic() && succeeded(getEntryPoint(func));
 }
@@ -100,27 +111,13 @@ bool isAArch64(IREE::HAL::ExecutableVariantOp variantOp) {
   return triple && triple.getValue().isAArch64();
 }
 
-static Optional<IREE::HAL::ExecutableVariantOp> getParentExecutableVariantOp(
-    Operation *op) {
-  if (auto result = dyn_cast<IREE::HAL::ExecutableVariantOp>(op)) {
-    return result;
-  }
-  if (auto result = op->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
-    return result;
-  }
-  return llvm::None;
-}
-
 // TODO(dcaballe): If we have to check for a significantly large number of
 // features in the future, we may want to consider a persistent state to carry
 // over processed HAL information or keeping the TTI instance alive and query
 // subtarget features data structure.
-static bool hasFeature(Operation *op, StringRef feature) {
-  auto variantOp = getParentExecutableVariantOp(op);
-  if (!variantOp) {
-    return false;
-  }
-  Optional<StringRef> features = getCpuFeatures(*variantOp);
+static bool hasFeature(IREE::HAL::ExecutableVariantOp variantOp,
+                       StringRef feature) {
+  Optional<StringRef> features = getCpuFeatures(variantOp);
   if (!features) {
     return false;
   }
@@ -138,25 +135,23 @@ static bool hasFeature(Operation *op, StringRef feature) {
   return false;
 }
 
-/// Returns true if the 'op' is or is enclosed in a HAL::ExecutableVarianOp that
-/// contains '+avx2' in its cpu features.
-bool hasAVX2Feature(Operation *op) { return hasFeature(op, "+avx2"); }
+/// Returns true if the 'variantOp' contains '+avx2' in its cpu features.
+bool hasAVX2Feature(IREE::HAL::ExecutableVariantOp variantOp) {
+  return hasFeature(variantOp, "+avx2");
+}
 
-/// Returns true if the 'op' is or is enclosed in a HAL::ExecutableVarianOp that
-/// contains '+v' in its cpu features.
-bool hasVFeature(Operation *op) { return hasFeature(op, "+v"); }
+/// Returns true if the 'variantOp' contains '+v' in its cpu features.
+bool hasVFeature(IREE::HAL::ExecutableVariantOp variantOp) {
+  return hasFeature(variantOp, "+v");
+}
 
-/// Returns true if the 'op' is or is enclosed in a HAL::ExecutableVarianOp that
-/// contains '+zve64x' in its cpu features.
-bool hasZve64xFeature(Operation *op) { return hasFeature(op, "+zve64x"); }
+/// Returns true if the 'variantOp' contains '+zve64x' in its cpu features.
+bool hasZve64xFeature(IREE::HAL::ExecutableVariantOp variantOp) {
+  return hasFeature(variantOp, "+zve64x");
+}
 
-bool isRISCV(Operation *op) {
-  auto variantOp = getParentExecutableVariantOp(op);
-  if (!variantOp) {
-    return false;
-  }
-
-  Optional<llvm::Triple> triple = getTargetTriple(*variantOp);
+bool isRISCV(IREE::HAL::ExecutableVariantOp variantOp) {
+  Optional<llvm::Triple> triple = getTargetTriple(variantOp);
   return triple && triple.getValue().isRISCV();
 }
 
