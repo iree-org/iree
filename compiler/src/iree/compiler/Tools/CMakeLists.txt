@@ -49,7 +49,6 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtTransformOps
     IREELinalgExtTransforms
-    IREELinalgExtOpInterfaceImpl
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
     IREEPyDMDialect

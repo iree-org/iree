@@ -33,8 +33,7 @@ module {
     // CHECK:   async.add_to_group %[[token]], %[[group]] : !async.token
     // CHECK: }
     // CHECK: async.await_all %[[group]]
-    iree_linalg_ext.in_parallel %1 -> () {
-      ^bb0(%arg3: index):  // no predecessors
+    scf.foreach_thread (%arg3) in (%1) -> () {
         %3 = affine.apply #map1(%arg3)[%arg0]
         %4 = affine.apply #map2(%0, %3)
         %5 = affine.min #map3(%4, %arg0)
@@ -48,25 +47,22 @@ module {
           %9 = arith.mulf %arg4, %cst : f32
           linalg.yield %9 : f32
         }
-
-        iree_linalg_ext.perform_concurrently {
-        }
     }
     return
   }
 
   transform.with_pdl_patterns {
   ^bb0(%arg0: !pdl.operation):
-    pdl.pattern @match_iree_linalg_ext_in_parallel : benefit(1) {
+    pdl.pattern @match_foreach_thread : benefit(1) {
       %0 = operands
       %1 = types
-      %2 = operation "iree_linalg_ext.in_parallel"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      %2 = operation "scf.foreach_thread"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
       rewrite %2 with "transform.dialect"
     }
     transform.structured.canonicalized_sequence %arg0 {
     ^bb1(%arg1: !pdl.operation):
-      %0 = pdl_match @match_iree_linalg_ext_in_parallel in %arg1
-      %1 = rewrite_iree_linalg_ext_in_parallel_to_async %0
+      %0 = pdl_match @match_foreach_thread in %arg1
+      %1 = foreach_thread_to_async %0
     }
   }
 }
