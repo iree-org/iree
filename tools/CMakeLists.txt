@@ -53,8 +53,8 @@ iree_cc_binary(
     iree::base::tracing
     iree::hal
     iree::modules::hal
-    iree::tools::utils::device_util
-    iree::tools::utils::vm_util
+    iree::tooling::device_util
+    iree::tooling::vm_util
     iree::vm
     iree::vm::bytecode_module
     iree::vm::cc
@@ -74,9 +74,9 @@ iree_cc_binary(
     iree::hal
     iree::modules::hal
     iree::testing::benchmark
-    iree::tools::utils::device_util
-    iree::tools::utils::trace_replay
-    iree::tools::utils::yaml_util
+    iree::tooling::device_util
+    iree::tooling::trace_replay
+    iree::tooling::yaml_util
     iree::vm
     yaml
 )
@@ -98,8 +98,8 @@ iree_cc_binary(
     iree::modules::check
     iree::modules::hal
     iree::testing::gtest
-    iree::tools::utils::device_util
-    iree::tools::utils::vm_util
+    iree::tooling::device_util
+    iree::tooling::vm_util
     iree::vm
     iree::vm::bytecode_module
   TESTONLY
@@ -131,8 +131,8 @@ iree_cc_binary(
     iree::base::internal::flags
     iree::base::tracing
     iree::modules::hal
-    iree::tools::utils::device_util
-    iree::tools::utils::vm_util
+    iree::tooling::device_util
+    iree::tooling::vm_util
     iree::vm
     iree::vm::bytecode_module
     iree::vm::cc
@@ -150,9 +150,9 @@ iree_cc_binary(
     iree::base::tracing
     iree::hal
     iree::modules::hal
-    iree::tools::utils::device_util
-    iree::tools::utils::trace_replay
-    iree::tools::utils::yaml_util
+    iree::tooling::device_util
+    iree::tooling::trace_replay
+    iree::tooling::yaml_util
     iree::vm
     yaml
 )
@@ -169,10 +169,10 @@ iree_cc_binary(
     iree::base::tracing
     iree::hal
     iree::modules::hal
-    iree::tools::utils::cpu_features
-    iree::tools::utils::device_util
-    iree::tools::utils::trace_replay
-    iree::tools::utils::yaml_util
+    iree::tooling::cpu_features
+    iree::tooling::device_util
+    iree::tooling::trace_replay
+    iree::tooling::yaml_util
     iree::vm
     yaml
 )
@@ -263,8 +263,8 @@ if(IREE_BUILD_COMPILER)
       iree::compiler::Tools::init_targets
       iree::hal
       iree::modules::hal
-      iree::tools::utils::device_util
-      iree::tools::utils::vm_util
+      iree::tooling::device_util
+      iree::tooling::vm_util
       iree::vm
       iree::vm::bytecode_module
       iree::vm::cc

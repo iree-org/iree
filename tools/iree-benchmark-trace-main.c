@@ -16,9 +16,9 @@
 #include "iree/base/internal/path.h"
 #include "iree/hal/api.h"
 #include "iree/testing/benchmark.h"
-#include "iree/tools/utils/device_util.h"
-#include "iree/tools/utils/trace_replay.h"
-#include "iree/tools/utils/yaml_util.h"
+#include "iree/tooling/device_util.h"
+#include "iree/tooling/trace_replay.h"
+#include "iree/tooling/yaml_util.h"
 #include "iree/vm/api.h"
 
 IREE_FLAG(string, driver, "local-task", "Backend driver to use.");

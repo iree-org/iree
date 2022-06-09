@@ -16,10 +16,10 @@
 #include "iree/base/target_platform.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
-#include "iree/tools/utils/cpu_features.h"
-#include "iree/tools/utils/device_util.h"
-#include "iree/tools/utils/trace_replay.h"
-#include "iree/tools/utils/yaml_util.h"
+#include "iree/tooling/cpu_features.h"
+#include "iree/tooling/device_util.h"
+#include "iree/tooling/trace_replay.h"
+#include "iree/tooling/yaml_util.h"
 #include "iree/vm/api.h"
 
 IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");

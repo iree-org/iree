@@ -14,8 +14,8 @@
 
 #include "iree/base/status_cc.h"
 #include "iree/modules/hal/module.h"
-#include "iree/tools/utils/device_util.h"
-#include "iree/tools/utils/vm_util.h"
+#include "iree/tooling/device_util.h"
+#include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 
