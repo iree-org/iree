@@ -38,6 +38,23 @@ def ConvertConv2DToImg2Col :
   let constructor = "mlir::iree_compiler::IREE::Flow::createConvertConv2DToImg2ColPass()";
 }
 
+def ConvertLinalgMatmulToMmt4D :
+    Pass<"iree-flow-convert-linalg-matmul-to-mmt4d", ""> {
+  let summary = "Convert linalg.matmul to linalg.mmt4d";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createConvertLinalgMatmulToMmt4DPass()";
+  let options = [
+    Option<"arch", "arch", "std::string",
+           /*default=*/"",
+           "Target architecture, e.g. aarch64">,
+    Option<"features", "features", "std::string",
+           /*default=*/"",
+           "Additional CPU feature flags, e.g. +dotprod">,
+    Option<"enableGenericSlow", "enable_generic_slow", "bool",
+           /*default=*/"false",
+           "For tests only. Use mmt4d even for cases that are not expected to compile to efficient code by using some arbitrary generic tile shape.">,
+  ];
+}
+
 def ConvertToFlow :
     Pass<"iree-flow-convert-to-flow", ""> {
   let summary = "Convert operations to flow. Currently just a test pass.";
@@ -65,6 +82,23 @@ def DispatchWithTransformDialect :
     Option<"transformFileName", "transform-file-name", "std::string", /*default=*/"",
            "File name containing a transform dialect specification to apply.">
   ];
+}
+
+def DumpDispatchGraph : Pass<"iree-flow-dump-dispatch-graph-pass"> {
+  let summary = "Print visualization of dispatches";
+  let options = [
+    Option<"maxLabelLen", "max-label-len", "unsigned",
+            /*default=*/"20", "Limit attribute/type length to number of chars">,
+    Option<"printAttrs", "print-attrs", "bool",
+           /*default=*/"true", "Print attributes of operations">,
+    Option<"printControlFlowEdges", "print-control-flow-edges", "bool",
+           /*default=*/"false", "Print control flow edges">,
+    Option<"printDataFlowEdges", "print-data-flow-edges", "bool",
+           /*default=*/"true", "Print data flow edges">,
+    Option<"printResultTypes", "print-result-types", "bool",
+            /*default=*/"true", "Print result types of operations">
+  ];
+  let constructor = "mlir::iree_compiler::IREE::Flow::createDumpDispatchGraphPass()";
 }
 
 def ExpandTensorShapes :
@@ -132,44 +166,10 @@ def PadLinalgOps :
   let constructor = "mlir::iree_compiler::IREE::Flow::createPadLinalgOpsToIntegerMultiplePass()";
 }
 
-def ConvertLinalgMatmulToMmt4D :
-    Pass<"iree-flow-convert-linalg-matmul-to-mmt4d", ""> {
-  let summary = "Convert linalg.matmul to linalg.mmt4d";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createConvertLinalgMatmulToMmt4DPass()";
-  let options = [
-    Option<"arch", "arch", "std::string",
-           /*default=*/"",
-           "Target architecture, e.g. aarch64">,
-    Option<"features", "features", "std::string",
-           /*default=*/"",
-           "Additional CPU feature flags, e.g. +dotprod">,
-    Option<"enableGenericSlow", "enable_generic_slow", "bool",
-           /*default=*/"false",
-           "For tests only. Use mmt4d even for cases that are not expected to compile to efficient code by using some arbitrary generic tile shape.">,
-  ];
-}
-
 def PadTensorToSubTensorInsert :
     Pass<"iree-flow-pad-tensor-to-subtensor-insert", ""> {
   let summary = "Convert linalg.pad_tensor into linalg.fill + subtensor_insert";
   let constructor = "mlir::iree_compiler::IREE::Flow::createPadTensorToSubTensorInsertPass()";
-}
-
-def DumpDispatchGraph : Pass<"iree-flow-dump-dispatch-graph-pass"> {
-  let summary = "Print visualization of dispatches";
-  let options = [
-    Option<"maxLabelLen", "max-label-len", "unsigned",
-            /*default=*/"20", "Limit attribute/type length to number of chars">,
-    Option<"printAttrs", "print-attrs", "bool",
-           /*default=*/"true", "Print attributes of operations">,
-    Option<"printControlFlowEdges", "print-control-flow-edges", "bool",
-           /*default=*/"false", "Print control flow edges">,
-    Option<"printDataFlowEdges", "print-data-flow-edges", "bool",
-           /*default=*/"true", "Print data flow edges">,
-    Option<"printResultTypes", "print-result-types", "bool",
-            /*default=*/"true", "Print result types of operations">
-  ];
-  let constructor = "mlir::iree_compiler::IREE::Flow::createDumpDispatchGraphPass()";
 }
 
 def SplitReduction :
