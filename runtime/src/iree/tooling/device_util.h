@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_TOOLS_UTILS_DEVICE_UTIL_H_
-#define IREE_TOOLS_UTILS_DEVICE_UTIL_H_
+#ifndef IREE_TOOLING_DEVICE_UTIL_H_
+#define IREE_TOOLING_DEVICE_UTIL_H_
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
@@ -21,4 +21,4 @@ iree_hal_driver_registry_t* iree_hal_available_driver_registry(void);
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_TOOLS_UTILS_DEVICE_UTIL_H_
+#endif  // IREE_TOOLING_DEVICE_UTIL_H_

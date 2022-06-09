@@ -4,12 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_TOOLS_UTILS_TRACE_REPLAY_H_
-#define IREE_TOOLS_UTILS_TRACE_REPLAY_H_
+#ifndef IREE_TOOLING_TRACE_REPLAY_H_
+#define IREE_TOOLING_TRACE_REPLAY_H_
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/tools/utils/yaml_util.h"
+#include "iree/tooling/yaml_util.h"
 #include "iree/vm/api.h"
 
 #ifdef __cplusplus
@@ -89,4 +89,4 @@ iree_status_t iree_trace_replay_event_call(iree_trace_replay_t* replay,
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_TOOLS_UTILS_TRACE_REPLAY_H_
+#endif  // IREE_TOOLING_TRACE_REPLAY_H_

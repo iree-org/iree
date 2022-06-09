@@ -8,7 +8,7 @@
 #define IREE_COMPILER_CONSTEVAL_RUNTIME_H_
 
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
-#include "iree/hal/driver_registry.h"
+#include "iree/hal/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/ref_cc.h"

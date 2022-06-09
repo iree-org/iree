@@ -33,8 +33,8 @@ iree_cc_library(
     ::android_native_app_glue
     iree::base::cc
     iree::modules::hal
-    iree::tools::utils::device_util
-    iree::tools::utils::vm_util
+    iree::tooling::device_util
+    iree::tooling::vm_util
     iree::vm
   LINKOPTS
     "-landroid"

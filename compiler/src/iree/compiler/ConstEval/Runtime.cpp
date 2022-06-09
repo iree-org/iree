@@ -7,10 +7,8 @@
 #include "iree/compiler/ConstEval/Runtime.h"
 
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
-#include "iree/hal/api.h"
 #include "iree/hal/drivers/local_task/registration/driver_module.h"
 #include "iree/modules/hal/module.h"
-#include "iree/vm/ref_cc.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 
