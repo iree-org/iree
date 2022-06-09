@@ -145,21 +145,21 @@ void iree_cpu_features_free(iree_allocator_t allocator,
 
 iree_status_t iree_cpu_features_query(iree_cpu_features_t* cpu_features,
                                       iree_string_view_t feature,
-                                      bool* result) {
-  *result = false;
+                                      bool* out_result) {
+  *out_result = false;
 
 #ifdef IREE_ARCH_ARM_64
   if (iree_string_view_equal(feature, iree_make_cstring_view("+dotprod"))) {
-    *result = iree_cpu_features_aarch64_dotprod(cpu_features);
+    *out_result = iree_cpu_features_aarch64_dotprod(cpu_features);
     return iree_ok_status();
   }
   if (iree_string_view_equal(feature, iree_make_cstring_view("+i8mm"))) {
-    *result = iree_cpu_features_aarch64_i8mm(cpu_features);
+    *out_result = iree_cpu_features_aarch64_i8mm(cpu_features);
     return iree_ok_status();
   }
 #endif  // IREE_ARCH_ARM_64
 
   return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                          "Unhandled CPU feature: '%.*s'", (int)feature.size,
+                          "unhandled CPU feature: '%.*s'", (int)feature.size,
                           feature.data);
 }

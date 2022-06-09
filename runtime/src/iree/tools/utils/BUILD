@@ -22,6 +22,20 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "device_util",
+    srcs = ["device_util.c"],
+    hdrs = ["device_util.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/internal:synchronization",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers",
+    ],
+)
+
 # TODO(benvanik): fold these into iree/runtime and use that instead.
 cc_library(
     name = "vm_util",

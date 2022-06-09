@@ -13,8 +13,8 @@
 #include <thread>
 
 #include "iree/base/status_cc.h"
-#include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
+#include "iree/tools/utils/device_util.h"
 #include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -103,7 +103,7 @@ Status RunModule(const IreeModuleInvocation& invocation) {
 
   iree_hal_device_t* device = nullptr;
   IREE_RETURN_IF_ERROR(iree_hal_create_device(
-      iree_hal_driver_registry_default(),
+      iree_hal_available_driver_registry(),
       iree_make_string_view(invocation.driver.data(), invocation.driver.size()),
       iree_allocator_system(), &device));
   iree_vm_module_t* hal_module = nullptr;
@@ -171,9 +171,6 @@ void RunModuleAppMain(android_app* app) {
   // TODO(antiagainst): This can be improved by rendering some UI button to
   // trigger the workload.
   std::this_thread::sleep_for(std::chrono::seconds(2));
-
-  IREE_CHECK_OK(iree_hal_register_all_available_drivers(
-      iree_hal_driver_registry_default()));
 
   ModuleLoader loader(app);
   IreeModuleInvocation invocation;

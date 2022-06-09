@@ -25,6 +25,23 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    device_util
+  HDRS
+    "device_util.h"
+  SRCS
+    "device_util.c"
+  DEPS
+    iree::base
+    iree::base::internal::flags
+    iree::base::internal::synchronization
+    iree::base::tracing
+    iree::hal
+    iree::hal::drivers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     vm_util
   HDRS
     "vm_util.h"

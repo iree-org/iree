@@ -20,11 +20,11 @@
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/init.h"
 #include "iree/modules/check/module.h"
 #include "iree/modules/hal/module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
+#include "iree/tools/utils/device_util.h"
 #include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -114,7 +114,7 @@ iree_status_t Run(std::string module_file_path, int* out_exit_code) {
 
   iree_hal_device_t* device = nullptr;
   IREE_RETURN_IF_ERROR(iree_hal_create_device(
-      iree_hal_driver_registry_default(), IREE_SV(FLAG_driver),
+      iree_hal_available_driver_registry(), IREE_SV(FLAG_driver),
       iree_allocator_system(), &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(
@@ -184,8 +184,6 @@ extern "C" int main(int argc, char** argv) {
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
                                IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
                            &argc, &argv);
-  IREE_CHECK_OK(iree_hal_register_all_available_drivers(
-      iree_hal_driver_registry_default()));
   ::testing::InitGoogleTest(&argc, argv);
   IREE_FORCE_BINARY_STDIN();
 

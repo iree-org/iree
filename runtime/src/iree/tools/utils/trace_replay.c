@@ -20,17 +20,22 @@
 
 iree_status_t iree_trace_replay_initialize(
     iree_string_view_t root_path, iree_vm_instance_t* instance,
-    iree_vm_context_flags_t context_flags, iree_allocator_t host_allocator,
-    iree_trace_replay_t* out_replay) {
+    iree_vm_context_flags_t context_flags,
+    iree_hal_driver_registry_t* driver_registry,
+    iree_allocator_t host_allocator, iree_trace_replay_t* out_replay) {
   memset(out_replay, 0, sizeof(*out_replay));
 
   IREE_RETURN_IF_ERROR(iree_hal_module_register_types());
 
-  out_replay->root_path = root_path;
-  out_replay->instance = instance;
-  out_replay->context_flags = context_flags;
   out_replay->host_allocator = host_allocator;
+  out_replay->root_path = root_path;
+
+  out_replay->instance = instance;
   iree_vm_instance_retain(out_replay->instance);
+  out_replay->context_flags = context_flags;
+
+  out_replay->driver_registry = driver_registry;
+
   return iree_ok_status();
 }
 
@@ -80,8 +85,7 @@ static iree_status_t iree_trace_replay_create_device(
   // Try to create a device from the driver.
   iree_hal_driver_t* driver = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_driver_registry_try_create(
-      iree_hal_driver_registry_default(), driver_name, host_allocator,
-      &driver));
+      replay->driver_registry, driver_name, host_allocator, &driver));
   iree_status_t status =
       iree_hal_driver_create_default_device(driver, host_allocator, out_device);
   iree_hal_driver_release(driver);

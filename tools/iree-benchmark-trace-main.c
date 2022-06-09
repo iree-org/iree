@@ -15,8 +15,8 @@
 #include "iree/base/internal/flags.h"
 #include "iree/base/internal/path.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/init.h"
 #include "iree/testing/benchmark.h"
+#include "iree/tools/utils/device_util.h"
 #include "iree/tools/utils/trace_replay.h"
 #include "iree/tools/utils/yaml_util.h"
 #include "iree/vm/api.h"
@@ -201,7 +201,8 @@ static iree_status_t iree_replay_benchmark_run_file(
   iree_trace_replay_t replay;
   IREE_RETURN_IF_ERROR(iree_trace_replay_initialize(
       registration->root_path, registration->instance,
-      IREE_VM_CONTEXT_FLAG_NONE, iree_allocator_system(), &replay));
+      IREE_VM_CONTEXT_FLAG_NONE, iree_hal_available_driver_registry(),
+      iree_allocator_system(), &replay));
   iree_trace_replay_set_hal_driver_override(
       &replay, iree_make_cstring_view(FLAG_driver));
 
@@ -276,8 +277,6 @@ int main(int argc, char** argv) {
   // Setup shared instance used for each benchmark.
   iree_vm_instance_t* instance = NULL;
   IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
-  IREE_CHECK_OK(iree_hal_register_all_available_drivers(
-      iree_hal_driver_registry_default()));
 
   // Register a benchmark per file provided and run them.
   iree_replay_benchmark_register_trace_files(argc - 1, argv + 1, instance);
