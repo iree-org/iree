@@ -53,7 +53,7 @@ from common.android_device_utils import (get_android_device_model,
 from common.common_arguments import build_common_argument_parser
 
 # Root directory to perform benchmarks in on the Android device.
-ANDROID_TMP_DIR = "/data/local/tmp/iree-benchmarks"
+ANDROID_TMPDIR = "/data/local/tmp/iree-benchmarks"
 
 NORMAL_TOOL_REL_DIR = "normal-tools"
 TRACED_TOOL_REL_DIR = "traced-tools"
@@ -66,13 +66,13 @@ def adb_push_to_tmp_dir(content: str,
 
   Args:
     content: the full path to the source file.
-    relative_dir: the directory to push to; relative to ANDROID_TMP_DIR.
+    relative_dir: the directory to push to; relative to ANDROID_TMPDIR.
 
   Returns:
     The full path to the content on the Android device.
   """
   filename = os.path.basename(content)
-  android_path = os.path.join(ANDROID_TMP_DIR, relative_dir, filename)
+  android_path = os.path.join(ANDROID_TMPDIR, relative_dir, filename)
   # When the output is a TTY, keep the default progress info output.
   # In other cases, redirect progress info to null to avoid bloating log files.
   stdout_redirect = None if sys.stdout.isatty() else subprocess.DEVNULL
@@ -94,13 +94,13 @@ def adb_execute_and_get_output(cmd_args: Sequence[str],
   Args:
     cmd_args: a list containing the command to execute and its parameters
     relative_dir: the directory to execute the command in; relative to
-      ANDROID_TMP_DIR.
+      ANDROID_TMPDIR.
 
   Returns:
     A string for the command output.
   """
   cmd = ["adb", "shell"]
-  cmd.extend(["cd", os.path.join(ANDROID_TMP_DIR, relative_dir)])
+  cmd.extend(["cd", os.path.join(ANDROID_TMPDIR, relative_dir)])
   cmd.append("&&")
   cmd.extend(cmd_args)
 
@@ -118,13 +118,13 @@ def adb_execute(cmd_args: Sequence[str],
   Args:
     cmd_args: a list containing the command to execute and its parameters
     relative_dir: the directory to execute the command in; relative to
-      ANDROID_TMP_DIR.
+      ANDROID_TMPDIR.
 
   Returns:
     The completed process.
   """
   cmd = ["adb", "shell"]
-  cmd.extend(["cd", os.path.join(ANDROID_TMP_DIR, relative_dir)])
+  cmd.extend(["cd", os.path.join(ANDROID_TMPDIR, relative_dir)])
   cmd.append("&&")
   cmd.extend(cmd_args)
 
@@ -152,13 +152,13 @@ def adb_start_cmd(cmd_args: Sequence[str],
   Args:
     cmd_args: a list containing the command to execute and its parameters
     relative_dir: the directory to execute the command in; relative to
-      ANDROID_TMP_DIR.
+      ANDROID_TMPDIR.
 
   Returns:
     A Popen object for the started command.
   """
   cmd = ["adb", "shell"]
-  cmd.extend(["cd", f"{ANDROID_TMP_DIR}/{relative_dir}"])
+  cmd.extend(["cd", f"{ANDROID_TMPDIR}/{relative_dir}"])
   cmd.append("&&")
   cmd.extend(cmd_args)
 
@@ -238,7 +238,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     # return.
     pull_cmd = [
         "adb", "pull",
-        os.path.join(ANDROID_TMP_DIR, android_case_dir,
+        os.path.join(ANDROID_TMPDIR, android_case_dir,
                      os.path.basename(results_filename)), results_filename
     ]
     execute_cmd_and_get_output(pull_cmd, verbose=self.verbose)
@@ -254,7 +254,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     android_tool = self.__check_and_push_file(host_tool_path,
                                               TRACED_TOOL_REL_DIR)
     run_cmd = [
-        "TRACY_NO_EXIT=1", f"IREE_PRESERVE_DYLIB_TEMP_FILES={ANDROID_TMP_DIR}",
+        "TRACY_NO_EXIT=1", f"IREE_PRESERVE_DYLIB_TEMP_FILES={ANDROID_TMPDIR}",
         "taskset", taskset, android_tool, f"--flagfile={MODEL_FLAGFILE_NAME}"
     ]
 
@@ -360,13 +360,13 @@ def main(args):
 
   # Clear the benchmark directory on the Android device first just in case
   # there are leftovers from manual or failed runs.
-  execute_cmd_and_get_output(["adb", "shell", "rm", "-rf", ANDROID_TMP_DIR],
+  execute_cmd_and_get_output(["adb", "shell", "rm", "-rf", ANDROID_TMPDIR],
                              verbose=args.verbose)
 
   if not args.no_clean:
     # Clear the benchmark directory on the Android device.
     atexit.register(execute_cmd_and_get_output,
-                    ["adb", "shell", "rm", "-rf", ANDROID_TMP_DIR],
+                    ["adb", "shell", "rm", "-rf", ANDROID_TMPDIR],
                     verbose=args.verbose)
     # Also clear temporary directory on the host device.
     atexit.register(shutil.rmtree, args.tmp_dir)

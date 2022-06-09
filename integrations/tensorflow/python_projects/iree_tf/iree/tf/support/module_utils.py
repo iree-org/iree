@@ -10,15 +10,15 @@
 import collections
 import os
 import tempfile
-from typing import Any, Callable, Dict, Optional, Sequence, Set, Tuple, Type, Union
+from typing import (Any, Callable, Dict, Optional, Sequence, Set, Tuple, Type,
+                    Union)
 
-from absl import flags
-from absl import logging
 import iree.compiler.tf
 import iree.runtime
-from iree.tf.support import tf_utils
 import numpy as np
 import tensorflow.compat.v2 as tf
+from absl import flags, logging
+from iree.tf.support import tf_utils
 
 flags.DEFINE_bool(
     "capture_crash_reproducer", True,
@@ -26,11 +26,6 @@ flags.DEFINE_bool(
     "and suppresses C++ stack traces.")
 
 FLAGS = flags.FLAGS
-
-
-def _running_bazel_test() -> bool:
-  # Bazel guarantees that TEST_TMPDIR is set when `bazel test` is running.
-  return "TEST_TMPDIR" in os.environ
 
 
 def _get_tf_import_output_kwargs(artifacts_dir: str,

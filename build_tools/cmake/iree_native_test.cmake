@@ -118,12 +118,10 @@ function(iree_native_test)
       NAME
         ${_TEST_NAME}
       COMMAND
-        "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
         "$<TARGET_FILE:${_SRC_TARGET}>"
         ${_RULE_ARGS}
     )
-    set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT "TEST_TMPDIR=${CMAKE_BINARY_DIR}/${_NAME}_test_tmpdir")
-    iree_add_test_environment_properties(${_TEST_NAME})
+    iree_configure_test(${_TEST_NAME})
   endif()
 
   if (NOT DEFINED _RULE_TIMEOUT)

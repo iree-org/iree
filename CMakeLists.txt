@@ -606,7 +606,7 @@ if(IREE_BUILD_COMPILER)
 endif()
 
 if(IREE_BUILD_TESTS)
-  enable_testing(iree)
+  include(iree_configure_testing)
 endif()
 
 if(IREE_BUILD_PYTHON_BINDINGS)
@@ -764,4 +764,8 @@ add_subdirectory(build_tools/benchmarks)
 # samples/ can depend on anything, so we include it last
 if(IREE_BUILD_SAMPLES)
   add_subdirectory(samples)
+endif()
+
+if(IREE_BUILD_TESTS)
+  iree_create_ctest_customization()
 endif()

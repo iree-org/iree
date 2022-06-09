@@ -229,7 +229,6 @@ function(iree_local_py_test)
   add_test(
     NAME ${_NAME_PATH}
     COMMAND
-      "${IREE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
       "${Python3_EXECUTABLE}"
       "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}"
       ${_RULE_ARGS}
@@ -244,11 +243,11 @@ function(iree_local_py_test)
 
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_ARGS})
+
   set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
       "PYTHONPATH=${_PYTHONPATH}"
-      "TEST_TMPDIR=${IREE_BINARY_DIR}/tmp/${_NAME}_test_tmpdir"
   )
-  iree_add_test_environment_properties(${_NAME_PATH})
+  iree_configure_test(${_NAME_PATH})
 
   # TODO(marbre): Find out how to add deps to tests.
   #               Similar to _RULE_DATA in iree_lit_test().
