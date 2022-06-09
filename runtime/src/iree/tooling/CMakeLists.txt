@@ -61,8 +61,6 @@ iree_cc_library(
   PUBLIC
 )
 
-if(IREE_HAL_DRIVER_LOCAL_SYNC)
-
 iree_cc_test(
   NAME
     vm_util_test
@@ -72,15 +70,13 @@ iree_cc_test(
     ::vm_util
     iree::base
     iree::hal
-    iree::hal::drivers::local_sync::registration
     iree::modules::hal
     iree::testing::gtest
     iree::testing::gtest_main
+    iree::tooling::device_util
     iree::vm
     iree::vm::cc
 )
-
-endif()
 
 # libyaml does not build cleanly on bare-metal systems
 if(IREE_ENABLE_THREADING)
