@@ -20,7 +20,7 @@ static iree_status_t iree_hal_local_task_driver_factory_enumerate(
   static const iree_hal_driver_info_t driver_infos[1] = {
       {
           .driver_name = IREE_SVL("local-task"),
-          .full_name = IREE_SVL("Local executable execution using the "
+          .full_name = IREE_SVL("Local execution using the "
                                 "IREE multithreading task system"),
       },
   };

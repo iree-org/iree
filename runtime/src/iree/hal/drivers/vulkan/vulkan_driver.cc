@@ -340,14 +340,15 @@ static iree_host_size_t iree_hal_vulkan_calculate_device_info_size(
   VkPhysicalDeviceProperties physical_device_properties;
   syms->vkGetPhysicalDeviceProperties(physical_device,
                                       &physical_device_properties);
-  return strlen(physical_device_properties.deviceName);
+  return /*device_path=*/16 + strlen(physical_device_properties.deviceName);
 }
 
 // Populates device information from the given Vulkan physical device handle.
 // |out_device_info| must point to valid memory and additional data will be
 // appended to |buffer_ptr| and the new pointer is returned.
 static uint8_t* iree_hal_vulkan_populate_device_info(
-    VkPhysicalDevice physical_device, DynamicSymbols* syms, uint8_t* buffer_ptr,
+    uint32_t physical_device_index, VkPhysicalDevice physical_device,
+    DynamicSymbols* syms, uint8_t* buffer_ptr,
     iree_hal_device_info_t* out_device_info) {
   memset(out_device_info, 0, sizeof(*out_device_info));
   out_device_info->device_id = (iree_hal_device_id_t)physical_device;
@@ -364,6 +365,14 @@ static uint8_t* iree_hal_vulkan_populate_device_info(
   syms->vkGetPhysicalDeviceProperties(physical_device,
                                       &physical_device_properties);
   // TODO(benvanik): check and optionally require reasonable limits.
+
+  // TODO(benvanik): persistent device IDs; these are just ordinals and won't be
+  // stable across processes.
+  char device_path[16] = {0};
+  snprintf(device_path, sizeof(device_path), "%u", physical_device_index);
+  buffer_ptr += iree_string_view_append_to_buffer(
+      iree_make_cstring_view(device_path), &out_device_info->path,
+      (char*)buffer_ptr);
 
   // TODO(benvanik): more clever/sanitized device naming.
   iree_string_view_t device_name =
@@ -404,7 +413,7 @@ static iree_status_t iree_hal_vulkan_driver_query_available_devices(
         physical_device_count * sizeof(iree_hal_device_info_t);
     for (uint32_t i = 0; i < physical_device_count; ++i) {
       buffer_ptr = iree_hal_vulkan_populate_device_info(
-          physical_devices[i], driver->syms.get(), buffer_ptr,
+          i, physical_devices[i], driver->syms.get(), buffer_ptr,
           &device_infos[i]);
     }
     *out_device_info_count = physical_device_count;
@@ -413,6 +422,15 @@ static iree_status_t iree_hal_vulkan_driver_query_available_devices(
 
   iree_allocator_free(host_allocator, physical_devices);
   return status;
+}
+
+static iree_status_t iree_hal_vulkan_driver_dump_device_info(
+    iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
+    iree_string_builder_t* builder) {
+  iree_hal_vulkan_driver_t* driver = iree_hal_vulkan_driver_cast(base_driver);
+  // TODO(benvanik): dump detailed device info.
+  (void)driver;
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_vulkan_driver_select_default_device(
@@ -479,18 +497,67 @@ static iree_status_t iree_hal_vulkan_driver_create_device_by_id(
   return status;
 }
 
+static iree_status_t iree_hal_vulkan_driver_create_device_by_index(
+    iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
+    uint32_t device_index, iree_host_size_t param_count,
+    const iree_string_pair_t* params, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device) {
+  iree_hal_vulkan_driver_t* driver = iree_hal_vulkan_driver_cast(base_driver);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)device_index);
+
+  // Query all devices from the Vulkan instance.
+  uint32_t physical_device_count = 0;
+  VkPhysicalDevice* physical_devices = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_driver_enumerate_physical_devices(
+      driver->syms.get(), driver->instance, host_allocator,
+      &physical_device_count, &physical_devices));
+
+  // Get the device at the requested index.
+  VkPhysicalDevice physical_device = VK_NULL_HANDLE;
+  if (device_index >= 0 && device_index < physical_device_count) {
+    physical_device = physical_devices[device_index];
+  }
+
+  iree_allocator_free(host_allocator, physical_devices);
+
+  if (physical_device == VK_NULL_HANDLE) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "physical device %u invalid; %u physical devices "
+                            "available",
+                            device_index, physical_device_count);
+  }
+
+  iree_status_t status = iree_hal_vulkan_driver_create_device_by_id(
+      base_driver, (iree_hal_device_id_t)physical_device, param_count, params,
+      host_allocator, out_device);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 static iree_status_t iree_hal_vulkan_driver_create_device_by_path(
     iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
     iree_string_view_t device_path, iree_host_size_t param_count,
     const iree_string_pair_t* params, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
-  if (!iree_string_view_is_empty(device_path)) {
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "device paths not yet implemented");
+  if (iree_string_view_is_empty(device_path)) {
+    return iree_hal_vulkan_driver_create_device_by_id(
+        base_driver, IREE_HAL_DEVICE_ID_DEFAULT, param_count, params,
+        host_allocator, out_device);
   }
-  return iree_hal_vulkan_driver_create_device_by_id(
-      base_driver, IREE_HAL_DEVICE_ID_DEFAULT, param_count, params,
-      host_allocator, out_device);
+
+  // TODO(benvanik): add more ways of addressing devices - maybe vendor:device?
+
+  // Try to parse as a device index.
+  uint32_t device_index = 0;
+  if (iree_string_view_atoi_uint32(device_path, &device_index)) {
+    return iree_hal_vulkan_driver_create_device_by_index(
+        base_driver, driver_name, device_index, param_count, params,
+        host_allocator, out_device);
+  }
+
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unsupported device path");
 }
 
 namespace {
@@ -498,6 +565,7 @@ const iree_hal_driver_vtable_t iree_hal_vulkan_driver_vtable = {
     /*.destroy=*/iree_hal_vulkan_driver_destroy,
     /*.query_available_devices=*/
     iree_hal_vulkan_driver_query_available_devices,
+    /*.dump_device_info=*/iree_hal_vulkan_driver_dump_device_info,
     /*.create_device_by_id=*/iree_hal_vulkan_driver_create_device_by_id,
     /*.create_device_by_path=*/iree_hal_vulkan_driver_create_device_by_path,
 };
