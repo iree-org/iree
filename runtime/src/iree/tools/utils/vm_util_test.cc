@@ -27,7 +27,9 @@ class VmUtilTest : public ::testing::Test {
 
   virtual void SetUp() {
     IREE_ASSERT_OK(iree_hal_module_register_types());
-    IREE_ASSERT_OK(CreateDevice("local-sync", &device_));
+    IREE_ASSERT_OK(iree_hal_create_device(iree_hal_driver_registry_default(),
+                                          IREE_SV("local-sync"),
+                                          iree_allocator_system(), &device_));
     allocator_ = iree_hal_device_allocator(device_);
   }
 

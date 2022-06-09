@@ -237,19 +237,4 @@ Status PrintVariantList(iree_vm_list_t* variant_list, size_t max_element_count,
   return OkStatus();
 }
 
-Status CreateDevice(const char* driver_name, iree_hal_device_t** out_device) {
-  IREE_LOG(INFO) << "Creating driver and device for '" << driver_name << "'...";
-  iree_hal_driver_t* driver = nullptr;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_driver_registry_try_create(iree_hal_driver_registry_default(),
-                                          iree_make_cstring_view(driver_name),
-                                          iree_allocator_system(), &driver),
-      "creating driver '%s'", driver_name);
-  IREE_RETURN_IF_ERROR(iree_hal_driver_create_default_device(
-                           driver, iree_allocator_system(), out_device),
-                       "creating default device for driver '%s'", driver_name);
-  iree_hal_driver_release(driver);
-  return OkStatus();
-}
-
 }  // namespace iree
