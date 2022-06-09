@@ -834,7 +834,7 @@ static LogicalResult setTransposeLikeOpRootConfig(
     return success();
   }
 
-  if (!hasAVX2Features(genericOp) || !isSupportedTransposeOp(genericOp)) {
+  if (!hasAVX2Feature(genericOp) || !isSupportedTransposeOp(genericOp)) {
     return success();
   }
 

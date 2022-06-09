@@ -54,12 +54,7 @@ inline bool isAArch64(func::FuncOp entryPointFn) {
   return isAArch64(variantOp);
 }
 
-bool isRISCV(IREE::HAL::ExecutableVariantOp variantOp);
-inline bool isRISCV(func::FuncOp entryPointFn) {
-  auto variantOp =
-      entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-  return isRISCV(variantOp);
-}
+bool isRISCV(Operation *op);
 
 inline bool isVMVXBackend(IREE::HAL::ExecutableVariantOp variantOp) {
   return variantOp.target().getBackend().getValue() == "vmvx";
@@ -72,7 +67,15 @@ inline bool isVMVXBackend(func::FuncOp entryPointFn) {
 
 /// Returns true if the 'op' is or is enclosed in a HAL::ExecutableVarianOp that
 /// contains '+avx2' in its cpu features.
-bool hasAVX2Features(Operation *op);
+bool hasAVX2Feature(Operation *op);
+
+/// Returns true if the 'op' is or is enclosed in a HAL::ExecutableVarianOp that
+/// contains '+v' in its cpu features.
+bool hasVFeature(Operation *op);
+
+/// Returns true if the 'op' is or is enclosed in a HAL::ExecutableVarianOp that
+/// contains '+zve64x' in its cpu features.
+bool hasZve64xFeature(Operation *op);
 
 /// Checks if a tensor value is generated from a read-only object, like
 /// and interface binding with read-only attribute or from an `arith.constant`

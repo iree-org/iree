@@ -959,7 +959,9 @@ void ConvertToLLVMPass::runOnOperation() {
   //   multiply or add.
   //
   // TODO(bjacob): Use a lowering that uses specific ARM/X86 intrinsics.
-  tosa::populateTosaRescaleToArithConversionPatterns(&patterns);
+  bool use32BitImpl =
+      isRISCV(module) && !hasVFeature(module) && !hasZve64xFeature(module);
+  tosa::populateTosaRescaleToArithConversionPatterns(&patterns, use32BitImpl);
 
   populateAffineToStdConversionPatterns(patterns);
   populateSCFToControlFlowConversionPatterns(patterns);
