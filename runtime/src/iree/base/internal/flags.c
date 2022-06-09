@@ -418,7 +418,7 @@ void iree_flags_dump(iree_flag_dump_mode_t mode, FILE* file) {
                 "# "
                 "===-----------------------------------------------------------"
                 "-----------===\n");
-        fprintf(file, "# Flags in %s:%d\n", flag->file, flag->line);
+        fprintf(file, "# Flags in %s\n", flag->file);
         fprintf(file,
                 "# "
                 "===-----------------------------------------------------------"
