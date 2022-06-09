@@ -58,7 +58,7 @@ function(iree_cc_test)
 
   cmake_parse_arguments(
     _RULE
-    "REQUIRES_TMPDIR"
+    ""
     "NAME"
     "ARGS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;LABELS;TIMEOUT"
     ${ARGN}
@@ -161,23 +161,15 @@ function(iree_cc_test)
     )
     set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
   else(ANDROID)
-
-
     add_test(
       NAME
         ${_NAME_PATH}
       COMMAND
-        # We run all our tests through a custom test runner to allow temp
-        # directory cleanup upon test completion.
-        "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
         "$<TARGET_FILE:${_NAME}>"
         ${_RULE_ARGS}
       )
 
-    set(_TEST_TMPDIR "${IREE_TEST_TMPDIR_ROOT}/${_NAME_PATH}_test_tmpdir")
-    set_property(GLOBAL APPEND PROPERTY IREE_TEST_TMPDIRS_REQUIRED ${_TEST_TMPDIR})
-    set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT "TEST_TMPDIR=${_TEST_TMPDIR}")
-    iree_add_test_environment_properties(${_NAME_PATH})
+    iree_configure_test(${_NAME_PATH})
   endif(ANDROID)
 
   if (NOT DEFINED _RULE_TIMEOUT)

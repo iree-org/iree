@@ -68,9 +68,6 @@ function(iree_lit_test)
     NAME
       ${_NAME_PATH}
     COMMAND
-      # We run all our tests through a custom test runner to allow setup
-      # and teardown.
-      "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
       "${Python3_EXECUTABLE}"
       "${LLVM_SOURCE_DIR}/utils/lit/lit.py"
       ${_LIT_PATH_ARGS}
@@ -80,14 +77,11 @@ function(iree_lit_test)
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST ${_NAME_PATH} PROPERTY REQUIRED_FILES "${_TEST_FILE_PATH}")
-  set(_TEST_TMPDIR "${IREE_TEST_TMPDIR_ROOT}/${_NAME_PATH}_test_tmpdir")
-  set_property(GLOBAL APPEND PROPERTY IREE_TEST_TMPDIRS_REQUIRED ${_TEST_TMPDIR})
   set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
-    "TEST_TMPDIR=${_TEST_TMPDIR}"
     "LIT_OPTS=-v"
     "FILECHECK_OPTS=--enable-var-scope")
   set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
-  iree_add_test_environment_properties(${_NAME_PATH})
+  iree_configure_test(${_NAME_PATH})
 
   # TODO(gcmn): Figure out how to indicate a dependency on _RULE_DATA being built
 endfunction()

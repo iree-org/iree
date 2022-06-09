@@ -606,7 +606,7 @@ if(IREE_BUILD_COMPILER)
 endif()
 
 if(IREE_BUILD_TESTS)
-  include(iree_enable_testing)
+  include(iree_configure_testing)
 endif()
 
 if(IREE_BUILD_PYTHON_BINDINGS)
@@ -758,5 +758,5 @@ if(IREE_BUILD_SAMPLES)
 endif()
 
 if(IREE_BUILD_TESTS)
-  ctest_create_test_tmpdir_pretest()
+  iree_create_ctest_customization()
 endif()
