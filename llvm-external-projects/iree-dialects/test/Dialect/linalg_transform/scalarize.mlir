@@ -23,7 +23,7 @@ transform.with_pdl_patterns {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @isa_linalg.matmul in %arg1
     %tiled_linalg_op, %loops:3 = transform.structured.tile %0 {interchange = [1, 0, 2], sizes = [6, 16, 32]}
-    %1 = peel_loop %loops#0
+    %1 = transform.loop.peel %loops#0
     // This test checks the proper handling of the scalarize dims attribute.
     // The first dimension does not divide but we can always scalarize a `?` into `1`
     // and enable vectorization of a lower-rank op this way.

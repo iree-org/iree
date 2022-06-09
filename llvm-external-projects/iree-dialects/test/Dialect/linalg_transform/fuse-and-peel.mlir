@@ -35,6 +35,6 @@ transform.with_pdl_patterns {
     %0 = pdl_match @pdl_target in %arg1
     %1, %loops:2 = transform.structured.fuse %0 {tile_sizes = [32, 32], tile_interchange = [0, 1]}
 
-    peel_loop %loops#0
+    transform.loop.peel %loops#0
   }
 }
