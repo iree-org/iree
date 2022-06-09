@@ -42,7 +42,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
                           model_tags=["f32"],
                           bench_mode=["full-inference"],
                           target_arch="CPU-x86_64",
-                          driver="dylib-sync",
+                          config="iree-dylib-sync",
                           benchmark_case_dir="case3",
                           benchmark_tool_name="tool")
     suite = BenchmarkSuite({

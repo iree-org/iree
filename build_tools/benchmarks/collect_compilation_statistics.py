@@ -54,10 +54,10 @@ def match_module_cmake_target(module_path: str) -> Optional[str]:
 
 
 def parse_compilation_time_from_ninja_log(log: TextIO) -> Dict[str, int]:
-  """Retrieve the compilation time from the Ninja build log.
+  """Retrieve the compilation time (ms) from the Ninja build log.
   
   Returns:
-    Map of target name and compilation time in milliseconds.
+    Map of target name and compilation time in ms.
   """
 
   target_build_time_map = {}

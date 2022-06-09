@@ -103,8 +103,10 @@ class BenchmarkSuite(object):
     """Filters benchmarks in a specific category for the given device.
       Args:
         category: the specific benchmark category.
-        available_drivers: list of drivers supported by the tools.
+        available_drivers: list of drivers supported by the tools. None means to
+          match any driver.
         available_loaders: list of executable loaders supported by the tools.
+          None means to match any loader.
         cpu_target_arch_filter: CPU target architecture filter regex.
         gpu_target_arch_filter: GPU target architecture filter regex.
         driver_filter: driver filter regex.
@@ -123,12 +125,14 @@ class BenchmarkSuite(object):
       config_info = IREE_DRIVERS_INFOS[benchmark_case.config.lower()]
 
       driver_name = config_info.driver_name
-      available_driver_matched = available_drivers is None or driver_name in available_drivers
-      drivler_filter_matched = driver_filter is None or re.match(driver_filter, driver_name) is not None
+      available_driver_matched = (available_drivers is None or
+                                  driver_name in available_drivers)
+      drivler_filter_matched = driver_filter is None or re.match(
+          driver_filter, driver_name) is not None
       matched_driver = available_driver_matched and drivler_filter_matched
 
-      matched_loader = not config_info.loader_name or available_loaders is None or (config_info.loader_name
-                                                       in available_loaders)
+      matched_loader = not config_info.loader_name or available_loaders is None or (
+          config_info.loader_name in available_loaders)
 
       target_arch = benchmark_case.target_arch.lower()
       matched_cpu_arch = (cpu_target_arch_filter is not None and re.match(
