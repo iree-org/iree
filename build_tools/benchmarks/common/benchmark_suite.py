@@ -114,7 +114,7 @@ class BenchmarkSuite(object):
         model_name_filter: model name regex.
       Returns:
         A list of matched benchmark cases.
-    """
+    """,
 
     category_dir = self.category_map.get(category)
     if category_dir is None:
@@ -125,11 +125,11 @@ class BenchmarkSuite(object):
       config_info = IREE_DRIVERS_INFOS[benchmark_case.config.lower()]
 
       driver_name = config_info.driver_name
-      available_driver_matched = (available_drivers is None or
+      matched_available_driver = (available_drivers is None or
                                   driver_name in available_drivers)
-      drivler_filter_matched = driver_filter is None or re.match(
+      matched_drivler_filter = driver_filter is None or re.match(
           driver_filter, driver_name) is not None
-      matched_driver = available_driver_matched and drivler_filter_matched
+      matched_driver = matched_available_driver and matched_drivler_filter
 
       matched_loader = not config_info.loader_name or available_loaders is None or (
           config_info.loader_name in available_loaders)

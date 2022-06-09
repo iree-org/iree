@@ -33,8 +33,9 @@ COMPILATION_STATS_MODULE_SUFFIX = "compile-stats"
 VM_COMPONENT_NAME = "module.fb"
 CONST_COMPONENT_NAME = "_const.bin"
 DISPATCH_COMPONENT_PATTERNS = [
-    r".+_embedded_elf_.+\.so", r".+_vulkan_spirv_fb\.fb",
-    r".+_vmvx_bytecode_fb\.bin"
+    r".+_embedded_elf_.+\.so",
+    r".+_vulkan_spirv_fb\.fb",
+    r".+_vmvx_bytecode_fb\.bin",
 ]
 
 
