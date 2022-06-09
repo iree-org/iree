@@ -134,7 +134,10 @@ excluded_tests_regex="($(IFS="|" ; echo "${excluded_tests[*]?}"))"
 cd ${CMAKE_BUILD_DIR?}
 
 echo "******************** Running main project ctests ************************"
-ctest --timeout 900 --output-on-failure \
+ctest \
+  --timeout 900 \
+  --output-on-failure \
+  --no-tests=error \
   --label-exclude "${label_exclude_regex}" \
   --exclude-regex "${excluded_tests_regex?}"
 

@@ -1,13 +1,13 @@
 # Deployment configurations
 
 IREE provides a flexible set of tools for various deployment scenarios.
-Fully featured environments can use IREE for dynamic model deployments taking
+Fully featured environments can use IREE to load programs on demand and to take
 advantage of multi-threaded hardware, while embedded systems can bypass IREE's
 runtime entirely or interface with custom accelerators.
 
 ## Stable configurations
 
-* [CPU - Dylib](./cpu-dylib.md)
+* [CPU](./cpu.md) for general purpose CPU deployment
 * [CPU - Bare-Metal](./bare-metal.md) with minimal platform dependencies
 * [GPU - Vulkan](./gpu-vulkan.md)
 * [GPU - CUDA/ROCm](./gpu-cuda-rocm.md)

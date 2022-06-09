@@ -24,8 +24,8 @@ struct iree_hal_buffer_view_t {
 };
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
-    iree_hal_buffer_t* buffer, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_hal_buffer_t* buffer, iree_host_size_t shape_rank,
+    const iree_hal_dim_t* shape, iree_hal_element_type_t element_type,
     iree_hal_encoding_type_t encoding_type, iree_allocator_t host_allocator,
     iree_hal_buffer_view_t** out_buffer_view) {
   IREE_ASSERT_ARGUMENT(buffer);
@@ -214,22 +214,22 @@ iree_hal_buffer_view_byte_length(const iree_hal_buffer_view_t* buffer_view) {
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_compute_offset(
-    const iree_hal_buffer_view_t* buffer_view, const iree_hal_dim_t* indices,
-    iree_host_size_t indices_count, iree_device_size_t* out_offset) {
+    const iree_hal_buffer_view_t* buffer_view, iree_host_size_t indices_count,
+    const iree_hal_dim_t* indices, iree_device_size_t* out_offset) {
   IREE_ASSERT_ARGUMENT(buffer_view);
   return iree_hal_buffer_compute_view_offset(
-      buffer_view->shape, buffer_view->shape_rank, buffer_view->element_type,
-      buffer_view->encoding_type, indices, indices_count, out_offset);
+      buffer_view->shape_rank, buffer_view->shape, buffer_view->element_type,
+      buffer_view->encoding_type, indices_count, indices, out_offset);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_compute_range(
-    const iree_hal_buffer_view_t* buffer_view,
-    const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
-    const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
-    iree_device_size_t* out_start_offset, iree_device_size_t* out_length) {
+    const iree_hal_buffer_view_t* buffer_view, iree_host_size_t indices_count,
+    const iree_hal_dim_t* start_indices, iree_host_size_t lengths_count,
+    const iree_hal_dim_t* lengths, iree_device_size_t* out_start_offset,
+    iree_device_size_t* out_length) {
   IREE_ASSERT_ARGUMENT(buffer_view);
   return iree_hal_buffer_compute_view_range(
-      buffer_view->shape, buffer_view->shape_rank, buffer_view->element_type,
-      buffer_view->encoding_type, start_indices, indices_count, lengths,
-      lengths_count, out_start_offset, out_length);
+      buffer_view->shape_rank, buffer_view->shape, buffer_view->element_type,
+      buffer_view->encoding_type, indices_count, start_indices, lengths_count,
+      lengths, out_start_offset, out_length);
 }

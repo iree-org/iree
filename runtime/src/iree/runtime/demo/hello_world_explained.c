@@ -195,8 +195,8 @@ static iree_status_t iree_runtime_demo_perform_mul(
       static const float arg0_data[4] = {1.0f, 1.1f, 1.2f, 1.3f};
       status = iree_hal_buffer_view_allocate_buffer(
           device_allocator,
-          // Shape dimensions and rank:
-          arg0_shape, IREE_ARRAYSIZE(arg0_shape),
+          // Shape rank and dimensions:
+          IREE_ARRAYSIZE(arg0_shape), arg0_shape,
           // Element type:
           IREE_HAL_ELEMENT_TYPE_FLOAT_32,
           // Encoding type:
@@ -232,7 +232,7 @@ static iree_status_t iree_runtime_demo_perform_mul(
       static const iree_hal_dim_t arg1_shape[1] = {4};
       static const float arg1_data[4] = {10.0f, 100.0f, 1000.0f, 10000.0f};
       status = iree_hal_buffer_view_allocate_buffer(
-          device_allocator, arg1_shape, IREE_ARRAYSIZE(arg1_shape),
+          device_allocator, IREE_ARRAYSIZE(arg1_shape), arg1_shape,
           IREE_HAL_ELEMENT_TYPE_FLOAT_32,
           IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
           (iree_hal_buffer_params_t){

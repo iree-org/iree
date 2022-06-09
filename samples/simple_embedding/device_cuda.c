@@ -24,7 +24,7 @@ iree_status_t create_sample_device(iree_allocator_t host_allocator,
   // Create the HAL driver from the name.
   iree_hal_driver_t* driver = NULL;
   iree_string_view_t identifier = iree_make_cstring_view("cuda");
-  iree_status_t status = iree_hal_driver_registry_try_create_by_name(
+  iree_status_t status = iree_hal_driver_registry_try_create(
       iree_hal_driver_registry_default(), identifier, host_allocator, &driver);
 
   // Create the default device (primary GPU).

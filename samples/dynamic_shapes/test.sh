@@ -27,14 +27,13 @@ cmake --build ${BUILD_DIR} --target iree-compile -- -k 0
 
 # 3. Compile `dynamic_shapes.mlir` using `iree-compile`.
 ${BUILD_DIR}/tools/iree-compile \
-  --iree-mlir-to-vm-bytecode-module \
-  --iree-hal-target-backends=dylib-llvm-aot \
+  --iree-hal-target-backends=cpu \
   --iree-input-type=mhlo \
-  ${ARTIFACTS_DIR}/dynamic_shapes.mlir -o ${ARTIFACTS_DIR}/dynamic_shapes_dylib.vmfb
+  ${ARTIFACTS_DIR}/dynamic_shapes.mlir -o ${ARTIFACTS_DIR}/dynamic_shapes_cpu.vmfb
 
 # 4. Build the `iree_samples_dynamic_shapes` CMake target.
 cmake --build ${BUILD_DIR} --target iree_samples_dynamic_shapes -- -k 0
 
 # 5. Run the sample binary.
 ${BUILD_DIR}/samples/dynamic_shapes/dynamic-shapes \
-  ${ARTIFACTS_DIR}/dynamic_shapes_dylib.vmfb dylib
+  ${ARTIFACTS_DIR}/dynamic_shapes_cpu.vmfb local-task

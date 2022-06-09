@@ -68,9 +68,9 @@
 #include "iree/base/status_cc.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
-#include "iree/tools/utils/vm_util.h"
+#include "iree/tooling/device_util.h"
+#include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/ref_cc.h"
@@ -315,7 +315,9 @@ class IREEBenchmark {
         iree_vm_instance_create(iree_allocator_system(), &instance_));
 
     // Create IREE's device and module.
-    IREE_RETURN_IF_ERROR(iree::CreateDevice(FLAG_driver, &device_));
+    IREE_RETURN_IF_ERROR(iree_hal_create_device(
+        iree_hal_available_driver_registry(), IREE_SV(FLAG_driver),
+        iree_allocator_system(), &device_));
     IREE_RETURN_IF_ERROR(
         iree_hal_module_create(device_, iree_allocator_system(), &hal_module_));
     IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
@@ -327,7 +329,7 @@ class IREEBenchmark {
     // module.
     std::array<iree_vm_module_t*, 2> modules = {hal_module_, input_module_};
     IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
-        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.data(), modules.size(),
+        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.size(), modules.data(),
         iree_allocator_system(), &context_));
 
     IREE_TRACE_FRAME_MARK_END_NAMED("init");
@@ -425,9 +427,6 @@ int main(int argc, char** argv) {
                                IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
                            &argc, &argv);
   ::benchmark::Initialize(&argc, argv);
-
-  IREE_CHECK_OK(iree_hal_register_all_available_drivers(
-      iree_hal_driver_registry_default()));
 
   iree::IREEBenchmark iree_benchmark;
   iree_status_t status = iree_benchmark.Register();

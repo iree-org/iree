@@ -89,7 +89,7 @@ static iree_status_t RunFunction(benchmark::State& state,
   std::array<iree_vm_module_t*, 2> modules = {import_module, bytecode_module};
   iree_vm_context_t* context = NULL;
   IREE_CHECK_OK(iree_vm_context_create_with_modules(
-      instance, IREE_VM_CONTEXT_FLAG_NONE, modules.data(), modules.size(),
+      instance, IREE_VM_CONTEXT_FLAG_NONE, modules.size(), modules.data(),
       iree_allocator_system(), &context));
 
   iree_vm_function_t function;

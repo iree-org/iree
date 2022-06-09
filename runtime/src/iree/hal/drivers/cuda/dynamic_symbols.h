@@ -32,7 +32,7 @@ typedef struct iree_hal_cuda_dynamic_symbols_t {
 // iree_hal_cuda_dynamic_symbols_deinitialize must be used to release the
 // library resources.
 iree_status_t iree_hal_cuda_dynamic_symbols_initialize(
-    iree_allocator_t allocator, iree_hal_cuda_dynamic_symbols_t* out_syms);
+    iree_allocator_t host_allocator, iree_hal_cuda_dynamic_symbols_t* out_syms);
 
 // Deinitializes |syms| by unloading the backing library. All function pointers
 // will be invalidated. They _may_ still work if there are other reasons the

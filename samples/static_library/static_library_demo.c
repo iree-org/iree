@@ -121,7 +121,7 @@ iree_status_t Run() {
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_allocate_buffer(
-        iree_hal_device_allocator(device), shape, IREE_ARRAYSIZE(shape),
+        iree_hal_device_allocator(device), IREE_ARRAYSIZE(shape), shape,
         IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
@@ -134,7 +134,7 @@ iree_status_t Run() {
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_allocate_buffer(
-        iree_hal_device_allocator(device), shape, IREE_ARRAYSIZE(shape),
+        iree_hal_device_allocator(device), IREE_ARRAYSIZE(shape), shape,
         IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,

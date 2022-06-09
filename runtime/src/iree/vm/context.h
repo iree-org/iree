@@ -57,7 +57,7 @@ IREE_API_EXPORT iree_status_t iree_vm_context_create(
 // |out_context| must be released by the caller.
 IREE_API_EXPORT iree_status_t iree_vm_context_create_with_modules(
     iree_vm_instance_t* instance, iree_vm_context_flags_t flags,
-    iree_vm_module_t** modules, iree_host_size_t module_count,
+    iree_host_size_t module_count, iree_vm_module_t** modules,
     iree_allocator_t allocator, iree_vm_context_t** out_context);
 
 // Retains the given |context| for the caller.
@@ -77,8 +77,8 @@ iree_vm_context_flags(const iree_vm_context_t* context);
 // order provided.
 // The modules will be retained by the context until destruction.
 IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
-    iree_vm_context_t* context, iree_vm_module_t** modules,
-    iree_host_size_t module_count);
+    iree_vm_context_t* context, iree_host_size_t module_count,
+    iree_vm_module_t** modules);
 
 // Freezes a context such that no more modules can be registered.
 // This can be used to ensure that context contents cannot be modified by other

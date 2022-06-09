@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_TOOLS_UTILS_CPU_FEATURES_H_
-#define IREE_TOOLS_UTILS_CPU_FEATURES_H_
+#ifndef IREE_TOOLING_CPU_FEATURES_H_
+#define IREE_TOOLING_CPU_FEATURES_H_
 
 #include "iree/base/allocator.h"
 #include "iree/base/status.h"
@@ -40,4 +40,4 @@ void iree_cpu_features_free(iree_allocator_t allocator,
 iree_status_t iree_cpu_features_query(iree_cpu_features_t* cpu_features,
                                       iree_string_view_t feature, bool* result);
 
-#endif  // IREE_TOOLS_UTILS_CPU_FEATURES_H_
+#endif  // IREE_TOOLING_CPU_FEATURES_H_

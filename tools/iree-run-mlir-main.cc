@@ -50,9 +50,9 @@
 #include "iree/compiler/Tools/init_dialects.h"
 #include "iree/compiler/Tools/init_targets.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
-#include "iree/tools/utils/vm_util.h"
+#include "iree/tooling/device_util.h"
+#include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/ref_cc.h"
@@ -176,11 +176,11 @@ Status GetTargetBackends(std::vector<std::string>* out_target_backends) {
       mlir::iree_compiler::IREE::HAL::TargetOptions::FromFlags::get().targets;
   if (target_backends.empty()) {
     iree_allocator_t host_allocator = iree_allocator_system();
-    iree_hal_driver_info_t* driver_infos = NULL;
     iree_host_size_t driver_info_count = 0;
+    iree_hal_driver_info_t* driver_infos = NULL;
     IREE_RETURN_IF_ERROR(iree_hal_driver_registry_enumerate(
-        iree_hal_driver_registry_default(), host_allocator, &driver_infos,
-        &driver_info_count));
+        iree_hal_available_driver_registry(), host_allocator,
+        &driver_info_count, &driver_infos));
     for (iree_host_size_t i = 0; i < driver_info_count; ++i) {
       target_backends.push_back(std::string(driver_infos[i].driver_name.data,
                                             driver_infos[i].driver_name.size));
@@ -349,7 +349,10 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
   }
 
   iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(CreateDevice(driver_name.c_str(), &device));
+  IREE_RETURN_IF_ERROR(iree_hal_create_device(
+      iree_hal_available_driver_registry(),
+      iree_make_string_view(driver_name.data(), driver_name.size()),
+      iree_allocator_system(), &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(
       iree_hal_module_create(device, iree_allocator_system(), &hal_module));
@@ -380,7 +383,7 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
             instance,
             trace_execution_flag ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
                                  : IREE_VM_CONTEXT_FLAG_NONE,
-            modules.data(), modules.size(), iree_allocator_system(), &context),
+            modules.size(), modules.data(), iree_allocator_system(), &context),
         "Creating context");
 
     // Invoke the function and print results.
@@ -553,8 +556,6 @@ extern "C" int main(int argc, char** argv) {
   char** argv_iree_ptr = argv_iree.data();
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc_iree,
                            &argv_iree_ptr);
-  IREE_CHECK_OK(iree_hal_register_all_available_drivers(
-      iree_hal_driver_registry_default()));
 
   auto status = RunFile(input_file_flag, registry);
   if (!status.ok()) {

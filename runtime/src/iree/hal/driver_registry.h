@@ -55,8 +55,8 @@ typedef struct iree_hal_driver_factory_t {
   //
   // Called with the driver registry lock held; may be called from any thread.
   iree_status_t(IREE_API_PTR* enumerate)(
-      void* self, const iree_hal_driver_info_t** out_driver_infos,
-      iree_host_size_t* out_driver_info_count);
+      void* self, iree_host_size_t* out_driver_info_count,
+      const iree_hal_driver_info_t** out_driver_infos);
 
   // Tries to create a driver as previously queried with enumerate.
   // |driver_id| is the opaque ID returned from enumeration; note that there may
@@ -68,8 +68,8 @@ typedef struct iree_hal_driver_factory_t {
   //
   // Called with the driver registry lock held; may be called from any thread.
   iree_status_t(IREE_API_PTR* try_create)(void* self,
-                                          iree_hal_driver_id_t driver_id,
-                                          iree_allocator_t allocator,
+                                          iree_string_view_t driver_name,
+                                          iree_allocator_t host_allocator,
                                           iree_hal_driver_t** out_driver);
 } iree_hal_driver_factory_t;
 
@@ -123,9 +123,9 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_unregister_factory(
     const iree_hal_driver_factory_t* factory);
 
 // Enumerates all drivers from registered factories and returns them as a list.
-// The provided |allocator| will be used to allocate the returned list and after
-// the caller is done with it |out_driver_infos| must be freed with that same
-// allocator by the caller.
+// The provided |host_allocator| will be used to allocate the returned list and
+// after the caller is done with it |out_driver_infos| must be freed with that
+// same allocator by the caller.
 //
 // The set of drivers returned should be considered the superset of those that
 // may be available for successful creation as it's possible that delay-loaded
@@ -134,20 +134,9 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_unregister_factory(
 // Thread-safe. Note that the factory may be unregistered between the query
 // completing and any attempt to instantiate the driver.
 IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
-    iree_hal_driver_registry_t* registry, iree_allocator_t allocator,
-    iree_hal_driver_info_t** out_driver_infos,
-    iree_host_size_t* out_driver_info_count);
-
-// Attempts to create a driver registered with the driver registry by a specific
-// ID as returned during enumeration in iree_hal_driver_info_t::driver_id.
-// This can be used to specify the exact driver to create in cases where there
-// may be multiple factories providing drivers with the same name.
-//
-// Thread-safe. May block the caller if the driver is delay-loaded and needs to
-// perform additional loading/verification/etc before returning.
-IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
-    iree_hal_driver_registry_t* registry, iree_hal_driver_id_t driver_id,
-    iree_allocator_t allocator, iree_hal_driver_t** out_driver);
+    iree_hal_driver_registry_t* registry, iree_allocator_t host_allocator,
+    iree_host_size_t* out_driver_info_count,
+    iree_hal_driver_info_t** out_driver_infos);
 
 // Attempts to create a driver registered with the given canonical driver name.
 // Effectively enumerate + find by name + try_create if found. Factories are
@@ -157,9 +146,34 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
 //
 // Thread-safe. May block the caller if the driver is delay-loaded and needs to
 // perform additional loading/verification/etc before returning.
-IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create_by_name(
+IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
     iree_hal_driver_registry_t* registry, iree_string_view_t driver_name,
-    iree_allocator_t allocator, iree_hal_driver_t** out_driver);
+    iree_allocator_t host_allocator, iree_hal_driver_t** out_driver);
+
+// Attempts to create a device with the given `driver://path?params` URI.
+// Factories are searched in most-recently-added order such that it's possible
+// to override drivers with newer registrations when multiple factories provide
+// for the same driver name.
+//
+// The driver specifier is required in the URI but the path and params are
+// optional. The path is a driver-dependent string that identifies a particular
+// device or type of device. If the path is omitted the driver will select a
+// device based on heuristics, flags, the environment, or a die roll.
+//
+// !!!! WARNING !!!!
+// Each call to this function may create a new driver. Drivers are generally
+// very expensive to create and often taint the process for its lifetime by
+// loading shared libraries, connecting to system resources, etc. Some drivers
+// may only be able to have one instance live at a time or will fail in
+// spectacularly nasty ways if multiple instances are used simultaneously.
+// If creating multiple devices then instead create a driver once and use
+// iree_hal_driver_create_device_by_uri to create the devices.
+//
+// Thread-safe. May block the caller if the driver is delay-loaded and needs to
+// perform additional loading/verification/etc before returning.
+IREE_API_EXPORT iree_status_t iree_hal_create_device(
+    iree_hal_driver_registry_t* registry, iree_string_view_t device_uri,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
 #ifdef __cplusplus
 }  // extern "C"

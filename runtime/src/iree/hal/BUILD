@@ -72,6 +72,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:path",
         "//runtime/src/iree/base/internal:synchronization",
     ],
 )

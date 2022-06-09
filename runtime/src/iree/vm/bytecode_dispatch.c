@@ -1482,6 +1482,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP_CORE_BINARY_I32(AndI32, vm_and_i32);
     DISPATCH_OP_CORE_BINARY_I32(OrI32, vm_or_i32);
     DISPATCH_OP_CORE_BINARY_I32(XorI32, vm_xor_i32);
+    DISPATCH_OP_CORE_UNARY_I32(CtlzI32, vm_ctlz_i32);
 
     DISPATCH_OP_CORE_BINARY_I64(AddI64, vm_add_i64);
     DISPATCH_OP_CORE_BINARY_I64(SubI64, vm_sub_i64);
@@ -1495,6 +1496,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP_CORE_BINARY_I64(AndI64, vm_and_i64);
     DISPATCH_OP_CORE_BINARY_I64(OrI64, vm_or_i64);
     DISPATCH_OP_CORE_BINARY_I64(XorI64, vm_xor_i64);
+    DISPATCH_OP_CORE_UNARY_I64(CtlzI64, vm_ctlz_i64);
 
     //===------------------------------------------------------------------===//
     // Casting and type conversion/emulation

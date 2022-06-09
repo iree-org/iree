@@ -89,8 +89,8 @@ TEST_P(command_buffer_dispatch_test, DispatchAbs) {
   iree_hal_buffer_view_t* input_buffer_view = NULL;
   float input_data[1] = {-2.5f};
   IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
-      device_allocator_, /*shape=*/NULL,
-      /*shape_rank=*/0, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+      device_allocator_,
+      /*shape_rank=*/0, /*shape=*/NULL, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
       IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, input_params,
       iree_make_const_byte_span((void*)input_data, sizeof(input_data)),
       &input_buffer_view));

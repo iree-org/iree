@@ -26,6 +26,7 @@ set(LIBS
   MLIRPDL
   MLIRPDLInterp
   MLIRSCF
+  MLIRSCFTransformOps
   MLIRSCFTransforms
   MLIRTensor
   MLIRTransforms

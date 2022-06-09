@@ -399,7 +399,7 @@ class DumpDispatchGraphPass
       auto operand = it.value();
       auto op = operand.getDefiningOp();
 
-      if (isScalarConstantOp(op)) {
+      if (op && isScalarConstantOp(op)) {
         auto ty = operand.getType();
         if (ty.isa<IntegerType>()) {
           os << cast<arith::ConstantIntOp>(op).value();

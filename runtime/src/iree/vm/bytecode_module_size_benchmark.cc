@@ -24,7 +24,7 @@ extern "C" int main(int argc, char** argv) {
 
   iree_vm_context_t* context = nullptr;
   iree_vm_context_create_with_modules(instance, IREE_VM_CONTEXT_FLAG_NONE,
-                                      &module, /*module_count=*/1,
+                                      /*module_count=*/1, &module,
                                       iree_allocator_system(), &context);
 
   iree_vm_function_t function;

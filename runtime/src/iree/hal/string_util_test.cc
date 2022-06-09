@@ -39,7 +39,7 @@ StatusOr<Shape> ParseShape(const std::string& value) {
   do {
     status =
         iree_hal_parse_shape(iree_string_view_t{value.data(), value.size()},
-                             shape.size(), shape.data(), &actual_rank);
+                             shape.size(), &actual_rank, shape.data());
     shape.resize(actual_rank);
   } while (iree_status_is_out_of_range(status));
   IREE_RETURN_IF_ERROR(std::move(status));
@@ -53,7 +53,7 @@ StatusOr<std::string> FormatShape(iree::span<const iree_hal_dim_t> value) {
   iree_status_t status = iree_ok_status();
   do {
     status =
-        iree_hal_format_shape(value.data(), value.size(), buffer.size() + 1,
+        iree_hal_format_shape(value.size(), value.data(), buffer.size() + 1,
                               &buffer[0], &actual_length);
     buffer.resize(actual_length);
   } while (iree_status_is_out_of_range(status));
@@ -108,7 +108,7 @@ StatusOr<ShapeAndType> ParseShapeAndElementType(const std::string& value) {
   do {
     status = iree_hal_parse_shape_and_element_type(
         iree_string_view_t{value.data(), value.size()}, shape.size(),
-        shape.data(), &actual_rank, &element_type);
+        &actual_rank, shape.data(), &element_type);
     shape.resize(actual_rank);
   } while (iree_status_is_out_of_range(status));
   IREE_RETURN_IF_ERROR(std::move(status));
@@ -184,7 +184,7 @@ StatusOr<std::string> FormatBufferElements(iree::span<const T> data,
     status = iree_hal_format_buffer_elements(
         iree_const_byte_span_t{reinterpret_cast<const uint8_t*>(data.data()),
                                data.size() * sizeof(T)},
-        shape.data(), shape.size(), element_type, max_element_count,
+        shape.size(), shape.data(), element_type, max_element_count,
         result.size() + 1, &result[0], &actual_length);
     result.resize(actual_length);
   } while (iree_status_is_out_of_range(status));
@@ -459,7 +459,7 @@ struct BufferView final
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
     BufferView buffer_view;
     iree_status_t status = iree_hal_buffer_view_create(
-        buffer, shape.data(), shape.size(), element_type, encoding_type,
+        buffer, shape.size(), shape.data(), element_type, encoding_type,
         iree_allocator_system(), &buffer_view);
     IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(buffer_view);

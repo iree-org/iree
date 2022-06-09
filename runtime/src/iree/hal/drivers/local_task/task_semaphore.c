@@ -32,6 +32,7 @@
 // synchronously waiting thread.
 typedef struct iree_hal_task_timepoint_t {
   iree_hal_semaphore_timepoint_t base;
+  iree_hal_semaphore_t* semaphore;
   iree_event_t event;
 } iree_hal_task_timepoint_t;
 
@@ -369,6 +370,7 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
         status = iree_hal_task_semaphore_acquire_timepoint(
             semaphore, semaphore_list->payload_values[i], timeout, timepoint);
         if (iree_status_is_ok(status)) {
+          timepoint->semaphore = &semaphore->base;
           status = iree_wait_set_insert(wait_set, timepoint->event);
         }
       }
@@ -389,9 +391,11 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
   // TODO(benvanik): if we flip the API to multi-acquire events from the pool
   // above then we can multi-release here too.
   for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
-    iree_hal_semaphore_cancel_timepoint(timepoints[i].base.semaphore,
-                                        &timepoints[i].base);
-    iree_event_pool_release(event_pool, 1, &timepoints[i].event);
+    iree_hal_semaphore_t* semaphore = timepoints[i].semaphore;
+    if (semaphore) {
+      iree_hal_semaphore_cancel_timepoint(semaphore, &timepoints[i].base);
+      iree_event_pool_release(event_pool, 1, &timepoints[i].event);
+    }
   }
   iree_wait_set_free(wait_set);
   iree_arena_deinitialize(&arena);

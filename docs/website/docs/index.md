@@ -74,7 +74,7 @@ general steps:
     Develop your program using one of the [supported frameworks](./getting-started/#supported-frameworks), then run your model
     using one of IREE's import tools.
 
-2. **Select your [deployment configuration](./deployment-configurations)**
+2. **Select your [deployment configuration](./deployment-configurations/)**
 
     Identify your target platform, accelerator(s), and other constraints.
 
@@ -121,7 +121,7 @@ associated scheduling logic.
 For example, compiling for
 [GPU execution](deployment-configurations/gpu-vulkan.md) using Vulkan generates
 SPIR-V kernels and Vulkan API calls. For
-[CPU execution](deployment-configurations/cpu-dylib.md), native code with
+[CPU execution](deployment-configurations/cpu.md), native code with
 static or dynamic linkage and the associated function calls are generated.
 
 ### Running models

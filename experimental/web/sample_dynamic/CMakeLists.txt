@@ -30,7 +30,7 @@ target_compile_options(${_NAME} PRIVATE ${IREE_DEFAULT_COPTS})
 target_link_libraries(${_NAME}
   iree_runtime_runtime
   iree_hal_local_loaders_system_library_loader
-  iree_hal_local_sync_driver
+  iree_hal_drivers_local_sync_sync_driver
 )
 
 target_link_options(${_NAME} PRIVATE
