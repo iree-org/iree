@@ -244,9 +244,16 @@ function(iree_local_py_test)
 
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_ARGS})
+
+  set(_TEST_TMPDIR "${IREE_FAKE_TEST_TMPDIR}")
+  # if("${IREE_REQUIRES_TMPDIR_TAG}" IN_LIST _RULE_LABELS)
+  set(_TEST_TMPDIR "${IREE_TEST_TMPDIR}/${_NAME_PATH}_test_tmpdir")
+  set_property(GLOBAL APPEND PROPERTY IREE_TEST_TMPDIRS_REQUIRED ${_TEST_TMPDIR})
+  set_property(TEST ${_NAME_PATH} PROPERTY FIXTURES_REQUIRED ${IREE_TEST_TMPDIR_FIXTURE})
+  # endif()
   set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
       "PYTHONPATH=${_PYTHONPATH}"
-      "TEST_TMPDIR=${IREE_TEST_FAKE_TMPDIR}/${_NAME}_test_tmpdir"
+      "TEST_TMPDIR=${_TEST_TMPDIR}"
   )
   iree_add_test_environment_properties(${_NAME_PATH})
 

@@ -122,7 +122,13 @@ function(iree_native_test)
         "$<TARGET_FILE:${_SRC_TARGET}>"
         ${_RULE_ARGS}
     )
-    set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT "TEST_TMPDIR=${CMAKE_BINARY_DIR}/${_NAME}_test_tmpdir")
+    set(_TEST_TMPDIR "${IREE_FAKE_TEST_TMPDIR}")
+    # if("${IREE_REQUIRES_TMPDIR_TAG}" IN_LIST _RULE_LABELS)
+    set(_TEST_TMPDIR "${IREE_TEST_TMPDIR}/${_TEST_NAME}_test_tmpdir")
+    set_property(GLOBAL APPEND PROPERTY IREE_TEST_TMPDIRS_REQUIRED ${_TEST_TMPDIR})
+    set_property(TEST ${_TEST_NAME} PROPERTY FIXTURES_REQUIRED ${IREE_TEST_TMPDIR_FIXTURE})
+    # endif()
+    set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT "TEST_TMPDIR=${_TEST_TMPDIR}")
     iree_add_test_environment_properties(${_TEST_NAME})
   endif()
 
