@@ -3,6 +3,15 @@
 This sample demonstrates how to run a MNIST handwritten digit detection vision
 model on an image using IREE's command line tools.
 
+A similar sample is implemented in C code over in the iree-samples repository
+at https://github.com/google/iree-samples/tree/main/cpp/vision_inference
+
+* This version of the sample uses a Python script to convert an image into the
+  expected format then runs the compiled MNIST program through IREE's command
+  line tools
+* The other version uses a C library to decode and pre-process an image then
+  uses IREE's C API to load the compiled program and run it on the image
+
 ## Instructions
 
 From this directory:
@@ -16,11 +25,12 @@ iree-compile \
     -o /tmp/mnist_cpu.vmfb
 
 # Convert the test image to the 1x28x28x1xf32 buffer format the program expects.
-cat mnist_test.png | python3 convert_to_float_grayscale.py > /tmp/mnist_test.bin
+cat mnist_test.png | python3 convert_image.py > /tmp/mnist_test.bin
 
 # Run the program, passing the path to the binary file as a function input.
 iree-run-module \
-  /tmp/mnist_test.bin \
+  --module_file=/tmp/mnist_cpu.bin \
+  --entry_point=predict \
   --function_input=1x28x28x1xf32=@/tmp/mnist_test.bin
 
 # Observe the results - a list of prediction confidence scores for each digit.
