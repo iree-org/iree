@@ -27,7 +27,8 @@ def iree_c_module(
         name: Name of the target
         src: mlir source file to be compiled to an IREE module.
         h_file_output: The H header file to output.
-        flags: flags to pass to the compile tool.
+        flags: additional flags to pass to the compile tool.
+            `--output-format=vm-c` is included automatically.
         deps: Optional. Dependencies to add to the generated library.
         compile_tool: the compiler to use to generate the module.
             Defaults to iree-compile.
@@ -41,7 +42,7 @@ def iree_c_module(
         cmd = " && ".join([
             " ".join([
                 "$(location %s)" % (compile_tool),
-                " ".join(flags),
+                " ".join(["--output-format=vm-c"] + flags),
                 "-o $(location %s)" % (h_file_output),
                 "$(location %s)" % (src),
             ]),
