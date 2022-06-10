@@ -47,8 +47,9 @@ MODEL_TOOLFILE_NAME = "tool"
 @dataclass
 class BenchmarkCase:
   """Represents a benchmark case.
-
-    model_name_with_tags: the source model with tags, e.g., 'MobileSSD-fp32'.
+  
+    model_name: the source model, e.g., 'MobileSSD'.
+    model_tags: the source model tags, e.g., ['f32'].
     bench_mode: the benchmark mode, e.g., '1-thread,big-core'.
     target_arch: the target CPU/GPU architature, e.g., 'GPU-Adreno'.
     config: the IREE runtime configuration, e.g., 'dylib'.
@@ -56,7 +57,8 @@ class BenchmarkCase:
     benchmark_tool_name: the benchmark tool, e.g., 'iree-benchmark-module'.
   """
 
-  model_name_with_tags: str
+  model_name: str
+  model_tags: Sequence[str]
   bench_mode: Sequence[str]
   target_arch: str
   config: str
@@ -91,18 +93,20 @@ class BenchmarkSuite(object):
   def filter_benchmarks_for_category(
       self,
       category: str,
-      available_drivers: Sequence[str],
-      available_loaders: Sequence[str],
-      cpu_target_arch_filter: str,
-      gpu_target_arch_filter: str,
+      available_drivers: Optional[Sequence[str]] = None,
+      available_loaders: Optional[Sequence[str]] = None,
+      cpu_target_arch_filter: Optional[str] = None,
+      gpu_target_arch_filter: Optional[str] = None,
       driver_filter: Optional[str] = None,
       mode_filter: Optional[str] = None,
       model_name_filter: Optional[str] = None) -> Sequence[BenchmarkCase]:
     """Filters benchmarks in a specific category for the given device.
       Args:
         category: the specific benchmark category.
-        available_drivers: list of drivers supported by the tools.
+        available_drivers: list of drivers supported by the tools. None means to
+          match any driver.
         available_loaders: list of executable loaders supported by the tools.
+          None means to match any loader.
         cpu_target_arch_filter: CPU target architecture filter regex.
         gpu_target_arch_filter: GPU target architecture filter regex.
         driver_filter: driver filter regex.
@@ -110,7 +114,7 @@ class BenchmarkSuite(object):
         model_name_filter: model name regex.
       Returns:
         A list of matched benchmark cases.
-    """
+    """,
 
     category_dir = self.category_map.get(category)
     if category_dir is None:
@@ -121,24 +125,33 @@ class BenchmarkSuite(object):
       config_info = IREE_DRIVERS_INFOS[benchmark_case.config.lower()]
 
       driver_name = config_info.driver_name
-      matched_driver = (driver_name in available_drivers) and (
-          driver_filter is None or
-          re.match(driver_filter, driver_name) is not None)
+      matched_available_driver = (available_drivers is None or
+                                  driver_name in available_drivers)
+      matched_drivler_filter = driver_filter is None or re.match(
+          driver_filter, driver_name) is not None
+      matched_driver = matched_available_driver and matched_drivler_filter
 
-      matched_loader = not config_info.loader_name or (config_info.loader_name
-                                                       in available_loaders)
+      matched_loader = not config_info.loader_name or available_loaders is None or (
+          config_info.loader_name in available_loaders)
 
       target_arch = benchmark_case.target_arch.lower()
-      matched_arch = (re.match(cpu_target_arch_filter,
-                               target_arch) is not None or
-                      re.match(gpu_target_arch_filter, target_arch) is not None)
+      matched_cpu_arch = (cpu_target_arch_filter is not None and re.match(
+          cpu_target_arch_filter, target_arch) is not None)
+      matched_gpu_arch = (gpu_target_arch_filter is not None and re.match(
+          gpu_target_arch_filter, target_arch) is not None)
+      matched_arch = (matched_cpu_arch or matched_gpu_arch or
+                      (cpu_target_arch_filter is None and
+                       gpu_target_arch_filter is None))
       bench_mode = ','.join(benchmark_case.bench_mode)
       matched_mode = (mode_filter is None or
                       re.match(mode_filter, bench_mode) is not None)
 
       # For backward compatibility, model_name_filter matches against the string:
       #   <model name with tags>/<benchmark case name>
-      model_and_case_name = f"{benchmark_case.model_name_with_tags}/{os.path.basename(benchmark_case.benchmark_case_dir)}"
+      model_name_with_tags = benchmark_case.model_name
+      if len(benchmark_case.model_tags) > 0:
+        model_name_with_tags += f"-{','.join(benchmark_case.model_tags)}"
+      model_and_case_name = f"{model_name_with_tags}/{os.path.basename(benchmark_case.benchmark_case_dir)}"
       matched_model_name = (model_name_filter is None or re.match(
           model_name_filter, model_and_case_name) is not None)
 
@@ -168,13 +181,20 @@ class BenchmarkSuite(object):
       # The path of model_dir is expected to be:
       #   <benchmark_suite_dir>/<category>/<model_name>-<model_tags>
       category_dir, model_name_with_tags = os.path.split(model_dir)
+      model_name_parts = model_name_with_tags.split("-", 1)
+      model_name = model_name_parts[0]
+      if len(model_name_parts) == 2:
+        model_tags = model_name_parts[1].split(",")
+      else:
+        model_tags = []
 
       with open(os.path.join(benchmark_case_dir, MODEL_TOOLFILE_NAME),
                 "r") as f:
         tool_name = f.read().strip()
 
       suite_map[category_dir].append(
-          BenchmarkCase(model_name_with_tags=model_name_with_tags,
+          BenchmarkCase(model_name=model_name,
+                        model_tags=model_tags,
                         bench_mode=bench_mode,
                         target_arch=target_arch,
                         config=config,
