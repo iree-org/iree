@@ -85,7 +85,7 @@ $ ../iree-build/tools/iree-compile \
 
 # Run the module through CUDA HAL backend.
 $ ../iree-build/tools/iree-run-module \
-  --driver=cuda \
+  --device=cuda \
   --module_file=/tmp/mhlo-add.vmfb \
   --entry_function=add \
   --function_input="4xf32=[1 2 3 4]" \

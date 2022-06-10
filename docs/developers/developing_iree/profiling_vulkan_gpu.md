@@ -45,7 +45,7 @@ $ /path/to/iree/build/tools/iree-compile -- \
 # Then package the Android app
 $ /path/to/iree/source/tools/android/run_module_app/build_apk.sh \
   ./build-apk \
-  --driver vulkan \
+  --device vulkan \
   --module_file /tmp/mhlo-dot.vmfb \
   --entry_function dot \
   --function_input=...

@@ -176,7 +176,7 @@ In the build directory, run the following command:
 
 ``` shell hl_lines="2"
 tools/iree-run-module \
-    --driver=vulkan \
+    --device=vulkan \
     --module_file=mobilenet-vulkan.vmfb \
     --entry_function=predict \
     --function_input="1x224x224x3xf32=0"

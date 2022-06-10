@@ -65,7 +65,7 @@ def iree_trace_runner_test(
     native_test(
         name = name,
         args = [
-            "--driver=%s" % driver,
+            "--device=%s" % driver,
             "$(location :%s)" % trace,
         ] + runner_args,
         data = [

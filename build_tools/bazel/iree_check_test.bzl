@@ -67,7 +67,7 @@ def iree_check_test(
     native_test(
         name = name,
         args = [
-            "--driver=%s" % driver,
+            "--device=%s" % driver,
             "$(location :%s)" % bytecode_module_name,
         ] + runner_args,
         data = [":%s" % bytecode_module_name],

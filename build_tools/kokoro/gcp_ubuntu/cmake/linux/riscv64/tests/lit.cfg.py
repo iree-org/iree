@@ -20,7 +20,7 @@ config.environment["TEST_CMD"] = (
     (os.getenv("QEMU_RV64_BIN"), os.getenv("RISCV_TOOLCHAIN_ROOT")))
 
 config.environment["TEST_MODULE_CMD"] = (
-    "%s %s/tools/iree-run-module --driver=local-task" %
+    "%s %s/tools/iree-run-module --device=local-task" %
     (config.environment["TEST_CMD"], os.getenv("BUILD_RISCV_DIR")))
 
 config.test_exec_root = os.getenv("BUILD_RISCV_DIR") + \

@@ -25,7 +25,7 @@ echo ""
 
 print_usage_and_exit() {
   echo "Usage: $0 <artifact-directory> "
-  echo "       --driver <driver>"
+  echo "       --device <device>"
   echo "       --module_file <input-module-file> "
   echo "       --entry_function <entry-function> "
   echo "       --function_inputs_file <input-buffer-file> "
@@ -34,9 +34,9 @@ print_usage_and_exit() {
 
 while (( "$#" )); do
   case "$1" in
-    --driver)
+    --device)
       if [[ -n "$2" ]] && [[ ${2:0:1} != "-" ]]; then
-        IREE_DRIVER=$2
+        IREE_DEVICE=$2
         shift 2
       else
         echo "Error: missing argument for $1" >&2
@@ -88,7 +88,7 @@ done
 
 if [[ -z "${IREE_ARTIFACT_ROOT}" ]] || [[ -z "${IREE_INPUT_MODULE_FILE}" ]] || \
    [[ -z "${IREE_ENTRY_FUNCTION}" ]] || [[ -z "${IREE_INPUT_BUFFER_FILE}" ]] || \
-   [[ -z "${IREE_DRIVER}" ]]; then
+   [[ -z "${IREE_DEVICE}" ]]; then
   echo "Error: missing necessary parameters" >&2
   print_usage_and_exit
 fi
@@ -231,7 +231,7 @@ mkdir -p "${IREE_ASSET_DIR?}"
 cp "${IREE_INPUT_MODULE_FILE?}" "${IREE_ASSET_DIR?}/module.vmfb"
 cp "${IREE_INPUT_BUFFER_FILE?}" "${IREE_ASSET_DIR?}/inputs.txt"
 echo -n "${IREE_ENTRY_FUNCTION?}" > "${IREE_ASSET_DIR?}/entry_function.txt"
-echo -n "${IREE_DRIVER?}" > "${IREE_ASSET_DIR?}/driver.txt"
+echo -n "${IREE_DEVICE?}" > "${IREE_ASSET_DIR?}/device.txt"
 
 echo ">>> Compiling app resources <<<"
 
