@@ -140,7 +140,7 @@ above on IREE's VMVX driver:
 ```shell
 $ ../iree-build/tools/iree-run-module \
   --module_file=/tmp/simple_abs_vmvx.vmfb \
-  --driver=local-task \
+  --device=local-task \
   --entry_function=abs \
   --function_input=f32=-2
 ```
@@ -165,7 +165,7 @@ $ ../iree-build/tools/iree-compile \
 ```shell
 $ ../iree-build/tools/iree-check-module \
   /tmp/abs.vmfb \
-  --driver=local-task
+  --device=local-task
 ```
 
 ### iree-run-mlir

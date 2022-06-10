@@ -31,14 +31,14 @@ const char* kAppTag = "iree-run-module";
 const char kModuleFileName[] = "module.vmfb";
 const char kEntryFunctionFileName[] = "entry_function.txt";
 const char kInputsFileName[] = "inputs.txt";
-const char kDriverFileName[] = "driver.txt";
+const char kDeviceFileName[] = "device.txt";
 
 // A struct containing information regarding one IREE VM module invocation.
 struct IreeModuleInvocation {
   std::string module;
   std::string entry_function;
   std::string inputs;
-  std::string driver;
+  std::string device;
 };
 
 // A class for loading IREE module invocation information from Android apk asset
@@ -54,7 +54,7 @@ class ModuleLoader {
     IREE_RETURN_IF_ERROR(
         ReadFileAsset(kEntryFunctionFileName, &invocation.entry_function));
     IREE_RETURN_IF_ERROR(ReadFileAsset(kInputsFileName, &invocation.inputs));
-    IREE_RETURN_IF_ERROR(ReadFileAsset(kDriverFileName, &invocation.driver));
+    IREE_RETURN_IF_ERROR(ReadFileAsset(kDeviceFileName, &invocation.device));
     *out_invocation = std::move(invocation);
     return OkStatus();
   }
@@ -104,7 +104,7 @@ Status RunModule(const IreeModuleInvocation& invocation) {
   iree_hal_device_t* device = nullptr;
   IREE_RETURN_IF_ERROR(iree_hal_create_device(
       iree_hal_available_driver_registry(),
-      iree_make_string_view(invocation.driver.data(), invocation.driver.size()),
+      iree_make_string_view(invocation.device.data(), invocation.device.size()),
       iree_allocator_system(), &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(
@@ -178,7 +178,7 @@ void RunModuleAppMain(android_app* app) {
   if (status.ok()) {
     LOGI("entry function: '%s'", invocation.entry_function.c_str());
     LOGI("inputs:\n%s", invocation.inputs.c_str());
-    LOGI("driver: '%s'", invocation.driver.c_str());
+    LOGI("device: '%s'", invocation.device.c_str());
     status = RunModule(invocation);
     if (!status.ok()) LOGE("%s", status.ToString().c_str());
   } else {

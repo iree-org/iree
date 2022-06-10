@@ -126,7 +126,7 @@ Example:
 
 ```shell
 TRACY_NO_EXIT=1 /data/local/tmp/iree-benchmark-module \
-  --driver=local-task \
+  --device=local-task \
   --module_file=/data/local/tmp/android_module.fbvm \
   --entry_function=serving_default \
   --function_input=1x384xi32 \

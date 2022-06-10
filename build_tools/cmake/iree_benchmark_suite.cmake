@@ -300,7 +300,7 @@ function(iree_benchmark_suite)
         COMMAND
           "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/scripts/generate_flagfile.py"
             --module_file="${_MODULE_FILE_FLAG}"
-            --driver=${_RULE_DRIVER}
+            --device=${_RULE_DRIVER}
             --entry_function=${_MODULE_ENTRY_FUNCTION}
             --function_inputs=${_MODULE_FUNCTION_INPUTS}
             "${_ADDITIONAL_ARGS_CL}"
