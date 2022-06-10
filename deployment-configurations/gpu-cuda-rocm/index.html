@@ -1383,7 +1383,7 @@ Here are a table of commonly used architecture</p>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code>tools/iree-run-module <span class="se">\</span>
-<span class="hll">    --driver<span class="o">=</span>cuda <span class="se">\</span>
+<span class="hll">    --device<span class="o">=</span>cuda <span class="se">\</span>
 </span>    --module_file<span class="o">=</span>mobilenet-cuda.vmfb <span class="se">\</span>
     --entry_function<span class="o">=</span>predict <span class="se">\</span>
     --function_input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
@@ -1391,7 +1391,7 @@ Here are a table of commonly used architecture</p>
 </div>
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code>tools/iree-run-module <span class="se">\</span>
-<span class="hll">    --driver<span class="o">=</span>rocm <span class="se">\</span>
+<span class="hll">    --device<span class="o">=</span>rocm <span class="se">\</span>
 </span>    --module_file<span class="o">=</span>mobilenet-rocm.vmfb <span class="se">\</span>
     --entry_function<span class="o">=</span>predict <span class="se">\</span>
     --function_input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
