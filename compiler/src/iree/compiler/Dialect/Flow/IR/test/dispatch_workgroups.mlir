@@ -91,3 +91,32 @@ func.func @inplaceDispatch(
   // CHECK: return %[[OUTER_RET0]] : tensor<?x4xf32>
   return %0 : tensor<?x4xf32>
 }
+
+// -----
+
+// CHECK-LABEL: @dispatchWithCountRegion
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<4xi32>)
+func.func @dispatchWithCountRegion(%arg0: tensor<4xi32>) -> tensor<4xi32> {
+  // CHECK-DAG: %[[WORKGROUP_COUNT_X:.+]] = arith.constant 100
+  %x = arith.constant 100 : index
+  // CHECK-DAG: %[[WORKGROUP_COUNT_Y:.+]] = arith.constant 50
+  %y = arith.constant 50 : index
+  // CHECK: %[[OUTER_RET0:.+]] = flow.dispatch.workgroups[
+  // CHECK-SAME: %[[WORKGROUP_COUNT_X]], %[[WORKGROUP_COUNT_Y]]
+  // CHECK-SAME: ](%[[ARG0]]) : (tensor<4xi32>) -> %[[ARG0]] =
+  %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<4xi32>) -> %arg0 =
+  // CHECK-NEXT: (%{{.+}}: !flow.dispatch.tensor<readwrite:4xi32>) {
+  (%arg0_capture: !flow.dispatch.tensor<readwrite:4xi32>) {
+    // CHECK-NEXT: flow.return
+    flow.return
+  // CHECK-NEXT: count(%[[X_CAPTURE:.+]]: index, %[[Y_CAPTURE:.+]]: index)
+  // CHECK-SAME:   -> (index, index, index)
+  } count(%x_capture: index, %y_capture: index) -> (index, index, index) {
+    // CHECK-NEXT: %[[Z:.+]] = arith.constant 1
+    %z = arith.constant 1 : index
+    // CHECK-NEXT: flow.return %[[X_CAPTURE]], %[[Y_CAPTURE]], %[[Z]]
+    flow.return %x_capture, %y_capture, %z : index, index, index
+  }
+  // CHECK: return %[[OUTER_RET0]] : tensor<4xi32>
+  return %0 : tensor<4xi32>
+}
