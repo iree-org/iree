@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 load("//build_tools/bazel:iree_c_module.bzl", "iree_c_module")
 
 package(
@@ -13,22 +13,13 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_cmake_extra_content(
-    content = """
-if(NOT IREE_ENABLE_EMITC)
-  return()
-endif()
-""",
-    inline = True,
-)
-
 iree_c_module(
   name = "add_module",
   src = "add.mlir",
   h_file_output = "add_module.h",
   flags = [
-    "--iree-mlir-to-vm-c-module",
-    "--iree-hal-target-backends=vmvx"
+    "--compile-mode=vm",
+    "--output-format=vm-c"
   ],
 )
 
@@ -51,8 +42,8 @@ iree_c_module(
   src = "import_module_a.mlir",
   h_file_output = "import_module_a.h",
   flags = [
-    "--iree-mlir-to-vm-c-module",
-    "--iree-hal-target-backends=vmvx"
+    "--compile-mode=vm",
+    "--output-format=vm-c"
   ],
 )
 
@@ -61,8 +52,8 @@ iree_c_module(
   src = "import_module_b.mlir",
   h_file_output = "import_module_b.h",
   flags = [
-    "--iree-mlir-to-vm-c-module",
-    "--iree-hal-target-backends=vmvx"
+    "--compile-mode=vm",
+    "--output-format=vm-c"
   ],
 )
 
