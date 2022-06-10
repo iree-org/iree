@@ -10,13 +10,13 @@
 #                                                                              #
 # Each suite benchmarks a list of modules with configurations specifying a     #
 # target architecture and runtime characteristics (e.g. threads/cores). These  #
-# benchmarks only configure IREE translation and runtime flags for the target  #
+# benchmarks only configure IREE compilation and runtime flags for the target  #
 # architecture and do *not* include any non-default flags. No non-default      #
 # flags should be added here.                                                  #
 #                                                                              #
 ################################################################################
 
-set(ANDROID_MALI_GPU_TRANSLATION_FLAGS
+set(ANDROID_MALI_GPU_COMPILATION_FLAGS
   "--iree-input-type=tosa"
   "--iree-vulkan-target-triple=valhall-unknown-android11"
 )
@@ -40,8 +40,8 @@ iree_benchmark_suite(
     "vulkan-spirv"
   TARGET_ARCHITECTURE
     "GPU-Mali-Valhall"
-  TRANSLATION_FLAGS
-    ${ANDROID_MALI_GPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${ANDROID_MALI_GPU_COMPILATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
@@ -64,8 +64,8 @@ iree_benchmark_suite(
     "vulkan-spirv"
   TARGET_ARCHITECTURE
     "GPU-Mali-Valhall"
-  TRANSLATION_FLAGS
-    ${ANDROID_MALI_GPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${ANDROID_MALI_GPU_COMPILATION_FLAGS}
     # This isn't a special optimization flag. It's so we can reuse the same f32
     # model file. See comments on MOBILEBERT_FP16_MODULE
     "--iree-flow-demote-f32-to-f16"
@@ -112,8 +112,8 @@ iree_benchmark_suite(
     "vulkan-spirv"
   TARGET_ARCHITECTURE
     "GPU-Mali-Valhall"
-  TRANSLATION_FLAGS
-    ${ANDROID_MALI_GPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${ANDROID_MALI_GPU_COMPILATION_FLAGS}
     "--iree-flow-enable-fuse-padding-into-consumer-ops"
   BENCHMARK_TOOL
     iree-benchmark-module
@@ -136,7 +136,7 @@ iree_benchmark_suite(
     "vulkan-spirv"
   TARGET_ARCHITECTURE
     "GPU-Mali-Valhall"
-  TRANSLATION_FLAGS
+  COMPILATION_FLAGS
     "--iree-input-type=tosa"
     "--iree-flow-demote-f32-to-f16"
     "--iree-vulkan-target-triple=valhall-unknown-android11"
@@ -178,8 +178,8 @@ iree_benchmark_suite(
     "vulkan-spirv"
   TARGET_ARCHITECTURE
     "GPU-Mali-Valhall"
-  TRANSLATION_FLAGS
-    ${ANDROID_MALI_GPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${ANDROID_MALI_GPU_COMPILATION_FLAGS}
     "--iree-flow-enable-fuse-padding-into-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   BENCHMARK_TOOL
@@ -205,7 +205,7 @@ iree_benchmark_suite(
     "vulkan-spirv"
   TARGET_ARCHITECTURE
     "GPU-Mali-Valhall"
-  TRANSLATION_FLAGS
+  COMPILATION_FLAGS
     "--iree-input-type=tosa"
     "--iree-flow-demote-f32-to-f16"
     "--iree-vulkan-target-triple=valhall-unknown-android11"
