@@ -306,45 +306,6 @@ void LinalgFusePass::runOnOperation() {
   }
 }
 
-/// Return true if 'loop' is a tiled loop that distributes work among threads.
-/// We currently check whether the loop control depends on any of the interface
-/// workgroup operations. This may lead to some false positives that may prevent
-/// peeling of loops that we could peel. We shouldn't need this check when we
-/// move to the Transform dialect.
-static bool isDistributionLoop(scf::ForOp loop) {
-  SmallVector<Value, 4> loopBounds;
-  SmallVector<Operation *> defWorkList;
-  DenseSet<Operation *> visited;
-  defWorkList.push_back(loop.getLowerBound().getDefiningOp());
-  defWorkList.push_back(loop.getUpperBound().getDefiningOp());
-  defWorkList.push_back(loop.getStep().getDefiningOp());
-  while (!defWorkList.empty()) {
-    Operation *def = defWorkList.pop_back_val();
-    if (!def) {
-      continue;
-    }
-
-    // Skip visited operations that are not distribution loops.
-    if (visited.contains(def)) {
-      continue;
-    }
-
-    // Loop with bounds fed by InterfaceWorkgroup*Ops are distribution loops.
-    if (isa<iree_compiler::IREE::HAL::InterfaceWorkgroupIDOp>(def) ||
-        isa<iree_compiler::IREE::HAL::InterfaceWorkgroupCountOp>(def) ||
-        isa<iree_compiler::IREE::HAL::InterfaceWorkgroupSizeOp>(def))
-      return true;
-
-    visited.insert(def);
-
-    // Add definition operands to the worklist.
-    llvm::transform(def->getOperands(), std::back_inserter(defWorkList),
-                    [](Value operand) { return operand.getDefiningOp(); });
-  }
-
-  return false;
-}
-
 void LinalgSingleTilingExpertPass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
 
@@ -406,7 +367,7 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
         for (int i = 0; i < maxNumLoopsToPeel; ++i) {
           currentOp = currentOp->getParentOfType<scf::ForOp>();
           auto loop = llvm::cast_or_null<scf::ForOp>(currentOp);
-          if (!loop || isDistributionLoop(loop)) {
+          if (!loop || iree_compiler::isTiledAndDistributedLoop(loop)) {
             break;
           }
           loopsToPeel.push_back(loop);
