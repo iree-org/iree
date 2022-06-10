@@ -121,12 +121,6 @@ endif()
 if(IREE_HAL_DRIVER_LOCAL_TASK)
   add_subdirectory(local_task)
   list(APPEND _INIT_INTERNAL_DEPS iree::hal::drivers::local_task::registration)
-elseif(IREE_BUILD_COMPILER)
-  # If building the compiler, always include local_task, but mark its targets
-  # as EXCLUDE_FROM_ALL if the option is not set. This allows for direct
-  # dependencies (like the compiler's ConstEval component), without linking
-  # into the global registry.
-  add_subdirectory(local_task EXCLUDE_FROM_ALL)
 endif()
 if(IREE_HAL_DRIVER_VULKAN)
   add_subdirectory(vulkan)

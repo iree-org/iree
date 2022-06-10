@@ -135,6 +135,12 @@ option(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF "Enables the embedded dynamic lib
 option(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY "Enables the system dynamic library loader for local HAL drivers" ${IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT})
 option(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE "Enables the VMVX module loader for local HAL drivers" ${IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE_DEFAULT})
 
+if(IREE_BUILD_COMPILER)
+  # The compiler requires the local task driver with the VMVX loader.
+  set(IREE_HAL_DRIVER_LOCAL_TASK ON)
+  set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE ON)
+endif()
+
 message(STATUS "IREE HAL drivers:")
 if(IREE_HAL_DRIVER_CUDA)
   message(STATUS "  - cuda")
