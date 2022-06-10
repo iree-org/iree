@@ -42,8 +42,8 @@ iree_tablegen_library(
   TD_FILE
     "VulkanAttributes.td"
   OUTS
-    --gen-struct-attr-decls VulkanAttributes.h.inc
-    --gen-struct-attr-defs VulkanAttributes.cpp.inc
+    --gen-attrdef-decls VulkanAttributes.h.inc
+    --gen-attrdef-defs VulkanAttributes.cpp.inc
 )
 
 iree_tablegen_library(

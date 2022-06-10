@@ -16,7 +16,7 @@ include "mlir/IR/EnumAttr.td"
 
 def VK_Dialect : Dialect {
   let name = "vk";
-  let cppNamespace = "Vulkan";
+  let cppNamespace = "::mlir::iree_compiler::IREE::Vulkan";
 
   let summary = "The Vulkan dialect in IREE";
   let description = [{
