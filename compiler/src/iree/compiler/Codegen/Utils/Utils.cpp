@@ -45,6 +45,17 @@ FailureOr<IREE::HAL::ExecutableExportOp> getEntryPoint(func::FuncOp funcOp) {
   return failure();
 }
 
+FailureOr<IREE::HAL::ExecutableVariantOp> getExecutableVariantOp(
+    Operation *op) {
+  if (auto result = dyn_cast<IREE::HAL::ExecutableVariantOp>(op)) {
+    return result;
+  }
+  if (auto result = op->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
+    return result;
+  }
+  return failure();
+}
+
 bool isEntryPoint(func::FuncOp func) {
   return func.isPublic() && succeeded(getEntryPoint(func));
 }
@@ -101,16 +112,47 @@ bool isAArch64(IREE::HAL::ExecutableVariantOp variantOp) {
 }
 
 // TODO(dcaballe): If we have to check for a significantly large number of
-// features in the future, we may want to consider keeping the TTI instance
-// alive and query subtarget features data structure.
-bool hasAVX2Features(Operation *op) {
-  auto variantOp = isa<IREE::HAL::ExecutableVariantOp>(op)
-                       ? cast<IREE::HAL::ExecutableVariantOp>(op)
-                       : op->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-  if (!variantOp) return false;
+// features in the future, we may want to consider a persistent state to carry
+// over processed HAL information or keeping the TTI instance alive and query
+// subtarget features data structure.
+static bool hasFeature(IREE::HAL::ExecutableVariantOp variantOp,
+                       StringRef feature) {
   Optional<StringRef> features = getCpuFeatures(variantOp);
-  if (!features) return false;
-  return features->contains("+avx2");
+  if (!features) {
+    return false;
+  }
+
+  // Find feature string in list of features, making sure that we don't match a
+  // sub-string.
+  std::stringstream sstream(features->str());
+  std::string str;
+  while (std::getline(sstream, str, ',')) {
+    if (str == feature) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/// Returns true if the 'variantOp' contains '+avx2' in its cpu features.
+bool hasAVX2Feature(IREE::HAL::ExecutableVariantOp variantOp) {
+  return hasFeature(variantOp, "+avx2");
+}
+
+/// Returns true if the 'variantOp' contains '+v' in its cpu features.
+bool hasVFeature(IREE::HAL::ExecutableVariantOp variantOp) {
+  return hasFeature(variantOp, "+v");
+}
+
+/// Returns true if the 'variantOp' contains '+zve32x' in its cpu features.
+bool hasZve32xFeature(IREE::HAL::ExecutableVariantOp variantOp) {
+  return hasFeature(variantOp, "+zve32x");
+}
+
+/// Returns true if the 'variantOp' contains '+zve64x' in its cpu features.
+bool hasZve64xFeature(IREE::HAL::ExecutableVariantOp variantOp) {
+  return hasFeature(variantOp, "+zve64x");
 }
 
 bool isRISCV(IREE::HAL::ExecutableVariantOp variantOp) {

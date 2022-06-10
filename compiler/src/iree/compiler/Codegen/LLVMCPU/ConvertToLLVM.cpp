@@ -959,7 +959,16 @@ void ConvertToLLVMPass::runOnOperation() {
   //   multiply or add.
   //
   // TODO(bjacob): Use a lowering that uses specific ARM/X86 intrinsics.
-  tosa::populateTosaRescaleToArithConversionPatterns(&patterns);
+  bool use32BitImpl = false;
+  auto variantOp = getExecutableVariantOp(module);
+  if (succeeded(variantOp) && isRISCV(*variantOp)) {
+    // Use the 32-bit lowering for RISC-V if 'zve32x' is specified and there is
+    // no 64-bit integer vector support.
+    // TODO(#9440) Simplify logic when 'cpu_features' is simplified.
+    use32BitImpl = hasZve32xFeature(*variantOp) && !hasVFeature(*variantOp) &&
+                   !hasZve64xFeature(*variantOp);
+  }
+  tosa::populateTosaRescaleToArithConversionPatterns(&patterns, use32BitImpl);
 
   populateAffineToStdConversionPatterns(patterns);
   populateSCFToControlFlowConversionPatterns(patterns);

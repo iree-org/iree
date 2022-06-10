@@ -536,9 +536,12 @@ static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,
                                                     int64_t vectorSize,
                                                     bool isQuantized) {
   SmallVector<int64_t> matmulTileSizes;
-  if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
+  auto variantOp = getExecutableVariantOp(entryPointFn);
+  assert(succeeded(variantOp) && "ExecutableVariantOp not found");
+
+  if (isX86(*variantOp) || isRISCV(*variantOp)) {
     matmulTileSizes = {8, 32, 16};
-  } else if (isAArch64(entryPointFn)) {
+  } else if (isAArch64(*variantOp)) {
     if (isQuantized) {
       matmulTileSizes = {vectorSize, vectorSize * 4, vectorSize};
     } else {
@@ -594,9 +597,12 @@ static LogicalResult setRootConfig(
   SmallVector<int64_t> workgroupTileSizes =
       getMatmulWorkgroupSizes(entryPointFn, linalgOp, vectorSize, isQuantized);
 
+  auto variantOp = getExecutableVariantOp(entryPointFn);
+  assert(succeeded(variantOp) && "ExecutableVariantOp not found");
+
   // Use the default distribution for the matmul loops.
   int64_t defaultMaxSize = defaultWorkgroupTileSize;
-  if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
+  if (isX86(*variantOp) || isRISCV(*variantOp)) {
     defaultMaxSize = 128;
   }
 
@@ -610,8 +616,8 @@ static LogicalResult setRootConfig(
   // works for linalg.matmul cases. We can relax it once we have better
   // scheduling, e.g., transform dialect.
   SmallVector<int64_t> flowTileSizes;
-  if (!disableMatmulPadPipeline &&
-      (isX86(entryPointFn) || isRISCV(entryPointFn)) && numLoops == 3) {
+  if (!disableMatmulPadPipeline && (isX86(*variantOp) || isRISCV(*variantOp)) &&
+      numLoops == 3) {
     // It's inspired from Sandbox configuration. Sandbox has
     // [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192 because
     // 288/12*8=192
@@ -628,11 +634,11 @@ static LogicalResult setRootConfig(
   // ARM codgen does not switch to use codegen driver based approach, so we have
   // special logic for it. All the new pipeline is expected to use codegen
   // driver based approach.
-  if (isAArch64(entryPointFn) && !isQuantized) {
+  if (isAArch64(*variantOp) && !isQuantized) {
     return setAArch64RootConfig(entryPointFn, contractionOp, flowTileSizes,
                                 workgroupTileSizes, vectorSize);
-  } else if (isX86(entryPointFn) || isRISCV(entryPointFn) ||
-             isAArch64(entryPointFn)) {
+  } else if (isX86(*variantOp) || isRISCV(*variantOp) ||
+             isAArch64(*variantOp)) {
     if (disableMatmulPadPipeline || numLoops != 3) {
       return setMatmulNoPadRootConfig(entryPointFn, contractionOp,
                                       flowTileSizes, workgroupTileSizes,
@@ -834,7 +840,9 @@ static LogicalResult setTransposeLikeOpRootConfig(
     return success();
   }
 
-  if (!hasAVX2Features(genericOp) || !isSupportedTransposeOp(genericOp)) {
+  auto variantOp = getExecutableVariantOp(genericOp);
+  assert(succeeded(variantOp) && "ExecutableVariantOp not found");
+  if (!hasAVX2Feature(*variantOp) || !isSupportedTransposeOp(genericOp)) {
     return success();
   }
 
@@ -1126,7 +1134,9 @@ static LogicalResult setRootConfig(
   Operation *rootOperation = rootOp.getValue();
 
   if (rootOperation) {
-    if (isVMVXBackend(entryPointFn)) {
+    auto variantOp = getExecutableVariantOp(entryPointFn);
+    assert(succeeded(variantOp) && "ExecutableVariantOp not found");
+    if (isVMVXBackend(*variantOp)) {
       if (failed(
               setVMVXRootConfigImpl(entryPointFn, rootOperation, tiledLoops))) {
         return failure();
