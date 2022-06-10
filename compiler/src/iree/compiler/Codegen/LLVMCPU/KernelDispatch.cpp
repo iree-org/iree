@@ -123,17 +123,20 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
     // Check the fastest varying dimension of the operand. Set the vector size
     // of the corresponding loop to the vector size.
     if (map.value().getNumResults() == 0) continue;
-    auto fastestVaryingDimExpr =
-        map.value().getResults().back().dyn_cast<AffineDimExpr>();
-    if (!fastestVaryingDimExpr) continue;
-    unsigned fastestVaryingDim = fastestVaryingDimExpr.getPosition();
+    for (auto iter : map.value().getResults()) {
+      auto fastestVaryingDimExpr = iter.dyn_cast<AffineDimExpr>();
+      if (!fastestVaryingDimExpr) continue;
+      unsigned fastestVaryingDim = fastestVaryingDimExpr.getPosition();
 
-    // If the indexing map has result it has to be a shaped type.
-    auto operandType =
-        inputOutputOpOperands[map.index()]->get().getType().cast<ShapedType>();
-    minTileSizes[fastestVaryingDim] =
-        std::max<int64_t>(minTileSizes[fastestVaryingDim],
-                          getVectorSize(entryPointFn, operandType));
+      // If the indexing map has result it has to be a shaped type.
+      auto operandType = inputOutputOpOperands[map.index()]
+                             ->get()
+                             .getType()
+                             .cast<ShapedType>();
+      minTileSizes[fastestVaryingDim] =
+          std::max<int64_t>(minTileSizes[fastestVaryingDim],
+                            getVectorSize(entryPointFn, operandType));
+    }
   }
   return minTileSizes;
 }
@@ -261,6 +264,7 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
 static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
                               int64_t vectorSizeVal,
                               bool allowIncompleteTile = false) {
+  //printf("%d %d %d %d %d\n", (int)lb, (int)ub, (int)maxSize, (int)vectorSizeVal, (int)allowIncompleteTile);
   if (ub == ShapedType::kDynamicSize || lb == ShapedType::kDynamicSize) {
     return maxSize;
   }
@@ -334,6 +338,9 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
       getDefaultDistributedLoopTileSizes(lbs, ubs, adjustedMinTileSizes,
                                          adjustedMaxTileSizes,
                                          adjustedVectorSizeHints);
+  //printf("Before fixing");
+  //for (auto i : distributedTileSizes) printf(" %d", (int)i);
+  //puts("");
   // Final fix up of the tile sizes to make sure that they divide the problem
   // size to make it vectorizable.
   for (auto i : llvm::seq<unsigned>(0, distributedTileSizes.size())) {
@@ -342,6 +349,9 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
         getMaxTileSize(lbs[i], ubs[i], distributedTileSizes[i], minTileSizes[i],
                        allowIncompleteTile);
   }
+  //printf("After fixing");
+  //for (auto i : distributedTileSizes) printf(" %d", (int)i);
+  //puts("");
   return distributedTileSizes;
 }
 static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
@@ -833,11 +843,13 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   unsigned numLoops = genericOp.getNumLoops();
   if (numLoops == 0) return success();
   if (numLoops != genericOp.getNumParallelLoops()) return success();
-  if (!genericOp.hasTensorSemantics()) return success();
 
   SmallVector<int64_t> minTileSizes =
       getMinTilingSizesForEachDim(entryPointFn, genericOp);
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
+  //printf("minTileSizes:");
+  //for (auto i : minTileSizes) printf(" %d", (int)i);
+  //puts("");
 
   // Set the flow level tiling to the default.
   SmallVector<int64_t> flowTileSizes =
@@ -853,9 +865,12 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back({});
 
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, genericOp, tileSizes,
-      DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert);
+  auto passPipeline =
+      genericOp.hasTensorSemantics()
+          ? DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert
+          : DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
+                                               tileSizes, passPipeline);
 }
 
 /// Sets the lowering configuration for a generic op implementing a

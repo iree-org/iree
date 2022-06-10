@@ -212,14 +212,23 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   {
-    // Skip tiling reduction loops because this is expected to apply on copy ops
-    // only.
     LinalgSingleTilingExpertPassOptions options;
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
-    options.vectorize = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
+  // Skip tiling reduction loops because this is expected to apply on copy ops
+  // only.
+  {
+    LinalgFusePassOptions options;
+    // TODO(hanchung): it's better to use peeling approach for copies.
+    options.padParallelDims = true;
+    options.vectorize = true;
+    options.vectorizePadding = true;
+    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
