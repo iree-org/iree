@@ -611,12 +611,14 @@ static LogicalResult setRootConfig(
   // scheduling, e.g., transform dialect.
   SmallVector<int64_t> flowTileSizes;
   if (!disableMatmulPadPipeline &&
-      (isX86(entryPointFn) || isRISCV(entryPointFn)) && numLoops == 3) {
+      (isX86(entryPointFn) || isRISCV(entryPointFn))) {
     // It's inspired from Sandbox configuration. Sandbox has
     // [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192 because
     // 288/12*8=192
-    maxTileSizes[0] = 192;
-    maxTileSizes[1] = 128;
+    if (numLoops == 3) {
+      maxTileSizes[0] = 192;
+      maxTileSizes[1] = 128;
+    }
     flowTileSizes = getDefaultDistributedLevelTileSizes(
         linalgOp, workgroupTileSizes, maxTileSizes,
         /*allowIncompleteTile=*/true);
@@ -631,13 +633,9 @@ static LogicalResult setRootConfig(
   if (isAArch64(entryPointFn) && !isQuantized) {
     return setAArch64RootConfig(entryPointFn, contractionOp, flowTileSizes,
                                 workgroupTileSizes, vectorSize);
-  } else if (isX86(entryPointFn) || isRISCV(entryPointFn) ||
-             isAArch64(entryPointFn)) {
-    if (disableMatmulPadPipeline || numLoops != 3) {
-      return setMatmulNoPadRootConfig(entryPointFn, contractionOp,
-                                      flowTileSizes, workgroupTileSizes,
-                                      vectorSize);
-    }
+  } else if (disableMatmulPadPipeline) {
+    return setMatmulNoPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
+                                    workgroupTileSizes, vectorSize);
   }
   return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
                                 workgroupTileSizes, vectorSize);
