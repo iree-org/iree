@@ -14,7 +14,8 @@ include(CMakeParseArguments)
 # H_FILE_OUTPUT: The H header file to output.
 # COMPILE_TOOL: Compiler tool to invoke (CMake target). The default tool is
 #     "iree-compile".
-# FLAGS: Flags to pass to the compiler tool (list of strings).
+# FLAGS: Additional flags to pass to the compile tool (list of strings).
+#     `--output-format=vm-c` is included automatically.
 # TESTONLY: When added, this target will only be built if user passes
 #     -DIREE_BUILD_TESTS=ON to CMake.
 #
@@ -52,7 +53,8 @@ function(iree_c_module)
 
   iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE ${_COMPILE_TOOL})
 
-  set(_ARGS "${_RULE_FLAGS}")
+  set(_ARGS "--output-format=vm-c")
+  list(APPEND _ARGS "${_RULE_FLAGS}")
   list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}")
   list(APPEND _ARGS "-o")
   list(APPEND _ARGS "${_RULE_H_FILE_OUTPUT}")

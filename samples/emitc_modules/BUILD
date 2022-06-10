@@ -18,7 +18,6 @@ iree_c_module(
     src = "add.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "add_module.h",
 )
@@ -42,7 +41,6 @@ iree_c_module(
     src = "import_module_a.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "import_module_a.h",
 )
@@ -52,7 +50,6 @@ iree_c_module(
     src = "import_module_b.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "import_module_b.h",
 )

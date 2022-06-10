@@ -56,7 +56,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:arithmetic_ops.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "arithmetic_ops.h",
 )
@@ -66,7 +65,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:arithmetic_ops_f32.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "arithmetic_ops_f32.h",
 )
@@ -76,7 +74,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:arithmetic_ops_i64.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "arithmetic_ops_i64.h",
 )
@@ -86,7 +83,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:assignment_ops.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "assignment_ops.h",
 )
@@ -96,7 +92,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:assignment_ops_f32.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "assignment_ops_f32.h",
 )
@@ -106,7 +101,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:assignment_ops_i64.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "assignment_ops_i64.h",
 )
@@ -116,7 +110,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:buffer_ops.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "buffer_ops.h",
 )
@@ -126,7 +119,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:call_ops.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "call_ops.h",
 )
@@ -136,7 +128,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:comparison_ops.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "comparison_ops.h",
 )
@@ -146,7 +137,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:comparison_ops_f32.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "comparison_ops_f32.h",
 )
@@ -156,7 +146,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:comparison_ops_i64.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "comparison_ops_i64.h",
 )
@@ -166,7 +155,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:control_flow_ops.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "control_flow_ops.h",
 )
@@ -176,7 +164,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:conversion_ops.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "conversion_ops.h",
 )
@@ -186,7 +173,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:conversion_ops_f32.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "conversion_ops_f32.h",
 )
@@ -196,7 +182,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:conversion_ops_i64.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "conversion_ops_i64.h",
 )
@@ -206,7 +191,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:global_ops.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "global_ops.h",
 )
@@ -216,7 +200,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:global_ops_f32.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "global_ops_f32.h",
 )
@@ -226,7 +209,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:global_ops_i64.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "global_ops_i64.h",
 )
@@ -236,7 +218,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:list_ops.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "list_ops.h",
 )
@@ -246,7 +227,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:list_variant_ops.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "list_variant_ops.h",
 )
@@ -256,7 +236,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:ref_ops.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "ref_ops.h",
 )
@@ -266,7 +245,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:shift_ops.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "shift_ops.h",
 )
@@ -276,7 +254,6 @@ iree_c_module(
     src = "//runtime/src/iree/vm/test:shift_ops_i64.mlir",
     flags = [
         "--compile-mode=vm",
-        "--output-format=vm-c",
     ],
     h_file_output = "shift_ops_i64.h",
 )

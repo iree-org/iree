@@ -16,7 +16,6 @@ iree_c_module(
   H_FILE_OUTPUT
     "add_module.h"
   FLAGS
-    "--iree-mlir-to-vm-c-module"
     "--iree-hal-target-backends=vmvx"
 )
 
@@ -59,7 +58,6 @@ iree_c_module(
   H_FILE_OUTPUT
     "import_module_a.h"
   FLAGS
-    "--iree-mlir-to-vm-c-module"
     "--iree-hal-target-backends=vmvx"
 )
 
@@ -71,6 +69,5 @@ iree_c_module(
   H_FILE_OUTPUT
     "import_module_b.h"
   FLAGS
-    "--iree-mlir-to-vm-c-module"
     "--iree-hal-target-backends=vmvx"
 )
