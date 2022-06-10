@@ -244,7 +244,8 @@ static iree_status_t iree_hal_cuda_driver_select_default_device(
                               "default device %d not found (of %ld enumerated)",
                               default_device_index, device_count);
   } else {
-    *out_device = (CUdevice)device_infos[default_device_index].device_id;
+    *out_device =
+        DEVICE_ID_TO_CUDEVICE(device_infos[default_device_index].device_id);
   }
   iree_allocator_free(host_allocator, device_infos);
   return status;
