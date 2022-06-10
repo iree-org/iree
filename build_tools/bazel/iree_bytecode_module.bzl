@@ -13,8 +13,8 @@ load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 def iree_bytecode_module(
         name,
         src,
-        module_name = None,
         flags,
+        module_name = None,
         compile_tool = "//tools:iree-compile",
         linker_tool = "@llvm-project//lld:lld",
         c_identifier = "",
@@ -27,12 +27,12 @@ def iree_bytecode_module(
         src: mlir source file to be compiled to an IREE module.
         flags: additional flags to pass to the compiler.
             `--output-format=vm-bytecode` is included automatically.
+        module_name: Optional name for the generated IREE module.
+            Defaults to `name.vmfb`.
         compile_tool: the compiler to use to generate the module.
             Defaults to iree-compile.
         linker_tool: the linker to use.
             Defaults to the lld from the llvm-project directory.
-        module_name: Optional name for the generated IREE module.
-            Defaults to `name.vmfb`.
         c_identifier: Optional. Enables embedding the module as C data.
         deps: Optional. Dependencies to add to the generated library.
         **kwargs: any additional attributes to pass to the underlying rules.
