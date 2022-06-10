@@ -68,6 +68,13 @@ set(IREE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(IREE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(IREE_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
+# TODO(#9421): split the IREE_DEFAULT_* flags into these, possibly still
+# retaining the defaults for things common between the two.
+set(IREE_COMPILER_COPTS)
+set(IREE_COMPILER_LINKOPTS)
+set(IREE_RUNTIME_COPTS)
+set(IREE_RUNTIME_LINKOPTS)
+
 # Key compilation options
 iree_select_compiler_opts(IREE_DEFAULT_COPTS
   CLANG_OR_GCC

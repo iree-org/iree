@@ -58,6 +58,8 @@ include(CMakeParseArguments)
 # )
 
 function(iree_cc_library)
+  # NOTE: ensure that if this changes the iree_compiler_cc_library and
+  # iree_runtime_cc_library functions below are updated to match.
   cmake_parse_arguments(
     _RULE
     "PUBLIC;TESTONLY;SHARED"
@@ -241,6 +243,68 @@ function(iree_cc_library)
       add_library(${_PACKAGE_NS} ALIAS ${_NAME})
     endif()
   endif()
+endfunction()
+
+# iree_compiler_cc_library()
+#
+# iree_cc_library with compiler-specific copts and linkopts added.
+# See build_tools/cmake/iree_copts.cmake for the IREE_COMPILER_COPTS and
+# IREE_COMPILER_LINKOPTS variables.
+function(iree_compiler_cc_library)
+  # NOTE: must match iree_cc_library.
+  cmake_parse_arguments(
+    _RULE
+    "PUBLIC;TESTONLY;SHARED"
+    "NAME"
+    "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
+    ${ARGN}
+  )
+  iree_cc_library(
+    NAME ${_RULE_NAME}
+    HDRS ${_RULE_HDRS}
+    TEXTUAL_HDRS ${_RULE_TEXTUAL_HDRS}
+    SRCS ${_RULE_SRCS}
+    DATA ${_RULE_DATA}
+    DEPS ${_RULE_DEPS}
+    COPTS ${IREE_COMPILER_COPTS} ${_RULE_COPTS}
+    DEFINES ${_RULE_DEFINES}
+    INCLUDES ${_RULE_INCLUDES}
+    LINKOPTS ${IREE_COMPILER_LINKOPTS} ${_RULE_LINKOPTS}
+    PUBLIC ${_RULE_PUBLIC}
+    TESTONLY ${_RULE_TESTONLY}
+    SHARED ${_RULE_SHARED}
+  )
+endfunction()
+
+# iree_runtime_cc_library()
+#
+# iree_cc_library with runtime-specific copts and linkopts added.
+# See build_tools/cmake/iree_copts.cmake for the IREE_RUNTIME_COPTS and
+# IREE_RUNTIME_LINKOPTS variables.
+function(iree_runtime_cc_library)
+  # NOTE: must match iree_cc_library.
+  cmake_parse_arguments(
+    _RULE
+    "PUBLIC;TESTONLY;SHARED"
+    "NAME"
+    "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
+    ${ARGN}
+  )
+  iree_cc_library(
+    NAME ${_RULE_NAME}
+    HDRS ${_RULE_HDRS}
+    TEXTUAL_HDRS ${_RULE_TEXTUAL_HDRS}
+    SRCS ${_RULE_SRCS}
+    DATA ${_RULE_DATA}
+    DEPS ${_RULE_DEPS}
+    COPTS ${IREE_RUNTIME_COPTS} ${_RULE_COPTS}
+    DEFINES ${_RULE_DEFINES}
+    INCLUDES ${_RULE_INCLUDES}
+    LINKOPTS ${IREE_RUNTIME_LINKOPTS} ${_RULE_LINKOPTS}
+    PUBLIC ${_RULE_PUBLIC}
+    TESTONLY ${_RULE_TESTONLY}
+    SHARED ${_RULE_SHARED}
+  )
 endfunction()
 
 # _iree_cc_library_add_object_deps()
