@@ -39,7 +39,8 @@ hal.executable private @apply_scale_no_vector_feature {
 }
 
 // 64-bit lowering is used by default if no vector features are provided.
-// TODO: We shouldn't vectorize the code if no vector features are provided.
+// TODO(diegocaballero): We shouldn't vectorize the code if no vector features
+// are provided.
 // CHECK-LABEL: llvm.func internal @apply_scale_no_vector_feature
 //       CHECK:   %[[ADD:.*]] = llvm.add %{{.*}}, %{{.*}} : vector<2xi64>
 //  CHECK-NEXT:   %[[SHR:.*]] = llvm.ashr %[[ADD]], %{{.*}} : vector<2xi64>
