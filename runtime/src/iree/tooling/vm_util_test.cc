@@ -8,10 +8,10 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/local_sync/registration/driver_module.h"
 #include "iree/modules/hal/module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
+#include "iree/tooling/device_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/ref_cc.h"
 
@@ -20,16 +20,18 @@ namespace {
 
 class VmUtilTest : public ::testing::Test {
  protected:
-  static void SetUpTestSuite() {
-    IREE_CHECK_OK(iree_hal_local_sync_driver_module_register(
-        iree_hal_driver_registry_default()));
-  }
-
   virtual void SetUp() {
     IREE_ASSERT_OK(iree_hal_module_register_types());
-    IREE_ASSERT_OK(iree_hal_create_device(iree_hal_driver_registry_default(),
-                                          IREE_SV("local-sync"),
-                                          iree_allocator_system(), &device_));
+    iree_status_t status = iree_hal_create_device(
+        iree_hal_available_driver_registry(), IREE_SV("local-sync"),
+        iree_allocator_system(), &device_);
+    if (iree_status_is_not_found(status)) {
+      IREE_LOG(WARNING)
+          << "Skipping test as 'local-sync' driver was not found:";
+      iree_status_fprint(stderr, status);
+      iree_status_free(status);
+      GTEST_SKIP();
+    }
     allocator_ = iree_hal_device_allocator(device_);
   }
 

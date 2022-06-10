@@ -55,13 +55,6 @@ cc_library(
     ],
 )
 
-iree_cmake_extra_content(
-    content = """
-if(IREE_HAL_DRIVER_LOCAL_SYNC)
-""",
-    inline = True,
-)
-
 cc_test(
     name = "vm_util_test",
     srcs = ["vm_util_test.cc"],
@@ -69,20 +62,13 @@ cc_test(
         ":vm_util",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/drivers/local_sync/registration",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/tooling:device_util",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm:cc",
     ],
-)
-
-iree_cmake_extra_content(
-    content = """
-endif()
-""",
-    inline = True,
 )
 
 iree_cmake_extra_content(
