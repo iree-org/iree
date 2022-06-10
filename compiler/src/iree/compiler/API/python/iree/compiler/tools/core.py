@@ -189,9 +189,6 @@ def build_compile_command_line(input_file: str, tfs: TempFileSaver,
   if options.output_file:
     cl.append(f"-o={options.output_file}")
 
-  # Translation to perform.
-  cl.append("--iree-mlir-to-vm-bytecode-module")
-
   # Tool paths.
   lld_path = find_tool("iree-lld")
   cl.append(f"--iree-llvm-embedded-linker-path={lld_path}")

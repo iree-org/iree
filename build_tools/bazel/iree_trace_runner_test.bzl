@@ -12,7 +12,7 @@ load("//build_tools/bazel:native_binary.bzl", "native_test")
 def iree_trace_runner_test(
         name,
         src,
-        module,
+        module_name,
         target_backend,
         driver,
         trace_runner,
@@ -31,18 +31,21 @@ def iree_trace_runner_test(
         target_backend: target backend to compile for.
         driver: driver to run the module with.
         compiler_flags: additional flags to pass to the compiler. Bytecode
-            translation and backend flags are passed automatically.
-        runner_args: additional args to pass to the trace-runner program. The driver
-            and input file flags are passed automatically.
-        tags: Additional labels to apply to the test. "driver=${DRIVER}" is added
-            automatically.
+            output format and backend flags are passed automatically.
+        runner_args: additional args to pass to the trace-runner program. The
+            driver and input file flags are passed automatically.
+        tags: Additional labels to apply to the test. "driver=${DRIVER}" is
+            added automatically.
         trace_runner: trace-runner program to run.
         trace: trace file input to the trace-runner program.
-        module: specifies the  path to use for the enerated IREE module (.vmfb). Mandatory,
-            unlike in iree_check_test, because trace files (.yaml) reference a specific module file path.
+        module_name: specifies the  path to use for the enerated IREE module
+            (.vmfb). Mandatory, unlike in iree_check_test, because trace files
+            (.yaml) reference a specific module file path.
         timeout: timeout for the generated tests.
-        target_cpu_features: currently unimplemented (must be empty), will eventually allow specifying target CPU features.
-        **kwargs: any additional attributes to pass to the underlying tests and test suite.
+        target_cpu_features: currently unimplemented (must be empty), will
+            eventually allow specifying target CPU features.
+        **kwargs: any additional attributes to pass to the underlying tests and
+            test suite.
     """
 
     if target_cpu_features:
@@ -51,10 +54,9 @@ def iree_trace_runner_test(
     bytecode_module_name = name + "_bytecode_module"
     iree_bytecode_module(
         name = bytecode_module_name,
-        module = module,
+        module_name = module_name,
         src = src,
         flags = [
-            "--iree-mlir-to-vm-bytecode-module",
             "--mlir-print-op-on-diagnostic=false",
             "--iree-hal-target-backends=%s" % target_backend,
         ] + compiler_flags,
@@ -98,8 +100,9 @@ def iree_single_backend_generated_trace_runner_test(
 
     Args:
         name: Name of the target
-        generator: Target to run to generate the source file and trace files. It will be
-            invoked with the following standard flags, in addition to generator_args:
+        generator: Target to run to generate the source file and trace files.
+            It will be invoked with the following standard flags, in addition
+            to generator_args:
             --output_code=(current binary dir)/name.mlir
             --output_trace=(current binary dir)/name.yaml
             --module_path=(current binary dir)/name.vmfb
@@ -107,15 +110,17 @@ def iree_single_backend_generated_trace_runner_test(
         target_backend: target backend to compile for.
         driver: driver to run the module with.
         compiler_flags: additional flags to pass to the compiler. Bytecode
-            translation and backend flags are passed automatically.
-        runner_args: additional args to pass to the trace-runner program. The driver
-            and input file flags are passed automatically.
-        tags: Additional labels to apply to the test. "driver=${DRIVER}" is added
-            automatically.
+            output format and backend flags are passed automatically.
+        runner_args: additional args to pass to the trace-runner program. The
+            driver and input file flags are passed automatically.
+        tags: Additional labels to apply to the test. "driver=${DRIVER}" is
+            added automatically.
         trace_runner: trace-runner program to run.
         timeout: timeout for the generated tests.
-        target_cpu_features: currently unimplemented (must be empty), will eventually allow specifying target CPU features.
-        **kwargs: any additional attributes to pass to the underlying tests and test suite.
+        target_cpu_features: currently unimplemented (must be empty), will
+            eventually allow specifying target CPU features.
+        **kwargs: any additional attributes to pass to the underlying tests and
+            test suite.
     """
 
     if target_cpu_features:
@@ -123,7 +128,7 @@ def iree_single_backend_generated_trace_runner_test(
 
     src = "%s.mlir" % (name)
     trace = "%s.yaml" % (name)
-    module = "%s.vmfb" % (name)
+    module_name = "%s.vmfb" % (name)
     native.genrule(
         name = "%s_generate" % (name),
         outs = [src, trace],
@@ -135,7 +140,7 @@ def iree_single_backend_generated_trace_runner_test(
             # Explanation for why "$(RULEDIR)/%s" instead of "$(location %s)" below:
             # module_path points to a file that does not yet exist as it will
             # be generated by iree_bytecode_module below iree_trace_runner_test.
-            "--module_path=$(RULEDIR)/%s" % (module),
+            "--module_path=$(RULEDIR)/%s" % (module_name),
         ] + [('"%s"' % arg) for arg in generator_args]),
         tools = [generator],
         message = "Generating code and trace for test %s..." % (name),
@@ -145,7 +150,7 @@ def iree_single_backend_generated_trace_runner_test(
     iree_trace_runner_test(
         name = name,
         src = src,
-        module = module,
+        module_name = module_name,
         target_backend = target_backend,
         driver = driver,
         trace_runner = trace_runner,
@@ -173,23 +178,26 @@ def iree_generated_trace_runner_test(
 
     Args:
         name: Name of the target
-        generator: Target to run to generate the source file and trace files. It will be
-            invoked with the following standard flags, in addition to generator_args:
+        generator: Target to run to generate the source file and trace files.
+            It will be invoked with the following standard flags, in addition
+            to generator_args:
             --output_code=(current binary dir)/name.mlir
             --output_trace=(current binary dir)/name.yaml
             --module_path=(current binary dir)/name.vmfb
         generator_args: additional args to pass to the generator program.
-        target_backends_and_drivers: backend/driver pairs to compile and run the module.
+        target_backends_and_drivers: backend/driver pairs to compile and run
+            the module.
         compiler_flags: additional flags to pass to the compiler. Bytecode
-            translation and backend flags are passed automatically.
-        runner_args: additional args to pass to the trace-runner program. The driver
-            and input file flags are passed automatically.
-        tags: Additional labels to apply to the test. "driver=${DRIVER}" is added
-            automatically.
+            output format and backend flags are passed automatically.
+        runner_args: additional args to pass to the trace-runner program. The
+            driver and input file flags are passed automatically.
+        tags: Additional labels to apply to the test. "driver=${DRIVER}" is
+            added automatically.
         trace_runner: trace-runner program to run.
         timeout: timeout for the generated tests.
-        target_cpu_features_variants: list of target cpu features variants. Currently unimplemented, so each
-            entry must be either "default" or start with "aarch64:" so as Bazel builds are currently x86-only,
+        target_cpu_features_variants: list of target cpu features variants.
+            Currently unimplemented, so each entry must be either "default" or
+            start with "aarch64:" so as Bazel builds are currently x86-only,
             we know that it is correct to ignore this.
         **kwargs: any additional attributes to pass to the underlying tests and test suite.
     """

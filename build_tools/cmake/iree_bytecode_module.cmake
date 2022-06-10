@@ -8,26 +8,27 @@ include(CMakeParseArguments)
 
 # iree_bytecode_module()
 #
-# CMake function to imitate Bazel's iree_bytecode_module rule.
+# Builds an IREE bytecode module.
 #
 # Parameters:
 # NAME: Name of target (see Note).
 # SRC: Source file to compile into a bytecode module.
 # FLAGS: Flags to pass to the compiler tool (list of strings).
+#     `--output-format=vm-bytecode` is included automatically.
+# MODULE_FILE_NAME: Optional. When specified, sets the output bytecode module
+#    file name. When not specified, a default file name will be generated from
+#    ${NAME}.
 # COMPILE_TOOL: Compiler tool to invoke (CMake target). The default tool is
 #     "iree-compile".
 # C_IDENTIFIER: Identifier to use for generate c embed code.
 #     If omitted then no C embed code will be generated.
+# FRIENDLY_NAME: Optional. Name to use to display build progress info.
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
 #     Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC
 #     will be in ${PACKAGE}/internal.
-# DEPS: Library dependencies to add to the generated embed cc library.
 # TESTONLY: When added, this target will only be built if IREE_BUILD_TESTS=ON.
-# MODULE_FILE_NAME: Optional. When specified, sets the output bytecode module
-#    file name. When not specified, a default file name will be generated from
-#    ${NAME}.
 # DEPENDS: Optional. Additional dependencies beyond SRC and the tools.
-# FRIENDLY_NAME: Optional. Name to use to display build progress info.
+# DEPS: Library dependencies to add to the generated embed cc library.
 #
 # Note:
 # By default, iree_bytecode_module will create a module target named ${NAME} and
@@ -38,7 +39,7 @@ function(iree_bytecode_module)
   cmake_parse_arguments(
     _RULE
     "PUBLIC;TESTONLY"
-    "NAME;SRC;COMPILE_TOOL;C_IDENTIFIER;MODULE_FILE_NAME;FRIENDLY_NAME"
+    "NAME;SRC;MODULE_FILE_NAME;COMPILE_TOOL;C_IDENTIFIER;FRIENDLY_NAME"
     "FLAGS;DEPENDS;DEPS"
     ${ARGN}
   )
@@ -62,7 +63,8 @@ function(iree_bytecode_module)
 
   iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE ${_COMPILE_TOOL})
 
-  set(_ARGS "${_RULE_FLAGS}")
+  set(_ARGS "--output-format=vm-bytecode")
+  list(APPEND _ARGS "${_RULE_FLAGS}")
 
   get_filename_component(_SRC_PATH "${_RULE_SRC}" REALPATH)
   list(APPEND _ARGS "${_SRC_PATH}")

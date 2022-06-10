@@ -196,7 +196,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     outputFormat = OutputFormat::vm_bytecode;
   }
 
-  // Defualt output format.
+  // Default output format.
   if (outputFormat == OutputFormat::none) {
     outputFormat = OutputFormat::vm_bytecode;
   }

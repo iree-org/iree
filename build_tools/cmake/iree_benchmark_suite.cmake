@@ -197,7 +197,6 @@ function(iree_benchmark_suite)
 
       # The full list of compilation flags.
       set(_COMPILATION_ARGS "")
-      list(APPEND _COMPILATION_ARGS "--iree-mlir-to-vm-bytecode-module")
       list(APPEND _COMPILATION_ARGS "--mlir-print-op-on-diagnostic=false")
       list(APPEND _COMPILATION_ARGS "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}")
       list(SORT _RULE_COMPILATION_FLAGS)

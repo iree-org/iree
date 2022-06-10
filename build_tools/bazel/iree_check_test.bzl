@@ -35,13 +35,14 @@ def iree_check_test(
       driver: driver to run the module with. This can be omitted to test only
           compilation, but consider omiting the driver as a hacky abuse of the
           rule since compilation on its own not use iree-check-module.
-      compiler_flags: additional flags to pass to the compiler. Bytecode translation and backend
-          flags are passed automatically.
-      runner_args: additional runner_args to pass to iree-check-module. The driver and input file
-          are passed automatically.
-      tags: additional tags to apply to the generated test. A tag "driver=DRIVER" is added
-          automatically.
-      target_cpu_features: currently unimplemented (must be empty), will eventually allow specifying target CPU features.
+      compiler_flags: additional flags to pass to the compiler. Bytecode output
+          format and backend flags are passed automatically.
+      runner_args: additional runner_args to pass to iree-check-module. The
+          driver and input file are passed automatically.
+      tags: additional tags to apply to the generated test. A tag
+          "driver=DRIVER" is added automatically.
+      target_cpu_features: currently unimplemented (must be empty), will
+          eventually allow specifying target CPU features.
       timeout: timeout for the generated tests.
       **kwargs: any additional attributes to pass to the underlying native_test.
     """
@@ -54,7 +55,6 @@ def iree_check_test(
         name = bytecode_module_name,
         src = src,
         flags = [
-            "--iree-mlir-to-vm-bytecode-module",
             "--mlir-print-op-on-diagnostic=false",
             "--iree-hal-target-backends=%s" % target_backend,
         ] + compiler_flags,
@@ -99,16 +99,20 @@ def iree_check_single_backend_test_suite(
       driver: driver to run the module with. This can be omitted to test only
           compilation, but consider omiting the driver as a hacky abuse of the
           rule since compilation on its own not use iree-check-module.
-      compiler_flags: additional flags to pass to the compiler. Bytecode translation and backend
-          flags are passed automatically.
-      runner_args: additional runner_args to pass to the underlying iree-check-module tests. The
-          driver and input file are passed automatically. To use different runner_args per test,
-          create a separate suite or iree_check_test.
-      target_cpu_features: currently unimplemented (must be empty), will eventually allow specifying target CPU features.
-      tags: tags to apply to the generated tests. Note that as in standard test suites, manual
-          is treated specially and will also apply to the test suite itself.
+      compiler_flags: additional flags to pass to the compiler. Bytecode output
+          format and backend flags are passed automatically.
+      runner_args: additional runner_args to pass to the underlying
+          iree-check-module tests. The driver and input file are passed
+          automatically. To use different runner_args per test, create a
+          separate suite or iree_check_test.
+      target_cpu_features: currently unimplemented (must be empty), will
+          eventually allow specifying target CPU features.
+      tags: tags to apply to the generated tests. Note that as in standard test
+          suites, manual is treated specially and will also apply to the test
+          suite itself.
       timeout: timeout for the generated tests.
-      **kwargs: any additional attributes to pass to the underlying tests and test suite.
+      **kwargs: any additional attributes to pass to the underlying tests and
+          test suite.
     """
 
     # We haven't implemented this so far because we have been using target_cpu_features so far only
@@ -168,18 +172,23 @@ def iree_check_test_suite(
     Args:
       name: name of the generated test suite.
       srcs: source mlir files containing the module.
-      target_backends_and_drivers: backend/driver pairs to compile and run the module, respectively.
-      compiler_flags: additional flags to pass to the compiler. Bytecode translation and backend
-          flags are passed automatically.
-      runner_args: additional runner_args to pass to the underlying iree-check-module tests. The
-          driver and input file are passed automatically. To use different runner_args per test,
-          create a separate suite or iree_check_test.
-      tags: tags to apply to the generated tests. Note that as in standard test suites, manual
-          is treated specially and will also apply to the test suite itself.
-      target_cpu_features_variants: list of target cpu features variants. Currently unimplemented, so each
-            entry must be either "default" or start with "aarch64:" so as Bazel builds are currently x86-only,
-            we know that it is correct to ignore this.
-      **kwargs: any additional attributes to pass to the underlying tests and test suite.
+      target_backends_and_drivers: backend/driver pairs to compile and run the
+          module, respectively.
+      compiler_flags: additional flags to pass to the compiler. Bytecode output
+          format and backend flags are passed automatically.
+      runner_args: additional runner_args to pass to the underlying
+          iree-check-module tests. The driver and input file are passed
+          automatically. To use different runner_args per test, create a
+          separate suite or iree_check_test.
+      tags: tags to apply to the generated tests. Note that as in standard test
+          suites, manual is treated specially and will also apply to the test
+          suite itself.
+      target_cpu_features_variants: list of target cpu features variants.
+          Currently unimplemented, so each entry must be either "default" or
+          start with "aarch64:" so as Bazel builds are currently x86-only, we
+          know that it is correct to ignore this.
+      **kwargs: any additional attributes to pass to the underlying tests and
+          test suite.
     """
 
     for target_cpu_features in target_cpu_features_variants:

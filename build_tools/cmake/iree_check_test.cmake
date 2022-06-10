@@ -55,7 +55,6 @@ TARGET_BACKEND=${_RULE_TARGET_BACKEND}.")
     SRC
       "${_RULE_SRC}"
     FLAGS
-      "--iree-mlir-to-vm-bytecode-module"
       "--mlir-print-op-on-diagnostic=false"
       "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
       ${_RULE_FLAGS}
@@ -76,8 +75,8 @@ endfunction()
 #   DRIVER: driver to run the module with. This can be omitted to test only
 #       compilation, but consider omiting the driver as a hacky abuse of the
 #       rule since compilation on its own not use iree-check-module.
-#   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode
-#       translation and backend flags are passed automatically.
+#   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode output
+#       format and backend flags are passed automatically.
 #   RUNNER_ARGS: additional args to pass to iree-check-module. The driver
 #       and input file are passed automatically.
 #   LABELS: Additional labels to apply to the test. The package path and
@@ -199,13 +198,13 @@ endfunction()
 #   DRIVER: driver to run the module with. This can be omitted to test only
 #       compilation, but consider omiting the driver as a hacky abuse of the
 #       rule since compilation on its own not use iree-check-module.
-#   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode
-#       translation and backend flags are passed automatically.
+#   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode output
+#       format and backend flags are passed automatically.
 #   RUNNER_ARGS: additional args to pass to the underlying iree-check-module
 #       tests. The driver and input file are passed automatically. To use
 #       different args per test, create a separate suite or iree_check_test.
-#   LABELS: Additional labels to apply to the generated tests. The package path is
-#       added automatically.
+#   LABELS: Additional labels to apply to the generated tests. The package path
+#       is added automatically.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
 #       --iree-llvm-target-cpu-features.
 function(iree_check_single_backend_test_suite)

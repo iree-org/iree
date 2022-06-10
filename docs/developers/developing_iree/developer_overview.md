@@ -156,7 +156,6 @@ runner for the IREE
 ```shell
 $ ../iree-build/tools/iree-compile \
   --iree-input-type=mhlo \
-  --iree-mlir-to-vm-bytecode-module \
   --iree-hal-target-backends=vmvx \
   $PWD/tests/e2e/xla_ops/abs.mlir \
   -o /tmp/abs.vmfb

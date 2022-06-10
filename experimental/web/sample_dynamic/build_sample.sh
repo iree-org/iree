@@ -48,7 +48,6 @@ COMPILE_TOOL="${INSTALL_ROOT?}/bin/iree-compile"
 compile_sample() {
   echo "  Compiling '$1' sample..."
   ${COMPILE_TOOL?} $2 \
-    --iree-mlir-to-vm-bytecode-module \
     --iree-input-type=mhlo \
     --iree-hal-target-backends=llvm \
     --iree-llvm-target-triple=wasm32-unknown-emscripten \

@@ -101,7 +101,6 @@ IREE's TensorFlow importer. We can now compile them for each GPU by running the 
 
     ``` shell hl_lines="3-5"
     iree-compile \
-        --iree-mlir-to-vm-bytecode-module \
         --iree-hal-target-backends=cuda \
         --iree-hal-cuda-llvm-target-arch=<...> \
         --iree-hal-cuda-disable-loop-nounroll-wa \
@@ -127,7 +126,6 @@ IREE's TensorFlow importer. We can now compile them for each GPU by running the 
 
     ``` shell hl_lines="3-6"
     tools/iree-compile \
-        --iree-mlir-to-vm-bytecode-module \
         --iree-hal-target-backends=rocm \
         --iree-rocm-target-chip=<...> \
         --iree-rocm-link-bc=true \
