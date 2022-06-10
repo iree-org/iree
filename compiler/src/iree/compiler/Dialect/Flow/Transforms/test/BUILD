@@ -26,6 +26,7 @@ iree_lit_test_suite(
             "dispatch_linalg_on_tensors.mlir",
             "dispatch_linalg_on_tensors_fusion.mlir",
             "dispatch_linalg_on_tensors_fusion_with_transpose.mlir",
+            "dispatch_linalg_transform_dialect.mlir",
             "expand_tensor_shapes.mlir",
             "export_benchmark_funcs.mlir",
             "infer_numeric_narrowing.mlir",
@@ -45,8 +46,12 @@ iree_lit_test_suite(
             "verify_input_ir.mlir",
         ],
         include = ["*.mlir"],
+        # linalg_transform_spec is a an MLIR file that specifies a
+        # transformation, it needs to be included as data.
+        exclude = ["transform_dialect_dispatch_spec.mlir"],
     ),
     cfg = "//compiler:lit.cfg.py",
+    data = ["transform_dialect_dispatch_spec.mlir"],
     tools = [
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",

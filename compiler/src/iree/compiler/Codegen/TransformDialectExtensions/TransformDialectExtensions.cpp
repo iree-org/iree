@@ -12,8 +12,11 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "llvm/Support/SourceMgr.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -24,6 +27,8 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE;
@@ -39,6 +44,312 @@ iree_compiler::IREE::transform_dialect::TransformDialectExtensions::
 void mlir::iree_compiler::registerLinalgTransformDialectExtension(
     DialectRegistry &registry) {
   registry.addExtensions<transform_dialect::TransformDialectExtensions>();
+}
+
+// TODO: Upstream to ShapeType and reuse.
+static SmallVector<int64_t> getIndicesOfDynamicDims(ShapedType t) {
+  int64_t numDynamicDims = t.getNumDynamicDims();
+  SmallVector<int64_t> res(numDynamicDims);
+  for (int64_t dim = 0; dim != numDynamicDims; ++dim)
+    res[dim] = t.getDynamicDimIndex(dim);
+  return res;
+}
+
+//===---------------------------------------------------------------------===//
+// Patterns for ForeachThreadOpToFlow rewrite.
+//===---------------------------------------------------------------------===//
+
+/// Rewrite ParallelInsertSlice ops in `performConcurrentlyOp` as Flow
+/// DispatchTensorStoreOps.
+/// Ops are inserted just before the `block` terminator.
+static void rewriteParallelInsertSlices(
+    PatternRewriter &rewriter, scf::PerformConcurrentlyOp performConcurrentlyOp,
+    Block &block, ValueRange resultTensorOperands,
+    ValueRange resultTensorsDynamicDims, BlockAndValueMapping tensorToFlowBvm) {
+  Location loc = performConcurrentlyOp.getLoc();
+  int64_t resultIndex = 0;
+  for (const Operation &yieldingOp :
+       llvm::make_early_inc_range(performConcurrentlyOp.yieldingOps())) {
+    auto parallelInsertOp = cast<scf::ParallelInsertSliceOp>(&yieldingOp);
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(block.getTerminator());
+    auto dynamicDims = Util::findVariadicDynamicDims(
+        resultIndex, resultTensorOperands, resultTensorsDynamicDims);
+    // clang-format off
+    rewriter.create<Flow::DispatchTensorStoreOp>(
+        loc,
+        parallelInsertOp.getSource(),
+        tensorToFlowBvm.lookup(resultTensorOperands[resultIndex++]),
+        dynamicDims,
+        parallelInsertOp.getMixedOffsets(),
+        parallelInsertOp.getMixedSizes(),
+        parallelInsertOp.getMixedStrides());
+    // clang-format on
+    rewriter.eraseOp(parallelInsertOp);
+  }
+}
+
+/// Rewrite ExtractSlice ops in `dispatchOp` as Flow::DispatchTensorLoadOps.
+/// Takes a list of all tensor and all tensorDynamicDims operands to the
+/// dispatchOp as well as a BlockAndValueMapping from tensor operands to the
+/// corresponding Flow dispatch tensor bbArgs.
+static void rewriteExtractSlices(PatternRewriter &rewriter,
+                                 Flow::DispatchWorkgroupsOp dispatchOp,
+                                 ValueRange tensorOperands,
+                                 ValueRange tensorDynamicDims,
+                                 BlockAndValueMapping tensorToFlowBvm) {
+  dispatchOp.walk([&](tensor::ExtractSliceOp extractSliceOp) {
+    Value source = extractSliceOp.source();
+    auto it = llvm::find(tensorOperands, source);
+    if (it == tensorOperands.end()) return;
+    int64_t index = std::distance(tensorOperands.begin(), it);
+    Value sourceFlow = tensorToFlowBvm.lookupOrNull(source);
+    if (!sourceFlow) return;
+
+    Location loc = extractSliceOp.getLoc();
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(extractSliceOp);
+    auto dynamicDims =
+        Util::findVariadicDynamicDims(index, tensorOperands, tensorDynamicDims);
+    // clang-format off
+    Value load = rewriter.create<Flow::DispatchTensorLoadOp>(
+        loc,
+        sourceFlow,
+        dynamicDims,
+        extractSliceOp.getMixedOffsets(),
+        extractSliceOp.getMixedSizes(),
+        extractSliceOp.getMixedStrides());
+    // clang-format on
+    rewriter.replaceOp(extractSliceOp, load);
+  });
+}
+
+/// Pattern to rewrite a ForeachThreadOp into a Flow::DispatchWorkGroupsOp.
+/// This rewrite proceeds in a few steps:
+///   - Step 1: Compute the result types and their result dynamic dim
+///   operands.
+///     This first step takes advantage of the ops contained in the
+///     ForeachThreadOp terminator and that are tied to the results.
+///   - Step 2: Get values defined above and separate them between
+///   non-tensors,
+///     tensors and introduce appropriate tensor dims.
+///   - Step 3: Compute workgroupCount.
+///   - Step 4: Create ordered vectors of operands to pass to the builder and
+///     build the dispatchOp.
+///   - Step 5: Fixup dispatchOp bbArgs and terminator.
+///   - Step 6: Move the body of foreachThreadOp to the dispatchOp.
+///   - Step 7: Set up bvm for RAUWIf. In particular, tensor operands become
+///     flow dispatch tensor bbArgs and need to be
+///     flow.dispatch.tensor.load'ed.
+///   - Step 8: Plug dispatch workgroup id and count values into the bvm.
+///   - Step 9. Rewrite tensor::ExtractSlice and ParallelInsert ops to the
+///     relevant Flow DispatchTensorLoad/Store version.
+///   - Step 10: Perform RAUWIf.
+///   - Step 11: Drop the terminator and replace foreachThreadOp.
+// TODO: n-D ForeachThreadOp
+struct ForeachThreadToFlowDispatchWorkgroupsRewriter
+    : public OpRewritePattern<scf::ForeachThreadOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  FailureOr<Flow::DispatchWorkgroupsOp> returningMatchAndRewrite(
+      scf::ForeachThreadOp foreachThreadOp, PatternRewriter &rewriter) const;
+
+  LogicalResult matchAndRewrite(scf::ForeachThreadOp foreachThreadOp,
+                                PatternRewriter &rewriter) const override {
+    return returningMatchAndRewrite(foreachThreadOp, rewriter);
+  }
+};
+
+FailureOr<Flow::DispatchWorkgroupsOp>
+ForeachThreadToFlowDispatchWorkgroupsRewriter::returningMatchAndRewrite(
+    scf::ForeachThreadOp foreachThreadOp, PatternRewriter &rewriter) const {
+  // Entry point start just before the foreachThreadOp.
+  Location loc = foreachThreadOp.getLoc();
+  scf::PerformConcurrentlyOp performConcurrentlyOp =
+      foreachThreadOp.getTerminator();
+
+  // Step 1: Compute all dynamic result dims.
+  // The `dest` of the ParallelInsertSliceOp are tied to the results and carry
+  // over to the Flow::DispatchWorkgroupsOp.
+  // Use a SetVector to ensure tensor operand uniqueness.
+  llvm::SetVector<Value> resultTensorOperands, resultTensorsDynamicDims;
+  for (const Operation &yieldingOp : performConcurrentlyOp.yieldingOps()) {
+    auto parallelInsertOp = cast<scf::ParallelInsertSliceOp>(&yieldingOp);
+    Value dest = parallelInsertOp.getDest();
+    bool inserted = resultTensorOperands.insert(dest);
+    if (!inserted) continue;
+    auto dynamicDims =
+        getIndicesOfDynamicDims(dest.getType().cast<ShapedType>());
+    for (int64_t dim : dynamicDims)
+      resultTensorsDynamicDims.insert(
+          rewriter.create<tensor::DimOp>(loc, dest, dim));
+  }
+  assert(resultTensorOperands.size() == foreachThreadOp.getNumResults() &&
+         "Expected as many resultTensorOperands as results of foreachThreadOp");
+
+  // Step 2. Get values defined above and separate them between non-tensors,
+  // tensors and introduce appropriate tensor dims.
+  // Tensors that have already been recorded as resultTensorOperands are
+  // omitted to avoid duplications.
+  llvm::SetVector<Value> valuesDefinedAbove;
+  mlir::getUsedValuesDefinedAbove(foreachThreadOp.getRegion(),
+                                  valuesDefinedAbove);
+  assert(!valuesDefinedAbove.empty() && "used values defined above is empty");
+
+  SmallVector<Value> nonTensorOperands, tensorOperands, tensorDynamicDims;
+  for (Value v : valuesDefinedAbove) {
+    auto tensorType = v.getType().dyn_cast<RankedTensorType>();
+    if (!tensorType) {
+      nonTensorOperands.push_back(v);
+      continue;
+    }
+    if (resultTensorOperands.contains(v)) continue;
+    tensorOperands.push_back(v);
+    for (int64_t dim : getIndicesOfDynamicDims(tensorType))
+      tensorDynamicDims.push_back(rewriter.create<tensor::DimOp>(loc, v, dim));
+  }
+
+  // Step 3. Compute workgroupCount.
+  // TODO: this should actually be workLoad information.
+  // Also this will require special handling during codegen to set up the
+  // HAL::EntryPointOp correctly (atm only 1x1x1 is supported).
+  SmallVector<Value> workgroupCount{foreachThreadOp.getNumThreads()};
+  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  workgroupCount.resize(3, one);
+
+  // Step 4. Create ordered vectors of operands to pass to the builder and
+  // build the dispatchOp.
+  SmallVector<Value> nonDimOperands;
+  llvm::append_range(nonDimOperands, nonTensorOperands);
+  llvm::append_range(nonDimOperands, tensorOperands);
+  llvm::append_range(nonDimOperands, resultTensorOperands);
+  // scf::ForeachThreadOp tensors inserted into are tied to results and
+  // translate to the tied operands of the dispatch.
+  int64_t sizeNonTensors = nonTensorOperands.size();
+  int64_t sizeNonResultTensors = tensorOperands.size();
+  int64_t sizeResultTensors = resultTensorOperands.size();
+  auto tiedOperandsSequence = llvm::seq<int64_t>(
+      sizeNonTensors + sizeNonResultTensors,
+      sizeNonTensors + sizeNonResultTensors + sizeResultTensors);
+  // Separate out tensorOperands and tensorDynamicDims for RAUWIf purposes.
+  SmallVector<Value> allTensorOperands = tensorOperands;
+  llvm::append_range(allTensorOperands, resultTensorOperands);
+  SmallVector<Value> allTensorDynamicDims = tensorDynamicDims;
+  llvm::append_range(allTensorDynamicDims, resultTensorsDynamicDims);
+  // clang-format off
+  auto dispatchOp = rewriter.create<Flow::DispatchWorkgroupsOp>(
+      loc,
+      /*workgroupCount=*/workgroupCount,
+      /*resultTypes=*/foreachThreadOp.getResultTypes(),
+      /*resultDims=*/resultTensorsDynamicDims.getArrayRef(),
+      /*operands=*/nonDimOperands,
+      /*operandDims=*/allTensorDynamicDims,
+      /*tiedOperands=*/llvm::to_vector<4>(tiedOperandsSequence));
+  // clang-format on
+
+  // Step 5. Fixup dispatchOp bbArgs and terminator.
+  // TODO: Ideally the builder would have created the proper bbArgs and the
+  // ceremonial terminator.
+  // Atm, the bbArgs for the region are missing index entries for the dynamic
+  // dims of the tensor operands
+  // We add them, following this convention:
+  //  - The first `sizeNonTensors` bbArgs correspond to the non-tensor operands.
+  //    These are already added by the builder and we leave them alone.
+  //  - The next `sizeNonResultTensors + sizeResultTensors` bbArgs correspond to
+  //    the tensor operands (non-result tensors followed by result tensors).
+  //    These are already added by the builder and we leave them alone.
+  //  - The next `tensorDynamicDims.size() + resultTensorsDynamicDims.size()`
+  //    bbArgs correspond to the dynamic dimensions of the tensor operands and
+  //    tensor results.
+  //    These are *not yet* added by the builder and we add them explicitly.
+  //    These index bbArgs are added after all tensor bbArgs and become the
+  //    trailing bbArgs.
+  //    Another possibility would be to interleave (tensor, tensor dynamic
+  //    dims) but unless proven wrong, the trailing indices convention is
+  //    quite simpler to implement: if bugs surface, these should be fixed or
+  //    a real convention + verification should be adopted on the op + builder.
+  Region &region = dispatchOp.workgroup_body();
+  Block *block = &region.front();
+  {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointToEnd(block);
+    rewriter.create<Flow::ReturnOp>(loc);
+  }
+  // Add trailing index bbArgs and perform a basic sanity check.
+  block->addArguments(
+      SmallVector<Type>(allTensorDynamicDims.size(), rewriter.getIndexType()),
+      SmallVector<Location>(allTensorDynamicDims.size(), loc));
+  SmallVector<Value> allOperands = nonDimOperands;
+  llvm::append_range(allOperands, allTensorDynamicDims);
+  assert(block->getNumArguments() == allOperands.size() &&
+         "Expected as many bbArgs as operands");
+
+  // Step 6. Move the body of foreachThreadOp to the dispatchOp.
+  block->getOperations().splice(
+      block->begin(), foreachThreadOp.getRegion().front().getOperations());
+
+  // Step 7. Set up bvm for RAUWIf.
+  // Generally, allOperands map to their corresponding bbArg but there is a
+  // twist: tensor operands map to flow.dispatch.tensor bbArgs and we need to
+  // insert an explicit Flow::DispatchTensorLoadOp to get back a proper
+  // tensor. Save the tensor operand -> flow tensor bbArg mapping in
+  // `tensorToFlowBvm`.
+  BlockAndValueMapping bvm, tensorToFlowBvm;
+  bvm.map(allOperands, block->getArguments());
+  auto allTensorDimsBBArgs = block->getArguments().slice(
+      nonDimOperands.size(), allTensorDynamicDims.size());
+  for (auto en : llvm::enumerate(allTensorOperands)) {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointToStart(block);
+    // Warning: findVariadicDynamicDims needs to use the RankedTensorTypes and
+    // does not work out of the box with Flow::DispatchTensorType.
+    auto dynamicDims = Util::findVariadicDynamicDims(
+        en.index(), allTensorOperands, allTensorDimsBBArgs);
+    auto loadOp = rewriter.create<Flow::DispatchTensorLoadOp>(
+        loc, en.value().getType().cast<RankedTensorType>(),
+        bvm.lookup(en.value()), dynamicDims);
+    // Replace the tensor -> flow.dispatch.tensor entry by a
+    // tensor -> flow.dispatch.tensor.load entry.
+    tensorToFlowBvm.map(en.value(), bvm.lookup(en.value()));
+    bvm.map(en.value(), loadOp.getResult());
+  }
+
+  // Step 8. Plug dispatch workgroup id and count values into the bvm.
+  rewriter.setInsertionPointToStart(block);
+  SmallVector<Value, 8> workgroupIds, workgroupCounts;
+  for (int64_t rank :
+       llvm::seq<int64_t>(0, foreachThreadOp.getThreadIndices().size())) {
+    workgroupIds.push_back(
+        rewriter.create<Flow::DispatchWorkgroupIDOp>(loc, rank));
+    workgroupCounts.push_back(
+        rewriter.create<Flow::DispatchWorkgroupCountOp>(loc, rank));
+  }
+  bvm.map(foreachThreadOp.getThreadIndices(), workgroupIds);
+  bvm.map(foreachThreadOp.getNumThreads(), workgroupCounts);
+
+  // Step 9. Rewrite tensor::ExtractSlice and ParallelInsert ops to the
+  // relevant Flow DispatchTensorLoad/Store version.
+  rewriteParallelInsertSlices(rewriter, performConcurrentlyOp, *block,
+                              resultTensorOperands.getArrayRef(),
+                              resultTensorsDynamicDims.getArrayRef(),
+                              tensorToFlowBvm);
+  rewriteExtractSlices(rewriter, dispatchOp, allTensorOperands,
+                       allTensorDynamicDims, tensorToFlowBvm);
+
+  // Step 10. Perform RAUWIf.
+  for (auto mapEntry : bvm.getValueMap()) {
+    assert(mapEntry.first.getType() == mapEntry.second.getType() &&
+           "must have the same type");
+    mapEntry.first.replaceUsesWithIf(mapEntry.second, [&](OpOperand &use) {
+      return dispatchOp->isProperAncestor(use.getOwner());
+    });
+  }
+
+  // Step 11. Drop the terminator and replace foreachThreadOp.
+  rewriter.eraseOp(performConcurrentlyOp);
+  rewriter.replaceOp(foreachThreadOp, dispatchOp.getResults());
+
+  return dispatchOp;
 }
 
 //===---------------------------------------------------------------------===//
@@ -74,11 +385,11 @@ static LogicalResult cpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
 static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
                                                      Location loc, Value from,
                                                      Value to) {
-  // TODO: ideally we should use linalg.copy which was recently reintroduced as
-  // an OpDSL named op. However, IREE-specific patterns to cleanup spurious
+  // TODO: ideally we should use linalg.copy which was recently reintroduced
+  // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
   // post-bufferization copies do not trigger properly.
   // So we keep using `createLinalgCopyOp` which builds a GenericOp.
-  //   builder.create<linalg::CopyOp>(loc, from, to);
+  // builder.create<linalg::CopyOp>(loc, from, to);
   mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
   return success();
 }
@@ -86,6 +397,21 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
 //===---------------------------------------------------------------------===//
 // IREE-specific transformations defined outside of iree_linalg_transform.
 //===---------------------------------------------------------------------===//
+
+LogicalResult transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::apply(
+    transform::TransformResults &results, transform::TransformState &state) {
+  if (state.getTopLevel()
+          ->walk<WalkOrder::PostOrder>([&](scf::ForeachThreadOp op) {
+            if (failed(functional::applyReturningPatternAt(
+                    ForeachThreadToFlowDispatchWorkgroupsRewriter(getContext()),
+                    op)))
+              return WalkResult::interrupt();
+            return WalkResult::advance();
+          })
+          .wasInterrupted())
+    return failure();
+  return success();
+}
 
 LogicalResult transform_dialect::IREEBufferizeOp::apply(
     transform::TransformResults &results, transform::TransformState &state) {

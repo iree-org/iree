@@ -62,8 +62,8 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(64));
 
-static llvm::cl::opt<bool> useLinalgTransformInterp(
-    "iree-codegen-use-linalg-transform-interp",
+static llvm::cl::opt<bool> clEnableCodegenTransformDialect(
+    "iree-codegen-use-transform-dialect",
     llvm::cl::desc(
         "experimental path to use the linalg transform dialect interpreter"),
     llvm::cl::init(false));
@@ -1186,7 +1186,7 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
 
     // If using sandbox passes, currently set the workload_per_wg to be
     // empty for single-threaded execution.
-    if (useLinalgTransformInterp) {
+    if (clEnableCodegenTransformDialect) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
           moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
                                      LinalgTransformInterpCodegen);
