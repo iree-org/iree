@@ -58,6 +58,9 @@ if [[ "${IREE_VULKAN_F16_DISABLE}" == 1 ]]; then
   label_exclude_args+=("^vulkan_uses_vk_khr_shader_float16_int8$")
 fi
 
+IFS=',' read -ra extra_label_exclude_args <<< "${IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE:-}"
+label_exclude_args+=(${extra_label_exclude_args[@]})
+
 # Join on "|"
 label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]}"))"
 
