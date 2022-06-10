@@ -441,15 +441,14 @@ class BuildFileFunctions(object):
                            name,
                            src,
                            flags=None,
-                           translate_tool=None,
+                           compile_tool=None,
                            c_identifier=None,
                            deps=None,
                            testonly=None):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     src_block = _convert_string_arg_block("SRC", src)
     c_identifier_block = _convert_string_arg_block("C_IDENTIFIER", c_identifier)
-    translate_tool_block = _convert_target_block("TRANSLATE_TOOL",
-                                                 translate_tool)
+    compile_tool_block = _convert_target_block("COMPILE_TOOL", compile_tool)
     flags_block = _convert_string_list_block("FLAGS", flags)
     deps_block = _convert_target_list_block("DEPS", deps)
     testonly_block = _convert_option_block("TESTONLY", testonly)
@@ -458,7 +457,7 @@ class BuildFileFunctions(object):
                             f"{name_block}"
                             f"{src_block}"
                             f"{c_identifier_block}"
-                            f"{translate_tool_block}"
+                            f"{compile_tool_block}"
                             f"{flags_block}"
                             f"{deps_block}"
                             f"{testonly_block}"

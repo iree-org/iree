@@ -35,15 +35,15 @@
 #       separated list of benchmark mode tags.
 #   TARGET_BACKEND: The compiler target backend.
 #   TARGET_ARCHITECTURE: The detailed target backend's architecture.
-#   TRANSLATION_FLAGS: A list of command-line options and their values to
-#       pass to the IREE translation tool for artifact generation.
+#   COMPILATION_FLAGS: A list of command-line options and their values to
+#       pass to the IREE compiler tool for artifact generation.
 #   CONFIG: Benchmark runner configuration name.
 #   DRIVER: The runtime driver.
 #   RUNTIME_FLAGS: A list of command-line options and their values to pass
 #       to the IREE runtime during benchmark exectuion.
 #
 # The above parameters largely fall into two categories: 1) for specifying
-# the MLIR input module and its metadata, 2) for specifying the translation/
+# the MLIR input module and its metadata, 2) for specifying the compilation/
 # runtime configuration.
 #
 # 1)
@@ -55,10 +55,10 @@
 #
 # 2)
 #
-# TARGET_BACKEND and TRANSLATION_FLAGS control how the input module will be
+# TARGET_BACKEND and COMPILATION_FLAGS control how the input module will be
 # converted into the final IREE deployable module format. DRIVER and
 # RUNTIME_FLAGS specify how the module will be executed. BENCHMARK_MODES
-# can be used to give descriptions of the translation/runtime configuration
+# can be used to give descriptions of the compilation/runtime configuration
 # (e.g., full-inference vs. kernel-execution) and specify more contextual
 # requirements (e.g., big-core vs. little-core).
 #
@@ -72,7 +72,7 @@ function(iree_benchmark_suite)
     _RULE
     ""
     "GROUP_NAME;CONFIG;DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
-    "BENCHMARK_MODES;BENCHMARK_TOOL;MODULES;TRANSLATION_FLAGS;RUNTIME_FLAGS"
+    "BENCHMARK_MODES;BENCHMARK_TOOL;MODULES;COMPILATION_FLAGS;RUNTIME_FLAGS"
   )
 
   iree_validate_required_arguments(
@@ -195,40 +195,40 @@ function(iree_benchmark_suite)
       list(APPEND _FRIENDLY_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
       list(JOIN _FRIENDLY_TARGET_NAME_LIST "__" _FRIENDLY_TARGET_NAME)
 
-      # The full list of translation flags.
-      set(_TRANSLATION_ARGS "")
-      list(APPEND _TRANSLATION_ARGS "--iree-mlir-to-vm-bytecode-module")
-      list(APPEND _TRANSLATION_ARGS "--mlir-print-op-on-diagnostic=false")
-      list(APPEND _TRANSLATION_ARGS "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}")
-      list(SORT _RULE_TRANSLATION_FLAGS)
-      list(APPEND _TRANSLATION_ARGS ${_RULE_TRANSLATION_FLAGS})
+      # The full list of compilation flags.
+      set(_COMPILATION_ARGS "")
+      list(APPEND _COMPILATION_ARGS "--iree-mlir-to-vm-bytecode-module")
+      list(APPEND _COMPILATION_ARGS "--mlir-print-op-on-diagnostic=false")
+      list(APPEND _COMPILATION_ARGS "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}")
+      list(SORT _RULE_COMPILATION_FLAGS)
+      list(APPEND _COMPILATION_ARGS ${_RULE_COMPILATION_FLAGS})
 
       # Get a unique identifier for this IREE module file by hashing the command
       # line flags and input file. We will also use this for the CMake target.
       # Note that this is NOT A SECURE HASHING ALGORITHM. We just want
       # uniqueness and MD5 is fast. If that changes, switch to something much
       # better (like SHA256).
-      string(MD5 _VMFB_HASH "${_TRANSLATION_ARGS};${_MODULE_SOURCE}")
+      string(MD5 _VMFB_HASH "${_COMPILATION_ARGS};${_MODULE_SOURCE}")
       get_filename_component(_MODULE_SOURCE_BASENAME "${_MODULE_SOURCE}" NAME)
       set(_MODULE_SOURCE_BASENAME_WITH_HASH "${_MODULE_SOURCE_BASENAME}-${_VMFB_HASH}")
       set(_VMFB_FILE "${_VMFB_ARTIFACTS_DIR}/${_MODULE_SOURCE_BASENAME_WITH_HASH}.vmfb")
 
       # Register the target once and share across all benchmarks having the same
-      # MLIR source and translation flags.
-      set(_TRANSLATION_NAME
+      # MLIR source and compilation flags.
+      set(_COMPILATION_NAME
         "iree-generate-benchmark-artifact-${_MODULE_SOURCE_BASENAME_WITH_HASH}"
       )
-      set(_TRANSLATION_TARGET_NAME "${_PACKAGE_NAME}_${_TRANSLATION_NAME}")
-      if(NOT TARGET "${_TRANSLATION_TARGET_NAME}")
+      set(_COMPILATION_TARGET_NAME "${_PACKAGE_NAME}_${_COMPILATION_NAME}")
+      if(NOT TARGET "${_COMPILATION_TARGET_NAME}")
         iree_bytecode_module(
           NAME
-            "${_TRANSLATION_NAME}"
+            "${_COMPILATION_NAME}"
           MODULE_FILE_NAME
             "${_VMFB_FILE}"
           SRC
             "${_MODULE_SOURCE}"
           FLAGS
-            ${_TRANSLATION_ARGS}
+            ${_COMPILATION_ARGS}
           DEPENDS
             "${_MODULE_SOURCE_TARGET}"
           FRIENDLY_NAME
@@ -236,23 +236,23 @@ function(iree_benchmark_suite)
         )
 
         # Mark dependency so that we have one target to drive them all.
-        add_dependencies(iree-benchmark-suites "${_TRANSLATION_TARGET_NAME}")
-        add_dependencies("${SUITE_SUB_TARGET}" "${_TRANSLATION_TARGET_NAME}")
+        add_dependencies(iree-benchmark-suites "${_COMPILATION_TARGET_NAME}")
+        add_dependencies("${SUITE_SUB_TARGET}" "${_COMPILATION_TARGET_NAME}")
       endif()
 
-      set(_COMPILE_STATS_TRANSLATION_NAME
-        "${_TRANSLATION_NAME}-compile-stats"
+      set(_COMPILE_STATS_COMPILATION_NAME
+        "${_COMPILATION_NAME}-compile-stats"
       )
-      set(_COMPILE_STATS_TRANSLATION_TARGET_NAME
-        "${_PACKAGE_NAME}_${_COMPILE_STATS_TRANSLATION_NAME}"
+      set(_COMPILE_STATS_COMPILATION_TARGET_NAME
+        "${_PACKAGE_NAME}_${_COMPILE_STATS_COMPILATION_NAME}"
       )
       set(_COMPILE_STATS_VMFB_FILE
         "${_VMFB_ARTIFACTS_DIR}/${_MODULE_SOURCE_BASENAME_WITH_HASH}-compile-stats.vmfb"
       )
-      if(IREE_ENABLE_COMPILATION_BENCHMARKS AND NOT TARGET "${_COMPILE_STATS_TRANSLATION_TARGET_NAME}")
+      if(IREE_ENABLE_COMPILATION_BENCHMARKS AND NOT TARGET "${_COMPILE_STATS_COMPILATION_TARGET_NAME}")
         iree_bytecode_module(
           NAME
-            "${_COMPILE_STATS_TRANSLATION_NAME}"
+            "${_COMPILE_STATS_COMPILATION_NAME}"
           MODULE_FILE_NAME
             "${_COMPILE_STATS_VMFB_FILE}"
           SRC
@@ -262,7 +262,7 @@ function(iree_benchmark_suite)
             "--iree-vm-emit-polyglot-zip=true"
             # Disable debug symbols to provide correct component sizes.
             "--iree-llvm-debug-symbols=false"
-            ${_TRANSLATION_ARGS}
+            ${_COMPILATION_ARGS}
           DEPENDS
             "${_MODULE_SOURCE_TARGET}"
           FRIENDLY_NAME
@@ -271,20 +271,20 @@ function(iree_benchmark_suite)
 
         # Mark dependency so that we have one target to drive them all.
         add_dependencies(iree-benchmark-suites
-          "${_COMPILE_STATS_TRANSLATION_TARGET_NAME}"
+          "${_COMPILE_STATS_COMPILATION_TARGET_NAME}"
         )
         add_dependencies("${SUITE_SUB_TARGET}"
-          "${_COMPILE_STATS_TRANSLATION_TARGET_NAME}"
+          "${_COMPILE_STATS_COMPILATION_TARGET_NAME}"
         )
       endif()
 
       if(NOT TARGET "${_FRIENDLY_TARGET_NAME}")
         add_custom_target("${_FRIENDLY_TARGET_NAME}")
       endif()
-      add_dependencies("${_FRIENDLY_TARGET_NAME}" "${_TRANSLATION_TARGET_NAME}")
+      add_dependencies("${_FRIENDLY_TARGET_NAME}" "${_COMPILATION_TARGET_NAME}")
       if(IREE_ENABLE_COMPILATION_BENCHMARKS)
         add_dependencies("${_FRIENDLY_TARGET_NAME}"
-          "${_COMPILE_STATS_TRANSLATION_TARGET_NAME}")
+          "${_COMPILE_STATS_COMPILATION_TARGET_NAME}")
       endif()
 
       set(_RUN_SPEC_DIR "${_ROOT_ARTIFACTS_DIR}/${_MODULE_DIR_NAME}/${_BENCHMARK_DIR_NAME}")
@@ -344,7 +344,7 @@ function(iree_benchmark_suite)
         COMMAND
           "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/scripts/generate_compilation_flagfile.py"
             --output "${_COMPILATION_FLAGFILE}"
-            -- ${_TRANSLATION_ARGS}
+            -- ${_COMPILATION_ARGS}
         WORKING_DIRECTORY "${_RUN_SPEC_DIR}"
         COMMENT "Generating ${_COMPILATION_FLAGFILE}"
       )

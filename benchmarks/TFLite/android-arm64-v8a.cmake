@@ -10,13 +10,13 @@
 #                                                                              #
 # Each suite benchmarks a list of modules with configurations specifying a     #
 # target architecture and runtime characteristics (e.g. threads/cores). These  #
-# benchmarks only configure IREE translation and runtime flags for the target  #
+# benchmarks only configure IREE compilation and runtime flags for the target  #
 # architecture and do *not* include any non-default flags. No non-default      #
 # flags should be added here.                                                  #
 #                                                                              #
 ################################################################################
 
-set(ANDROID_CPU_TRANSLATION_FLAGS
+set(ANDROID_CPU_COMPILATION_FLAGS
   "--iree-input-type=tosa"
   "--iree-llvm-target-triple=aarch64-none-linux-android29")
 
@@ -41,8 +41,8 @@ iree_benchmark_suite(
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
-  TRANSLATION_FLAGS
-    ${ANDROID_CPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${ANDROID_CPU_COMPILATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
@@ -72,8 +72,8 @@ iree_benchmark_suite(
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
-  TRANSLATION_FLAGS
-    ${ANDROID_CPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${ANDROID_CPU_COMPILATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
@@ -105,8 +105,8 @@ iree_benchmark_suite(
 #     "dylib-llvm-aot"
 #   TARGET_ARCHITECTURE
 #     "CPU-ARM64-v8A"
-#   TRANSLATION_FLAGS
-#     ${ANDROID_CPU_TRANSLATION_FLAGS}
+#   COMPILATION_FLAGS
+#     ${ANDROID_CPU_COMPILATION_FLAGS}
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
 #   CONFIG
@@ -136,8 +136,8 @@ iree_benchmark_suite(
 #     "dylib-llvm-aot"
 #   TARGET_ARCHITECTURE
 #     "CPU-ARM64-v8A"
-#   TRANSLATION_FLAGS
-#     ${ANDROID_CPU_TRANSLATION_FLAGS}
+#   COMPILATION_FLAGS
+#     ${ANDROID_CPU_COMPILATION_FLAGS}
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
 #   CONFIG
@@ -168,8 +168,8 @@ iree_benchmark_suite(
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
-  TRANSLATION_FLAGS
-    ${ANDROID_CPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${ANDROID_CPU_COMPILATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
@@ -219,8 +219,8 @@ iree_benchmark_suite(
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
-  TRANSLATION_FLAGS
-    ${ANDROID_CPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${ANDROID_CPU_COMPILATION_FLAGS}
     "--iree-flow-mmt4d-target-options=arch=aarch64"
   BENCHMARK_TOOL
     iree-benchmark-module
@@ -248,8 +248,8 @@ iree_benchmark_suite(
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
-  TRANSLATION_FLAGS
-    ${ANDROID_CPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${ANDROID_CPU_COMPILATION_FLAGS}
     "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
     "--iree-llvm-target-cpu-features=+dotprod"
   BENCHMARK_TOOL
@@ -286,8 +286,8 @@ iree_benchmark_suite(
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
-  TRANSLATION_FLAGS
-    ${ANDROID_CPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${ANDROID_CPU_COMPILATION_FLAGS}
     "--iree-flow-mmt4d-target-options=arch=aarch64"
   BENCHMARK_TOOL
     iree-benchmark-module
@@ -317,8 +317,8 @@ iree_benchmark_suite(
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
-  TRANSLATION_FLAGS
-    ${ANDROID_CPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${ANDROID_CPU_COMPILATION_FLAGS}
     "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
     "--iree-llvm-target-cpu-features=+dotprod"
   BENCHMARK_TOOL
@@ -352,8 +352,8 @@ iree_benchmark_suite(
 #     "dylib-llvm-aot"
 #   TARGET_ARCHITECTURE
 #     "CPU-ARM64-v8A"
-#   TRANSLATION_FLAGS
-#     ${ANDROID_CPU_TRANSLATION_FLAGS}
+#   COMPILATION_FLAGS
+#     ${ANDROID_CPU_COMPILATION_FLAGS}
 #     "--iree-flow-mmt4d-target-options=arch=aarch64"
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
@@ -384,8 +384,8 @@ iree_benchmark_suite(
 #     "dylib-llvm-aot"
 #   TARGET_ARCHITECTURE
 #     "CPU-ARM64-v8A"
-#   TRANSLATION_FLAGS
-#     ${ANDROID_CPU_TRANSLATION_FLAGS}
+#   COMPILATION_FLAGS
+#     ${ANDROID_CPU_COMPILATION_FLAGS}
 #     "--iree-flow-mmt4d-target-options=arch=aarch64"
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
@@ -420,8 +420,8 @@ iree_benchmark_suite(
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
-  TRANSLATION_FLAGS
-    ${ANDROID_CPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${ANDROID_CPU_COMPILATION_FLAGS}
     "--iree-flow-mmt4d-target-options=arch=aarch64"
 
   BENCHMARK_TOOL
@@ -452,8 +452,8 @@ iree_benchmark_suite(
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
-  TRANSLATION_FLAGS
-    ${ANDROID_CPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${ANDROID_CPU_COMPILATION_FLAGS}
     "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
     "--iree-llvm-target-cpu-features=+dotprod"
 
@@ -486,7 +486,7 @@ iree_benchmark_suite(
     "vmvx"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
-  TRANSLATION_FLAGS
+  COMPILATION_FLAGS
     "--iree-input-type=tosa"
   BENCHMARK_TOOL
     iree-benchmark-module

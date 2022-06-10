@@ -15,8 +15,7 @@ def iree_bytecode_module(
         src,
         module = None,
         flags = ["--iree-mlir-to-vm-bytecode-module"],
-        # TODO: Rename this to 'compile_tool'
-        translate_tool = "//tools:iree-compile",
+        compile_tool = "//tools:iree-compile",
         linker_tool = "@llvm-project//lld:lld",
         c_identifier = "",
         deps = [],
@@ -28,7 +27,7 @@ def iree_bytecode_module(
         src: mlir source file to be compiled to an IREE module.
         flags: additional flags to pass to the compiler. Bytecode
             translation and backend flags are passed automatically.
-        translate_tool: the compiler to use to generate the module.
+        compile_tool: the compiler to use to generate the module.
             Defaults to iree-compile.
         linker_tool: the linker to use.
             Defaults to the lld from the llvm-project directory.
@@ -49,7 +48,7 @@ def iree_bytecode_module(
         ],
         cmd = " && ".join([
             " ".join([
-                "$(location %s)" % (translate_tool),
+                "$(location %s)" % (compile_tool),
                 " ".join(flags),
                 "--iree-llvm-embedded-linker-path=$(location %s)" % (linker_tool),
                 "--iree-llvm-wasm-linker-path=$(location %s)" % (linker_tool),
@@ -58,7 +57,7 @@ def iree_bytecode_module(
                 "$(location %s)" % (src),
             ]),
         ]),
-        tools = [translate_tool, linker_tool],
+        tools = [compile_tool, linker_tool],
         message = "Compiling IREE module %s..." % (name),
         output_to_bindir = 1,
         **kwargs
