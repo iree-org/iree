@@ -441,7 +441,7 @@ if(IREE_TARGET_BACKEND_CUDA OR IREE_HAL_DRIVER_CUDA)
     set(CUDAToolkit_ROOT "$ENV{IREE_CUDA_DEPS_DIR}")
     message(STATUS "CUDA SDK not found by CMake but using IREE_CUDA_DEPS = ${CUDAToolkit_ROOT}")
   else()
-    # If we haven't found CUDA deps, emulate the CI by downloading them fon demand.
+    # If we haven't found CUDA deps, download at least enough to build for CUDA.
     # This will define IREE_CUDA_DOWNLOAD_LIBDEVICE_PATH & IREE_CUDA_DOWNLOAD_INCLUDE_PATH
     # vars with the target deps.
     message(STATUS "CUDA SDK not found by CMake but downloading dependencies")

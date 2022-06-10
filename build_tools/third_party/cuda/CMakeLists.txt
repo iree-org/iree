@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 set(TARGET_DIR ${CMAKE_CURRENT_BINARY_DIR})
-set(DOWNLOAD_SCRIPT_URL "https://raw.githubusercontent.com/NVIDIA/build-system-archive-import-examples/main/parse_redist.py")
+set(DOWNLOAD_SCRIPT_URL "https://raw.githubusercontent.com/NVIDIA/build-system-archive-import-examples/44dfb51fad75a8a2f1044a4fe221aba70571b86f/parse_redist.py")
 set(DOWNLOAD_DIR ${TARGET_DIR}/download)
 set(DOWNLOAD_SCRIPT_PATH ${DOWNLOAD_DIR}/parse_redist.py)
 
@@ -19,7 +19,7 @@ if(UNIX)
 elseif(WIN32)
   set(OS "windows")
 else()
-  message(SEND_ERROR "Unsupported OS environment. Must be Windows or Unix.")
+  message(SEND_ERROR "Unsupported OS environment. Must be Windows or Linux.")
   return()
 endif()
 set(ARCH "x86_64")
@@ -57,8 +57,7 @@ foreach(COMPONENT ${COMPONENTS})
     --output "${DOWNLOAD_DIR}")
 endforeach()
 
-if(EXISTS "${SRC_DIR}")
-else()
+if(NOT EXISTS "${SRC_DIR}")
   message(SEND_ERROR "Download did not produce expected source dir: ${SRC_DIR}")
   return()
 endif()
