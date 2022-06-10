@@ -1313,10 +1313,9 @@ weights from <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classifi
 <p>Run the following command (assuming the path to <code>iree-compile</code> is in your
 system's <code>PATH</code>):</p>
 <div class="highlight"><pre><span></span><code>iree-compile <span class="se">\</span>
-    --iree-mlir-to-vm-bytecode-module <span class="se">\</span>
-<span class="hll">    --iree-hal-target-backends<span class="o">=</span>dylib-llvm-aot <span class="se">\</span>
-</span>    iree_input.mlir -o mobilenet_cpu.vmfb
-</code></pre></div>
+    --iree-hal-target-backends<span class="o">=</span>cpu <span class="se">\</span>
+<span class="hll">    iree_input.mlir -o mobilenet_cpu.vmfb
+</span></code></pre></div>
 <div class="admonition todo">
 <p class="admonition-title">Todo</p>
 <p>Choose the suitable target triple for the current CPU</p>

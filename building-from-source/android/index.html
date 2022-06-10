@@ -1227,7 +1227,6 @@ run the tests, then report the status back to your host machine.</p>
 <h2 id="running-tools-directly">Running tools directly<a class="headerlink" href="#running-tools-directly" title="Permanent link">&para;</a></h2>
 <p>Invoke the host compiler tools to produce a bytecode module FlatBuffer:</p>
 <div class="highlight"><pre><span></span><code>../iree-build/install/bin/iree-compile <span class="se">\</span>
-  --iree-mlir-to-vm-bytecode-module <span class="se">\</span>
   --iree-hal-target-backends<span class="o">=</span>vmvx <span class="se">\</span>
   samples/models/simple_abs.mlir <span class="se">\</span>
   -o /tmp/simple_abs_vmvx.vmfb
