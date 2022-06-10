@@ -9,7 +9,7 @@
 ################################################################################
 
 if(NOT IREE_BUILD_TORCH_MLIR_SUPPORT)
-  iree_cc_library(
+  iree_compiler_cc_library(
     NAME TMTensor
   )
   return()
@@ -26,7 +26,7 @@ iree_tablegen_library(
     --gen-pass-decls Passes.h.inc
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     PassHeaders
   HDRS
@@ -40,7 +40,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     TMTensor
   HDRS

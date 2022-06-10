@@ -12,7 +12,7 @@ iree_add_all_subdirs()
 
 if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     embedded_elf_loader
   HDRS
@@ -34,7 +34,7 @@ iree_cc_library(
 
 endif()
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     static_library_loader
   HDRS
@@ -55,7 +55,7 @@ iree_cc_library(
 
 if(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY)
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     system_library_loader
   HDRS
@@ -79,7 +79,7 @@ endif()
 
 if(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     vmvx_module_loader
   HDRS

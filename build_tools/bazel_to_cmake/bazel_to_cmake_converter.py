@@ -289,6 +289,7 @@ class BuildFileFunctions(object):
     return d["//conditions:default"]
 
   def cc_library(self,
+                 rule,
                  name,
                  hdrs=None,
                  textual_hdrs=None,
@@ -314,7 +315,7 @@ class BuildFileFunctions(object):
     deps_block = _convert_target_list_block("DEPS", deps)
     testonly_block = _convert_option_block("TESTONLY", testonly)
 
-    self.converter.body += (f"iree_cc_library(\n"
+    self.converter.body += (f"{rule}(\n"
                             f"{name_block}"
                             f"{copts_block}"
                             f"{hdrs_block}"
@@ -327,10 +328,14 @@ class BuildFileFunctions(object):
                             f"  PUBLIC\n)\n\n")
 
   def iree_compiler_cc_library(self, deps=[], **kwargs):
-    self.cc_library(deps=deps + ["//compiler/src:defs"], **kwargs)
+    self.cc_library("iree_compiler_cc_library",
+                    deps=deps + ["//compiler/src:defs"],
+                    **kwargs)
 
   def iree_runtime_cc_library(self, deps=[], **kwargs):
-    self.cc_library(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
+    self.cc_library("iree_runtime_cc_library",
+                    deps=deps + ["//runtime/src:runtime_defines"],
+                    **kwargs)
 
   def cc_test(self,
               name,

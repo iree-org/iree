@@ -127,7 +127,7 @@ if(IREE_HAL_DRIVER_VULKAN)
   list(APPEND _INIT_INTERNAL_DEPS iree::hal::drivers::vulkan::registration)
 endif()
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     drivers
   HDRS

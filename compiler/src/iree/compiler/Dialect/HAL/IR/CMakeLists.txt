@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     IR
   HDRS
@@ -56,7 +56,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     HALDialect
   HDRS

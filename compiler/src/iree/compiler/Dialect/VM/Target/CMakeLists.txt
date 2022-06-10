@@ -12,7 +12,7 @@ if(IREE_ENABLE_EMITC)
   )
 endif()
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     init_targets
   HDRS

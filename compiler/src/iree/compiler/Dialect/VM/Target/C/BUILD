@@ -17,13 +17,13 @@ iree_cmake_extra_content(
 if(NOT IREE_ENABLE_EMITC)
   # If the real "C" library is enabled, it will define IREE_ENABLE_EMITC,
   # which can be used for conditionally switching.
-  iree_cc_library(
+  iree_compiler_cc_library(
     NAME Enabled
   )
-  iree_cc_library(
+  iree_compiler_cc_library(
     NAME C
   )
-  iree_cc_library(
+  iree_compiler_cc_library(
     NAME TranslateToCpp
   )
   return()

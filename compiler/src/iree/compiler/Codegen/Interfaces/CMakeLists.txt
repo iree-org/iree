@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     Interfaces
   HDRS
@@ -26,7 +26,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     BufferizationInterfaces
   HDRS
@@ -50,7 +50,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     ProcessorOpInterfaces
   HDRS

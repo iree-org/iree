@@ -29,7 +29,7 @@ iree_c_embed_data(
   PUBLIC
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     CUDA
   HDRS

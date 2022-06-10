@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     arena
   HDRS
@@ -34,7 +34,7 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     intrusive_list
   HDRS
@@ -57,7 +57,7 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     ref_ptr
   HDRS

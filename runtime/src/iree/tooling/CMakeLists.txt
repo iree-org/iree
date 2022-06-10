@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     cpu_features
   HDRS
@@ -23,7 +23,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     device_util
   HDRS
@@ -40,7 +40,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     vm_util
   HDRS
@@ -81,7 +81,7 @@ iree_cc_test(
 # libyaml does not build cleanly on bare-metal systems
 if(IREE_ENABLE_THREADING)
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     trace_replay
   HDRS
@@ -102,7 +102,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     yaml_util
   HDRS

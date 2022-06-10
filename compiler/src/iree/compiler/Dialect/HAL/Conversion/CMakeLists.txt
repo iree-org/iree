@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     Conversion
   HDRS
@@ -31,7 +31,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     Passes
   HDRS

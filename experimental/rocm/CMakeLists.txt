@@ -16,7 +16,7 @@ else()
   message(SEND_ERROR "Could not locate ROCm: ${ROCM_HEADERS_API_ROOT}")
 endif()
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     rocm
   HDRS
@@ -68,7 +68,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     dynamic_symbols
   HDRS

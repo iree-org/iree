@@ -7,7 +7,7 @@
 # TODO(scotttodd): clean up bazel_to_cmake handling here
 #   * this is a cc_binary in Bazel, but `linkshared` fits iree_cc_library better
 #   * the output file name is platform-specific, get it with $<TARGET_FILE:>
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     dynamic_library_test_library.so
   SRCS

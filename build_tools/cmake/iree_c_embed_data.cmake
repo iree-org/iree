@@ -83,7 +83,7 @@ function(iree_c_embed_data)
     set(_PUBLIC_ARG "PUBLIC")
   endif()
 
-  iree_cc_library(
+  iree_runtime_cc_library(
     NAME ${_RULE_NAME}
     HDRS "${_RULE_H_FILE_OUTPUT}"
     SRCS "${_RULE_C_FILE_OUTPUT}"

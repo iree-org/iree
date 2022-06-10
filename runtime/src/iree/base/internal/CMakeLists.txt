@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     internal
   HDRS
@@ -51,7 +51,7 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     arena
   HDRS
@@ -67,7 +67,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     atomic_slist
   HDRS
@@ -92,7 +92,7 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     cpu
   HDRS
@@ -105,7 +105,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     dynamic_library
   HDRS
@@ -123,7 +123,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     file_io
   HDRS
@@ -151,7 +151,7 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     flags
   HDRS
@@ -188,7 +188,7 @@ iree_lit_test_suite(
     "hostonly"
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     fpu_state
   HDRS
@@ -226,7 +226,7 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     main
   HDRS
@@ -239,7 +239,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     path
   HDRS
@@ -264,7 +264,7 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     prng
   HDRS
@@ -286,7 +286,7 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     span
   HDRS
@@ -296,7 +296,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     synchronization
   HDRS
@@ -335,7 +335,7 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     wait_handle
   HDRS
@@ -374,7 +374,7 @@ if(NOT IREE_ENABLE_THREADING)
   return()
 endif()
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     event_pool
   HDRS
@@ -391,7 +391,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     threading
   HDRS

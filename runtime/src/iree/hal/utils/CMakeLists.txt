@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     buffer_transfer
   HDRS
@@ -24,7 +24,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     deferred_command_buffer
   HDRS
@@ -40,7 +40,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     resource_set
   HDRS
@@ -82,7 +82,7 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     semaphore_base
   HDRS

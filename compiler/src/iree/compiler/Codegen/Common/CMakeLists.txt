@@ -19,7 +19,7 @@ iree_tablegen_library(
     --gen-rewriters FoldTensorExtractOp.cpp.inc
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     Common
   HDRS

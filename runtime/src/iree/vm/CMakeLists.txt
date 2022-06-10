@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     vm
   HDRS
@@ -21,7 +21,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     cc
   HDRS
@@ -37,7 +37,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     impl
   HDRS
@@ -115,7 +115,7 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     native_module_test_hdrs
   HDRS
@@ -166,7 +166,7 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     bytecode_module
   HDRS
@@ -272,7 +272,7 @@ iree_bytecode_module(
 
 endif()
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     ops
   HDRS
@@ -283,7 +283,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     ops_emitc
   HDRS
@@ -293,7 +293,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     shims_emitc
   HDRS

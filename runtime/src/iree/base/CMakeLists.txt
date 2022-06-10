@@ -6,7 +6,7 @@
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     base
   HDRS
@@ -38,7 +38,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     core_headers
   HDRS
@@ -49,7 +49,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     cc
   HDRS
@@ -88,7 +88,7 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     loop_test_hdrs
   HDRS
@@ -137,7 +137,7 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     target_platform
   HDRS
@@ -145,7 +145,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     logging
   HDRS
@@ -159,7 +159,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     loop_sync
   HDRS
@@ -194,7 +194,7 @@ iree_cc_test(
 # really really useful and the only way for applications to interleave with our
 # tracing (today).
 if(IREE_ENABLE_RUNTIME_TRACING)
-  iree_cc_library(
+  iree_runtime_cc_library(
     NAME
       tracing
     HDRS
@@ -211,7 +211,7 @@ if(IREE_ENABLE_RUNTIME_TRACING)
     PUBLIC
   )
 else()
-  iree_cc_library(
+  iree_runtime_cc_library(
     NAME
       tracing
     HDRS

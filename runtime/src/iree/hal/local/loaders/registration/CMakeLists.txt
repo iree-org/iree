@@ -15,7 +15,7 @@ if(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
   list(APPEND IREE_HAL_EXECUTABLE_LOADER_MODULES iree::hal::local::loaders::vmvx_module_loader)
 endif()
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     registration
   HDRS

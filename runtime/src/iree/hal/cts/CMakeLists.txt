@@ -36,7 +36,7 @@ set(IREE_ALL_CTS_EXECUTABLE_SOURCES
   PARENT_SCOPE
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     cts_test_base
   HDRS
@@ -49,7 +49,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     allocator_test_library
   HDRS
@@ -61,7 +61,7 @@ iree_cc_library(
     iree::testing::gtest
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     buffer_mapping_test_library
   HDRS
@@ -73,7 +73,7 @@ iree_cc_library(
     iree::testing::gtest
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     command_buffer_test_library
   HDRS
@@ -85,7 +85,7 @@ iree_cc_library(
     iree::testing::gtest
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     command_buffer_dispatch_test_library
   HDRS
@@ -97,7 +97,7 @@ iree_cc_library(
     iree::testing::gtest
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     descriptor_set_test_library
   HDRS
@@ -109,7 +109,7 @@ iree_cc_library(
     iree::testing::gtest
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     descriptor_set_layout_test_library
   HDRS
@@ -121,7 +121,7 @@ iree_cc_library(
     iree::testing::gtest
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     driver_test_library
   HDRS
@@ -133,7 +133,7 @@ iree_cc_library(
     iree::testing::gtest
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     event_test_library
   HDRS
@@ -145,7 +145,7 @@ iree_cc_library(
     iree::testing::gtest
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     executable_layout_test_library
   HDRS
@@ -157,7 +157,7 @@ iree_cc_library(
     iree::testing::gtest
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     executable_cache_test_library
   HDRS
@@ -169,7 +169,7 @@ iree_cc_library(
     iree::testing::gtest
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     semaphore_test_library
   HDRS
@@ -181,7 +181,7 @@ iree_cc_library(
     iree::testing::gtest
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     semaphore_submission_test_library
   HDRS

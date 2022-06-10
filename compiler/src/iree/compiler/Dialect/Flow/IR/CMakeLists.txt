@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     IR
   HDRS
@@ -109,7 +109,7 @@ iree_tablegen_doc(
     --gen-dialect-doc -dialect=flow FlowDialect.md
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     PartitionableLoopsInterface
   HDRS

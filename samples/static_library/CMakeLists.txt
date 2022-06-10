@@ -141,7 +141,7 @@ SET_TARGET_PROPERTIES(
 )
 
 # TODO(marbre): Cleanup SRCS and DEPS.
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     simple_mul_emitc
   HDRS

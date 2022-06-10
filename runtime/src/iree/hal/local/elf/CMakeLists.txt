@@ -15,7 +15,7 @@ endif()
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     elf_module
   HDRS
@@ -53,7 +53,7 @@ iree_native_test(
     ::elf_module_test_binary
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     arch
   HDRS
@@ -72,7 +72,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     platform
   HDRS

@@ -14,7 +14,7 @@ endif()
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     MetalSPIRV
   HDRS
@@ -40,7 +40,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     SPIRVToMSL
   HDRS

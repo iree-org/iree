@@ -38,7 +38,7 @@ if(IREE_TARGET_BACKEND_ROCM)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_ROCM_TARGET")
 endif()
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     init_iree_passes_and_dialects
   HDRS
@@ -81,7 +81,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     init_mlir_passes_and_dialects
   HDRS
@@ -127,7 +127,7 @@ if(IREE_BUILD_TORCH_MLIR_SUPPORT)
   set(_OPTIONAL_INIT_TORCH_MLIR_DIALECT_LIB ::init_torch_mlir_dialects)
 endif()
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     init_passes_and_dialects
   HDRS
@@ -144,7 +144,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     init_llvmir_translations
   HDRS
@@ -155,7 +155,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     init_compiler_modules
   HDRS
@@ -164,7 +164,7 @@ iree_cc_library(
     iree::compiler::Dialect::Modules::Check::IR::CheckDialect
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     init_targets
   HDRS
@@ -178,7 +178,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     init_xla_dialects
   HDRS
@@ -191,7 +191,7 @@ iree_cc_library(
 )
 
 if(IREE_BUILD_TORCH_MLIR_SUPPORT)
-  iree_cc_library(
+  iree_compiler_cc_library(
     NAME
       init_torch_mlir_dialects
     HDRS
@@ -204,7 +204,7 @@ if(IREE_BUILD_TORCH_MLIR_SUPPORT)
   )
 endif()
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     iree_compile_lib
   HDRS

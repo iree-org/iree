@@ -9,7 +9,7 @@
 iree_add_all_subdirs()
 
 if(IREE_ENABLE_THREADING)
-  iree_cc_library(
+  iree_runtime_cc_library(
     NAME
       benchmark
     HDRS
@@ -23,7 +23,7 @@ if(IREE_ENABLE_THREADING)
     PUBLIC
   )
 else()
-  iree_cc_library(
+  iree_runtime_cc_library(
     NAME
       benchmark
     HDRS
@@ -37,7 +37,7 @@ else()
   )
 endif()
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     benchmark_main
   SRCS
@@ -49,7 +49,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     gtest
   HDRS
@@ -63,7 +63,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     gtest_main
   SRCS

@@ -64,7 +64,7 @@ function(iree_c_module)
     DEPENDS ${_COMPILE_TOOL_EXECUTABLE} ${_RULE_SRC}
   )
 
-  iree_cc_library(
+  iree_runtime_cc_library(
     NAME ${_RULE_NAME}
     HDRS "${_RULE_H_FILE_OUTPUT}"
     SRCS "${IREE_SOURCE_DIR}/runtime/src/iree/vm/module_impl_emitc.c"

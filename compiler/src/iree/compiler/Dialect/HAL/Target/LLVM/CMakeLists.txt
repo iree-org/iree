@@ -14,7 +14,7 @@ endif()
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     LLVM
   HDRS
@@ -54,7 +54,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     LLVMIRPasses
   HDRS
@@ -74,7 +74,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     LLVMTargetOptions
   HDRS
@@ -89,7 +89,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     LinkerTool
   HDRS
@@ -102,7 +102,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     LinkerTool_hdrs
   HDRS
@@ -115,7 +115,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     StaticLibraryGenerator
   HDRS

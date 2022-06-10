@@ -22,7 +22,7 @@ if(IREE_ENABLE_CPUINFO)
   set(IREE_CPUINFO_TARGET cpuinfo)
 endif()
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     api
   HDRS
@@ -36,7 +36,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     task
   HDRS

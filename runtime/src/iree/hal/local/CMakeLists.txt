@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     executable_environment
   HDRS
@@ -26,7 +26,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     executable_library
   HDRS
@@ -69,7 +69,7 @@ iree_cc_test(
     iree::base::core_headers
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     local
   HDRS

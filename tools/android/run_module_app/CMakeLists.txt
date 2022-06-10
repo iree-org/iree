@@ -10,7 +10,7 @@ endif()
 
 set(NATIVE_APP_GLUE_DIR "${ANDROID_NDK}/sources/android/native_app_glue")
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     android_native_app_glue
   SRCS
@@ -22,7 +22,7 @@ iree_cc_library(
 set(CMAKE_SHARED_LINKER_FLAGS
     "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     iree_run_module_app
   SRCS

@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -12,7 +12,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "cpu_features",
     srcs = ["cpu_features.c"],
     hdrs = ["cpu_features.h"],
@@ -22,7 +22,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "device_util",
     srcs = ["device_util.c"],
     hdrs = ["device_util.h"],
@@ -37,7 +37,7 @@ cc_library(
 )
 
 # TODO(benvanik): fold these into iree/runtime and use that instead.
-cc_library(
+iree_runtime_cc_library(
     name = "vm_util",
     srcs = ["vm_util.cc"],
     hdrs = ["vm_util.h"],
@@ -55,7 +55,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "vm_util_test",
     srcs = ["vm_util_test.cc"],
     deps = [
@@ -79,7 +79,7 @@ if(IREE_ENABLE_THREADING)
     inline = True,
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "trace_replay",
     srcs = ["trace_replay.c"],
     hdrs = ["trace_replay.h"],
@@ -97,7 +97,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "yaml_util",
     srcs = ["yaml_util.c"],
     hdrs = ["yaml_util.h"],

@@ -8,7 +8,7 @@ if(NOT IREE_TARGET_BACKEND_WEBGPU)
   return()
 endif()
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     WebGPU
   HDRS

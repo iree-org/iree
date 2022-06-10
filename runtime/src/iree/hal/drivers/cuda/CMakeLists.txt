@@ -10,7 +10,7 @@ endif()
 
 iree_add_all_subdirs()
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     cuda
   HDRS
@@ -61,7 +61,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_runtime_cc_library(
   NAME
     dynamic_symbols
   HDRS

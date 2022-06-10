@@ -19,7 +19,7 @@ iree_tablegen_library(
     --gen-pass-decls Passes.h.inc
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     PassHeaders
   HDRS
@@ -33,7 +33,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     Common
   HDRS

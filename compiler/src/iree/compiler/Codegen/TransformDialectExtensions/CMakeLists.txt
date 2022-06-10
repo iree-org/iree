@@ -20,7 +20,7 @@ iree_tablegen_library(
     --gen-op-defs TransformDialectExtensionsOps.cpp.inc
 )
 
-iree_cc_library(
+iree_compiler_cc_library(
   NAME
     TransformDialectExtensions
   HDRS
