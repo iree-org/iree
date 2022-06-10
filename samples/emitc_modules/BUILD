@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_test")
 load("//build_tools/bazel:iree_c_module.bzl", "iree_c_module")
 
 package(
@@ -14,61 +14,60 @@ package(
 )
 
 iree_c_module(
-  name = "add_module",
-  src = "add.mlir",
-  h_file_output = "add_module.h",
-  flags = [
-    "--compile-mode=vm",
-    "--output-format=vm-c"
-  ],
+    name = "add_module",
+    src = "add.mlir",
+    flags = [
+        "--compile-mode=vm",
+        "--output-format=vm-c",
+    ],
+    h_file_output = "add_module.h",
 )
 
 iree_runtime_cc_test(
-  name = "add_module_test",
-  srcs = ["add_module_test.cc"],
-  deps = [
-    ":add_module",
-    "//runtime/src/iree/base",
-    "//runtime/src/iree/base:cc",
-    "//runtime/src/iree/testing:gtest",
-    "//runtime/src/iree/testing:gtest_main",
-    "//runtime/src/iree/vm:vm",
-    "//runtime/src/iree/vm:cc",
-  ]
+    name = "add_module_test",
+    srcs = ["add_module_test.cc"],
+    deps = [
+        ":add_module",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:cc",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/vm",
+        "//runtime/src/iree/vm:cc",
+    ],
 )
 
 iree_c_module(
-  name = "import_module_a",
-  src = "import_module_a.mlir",
-  h_file_output = "import_module_a.h",
-  flags = [
-    "--compile-mode=vm",
-    "--output-format=vm-c"
-  ],
+    name = "import_module_a",
+    src = "import_module_a.mlir",
+    flags = [
+        "--compile-mode=vm",
+        "--output-format=vm-c",
+    ],
+    h_file_output = "import_module_a.h",
 )
 
 iree_c_module(
-  name = "import_module_b",
-  src = "import_module_b.mlir",
-  h_file_output = "import_module_b.h",
-  flags = [
-    "--compile-mode=vm",
-    "--output-format=vm-c"
-  ],
+    name = "import_module_b",
+    src = "import_module_b.mlir",
+    flags = [
+        "--compile-mode=vm",
+        "--output-format=vm-c",
+    ],
+    h_file_output = "import_module_b.h",
 )
 
 iree_runtime_cc_test(
-  name = "import_module_test",
-  srcs = ["import_module_test.cc"],
-  deps = [
-    ":import_module_a",
-    ":import_module_b",
-    "//runtime/src/iree/base",
-    "//runtime/src/iree/base:cc",
-    "//runtime/src/iree/testing:gtest",
-    "//runtime/src/iree/testing:gtest_main",
-    "//runtime/src/iree/vm:vm",
-    "//runtime/src/iree/vm:cc",
-  ]
+    name = "import_module_test",
+    srcs = ["import_module_test.cc"],
+    deps = [
+        ":import_module_a",
+        ":import_module_b",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:cc",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/vm",
+        "//runtime/src/iree/vm:cc",
+    ],
 )
-
