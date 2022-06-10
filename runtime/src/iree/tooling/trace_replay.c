@@ -53,9 +53,11 @@ void iree_trace_replay_deinitialize(iree_trace_replay_t* replay,
   memset(replay, 0, sizeof(*replay));
 }
 
-void iree_trace_replay_set_hal_driver_override(iree_trace_replay_t* replay,
-                                               iree_string_view_t driver) {
-  replay->driver = driver;
+void iree_trace_replay_set_hal_devices_override(
+    iree_trace_replay_t* replay, iree_host_size_t device_uri_count,
+    const iree_string_view_t* device_uris) {
+  replay->device_uri_count = device_uri_count;
+  replay->device_uris = device_uris;
 }
 
 iree_status_t iree_trace_replay_event_context_load(iree_trace_replay_t* replay,
@@ -73,24 +75,24 @@ iree_status_t iree_trace_replay_event_context_load(iree_trace_replay_t* replay,
                                 replay->host_allocator, &replay->context);
 }
 
+// TODO(benvanik): rework this to allow for multiple devices from a device set.
 static iree_status_t iree_trace_replay_create_device(
-    iree_trace_replay_t* replay, yaml_node_t* driver_node,
+    iree_trace_replay_t* replay, yaml_node_t* device_node,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
-  // Use the provided driver name or override with the --driver= flag.
-  iree_string_view_t driver_name = iree_yaml_node_as_string(driver_node);
-  if (iree_string_view_is_empty(driver_name)) {
-    driver_name = replay->driver;
+  // Use the provided driver name or override with the --device= flag.
+  iree_string_view_t device_uri = iree_yaml_node_as_string(device_node);
+  if (iree_string_view_is_empty(device_uri)) {
+    if (replay->device_uri_count != 1) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "exactly one device must be specified when none "
+                              "is present in the trace file");
+    }
+    device_uri = replay->device_uris[0];
   }
 
-  // Try to create a device from the driver.
-  iree_hal_driver_t* driver = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_driver_registry_try_create(
-      replay->driver_registry, driver_name, host_allocator, &driver));
-  iree_status_t status =
-      iree_hal_driver_create_default_device(driver, host_allocator, out_device);
-  iree_hal_driver_release(driver);
-
-  return status;
+  // Try to create the device.
+  return iree_hal_create_device(replay->driver_registry, device_uri,
+                                host_allocator, out_device);
 }
 
 static iree_status_t iree_trace_replay_load_builtin_module(

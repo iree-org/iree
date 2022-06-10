@@ -22,8 +22,6 @@ IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
 IREE_FLAG(bool, print_statistics, false,
           "Prints runtime statistics to stderr on exit.");
 
-IREE_FLAG(string, driver, "local-task", "Backend driver to use.");
-
 // Runs the trace in |file| using |root_path| as the base for any path lookups
 // required for external files referenced in |file|.
 static iree_status_t iree_run_trace_file(iree_string_view_t root_path,
@@ -35,8 +33,15 @@ static iree_status_t iree_run_trace_file(iree_string_view_t root_path,
       FLAG_trace_execution ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
                            : IREE_VM_CONTEXT_FLAG_NONE,
       iree_hal_available_driver_registry(), iree_allocator_system(), &replay));
-  iree_trace_replay_set_hal_driver_override(
-      &replay, iree_make_cstring_view(FLAG_driver));
+
+  // Query device overrides, if any. When omitted the devices from the trace
+  // file will be used.
+  // TODO(#5724): remove this and instead provide a device set on initialize.
+  iree_host_size_t device_uri_count = 0;
+  iree_string_view_t* device_uris = NULL;
+  iree_hal_get_devices_flag_list(&device_uri_count, &device_uris);
+  iree_trace_replay_set_hal_devices_override(&replay, device_uri_count,
+                                             device_uris);
 
   yaml_parser_t parser;
   if (!yaml_parser_initialize(&parser)) {
