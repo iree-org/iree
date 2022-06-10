@@ -387,7 +387,7 @@ cc_library(
     ]),
     hdrs = glob([
         "include/iree-dialects/Dialect/LinalgExt/Transforms/*.h",
-    ]) + ["include/iree-dialects/Dialect/LinalgExt/LinalgExtBufferization.h"],
+    ]),
     deps = [
         ":IREEInputDialect",
         ":IREELinalgExtDialect",

@@ -2,7 +2,6 @@ set(LIBS
   # Local dialects.
   IREEInputDialect
   IREELinalgExtDialect
-  IREELinalgExtOpInterfaceImpl
   IREELinalgExtPasses
   IREELinalgExtTransformOps
   IREELinalgExtTransforms

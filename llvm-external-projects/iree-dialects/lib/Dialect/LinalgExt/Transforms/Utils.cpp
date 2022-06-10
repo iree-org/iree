@@ -73,21 +73,6 @@ Value mlir::iree_compiler::IREE::LinalgExt::
                                                sizes, strides);
 }
 
-/// Create a iree_compiler::IREE::LinalgExt::ParallelInsertSliceOp by
-/// auto-completing the missing trailing dimensions to always be offset = 0,
-/// size = dim, stride = 1.
-Operation *mlir::iree_compiler::IREE::LinalgExt::
-    createParallelInsertSliceOpFromLeadingOffsetsSizesAndStrides(
-        OpBuilder &b, Location loc, Value tensor, Value dest,
-        ArrayRef<Value> leadingOffsets, ArrayRef<Value> leadingSizes,
-        ArrayRef<Value> leadingStrides) {
-  SmallVector<Value> offsets, sizes, strides;
-  completeOffsetsSizesAndStrides(b, loc, tensor, leadingOffsets, leadingSizes,
-                                 leadingStrides, offsets, sizes, strides);
-  return b.createOrFold<iree_compiler::IREE::LinalgExt::ParallelInsertSliceOp>(
-      loc, tensor, dest, offsets, sizes, strides);
-}
-
 /// Insert the `source` tensor into the `dest` tensor by creating the relevant
 /// `subset_insert` op. The details of the `subset_insert` op are retrieved
 /// from the `subset_extract` op so that they form a matching extract/insert
