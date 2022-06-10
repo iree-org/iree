@@ -80,8 +80,8 @@ to many different formats/architectures.
 2. Translate the executable into the binary form consumed by the IREE loaders:
 
 ```
-iree-translate \
-    --iree-mlir-to-hal-executable \
+iree-compile \
+    --compile-mode=hal-executable \
     iree/hal/local/testdata/elementwise_mul.mlir \
     -o=elementwise_mul.so \
     --iree-hal-target-backends=dylib-llvm-aot \

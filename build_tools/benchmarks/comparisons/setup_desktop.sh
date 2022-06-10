@@ -56,7 +56,8 @@ MODEL_NAME="mobilebert_float_384_gpu"
 bazel-bin/iree_tf_compiler/iree-import-tflite "${TFLITE_MODEL_DIR}/${MODEL_NAME}.tflite" -o "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir"
 # Build for CUDA.
 echo "Compiling ${MODEL_NAME}.vmfb for cuda..."
-"${IREE_COMPILE_PATH}" --iree-input-type=tosa --iree-mlir-to-vm-bytecode-module \
+"${IREE_COMPILE_PATH}" \
+  --iree-input-type=tosa \
   --iree-hal-target-backends=cuda \
   --iree-hal-cuda-llvm-target-arch=sm_80 \
   --iree-llvm-debug-symbols=false \
@@ -66,7 +67,8 @@ echo "Compiling ${MODEL_NAME}.vmfb for cuda..."
   --o "${IREE_MODEL_DIR}/cuda/${MODEL_NAME}.vmfb"
 # Build for x86.
 echo "Compiling ${MODEL_NAME}.vmfb for dylib..."
-"${IREE_COMPILE_PATH}" --iree-input-type=tosa --iree-mlir-to-vm-bytecode-module \
+"${IREE_COMPILE_PATH}" \
+  --iree-input-type=tosa \
   --iree-llvm-target-cpu-features=host \
   --iree-hal-target-backends=dylib-llvm-aot \
   --iree-llvm-debug-symbols=false \

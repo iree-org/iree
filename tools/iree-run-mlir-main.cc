@@ -229,7 +229,7 @@ Status PrepareModule(std::string target_backend,
     mlir_module->dump();
   }
 
-  // NOTE: if we have an output file specified then we could translate into that
+  // NOTE: if we have an output file specified then we could compile into that
   // for greater efficiency. Today we assume that users aren't passing multi-GB
   // models through this tool (or if they are they have the memory to run them).
   auto bytecode_options =

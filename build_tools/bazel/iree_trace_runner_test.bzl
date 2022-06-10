@@ -30,8 +30,8 @@ def iree_trace_runner_test(
         src: mlir source file to be compiled to an IREE module.
         target_backend: target backend to compile for.
         driver: driver to run the module with.
-        compiler_flags: additional flags to pass to the compiler. Bytecode
-            translation and backend flags are passed automatically.
+        compiler_flags: additional flags to pass to the compiler. Bytecode output
+            format and backend flags are passed automatically.
         runner_args: additional args to pass to the trace-runner program. The driver
             and input file flags are passed automatically.
         tags: Additional labels to apply to the test. "driver=${DRIVER}" is added
@@ -54,7 +54,6 @@ def iree_trace_runner_test(
         module = module,
         src = src,
         flags = [
-            "--iree-mlir-to-vm-bytecode-module",
             "--mlir-print-op-on-diagnostic=false",
             "--iree-hal-target-backends=%s" % target_backend,
         ] + compiler_flags,
@@ -106,8 +105,8 @@ def iree_single_backend_generated_trace_runner_test(
         generator_args: additional args to pass to the generator program.
         target_backend: target backend to compile for.
         driver: driver to run the module with.
-        compiler_flags: additional flags to pass to the compiler. Bytecode
-            translation and backend flags are passed automatically.
+        compiler_flags: additional flags to pass to the compiler. Bytecode output
+            format and backend flags are passed automatically.
         runner_args: additional args to pass to the trace-runner program. The driver
             and input file flags are passed automatically.
         tags: Additional labels to apply to the test. "driver=${DRIVER}" is added
@@ -180,8 +179,8 @@ def iree_generated_trace_runner_test(
             --module_path=(current binary dir)/name.vmfb
         generator_args: additional args to pass to the generator program.
         target_backends_and_drivers: backend/driver pairs to compile and run the module.
-        compiler_flags: additional flags to pass to the compiler. Bytecode
-            translation and backend flags are passed automatically.
+        compiler_flags: additional flags to pass to the compiler. Bytecode output
+            format and backend flags are passed automatically.
         runner_args: additional args to pass to the trace-runner program. The driver
             and input file flags are passed automatically.
         tags: Additional labels to apply to the test. "driver=${DRIVER}" is added

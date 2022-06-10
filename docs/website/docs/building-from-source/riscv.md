@@ -104,7 +104,6 @@ Invoke the host compiler tools to produce a bytecode module FlatBuffer:
 
 ``` shell
 ../iree-build/install/bin/iree-compile \
-  --iree-mlir-to-vm-bytecode-module \
   --iree-hal-target-backends=vmvx \
   samples/models/simple_abs.mlir \
   -o /tmp/simple_abs_vmvx.vmfb
@@ -146,7 +145,6 @@ with the additional command-line flags
 
 ```shell hl_lines="3 4 5 6 7 8"
 tools/iree-compile \
-  --iree-mlir-to-vm-bytecode-module \
   --iree-hal-target-backends=dylib-llvm-aot \
   --iree-llvm-target-triple=riscv64 \
   --iree-llvm-target-cpu=generic-rv64 \

@@ -8,12 +8,13 @@ include(CMakeParseArguments)
 
 # iree_bytecode_module()
 #
-# CMake function to imitate Bazel's iree_bytecode_module rule.
+# Builds an IREE bytecode module.
 #
 # Parameters:
 # NAME: Name of target (see Note).
 # SRC: Source file to compile into a bytecode module.
 # FLAGS: Flags to pass to the compiler tool (list of strings).
+#     `--output-format=vm-bytecode` is included automatically.
 # COMPILE_TOOL: Compiler tool to invoke (CMake target). The default tool is
 #     "iree-compile".
 # C_IDENTIFIER: Identifier to use for generate c embed code.
@@ -62,7 +63,8 @@ function(iree_bytecode_module)
 
   iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE ${_COMPILE_TOOL})
 
-  set(_ARGS "${_RULE_FLAGS}")
+  set(_ARGS "--output-format=vm-bytecode")
+  list(APPEND _ARGS "${_RULE_FLAGS}")
 
   get_filename_component(_SRC_PATH "${_RULE_SRC}" REALPATH)
   list(APPEND _ARGS "${_SRC_PATH}")

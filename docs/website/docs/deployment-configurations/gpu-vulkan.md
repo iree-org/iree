@@ -146,7 +146,6 @@ system's `PATH`):
 
 ``` shell hl_lines="3 4"
 iree-compile \
-    --iree-mlir-to-vm-bytecode-module \
     --iree-hal-target-backends=vulkan-spirv \
     --iree-vulkan-target-triple=<...> \
     iree_input.mlir -o mobilenet-vulkan.vmfb

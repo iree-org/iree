@@ -440,6 +440,7 @@ class BuildFileFunctions(object):
   def iree_bytecode_module(self,
                            name,
                            src,
+                           module_name=None,
                            flags=None,
                            compile_tool=None,
                            c_identifier=None,
@@ -447,6 +448,8 @@ class BuildFileFunctions(object):
                            testonly=None):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     src_block = _convert_string_arg_block("SRC", src)
+    module_name_block = _convert_string_arg_block("MODULE_FILE_NAME",
+                                                  module_name)
     c_identifier_block = _convert_string_arg_block("C_IDENTIFIER", c_identifier)
     compile_tool_block = _convert_target_block("COMPILE_TOOL", compile_tool)
     flags_block = _convert_string_list_block("FLAGS", flags)
@@ -456,6 +459,7 @@ class BuildFileFunctions(object):
     self.converter.body += (f"iree_bytecode_module(\n"
                             f"{name_block}"
                             f"{src_block}"
+                            f"{module_name_block}"
                             f"{c_identifier_block}"
                             f"{compile_tool_block}"
                             f"{flags_block}"
