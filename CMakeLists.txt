@@ -34,6 +34,7 @@ include(CMakeDependentOption)
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF)
 option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
+option(IREE_ENABLE_CLANG_TIDY "Builds IREE in with clang tidy enabled on IREE's libraries." OFF)
 
 # TODO(#8469): remove the dependency on cpuinfo entirely.
 option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topology detection." ON)
@@ -70,7 +71,6 @@ option(IREE_BUILD_MICROBENCHMARKS "Builds IREE microbenchmark suites." OFF)
 
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
 option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
-option(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM "Builds the experimental ROCm Backend." OFF)
 
 #-------------------------------------------------------------------------------
 # Derived flags based on primary options
@@ -84,6 +84,10 @@ cmake_dependent_option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ON $
 # not require external deps are enabled by default. This can be changed with:
 #   -DIREE_HAL_DRIVER_DEFAULTS=OFF
 #-------------------------------------------------------------------------------
+
+# External HAL drivers; see runtime/src/iree/hal/drivers/CMakeLists.txt for more
+# information on how to declare external drivers.
+set(IREE_EXTERNAL_HAL_DRIVERS "" CACHE STRING "")
 
 option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL drivers" ON)
 # CUDA support must be explicitly enabled.
@@ -144,6 +148,9 @@ endif()
 if(IREE_HAL_DRIVER_VULKAN)
   message(STATUS "  - vulkan")
 endif()
+if(IREE_EXTERNAL_HAL_DRIVERS)
+  message(STATUS "  + external: ${IREE_EXTERNAL_HAL_DRIVERS}")
+endif()
 
 message(STATUS "IREE HAL local executable library loaders:")
 if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
@@ -155,6 +162,15 @@ endif()
 if(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
   message(STATUS "  - vmvx-module")
 endif()
+
+#-------------------------------------------------------------------------------
+# Experimental ROCM HAL driver
+#-------------------------------------------------------------------------------
+
+set(IREE_EXTERNAL_ROCM_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/rocm")
+set(IREE_EXTERNAL_ROCM_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experimental/rocm")
+set(IREE_EXTERNAL_ROCM_HAL_DRIVER_TARGET "iree::experimental::rocm::registration")
+set(IREE_EXTERNAL_ROCM_HAL_DRIVER_REGISTER "iree_hal_rocm_driver_module_register")
 
 #-------------------------------------------------------------------------------
 # Compiler Target Options
@@ -556,7 +572,6 @@ include(flatbuffer_c_library)
 
 add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/llvm-project EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/stblib EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
 
 iree_set_googletest_cmake_options()
@@ -573,7 +588,9 @@ endif()
 
 add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
 
-add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
+if(IREE_HAL_DRIVER_VULKAN)
+  add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
+endif()
 
 # TODO(scotttodd): Iterate some more and find a better place for this.
 if(NOT CMAKE_CROSSCOMPILING)
@@ -654,6 +671,10 @@ add_custom_target(iree-test-deps COMMENT "Building IREE test deps")
 # IREE top-level libraries
 #-------------------------------------------------------------------------------
 
+if(IREE_ENABLE_CLANG_TIDY)
+  set(CMAKE_CXX_CLANG_TIDY clang-tidy -warnings-as-errors=*)
+endif()
+
 add_subdirectory(build_tools/embed_data/)
 
 # Note: Test deps are not built as part of all (use the iree-test-deps target).
@@ -669,11 +690,6 @@ if(IREE_BUILD_BENCHMARKS)
   add_subdirectory(benchmarks)
 endif()
 
-if(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM)
-  add_subdirectory(build_tools/third_party/rocm EXCLUDE_FROM_ALL)
-  add_subdirectory(experimental/rocm)
-endif()
-
 if(IREE_BUILD_COMPILER)
   add_subdirectory(compiler)
 endif()
@@ -682,6 +698,11 @@ add_subdirectory(runtime)
 
 # tools/ can depend on compiler/ and runtime/
 add_subdirectory(tools)
+
+
+if(IREE_ENABLE_CLANG_TIDY)
+  set(CMAKE_CXX_CLANG_TIDY "")
+endif()
 
 if(IREE_BUILD_TRACY)
   if(NOT CMAKE_SYSTEM_NAME MATCHES "Linux")

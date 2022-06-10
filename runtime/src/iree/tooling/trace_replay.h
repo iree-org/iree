@@ -4,12 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_TOOLS_UTILS_TRACE_REPLAY_H_
-#define IREE_TOOLS_UTILS_TRACE_REPLAY_H_
+#ifndef IREE_TOOLING_TRACE_REPLAY_H_
+#define IREE_TOOLING_TRACE_REPLAY_H_
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/tools/utils/yaml_util.h"
+#include "iree/tooling/yaml_util.h"
 #include "iree/vm/api.h"
 
 #ifdef __cplusplus
@@ -25,8 +25,11 @@ typedef uint32_t iree_trace_replay_shutdown_flags_t;
 typedef struct iree_trace_replay_t {
   iree_allocator_t host_allocator;
   iree_string_view_t root_path;
+
   iree_vm_instance_t* instance;
   iree_vm_context_flags_t context_flags;
+
+  iree_hal_driver_registry_t* driver_registry;
   iree_string_view_t driver;
 
   iree_vm_context_t* context;
@@ -38,8 +41,9 @@ typedef struct iree_trace_replay_t {
 // path (may be cwd, may be file source, etc).
 iree_status_t iree_trace_replay_initialize(
     iree_string_view_t root_path, iree_vm_instance_t* instance,
-    iree_vm_context_flags_t context_flags, iree_allocator_t host_allocator,
-    iree_trace_replay_t* out_replay);
+    iree_vm_context_flags_t context_flags,
+    iree_hal_driver_registry_t* driver_registry,
+    iree_allocator_t host_allocator, iree_trace_replay_t* out_replay);
 
 // Deinitializes a trace replay context and releases all resources.
 void iree_trace_replay_deinitialize(iree_trace_replay_t* replay,
@@ -85,4 +89,4 @@ iree_status_t iree_trace_replay_event_call(iree_trace_replay_t* replay,
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_TOOLS_UTILS_TRACE_REPLAY_H_
+#endif  // IREE_TOOLING_TRACE_REPLAY_H_

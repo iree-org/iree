@@ -68,7 +68,7 @@ static DWORD iree_memory_access_to_win32_page_flags(
 
 iree_status_t iree_memory_view_reserve(iree_memory_view_flags_t flags,
                                        iree_host_size_t total_length,
-                                       iree_allocator_t allocator,
+                                       iree_allocator_t host_allocator,
                                        void** out_base_address) {
   *out_base_address = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -88,7 +88,7 @@ iree_status_t iree_memory_view_reserve(iree_memory_view_flags_t flags,
 }
 
 void iree_memory_view_release(void* base_address, iree_host_size_t total_length,
-                              iree_allocator_t allocator) {
+                              iree_allocator_t host_allocator) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // NOTE: return value ignored as this is a shutdown path.
   VirtualFree(base_address, 0, MEM_RELEASE);

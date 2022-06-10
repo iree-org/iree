@@ -11,15 +11,15 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/file_path.h"
 #include "iree/base/internal/flags.h"
+#include "iree/base/internal/path.h"
 #include "iree/base/target_platform.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
-#include "iree/tools/utils/cpu_features.h"
-#include "iree/tools/utils/trace_replay.h"
-#include "iree/tools/utils/yaml_util.h"
+#include "iree/tooling/cpu_features.h"
+#include "iree/tooling/device_util.h"
+#include "iree/tooling/trace_replay.h"
+#include "iree/tooling/yaml_util.h"
 #include "iree/vm/api.h"
 
 IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
@@ -83,8 +83,8 @@ static iree_status_t allocate_host_buffer_view_like(
     iree_hal_allocator_t* hal_allocator, iree_hal_buffer_view_t* src,
     iree_hal_buffer_view_t** dst) {
   return iree_hal_buffer_view_allocate_buffer(
-      hal_allocator, iree_hal_buffer_view_shape_dims(src),
-      iree_hal_buffer_view_shape_rank(src),
+      hal_allocator, iree_hal_buffer_view_shape_rank(src),
+      iree_hal_buffer_view_shape_dims(src),
       iree_hal_buffer_view_element_type(src),
       iree_hal_buffer_view_encoding_type(src),
       (iree_hal_buffer_params_t){
@@ -101,8 +101,8 @@ static iree_status_t allocate_device_buffer_view_like(
     iree_hal_allocator_t* hal_allocator, iree_hal_buffer_view_t* src,
     iree_const_byte_span_t initial_data, iree_hal_buffer_view_t** dst) {
   return iree_hal_buffer_view_allocate_buffer(
-      hal_allocator, iree_hal_buffer_view_shape_dims(src),
-      iree_hal_buffer_view_shape_rank(src),
+      hal_allocator, iree_hal_buffer_view_shape_rank(src),
+      iree_hal_buffer_view_shape_dims(src),
       iree_hal_buffer_view_element_type(src),
       iree_hal_buffer_view_encoding_type(src),
       (iree_hal_buffer_params_t){
@@ -778,8 +778,8 @@ static iree_status_t make_device_identity_matrix_like(
     iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
     iree_hal_buffer_view_t* src, iree_hal_buffer_view_t** dst) {
   return iree_hal_buffer_view_generate_buffer(
-      hal_allocator, iree_hal_buffer_view_shape_dims(src),
-      iree_hal_buffer_view_shape_rank(src),
+      hal_allocator, iree_hal_buffer_view_shape_rank(src),
+      iree_hal_buffer_view_shape_dims(src),
       iree_hal_buffer_view_element_type(src),
       iree_hal_buffer_view_encoding_type(src),
       (iree_hal_buffer_params_t){
@@ -1138,7 +1138,7 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
       root_path, instance,
       FLAG_trace_execution ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
                            : IREE_VM_CONTEXT_FLAG_NONE,
-      iree_allocator_system(), &replay));
+      iree_hal_available_driver_registry(), iree_allocator_system(), &replay));
   iree_trace_replay_set_hal_driver_override(
       &replay, iree_make_cstring_view(FLAG_driver));
 
@@ -1205,8 +1205,6 @@ int main(int argc, char** argv) {
   iree_status_t status =
       iree_vm_instance_create(iree_allocator_system(), &instance);
   if (iree_status_is_ok(status)) {
-    IREE_CHECK_OK(iree_hal_register_all_available_drivers(
-        iree_hal_driver_registry_default()));
     status = run_trace_files(argc - 1, argv + 1, instance);
   }
   iree_vm_instance_release(instance);

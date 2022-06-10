@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "iree/base/internal/call_once.h"
+#include "iree/base/internal/path.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/tracing.h"
 
@@ -188,10 +189,12 @@ static iree_host_size_t iree_hal_driver_info_copy(
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
-    iree_hal_driver_registry_t* registry, iree_allocator_t allocator,
-    iree_hal_driver_info_t** out_driver_infos,
-    iree_host_size_t* out_driver_info_count) {
+    iree_hal_driver_registry_t* registry, iree_allocator_t host_allocator,
+    iree_host_size_t* out_driver_info_count,
+    iree_hal_driver_info_t** out_driver_infos) {
   IREE_ASSERT_ARGUMENT(registry);
+  IREE_ASSERT_ARGUMENT(out_driver_info_count);
+  IREE_ASSERT_ARGUMENT(out_driver_infos);
   IREE_TRACE_ZONE_BEGIN(z0);
 
   *out_driver_info_count = 0;
@@ -209,7 +212,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
     const iree_hal_driver_info_t* driver_infos = NULL;
     iree_host_size_t driver_info_count = 0;
     status =
-        factory->enumerate(factory->self, &driver_infos, &driver_info_count);
+        factory->enumerate(factory->self, &driver_info_count, &driver_infos);
     if (!iree_status_is_ok(status)) break;
     total_driver_info_count += driver_info_count;
     for (iree_host_size_t j = 0; j < driver_info_count; j++) {
@@ -223,7 +226,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
   iree_host_size_t total_driver_infos_size =
       total_driver_info_count * sizeof(iree_hal_driver_info_t);
   if (iree_status_is_ok(status)) {
-    status = iree_allocator_malloc(allocator,
+    status = iree_allocator_malloc(host_allocator,
                                    total_driver_infos_size + total_storage_size,
                                    (void**)out_driver_infos);
   }
@@ -240,7 +243,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
       const iree_hal_driver_info_t* driver_infos = NULL;
       iree_host_size_t driver_info_count = 0;
       status =
-          factory->enumerate(factory->self, &driver_infos, &driver_info_count);
+          factory->enumerate(factory->self, &driver_info_count, &driver_infos);
       if (!iree_status_is_ok(status)) break;
       for (iree_host_size_t j = 0; j < driver_info_count; j++) {
         string_storage_ptr += iree_hal_driver_info_copy(
@@ -255,49 +258,15 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
 
   // Cleanup memory if we failed.
   if (!iree_status_is_ok(status) && *out_driver_infos) {
-    iree_allocator_free(allocator, *out_driver_infos);
+    iree_allocator_free(host_allocator, *out_driver_infos);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
-    iree_hal_driver_registry_t* registry, iree_hal_driver_id_t driver_id,
-    iree_allocator_t allocator, iree_hal_driver_t** out_driver) {
-  IREE_ASSERT_ARGUMENT(registry);
-  if (driver_id == IREE_HAL_DRIVER_ID_INVALID) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "invalid driver id");
-  }
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, driver_id);
-
-  *out_driver = NULL;
-
-  iree_status_t status = iree_ok_status();
-  iree_slim_mutex_lock(&registry->mutex);
-
-  // TODO(benvanik): figure out a good way of lining this up. The issue is that
-  // the driver_id is something we return during enumeration but we really
-  // want it to be something dynamic. We could pack an epoch into it that is
-  // bumped each time the registry factory list is modified so we could tell
-  // when a factory was added/removed, etc. So:
-  //   driver_id = [3 byte epoch] [1 byte index into factory list] [4 byte id]
-  // Not sure which status code to return if the epoch is a mismatch, maybe
-  // IREE_STATUS_UNAVAILABLE? If you are mutating the registry from multiple
-  // threads while also enumerating, that may just be enough of a footgun to
-  // bail and force the caller to resolve :)
-  status =
-      iree_make_status(IREE_STATUS_UNIMPLEMENTED, "driver creation by id nyi");
-
-  iree_slim_mutex_unlock(&registry->mutex);
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
-IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create_by_name(
     iree_hal_driver_registry_t* registry, iree_string_view_t driver_name,
-    iree_allocator_t allocator, iree_hal_driver_t** out_driver) {
+    iree_allocator_t host_allocator, iree_hal_driver_t** out_driver) {
   IREE_ASSERT_ARGUMENT(registry);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_TEXT(z0, driver_name.data, driver_name.size);
@@ -314,7 +283,6 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create_by_name(
   // NOTE: we scan in reverse so that we prefer the first hit in the most
   // recently registered factory.
   const iree_hal_driver_factory_t* hit_factory = NULL;
-  iree_hal_driver_id_t hit_driver_id = IREE_HAL_DRIVER_ID_INVALID;
   for (iree_host_size_t i = 0; i < registry->factory_count; ++i) {
     // Reach inside and grab the internal factory data structures.
     const iree_hal_driver_factory_t* factory =
@@ -322,7 +290,7 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create_by_name(
     const iree_hal_driver_info_t* driver_infos = NULL;
     iree_host_size_t driver_info_count = 0;
     status =
-        factory->enumerate(factory->self, &driver_infos, &driver_info_count);
+        factory->enumerate(factory->self, &driver_info_count, &driver_infos);
     if (!iree_status_is_ok(status)) break;
 
     // Scan for the specific driver by name.
@@ -333,21 +301,20 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create_by_name(
           &driver_infos[driver_info_count - j - 1];
       if (iree_string_view_equal(driver_name, driver_info->driver_name)) {
         hit_factory = factory;
-        hit_driver_id = driver_info->driver_id;
         break;
       }
     }
     // Since we are scanning in reverse we stop searching when we find the first
     // hit (aka the most recently added driver).
-    if (hit_driver_id != IREE_HAL_DRIVER_ID_INVALID) break;
+    if (hit_factory != NULL) break;
   }
 
   // If we found a driver during the scan try to create it now.
   // This may block the caller (with the lock held!), and may fail if for
   // example a delay-loaded driver cannot be created even if it was enumerated.
-  if (hit_driver_id != IREE_HAL_DRIVER_ID_INVALID) {
-    status = hit_factory->try_create(hit_factory->self, hit_driver_id,
-                                     allocator, out_driver);
+  if (hit_factory != NULL) {
+    status = hit_factory->try_create(hit_factory->self, driver_name,
+                                     host_allocator, out_driver);
   } else {
     status =
         iree_make_status(IREE_STATUS_NOT_FOUND, "no driver '%.*s' registered",
@@ -355,6 +322,37 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create_by_name(
   }
 
   iree_slim_mutex_unlock(&registry->mutex);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_create_device(
+    iree_hal_driver_registry_t* registry, iree_string_view_t device_uri,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
+  IREE_ASSERT_ARGUMENT(registry);
+  IREE_ASSERT_ARGUMENT(out_device);
+  *out_device = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, device_uri.data, device_uri.size);
+
+  // Try to create the driver; the backing driver factory may cache this but
+  // it's not safe to assume the returned driver is going to remain live for
+  // any longer than this function holds a reference.
+  iree_string_view_t driver_name = iree_uri_schema(device_uri);
+  iree_hal_driver_t* driver = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_driver_registry_try_create(registry, driver_name, host_allocator,
+                                          &driver),
+      "creating driver for device '%.*s'", (int)device_uri.size,
+      device_uri.data);
+
+  // Have the driver create the device.
+  iree_status_t status = iree_hal_driver_create_device_by_uri(
+      driver, device_uri, host_allocator, out_device);
+
+  iree_hal_driver_release(driver);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

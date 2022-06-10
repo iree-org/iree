@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_TOOLS_UTILS_VM_UTIL_H_
-#define IREE_TOOLS_UTILS_VM_UTIL_H_
+#ifndef IREE_TOOLING_VM_UTIL_H_
+#define IREE_TOOLING_VM_UTIL_H_
 
 #include <iostream>
 #include <ostream>
@@ -52,10 +52,6 @@ inline Status PrintVariantList(iree_vm_list_t* variant_list,
   return PrintVariantList(variant_list, max_element_count, &std::cout);
 }
 
-// Creates the default device for |driver| in |out_device|.
-// The returned |out_device| must be released by the caller.
-Status CreateDevice(const char* driver_name, iree_hal_device_t** out_device);
-
 }  // namespace iree
 
-#endif  // IREE_TOOLS_UTILS_VM_UTIL_H_
+#endif  // IREE_TOOLING_VM_UTIL_H_

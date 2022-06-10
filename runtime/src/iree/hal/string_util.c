@@ -20,7 +20,7 @@
 
 IREE_API_EXPORT iree_status_t iree_hal_parse_shape(
     iree_string_view_t value, iree_host_size_t shape_capacity,
-    iree_hal_dim_t* out_shape, iree_host_size_t* out_shape_rank) {
+    iree_host_size_t* out_shape_rank, iree_hal_dim_t* out_shape) {
   IREE_ASSERT_ARGUMENT(out_shape_rank);
   *out_shape_rank = 0;
 
@@ -79,7 +79,7 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_shape(
 }
 
 IREE_API_EXPORT iree_status_t
-iree_hal_format_shape(const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
+iree_hal_format_shape(iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
                       iree_host_size_t buffer_capacity, char* buffer,
                       iree_host_size_t* out_buffer_length) {
   if (out_buffer_length) {
@@ -185,7 +185,7 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element_type(
 
 IREE_API_EXPORT iree_status_t iree_hal_parse_shape_and_element_type(
     iree_string_view_t value, iree_host_size_t shape_capacity,
-    iree_hal_dim_t* out_shape, iree_host_size_t* out_shape_rank,
+    iree_host_size_t* out_shape_rank, iree_hal_dim_t* out_shape,
     iree_hal_element_type_t* out_element_type) {
   *out_shape_rank = 0;
   *out_element_type = IREE_HAL_ELEMENT_TYPE_NONE;
@@ -223,7 +223,7 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_shape_and_element_type(
 
   // AxBxC...
   IREE_RETURN_IF_ERROR(iree_hal_parse_shape(shape_str, shape_capacity,
-                                            out_shape, out_shape_rank));
+                                            out_shape_rank, out_shape));
 
   // f32, i32, etc
   IREE_RETURN_IF_ERROR(iree_hal_parse_element_type(type_str, out_element_type));
@@ -553,8 +553,8 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_buffer_elements(
   }
 
 static iree_status_t iree_hal_format_buffer_elements_recursive(
-    iree_const_byte_span_t data, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_const_byte_span_t data, iree_host_size_t shape_rank,
+    const iree_hal_dim_t* shape, iree_hal_element_type_t element_type,
     iree_host_size_t* max_element_count, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length) {
   iree_host_size_t buffer_length = 0;
@@ -562,7 +562,7 @@ static iree_status_t iree_hal_format_buffer_elements_recursive(
     // Scalar value; recurse to get on to the leaf dimension path.
     const iree_hal_dim_t one = 1;
     return iree_hal_format_buffer_elements_recursive(
-        data, &one, 1, element_type, max_element_count, buffer_capacity, buffer,
+        data, 1, &one, element_type, max_element_count, buffer_capacity, buffer,
         out_buffer_length);
   } else if (shape_rank > 1) {
     // Nested dimension; recurse into the next innermost dimension.
@@ -585,7 +585,7 @@ static iree_status_t iree_hal_format_buffer_elements_recursive(
       APPEND_CHAR('[');
       iree_host_size_t actual_length = 0;
       iree_status_t status = iree_hal_format_buffer_elements_recursive(
-          subdata, shape + 1, shape_rank - 1, element_type, max_element_count,
+          subdata, shape_rank - 1, shape + 1, element_type, max_element_count,
           buffer ? buffer_capacity - buffer_length : 0,
           buffer ? buffer + buffer_length : NULL, &actual_length);
       buffer_length += actual_length;
@@ -641,8 +641,8 @@ static iree_status_t iree_hal_format_buffer_elements_recursive(
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_format_buffer_elements(
-    iree_const_byte_span_t data, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_const_byte_span_t data, iree_host_size_t shape_rank,
+    const iree_hal_dim_t* shape, iree_hal_element_type_t element_type,
     iree_host_size_t max_element_count, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length) {
   if (out_buffer_length) {
@@ -652,6 +652,6 @@ IREE_API_EXPORT iree_status_t iree_hal_format_buffer_elements(
     buffer[0] = '\0';
   }
   return iree_hal_format_buffer_elements_recursive(
-      data, shape, shape_rank, element_type, &max_element_count,
+      data, shape_rank, shape, element_type, &max_element_count,
       buffer_capacity, buffer, out_buffer_length);
 }

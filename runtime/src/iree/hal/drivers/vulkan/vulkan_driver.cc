@@ -158,12 +158,12 @@ static iree_status_t iree_hal_vulkan_driver_query_extensibility_set(
     iree_hal_vulkan_extensibility_set_t set, iree::Arena* arena,
     iree_hal_vulkan_string_list_t* out_string_list) {
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_query_extensibility_set(
-      requested_features, set, 0, NULL, &out_string_list->count));
+      requested_features, set, 0, &out_string_list->count, NULL));
   out_string_list->values = (const char**)arena->AllocateBytes(
       out_string_list->count * sizeof(out_string_list->values[0]));
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_query_extensibility_set(
-      requested_features, set, out_string_list->count, out_string_list->values,
-      &out_string_list->count));
+      requested_features, set, out_string_list->count, &out_string_list->count,
+      out_string_list->values));
   return iree_ok_status();
 }
 
@@ -377,8 +377,8 @@ static uint8_t* iree_hal_vulkan_populate_device_info(
 
 static iree_status_t iree_hal_vulkan_driver_query_available_devices(
     iree_hal_driver_t* base_driver, iree_allocator_t host_allocator,
-    iree_hal_device_info_t** out_device_infos,
-    iree_host_size_t* out_device_info_count) {
+    iree_host_size_t* out_device_info_count,
+    iree_hal_device_info_t** out_device_infos) {
   iree_hal_vulkan_driver_t* driver = iree_hal_vulkan_driver_cast(base_driver);
 
   // Query all devices from the Vulkan instance.
@@ -437,8 +437,9 @@ static iree_status_t iree_hal_vulkan_driver_select_default_device(
   return status;
 }
 
-static iree_status_t iree_hal_vulkan_driver_create_device(
+static iree_status_t iree_hal_vulkan_driver_create_device_by_id(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
+    iree_host_size_t param_count, const iree_string_pair_t* params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_vulkan_driver_t* driver = iree_hal_vulkan_driver_cast(base_driver);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -478,11 +479,26 @@ static iree_status_t iree_hal_vulkan_driver_create_device(
   return status;
 }
 
+static iree_status_t iree_hal_vulkan_driver_create_device_by_path(
+    iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
+    iree_string_view_t device_path, iree_host_size_t param_count,
+    const iree_string_pair_t* params, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device) {
+  if (!iree_string_view_is_empty(device_path)) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "device paths not yet implemented");
+  }
+  return iree_hal_vulkan_driver_create_device_by_id(
+      base_driver, IREE_HAL_DEVICE_ID_DEFAULT, param_count, params,
+      host_allocator, out_device);
+}
+
 namespace {
 const iree_hal_driver_vtable_t iree_hal_vulkan_driver_vtable = {
     /*.destroy=*/iree_hal_vulkan_driver_destroy,
     /*.query_available_devices=*/
     iree_hal_vulkan_driver_query_available_devices,
-    /*.create_device=*/iree_hal_vulkan_driver_create_device,
+    /*.create_device_by_id=*/iree_hal_vulkan_driver_create_device_by_id,
+    /*.create_device_by_path=*/iree_hal_vulkan_driver_create_device_by_path,
 };
 }  // namespace

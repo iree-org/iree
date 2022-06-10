@@ -93,8 +93,8 @@ VmContext VmContext::Create(VmInstance* instance,
       module_handles[i] = (*modules)[i]->raw_ptr();
     }
     auto status = iree_vm_context_create_with_modules(
-        instance->raw_ptr(), IREE_VM_CONTEXT_FLAG_NONE, module_handles.data(),
-        module_handles.size(), iree_allocator_system(), &context);
+        instance->raw_ptr(), IREE_VM_CONTEXT_FLAG_NONE, module_handles.size(),
+        module_handles.data(), iree_allocator_system(), &context);
     CheckApiStatus(status, "Error creating vm context with modules");
   }
 
@@ -108,8 +108,8 @@ void VmContext::RegisterModules(std::vector<VmModule*> modules) {
   for (size_t i = 0, e = module_handles.size(); i < e; ++i) {
     module_handles[i] = modules[i]->raw_ptr();
   }
-  auto status = iree_vm_context_register_modules(raw_ptr(), &module_handles[0],
-                                                 module_handles.size());
+  auto status = iree_vm_context_register_modules(
+      raw_ptr(), module_handles.size(), &module_handles[0]);
   CheckApiStatus(status, "Error registering modules");
 }
 

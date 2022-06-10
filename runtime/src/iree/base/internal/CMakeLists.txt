@@ -115,8 +115,8 @@ iree_cc_library(
     "dynamic_library_win32.c"
   DEPS
     ${CMAKE_DL_LIBS}
-    ::file_path
     ::internal
+    ::path
     ::synchronization
     iree::base::core_headers
     iree::base::tracing
@@ -147,31 +147,6 @@ iree_cc_test(
     iree::base::cc
     iree::base::core_headers
     iree::base::logging
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    file_path
-  HDRS
-    "file_path.h"
-  SRCS
-    "file_path.c"
-  DEPS
-    iree::base
-    iree::base::core_headers
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    file_path_test
-  SRCS
-    "file_path_test.cc"
-  DEPS
-    ::file_path
-    iree::base::core_headers
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -262,6 +237,31 @@ iree_cc_library(
   DEPS
     iree::base::core_headers
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    path
+  HDRS
+    "path.h"
+  SRCS
+    "path.c"
+  DEPS
+    iree::base
+    iree::base::core_headers
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    path_test
+  SRCS
+    "path_test.cc"
+  DEPS
+    ::path
+    iree::base::core_headers
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(

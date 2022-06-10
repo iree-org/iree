@@ -42,45 +42,6 @@ def CanonicalizedSequenceOp
 
 //===----------------------------------------------------------------------===//
 
-def FuseOp : Op<Transform_Dialect, "structured.fuse",
-    [FunctionalStyleMultiOperandMultiResultTransformOpTrait, 
-     MemoryEffectsOpInterface,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
-  let description = [{Tiles the operations pointed to by the target handle and
-  fuses their producers greedily using the options provided as attributes.}];
-
-  let arguments =
-    (ins PDL_Operation:$target,
-         DefaultValuedAttr<I64ArrayAttr, "{}">:$tile_sizes,
-         DefaultValuedAttr<I64ArrayAttr, "{}">:$tile_interchange);
-  let results = (outs PDL_Operation:$transformed,
-                      Variadic<PDL_Operation>:$loops);
-
-  let hasCustomAssemblyFormat = 1;
-  let hasVerifier = 1;
-  let cppNamespace = "transform_ext";
-}
-
-def GeneralizeOp : Op<Transform_Dialect, "structured2.generalize",
-    [FunctionalStyleTransformOpTrait, 
-     MemoryEffectsOpInterface,
-     TransformOpInterface,
-     TransformEachOpTrait]> {
-  let description = [{Generalizes the operations pointed to
-  by the target handle.}];
-
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$transformed);
-
-  let assemblyFormat = "$target attr-dict";
-  let cppNamespace = "transform_ext";
-
-  let extraClassDeclaration = [{
-    ::mlir::FailureOr<::mlir::linalg::LinalgOp> applyToOne(
-        ::mlir::linalg::LinalgOp target);
-  }];
-}
-
 def BufferizeOp : Op<Transform_Dialect, "bufferize",
     [DeclareOpInterfaceMethods<TransformOpInterface>, 
      FunctionalStyleMultiOperandMultiResultTransformOpTrait,
@@ -88,34 +49,6 @@ def BufferizeOp : Op<Transform_Dialect, "bufferize",
      TransformOpInterface]> {
   let description = [{Indicates that the entire module should be bufferized.}];
   let assemblyFormat = "attr-dict";
-  let cppNamespace = "transform_ext";
-}
-
-def DecomposeOp : Op<Transform_Dialect, "structured2.decompose",
-    [DeclareOpInterfaceMethods<TransformOpInterface>,
-     MemoryEffectsOpInterface,
-     FunctionalStyleMultiOperandMultiResultTransformOpTrait]> {
-  let description = [{Indicates that ops in the entire module should be
-  decomposed into lower-level components.}];
-  let assemblyFormat = "attr-dict";
-  let cppNamespace = "transform_ext";
-}
-
-def VectorizeOp : Op<Transform_Dialect, "structured2.vectorize",
-     [DeclareOpInterfaceMethods<TransformOpInterface>,
-      FunctionalStyleMultiOperandMultiResultTransformOpTrait,
-      MemoryEffectsOpInterface]> {
-  let description = [{Indiactes that vectorization should be performed. If a
-  target handle is provided, only vectorizes the operations pointed to by the
-  handle. Otherwise vectorizes the entire module. Vectorization options are
-  provided as operation attributes.}];
-
-  let arguments = (ins Optional<PDL_Operation>:$target,
-                   DefaultValuedAttr<BoolAttr, "false">:$vectorize_padding
-                  );
-  let results = (outs Optional<PDL_Operation>:$transformed);
-
-  let hasCustomAssemblyFormat = 1;
   let cppNamespace = "transform_ext";
 }
 
@@ -159,92 +92,6 @@ def LowerToLLVMOp : Op<Transform_Dialect, "lower_to_llvm",
      DefaultValuedAttr<BoolAttr, "false">:$enable_async);
 
   let assemblyFormat = "attr-dict";
-  let cppNamespace = "transform_ext";
-}
-
-def GetParentLoopOp : Op<Transform_Dialect, "get_parent_loop",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     FunctionalStyleTransformOpTrait,
-     TransformEachOpTrait,
-     TransformOpInterface]> {
-  let description = [{Obtains a handle to a parent loop of the given
-  operation.}];
-
-  let arguments =
-    (ins PDL_Operation:$target,
-         DefaultValuedAttr<Confined<I64Attr, [IntPositive]>,
-                           "1">:$num_loops);
-  let results = (outs PDL_Operation:$transformed);
-
-  let assemblyFormat = "$target attr-dict";
-  let cppNamespace = "transform_ext";
-
-  let extraClassDeclaration = [{
-    ::mlir::FailureOr<::mlir::scf::ForOp> applyToOne(::mlir::Operation *source);
-  }];
-}
-
-def UnrollLoopOp : Op<Transform_Dialect, "unroll_loop",
-    [FunctionalStyleMultiOperandMultiResultTransformOpTrait,
-     MemoryEffectsOpInterface,
-     TransformEachOpTrait,
-     TransformOpInterface]> {
-  let description = [{Unrolls the given loop with the given unroll factor.}];
-
-  let arguments = (ins PDL_Operation:$target,
-                       Confined<I64Attr, [IntPositive]>:$factor);
-
-  let assemblyFormat = "$target attr-dict";
-  let cppNamespace = "transform_ext";
-
-  let extraClassDeclaration = [{
-    ::mlir::LogicalResult applyToOne(::mlir::scf::ForOp loop);
-  }];
-}
-
-def PeelLoopOp : Op<Transform_Dialect, "peel_loop",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     TransformEachOpTrait,
-     TransformOpInterface]> {
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$transformed);
-
-  let assemblyFormat = "$target attr-dict";
-  let cppNamespace = "transform_ext";
-
-  let extraClassDeclaration = [{
-    ::mlir::FailureOr<::mlir::scf::ForOp> applyToOne(::mlir::scf::ForOp loop);
-  }];
-}
-
-def PipelineLoopOp : Op<Transform_Dialect, "pipeline_loop",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     TransformEachOpTrait,
-     TransformOpInterface]> {
-  let arguments = (ins PDL_Operation:$target,
-                   DefaultValuedAttr<I64Attr, "1">:$iteration_interval,
-                   DefaultValuedAttr<I64Attr, "10">:$read_latency);
-  let results = (outs PDL_Operation:$transformed);
-
-  let assemblyFormat = "$target attr-dict";
-  let cppNamespace = "transform_ext";
-
-  let extraClassDeclaration = [{
-    ::mlir::FailureOr<::mlir::scf::ForOp> applyToOne(::mlir::scf::ForOp loop);
-  }];
-}
-
-def OutlineLoopOp : Op<Transform_Dialect, "outline_loop",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
-  let arguments = (ins PDL_Operation:$target,
-                   StrAttr:$func_name);
-  let results = (outs PDL_Operation:$transformed);
-
-  let assemblyFormat = "$target attr-dict";
   let cppNamespace = "transform_ext";
 }
 

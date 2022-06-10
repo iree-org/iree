@@ -18,9 +18,9 @@
 #include "iree/base/status_cc.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
-#include "iree/tools/utils/vm_util.h"
+#include "iree/tooling/device_util.h"
+#include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/ref_cc.h"
@@ -111,7 +111,9 @@ iree_status_t Run() {
       iree_allocator_system(), &input_module));
 
   iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(CreateDevice(FLAG_driver, &device));
+  IREE_RETURN_IF_ERROR(iree_hal_create_device(
+      iree_hal_available_driver_registry(), IREE_SV(FLAG_driver),
+      iree_allocator_system(), &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(
       iree_hal_module_create(device, iree_allocator_system(), &hal_module));
@@ -124,7 +126,7 @@ iree_status_t Run() {
           instance,
           FLAG_trace_execution ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
                                : IREE_VM_CONTEXT_FLAG_NONE,
-          modules.data(), modules.size(), iree_allocator_system(), &context),
+          modules.size(), modules.data(), iree_allocator_system(), &context),
       "creating context");
 
   std::string function_name = std::string(FLAG_entry_function);
@@ -191,8 +193,6 @@ extern "C" int main(int argc, char** argv) {
                  " Use '--' instead.\n";
     return 1;
   }
-  IREE_CHECK_OK(iree_hal_register_all_available_drivers(
-      iree_hal_driver_registry_default()));
   IREE_CHECK_OK(Run());
   return 0;
 }

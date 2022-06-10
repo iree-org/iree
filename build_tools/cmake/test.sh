@@ -62,7 +62,11 @@ label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 
 cd "$BUILD_DIR"
 echo "******************** Running main project ctests ************************"
-ctest --timeout 900 --output-on-failure --label-exclude "${label_exclude_regex?}"
+ctest \
+  --timeout 900 \
+  --output-on-failure \
+  --no-tests=error \
+  --label-exclude "${label_exclude_regex?}"
 
 echo "******************** llvm-external-projects tests ***********************"
 cmake --build . --target check-iree-dialects -- -k 0

@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/tools/utils/vm_util.h"
+#include "iree/tooling/vm_util.h"
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
@@ -27,7 +27,9 @@ class VmUtilTest : public ::testing::Test {
 
   virtual void SetUp() {
     IREE_ASSERT_OK(iree_hal_module_register_types());
-    IREE_ASSERT_OK(CreateDevice("local-sync", &device_));
+    IREE_ASSERT_OK(iree_hal_create_device(iree_hal_driver_registry_default(),
+                                          IREE_SV("local-sync"),
+                                          iree_allocator_system(), &device_));
     allocator_ = iree_hal_device_allocator(device_);
   }
 

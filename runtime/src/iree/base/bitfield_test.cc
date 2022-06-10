@@ -26,7 +26,7 @@ std::string FormatBitfieldValue(
     uint32_t value,
     const iree_bitfield_string_mapping_t (&mappings)[mapping_count]) {
   iree_bitfield_string_temp_t temp;
-  auto sv = iree_bitfield_format_inline(value, mappings, mapping_count, &temp);
+  auto sv = iree_bitfield_format_inline(value, mapping_count, mappings, &temp);
   return std::string(sv.data, sv.size);
 }
 
@@ -48,7 +48,7 @@ TEST(BitfieldTest, FormatBitfieldValueEmpty) {
       {0, IREE_SV("UNUSED")},
   };
   iree_bitfield_string_temp_t temp;
-  auto sv = iree_bitfield_format_inline(MY_BITFIELD_NONE, mappings, 0, &temp);
+  auto sv = iree_bitfield_format_inline(MY_BITFIELD_NONE, 0, mappings, &temp);
   EXPECT_TRUE(iree_string_view_is_empty(sv));
 }
 

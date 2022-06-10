@@ -2385,6 +2385,18 @@ def VM_XorI64Op :
   let hasFolder = 1;
 }
 
+def VM_CtlzI32Op :
+    VM_UnaryArithmeticOp<I32, "ctlz.i32", VM_OPC_CtlzI32> {
+  let summary = [{counts the leading zeros in an integer value}];
+  let hasFolder = 1;
+}
+
+def VM_CtlzI64Op :
+    VM_UnaryArithmeticOp<I64, "ctlz.i64", VM_OPC_CtlzI64> {
+  let summary = [{counts the leading zeros in an integer value}];
+  let hasFolder = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Bitwise shifts and rotates
 //===----------------------------------------------------------------------===//

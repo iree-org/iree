@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/tools/utils/yaml_util.h"
+#include "iree/tooling/yaml_util.h"
 
 iree_status_t iree_status_from_yaml_parser_error(yaml_parser_t* parser) {
   // TODO(benvanik): copy parser.error to status.

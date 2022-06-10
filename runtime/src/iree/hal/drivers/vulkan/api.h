@@ -102,7 +102,7 @@ typedef enum iree_hal_vulkan_extensibility_set_e {
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
     iree_hal_vulkan_features_t requested_features,
     iree_hal_vulkan_extensibility_set_t set, iree_host_size_t string_capacity,
-    const char** out_string_values, iree_host_size_t* out_string_count);
+    iree_host_size_t* out_string_count, const char** out_string_values);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_vulkan_syms_t

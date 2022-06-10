@@ -22,13 +22,13 @@ extern "C" {
 // (the same as produced by iree_hal_format_shape).
 IREE_API_EXPORT iree_status_t iree_hal_parse_shape(
     iree_string_view_t value, iree_host_size_t shape_capacity,
-    iree_hal_dim_t* out_shape, iree_host_size_t* out_shape_rank);
+    iree_host_size_t* out_shape_rank, iree_hal_dim_t* out_shape);
 
 // Converts shape dimensions into a `4x5x6` format.
 //
 // Follows the standard API string formatting rules. See iree/base/api.h.
 IREE_API_EXPORT iree_status_t
-iree_hal_format_shape(const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
+iree_hal_format_shape(iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
                       iree_host_size_t buffer_capacity, char* buffer,
                       iree_host_size_t* out_buffer_length);
 
@@ -53,7 +53,7 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element_type(
 // iree_hal_parse_element_type. Ignores any training `=`.
 IREE_API_EXPORT iree_status_t iree_hal_parse_shape_and_element_type(
     iree_string_view_t value, iree_host_size_t shape_capacity,
-    iree_hal_dim_t* out_shape, iree_host_size_t* out_shape_rank,
+    iree_host_size_t* out_shape_rank, iree_hal_dim_t* out_shape,
     iree_hal_element_type_t* out_element_type);
 
 // Parses a serialized element of |element_type| to its in-memory form.
@@ -100,8 +100,8 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_buffer_elements(
 //
 // Follows the standard API string formatting rules. See iree/base/api.h.
 IREE_API_EXPORT iree_status_t iree_hal_format_buffer_elements(
-    iree_const_byte_span_t data, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_const_byte_span_t data, iree_host_size_t shape_rank,
+    const iree_hal_dim_t* shape, iree_hal_element_type_t element_type,
     iree_host_size_t max_element_count, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length);
 

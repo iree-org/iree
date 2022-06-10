@@ -7,10 +7,8 @@
 #include "iree/compiler/ConstEval/Runtime.h"
 
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
-#include "iree/hal/api.h"
 #include "iree/hal/drivers/local_task/registration/driver_module.h"
 #include "iree/modules/hal/module.h"
-#include "iree/vm/ref_cc.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 
@@ -264,7 +262,7 @@ void CompiledBinary::initialize(void* data, size_t length) {
 
   // Create driver and device.
   iree_hal_driver_t* driver = nullptr;
-  IREE_CHECK_OK(iree_hal_driver_registry_try_create_by_name(
+  IREE_CHECK_OK(iree_hal_driver_registry_try_create(
       runtime.registry, iree_make_cstring_view("local-task"),
       iree_allocator_system(), &driver));
   IREE_CHECK_OK(iree_hal_driver_create_default_device(
@@ -283,8 +281,8 @@ void CompiledBinary::initialize(void* data, size_t length) {
   // Context.
   std::array<iree_vm_module_t*, 2> modules = {hal_module, main_module};
   IREE_CHECK_OK(iree_vm_context_create_with_modules(
-      runtime.instance, IREE_VM_CONTEXT_FLAG_NONE, modules.data(),
-      modules.size(), iree_allocator_system(), &context));
+      runtime.instance, IREE_VM_CONTEXT_FLAG_NONE, modules.size(),
+      modules.data(), iree_allocator_system(), &context));
 }
 
 InMemoryCompiledBinary::~InMemoryCompiledBinary() { deinitialize(); }

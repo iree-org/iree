@@ -13,9 +13,9 @@
 #include <thread>
 
 #include "iree/base/status_cc.h"
-#include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
-#include "iree/tools/utils/vm_util.h"
+#include "iree/tooling/device_util.h"
+#include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 
@@ -102,7 +102,10 @@ Status RunModule(const IreeModuleInvocation& invocation) {
       iree_allocator_null(), iree_allocator_system(), &input_module));
 
   iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(CreateDevice(invocation.driver.c_str(), &device));
+  IREE_RETURN_IF_ERROR(iree_hal_create_device(
+      iree_hal_available_driver_registry(),
+      iree_make_string_view(invocation.driver.data(), invocation.driver.size()),
+      iree_allocator_system(), &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(
       iree_hal_module_create(device, iree_allocator_system(), &hal_module));
@@ -111,8 +114,8 @@ Status RunModule(const IreeModuleInvocation& invocation) {
   // Order matters. The input module will likely be dependent on the hal module.
   std::array<iree_vm_module_t*, 2> modules = {hal_module, input_module};
   IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
-                           instance, IREE_VM_CONTEXT_FLAG_NONE, modules.data(),
-                           modules.size(), iree_allocator_system(), &context),
+                           instance, IREE_VM_CONTEXT_FLAG_NONE, modules.size(),
+                           modules.data(), iree_allocator_system(), &context),
                        "creating context");
 
   const std::string& function_name = invocation.entry_function;
@@ -168,9 +171,6 @@ void RunModuleAppMain(android_app* app) {
   // TODO(antiagainst): This can be improved by rendering some UI button to
   // trigger the workload.
   std::this_thread::sleep_for(std::chrono::seconds(2));
-
-  IREE_CHECK_OK(iree_hal_register_all_available_drivers(
-      iree_hal_driver_registry_default()));
 
   ModuleLoader loader(app);
   IreeModuleInvocation invocation;

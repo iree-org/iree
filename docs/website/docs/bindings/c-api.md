@@ -112,7 +112,7 @@ IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
 // driver like the GPU "vulkan" driver. The driver(s) used should match with
 // the target(s) specified during compilation.
 iree_hal_driver_t* driver = NULL;
-IREE_CHECK_OK(iree_hal_driver_registry_try_create_by_name(
+IREE_CHECK_OK(iree_hal_driver_registry_try_create(
     iree_hal_driver_registry_default(),
     iree_string_view_literal("local-task"),
     iree_allocator_system(), &driver));
@@ -163,7 +163,7 @@ iree_vm_context_t* context = NULL;
 iree_vm_module_t* modules[2] = {hal_module, bytecode_module};
 IREE_CHECK_OK(iree_vm_context_create_with_modules(
     instance, IREE_VM_CONTEXT_FLAG_NONE,
-    modules, IREE_ARRAYSIZE(modules),
+    IREE_ARRAYSIZE(modules), modules,
     iree_allocator_system(), &context));
 // References to the modules can be released now.
 iree_vm_module_release(hal_module);

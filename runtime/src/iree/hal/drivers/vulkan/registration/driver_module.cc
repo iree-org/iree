@@ -14,8 +14,6 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/api.h"
 
-#define IREE_HAL_VULKAN_1_X_DRIVER_ID 0x564C4B31u  // VLK1
-
 IREE_FLAG(bool, vulkan_validation_layers, true,
           "Enables standard Vulkan validation layers.");
 IREE_FLAG(bool, vulkan_debug_utils, true,
@@ -28,7 +26,7 @@ IREE_FLAG(bool, vulkan_tracing, true,
           "Enables Vulkan tracing (if IREE tracing is enabled).");
 
 static iree_status_t iree_hal_vulkan_create_driver_with_flags(
-    iree_string_view_t identifier, iree_allocator_t allocator,
+    iree_string_view_t identifier, iree_allocator_t host_allocator,
     iree_hal_driver_t** out_driver) {
   IREE_TRACE_SCOPE();
 
@@ -65,21 +63,20 @@ static iree_status_t iree_hal_vulkan_create_driver_with_flags(
   // does not have the expected functions.
   iree_hal_vulkan_syms_t* syms = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_hal_vulkan_syms_create_from_system_loader(allocator, &syms));
+      iree_hal_vulkan_syms_create_from_system_loader(host_allocator, &syms));
 
   iree_status_t status = iree_hal_vulkan_driver_create(
-      identifier, &driver_options, syms, allocator, out_driver);
+      identifier, &driver_options, syms, host_allocator, out_driver);
 
   iree_hal_vulkan_syms_release(syms);
   return status;
 }
 
 static iree_status_t iree_hal_vulkan_driver_factory_enumerate(
-    void* self, const iree_hal_driver_info_t** out_driver_infos,
-    iree_host_size_t* out_driver_info_count) {
+    void* self, iree_host_size_t* out_driver_info_count,
+    const iree_hal_driver_info_t** out_driver_infos) {
   // NOTE: we could query supported vulkan versions or featuresets here.
   static const iree_hal_driver_info_t driver_infos[1] = {{
-      /*driver_id=*/IREE_HAL_VULKAN_1_X_DRIVER_ID,
       /*driver_name=*/iree_make_cstring_view("vulkan"),
       /*full_name=*/iree_make_cstring_view("Vulkan 1.x (dynamic)"),
   }};
@@ -89,20 +86,14 @@ static iree_status_t iree_hal_vulkan_driver_factory_enumerate(
 }
 
 static iree_status_t iree_hal_vulkan_driver_factory_try_create(
-    void* self, iree_hal_driver_id_t driver_id, iree_allocator_t allocator,
+    void* self, iree_string_view_t driver_name, iree_allocator_t host_allocator,
     iree_hal_driver_t** out_driver) {
-  if (driver_id != IREE_HAL_VULKAN_1_X_DRIVER_ID) {
+  if (!iree_string_view_equal(driver_name, IREE_SV("vulkan"))) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "no driver with ID %016" PRIu64
-                            " is provided by this factory",
-                            driver_id);
+                            "no driver '%.*s' is provided by this factory",
+                            (int)driver_name.size, driver_name.data);
   }
-
-  // When we expose more than one driver (different vulkan versions, etc) we
-  // can name them here:
-  iree_string_view_t identifier = iree_make_cstring_view("vulkan");
-
-  return iree_hal_vulkan_create_driver_with_flags(identifier, allocator,
+  return iree_hal_vulkan_create_driver_with_flags(driver_name, host_allocator,
                                                   out_driver);
 }
 

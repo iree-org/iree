@@ -41,20 +41,20 @@ void iree_memory_jit_context_end(void) {}
 
 iree_status_t iree_memory_view_reserve(iree_memory_view_flags_t flags,
                                        iree_host_size_t total_length,
-                                       iree_allocator_t allocator,
+                                       iree_allocator_t host_allocator,
                                        void** out_base_address) {
   *out_base_address = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status =
-      iree_allocator_malloc(allocator, total_length, out_base_address);
+      iree_allocator_malloc(host_allocator, total_length, out_base_address);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 void iree_memory_view_release(void* base_address, iree_host_size_t total_length,
-                              iree_allocator_t allocator) {
+                              iree_allocator_t host_allocator) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_allocator_free(allocator, base_address);
+  iree_allocator_free(host_allocator, base_address);
   IREE_TRACE_ZONE_END(z0);
 }
 

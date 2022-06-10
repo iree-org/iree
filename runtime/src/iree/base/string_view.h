@@ -50,6 +50,42 @@ static inline iree_string_view_t iree_make_cstring_view(const char* str) {
   return v;
 }
 
+// A pair of strings.
+typedef struct iree_string_pair_t {
+  union {
+    iree_string_view_t first;
+    iree_string_view_t key;
+  };
+  union {
+    iree_string_view_t second;
+    iree_string_view_t value;
+  };
+} iree_string_pair_t;
+
+// Returns an empty string pair ("", "").
+static inline iree_string_pair_t iree_string_pair_empty(void) {
+  iree_string_pair_t v = {iree_string_view_empty(), iree_string_view_empty()};
+  return v;
+}
+
+// Returns a string pair with the given values.
+static inline iree_string_pair_t iree_make_string_pair(
+    iree_string_view_t first, iree_string_view_t second) {
+  iree_string_pair_t v = {first, second};
+  return v;
+}
+
+// Returns a string pair initialized with references to the given NUL-terminated
+// string literals.
+static inline iree_string_pair_t iree_make_cstring_pair(const char* first,
+                                                        const char* second) {
+  iree_string_pair_t v = {
+      {iree_make_cstring_view(first)},
+      {iree_make_cstring_view(second)},
+  };
+  return v;
+}
+
 #define iree_string_view_literal(str) \
   { .data = (str), .size = IREE_ARRAYSIZE(str) - 1 }
 

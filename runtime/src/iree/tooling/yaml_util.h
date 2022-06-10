@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_TOOLS_UTILS_YAML_UTIL_H_
-#define IREE_TOOLS_UTILS_YAML_UTIL_H_
+#ifndef IREE_TOOLING_YAML_UTIL_H_
+#define IREE_TOOLING_YAML_UTIL_H_
 
 #include "iree/base/api.h"
 
@@ -43,4 +43,4 @@ size_t iree_yaml_base64_calculate_size(iree_string_view_t source);
 iree_status_t iree_yaml_base64_decode(iree_string_view_t source,
                                       iree_byte_span_t target);
 
-#endif  // IREE_TOOLS_UTILS_YAML_UTIL_H_
+#endif  // IREE_TOOLING_YAML_UTIL_H_

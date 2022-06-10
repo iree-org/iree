@@ -143,4 +143,34 @@ vm.module @arithmetic_ops_i64 {
     vm.check.eq %v, %c3, "5^3=6" : i64
     vm.return
   }
+
+  vm.export @test_ctlz_i64_const_zero
+  vm.func @test_ctlz_i64_const_zero() {
+    %c = vm.const.i64 0
+    %cdno = util.do_not_optimize(%c) : i64
+    %actual = vm.ctlz.i64 %cdno : i64
+    %expected = vm.const.i64 64
+    vm.check.eq %actual, %expected, "ctlz(0)=64" : i64
+    vm.return
+  }
+
+  vm.export @test_ctlz_i64_const_1
+  vm.func @test_ctlz_i64_const_1() {
+    %c = vm.const.i64 1
+    %cdno = util.do_not_optimize(%c) : i64
+    %actual = vm.ctlz.i64 %cdno : i64
+    %expected = vm.const.i64 63
+    vm.check.eq %actual, %expected, "ctlz(1)=63" : i64
+    vm.return
+  }
+
+  vm.export @test_ctlz_i64_const_ffffffffffffffff
+  vm.func @test_ctlz_i64_const_ffffffffffffffff() {
+    %c = vm.const.i64 0xFFFFFFFFFFFFFFFF
+    %cdno = util.do_not_optimize(%c) : i64
+    %actual = vm.ctlz.i64 %cdno : i64
+    %expected = vm.const.i64 0
+    vm.check.eq %actual, %expected, "ctlz(0xFFFFFFFFFFFFFFFF)=0" : i64
+    vm.return
+  }
 }
