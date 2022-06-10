@@ -36,7 +36,7 @@
 #   TARGET_BACKEND: The compiler target backend.
 #   TARGET_ARCHITECTURE: The detailed target backend's architecture.
 #   TRANSLATION_FLAGS: A list of command-line options and their values to
-#       pass to the IREE translation tool for artifact generation.
+#       pass to the IREE compiler tool for artifact generation.
 #   CONFIG: Benchmark runner configuration name.
 #   DRIVER: The runtime driver.
 #   RUNTIME_FLAGS: A list of command-line options and their values to pass

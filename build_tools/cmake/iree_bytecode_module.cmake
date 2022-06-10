@@ -13,9 +13,9 @@ include(CMakeParseArguments)
 # Parameters:
 # NAME: Name of target (see Note).
 # SRC: Source file to compile into a bytecode module.
-# FLAGS: Flags to pass to the translation tool (list of strings).
-# TRANSLATE_TOOL: Translation tool to invoke (CMake target). The default
-#     tool is "iree-compile".
+# FLAGS: Flags to pass to the compiler tool (list of strings).
+# COMPILE_TOOL: Compiler tool to invoke (CMake target). The default tool is
+#     "iree-compile".
 # C_IDENTIFIER: Identifier to use for generate c embed code.
 #     If omitted then no C embed code will be generated.
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
@@ -38,7 +38,7 @@ function(iree_bytecode_module)
   cmake_parse_arguments(
     _RULE
     "PUBLIC;TESTONLY"
-    "NAME;SRC;TRANSLATE_TOOL;C_IDENTIFIER;MODULE_FILE_NAME;FRIENDLY_NAME"
+    "NAME;SRC;COMPILE_TOOL;C_IDENTIFIER;MODULE_FILE_NAME;FRIENDLY_NAME"
     "FLAGS;DEPENDS;DEPS"
     ${ARGN}
   )
@@ -47,11 +47,11 @@ function(iree_bytecode_module)
     return()
   endif()
 
-  # Set default for TRANSLATE_TOOL.
-  if(DEFINED _RULE_TRANSLATE_TOOL)
-    set(_TRANSLATE_TOOL ${_RULE_TRANSLATE_TOOL})
+  # Set default for COMPILE_TOOL.
+  if(DEFINED _RULE_COMPILE_TOOL)
+    set(_COMPILE_TOOL ${_RULE_COMPILE_TOOL})
   else()
-    set(_TRANSLATE_TOOL "iree-compile")
+    set(_COMPILE_TOOL "iree-compile")
   endif()
 
   if(DEFINED _RULE_MODULE_FILE_NAME)
@@ -60,7 +60,7 @@ function(iree_bytecode_module)
     set(_MODULE_FILE_NAME "${_RULE_NAME}.vmfb")
   endif()
 
-  iree_get_executable_path(_TRANSLATE_TOOL_EXECUTABLE ${_TRANSLATE_TOOL})
+  iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE ${_COMPILE_TOOL})
 
   set(_ARGS "${_RULE_FLAGS}")
 
@@ -100,12 +100,11 @@ function(iree_bytecode_module)
     OUTPUT
       "${_MODULE_FILE_NAME}"
     COMMAND
-      ${_TRANSLATE_TOOL_EXECUTABLE}
+      ${_COMPILE_TOOL_EXECUTABLE}
       ${_ARGS}
-    # Changes to either the translation tool or the input source should
-    # trigger rebuilding.
+    # Changes to either the compiler tool or the input sources should rebuild.
     DEPENDS
-      ${_TRANSLATE_TOOL_EXECUTABLE}
+      ${_COMPILE_TOOL_EXECUTABLE}
       ${_LINKER_TOOL_EXECUTABLE}
       ${_RULE_SRC}
       ${_RULE_DEPENDS}

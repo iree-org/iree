@@ -54,7 +54,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -68,7 +68,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -82,7 +82,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -96,7 +96,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -110,7 +110,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -124,7 +124,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-    TRANSLATE_TOOL
+    COMPILE_TOOL
     iree-compile
 )
 
@@ -138,7 +138,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -152,7 +152,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -166,7 +166,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-    TRANSLATE_TOOL
+    COMPILE_TOOL
     iree-compile
 )
 
@@ -180,7 +180,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -194,7 +194,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -208,7 +208,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -222,7 +222,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -236,7 +236,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -250,7 +250,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -264,7 +264,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -278,7 +278,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -292,7 +292,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -306,7 +306,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -320,7 +320,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -334,7 +334,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -348,7 +348,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -362,7 +362,7 @@ iree_c_module(
   FLAGS
     "--compile-mode=vm"
     "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
