@@ -73,12 +73,6 @@ option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." 
 option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
 
 #-------------------------------------------------------------------------------
-# Derived flags based on primary options
-#-------------------------------------------------------------------------------
-
-cmake_dependent_option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ON ${IREE_BUILD_COMPILER} OFF)
-
-#-------------------------------------------------------------------------------
 # Runtime HAL Driver Options
 # By default, all runtime drivers supported by the current platform which do
 # not require external deps are enabled by default. This can be changed with:
@@ -202,6 +196,13 @@ cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler tar
 cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
 # Disable WebGPU by default - it has complex deps and is under development.
 cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
+
+#-------------------------------------------------------------------------------
+# Compiler Output Formats
+#-------------------------------------------------------------------------------
+
+# The 'vm-bytecode' and 'vm-asm' formats are always enabled.
+cmake_dependent_option(IREE_OUTPUT_FORMAT_C "Enables the 'vm-c' output format, using MLIR EmitC" ON ${IREE_BUILD_COMPILER} OFF)
 
 #-------------------------------------------------------------------------------
 # IREE compilation toolchain configuration

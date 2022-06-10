@@ -12,35 +12,6 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_cmake_extra_content(
-    content = """
-if(NOT IREE_ENABLE_EMITC)
-  # If the real "C" library is enabled, it will define IREE_ENABLE_EMITC,
-  # which can be used for conditionally switching.
-  iree_cc_library(
-    NAME Enabled
-  )
-  iree_cc_library(
-    NAME C
-  )
-  iree_cc_library(
-    NAME TranslateToCpp
-  )
-  return()
-endif()
-""",
-)
-
-iree_compiler_cc_library(
-    name = "Enabled",
-    defines = [
-        "IREE_HAVE_EMITC_DIALECT",
-    ],
-    deps = [
-        "@llvm-project//mlir:EmitC",
-    ],
-)
-
 iree_compiler_cc_library(
     name = "TranslateToCpp",
     srcs = [
@@ -49,8 +20,10 @@ iree_compiler_cc_library(
     hdrs = [
         "CppEmitter.h",
     ],
+    defines = [
+        "IREE_HAVE_C_OUTPUT_FORMAT",
+    ],
     deps = [
-        ":Enabled",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ControlFlowOps",
         "@llvm-project//mlir:EmitC",
@@ -73,7 +46,6 @@ iree_compiler_cc_library(
         "TranslationFlags.h",
     ],
     deps = [
-        ":Enabled",
         ":TranslateToCpp",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/Util/Transforms",

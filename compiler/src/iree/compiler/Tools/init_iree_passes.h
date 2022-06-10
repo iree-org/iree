@@ -29,12 +29,14 @@
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #ifdef IREE_HAVE_TORCH_MLIR_DIALECTS
 #include "iree/compiler/InputConversion/TMTensor/Passes.h"
-#endif
+#endif  // IREE_HAVE_TORCH_MLIR_DIALECTS
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
 
+#ifdef IREE_HAVE_C_OUTPUT_FORMAT
 // TODO: Remove these once rolled up into explicit registration.
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
+#endif  // IREE_HAVE_C_OUTPUT_FORMAT
 
 namespace mlir {
 namespace iree_compiler {
@@ -70,8 +72,11 @@ inline void registerAllIreePasses() {
   // registration and that we need to force instantiation
   // of in order to register.
   // TODO: Eliminate these.
+#ifdef IREE_HAVE_C_OUTPUT_FORMAT
   IREE::VM::createConvertVMToEmitCPass();
+#endif  // IREE_HAVE_C_OUTPUT_FORMAT
 }
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

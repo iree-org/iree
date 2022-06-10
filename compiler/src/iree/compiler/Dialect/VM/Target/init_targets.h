@@ -12,10 +12,11 @@ namespace iree_compiler {
 
 namespace IREE {
 namespace VM {
+
 void registerToVMBytecodeTranslation();
-#ifdef IREE_HAVE_EMITC_DIALECT
+#ifdef IREE_HAVE_C_OUTPUT_FORMAT
 void registerToCTranslation();
-#endif  // IREE_HAVE_EMITC_DIALECT
+#endif  // IREE_HAVE_C_OUTPUT_FORMAT
 }  // namespace VM
 }  // namespace IREE
 
@@ -26,9 +27,10 @@ void registerToCTranslation();
 inline void registerVMTargets() {
   static bool init_once = []() {
     IREE::VM::registerToVMBytecodeTranslation();
-#ifdef IREE_HAVE_EMITC_DIALECT
+
+#ifdef IREE_HAVE_C_OUTPUT_FORMAT
     IREE::VM::registerToCTranslation();
-#endif  // IREE_HAVE_EMITC_DIALECT
+#endif  // IREE_HAVE_C_OUTPUT_FORMAT
 
     return true;
   }();

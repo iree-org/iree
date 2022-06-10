@@ -41,10 +41,10 @@
 #include "mlir/Support/ToolUtilities.h"
 #include "mlir/Tools/mlir-translate/Translation.h"
 
-#ifdef IREE_HAVE_EMITC_DIALECT
+#ifdef IREE_HAVE_C_OUTPUT_FORMAT
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Target/C/TranslationFlags.h"
-#endif  // IREE_HAVE_EMITC_DIALECT
+#endif  // IREE_HAVE_C_OUTPUT_FORMAT
 
 namespace mlir {
 namespace iree_compiler {
@@ -137,9 +137,9 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       llvm::cl::values(
           clEnumValN(OutputFormat::vm_bytecode, "vm-bytecode",
                      "IREE VM Bytecode (default)"),
-#ifdef IREE_HAVE_EMITC_DIALECT
+#ifdef IREE_HAVE_C_OUTPUT_FORMAT
           clEnumValN(OutputFormat::vm_c, "vm-c", "C source module"),
-#endif
+#endif  // IREE_HAVE_C_OUTPUT_FORMAT
           clEnumValN(OutputFormat::vm_asm, "vm-asm", "IREE VM MLIR Assembly")),
       llvm::cl::init(OutputFormat::none), llvm::cl::cat(mainOptions));
 
@@ -172,7 +172,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       llvm::cl::init(false));
 
 // Optional output formats.
-#ifdef IREE_HAVE_EMITC_DIALECT
+#ifdef IREE_HAVE_C_OUTPUT_FORMAT
   auto cTargetOptions = IREE::VM::getCTargetOptionsFromFlags();
 #endif
 
@@ -283,11 +283,11 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       case OutputFormat::vm_bytecode:
         return translateModuleToBytecode(module.get(), bytecodeTargetOptions,
                                          os);
-#ifdef IREE_HAVE_EMITC_DIALECT
+#ifdef IREE_HAVE_C_OUTPUT_FORMAT
       case OutputFormat::vm_c:
         return mlir::iree_compiler::IREE::VM::translateModuleToC(
             module.get(), cTargetOptions, os);
-#endif
+#endif  // IREE_HAVE_C_OUTPUT_FORMAT
       case OutputFormat::hal_executable: {
         // Extract the serialized binary representation from the executable.
         auto executableOp =
