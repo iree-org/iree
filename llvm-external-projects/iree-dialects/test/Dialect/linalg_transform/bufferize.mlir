@@ -13,8 +13,7 @@ func.func @matmul_tensors(
                      outs(%arg2: tensor<128x128xf32>)
     -> tensor<128x128xf32>
 
-  // CHECK: return
-  // CHECK-NOT: %{{.*}}
+  // CHECK: return %[[TC]]
   return %0 : tensor<128x128xf32>
 // CHECK: }
 }
