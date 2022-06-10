@@ -30,7 +30,8 @@ typedef struct iree_trace_replay_t {
   iree_vm_context_flags_t context_flags;
 
   iree_hal_driver_registry_t* driver_registry;
-  iree_string_view_t driver;
+  iree_host_size_t device_uri_count;
+  const iree_string_view_t* device_uris;
 
   iree_vm_context_t* context;
   iree_hal_device_t* device;
@@ -49,9 +50,12 @@ iree_status_t iree_trace_replay_initialize(
 void iree_trace_replay_deinitialize(iree_trace_replay_t* replay,
                                     iree_trace_replay_shutdown_flags_t flags);
 
+// TODO(#5724): remove this and instead provide a device set on initialize.
 // Overrides the HAL driver used in the trace with the given |driver|.
-void iree_trace_replay_set_hal_driver_override(iree_trace_replay_t* replay,
-                                               iree_string_view_t driver);
+// |device_uris| must remain valid for the lifetime of the replay instance.
+void iree_trace_replay_set_hal_devices_override(
+    iree_trace_replay_t* replay, iree_host_size_t device_uri_count,
+    const iree_string_view_t* device_uris);
 
 // Replays the given |event_node| against the replay context.
 // Automatically switches between the default iree_trace_replay_event_* methods.

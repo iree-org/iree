@@ -222,7 +222,8 @@ typedef struct iree_status_handle_t* iree_status_t;
 #define IREE_STATUS_IMPL_GET_EXPR_(expr, ...) expr
 #define IREE_STATUS_IMPL_GET_ARGS_(expr, ...) __VA_ARGS__
 #define IREE_STATUS_IMPL_GET_MACRO_(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, \
-                                    _10, _11, _12, _13, _14, ...)           \
+                                    _10, _11, _12, _13, _14, _15, _16, _17, \
+                                    ...)                                    \
   IREE_STATUS_IMPL_IDENTITY_(                                               \
       IREE_STATUS_IMPL_IDENTITY_(IREE_STATUS_IMPL_GET_EXPR_)(__VA_ARGS__))
 
@@ -242,7 +243,9 @@ typedef struct iree_status_handle_t* iree_status_t;
       IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, \
       IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, \
       IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, \
-      IREE_STATUS_IMPL_MAKE_ANNOTATE_, IREE_STATUS_IMPL_MAKE_EMPTY_))       \
+      IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, \
+      IREE_STATUS_IMPL_MAKE_ANNOTATE_F_, IREE_STATUS_IMPL_MAKE_ANNOTATE_,   \
+      IREE_STATUS_IMPL_MAKE_EMPTY_))                                        \
   (file, line, IREE_STATUS_IMPL_GET_EXPR_(__VA_ARGS__),                     \
    IREE_STATUS_IMPL_GET_ARGS_(__VA_ARGS__))
 
@@ -255,17 +258,19 @@ typedef struct iree_status_handle_t* iree_status_t;
   IREE_STATUS_IMPL_IDENTITY_(iree_status_annotate_f( \
       var,                                           \
       IREE_STATUS_IMPL_IDENTITY_(IREE_STATUS_IMPL_GET_ARGS_)(__VA_ARGS__)))
-#define IREE_STATUS_IMPL_ANNOTATE_SWITCH_(...)                                 \
-  IREE_STATUS_IMPL_IDENTITY_(IREE_STATUS_IMPL_IDENTITY_(                       \
-      IREE_STATUS_IMPL_GET_MACRO_)(                                            \
-      __VA_ARGS__, IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_, \
-      IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_,              \
-      IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_,              \
-      IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_,              \
-      IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_,              \
-      IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_,              \
-      IREE_STATUS_IMPL_ANNOTATE_, IREE_STATUS_IMPL_PASS_))                     \
-  (IREE_STATUS_IMPL_GET_EXPR_(__VA_ARGS__),                                    \
+#define IREE_STATUS_IMPL_ANNOTATE_SWITCH_(...)                        \
+  IREE_STATUS_IMPL_IDENTITY_(                                         \
+      IREE_STATUS_IMPL_IDENTITY_(IREE_STATUS_IMPL_GET_MACRO_)(        \
+          __VA_ARGS__, IREE_STATUS_IMPL_ANNOTATE_F_,                  \
+          IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_, \
+          IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_, \
+          IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_, \
+          IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_, \
+          IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_, \
+          IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_, \
+          IREE_STATUS_IMPL_ANNOTATE_F_, IREE_STATUS_IMPL_ANNOTATE_F_, \
+          IREE_STATUS_IMPL_ANNOTATE_, IREE_STATUS_IMPL_PASS_))        \
+  (IREE_STATUS_IMPL_GET_EXPR_(__VA_ARGS__),                           \
    IREE_STATUS_IMPL_GET_ARGS_(__VA_ARGS__))
 #define IREE_STATUS_IMPL_RETURN_IF_API_ERROR_(var, ...)                      \
   iree_status_t var = (IREE_STATUS_IMPL_IDENTITY_(                           \

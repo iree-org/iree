@@ -70,7 +70,9 @@ typedef uint32_t iree_hal_device_feature_t;
 typedef struct iree_hal_device_info_t {
   // Opaque handle used by drivers. Not valid across driver instances.
   iree_hal_device_id_t device_id;
-  // Name of the device as returned by the API.
+  // Stable driver-specific path used to reference the device.
+  iree_string_view_t path;
+  // Human-readable name of the device as returned by the API.
   iree_string_view_t name;
 } iree_hal_device_info_t;
 

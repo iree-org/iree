@@ -330,8 +330,22 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
                          const std::string& flatbuffer_data) {
   IREE_TRACE_SCOPE0("EvaluateFunctions");
 
+  iree_string_view_t device_uri =
+      iree_make_string_view(driver_name.data(), driver_name.size());
+
+  // We'll prioritize using the device the user specifies on the command line;
+  // if not set we'll try to infer it based on the compilation mode.
+  // TODO(#5724): remove this and instead provide a device set.
+  iree_host_size_t device_uri_count = 0;
+  iree_string_view_t* device_uris = NULL;
+  iree_hal_get_devices_flag_list(&device_uri_count, &device_uris);
+  if (device_uri_count == 1) {
+    device_uri = device_uris[0];
+  }
+
   IREE_LOG(INFO) << "Evaluating all functions in module for driver '"
-                 << driver_name << "'...";
+                 << driver_name << "' using device '"
+                 << std::string(device_uri.data, device_uri.size) << "'...";
 
   // Load the bytecode module from the flatbuffer data.
   // We do this first so that if we fail validation we know prior to dealing
@@ -353,6 +367,7 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
       iree_hal_available_driver_registry(),
       iree_make_string_view(driver_name.data(), driver_name.size()),
       iree_allocator_system(), &device));
+
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(
       iree_hal_module_create(device, iree_allocator_system(), &hal_module));

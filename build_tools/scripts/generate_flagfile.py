@@ -19,11 +19,11 @@ def parse_arguments():
                       required=True,
                       metavar="<module-file>",
                       help="The name of the module file")
-  parser.add_argument("--driver",
+  parser.add_argument("--device",
                       type=str,
                       required=True,
-                      metavar="<driver>",
-                      help="The name of the IREE driver")
+                      metavar="<device>",
+                      help="The name of the HAL device")
   parser.add_argument("--entry_function",
                       type=str,
                       required=True,
@@ -50,7 +50,7 @@ def parse_arguments():
 
 def main(args):
   lines = [
-      f"--driver={args.driver}", f"--module_file={args.module_file}",
+      f"--device={args.device}", f"--module_file={args.module_file}",
       f"--entry_function={args.entry_function}"
   ]
   lines.extend([
