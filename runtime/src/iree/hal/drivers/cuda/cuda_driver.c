@@ -130,8 +130,8 @@ static iree_status_t iree_hal_cuda_populate_device_info(
 
   // This matches the output of `nvidia-smi -L`.
   CUuuid device_uuid;
-  CUDA_RETURN_IF_ERROR(syms, cuDeviceGetUuid_v2(&device_uuid, device),
-                       "cuDeviceGetUuid_v2");
+  CUDA_RETURN_IF_ERROR(syms, cuDeviceGetUuid(&device_uuid, device),
+                       "cuDeviceGetUuid");
   char device_path_str[40 + 1] = {0};
   snprintf(device_path_str, sizeof(device_path_str),
            "GPU-"
@@ -337,8 +337,8 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_uuid(
   for (int i = 0; i < device_count; i++) {
     CUDA_RETURN_IF_ERROR(&driver->syms, cuDeviceGet(&device, i), "cuDeviceGet");
     CUuuid query_uuid;
-    CUDA_RETURN_IF_ERROR(&driver->syms, cuDeviceGetUuid_v2(&query_uuid, device),
-                         "cuDeviceGetUuid_v2");
+    CUDA_RETURN_IF_ERROR(&driver->syms, cuDeviceGetUuid(&query_uuid, device),
+                         "cuDeviceGetUuid");
     if (memcmp(&device_uuid->bytes[0], &query_uuid.bytes[0],
                sizeof(device_uuid)) == 0) {
       found_device = true;
@@ -408,7 +408,7 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_path(
   }
 
   if (iree_string_view_consume_prefix(&device_path, IREE_SV("GPU-"))) {
-    // UUID as returned by cuDeviceGetUuid_v2.
+    // UUID as returned by cuDeviceGetUuid.
     CUuuid device_uuid;
     if (!iree_hal_cuda_parse_uuid(device_path, &device_uuid)) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,

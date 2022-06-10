@@ -10,7 +10,7 @@ CU_PFN_DECL(cuDeviceGet, CUdevice*, int)
 CU_PFN_DECL(cuDeviceGetCount, int*)
 CU_PFN_DECL(cuDeviceGetName, char*, int, CUdevice)
 CU_PFN_DECL(cuDeviceGetAttribute, int*, CUdevice_attribute, CUdevice)
-CU_PFN_DECL(cuDeviceGetUuid_v2, CUuuid*, CUdevice)
+CU_PFN_DECL(cuDeviceGetUuid, CUuuid*, CUdevice)
 CU_PFN_DECL(cuGetErrorName, CUresult, const char**)
 CU_PFN_DECL(cuGetErrorString, CUresult, const char**)
 CU_PFN_DECL(cuGraphAddMemcpyNode, CUgraphNode*, CUgraph, const CUgraphNode*,
