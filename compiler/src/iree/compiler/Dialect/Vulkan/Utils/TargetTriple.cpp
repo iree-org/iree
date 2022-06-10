@@ -304,24 +304,24 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
       variablePointers = variablePointersStorageBuffer = true;
 
-      auto i32v8 = builder.getI32IntegerAttr(8);
-      auto i32v16 = builder.getI32IntegerAttr(16);
-      auto i32v32 = builder.getI32IntegerAttr(32);
-      auto i8t = TypeAttr::get(builder.getIntegerType(8));
-      auto i32t = TypeAttr::get(builder.getIntegerType(32));
-      auto f16t = TypeAttr::get(builder.getF16Type());
-      auto f32t = TypeAttr::get(builder.getF32Type());
+      auto i8t = builder.getIntegerType(8);
+      auto i32t = builder.getIntegerType(32);
+      auto f16t = builder.getF16Type();
+      auto f32t = builder.getF32Type();
       auto scope = ScopeNVAttr::get(context, ScopeNV::Subgroup);
 
       coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
-          /*mSize=*/i32v8, /*nSize=*/i32v8, /*kSize=*/i32v32, /*aType=*/i8t,
-          /*bType=*/i8t, /*cType=*/i32t, /*resultType=*/i32t, scope, context));
+          context,
+          /*mSize=*/8, /*nSize=*/8, /*kSize=*/32, /*aType=*/i8t,
+          /*bType=*/i8t, /*cType=*/i32t, /*resultType=*/i32t, scope));
       coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
-          /*mSize=*/i32v16, /*nSize=*/i32v16, /*kSize=*/i32v16, /*aType=*/f16t,
-          /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, scope, context));
+          context,
+          /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
+          /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, scope));
       coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
-          /*mSize=*/i32v16, /*nSize=*/i32v16, /*kSize=*/i32v16, /*aType=*/f16t,
-          /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, scope, context));
+          context,
+          /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
+          /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, scope));
     } break;
     case TargetTripleArch::QC_Adreno:
       // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10983
@@ -348,20 +348,18 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
   };
 
   return CapabilitiesAttr::get(
-      builder.getI32IntegerAttr(maxComputeSharedMemorySize),
-      builder.getI32IntegerAttr(maxComputeWorkGroupInvocations),
+      context, maxComputeSharedMemorySize, maxComputeWorkGroupInvocations,
       builder.getI32VectorAttr(maxComputeWorkGroupSize),
       getBoolAttr(shaderFloat64), getBoolAttr(shaderInt16),
       getBoolAttr(shaderInt64),
-      SubgroupFeatureAttr::get(context, subgroupFeatures),
-      builder.getI32IntegerAttr(subgroupSize),
+      SubgroupFeatureAttr::get(context, subgroupFeatures), subgroupSize,
       getBoolAttr(storageBuffer16BitAccess), getBoolAttr(storagePushConstant16),
       getBoolAttr(uniformAndStorageBuffer16BitAccess),
       getBoolAttr(storageBuffer8BitAccess), getBoolAttr(storagePushConstant8),
       getBoolAttr(uniformAndStorageBuffer8BitAccess),
       getBoolAttr(shaderFloat16), getBoolAttr(shaderInt8),
       getBoolAttr(variablePointersStorageBuffer), getBoolAttr(variablePointers),
-      builder.getArrayAttr(coopmatCases), context);
+      builder.getArrayAttr(coopmatCases));
 }
 }  // namespace
 

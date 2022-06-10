@@ -11,12 +11,12 @@
 #include "mlir/Dialect/SPIRV/IR/SPIRVTypes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
+#define GET_ATTRDEF_CLASSES
+#include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h.inc"  // IWYU pragma: export
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
-
-#include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h.inc"  // IWYU pragma: export
-
 namespace Vulkan {
 
 namespace detail {
@@ -37,11 +37,11 @@ class TargetEnvAttr
   static TargetEnvAttr get(Version version, uint32_t revision,
                            ArrayRef<Extension> extensions,
                            spirv::Vendor vendorID, spirv::DeviceType deviceType,
-                           uint32_t deviceID, DictionaryAttr capabilities);
+                           uint32_t deviceID, CapabilitiesAttr capabilities);
   static TargetEnvAttr get(IntegerAttr version, IntegerAttr revision,
                            ArrayAttr extensions, spirv::Vendor vendorID,
                            spirv::DeviceType deviceType, uint32_t deviceID,
-                           DictionaryAttr capabilities);
+                           CapabilitiesAttr capabilities);
 
   /// Returns the attribute kind's name (without the 'vk.' prefix).
   static StringRef getKindName();
@@ -82,7 +82,7 @@ class TargetEnvAttr
                               IntegerAttr version, IntegerAttr revision,
                               ArrayAttr extensions, spirv::Vendor vendorID,
                               spirv::DeviceType deviceType, uint32_t deviceID,
-                              DictionaryAttr capabilities);
+                              CapabilitiesAttr capabilities);
 };
 
 }  // namespace Vulkan
