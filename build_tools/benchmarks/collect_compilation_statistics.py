@@ -81,9 +81,10 @@ def parse_compilation_time_from_ninja_log(log: TextIO) -> Dict[str, int]:
 
 def get_module_component_info(module: BinaryIO,
                               module_file_size: int) -> ModuleComponentSizes:
-  module_zipfile = zipfile.ZipFile(module)
-  size_map = dict(
-      (info.filename, info.file_size) for info in module_zipfile.infolist())
+  with zipfile.ZipFile(module) as module_zipfile:
+    size_map = dict(
+        (info.filename, info.file_size) for info in module_zipfile.infolist())
+
   vm_component_size = size_map[VM_COMPONENT_NAME]
   const_component_size = size_map[CONST_COMPONENT_NAME]
   identified_names = {VM_COMPONENT_NAME, CONST_COMPONENT_NAME}

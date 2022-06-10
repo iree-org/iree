@@ -40,12 +40,11 @@ class CollectCompilationStatistics(unittest.TestCase):
 
   def test_get_module_component_info(self):
     module_file = BytesIO()
-    zip = zipfile.ZipFile(module_file, "w")
-    zip.writestr(VM_COMPONENT_NAME, b"abcd")
-    zip.writestr(CONST_COMPONENT_NAME, b"123")
-    zip.writestr("main_dispatch_0_vulkan_spirv_fb.fb", b"bindata1")
-    zip.writestr("main_dispatch_1_vulkan_spirv_fb.fb", b"bindata2")
-    zip.close()
+    with zipfile.ZipFile(module_file, "w") as zip:
+      zip.writestr(VM_COMPONENT_NAME, b"abcd")
+      zip.writestr(CONST_COMPONENT_NAME, b"123")
+      zip.writestr("main_dispatch_0_vulkan_spirv_fb.fb", b"bindata1")
+      zip.writestr("main_dispatch_1_vulkan_spirv_fb.fb", b"bindata2")
     module_file_data = module_file.getvalue()
 
     component_sizes = get_module_component_info(BytesIO(module_file_data),
@@ -60,11 +59,10 @@ class CollectCompilationStatistics(unittest.TestCase):
 
   def test_get_module_component_info_unknown_components(self):
     module_file = BytesIO()
-    zip = zipfile.ZipFile(module_file, "w")
-    zip.writestr(VM_COMPONENT_NAME, b"abcd")
-    zip.writestr(CONST_COMPONENT_NAME, b"123")
-    zip.writestr("main_dispatch_0_unknown.fb", b"bindata")
-    zip.close()
+    with zipfile.ZipFile(module_file, "w") as zip:
+      zip.writestr(VM_COMPONENT_NAME, b"abcd")
+      zip.writestr(CONST_COMPONENT_NAME, b"123")
+      zip.writestr("main_dispatch_0_unknown.fb", b"bindata")
     module_file_data = module_file.getvalue()
 
     self.assertRaises(
