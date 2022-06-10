@@ -334,3 +334,5 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base:core_headers",
     ],
 )
+
+exports_files(["module_impl_emitc.c"])
