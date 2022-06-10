@@ -62,15 +62,6 @@ jobs:
       MANYLINUX_X86_64_IMAGE: gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:2c6a9120a5f96bcf3b1dda4086d807682705b51fb9c6ee5b48a8756c436220bc
 
     steps:
-      - name: DEBUG DO NOT SUBMIT
-        if: "matrix.build_family == 'linux'"
-        shell: bash
-        run: |
-          whoami
-          groups
-          ls -l
-          docker run --rm hello-world
-
       - uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
           path: 'main_checkout'
