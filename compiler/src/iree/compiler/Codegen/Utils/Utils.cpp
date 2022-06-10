@@ -145,6 +145,11 @@ bool hasVFeature(IREE::HAL::ExecutableVariantOp variantOp) {
   return hasFeature(variantOp, "+v");
 }
 
+/// Returns true if the 'variantOp' contains '+zve32x' in its cpu features.
+bool hasZve32xFeature(IREE::HAL::ExecutableVariantOp variantOp) {
+  return hasFeature(variantOp, "+zve32x");
+}
+
 /// Returns true if the 'variantOp' contains '+zve64x' in its cpu features.
 bool hasZve64xFeature(IREE::HAL::ExecutableVariantOp variantOp) {
   return hasFeature(variantOp, "+zve64x");

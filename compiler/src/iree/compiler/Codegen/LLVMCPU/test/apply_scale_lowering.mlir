@@ -38,14 +38,12 @@ hal.executable private @apply_scale_no_vector_feature {
   }
 }
 
-// 32-bit lowering is used by default if no vector features are provided. Note
-// that the 32-bit lowering generates 64-bit mul operations that are decomposed
-// into 32-bit operations by the LLVM backend.
+// 64-bit lowering is used by default if no vector features are provided.
+// TODO: We shouldn't vectorize the code if no vector features are provided.
 // CHECK-LABEL: llvm.func internal @apply_scale_no_vector_feature
-//       CHECK:   %[[MUL:.*]] = llvm.mul %{{.*}}, %{{.*}} : vector<2xi64>
-//  CHECK-NEXT:   %[[SHR:.*]] = llvm.lshr %{{.*}}, %{{.*}} : vector<2xi64>
+//       CHECK:   %[[ADD:.*]] = llvm.add %{{.*}}, %{{.*}} : vector<2xi64>
+//  CHECK-NEXT:   %[[SHR:.*]] = llvm.ashr %[[ADD]], %{{.*}} : vector<2xi64>
 //  CHECK-NEXT:   llvm.trunc %[[SHR]] : vector<2xi64> to vector<2xi32>
-//  CHECK-NEXT:   llvm.mul %{{.*}}, %{{.*}}  : vector<2xi32>
 
 // -----
 

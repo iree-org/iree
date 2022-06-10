@@ -60,6 +60,9 @@ bool hasAVX2Feature(IREE::HAL::ExecutableVariantOp variantOp);
 /// Returns true if the 'variantOp' contains '+v' in its cpu features.
 bool hasVFeature(IREE::HAL::ExecutableVariantOp variantOp);
 
+/// Returns true if the 'variantOp' contains '+zve32x' in its cpu features.
+bool hasZve32xFeature(IREE::HAL::ExecutableVariantOp variantOp);
+
 /// Returns true if the 'variantOp' contains '+zve64x' in its cpu features.
 bool hasZve64xFeature(IREE::HAL::ExecutableVariantOp variantOp);
 

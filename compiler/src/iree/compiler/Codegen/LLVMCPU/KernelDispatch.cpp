@@ -537,7 +537,7 @@ static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,
                                                     bool isQuantized) {
   SmallVector<int64_t> matmulTileSizes;
   auto variantOp = getExecutableVariantOp(entryPointFn);
-  assert(*variantOp && "ExecutableVariantOp not found");
+  assert(succeeded(variantOp) && "ExecutableVariantOp not found");
 
   if (isX86(*variantOp) || isRISCV(*variantOp)) {
     matmulTileSizes = {8, 32, 16};
@@ -598,7 +598,7 @@ static LogicalResult setRootConfig(
       getMatmulWorkgroupSizes(entryPointFn, linalgOp, vectorSize, isQuantized);
 
   auto variantOp = getExecutableVariantOp(entryPointFn);
-  assert(*variantOp && "ExecutableVariantOp not found");
+  assert(succeeded(variantOp) && "ExecutableVariantOp not found");
 
   // Use the default distribution for the matmul loops.
   int64_t defaultMaxSize = defaultWorkgroupTileSize;
@@ -841,7 +841,7 @@ static LogicalResult setTransposeLikeOpRootConfig(
   }
 
   auto variantOp = getExecutableVariantOp(genericOp);
-  assert(*variantOp && "ExecutableVariantOp not found");
+  assert(succeeded(variantOp) && "ExecutableVariantOp not found");
   if (!hasAVX2Feature(*variantOp) || !isSupportedTransposeOp(genericOp)) {
     return success();
   }
@@ -1135,7 +1135,7 @@ static LogicalResult setRootConfig(
 
   if (rootOperation) {
     auto variantOp = getExecutableVariantOp(entryPointFn);
-    assert(*variantOp && "ExecutableVariantOp not found");
+    assert(succeeded(variantOp) && "ExecutableVariantOp not found");
     if (isVMVXBackend(*variantOp)) {
       if (failed(
               setVMVXRootConfigImpl(entryPointFn, rootOperation, tiledLoops))) {
