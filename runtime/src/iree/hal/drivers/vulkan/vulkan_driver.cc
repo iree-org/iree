@@ -333,6 +333,9 @@ static iree_status_t iree_hal_vulkan_driver_enumerate_physical_devices(
   return status;
 }
 
+// 36 characters for the full UUID (excluding NUL).
+#define IREE_HAL_VULKAN_DEVICE_UUID_TEXT_LENGTH 36
+
 // Returns the size, in bytes, of the iree_hal_device_info_t storage required
 // for holding the given |physical_device|.
 static iree_host_size_t iree_hal_vulkan_calculate_device_info_size(
@@ -340,7 +343,8 @@ static iree_host_size_t iree_hal_vulkan_calculate_device_info_size(
   VkPhysicalDeviceProperties physical_device_properties;
   syms->vkGetPhysicalDeviceProperties(physical_device,
                                       &physical_device_properties);
-  return /*device_path=*/16 + strlen(physical_device_properties.deviceName);
+  return IREE_HAL_VULKAN_DEVICE_UUID_TEXT_LENGTH +
+         strlen(physical_device_properties.deviceName);
 }
 
 // Populates device information from the given Vulkan physical device handle.
@@ -353,31 +357,44 @@ static uint8_t* iree_hal_vulkan_populate_device_info(
   memset(out_device_info, 0, sizeof(*out_device_info));
   out_device_info->device_id = (iree_hal_device_id_t)physical_device;
 
-  VkPhysicalDeviceFeatures physical_device_features;
-  syms->vkGetPhysicalDeviceFeatures(physical_device, &physical_device_features);
   // TODO(benvanik): check and optionally require these features:
+  // VkPhysicalDeviceFeatures physical_device_features;
+  // syms->vkGetPhysicalDeviceFeatures(physical_device,
+  //                                   &physical_device_features);
   // - physical_device_features.robustBufferAccess
   // - physical_device_features.shaderInt16
   // - physical_device_features.shaderInt64
   // - physical_device_features.shaderFloat64
 
-  VkPhysicalDeviceProperties physical_device_properties;
-  syms->vkGetPhysicalDeviceProperties(physical_device,
-                                      &physical_device_properties);
-  // TODO(benvanik): check and optionally require reasonable limits.
+  VkPhysicalDeviceIDProperties device_id_props = {};
+  device_id_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES;
+  device_id_props.pNext = NULL;
+  VkPhysicalDeviceProperties2 device_props2 = {};
+  device_props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+  device_props2.pNext = &device_id_props;
+  syms->vkGetPhysicalDeviceProperties2(physical_device, &device_props2);
 
-  // TODO(benvanik): persistent device IDs; these are just ordinals and won't be
-  // stable across processes.
-  char device_path[16] = {0};
-  snprintf(device_path, sizeof(device_path), "%u", physical_device_index);
+  // Use the deviceUUID - which is _mostly_ persistent - as the primary path.
+  const uint8_t* device_uuid = device_id_props.deviceUUID;
+  char device_path_str[IREE_HAL_VULKAN_DEVICE_UUID_TEXT_LENGTH + 1] = {0};
+  snprintf(device_path_str, sizeof(device_path_str),
+           "%02x%02x%02x%02x-"
+           "%02x%02x-"
+           "%02x%02x-"
+           "%02x%02x-"
+           "%02x%02x%02x%02x%02x%02x",
+           device_uuid[0], device_uuid[1], device_uuid[2], device_uuid[3],
+           device_uuid[4], device_uuid[5], device_uuid[6], device_uuid[7],
+           device_uuid[8], device_uuid[9], device_uuid[10], device_uuid[11],
+           device_uuid[12], device_uuid[13], device_uuid[14], device_uuid[15]);
+  iree_string_view_t device_path = iree_make_string_view(
+      device_path_str, IREE_ARRAYSIZE(device_path_str) - 1);
   buffer_ptr += iree_string_view_append_to_buffer(
-      iree_make_cstring_view(device_path), &out_device_info->path,
-      (char*)buffer_ptr);
+      device_path, &out_device_info->path, (char*)buffer_ptr);
 
   // TODO(benvanik): more clever/sanitized device naming.
   iree_string_view_t device_name =
-      iree_make_string_view(physical_device_properties.deviceName,
-                            strlen(physical_device_properties.deviceName));
+      iree_make_cstring_view(device_props2.properties.deviceName);
   buffer_ptr += iree_string_view_append_to_buffer(
       device_name, &out_device_info->name, (char*)buffer_ptr);
 
@@ -509,9 +526,10 @@ static iree_status_t iree_hal_vulkan_driver_create_device_by_index(
   // Query all devices from the Vulkan instance.
   uint32_t physical_device_count = 0;
   VkPhysicalDevice* physical_devices = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_driver_enumerate_physical_devices(
-      driver->syms.get(), driver->instance, host_allocator,
-      &physical_device_count, &physical_devices));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_vulkan_driver_enumerate_physical_devices(
+              driver->syms.get(), driver->instance, host_allocator,
+              &physical_device_count, &physical_devices));
 
   // Get the device at the requested index.
   VkPhysicalDevice physical_device = VK_NULL_HANDLE;
@@ -522,10 +540,72 @@ static iree_status_t iree_hal_vulkan_driver_create_device_by_index(
   iree_allocator_free(host_allocator, physical_devices);
 
   if (physical_device == VK_NULL_HANDLE) {
+    IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_NOT_FOUND,
                             "physical device %u invalid; %u physical devices "
                             "available",
                             device_index, physical_device_count);
+  }
+
+  iree_status_t status = iree_hal_vulkan_driver_create_device_by_id(
+      base_driver, (iree_hal_device_id_t)physical_device, param_count, params,
+      host_allocator, out_device);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static iree_status_t iree_hal_vulkan_driver_create_device_by_uuid(
+    iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
+    const uint8_t* device_uuid, iree_host_size_t param_count,
+    const iree_string_pair_t* params, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device) {
+  iree_hal_vulkan_driver_t* driver = iree_hal_vulkan_driver_cast(base_driver);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Query all devices from the Vulkan instance.
+  uint32_t physical_device_count = 0;
+  VkPhysicalDevice* physical_devices = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_vulkan_driver_enumerate_physical_devices(
+              driver->syms.get(), driver->instance, host_allocator,
+              &physical_device_count, &physical_devices));
+
+  // Scan the devices and find the one with the matching UUID.
+  VkPhysicalDevice physical_device = NULL;
+  for (uint32_t i = 0; i < physical_device_count; ++i) {
+    VkPhysicalDeviceIDProperties device_id_props = {};
+    device_id_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES;
+    device_id_props.pNext = NULL;
+    VkPhysicalDeviceProperties2 device_props2 = {};
+    device_props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    device_props2.pNext = &device_id_props;
+    driver->syms->vkGetPhysicalDeviceProperties2(physical_devices[i],
+                                                 &device_props2);
+    if (memcmp(device_uuid, device_id_props.deviceUUID,
+               IREE_ARRAYSIZE(device_id_props.deviceUUID)) == 0) {
+      physical_device = physical_devices[i];
+      break;
+    }
+  }
+
+  iree_allocator_free(host_allocator, physical_devices);
+
+  if (physical_device == VK_NULL_HANDLE) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_NOT_FOUND,
+        "Vulkan device with deviceUUID "
+        "%02x%02x%02x%02x-"
+        "%02x%02x-"
+        "%02x%02x-"
+        "%02x%02x-"
+        "%02x%02x%02x%02x%02x%02x"
+        " not found",
+        device_uuid[0], device_uuid[1], device_uuid[2], device_uuid[3],
+        device_uuid[4], device_uuid[5], device_uuid[6], device_uuid[7],
+        device_uuid[8], device_uuid[9], device_uuid[10], device_uuid[11],
+        device_uuid[12], device_uuid[13], device_uuid[14], device_uuid[15]);
   }
 
   iree_status_t status = iree_hal_vulkan_driver_create_device_by_id(
@@ -547,9 +627,17 @@ static iree_status_t iree_hal_vulkan_driver_create_device_by_path(
         host_allocator, out_device);
   }
 
+  // Try parsing as a device UUID.
+  uint8_t device_uuid[16] = {0};
+  if (iree_string_view_parse_hex_bytes(device_path, 16, device_uuid)) {
+    return iree_hal_vulkan_driver_create_device_by_uuid(
+        base_driver, driver_name, device_uuid, param_count, params,
+        host_allocator, out_device);
+  }
+
   // TODO(benvanik): add more ways of addressing devices - maybe vendor:device?
 
-  // Try to parse as a device index.
+  // Fallback and try to parse as a device index.
   uint32_t device_index = 0;
   if (iree_string_view_atoi_uint32(device_path, &device_index)) {
     return iree_hal_vulkan_driver_create_device_by_index(
