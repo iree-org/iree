@@ -132,7 +132,7 @@ static iree_status_t iree_hal_cuda_populate_device_info(
   CUuuid device_uuid;
   CUDA_RETURN_IF_ERROR(syms, cuDeviceGetUuid(&device_uuid, device),
                        "cuDeviceGetUuid");
-  char device_path_str[40 + 1] = {0};
+  char device_path_str[4 + 36 + 1] = {0};
   snprintf(device_path_str, sizeof(device_path_str),
            "GPU-"
            "%02x%02x%02x%02x-"
@@ -149,8 +149,9 @@ static iree_status_t iree_hal_cuda_populate_device_info(
            (uint8_t)device_uuid.bytes[12], (uint8_t)device_uuid.bytes[13],
            (uint8_t)device_uuid.bytes[14], (uint8_t)device_uuid.bytes[15]);
   buffer_ptr += iree_string_view_append_to_buffer(
-      iree_make_cstring_view(device_path_str), &out_device_info->path,
-      (char*)buffer_ptr);
+      iree_make_string_view(device_path_str,
+                            IREE_ARRAYSIZE(device_path_str) - 1),
+      &out_device_info->path, (char*)buffer_ptr);
 
   iree_string_view_t device_name_str =
       iree_make_string_view(device_name, strlen(device_name));
@@ -259,7 +260,7 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_id(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Ensure CUDA is initialized before querying it.
-  IREE_RETURN_IF_ERROR(iree_hal_cuda_init(driver));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_cuda_init(driver));
 
   // Use either the specified device (enumerated earlier) or whatever default
   // one was specified when the driver was created.
@@ -284,46 +285,12 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_id(
   return status;
 }
 
-static bool iree_hal_cuda_parse_uuid(iree_string_view_t value,
-                                     CUuuid* out_uuid) {
-  /* clang-format off */
-  static const char kHexValue[256] = {
-      0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-      0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-      0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-      0,  1,  2,  3,  4,  5,  6, 7, 8, 9, 0, 0, 0, 0, 0, 0,  // '0'..'9'
-      0, 10, 11, 12, 13, 14, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // 'A'..'F'
-      0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-      0, 10, 11, 12, 13, 14, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // 'a'..'f'
-      0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-      0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-      0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-      0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-      0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-      0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-      0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-      0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-      0,  0,  0,  0,  0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-  };
-  /* clang-format on */
-  for (int i = 0; i < IREE_ARRAYSIZE(out_uuid->bytes); ++i) {
-    iree_string_view_consume_prefix(&value, IREE_SV("-"));
-    if (value.size < 2) return false;
-    out_uuid->bytes[i] = (kHexValue[value.data[0] & 0xFF] << 4) +
-                         kHexValue[value.data[1] & 0xFF];
-    value = iree_string_view_remove_prefix(value, 2);
-  }
-  // Should have consumed all characters.
-  return iree_string_view_is_empty(value);
-}
-
 static iree_status_t iree_hal_cuda_driver_create_device_by_uuid(
     iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
     const CUuuid* device_uuid, iree_host_size_t param_count,
     const iree_string_pair_t* params, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
   iree_hal_cuda_driver_t* driver = iree_hal_cuda_driver_cast(base_driver);
-  IREE_TRACE_ZONE_BEGIN(z0);
 
   // Ensure CUDA is initialized before querying it.
   IREE_RETURN_IF_ERROR(iree_hal_cuda_init(driver));
@@ -370,7 +337,6 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_uuid(
       base_driver, CUDEVICE_TO_DEVICE_ID(device), param_count, params,
       host_allocator, out_device);
 
-  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -380,7 +346,6 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_index(
     const iree_string_pair_t* params, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
   iree_hal_cuda_driver_t* driver = iree_hal_cuda_driver_cast(base_driver);
-  IREE_TRACE_ZONE_BEGIN(z0);
 
   // Ensure CUDA is initialized before querying it.
   IREE_RETURN_IF_ERROR(iree_hal_cuda_init(driver));
@@ -393,7 +358,6 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_index(
       base_driver, CUDEVICE_TO_DEVICE_ID(device), param_count, params,
       host_allocator, out_device);
 
-  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -411,7 +375,9 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_path(
   if (iree_string_view_consume_prefix(&device_path, IREE_SV("GPU-"))) {
     // UUID as returned by cuDeviceGetUuid.
     CUuuid device_uuid;
-    if (!iree_hal_cuda_parse_uuid(device_path, &device_uuid)) {
+    if (!iree_string_view_parse_hex_bytes(device_path,
+                                          IREE_ARRAYSIZE(device_uuid.bytes),
+                                          (uint8_t*)device_uuid.bytes)) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "invalid GPU UUID: '%.*s'", (int)device_path.size,
                               device_path.data);

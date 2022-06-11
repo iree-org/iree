@@ -385,3 +385,52 @@ IREE_API_EXPORT bool iree_string_view_atod(iree_string_view_t value,
   if (temp == end) return false;
   return *out_value != 0 || errno == 0;
 }
+
+static bool iree_string_view_parse_hex_nibble(char c, uint8_t* out_b) {
+  if ('0' <= c && c <= '9') {
+    *out_b = (uint8_t)(c - '0');
+    return true;
+  } else if ('a' <= c && c <= 'f') {
+    *out_b = (uint8_t)(c - 'a' + 10);
+    return true;
+  } else if ('A' <= c && c <= 'F') {
+    *out_b = (uint8_t)(c - 'A' + 10);
+    return true;
+  }
+  return false;
+}
+
+IREE_API_EXPORT bool iree_string_view_parse_hex_bytes(
+    iree_string_view_t value, iree_host_size_t buffer_length,
+    uint8_t* out_buffer) {
+  // Strip leading/trailing whitespace.
+  value = iree_string_view_trim(value);
+
+  // Try to consume all bytes.
+  for (iree_host_size_t i = 0; i < buffer_length; ++i) {
+    // Strip interior whitespace/-'s.
+    if (i > 0 && value.size) {
+      char c = value.data[0];
+      if (c == ' ' || c == '-') {
+        value = iree_string_view_remove_prefix(value, 1);
+      }
+    }
+
+    // Ensure there are two nibbles.
+    if (value.size < 2) return false;
+
+    // Hex nibbles to byte; fail if invalid characters.
+    uint8_t b0 = 0, b1 = 0;
+    if (!iree_string_view_parse_hex_nibble(value.data[0], &b0) ||
+        !iree_string_view_parse_hex_nibble(value.data[1], &b1)) {
+      return false;
+    }
+    out_buffer[i] = (b0 << 4) + b1;
+
+    // Eat the nibbles.
+    value = iree_string_view_remove_prefix(value, 2);
+  }
+
+  // Should have consumed all characters.
+  return iree_string_view_is_empty(value);
+}
