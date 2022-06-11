@@ -344,7 +344,7 @@ namespace vulkan {
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceMultisamplePropertiesEXT)        \
   INS_PFN(EXCLUDED, vkGetPhysicalDevicePresentRectanglesKHR)            \
   INS_PFN(REQUIRED, vkGetPhysicalDeviceProperties)                      \
-  INS_PFN(EXCLUDED, vkGetPhysicalDeviceProperties2)                     \
+  INS_PFN(REQUIRED, vkGetPhysicalDeviceProperties2)                     \
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceProperties2KHR)                  \
   INS_PFN(REQUIRED, vkGetPhysicalDeviceQueueFamilyProperties)           \
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceQueueFamilyProperties2)          \

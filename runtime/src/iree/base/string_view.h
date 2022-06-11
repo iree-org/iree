@@ -205,6 +205,18 @@ IREE_API_EXPORT bool iree_string_view_atof(iree_string_view_t value,
 IREE_API_EXPORT bool iree_string_view_atod(iree_string_view_t value,
                                            double* out_value);
 
+// Parses a |buffer_length|-byte hex byte string into |out_buffer|.
+// Ignores interior `-` characters and spaces as common in UUIDs.
+// Returns true if the entire buffer was successfully parsed.
+// Returns false if there are invalid, insufficient, or extra characters.
+//
+// Examples:
+//   754d9ae28df5f8e33502182434a12876
+//   754d9ae2-8df5-f8e3-3502-182434a12876
+IREE_API_EXPORT bool iree_string_view_parse_hex_bytes(
+    iree_string_view_t value, iree_host_size_t buffer_length,
+    uint8_t* out_buffer);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
