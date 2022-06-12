@@ -76,6 +76,7 @@ iree_cc_library(
   SRCS
     "vm_util.cc"
   DEPS
+    ::numpy_io
     iree::base
     iree::base::cc
     iree::base::internal::span

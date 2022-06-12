@@ -66,6 +66,7 @@ cc_library(
     srcs = ["vm_util.cc"],
     hdrs = ["vm_util.h"],
     deps = [
+        ":numpy_io",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base:logging",
