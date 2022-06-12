@@ -197,6 +197,10 @@ template <typename T>
 struct ElementTypeFromCType;
 
 template <>
+struct ElementTypeFromCType<bool> {
+  static constexpr iree_hal_element_type_t value = IREE_HAL_ELEMENT_TYPE_BOOL_8;
+};
+template <>
 struct ElementTypeFromCType<int8_t> {
   static constexpr iree_hal_element_type_t value = IREE_HAL_ELEMENT_TYPE_SINT_8;
 };
@@ -575,6 +579,8 @@ TEST(ShapeStringUtilTest, FormatShape) {
 }
 
 TEST(ElementTypeStringUtilTest, ParseElementType) {
+  EXPECT_THAT(ParseElementType("i1"),
+              IsOkAndHolds(Eq(IREE_HAL_ELEMENT_TYPE_BOOL_8)));
   EXPECT_THAT(ParseElementType("i8"),
               IsOkAndHolds(Eq(IREE_HAL_ELEMENT_TYPE_INT_8)));
   EXPECT_THAT(ParseElementType("si8"),
@@ -604,6 +610,8 @@ TEST(ElementTypeStringUtilTest, ParseElementTypeInvalid) {
 }
 
 TEST(ElementTypeStringUtilTest, FormatElementType) {
+  EXPECT_THAT(FormatElementType(IREE_HAL_ELEMENT_TYPE_BOOL_8),
+              IsOkAndHolds(Eq("i1")));
   EXPECT_THAT(FormatElementType(IREE_HAL_ELEMENT_TYPE_INT_8),
               IsOkAndHolds(Eq("i8")));
   EXPECT_THAT(FormatElementType(IREE_HAL_ELEMENT_TYPE_SINT_8),
