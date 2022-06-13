@@ -9,11 +9,11 @@
 ]>
 hal.executable @matmul_1x4096x9216 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.5, [Shader], []>, NVIDIA:DiscreteGPU, {
-        max_compute_shared_memory_size = 49152 : i32,
-        max_compute_workgroup_invocations = 1024 : i32,
-        max_compute_workgroup_size = dense<[1024, 1024, 64]> : vector<3xi32>,
-        subgroup_size = 32 : i32}>
+      spv.target_env = #spv.target_env<#spv.vce<v1.5, [Shader], []>, NVIDIA:DiscreteGPU, #spv.resource_limits<
+        max_compute_shared_memory_size = 49152,
+        max_compute_workgroup_invocations = 1024,
+        max_compute_workgroup_size = [1024, 1024, 64],
+        subgroup_size = 32>>
     }> {
     hal.executable.export @matmul_1x4096x9216 layout(#executable_layout)
     builtin.module {
