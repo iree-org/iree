@@ -297,7 +297,7 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
 
 static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
                                     IREE::LinalgExt::FftOp op) {
-  const int64_t subgroupSize = limits.subgroup_size().getValue().getSExtValue();
+  const int subgroupSize = limits.getSubgroup_size();
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
 
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
@@ -353,7 +353,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                                  workgroupSize);
   }
 
-  const int subgroupSize = limits.subgroup_size().getValue().getSExtValue();
+  const int subgroupSize = limits.getSubgroup_size();
   const unsigned loopDepth = partitionedLoops.back() + 1;
 
   // Configurations we need to decide.

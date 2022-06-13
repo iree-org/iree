@@ -12,11 +12,11 @@
 
 hal.executable @matmul_256x1024x128 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
-    spv.target_env = #spv.target_env<#spv.vce<v1.5, [Shader], []>, NVIDIA:DiscreteGPU,
-      {max_compute_shared_memory_size = 49152 : i32,
-       max_compute_workgroup_invocations = 1024 : i32,
-       max_compute_workgroup_size = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
-       subgroup_size = 32 : i32}>}> {
+    spv.target_env = #spv.target_env<#spv.vce<v1.5, [Shader], []>, NVIDIA:DiscreteGPU, #spv.resource_limits<
+      max_compute_shared_memory_size = 49152,
+      max_compute_workgroup_invocations = 1024,
+      max_compute_workgroup_size = [65535, 65535, 65535],
+      subgroup_size = 32>>}> {
     hal.executable.export public @matmul_256x1024x128 ordinal(0) layout(#executable_layout) {
       translation_info = #iree_codegen.translation_info<SPIRVVectorizeWithWorkgroupMemory workload_per_wg = [128, 128]>,
       workgroup_size = [32 : index, 8 : index, 1 : index]

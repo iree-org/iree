@@ -12,23 +12,27 @@
 
 hal.executable public @matmul_256x1024x128_div_sub {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
-    spv.target_env =
-      #spv.target_env<#spv.vce<v1.5,
-        [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-        [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
-        {cooperative_matrix_properties_nv = [
-          {a_type = i8, b_type = i8, c_type = i32, k_size = 32 : i32,
-            m_size = 8 : i32, n_size = 8 : i32, result_type = i32, scope = 3 : i32},
-          {a_type = f16, b_type = f16, c_type = f16, k_size = 16 : i32,
-            m_size = 16 : i32, n_size = 16 : i32, result_type = f16,
-            scope = 3 : i32},
-          {a_type = f16, b_type = f16, c_type = f32, k_size = 16 : i32,
-            m_size = 16 : i32, n_size = 16 : i32, result_type = f32,
-            scope = 3 : i32}],
-          max_compute_shared_memory_size = 49152 : i32,
-          max_compute_workgroup_invocations = 1024 : i32,
-          max_compute_workgroup_size = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
-          subgroup_size = 32 : i32}>}> {
+    spv.target_env = #spv.target_env<
+      #spv.vce<v1.5,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
+      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
+      #spv.resource_limits<
+        cooperative_matrix_properties_nv = [
+          #spv.coop_matrix_props<
+            a_type = i8, b_type = i8, c_type = i32, k_size = 32,
+            m_size = 8, n_size = 8, result_type = i32, scope = 3 : i32>,
+          #spv.coop_matrix_props<
+            a_type = f16, b_type = f16, c_type = f16, k_size = 16,
+            m_size = 16, n_size = 16, result_type = f16, scope = 3 : i32>,
+          #spv.coop_matrix_props<
+            a_type = f16, b_type = f16, c_type = f32, k_size = 16,
+            m_size = 16, n_size = 16, result_type = f32, scope = 3 : i32>
+        ],
+        max_compute_shared_memory_size = 49152,
+        max_compute_workgroup_invocations = 1024,
+        max_compute_workgroup_size = [2147483647, 65535, 65535],
+        subgroup_size = 32>
+       >}> {
     hal.executable.export public @matmul_256x1024x128_div_sub layout(#executable_layout)
     builtin.module  {
       func.func @matmul_256x1024x128_div_sub() {
