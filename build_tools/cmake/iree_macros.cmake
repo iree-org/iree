@@ -66,7 +66,10 @@ function(iree_package_ns PACKAGE_NS)
   # the corresponding rule in:
   #   build_tools/bazel_to_cmake/bazel_to_cmake_targets.py
   # Some sub-trees form their own roots for package purposes. Rewrite them.
-  if(_RELATIVE_PATH MATCHES "^compiler/src/(.*)")
+  if(IREE_ENABLE_MACRO_FOR_EXTERNAL_PROJECT)
+    # Use relative path directly for the external project.
+    set(_PACKAGE "${_RELATIVE_PATH}")
+  elseif(_RELATIVE_PATH MATCHES "^compiler/src/(.*)")
     # compiler/src/iree/compiler -> iree/compiler
     set(_PACKAGE "${CMAKE_MATCH_1}")
   elseif(_RELATIVE_PATH MATCHES "^runtime/src/(.*)")
