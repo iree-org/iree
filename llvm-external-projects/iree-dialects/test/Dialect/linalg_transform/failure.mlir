@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt --linalg-transform-interp --split-input-file --verify-diagnostics --allow-unregistered-dialect %s
+// RUN: iree-dialects-opt --transform-dialect-interpreter --split-input-file --verify-diagnostics --allow-unregistered-dialect %s
 
 func.func public @no_outlining() {
   // expected-note @below {{target op}}

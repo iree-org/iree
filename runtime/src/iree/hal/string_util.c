@@ -113,7 +113,11 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_element_type(
 
   iree_string_view_t str_value = value;
   iree_hal_numerical_type_t numerical_type = IREE_HAL_NUMERICAL_TYPE_UNKNOWN;
-  if (iree_string_view_consume_prefix(&str_value, IREE_SV("i"))) {
+  if (iree_string_view_equal(str_value, IREE_SV("i1"))) {
+    numerical_type = IREE_HAL_NUMERICAL_TYPE_BOOLEAN;
+    *out_element_type = iree_hal_make_element_type(numerical_type, 8);
+    return iree_ok_status();
+  } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("i"))) {
     numerical_type = IREE_HAL_NUMERICAL_TYPE_INTEGER;
   } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("si"))) {
     numerical_type = IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED;
@@ -151,7 +155,12 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element_type(
     *out_buffer_length = 0;
   }
   const char* prefix;
+  int32_t bit_count = (int32_t)iree_hal_element_bit_count(element_type);
   switch (iree_hal_element_numerical_type(element_type)) {
+    case IREE_HAL_NUMERICAL_TYPE_BOOLEAN:
+      prefix = "i";
+      bit_count = 1;
+      break;
     case IREE_HAL_NUMERICAL_TYPE_INTEGER:
       prefix = "i";
       break;
@@ -171,8 +180,7 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element_type(
       prefix = "*";
       break;
   }
-  int n = snprintf(buffer, buffer_capacity, "%s%d", prefix,
-                   (int32_t)iree_hal_element_bit_count(element_type));
+  int n = snprintf(buffer, buffer_capacity, "%s%d", prefix, bit_count);
   if (n < 0) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "snprintf failed");
   }

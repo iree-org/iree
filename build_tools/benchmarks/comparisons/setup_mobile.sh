@@ -65,7 +65,8 @@ mkdir -p "${IREE_MODEL_DIR}/dylib"
 MODEL_NAME="mobilebert_float_384_gpu"
 bazel-bin/iree_tf_compiler/iree-import-tflite "${TFLITE_MODEL_DIR}/${MODEL_NAME}.tflite" -o "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir"
 echo "Compiling ${MODEL_NAME}.vmfb for aarch64..."
-"${IREE_COMPILE_PATH}" --iree-input-type=tosa --iree-mlir-to-vm-bytecode-module \
+"${IREE_COMPILE_PATH}" \
+  --iree-input-type=tosa \
   --iree-hal-target-backends=dylib-llvm-aot \
   --iree-llvm-target-triple=aarch64-none-linux-android29 \
   --iree-llvm-debug-symbols=false \
@@ -75,7 +76,8 @@ echo "Compiling ${MODEL_NAME}.vmfb for aarch64..."
   --o "${IREE_MODEL_DIR}/dylib/${MODEL_NAME}.vmfb"
 
 echo "Compiling ${MODEL_NAME}_mmt4d.vmfb for aarch64..."
-"${IREE_COMPILE_PATH}" --iree-input-type=tosa --iree-mlir-to-vm-bytecode-module \
+"${IREE_COMPILE_PATH}" \
+  --iree-input-type=tosa \
   --iree-hal-target-backends=dylib-llvm-aot \
   --iree-llvm-target-triple=aarch64-none-linux-android29 \
   "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod" \
@@ -88,7 +90,8 @@ echo "Compiling ${MODEL_NAME}_mmt4d.vmfb for aarch64..."
 
 if [[ "${GPU_TYPE}" = "mali" ]]; then
   echo "Compiling ${MODEL_NAME}.vmfb for vulkan mali..."
-  "${IREE_COMPILE_PATH}" --iree-input-type=tosa --iree-mlir-to-vm-bytecode-module \
+  "${IREE_COMPILE_PATH}" \
+    --iree-input-type=tosa \
     --iree-hal-target-backends=vulkan-spirv \
     --iree-vulkan-target-triple=valhall-unknown-android11 \
     --iree-llvm-debug-symbols=false \
@@ -98,7 +101,8 @@ if [[ "${GPU_TYPE}" = "mali" ]]; then
     --o "${IREE_MODEL_DIR}/vulkan/${MODEL_NAME}.vmfb"
 else
   echo "Compiling ${MODEL_NAME}.vmfb for vulkan adreno..."
-  "${IREE_COMPILE_PATH}" --iree-input-type=tosa --iree-mlir-to-vm-bytecode-module \
+  "${IREE_COMPILE_PATH}" \
+    --iree-input-type=tosa \
     --iree-hal-target-backends=vulkan-spirv \
     --iree-vulkan-target-triple=adreno-unknown-android11 \
     --iree-llvm-debug-symbols=false \
@@ -167,4 +171,3 @@ fi
 adb push "${SOURCE_DIR}/build_tools/benchmarks/comparisons" /data/local/tmp/
 adb shell "su root /data/data/com.termux/files/usr/bin/python /data/local/tmp/comparisons/run_benchmarks.py --device_name=Pixel6  --mode=mobile --base_dir=${DEVICE_ROOT_DIR} --output_dir=${DEVICE_ROOT_DIR}/output"
 adb shell cat "${DEVICE_ROOT_DIR}/output/result.csv"
-

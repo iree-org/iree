@@ -104,6 +104,12 @@ static llvm::cl::opt<std::string> clDumpDispatchGraphOutputFile(
     llvm::cl::desc("Output file name for a dispatch graph dump"),
     llvm::cl::init("dispatch.dot"));
 
+static llvm::cl::opt<std::string> clDispatchTransformFileName(
+    "iree-flow-dispatch-use-transform-dialect",
+    llvm::cl::desc("mlir file containing a top-level module that specifies "
+                   "the transformations to apply to form dispatch regions."),
+    llvm::cl::init(""));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -236,9 +242,19 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // transpose.
       .addPredicatedPass(clNormalizeInputIndexingMap,
                          createInterchangeTransposeGenericOpsPass)
-
+      ////////////////////////////////////////////////////////////////////////
       // Dispatch region formation.
-      .addPass(createDispatchLinalgOnTensorsPass)
+      .addPredicatedPass(!clDispatchTransformFileName.empty(),
+                         [&]() {
+                           return createDispatchWithTransformDialect(
+                               clDispatchTransformFileName);
+                         })
+      // TODO: we may only want to use the transform dialect for some dispatch
+      // regions and let the DispatchLinalgOnTensorsPass unconditionally handle
+      // the rest.
+      .addPredicatedPass(clDispatchTransformFileName.empty(),
+                         createDispatchLinalgOnTensorsPass)
+      ////////////////////////////////////////////////////////////////////////
       .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(createCSEPass);

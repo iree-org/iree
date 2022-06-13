@@ -35,8 +35,6 @@ IREE_FLAG(string, entry_function, "",
 
 IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
 
-IREE_FLAG(string, driver, "local-task", "Backend driver to use.");
-
 IREE_FLAG(int32_t, print_max_element_count, 1024,
           "Prints up to the maximum number of elements of output tensors, "
           "eliding the remainder.");
@@ -74,6 +72,8 @@ IREE_FLAG_CALLBACK(
     "  2x2xi32=[[1 2][3 4]]\n"
     "Raw binary files can be read to provide buffer contents:\n"
     "  2x2xi32=@some/file.bin\n"
+    "numpy npy files (from numpy.save) can be read to provide 1+ values:\n"
+    "  @some.npy\n"
     "Each occurrence of the flag indicates an input in the order they were\n"
     "specified on the command line.");
 
@@ -111,9 +111,8 @@ iree_status_t Run() {
       iree_allocator_system(), &input_module));
 
   iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(iree_hal_create_device(
-      iree_hal_available_driver_registry(), IREE_SV(FLAG_driver),
-      iree_allocator_system(), &device));
+  IREE_RETURN_IF_ERROR(iree_hal_create_device_from_flags(
+      iree_hal_default_device_uri(), iree_allocator_system(), &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(
       iree_hal_module_create(device, iree_allocator_system(), &hal_module));

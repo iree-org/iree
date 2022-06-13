@@ -18,6 +18,19 @@ def FunctionalStyleMultiOperandMultiResultTransformOpTrait
   let cppNamespace = "::mlir::transform";
 }
 
+def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.foreach_thread_to_flow",
+    [FunctionalStyleMultiOperandMultiResultTransformOpTrait, 
+     MemoryEffectsOpInterface,
+     DeclareOpInterfaceMethods<TransformOpInterface>]> {
+  let description = [{Rewrite an scf.foreach_thread to Flow::DispatchWorkgroups.}];
+
+  let arguments = (ins);
+  let results = (outs);
+
+  let assemblyFormat = "attr-dict";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
 def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
     [FunctionalStyleMultiOperandMultiResultTransformOpTrait, 
      MemoryEffectsOpInterface,

@@ -73,12 +73,6 @@ option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." 
 option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
 
 #-------------------------------------------------------------------------------
-# Derived flags based on primary options
-#-------------------------------------------------------------------------------
-
-cmake_dependent_option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ON ${IREE_BUILD_COMPILER} OFF)
-
-#-------------------------------------------------------------------------------
 # Runtime HAL Driver Options
 # By default, all runtime drivers supported by the current platform which do
 # not require external deps are enabled by default. This can be changed with:
@@ -134,6 +128,12 @@ endif()
 option(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF "Enables the embedded dynamic library loader for local HAL drivers" ${IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT})
 option(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY "Enables the system dynamic library loader for local HAL drivers" ${IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT})
 option(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE "Enables the VMVX module loader for local HAL drivers" ${IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE_DEFAULT})
+
+if(IREE_BUILD_COMPILER)
+  # The compiler requires the local task driver with the VMVX loader.
+  set(IREE_HAL_DRIVER_LOCAL_TASK ON)
+  set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE ON)
+endif()
 
 message(STATUS "IREE HAL drivers:")
 if(IREE_HAL_DRIVER_CUDA)
@@ -196,6 +196,13 @@ cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler tar
 cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
 # Disable WebGPU by default - it has complex deps and is under development.
 cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
+
+#-------------------------------------------------------------------------------
+# Compiler Output Formats
+#-------------------------------------------------------------------------------
+
+# The 'vm-bytecode' and 'vm-asm' formats are always enabled.
+cmake_dependent_option(IREE_OUTPUT_FORMAT_C "Enables the 'vm-c' output format, using MLIR EmitC" ON ${IREE_BUILD_COMPILER} OFF)
 
 #-------------------------------------------------------------------------------
 # IREE compilation toolchain configuration

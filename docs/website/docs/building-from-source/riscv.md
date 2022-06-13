@@ -104,7 +104,6 @@ Invoke the host compiler tools to produce a bytecode module FlatBuffer:
 
 ``` shell
 ../iree-build/install/bin/iree-compile \
-  --iree-mlir-to-vm-bytecode-module \
   --iree-hal-target-backends=vmvx \
   samples/models/simple_abs.mlir \
   -o /tmp/simple_abs_vmvx.vmfb
@@ -117,7 +116,7 @@ ${QEMU_BIN} \
   -cpu rv64 \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
   ../iree-build-riscv/tools/iree-run-module \
-  --driver=local-task \
+  --device=local-task \
   --module_file=/tmp/simple_abs_vmvx.vmfb \
   --entry_function=abs \
   --function_input=f32=-5
@@ -146,7 +145,6 @@ with the additional command-line flags
 
 ```shell hl_lines="3 4 5 6 7 8"
 tools/iree-compile \
-  --iree-mlir-to-vm-bytecode-module \
   --iree-hal-target-backends=dylib-llvm-aot \
   --iree-llvm-target-triple=riscv64 \
   --iree-llvm-target-cpu=generic-rv64 \
@@ -163,7 +161,7 @@ ${QEMU_BIN} \
   -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
   ../iree-build-riscv/tools/iree-run-module \
-  --driver=local-task \
+  --device=local-task \
   --module_file=mobilenet_cpu.vmfb \
   --entry_function=predict \
   --function_input="1x224x224x3xf32=0"

@@ -34,10 +34,9 @@ func @dot(%lhs: tensor<2x4xf32>, %rhs: tensor<4x2xf32>) -> tensor<2x2xf32> {
 ```
 
 ```shell
-# First translate into a VM bytecode module
+# First compile into a VM bytecode module
 $ /path/to/iree/build/tools/iree-compile -- \
   --iree-input-type=mhlo \
-  --iree-mlir-to-vm-bytecode-module \
   --iree-hal-target-backends=vulkan-spirv \
   /path/to/mhlo-dot.mlir \
   -o /tmp/mhlo-dot.vmfb
@@ -45,7 +44,7 @@ $ /path/to/iree/build/tools/iree-compile -- \
 # Then package the Android app
 $ /path/to/iree/source/tools/android/run_module_app/build_apk.sh \
   ./build-apk \
-  --driver vulkan \
+  --device vulkan \
   --module_file /tmp/mhlo-dot.vmfb \
   --entry_function dot \
   --function_input=...

@@ -49,7 +49,6 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtTransformOps
     IREELinalgExtTransforms
-    IREELinalgExtOpInterfaceImpl
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
     IREEPyDMDialect
@@ -69,8 +68,8 @@ iree_cc_library(
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Dialect::VM::Analysis
-    iree::compiler::Dialect::VM::Conversion::VMToEmitC
     iree::compiler::Dialect::VM::IR
+    iree::compiler::Dialect::VM::Target::init_targets
     iree::compiler::Dialect::VM::Transforms
     iree::compiler::Dialect::Vulkan::IR
     iree::compiler::InputConversion::Common
@@ -89,9 +88,6 @@ iree_cc_library(
     "init_mlir_dialects.h"
     "init_mlir_passes.h"
   DEPS
-    # Sets IREE_HAVE_EMITC_DIALECT and transitively depends on MLIREmitC
-    # if enabled.
-    iree::compiler::Dialect::VM::Target::C::Enabled
     MLIRAffine
     MLIRAffineTransforms
     MLIRArmNeon
@@ -121,6 +117,7 @@ iree_cc_library(
     MLIRTosaTransforms
     MLIRTransforms
     MLIRVector
+    iree::compiler::Dialect::VM::Target::init_targets
   PUBLIC
 )
 
@@ -225,9 +222,7 @@ iree_cc_library(
     MLIRTargetLLVMIRExport
     iree::compiler::Codegen::Codegen
     iree::compiler::ConstEval
-    iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Target::init_targets
-    iree::compiler::Dialect::VM::Target::C
     iree::compiler::Pipelines
     iree::compiler::Utils
   PUBLIC

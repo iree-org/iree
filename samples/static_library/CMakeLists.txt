@@ -16,7 +16,6 @@ set(_COMPILE_TOOL_EXECUTABLE $<TARGET_FILE:iree-compile>)
 ## Example with VM bytecode module.
 # Setup args for iree-compile.
 set(_COMPILE_ARGS)
-list(APPEND _COMPILE_ARGS "--iree-mlir-to-vm-bytecode-module")
 list(APPEND _COMPILE_ARGS "--iree-hal-target-backends=dylib-llvm-aot")
 list(APPEND _COMPILE_ARGS "--iree-llvm-link-embedded=false")
 list(APPEND _COMPILE_ARGS "--iree-llvm-link-static")
@@ -95,7 +94,7 @@ iree_lit_test(
 )
 
 
-if(NOT (IREE_ENABLE_EMITC OR DEFINED IREE_HOST_BINARY_ROOT))
+if(NOT (IREE_OUTPUT_FORMAT_C OR DEFINED IREE_HOST_BINARY_ROOT))
   return()
 endif()
 

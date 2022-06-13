@@ -255,6 +255,9 @@ py::object MapElementTypeToDType(iree_hal_element_type_t element_type) {
   // TODO: Handle dtypes that do not map to a code (i.e. fp16).
   const char* dtype_code;
   switch (element_type) {
+    case IREE_HAL_ELEMENT_TYPE_BOOL_8:
+      dtype_code = "?";
+      break;
     case IREE_HAL_ELEMENT_TYPE_INT_8:
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
       dtype_code = "b";
@@ -288,9 +291,6 @@ py::object MapElementTypeToDType(iree_hal_element_type_t element_type) {
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
       dtype_code = "d";
-      break;
-    case IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER, 1):
-      dtype_code = "?";
       break;
     default:
       throw RaiseValueError("Unsupported VM Buffer -> numpy dtype mapping");
@@ -381,6 +381,7 @@ void SetupHalBindings(pybind11::module m) {
       .value("OPAQUE_16", IREE_HAL_ELEMENT_TYPE_OPAQUE_16)
       .value("OPAQUE_32", IREE_HAL_ELEMENT_TYPE_OPAQUE_32)
       .value("OPAQUE_64", IREE_HAL_ELEMENT_TYPE_OPAQUE_64)
+      .value("BOOL_8", IREE_HAL_ELEMENT_TYPE_BOOL_8)
       .value("INT_4", IREE_HAL_ELEMENT_TYPE_INT_4)
       .value("INT_8", IREE_HAL_ELEMENT_TYPE_INT_8)
       .value("INT_16", IREE_HAL_ELEMENT_TYPE_INT_16)
@@ -400,9 +401,6 @@ void SetupHalBindings(pybind11::module m) {
       .value("FLOAT_32", IREE_HAL_ELEMENT_TYPE_FLOAT_32)
       .value("FLOAT_64", IREE_HAL_ELEMENT_TYPE_FLOAT_64)
       .value("BFLOAT_16", IREE_HAL_ELEMENT_TYPE_BFLOAT_16)
-      .value("BOOL_8",
-             static_cast<iree_hal_element_types_t>(IREE_HAL_ELEMENT_TYPE_VALUE(
-                 IREE_HAL_NUMERICAL_TYPE_INTEGER, 1)))
       .export_values()
       .def_static("map_to_dtype", &MapElementTypeToDType);
 

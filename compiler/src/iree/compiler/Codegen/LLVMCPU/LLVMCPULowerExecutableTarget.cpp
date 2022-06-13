@@ -191,7 +191,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       }
 
       bool lowerToVectors = !isVMVXBackend(variantOp);
-      bool lowerToAVX2 = hasAVX2Features(variantOp);
+      bool lowerToAVX2 = hasAVX2Feature(variantOp);
       if (!testLoweringConfiguration) {
         switch (translationInfo.getValue().getDispatchLoweringPassPipeline()) {
           case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
@@ -217,8 +217,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
                 executableLoweringPipeline);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
-              LinalgTransformInterpCodegen:
-            addLinalgTransformInterpPasses(executableLoweringPipeline);
+              TransformDialectInterpreterCodegen:
+            addTransformDialectInterpreterPasses(executableLoweringPipeline);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUTileFuseAndVectorize:

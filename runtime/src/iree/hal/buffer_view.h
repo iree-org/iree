@@ -37,6 +37,8 @@ enum iree_hal_numerical_type_bits_t {
   // Unsigned integer.
   IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED =
       IREE_HAL_NUMERICAL_TYPE_INTEGER | 0x02u,
+  // Boolean; stored as an integer but only 1 bit is valid.
+  IREE_HAL_NUMERICAL_TYPE_BOOLEAN = IREE_HAL_NUMERICAL_TYPE_INTEGER | 0x03u,
 
   // Float-like.
   IREE_HAL_NUMERICAL_TYPE_FLOAT = 0x20,
@@ -64,6 +66,11 @@ typedef uint8_t iree_hal_numerical_type_t;
   (iree_hal_element_numerical_type(element_type) ==             \
    IREE_HAL_NUMERICAL_TYPE_UNKNOWN)
 
+// Returns true if |element_type| is a boolean of some width and semantics.
+#define iree_hal_element_numerical_type_is_boolean(element_type)   \
+  iree_all_bits_set(iree_hal_element_numerical_type(element_type), \
+                    IREE_HAL_NUMERICAL_TYPE_BOOLEAN)
+
 // Returns true if |element_type| is an integer of some width and semantics.
 #define iree_hal_element_numerical_type_is_integer(element_type)   \
   iree_all_bits_set(iree_hal_element_numerical_type(element_type), \
@@ -76,7 +83,8 @@ typedef uint8_t iree_hal_numerical_type_t;
 
 // TODO(#8193): split out logical and physical bit widths.
 // Returns the bit width of each element.
-#define iree_hal_element_bit_count(element_type) (size_t)((element_type)&0xFF)
+#define iree_hal_element_bit_count(element_type) \
+  (iree_host_size_t)((element_type)&0xFF)
 
 // Returns true if the element is byte-aligned.
 // Sub-byte aligned types such as i4 require user handling of the packing.
@@ -111,6 +119,7 @@ enum iree_hal_element_types_t {
   IREE_HAL_ELEMENT_TYPE_OPAQUE_16        = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,            16),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_OPAQUE_32        = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,            32),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_OPAQUE_64        = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,            64),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_BOOL_8           = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_BOOLEAN,             8),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_INT_4            = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER,             4),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_SINT_4           = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,      4),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_UINT_4           = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,    4),  // NOLINT

@@ -452,3 +452,70 @@ class BenchmarkResults(object):
         BenchmarkRun.from_json_object(b) for b in json_object["benchmarks"]
     ]
     return results
+
+
+@dataclass(frozen=True)
+class CompilationInfo(object):
+  model_name: str
+  model_tags: Sequence[str]
+  model_source: str
+  target_arch: str
+  bench_mode: Sequence[str]
+
+  def __str__(self):
+    if self.model_tags:
+      tags = ",".join(self.model_tags)
+      model_part = f"{self.model_name} [{tags}] ({self.model_source})"
+    else:
+      model_part = f"{self.model_name} ({self.model_source})"
+    bench_mode_str = ",".join(self.bench_mode)
+    return f"{model_part} {self.target_arch} {bench_mode_str}"
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return CompilationInfo(**json_object)
+
+
+@dataclass(frozen=True)
+class ModuleComponentSizes(object):
+  file_size: int
+  vm_component_size: int
+  const_component_size: int
+  total_dispatch_component_size: int
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return ModuleComponentSizes(**json_object)
+
+
+@dataclass(frozen=True)
+class CompilationStatistics(object):
+  compilation_info: CompilationInfo
+  # Module file and component sizes.
+  module_component_sizes: ModuleComponentSizes
+  # Module compilation time in ms.
+  compilation_time: int
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return CompilationStatistics(
+        compilation_info=CompilationInfo.from_json_object(
+            json_object["compilation_info"]),
+        module_component_sizes=ModuleComponentSizes.from_json_object(
+            json_object["module_component_sizes"]),
+        compilation_time=json_object["compilation_info"])
+
+
+@dataclass(frozen=True)
+class CompilationResults(object):
+  commit: str
+  compilation_statistics: Sequence[CompilationStatistics]
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return CompilationResults(
+        commit=json_object["commit"],
+        compilation_statistics=[
+            CompilationStatistics.from_json_object(obj)
+            for obj in json_object["compilation_statistics"]
+        ])

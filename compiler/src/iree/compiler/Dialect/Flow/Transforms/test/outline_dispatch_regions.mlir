@@ -154,3 +154,19 @@ func.func @dynamicShapeDispatch(%arg0 : tensor<7x?x24x?xf32>) -> tensor<?x?x1024
   // CHECK-NEXT: return %[[RET0]]
   return %ret0 : tensor<?x?x1024xf32>
 }
+
+// -----
+
+// CHECK-LABEL: func.func @dispatchWithCountRegion
+func.func @dispatchWithCountRegion(%arg0: tensor<4xi32>) -> tensor<4xi32> {
+  %x = arith.constant 100 : index
+  %y = arith.constant 50 : index
+  %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<4xi32>) -> %arg0 =
+      (%arg0_capture: !flow.dispatch.tensor<readwrite:4xi32>) {
+    flow.return
+  } count(%x_capture: index, %y_capture: index) -> (index, index, index) {
+    %z = arith.constant 1 : index
+    flow.return %x_capture, %y_capture, %z : index, index, index
+  }
+  return %0 : tensor<4xi32>
+}

@@ -166,13 +166,15 @@ iree_status_t iree_file_write_contents(const char* path,
                             "failed to open file '%s'", path);
   }
 
-  int ret = fwrite((char*)content.data, content.data_length, 1, file);
   iree_status_t status = iree_ok_status();
-  if (ret != 1) {
-    status =
-        iree_make_status(IREE_STATUS_DATA_LOSS,
-                         "unable to write file contents of %zu bytes to '%s'",
-                         content.data_length, path);
+  if (content.data_length > 0) {
+    int ret = fwrite((char*)content.data, content.data_length, 1, file);
+    if (ret != 1) {
+      status =
+          iree_make_status(IREE_STATUS_DATA_LOSS,
+                           "unable to write file contents of %zu bytes to '%s'",
+                           content.data_length, path);
+    }
   }
 
   fclose(file);

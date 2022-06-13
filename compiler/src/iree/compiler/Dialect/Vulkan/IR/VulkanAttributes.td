@@ -9,25 +9,29 @@
 
 include "iree/compiler/Dialect/Vulkan/IR/VulkanBase.td"
 
+class VK_Attr<string attrName, string attrMnemonic, list<Trait> traits = []>
+    : AttrDef<VK_Dialect, attrName> {
+  let mnemonic = attrMnemonic;
+  let assemblyFormat = "`<` struct(params) `>`";
+}
+
 // Attribute that can be used to specify the configuration of the
 // cooperative matrix multiply instructions supported by the target
 // device. This corresponds to `VkCooperativeMatrixPropertiesNV` structure:
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkCooperativeMatrixPropertiesNV.html
 def VK_CooperativeMatrixPropertiesNVAttr :
-  StructAttr<"CooperativeMatrixPropertiesNVAttr", VK_Dialect, [
-    StructFieldAttr<"mSize", I32Attr>,
-    StructFieldAttr<"nSize", I32Attr>,
-    StructFieldAttr<"kSize", I32Attr>,
-    StructFieldAttr<"aType", TypeAttr>,
-    StructFieldAttr<"bType", TypeAttr>,
-    StructFieldAttr<"cType", TypeAttr>,
-    StructFieldAttr<"resultType", TypeAttr>,
-    StructFieldAttr<"scope", VK_ScopeNV_Attr>
-]>;
-
-def VK_CooperativeMatrixPropertiesNVArrayAttr :
-  TypedArrayAttrBase<VK_CooperativeMatrixPropertiesNVAttr,
-                     "CooperativeMatrixPropertiesNV array attribute">;
+  VK_Attr<"CooperativeMatrixPropertiesNV", "coop_matrix_props"> {
+  let parameters = (ins
+    "int":$mSize,
+    "int":$nSize,
+    "int":$kSize,
+    "::mlir::Type":$aType,
+    "::mlir::Type":$bType,
+    "::mlir::Type":$cType,
+    "::mlir::Type":$resultType,
+    "::mlir::iree_compiler::IREE::Vulkan::ScopeNVAttr":$scope
+  );
+}
 
 // TODO(antiagainst): consider auto-generating this file (or part of it) from
 // vk.xml:
@@ -39,72 +43,72 @@ def VK_CooperativeMatrixPropertiesNVArrayAttr :
 // Note that we are using UnitAttr for booleans to allow omitting to mean false.
 // TODO(antiagainst): support DefaultValuedAttr in StrucctAttr to allow
 // specifying defaults for non-boolean fields.
-def VK_CapabilitiesAttr : StructAttr<"CapabilitiesAttr", VK_Dialect, [
-  // Core Vulkan 1.0 physical device properties.
-  //
-  // This corresponds to the `VkPhysicalDeviceProperties` structure:
-  // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceProperties.html
-  StructFieldAttr<"maxComputeSharedMemorySize", I32Attr>,
-  StructFieldAttr<"maxComputeWorkGroupInvocations", I32Attr>,
-  StructFieldAttr<"maxComputeWorkGroupSize", I32ElementsAttr>,
+def VK_CapabilitiesAttr : VK_Attr<"Capabilities", "caps"> {
+  let parameters = (ins
+    // Core Vulkan 1.0 physical device properties.
+    //
+    // This corresponds to the `VkPhysicalDeviceProperties` structure:
+    // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceProperties.html
+    "int":$maxComputeSharedMemorySize,
+    "int":$maxComputeWorkGroupInvocations,
+    "::mlir::DenseIntElementsAttr":$maxComputeWorkGroupSize,
 
-  // Core Vulkan 1.0 physical device features.
-  //
-  // This corresponds to the `VkPhysicalDeviceFeatures` structure:
-  // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceFeatures.html
-  StructFieldAttr<"shaderFloat64", UnitAttr>,
-  StructFieldAttr<"shaderInt16", UnitAttr>,
-  StructFieldAttr<"shaderInt64", UnitAttr>,
+    // Core Vulkan 1.0 physical device features.
+    //
+    // This corresponds to the `VkPhysicalDeviceFeatures` structure:
+    // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceFeatures.html
+    OptionalParameter<"::mlir::UnitAttr">:$shaderFloat64,
+    OptionalParameter<"::mlir::UnitAttr">:$shaderInt16,
+    OptionalParameter<"::mlir::UnitAttr">:$shaderInt64,
 
-  // Core Vulkan 1.1 physical device subgroup properties.
-  //
-  // This corresponds to the `VkPhysicalDeviceSubgroupProperties` structure:
-  // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceSubgroupProperties.html
+    // Core Vulkan 1.1 physical device subgroup properties.
+    //
+    // This corresponds to the `VkPhysicalDeviceSubgroupProperties` structure:
+    // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceSubgroupProperties.html
 
-  // TODO(antiagainst): StructAttr does not actually support attribute kinds
-  // that are derived from IntegerAttr well. So the nice parsing/printing for
-  // VK_SubgroupFeatureAttr does not really kick in here. We need to enhance
-  // upstream MLIR.
-  StructFieldAttr<"subgroupFeatures", VK_SubgroupFeatureAttr>,
-  StructFieldAttr<"subgroupSize", I32Attr>,
+    // TODO(antiagainst): StructAttr does not actually support attribute kinds
+    // that are derived from IntegerAttr well. So the nice parsing/printing for
+    // VK_SubgroupFeatureAttr does not really kick in here. We need to enhance
+    // upstream MLIR.
+    "::mlir::iree_compiler::IREE::Vulkan::SubgroupFeatureAttr":$subgroupFeatures,
+    "int":$subgroupSize,
 
-  // VK_KHR_16bit_storage features.
-  //
-  // This corresponds to the `VkPhysicalDevice16BitStorageFeatures` structure:
-  // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDevice16BitStorageFeatures.html
-  StructFieldAttr<"storageBuffer16BitAccess", UnitAttr>,
-  StructFieldAttr<"storagePushConstant16", UnitAttr>,
-  StructFieldAttr<"uniformAndStorageBuffer16BitAccess", UnitAttr>,
+    // VK_KHR_16bit_storage features.
+    //
+    // This corresponds to the `VkPhysicalDevice16BitStorageFeatures` structure:
+    // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDevice16BitStorageFeatures.html
+    OptionalParameter<"::mlir::UnitAttr">:$storageBuffer16BitAccess,
+    OptionalParameter<"::mlir::UnitAttr">:$storagePushConstant16,
+    OptionalParameter<"::mlir::UnitAttr">:$uniformAndStorageBuffer16BitAccess,
 
-  // VK_KHR_8bit_storage features.
-  //
-  // This corresponds to the `VkPhysicalDevice8BitStorageFeatures` structure:
-  // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDevice8BitStorageFeatures.html
-  StructFieldAttr<"storageBuffer8BitAccess", UnitAttr>,
-  StructFieldAttr<"storagePushConstant8", UnitAttr>,
-  StructFieldAttr<"uniformAndStorageBuffer8BitAccess", UnitAttr>,
+    // VK_KHR_8bit_storage features.
+    //
+    // This corresponds to the `VkPhysicalDevice8BitStorageFeatures` structure:
+    // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDevice8BitStorageFeatures.html
+    OptionalParameter<"::mlir::UnitAttr">:$storageBuffer8BitAccess,
+    OptionalParameter<"::mlir::UnitAttr">:$storagePushConstant8,
+    OptionalParameter<"::mlir::UnitAttr">:$uniformAndStorageBuffer8BitAccess,
 
-  // VK_KHR_shader_float16_int8 features.
-  //
-  // This corresponds to the `VkPhysicalDeviceShaderFloat16Int8Features`
-  // structure:
-  // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceShaderFloat16Int8Features.html
-  StructFieldAttr<"shaderFloat16", UnitAttr>,
-  StructFieldAttr<"shaderInt8", UnitAttr>,
+    // VK_KHR_shader_float16_int8 features.
+    //
+    // This corresponds to the `VkPhysicalDeviceShaderFloat16Int8Features`
+    // structure:
+    // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceShaderFloat16Int8Features.html
+    OptionalParameter<"::mlir::UnitAttr">:$shaderFloat16,
+    OptionalParameter<"::mlir::UnitAttr">:$shaderInt8,
 
-  // VK_KHR_variable_pointers features.
-  // This corresponds to the `VkPhysicalDeviceVariablePointersFeatures`
-  // structure:
-  // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceVariablePointersFeatures.html
-  StructFieldAttr<"variablePointersStorageBuffer", UnitAttr>,
-  StructFieldAttr<"variablePointers", UnitAttr>,
+    // VK_KHR_variable_pointers features.
+    // This corresponds to the `VkPhysicalDeviceVariablePointersFeatures`
+    // structure:
+    // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceVariablePointersFeatures.html
+    OptionalParameter<"::mlir::UnitAttr">:$variablePointersStorageBuffer,
+    OptionalParameter<"::mlir::UnitAttr">:$variablePointers,
 
-  // VkCooperativeMatrixPropertiesNV features.
-  // This corresponds to `VkCoooperativeMatrixPropertiesNV` structure:
-  // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkCooperativeMatrixPropertiesNV.html
-  StructFieldAttr<
-      "cooperativeMatrixPropertiesNV",
-      DefaultValuedAttr<VK_CooperativeMatrixPropertiesNVArrayAttr, "{}">>
-]>;
+    // VkCooperativeMatrixPropertiesNV features.
+    // This corresponds to `VkCoooperativeMatrixPropertiesNV` structure:
+    // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkCooperativeMatrixPropertiesNV.html
+    DefaultValuedParameter<"ArrayAttr", "nullptr">:$cooperativeMatrixPropertiesNV
+  );
+}
 
 #endif  // IREE_DIALECT_VULKAN_VULKANATTRIBUTES

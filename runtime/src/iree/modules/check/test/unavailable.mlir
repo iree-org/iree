@@ -1,4 +1,4 @@
-// RUN: iree-compile --iree-input-type=mhlo --iree-hal-target-backends=vmvx --iree-mlir-to-vm-bytecode-module %s | iree-run-module --module_file=- --entry_function=expect_true_of_false | FileCheck %s
+// RUN: iree-compile --iree-input-type=mhlo --iree-hal-target-backends=vmvx %s | iree-run-module --module_file=- --entry_function=expect_true_of_false | FileCheck %s
 
 // Tests that even if the check module is not available (in this case because
 // we are running with iree-run-module instead of iree-check-module) the

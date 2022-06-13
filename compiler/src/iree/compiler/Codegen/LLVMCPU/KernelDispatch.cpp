@@ -62,18 +62,18 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(64));
 
-static llvm::cl::opt<bool> useLinalgTransformInterp(
-    "iree-codegen-use-linalg-transform-interp",
-    llvm::cl::desc(
-        "experimental path to use the linalg transform dialect interpreter"),
-    llvm::cl::init(false));
-
 // TODO(hanchung): Remove the flag. This is the flag for fastly falling back to
 // the previous snapshot.
 static llvm::cl::opt<bool> disableMatmulPadPipeline(
     "iree-codegen-disable-matmul-pad-pipeline",
     llvm::cl::desc("disable padding options in Matmul codegen"),
     llvm::cl::init(false));
+
+llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName(
+    "iree-codegen-use-transform-dialect",
+    llvm::cl::desc(
+        "MLIR file containing a transform dialect specification to apply"),
+    llvm::cl::init(""));
 
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
@@ -536,9 +536,12 @@ static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,
                                                     int64_t vectorSize,
                                                     bool isQuantized) {
   SmallVector<int64_t> matmulTileSizes;
-  if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
+  auto variantOp = getExecutableVariantOp(entryPointFn);
+  assert(succeeded(variantOp) && "ExecutableVariantOp not found");
+
+  if (isX86(*variantOp) || isRISCV(*variantOp)) {
     matmulTileSizes = {8, 32, 16};
-  } else if (isAArch64(entryPointFn)) {
+  } else if (isAArch64(*variantOp)) {
     if (isQuantized) {
       matmulTileSizes = {vectorSize, vectorSize * 4, vectorSize};
     } else {
@@ -594,9 +597,12 @@ static LogicalResult setRootConfig(
   SmallVector<int64_t> workgroupTileSizes =
       getMatmulWorkgroupSizes(entryPointFn, linalgOp, vectorSize, isQuantized);
 
+  auto variantOp = getExecutableVariantOp(entryPointFn);
+  assert(succeeded(variantOp) && "ExecutableVariantOp not found");
+
   // Use the default distribution for the matmul loops.
   int64_t defaultMaxSize = defaultWorkgroupTileSize;
-  if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
+  if (isX86(*variantOp) || isRISCV(*variantOp)) {
     defaultMaxSize = 128;
   }
 
@@ -610,8 +616,8 @@ static LogicalResult setRootConfig(
   // works for linalg.matmul cases. We can relax it once we have better
   // scheduling, e.g., transform dialect.
   SmallVector<int64_t> flowTileSizes;
-  if (!disableMatmulPadPipeline &&
-      (isX86(entryPointFn) || isRISCV(entryPointFn)) && numLoops == 3) {
+  if (!disableMatmulPadPipeline && (isX86(*variantOp) || isRISCV(*variantOp)) &&
+      numLoops == 3) {
     // It's inspired from Sandbox configuration. Sandbox has
     // [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192 because
     // 288/12*8=192
@@ -628,11 +634,11 @@ static LogicalResult setRootConfig(
   // ARM codgen does not switch to use codegen driver based approach, so we have
   // special logic for it. All the new pipeline is expected to use codegen
   // driver based approach.
-  if (isAArch64(entryPointFn) && !isQuantized) {
+  if (isAArch64(*variantOp) && !isQuantized) {
     return setAArch64RootConfig(entryPointFn, contractionOp, flowTileSizes,
                                 workgroupTileSizes, vectorSize);
-  } else if (isX86(entryPointFn) || isRISCV(entryPointFn) ||
-             isAArch64(entryPointFn)) {
+  } else if (isX86(*variantOp) || isRISCV(*variantOp) ||
+             isAArch64(*variantOp)) {
     if (disableMatmulPadPipeline || numLoops != 3) {
       return setMatmulNoPadRootConfig(entryPointFn, contractionOp,
                                       flowTileSizes, workgroupTileSizes,
@@ -834,7 +840,9 @@ static LogicalResult setTransposeLikeOpRootConfig(
     return success();
   }
 
-  if (!hasAVX2Features(genericOp) || !isSupportedTransposeOp(genericOp)) {
+  auto variantOp = getExecutableVariantOp(genericOp);
+  assert(succeeded(variantOp) && "ExecutableVariantOp not found");
+  if (!hasAVX2Feature(*variantOp) || !isSupportedTransposeOp(genericOp)) {
     return success();
   }
 
@@ -1126,7 +1134,9 @@ static LogicalResult setRootConfig(
   Operation *rootOperation = rootOp.getValue();
 
   if (rootOperation) {
-    if (isVMVXBackend(entryPointFn)) {
+    auto variantOp = getExecutableVariantOp(entryPointFn);
+    assert(succeeded(variantOp) && "ExecutableVariantOp not found");
+    if (isVMVXBackend(*variantOp)) {
       if (failed(
               setVMVXRootConfigImpl(entryPointFn, rootOperation, tiledLoops))) {
         return failure();
@@ -1184,12 +1194,11 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     if (!exportOp) continue;
     if (getTranslationInfo(exportOp)) continue;
 
-    // If using sandbox passes, currently set the workload_per_wg to be
-    // empty for single-threaded execution.
-    if (useLinalgTransformInterp) {
+    // If using the transform dialect interpreter, call the proper pipeline.
+    if (clCPUCodegenTransformDialectFileName.size() > 0) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
           moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                     LinalgTransformInterpCodegen);
+                                     TransformDialectInterpreterCodegen);
       setTranslationInfo(funcOp, translationInfo);
       continue;
     }

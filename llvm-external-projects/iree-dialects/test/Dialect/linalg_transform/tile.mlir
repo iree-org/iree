@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt --linalg-transform-interp %s | FileCheck %s
+// RUN: iree-dialects-opt --transform-dialect-interpreter %s | FileCheck %s
 
 // CHECK-LABEL: func.func @matmul_tensors(
 // CHECK-SAME:    %[[TA:[0-9a-z]+]]: tensor<128x128xf32>

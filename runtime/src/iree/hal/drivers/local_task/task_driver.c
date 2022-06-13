@@ -118,6 +118,17 @@ static iree_status_t iree_hal_task_driver_query_available_devices(
       (void**)out_device_infos);
 }
 
+static iree_status_t iree_hal_task_driver_dump_device_info(
+    iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
+    iree_string_builder_t* builder) {
+  iree_hal_task_driver_t* driver = iree_hal_task_driver_cast(base_driver);
+  // TODO(benvanik): dump detailed device info.
+  // Could do executable loaders, CPU features, etc. Ideally would share some
+  // with the other local drivers.
+  (void)driver;
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_task_driver_create_device_by_id(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
     iree_host_size_t param_count, const iree_string_pair_t* params,
@@ -146,6 +157,7 @@ static iree_status_t iree_hal_task_driver_create_device_by_path(
 static const iree_hal_driver_vtable_t iree_hal_task_driver_vtable = {
     .destroy = iree_hal_task_driver_destroy,
     .query_available_devices = iree_hal_task_driver_query_available_devices,
+    .dump_device_info = iree_hal_task_driver_dump_device_info,
     .create_device_by_id = iree_hal_task_driver_create_device_by_id,
     .create_device_by_path = iree_hal_task_driver_create_device_by_path,
 };

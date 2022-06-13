@@ -15,11 +15,11 @@
 #include "iree/base/internal/span.h"
 #include "iree/base/status_cc.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/local_task/registration/driver_module.h"
 #include "iree/modules/check/module.h"
 #include "iree/modules/hal/module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
+#include "iree/tooling/device_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/ref_cc.h"
 
@@ -29,16 +29,21 @@ namespace {
 class CheckTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
-    IREE_CHECK_OK(iree_hal_local_task_driver_module_register(
-        iree_hal_driver_registry_default()));
     // TODO(benvanik): move to instance-based registration.
     IREE_ASSERT_OK(iree_hal_module_register_types());
 
     iree_hal_driver_t* hal_driver = nullptr;
-    IREE_ASSERT_OK(iree_hal_driver_registry_try_create(
-        iree_hal_driver_registry_default(),
+    iree_status_t status = iree_hal_driver_registry_try_create(
+        iree_hal_available_driver_registry(),
         iree_make_cstring_view("local-task"), iree_allocator_system(),
-        &hal_driver));
+        &hal_driver);
+    if (iree_status_is_not_found(status)) {
+      IREE_LOG(WARNING)
+          << "Skipping tests as 'local-task' driver was not found:";
+      iree_status_fprint(stderr, status);
+      iree_status_free(status);
+      return;
+    }
     IREE_ASSERT_OK(iree_hal_driver_create_default_device(
         hal_driver, iree_allocator_system(), &device_));
     IREE_ASSERT_OK(
@@ -61,6 +66,9 @@ class CheckTest : public ::testing::Test {
   }
 
   void SetUp() override {
+    if (!device_) {
+      GTEST_SKIP();
+    }
     std::vector<iree_vm_module_t*> modules = {hal_module_, check_module_};
     IREE_ASSERT_OK(iree_vm_context_create_with_modules(
         instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.size(), modules.data(),
