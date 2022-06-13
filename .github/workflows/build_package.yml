@@ -189,8 +189,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
           release_id: ${{ github.event.inputs.release_id }}
-          # Only upload iree wheels.
-          assets_path: ./bindist/iree*.whl
+          # Only upload iree artifacts.
+          assets_path: ./bindist/iree*.*
 
   validate_and_publish:
     name: "Invoke workflow to validate and publish release"
