@@ -11,6 +11,17 @@ name: Lint
 on: [pull_request]
 
 jobs:
+  info:
+    runs-on: ubuntu-18.04
+    steps:
+      - run: |
+          whoami
+          groups
+          echo $HOME
+          ls -laht
+          pwd
+          sudo whoami
+
   bazel_to_cmake:
     runs-on: ubuntu-18.04
     steps:
