@@ -822,18 +822,11 @@ cc_library(
     deps = [
         ":IREEDialectsTransforms",
         ":IREELinalgExtDialect",
-        ":IREELinalgExtTransforms",
         ":IREELinalgTransformDialect",
         ":IREELinalgTransformDialectPasses",
-        "@llvm-project//mlir:ArithmeticDialect",
-        "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LinalgOps",
-        "@llvm-project//mlir:MathDialect",
-        "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Rewrite",
-        "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:Transforms",
     ],
 )

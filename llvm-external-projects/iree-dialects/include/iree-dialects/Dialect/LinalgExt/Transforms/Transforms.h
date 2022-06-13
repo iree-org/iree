@@ -193,27 +193,6 @@ private:
   SmallVector<int64_t> operandsToFuse;
 };
 
-/// Function signature to control reduction splitting. This returns the split
-/// reduction ratio used to split the reduction dimension. The ratio is applied
-/// to the reduction dimension of TopK. If the ratio value is less or equal to 1
-/// then nothing will be done.
-using TopkSplitReductionControlFn = std::function<int64_t(TopkOp topkOp)>;
-
-struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  TopkOpSplitReduction(MLIRContext *context, TopkSplitReductionControlFn fn,
-                       linalg::LinalgTransformationFilter filt)
-      : OpRewritePattern<TopkOp>(context), splitReductionFn(std::move(fn)),
-        filter(std::move(filt)) {}
-
-  LogicalResult matchAndRewrite(TopkOp topkOp, PatternRewriter &rewriter) const;
-
-private:
-  TopkSplitReductionControlFn splitReductionFn;
-  linalg::LinalgTransformationFilter filter;
-};
-
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler

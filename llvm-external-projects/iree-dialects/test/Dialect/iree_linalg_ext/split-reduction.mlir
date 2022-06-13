@@ -1,5 +1,5 @@
-// RUN: iree-dialects-opt --test-topk-split-reduction='split-ratio=3' %s | FileCheck %s --check-prefix SINGLE
-// RUN: iree-dialects-opt --test-topk-split-reduction='split-ratio=4' %s | FileCheck %s --check-prefix MULTIPLE
+// RUN: iree-dialects-opt --iree-linalg-ext-topk-split-reduction='split-ratio=3' %s | FileCheck %s --check-prefix SINGLE
+// RUN: iree-dialects-opt --iree-linalg-ext-topk-split-reduction='split-ratio=4' %s | FileCheck %s --check-prefix MULTIPLE
 
 func.func @topk_split_reduction_1d(%input_values: tensor<30xf32>, %out_values: tensor<3xf32>, %out_indices: tensor<3xi32>) -> (tensor<3xf32>, tensor<3xi32>) {
   %0:2 = iree_linalg_ext.topk

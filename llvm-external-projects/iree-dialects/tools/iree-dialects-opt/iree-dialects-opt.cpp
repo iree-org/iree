@@ -41,7 +41,6 @@ namespace mlir {
 namespace test_ext {
 /// Test passes, do not deserve an include.
 void registerTestLinalgTransformWrapScope();
-void registerTestLinalgExtTransformSplitReduction();
 void registerTestListenerPasses();
 } // namespace test_ext
 } // namespace mlir
@@ -85,7 +84,6 @@ int main(int argc, char **argv) {
   mlir::linalg::transform::registerDropSchedulePass();
   // Local test passes.
   mlir::test_ext::registerTestLinalgTransformWrapScope();
-  mlir::test_ext::registerTestLinalgExtTransformSplitReduction();
   mlir::test_ext::registerTestListenerPasses();
 
   // External models.
