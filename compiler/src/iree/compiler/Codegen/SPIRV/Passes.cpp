@@ -287,7 +287,7 @@ void addSPIRVTileAndVectorizeWithWorkgroupMemoryPassPipeline(
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
 
-  // nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass());
 
   addLoopMaterializationPasses(nestedModulePM);
 }

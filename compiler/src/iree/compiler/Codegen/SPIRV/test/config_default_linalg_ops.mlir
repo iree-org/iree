@@ -466,7 +466,7 @@ hal.executable private @innermost_reduction {
   }
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128], [4],  [0, 4]{{\]}}>
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32], [1],  [0, 4]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
 // CHECK-LABEL: hal.executable.export public @innermost_reduction
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
