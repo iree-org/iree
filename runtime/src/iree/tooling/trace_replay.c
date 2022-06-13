@@ -678,8 +678,7 @@ static iree_status_t iree_trace_replay_parse_hal_buffer(
       iree_hal_device_allocator(replay->device),
       (iree_hal_buffer_params_t){
           .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-          .usage =
-              IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
+          .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
       },
       allocation_size, iree_const_byte_span_empty(), &buffer));
 
@@ -757,8 +756,7 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
         element_type, encoding_type,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-            .usage =
-                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
+            .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
         },
         iree_trace_replay_generate_hal_buffer_callback, &params, &buffer_view));
   } else {
@@ -767,8 +765,7 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
         element_type, encoding_type,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-            .usage =
-                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
+            .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
         },
         iree_const_byte_span_empty(), &buffer_view));
   }

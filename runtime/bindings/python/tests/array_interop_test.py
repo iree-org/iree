@@ -60,7 +60,7 @@ class DeviceHalTest(unittest.TestCase):
     init_ary = np.zeros([3, 4], dtype=np.int32) + 2
     buffer_view = self.allocator.allocate_buffer_copy(
         memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
-        allowed_usage=iree.runtime.BufferUsage.CONSTANT,
+        allowed_usage=iree.runtime.BufferUsage.DEFAULT,
         buffer=init_ary,
         element_type=iree.runtime.HalElementType.SINT_32)
 

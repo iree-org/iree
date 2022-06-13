@@ -412,7 +412,8 @@ class SimpleMulModule : public iree::vm::Module {
     // %0 = "iree_ll_seq.alloc_heap"() : () -> memref<4xf32>
     ASSIGN_OR_RETURN(auto result, device->allocator()->Allocate(
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-        IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_MAPPING));
+        IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
+        IREE_HAL_BUFFER_USAGE_MAPPING));
     auto result_view = iree::hal::BufferView(
         std::move(result), {4}, sizeof(float));
 

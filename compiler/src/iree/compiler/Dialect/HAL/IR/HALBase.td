@@ -48,18 +48,52 @@ def HAL_MemoryTypeBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_BufferUsage_None      : I32BitEnumAttrCase<"None",     0x0000>;  // ?
-def HAL_BufferUsage_Constant  : I32BitEnumAttrCase<"Constant", 0x0001>;  // C
-def HAL_BufferUsage_Transfer  : I32BitEnumAttrCase<"Transfer", 0x0002>;  // T
-def HAL_BufferUsage_Mapping   : I32BitEnumAttrCase<"Mapping",  0x0004>;  // M
-def HAL_BufferUsage_Dispatch  : I32BitEnumAttrCase<"Dispatch", 0x0008>;  // D
+def HAL_BufferUsage_None                         : I32BitEnumAttrCase<"None",                         0x00000000>;
+def HAL_BufferUsage_TransferSource               : I32BitEnumAttrCase<"TransferSource",               0x00000001>;
+def HAL_BufferUsage_TransferTarget               : I32BitEnumAttrCase<"TransferTarget",               0x00000002>;
+def HAL_BufferUsage_Transfer                     : I32BitEnumAttrCase<"Transfer",                     0x00000003>;
+def HAL_BufferUsage_DispatchIndirectParams       : I32BitEnumAttrCase<"DispatchIndirectParams",       0x00000100>;
+def HAL_BufferUsage_DispatchUniformRead          : I32BitEnumAttrCase<"DispatchUniformRead",          0x00000200>;
+def HAL_BufferUsage_DispatchStorageRead          : I32BitEnumAttrCase<"DispatchStorageRead",          0x00000400>;
+def HAL_BufferUsage_DispatchStorageWrite         : I32BitEnumAttrCase<"DispatchStorageWrite",         0x00000800>;
+def HAL_BufferUsage_DispatchStorage              : I32BitEnumAttrCase<"DispatchStorage",              0x00000C00>;
+def HAL_BufferUsage_DispatchImageRead            : I32BitEnumAttrCase<"DispatchImageRead",            0x00001000>;
+def HAL_BufferUsage_DispatchImageWrite           : I32BitEnumAttrCase<"DispatchImageWrite",           0x00002000>;
+def HAL_BufferUsage_DispatchImage                : I32BitEnumAttrCase<"DispatchImage",                0x00003000>;
+def HAL_BufferUsage_SharingExport                : I32BitEnumAttrCase<"SharingExport",                0x00010000>;
+def HAL_BufferUsage_SharingReplicate             : I32BitEnumAttrCase<"SharingReplicate",             0x00020000>;
+def HAL_BufferUsage_SharingConcurrent            : I32BitEnumAttrCase<"SharingConcurrent",            0x00040000>;
+def HAL_BufferUsage_SharingImmutable             : I32BitEnumAttrCase<"SharingImmutable",             0x00080000>;
+def HAL_BufferUsage_MappingScoped                : I32BitEnumAttrCase<"MappingScoped",                0x01000000>;
+def HAL_BufferUsage_MappingPersistent            : I32BitEnumAttrCase<"MappingPersistent",            0x02000000>;
+def HAL_BufferUsage_MappingOptional              : I32BitEnumAttrCase<"MappingOptional",              0x04000000>;
+def HAL_BufferUsage_MappingAccessRandom          : I32BitEnumAttrCase<"MappingAccessRandom",          0x08000000>;
+def HAL_BufferUsage_MappingAccessSequentialWrite : I32BitEnumAttrCase<"MappingAccessSequentialWrite", 0x10000000>;
+def HAL_BufferUsage_Mapping                      : I32BitEnumAttrCase<"Mapping",                      0x09000000>;
 def HAL_BufferUsageBitfieldAttr :
     I32BitEnumAttr<"BufferUsageBitfield", "valid BufferUsage", [
       HAL_BufferUsage_None,
-      HAL_BufferUsage_Constant,
+      HAL_BufferUsage_TransferSource,
+      HAL_BufferUsage_TransferTarget,
       HAL_BufferUsage_Transfer,
+      HAL_BufferUsage_DispatchIndirectParams,
+      HAL_BufferUsage_DispatchUniformRead,
+      HAL_BufferUsage_DispatchStorageRead,
+      HAL_BufferUsage_DispatchStorageWrite,
+      HAL_BufferUsage_DispatchStorage,
+      HAL_BufferUsage_DispatchImageRead,
+      HAL_BufferUsage_DispatchImageWrite,
+      HAL_BufferUsage_DispatchImage,
+      HAL_BufferUsage_SharingExport,
+      HAL_BufferUsage_SharingReplicate,
+      HAL_BufferUsage_SharingConcurrent,
+      HAL_BufferUsage_SharingImmutable,
+      HAL_BufferUsage_MappingScoped,
+      HAL_BufferUsage_MappingPersistent,
+      HAL_BufferUsage_MappingOptional,
+      HAL_BufferUsage_MappingAccessRandom,
+      HAL_BufferUsage_MappingAccessSequentialWrite,
       HAL_BufferUsage_Mapping,
-      HAL_BufferUsage_Dispatch,
     ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }

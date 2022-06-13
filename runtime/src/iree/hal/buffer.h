@@ -149,37 +149,229 @@ typedef uint16_t iree_hal_memory_access_t;
 
 // Bitfield that defines how a buffer is intended to be used.
 // Usage allows the driver to appropriately place the buffer for more
-// efficient operations of the specified types.
+// efficient operations of the specified types. Validation will fail if a buffer
+// is used in ways other than it was declared it would be used in.
 enum iree_hal_buffer_usage_bits_t {
   IREE_HAL_BUFFER_USAGE_NONE = 0u,
 
-  // The buffer, once defined, will not be mapped or updated again.
-  // This should be used for uniform parameter values such as runtime
-  // constants for executables. Doing so may allow drivers to inline values or
-  // represent them in command buffers more efficiently (avoiding memory reads
-  // or swapping, etc).
-  IREE_HAL_BUFFER_USAGE_CONSTANT = 1u << 0,
+  // ==== IREE_HAL_BUFFER_USAGE_TRANSFER_* =====================================
 
-  // The buffer can be used as the source or target of a transfer command
-  // (CopyBuffer, UpdateBuffer, etc).
+  // Buffer is used as a source for transfer operations.
+  // Buffer may be a source for:
+  //   iree_hal_command_buffer_copy_buffer
   //
-  // If |IREE_HAL_BUFFER_USAGE_MAPPING| is not specified drivers may safely
-  // assume that the host may never need visibility of this buffer as all
-  // accesses will happen via command buffers.
-  IREE_HAL_BUFFER_USAGE_TRANSFER = 1u << 1,
+  // Maps to:
+  //  - D3D12_RESOURCE_STATE_COPY_SOURCE
+  //  - GPUBufferUsage.COPY_SRC
+  //  - VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+  IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE = 1u << 0,
 
-  // The buffer can be mapped by the host application for reading and writing
-  // without a copy.
+  // Buffer is used as a target for transfer operations.
+  // Buffer may be a target for:
+  //   iree_hal_command_buffer_fill_buffer
+  //   iree_hal_command_buffer_update_buffer
+  //   iree_hal_command_buffer_copy_buffer
   //
-  // As mapping may require placement in special address ranges or system
-  // calls to enable visibility the driver can use the presence (or lack of)
-  // this flag to perform allocation-type setup and avoid initial mapping
-  // overhead.
-  IREE_HAL_BUFFER_USAGE_MAPPING = 1u << 2,
+  // Maps to:
+  //  - D3D12_RESOURCE_STATE_COPY_DEST
+  //  - GPUBufferUsage.COPY_DST
+  //  - VK_BUFFER_USAGE_TRANSFER_DST_BIT
+  IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET = 1u << 1,
 
-  // The buffer can be provided as an input or output to an executable.
-  // Buffers of this type may be directly used by drivers during dispatch.
-  IREE_HAL_BUFFER_USAGE_DISPATCH = 1u << 3,
+  // Buffer contents are transferred using DMA operations.
+  // Buffer may be a source or target for:
+  //   iree_hal_command_buffer_fill_buffer
+  //   iree_hal_command_buffer_update_buffer
+  //   iree_hal_command_buffer_copy_buffer
+  //
+  // Maps to:
+  //  - D3D12_RESOURCE_STATE_COPY_SOURCE | D3D12_RESOURCE_STATE_COPY_DEST
+  //  - GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST
+  //  - VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+  IREE_HAL_BUFFER_USAGE_TRANSFER = IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE |
+                                   IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET,
+
+  // ==== IREE_HAL_BUFFER_USAGE_DISPATCH_* =====================================
+
+  // Buffer contents are used for indirect dispatch workgroup parameters.
+  // Dispatch parameters must be aligned on 16-byte boundaries and be of the
+  // form `struct { uint32_t workgroup_xyz[3]; }`.
+  //
+  // Maps to:
+  //  - D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT
+  //  - GPUBufferUsage.INDIRECT
+  //  - MTLResourceUsageRead
+  //  - VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
+  IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS = 1u << 8,
+
+  // Buffer contents are uniformly read by dispatches.
+  // These may occasionally be written as storage buffers in cases of
+  // data-dependent sequences but are largely read-only and may have total size
+  // limitations (~32-64KB visible per binding).
+  //
+  // Uniform buffers can be used in place of push constants or as additional
+  // storage for when push constant resources are exhausted. As push constants
+  // must be recorded into the command buffer any values that may change if the
+  // command buffer were to be reused should be put in a mutable uniform
+  // buffer instead. By using uniform buffers (vs storage buffers) the hardware
+  // can perform better caching and coalescing as they are guaranteed to be
+  // read-only across all workgroups in a dispatch.
+  //
+  // Maps to:
+  //  - D3D12_CONSTANT_BUFFER_VIEW_DESC
+  //  - GPUBufferUsage.UNIFORM
+  //  - MTLResourceUsageRead
+  //  - VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT
+  IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ = 1u << 9,
+
+  // Buffer contents are read by dispatches as storage buffers.
+  // Read-only buffers can enable non-local prefetching and replication.
+  IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_READ = 1u << 10,
+
+  // Buffer contents are written by dispatches as storage buffers.
+  // Write-only buffers can reduce cache pollution and writeback latency.
+  IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_WRITE = 1u << 11,
+
+  // Buffer contents are read and written by dispatches as storage buffers.
+  // Storage buffers allow random read/write access to underlying data using
+  // flexible data formats and alignment. Atomic operations may be allowed
+  // depending on implementation.
+  //
+  // Maps to:
+  //  - D3D12_UNORDERED_ACCESS_VIEW_DESC::D3D12_BUFFER_UAV
+  //    + D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+  //  - GPUBufferUsage.STORAGE
+  //  - MTLResourceUsageRead | MTLResourceUsageWrite
+  //  - VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+  IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE =
+      IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_READ |
+      IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_WRITE,
+
+  // Buffer contents are read by dispatches as images.
+  // Depending on the implementation this may be ignored or treated the same as
+  // IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_READ.
+  IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE_READ = 1u << 12,
+
+  // Buffer contents are written by dispatches as images.
+  // Depending on the implementation this may be ignored or treated the same as
+  // IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_WRITE.
+  IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE_WRITE = 1u << 13,
+
+  // Buffer contents are read and written by dispatches as images.
+  // Depending on the implementation this may be ignored or treated the same as
+  // IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE. If supported then additional
+  // hardware resources may be required to perform the binding.
+  //
+  // Storage buffers are preferred in most cases due to the more flexible data
+  // types and access allowance. On specific hardware images may allow use of
+  // fixed-function sampling hardware and texture caches that are not available
+  // on the storage buffer path. The largest benefit from using images is around
+  // uniform loads (all invocations in a workgroup loading the same location) on
+  // low-end hardware in order to tickle driver compiler optimizations. In
+  // almost all other cases the image path can incur significant additional
+  // latency or correctness hazards especially in data-dependent operations.
+  //
+  // Maps to:
+  //  - D3D12_SHADER_RESOURCE_VIEW_DESC::D3D12_BUFFER_SRV
+  //  - MTLResourceUsageRead | MTLResourceUsageWrite
+  //  - VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT
+  IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE =
+      IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE_READ |
+      IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE_WRITE,
+
+  // ==== IREE_HAL_BUFFER_USAGE_SHARING_* ======================================
+
+  // Buffer can be exported via iree_hal_allocator_export_buffer.
+  // Exported buffers may require special allocation behavior (dedicated
+  // allocations, higher alignment, etc) and may impose lifetime restrictions.
+  IREE_HAL_BUFFER_USAGE_SHARING_EXPORT = 1u << 16,
+
+  // Buffer can be automatically replicated across peers.
+  // When multiple devices use the same buffer an implementation is allowed to
+  // clone the buffer per-device in order to keep accesses local.
+  // Implementations are free to ignore this flag if doing so would require
+  // additional overhead (managed memory/global locking/etc).
+  IREE_HAL_BUFFER_USAGE_SHARING_REPLICATE = 1u << 17,
+
+  // Buffer can be used concurrently by multiple queues.
+  // This may incur additional implicit synchronization overhead.
+  // When omitted the buffer is assumed to be exclusive to a queue and may not
+  // be accessible from other queues without explicit transfer operations.
+  IREE_HAL_BUFFER_USAGE_SHARING_CONCURRENT = 1u << 18,
+
+  // Buffer is immutable once initialized and implementations are allowed to
+  // avoid synchronization/transfers done in cases where the buffer may be
+  // mutable. Implementations are allowed to protect the buffer contents for
+  // read-only access if they support it.
+  IREE_HAL_BUFFER_USAGE_SHARING_IMMUTABLE = 1u << 19,
+
+  // ==== IREE_HAL_BUFFER_USAGE_MAPPING_* ======================================
+
+  // Buffer may be mapped for scoped host access.
+  // Each iree_hal_buffer_map_range must be paired with an
+  // iree_hal_buffer_unmap_range.
+  //
+  // Concurrent access across host and device are not allowed during scoped
+  // mappings and will lead to desynchronization. If concurrent access is
+  // required then persistent mapping can be used (if supported) and otherwise
+  // staging buffers with transfer operations can preserve proper pipelining.
+  IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED = 1u << 24,
+
+  // Buffer may be mapped for persistent host access.
+  // iree_hal_buffer_map_range _may_ be paired with a matching
+  // iree_hal_buffer_unmap_range but it's not required.
+  //
+  // These mappings can persist for the lifetime of the buffer and allow for
+  // concurrent usage from both host and device. Depending on the memory type
+  // additional synchronization may be required via flushes and invalidation.
+  // Not all implementations support this and of those that do many may place
+  // such allocations in slower or more restrictive memory.
+  IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT = 1u << 25,
+
+  // Buffer is allowed to be mapped only if doing so is cheap.
+  // If omitted and one of the other mapping usage flags is set the allocation
+  // will fail if the buffer cannot be allocated in mapped memory. This can be
+  // used to optimistically request mapping for staging buffers that avoids
+  // additional allocations and copies. Code setting this flag is expected to
+  // handle the transfers when mapping is not used by checking the allocated
+  // buffer usage bits.
+  IREE_HAL_BUFFER_USAGE_MAPPING_OPTIONAL = 1u << 26,
+
+  // Indicates that the mapped memory will be accessed by the host randomly.
+  // Reads and writes will be non-contiguous or non-temporal and host-cached
+  // memory is strongly preferred.
+  IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_RANDOM = 1u << 27,
+
+  // Indicates that the mapped memory will be written sequentially (memcpy/etc).
+  // The host will only write to the mapped memory and do so using a sequential
+  // operation (memcpy, memset, etc). Reads may fail or be *extremely* slow.
+  IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_SEQUENTIAL_WRITE = 1u << 28,
+
+  // Buffer may be mapped for scoped random-access host access.
+  // Allocation will fail if mapping is not available; if attempting to
+  // optimistically map in order to avoid staging transfers then add the
+  // IREE_HAL_BUFFER_USAGE_MAPPING_OPTIONAL bit.
+  //
+  // WARNING: mapping can be extremely expensive, use limited hardware
+  // resources, introduce data hazards, and synchronize host and device
+  // execution. Unless an application knows that such issues will not arise
+  // (as in tests where there's never concurrent usage) mapping should be used
+  // judiciously: do not assume mapping is a high-performance technique!
+  //
+  // If an application knows its access characteristics (such as memcpy only)
+  // then prefer specifying the bits directly and including
+  // IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_SEQUENTIAL_WRITE. Random access (set
+  // by default with this value) can severely harm device performance.
+  IREE_HAL_BUFFER_USAGE_MAPPING = IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED |
+                                  IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_RANDOM,
+
+  // ==== IREE_HAL_BUFFER_USAGE_* helpers ======================================
+
+  // Default usage mode covering transfer and dispatch.
+  // Most internal buffers will be allocated for this usage and external buffers
+  // should use this unless specific usage is required (such as mapping).
+  IREE_HAL_BUFFER_USAGE_DEFAULT =
+      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE,
 };
 typedef uint32_t iree_hal_buffer_usage_t;
 

@@ -33,7 +33,7 @@ class command_buffer_test : public CtsTestBase {
     iree_hal_buffer_params_t params = {0};
     params.type =
         IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                    IREE_HAL_BUFFER_USAGE_TRANSFER |
                    IREE_HAL_BUFFER_USAGE_MAPPING;
     iree_hal_buffer_t* device_buffer = NULL;
@@ -141,7 +141,7 @@ TEST_P(command_buffer_test, CopyWholeBuffer) {
   iree_hal_buffer_params_t host_params = {0};
   host_params.type =
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-  host_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+  host_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                       IREE_HAL_BUFFER_USAGE_TRANSFER |
                       IREE_HAL_BUFFER_USAGE_MAPPING;
   iree_hal_buffer_t* host_buffer = nullptr;
@@ -155,7 +155,7 @@ TEST_P(command_buffer_test, CopyWholeBuffer) {
   iree_hal_buffer_params_t device_params = {0};
   device_params.type =
       IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  device_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+  device_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                         IREE_HAL_BUFFER_USAGE_TRANSFER |
                         IREE_HAL_BUFFER_USAGE_MAPPING;
   iree_hal_buffer_t* device_buffer = nullptr;
@@ -199,7 +199,7 @@ TEST_P(command_buffer_test, CopySubBuffer) {
   iree_hal_buffer_params_t device_params = {0};
   device_params.type =
       IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  device_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+  device_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                         IREE_HAL_BUFFER_USAGE_TRANSFER |
                         IREE_HAL_BUFFER_USAGE_MAPPING;
   iree_hal_buffer_t* device_buffer = NULL;
@@ -216,7 +216,7 @@ TEST_P(command_buffer_test, CopySubBuffer) {
   iree_hal_buffer_params_t host_params = {0};
   host_params.type =
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-  host_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+  host_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                       IREE_HAL_BUFFER_USAGE_TRANSFER |
                       IREE_HAL_BUFFER_USAGE_MAPPING;
   std::vector<uint8_t> host_buffer_data(kDefaultAllocationSize, i8_val);

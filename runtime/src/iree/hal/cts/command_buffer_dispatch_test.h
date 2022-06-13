@@ -85,7 +85,7 @@ TEST_P(command_buffer_dispatch_test, DispatchAbs) {
   iree_hal_buffer_params_t input_params = {0};
   input_params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
   input_params.usage =
-      IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER;
+      IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE | IREE_HAL_BUFFER_USAGE_TRANSFER;
   iree_hal_buffer_view_t* input_buffer_view = NULL;
   float input_data[1] = {-2.5f};
   IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
@@ -97,7 +97,7 @@ TEST_P(command_buffer_dispatch_test, DispatchAbs) {
   iree_hal_buffer_params_t output_params = {0};
   output_params.type =
       IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  output_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+  output_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                         IREE_HAL_BUFFER_USAGE_TRANSFER |
                         IREE_HAL_BUFFER_USAGE_MAPPING;
   iree_hal_buffer_t* output_buffer = NULL;

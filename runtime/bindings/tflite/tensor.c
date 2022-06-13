@@ -141,7 +141,7 @@ iree_status_t _TfLiteTensorReallocateIfNeeded(
               (iree_hal_buffer_params_t){
                   .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
                           IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-                  .usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                  .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                            IREE_HAL_BUFFER_USAGE_TRANSFER |
                            IREE_HAL_BUFFER_USAGE_MAPPING,
               },

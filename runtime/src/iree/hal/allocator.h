@@ -96,8 +96,7 @@ typedef struct iree_hal_buffer_params_t {
 static inline void iree_hal_buffer_params_canonicalize(
     iree_hal_buffer_params_t* params) {
   if (!params->usage) {
-    params->usage =
-        IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER;
+    params->usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
   }
   if (!params->access) {
     params->access = IREE_HAL_MEMORY_ACCESS_ALL;
@@ -116,7 +115,7 @@ static inline iree_hal_buffer_params_t iree_hal_buffer_params_with_usage(
   iree_hal_buffer_params_t result = params;
   if (!result.usage) {
     result.usage =
-        IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER;
+        IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE | IREE_HAL_BUFFER_USAGE_TRANSFER;
   }
   result.usage |= usage;
   return result;

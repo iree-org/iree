@@ -92,7 +92,7 @@ class CheckTest : public ::testing::Test {
     iree_hal_buffer_params_t params = {0};
     params.type =
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                    IREE_HAL_BUFFER_USAGE_TRANSFER |
                    IREE_HAL_BUFFER_USAGE_MAPPING;
     IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
@@ -114,7 +114,7 @@ class CheckTest : public ::testing::Test {
     iree_hal_buffer_params_t params = {0};
     params.type =
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                    IREE_HAL_BUFFER_USAGE_TRANSFER |
                    IREE_HAL_BUFFER_USAGE_MAPPING;
     IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
@@ -136,7 +136,7 @@ class CheckTest : public ::testing::Test {
     iree_hal_buffer_params_t params = {0};
     params.type =
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                    IREE_HAL_BUFFER_USAGE_TRANSFER |
                    IREE_HAL_BUFFER_USAGE_MAPPING;
     IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
@@ -158,7 +158,7 @@ class CheckTest : public ::testing::Test {
     iree_hal_buffer_params_t params = {0};
     params.type =
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                    IREE_HAL_BUFFER_USAGE_TRANSFER |
                    IREE_HAL_BUFFER_USAGE_MAPPING;
     IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(

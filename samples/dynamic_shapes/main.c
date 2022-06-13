@@ -25,8 +25,7 @@ iree_status_t reduce_sum_1d(iree_runtime_session_t* session, const int* values,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-            .usage =
-                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
+            .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
         },
         iree_make_const_byte_span((void*)values, sizeof(int) * values_length),
         &arg0);
@@ -75,8 +74,7 @@ iree_status_t reduce_sum_2d(iree_runtime_session_t* session, const int* values,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-            .usage =
-                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
+            .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
         },
         iree_make_const_byte_span((void*)values, sizeof(int) * values_length),
         &arg0);
@@ -116,8 +114,7 @@ iree_status_t add_one(iree_runtime_session_t* session, const int* values,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-            .usage =
-                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
+            .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
         },
         iree_make_const_byte_span((void*)values, sizeof(int) * values_length),
         &arg0);
