@@ -91,8 +91,10 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.memref
   MLIRPythonSources.Dialects.pdl
   MLIRPythonSources.Dialects.shape
+  MLIRPythonSources.Dialects.structured_transform
   MLIRPythonSources.Dialects.tensor
   MLIRPythonSources.Dialects.tosa
+  MLIRPythonSources.Dialects.transform
   MLIRPythonSources.Dialects.vector
 
   # mhlo project.
