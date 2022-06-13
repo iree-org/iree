@@ -152,29 +152,28 @@ spirv::ResourceLimitsAttr convertResourceLimits(
     Vulkan::TargetEnvAttr vkTargetEnv) {
   MLIRContext *context = vkTargetEnv.getContext();
   Builder builder(context);
-  auto toI32Attr = [&](int v) { return builder.getI32IntegerAttr(v); };
-  auto toTypeAttr = [&](Type t) { return TypeAttr::get(t); };
   auto vkCapabilities = vkTargetEnv.getCapabilitiesAttr();
   SmallVector<Attribute, 1> spvAttrs;
   if (ArrayAttr attr = vkCapabilities.getCooperativeMatrixPropertiesNV()) {
     for (auto props :
          attr.getAsRange<Vulkan::CooperativeMatrixPropertiesNVAttr>()) {
       spvAttrs.push_back(spirv::CooperativeMatrixPropertiesNVAttr::get(
-          toI32Attr(props.getMSize()), toI32Attr(props.getNSize()),
-          toI32Attr(props.getKSize()), toTypeAttr(props.getAType()),
-          toTypeAttr(props.getBType()), toTypeAttr(props.getCType()),
-          toTypeAttr(props.getResultType()),
-          spirv::ScopeAttr::get(
-              context, static_cast<spirv::Scope>(props.getScope().getValue())),
-          context));
+          context, props.getMSize(), props.getNSize(), props.getKSize(),
+          props.getAType(), props.getBType(), props.getCType(),
+          props.getResultType(),
+          spirv::ScopeAttr::get(context, static_cast<spirv::Scope>(
+                                             props.getScope().getValue()))));
     }
   }
+  auto sizeValues =
+      vkCapabilities.getMaxComputeWorkGroupSize().getValues<int32_t>();
+  SmallVector<int32_t, 4> sizes;
+  sizes.insert(sizes.end(), sizeValues.begin(), sizeValues.end());
   return spirv::ResourceLimitsAttr::get(
-      toI32Attr(vkCapabilities.getMaxComputeSharedMemorySize()),
-      toI32Attr(vkCapabilities.getMaxComputeWorkGroupInvocations()),
-      vkCapabilities.getMaxComputeWorkGroupSize(),
-      toI32Attr(vkCapabilities.getSubgroupSize()),
-      ArrayAttr::get(context, spvAttrs), context);
+      context, vkCapabilities.getMaxComputeSharedMemorySize(),
+      vkCapabilities.getMaxComputeWorkGroupInvocations(),
+      builder.getI32ArrayAttr(sizes), vkCapabilities.getSubgroupSize(),
+      ArrayAttr::get(context, spvAttrs));
 }
 }  // anonymous namespace
 

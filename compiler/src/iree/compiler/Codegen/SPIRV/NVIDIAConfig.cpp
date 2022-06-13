@@ -34,17 +34,16 @@ struct CooperativeMatrixSize {
 static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
     spirv::ResourceLimitsAttr resourceLimits, Type lhsType, Type rhsType,
     Type resultType, int64_t m, int64_t n, int64_t k) {
-  auto properties = resourceLimits.cooperative_matrix_properties_nv()
+  auto properties = resourceLimits.getCooperative_matrix_properties_nv()
                         .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>();
   for (auto property : properties) {
-    if (property.a_type().getValue() == lhsType &&
-        property.b_type().getValue() == rhsType &&
-        property.c_type().getValue() == resultType &&
-        property.result_type().getValue() == resultType &&
-        property.scope().getValue() == spirv::Scope::Subgroup) {
-      int64_t matmulM = property.m_size().getValue().getZExtValue();
-      int64_t matmulN = property.n_size().getValue().getZExtValue();
-      int64_t matmulK = property.k_size().getValue().getZExtValue();
+    if (property.getA_type() == lhsType && property.getB_type() == rhsType &&
+        property.getC_type() == resultType &&
+        property.getResult_type() == resultType &&
+        property.getScope().getValue() == spirv::Scope::Subgroup) {
+      int matmulM = property.getM_size();
+      int matmulN = property.getN_size();
+      int matmulK = property.getK_size();
       if (m % matmulM == 0 && n % matmulN == 0 && k % matmulK == 0) {
         return CooperativeMatrixSize{matmulM, matmulN, matmulK};
       }
@@ -93,7 +92,7 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
   // TODO: Use some heuristics to deduce how many subgroups should be used and
   // the tile sizes for each subgroup, considering the input workload size and
   // native cooperative matrix size choices.
-  int64_t subgroupSize = resourceLimits.subgroup_size().getInt();
+  int subgroupSize = resourceLimits.getSubgroup_size();
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
 
   TileSizesListType tileSizes;
@@ -141,7 +140,7 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
 
 LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
                                      Operation *rootOp) {
-  int64_t subgroupSize = targetEnv.getResourceLimits().subgroup_size().getInt();
+  int subgroupSize = targetEnv.getResourceLimits().getSubgroup_size();
   if (auto matmulOp = dyn_cast<linalg::MatmulOp>(rootOp)) {
     // First try to see if we can use tensor cores.
     if (failed(setOpConfig(targetEnv, matmulOp))) return failure();
