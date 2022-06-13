@@ -207,8 +207,7 @@ static iree_status_t iree_runtime_demo_perform_mul(
               // Access to allow to this memory (this is .rodata so READ only):
               .access = IREE_HAL_MEMORY_ACCESS_READ,
               // Intended usage of the buffer (transfers, dispatches, etc):
-              .usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
-                       IREE_HAL_BUFFER_USAGE_TRANSFER,
+              .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
           },
           // The actual heap buffer to wrap or clone and its allocator:
           iree_make_const_byte_span(arg0_data, sizeof(arg0_data)),
@@ -238,8 +237,7 @@ static iree_status_t iree_runtime_demo_perform_mul(
           (iree_hal_buffer_params_t){
               .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
               .access = IREE_HAL_MEMORY_ACCESS_READ,
-              .usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
-                       IREE_HAL_BUFFER_USAGE_TRANSFER,
+              .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
           },
           iree_make_const_byte_span(arg1_data, sizeof(arg1_data)), &arg1);
     }

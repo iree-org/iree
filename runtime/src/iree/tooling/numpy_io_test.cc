@@ -114,8 +114,7 @@ static void LoadArrayAndAssertContents(FILE* stream,
                                        iree_hal_encoding_type_t encoding_type,
                                        std::vector<T> contents) {
   iree_hal_buffer_params_t buffer_params = {};
-  buffer_params.usage =
-      IREE_HAL_BUFFER_USAGE_CONSTANT | IREE_HAL_BUFFER_USAGE_TRANSFER;
+  buffer_params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
   buffer_params.access = IREE_HAL_MEMORY_ACCESS_READ;
   buffer_params.type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL;
   iree_hal_buffer_view_t* buffer_view = NULL;
@@ -136,8 +135,7 @@ TEST_F(NumpyIOTest, LoadEmptyFile) {
 
   // Try (and fail) to parse something from the empty file.
   iree_hal_buffer_params_t buffer_params = {};
-  buffer_params.usage =
-      IREE_HAL_BUFFER_USAGE_CONSTANT | IREE_HAL_BUFFER_USAGE_TRANSFER;
+  buffer_params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
   buffer_params.access = IREE_HAL_MEMORY_ACCESS_READ;
   buffer_params.type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL;
   iree_hal_buffer_view_t* buffer_view = NULL;
@@ -306,8 +304,7 @@ static void RoundTripArrays(FILE* source_stream, FILE* target_stream,
                             iree_hal_allocator_t* device_allocator) {
   while (!IsEOF(source_stream)) {
     iree_hal_buffer_params_t buffer_params = {};
-    buffer_params.usage =
-        IREE_HAL_BUFFER_USAGE_CONSTANT | IREE_HAL_BUFFER_USAGE_TRANSFER;
+    buffer_params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
     buffer_params.access = IREE_HAL_MEMORY_ACCESS_READ;
     buffer_params.type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL;
     iree_hal_buffer_view_t* buffer_view = NULL;

@@ -420,7 +420,7 @@ iree_status_t iree_hal_command_buffer_dispatch_indirect_validation(
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_compatibility(
       command_buffer, workgroups_buffer,
       IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
-      IREE_HAL_BUFFER_USAGE_DISPATCH));
+      IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS));
 
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
       iree_hal_buffer_memory_type(workgroups_buffer),
@@ -430,7 +430,7 @@ iree_status_t iree_hal_command_buffer_dispatch_indirect_validation(
       IREE_HAL_MEMORY_ACCESS_READ));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
       iree_hal_buffer_allowed_usage(workgroups_buffer),
-      IREE_HAL_BUFFER_USAGE_DISPATCH));
+      IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_range(
       workgroups_buffer, workgroups_offset, sizeof(uint32_t) * 3));
 

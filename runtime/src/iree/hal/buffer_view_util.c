@@ -399,7 +399,7 @@ static iree_status_t iree_hal_buffer_view_parse_impl(
   // Allocate the buffer from the provided allocator and parse directly into it.
   const iree_hal_buffer_params_t buffer_params = {
       .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-      .usage = IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
+      .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
   };
   iree_hal_buffer_view_parse_params_t parse_params = {
       .data_str = data_str,
