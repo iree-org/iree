@@ -24,21 +24,8 @@ def check_and_get_output_lines(command: Sequence[str],
   print(f'Running: `{" ".join(command)}`')
   if dry_run:
     return None, None
-  process = subprocess.run(
-      command,
-      # TODO(#4131) python>=3.7: Use capture_output=True.
-      stderr=subprocess.PIPE,
-      stdout=subprocess.PIPE,
-      # TODO(#4131) python>=3.7: Replace 'universal_newlines' with 'text'.
-      universal_newlines=True)
-
-  if log_stderr:
-    for line in process.stderr.splitlines():
-      print(line)
-
-  process.check_returncode()
-
-  return process.stdout.splitlines()
+  return subprocess.run(command, stdout=subprocess.PIPE, text=true,
+                        check=True).stdout.splitlines()
 
 
 def get_test_targets(test_suite_path: str):
