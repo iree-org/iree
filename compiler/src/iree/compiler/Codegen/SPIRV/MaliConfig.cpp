@@ -28,7 +28,7 @@ namespace detail {
 
 LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
                                    Operation *rootOp) {
-  int64_t subgroupSize = targetEnv.getResourceLimits().subgroup_size().getInt();
+  int subgroupSize = targetEnv.getResourceLimits().getSubgroup_size();
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([subgroupSize](auto op) {
         std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 2};

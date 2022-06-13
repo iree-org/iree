@@ -11,11 +11,11 @@
 ]>
 hal.executable @matmul_1024x2048x512 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
-        max_compute_shared_memory_size = 32768 : i32,
-        max_compute_workgroup_invocations = 512 : i32,
-        max_compute_workgroup_size = dense<512> : vector<3xi32>,
-       subgroup_size = 16 : i32}>
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spv.resource_limits<
+        max_compute_shared_memory_size = 32768,
+        max_compute_workgroup_invocations = 512,
+        max_compute_workgroup_size = [512, 512, 512],
+       subgroup_size = 16>>
     }> {
     hal.executable.export @matmul_1024x2048x512 layout(#executable_layout)
     builtin.module {
@@ -63,11 +63,11 @@ hal.executable @matmul_1024x2048x512 {
 ]>
 hal.executable @matmul_3136x24x96 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
-        max_compute_shared_memory_size = 32768 : i32,
-        max_compute_workgroup_invocations = 512 : i32,
-        max_compute_workgroup_size = dense<512> : vector<3xi32>,
-       subgroup_size = 16 : i32}>
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spv.resource_limits<
+        max_compute_shared_memory_size = 32768,
+        max_compute_workgroup_invocations = 512,
+        max_compute_workgroup_size = [512, 512, 512],
+       subgroup_size = 16>>
     }> {
     hal.executable.export @matmul_3136x24x96 layout(#executable_layout)
     builtin.module {
@@ -116,11 +116,11 @@ hal.executable @matmul_3136x24x96 {
 ]>
 hal.executable @matmul_196x64x192 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
-        max_compute_shared_memory_size = 32768 : i32,
-        max_compute_workgroup_invocations = 512 : i32,
-        max_compute_workgroup_size = dense<512> : vector<3xi32>,
-       subgroup_size = 16 : i32}>
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spv.resource_limits<
+        max_compute_shared_memory_size = 32768,
+        max_compute_workgroup_invocations = 512,
+        max_compute_workgroup_size = [512, 512, 512],
+       subgroup_size = 16>>
     }> {
     hal.executable.export @matmul_196x64x192 layout(#executable_layout)
     builtin.module {
@@ -170,11 +170,11 @@ hal.executable @matmul_196x64x192 {
 ]>
 hal.executable @matmul_12544x96x16 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
-        max_compute_shared_memory_size = 32768 : i32,
-        max_compute_workgroup_invocations = 512 : i32,
-        max_compute_workgroup_size = dense<512> : vector<3xi32>,
-       subgroup_size = 16 : i32}>
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spv.resource_limits<
+        max_compute_shared_memory_size = 32768,
+        max_compute_workgroup_invocations = 512,
+        max_compute_workgroup_size = [512, 512, 512],
+       subgroup_size = 16>>
     }> {
     hal.executable.export @matmul_12544x96x16 layout(#executable_layout)
     builtin.module {
@@ -217,11 +217,11 @@ hal.executable @matmul_12544x96x16 {
 ]>
 hal.executable @matmul_49x160x576 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
-        max_compute_shared_memory_size = 32768 : i32,
-        max_compute_workgroup_invocations = 512 : i32,
-        max_compute_workgroup_size = dense<512> : vector<3xi32>,
-       subgroup_size = 16 : i32}>
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spv.resource_limits<
+        max_compute_shared_memory_size = 32768,
+        max_compute_workgroup_invocations = 512,
+        max_compute_workgroup_size = [512, 512, 512],
+       subgroup_size = 16>>
     }> {
     hal.executable.export @matmul_49x160x576 layout(#executable_layout)
     builtin.module {
@@ -272,11 +272,11 @@ hal.executable @matmul_49x160x576 {
 
 hal.executable @matmul_1x1024x576 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
-        max_compute_shared_memory_size = 32768 : i32,
-        max_compute_workgroup_invocations = 512 : i32,
-        max_compute_workgroup_size = dense<512> : vector<3xi32>,
-       subgroup_size = 16 : i32}>
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spv.resource_limits<
+        max_compute_shared_memory_size = 32768,
+        max_compute_workgroup_invocations = 512,
+        max_compute_workgroup_size = [512, 512, 512],
+       subgroup_size = 16>>
     }> {
     hal.executable.export @matmul_1x1024x576 layout(#executable_layout)
     builtin.module {
@@ -328,11 +328,11 @@ hal.executable @matmul_1x1024x576 {
 ]>
 hal.executable @batch_matmul_4x384x384 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
-        max_compute_shared_memory_size = 32768 : i32,
-        max_compute_workgroup_invocations = 512 : i32,
-        max_compute_workgroup_size = dense<512> : vector<3xi32>,
-       subgroup_size = 16 : i32}>
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spv.resource_limits<
+        max_compute_shared_memory_size = 32768,
+        max_compute_workgroup_invocations = 512,
+        max_compute_workgroup_size = [512, 512, 512],
+       subgroup_size = 16>>
     }> {
     hal.executable.export @batch_matmul_4x384x384 layout(#executable_layout)
     builtin.module {
@@ -383,11 +383,11 @@ hal.executable @batch_matmul_4x384x384 {
 ]>
 hal.executable @batch_matmul_4x2x8 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
-        max_compute_shared_memory_size = 32768 : i32,
-        max_compute_workgroup_invocations = 512 : i32,
-        max_compute_workgroup_size = dense<512> : vector<3xi32>,
-       subgroup_size = 16 : i32}>
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spv.resource_limits<
+        max_compute_shared_memory_size = 32768,
+        max_compute_workgroup_invocations = 512,
+        max_compute_workgroup_size = [512, 512, 512],
+       subgroup_size = 16>>
     }> {
     hal.executable.export @batch_matmul_4x2x8 layout(#executable_layout)
     builtin.module {

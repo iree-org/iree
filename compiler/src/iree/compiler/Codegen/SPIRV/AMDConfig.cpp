@@ -37,7 +37,7 @@ namespace detail {
 
 LogicalResult setAMDCodeGenConfig(const spirv::TargetEnv &targetEnv,
                                   Operation *rootOp) {
-  int64_t subgroupSize = targetEnv.getResourceLimits().subgroup_size().getInt();
+  int subgroupSize = targetEnv.getResourceLimits().getSubgroup_size();
   if (auto matmulOp = dyn_cast<linalg::MatmulOp>(rootOp)) {
     std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 8};
     std::array<int64_t, 3> threadMNK = {8, 4, 32};
