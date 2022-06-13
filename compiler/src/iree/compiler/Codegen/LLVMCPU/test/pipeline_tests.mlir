@@ -116,6 +116,55 @@ hal.executable private @preset_config_matmul  {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+#executable_layout = #hal.executable.layout<push_constants = 6, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>]
+  >]>
+hal.executable private @batch_matmul_dynamic {
+  hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+    hal.executable.export public @batch_matmul_dynamic ordinal(0) layout(#executable_layout)
+    builtin.module {
+      func.func @batch_matmul_dynamic() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.constant.load[0] : i32
+        %1 = hal.interface.constant.load[1] : i32
+        %2 = hal.interface.constant.load[2] : i32
+        %3 = hal.interface.constant.load[3] : i32
+        %4 = hal.interface.constant.load[4] : i32
+        %5 = hal.interface.constant.load[5] : i32
+        %6 = arith.index_cast %0 : i32 to index
+        %7 = arith.index_cast %1 : i32 to index
+        %8 = arith.index_cast %2 : i32 to index
+        %9 = arith.index_cast %3 : i32 to index
+        %10 = arith.index_cast %4 : i32 to index
+        %11 = arith.index_cast %5 : i32 to index
+        %12 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:?x?x?xf32>{%6, %7, %9}
+        %13 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:?x?x?xf32>{%10, %11, %8}
+        %14 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:?x?x?xf32>{%6, %7, %8}
+        %15 = flow.dispatch.tensor.load %12, offsets = [0, 0, 0], sizes = [%6, %7, %9], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:?x?x?xf32>{%6, %7, %9} -> tensor<?x?x?xf32>
+        %16 = flow.dispatch.tensor.load %13, offsets = [0, 0, 0], sizes = [%10, %11, %8], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:?x?x?xf32>{%10, %11, %8} -> tensor<?x?x?xf32>
+        %17 = linalg.init_tensor [%6, %7, %8] : tensor<?x?x?xf32>
+        %18 = linalg.fill ins(%cst : f32) outs(%17 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+        %19 = linalg.batch_matmul ins(%15, %16 : tensor<?x?x?xf32>, tensor<?x?x?xf32>) outs(%18 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+        flow.dispatch.tensor.store %19, %14, offsets = [0, 0, 0], sizes = [%6, %7, %8], strides = [1, 1, 1] : tensor<?x?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?x?xf32>{%6, %7, %8}
+        return
+      }
+    }
+  }
+}
+// CHECK: func.func @batch_matmul_dynamic
+// CHECK:   vector.outerproduct
+
+// -----
+
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+  cpu_features = "",
+  data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+  native_vector_size = 16 : index,
+  target_triple = "x86_64-unknown-unknown-eabi-elf"}>
 #executable_layout = #hal.executable.layout<push_constants = 2, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
