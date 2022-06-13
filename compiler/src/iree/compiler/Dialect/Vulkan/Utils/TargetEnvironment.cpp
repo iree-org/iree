@@ -157,22 +157,21 @@ spirv::ResourceLimitsAttr convertResourceLimits(
   if (ArrayAttr attr = vkCapabilities.getCooperativeMatrixPropertiesNV()) {
     for (auto props :
          attr.getAsRange<Vulkan::CooperativeMatrixPropertiesNVAttr>()) {
+      auto scope = static_cast<spirv::Scope>(props.getScope().getValue());
       spvAttrs.push_back(spirv::CooperativeMatrixPropertiesNVAttr::get(
           context, props.getMSize(), props.getNSize(), props.getKSize(),
           props.getAType(), props.getBType(), props.getCType(),
-          props.getResultType(),
-          spirv::ScopeAttr::get(context, static_cast<spirv::Scope>(
-                                             props.getScope().getValue()))));
+          props.getResultType(), spirv::ScopeAttr::get(context, scope)));
     }
   }
   auto sizeValues =
       vkCapabilities.getMaxComputeWorkGroupSize().getValues<int32_t>();
-  SmallVector<int32_t, 4> sizes;
+  SmallVector<int64_t, 4> sizes;
   sizes.insert(sizes.end(), sizeValues.begin(), sizeValues.end());
   return spirv::ResourceLimitsAttr::get(
       context, vkCapabilities.getMaxComputeSharedMemorySize(),
       vkCapabilities.getMaxComputeWorkGroupInvocations(),
-      builder.getI32ArrayAttr(sizes), vkCapabilities.getSubgroupSize(),
+      builder.getI64ArrayAttr(sizes), vkCapabilities.getSubgroupSize(),
       ArrayAttr::get(context, spvAttrs));
 }
 }  // anonymous namespace
