@@ -562,7 +562,7 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
         bytecode_module,
     };
     status = iree_vm_context_create_with_modules(
-        executable_loader->instance, IREE_VM_CONTEXT_FLAG_NONE,
+        executable_loader->instance, IREE_VM_CONTEXT_FLAG_CONCURRENT,
         IREE_ARRAYSIZE(modules), modules, executable_loader->host_allocator,
         &context);
   }
