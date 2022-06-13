@@ -188,6 +188,7 @@ cc_library(
         "//compiler/src/iree/compiler/Codegen",
         "//compiler/src/iree/compiler/ConstEval",
         "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",
+        "//compiler/src/iree/compiler/Dialect/VM/Target/C",
         "//compiler/src/iree/compiler/Pipelines",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
