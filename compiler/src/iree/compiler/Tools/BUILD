@@ -59,7 +59,7 @@ cc_library(
         "init_mlir_passes.h",
     ],
     deps = [
-        "//compiler/src/iree/compiler/Dialect/VM/Target/C:Enabled",
+        "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:ArmNeon",
@@ -188,7 +188,6 @@ cc_library(
         "//compiler/src/iree/compiler/Codegen",
         "//compiler/src/iree/compiler/ConstEval",
         "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",
-        "//compiler/src/iree/compiler/Dialect/VM/Target/Bytecode",
         "//compiler/src/iree/compiler/Dialect/VM/Target/C",
         "//compiler/src/iree/compiler/Pipelines",
         "//compiler/src/iree/compiler/Utils",

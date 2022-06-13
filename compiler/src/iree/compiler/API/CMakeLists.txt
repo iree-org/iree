@@ -48,7 +48,7 @@ add_mlir_public_c_api_library(IREECompilerCAPILib
     iree::compiler::InputConversion::MHLO::MHLO
     iree::compiler::InputConversion::TOSA::TOSA
     iree::compiler::Dialect::VM::IR::IR
-    iree::compiler::Dialect::VM::Target::Bytecode::Bytecode
+    iree::compiler::Dialect::VM::Target::init_targets
     iree::compiler::Pipelines
 
     # Passes and dialects.

@@ -26,10 +26,6 @@ Enables instrumented runtime tracing. Defaults to `OFF`.
 Enables instrumented compiler tracing. This requires that
 `IREE_ENABLE_RUNTIME_TRACING` also be set. Defaults to `OFF`.
 
-#### `IREE_ENABLE_EMITC`:BOOL
-
-Enables the build of the out-of-tree MLIR dialect EmitC. Defaults to `OFF`.
-
 #### `IREE_BUILD_COMPILER`:BOOL
 
 Builds the IREE compiler. Defaults to `ON`.
@@ -77,6 +73,10 @@ Default setting for each `IREE_TARGET_BACKEND_*` option.
 #### `IREE_TARGET_BACKEND_*`:BOOL
 
 Individual options enabling the build for each compiler target backend.
+
+#### `IREE_OUTPUT_FORMAT_C`:BOOL
+
+Enables the vm-c compiler output format, using MLIR EmitC. Defaults to `ON`.
 
 #### `IREE_DEV_MODE`:BOOL
 

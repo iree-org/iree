@@ -6,7 +6,7 @@
 
 iree_add_all_subdirs()
 
-if(IREE_ENABLE_EMITC)
+if(IREE_OUTPUT_FORMAT_C)
 
 iree_cc_test(
   NAME
