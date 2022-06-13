@@ -229,6 +229,7 @@ enum class NumericalType : uint32_t {
   kInteger = 0x10,
   kIntegerSigned = kInteger | 0x01,
   kIntegerUnsigned = kInteger | 0x02,
+  kBoolean = kInteger | 0x03,
   kFloat = 0x20,
   kFloatIEEE = kFloat | 0x01,
   kFloatBrain = kFloat | 0x02,
@@ -242,7 +243,9 @@ constexpr inline int32_t makeElementTypeValue(NumericalType numericalType,
 llvm::Optional<int32_t> getElementTypeValue(Type type) {
   if (auto intType = type.dyn_cast_or_null<IntegerType>()) {
     NumericalType numericalType;
-    if (intType.isSigned()) {
+    if (intType.isInteger(1)) {
+      return makeElementTypeValue(NumericalType::kBoolean, 8);
+    } else if (intType.isSigned()) {
       numericalType = NumericalType::kIntegerSigned;
     } else if (intType.isUnsigned()) {
       numericalType = NumericalType::kIntegerUnsigned;

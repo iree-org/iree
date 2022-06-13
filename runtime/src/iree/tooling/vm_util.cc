@@ -19,9 +19,71 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
+#include "iree/tooling/numpy_io.h"
 #include "iree/vm/ref_cc.h"
 
+// TODO(benvanik): drop use of stdio and make an iree_io_stream_t.
+#if defined(IREE_PLATFORM_WINDOWS)
+static uint64_t GetFileLength(FILE* file) {
+  _fseeki64(file, 0, SEEK_END);
+  uint64_t file_length = _ftelli64(file);
+  _fseeki64(file, 0, SEEK_SET);
+  return file_length;
+}
+static bool IsEOF(FILE* file, uint64_t file_length) {
+  return _ftelli64(file) == file_length;
+}
+#else
+static uint64_t GetFileLength(FILE* file) {
+  fseeko(file, 0, SEEK_END);
+  uint64_t file_length = ftello(file);
+  fseeko(file, 0, SEEK_SET);
+  return file_length;
+}
+static bool IsEOF(FILE* file, uint64_t file_length) {
+  return ftello(file) == file_length;
+}
+#endif  // IREE_PLATFORM_*
+
 namespace iree {
+
+static iree_status_t LoadNdarraysFromFile(
+    iree_string_view_t file_path, iree_hal_allocator_t* device_allocator,
+    iree_vm_list_t* variant_list) {
+  // Open the file for reading.
+  std::string file_path_str(file_path.data, file_path.size);
+  FILE* file = std::fopen(file_path_str.c_str(), "rb");
+  if (!file) {
+    return iree_make_status(iree_status_code_from_errno(errno),
+                            "failed to open file '%.*s'", (int)file_path.size,
+                            file_path.data);
+  }
+
+  uint64_t file_length = GetFileLength(file);
+
+  iree_hal_buffer_params_t buffer_params = {};
+  buffer_params.usage = IREE_HAL_BUFFER_USAGE_CONSTANT |
+                        IREE_HAL_BUFFER_USAGE_TRANSFER |
+                        IREE_HAL_BUFFER_USAGE_DISPATCH;
+  buffer_params.access = IREE_HAL_MEMORY_ACCESS_READ;
+  buffer_params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status) && !IsEOF(file, file_length)) {
+    iree_hal_buffer_view_t* buffer_view = NULL;
+    status = iree_numpy_npy_load_ndarray(
+        file, IREE_NUMPY_NPY_LOAD_OPTION_DEFAULT, buffer_params,
+        device_allocator, &buffer_view);
+    if (iree_status_is_ok(status)) {
+      auto buffer_view_ref = iree_hal_buffer_view_retain_ref(buffer_view);
+      status = iree_vm_list_push_ref_move(variant_list, &buffer_view_ref);
+    }
+    iree_hal_buffer_view_release(buffer_view);
+  }
+
+  std::fclose(file);
+  return status;
+}
 
 // Creates a HAL buffer view with the given |metadata| and reads the contents
 // from the file at |file_path|.
@@ -108,6 +170,11 @@ Status ParseToVariantList(iree_hal_allocator_t* device_allocator,
   for (size_t i = 0; i < input_strings.size(); ++i) {
     iree_string_view_t input_view = iree_string_view_trim(iree_make_string_view(
         input_strings[i].data(), input_strings[i].size()));
+    if (iree_string_view_consume_prefix(&input_view, IREE_SV("@"))) {
+      IREE_RETURN_IF_ERROR(LoadNdarraysFromFile(input_view, device_allocator,
+                                                variant_list.get()));
+      continue;
+    }
     bool has_equal =
         iree_string_view_find_char(input_view, '=', 0) != IREE_STRING_VIEW_NPOS;
     bool has_x =

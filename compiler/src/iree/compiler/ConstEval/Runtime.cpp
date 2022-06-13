@@ -20,7 +20,9 @@ namespace {
 
 Type mapElementType(Location loc, iree_hal_element_type_t halElementType) {
   Builder builder(loc.getContext());
-  if (iree_hal_element_numerical_type_is_integer(halElementType)) {
+  if (iree_hal_element_numerical_type_is_boolean(halElementType)) {
+    return builder.getIntegerType(1);
+  } else if (iree_hal_element_numerical_type_is_integer(halElementType)) {
     return builder.getIntegerType(iree_hal_element_bit_count(halElementType));
   } else if (halElementType == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
     return builder.getF32Type();
