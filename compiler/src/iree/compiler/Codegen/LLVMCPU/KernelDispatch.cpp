@@ -123,17 +123,20 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
     // Check the fastest varying dimension of the operand. Set the vector size
     // of the corresponding loop to the vector size.
     if (map.value().getNumResults() == 0) continue;
-    auto fastestVaryingDimExpr =
-        map.value().getResults().back().dyn_cast<AffineDimExpr>();
-    if (!fastestVaryingDimExpr) continue;
-    unsigned fastestVaryingDim = fastestVaryingDimExpr.getPosition();
+    for (auto iter : map.value().getResults()) {
+      auto fastestVaryingDimExpr = iter.dyn_cast<AffineDimExpr>();
+      if (!fastestVaryingDimExpr) continue;
+      unsigned fastestVaryingDim = fastestVaryingDimExpr.getPosition();
 
-    // If the indexing map has result it has to be a shaped type.
-    auto operandType =
-        inputOutputOpOperands[map.index()]->get().getType().cast<ShapedType>();
-    minTileSizes[fastestVaryingDim] =
-        std::max<int64_t>(minTileSizes[fastestVaryingDim],
-                          getVectorSize(entryPointFn, operandType));
+      // If the indexing map has result it has to be a shaped type.
+      auto operandType = inputOutputOpOperands[map.index()]
+                             ->get()
+                             .getType()
+                             .cast<ShapedType>();
+      minTileSizes[fastestVaryingDim] =
+          std::max<int64_t>(minTileSizes[fastestVaryingDim],
+                            getVectorSize(entryPointFn, operandType));
+    }
   }
   return minTileSizes;
 }
@@ -835,8 +838,8 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   if (numLoops != genericOp.getNumParallelLoops()) return success();
   if (!genericOp.hasTensorSemantics()) return success();
 
-  SmallVector<int64_t> minTileSizes(numLoops, getVectorSize(entryPointFn, 4));
-      // = getMinTilingSizesForEachDim(entryPointFn, genericOp);
+  SmallVector<int64_t> minTileSizes =
+      getMinTilingSizesForEachDim(entryPointFn, genericOp);
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
 
   // Set the flow level tiling to the default.
