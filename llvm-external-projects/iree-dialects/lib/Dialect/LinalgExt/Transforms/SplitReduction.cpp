@@ -38,14 +38,11 @@ SmallVector<int64_t> getExpandedShape(ArrayRef<int64_t> inputShape,
   return ans;
 }
 
-SmallVector<int64_t> getCollapsedShape(ArrayRef<int64_t> inputShape,
+SmallVector<int64_t> getCollapsedShape(ArrayRef<int64_t> shape,
                                        int64_t splitReductionRatio, int64_t k,
-                                       int64_t kDimOrig) {
-  SmallVector<int64_t> ans;
-  for (auto elem : inputShape) {
-    ans.push_back(elem);
-  }
-  ans[kDimOrig] = k * splitReductionRatio;
+                                       int64_t targetDim) {
+  SmallVector<int64_t> ans(shape.begin(), shape.end());
+  ans[targetDim] = k * splitReductionRatio;
   return ans;
 }
 
@@ -69,8 +66,8 @@ LogicalResult shouldParallelTopk(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
                                  int64_t splitReductionRatio) {
   // Determine if we should split the reduction. Requires aligned static shapes
   // and no input indicies.
-  ShapedType valuesOrigType = topkOp.values().getType().cast<ShapedType>();
-  if (valuesOrigType.getDimSize(kDimOrig) == ShapedType::kDynamicSize) {
+  auto valuesOrigType = topkOp.values().getType().cast<ShapedType>();
+  if (valuesOrigType.isDynamicDim(kDimOrig)) {
     return rewriter.notifyMatchFailure(topkOp,
                                        "cannot split dynamic dimension");
   }
@@ -79,7 +76,7 @@ LogicalResult shouldParallelTopk(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
                                        "input indices aren't supported");
   }
   if (splitReductionRatio <= 1) {
-    return rewriter.notifyMatchFailure(topkOp, "no split from control fn");
+    return rewriter.notifyMatchFailure(topkOp, "reduction ratio <= 1");
   }
   if (valuesOrigType.getDimSize(kDimOrig) % splitReductionRatio != 0) {
     return rewriter.notifyMatchFailure(
@@ -123,10 +120,10 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
 
   // Initialize the expanded output values
   SmallVector<Value> dynSizes;
-  for (auto en : llvm::enumerate(valuesExpandedType.getShape())) {
-    if (en.value() == ShapedType::kDynamicSize) {
+  for (auto i : llvm::seq<int64_t>(0, valuesExpandedType.getRank())) {
+    if (valuesExpandedType.isDynamicDim(i)) {
       dynSizes.push_back(
-          rewriter.create<tensor::DimOp>(loc, valuesExpanded, en.index()));
+          rewriter.create<tensor::DimOp>(loc, valuesExpanded, i));
     }
   }
   Value initTensorOutputValues = rewriter.create<mlir::linalg::InitTensorOp>(
@@ -159,16 +156,16 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
 
   SmallVector<Type> parallelTopkResultTypes{outputValuesExpandedType,
                                             outputIndicesExpandedType};
-  SmallVector<Value> parallelTopkIns{valuesExpanded};
-  SmallVector<Value> parallelTopkOuts{negInfTensor, posInfTensor};
+  SmallVector<Value> parallelTopkIns = {valuesExpanded};
+  SmallVector<Value> parallelTopkOuts = {negInfTensor, posInfTensor};
 
   // Parallel topk
   auto parallelTopkOp = rewriter.create<iree_compiler::IREE::LinalgExt::TopkOp>(
       loc,
-      /* resultTypes= */
+      /*resultTypes=*/
       parallelTopkResultTypes,
-      /* ins= */ parallelTopkIns,
-      /* outs= */ parallelTopkOuts, kDimParallel);
+      /*ins=*/parallelTopkIns,
+      /*outs=*/parallelTopkOuts, kDimParallel);
   rewriter.cloneRegionBefore(topkOp.region(), parallelTopkOp.region(),
                              parallelTopkOp.region().end());
 
@@ -194,10 +191,10 @@ Value offsetParallelIndices(Location loc, PatternRewriter &rewriter,
   return rewriter
       .create<linalg::GenericOp>(
           loc,
-          /* resultType= */ parallelIndicesType,
-          /* inputs= */ ValueRange{},
-          /* outputs= */ ValueRange{parallelIndices}, indexingMaps, iterators,
-          [=](OpBuilder &b, Location loc, ValueRange args) {
+          /*resultType=*/parallelIndicesType,
+          /*inputs=*/ValueRange{},
+          /*outputs=*/ValueRange{parallelIndices}, indexingMaps, iterators,
+          [&](OpBuilder &b, Location loc, ValueRange args) {
             Value splitIndex = b.create<linalg::IndexOp>(loc, splitDimParallel);
             Value splitIndexInt = b.create<arith::IndexCastOp>(
                 loc, parallelIndicesType.getElementType(), splitIndex);
@@ -245,9 +242,9 @@ computeReductionTopk(Location loc, PatternRewriter &rewriter,
   auto reductionTopkOp =
       rewriter.create<iree_compiler::IREE::LinalgExt::TopkOp>(
           loc,
-          /* resultTypes= */ topkOp->getResultTypes(),
-          /* ins= */ ValueRange{valuesCollapsed, indicesCollapsed},
-          /* outs= */ topkOp.outputs(), kDimOrig);
+          /*resultTypes=*/topkOp->getResultTypes(),
+          /*ins=*/ValueRange{valuesCollapsed, indicesCollapsed},
+          /*outs=*/topkOp.outputs(), kDimOrig);
   rewriter.cloneRegionBefore(topkOp.region(), reductionTopkOp.region(),
                              reductionTopkOp.region().end());
   return reductionTopkOp;
@@ -266,11 +263,10 @@ computeReductionTopk(Location loc, PatternRewriter &rewriter,
 // Topk is run again on the combined output to produce a final output.
 //
 // Currently only topk operations without input indices are supported.
-FailureOr<TopkOp> mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction::
-    returningMatchAndRewrite(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
-                             PatternRewriter &rewriter,
-                             TopkSplitReductionControlFn splitReductionFn,
-                             linalg::LinalgTransformationFilter filter) const {
+LogicalResult
+mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction::matchAndRewrite(
+    iree_compiler::IREE::LinalgExt::TopkOp topkOp,
+    PatternRewriter &rewriter) const {
   if (failed(filter.checkAndNotify(rewriter, topkOp))) {
     return rewriter.notifyMatchFailure(topkOp, "preconditions not met");
   }
@@ -315,5 +311,5 @@ FailureOr<TopkOp> mlir::iree_compiler::IREE::LinalgExt::TopkOpSplitReduction::
   rewriter.replaceOp(topkOp, reductionTopkOp.getResults());
   filter.replaceLinalgTransformationFilter(rewriter, parallelTopkOp);
   filter.replaceLinalgTransformationFilter(rewriter, reductionTopkOp);
-  return reductionTopkOp;
+  return success();
 }

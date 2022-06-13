@@ -207,15 +207,7 @@ struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
       : OpRewritePattern<TopkOp>(context), splitReductionFn(std::move(fn)),
         filter(std::move(filt)) {}
 
-  FailureOr<TopkOp>
-  returningMatchAndRewrite(TopkOp topkOp, PatternRewriter &rewriter,
-                           TopkSplitReductionControlFn splitReductionFn,
-                           linalg::LinalgTransformationFilter filter) const;
-
-  LogicalResult matchAndRewrite(TopkOp topkOp,
-                                PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(topkOp, rewriter, splitReductionFn, filter);
-  }
+  LogicalResult matchAndRewrite(TopkOp topkOp, PatternRewriter &rewriter) const;
 
 private:
   TopkSplitReductionControlFn splitReductionFn;

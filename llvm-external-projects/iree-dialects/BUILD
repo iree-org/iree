@@ -820,9 +820,9 @@ cc_library(
         "test/lib/**/*.cpp",
     ]),
     deps = [
-        "IREELinalgExtTransforms",
         ":IREEDialectsTransforms",
         ":IREELinalgExtDialect",
+        ":IREELinalgExtTransforms",
         ":IREELinalgTransformDialect",
         ":IREELinalgTransformDialectPasses",
         "@llvm-project//mlir:ArithmeticDialect",

@@ -18,9 +18,9 @@ func.func @topk_split_reduction_1d(%input_values: tensor<30xf32>, %out_values: t
 // SINGLE-SAME:                                       %[[ARG0:.*]]: tensor<30xf32>,
 // SINGLE-SAME:                                       %[[ARG1:.*]]: tensor<3xf32>,
 // SINGLE-SAME:                                       %[[ARG2:.*]]: tensor<3xi32>) -> (tensor<3xf32>, tensor<3xi32>) {
-// SINGLE:           %[[CNEG:.*]] = arith.constant 0xFF800000 : f32
-// SINGLE:           %[[CPOS:.*]] = arith.constant 2147483647 : i32
-// SINGLE:           %[[C3:.*]] = arith.constant 3 : i32
+// SINGLE-DAG:       %[[CNEG:.*]] = arith.constant 0xFF800000 : f32
+// SINGLE-DAG:       %[[CPOS:.*]] = arith.constant 2147483647 : i32
+// SINGLE-DAG:       %[[C3:.*]] = arith.constant 3 : i32
 // SINGLE:           %[[D0:.*]] = tensor.expand_shape %[[ARG0]] {{\[\[}}0, 1]] : tensor<30xf32> into tensor<3x10xf32>
 // SINGLE:           %[[D1:.*]] = linalg.init_tensor [3, 3] : tensor<3x3xf32>
 // SINGLE:           %[[D2:.*]] = linalg.init_tensor [3, 3] : tensor<3x3xi32>
@@ -68,9 +68,9 @@ func.func @topk_split_reduction_nd(%input_values: tensor<3x10x40x8xf32>, %out_va
 // MULTIPLE-SAME:                                    %[[ARG0:.*]]: tensor<3x10x40x8xf32>,
 // MULTIPLE-SAME:                                    %[[ARG1:.*]]: tensor<3x10x4x8xf32>,
 // MULTIPLE-SAME:                                    %[[ARG2:.*]]: tensor<3x10x4x8xi32>) -> (tensor<3x10x4x8xf32>, tensor<3x10x4x8xi32>) {
-// MULTIPLE:           %[[CNEG:.*]] = arith.constant 0xFF800000 : f32
-// MULTIPLE:           %[[CPOS:.*]] = arith.constant 2147483647 : i32
-// MULTIPLE:           %[[C3:.*]] = arith.constant 4 : i32
+// MULTIPLE-DAG:       %[[CNEG:.*]] = arith.constant 0xFF800000 : f32
+// MULTIPLE-DAG:       %[[CPOS:.*]] = arith.constant 2147483647 : i32
+// MULTIPLE-DAG:       %[[C3:.*]] = arith.constant 4 : i32
 // MULTIPLE:           %[[D0:.*]] = tensor.expand_shape %[[ARG0]] {{\[\[}}0], [1], [2, 3], [4]] : tensor<3x10x40x8xf32> into tensor<3x10x4x10x8xf32>
 // MULTIPLE:           %[[D1:.*]] = linalg.init_tensor [3, 10, 4, 4, 8] : tensor<3x10x4x4x8xf32>
 // MULTIPLE:           %[[D2:.*]] = linalg.init_tensor [3, 10, 4, 4, 8] : tensor<3x10x4x4x8xi32>
