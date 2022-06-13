@@ -53,7 +53,6 @@ option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
-option(IREE_BUILD_TORCH_MLIR_SUPPORT "Builds support for compiling torch-mlir programs." ON)
 
 option(IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER "Use the system linker when generating IREE modules in tests/samples/benchmarks (useful for Tracy)." OFF)
 
@@ -206,11 +205,37 @@ cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler tar
 cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
 
 #-------------------------------------------------------------------------------
+# Compiler Input Dialects
+#-------------------------------------------------------------------------------
+
+cmake_dependent_option(IREE_INPUT_DIALECTS_MHLO "Builds support for compiling MHLO programs" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_INPUT_DIALECTS_TORCH "Builds support for compiling Torch MLIR programs" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_INPUT_DIALECTS_TOSA "Builds support for compiling TOSA programs" ON ${IREE_BUILD_COMPILER} OFF)
+
+message(STATUS "IREE compiler input dialects:")
+if(IREE_INPUT_DIALECTS_MHLO)
+  message(STATUS "  - MHLO")
+endif()
+if(IREE_INPUT_DIALECTS_TORCH)
+  message(STATUS "  - Torch MLIR")
+endif()
+if(IREE_INPUT_DIALECTS_TOSA)
+  message(STATUS "  - TOSA")
+endif()
+
+#-------------------------------------------------------------------------------
 # Compiler Output Formats
 #-------------------------------------------------------------------------------
 
-# The 'vm-bytecode' and 'vm-asm' formats are always enabled.
 cmake_dependent_option(IREE_OUTPUT_FORMAT_C "Enables the 'vm-c' output format, using MLIR EmitC" ON ${IREE_BUILD_COMPILER} OFF)
+
+message(STATUS "IREE compiler output formats:")
+if(IREE_OUTPUT_FORMAT_C)
+  message(STATUS "  - C source module")
+endif()
+# The 'vm-bytecode' and 'vm-asm' formats are always enabled.
+message(STATUS "  - VM Bytecode")
+message(STATUS "  - VM MLIR Assembly")
 
 #-------------------------------------------------------------------------------
 # IREE compilation toolchain configuration
@@ -543,7 +568,7 @@ else()
   # Add default external projects.
   iree_add_llvm_external_project(mlir-iree-dialects MLIR_IREE_DIALECTS ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
   iree_add_llvm_external_project(mlir-hlo MLIR_HLO ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-hlo)
-  if(IREE_BUILD_TORCH_MLIR_SUPPORT)
+  if(IREE_INPUT_DIALECTS_TORCH)
     iree_add_llvm_external_project(torch-mlir-dialects TORCH_MLIR_DIALECTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/torch-mlir-dialects)
   endif()
 

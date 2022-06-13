@@ -17,7 +17,9 @@ iree_compiler_cc_library(
     srcs = ["Options.cpp"],
     hdrs = ["Options.h"],
     deps = [
+        "//compiler/src/iree/compiler/InputConversion/MHLO",
         "//compiler/src/iree/compiler/InputConversion/TMTensor",
+        "//compiler/src/iree/compiler/InputConversion/TOSA",
         "//compiler/src/iree/compiler/Utils",
     ],
 )

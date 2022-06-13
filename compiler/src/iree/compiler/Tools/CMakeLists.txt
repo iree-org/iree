@@ -38,6 +38,39 @@ if(IREE_TARGET_BACKEND_ROCM)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_ROCM_TARGET")
 endif()
 
+# Enable input dialects based on options.
+set(IREE_INPUT_DIALECT_DEPS "")
+if(IREE_INPUT_DIALECTS_MHLO)
+  list(APPEND IREE_INPUT_DIALECT_DEPS iree::compiler::InputConversion::MHLO)
+  list(APPEND IREE_INPUT_DIALECT_DEPS tensorflow::external_mhlo_includes)
+  list(APPEND IREE_INPUT_DIALECT_DEPS ChloDialect)
+  list(APPEND IREE_INPUT_DIALECT_DEPS MhloDialect)
+endif()
+if(IREE_INPUT_DIALECTS_TORCH)
+  list(APPEND IREE_INPUT_DIALECT_DEPS iree::compiler::InputConversion::TMTensor)
+  list(APPEND IREE_INPUT_DIALECT_DEPS TorchMLIRTMTensorDialect)
+endif()
+if(IREE_INPUT_DIALECTS_TOSA)
+  list(APPEND IREE_INPUT_DIALECT_DEPS iree::compiler::InputConversion::TOSA)
+  list(APPEND IREE_INPUT_DIALECT_DEPS MLIRTosaDialect)
+  list(APPEND IREE_INPUT_DIALECT_DEPS MLIRTosaTransforms)
+endif()
+
+iree_cc_library(
+  NAME
+    init_input_passes_and_dialects
+  HDRS
+    "init_input_dialects.h"
+    "init_input_passes.h"
+  SRCS
+    "init_input_dialects.cc"
+    "init_input_passes.cc"
+  DEPS
+    ${IREE_INPUT_DIALECT_DEPS}
+    iree::compiler::InputConversion::Common
+  PUBLIC
+)
+
 iree_cc_library(
   NAME
     init_iree_passes_and_dialects
@@ -72,10 +105,6 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Target::init_targets
     iree::compiler::Dialect::VM::Transforms
     iree::compiler::Dialect::Vulkan::IR
-    iree::compiler::InputConversion::Common
-    iree::compiler::InputConversion::MHLO
-    iree::compiler::InputConversion::TMTensor
-    iree::compiler::InputConversion::TOSA
     iree::compiler::ConstEval
     iree::compiler::Pipelines
   PUBLIC
@@ -114,17 +143,11 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFuncToSPIRV
     MLIRTensorInferTypeOpInterfaceImpl
-    MLIRTosaDialect
-    MLIRTosaTransforms
     MLIRTransforms
     MLIRVectorDialect
     iree::compiler::Dialect::VM::Target::init_targets
   PUBLIC
 )
-
-if(IREE_BUILD_TORCH_MLIR_SUPPORT)
-  set(_OPTIONAL_INIT_TORCH_MLIR_DIALECT_LIB ::init_torch_mlir_dialects)
-endif()
 
 iree_cc_library(
   NAME
@@ -134,10 +157,9 @@ iree_cc_library(
     "init_passes.h"
   DEPS
     ::init_compiler_modules
+    ::init_input_passes_and_dialects
     ::init_iree_passes_and_dialects
     ::init_mlir_passes_and_dialects
-    ${_OPTIONAL_INIT_TORCH_MLIR_DIALECT_LIB}
-    ::init_xla_dialects
     iree::compiler::Codegen::Codegen
     iree::compiler::Dialect::HAL::Conversion::Passes
   PUBLIC
@@ -176,32 +198,6 @@ iree_cc_library(
     ${IREE_COMPILER_TARGET_COPTS}
   PUBLIC
 )
-
-iree_cc_library(
-  NAME
-    init_xla_dialects
-  HDRS
-    "init_xla_dialects.h"
-  DEPS
-    tensorflow::external_mhlo_includes
-    ChloDialect
-    MhloDialect
-  PUBLIC
-)
-
-if(IREE_BUILD_TORCH_MLIR_SUPPORT)
-  iree_cc_library(
-    NAME
-      init_torch_mlir_dialects
-    HDRS
-      "init_torch_mlir_dialects.h"
-    DEPS
-      TorchMLIRTMTensorDialect
-    DEFINES
-      "IREE_HAVE_TORCH_MLIR_DIALECTS"
-    PUBLIC
-  )
-endif()
 
 iree_cc_library(
   NAME

@@ -33,18 +33,24 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc("Specifies the input program representation."),
       llvm::cl::values(
           clEnumValN(InputDialectOptions::Type::none, "none",
-                     "No input dialect transformation."),
-          clEnumValN(InputDialectOptions::Type::tosa, "tosa",
-                     "Legalize from TOSA ops."),
-          clEnumValN(InputDialectOptions::Type::mhlo, "mhlo",
-                     "Legalize from MHLO ops."),
-#ifdef IREE_HAVE_TORCH_MLIR_DIALECTS
-          clEnumValN(InputDialectOptions::Type::tm_tensor, "tm_tensor",
-                     "Legalize from TMTensor ops."),
-#endif
-          clEnumValN(
-              InputDialectOptions::Type::xla, "xla",
-              "Legalize from MHLO ops (with XLA cleanup preprocessing).")),
+                     "No input dialect transformation.")
+  // clang-format off
+#ifdef IREE_HAVE_MHLO_DIALECTS
+        , clEnumValN(InputDialectOptions::Type::mhlo, "mhlo",
+                     "Legalize from MHLO ops.")
+        , clEnumValN(InputDialectOptions::Type::xla, "xla",
+              "Legalize from MHLO ops (with XLA cleanup preprocessing).")
+#endif  // IREE_HAVE_MHLO_DIALECTS
+#ifdef IREE_HAVE_TORCH_DIALECTS
+        , clEnumValN(InputDialectOptions::Type::tm_tensor, "tm_tensor",
+                     "Legalize from TMTensor ops.")
+#endif  // IREE_HAVE_TORCH_DIALECTS
+#ifdef IREE_HAVE_TOSA_DIALECTS
+        , clEnumValN(InputDialectOptions::Type::tosa, "tosa",
+                     "Legalize from TOSA ops.")
+#endif  // IREE_HAVE_TOSA_DIALECTS
+          ),
+      // clang-format on
       llvm::cl::cat(inputDialectOptions));
 }
 

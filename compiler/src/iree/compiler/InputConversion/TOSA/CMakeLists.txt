@@ -54,6 +54,8 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::InputConversion::Common
+  DEFINES
+    "IREE_HAVE_TOSA_DIALECTS"
   PUBLIC
 )
 

@@ -60,6 +60,9 @@ iree_compiler_cc_library(
     hdrs = [
         "Passes.h",
     ],
+    defines = [
+        "IREE_HAVE_MHLO_DIALECTS",
+    ],
     deps = [
         ":PassHeaders",
         ":PassesIncGen",

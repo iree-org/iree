@@ -11,6 +11,30 @@ package(
 )
 
 cc_library(
+    name = "init_input_passes_and_dialects",
+    srcs = [
+        "init_input_dialects.cc",
+        "init_input_passes.cc",
+    ],
+    hdrs = [
+        "init_input_dialects.h",
+        "init_input_passes.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/InputConversion/Common",
+        "//compiler/src/iree/compiler/InputConversion/MHLO",
+        "//compiler/src/iree/compiler/InputConversion/TMTensor",
+        "//compiler/src/iree/compiler/InputConversion/TOSA",
+        "@llvm-project//mlir:ConversionPasses",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:TosaDialect",
+        "@mlir-hlo//:hlo",
+        "@mlir-hlo//:lhlo",
+        "@torch-mlir-dialects//:TorchMLIRTMTensorDialect",
+    ],
+)
+
+cc_library(
     name = "init_iree_passes_and_dialects",
     hdrs = [
         "init_iree_dialects.h",
@@ -37,10 +61,6 @@ cc_library(
         "//compiler/src/iree/compiler/Dialect/VMVX/IR:VMVXDialect",
         "//compiler/src/iree/compiler/Dialect/VMVX/Transforms",
         "//compiler/src/iree/compiler/Dialect/Vulkan/IR",
-        "//compiler/src/iree/compiler/InputConversion/Common",
-        "//compiler/src/iree/compiler/InputConversion/MHLO",
-        "//compiler/src/iree/compiler/InputConversion/TMTensor",
-        "//compiler/src/iree/compiler/InputConversion/TOSA",
         "//compiler/src/iree/compiler/Pipelines",
         "//llvm-external-projects/iree-dialects:IREEInputDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
@@ -104,10 +124,9 @@ cc_library(
     ],
     deps = [
         ":init_compiler_modules",
+        ":init_input_passes_and_dialects",
         ":init_iree_passes_and_dialects",
         ":init_mlir_passes_and_dialects",
-        ":init_torch_mlir_dialects",
-        ":init_xla_dialects",
         "//compiler/src/iree/compiler/Codegen",
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion:Passes",
     ],
@@ -140,28 +159,6 @@ cc_library(
         "//compiler/src/iree/compiler/Dialect/HAL/Target/ROCM",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/VMVX",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
-    ],
-)
-
-cc_library(
-    name = "init_xla_dialects",
-    hdrs = [
-        "init_xla_dialects.h",
-    ],
-    deps = [
-        "@llvm-project//mlir:IR",
-        "@mlir-hlo//:hlo",
-        "@mlir-hlo//:lhlo",
-    ],
-)
-
-cc_library(
-    name = "init_torch_mlir_dialects",
-    hdrs = [
-        "init_torch_mlir_dialects.h",
-    ],
-    deps = [
-        "@torch-mlir-dialects//:TorchMLIRTMTensorDialect",
     ],
 )
 

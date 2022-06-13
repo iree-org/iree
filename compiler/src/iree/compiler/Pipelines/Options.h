@@ -34,17 +34,21 @@ struct InputDialectOptions {
     // Applies no input transformation. Only supported core and extension ops
     // are supported.
     none,
-    // Legalizes input defined over TOSA ops.
-    tosa,
+#ifdef IREE_HAVE_MHLO_DIALECTS
     // Legalizes input defined over MHLO ops.
     mhlo,
-#ifdef IREE_HAVE_TORCH_MLIR_DIALECTS
-    // Legalizes input defined over TMTensor ops.
-    tm_tensor,
-#endif
     // Special case of 'mhlo' legalization which also performs some XLA
     // cleanup activities.
     xla,
+#endif  // IREE_HAVE_MHLO_DIALECTS
+#ifdef IREE_HAVE_TORCH_DIALECTS
+    // Legalizes input defined over TMTensor ops.
+    tm_tensor,
+#endif  // IREE_HAVE_TORCH_DIALECTS
+#ifdef IREE_HAVE_TOSA_DIALECTS
+    // Legalizes input defined over TOSA ops.
+    tosa,
+#endif  // IREE_HAVE_TOSA_DIALECTS
   };
   Type type = Type::none;
 
