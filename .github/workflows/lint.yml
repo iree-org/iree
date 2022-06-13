@@ -95,6 +95,8 @@ jobs:
     steps:
       - name: Installing dependencies
         run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -qq -y --no-install-recommends clang-format-9
           wget https://raw.githubusercontent.com/llvm-mirror/clang/master/tools/clang-format/git-clang-format -O /tmp/git-clang-format
           chmod +x /tmp/git-clang-format
       - name: Checking out repository
@@ -104,7 +106,7 @@ jobs:
         run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
       - name: Running clang-format on changed source files
         run: |
-          /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-12 --style=file
+          /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-9 --style=file
           git diff --exit-code
 
   tabs:
