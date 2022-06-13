@@ -53,8 +53,7 @@ iree_status_t counter_set_value(iree_runtime_session_t* session,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-            .usage =
-                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
+            .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
         },
         iree_make_const_byte_span((void*)arg0_data, sizeof(arg0_data)), &arg0);
   }
@@ -86,8 +85,7 @@ iree_status_t counter_add_to_value(iree_runtime_session_t* session, int x) {
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-            .usage =
-                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
+            .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
         },
         iree_make_const_byte_span((void*)arg0_data, sizeof(arg0_data)), &arg0);
   }

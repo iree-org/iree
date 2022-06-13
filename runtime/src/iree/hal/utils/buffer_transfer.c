@@ -199,8 +199,8 @@ IREE_API_EXPORT iree_status_t iree_hal_device_transfer_mappable_range(
         !iree_all_bits_set(iree_hal_buffer_memory_type(target.device_buffer),
                            IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
       status = iree_status_join(
-          status, iree_hal_buffer_flush_range(&target_mapping, 0,
-                                              adjusted_data_length));
+          status, iree_hal_buffer_mapping_flush_range(&target_mapping, 0,
+                                                      adjusted_data_length));
     }
     status =
         iree_status_join(status, iree_hal_buffer_unmap_range(&target_mapping));

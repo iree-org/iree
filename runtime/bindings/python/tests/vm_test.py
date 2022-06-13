@@ -96,8 +96,7 @@ class VmTest(unittest.TestCase):
       ary1 = np.asarray([1, 2, 3, 4], dtype=dt)
       bv1 = self.device.allocator.allocate_buffer_copy(
           memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
-          allowed_usage=(iree.runtime.BufferUsage.DISPATCH |
-                         iree.runtime.BufferUsage.TRANSFER |
+          allowed_usage=(iree.runtime.BufferUsage.DEFAULT |
                          iree.runtime.BufferUsage.MAPPING),
           buffer=ary1,
           element_type=et)

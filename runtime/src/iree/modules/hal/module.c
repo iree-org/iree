@@ -319,7 +319,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_map_byte_buffer,  //
   iree_hal_memory_access_t allowed_access = IREE_HAL_MEMORY_ACCESS_READ;
   if (!iree_all_bits_set(source->access, IREE_VM_BUFFER_ACCESS_MUTABLE)) {
     // Source buffer is read-only; require that the access request matches.
-    if (!iree_all_bits_set(buffer_usage, IREE_HAL_BUFFER_USAGE_CONSTANT)) {
+    if (!iree_all_bits_set(buffer_usage,
+                           IREE_HAL_BUFFER_USAGE_SHARING_IMMUTABLE)) {
       return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
                               "source buffer is immutable and can only be "
                               "mapped for constant usage");
@@ -331,7 +332,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_map_byte_buffer,  //
     // whatever it wants with the memory.
   } else {
     // Source buffer is mutable; allow in-place writes.
-    if (!iree_all_bits_set(buffer_usage, IREE_HAL_BUFFER_USAGE_CONSTANT)) {
+    if (!iree_all_bits_set(buffer_usage,
+                           IREE_HAL_BUFFER_USAGE_SHARING_IMMUTABLE)) {
       allowed_access |= IREE_HAL_MEMORY_ACCESS_WRITE;
     }
   }

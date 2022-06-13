@@ -62,9 +62,7 @@ static iree_status_t LoadNdarraysFromFile(
   uint64_t file_length = GetFileLength(file);
 
   iree_hal_buffer_params_t buffer_params = {};
-  buffer_params.usage = IREE_HAL_BUFFER_USAGE_CONSTANT |
-                        IREE_HAL_BUFFER_USAGE_TRANSFER |
-                        IREE_HAL_BUFFER_USAGE_DISPATCH;
+  buffer_params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
   buffer_params.access = IREE_HAL_MEMORY_ACCESS_READ;
   buffer_params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
 
@@ -129,8 +127,7 @@ static iree_status_t CreateBufferViewFromFile(
 
   iree_hal_buffer_params_t buffer_params = {0};
   buffer_params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
-  buffer_params.usage =
-      IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER;
+  buffer_params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
   struct read_params_t {
     FILE* file;
   } read_params = {

@@ -105,8 +105,7 @@ static iree_status_t allocate_device_buffer_view_like(
       iree_hal_buffer_view_encoding_type(src),
       (iree_hal_buffer_params_t){
           .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-          .usage =
-              IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH,
+          .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
       },
       initial_data, dst);
 }
@@ -782,8 +781,7 @@ static iree_status_t make_device_identity_matrix_like(
       iree_hal_buffer_view_encoding_type(src),
       (iree_hal_buffer_params_t){
           .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-          .usage =
-              IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
+          .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
       },
       make_identity_matrix_callback, src, dst);
 }

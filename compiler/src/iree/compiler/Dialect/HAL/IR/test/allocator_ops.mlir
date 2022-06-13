@@ -7,7 +7,7 @@ func.func @allocator_allocate(%allocator: !hal.allocator) {
   %size = arith.constant 123 : index
   //      CHECK: %[[REF:.+]] = hal.allocator.allocate<%[[ALLOCATOR]] : !hal.allocator>
   // CHECK-SAME:   type("HostVisible|HostCoherent|HostLocal")
-  // CHECK-SAME:   usage(Transfer)
+  // CHECK-SAME:   usage("TransferSource|TransferTarget|Transfer")
   // CHECK-SAME:   : !hal.buffer{%[[SIZE]]}
   %ref = hal.allocator.allocate<%allocator : !hal.allocator>
       type(HostLocal) usage(Transfer) : !hal.buffer{%size}
@@ -26,7 +26,7 @@ func.func @allocator_map_byte_buffer(%allocator: !hal.allocator, %arg1: !util.by
   //      CHECK: = hal.allocator.map<%[[ALLOCATOR]] : !hal.allocator>
   // CHECK-SAME:   source(%arg1 : !util.byte_buffer)[%[[OFFSET]], %[[LENGTH]]]
   // CHECK-SAME:   type("DeviceVisible|DeviceLocal")
-  // CHECK-SAME:   usage(Transfer)
+  // CHECK-SAME:   usage("TransferSource|TransferTarget|Transfer")
   // CHECK-SAME:   : !hal.buffer
   %ref = hal.allocator.map<%allocator : !hal.allocator>
                     source(%arg1 : !util.byte_buffer)[%offset, %length]
