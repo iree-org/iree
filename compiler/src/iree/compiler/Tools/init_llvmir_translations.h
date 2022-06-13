@@ -7,7 +7,7 @@
 // Configures a context with hooks to translate custom extensions to LLVMIR.
 // Note that this has nothing to do with the named translations that are
 // globally registered as part of init_translations.h for the purpose of
-// driving iree-translate. This is maintained separately to other dialect
+// driving iree-compile. This is maintained separately to other dialect
 // initializations because it causes a transitive dependency on LLVMIR.
 
 #ifndef IREE_COMPILER_TOOLS_INIT_LLVMIR_TRANSLATIONS_H_

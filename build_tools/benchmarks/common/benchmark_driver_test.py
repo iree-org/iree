@@ -73,13 +73,15 @@ class BenchmarkDriverTest(unittest.TestCase):
                                   cpu_features=["sha2"],
                                   gpu_name="Mali-G78")
 
-    case1 = BenchmarkCase(model_name_with_tags="DeepNet",
+    case1 = BenchmarkCase(model_name="DeepNet",
+                          model_tags=[],
                           bench_mode=["1-thread", "full-inference"],
                           target_arch="CPU-ARM64-v8A",
                           config="iree-dylib",
                           benchmark_case_dir="case1",
                           benchmark_tool_name="tool")
-    case2 = BenchmarkCase(model_name_with_tags="DeepNetv2-f32",
+    case2 = BenchmarkCase(model_name="DeepNetv2",
+                          model_tags=["f32"],
                           bench_mode=["full-inference"],
                           target_arch="CPU-ARM64-v8A",
                           config="iree-dylib-sync",

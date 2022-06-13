@@ -42,9 +42,8 @@ iree-import-tflite ${TFLITE_PATH} -o ${IMPORT_PATH}
 
 # Compile for the CPU backend
 iree-compile \
-    --iree-mlir-to-vm-bytecode-module \
     --iree-input-type=tosa \
-    --iree-hal-target-backends=dylib-llvm-aot \
+    --iree-hal-target-backends=cpu \
     ${IMPORT_PATH} \
     -o ${MODULE_PATH}
 ```

@@ -285,7 +285,7 @@ class Trace:
         serialized_inputs = self.calls[0].serialized_inputs
         flagfile = [
             f"--module_file={compiled_path}",
-            f"--driver={self.backend_driver}",
+            f"--device={self.backend_driver}",
             f"--entry_function={entry_function}",
         ] + [f"--function_input={input}" for input in serialized_inputs]
         with open(os.path.join(trace_dir, "flagfile"), "w") as f:

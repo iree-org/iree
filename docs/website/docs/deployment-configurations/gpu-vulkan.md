@@ -146,7 +146,6 @@ system's `PATH`):
 
 ``` shell hl_lines="3 4"
 iree-compile \
-    --iree-mlir-to-vm-bytecode-module \
     --iree-hal-target-backends=vulkan-spirv \
     --iree-vulkan-target-triple=<...> \
     iree_input.mlir -o mobilenet-vulkan.vmfb
@@ -176,7 +175,7 @@ In the build directory, run the following command:
 
 ``` shell hl_lines="2"
 tools/iree-run-module \
-    --driver=vulkan \
+    --device=vulkan \
     --module_file=mobilenet-vulkan.vmfb \
     --entry_function=predict \
     --function_input="1x224x224x3xf32=0"

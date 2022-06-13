@@ -24,23 +24,32 @@ class BenchmarkSuiteTest(unittest.TestCase):
                                                ("TFLite", "suite/TFLite")])
 
   def test_filter_benchmarks_for_category(self):
-    case1 = BenchmarkCase(model_name_with_tags="deepnet",
+    case1 = BenchmarkCase(model_name="deepnet",
+                          model_tags=[],
                           bench_mode=["1-thread", "full-inference"],
                           target_arch="CPU-ARMv8",
                           config="iree-dylib",
                           benchmark_case_dir="case1",
                           benchmark_tool_name="tool")
-    case2 = BenchmarkCase(model_name_with_tags="deepnetv2-f32",
+    case2 = BenchmarkCase(model_name="deepnetv2",
+                          model_tags=["f32"],
                           bench_mode=["full-inference"],
                           target_arch="GPU-Mali",
                           config="iree-vulkan",
                           benchmark_case_dir="case2",
                           benchmark_tool_name="tool")
+    case3 = BenchmarkCase(model_name="deepnetv3",
+                          model_tags=["f32"],
+                          bench_mode=["full-inference"],
+                          target_arch="CPU-x86_64",
+                          config="iree-dylib-sync",
+                          benchmark_case_dir="case3",
+                          benchmark_tool_name="tool")
     suite = BenchmarkSuite({
-        "suite/TFLite": [case1, case2],
+        "suite/TFLite": [case1, case2, case3],
     })
 
-    both_benchmarks = suite.filter_benchmarks_for_category(
+    cpu_and_gpu_benchmarks = suite.filter_benchmarks_for_category(
         category="TFLite",
         available_drivers=["local-task", "vulkan"],
         available_loaders=["embedded-elf"],
@@ -58,9 +67,18 @@ class BenchmarkSuiteTest(unittest.TestCase):
         driver_filter="vulkan",
         mode_filter=".*full-inference.*",
         model_name_filter="deepnet.*/case2")
+    all_benchmarks = suite.filter_benchmarks_for_category(
+        category="TFLite",
+        available_drivers=None,
+        cpu_target_arch_filter=None,
+        gpu_target_arch_filter=None,
+        driver_filter=None,
+        mode_filter=None,
+        model_name_filter=None)
 
-    self.assertEqual(both_benchmarks, [case1, case2])
+    self.assertEqual(cpu_and_gpu_benchmarks, [case1, case2])
     self.assertEqual(gpu_benchmarks, [case2])
+    self.assertEqual(all_benchmarks, [case1, case2, case3])
 
   def test_filter_benchmarks_for_nonexistent_category(self):
     suite = BenchmarkSuite({
@@ -81,13 +99,15 @@ class BenchmarkSuiteTest(unittest.TestCase):
       tflite_dir = os.path.join(tmp_dir, "TFLite")
       pytorch_dir = os.path.join(tmp_dir, "PyTorch")
       BenchmarkSuiteTest.__create_bench(tflite_dir,
-                                        model="DeepNet",
+                                        model_name="DeepNet",
+                                        model_tags=["f32"],
                                         bench_mode=["4-thread", "full"],
                                         target_arch="CPU-ARMv8",
                                         config="iree-dylib",
                                         tool="run-cpu-bench")
       case2 = BenchmarkSuiteTest.__create_bench(pytorch_dir,
-                                                model="DeepNetv2",
+                                                model_name="DeepNetv2",
+                                                model_tags=[],
                                                 bench_mode=["full-inference"],
                                                 target_arch="GPU-Mali",
                                                 config="iree-vulkan",
@@ -106,15 +126,20 @@ class BenchmarkSuiteTest(unittest.TestCase):
               gpu_target_arch_filter="gpu-mali"), [case2])
 
   @staticmethod
-  def __create_bench(dir_path: str, model: str, bench_mode: Sequence[str],
-                     target_arch: str, config: str, tool: str):
+  def __create_bench(dir_path: str, model_name: str, model_tags: Sequence[str],
+                     bench_mode: Sequence[str], target_arch: str, config: str,
+                     tool: str):
     case_name = f"{config}__{target_arch}__{','.join(bench_mode)}"
-    bench_path = os.path.join(dir_path, model, case_name)
+    model_name_with_tags = model_name
+    if len(model_tags) > 0:
+      model_name_with_tags += f"-{','.join(model_tags)}"
+    bench_path = os.path.join(dir_path, model_name_with_tags, case_name)
     os.makedirs(bench_path)
     with open(os.path.join(bench_path, "tool"), "w") as f:
       f.write(tool)
 
-    return BenchmarkCase(model_name_with_tags=model,
+    return BenchmarkCase(model_name=model_name,
+                         model_tags=model_tags,
                          bench_mode=bench_mode,
                          target_arch=target_arch,
                          config=config,

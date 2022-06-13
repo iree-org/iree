@@ -17,6 +17,22 @@ extern "C" {
 // Returns a driver registry initialized with all linked driver registered.
 iree_hal_driver_registry_t* iree_hal_available_driver_registry(void);
 
+// Returns a device URI for a default device to be used when no other devices
+// are specified by the user. It may not work; it's always better to specify
+// flags and tools should encourage that.
+iree_string_view_t iree_hal_default_device_uri(void);
+
+// TODO(#5724): remove this and replace with an iree_hal_device_set_t.
+void iree_hal_get_devices_flag_list(iree_host_size_t* out_count,
+                                    iree_string_view_t** out_list);
+
+// Creates a single device from the --device= flag.
+// Uses the |default_device| if no flags were specified.
+// Fails if more than one device was specified.
+iree_status_t iree_hal_create_device_from_flags(
+    iree_string_view_t default_device, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

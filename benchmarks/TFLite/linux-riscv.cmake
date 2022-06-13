@@ -10,13 +10,13 @@
 #                                                                              #
 # Each suite benchmarks a list of modules with configurations specifying a     #
 # target architecture and runtime characteristics (e.g. threads/cores). These  #
-# benchmarks only configure IREE translation and runtime flags for the target  #
+# benchmarks only configure IREE compilation and runtime flags for the target  #
 # architecture and do *not* include any non-default flags. No non-default      #
 # flags should be added here.                                                  #
 #                                                                              #
 ################################################################################
 
-set(LINUX_RV64_GENERIC_CPU_TRANSLATION_FLAGS
+set(LINUX_RV64_GENERIC_CPU_COMPILATION_FLAGS
   "--iree-input-type=tosa"
   "--iree-llvm-target-triple=riscv64"
   "--iree-llvm-target-cpu=generic-rv64"
@@ -26,7 +26,7 @@ set(LINUX_RV64_GENERIC_CPU_TRANSLATION_FLAGS
   "--riscv-v-fixed-length-vector-lmul-max=8"
 )
 
-set(LINUX_RV32_GENERIC_CPU_TRANSLATION_FLAGS
+set(LINUX_RV32_GENERIC_CPU_COMPILATION_FLAGS
   "--iree-input-type=tosa"
   "--iree-llvm-target-triple=riscv32-pc-linux-elf"
   "--iree-llvm-target-cpu=generic-rv32"
@@ -52,8 +52,8 @@ iree_benchmark_suite(
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-RV64-Generic"
-  TRANSLATION_FLAGS
-    ${LINUX_RV64_GENERIC_CPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${LINUX_RV64_GENERIC_CPU_COMPILATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
@@ -78,8 +78,8 @@ iree_benchmark_suite(
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-RV32-Generic"
-  TRANSLATION_FLAGS
-    ${LINUX_RV32_GENERIC_CPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${LINUX_RV32_GENERIC_CPU_COMPILATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG

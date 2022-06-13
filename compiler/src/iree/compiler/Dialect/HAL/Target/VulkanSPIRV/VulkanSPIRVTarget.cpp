@@ -50,7 +50,7 @@ llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
   return llvm::None;
 }
 
-std::string guessModuleName(mlir::ModuleOp moduleOp) {
+std::string guessModuleName(ModuleOp moduleOp) {
   std::string moduleName =
       moduleOp.getName().hasValue() ? moduleOp.getName().getValue().str() : "";
   if (!moduleName.empty()) return moduleName;
@@ -91,7 +91,7 @@ static spirv::TargetEnvAttr getSPIRVTargetEnv(
     const std::string &vulkanTargetEnv, const std::string &vulkanTargetTriple,
     MLIRContext *context) {
   if (!vulkanTargetEnv.empty()) {
-    if (auto attr = mlir::parseAttribute(vulkanTargetEnv, context)) {
+    if (auto attr = parseAttribute(vulkanTargetEnv, context)) {
       if (auto vkTargetEnv = attr.dyn_cast<Vulkan::TargetEnvAttr>()) {
         return convertTargetEnv(vkTargetEnv);
       }

@@ -15,9 +15,8 @@ module {
     %1 = linalg.fill ins(%cst : f32) outs(%arg2 : tensor<64xf32>) -> tensor<64xf32>
 
     %2 = affine.apply #map0()[%arg0]
-    // CHECK: iree_linalg_ext.in_parallel
-    %3 = iree_linalg_ext.in_parallel %2  -> (tensor<64xf32>) {
-    ^bb0(%arg3: index):
+    // CHECK: scf.foreach_thread
+    %3 = scf.foreach_thread (%arg3) in (%2) -> (tensor<64xf32>) {
       // CHECK:    %[[OFFSET:.*]] = affine.apply
       // CHECK:    %[[SIZE:.*]] = affine.min
       %4 = affine.apply #map1(%arg3)[%arg0]
@@ -32,8 +31,8 @@ module {
 
       // CHECK:    %[[T4:.*]] = linalg.elemwise_unary ins(%[[T1]] {{.*}} outs(%[[T3]]
       %8 = linalg.elemwise_unary ins(%6 : tensor<?xf32>) outs(%7 : tensor<?xf32>) -> tensor<?xf32>
-      iree_linalg_ext.perform_concurrently {
-        iree_linalg_ext.parallel_insert_slice %8 into %arg2[%4] [%5] [1] : tensor<?xf32> into tensor<64xf32>
+      scf.foreach_thread.perform_concurrently {
+        scf.foreach_thread.parallel_insert_slice %8 into %arg2[%4] [%5] [1] : tensor<?xf32> into tensor<64xf32>
       }
     }
     func.return %3 : tensor<64xf32>
@@ -50,7 +49,7 @@ module {
     pdl.pattern @match_in_parallel : benefit(1) {
       %0 = operands
       %1 = types
-      %2 = operation "iree_linalg_ext.in_parallel"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      %2 = operation "scf.foreach_thread"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
       rewrite %2 with "transform.dialect"
     }
     transform.structured.canonicalized_sequence %arg0 {
@@ -79,9 +78,8 @@ module {
     // TODO: Choosing %arg2 here complicates the size computation.
     %d0 = tensor.dim %arg1, %c0 : tensor<?xf32>
     %1 = affine.apply #map0()[%d0, %arg0]
-    // CHECK: iree_linalg_ext.in_parallel
-    %2 = iree_linalg_ext.in_parallel %1  -> (tensor<?xf32>) {
-    ^bb0(%arg3: index):
+    // CHECK: scf.foreach_thread
+    %2 = scf.foreach_thread (%arg3) in (%1)  -> (tensor<?xf32>) {
       // CHECK:    %[[OFFSET:.*]] = affine.apply
       // CHECK:    %[[SIZE:.*]] = affine.min
       %3 = affine.apply #map1(%arg3)[%arg0]
@@ -94,8 +92,8 @@ module {
 
       // CHECK:    %[[T2:.*]] = linalg.elemwise_unary ins(%[[T1]]
       %7 = linalg.elemwise_unary ins(%6 : tensor<?xf32>) outs(%5 : tensor<?xf32>) -> tensor<?xf32>
-      iree_linalg_ext.perform_concurrently {
-        iree_linalg_ext.parallel_insert_slice %7 into %arg2[%3] [%4] [1] : tensor<?xf32> into tensor<?xf32>
+      scf.foreach_thread.perform_concurrently {
+        scf.foreach_thread.parallel_insert_slice %7 into %arg2[%3] [%4] [1] : tensor<?xf32> into tensor<?xf32>
       }
     }
     func.return %2 : tensor<?xf32>
@@ -112,7 +110,7 @@ module {
     pdl.pattern @match_in_parallel : benefit(1) {
       %0 = operands
       %1 = types
-      %2 = operation "iree_linalg_ext.in_parallel"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      %2 = operation "scf.foreach_thread"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
       rewrite %2 with "transform.dialect"
     }
     transform.structured.canonicalized_sequence %arg0 {

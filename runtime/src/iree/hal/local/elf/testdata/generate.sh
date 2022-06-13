@@ -16,7 +16,7 @@
 # run the script:
 #   $ ./iree/hal/local/elf/testdata/generate.sh
 
-# Uncomment to see the iree-translate commands issued:
+# Uncomment to see the iree-compile commands issued:
 # set -x
 set -e
 
@@ -24,24 +24,24 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 TESTDATA="${ROOT_DIR}/iree/hal/local/elf/testdata"
 
 # $1: file name ("foo_arm_32.so")
-# $2: list of iree-translate arguments for targeting
+# $2: list of iree-compile arguments for targeting
 function compile_and_extract_library() {
   local so_name=$1
   shift
-  local translate_args=("$@")
+  local compile_args=("$@")
 
   echo "Updating ${TESTDATA}/${so_name}"
 
   CMD=(
-    iree-translate
-      -iree-mlir-to-hal-executable
+    iree-compile
+      --compile-mode=hal-executable
       ${TESTDATA}/elementwise_mul.mlir
       -o="${TESTDATA}/${so_name}"
 
       --iree-hal-target-backends=dylib-llvm-aot
       --iree-llvm-debug-symbols=false
 
-      "${translate_args[@]}"
+      "${compile_args[@]}"
   )
   "${CMD[@]}"
 }

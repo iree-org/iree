@@ -40,3 +40,10 @@ function(benchmark_tool_py_test)
 endfunction()
 
 add_subdirectory(common)
+
+benchmark_tool_py_test(
+  NAME
+    collect_compilation_statistics_test
+  SRC
+    "collect_compilation_statistics_test.py"
+)

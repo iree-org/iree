@@ -91,8 +91,6 @@ IREE_FLAG(string, entry_function, "",
           "to run. If this is not set, all the exported functions will be "
           "benchmarked and they are expected to not have input arguments.");
 
-IREE_FLAG(string, driver, "local-task", "Backend driver to use.");
-
 IREE_FLAG(bool, print_statistics, false,
           "Prints runtime statistics to stderr on exit.");
 
@@ -315,9 +313,8 @@ class IREEBenchmark {
         iree_vm_instance_create(iree_allocator_system(), &instance_));
 
     // Create IREE's device and module.
-    IREE_RETURN_IF_ERROR(iree_hal_create_device(
-        iree_hal_available_driver_registry(), IREE_SV(FLAG_driver),
-        iree_allocator_system(), &device_));
+    IREE_RETURN_IF_ERROR(iree_hal_create_device_from_flags(
+        iree_hal_default_device_uri(), iree_allocator_system(), &device_));
     IREE_RETURN_IF_ERROR(
         iree_hal_module_create(device_, iree_allocator_system(), &hal_module_));
     IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(

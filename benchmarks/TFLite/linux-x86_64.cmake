@@ -10,13 +10,13 @@
 #                                                                              #
 # Each suite benchmarks a list of modules with configurations specifying a     #
 # target architecture and runtime characteristics (e.g. threads/cores). These  #
-# benchmarks only configure IREE translation and runtime flags for the target  #
+# benchmarks only configure IREE compilation and runtime flags for the target  #
 # architecture and do *not* include any non-default flags. No non-default      #
 # flags should be added here.                                                  #
 #                                                                              #
 ################################################################################
 
-set(LINUX_X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS
+set(LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS
   "--iree-input-type=tosa"
   "--iree-llvm-target-cpu=cascadelake"
   "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
@@ -41,8 +41,8 @@ iree_benchmark_suite(
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-x86_64-CascadeLake"
-  TRANSLATION_FLAGS
-    ${LINUX_X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
@@ -70,8 +70,8 @@ iree_benchmark_suite(
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-x86_64-CascadeLake"
-  TRANSLATION_FLAGS
-    ${LINUX_X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
@@ -101,8 +101,8 @@ iree_benchmark_suite(
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-x86_64-CascadeLake"
-  TRANSLATION_FLAGS
-    ${LINUX_X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
@@ -132,8 +132,8 @@ iree_benchmark_suite(
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-x86_64-CascadeLake"
-  TRANSLATION_FLAGS
-    ${LINUX_X86_64_CASCADELAKE_CPU_TRANSLATION_FLAGS}
+  COMPILATION_FLAGS
+    ${LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG

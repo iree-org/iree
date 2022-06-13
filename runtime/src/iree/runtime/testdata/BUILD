@@ -28,7 +28,6 @@ iree_bytecode_module(
     c_identifier = "iree_runtime_testdata_simple_mul_module",
     flags = [
         "--iree-input-type=mhlo",
-        "--iree-mlir-to-vm-bytecode-module",
         "--iree-hal-target-backends=vmvx",
     ],
 )

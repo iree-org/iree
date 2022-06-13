@@ -101,7 +101,6 @@ IREE's TensorFlow importer. We can now compile them for each GPU by running the 
 
     ``` shell hl_lines="3-5"
     iree-compile \
-        --iree-mlir-to-vm-bytecode-module \
         --iree-hal-target-backends=cuda \
         --iree-hal-cuda-llvm-target-arch=<...> \
         --iree-hal-cuda-disable-loop-nounroll-wa \
@@ -127,7 +126,6 @@ IREE's TensorFlow importer. We can now compile them for each GPU by running the 
 
     ``` shell hl_lines="3-6"
     tools/iree-compile \
-        --iree-mlir-to-vm-bytecode-module \
         --iree-hal-target-backends=rocm \
         --iree-rocm-target-chip=<...> \
         --iree-rocm-link-bc=true \
@@ -158,7 +156,7 @@ In the build directory, run the following command:
 
     ``` shell hl_lines="2"
     tools/iree-run-module \
-        --driver=cuda \
+        --device=cuda \
         --module_file=mobilenet-cuda.vmfb \
         --entry_function=predict \
         --function_input="1x224x224x3xf32=0"
@@ -168,7 +166,7 @@ In the build directory, run the following command:
 
     ``` shell hl_lines="2"
     tools/iree-run-module \
-        --driver=rocm \
+        --device=rocm \
         --module_file=mobilenet-rocm.vmfb \
         --entry_function=predict \
         --function_input="1x224x224x3xf32=0"

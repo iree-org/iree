@@ -70,6 +70,22 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_query_available_devices(
     iree_host_size_t* out_device_info_count,
     iree_hal_device_info_t** out_device_infos);
 
+// Appends detailed info about a device with the given |device_id| to |builder|.
+// Only IDs as queried from the driver may be used.
+//
+// !!! WARNING !!!
+// This information may contain personally identifiable information and should
+// only be used for diagnostics: don't mindlessly report this in analytics.
+//
+// Callers should ensure the builder is at a newline before calling and drivers
+// should append a trailing newline if they append any information.
+//
+// Returns success whether or not any information was added to the builder;
+// not all drivers or devices have information.
+IREE_API_EXPORT iree_status_t iree_hal_driver_dump_device_info(
+    iree_hal_driver_t* driver, iree_hal_device_id_t device_id,
+    iree_string_builder_t* builder);
+
 // Creates a device with the given |device_ordinal| as enumerated by
 // iree_hal_driver_query_available_devices. The ordering of devices is driver
 // dependent and may vary across driver instances and processes.
@@ -141,6 +157,10 @@ typedef struct iree_hal_driver_vtable_t {
       iree_hal_driver_t* driver, iree_allocator_t host_allocator,
       iree_host_size_t* out_device_info_count,
       iree_hal_device_info_t** out_device_infos);
+
+  iree_status_t(IREE_API_PTR* dump_device_info)(iree_hal_driver_t* driver,
+                                                iree_hal_device_id_t device_id,
+                                                iree_string_builder_t* builder);
 
   iree_status_t(IREE_API_PTR* create_device_by_id)(
       iree_hal_driver_t* driver, iree_hal_device_id_t device_id,
