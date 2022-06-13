@@ -51,7 +51,7 @@ MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(
     mlir::linalg::transform::LinalgTransformDialect)
 
 void mlirIREELinalgTransformRegisterPasses() {
-  mlir::linalg::transform::registerLinalgTransformInterpreterPass();
+  mlir::linalg::transform::registerTransformDialectInterpreterPass();
   mlir::linalg::transform::registerLinalgTransformExpertExpansionPass();
   mlir::linalg::transform::registerDropSchedulePass();
 }
@@ -74,7 +74,7 @@ void ireeRegisterTransformDialectExtensions(MlirContext context) {
 
 void mlirIREETransformRegisterPasses() {
   mlir::linalg::transform::registerDropSchedulePass();
-  mlir::linalg::transform::registerLinalgTransformInterpreterPass();
+  mlir::linalg::transform::registerTransformDialectInterpreterPass();
 }
 
 //===----------------------------------------------------------------------===//

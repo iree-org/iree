@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
   // Local dialect passes.
   mlir::iree_compiler::IREE::PYDM::registerPasses();
   mlir::iree_compiler::IREE::LinalgExt::registerPasses();
-  mlir::linalg::transform::registerLinalgTransformInterpreterPass();
+  mlir::linalg::transform::registerTransformDialectInterpreterPass();
   mlir::linalg::transform::registerLinalgTransformExpertExpansionPass();
   mlir::linalg::transform::registerDropSchedulePass();
   // Local test passes.

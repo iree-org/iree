@@ -217,8 +217,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
                 executableLoweringPipeline);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
-              LinalgTransformInterpCodegen:
-            addLinalgTransformInterpPasses(executableLoweringPipeline);
+              TransformDialectInterpreterCodegen:
+            addTransformDialectInterpreterPasses(executableLoweringPipeline);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUTileFuseAndVectorize:

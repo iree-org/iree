@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s --linalg-transform-interp --split-input-file | FileCheck %s
+// RUN: iree-dialects-opt %s --transform-dialect-interpreter --split-input-file | FileCheck %s
 
 // Offset per thread:
 // CHECK-DAG: affine_map<(d0)[s0] -> (d0 * (s0 ceildiv 10))>

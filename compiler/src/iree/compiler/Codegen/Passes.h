@@ -282,7 +282,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager);
 /// Populates the passes from Sandbox for testing transformations from sandbox.
 /// Unlike other pipelines this pass mangaer is nested at the
 /// `hal.executable.variant` op.
-void addLinalgTransformInterpPasses(OpPassManager &passManager);
+void addTransformDialectInterpreterPasses(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize lowering
 /// of linalg ops on tensors to vectors operations.

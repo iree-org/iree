@@ -32,7 +32,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include <mlir/Pass/PassRegistry.h>
 
-#define DEBUG_TYPE "transform-interpreter"
+#define DEBUG_TYPE "transform-dialect-interpreter"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 
 using namespace mlir;
@@ -46,9 +46,43 @@ static llvm::cl::opt<std::string> clTransformFileName(
 namespace {
 /// Simple pass that applies transform dialect ops directly contained in a
 /// module.
-class LinalgTransformInterp : public PassWrapper<LinalgTransformInterp, Pass> {
+class TransformDialectInterpreter
+    : public PassWrapper<TransformDialectInterpreter, Pass> {
 public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LinalgTransformInterp)
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TransformDialectInterpreter)
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    // TODO: this is only necessary to make registry subset happy when running
+    // the lowering to LLVM. The lowering should be changed to stop using the
+    // nested pass manager and this will go away.
+
+    // clang-format off
+    registry.insert<mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
+                    arith::ArithmeticDialect,
+                    AffineDialect,
+                    bufferization::BufferizationDialect,
+                    func::FuncDialect,
+                    linalg::LinalgDialect,
+                    linalg::transform::LinalgTransformDialect,
+                    LLVM::LLVMDialect,
+                    pdl::PDLDialect,
+                    pdl_interp::PDLInterpDialect,
+                    scf::SCFDialect,
+                    tensor::TensorDialect,
+                    vector::VectorDialect
+        // clang-format on
+        >();
+
+    // TODO: these should be registered by the extension instead, but there is
+    // no support for it in core currently.
+    arith::registerBufferizableOpInterfaceExternalModels(registry);
+    linalg::registerBufferizableOpInterfaceExternalModels(registry);
+    scf::registerBufferizableOpInterfaceExternalModels(registry);
+    bufferization::func_ext::registerBufferizableOpInterfaceExternalModels(
+        registry);
+    tensor::registerBufferizableOpInterfaceExternalModels(registry);
+    vector::registerBufferizableOpInterfaceExternalModels(registry);
+  }
 
   StringRef getArgument() const override { return "linalg-transform-interp"; }
 
@@ -98,39 +132,6 @@ public:
         return signalPassFailure();
     }
   }
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    // TODO: this is only necessary to make registry subset happy when running
-    // the lowering to LLVM. The lowering should be changed to stop using the
-    // nested pass manager and this will go away.
-
-    // clang-format off
-    registry.insert<mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
-                    arith::ArithmeticDialect,
-                    AffineDialect,
-                    bufferization::BufferizationDialect,
-                    func::FuncDialect,
-                    linalg::LinalgDialect,
-                    linalg::transform::LinalgTransformDialect,
-                    LLVM::LLVMDialect,
-                    pdl::PDLDialect,
-                    pdl_interp::PDLInterpDialect,
-                    scf::SCFDialect,
-                    tensor::TensorDialect,
-                    vector::VectorDialect
-        // clang-format on
-        >();
-
-    // TODO: these should be registered by the extension instead, but there is
-    // no support for it in core currently.
-    arith::registerBufferizableOpInterfaceExternalModels(registry);
-    linalg::registerBufferizableOpInterfaceExternalModels(registry);
-    scf::registerBufferizableOpInterfaceExternalModels(registry);
-    bufferization::func_ext::registerBufferizableOpInterfaceExternalModels(
-        registry);
-    tensor::registerBufferizableOpInterfaceExternalModels(registry);
-    vector::registerBufferizableOpInterfaceExternalModels(registry);
-  }
 };
 
 struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {
@@ -158,9 +159,9 @@ struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {
 };
 } // namespace
 
-/// Create a Linalg Transform interpreter pass.
-std::unique_ptr<Pass> mlir::createLinalgTransformInterpreterPass() {
-  return std::make_unique<LinalgTransformInterp>();
+/// Create a Transform dialect interpreter pass.
+std::unique_ptr<Pass> mlir::createTransformDialectInterpreterPass() {
+  return std::make_unique<TransformDialectInterpreter>();
 }
 
 /// Create a Linalg pass to drop the schedule from the module.
@@ -173,7 +174,7 @@ void mlir::linalg::transform::registerDropSchedulePass() {
   PassRegistration<DropSchedulePass>();
 }
 
-/// Registration hook for the Linalg Transform interpreter pass.
-void mlir::linalg::transform::registerLinalgTransformInterpreterPass() {
-  PassRegistration<LinalgTransformInterp>();
+/// Registration hook for the Transform dialect interpreter pass.
+void mlir::linalg::transform::registerTransformDialectInterpreterPass() {
+  PassRegistration<TransformDialectInterpreter>();
 }

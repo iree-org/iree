@@ -62,18 +62,18 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(64));
 
-static llvm::cl::opt<bool> clEnableCodegenTransformDialect(
-    "iree-codegen-use-transform-dialect",
-    llvm::cl::desc(
-        "experimental path to use the linalg transform dialect interpreter"),
-    llvm::cl::init(false));
-
 // TODO(hanchung): Remove the flag. This is the flag for fastly falling back to
 // the previous snapshot.
 static llvm::cl::opt<bool> disableMatmulPadPipeline(
     "iree-codegen-disable-matmul-pad-pipeline",
     llvm::cl::desc("disable padding options in Matmul codegen"),
     llvm::cl::init(false));
+
+llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName(
+    "iree-codegen-use-transform-dialect",
+    llvm::cl::desc(
+        "MLIR file containing a transform dialect specification to apply"),
+    llvm::cl::init(""));
 
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
@@ -1194,12 +1194,11 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     if (!exportOp) continue;
     if (getTranslationInfo(exportOp)) continue;
 
-    // If using sandbox passes, currently set the workload_per_wg to be
-    // empty for single-threaded execution.
-    if (clEnableCodegenTransformDialect) {
+    // If using the transform dialect interpreter, call the proper pipeline.
+    if (clCPUCodegenTransformDialectFileName.size() > 0) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
           moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                     LinalgTransformInterpCodegen);
+                                     TransformDialectInterpreterCodegen);
       setTranslationInfo(funcOp, translationInfo);
       continue;
     }
