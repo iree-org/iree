@@ -321,6 +321,9 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
                                         unsigned pipelineDepth);
 
+/// Experimental path for transform dialect.
+void addGPUTransformDialectInterpreterPasses(OpPassManager &pm);
+
 /// Simple lowering only distributute linalg ops on blocks and threads. This
 /// will result in scalar operations. Expects pass manager to be a module-level
 /// pass manager.

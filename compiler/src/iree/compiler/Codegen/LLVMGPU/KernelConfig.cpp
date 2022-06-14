@@ -11,6 +11,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -22,6 +23,15 @@ using namespace mlir;
 using namespace mlir::iree_compiler;
 
 static constexpr unsigned cudaWarpSize = 32;
+namespace mlir {
+namespace iree_compiler {
+llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
+    "iree-codegen-llvmgpu-use-transform-dialect",
+    llvm::cl::desc(
+        "MLIR file containing a transform dialect specification to apply"),
+    llvm::cl::init(""));
+}
+}  // namespace mlir
 
 namespace {
 struct TileWorkgroupSizePair {
@@ -454,6 +464,16 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
     if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
       return funcOp.emitOpError("failed to get compute ops");
+    }
+
+    // If using sandbox passes, currently set the workload_per_wg to be
+    // empty for single-threaded execution.
+    if (clGPUCodegenTransformDialectFileName.size() > 0) {
+      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
+                                     TransformDialectInterpreterCodegen);
+      setTranslationInfo(funcOp, translationInfo);
+      continue;
     }
 
     Operation *rootOperation = nullptr;
