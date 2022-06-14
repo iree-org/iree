@@ -13,8 +13,8 @@
 #   ref: reference – for the reference CompiledModule
 #   tar: target - for one of the target CompiledModules
 
-# TODO(#4131) python>=3.7: Use postponed type annotations.
-
+from __future__ import annotations
+from dataclasses import dataclass
 import collections
 import copy
 import itertools
@@ -105,9 +105,20 @@ def get_target_backends() -> Sequence[module_utils.BackendInfo]:
   return backends
 
 
-# TODO(#4131) python>=3.7: Consider using a (frozen) dataclass.
-Modules = collections.namedtuple("Modules",
-                                 ["ref_module", "tar_modules", "artifacts_dir"])
+@dataclass(frozen=True)
+class Modules:
+  """Compiled modules.
+
+  Args:
+    ref_module: Module compiled with the reference backend.
+    tar_modules: Sequence of modules compiled with the different target 
+      backends.
+    artifacts_dir: String pointing to where compilation artifacts were saved.
+  """
+  ref_module: module_utils.CompiledModule
+  tar_modules: Sequence[module_utils.CompiledModule]
+  artifacts_dir: str
+
 
 # We have to use a global variable to store the compiled modules so that we can
 # avoid recompilation. This is because the TestCase class resets it's entire
@@ -134,7 +145,7 @@ def compile_tf_module(module_class: Type[tf.Module],
       module_class.__name__ will be used.
 
   Returns:
-    A 'Modules' namedtuple containing the reference module, target modules and
+    A 'Modules' dataclass containing the reference module, target modules and
     artifacts directory.
   """
   global _global_modules
@@ -179,7 +190,7 @@ def compile_tf_signature_def_saved_model(
     output_names: A sequence of named outputs to extract from the saved model.
 
   Returns:
-    A 'Modules' namedtuple containing the reference module, target modules and
+    A 'Modules' dataclass containing the reference module, target modules and
     artifacts directory.
   """
   global _global_modules
@@ -231,7 +242,7 @@ class UnitTestSpec:
     self.kwargs = dict() if kwargs is None else kwargs
     self.input_generator = input_generator
 
-  def with_name(self, new_name: str) -> "UnitTestSpec":
+  def with_name(self, new_name: str) -> UnitTestSpec:
     return UnitTestSpec(new_name, self.input_signature, self.input_generator,
                         self.input_args, self.kwargs)
 

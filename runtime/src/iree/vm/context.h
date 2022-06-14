@@ -41,6 +41,12 @@ enum iree_vm_context_flag_bits_t {
   // All invocations made to this context - including initializers - will be
   // traced. For fine-grained control use `iree_vm_invocation_flags_t`.
   IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION = 1u << 0,
+
+  // Context allows concurrent execution.
+  // Multiple OS threads may call into the context concurrently. Synchronization
+  // is not performed by the context and callers must ensure the executing
+  // programs support concurrency.
+  IREE_VM_CONTEXT_FLAG_CONCURRENT = 1u << 1,
 };
 typedef uint32_t iree_vm_context_flags_t;
 

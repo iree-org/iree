@@ -61,7 +61,7 @@ TEST_P(allocator_test, BaselineBufferCompatibility) {
   iree_hal_buffer_params_t dispatch_params = {0};
   dispatch_params.type =
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-  dispatch_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH;
+  dispatch_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
   iree_hal_buffer_compatibility_t dispatch_compatibility =
       iree_hal_allocator_query_compatibility(device_allocator_, dispatch_params,
                                              kAllocationSize);

@@ -59,6 +59,39 @@ static SmallVector<int64_t> getIndicesOfDynamicDims(ShapedType t) {
 // Patterns for ForeachThreadOpToFlow rewrite.
 //===---------------------------------------------------------------------===//
 
+/// Populate the workgroup_count region of `dispatchOp`.
+/// For now, this only supports constant index ops and empty workload operands.
+/// Assumes the Flow::DispatchWorkgroupsOp is built with an empty region.
+static LogicalResult populateWorkgroupCountComputingRegion(
+    PatternRewriter &rewriter, scf::ForeachThreadOp foreachThreadOp,
+    Flow::DispatchWorkgroupsOp dispatchOp) {
+  Location loc = foreachThreadOp.getLoc();
+  OpBuilder::InsertionGuard g(rewriter);
+  Region &r = dispatchOp.workgroup_count();
+  assert(r.empty() && "expected block-less workgroup_count region");
+  Block *block = rewriter.createBlock(&r);
+  rewriter.setInsertionPointToStart(block);
+
+  // Resize to `3` to match IREE's assumptions.
+  SmallVector<Value> workgroupCount{foreachThreadOp.getNumThreads()};
+  workgroupCount.resize(3, rewriter.create<arith::ConstantIndexOp>(loc, 1));
+  auto returnOp = rewriter.create<Flow::ReturnOp>(loc, workgroupCount);
+
+  // Fill the region.
+  // For now, this assumes that we only pull in constants.
+  // TODO: Iteratively pull operations that are only consuming IndexType.
+  BlockAndValueMapping bvm;
+  for (auto v : foreachThreadOp.getNumThreads()) {
+    auto op = dyn_cast_or_null<arith::ConstantIndexOp>(v.getDefiningOp());
+    if (!op) return failure();
+    rewriter.clone(*op, bvm);
+  }
+  rewriter.setInsertionPoint(returnOp);
+  rewriter.clone(*returnOp, bvm);
+  rewriter.eraseOp(returnOp);
+  return success();
+}
+
 /// Rewrite ParallelInsertSlice ops in `performConcurrentlyOp` as Flow
 /// DispatchTensorStoreOps.
 /// Ops are inserted just before the `block` terminator.
@@ -126,16 +159,15 @@ static void rewriteExtractSlices(PatternRewriter &rewriter,
 
 /// Pattern to rewrite a ForeachThreadOp into a Flow::DispatchWorkGroupsOp.
 /// This rewrite proceeds in a few steps:
-///   - Step 1: Compute the result types and their result dynamic dim
-///   operands.
+///   - Step 1: Compute the result types and their result dynamic dim operands.
 ///     This first step takes advantage of the ops contained in the
 ///     ForeachThreadOp terminator and that are tied to the results.
-///   - Step 2: Get values defined above and separate them between
-///   non-tensors,
+///   - Step 2: Get values defined above and separate them between non-tensors,
 ///     tensors and introduce appropriate tensor dims.
-///   - Step 3: Compute workgroupCount.
-///   - Step 4: Create ordered vectors of operands to pass to the builder and
+///   - Step 3: Create ordered vectors of operands to pass to the builder and
 ///     build the dispatchOp.
+///   - Step 4: Populate the workgroupCount region of the dispatchOp and set
+///     the workload operands to the values defined above.
 ///   - Step 5: Fixup dispatchOp bbArgs and terminator.
 ///   - Step 6: Move the body of foreachThreadOp to the dispatchOp.
 ///   - Step 7: Set up bvm for RAUWIf. In particular, tensor operands become
@@ -209,16 +241,9 @@ ForeachThreadToFlowDispatchWorkgroupsRewriter::returningMatchAndRewrite(
       tensorDynamicDims.push_back(rewriter.create<tensor::DimOp>(loc, v, dim));
   }
 
-  // Step 3. Compute workgroupCount.
-  // TODO: this should actually be workLoad information.
-  // Also this will require special handling during codegen to set up the
-  // HAL::EntryPointOp correctly (atm only 1x1x1 is supported).
-  SmallVector<Value> workgroupCount{foreachThreadOp.getNumThreads()};
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-  workgroupCount.resize(3, one);
-
-  // Step 4. Create ordered vectors of operands to pass to the builder and
-  // build the dispatchOp.
+  // Step 3. Create ordered vectors of operands to pass to the builder and
+  // build the dispatchOp. The dispatchOp is created with an empty
+  // workgroup_count region and empty workload. They are populated next
   SmallVector<Value> nonDimOperands;
   llvm::append_range(nonDimOperands, nonTensorOperands);
   llvm::append_range(nonDimOperands, tensorOperands);
@@ -239,13 +264,21 @@ ForeachThreadToFlowDispatchWorkgroupsRewriter::returningMatchAndRewrite(
   // clang-format off
   auto dispatchOp = rewriter.create<Flow::DispatchWorkgroupsOp>(
       loc,
-      /*workgroupCount=*/workgroupCount,
+      /*workload=*/ValueRange{},
       /*resultTypes=*/foreachThreadOp.getResultTypes(),
       /*resultDims=*/resultTensorsDynamicDims.getArrayRef(),
       /*operands=*/nonDimOperands,
       /*operandDims=*/allTensorDynamicDims,
       /*tiedOperands=*/llvm::to_vector<4>(tiedOperandsSequence));
   // clang-format on
+
+  // Step 4. Outline the compute workload region and set up the workload
+  // operands.
+  if (failed(populateWorkgroupCountComputingRegion(rewriter, foreachThreadOp,
+                                                   dispatchOp)))
+    return foreachThreadOp.emitError(
+               "failed to populate workload region for dispatchOp: ")
+           << dispatchOp;
 
   // Step 5. Fixup dispatchOp bbArgs and terminator.
   // TODO: Ideally the builder would have created the proper bbArgs and the

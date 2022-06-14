@@ -6,8 +6,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Imports XLA artifacts via the `iree-import-xla` tool."""
 
-# TODO(#4131) python>=3.7: Use postponed type annotations.
-
+from __future__ import annotations
+from dataclasses import dataclass
 from enum import Enum
 import logging
 import tempfile
@@ -47,7 +47,7 @@ class ImportFormat(Enum):
   MLIR_TEXT = "mlir_text"
 
   @staticmethod
-  def parse(spec: Union[str, "ImportFormat"]) -> "ImportFormat":
+  def parse(spec: Union[str, ImportFormat]) -> ImportFormat:
     """Parses or returns an ImportFormat.
 
     Args:
@@ -65,31 +65,24 @@ class ImportFormat(Enum):
     return ImportFormat[spec]
 
 
-# TODO(#4131) python>=3.7: Consider using a dataclass.
+@dataclass
 class ImportOptions(CompilerOptions):
-  """Import options layer on top of the backend compiler options."""
+  """Import options layer on top of the backend compiler options.
 
-  def __init__(self,
-               import_only: bool = False,
-               import_format: Union[ImportFormat,
-                                    str] = ImportFormat.BINARY_PROTO,
-               import_extra_args: Sequence[str] = (),
-               save_temp_mhlo_input: Optional[str] = None,
-               save_temp_iree_input: Optional[str] = None,
-               **kwargs):
-    """Initialize options from keywords.
+  Args:
+    import_format: Format of the proto (text or binary).
+    save_temp_iree_input: Optionally save the IR that is the result of the
+      import (ready to be passed to IREE).
+  """
 
-    Args:
-      import_format: Format of the proto (text or binary).
-      save_temp_iree_input: Optionally save the IR that is the result of the
-        import (ready to be passed to IREE).
-    """
-    super().__init__(**kwargs)
-    self.import_only = import_only
-    self.import_format = ImportFormat.parse(import_format)
-    self.import_extra_args = import_extra_args
-    self.save_temp_mhlo_input = save_temp_mhlo_input
-    self.save_temp_iree_input = save_temp_iree_input
+  import_only: bool = False
+  import_format: Union[ImportFormat, str] = ImportFormat.BINARY_PROTO
+  import_extra_args: Sequence[str] = ()
+  save_temp_mhlo_input: Optional[str] = None
+  save_temp_iree_input: Optional[str] = None
+
+  def __post_init__(self):
+    self.import_format = ImportFormat.parse(self.import_format)
 
 
 def build_import_command_line(input_path: str, tfs: TempFileSaver,

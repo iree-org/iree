@@ -7,15 +7,15 @@
 # MLIR.
 # pytype: skip-file
 try:
-  from .. import ir
+  from ..ir import *
   from ..dialects import pdl
   from ._ods_common import extend_opview_class as _ods_extend_opview_class, segmented_accessor as _ods_segmented_accessor, equally_sized_accessor as _ods_equally_sized_accessor, get_default_loc_context as _ods_get_default_loc_context, get_op_result_or_value as _get_op_result_or_value, get_op_results_or_values as _get_op_results_or_values
-  from typing import Optional, Sequence, Union
+  from typing import Optional, overload, Sequence, Union
 except ImportError as e:
   raise RuntimeError("Error loading imports from extension module") from e
-BoolArg = Optional[Union[bool, ir.BoolAttr]]
-IntListArg = Optional[Union[Sequence[int], ir.ArrayAttr]]
-StringArg = Optional[Union[str, ir.StringAttr]]
+BoolArg = Optional[Union[bool, BoolAttr]]
+IntListArg = Optional[Union[Sequence[int], ArrayAttr]]
+StringArg = Optional[Union[str, StringAttr]]
 
 
 def _defaulted_ensure(f):
@@ -29,46 +29,53 @@ def _defaulted_ensure(f):
 
 @_defaulted_ensure
 def _ensure_int_array_attr(value: IntListArg):
-  i64 = ir.IntegerType.get_signless(64)
+  i64 = IntegerType.get_signless(64)
   if isinstance(value, Sequence):
-    return ir.ArrayAttr.get([ir.IntegerAttr.get(i64, i) for i in value])
+    return ArrayAttr.get([IntegerAttr.get(i64, i) for i in value])
   return value
 
 
 @_defaulted_ensure
 def _ensure_bool_attr(value: BoolArg):
   if isinstance(value, bool):
-    return ir.BoolAttr.get(value)
+    return BoolAttr.get(value)
   return value
 
 
 @_defaulted_ensure
 def _ensure_string_attr(value: StringArg):
   if isinstance(value, str):
-    return ir.StringAttr.get(value)
+    return StringAttr.get(value)
   return value
 
 
 class CanonicalizedSequenceOp:
-  """Specialization for the CanonicalizedSequenceOp class."""
 
-  def __init__(self, target, *, loc=None, ip=None):
-    operands = []
-    results = []
-    attributes = {}
-    regions = 1
-    if target is not None:
-      operands.append(_get_op_result_or_value(target))
-    _ods_successors = None
-    super().__init__(
-        self.build_generic(attributes=attributes,
-                           results=results,
-                           operands=operands,
-                           successors=_ods_successors,
-                           regions=regions,
-                           loc=loc,
-                           ip=ip))
-    self.body.blocks.append(pdl.OperationType.get())
+  @overload
+  def __init__(self, resultsOrRoot: Sequence[Type],
+               optionalRoot: Optional[Union[Operation, Value]]):
+    ...
+
+  @overload
+  def __init__(self, resultsOrRoot: Optional[Union[Operation, Value]],
+               optionalRoot: NoneType):
+    ...
+
+  def __init__(self, resultsOrRoot=None, optionalRoot=None):
+    results = resultsOrRoot if isinstance(resultsOrRoot, Sequence) else []
+    root = (resultsOrRoot
+            if not isinstance(resultsOrRoot, Sequence) else optionalRoot)
+    root = _get_op_result_or_value(root) if root else None
+    super().__init__(results_=results, root=root)
+    self.regions[0].blocks.append(pdl.OperationType.get())
+
+  @property
+  def body(self) -> Block:
+    return self.regions[0].blocks[0]
+
+  @property
+  def bodyTarget(self) -> Value:
+    return self.body.arguments[0]
 
 
 class LowerVectorsOp:
@@ -133,7 +140,7 @@ class LowerToLLVMOp:
 class PrintOp:
 
   def __init__(self,
-               target: Optional[Union[ir.Value, ir.Operation, ir.OpView]],
+               target: Optional[Union[Value, Operation, OpView]],
                *,
                name: StringArg,
                loc=None,

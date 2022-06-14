@@ -79,7 +79,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
                                env={"TRACY_NO_EXIT": "1"},
                                cwd=case_dir,
                                stdout=subprocess.PIPE,
-                               universal_newlines=True)
+                               text=True)
 
     wait_for_iree_benchmark_module_start(process, self.verbose)
 

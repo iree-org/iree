@@ -136,6 +136,8 @@ static LogicalResult outlineDispatchWorkgroupsOp(
   auto exportOp = builder.create<ExecutableExportOp>(
       regionOp.getLoc(), workgroupFuncOp.getName(),
       SymbolRefAttr::get(workgroupFuncOp));
+  if (!regionOp.workgroup_count().empty())
+    exportOp.workgroup_count().takeBody(regionOp.workgroup_count());
 
   // Move over the workgroup count region, if present.
   if (!regionOp.workgroup_count().empty()) {

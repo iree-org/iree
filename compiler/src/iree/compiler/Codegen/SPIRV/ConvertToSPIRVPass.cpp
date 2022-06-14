@@ -353,7 +353,6 @@ void ConvertToSPIRVPass::runOnOperation() {
   arith::populateArithmeticToSPIRVPatterns(typeConverter, patterns);
   populateFuncToSPIRVPatterns(typeConverter, patterns);
   populateMathToSPIRVPatterns(typeConverter, patterns);
-  populateExpandCtlzPattern(patterns);
 
   // Pull in standard patterns to convert tensor operations to SPIR-V. These are
   // primarily used to handle tensor-type constants and contain a

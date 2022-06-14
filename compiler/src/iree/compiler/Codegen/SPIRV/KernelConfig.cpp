@@ -237,6 +237,10 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
   }
   if (workgroupTileSizes[1 + isBM] == 0) return success();
 
+  // Don't overshoot when using workgroup memory to avoid blowing up workgroup
+  // memory size.
+  if (useWorkgroupMemory) residualThreads = std::min(residualThreads, bestY);
+
   // Deduce the configuration for the M dimension. Start with the best workgroup
   // Y size, and reduce by a factor of two each time.
   for (int64_t y = residualThreads; y >= 1; y >>= 1) {
@@ -297,7 +301,7 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
 
 static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
                                     IREE::LinalgExt::FftOp op) {
-  const int64_t subgroupSize = limits.subgroup_size().getValue().getSExtValue();
+  const int subgroupSize = limits.getSubgroup_size();
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
 
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
@@ -353,7 +357,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                                  workgroupSize);
   }
 
-  const int subgroupSize = limits.subgroup_size().getValue().getSExtValue();
+  const int subgroupSize = limits.getSubgroup_size();
   const unsigned loopDepth = partitionedLoops.back() + 1;
 
   // Configurations we need to decide.
@@ -461,16 +465,28 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
           int64_t idleThreads = candidate - (loopBound % candidate);
           if (idleThreads > candidate / *lossFactor) continue;
         }
+        // If the workload is too small and we cannot distribute to more than 2
+        // workgroups, try a smaller tile size to increase parallelism.
+        if (partitionedLoops.size() == 1 && candidate > subgroupSize &&
+            llvm::divideCeil(loopBound, candidate) <= 2) {
+          continue;
+        }
 
         // Found a suitable candidate. Try to let each thread handle 4
         // elements if this is the workgroup x dimension.
         workgroupTileSizes[shapeDim] = candidate;
         LLVM_DEBUG(llvm::dbgs() << "Chosen tile size: " << candidate << "\n");
         if (vectorizable && wgDim == 0 && !lossFactor && candidate % 4 == 0) {
-          threadTileSizes[shapeDim] = 4;
-          workgroupSize[wgDim] = candidate / 4;
-          assert(numThreads % (candidate / 4) == 0);
-          numThreads /= candidate / 4;
+          // Use size-1 vectors to increase parallelism if larger ones causes
+          // idle threads in the subgroup.
+          bool hasIdleThreads =
+              partitionedLoops.size() == 1 && candidate <= subgroupSize;
+          int vectorSize = hasIdleThreads ? 1 : 4;
+          LLVM_DEBUG(llvm::dbgs() << "Use vector size: " << vectorSize << "\n");
+          threadTileSizes[shapeDim] = vectorSize;
+          workgroupSize[wgDim] = candidate / vectorSize;
+          assert(numThreads % (candidate / vectorSize) == 0);
+          numThreads /= candidate / vectorSize;
         } else {
           if (wgDim == 0) vectorizable = false;
           threadTileSizes[shapeDim] = 1;

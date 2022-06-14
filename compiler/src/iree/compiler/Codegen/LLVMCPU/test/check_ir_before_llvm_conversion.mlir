@@ -10,7 +10,7 @@ module {
 
 // -----
 
-// expected-error @+1 {{expected total size of stack allocation is not greater than 32 KB, but got 65536 bytes}}
+// expected-error @+1 {{expected total size of stack allocation is not greater than 32768 bytes, but got 65536 bytes}}
 module {
   func.func @static_big_allocas(%arg0: index) {
     %0 = memref.alloca() : memref<16384xi32>
@@ -21,7 +21,7 @@ module {
 // -----
 
 #map = affine_map<(d0) -> (-d0, 16384)>
-// expected-error @+1 {{expected total size of stack allocation is not greater than 32 KB, but got 65536 bytes}}
+// expected-error @+1 {{expected total size of stack allocation is not greater than 32768 bytes, but got 65536 bytes}}
 module {
   func.func @dynamic_big_allocas(%arg0: index) {
     %0 = affine.min #map(%arg0)

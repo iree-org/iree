@@ -28,6 +28,8 @@ iree_lit_test_suite(
   LABELS
     "hostonly"
     "optonly"
+  TIMEOUT
+    900
 )
 
 iree_check_single_backend_test_suite(

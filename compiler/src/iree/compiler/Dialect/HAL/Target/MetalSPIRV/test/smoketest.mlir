@@ -5,7 +5,7 @@ module attributes {
     #hal.device.target<"metal", {
       executable_targets = [
         #hal.executable.target<"metal-spirv", "metal-msl-fb", {
-          spv.target_env = #spv.target_env<#spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {}>
+          spv.target_env = #spv.target_env<#spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, #spv.resource_limits<>>
         }>
       ]
     }>

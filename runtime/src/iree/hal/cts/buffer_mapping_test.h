@@ -534,8 +534,9 @@ TEST_P(buffer_mapping_test, MapRangeWrite) {
   // Write into the mapped memory, flush for device access, then read back.
   uint8_t fill_value = 0x12;
   std::memset(mapping.contents.data, fill_value, buffer_size);
-  IREE_ASSERT_OK(iree_hal_buffer_flush_range(&mapping, /*byte_offset=*/0,
-                                             /*byte_length=*/buffer_size));
+  IREE_ASSERT_OK(
+      iree_hal_buffer_mapping_flush_range(&mapping, /*byte_offset=*/0,
+                                          /*byte_length=*/buffer_size));
   std::vector<uint8_t> actual_data(buffer_size);
   IREE_ASSERT_OK(iree_hal_buffer_map_read(
       buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));

@@ -32,10 +32,6 @@ void IREEDbgHelpUnlock(void) { ReleaseMutex(iree_dbghelp_mutex); }
 
 #if IREE_TRACING_FEATURES != 0
 
-void iree_tracing_set_thread_name_impl(const char* name) {
-  tracy::SetThreadName(name);
-}
-
 iree_zone_id_t iree_tracing_zone_begin_impl(
     const iree_tracing_location_t* src_loc, const char* name,
     size_t name_length) {
@@ -43,22 +39,22 @@ iree_zone_id_t iree_tracing_zone_begin_impl(
 
 #ifndef TRACY_NO_VERIFY
   {
-    TracyLfqPrepareC(tracy::QueueType::ZoneValidation);
+    TracyQueuePrepareC(tracy::QueueType::ZoneValidation);
     tracy::MemWrite(&item->zoneValidation.id, zone_id);
-    TracyLfqCommitC;
+    TracyQueueCommitC(zoneValidationThread);
   }
 #endif  // TRACY_NO_VERIFY
 
   {
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS
-    TracyLfqPrepareC(tracy::QueueType::ZoneBeginCallstack);
+    TracyQueuePrepareC(tracy::QueueType::ZoneBeginCallstack);
 #else
-    TracyLfqPrepareC(tracy::QueueType::ZoneBegin);
+    TracyQueuePrepareC(tracy::QueueType::ZoneBegin);
 #endif  // IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS
     tracy::MemWrite(&item->zoneBegin.time, tracy::Profiler::GetTime());
     tracy::MemWrite(&item->zoneBegin.srcloc,
                     reinterpret_cast<uint64_t>(src_loc));
-    TracyLfqCommitC;
+    TracyQueueCommitC(zoneBeginThread);
   }
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS
@@ -68,19 +64,19 @@ iree_zone_id_t iree_tracing_zone_begin_impl(
   if (name_length) {
 #ifndef TRACY_NO_VERIFY
     {
-      TracyLfqPrepareC(tracy::QueueType::ZoneValidation);
+      TracyQueuePrepareC(tracy::QueueType::ZoneValidation);
       tracy::MemWrite(&item->zoneValidation.id, zone_id);
-      TracyLfqCommitC;
+      TracyQueueCommitC(zoneValidationThread);
     }
 #endif  // TRACY_NO_VERIFY
     auto name_ptr = reinterpret_cast<char*>(tracy::tracy_malloc(name_length));
     memcpy(name_ptr, name, name_length);
-    TracyLfqPrepareC(tracy::QueueType::ZoneName);
+    TracyQueuePrepareC(tracy::QueueType::ZoneName);
     tracy::MemWrite(&item->zoneTextFat.text,
                     reinterpret_cast<uint64_t>(name_ptr));
     tracy::MemWrite(&item->zoneTextFat.size,
                     static_cast<uint64_t>(name_length));
-    TracyLfqCommitC;
+    TracyQueueCommitC(zoneTextFatThread);
   }
 
   return zone_id;
@@ -98,21 +94,21 @@ iree_zone_id_t iree_tracing_zone_begin_external_impl(
 
 #ifndef TRACY_NO_VERIFY
   {
-    TracyLfqPrepareC(tracy::QueueType::ZoneValidation);
+    TracyQueuePrepareC(tracy::QueueType::ZoneValidation);
     tracy::MemWrite(&item->zoneValidation.id, zone_id);
-    TracyLfqCommitC;
+    TracyQueueCommitC(zoneValidationThread);
   }
 #endif  // TRACY_NO_VERIFY
 
   {
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS
-    TracyLfqPrepareC(tracy::QueueType::ZoneBeginAllocSrcLocCallstack);
+    TracyQueuePrepareC(tracy::QueueType::ZoneBeginAllocSrcLocCallstack);
 #else
-    TracyLfqPrepareC(tracy::QueueType::ZoneBeginAllocSrcLoc);
+    TracyQueuePrepareC(tracy::QueueType::ZoneBeginAllocSrcLoc);
 #endif  // IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS
     tracy::MemWrite(&item->zoneBegin.time, tracy::Profiler::GetTime());
     tracy::MemWrite(&item->zoneBegin.srcloc, src_loc);
-    TracyLfqCommitC;
+    TracyQueueCommitC(zoneBeginThread);
   }
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS
