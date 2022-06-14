@@ -22,7 +22,7 @@ on:
         description: 'Release id to upload artifacts to'
         default: ''
       commit:
-        description: 'Last green commit to check out'
+        description: 'Commit to check out'
         default: ''
 
 jobs:

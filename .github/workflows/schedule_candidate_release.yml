@@ -11,15 +11,16 @@ jobs:
     name: "Tag candidate release"
     runs-on: ubuntu-18.04
     # Don't run this in everyone's forks.
-    # if: github.repository == 'google/iree'
+    if: github.repository == 'google/iree'
     steps:
       - name: Checking out repository
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+
       - name: Get the last green commit
         id: last_green_commit
-        uses: talentpair/last-green-commit-action@master
+        uses: talentpair/last-green-commit-action@d95cfa836b22ef047dd0a8ddb1e6d9567982d702
         with:
           github-token: ${{ secrets.WRITE_ACCESS_TOKEN }}
 
@@ -39,7 +40,7 @@ jobs:
         uses: ad-m/github-push-action@40bf560936a8022e68a3c00e7d2abefaf01305a6  # v0.6.0
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
-          branch: green-commit
+          branch: ${{ github.ref_name }}
           tags: true
 
       - name: Create Release
