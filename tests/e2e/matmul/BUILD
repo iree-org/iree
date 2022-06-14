@@ -7,6 +7,7 @@
 # End-to-end matrix multiplication tests.
 
 load("//build_tools/bazel:iree_trace_runner_test.bzl", "iree_generated_trace_runner_test")
+load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -220,13 +221,11 @@ py_binary(
 # Check tests
 iree_check_single_backend_test_suite(
     name = "check_cuda",
-    srcs = enforce_glob(
+    srcs =
         [
             # currently only enabled on cuda as it can be slow on other backends.
             "large_linalg_matmul.mlir",
         ],
-        include = ["*.mlir"],
-    ),
     driver = "cuda",
     tags = [
         # CUDA cuInit fails with sanitizer on.
