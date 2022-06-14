@@ -15,14 +15,12 @@ import json
 import os
 import re
 import zipfile
-from dataclasses import asdict
-from pathlib import PurePath
-from typing import BinaryIO, Dict, Optional, TextIO
 
-from common.benchmark_definition import (CompilationInfo, CompilationResults,
-                                         CompilationStatistics,
-                                         ModuleComponentSizes,
-                                         get_git_commit_hash)
+from dataclasses import asdict
+from typing import BinaryIO, Dict, Optional, TextIO
+from pathlib import PurePath
+
+from common.benchmark_definition import CompilationInfo, CompilationResults, CompilationStatistics, ModuleComponentSizes, get_git_commit_hash
 from common.benchmark_suite import BENCHMARK_SUITE_REL_PATH, BenchmarkSuite
 
 BENCHMARK_FLAGFILE = "flagfile"
@@ -58,7 +56,7 @@ def match_module_cmake_target(module_path: str) -> Optional[str]:
 
 def parse_compilation_time_from_ninja_log(log: TextIO) -> Dict[str, int]:
   """Retrieve the compilation time (ms) from the Ninja build log.
-
+  
   Returns:
     Map of target name and compilation time in ms.
   """
@@ -174,8 +172,9 @@ def main(args: argparse.Namespace):
 
       with open(module_path, "rb") as module_file:
         module_component_sizes = get_module_component_info(
-            "module_file",
+            module_file,
             os.stat(module_path).st_size)
+
       cmake_target = match_module_cmake_target(module_path)
       if cmake_target is None:
         raise RuntimeError(
