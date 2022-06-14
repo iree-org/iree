@@ -32,11 +32,14 @@ std::string GetUniquePath(const char* unique_name) {
   char* test_tmpdir = getenv("TEST_TMPDIR");
   if (!test_tmpdir) {
     test_tmpdir = getenv("TMPDIR");
-  }
+}
   if (!test_tmpdir) {
     test_tmpdir = getenv("TEMP");
   }
-  IREE_CHECK(test_tmpdir) << "TEST_TMPDIR/TMPDIR/TEMP not defined";
+
+
+  IREE_CHECK(
+test_tmpdir) << "TEST_TMPDIR/TMPDIR/TEMP not defined";
   return test_tmpdir + std::string("/iree_test_") + unique_name;
 }
 
