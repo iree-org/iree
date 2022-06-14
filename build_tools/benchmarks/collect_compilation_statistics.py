@@ -176,7 +176,6 @@ def main(args: argparse.Namespace):
         module_component_sizes = get_module_component_info(
             "module_file",
             os.stat(module_path).st_size)
-
       cmake_target = match_module_cmake_target(module_path)
       if cmake_target is None:
         raise RuntimeError(
