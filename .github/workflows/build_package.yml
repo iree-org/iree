@@ -50,14 +50,14 @@ jobs:
             experimental: false
 
           # Macos packages.
-          # - runner: macos-11
-          #   build_family: macos
-          #   build_package: py-compiler-pkg
-          #   experimental: true
-          # - runner: macos-11
-          #   build_family: macos
-          #   build_package: py-runtime-pkg
-          #   experimental: true
+          - runner: macos-11
+            build_family: macos
+            build_package: py-compiler-pkg
+            experimental: true
+          - runner: macos-11
+            build_family: macos
+            build_package: py-runtime-pkg
+            experimental: true
     env:
       MANYLINUX_X86_64_IMAGE: gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:2c6a9120a5f96bcf3b1dda4086d807682705b51fb9c6ee5b48a8756c436220bc
 
@@ -189,8 +189,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
           release_id: ${{ github.event.inputs.release_id }}
-          # Only upload iree artifacts.
-          assets_path: ./bindist/iree*.*
+          # Only upload iree wheels.
+          assets_path: ./bindist/iree*.whl
 
   validate_and_publish:
     name: "Invoke workflow to validate and publish release"
