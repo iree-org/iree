@@ -206,6 +206,8 @@ static void populatePromotionPatterns(MLIRContext *context,
           .addFilter([](Operation *op) {
             auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
             if (!linalgOp) return failure();
+            if(linalgOp.hasDynamicShape())
+              return failure();
             return success(linalg::isaContractionOpInterface(op) &&
                            linalgOp.getNumParallelLoops() >= 2);
           }));
