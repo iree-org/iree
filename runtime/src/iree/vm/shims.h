@@ -15,6 +15,7 @@
 #include "iree/base/attributes.h"
 #include "iree/base/target_platform.h"
 #include "iree/vm/module.h"
+#include "iree/vm/native_module.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
 #include "iree/vm/value.h"
@@ -74,7 +75,8 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_target2_t)(
 
 #define IREE_VM_ABI_DECLARE_SHIM(arg_types, ret_types)                         \
   iree_status_t iree_vm_shim_##arg_types##_##ret_types(                        \
-      iree_vm_stack_t* IREE_RESTRICT stack, iree_byte_span_t args_storage,     \
+      iree_vm_stack_t* IREE_RESTRICT stack,                                    \
+      iree_vm_native_function_flags_t flags, iree_byte_span_t args_storage,    \
       iree_byte_span_t rets_storage,                                           \
       iree_vm_native_function_target2_t target_fn, void* IREE_RESTRICT module, \
       void* IREE_RESTRICT module_state,                                        \
@@ -82,7 +84,8 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_target2_t)(
 
 #define IREE_VM_ABI_DEFINE_SHIM(arg_types, ret_types)                          \
   iree_status_t iree_vm_shim_##arg_types##_##ret_types(                        \
-      iree_vm_stack_t* IREE_RESTRICT stack, iree_byte_span_t args_storage,     \
+      iree_vm_stack_t* IREE_RESTRICT stack,                                    \
+      iree_vm_native_function_flags_t flags, iree_byte_span_t args_storage,    \
       iree_byte_span_t rets_storage,                                           \
       iree_vm_native_function_target2_t target_fn, void* IREE_RESTRICT module, \
       void* IREE_RESTRICT module_state,                                        \
@@ -91,7 +94,9 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_target2_t)(
         iree_vm_abi_##arg_types##_checked_deref(args_storage);                 \
     IREE_VM_ABI_TYPE_NAME(ret_types)* rets =                                   \
         iree_vm_abi_##ret_types##_checked_deref(rets_storage);                 \
-    if (IREE_UNLIKELY(!args || !rets)) {                                       \
+    if (IREE_UNLIKELY(                                                         \
+            !((flags & IREE_VM_NATIVE_FUNCTION_CALL_RESUME) || args) ||        \
+            !rets)) {                                                          \
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                    \
                               "argument/result signature mismatch");           \
     }                                                                          \

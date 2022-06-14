@@ -34,11 +34,12 @@ namespace {
 
 enum {
   SHIM_ARGUMENT_STACK = 0,
-  SHIM_ARGUMENT_ARGS_STORAGE = 1,
-  SHIM_ARGUMENT_RETS_STORAGE = 2,
-  SHIM_ARGUMENT_MODULE = 3,
-  SHIM_ARGUMENT_MODULE_STATE = 4,
-  SHIM_ARGUMENT_EXECUTION_RESULT = 5,
+  SHIM_ARGUMENT_FLAGS,
+  SHIM_ARGUMENT_ARGS_STORAGE,
+  SHIM_ARGUMENT_RETS_STORAGE,
+  SHIM_ARGUMENT_MODULE,
+  SHIM_ARGUMENT_MODULE_STATE,
+  SHIM_ARGUMENT_EXECUTION_RESULT,
 };
 
 // TODO(simon-camp/marbre): Use this function throughout the conversions.
@@ -1477,6 +1478,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
 
     Type stackType =
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_stack_t"));
+    Type flagsType = emitc::OpaqueType::get(ctx, "uint32_t");
     Type spanType = emitc::OpaqueType::get(ctx, "iree_byte_span_t");
     Type moduleType =
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"));
@@ -1485,9 +1487,15 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
     Type executionResultType = emitc::PointerType::get(
         emitc::OpaqueType::get(ctx, "iree_vm_execution_result_t"));
 
-    SmallVector<Type, 6> inputTypes = {stackType,       spanType,
-                                       spanType,        moduleType,
-                                       moduleStateType, executionResultType};
+    SmallVector<Type> inputTypes = {
+        stackType,            // SHIM_ARGUMENT_STACK
+        flagsType,            // SHIM_ARGUMENT_FLAGS
+        spanType,             // SHIM_ARGUMENT_ARGS_STORAGE
+        spanType,             // SHIM_ARGUMENT_RETS_STORAGE
+        moduleType,           // SHIM_ARGUMENT_MODULE
+        moduleStateType,      // SHIM_ARGUMENT_MODULE_STATE
+        executionResultType,  // SHIM_ARGUMENT_EXECUTION_RESULT
+    };
 
     auto newFuncType = mlir::FunctionType::get(
         ctx, {inputTypes}, {emitc::OpaqueType::get(ctx, "iree_status_t")});
@@ -1513,12 +1521,14 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
           rewriter.createBlock(&newFuncOp.getBody(), newFuncOp.getBody().end());
 
       // Insert arguments into block.
-      block->addArgument(stackType, loc);
-      block->addArgument(spanType, loc);
-      block->addArgument(spanType, loc);
-      block->addArgument(moduleType, loc);
-      block->addArgument(moduleStateType, loc);
-      block->addArgument(executionResultType, loc);
+      block->addArgument(stackType, loc);        // SHIM_ARGUMENT_STACK
+      block->addArgument(flagsType, loc);        // SHIM_ARGUMENT_FLAGS
+      block->addArgument(spanType, loc);         // SHIM_ARGUMENT_ARGS_STORAGE
+      block->addArgument(spanType, loc);         // SHIM_ARGUMENT_RETS_STORAGE
+      block->addArgument(moduleType, loc);       // SHIM_ARGUMENT_MODULE
+      block->addArgument(moduleStateType, loc);  // SHIM_ARGUMENT_MODULE_STATE
+      block->addArgument(executionResultType,
+                         loc);  // SHIM_ARGUMENT_EXECUTION_RESULT
 
       rewriter.setInsertionPointToStart(block);
 

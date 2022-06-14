@@ -479,7 +479,9 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
   // Call external function.
   iree_status_t call_status = call.function.module->begin_call(
       call.function.module->self, stack, &call, out_result);
-  if (IREE_UNLIKELY(!iree_status_is_ok(call_status))) {
+  if (iree_status_is_deferred(call_status)) {
+    return call_status;  // deferred for future resume
+  } else if (IREE_UNLIKELY(!iree_status_is_ok(call_status))) {
     // TODO(benvanik): set execution result to failure/capture stack.
     return iree_status_annotate(call_status,
                                 iree_make_cstring_view("while calling import"));
