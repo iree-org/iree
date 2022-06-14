@@ -7,11 +7,28 @@
 steps:
   - label: ":hammer_and_wrench: Build"
     key: "build"
-    commands:
-      - "docker run --user=$(id -u):$(id -g) --volume=\\${HOME?}:\\${HOME?} --volume=/etc/passwd:/etc/passwd:ro --volume=/etc/group:/etc/group:ro --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/frontends@sha256:a39123add274ffc540bfe7937c95e0d85a2e321e3648c98ec033b8f38a84011a build_tools/cmake/build_linux_benchmark.sh"
-      - "tar --exclude='*.tar.gz' --exclude='*.tgz' --exclude='*.mlir' --exclude='*.tflite' --exclude='*tf-model' -czvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz build-host/benchmark_suites"
-      - "find build-host/benchmark_suites -name '*.mlir' | tar -czvf source-mlir-models-${BUILDKITE_BUILD_NUMBER}.tgz -T -"
-      - "tar -czvf iree-linux-x86_64-tools-${BUILDKITE_BUILD_NUMBER}.tgz build-linux-x86_64/tools/iree-benchmark-module build-linux-x86_64/tools/build_config.txt"
+    commands: |
+      docker run --user=$(id -u):$(id -g) \
+        --volume="$${HOME?}:$${HOME?}" \
+        --volume="/etc/passwd:/etc/passwd:ro" \
+        --volume="/etc/group:/etc/group:ro" \
+        --volume="$$PWD:$$IREE_DOCKER_WORKDIR" \
+        --workdir="$$IREE_DOCKER_WORKDIR" \
+        --rm \
+        gcr.io/iree-oss/frontends@sha256:a39123add274ffc540bfe7937c95e0d85a2e321e3648c98ec033b8f38a84011a \
+        build_tools/cmake/build_linux_benchmark.sh
+      tar --exclude="*.tar.gz" \
+        --exclude="*.tgz" \
+        --exclude="*.mlir" \
+        --exclude="*.tflite" \
+        --exclude="*-tf-model" \
+        -czvf "benchmark-suites-$${BUILDKITE_BUILD_NUMBER}.tgz" \
+        build-host/benchmark_suites build-host/.ninja_log
+      find build-host/benchmark_suites -name "*.mlir" | \
+        tar -czvf "source-mlir-models-$${BUILDKITE_BUILD_NUMBER}.tgz" -T -
+      tar -czvf "iree-linux-x86_64-tools-$${BUILDKITE_BUILD_NUMBER}.tgz" \
+        build-linux-x86_64/tools/iree-benchmark-module \
+        build-linux-x86_64/tools/build_config.txt
     if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86_64')"
     agents:
       - "queue=build"
@@ -25,13 +42,21 @@ steps:
   - wait
 
   - label: ":stopwatch: Benchmark on Intel Cascade Lake CPU (GCP-c2-standard-16)"
-    commands:
-      - "git clean -fdx"
-      - "buildkite-agent artifact download --step build benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz ./"
-      - "buildkite-agent artifact download --step build iree-linux-x86_64-tools-${BUILDKITE_BUILD_NUMBER}.tgz ./"
-      - "tar -xzvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz"
-      - "tar -xzvf iree-linux-x86_64-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
-      - "python3 build_tools/benchmarks/run_benchmarks_on_linux.py --device_model=GCP-c2-standard-16 --cpu_uarch=CascadeLake --normal_benchmark_tool_dir=build-linux-x86_64/tools/ -o benchmark-results-gcp-cpu-${BUILDKITE_BUILD_NUMBER}.json --verbose build-host/"
+    commands: |
+      git clean -fdx
+      buildkite-agent artifact download --step \
+        build "benchmark-suites-$${BUILDKITE_BUILD_NUMBER}.tgz" ./
+      buildkite-agent artifact download --step \
+        build "iree-linux-x86_64-tools-$${BUILDKITE_BUILD_NUMBER}.tgz" ./
+      tar -xzvf "benchmark-suites-$${BUILDKITE_BUILD_NUMBER}.tgz"
+      tar -xzvf "iree-linux-x86_64-tools-$${BUILDKITE_BUILD_NUMBER}.tgz"
+      python3 build_tools/benchmarks/run_benchmarks_on_linux.py \
+        --device_model=GCP-c2-standard-16 \
+        --cpu_uarch=CascadeLake \
+        --normal_benchmark_tool_dir=build-linux-x86_64/tools/ \
+        -o "benchmark-results-gcp-cpu-$${BUILDKITE_BUILD_NUMBER}.json" \
+        --verbose \
+        build-host/
     if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86_64')"
     agents:
       - "gcp:machine-type=c2-standard-16"
@@ -40,23 +65,47 @@ steps:
       - "benchmark-results-gcp-cpu-${BUILDKITE_BUILD_NUMBER}.json"
     timeout_in_minutes: "10"
 
+  - label: "Collect compilation statistics"
+    commands: |
+      git clean -fdx
+      buildkite-agent artifact download --step build \
+        "benchmark-suites-$${BUILDKITE_BUILD_NUMBER}.tgz" ./
+      tar -xzvf "benchmark-suites-$${BUILDKITE_BUILD_NUMBER}.tgz"
+      python3 build_tools/benchmarks/collect_compilation_statistics.py \
+        --verbose \
+        --output "compile-stats-results-linux-$${BUILDKITE_BUILD_NUMBER}.json" \
+        build-host/
+    if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86_64')"
+    agents:
+      - "queue=build"
+    artifact_paths:
+      - "compile-stats-results-linux-${BUILDKITE_BUILD_NUMBER}.json"
+    timeout_in_minutes: "10"
+
   - wait
 
   - label: ":lower_left_crayon: Comment benchmark results on pull request"
-    commands:
-      - "git clean -fdx"
-      - "buildkite-agent artifact download benchmark-results-*.json ./"
-      - "python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py --verbose --query-base --comment-title=\"Abbreviated x86_64 Benchmark Summary (experimental)\" benchmark-results-*.json"
+    commands: |
+      git clean -fdx
+      buildkite-agent artifact download "benchmark-results-*.json" ./
+      buildkite-agent artifact download "compile-stats-results-*.json" ./
+      python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py \
+        --verbose \
+        --query-base \
+        --comment-title="Abbreviated x86_64 Benchmark Summary (experimental)" \
+        --benchmark_files benchmark-results-*.json \
+        --compile_stats_files compile-stats-results-*.json
     key: "post-on-pr-x86_64"
     if: "build.pull_request.id != null && (build.pull_request.labels includes 'buildkite:benchmark-x86_64')"
     agents:
       - "queue=report"
 
   - label: ":lower_left_crayon: Push benchmark results to dashboard"
-    commands:
-      - "git clean -fdx"
-      - "buildkite-agent artifact download benchmark-results-*.json ./"
-      - "python3 build_tools/benchmarks/upload_benchmarks_to_dashboard.py --verbose benchmark-results-*.json"
+    commands: |
+      git clean -fdx
+      buildkite-agent artifact download "benchmark-results-*.json" ./
+      python3 build_tools/benchmarks/upload_benchmarks_to_dashboard.py \
+        --verbose benchmark-results-*.json
     key: "upload-to-dashboard-x86_64"
     branches: "main"
     agents:
