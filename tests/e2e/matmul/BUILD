@@ -216,3 +216,25 @@ py_binary(
     "valhall-unknown-android11",
     "ampere-unknown-linux",
 ]]
+
+# Check tests
+iree_check_single_backend_test_suite(
+    name = "check_cuda",
+    srcs = enforce_glob(
+        [
+            # currently only enabled on cuda as it can be slow on other backends.
+            "large_linalg_matmul.mlir",
+        ],
+        include = ["*.mlir"],
+    ),
+    driver = "cuda",
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backend = "cuda",
+)
