@@ -39,7 +39,6 @@ iree_runtime_cc_library(
         "math.h",
     ],
     deps = [
-        "//runtime/src/iree/base:core_headers",
     ],
 )
 
