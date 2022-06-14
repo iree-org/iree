@@ -10,6 +10,7 @@
 include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
@@ -20,24 +21,35 @@ def FunctionalStyleMultiOperandMultiResultTransformOpTrait
 }
 
 def CanonicalizedSequenceOp
-    : Op<Transform_Dialect, "structured.canonicalized_sequence", [
-        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-        DeclareOpInterfaceMethods<TransformOpInterface>,
-        OpAsmOpInterface,
-        PossibleTopLevelTransformOpTrait,
-        SingleBlockImplicitTerminator<"::mlir::transform::YieldOp">]> {
-  let summary = "A transformation sequence interspersed with canonicalizations";
+    : TransformDialectOp<"structured.canonicalized_sequence",
+      [DeclareOpInterfaceMethods<RegionBranchOpInterface,
+          ["getSuccessorEntryOperands", "getSuccessorRegions",
+           "getRegionInvocationBounds"]>,
+       DeclareOpInterfaceMethods<TransformOpInterface>,
+       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+       OpAsmOpInterface, PossibleTopLevelTransformOpTrait,
+       SingleBlockImplicitTerminator<"::mlir::transform::YieldOp">]> {
 
-  let arguments = (ins Optional<PDL_Operation>:$target);
+  let summary = "A transformation sequence interspersed with canonicalizations";
+  let description = [{
+    This op is a copy of `transform.sequence`, but applies canonicalizations
+    after each step in the sequence.
+  }];
+
+  let arguments = (ins Optional<PDL_Operation>:$root);
+  let results = (outs Variadic<AnyType>:$results);
   let regions = (region SizedRegion<1>:$body);
 
-  let assemblyFormat = "($target^)? attr-dict-with-keyword regions";
+  let assemblyFormat =
+    "($root^)? attr-dict-with-keyword regions (`:` type($results)^)?";
+
   let extraClassDeclaration = [{
     /// Allow the dialect prefix to be omitted.
     static ::llvm::StringRef getDefaultDialect() { return "transform"; }
   }];
 
   let cppNamespace = "transform_ext";
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//

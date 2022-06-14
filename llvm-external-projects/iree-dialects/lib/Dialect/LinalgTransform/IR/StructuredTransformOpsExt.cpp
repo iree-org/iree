@@ -520,8 +520,7 @@ static LogicalResult performEnablerTransformations(
 }
 
 LogicalResult transform_ext::CanonicalizedSequenceOp::apply(
-    transform::TransformResults &transformResults,
-    transform::TransformState &state) {
+    transform::TransformResults &results, transform::TransformState &state) {
 
   MLIRContext *ctx = getContext();
   RewritePatternSet patternList(ctx);
@@ -543,8 +542,8 @@ LogicalResult transform_ext::CanonicalizedSequenceOp::apply(
       [&](function_ref<LogicalResult(Operation *, RewriteListener &)>
               transform) {
         SmallVector<Operation *> roots;
-        if (Value target = getTarget())
-          llvm::append_range(roots, state.getPayloadOps(target));
+        if (Value root = getRoot())
+          llvm::append_range(roots, state.getPayloadOps(root));
         else
           roots.push_back(state.getTopLevel());
 
@@ -590,6 +589,7 @@ LogicalResult transform_ext::CanonicalizedSequenceOp::apply(
   if (failed(checkedListenerTransform(performCanonicalization)))
     return failure();
 
+  // Apply the sequenced ops one by one.
   for (Operation &transform : getBodyBlock()->without_terminator()) {
     if (failed(state.applyTransform(
             cast<transform::TransformOpInterface>(transform)))) {
@@ -606,26 +606,175 @@ LogicalResult transform_ext::CanonicalizedSequenceOp::apply(
       return failure();
   }
 
+  // Forward the operation mapping for values yielded from the sequence to the
+  // values produced by the sequence op.
+  for (const auto &pair :
+       llvm::zip(getBodyBlock()->getTerminator()->getOperands(),
+                 getOperation()->getOpResults())) {
+    Value terminatorOperand = std::get<0>(pair);
+    OpResult result = std::get<1>(pair);
+    results.set(result, state.getPayloadOps(terminatorOperand));
+  }
+
   LLVM_DEBUG(DBGS() << "end canonicalizing sequence\n");
+  return success();
+}
+
+/// Returns `true` if the given op operand may be consuming the handle value in
+/// the Transform IR. That is, if it may have a Free effect on it.
+static bool isValueUsePotentialConsumer(OpOperand &use) {
+  // Conservatively assume the effect being present in absence of the interface.
+  auto memEffectInterface = dyn_cast<MemoryEffectOpInterface>(use.getOwner());
+  if (!memEffectInterface)
+    return true;
+
+  SmallVector<MemoryEffects::EffectInstance, 2> effects;
+  memEffectInterface.getEffectsOnValue(use.get(), effects);
+  return llvm::any_of(effects, [](const MemoryEffects::EffectInstance &effect) {
+    return isa<transform::TransformMappingResource>(effect.getResource()) &&
+           isa<MemoryEffects::Free>(effect.getEffect());
+  });
+}
+
+// TODO: Add declaration to TransformOps.h, then we do not have to duplicate
+// this function.
+static LogicalResult
+checkDoubleConsume(Value value,
+                   function_ref<InFlightDiagnostic()> reportError) {
+  OpOperand *potentialConsumer = nullptr;
+  for (OpOperand &use : value.getUses()) {
+    if (!isValueUsePotentialConsumer(use))
+      continue;
+
+    if (!potentialConsumer) {
+      potentialConsumer = &use;
+      continue;
+    }
+
+    InFlightDiagnostic diag = reportError()
+                              << " has more than one potential consumer";
+    diag.attachNote(potentialConsumer->getOwner()->getLoc())
+        << "used here as operand #" << potentialConsumer->getOperandNumber();
+    diag.attachNote(use.getOwner()->getLoc())
+        << "used here as operand #" << use.getOperandNumber();
+    return diag;
+  }
+
+  return success();
+}
+
+LogicalResult transform_ext::CanonicalizedSequenceOp::verify() {
+  // Check if the block argument has more than one consuming use.
+  for (BlockArgument argument : getBodyBlock()->getArguments()) {
+    auto report = [&]() {
+      return (emitOpError() << "block argument #" << argument.getArgNumber());
+    };
+    if (failed(checkDoubleConsume(argument, report)))
+      return failure();
+  }
+
+  // Check properties of the nested operations they cannot check themselves.
+  for (Operation &child : *getBodyBlock()) {
+    if (!isa<transform::TransformOpInterface>(child) &&
+        &child != &getBodyBlock()->back()) {
+      InFlightDiagnostic diag =
+          emitOpError()
+          << "expected children ops to implement TransformOpInterface";
+      diag.attachNote(child.getLoc()) << "op without interface";
+      return diag;
+    }
+
+    for (OpResult result : child.getResults()) {
+      auto report = [&]() {
+        return (child.emitError() << "result #" << result.getResultNumber());
+      };
+      if (failed(checkDoubleConsume(result, report)))
+        return failure();
+    }
+  }
+
+  if (getBodyBlock()->getTerminator()->getOperandTypes() !=
+      getOperation()->getResultTypes()) {
+    InFlightDiagnostic diag = emitOpError()
+                              << "expects the types of the terminator operands "
+                                 "to match the types of the result";
+    diag.attachNote(getBodyBlock()->getTerminator()->getLoc()) << "terminator";
+    return diag;
+  }
   return success();
 }
 
 void transform_ext::CanonicalizedSequenceOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  SmallVector<MemoryEffects::EffectInstance> childEffects;
-  walk([&](Operation *child) {
-    // Skip self to avoid infinite recursion.
-    if (child == getOperation())
-      return;
+  auto *mappingResource = transform::TransformMappingResource::get();
+  effects.emplace_back(MemoryEffects::Read::get(), getRoot(), mappingResource);
 
-    auto iface = dyn_cast<MemoryEffectOpInterface>(child);
-    if (!iface)
-      return;
+  for (Value result : getResults()) {
+    effects.emplace_back(MemoryEffects::Allocate::get(), result,
+                         mappingResource);
+    effects.emplace_back(MemoryEffects::Write::get(), result, mappingResource);
+  }
 
-    childEffects.clear();
-    iface.getEffects(childEffects);
-    llvm::append_range(effects, childEffects);
-  });
+  if (!getRoot()) {
+    for (Operation &op : *getBodyBlock()) {
+      auto iface = dyn_cast<MemoryEffectOpInterface>(&op);
+      if (!iface) {
+        // TODO: fill all possible effects; or require ops to actually implement
+        // the memory effect interface always
+        assert(false);
+      }
+
+      SmallVector<MemoryEffects::EffectInstance, 2> nestedEffects;
+      iface.getEffects(effects);
+    }
+    return;
+  }
+
+  // Carry over all effects on the argument of the entry block as those on the
+  // operand, this is the same value just remapped.
+  for (Operation &op : *getBodyBlock()) {
+    auto iface = dyn_cast<MemoryEffectOpInterface>(&op);
+    if (!iface) {
+      // TODO: fill all possible effects; or require ops to actually implement
+      // the memory effect interface always
+      assert(false);
+    }
+
+    SmallVector<MemoryEffects::EffectInstance, 2> nestedEffects;
+    iface.getEffectsOnValue(getBodyBlock()->getArgument(0), nestedEffects);
+    for (const auto &effect : nestedEffects)
+      effects.emplace_back(effect.getEffect(), getRoot(), effect.getResource());
+  }
+}
+
+OperandRange transform_ext::CanonicalizedSequenceOp::getSuccessorEntryOperands(
+    unsigned index) {
+  assert(index == 0 && "unexpected region index");
+  if (getOperation()->getNumOperands() == 1)
+    return getOperation()->getOperands();
+  return OperandRange(getOperation()->operand_end(),
+                      getOperation()->operand_end());
+}
+
+void transform_ext::CanonicalizedSequenceOp::getSuccessorRegions(
+    Optional<unsigned> index, ArrayRef<Attribute> operands,
+    SmallVectorImpl<RegionSuccessor> &regions) {
+  if (!index.hasValue()) {
+    Region *bodyRegion = &getBody();
+    regions.emplace_back(bodyRegion, !operands.empty()
+                                         ? bodyRegion->getArguments()
+                                         : Block::BlockArgListType());
+    return;
+  }
+
+  assert(*index == 0 && "unexpected region index");
+  regions.emplace_back(getOperation()->getResults());
+}
+
+void transform_ext::CanonicalizedSequenceOp::getRegionInvocationBounds(
+    ArrayRef<Attribute> operands, SmallVectorImpl<InvocationBounds> &bounds) {
+  (void)operands;
+  bounds.emplace_back(1, 1);
 }
 
 //===----------------------------------------------------------------------===//
