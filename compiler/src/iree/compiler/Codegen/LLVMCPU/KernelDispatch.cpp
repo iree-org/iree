@@ -498,7 +498,6 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
                                           ArrayRef<int64_t> workgroupTileSizes,
                                           int vectorSize) {
   assert(flowTileSizes.size() == workgroupTileSizes.size());
-  int64_t numLoops = workgroupTileSizes.size();
   SmallVector<int64_t> l1TileSizes;
   auto shape = cast<linalg::LinalgOp>(op.getOperation()).getStaticLoopRanges();
   for (auto en : llvm::enumerate(flowTileSizes.drop_back())) {
@@ -514,12 +513,8 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
       getMaxTileSize(0, K, workgroupTileSizes.back(), vectorSize));
 
   SmallVector<int64_t> vectorTileSizes;
-  if (numLoops >= 3) {
-    vectorTileSizes.append(numLoops - 3, 1);
-    vectorTileSizes.append(3, vectorSize);
-  } else {
-    vectorTileSizes.append(numLoops, vectorSize);
-  }
+  splitParallelAndReductionTiles(cast<linalg::LinalgOp>(op.getOperation()),
+                                 l1TileSizes, vectorTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
@@ -528,7 +523,7 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
-      DispatchLoweringPassPipeline::CPUTileFuseAndVectorize);
+      DispatchLoweringPassPipeline::CPUAArchDoubleTilingExpert);
 }
 
 static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,

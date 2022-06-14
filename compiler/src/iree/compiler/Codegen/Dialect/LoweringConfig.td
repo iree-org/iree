@@ -45,23 +45,26 @@ def SPIRV_VectorizeToCooperativeOps
 def SPIRV_VectorizeWithWorkgroupMemory
     : I32EnumAttrCase<"SPIRVVectorizeWithWorkgroupMemory", 14>;
 
+def CPU_AArchDoubleTilingExpert
+    : I32EnumAttrCase<"CPUAArchDoubleTilingExpert", 15>;
+
 def None
     : I32EnumAttrCase<"None", 0xff>;
 
 // EnumAttrCase for all known lowerings for ops within dispatch region
 // to scalar/native-vector code.
 def DispatchLoweringPassPipelineEnum
-    : I32EnumAttr<"DispatchLoweringPassPipeline",
-                  "identifier for pass pipeline use to lower dispatch region", [
-                    CPU_Default, CPU_DoubleTilingExpert,
-                    CPU_DoubleTilingPadExpert, CPU_ConvTileAndDecomposeExpert,
-                    CPU_TileFuseAndVectorize, CPU_BufferOpsTileAndVectorize,
-                    Linalg_TransformInterpCodegen, LLVMGPU_SimpleDistribute,
-                    LLVMGPU_Vectorize, LLVMGPU_MatmulSimt,
-                    LLVMGPU_MatmulTensorCore, SPIRV_Distribute, SPIRV_Vectorize,
-                    SPIRV_VectorizeToCooperativeOps,
-                    SPIRV_VectorizeWithWorkgroupMemory, None
-                  ]> {
+    : I32EnumAttr<
+          "DispatchLoweringPassPipeline",
+          "identifier for pass pipeline use to lower dispatch region", [
+            CPU_Default, CPU_DoubleTilingExpert, CPU_DoubleTilingPadExpert,
+            CPU_ConvTileAndDecomposeExpert, CPU_TileFuseAndVectorize,
+            CPU_AArchDoubleTilingExpert, CPU_BufferOpsTileAndVectorize,
+            Linalg_TransformInterpCodegen, LLVMGPU_SimpleDistribute,
+            LLVMGPU_Vectorize, LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
+            SPIRV_Distribute, SPIRV_Vectorize, SPIRV_VectorizeToCooperativeOps,
+            SPIRV_VectorizeWithWorkgroupMemory, None
+          ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   // Don't generate a C++ class! We want to use the AttrDef
   let genSpecializedAttr = 0;
