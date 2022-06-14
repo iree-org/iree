@@ -5,12 +5,13 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-from ghapi.all import GhApi
 import argparse
 import dataclasses
 import os
 import sys
 import time
+
+from ghapi.all import GhApi
 
 CLA_CHECK_NAME = "cla/google"
 REPO_OWNER = "google"
@@ -71,8 +72,8 @@ def parse_args():
       nargs="?",
       metavar="N",
       help="Poll for a complete check every N seconds if one is not found."
-      " Without this flag, the script will only check once. If this is set"
-      " without a value, if will check every 2 seconds.",
+            " Without this flag, the script will only check once. If this is set"
+            " without a value, if will check every 2 seconds.",
       default=0,
       const=2,
   )
