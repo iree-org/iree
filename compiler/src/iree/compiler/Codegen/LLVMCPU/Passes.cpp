@@ -457,10 +457,6 @@ void addAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  // Run LinalgFusePass firstly in case that we have fill + matmul + generic
-  // ops. At this stage, we do not apply vectorization. The reduction dim won't
-  // get tiled if the case is matmul + generic op. In this case, we have to tile
-  // along reduction dim again, which needs them to be Linalg ops form.
   {
     LinalgFusePassOptions options;
     options.tilingLevel =
@@ -470,12 +466,53 @@ void addAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  // Add the sandbox single tiling expert to tile and vectorize.
+  auto pad = [&](std::string anchorOpName, ArrayRef<int64_t> paddingDims,
+                 ArrayRef<int64_t> packPaddings = {}) {
+    LinalgFusePassOptions options;
+    options.pad = true;
+    options.anchorOpName = anchorOpName;
+    options.packPaddings.assign(packPaddings.begin(), packPaddings.end());
+    options.paddingDimensions.assign(paddingDims.begin(), paddingDims.end());
+    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
+  };
+
+  SmallVector<int64_t> paddingDims = {0, 1};
+  pad("linalg.fill", paddingDims);
+  pad("linalg.matmul", paddingDims);
+  // TODO(hanchung): pack and hoist padding for linalg.generic op.
+  pad("linalg.generic", paddingDims);
+
+  {
+    LinalgSingleTilingExpertPassOptions options;
+    options.tilingLevel =
+        static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLinalgSingleTilingExpertPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
+
+  paddingDims = {2};
+  if (!clEnableHoistPadding) {
+    pad("linalg.matmul", paddingDims);
+  } else {
+    pad("linalg.matmul", paddingDims, /*packPaddings=*/{1, 1, 0});
+    LinalgFusePassOptions options;
+    options.pad = true;
+    options.anchorOpName = "linalg.matmul";
+    options.hoistPaddings = SmallVector<int64_t>{2, 3, 0};
+    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
+
+  // Fold dim(pad) away before vectorization.
+  nestedModulePM.addPass(memref::createResolveShapedTypeResultDimsPass());
+
   {
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
-    options.tilingLevel =
-        static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
+    options.vectorizePadding = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
