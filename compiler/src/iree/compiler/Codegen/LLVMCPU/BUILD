@@ -67,7 +67,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:LLVMTransforms",
         "@llvm-project//mlir:LinalgInterfaces",
-        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LinalgToLLVM",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MathDialect",

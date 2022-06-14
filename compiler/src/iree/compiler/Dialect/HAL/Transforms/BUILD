@@ -56,7 +56,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:AffineToStandard",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:BufferizationDialect",
-        "@llvm-project//mlir:ControlFlowOps",
+        "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
