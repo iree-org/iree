@@ -80,7 +80,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
-        "@llvm-project//mlir:LinalgInterfaces",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",

@@ -29,10 +29,10 @@ td_library(
     deps = [
         "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
+        "@llvm-project//mlir:FuncTdFiles",
         "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:SideEffectInterfacesTdFiles",
-        "@llvm-project//mlir:StdOpsTdFiles",
         "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
     ],
 )
@@ -202,7 +202,6 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
-        "@llvm-project//mlir:LinalgInterfaces",
         "@llvm-project//mlir:LinalgStructuredOpsIncGen",
         "@llvm-project//mlir:TensorDialect",
     ],

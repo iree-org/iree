@@ -28,8 +28,8 @@ td_library(
     ),
     deps = [
         "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
+        "@llvm-project//mlir:FuncTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:StdOpsTdFiles",
     ],
 )
 

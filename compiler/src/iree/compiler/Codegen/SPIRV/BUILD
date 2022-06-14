@@ -56,7 +56,7 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineAnalysis",
-        "@llvm-project//mlir:AffineToStandardTransforms",
+        "@llvm-project//mlir:AffineToStandard",
         "@llvm-project//mlir:AffineUtils",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithmeticDialect",

@@ -403,7 +403,6 @@ cc_library(
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
-        "@llvm-project//mlir:LinalgInterfaces",
         "@llvm-project//mlir:LinalgStructuredOpsIncGen",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MathDialect",
@@ -713,7 +712,7 @@ cc_library(
         "@llvm-project//mlir:Rewrite",
         # Interfaces
         "@llvm-project//mlir:ControlFlowInterfaces",
-        "@llvm-project//mlir:LinalgInterfaces",
+
         # Transforms
         "@llvm-project//mlir:AsyncTransforms",
         "@llvm-project//mlir:LinalgTransforms",

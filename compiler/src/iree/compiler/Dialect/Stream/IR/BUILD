@@ -27,10 +27,10 @@ td_library(
     ),
     deps = [
         "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
+        "@llvm-project//mlir:FuncTdFiles",
         "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:SideEffectInterfacesTdFiles",
-        "@llvm-project//mlir:StdOpsTdFiles",
         "@llvm-project//mlir:SubElementInterfacesTdFiles",
         "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
     ],

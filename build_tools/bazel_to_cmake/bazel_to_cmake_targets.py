@@ -41,9 +41,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//llvm:FileCheck": ["FileCheck"],
     # MLIR
     "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
-    "@llvm-project//mlir:AffineToStandardTransforms": ["MLIRAffineToStandard"],
     "@llvm-project//mlir:ControlFlowDialect": ["MLIRControlFlow"],
-    "@llvm-project//mlir:CFGTransforms": ["MLIRSCFToControlFlow"],
     "@llvm-project//mlir:ComplexDialect": ["MLIRComplex"],
     "@llvm-project//mlir:DialectUtils": [""],
     "@llvm-project//mlir:GPUDialect": ["MLIRGPUOps"],
@@ -54,7 +52,6 @@ EXPLICIT_TARGET_MAPPING = {
     ],
     "@llvm-project//mlir:LinalgDialect": ["MLIRLinalg"],
     "@llvm-project//mlir:LLVMDialect": ["MLIRLLVMIR"],
-    "@llvm-project//mlir:LLVMTransforms": ["MLIRFuncToLLVM"],
     "@llvm-project//mlir:MathDialect": ["MLIRMath"],
     "@llvm-project//mlir:ArithmeticDialect": ["MLIRArithmetic"],
     "@llvm-project//mlir:BufferizationDialect": ["MLIRBufferization"],
