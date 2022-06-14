@@ -35,7 +35,7 @@ function(iree_lit_test)
     _RULE
     ""
     "NAME;TEST_FILE"
-    "DATA;TOOLS;LABELS"
+    "DATA;TOOLS;LABELS;TIMEOUT"
     ${ARGN}
   )
 
@@ -68,9 +68,6 @@ function(iree_lit_test)
     NAME
       ${_NAME_PATH}
     COMMAND
-      # We run all our tests through a custom test runner to allow setup
-      # and teardown.
-      "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
       "${Python3_EXECUTABLE}"
       "${LLVM_SOURCE_DIR}/utils/lit/lit.py"
       ${_LIT_PATH_ARGS}
@@ -81,10 +78,10 @@ function(iree_lit_test)
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST ${_NAME_PATH} PROPERTY REQUIRED_FILES "${_TEST_FILE_PATH}")
   set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
-    "TEST_TMPDIR=${IREE_BINARY_DIR}/tmp/${_NAME}_test_tmpdir"
     "LIT_OPTS=-v"
     "FILECHECK_OPTS=--enable-var-scope")
-  iree_add_test_environment_properties(${_NAME_PATH})
+  set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
+  iree_configure_test(${_NAME_PATH})
 
   # TODO(gcmn): Figure out how to indicate a dependency on _RULE_DATA being built
 endfunction()
@@ -116,9 +113,13 @@ function(iree_lit_test_suite)
     _RULE
     ""
     "NAME"
-    "SRCS;DATA;TOOLS;LABELS"
+    "SRCS;DATA;TOOLS;LABELS;TIMEOUT"
     ${ARGN}
   )
+
+  if (NOT DEFINED _RULE_TIMEOUT)
+    set(_RULE_TIMEOUT 60)
+  endif()
 
   foreach(_TEST_FILE ${_RULE_SRCS})
     get_filename_component(_TEST_BASENAME ${_TEST_FILE} NAME)
@@ -133,6 +134,8 @@ function(iree_lit_test_suite)
         "${_RULE_TOOLS}"
       LABELS
         "${_RULE_LABELS}"
+      TIMEOUT
+        ${_RULE_TIMEOUT}
     )
   endforeach()
 endfunction()

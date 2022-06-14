@@ -38,8 +38,7 @@ CMAKE_ARGS=(
   # give us early warnings for some types of website publication errors.
   "-DIREE_BUILD_DOCS=ON"
 
-  # Enable building the python bindings on CI. Most heavy targets are gated on
-  # IREE_ENABLE_TENSORFLOW, so what's left here should be fast.
+  # Enable building the python bindings on CI.
   "-DIREE_BUILD_PYTHON_BINDINGS=ON"
 
   # Enable assertions. We wouldn't want to be testing *only* with assertions
@@ -48,6 +47,12 @@ CMAKE_ARGS=(
   # get a reasonable mix of {builds with asserts, builds with other features
   # such as ASan but without asserts}.
   "-DIREE_ENABLE_ASSERTIONS=ON"
+
+  # Enable CUDA compiler and runtime builds unconditionally. Our CI images all
+  # have enough deps to at least build CUDA support and compile CUDA binaries
+  # (but not necessarily test on real hardware).
+  "-DIREE_HAL_DRIVER_CUDA=ON"
+  "-DIREE_TARGET_BACKEND_CUDA=ON"
 )
 
 "$CMAKE_BIN" "${CMAKE_ARGS[@]?}" "$@" ..

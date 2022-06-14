@@ -120,13 +120,12 @@ int run_sample(iree_sample_state_t* state, float* image_data) {
   iree_hal_dim_t buffer_shape[] = {1, 28, 28, 1};
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_allocate_buffer(
-        iree_hal_device_allocator(state->device), buffer_shape,
-        IREE_ARRAYSIZE(buffer_shape), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+        iree_hal_device_allocator(state->device), IREE_ARRAYSIZE(buffer_shape),
+        buffer_shape, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-            .usage =
-                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
+            .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
         },
         iree_make_const_byte_span((void*)image_data, sizeof(float) * 28 * 28),
         &arg_buffer_view);

@@ -53,12 +53,40 @@ endfunction()
 # Sets ${PACKAGE_NS} to the IREE-root relative package name in C++ namespace
 # format (::).
 #
-# Example when called from iree/base/CMakeLists.txt:
-#   iree::base
+# Examples:
+#   compiler/src/iree/compiler/Utils/CMakeLists.txt -> iree::compiler::Utils
+#   runtime/src/iree/base/CMakeLists.txt -> iree::base
+#   tests/e2e/CMakeLists.txt -> iree::tests::e2e
 function(iree_package_ns PACKAGE_NS)
-  string(REPLACE ${IREE_ROOT_DIR} "" _PACKAGE ${CMAKE_CURRENT_LIST_DIR})
-  string(SUBSTRING ${_PACKAGE} 1 -1 _PACKAGE)
-  string(REPLACE "/" "::" _PACKAGE_NS ${_PACKAGE})
+  # Get the relative path of the current dir (i.e. runtime/src/iree/vm).
+  string(REPLACE ${IREE_ROOT_DIR} "" _RELATIVE_PATH ${CMAKE_CURRENT_LIST_DIR})
+  string(SUBSTRING ${_RELATIVE_PATH} 1 -1 _RELATIVE_PATH)
+
+  # If changing the directory/package mapping rules, please also implement
+  # the corresponding rule in:
+  #   build_tools/bazel_to_cmake/bazel_to_cmake_targets.py
+  # Some sub-trees form their own roots for package purposes. Rewrite them.
+  if(_RELATIVE_PATH MATCHES "^compiler/src/(.*)")
+    # compiler/src/iree/compiler -> iree/compiler
+    set(_PACKAGE "${CMAKE_MATCH_1}")
+  elseif(_RELATIVE_PATH MATCHES "^runtime/src/(.*)")
+    # runtime/src/iree/base -> iree/base
+    set(_PACKAGE "${CMAKE_MATCH_1}")
+  elseif(_RELATIVE_PATH MATCHES "^tools$")
+    # Special case for tools/ -> "" (empty string)
+    # For example, tools/iree-compile -> iree-compile (no namespace)
+    set(_PACKAGE "")
+  else()
+    # Default to prefixing with iree/
+    set(_PACKAGE "iree/${_RELATIVE_PATH}")
+  endif()
+
+  string(REPLACE "/" "::" _PACKAGE_NS "${_PACKAGE}")
+
+  if(_DEBUG_IREE_PACKAGE_NAME)
+    message(STATUS "iree_package_ns(): map ${_RELATIVE_PATH} -> ${_PACKAGE_NS}")
+  endif()
+
   set(${PACKAGE_NS} ${_PACKAGE_NS} PARENT_SCOPE)
 endfunction()
 
@@ -68,7 +96,7 @@ endfunction()
 #   iree_base
 function(iree_package_name PACKAGE_NAME)
   iree_package_ns(_PACKAGE_NS)
-  string(REPLACE "::" "_" _PACKAGE_NAME ${_PACKAGE_NS})
+  string(REPLACE "::" "_" _PACKAGE_NAME "${_PACKAGE_NS}")
   set(${PACKAGE_NAME} ${_PACKAGE_NAME} PARENT_SCOPE)
 endfunction()
 
@@ -88,7 +116,7 @@ endfunction()
 #   base
 function(iree_package_dir PACKAGE_DIR)
   iree_package_ns(_PACKAGE_NS)
-  string(FIND ${_PACKAGE_NS} "::" _END_OFFSET REVERSE)
+  string(FIND "${_PACKAGE_NS}" "::" _END_OFFSET REVERSE)
   math(EXPR _END_OFFSET "${_END_OFFSET} + 2")
   string(SUBSTRING ${_PACKAGE_NS} ${_END_OFFSET} -1 _PACKAGE_DIR)
   set(${PACKAGE_DIR} ${_PACKAGE_DIR} PARENT_SCOPE)
@@ -107,7 +135,7 @@ endfunction()
 #     the binary when importing a binary from a host build. Thus this should be
 #     the global unqualified name of the binary, not the fully-specified name.
 function(iree_get_executable_path OUTPUT_PATH_VAR EXECUTABLE)
-  if (NOT DEFINED IREE_HOST_BINARY_ROOT OR TARGET "${EXECUTABLE}")
+  if(NOT DEFINED IREE_HOST_BINARY_ROOT OR TARGET "${EXECUTABLE}")
     # We can either expect the target to be defined as part of this CMake
     # invocation (if not cross compiling) or the target is defined already.
     set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${EXECUTABLE}>" PARENT_SCOPE)
@@ -116,7 +144,7 @@ function(iree_get_executable_path OUTPUT_PATH_VAR EXECUTABLE)
     # for an already built executable at IREE_HOST_BINARY_ROOT. If we find it,
     # add it as an imported target so it gets picked up on later invocations.
     set(_EXECUTABLE_PATH "${IREE_HOST_BINARY_ROOT}/bin/${EXECUTABLE}${IREE_HOST_EXECUTABLE_SUFFIX}")
-    if (EXISTS ${_EXECUTABLE_PATH})
+    if(EXISTS ${_EXECUTABLE_PATH})
       add_executable("${EXECUTABLE}" IMPORTED GLOBAL)
       set_property(TARGET "${EXECUTABLE}" PROPERTY IMPORTED_LOCATION "${_EXECUTABLE_PATH}")
       set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${EXECUTABLE}>" PARENT_SCOPE)
@@ -154,7 +182,7 @@ function(iree_select_compiler_opts OPTS)
     _IREE_SELECTS
     ""
     ""
-    "ALL;CLANG;CLANG_CL;MSVC;GCC;CLANG_OR_GCC;MSVC_OR_CLANG_CL"
+    "ALL;CLANG;CLANG_GTE_10;CLANG_CL;MSVC;GCC;CLANG_OR_GCC;MSVC_OR_CLANG_CL"
   )
   # OPTS is a variable containing the *name* of the variable being populated, so
   # we need to dereference it twice.
@@ -169,6 +197,9 @@ function(iree_select_compiler_opts OPTS)
       list(APPEND _OPTS ${_IREE_SELECTS_MSVC_OR_CLANG_CL})
     else()
       list(APPEND _OPTS ${_IREE_SELECTS_CLANG})
+      if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
+        list(APPEND _OPTS ${_IREE_SELECTS_CLANG_GTE_10})
+      endif()
       list(APPEND _OPTS ${_IREE_SELECTS_CLANG_OR_GCC})
     endif()
   elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
@@ -189,8 +220,8 @@ endfunction()
 #
 # Parameters:
 # NAME: name of the target to add data dependencies to
-# DATA: List of targets and/or files in the source tree. Files should use the
-#       same format as targets (i.e. iree::package::subpackage::file.txt)
+# DATA: List of targets and/or files in the source tree (relative to the
+# project root).
 function(iree_add_data_dependencies)
   cmake_parse_arguments(
     _RULE
@@ -209,11 +240,12 @@ function(iree_add_data_dependencies)
       add_dependencies(${_RULE_NAME} ${_DATA_LABEL})
     else()
       # Not a target, assume to be a file instead.
-      string(REPLACE "::" "/" _FILE_PATH ${_DATA_LABEL})
+      set(_FILE_PATH ${_DATA_LABEL})
 
       # Create a target which copies the data file into the build directory.
       # If this file is included in multiple rules, only create the target once.
       string(REPLACE "::" "_" _DATA_TARGET ${_DATA_LABEL})
+      string(REPLACE "/" "_" _DATA_TARGET ${_DATA_TARGET})
       if(NOT TARGET ${_DATA_TARGET})
         set(_INPUT_PATH "${PROJECT_SOURCE_DIR}/${_FILE_PATH}")
         set(_OUTPUT_PATH "${PROJECT_BINARY_DIR}/${_FILE_PATH}")
@@ -245,7 +277,7 @@ endfunction()
 #   TO_EXE_NAME: The executable name to output in the current binary dir.
 function(iree_symlink_tool)
   cmake_parse_arguments(
-    ARG
+    _RULE
     ""
     "TARGET;FROM_TOOL_TARGET;TO_EXE_NAME"
     ""
@@ -255,16 +287,16 @@ function(iree_symlink_tool)
   # Transform TARGET
   iree_package_ns(_PACKAGE_NS)
   iree_package_name(_PACKAGE_NAME)
-  set(_TARGET "${_PACKAGE_NAME}_${ARG_TARGET}")
-  set(_FROM_TOOL_TARGET ${ARG_FROM_TOOL_TARGET})
-  set(_TO_TOOL_PATH "${CMAKE_CURRENT_BINARY_DIR}/${ARG_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}")
+  set(_TARGET "${_PACKAGE_NAME}_${_RULE_TARGET}")
+  set(_FROM_TOOL_TARGET ${_RULE_FROM_TOOL_TARGET})
+  set(_TO_TOOL_PATH "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}")
   get_filename_component(_TO_TOOL_DIR "${_TO_TOOL_PATH}" DIRECTORY)
 
 
   add_custom_command(
     TARGET "${_TARGET}"
     BYPRODUCTS
-      "${CMAKE_CURRENT_BINARY_DIR}/${ARG_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}"
+      "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}"
     COMMAND
       ${CMAKE_COMMAND} -E make_directory "${_TO_TOOL_DIR}"
     COMMAND
@@ -278,27 +310,6 @@ endfunction()
 #-------------------------------------------------------------------------------
 # Tests
 #-------------------------------------------------------------------------------
-
-# iree_add_test_environment_properties
-#
-# Adds test environment variable properties based on the current build options.
-#
-# Parameters:
-#   TEST_NAME: the test name, e.g. iree/base:math_test
-function(iree_add_test_environment_properties TEST_NAME)
-  # IREE_*_DISABLE environment variables may used to skip test cases which
-  # require both a compiler target backend and compatible runtime HAL driver.
-  #
-  # These variables may be set by the test environment, typically as a property
-  # of some continuous execution test runner or by an individual developer, or
-  # here by the build system.
-  #
-  # Tests which only depend on a compiler target backend or a runtime HAL
-  # driver, but not both, should generally use a different method of filtering.
-  if(NOT "${IREE_TARGET_BACKEND_VULKAN_SPIRV}" OR NOT "${IREE_HAL_DRIVER_VULKAN}")
-    set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "IREE_VULKAN_DISABLE=1")
-  endif()
-endfunction()
 
 # iree_check_defined
 #

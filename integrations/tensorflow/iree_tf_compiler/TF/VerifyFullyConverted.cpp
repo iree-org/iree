@@ -21,7 +21,8 @@ namespace iree_integrations {
 namespace TF {
 
 class VerifyFullyConvertedPass
-    : public PassWrapper<VerifyFullyConvertedPass, OperationPass<FuncOp>> {
+    : public PassWrapper<VerifyFullyConvertedPass,
+                         OperationPass<func::FuncOp>> {
  public:
   StringRef getArgument() const override {
     return "iree-tf-verify-fully-converted";
@@ -49,7 +50,7 @@ class VerifyFullyConvertedPass
 
 static PassRegistration<VerifyFullyConvertedPass> pass;
 
-std::unique_ptr<OperationPass<FuncOp>> createVerifyFullyConvertedPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createVerifyFullyConvertedPass() {
   return std::make_unique<VerifyFullyConvertedPass>();
 }
 

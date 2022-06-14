@@ -1,9 +1,10 @@
-# Lint as: python3
 # Copyright 2020 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+import re
 
 # Bazel to CMake target name conversions used by bazel_to_cmake.py.
 
@@ -11,34 +12,14 @@ EXPLICIT_TARGET_MAPPING = {
     # Internal utilities to emulate various binary/library options.
     "//build_tools:default_linkopts": [],
     "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
+    "//compiler/src:defs": [],
+    "//compiler/src/iree/compiler/API:CAPI": ["IREECompilerCAPILib"],
+    "//runtime/src:runtime_defines": [],
 
     # IREE llvm-external-projects
-    "//llvm-external-projects/iree-dialects:IREEInputDialect": [
-        "IREEInputDialect"
-    ],
-    "//llvm-external-projects/iree-dialects:IREELinalgExtDialect": [
-        "IREELinalgExtDialect"
-    ],
-    "//llvm-external-projects/iree-dialects:IREELinalgExtPasses": [
-        "IREELinalgExtPasses"
-    ],
-    "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms": [
-        "IREELinalgExtTransforms"
-    ],
-    "@torch-mlir-dialects//:TorchMLIRTMTensorDialect": [
-        "TorchMLIRTMTensorDialect"
-    ],
-    "//llvm-external-projects/iree-dialects:IREEPyDMDialect": [
-        "IREEPyDMDialect"
-    ],
     "//llvm-external-projects/iree-dialects:IREEPyDMTransforms": [
         "IREEPyDMPasses"
     ],
-    "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect": [
-        "IREELinalgTransformDialect"
-    ],
-    "//llvm-external-projects/iree-dialects:IREELinalgTransformDialectTransforms":
-        ["IREELinalgTransformDialectTransforms"],
 
     # Disable all hard-coded codegen targets (they are expanded dynamically
     # in CMake).
@@ -65,10 +46,12 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:CFGTransforms": ["MLIRSCFToControlFlow"],
     "@llvm-project//mlir:ComplexDialect": ["MLIRComplex"],
     "@llvm-project//mlir:DialectUtils": [""],
-    "@llvm-project//mlir:ExecutionEngineUtils": ["MLIRExecutionEngine"],
     "@llvm-project//mlir:GPUDialect": ["MLIRGPUOps"],
     "@llvm-project//mlir:GPUTransforms": ["MLIRGPUTransforms"],
     "@llvm-project//mlir:LinalgInterfaces": ["MLIRLinalg"],
+    "@llvm-project//mlir:LinalgStructuredOpsIncGen": [
+        "MLIRLinalgStructuredOpsIncGenLib"
+    ],
     "@llvm-project//mlir:LinalgOps": ["MLIRLinalg"],
     "@llvm-project//mlir:LLVMDialect": ["MLIRLLVMIR"],
     "@llvm-project//mlir:LLVMTransforms": ["MLIRFuncToLLVM"],
@@ -84,7 +67,6 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:SPIRVDialect": ["MLIRSPIRV"],
     "@llvm-project//mlir:TosaDialect": ["MLIRTosa"],
     "@llvm-project//mlir:ToLLVMIRTranslation": ["MLIRTargetLLVMIRExport"],
-    "@llvm-project//mlir:mlir_c_runner_utils": ["MLIRExecutionEngine"],
     "@llvm-project//mlir:mlir-translate": ["mlir-translate"],
     "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
     "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
@@ -172,10 +154,13 @@ EXPLICIT_TARGET_MAPPING = {
         "MhloPasses",
     ],
 
+    # Torch-MLIR.
+    "@torch-mlir-dialects//:TorchMLIRTMTensorDialect": [
+        "TorchMLIRTMTensorDialect"
+    ],
+
     # Vulkan
     "@vulkan_headers": ["Vulkan::Headers"],
-    # The Bazel target maps to the IMPORTED target defined by FindVulkan().
-    "@vulkan_sdk//:sdk": ["Vulkan::Vulkan"],
     # Misc single targets
     "@com_google_benchmark//:benchmark": ["benchmark"],
     "@com_github_dvidelabs_flatcc//:flatcc": ["flatcc"],
@@ -184,7 +169,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_github_yaml_libyaml//:yaml": ["yaml"],
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
-    "@cpuinfo": ["cpuinfo"],
+    "@cpuinfo": ["${IREE_CPUINFO_TARGET}"],
     "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
 }
 
@@ -205,6 +190,22 @@ def _convert_llvm_target(target):
   return ["LLVM" + target.rsplit(":")[-1]]
 
 
+def _convert_iree_dialects_target(target):
+  # Just take the target name as-is.
+  return [target.rsplit(":")[-1]]
+
+
+def _convert_to_cmake_path(bazel_path_fragment: str) -> str:
+  cmake_path = bazel_path_fragment
+  # Bazel `//iree/base`     -> CMake `iree::base`
+  # Bazel `//iree/base:foo` -> CMake `iree::base::foo`
+  if cmake_path.startswith("//"):
+    cmake_path = cmake_path[len("//"):]
+  cmake_path = cmake_path.replace(":", "::")  # iree/base::foo or ::foo
+  cmake_path = cmake_path.replace("/", "::")  # iree::base
+  return cmake_path
+
+
 def convert_target(target):
   """Converts a Bazel target to a list of CMake targets.
 
@@ -223,18 +224,44 @@ def convert_target(target):
   """
   if target in EXPLICIT_TARGET_MAPPING:
     return EXPLICIT_TARGET_MAPPING[target]
-  if not target.startswith("@"):
-    # Bazel `:api`            -> CMake `::api`
-    # Bazel `//iree/base`     -> CMake `iree::base`
-    # Bazel `//iree/base:foo` -> CMake `iree::base::foo`
-    if target.startswith("//"):
-      target = target[len("//"):]
-    target = target.replace(":", "::")  # iree/base::foo or ::foo
-    target = target.replace("/", "::")  # iree::base
-    return [target]
   if target.startswith("@llvm-project//llvm"):
     return _convert_llvm_target(target)
   if target.startswith("@llvm-project//mlir"):
     return _convert_mlir_target(target)
+  if target.startswith("@"):
+    raise KeyError(f"No conversion found for target '{target}'")
 
-  raise KeyError(f"No conversion found for target '{target}'")
+  if target.startswith("//llvm-external-projects/iree-dialects"):
+    return _convert_iree_dialects_target(target)
+
+  # IREE root paths map to package names based on explicit rules.
+  #   * src/iree/ directories (compiler/src/iree/ and runtime/src/iree/)
+  #     creating their own root paths by trimming down to just "iree"
+  #   * tools/ uses an empty root, for binary targets names like "iree-compile"
+  #   * other top level directories add back an 'iree' prefix
+  # If changing these, make the corresponding change in iree_macros.cmake
+  # (iree_package_ns function).
+
+  # Map //compiler/src/iree/(.*) -> iree::\1 (i.e. iree::compiler::\1)
+  m = re.match("^//compiler/src/iree/(.+)", target)
+  if m:
+    return ["iree::" + _convert_to_cmake_path(m.group(1))]
+
+  # Map //runtime/src/iree/(.*) -> iree::\1
+  m = re.match("^//runtime/src/iree/(.+)", target)
+  if m:
+    return ["iree::" + _convert_to_cmake_path(m.group(1))]
+
+  # Map //tools/(.*) -> \1
+  m = re.match("^//tools[/|:](.+)", target)
+  if m:
+    return [_convert_to_cmake_path(m.group(1))]
+
+  # Pass through package-relative targets
+  #   :target_name
+  #   file_name.txt
+  if target.startswith(":") or ":" not in target:
+    return [_convert_to_cmake_path(target)]
+
+  # Default rewrite: prefix with "iree::", without pruning the path.
+  return ["iree::" + _convert_to_cmake_path(target)]

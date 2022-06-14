@@ -8,6 +8,7 @@
 
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -45,16 +46,20 @@ void buildTFLImportPassPipeline(OpPassManager &pm) {
   //----------------------------------------------------------------------------
 
   pm.addPass(createConvertModuleMetadataPass());
-  pm.nest<FuncOp>().addPass(createConvertFunctionMetadataPass());
+  pm.nest<func::FuncOp>().addPass(createConvertFunctionMetadataPass());
 
   //----------------------------------------------------------------------------
   // Convert all TFL ops to TOSA ops
   //----------------------------------------------------------------------------
 
-  mlir::tosa::TOSATFTFLLegalizationPipelineOptions tosaOptions;
   pm.addPass(createLowerGlobalTensorsPass());
+
+  mlir::tosa::TOSATFTFLLegalizationPipelineOptions tosaOptions;
+  // Temporary work-around for https://github.com/google/iree/issues/8974
+  tosaOptions.dequantize_tfl_softmax = true;
   mlir::tosa::createTFTFLtoTOSALegalizationPipeline(pm, tosaOptions);
-  pm.nest<FuncOp>().addPass(mlir::tosa::createStripQuantTypesPass());
+
+  pm.nest<func::FuncOp>().addPass(mlir::tosa::createStripQuantTypesPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createReconcileUnrealizedCastsPass());
 
@@ -72,7 +77,7 @@ void buildTFLImportPassPipeline(OpPassManager &pm) {
   // Remove the rest of the TFL goo and verify that all ops converted
   //----------------------------------------------------------------------------
 
-  pm.nest<FuncOp>().addPass(createStripFunctionMetadataPass());
+  pm.nest<func::FuncOp>().addPass(createStripFunctionMetadataPass());
   pm.addPass(createStripModuleMetadataPass());
   pm.addPass(createVerifyFullyConvertedPass());
 }

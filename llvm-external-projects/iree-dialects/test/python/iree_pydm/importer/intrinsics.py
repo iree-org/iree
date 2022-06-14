@@ -1,4 +1,4 @@
-# RUN: %PYTHON %s | iree-dialects-opt -split-input-file | FileCheck --enable-var-scope --dump-input-filter=all %s
+# RUN: %PYTHON %s | iree-dialects-opt --split-input-file | FileCheck --enable-var-scope --dump-input-filter=all %s
 # TODO(#7879): Enable the test
 # XFAIL: *
 

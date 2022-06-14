@@ -10,8 +10,7 @@ IREE. The output artifact is a web page that loads separately provided IREE
 2. Install the Emscripten SDK by
    [following these directions](https://emscripten.org/docs/getting_started/downloads.html)
 3. Initialize your Emscripten environment (e.g. run `emsdk_env.bat`)
-4. From this directory, run `bash ./build_sample.sh`
-    * You may need to set the path to your host tools install
+4. From this directory, run `bash ./build_sample.sh [path to install] && bash ./serve_sample.sh`
 5. Open the localhost address linked in the script output
 
 To rebuild most parts of the sample (C runtime, sample HTML, CMake config,
@@ -23,7 +22,7 @@ etc.), just `control + C` to stop the local webserver and rerun the script.
 to compile the runtime into WebAssembly and JavaScript files.
 
 Any supported IREE program, such as
-[simple_abs.mlir](../../../iree/samples/models/simple_abs.mlir), is compiled using
+[simple_abs.mlir](../../../samples/models/simple_abs.mlir), is compiled using
 the "system library" linking mode. This creates a shared object (typically
 .so/.dll, .wasm in this case). When the runtime attempts to load this file
 using `dlopen()` and `dlsym()`, Emscripten makes use of its

@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s  -linalg-interp-transforms --split-input-file | FileCheck %s
+// RUN: iree-dialects-opt %s  --linalg-transform-interp --split-input-file | FileCheck %s
 
 // CHECK-DAG: #[[$MUL_MAP:.*]] = affine_map<(d0)[s0] -> (d0 * s0)>
 // CHECK-DAG: #[[$SUB_MAP:.*]] = affine_map<(d0)[s0, s1] -> (-(d0 * s0) + s1, s0)>
@@ -10,11 +10,11 @@
 #map4 = affine_map<(d0) -> (d0)>
 
 module {
-  // CHECK-LABEL: func @static_tile
+  // CHECK-LABEL: func.func @static_tile
   //  CHECK-SAME:   %[[CHUNK_SIZE:[0-9a-z]+]]: index
   //  CHECK-SAME:   %[[IN:[0-9a-z]+]]: memref<?xf32>
   //  CHECK-SAME:   %[[OUT:[0-9a-z]+]]: memref<?xf32>
-  func @static_tile(%arg0: index, %arg1: memref<?xf32>, %arg2: memref<?xf32>) {
+  func.func @static_tile(%arg0: index, %arg1: memref<?xf32>, %arg2: memref<?xf32>) {
     %cst = arith.constant 4.200000e+01 : f32
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
@@ -22,8 +22,8 @@ module {
     %1 = affine.apply #map0(%0)[%arg0]
 
     // CHECK: %[[M:.*]] = memref.dim %{{.*}}, %{{.*}} : memref<?xf32>
-    // CHECK: %[[group:.*]] = async.create_group {{.*}}: !async.group 
-    // CHECK: scf.for %[[IV:.*]] = {{.*}} 
+    // CHECK: %[[group:.*]] = async.create_group {{.*}}: !async.group
+    // CHECK: scf.for %[[IV:.*]] = {{.*}}
     // CHECK:   %[[token:.*]] = async.execute {
     // CHECK:     subview
     // CHECK:     subview
@@ -42,7 +42,7 @@ module {
         %6 = memref.subview %arg2[%3] [%5] [%c1] : memref<?xf32> to memref<?xf32, offset:?, strides:[?]>
         %7 = memref.subview %arg1[%3] [%5] [1] : memref<?xf32> to memref<?xf32, offset:?, strides:[?]>
 
-        linalg.generic {indexing_maps = [#map4, #map4], iterator_types = ["parallel"]} 
+        linalg.generic {indexing_maps = [#map4, #map4], iterator_types = ["parallel"]}
           ins(%7 : memref<?xf32, offset:?, strides:[?]>) outs(%6 : memref<?xf32, offset:?, strides:[?]>) {
         ^bb0(%arg4: f32, %arg5: f32):  // no predecessors
           %9 = arith.mulf %arg4, %cst : f32
@@ -55,14 +55,18 @@ module {
     return
   }
 
-  pdl.pattern @match_iree_linalg_ext_in_parallel : benefit(1) {
-    %0 = operands
-    %1 = types
-    %2 = operation "iree_linalg_ext.in_parallel"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
-    rewrite %2 with "iree_linalg_transform.apply"
-  }
-  iree_linalg_transform.sequence {
-    %0 = match @match_iree_linalg_ext_in_parallel
-    %1 = rewrite_iree_linalg_ext_in_parallel_to_async %0
+  transform.with_pdl_patterns {
+  ^bb0(%arg0: !pdl.operation):
+    pdl.pattern @match_iree_linalg_ext_in_parallel : benefit(1) {
+      %0 = operands
+      %1 = types
+      %2 = operation "iree_linalg_ext.in_parallel"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      rewrite %2 with "transform.dialect"
+    }
+    transform.structured.canonicalized_sequence %arg0 {
+    ^bb1(%arg1: !pdl.operation):
+      %0 = pdl_match @match_iree_linalg_ext_in_parallel in %arg1
+      %1 = rewrite_iree_linalg_ext_in_parallel_to_async %0
+    }
   }
 }

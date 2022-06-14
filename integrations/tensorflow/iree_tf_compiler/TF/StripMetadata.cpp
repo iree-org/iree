@@ -54,7 +54,8 @@ class StripModuleMetadataPass
 };
 
 class StripFunctionMetadataPass
-    : public PassWrapper<StripFunctionMetadataPass, OperationPass<FuncOp>> {
+    : public PassWrapper<StripFunctionMetadataPass,
+                         OperationPass<func::FuncOp>> {
  public:
   StringRef getArgument() const override {
     return "iree-tf-strip-function-metadata";
@@ -97,7 +98,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createStripModuleMetadataPass() {
   return std::make_unique<StripModuleMetadataPass>();
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createStripFunctionMetadataPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createStripFunctionMetadataPass() {
   return std::make_unique<StripFunctionMetadataPass>();
 }
 

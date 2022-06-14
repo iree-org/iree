@@ -19,19 +19,18 @@ measurements more akin to unit tests, see [Executable Benchmarks](#executable-be
 To use `iree-benchmark-module`, generate an IREE module for the target backend:
 
 ```shell
-$ bazel run //iree/tools:iree-compile -- \
-  -iree-mlir-to-vm-bytecode-module \
-  -iree-hal-target-backends=vmvx \
-  $PWD/iree/samples/models/simple_abs.mlir \
+$ bazel run //tools:iree-compile -- \
+  --iree-hal-target-backends=vmvx \
+  $PWD/samples/models/simple_abs.mlir \
   -o /tmp/module.fb
 ```
 
 and then benchmark an exported function in that module:
 
 ```shell
-$ bazel run //iree/tools:iree-benchmark-module -- \
+$ bazel run //tools:iree-benchmark-module -- \
   --module_file=/tmp/module.fb \
-  --driver=vmvx \
+  --device=local-task \
   --entry_function=abs \
   --function_input=f32=-2
 ```
@@ -62,7 +61,7 @@ generally build an optimized build (`-c opt` in Bazel) and
 [disable CPU scaling](#cpu-configuration).
 
 ```shell
-$ bazel build -c opt //iree/tools:iree-benchmark-module
+$ bazel build -c opt //tools:iree-benchmark-module
 ```
 
 Another thing to consider is that depending on where you are running the
@@ -76,9 +75,9 @@ programs such as Chrome and Bazel.
 Now we'll actually invoke the binary:
 
 ```shell
-$ ./bazel-bin/iree/tools/iree-benchmark-module \
+$ ./bazel-bin/tools/iree-benchmark-module \
   --module_file=/tmp/module.fb \
-  --driver=vmvx \
+  --device=local-task \
   --entry_function=abs \
   --function_input=f32=-2
 ```
@@ -107,12 +106,11 @@ dispatch functions, generate an IREE module with the
 `-iree-flow-export-benchmark-funcs` flag set:
 
 ```shell
-$ build/iree/tools/iree-compile \
-  -iree-input-type=mhlo \
-  -iree-mlir-to-vm-bytecode-module \
-  -iree-flow-export-benchmark-funcs \
-  -iree-hal-target-backends=vmvx \
-  iree/test/e2e/models/fullyconnected.mlir \
+$ build/tools/iree-compile \
+  --iree-input-type=mhlo \
+  --iree-flow-export-benchmark-funcs \
+  --iree-hal-target-backends=vmvx \
+  tests/e2e/models/fullyconnected.mlir \
   -o /tmp/fullyconnected.vmfb
 ```
 
@@ -120,9 +118,9 @@ and then benchmark all exported dispatch functions (and all exported functions)
 in that module:
 
 ```shell
-$ build/iree/tools/iree-benchmark-module
+$ build/tools/iree-benchmark-module
   --module_file=/tmp/fullyconnected.vmfb
-  --driver=vmvx
+  --device=local-task
 ```
 
 If no `entry_function` is specified, `iree-benchmark-module` will register a

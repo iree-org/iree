@@ -1,4 +1,3 @@
-# Lint as: python3
 # Copyright 2019 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
@@ -6,20 +5,19 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Utilities for compiling 'tf.Module's"""
 
-# TODO(#4131) python>=3.7: Use postponed type annotations.
-
+from __future__ import annotations
 import collections
 import os
 import tempfile
-from typing import Any, Callable, Dict, Optional, Sequence, Set, Tuple, Type, Union
+from typing import (Any, Callable, Dict, Optional, Sequence, Set, Tuple, Type,
+                    Union)
 
-from absl import flags
-from absl import logging
 import iree.compiler.tf
 import iree.runtime
-from iree.tf.support import tf_utils
 import numpy as np
 import tensorflow.compat.v2 as tf
+from absl import flags, logging
+from iree.tf.support import tf_utils
 
 flags.DEFINE_bool(
     "capture_crash_reproducer", True,
@@ -27,11 +25,6 @@ flags.DEFINE_bool(
     "and suppresses C++ stack traces.")
 
 FLAGS = flags.FLAGS
-
-
-def _running_bazel_test() -> bool:
-  # Bazel guarantees that TEST_TMPDIR is set when `bazel test` is running.
-  return "TEST_TMPDIR" in os.environ
 
 
 def _get_tf_import_output_kwargs(artifacts_dir: str,
@@ -85,7 +78,7 @@ def _get_tf_import_output_kwargs(artifacts_dir: str,
 
 def _incrementally_compile_tf_module(
     module: Type[tf.Module],
-    backend_info: "BackendInfo",
+    backend_info: BackendInfo,
     exported_names: Sequence[str] = (),
     artifacts_dir: Optional[str] = None,
 ) -> Tuple[bytes, Optional[str]]:
@@ -136,8 +129,8 @@ def _incrementally_compile_tf_module(
 
 
 def _incrementally_compile_tf_signature_def_saved_model(
-    saved_model_dir: str, saved_model_tags: Set[str],
-    backend_info: "BackendInfo", exported_name: str, artifacts_dir: str):
+    saved_model_dir: str, saved_model_tags: Set[str], backend_info: BackendInfo,
+    exported_name: str, artifacts_dir: str):
   """Compile a SignatureDef SavedModel and optionally save compilation artifacts.
 
   The module blob this creates is not callable. See IreeCompiledModule for an
@@ -190,7 +183,7 @@ class CompiledModule(object):
   def __init__(
       self,
       module_name: str,
-      backend_info: "BackendInfo",
+      backend_info: BackendInfo,
       compiled_paths: Union[Dict[str, str], None],
   ):
     """Shared base constructor – not useful on its own.
@@ -213,7 +206,7 @@ class CompiledModule(object):
   @classmethod
   def create_from_class(cls,
                         module_class: Type[tf.Module],
-                        backend_info: "BackendInfo",
+                        backend_info: BackendInfo,
                         exported_names: Sequence[str] = (),
                         artifacts_dir: Optional[str] = None):
     """Compile a tf.Module subclass to the target backend in backend_info.
@@ -231,7 +224,7 @@ class CompiledModule(object):
   @classmethod
   def create_from_instance(cls,
                            module_instance: tf.Module,
-                           backend_info: "BackendInfo",
+                           backend_info: BackendInfo,
                            exported_names: Sequence[str] = (),
                            artifacts_dir: Optional[str] = None):
     """Compile a tf.Module instance to the target backend in backend_info.
@@ -254,7 +247,7 @@ class CompiledModule(object):
       saved_model_dir: str,
       saved_model_tags: Set[str],
       module_name: str,
-      backend_info: "BackendInfo",
+      backend_info: BackendInfo,
       exported_name: str,
       input_names: Sequence[str],
       output_names: Sequence[str],
@@ -313,7 +306,7 @@ class IreeCompiledModule(CompiledModule):
   def __init__(
       self,
       module_name: str,
-      backend_info: "BackendInfo",
+      backend_info: BackendInfo,
       compiled_paths: Dict[str, str],
       vm_module: iree.runtime.VmModule,
       config: iree.runtime.Config,
@@ -337,7 +330,7 @@ class IreeCompiledModule(CompiledModule):
   @classmethod
   def create_from_class(cls,
                         module_class: Type[tf.Module],
-                        backend_info: "BackendInfo",
+                        backend_info: BackendInfo,
                         exported_names: Sequence[str] = (),
                         artifacts_dir: Optional[str] = None):
     """Compile a tf.Module subclass to the target backend in backend_info.
@@ -358,7 +351,7 @@ class IreeCompiledModule(CompiledModule):
   @classmethod
   def create_from_instance(cls,
                            module_instance: tf.Module,
-                           backend_info: "BackendInfo",
+                           backend_info: BackendInfo,
                            exported_names: Sequence[str] = (),
                            artifacts_dir: Optional[str] = None):
     """Compile a tf.Module instance to the target backend in backend_info.
@@ -394,7 +387,7 @@ class IreeCompiledModule(CompiledModule):
       saved_model_dir: str,
       saved_model_tags: Set[str],
       module_name: str,
-      backend_info: "BackendInfo",
+      backend_info: BackendInfo,
       exported_name: str,
       input_names: Sequence[str],
       output_names: Sequence[str],
@@ -490,7 +483,7 @@ class TfCompiledModule(CompiledModule):
   def __init__(
       self,
       module_name: str,
-      backend_info: "BackendInfo",
+      backend_info: BackendInfo,
       constructor: Callable[[], tf.Module],
       exported_names: Sequence[str],
   ):
@@ -514,7 +507,7 @@ class TfCompiledModule(CompiledModule):
   @classmethod
   def create_from_class(cls,
                         module_class: Type[tf.Module],
-                        backend_info: "BackendInfo",
+                        backend_info: BackendInfo,
                         exported_names: Sequence[str] = (),
                         artifacts_dir: Optional[str] = None):
     """Compile a tf.Module subclass to the target backend in backend_info.
@@ -537,7 +530,7 @@ class TfCompiledModule(CompiledModule):
       saved_model_dir: str,
       saved_model_tags: Set[str],
       module_name: str,
-      backend_info: "BackendInfo",
+      backend_info: BackendInfo,
       exported_name: str,
       input_names: Sequence[str],
       output_names: Sequence[str],
@@ -787,7 +780,7 @@ class TfLiteCompiledModule(CompiledModule):
   def __init__(
       self,
       module_name: str,
-      backend_info: "BackendInfo",
+      backend_info: BackendInfo,
       compiled_paths: Dict[str, str],
       interpreters: Dict[str, tf.lite.Interpreter],
       output_names: Optional[Sequence[str]] = None,
@@ -809,7 +802,7 @@ class TfLiteCompiledModule(CompiledModule):
   @classmethod
   def create_from_class(cls,
                         module_class: Type[tf.Module],
-                        backend_info: "BackendInfo",
+                        backend_info: BackendInfo,
                         exported_names: Sequence[str] = (),
                         artifacts_dir: Optional[str] = None):
     """Compile a tf.Module subclass to the target backend in backend_info.
@@ -836,7 +829,7 @@ class TfLiteCompiledModule(CompiledModule):
       saved_model_dir: str,
       saved_model_tags: Set[str],
       module_name: str,
-      backend_info: "BackendInfo",
+      backend_info: BackendInfo,
       exported_name: str,
       input_names: Sequence[str],
       output_names: Sequence[str],
@@ -896,7 +889,7 @@ class BackendInfo:
       },
       "iree_vmvx": {
           "compiled_module_class": IreeCompiledModule,
-          "driver": "vmvx",
+          "driver": "local-task",
           "compiler_targets": ["vmvx"]
       },
       "iree_vulkan": {
@@ -906,7 +899,7 @@ class BackendInfo:
       },
       "iree_llvmaot": {
           "compiled_module_class": IreeCompiledModule,
-          "driver": "dylib",
+          "driver": "local-task",
           "compiler_targets": ["dylib-llvm-aot"]
       },
   }
@@ -963,6 +956,6 @@ class BackendInfo:
         input_names, output_names, artifacts_dir)
 
   @classmethod
-  def get_all_backends(cls) -> Sequence["BackendInfo"]:
+  def get_all_backends(cls) -> Sequence[BackendInfo]:
     """Returns a list of all BackendInfo configurations."""
     return [BackendInfo(backend_name) for backend_name in cls._name_to_info]

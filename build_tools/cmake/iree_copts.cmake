@@ -72,10 +72,12 @@ set(IREE_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 iree_select_compiler_opts(IREE_DEFAULT_COPTS
   CLANG_OR_GCC
     "-fvisibility=hidden"
+
     # NOTE: The RTTI setting must match what LLVM was compiled with (defaults
     # to RTTI disabled).
     "$<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>"
     "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>"
+
   MSVC_OR_CLANG_CL
     # Exclude a bunch of rarely-used APIs, such as crypto/DDE/shell.
     # https://docs.microsoft.com/en-us/windows/win32/winprog/using-the-windows-headers
@@ -271,13 +273,29 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
 
 # Set some things back to warnings that are really annoying as build errors
 # during active development (but we still want as errors on CI).
-if (IREE_DEV_MODE)
+if(IREE_DEV_MODE)
   iree_select_compiler_opts(IREE_DEFAULT_COPTS
     CLANG_OR_GCC
       "-Wno-error=unused-parameter"
       "-Wno-error=unused-variable"
   )
 endif()
+
+# Debug information and __FILE__ macros get expanded with full paths by default.
+# This results in binaries that differ based on what directories they are built
+# from and that's annoying.
+#
+# For now in all configurations we make __FILE__ macros relative. We could also
+# make debug information relative using -fdebug-prefix-map but deterministic
+# builds are most interesting in release modes that have debug info stripped.
+get_filename_component(_IREE_ROOT_NAME ${IREE_ROOT_DIR} NAME)
+iree_select_compiler_opts(IREE_DEFAULT_COPTS
+  # TODO(benvanik): make this CLANG_OR_GCC once clang-9 is no longer supported.
+  CLANG_GTE_10
+    "-fmacro-prefix-map=${IREE_ROOT_DIR}=${_IREE_ROOT_NAME}"
+  GCC
+    "-fmacro-prefix-map=${IREE_ROOT_DIR}=${_IREE_ROOT_NAME}"
+)
 
 # On MSVC, CMake sets /GR by default (enabling RTTI), but we set /GR-
 # (disabling it) above. To avoid Command line warning D9025 which warns about
@@ -295,7 +313,7 @@ if(CMAKE_CXX_FLAGS AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
   string(REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
 
-if(NOT ANDROID AND ${IREE_ENABLE_THREADING})
+if(NOT ANDROID AND IREE_ENABLE_THREADING)
   iree_select_compiler_opts(_IREE_PTHREADS_LINKOPTS
     CLANG_OR_GCC
       "-lpthread"
@@ -312,7 +330,7 @@ endif()
 # TODO(scotttodd): Figure out how to use atomics and/or shared memory without
 #                  Specifying this flag
 # https://emscripten.org/docs/porting/pthreads.html#compiling-with-pthreads-enabled
-if(EMSCRIPTEN AND ${IREE_ENABLE_THREADING})
+if(EMSCRIPTEN AND IREE_ENABLE_THREADING)
   iree_select_compiler_opts(IREE_DEFAULT_COPTS
     ALL
       "-pthread"
@@ -334,7 +352,7 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     ${_IREE_PTHREADS_LINKOPTS}
     ${_IREE_LOGGING_LINKOPTS}
   MSVC
-    "-natvis:${CMAKE_SOURCE_DIR}/iree/iree.natvis"
+    "-natvis:${IREE_ROOT_DIR}/runtime/iree.natvis"
 )
 
 # Add to LINKOPTS on a binary to configure it for X/Wayland/Windows/etc
@@ -350,7 +368,7 @@ endif()
 #-------------------------------------------------------------------------------
 
 # TODO(#898): add a dedicated size-constrained configuration.
-if(${IREE_SIZE_OPTIMIZED})
+if(IREE_SIZE_OPTIMIZED)
   iree_select_compiler_opts(IREE_SIZE_OPTIMIZED_DEFAULT_COPTS
     MSVC_OR_CLANG_CL
       "/GS-"
@@ -379,7 +397,6 @@ if(${IREE_SIZE_OPTIMIZED})
       "-DIREE_HAL_MODULE_STRING_UTIL_ENABLE=0"
       "-DIREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE=0"
       "-DIREE_VM_BACKTRACE_ENABLE=0"
-      "-DIREE_VM_EXT_I64_ENABLE=0"
       "-DIREE_VM_EXT_F32_ENABLE=0"
       "-DIREE_VM_EXT_F64_ENABLE=0"
   )

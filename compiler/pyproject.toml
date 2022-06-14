@@ -1,0 +1,15 @@
+[build-system]
+requires = [
+    "setuptools>=42",
+    "wheel",
+    # There is no fundamental reason to pin this CMake version, beyond
+    # build stability.
+    "cmake==3.22.2",
+    "ninja==1.10.2",
+    # MLIR build depends.
+    "numpy",
+    "packaging",
+    "pybind11>=2.8.0",
+    "PyYAML",
+]
+build-backend = "setuptools.build_meta"

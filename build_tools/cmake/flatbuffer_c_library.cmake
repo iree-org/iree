@@ -117,8 +117,6 @@ function(flatbuffer_c_library)
   add_dependencies(${_NAME} ${_GEN_TARGET})
   target_include_directories(${_NAME} SYSTEM
     INTERFACE
-      "$<BUILD_INTERFACE:${IREE_SOURCE_DIR}>"
-      "$<BUILD_INTERFACE:${IREE_BINARY_DIR}>"
       ${CMAKE_CURRENT_BINARY_DIR}
     )
   target_link_libraries(${_NAME}

@@ -30,12 +30,12 @@ target_compile_options(${_NAME} PRIVATE ${IREE_DEFAULT_COPTS})
 target_link_libraries(${_NAME}
   iree_runtime_runtime
   iree_hal_local_loaders_system_library_loader
-  iree_hal_local_sync_driver
+  iree_hal_drivers_local_sync_sync_driver
 )
 
 target_link_options(${_NAME} PRIVATE
   # https://emscripten.org/docs/porting/connecting_cpp_and_javascript/Interacting-with-code.html#interacting-with-code-ccall-cwrap
-  "-sEXPORTED_FUNCTIONS=['_setup_sample', '_cleanup_sample', '_load_program', '_unload_program', '_call_function']"
+  "-sEXPORTED_FUNCTIONS=['_setup_sample', '_cleanup_sample', '_load_program', '_inspect_program', '_unload_program', '_call_function']"
   "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
   #
   "-sASSERTIONS=1"

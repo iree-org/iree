@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+from __future__ import annotations
 from types import ModuleType
 from typing import Any, Mapping, Optional, Sequence, Union
 
@@ -190,7 +191,7 @@ class ImportStage:
       "hooks",
   ]
 
-  def __init__(self, ic: ImportContext, hooks: "ImportHooks"):
+  def __init__(self, ic: ImportContext, hooks: ImportHooks):
     self.ic = ic
     self.hooks = hooks
 
@@ -221,7 +222,7 @@ class Intrinsic:
   UNBOUND_VALUE = _UnboundValue()
 
   def resolve_static_getattr(self, stage: ImportStage,
-                             attr_name: str) -> "ResolveOutcome":
+                             attr_name: str) -> ResolveOutcome:
     return Intrinsic.UNBOUND_VALUE
 
   def emit_call(self, stage: ImportStage, args: Sequence[ir.Value],
@@ -237,7 +238,7 @@ class Intrinsic:
         f"the compiler intrinsic {self} can not be serialized as a value")
 
   @staticmethod
-  def make_singleton(cls) -> "Intrinsic":
+  def make_singleton(cls) -> Intrinsic:
     """Class decorator to instantiate a singleton intrinsic class."""
     assert issubclass(cls, Intrinsic)
     return cls()

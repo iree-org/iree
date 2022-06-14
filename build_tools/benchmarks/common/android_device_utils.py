@@ -60,7 +60,9 @@ def get_android_gpu_name(verbose: bool = False) -> str:
 
 def get_android_device_info(verbose: bool = False) -> DeviceInfo:
   """Returns device info for the Android device."""
-  return DeviceInfo(PlatformType.ANDROID, get_android_device_model(verbose),
-                    get_android_cpu_abi(verbose),
-                    get_android_cpu_features(verbose),
-                    get_android_gpu_name(verbose))
+  return DeviceInfo(platform_type=PlatformType.ANDROID,
+                    model=get_android_device_model(verbose),
+                    cpu_abi=get_android_cpu_abi(verbose),
+                    cpu_uarch=None,
+                    cpu_features=get_android_cpu_features(verbose),
+                    gpu_name=get_android_gpu_name(verbose))

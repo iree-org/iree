@@ -57,38 +57,22 @@ CMAKE_BUILD_DIR="$HOME/iree/build/tf"
 # TODO(gcmn): It would be nice to be able to build and test as much as possible,
 # so a build failure only prevents building/testing things that depend on it and
 # we can still run the other tests.
-# TODO: Add "-DIREE_TARGET_BACKEND_CUDA=ON -DIREE_HAL_DRIVER_CUDA=ON" once the
-# VMs have been updated with the correct CUDA SDK.
 echo "Configuring CMake"
 "${CMAKE_BIN}" -B "${CMAKE_BUILD_DIR?}" -G Ninja \
-   -DIREE_TF_TOOLS_ROOT="${BAZEL_BINDIR?}/iree_tf_compiler/" \
    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
    -DIREE_BUILD_COMPILER=ON \
    -DIREE_BUILD_TESTS=ON \
    -DIREE_BUILD_SAMPLES=OFF \
    -DIREE_BUILD_PYTHON_BINDINGS=ON \
+   -DIREE_HAL_DRIVER_CUDA=ON \
+   -DIREE_TARGET_BACKEND_CUDA=ON \
    .
 
 echo "Building with Ninja"
 cd "${CMAKE_BUILD_DIR?}"
 ninja
 
-# Limit parallelism dramatically to avoid exhausting GPU memory
-# TODO(#5162): Handle this more robustly
-export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-1}
-
 tests_passed=true
-
-# Only test drivers that use the GPU, since we run all tests on non-GPU machines
-# as well.
-echo "***** Testing with CTest *****"
-if ! ctest --timeout 900 --output-on-failure \
-   --tests-regex "^integrations/tensorflow/|^bindings/python/" \
-   --label-regex "^driver=vulkan$|^driver=cuda$" \
-   --label-exclude "^nokokoro$"
-then
-   tests_passed=false
-fi
 
 echo "***** Running TensorFlow integration tests *****"
 # TODO: Use "--timeout 900" instead of --max-time below. Requires that

@@ -89,7 +89,7 @@ cmake --build ../iree-build-riscv/
 !!! note
     The following instructions are meant for the RISC-V 64-bit Linux
     target. For the bare-metal target, please refer to
-    [simple_embedding](https://github.com/google/iree/blob/main/iree/samples/simple_embedding)
+    [simple_embedding](https://github.com/google/iree/blob/main/samples/simple_embedding)
     to see how to build a ML workload for a bare-metal machine.
 
 Set the path to qemu-riscv64 Linux emulator binary in the `QEMU_BIN` environment
@@ -100,13 +100,12 @@ ${HOME}/riscv/qemu/linux/RISCV/bin/qemu-riscv64.
 export QEMU_BIN=<path to qemu-riscv64 binary>
 ```
 
-Invoke the host compiler tools to produce a bytecode module flatbuffer:
+Invoke the host compiler tools to produce a bytecode module FlatBuffer:
 
 ``` shell
 ../iree-build/install/bin/iree-compile \
-  -iree-mlir-to-vm-bytecode-module \
-  -iree-hal-target-backends=vmvx \
-  iree/samples/models/simple_abs.mlir \
+  --iree-hal-target-backends=vmvx \
+  samples/models/simple_abs.mlir \
   -o /tmp/simple_abs_vmvx.vmfb
 ```
 
@@ -116,8 +115,8 @@ Run the RISC-V emulation:
 ${QEMU_BIN} \
   -cpu rv64 \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
-  ../iree-build-riscv/iree/tools/iree-run-module \
-  --driver=vmvx \
+  ../iree-build-riscv/tools/iree-run-module \
+  --device=local-task \
   --module_file=/tmp/simple_abs_vmvx.vmfb \
   --entry_function=abs \
   --function_input=f32=-5
@@ -141,19 +140,18 @@ ${QEMU_BIN} \
 [https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh](https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh).
 
 The SIMD code can be generated following the
-[IREE dynamic library CPU HAL driver flow](../deployment-configurations/cpu-dylib.md)
+[IREE CPU flow](../deployment-configurations/cpu.md)
 with the additional command-line flags
 
 ```shell hl_lines="3 4 5 6 7 8"
-iree/tools/iree-compile \
-  -iree-mlir-to-vm-bytecode-module \
-  -iree-hal-target-backends=dylib-llvm-aot \
-  -iree-llvm-target-triple=riscv64 \
-  -iree-llvm-target-cpu=generic-rv64 \
-  -iree-llvm-target-abi=lp64d \
-  -iree-llvm-target-cpu-features="+m,+a,+f,+d,+v" \
-  -riscv-v-vector-bits-min=256 -riscv-v-fixed-length-vector-lmul-max=8 \
-  iree_input.mlir -o mobilenet-dylib.vmfb
+tools/iree-compile \
+  --iree-hal-target-backends=dylib-llvm-aot \
+  --iree-llvm-target-triple=riscv64 \
+  --iree-llvm-target-cpu=generic-rv64 \
+  --iree-llvm-target-abi=lp64d \
+  --iree-llvm-target-cpu-features="+m,+a,+f,+d,+v" \
+  --riscv-v-vector-bits-min=256 --riscv-v-fixed-length-vector-lmul-max=8 \
+  iree_input.mlir -o mobilenet_cpu.vmfb
 ```
 
 Then run on the RISC-V QEMU:
@@ -162,9 +160,9 @@ Then run on the RISC-V QEMU:
 ${QEMU_BIN} \
   -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
-  ../iree-build-riscv/iree/tools/iree-run-module \
-  --driver=dylib \
-  --module_file=mobilenet-dylib.vmfb \
+  ../iree-build-riscv/tools/iree-run-module \
+  --device=local-task \
+  --module_file=mobilenet_cpu.vmfb \
   --entry_function=predict \
   --function_input="1x224x224x3xf32=0"
 ```

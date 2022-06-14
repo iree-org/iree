@@ -32,7 +32,7 @@ function(iree_c_embed_data)
     _RULE
     "PUBLIC;TESTONLY;FLATTEN"
     "NAME;IDENTIFIER;STRIP_PREFIX;C_FILE_OUTPUT;H_FILE_OUTPUT"
-    "SRCS;GENERATED_SRCS"
+    "DEPS;SRCS;GENERATED_SRCS"
     ${ARGN}
   )
 
@@ -53,20 +53,20 @@ function(iree_c_embed_data)
   if(DEFINED _RULE_STRIP_PREFIX)
     list(APPEND _ARGS "--strip_prefix=${_RULE_STRIP_PREFIX}")
   endif()
-  if(${_RULE_FLATTEN})
+  if(_RULE_FLATTEN)
     list(APPEND _ARGS "--flatten")
   endif()
 
-  foreach(SRC ${_RULE_SRCS})
-    if(IS_ABSOLUTE "${SRC}")
-      list(APPEND _ARGS "${SRC}")
+  foreach(_SRC ${_RULE_SRCS})
+    if(IS_ABSOLUTE "${_SRC}")
+      list(APPEND _ARGS "${_SRC}")
     else()
-      list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${SRC}")
+      list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${_SRC}")
     endif()
-  endforeach(SRC)
-  foreach(SRC ${_RULE_GENERATED_SRCS})
-    list(APPEND _ARGS "${SRC}")
-  endforeach(SRC)
+  endforeach(_SRC)
+  foreach(_SRC ${_RULE_GENERATED_SRCS})
+    list(APPEND _ARGS "${_SRC}")
+  endforeach(_SRC)
 
   iree_get_executable_path(_EXE_PATH generate_embed_data)
 
@@ -87,6 +87,7 @@ function(iree_c_embed_data)
     NAME ${_RULE_NAME}
     HDRS "${_RULE_H_FILE_OUTPUT}"
     SRCS "${_RULE_C_FILE_OUTPUT}"
+    DEPS "${_RULE_DEPS}"
     "${_PUBLIC_ARG}"
     "${_TESTONLY_ARG}"
   )

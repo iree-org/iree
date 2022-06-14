@@ -1,4 +1,3 @@
-# Lint as: python3
 # Copyright 2020 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
@@ -40,6 +39,23 @@ def _convert_string_arg_block(name, value, quote=True):
     return f"  {name}\n    {value}\n"
 
 
+# Match Bazel's timeout values
+# https://docs.bazel.build/versions/main/test-encyclopedia.html
+timeout_map = {
+    "short": 60,
+    "moderate": 300,
+    "long": 900,
+    "eternal": 3600,
+}
+
+
+def _convert_timeout_arg_block(name, value):
+  if value is None:
+    return ""
+  value = timeout_map[value]
+  return f"  {name}\n    {value}\n"
+
+
 def _convert_string_list_block(name, values, quote=True, sort=False):
   # Note this deliberately distinguishes between an empty list (argument
   # explicitly specified) and None (argument left as default).
@@ -69,11 +85,18 @@ def _convert_option_block(option, option_value):
 def _convert_target_block(name, target):
   if target is None:
     return ""
-  # Bazel target name to cmake binary name
-  # Bazel `//iree/custom:custom-translate` -> CMake `iree_custom_custom-translate`
-  target = target.replace("//iree", "iree")  # iree/custom:custom-translate
-  target = target.replace(":", "_")  # iree/custom_custom-translate
-  target = target.replace("/", "_")  # iree_custom_custom-translate
+
+  # Convert the target name from its Bazel name to the corresponding CMake name.
+  # The specific conversion pattern depends on the target location. In general,
+  # Bazel targets are fully qualified and use slashes as delimiters, while
+  # targets in CMake are rooted on subtrees and use _ (with :: aliases).
+  cmake_aliases = bazel_to_cmake_targets.convert_target(target)
+  if len(cmake_aliases) != 1:
+    raise ValueError(
+        f"Expected a CMake alias from {target}. Got {cmake_aliases}")
+  target = cmake_aliases[0]
+  # Replace aliased :: target names with their explicit _ names.
+  target = target.replace("::", "_")
   return _convert_string_arg_block(name, target, quote=False)
 
 
@@ -154,28 +177,6 @@ def _convert_target_list_block(list_name, targets):
   targets = filter(None, targets)
 
   return _convert_string_list_block(list_name, targets, sort=True, quote=False)
-
-
-# Copied from integrations/tensorflow/e2e/iree_e2e_cartesian_product_test_suite.bzl
-def _normalize_dictionary(dictionary):
-  """Wraps every value of dictionary in a list if it isn't one already."""
-  for key, value in dictionary.items():
-    if type(value) != type([]):
-      dictionary[key] = [value]
-  return dictionary
-
-
-def _dictionary_product(dictionary):
-  """Returns a named cartesian product of dictionary's values."""
-
-  # Converts {'a': [1, 2], 'b': [3, 4]} into
-  # [{'a': 1, 'b': 3}, {'a': 1, 'b': 4}, {'a': 2, 'b': 3}, {'a': 2, 'b': 4}]
-  product = [[]]
-  for values in dictionary.values():
-    # Iteratively grow the elements of the product.
-    product = [element + [value] for element in product for value in values]
-  dicts = [{k: v for k, v in zip(dictionary, element)} for element in product]
-  return dicts
 
 
 class BuildFileFunctions(object):
@@ -281,7 +282,7 @@ class BuildFileFunctions(object):
 
   # TODO(gcmn) implement these types of functions in a less hard-coded way
   def platform_trampoline_deps(self, basename, path="base"):
-    return [f"//iree/{path}/internal:{basename}_internal"]
+    return [f"//{path}/internal:{basename}_internal"]
 
   def select(self, d):
     self._convert_unimplemented_function("select", str(d))
@@ -325,6 +326,12 @@ class BuildFileFunctions(object):
                             f"{testonly_block}"
                             f"  PUBLIC\n)\n\n")
 
+  def iree_compiler_cc_library(self, deps=[], **kwargs):
+    self.cc_library(deps=deps + ["//compiler/src:defs"], **kwargs)
+
+  def iree_runtime_cc_library(self, deps=[], **kwargs):
+    self.cc_library(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
+
   def cc_test(self,
               name,
               hdrs=None,
@@ -333,6 +340,7 @@ class BuildFileFunctions(object):
               defines=None,
               data=None,
               deps=None,
+              timeout=None,
               args=None,
               tags=None,
               **kwargs):
@@ -345,6 +353,7 @@ class BuildFileFunctions(object):
     deps_block = _convert_target_list_block("DEPS", deps)
     args_block = _convert_string_list_block("ARGS", args)
     labels_block = _convert_string_list_block("LABELS", tags)
+    timeout_block = _convert_timeout_arg_block("TIMEOUT", timeout)
 
     self.converter.body += (f"iree_cc_test(\n"
                             f"{name_block}"
@@ -356,7 +365,11 @@ class BuildFileFunctions(object):
                             f"{deps_block}"
                             f"{args_block}"
                             f"{labels_block}"
+                            f"{timeout_block}"
                             f")\n\n")
+
+  def iree_runtime_cc_test(self, deps=[], **kwargs):
+    self.cc_test(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
 
   def cc_binary(self,
                 name,
@@ -400,6 +413,7 @@ class BuildFileFunctions(object):
                    strip_prefix=None,
                    flatten=None,
                    identifier=None,
+                   deps=None,
                    **kwargs):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
@@ -410,10 +424,12 @@ class BuildFileFunctions(object):
     testonly_block = _convert_option_block("TESTONLY", testonly)
     identifier_block = _convert_string_arg_block("IDENTIFIER", identifier)
     flatten_block = _convert_option_block("FLATTEN", flatten)
+    deps_block = _convert_target_list_block("DEPS", deps)
 
     self.converter.body += (f"iree_c_embed_data(\n"
                             f"{name_block}"
                             f"{srcs_block}"
+                            f"{deps_block}"
                             f"{c_file_output_block}"
                             f"{h_file_output_block}"
                             f"{identifier_block}"
@@ -421,39 +437,33 @@ class BuildFileFunctions(object):
                             f"{flatten_block}"
                             f"  PUBLIC\n)\n\n")
 
-  def spirv_kernel_cc_library(self, name, srcs):
-    name_block = _convert_string_arg_block("NAME", name, quote=False)
-    srcs_block = _convert_srcs_block(srcs)
-
-    self.converter.body += (f"iree_spirv_kernel_cc_library(\n"
-                            f"{name_block}"
-                            f"{srcs_block}"
-                            f")\n\n")
-
   def iree_bytecode_module(self,
                            name,
                            src,
+                           module_name=None,
                            flags=None,
-                           translate_tool=None,
+                           compile_tool=None,
                            c_identifier=None,
-                           opt_flags=None,
+                           deps=None,
                            testonly=None):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     src_block = _convert_string_arg_block("SRC", src)
+    module_name_block = _convert_string_arg_block("MODULE_FILE_NAME",
+                                                  module_name)
     c_identifier_block = _convert_string_arg_block("C_IDENTIFIER", c_identifier)
-    translate_tool_block = _convert_target_block("TRANSLATE_TOOL",
-                                                 translate_tool)
+    compile_tool_block = _convert_target_block("COMPILE_TOOL", compile_tool)
     flags_block = _convert_string_list_block("FLAGS", flags)
-    opt_flags_block = _convert_string_list_block("OPT_FLAGS", opt_flags)
+    deps_block = _convert_target_list_block("DEPS", deps)
     testonly_block = _convert_option_block("TESTONLY", testonly)
 
     self.converter.body += (f"iree_bytecode_module(\n"
                             f"{name_block}"
                             f"{src_block}"
+                            f"{module_name_block}"
                             f"{c_identifier_block}"
-                            f"{translate_tool_block}"
+                            f"{compile_tool_block}"
                             f"{flags_block}"
-                            f"{opt_flags_block}"
+                            f"{deps_block}"
                             f"{testonly_block}"
                             f"  PUBLIC\n)\n\n")
 
@@ -490,6 +500,11 @@ class BuildFileFunctions(object):
                             f"{tblgen_block}"
                             f")\n\n")
 
+  def iree_gentbl_cc_library(self, **kwargs):
+    # The bazel version of this rule adds some include directories and defs
+    # that are implicitly handled by the cmake version.
+    self.gentbl_cc_library(**kwargs)
+
   def iree_tablegen_doc(self,
                         name,
                         tblgen,
@@ -517,12 +532,14 @@ class BuildFileFunctions(object):
                           tools=None,
                           data=None,
                           tags=None,
+                          timeout=None,
                           **kwargs):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
     tools_block = _convert_target_list_block("TOOLS", tools)
     data_block = _convert_target_list_block("DATA", data)
     labels_block = _convert_string_list_block("LABELS", tags)
+    timeout_block = _convert_timeout_arg_block("TIMEOUT", timeout)
 
     self.converter.body += (f"iree_lit_test_suite(\n"
                             f"{name_block}"
@@ -530,6 +547,7 @@ class BuildFileFunctions(object):
                             f"{tools_block}"
                             f"{data_block}"
                             f"{labels_block}"
+                            f"{timeout_block}"
                             f")\n\n")
 
   def iree_check_single_backend_test_suite(self,
@@ -541,8 +559,8 @@ class BuildFileFunctions(object):
                                            target_backends_and_drivers=None,
                                            runner_args=None,
                                            tags=None,
-                                           opt_flags=None,
                                            target_cpu_features=None,
+                                           timeout=None,
                                            **kwargs):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
@@ -553,9 +571,9 @@ class BuildFileFunctions(object):
                                                       compiler_flags)
     runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
     labels_block = _convert_string_list_block("LABELS", tags)
-    opt_flags_block = _convert_string_list_block("OPT_FLAGS", opt_flags)
     target_cpu_features_block = _convert_string_arg_block(
         "TARGET_CPU_FEATURES", target_cpu_features)
+    timeout_block = _convert_timeout_arg_block("TIMEOUT", timeout)
 
     self.converter.body += (f"iree_check_single_backend_test_suite(\n"
                             f"{name_block}"
@@ -565,8 +583,8 @@ class BuildFileFunctions(object):
                             f"{compiler_flags_block}"
                             f"{runner_args_block}"
                             f"{labels_block}"
-                            f"{opt_flags_block}"
                             f"{target_cpu_features_block}"
+                            f"{timeout_block}"
                             f")\n\n")
 
   def iree_check_test_suite(self,
@@ -576,8 +594,8 @@ class BuildFileFunctions(object):
                             compiler_flags=None,
                             runner_args=None,
                             tags=None,
-                            opt_flags=None,
                             target_cpu_features_variants=None,
+                            timeout=None,
                             **kwargs):
     target_backends = None
     drivers = None
@@ -594,9 +612,9 @@ class BuildFileFunctions(object):
                                                       compiler_flags)
     runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
     labels_block = _convert_string_list_block("LABELS", tags)
-    opt_flags_block = _convert_string_list_block("OPT_FLAGS", opt_flags)
     target_cpu_features_variants_block = _convert_string_list_block(
         "TARGET_CPU_FEATURES_VARIANTS", target_cpu_features_variants)
+    timeout_block = _convert_timeout_arg_block("TIMEOUT", timeout)
 
     self.converter.body += (f"iree_check_test_suite(\n"
                             f"{name_block}"
@@ -606,8 +624,8 @@ class BuildFileFunctions(object):
                             f"{compiler_flags_block}"
                             f"{runner_args_block}"
                             f"{labels_block}"
-                            f"{opt_flags_block}"
                             f"{target_cpu_features_variants_block}"
+                            f"{timeout_block}"
                             f")\n\n")
 
   def iree_generated_trace_runner_test(self,
@@ -619,8 +637,6 @@ class BuildFileFunctions(object):
                                        compiler_flags=None,
                                        runner_args=None,
                                        tags=None,
-                                       opt_tool=None,
-                                       opt_flags=None,
                                        target_cpu_features_variants=None,
                                        **kwargs):
     target_backends = None
@@ -646,7 +662,6 @@ class BuildFileFunctions(object):
                                                       compiler_flags)
     runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
     labels_block = _convert_string_list_block("LABELS", tags)
-    opt_flags_block = _convert_string_list_block("OPT_FLAGS", opt_flags)
     target_cpu_features_variants_block = _convert_string_list_block(
         "TARGET_CPU_FEATURES_VARIANTS", target_cpu_features_variants)
 
@@ -660,69 +675,16 @@ class BuildFileFunctions(object):
                             f"{compiler_flags_block}"
                             f"{runner_args_block}"
                             f"{labels_block}"
-                            f"{opt_flags_block}"
                             f"{target_cpu_features_variants_block}"
                             f")\n\n")
 
-  def iree_e2e_cartesian_product_test_suite(self,
-                                            name,
-                                            matrix,
-                                            failing_configurations=None,
-                                            tags=None,
-                                            data=None,
-                                            **kwargs):
-    # Note kwargs deps, size, python_version are unused
-    if data is not None:
-      self._convert_unimplemented_function(
-          "iree_e2e_cartesian_product_test_suite", name + " has data")
-
-    matrix_keys = matrix.keys()
-
-    name_block = _convert_string_arg_block("NAME", name, quote=False)
-    matrix_keys_block = _convert_string_list_block("MATRIX_KEYS", matrix_keys)
-    labels_block = _convert_string_list_block("LABELS", tags)
-
-    value_strings = []
-    for key in matrix_keys:
-      # ensure matching order
-      values = matrix[key]
-      if not isinstance(values, list):
-        values = [values]
-      if not values:
-        self._convert_unimplemented_function(
-            "iree_e2e_cartesian_product_test_suite",
-            name + f" has empty list for matrix key {key}")
-      value_strings.append(";".join(str(value) for value in values))
-    matrix_values_block = _convert_string_list_block("MATRIX_VALUES",
-                                                     value_strings)
-
-    # Copied from integrations/tensorflow/e2e/iree_e2e_cartesian_product_test_suite.bzl
-    failing_configurations_block = ""
-    if failing_configurations is not None:
-      failing_matrix_configurations = []
-      for failing_configuration in failing_configurations:
-        failing_configuration = _normalize_dictionary(failing_configuration)
-
-        failing_matrix_configurations.extend(
-            _dictionary_product(failing_configuration))
-
-      failing_configuration_strings = []
-      for failing_configuration in failing_matrix_configurations:
-        failing_config_string = ",".join(
-            str(failing_configuration.get(key, "")) for key in matrix_keys)
-        failing_configuration_strings.append(failing_config_string)
-        failing_configurations_block = _convert_string_list_block(
-            "FAILING_CONFIGURATIONS", failing_configuration_strings)
-
-    self.converter.body += (f"iree_e2e_cartesian_product_test_suite(\n"
-                            f"{name_block}"
-                            f"{matrix_keys_block}"
-                            f"{matrix_values_block}"
-                            f"{failing_configurations_block}"
-                            f"{labels_block}"
-                            f")\n\n")
-
-  def native_test(self, name, src, args=None, data=None, tags=None):
+  def native_test(self,
+                  name,
+                  src,
+                  args=None,
+                  data=None,
+                  tags=None,
+                  timeout=None):
     if data is not None:
       self._convert_unimplemented_function("native_test", name + " has data")
 
@@ -730,6 +692,7 @@ class BuildFileFunctions(object):
     test_binary_block = _convert_single_target_block("SRC", src)
     args_block = _convert_string_list_block("ARGS", args)
     labels_block = _convert_string_list_block("LABELS", tags)
+    timeout_block = _convert_timeout_arg_block("TIMEOUT", timeout)
 
     self.converter.body += (f"iree_native_test(\n"
                             f"{name_block}"

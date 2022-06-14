@@ -20,8 +20,8 @@
 /third_party/mlir-hlo @ghost
 
 # Bindings
-/bindings/python/ @stellaraccident
-/bindings/tflite/ @benvanik
+/runtime/bindings/python/ @stellaraccident
+/runtime/bindings/tflite/ @benvanik
 
 # Integrations
 /integrations/ @benvanik @stellaraccident
@@ -41,9 +41,9 @@
 /build_tools/ @GMNGeoffrey @ScottTodd
 /build_tools/benchmarks/ @GMNGeoffrey @antiagainst
 /build_tools/python_deploy/ @stellaraccident
+/build_tools/scripts/ @GMNGeoffrey @ScottTodd
 /build_tools/third_party/ @GMNGeoffrey @ScottTodd @stellaraccident
 /.github/ @GMNGeoffrey @ScottTodd
-/scripts/ @GMNGeoffrey @ScottTodd
 
 # llvm-external-projects
 /llvm-external-projects/ @stellaraccident
@@ -52,33 +52,26 @@
 /llvm-external-projects/iree-dialects/test/iree_linalgext @hanhanW @MaheshRavishankar
 
 # Other Top-Level Directories
-/colab/ @ScottTodd
 /docs/ @ScottTodd
-
-
-# Main IREE directories
-/iree/ @benvanik
+/samples/ @ScottTodd
+/tools/ @benvanik @GMNGeoffrey
 
 # Compiler
-/iree/compiler/Codegen/ @MaheshRavishankar
-/iree/compiler/Codegen/LLVMCPU/ @hanhanW @MaheshRavishankar
-/iree/compiler/Codegen/LLVMGPU/ @MaheshRavishankar @ThomasRaoux
-/iree/compiler/Codegen/Sandbox/ @hanhanW @MaheshRavishankar
-/iree/compiler/Codegen/SPIRV/ @antiagainst @MaheshRavishankar
-/iree/compiler/ConstEval/ @stellaraccident
-/iree/compiler/Dialect/Flow/ @MaheshRavishankar
-/iree/compiler/Dialect/Vulkan/ @antiagainst
-/iree/compiler/InputConversion/ @MaheshRavishankar @stellaraccident
-/iree/compiler/InputConversion/MHLO @hanhanW @MaheshRavishankar @rsuderman
-/iree/compiler/InputConversion/TOSA @MaheshRavishankar @rsuderman
-
+/compiler/src/iree/compiler/ @benvanik
+/compiler/src/iree/compiler/Codegen/ @MaheshRavishankar
+/compiler/src/iree/compiler/Codegen/LLVMCPU/ @hanhanW @MaheshRavishankar
+/compiler/src/iree/compiler/Codegen/LLVMGPU/ @MaheshRavishankar @ThomasRaoux
+/compiler/src/iree/compiler/Codegen/Sandbox/ @hanhanW @MaheshRavishankar
+/compiler/src/iree/compiler/Codegen/SPIRV/ @antiagainst @MaheshRavishankar
+/compiler/src/iree/compiler/ConstEval/ @stellaraccident
+/compiler/src/iree/compiler/Dialect/Flow/ @MaheshRavishankar
+/compiler/src/iree/compiler/Dialect/Vulkan/ @antiagainst
+/compiler/src/iree/compiler/InputConversion/ @MaheshRavishankar @stellaraccident
+/compiler/src/iree/compiler/InputConversion/MHLO @hanhanW @MaheshRavishankar @rsuderman
+/compiler/src/iree/compiler/InputConversion/TOSA @MaheshRavishankar @rsuderman
 
 # Runtime
-/iree/hal/cuda/ @ThomasRaoux
-/iree/hal/cts/ @ScottTodd
-/iree/hal/vulkan/ @antiagainst @ScottTodd
-
-# Other IREE directories
-/iree/samples/ @ScottTodd
-/iree/test/ @ghost
-/iree/tools/ @benvanik @GMNGeoffrey
+/runtime/src/iree/ @benvanik
+/runtime/src/iree/hal/cts/ @ScottTodd
+/runtime/src/iree/hal/drivers/cuda/ @ThomasRaoux
+/runtime/src/iree/hal/drivers/vulkan/ @antiagainst @ScottTodd

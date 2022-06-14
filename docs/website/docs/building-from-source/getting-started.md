@@ -113,8 +113,7 @@ Run all built tests through
 [CTest](https://gitlab.kitware.com/cmake/community/-/wikis/doc/ctest/Testing-With-CTest):
 
 ``` shell
-cd ../iree-build/
-ctest --output-on-failure
+ctest --test-dir ../iree-build/ --output-on-failure
 ```
 
 ### Take a look around
@@ -122,8 +121,8 @@ ctest --output-on-failure
 Check out the contents of the 'tools' build directory:
 
 ``` shell
-ls ../iree-build/iree/tools/
-../iree-build/iree/tools/iree-compile --help
+ls ../iree-build/tools/
+../iree-build/tools/iree-compile --help
 ```
 
 <!-- TODO(scotttodd): troubleshooting section? link to github issues? -->

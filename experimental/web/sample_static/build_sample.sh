@@ -43,14 +43,13 @@ INSTALL_ROOT="${1:-${ROOT_DIR}/build-host/install}"
 # Compile from .mlir input to static C source files using host tools          #
 ###############################################################################
 
-TRANSLATE_TOOL="${INSTALL_ROOT?}/bin/iree-compile"
+COMPILE_TOOL="${INSTALL_ROOT?}/bin/iree-compile"
 EMBED_DATA_TOOL="${INSTALL_ROOT?}/bin/generate_embed_data"
 INPUT_NAME="mnist"
-INPUT_PATH="${ROOT_DIR?}/iree/samples/models/mnist.mlir"
+INPUT_PATH="${ROOT_DIR?}/samples/models/mnist.mlir"
 
-echo "=== Translating MLIR to static library output (.vmfb, .h, .o) ==="
-${TRANSLATE_TOOL?} ${INPUT_PATH} \
-  --iree-mlir-to-vm-bytecode-module \
+echo "=== Compiling MLIR to static library output (.vmfb, .h, .o) ==="
+${COMPILE_TOOL?} ${INPUT_PATH} \
   --iree-input-type=mhlo \
   --iree-hal-target-backends=llvm \
   --iree-llvm-target-triple=wasm32-unknown-unknown \
@@ -81,6 +80,8 @@ emcmake "${CMAKE_BIN?}" -G Ninja .. \
   -DIREE_HOST_BINARY_ROOT=${INSTALL_ROOT} \
   -DIREE_BUILD_EXPERIMENTAL_WEB_SAMPLES=ON \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
+  -DIREE_HAL_DRIVER_LOCAL_SYNC=ON \
+  -DIREE_HAL_DRIVER_LOCAL_TASK=ON \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=OFF
 
@@ -93,6 +94,7 @@ popd
 echo "=== Copying static files to the build directory ==="
 
 cp ${SOURCE_DIR}/index.html ${BINARY_DIR}
+cp ${ROOT_DIR?}/docs/website/overrides/ghost.svg ${BINARY_DIR}
 cp ${SOURCE_DIR}/iree_api.js ${BINARY_DIR}
 cp ${SOURCE_DIR}/iree_worker.js ${BINARY_DIR}
 

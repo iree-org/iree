@@ -1,4 +1,3 @@
-# Lint as: python3
 # Copyright 2021 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
@@ -24,7 +23,7 @@ targets = {
 }
 
 configs = {
-    'llvmaot': 'dylib',
+    'llvmaot': 'local-task',
     'vulkan': 'vulkan',
 }
 
@@ -63,7 +62,7 @@ class TFLiteModelTest(testing.absltest.TestCase):
     if self.model_path is None:
       return
     self.workdir = _setup_artifacts_dir("download")
-    print(f"TMP_DIR = {self.workdir}")
+    print(f"TMPDIR = {self.workdir}")
     self.tflite_file = '/'.join([self.workdir, 'model.tflite'])
     self.tflite_ir = '/'.join([self.workdir, 'tflite.mlir'])
     self.iree_ir = '/'.join([self.workdir, 'tosa.mlir'])

@@ -13,22 +13,15 @@
 # defined with the same sanitizer flags, including e.g. standard library
 # symbols that might be used by both IREE and non-IREE (e.g. LLVM) code.
 
-if(${IREE_ENABLE_ASAN})
+if(IREE_ENABLE_ASAN)
   string(APPEND CMAKE_CXX_FLAGS " -fsanitize=address")
   string(APPEND CMAKE_C_FLAGS " -fsanitize=address")
 endif()
-if(${IREE_ENABLE_MSAN})
+if(IREE_ENABLE_MSAN)
   string(APPEND CMAKE_CXX_FLAGS " -fsanitize=memory")
   string(APPEND CMAKE_C_FLAGS " -fsanitize=memory")
 endif()
-if(${IREE_ENABLE_TSAN})
+if(IREE_ENABLE_TSAN)
   string(APPEND CMAKE_CXX_FLAGS " -fsanitize=thread")
   string(APPEND CMAKE_C_FLAGS " -fsanitize=thread")
-endif()
-if(ANDROID)
-  # Work around https://github.com/android/ndk/issues/1088
-  if(${IREE_ENABLE_ASAN} OR ${IREE_ENABLE_MSAN} OR ${IREE_ENABLE_TSAN})
-    string(APPEND CMAKE_EXE_LINKER_FLAGS " -fuse-ld=gold")
-    string(APPEND CMAKE_SHARED_LINKER_FLAGS " -fuse-ld=gold")
-  endif()
 endif()

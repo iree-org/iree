@@ -27,6 +27,7 @@ def IREEInput_Dialect : Dialect {
     LLVM/MLIR's API surface is itself unstable.
   }];
   let cppNamespace = "::mlir::iree_compiler::IREE::Input";
+  let useDefaultTypePrinterParser = 1;
 }
 
 class IREEInput_Op<string mnemonic, list<Trait> traits = []> :

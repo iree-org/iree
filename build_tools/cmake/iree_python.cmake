@@ -33,106 +33,6 @@ endfunction()
 # Main user rules
 ###############################################################################
 
-# Declares that the current source directory is part of a python package
-# that will:
-#   - Will create an install target install-COMPONENT (global, not package
-#     scoped)
-#   - Be installed under python_packages/PACKAGE_NAME
-#   - Have a local path of MODULE_PATH (i.e. namespace package path)
-#   - Process a setup.py.in from the current directory (if NOT AUGMENT_EXISTING_PACKAGE)
-#   - Process a version.py.in from the current directory (if NOT AUGMENT_EXISTING_PACKAGE)
-# Will set parent scope variables:
-#   - PY_INSTALL_COMPONENT: Install component. Echoed back from the argument
-#     for easier addition after this call.
-#   - PY_INSTALL_PACKAGES_DIR: The python_packages/PACKAGE_NAME path
-#   - PY_INSTALL_MODULE_DIR: The path to the module directory under
-#     INSTALL_PACKAGES_DIR.
-#
-# Add any built deps to DEPS (you will need to add install actions to them
-# after).
-#
-# Any python files in the source directory will be automatically installed
-# (recursive).
-#
-# Also adds a *-stripped target which strips any binaries that are
-# present.
-#
-# Arguments:
-#   AUGMENT_EXISTING_PACKAGE: Whether to add install artifacts to an existing
-#     package.
-#   COMPONENT: Install component
-#   PACKAGE_NAME: Name of the Python package in the install directory tree.
-#   MODULE_PATH: Relative path within the package to the module being installed.
-#   FILES_MATCHING: Explicit arguments to the install FILES_MATCHING directive.
-#     (Defaults to "PATTERN *.py")
-#   DEPS: Dependencies.
-function(iree_py_install_package)
-  cmake_parse_arguments(ARG
-    "AUGMENT_EXISTING_PACKAGE"
-    "COMPONENT;PACKAGE_NAME;MODULE_PATH"
-    "DEPS;ADDL_PACKAGE_FILES;FILES_MATCHING"
-    ${ARGN})
-  set(_install_component ${ARG_COMPONENT})
-  set(_install_packages_dir "${CMAKE_INSTALL_PREFIX}/python_packages/${ARG_PACKAGE_NAME}")
-  set(_install_module_dir "${_install_packages_dir}/${ARG_MODULE_PATH}")
-  set(_target_name install-${_install_component})
-
-  if(NOT FILES_MATCHING)
-    set(_files_matching PATTERN "*.py")
-  else()
-    set(_files_matching ${ARG_FILES_MATCHING})
-  endif()
-
-  if(NOT ARG_AUGMENT_EXISTING_PACKAGE)
-    configure_file(setup.py.in setup.py)
-    install(
-      FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/setup.py
-        ${ARG_ADDL_PACKAGE_FILES}
-      COMPONENT ${_install_component}
-      DESTINATION "${_install_packages_dir}"
-    )
-    configure_file(version.py.in version.py)
-    install(
-      FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/version.py
-      COMPONENT ${_install_component}
-      DESTINATION "${_install_module_dir}"
-    )
-
-    set(_component_option -DCMAKE_INSTALL_COMPONENT="${ARG_COMPONENT}")
-    add_custom_target(${_target_name}
-      COMMAND "${CMAKE_COMMAND}"
-              ${_component_option}
-              -P "${CMAKE_BINARY_DIR}/cmake_install.cmake"
-      USES_TERMINAL)
-    add_custom_target(${_target_name}-stripped
-      COMMAND "${CMAKE_COMMAND}"
-              ${_component_option}
-              -DCMAKE_INSTALL_DO_STRIP=1
-              -P "${CMAKE_BINARY_DIR}/cmake_install.cmake"
-      USES_TERMINAL)
-  endif()
-
-  # Explicit add dependencies in case if we are just extending a package
-  # vs adding the targets.
-  if(ARG_DEPS)
-    add_dependencies(${_target_name} ${ARG_DEPS})
-    add_dependencies(${_target_name}-stripped ${ARG_DEPS})
-  endif()
-
-  install(
-    DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
-    COMPONENT ${_install_component}
-    DESTINATION "${_install_module_dir}"
-    FILES_MATCHING ${_files_matching}
-  )
-
-  set(PY_INSTALL_COMPONENT ${_install_component} PARENT_SCOPE)
-  set(PY_INSTALL_PACKAGES_DIR "${_install_packages_dir}" PARENT_SCOPE)
-  set(PY_INSTALL_MODULE_DIR "${_install_module_dir}" PARENT_SCOPE)
-endfunction()
-
 # iree_pyext_module()
 #
 # Builds a native python module (.so/.dylib/.pyd).
@@ -244,7 +144,7 @@ endfunction()
 # PYEXT_DEPS: List of deps of extensions built with iree_pyext_module
 function(iree_py_library)
   cmake_parse_arguments(
-    ARG
+    _RULE
     ""
     "NAME"
     "SRCS;DEPS;PYEXT_DEPS"
@@ -253,61 +153,62 @@ function(iree_py_library)
 
   iree_package_ns(_PACKAGE_NS)
   # Replace dependencies passed by ::name with ::iree::package::name
-  list(TRANSFORM ARG_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
 
   iree_package_name(_PACKAGE_NAME)
-  set(_NAME "${_PACKAGE_NAME}_${ARG_NAME}")
+  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   add_custom_target(${_NAME} ALL
-    DEPENDS ${ARG_DEPS}
+    DEPENDS ${_RULE_DEPS}
   )
 
   # Symlink each file as its own target.
-  foreach(SRC_FILE ${ARG_SRCS})
-    # SRC_FILE could have other path components in it, so we need to make a
+  foreach(_SRC_FILE ${_RULE_SRCS})
+    # _SRC_FILE could have other path components in it, so we need to make a
     # directory for it. Ninja does this automatically, but make doesn't. See
     # https://github.com/google/iree/issues/6801
-    set(_SRC_BIN_PATH "${CMAKE_CURRENT_BINARY_DIR}/${SRC_FILE}")
+    set(_SRC_BIN_PATH "${CMAKE_CURRENT_BINARY_DIR}/${_SRC_FILE}")
     get_filename_component(_SRC_BIN_DIR "${_SRC_BIN_PATH}" DIRECTORY)
     add_custom_command(
       TARGET ${_NAME}
       COMMAND
         ${CMAKE_COMMAND} -E make_directory "${_SRC_BIN_DIR}"
       COMMAND ${CMAKE_COMMAND} -E create_symlink
-        "${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}" "${_SRC_BIN_PATH}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/${_SRC_FILE}" "${_SRC_BIN_PATH}"
       BYPRODUCTS "${_SRC_BIN_PATH}"
     )
   endforeach()
 
   # Add PYEXT_DEPS if any.
-  if(ARG_PYEXT_DEPS)
-    list(TRANSFORM ARG_PYEXT_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
-    add_dependencies(${_NAME} ${ARG_PYEXT_DEPS})
+  if(_RULE_PYEXT_DEPS)
+    list(TRANSFORM _RULE_PYEXT_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+    add_dependencies(${_NAME} ${_RULE_PYEXT_DEPS})
   endif()
 endfunction()
 
-# iree_py_test()
+# iree_local_py_test()
 #
-# CMake function to imitate Bazel's iree_py_test rule.
+# CMake function to run python test with provided python package paths.
 #
 # Parameters:
 # NAME: name of test
-# SRCS: Test source file (single file only, despite name)
+# SRC: Test source file
 # ARGS: Command line arguments to the Python source file.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
 # GENERATED_IN_BINARY_DIR: If present, indicates that the srcs have been
 #   in the CMAKE_CURRENT_BINARY_DIR.
-function(iree_py_test)
-  if(NOT IREE_BUILD_TESTS)
+# PACKAGE_DIRS: Python package paths to be added to PYTHONPATH.
+function(iree_local_py_test)
+  if(NOT IREE_BUILD_TESTS OR ANDROID OR EMSCRIPTEN)
     return()
   endif()
 
   cmake_parse_arguments(
     _RULE
     "GENERATED_IN_BINARY_DIR"
-    "NAME;SRCS"
-    "ARGS;LABELS"
+    "NAME;SRC"
+    "ARGS;LABELS;PACKAGE_DIRS;TIMEOUT"
     ${ARGN}
   )
 
@@ -328,19 +229,66 @@ function(iree_py_test)
   add_test(
     NAME ${_NAME_PATH}
     COMMAND
-      "${IREE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
       "${Python3_EXECUTABLE}"
-      "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRCS}"
+      "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}"
       ${_RULE_ARGS}
   )
 
+  list(APPEND _RULE_PACKAGE_DIRS "$ENV{PYTHONPATH}")
+  string(JOIN ":" _PYTHONPATH ${_RULE_PACKAGE_DIRS})
+
+  if (NOT DEFINED _RULE_TIMEOUT)
+    set(_RULE_TIMEOUT 60)
+  endif()
+
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
+  set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_ARGS})
+
   set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
-      "PYTHONPATH=${IREE_BINARY_DIR}/compiler-api/python_package:${IREE_BINARY_DIR}/bindings/python:$ENV{PYTHONPATH}"
-      "TEST_TMPDIR=${IREE_BINARY_DIR}/tmp/${_NAME}_test_tmpdir"
+      "PYTHONPATH=${_PYTHONPATH}"
   )
-  iree_add_test_environment_properties(${_NAME_PATH})
+  iree_configure_test(${_NAME_PATH})
 
   # TODO(marbre): Find out how to add deps to tests.
   #               Similar to _RULE_DATA in iree_lit_test().
+endfunction()
+
+# iree_py_test()
+#
+# CMake function to imitate Bazel's iree_py_test rule.
+#
+# Parameters:
+# NAME: name of test
+# SRCS: Test source file (single file only, despite name)
+# ARGS: Command line arguments to the Python source file.
+# LABELS: Additional labels to apply to the test. The package path is added
+#     automatically.
+# GENERATED_IN_BINARY_DIR: If present, indicates that the srcs have been
+#   in the CMAKE_CURRENT_BINARY_DIR.
+function(iree_py_test)
+  cmake_parse_arguments(
+    _RULE
+    "GENERATED_IN_BINARY_DIR"
+    "NAME;SRCS"
+    "ARGS;LABELS;TIMEOUT"
+    ${ARGN}
+  )
+
+  iree_local_py_test(
+    NAME
+      "${_RULE_NAME}"
+    SRC
+      "${_RULE_SRCS}"
+    ARGS
+      ${_RULE_ARGS}
+    LABELS
+      ${_RULE_LABELS}
+    PACKAGE_DIRS
+      "${IREE_BINARY_DIR}/compiler/bindings/python"
+      "${IREE_BINARY_DIR}/runtime/bindings/python"
+    GENERATED_IN_BINARY_DIR
+      "${_RULE_GENERATED_IN_BINARY_DIR}"
+    TIMEOUT
+      ${_RULE_TIMEOUT}
+  )
 endfunction()

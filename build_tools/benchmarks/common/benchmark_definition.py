@@ -11,11 +11,33 @@ shared between different stages of the same benchmark pipeline.
 """
 
 import json
+import os
+import re
 import subprocess
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Sequence
+from typing import Any, Dict, Optional, Sequence
+
+# A map from CPU ABI to IREE's benchmark target architecture.
+CPU_ABI_TO_TARGET_ARCH_MAP = {
+    "arm64-v8a": "cpu-arm64-v8a",
+    "x86_64": "cpu-x86_64",
+}
+
+# A map from GPU name to IREE's benchmark target architecture.
+GPU_NAME_TO_TARGET_ARCH_MAP = {
+    "adreno-640": "gpu-adreno",
+    "adreno-650": "gpu-adreno",
+    "adreno-660": "gpu-adreno",
+    "adreno-730": "gpu-adreno",
+    "mali-g77": "gpu-mali-valhall",
+    "mali-g78": "gpu-mali-valhall",
+    "unknown": "gpu-unknown",
+}
+
+# A map of canonical microarchitecture names.
+CANONICAL_MICROARCHITECTURE_NAMES = {"CascadeLake", "Zen2"}
 
 
 @dataclass
@@ -25,21 +47,30 @@ class DriverInfo:
   It includes the following characteristics:
   - pretty_name: the pretty name, e.g., 'IREE-DyLib'
   - device_type: the targeted device type, e.g., 'CPU'
+  - driver_name: runtime driver flag, e.g., 'local-task'
+  - loader_name: executable loader name, if used
   """
 
   pretty_name: str
   device_type: str
+  driver_name: str
+  loader_name: str
 
 
 # A map for IREE driver names. This allows us to normalize driver names like
 # mapping to more friendly ones and detach to keep driver names used in
 # benchmark presentation stable.
 IREE_DRIVERS_INFOS = {
-    "iree-dylib": DriverInfo("IREE-Dylib", "CPU"),
-    "iree-dylib-sync": DriverInfo("IREE-Dylib-Sync", "CPU"),
-    "iree-vmvx": DriverInfo("IREE-VMVX", "CPU"),
-    "iree-vmvx-sync": DriverInfo("IREE-VMVX-Sync", "CPU"),
-    "iree-vulkan": DriverInfo("IREE-Vulkan", "GPU"),
+    "iree-dylib":
+        DriverInfo("IREE-Dylib", "CPU", "local-task", "embedded-elf"),
+    "iree-dylib-sync":
+        DriverInfo("IREE-Dylib-Sync", "CPU", "local-sync", "embedded-elf"),
+    "iree-vmvx":
+        DriverInfo("IREE-VMVX", "CPU", "local-task", "vmvx-module"),
+    "iree-vmvx-sync":
+        DriverInfo("IREE-VMVX-Sync", "CPU", "local-sync", "vmvx-module"),
+    "iree-vulkan":
+        DriverInfo("IREE-Vulkan", "GPU", "vulkan", ""),
 }
 
 IREE_PRETTY_NAMES_TO_DRIVERS = {
@@ -84,19 +115,72 @@ def execute_cmd_and_get_output(args: Sequence[str],
                      **kwargs).stdout.strip()
 
 
+def get_git_commit_hash(commit: str) -> str:
+  return execute_cmd_and_get_output(['git', 'rev-parse', commit],
+                                    cwd=os.path.dirname(
+                                        os.path.realpath(__file__)))
+
+
+def get_iree_benchmark_module_arguments(
+    results_filename: str,
+    config: str,
+    benchmark_min_time: Optional[float] = None):
+  """Returns the common arguments to run iree-benchmark-module."""
+
+  if config == "iree-vmvx" or config == "iree-vmvx-sync":
+    # VMVX is very unoptimized for now and can take a long time to run.
+    # Decrease the repetition for it until it's reasonably fast.
+    repetitions = 3
+  else:
+    repetitions = 10
+
+  cmd = [
+      "--benchmark_format=json",
+      "--benchmark_out_format=json",
+      f"--benchmark_out={results_filename}",
+  ]
+  if benchmark_min_time:
+    cmd.extend([
+        f"--benchmark_min_time={benchmark_min_time}",
+    ])
+  else:
+    cmd.extend([
+        f"--benchmark_repetitions={repetitions}",
+    ])
+
+  return cmd
+
+
+def wait_for_iree_benchmark_module_start(process: subprocess.Popen,
+                                         verbose: bool = False) -> None:
+  """Wait for the start of iree-benchmark module; otherwise will see connection
+  failure when opening the catpure tool."""
+
+  while True:
+    line = process.stdout.readline()  # pytype: disable=attribute-error
+    if line == "" and process.poll() is not None:  # Process completed
+      raise ValueError("Cannot find benchmark result line in the log!")
+    if verbose:
+      print(line.strip())
+    # Result available
+    if re.match(r"^BM_.+/real_time", line) is not None:
+      break
+
+
 class PlatformType(Enum):
   ANDROID = "Android"
   LINUX = "Linux"
 
 
-@dataclass
+@dataclass(frozen=True)
 class DeviceInfo:
   """An object describing a device.
 
   It includes the following characteristics:
   - platform_type: the OS platform, e.g., 'Android'
   - model: the product model, e.g., 'Pixel-4'
-  - cpu_abi: the CPU ABI, e.g., 'arm64-v8a'
+  - cpu_abi: the CPU ABI, e.g., 'arm64-v8a', 'x86_64'
+  - cpu_uarch: the CPU microarchitecture, e.g., 'CascadeLake'
   - cpu_features: the detailed CPU features, e.g., ['fphp', 'sve']
   - gpu_name: the GPU name, e.g., 'Mali-G77'
   """
@@ -104,6 +188,7 @@ class DeviceInfo:
   platform_type: PlatformType
   model: str
   cpu_abi: str
+  cpu_uarch: Optional[str]
   cpu_features: Sequence[str]
   gpu_name: str
 
@@ -112,15 +197,43 @@ class DeviceInfo:
     params = [
         f"model='{self.model}'",
         f"cpu_abi='{self.cpu_abi}'",
+        f"cpu_uarch='{self.cpu_uarch}'",
         f"gpu_name='{self.gpu_name}'",
         f"cpu_features=[{features}]",
     ]
     params = ", ".join(params)
     return f"{self.platform_type.value} device <{params}>"
 
-  def get_cpu_arch_revision(self) -> str:
+  def get_iree_cpu_arch_name(self) -> str:
+    arch = CPU_ABI_TO_TARGET_ARCH_MAP.get(self.cpu_abi.lower())
+    if not arch:
+      raise ValueError(f"Unrecognized CPU ABI: '{self.cpu_abi}'; "
+                       "need to update the map")
+
+    if self.cpu_uarch:
+      if self.cpu_uarch not in CANONICAL_MICROARCHITECTURE_NAMES:
+        raise ValueError(
+            f"Unrecognized CPU microarchitecture: '{self.cpu_uarch}'; "
+            "need to update the map")
+
+      arch = f'{arch}-{self.cpu_uarch.lower()}'
+
+    return arch
+
+  def get_iree_gpu_arch_name(self) -> str:
+    arch = GPU_NAME_TO_TARGET_ARCH_MAP.get(self.gpu_name.lower())
+    if not arch:
+      raise ValueError(f"Unrecognized GPU name: '{self.gpu_name}'; "
+                       "need to update the map")
+    return arch
+
+  def get_detailed_cpu_arch_name(self) -> str:
+    """Returns the detailed architecture name."""
+
     if self.cpu_abi == "arm64-v8a":
       return self.__get_arm_cpu_arch_revision()
+    if self.cpu_abi == "x86_64":
+      return self.__get_x86_detailed_cpu_arch_name()
     raise ValueError("Unrecognized CPU ABI; need to update the list")
 
   def to_json_object(self) -> Dict[str, Any]:
@@ -128,15 +241,26 @@ class DeviceInfo:
         "platform_type": self.platform_type.value,
         "model": self.model,
         "cpu_abi": self.cpu_abi,
+        "cpu_uarch": self.cpu_uarch if self.cpu_uarch else "",
         "cpu_features": self.cpu_features,
         "gpu_name": self.gpu_name,
     }
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
+    cpu_uarch = json_object.get("cpu_uarch")
     return DeviceInfo(PlatformType(json_object["platform_type"]),
                       json_object["model"], json_object["cpu_abi"],
+                      None if cpu_uarch == "" else cpu_uarch,
                       json_object["cpu_features"], json_object["gpu_name"])
+
+  def __get_x86_detailed_cpu_arch_name(self) -> str:
+    """Returns the x86 architecture with microarchitecture name."""
+
+    if not self.cpu_uarch:
+      return self.cpu_abi
+
+    return f"{self.cpu_abi}-{self.cpu_uarch}"
 
   def __get_arm_cpu_arch_revision(self) -> str:
     """Returns the ARM architecture revision."""
@@ -156,7 +280,7 @@ class DeviceInfo:
     return rev
 
 
-@dataclass
+@dataclass(frozen=True)
 class BenchmarkInfo:
   """An object describing the current benchmark.
 
@@ -189,7 +313,7 @@ class BenchmarkInfo:
     if driver_info.device_type == 'GPU':
       target_arch = "GPU-" + self.device_info.gpu_name
     elif driver_info.device_type == 'CPU':
-      target_arch = "CPU-" + self.device_info.get_cpu_arch_revision()
+      target_arch = "CPU-" + self.device_info.get_detailed_cpu_arch_name()
     else:
       raise ValueError(
           f"Unrecognized device type '{driver_info.device_type}' of the runner '{self.runner}'"
@@ -224,17 +348,6 @@ class BenchmarkInfo:
     runner = IREE_PRETTY_NAMES_TO_DRIVERS.get(runner)
     return BenchmarkInfo(model_name, model_tags, model_source, bench_mode,
                          runner, device_info)
-
-  def deduce_taskset(self) -> str:
-    """Deduces the CPU affinity taskset mask according to benchmark modes."""
-    # TODO: we actually should check the number of cores the phone have.
-    if "big-core" in self.bench_mode:
-      return "80" if "1-thread" in self.bench_mode else "f0"
-    if "little-core" in self.bench_mode:
-      return "08" if "1-thread" in self.bench_mode else "0f"
-
-    # Not specified: use the 7th core.
-    return "80"
 
   def to_json_object(self) -> Dict[str, Any]:
     return {
@@ -339,3 +452,70 @@ class BenchmarkResults(object):
         BenchmarkRun.from_json_object(b) for b in json_object["benchmarks"]
     ]
     return results
+
+
+@dataclass(frozen=True)
+class CompilationInfo(object):
+  model_name: str
+  model_tags: Sequence[str]
+  model_source: str
+  target_arch: str
+  bench_mode: Sequence[str]
+
+  def __str__(self):
+    if self.model_tags:
+      tags = ",".join(self.model_tags)
+      model_part = f"{self.model_name} [{tags}] ({self.model_source})"
+    else:
+      model_part = f"{self.model_name} ({self.model_source})"
+    bench_mode_str = ",".join(self.bench_mode)
+    return f"{model_part} {self.target_arch} {bench_mode_str}"
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return CompilationInfo(**json_object)
+
+
+@dataclass(frozen=True)
+class ModuleComponentSizes(object):
+  file_size: int
+  vm_component_size: int
+  const_component_size: int
+  total_dispatch_component_size: int
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return ModuleComponentSizes(**json_object)
+
+
+@dataclass(frozen=True)
+class CompilationStatistics(object):
+  compilation_info: CompilationInfo
+  # Module file and component sizes.
+  module_component_sizes: ModuleComponentSizes
+  # Module compilation time in ms.
+  compilation_time: int
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return CompilationStatistics(
+        compilation_info=CompilationInfo.from_json_object(
+            json_object["compilation_info"]),
+        module_component_sizes=ModuleComponentSizes.from_json_object(
+            json_object["module_component_sizes"]),
+        compilation_time=json_object["compilation_info"])
+
+
+@dataclass(frozen=True)
+class CompilationResults(object):
+  commit: str
+  compilation_statistics: Sequence[CompilationStatistics]
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return CompilationResults(
+        commit=json_object["commit"],
+        compilation_statistics=[
+            CompilationStatistics.from_json_object(obj)
+            for obj in json_object["compilation_statistics"]
+        ])

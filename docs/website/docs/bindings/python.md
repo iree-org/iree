@@ -115,9 +115,9 @@ API reference pages for IREE's runtime and compiler Python APIs are hosted on
 [readthedocs](https://iree-python-api.readthedocs.io/en/latest/).
 
 Check out the samples in IREE's
-[colab/ directory](https://github.com/google/iree/tree/main/colab) and the
-[iree-samples repository](https://github.com/google/iree-samples) for examples
-using the Python APIs.
+[samples/colab/ directory](https://github.com/google/iree/tree/main/samples/colab)
+and the [iree-samples repository](https://github.com/google/iree-samples) for
+examples using the Python APIs.
 
 <!-- ## Troubleshooting -->
 

@@ -4,11 +4,17 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-if(NOT ${IREE_HAL_DRIVER_EXPERIMENTAL_ROCM})
-  return()
+iree_add_all_subdirs()
+
+if(NOT ROCM_HEADERS_API_ROOT)
+  set(ROCM_HEADERS_API_ROOT "/opt/rocm/include")
 endif()
 
-iree_add_all_subdirs()
+if(EXISTS ${ROCM_HEADERS_API_ROOT})
+  message(STATUS "ROCm Header Path: ${ROCM_HEADERS_API_ROOT}")
+else()
+  message(SEND_ERROR "Could not locate ROCm: ${ROCM_HEADERS_API_ROOT}")
+endif()
 
 iree_cc_library(
   NAME
@@ -44,8 +50,10 @@ iree_cc_library(
   INCLUDES
     "${CMAKE_CURRENT_LIST_DIR}/../.."
     "${PROJECT_BINARY_DIR}"
+    "${ROCM_HEADERS_API_ROOT}"
   DEPS
     ::dynamic_symbols
+    rocm_headers
     iree::base
     iree::base::core_headers
     iree::base::internal
@@ -55,11 +63,10 @@ iree_cc_library(
     iree::base::tracing
     iree::hal
     iree::hal::utils::buffer_transfer
+    iree::hal::utils::semaphore_base
     iree::schemas::rocm_executable_def_c_fbs
   PUBLIC
 )
-
-add_definitions(-D__HIP_PLATFORM_HCC__)
 
 iree_cc_library(
   NAME
@@ -73,6 +80,8 @@ iree_cc_library(
     "dynamic_symbols.c"
   INCLUDES
     "${CMAKE_CURRENT_LIST_DIR}/../.."
+  COPTS
+    "-D__HIP_PLATFORM_HCC__=1"
   DEPS
     rocm_headers
     iree::base::core_headers
@@ -94,5 +103,3 @@ iree_cc_test(
   LABELS
     "driver=rocm"
 )
-
-### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

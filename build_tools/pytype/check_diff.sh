@@ -26,7 +26,9 @@ fi
 
 # We seperate the python files into multiple pytype calls because otherwise
 # Ninja gets confused. See https://github.com/google/pytype/issues/198
-BASE=$(echo "${FILES?}" | grep -vP '^(\./)?integrations/*$')
+BASE=$(echo "${FILES?}" | \
+       grep -vP '^(\./)?integrations/*$' | \
+       grep -vP '(\./)?setup\.py$')
 IREE_TF=$(echo "${FILES?}" | \
           grep -P '^(\./)?integrations/tensorflow/bindings/python/iree/tf/.*')
 IREE_XLA=$(echo "${FILES?}" | \

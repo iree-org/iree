@@ -1,13 +1,12 @@
 # Run on a Bare-Metal Platform
 
-IREE supports CPU model execution on a bare-metal platform. That is, a platform
-without operating system support, and the executable is built with the
-machine-specific linker script and/or the board support package (BSP).
+IREE supports CPU model execution on bare-metal platforms. That is, platforms
+without operating system support, for which executables are built using
+machine-specific linker scripts and/or board support packages (BSPs).
 
 Bare-metal deployment typically uses IREE's LLVM compiler target much like the
-[CPU - Dylib](./cpu-dylib.md)
-configuration, but using a limited subset of IREE's CPU HAL driver at runtime to
-load and execute compiled programs.
+[CPU configuration](./cpu.md), but using a limited subset of IREE's CPU HAL
+driver code at runtime to load and execute compiled programs.
 
 ## Prerequisites
 
@@ -19,23 +18,22 @@ ready, such as
 * Firmware libraries
 
 Please follow the
-[instructions](./cpu-dylib.md#get-compiler-for-cpu-native-instructions)
+[instructions](./cpu.md#get-compiler-for-cpu-native-instructions)
 to retrieve the IREE compiler.
 
 ## Compile the model for bare-metal
 
-The model can be compiled with the following command from the IREE compiler
-build directory
+The model can be compiled with the following command (assuming the path to
+`iree-compile` is in your system's `PATH`):
 
 ```shell
-iree/tools/iree-compile \
-    -iree-mlir-to-vm-bytecode-module \
-    -iree-stream-partitioning-favor=min-peak-memory \
-    -iree-hal-target-backends=dylib-llvm-aot \
-    -iree-llvm-target-triple=x86_64-pc-linux-elf \
-    -iree-llvm-debug-symbols=false \
-    iree/samples/models/simple_abs.mlir \
-    -o /tmp/simple_abs_dylib.vmfb
+iree-compile \
+    --iree-stream-partitioning-favor=min-peak-memory \
+    --iree-hal-target-backends=dylib-llvm-aot \
+    --iree-llvm-target-triple=x86_64-pc-linux-elf \
+    --iree-llvm-debug-symbols=false \
+    samples/models/simple_abs.mlir \
+    -o /tmp/simple_abs_cpu.vmfb
 
 ```
 
@@ -55,11 +53,11 @@ See [generate.sh](https://github.com/google/iree/blob/main/iree/hal/local/elf/te
 for example command-line instructions of some common architectures
 
 You can replace the MLIR file with the other MLIR model files, following the
-[instructions](./cpu-dylib.md#compile-the-model)
+[instructions](./cpu.md#compile-the-model)
 
 ### Compiling the bare-metal model for static-library support
 
-See the [static_library](https://github.com/google/iree/tree/main/iree/samples/static_library)
+See the [static_library](https://github.com/google/iree/tree/main/samples/static_library)
 demo sample for an example and instructions on running a model with IREE's
 `static_library_loader`.
 
@@ -84,12 +82,12 @@ operating system
 * `set(IREE_BINDINGS_TFLITE OFF)`: Disable the TFLite binding support
 * `set(IREE_ENABLE_THREADING OFF)`: Disable multi-thread library support
 * `set(IREE_HAL_DRIVER_DEFAULTS OFF)`: Disable HAL drivers by default, then
-enable the synchronous HAL drivers with `set(IREE_HAL_DRIVER_VMVX_SYNC ON)` and
-`set(IREE_HAL_DRIVER_DYLIB_SYNC ON)`
+enable the synchronous HAL drivers with `set(IREE_HAL_DRIVER_LOCAL_SYNC ON)`
+* `set(IREE_HAL_EXECUTABLE_LOADER_DEFAULTS OFF)`: Disable HAL executable loaders by default, then enable the CPU codegen and VMVX loaders with `set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF ON)` and `set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE ON)`
 * `set(IREE_BUILD_TESTS OFF)`: Disable tests until IREE supports running them on
 bare-metal platforms
 * `set(IREE_BUILD_SAMPLES ON)`: Build
-[simple_embedding](https://github.com/google/iree/tree/main/iree/samples/simple_embedding)
+[simple_embedding](https://github.com/google/iree/tree/main/samples/simple_embedding)
 example
 
 !!! todo
@@ -117,10 +115,11 @@ Examples of how to setup the CMakeLists.txt and .cmake file:
 
 * [IREE RISC-V toolchain cmake](https://github.com/google/iree/blob/main/build_tools/cmake/riscv.toolchain.cmake)
 * [IREE Bare-Metal Arm Sample](https://github.com/iml130/iree-bare-metal-arm)
+* [IREE Bare-Metal RV32 Sample](https://github.com/AmbiML/iree-rv32-springbok)
 
 ## Bare-metal execution example
 
 See
-[simple_embedding for generic platform](https://github.com/google/iree/blob/main/iree/samples/simple_embedding/README.md#generic-platform-support)
+[simple_embedding for generic platform](https://github.com/google/iree/blob/main/samples/simple_embedding/README.md#generic-platform-support)
 to see how to use the IREE runtime library to build/run the IREE model for the
 bare-metal target.

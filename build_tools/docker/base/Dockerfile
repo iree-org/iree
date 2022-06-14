@@ -13,21 +13,22 @@ ARG APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
 
 ######## Basic stuff ########
 # Default compiler environment variables for IREE.
-ENV CC /usr/bin/clang
-ENV CXX /usr/bin/clang++
+# Matches the version of clang installed below.
+ENV CC /usr/bin/clang-9
+ENV CXX /usr/bin/clang++-9
 
 RUN apt-get update \
   && apt-get install -y \
     # For updating IREE's submodules.
     git \
-    # Default compiler and linker.
-    clang \
+    # Install our minimum supported clang version.
+    clang-9 \
     lld-9 \
     # IREE transitive dependencies
     libsdl2-dev \
     libssl-dev \
     # A much better CMake builder
-     ninja-build \
+    ninja-build \
     # For building child images. Best practices would tell us to use multi-stage
     # builds (https://docs.docker.com/develop/develop-images/multistage-build/)
     # but it turns out that Dockerfile is a thoroughly non-composable awful
@@ -37,11 +38,14 @@ RUN apt-get update \
     wget \
     gnupg2 \
     # Needed for installing Bazel, per https://bazel.build/install/ubuntu
-    apt-transport-https \ 
+    apt-transport-https \
     curl \
     gnupg \
     # Needed for building lld with Bazel (as currently configured)
     libxml2-dev \
+    # Optional for tools like llvm-symbolizer, which we could build from
+    # source but would rather just have available ahead of time
+    llvm-dev \
     # Someone is welcome to tell me a better way to just install lld-9 as lld
     # (lld=9 doesn't work)
     && ln -s lld-9 /usr/bin/lld \
@@ -54,12 +58,12 @@ WORKDIR /install-cmake
 # to get the /usr/share path.
 # See https://github.com/moby/moby/issues/41383
 ARG CMAKE_MAJOR_VERSION=3
-ARG CMAKE_MINOR_VERSION=17
-ARG CMAKE_PATCH_VERSION=5
+ARG CMAKE_MINOR_VERSION=21
+ARG CMAKE_PATCH_VERSION=6
 
 ENV CMAKE_VERSION="${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}.${CMAKE_PATCH_VERSION}"
 
-# Install CMake v3.13, which is ahead of apt-get's version (3.10.2).
+# Install our CMake version, which may be ahead of apt-get's version.
 RUN wget "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION?}/cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" \
     && chmod +x "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" \
     && "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" --skip-license --prefix=/usr/  \
@@ -69,6 +73,10 @@ RUN wget "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION?}/
 
 ######## Bazel ########
 WORKDIR /install-bazel
+# Making a required Bazel version change? Most images derive from this one
+# and will get it automatically. However these don't. Please update them as
+# well:
+#   manylinux2014_x86_64-release
 ARG BAZEL_VERSION=5.1.0
 
 # https://bazel.build/install/ubuntu
@@ -84,6 +92,14 @@ RUN curl -fsSL https://bazel.build/bazel-release.pub.gpg \
 ##############
 
 ######## Python ########
+# Note that we use --ignore-installed when installing packages that may have
+# been auto-installed by the OS package manager (i.e. PyYAML is often an
+# implicit OS-level dep). This should not break so long as we do not
+# subsequently reinstall it on the OS side. Failing to do this will yield a
+# hard error with pip along the lines of:
+#   Cannot uninstall 'PyYAML'. It is a distutils installed project and thus we
+#   cannot accurately determine which files belong to it which would lead to
+#   only a partial uninstall.
 WORKDIR /install-python
 
 RUN apt-get update \
@@ -95,13 +111,22 @@ RUN apt-get update \
     python3-pip \
     python3-setuptools \
     python3-distutils \
-  && python3 -m pip install --upgrade pip \
-  && python3 -m pip install \
+    python3-venv \
+    python3.7-venv \
+  && python3 -m pip install --upgrade pip>=21.3 \
+  && python3 -m pip install --upgrade setuptools \
+  && python3 -m pip install --ignore-installed \
     numpy==1.19.4 absl-py==0.12.0 requests PyYAML==5.4.1 wheel==0.36.2 \
     pybind11==2.9.0
 
 ENV PYTHON_BIN /usr/bin/python3
 
+##############
+
+######## IREE CUDA DEPS ########
+COPY fetch_cuda_deps.sh /usr/local/bin
+RUN /usr/local/bin/fetch_cuda_deps.sh /usr/local/iree_cuda_deps
+ENV IREE_CUDA_DEPS_DIR="/usr/local/iree_cuda_deps"
 ##############
 
 ######## Vulkan ########

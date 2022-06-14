@@ -98,8 +98,7 @@ all built tests through
 [CTest](https://gitlab.kitware.com/cmake/community/-/wikis/doc/ctest/Testing-With-CTest):
 
 ``` shell
-cd ../iree-build-android/
-ctest --output-on-failure
+ctest --test-dir ../iree-build-android/ --output-on-failure
 ```
 
 This will automatically upload build artifacts to the connected Android device,
@@ -107,20 +106,19 @@ run the tests, then report the status back to your host machine.
 
 ## Running tools directly
 
-Invoke the host compiler tools to produce a bytecode module flatbuffer:
+Invoke the host compiler tools to produce a bytecode module FlatBuffer:
 
 ``` shell
 ../iree-build/install/bin/iree-compile \
-  -iree-mlir-to-vm-bytecode-module \
-  -iree-hal-target-backends=vmvx \
-  iree/samples/models/simple_abs.mlir \
+  --iree-hal-target-backends=vmvx \
+  samples/models/simple_abs.mlir \
   -o /tmp/simple_abs_vmvx.vmfb
 ```
 
-Push the Android runtime tools to the device, along with any flatbuffer files:
+Push the Android runtime tools to the device, along with any FlatBuffer files:
 
 ``` shell
-adb push ../iree-build-android/iree/tools/iree-run-module /data/local/tmp/
+adb push ../iree-build-android/tools/iree-run-module /data/local/tmp/
 adb shell chmod +x /data/local/tmp/iree-run-module
 adb push /tmp/simple_abs_vmvx.vmfb /data/local/tmp/
 ```
@@ -128,8 +126,8 @@ adb push /tmp/simple_abs_vmvx.vmfb /data/local/tmp/
 Run the tool:
 
 ``` shell
-adb shell /data/local/tmp/iree-run-module -driver=vmvx \
-  -module_file=/data/local/tmp/simple_abs_vmvx.vmfb \
-  -entry_function=abs \
-  -function_input="f32=-5"
+adb shell /data/local/tmp/iree-run-module --device=local-task \
+  --module_file=/data/local/tmp/simple_abs_vmvx.vmfb \
+  --entry_function=abs \
+  --function_input="f32=-5"
 ```

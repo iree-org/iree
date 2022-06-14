@@ -6,7 +6,14 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build the project with cmake using Kokoro.
+# Build and test the project with CMake using Kokoro, with ASan enabled and
+# using SwiftShader's software Vulkan driver.
+# ASan docs: https://clang.llvm.org/docs/AddressSanitizer.html
+#
+# Note: this script diverges from the non-ASan build in a few ways:
+#   * The CMake build sets `IREE_ENABLE_ASAN=ON`
+#   * Omit optional components that don't work with ASan (e.g. Python bindings)
+#   * Some tests that fail under ASan are individually excluded
 
 set -e
 set -x
@@ -36,6 +43,15 @@ CMAKE_ARGS=(
   "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
   "-DIREE_ENABLE_ASAN=ON"
   "-B" "${CMAKE_BUILD_DIR?}"
+
+  # Also check if microbenchmarks are buildable.
+  "-DIREE_BUILD_MICROBENCHMARKS=ON"
+
+  # Enable CUDA compiler and runtime builds unconditionally. Our CI images all
+  # have enough deps to at least build CUDA support and compile CUDA binaries
+  # (but not necessarily test on real hardware).
+  "-DIREE_HAL_DRIVER_CUDA=ON"
+  "-DIREE_TARGET_BACKEND_CUDA=ON"
 )
 
 echo "Configuring CMake"
@@ -48,6 +64,10 @@ echo "------------"
 echo "Building test deps"
 echo "------------------"
 "${CMAKE_BIN?}" --build "${CMAKE_BUILD_DIR?}" --target iree-test-deps -- -k 0
+
+echo "Building microbenchmark suites"
+echo "------------------"
+"${CMAKE_BIN?}" --build "${CMAKE_BUILD_DIR?}" --target iree-microbenchmark-suites -- -k 0
 
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
@@ -113,7 +133,13 @@ excluded_tests_regex="($(IFS="|" ; echo "${excluded_tests[*]?}"))"
 
 cd ${CMAKE_BUILD_DIR?}
 
-echo "Testing with ctest"
-ctest --timeout 900 --output-on-failure \
+echo "******************** Running main project ctests ************************"
+ctest \
+  --timeout 900 \
+  --output-on-failure \
+  --no-tests=error \
   --label-exclude "${label_exclude_regex}" \
   --exclude-regex "${excluded_tests_regex?}"
+
+echo "******************** llvm-external-projects tests ***********************"
+cmake --build . --target check-iree-dialects -- -k 0

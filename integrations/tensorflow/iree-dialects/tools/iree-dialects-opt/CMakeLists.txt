@@ -4,20 +4,23 @@ set(LIBS
   IREELinalgExtDialect
   IREELinalgExtOpInterfaceImpl
   IREELinalgExtPasses
+  IREELinalgExtTransformOps
   IREELinalgExtTransforms
   IREELinalgTransformDialect
-  IREELinalgTransformDialectTransforms
+  IREELinalgTransformDialectPasses
   IREELinalgTransformTestPasses
   IREETransformsTestPasses
   IREEPyDMDialect
   IREEPyDMPasses
   # Core dialects.
+  MLIRAffine
   MLIRArithmetic
   MLIRAsync
   MLIRControlFlow
   MLIRDialect
   MLIRFunc
   MLIRLinalg
+  MLIRLinalgTransformOps
   MLIRMemRef
   MLIROptLib
   MLIRPDL

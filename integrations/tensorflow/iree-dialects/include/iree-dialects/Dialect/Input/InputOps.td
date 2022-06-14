@@ -127,7 +127,8 @@ def IREEInput_GlobalAddressOp : IREEInput_PureOp<"global.address"> {
   }];
 }
 
-def IREEInput_GlobalLoadOp : IREEInput_Op<"global.load"> {
+def IREEInput_GlobalLoadOp : IREEInput_Op<"global.load",
+    [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
   let summary = [{loads a value from a global variable}];
   let description = [{
     Returns a copy of the global value.
@@ -161,9 +162,11 @@ def IREEInput_GlobalLoadIndirectOp : IREEInput_Op<"global.load.indirect"> {
   let assemblyFormat = [{
     $global attr-dict `:` type($global) `->` type($result)
   }];
+  let hasVerifier = 1;
 }
 
-def IREEInput_GlobalStoreOp : IREEInput_Op<"global.store"> {
+def IREEInput_GlobalStoreOp : IREEInput_Op<"global.store",
+    [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
   let summary = [{stores a value into a global variable}];
   let description = [{
     Stores a copy of the value into a global.
@@ -193,6 +196,7 @@ def IREEInput_GlobalStoreIndirectOp : IREEInput_Op<"global.store.indirect"> {
   let assemblyFormat = [{
     $value `,` $global attr-dict `:` type($value) `->` type($global)
   }];
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -546,21 +550,6 @@ def IREEInput_TensorTraceOp : IREEInput_Op<"tensor.trace", []> {
 //===----------------------------------------------------------------------===//
 
 // TODO: Define dispatch.workgroup op.
-
-def IREEInput_DispatchWorkgroupRankOp : IREEInput_PureOp<"dispatch.workgroup.rank"> {
-  let summary = [{returns the rank of the workgroup dimensions}];
-  let description = [{
-    The number of workgroup dimensions used during dispatch, bounding the
-    `iree_input.dispatch.workgroup.*` query functions.
-
-    ```mlir
-    %rank = iree_input.dispatch.workgroup.rank : index
-    ```
-  }];
-  let arguments = (ins);
-  let results = (outs IREEInput_Dim:$result);
-  let assemblyFormat = "attr-dict `:` type($result)";
-}
 
 def IREEInput_DispatchWorkgroupIDOp : IREEInput_PureOp<"dispatch.workgroup.id"> {
   let summary = [{returns the index of the current workgroup in the grid}];

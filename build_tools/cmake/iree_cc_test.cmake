@@ -60,7 +60,7 @@ function(iree_cc_test)
     _RULE
     ""
     "NAME"
-    "ARGS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;LABELS"
+    "ARGS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;LABELS;TIMEOUT"
     ${ARGN}
   )
 
@@ -127,6 +127,11 @@ function(iree_cc_test)
 
   list(APPEND _RULE_DEPS "gmock")
 
+  # Implicit deps.
+  if(IREE_IMPLICIT_DEFS_CC_DEPS)
+    list(APPEND _RULE_DEPS ${IREE_IMPLICIT_DEFS_CC_DEPS})
+  endif()
+
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
   set(_NAME_PATH "${_PACKAGE_PATH}/${_RULE_NAME}")
 
@@ -160,16 +165,18 @@ function(iree_cc_test)
       NAME
         ${_NAME_PATH}
       COMMAND
-        # We run all our tests through a custom test runner to allow temp
-        # directory cleanup upon test completion.
-        "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
         "$<TARGET_FILE:${_NAME}>"
         ${_RULE_ARGS}
       )
-    set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT "TEST_TMPDIR=${IREE_BINARY_DIR}/tmp/${_NAME}_test_tmpdir")
-    iree_add_test_environment_properties(${_NAME_PATH})
+
+    iree_configure_test(${_NAME_PATH})
   endif(ANDROID)
+
+  if (NOT DEFINED _RULE_TIMEOUT)
+    set(_RULE_TIMEOUT 60)
+  endif()
 
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
+  set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
 endfunction()

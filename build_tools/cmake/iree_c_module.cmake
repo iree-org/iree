@@ -12,11 +12,12 @@ include(CMakeParseArguments)
 # NAME: Name of target (see Note).
 # SRC: MLIR source file to compile into a c module.
 # H_FILE_OUTPUT: The H header file to output.
-# TRANSLATE_TOOL: Translation tool to invoke (CMake target). The default
-#     tool is "iree-compile".
-# FLAGS: Flags to pass to the translation tool (list of strings).
+# COMPILE_TOOL: Compiler tool to invoke (CMake target). The default tool is
+#     "iree-compile".
+# FLAGS: Additional flags to pass to the compile tool (list of strings).
+#     `--output-format=vm-c` is included automatically.
 # TESTONLY: When added, this target will only be built if user passes
-#    -DIREE_BUILD_TESTS=ON to CMake.
+#     -DIREE_BUILD_TESTS=ON to CMake.
 #
 # Note:
 # By default, iree_c_module will create a library named ${NAME},
@@ -26,7 +27,7 @@ function(iree_c_module)
   cmake_parse_arguments(
     _RULE
     "TESTONLY"
-    "NAME;SRC;H_FILE_OUTPUT;TRANSLATE_TOOL"
+    "NAME;SRC;H_FILE_OUTPUT;COMPILE_TOOL"
     "FLAGS"
     ${ARGN}
   )
@@ -43,35 +44,39 @@ function(iree_c_module)
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}_hdrs")
 
-  # Set defaults for TRANSLATE_TOOL.
-  if(DEFINED _RULE_TRANSLATE_TOOL)
-    set(_TRANSLATE_TOOL ${_RULE_TRANSLATE_TOOL})
+  # Set defaults for COMPILE_TOOL.
+  if(DEFINED _RULE_COMPILE_TOOL)
+    set(_COMPILE_TOOL ${_RULE_COMPILE_TOOL})
   else()
-    set(_TRANSLATE_TOOL "iree-compile")
+    set(_COMPILE_TOOL "iree-compile")
   endif()
 
-  iree_get_executable_path(_TRANSLATE_TOOL_EXECUTABLE ${_TRANSLATE_TOOL})
+  iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE ${_COMPILE_TOOL})
 
-  set(_ARGS "${_RULE_FLAGS}")
+  set(_ARGS "--output-format=vm-c")
+  list(APPEND _ARGS "${_RULE_FLAGS}")
   list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}")
   list(APPEND _ARGS "-o")
   list(APPEND _ARGS "${_RULE_H_FILE_OUTPUT}")
 
   add_custom_command(
     OUTPUT "${_RULE_H_FILE_OUTPUT}"
-    COMMAND ${_TRANSLATE_TOOL_EXECUTABLE} ${_ARGS}
-    # Changes to either the translation tool or the input source should
-    # trigger rebuilding.
-    DEPENDS ${_TRANSLATE_TOOL_EXECUTABLE} ${_RULE_SRC}
+    COMMAND ${_COMPILE_TOOL_EXECUTABLE} ${_ARGS}
+    # Changes to either the compiler tool or the input source should rebuild.
+    DEPENDS ${_COMPILE_TOOL_EXECUTABLE} ${_RULE_SRC}
   )
 
   iree_cc_library(
     NAME ${_RULE_NAME}
     HDRS "${_RULE_H_FILE_OUTPUT}"
-    SRCS "${IREE_SOURCE_DIR}/iree/vm/module_impl_emitc.c"
+    SRCS "${IREE_SOURCE_DIR}/runtime/src/iree/vm/module_impl_emitc.c"
     INCLUDES "${CMAKE_CURRENT_BINARY_DIR}"
-    COPTS "-DEMITC_IMPLEMENTATION=\"${_RULE_H_FILE_OUTPUT}\""
-    "${_TESTONLY_ARG}"
+    COPTS
+      "-DEMITC_IMPLEMENTATION=\"${_RULE_H_FILE_OUTPUT}\""
+      "${_TESTONLY_ARG}"
+    DEPS
+      # Include paths and options for the runtime sources.
+      iree::runtime::src::defs
   )
 
   set(_GEN_TARGET "${_NAME}_gen")

@@ -56,12 +56,13 @@ CMAKE_BUILD_DIR="$HOME/iree/build/tf"
 # we can still run the other tests.
 echo "Configuring CMake"
 "${CMAKE_BIN}" -B "${CMAKE_BUILD_DIR?}" -G Ninja \
-   -DIREE_TF_TOOLS_ROOT="${BAZEL_BINDIR?}/iree_tf_compiler/" \
    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
    -DIREE_BUILD_COMPILER=ON \
    -DIREE_BUILD_TESTS=ON \
    -DIREE_BUILD_SAMPLES=OFF \
    -DIREE_BUILD_PYTHON_BINDINGS=ON \
+   -DIREE_HAL_DRIVER_CUDA=ON \
+   -DIREE_TARGET_BACKEND_CUDA=ON \
    .
 
 echo "Building with Ninja"
@@ -73,8 +74,11 @@ export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 tests_passed=true
 
 echo "***** Testing with CTest *****"
-if ! ctest --timeout 900 --output-on-failure \
-   --tests-regex "^integrations/tensorflow/|^bindings/python/" \
+if ! ctest \
+   --timeout 900 \
+   --output-on-failure \
+   --no-tests=error \
+   --tests-regex "^iree/runtime/bindings/python/" \
    --label-exclude "^nokokoro$|^vulkan_uses_vk_khr_shader_float16_int8$"
 then
    tests_passed=false

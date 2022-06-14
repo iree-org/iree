@@ -29,8 +29,7 @@ $ cd iree-build/  # Make and cd into some build directory
 $ cmake ../iree -G Ninja \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
-    -DIREE_BUILD_PYTHON_BINDINGS=ON  \
-    -DIREE_BUILD_TENSORFLOW_COMPILER=ON
+    -DIREE_BUILD_PYTHON_BINDINGS=ON
 $ cmake --build .
 # Also from the Python get-started doc, set this environment variable:
 $ export PYTHONPATH=$(pwd)/bindings/python
@@ -116,9 +115,9 @@ benchmark a static left-hand-side batched matmul using `MatrixOpsStaticModule`
 on VMVX run:
 
 ```shell
-$ iree/tools/iree-benchmark-module \
+$ tools/iree-benchmark-module \
   --module_file=/tmp/iree/modules/MatrixOpsStaticModule/iree_vmvx/compiled.vmfb \
-  --driver=vmvx \
+  --device=local-task \
   --entry_function=matmul_lhs_batch \
   --function_input=256x64x32xf32=2 \
   --function_input=32x16xf32=3
@@ -193,10 +192,10 @@ your environment to cross-compile to Android can be found
 ```shell
 # After following the instructions above up to 'Build all targets', the
 # iree-benchmark-module binary should be in the following directory:
-$ ls build-android/iree/tools/
+$ ls build-android/tools/
 
 # Copy the benchmarking binary to phone.
-$ adb push build-android/iree/tools/iree-benchmark-module /data/local/tmp
+$ adb push build-android/tools/iree-benchmark-module /data/local/tmp
 ```
 
 ### 4.2 Push the IREE's compilation / benchmarking artifacts to the device
@@ -222,7 +221,7 @@ $ adb push /tmp/iree/modules/MatrixOpsStaticModule/iree_vmvx/* \
 ```shell
 $ adb shell /data/local/tmp/iree-benchmark-module \
   --module_file="/data/local/tmp/MatrixOpsStaticModule/iree_vmvx/compiled.vmfb" \
-  --driver=vmvx \
+  --device=local-task \
   --entry_function=matmul_lhs_batch \
   --function_input=256x64x32xf32=2 \
   --function_input=32x16xf32=3

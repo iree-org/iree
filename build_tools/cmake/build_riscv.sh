@@ -38,8 +38,8 @@ fi
 # Configure, build, install.
 "${CMAKE_BIN?}" -G Ninja -B "${BUILD_HOST_DIR?}" \
   -DCMAKE_INSTALL_PREFIX="${BUILD_HOST_DIR?}/install" \
-  -DCMAKE_C_COMPILER=clang \
-  -DCMAKE_CXX_COMPILER=clang++ \
+  -DCMAKE_C_COMPILER="${CC:-clang}" \
+  -DCMAKE_CXX_COMPILER="${CXX:-clang++}" \
   -DIREE_ENABLE_ASSERTIONS=ON \
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
@@ -78,7 +78,7 @@ if [[ "${RISCV_CONFIG?}" == "rv64" ]]; then
   )
 elif [[ "${RISCV_CONFIG?}" == "rv32-baremetal" ]]; then
   args+=(
-    # TODO(#6353): Off until iree/tools are refactored to support threadless config.
+    # TODO(#6353): Off until tools/ are refactored to support threadless config.
     -DIREE_BUILD_TESTS=OFF
     -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV32_NEWLIB_TOOLCHAIN_ROOT?}"
   )

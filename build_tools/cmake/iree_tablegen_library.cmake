@@ -35,7 +35,8 @@ function(iree_tablegen_library)
   set(LLVM_TARGET_DEFINITIONS ${_RULE_TD_FILE})
   set(_INCLUDE_DIRS
     "${MLIR_INCLUDE_DIRS}"
-    "${IREE_SOURCE_DIR}"
+    "${IREE_SOURCE_DIR}/compiler/src"
+    "${IREE_BINARY_DIR}/compiler/src"
   )
   list(APPEND _INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
   list(TRANSFORM _INCLUDE_DIRS PREPEND "-I")

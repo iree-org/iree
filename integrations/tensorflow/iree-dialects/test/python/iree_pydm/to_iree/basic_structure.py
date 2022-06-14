@@ -1,4 +1,4 @@
-# RUN: %PYTHON %s | iree-dialects-opt -convert-iree-pydm-to-iree | FileCheck --enable-var-scope --dump-input-filter=all %s
+# RUN: %PYTHON %s | iree-dialects-opt --convert-iree-pydm-to-iree | FileCheck --enable-var-scope --dump-input-filter=all %s
 # This test isn't currently checking anything except that e2e lowering doesn't
 # crash.
 

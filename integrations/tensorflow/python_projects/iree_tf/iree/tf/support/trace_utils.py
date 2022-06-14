@@ -1,4 +1,3 @@
-# Lint as: python3
 # Copyright 2019 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
@@ -10,8 +9,7 @@
 #   ref: reference – for the reference CompiledModule
 #   tar: target - for one of the target CompiledModules
 
-# TODO(#4131) python>=3.7: Use postponed type annotations.
-
+from __future__ import annotations
 import copy
 import glob
 import inspect
@@ -19,7 +17,7 @@ import os
 import pickle
 import sys
 import textwrap
-from typing import Any, Callable, Dict, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Sequence, Tuple, Union, Optional
 
 from absl import logging
 from iree.tf.support import module_utils
@@ -35,7 +33,7 @@ def _zfill_width(length: int) -> Union[int, None]:
   return int(np.ceil(np.log10(length))) if length else None
 
 
-def get_trace_dir(artifacts_dir: str, trace: "Trace") -> str:
+def get_trace_dir(artifacts_dir: str, trace: Trace) -> str:
   trace_dir = os.path.join(artifacts_dir, trace.backend_id, "traces",
                            trace.function_name)
   os.makedirs(trace_dir, exist_ok=True)
@@ -50,8 +48,8 @@ class ModuleCall:
                outputs: Tuple[Any],
                serialized_inputs: Tuple[str],
                serialized_outputs: Tuple[str],
-               rtol: float = 1e-6,
-               atol: float = 1e-6):
+               rtol: float = 1e-5,
+               atol: float = 1e-5):
     """Records the details of a call to a CompiledModule."""
     self.method = method
 
@@ -136,7 +134,7 @@ class ModuleCall:
         pickle.dump(value, f)
 
   @staticmethod
-  def load(call_dir: str) -> "ModuleCall":
+  def load(call_dir: str) -> ModuleCall:
     """Loads and returns a trace serialized with ModuleCall.serialize."""
     with open(os.path.join(call_dir, "metadata.pkl"), "rb") as f:
       kwargs = pickle.load(f)
@@ -161,8 +159,8 @@ class Trace:
 
   def __init__(self,
                module: Union[module_utils.CompiledModule, None],
-               function: Union[Callable[["TracedModule"], None], None],
-               _load_dict: Dict[str, Any] = None):
+               function: Union[Callable[[TracedModule], None], None],
+               _load_dict: Optional[Dict[str, Any]] = None):
     """Extracts metadata from module and function and initializes.
 
     Example usage:
@@ -286,7 +284,7 @@ class Trace:
         serialized_inputs = self.calls[0].serialized_inputs
         flagfile = [
             f"--module_file={compiled_path}",
-            f"--driver={self.backend_driver}",
+            f"--device={self.backend_driver}",
             f"--entry_function={entry_function}",
         ] + [f"--function_input={input}" for input in serialized_inputs]
         with open(os.path.join(trace_dir, "flagfile"), "w") as f:
@@ -296,7 +294,7 @@ class Trace:
           f.writelines(compiled_path + "\n")
 
   @staticmethod
-  def load(trace_dir: str) -> "Trace":
+  def load(trace_dir: str) -> Trace:
     """Loads and returns a trace serialized with Trace.serialize.
 
     Args:

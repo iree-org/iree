@@ -1,8 +1,8 @@
-// RUN: iree-dialects-opt -pydm-variables-to-ssa --allow-unregistered-dialect %s | FileCheck  --dump-input-filter=all %s
+// RUN: iree-dialects-opt --pydm-variables-to-ssa --allow-unregistered-dialect %s | FileCheck  --dump-input-filter=all %s
 
 // CHECK-LABEL: @entry_block_does_not_hoist
 // Hoisting must be disabled for the entry block as that would change the
-// func signature (which is tested because it would fail verification).
+// func.func signature (which is tested because it would fail verification).
 iree_pydm.func @entry_block_does_not_hoist() -> (!iree_pydm.exception_result, !iree_pydm.none) {
   // CHECK: load_var
   %a = alloc_free_var "a" -> !iree_pydm.free_var_ref

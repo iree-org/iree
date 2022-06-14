@@ -1,0 +1,31 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+agents:
+  queue: "orchestration"
+  security: "trusted"
+
+steps:
+  - label: "Updating pipelines"
+    concurrency: 1
+    concurrency_group: "update-pipelines"
+    commands: |
+      build_tools/buildkite/scripts/update_pipeline_configurations.py
+
+  - wait
+
+  - label: "Executing build-runtime-cmake"
+    commands: |
+      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py \
+        --annotate \
+        build-runtime-cmake
+
+  - label: "Executing build-and-test-tsan"
+    key: "build-and-test-tsan"
+    commands: |
+      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py \
+        --annotate \
+        build-and-test-tsan

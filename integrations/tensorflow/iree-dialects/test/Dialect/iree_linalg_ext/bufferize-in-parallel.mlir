@@ -1,13 +1,13 @@
-// RUN: iree-dialects-opt %s -linalg-interp-transforms -canonicalize | FileCheck %s
+// RUN: iree-dialects-opt %s --linalg-transform-interp --canonicalize | FileCheck %s
 
-// CHECK-LABEL: func @parallel_insert_slice_no_conflict(
+// CHECK-LABEL: func.func @parallel_insert_slice_no_conflict(
 //  CHECK-SAME:     %[[idx:.*]]: index, %[[idx2:.*]]: index,
 //  CHECK-SAME:     %[[arg1:.*]]: memref<?xf32, #{{.*}}>,
 //  CHECK-SAME:     %[[arg2:.*]]: memref<?xf32, #{{.*}}>
-func @parallel_insert_slice_no_conflict(
+func.func @parallel_insert_slice_no_conflict(
     %idx: index, %idx2: index,
-    %arg1: tensor<?xf32> {linalg.inplaceable=true},
-    %arg2: tensor<?xf32> {linalg.inplaceable=true}) -> (tensor<?xf32>, f32)
+    %arg1: tensor<?xf32> {bufferization.writable=true},
+    %arg2: tensor<?xf32> {bufferization.writable=true}) -> (tensor<?xf32>, f32)
 {
   %cst = arith.constant 4.200000e+01 : f32
   %c0 = arith.constant 0 : index
@@ -35,18 +35,14 @@ func @parallel_insert_slice_no_conflict(
   return %2, %f : tensor<?xf32>, f32
 }
 
-// -----
-
-module {
-
-// CHECK-LABEL: func @parallel_insert_slice_with_conflict(
+// CHECK-LABEL: func.func @parallel_insert_slice_with_conflict(
 //  CHECK-SAME:     %[[idx:.*]]: index, %[[idx2:.*]]: index,
 //  CHECK-SAME:     %[[arg1:.*]]: memref<?xf32, #{{.*}}>,
 //  CHECK-SAME:     %[[arg2:.*]]: memref<?xf32, #{{.*}}>
-func @parallel_insert_slice_with_conflict(
+func.func @parallel_insert_slice_with_conflict(
     %idx: index, %idx2: index,
-    %arg1: tensor<?xf32> {linalg.inplaceable=true},
-    %arg2: tensor<?xf32> {linalg.inplaceable=true}) -> (f32, f32)
+    %arg1: tensor<?xf32> {bufferization.writable=true},
+    %arg2: tensor<?xf32> {bufferization.writable=true}) -> (f32, f32)
 {
   %cst = arith.constant 4.200000e+01 : f32
   %c0 = arith.constant 0 : index
@@ -54,6 +50,8 @@ func @parallel_insert_slice_with_conflict(
 
   // The parallel_insert_slice_op bufferizes out-of-place, so we need an allocation.
   // CHECK: %[[alloc1:.*]] = memref.alloc
+  // CHECK: linalg.generic {{.*}} ins(%[[arg2]]{{.*}}outs(%[[alloc1]]
+
   // CHECK: iree_linalg_ext.in_parallel %[[idx2]]  -> ()
   %2 = iree_linalg_ext.in_parallel %idx2  -> (tensor<?xf32>) {
     ^bb0(%arg3: index):  // no predecessors
@@ -64,12 +62,8 @@ func @parallel_insert_slice_with_conflict(
       // CHECK: linalg.fill ins(%{{.*}}) outs(%[[alloc2]] : memref<?xf32
       %8 = linalg.fill ins(%cst : f32) outs(%6 : tensor<?xf32>) -> tensor<?xf32>
 
-      // parallel_insert_slice buffer was already allocated but not copied yet.
-      //
-      // CHECK: linalg.generic {{.*}} ins(%[[arg2]]{{.*}}outs(%[[alloc1]]
-
       // Now the copy of the actual insert_slice.
-      // CHECK: %[[subview1:.*]] = memref.subview %[[arg2]][5] [%[[idx]]] [1]
+      // CHECK: %[[subview1:.*]] = memref.subview %[[alloc1]][5] [%[[idx]]] [1]
       //
       // CHECK: linalg.generic {{.*}} ins(%[[alloc2]]{{.*}}outs(%[[subview1]]
       // CHECK: memref.dealloc %[[alloc2]]
@@ -92,14 +86,16 @@ func @parallel_insert_slice_with_conflict(
   return %f2, %f : f32, f32
 }
 
-pdl.pattern @pdl_target_2 : benefit(1) {
-  %0 = operation "func"
-  // TODO: we don't want this, but it is the required terminator for pdl.pattern
-  rewrite %0 with "iree_linalg_transform.apply"
-}
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  pdl.pattern @pdl_target_2 : benefit(1) {
+    %0 = operation "func"
+    // TODO: we don't want this, but it is the required terminator for pdl.pattern
+    rewrite %0 with "transform.dialect"
+  }
 
-iree_linalg_transform.sequence {
-  bufferize
-}
-
+  transform.structured.canonicalized_sequence %arg0 {
+  ^bb0(%arg1: !pdl.operation):
+    bufferize
+  }
 }

@@ -47,7 +47,8 @@ function(iree_tablegen_doc)
 
   set(_INCLUDE_DIRS
     "${MLIR_INCLUDE_DIRS}"
-    "${IREE_SOURCE_DIR}"
+    "${IREE_SOURCE_DIR}/compiler/src"
+    "${IREE_BINARY_DIR}/compiler/src"
   )
   list(APPEND _INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
   list(TRANSFORM _INCLUDE_DIRS PREPEND "-I")
@@ -59,11 +60,16 @@ function(iree_tablegen_doc)
   while(_RULE_OUTS)
     list(GET _RULE_OUTS 0 _COMMAND)
     list(REMOVE_AT _RULE_OUTS 0)
+    list(LENGTH _RULE_OUTS _LEN)
+    if(_LEN GREATER 1)
+      list(GET _RULE_OUTS 0 _DIALECT)
+      list(REMOVE_AT _RULE_OUTS 0)
+    endif()
     list(GET _RULE_OUTS 0 _OUTPUT)
     list(REMOVE_AT _RULE_OUTS 0)
 
     # TableGen this output with the given command.
-    tablegen(${_TBLGEN} ${_OUTPUT} ${_COMMAND} ${_INCLUDE_DIRS})
+    tablegen(${_TBLGEN} ${_OUTPUT} ${_COMMAND} ${_DIALECT} ${_INCLUDE_DIRS})
     list(APPEND _OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/${_OUTPUT})
   endwhile()
 

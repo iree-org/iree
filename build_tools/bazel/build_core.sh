@@ -6,8 +6,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build IREE's core (//iree/..., //llvm-external-projects, //build_tools/...)
-# with bazel.
+# Build IREE's core workspace (excluding integrations/tensorflow/) with bazel.
 # Designed for CI, but can be run manually.
 
 # Looks at environment variables and uses CI-friendly defaults if they are not
@@ -81,11 +80,7 @@ fi
 bazel \
   --noworkspace_rc \
   --bazelrc=build_tools/bazel/iree.bazelrc \
-  query \
-    --config=non_darwin \
-    //iree/... + //build_tools/... + \
-    //llvm-external-projects/iree-compiler-api/... + \
-    //llvm-external-projects/iree-dialects/... | \
+  query //... | \
       xargs --max-args 1000000 --max-chars 1000000 --exit \
         bazel \
           --noworkspace_rc \
@@ -94,7 +89,6 @@ bazel \
               --color=yes \
               ${test_env_args[@]} \
               --config=generic_clang \
-              --config=non_darwin \
               --build_tag_filters="${BUILD_TAG_FILTERS?}" \
               --test_tag_filters="${TEST_TAG_FILTERS?}" \
               --keep_going \

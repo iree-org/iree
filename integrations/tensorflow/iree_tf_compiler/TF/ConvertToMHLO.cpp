@@ -8,6 +8,7 @@
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
@@ -32,15 +33,14 @@ namespace TF {
 // It does not require the same number of options as we can hardcode as the pass
 // the IREE requires.
 class ConvertToMHLOPass
-    : public PassWrapper<ConvertToMHLOPass, OperationPass<FuncOp>> {
+    : public PassWrapper<ConvertToMHLOPass, OperationPass<func::FuncOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<mlir::linalg::LinalgDialect, mlir::TF::TensorFlowDialect,
-                mlir::tf_executor::TensorFlowExecutorDialect,
-                mlir::tf_device::TensorFlowDeviceDialect,
-                mlir::tf_saved_model::TensorFlowSavedModelDialect,
-                chlo::HloClientDialect, mhlo::MhloDialect, shape::ShapeDialect,
-                mlir::arith::ArithmeticDialect, func::FuncDialect>();
+    registry.insert<mlir::linalg::LinalgDialect, mlir::TF::TensorFlowDialect,
+                    mlir::tf_executor::TensorFlowExecutorDialect,
+                    mlir::tf_device::TensorFlowDeviceDialect,
+                    mlir::tf_saved_model::TensorFlowSavedModelDialect,
+                    chlo::ChloDialect, mhlo::MhloDialect, shape::ShapeDialect,
+                    mlir::arith::ArithmeticDialect, func::FuncDialect>();
   }
 
   StringRef getArgument() const override { return "iree-tf-convert-to-mhlo"; }
@@ -88,7 +88,7 @@ class ConvertToMHLOPass
     chlo::ConstantLikeOp::getCanonicalizationPatterns(patterns, context);
 
     ConversionTarget target(*context);
-    target.addLegalDialect<chlo::HloClientDialect>();
+    target.addLegalDialect<chlo::ChloDialect>();
     target.addLegalDialect<linalg::LinalgDialect>();
     target.addLegalDialect<mhlo::MhloDialect>();
     target.addLegalDialect<mlir::func::FuncDialect,

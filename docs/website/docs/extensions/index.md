@@ -167,14 +167,14 @@ system.
 ```mlir
 // Main user module compiled by IREE:
 module @model {
-  func @predict() {
+  func.func @predict() {
     %4 = call @my_custom_module::@some_func(%3) : (tensor<?xf32>) -> i32
     ...
   }
 }
 // External module that will be available at runtime:
 module @my_custom_module {
-  func @some_func(%input: tensor<?xf32>) -> i32  // note empty for extern
+  func.func @some_func(%input: tensor<?xf32>) -> i32  // note empty for extern
 }
 ```
 
@@ -239,7 +239,7 @@ minimal overhead and is used for example [by the IREE HAL itself](https://github
 There is also a C++ wrapper that is significantly easier to work with however it
 needs some performance improvements.
 
-A full end-to-end example can be found under [`iree/samples/custom_modules/`](https://github.com/google/iree/tree/main/iree/samples/custom_modules),
+A full end-to-end example can be found under [`samples/custom_modules/`](https://github.com/google/iree/tree/main/samples/custom_modules),
 though it should not currently be considered representative of best practices.
 
 ## 3. Extend target-specific device conversion patterns

@@ -14,5 +14,5 @@ cd ${ROOT_DIR?}
 git submodule sync
 git submodule update --init
 
-./iree/samples/dynamic_shapes/test.sh
-./iree/samples/variables_and_state/test.sh
+./samples/dynamic_shapes/test.sh
+./samples/variables_and_state/test.sh

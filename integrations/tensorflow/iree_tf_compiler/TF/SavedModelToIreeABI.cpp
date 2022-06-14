@@ -409,7 +409,7 @@ struct StructureLevel {
   }
 };
 
-LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
+LogicalResult materializeABIWrapper(ModuleOp module, func::FuncOp internalFunc,
                                     StringRef exportedName) {
   Location loc = internalFunc.getLoc();
   OpBuilder builder(internalFunc);
@@ -492,7 +492,8 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
   // Create the wrapper function.
   FunctionType wrapperFuncType =
       builder.getFunctionType(wrapperArgTypes, wrapperResultTypes);
-  auto wrapperFunc = builder.create<FuncOp>(loc, exportedName, wrapperFuncType);
+  auto wrapperFunc =
+      builder.create<func::FuncOp>(loc, exportedName, wrapperFuncType);
   SymbolTable::setSymbolVisibility(wrapperFunc,
                                    SymbolTable::Visibility::Public);
   Block *entryBlock = wrapperFunc.addEntryBlock();
@@ -595,7 +596,7 @@ class SavedModelToIREEABIPass
     (void)savedModelIndexPathIdent;
 
     // Handle saved model exported functions.
-    for (auto func : getOperation().getOps<FuncOp>()) {
+    for (auto func : getOperation().getOps<func::FuncOp>()) {
       // Transfer exported names to IREE.
       auto exportedNames = mlir::tf_saved_model::GetExportedNames(func);
       if (exportedNames.empty()) continue;

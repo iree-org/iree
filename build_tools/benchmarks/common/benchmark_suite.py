@@ -29,122 +29,176 @@ CMake target, which put them in the following directory structure:
         └── <compiled-iree-model>-<sha1>.vmfb
 """
 
-import re
+import collections
 import os
+import re
 
-from typing import List, Optional, Sequence
-
-from .benchmark_definition import DeviceInfo, BenchmarkInfo
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Sequence, Tuple
+from common.benchmark_definition import IREE_DRIVERS_INFOS
 
 # All benchmarks' relative path against root build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
 
+MODEL_FLAGFILE_NAME = "flagfile"
+MODEL_TOOLFILE_NAME = "tool"
 
-def compose_info_object(device_info: DeviceInfo, benchmark_category_dir: str,
-                        benchmark_case_dir: str) -> BenchmarkInfo:
-  """Creates an BenchmarkInfo object to describe the benchmark.
-  Args:
-    device_info: an DeviceInfo object.
-    benchmark_category_dir: the directory to a specific benchmark category.
-    benchmark_case_dir: a directory containing the benchmark case.
-  Returns:
-    A BenchmarkInfo object.
+
+@dataclass
+class BenchmarkCase:
+  """Represents a benchmark case.
+  
+    model_name: the source model, e.g., 'MobileSSD'.
+    model_tags: the source model tags, e.g., ['f32'].
+    bench_mode: the benchmark mode, e.g., '1-thread,big-core'.
+    target_arch: the target CPU/GPU architature, e.g., 'GPU-Adreno'.
+    config: the IREE runtime configuration, e.g., 'dylib'.
+    benchmark_case_dir: the path to benchmark case directory.
+    benchmark_tool_name: the benchmark tool, e.g., 'iree-benchmark-module'.
   """
-  # Extract the model name from the directory path. This uses the relative
-  # path under the root model directory. If there are multiple segments,
-  # additional ones will be placed in parentheses.
-  model_name = os.path.relpath(benchmark_case_dir, benchmark_category_dir)
-  # Now we have <model-name>/.../<iree-driver>__<target-arch>__<bench_mode>,
-  # Remove the last segment.
-  model_name = os.path.dirname(model_name)
-  main, rest = os.path.split(model_name)
-  if main:
-    # Tags coming from directory structure.
-    model_name = main
-    model_tags = [re.sub(r"\W+", "-", rest)]
-  else:
-    # Tags coming from the name itself.
-    model_name, rest = rest.split("-", 1)
-    model_tags = rest.split(",")
 
-  # Extract benchmark info from the directory path following convention:
-  #   <iree-driver>__<target-architecture>__<benchmark_mode>
-  root_immediate_dir = os.path.basename(benchmark_case_dir)
-  iree_driver, target_arch, bench_mode = root_immediate_dir.split("__")
-
-  model_source = os.path.basename(benchmark_category_dir)
-
-  return BenchmarkInfo(model_name=model_name,
-                       model_tags=model_tags,
-                       model_source=model_source,
-                       bench_mode=bench_mode.split(","),
-                       runner=iree_driver,
-                       device_info=device_info)
+  model_name: str
+  model_tags: Sequence[str]
+  bench_mode: Sequence[str]
+  target_arch: str
+  config: str
+  benchmark_case_dir: str
+  benchmark_tool_name: str
 
 
-def filter_benchmarks_for_category(benchmark_category_dir: str,
-                                   cpu_target_arch_filter: str,
-                                   gpu_target_arch_filter: str,
-                                   available_drivers: Sequence[str],
-                                   driver_filter: Optional[str],
-                                   mode_filter: Optional[str],
-                                   model_name_filter: Optional[str],
-                                   verbose: bool = False) -> Sequence[str]:
-  """Filters benchmarks in a specific category for the given device.
-  Args:
-    benchmark_category_dir: the directory to a specific benchmark category.
-    cpu_target_arch_filter: CPU target architecture filter regex.
-    gpu_target_arch_filter: GPU target architecture filter regex.
-    available_drivers: list of drivers supported by the tools in this build dir.
-    driver_filter: driver filter regex.
-    mode_filter: benchmark mode regex.
-    model_name_filter: model name regex.
-    verbose: whether to print additional debug info.
-  Returns:
-    A list containing all matched benchmark cases' directories.
-  """
-  matched_benchmarks = []
+class BenchmarkSuite(object):
+  """Represents the benchmarks in benchmark suite directory."""
 
-  # Go over all benchmarks in the model directory to find those matching the
-  # current Android device's CPU/GPU architecture.
-  for root, dirs, _ in os.walk(benchmark_category_dir):
-    # Take the immediate directory name and try to see if it contains compiled
-    # models and flagfiles. This relies on the following directory naming
-    # convention:
-    #   <iree-driver>__<target-architecture>__<benchmark_mode>
-    root_immediate_dir = os.path.basename(root)
-    segments = root_immediate_dir.split("__")
-    if len(segments) != 3 or not segments[0].startswith("iree-"):
-      continue
+  def __init__(self, suite_map: Dict[str, List[BenchmarkCase]]):
+    """Construct a benchmark suite.
 
-    model_name = os.path.relpath(root, benchmark_category_dir)
-    iree_driver, target_arch, bench_mode = segments
-    iree_driver = iree_driver[len("iree-"):].lower()
-    target_arch = target_arch.lower()
+    Args:
+      suites: the map of benchmark cases keyed by category directories.
+    """
+    self.suite_map = suite_map
+    self.category_map = dict((os.path.basename(category_dir), category_dir)
+                             for category_dir in self.suite_map.keys())
 
-    # We can choose this benchmark if it matches the driver and CPU/GPU
-    # architecture.
-    matched_driver = (iree_driver in available_drivers) and (
-        driver_filter is None or
-        re.match(driver_filter, iree_driver) is not None)
-    matched_arch = (re.match(cpu_target_arch_filter, target_arch) is not None or
-                    re.match(gpu_target_arch_filter, target_arch) is not None)
-    matched_model_name = (model_name_filter is None or
-                          re.match(model_name_filter, model_name) is not None)
-    matched_mode = (mode_filter is None or
-                    re.match(mode_filter, bench_mode) is not None)
+  def list_categories(self) -> List[Tuple[str, str]]:
+    """Returns all categories and their directories.
 
-    chosen = False
-    if matched_driver and matched_arch and matched_model_name and matched_mode:
-      matched_benchmarks.append(root)
-      chosen = True
+    Returns:
+      A tuple of (category name, category dir).
+    """
+    category_list = [(name, path) for name, path in self.category_map.items()]
+    # Fix the order of category list.
+    category_list.sort(key=lambda category: category[0])
+    return category_list
 
-    if verbose:
-      print(f"dir: {root}")
-      print(f"  model_name: {model_name}")
-      print(f"  iree_driver: {iree_driver}")
-      print(f"  target_arch: {target_arch}")
-      print(f"  bench_mode: {bench_mode}")
-      print(f"  chosen: {chosen}")
+  def filter_benchmarks_for_category(
+      self,
+      category: str,
+      available_drivers: Optional[Sequence[str]] = None,
+      available_loaders: Optional[Sequence[str]] = None,
+      cpu_target_arch_filter: Optional[str] = None,
+      gpu_target_arch_filter: Optional[str] = None,
+      driver_filter: Optional[str] = None,
+      mode_filter: Optional[str] = None,
+      model_name_filter: Optional[str] = None) -> Sequence[BenchmarkCase]:
+    """Filters benchmarks in a specific category for the given device.
+      Args:
+        category: the specific benchmark category.
+        available_drivers: list of drivers supported by the tools. None means to
+          match any driver.
+        available_loaders: list of executable loaders supported by the tools.
+          None means to match any loader.
+        cpu_target_arch_filter: CPU target architecture filter regex.
+        gpu_target_arch_filter: GPU target architecture filter regex.
+        driver_filter: driver filter regex.
+        mode_filter: benchmark mode regex.
+        model_name_filter: model name regex.
+      Returns:
+        A list of matched benchmark cases.
+    """,
 
-  return matched_benchmarks
+    category_dir = self.category_map.get(category)
+    if category_dir is None:
+      return []
+
+    chosen_cases = []
+    for benchmark_case in self.suite_map[category_dir]:
+      config_info = IREE_DRIVERS_INFOS[benchmark_case.config.lower()]
+
+      driver_name = config_info.driver_name
+      matched_available_driver = (available_drivers is None or
+                                  driver_name in available_drivers)
+      matched_drivler_filter = driver_filter is None or re.match(
+          driver_filter, driver_name) is not None
+      matched_driver = matched_available_driver and matched_drivler_filter
+
+      matched_loader = not config_info.loader_name or available_loaders is None or (
+          config_info.loader_name in available_loaders)
+
+      target_arch = benchmark_case.target_arch.lower()
+      matched_cpu_arch = (cpu_target_arch_filter is not None and re.match(
+          cpu_target_arch_filter, target_arch) is not None)
+      matched_gpu_arch = (gpu_target_arch_filter is not None and re.match(
+          gpu_target_arch_filter, target_arch) is not None)
+      matched_arch = (matched_cpu_arch or matched_gpu_arch or
+                      (cpu_target_arch_filter is None and
+                       gpu_target_arch_filter is None))
+      bench_mode = ','.join(benchmark_case.bench_mode)
+      matched_mode = (mode_filter is None or
+                      re.match(mode_filter, bench_mode) is not None)
+
+      # For backward compatibility, model_name_filter matches against the string:
+      #   <model name with tags>/<benchmark case name>
+      model_name_with_tags = benchmark_case.model_name
+      if len(benchmark_case.model_tags) > 0:
+        model_name_with_tags += f"-{','.join(benchmark_case.model_tags)}"
+      model_and_case_name = f"{model_name_with_tags}/{os.path.basename(benchmark_case.benchmark_case_dir)}"
+      matched_model_name = (model_name_filter is None or re.match(
+          model_name_filter, model_and_case_name) is not None)
+
+      if (matched_driver and matched_loader and matched_arch and
+          matched_model_name and matched_mode):
+        chosen_cases.append(benchmark_case)
+
+    return chosen_cases
+
+  @staticmethod
+  def load_from_benchmark_suite_dir(benchmark_suite_dir: str):
+    """Scans and loads the benchmarks under the directory."""
+
+    suite_map: Dict[str, List[BenchmarkCase]] = collections.defaultdict(list)
+    for benchmark_case_dir, _, _ in os.walk(benchmark_suite_dir):
+      model_dir, benchmark_name = os.path.split(benchmark_case_dir)
+      # Take the benchmark directory name and see if it matches the benchmark
+      # naming convention:
+      #   <iree-driver>__<target-architecture>__<benchmark_mode>
+      segments = benchmark_name.split("__")
+      if len(segments) != 3 or not segments[0].startswith("iree-"):
+        continue
+
+      config, target_arch, bench_mode = segments
+      bench_mode = bench_mode.split(",")
+
+      # The path of model_dir is expected to be:
+      #   <benchmark_suite_dir>/<category>/<model_name>-<model_tags>
+      category_dir, model_name_with_tags = os.path.split(model_dir)
+      model_name_parts = model_name_with_tags.split("-", 1)
+      model_name = model_name_parts[0]
+      if len(model_name_parts) == 2:
+        model_tags = model_name_parts[1].split(",")
+      else:
+        model_tags = []
+
+      with open(os.path.join(benchmark_case_dir, MODEL_TOOLFILE_NAME),
+                "r") as f:
+        tool_name = f.read().strip()
+
+      suite_map[category_dir].append(
+          BenchmarkCase(model_name=model_name,
+                        model_tags=model_tags,
+                        bench_mode=bench_mode,
+                        target_arch=target_arch,
+                        config=config,
+                        benchmark_case_dir=benchmark_case_dir,
+                        benchmark_tool_name=tool_name))
+
+    return BenchmarkSuite(suite_map=suite_map)

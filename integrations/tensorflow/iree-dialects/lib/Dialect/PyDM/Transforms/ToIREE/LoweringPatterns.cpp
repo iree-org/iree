@@ -7,6 +7,7 @@
 #include "iree-dialects/Dialect/Input/InputOps.h"
 #include "iree-dialects/Dialect/PyDM/IR/PyDMOps.h"
 #include "iree-dialects/Dialect/PyDM/Transforms/ToIREE/Patterns.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -661,7 +662,7 @@ class FuncOpConversion : public OpConversionPattern<PYDM::FuncOp> {
     auto newFuncType = mlir::FunctionType::get(
         srcOp.getContext(), signatureConversion.getConvertedTypes(),
         convertedResultTypes);
-    auto newFuncOp = rewriter.create<mlir::FuncOp>(
+    auto newFuncOp = rewriter.create<func::FuncOp>(
         srcOp.getLoc(), srcOp.getName(), newFuncType);
     newFuncOp.setVisibility(srcOp.getVisibility());
     rewriter.inlineRegionBefore(srcOp.getBody(), newFuncOp.getBody(),
@@ -836,7 +837,7 @@ class RaiseOnFailureOpConversion
     Value status = adaptor.getOperands()[0];
     // Get the containing function return type so that we can create a
     // suitable null return value.
-    auto parentFunc = srcOp->getParentOfType<mlir::FuncOp>();
+    auto parentFunc = srcOp->getParentOfType<func::FuncOp>();
     if (!parentFunc)
       return rewriter.notifyMatchFailure(srcOp, "not contained by a func");
     Type convertedReturnType = parentFunc.getFunctionType().getResult(1);

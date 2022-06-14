@@ -37,7 +37,7 @@ class VerifyFullyConvertedPass
 
 }  // anonymous namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createVerifyFullyConvertedPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createVerifyFullyConvertedPass() {
   return std::make_unique<VerifyFullyConvertedPass>();
 }
 

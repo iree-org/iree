@@ -56,6 +56,7 @@ td_library(
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:PDLDialectTdFiles",
         "@llvm-project//mlir:SideEffectTdFiles",
+        "@llvm-project//mlir:TransformDialectTdFiles",
     ],
 )
 
@@ -68,27 +69,27 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
-            ["-gen-dialect-decls"],
+            ["--gen-dialect-decls"],
             "include/iree-dialects/Dialect/Input/InputDialect.h.inc",
         ),
         (
-            ["-gen-dialect-defs"],
+            ["--gen-dialect-defs"],
             "include/iree-dialects/Dialect/Input/InputDialect.cpp.inc",
         ),
         (
-            ["-gen-op-decls"],
+            ["--gen-op-decls"],
             "include/iree-dialects/Dialect/Input/InputOps.h.inc",
         ),
         (
-            ["-gen-op-defs"],
+            ["--gen-op-defs"],
             "include/iree-dialects/Dialect/Input/InputOps.cpp.inc",
         ),
         (
-            ["-gen-typedef-decls"],
+            ["--gen-typedef-decls"],
             "include/iree-dialects/Dialect/Input/InputTypes.h.inc",
         ),
         (
-            ["-gen-typedef-defs"],
+            ["--gen-typedef-defs"],
             "include/iree-dialects/Dialect/Input/InputTypes.cpp.inc",
         ),
     ],
@@ -119,8 +120,8 @@ gentbl_filegroup(
     tbl_outs = [
         (
             [
-                "-gen-python-op-bindings",
-                "-bind-dialect=iree",
+                "--gen-python-op-bindings",
+                "--bind-dialect=iree",
             ],
             "python/iree/compiler/dialects/_iree_ops_gen.py",
         ),
@@ -159,32 +160,32 @@ gentbl_cc_library(
     tbl_outs = [
         (
             [
-                "-dialect=iree_linalg_ext",
-                "-gen-dialect-decls",
+                "--dialect=iree_linalg_ext",
+                "--gen-dialect-decls",
             ],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h.inc",
         ),
         (
             [
-                "-dialect=iree_linalg_ext",
-                "-gen-dialect-defs",
+                "--dialect=iree_linalg_ext",
+                "--gen-dialect-defs",
             ],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.cpp.inc",
         ),
         (
-            ["-gen-op-decls"],
+            ["--gen-op-decls"],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h.inc",
         ),
         (
-            ["-gen-op-defs"],
+            ["--gen-op-defs"],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc",
         ),
         (
-            ["-gen-typedef-decls"],
+            ["--gen-typedef-decls"],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtTypes.h.inc",
         ),
         (
-            ["-gen-typedef-defs"],
+            ["--gen-typedef-defs"],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtTypes.cpp.inc",
         ),
     ],
@@ -205,19 +206,19 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
-            ["-gen-op-interface-decls"],
+            ["--gen-op-interface-decls"],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtOpInterfaces.h.inc",
         ),
         (
-            ["-gen-op-interface-defs"],
+            ["--gen-op-interface-defs"],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtOpInterfaces.cpp.inc",
         ),
         (
-            ["-gen-type-interface-decls"],
+            ["--gen-type-interface-decls"],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtTypeInterfaces.h.inc",
         ),
         (
-            ["-gen-type-interface-defs"],
+            ["--gen-type-interface-defs"],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtTypeInterfaces.cpp.inc",
         ),
     ],
@@ -233,11 +234,11 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
-            ["-gen-op-interface-decls"],
+            ["--gen-op-interface-decls"],
             "include/iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h.inc",
         ),
         (
-            ["-gen-op-interface-defs"],
+            ["--gen-op-interface-defs"],
             "include/iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.cpp.inc",
         ),
     ],
@@ -253,15 +254,15 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
-            ["-gen-pass-decls"],
+            ["--gen-pass-decls"],
             "include/iree-dialects/Dialect/LinalgExt/Passes/Passes.h.inc",
         ),
         (
-            ["-gen-pass-capi-header"],
+            ["--gen-pass-capi-header"],
             "include/iree-dialects/Dialect/LinalgExt/Passes/Passes.capi.h.inc",
         ),
         (
-            ["-gen-pass-capi-impl"],
+            ["--gen-pass-capi-impl"],
             "include/iree-dialects/Dialect/LinalgExt/Passes/Passes.capi.cpp.inc",
         ),
     ],
@@ -289,6 +290,7 @@ cc_library(
         ":IREELinalgExtTiledOpInterfacesIncGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ArithmeticUtils",
         "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:DialectUtils",
@@ -341,6 +343,43 @@ cc_library(
     ],
 )
 
+gentbl_cc_library(
+    name = "IREELinalgExtTransformOpsIncGen",
+    strip_include_prefix = "include",
+    tbl_outs = [
+        (
+            ["--gen-op-decls"],
+            "include/iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "include/iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.td",
+    deps = [
+        ":TdFiles",
+        "@llvm-project//mlir:SideEffectInterfacesTdFiles",
+    ],
+)
+
+cc_library(
+    name = "IREELinalgExtTransformOps",
+    srcs = glob(["lib/Dialect/LinalgExt/TransformOps/*.cpp"]),
+    hdrs = glob(["include/iree-dialects/Dialect/LinalgExt/TransformOps/*.h"]),
+    deps = [
+        ":IREEDialectsTransforms",
+        ":IREELinalgExtDialect",
+        ":IREELinalgExtTransformOpsIncGen",
+        ":IREELinalgExtTransforms",
+        ":IREELinalgTransformDialect",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:TransformDialect",
+    ],
+)
+
 cc_library(
     name = "IREELinalgExtTransforms",
     srcs = glob([
@@ -357,11 +396,13 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:ArithmeticUtils",
         "@llvm-project//mlir:Async",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgInterfaces",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgStructuredOpsIncGen",
         "@llvm-project//mlir:LinalgTransforms",
@@ -388,27 +429,27 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
-            ["-gen-dialect-decls"],
+            ["--gen-dialect-decls"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMDialect.h.inc",
         ),
         (
-            ["-gen-dialect-defs"],
+            ["--gen-dialect-defs"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMDialect.cpp.inc",
         ),
         (
-            ["-gen-op-decls"],
+            ["--gen-op-decls"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMOps.h.inc",
         ),
         (
-            ["-gen-op-defs"],
+            ["--gen-op-defs"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMOps.cpp.inc",
         ),
         (
-            ["-gen-typedef-decls"],
+            ["--gen-typedef-decls"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMTypes.h.inc",
         ),
         (
-            ["-gen-typedef-defs"],
+            ["--gen-typedef-defs"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMTypes.cpp.inc",
         ),
     ],
@@ -427,19 +468,19 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
-            ["-gen-op-interface-decls"],
+            ["--gen-op-interface-decls"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMOpInterfaces.h.inc",
         ),
         (
-            ["-gen-op-interface-defs"],
+            ["--gen-op-interface-defs"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMOpInterfaces.cpp.inc",
         ),
         (
-            ["-gen-type-interface-decls"],
+            ["--gen-type-interface-decls"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMTypeInterfaces.h.inc",
         ),
         (
-            ["-gen-type-interface-defs"],
+            ["--gen-type-interface-defs"],
             "include/iree-dialects/Dialect/PyDM/IR/PyDMTypeInterfaces.cpp.inc",
         ),
     ],
@@ -455,15 +496,15 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
-            ["-gen-pass-decls"],
+            ["--gen-pass-decls"],
             "include/iree-dialects/Dialect/PyDM/Transforms/Passes.h.inc",
         ),
         (
-            ["-gen-pass-capi-header"],
+            ["--gen-pass-capi-header"],
             "include/iree-dialects/Dialect/PyDM/Transforms/Passes.capi.h.inc",
         ),
         (
-            ["-gen-pass-capi-impl"],
+            ["--gen-pass-capi-impl"],
             "include/iree-dialects/Dialect/PyDM/Transforms/Passes.capi.cpp.inc",
         ),
     ],
@@ -480,8 +521,8 @@ gentbl_filegroup(
     tbl_outs = [
         (
             [
-                "-gen-python-op-bindings",
-                "-bind-dialect=iree_pydm",
+                "--gen-python-op-bindings",
+                "--bind-dialect=iree_pydm",
             ],
             "python/iree/compiler/dialects/_iree_pydm_ops_gen.py",
         ),
@@ -562,24 +603,24 @@ gentbl_cc_library(
     tbl_outs = [
         (
             [
-                "-dialect=iree_linalg_transform",
-                "-gen-dialect-decls",
+                "--dialect=iree_linalg_transform",
+                "--gen-dialect-decls",
             ],
             "include/iree-dialects/Dialect/LinalgTransform/LinalgTransformDialect.h.inc",
         ),
         (
             [
-                "-dialect=iree_linalg_transform",
-                "-gen-dialect-defs",
+                "--dialect=iree_linalg_transform",
+                "--gen-dialect-defs",
             ],
             "include/iree-dialects/Dialect/LinalgTransform/LinalgTransformDialect.cpp.inc",
         ),
         (
-            ["-gen-op-decls"],
+            ["--gen-op-decls"],
             "include/iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h.inc",
         ),
         (
-            ["-gen-op-defs"],
+            ["--gen-op-defs"],
             "include/iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.cpp.inc",
         ),
     ],
@@ -596,16 +637,36 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
-            ["-gen-op-interface-decls"],
+            ["--gen-op-interface-decls"],
             "include/iree-dialects/Dialect/LinalgTransform/TransformOpInterface.h.inc",
         ),
         (
-            ["-gen-op-interface-defs"],
+            ["--gen-op-interface-defs"],
             "include/iree-dialects/Dialect/LinalgTransform/TransformOpInterface.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "include/iree-dialects/Dialect/LinalgTransform/TransformOpInterface.td",
+    deps = [
+        ":TdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "IREELinalgTransformStructuredIncGen",
+    strip_include_prefix = "include",
+    tbl_outs = [
+        (
+            ["--gen-op-decls"],
+            "include/iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "include/iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.td",
     deps = [
         ":TdFiles",
     ],
@@ -627,8 +688,11 @@ cc_library(
         ":IREELinalgExtTransforms",
         ":IREELinalgTransformIncGen",
         ":IREELinalgTransformInterfacesIncGen",
+        ":IREELinalgTransformStructuredIncGen",
         "@llvm-project//llvm:Support",
         # Dialects
+        "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:AffineUtils",
         "@llvm-project//mlir:Async",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:BufferizationDialect",
@@ -638,7 +702,10 @@ cc_library(
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:SCFUtils",
+        "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TransformDialect",
         # IR
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
@@ -651,7 +718,6 @@ cc_library(
         "@llvm-project//mlir:AsyncTransforms",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:AffineToStandard",
-        "@llvm-project//mlir:ModuleBufferization",
         "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:ReconcileUnrealizedCasts",
@@ -671,12 +737,11 @@ cc_library(
 )
 
 cc_library(
-    name = "IREELinalgTransformDialectTransforms",
+    name = "IREELinalgTransformDialectPasses",
     srcs = glob([
-        "lib/Dialect/LinalgTransform/Transforms/*.cpp",
+        "lib/Dialect/LinalgTransform/Passes/*.cpp",
     ]),
     hdrs = [
-        "include/iree-dialects/Dialect/LinalgTransform/TrackingCSE.h",
         "include/iree-dialects/Dialect/LinalgTransform/TrackingListener.h",
         "include/iree-dialects/Dialect/LinalgTransform/TrackingRewriteDriver.h",
     ],
@@ -687,8 +752,10 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineUtils",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ArithmeticTransforms",
         "@llvm-project//mlir:BufferizationDialect",
+        "@llvm-project//mlir:BufferizationTransforms",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
@@ -697,7 +764,6 @@ cc_library(
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:MemRefDialect",
-        "@llvm-project//mlir:ModuleBufferization",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:PDLInterpDialect",
         "@llvm-project//mlir:Parser",
@@ -710,6 +776,7 @@ cc_library(
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:TensorUtils",
+        "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorOps",
@@ -730,12 +797,16 @@ cc_library(
     deps = [
         ":IREEInputDialect",
         ":IREELinalgExtDialect",
+        ":IREELinalgExtTransformOps",
         ":IREELinalgTransformDialect",
+        ":IREELinalgTransformDialectPasses",
         ":IREEPyDMDialect",
         ":IREEPyDMTransforms",
         "@llvm-project//mlir:CAPIIR",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgTransformOps",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformDialect",
     ],
 )
 
@@ -752,7 +823,7 @@ cc_library(
         ":IREEDialectsTransforms",
         ":IREELinalgExtDialect",
         ":IREELinalgTransformDialect",
-        ":IREELinalgTransformDialectTransforms",
+        ":IREELinalgTransformDialectPasses",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Rewrite",
@@ -776,17 +847,20 @@ cc_binary(
         ":IREEInputDialect",
         ":IREELinalgExtDialect",
         ":IREELinalgExtPasses",
+        ":IREELinalgExtTransformOps",
         ":IREELinalgTransformDialect",
-        ":IREELinalgTransformDialectTransforms",
+        ":IREELinalgTransformDialectPasses",
         ":IREEPyDMDialect",
         ":IREEPyDMTransforms",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:Async",
         "@llvm-project//mlir:ControlFlowOps",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:LinalgTransformOps",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:MlirOptLib",
         "@llvm-project//mlir:PDLDialect",
@@ -794,6 +868,7 @@ cc_binary(
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:Transforms",
     ],
 )

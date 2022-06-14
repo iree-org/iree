@@ -60,7 +60,8 @@ to low-level parallel pipelined hardware/API like
 dense computation on the hardware in the form of hardware/API-specific binaries
 like [SPIR-V](https://www.khronos.org/spir/).
 
-![IREE Architecture](assets/images/iree_architecture.svg)
+![IREE Architecture](assets/images/iree_architecture_dark.svg#gh-dark-mode-only)
+![IREE Architecture](assets/images/iree_architecture.svg#gh-light-mode-only)
 
 ## Workflow overview
 
@@ -73,7 +74,7 @@ general steps:
     Develop your program using one of the [supported frameworks](./getting-started/#supported-frameworks), then run your model
     using one of IREE's import tools.
 
-2. **Select your [deployment configuration](./deployment-configurations)**
+2. **Select your [deployment configuration](./deployment-configurations/)**
 
     Identify your target platform, accelerator(s), and other constraints.
 
@@ -120,7 +121,7 @@ associated scheduling logic.
 For example, compiling for
 [GPU execution](deployment-configurations/gpu-vulkan.md) using Vulkan generates
 SPIR-V kernels and Vulkan API calls. For
-[CPU execution](deployment-configurations/cpu-dylib.md), native code with
+[CPU execution](deployment-configurations/cpu.md), native code with
 static or dynamic linkage and the associated function calls are generated.
 
 ### Running models

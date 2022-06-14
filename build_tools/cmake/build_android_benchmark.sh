@@ -34,7 +34,7 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 cd "${ROOT_DIR}"
 
 # BUILD the iree-import-tflite binary for importing models to benchmark from
-# TFLite flatbuffers.
+# TFLite FlatBuffers.
 cd "${ROOT_DIR}/integrations/tensorflow"
 BAZEL_CMD=(bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree-tf.bazelrc)
 BAZEL_BINDIR="$(${BAZEL_CMD[@]} info bazel-bin)"
@@ -64,11 +64,17 @@ cd build-host
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_BENCHMARKS=ON \
+  -DIREE_BUILD_MICROBENCHMARKS=ON \
   -DIREE_BUILD_SAMPLES=OFF
 
 "${CMAKE_BIN}" --build . --target install -- -k 0
 # Also generate artifacts for benchmarking on Android.
-"${CMAKE_BIN}" --build . --target iree-benchmark-suites -- -k 0
+"${CMAKE_BIN}" --build . --target \
+  iree-benchmark-suites-android-arm64-v8a \
+  iree-benchmark-suites-android-adreno \
+  iree-benchmark-suites-android-mali \
+  -- -k 0
+"${CMAKE_BIN}" --build . --target iree-microbenchmark-suites -- -k 0
 # --------------------------------------------------------------------------- #
 
 # --------------------------------------------------------------------------- #

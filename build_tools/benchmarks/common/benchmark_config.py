@@ -40,6 +40,7 @@ class BenchmarkConfig:
     root_benchmark_dir: the root directory containing the built benchmark
       suites.
     benchmark_results_dir: the directory to store benchmark results files.
+    git_commit_hash: the git commit hash.
     normal_benchmark_tool_dir: the path to the non-traced benchmark tool
       directory.
     trace_capture_config: the config for capturing traces. Set if and only if
@@ -59,6 +60,7 @@ class BenchmarkConfig:
 
   root_benchmark_dir: str
   benchmark_results_dir: str
+  git_commit_hash: str
 
   normal_benchmark_tool_dir: Optional[str] = None
   trace_capture_config: Optional[TraceCaptureConfig] = None
@@ -76,8 +78,7 @@ class BenchmarkConfig:
     
     Args:
       args: the command arguments.
-      git_commit_hash: the commit hash to separete different benchmark runs in
-        the temporary directory.
+      git_commit_hash: the git commit hash of IREE.
     """
 
     def real_path_or_none(path: str) -> Optional[str]:
@@ -112,6 +113,7 @@ class BenchmarkConfig:
         root_benchmark_dir=os.path.join(build_dir, BENCHMARK_SUITE_REL_PATH),
         benchmark_results_dir=os.path.join(per_commit_tmp_dir,
                                            BENCHMARK_RESULTS_REL_PATH),
+        git_commit_hash=git_commit_hash,
         normal_benchmark_tool_dir=real_path_or_none(
             args.normal_benchmark_tool_dir),
         trace_capture_config=trace_capture_config,

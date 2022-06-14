@@ -67,8 +67,8 @@ as an example and assuming the serving signature is `predict`:
 
 ``` shell
 iree-import-tf
-  -tf-import-type=savedmodel_v1 \
-  -tf-savedmodel-exported-names=predict \
+  --tf-import-type=savedmodel_v1 \
+  --tf-savedmodel-exported-names=predict \
   /path/to/savedmodel -o iree_input.mlir
 ```
 
@@ -83,7 +83,7 @@ iree-import-tf
     and v2 if you see one of them gives an empty dump.
 
 Afterwards you can further compile the model in `iree_input.mlir` for
-[CPU](../deployment-configurations/cpu-dylib.md) or
+[CPU](../deployment-configurations/cpu.md) or
 [GPU](../deployment-configurations/gpu-vulkan.md).
 
 <!-- TODO(??): overview of APIs available, code snippets (lift from Colab?) -->
@@ -97,10 +97,10 @@ Afterwards you can further compile the model in `iree_input.mlir` for
 
 | Colab notebooks |  |
 | -- | -- |
-Training an MNIST digits classifier | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/mnist_training.ipynb)
-Edge detection module | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/edge_detection.ipynb)
-Pretrained ResNet50 inference | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/resnet.ipynb)
-TensorFlow Hub Import | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/tensorflow_hub_import.ipynb)
+Training an MNIST digits classifier | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/samples/colab/mnist_training.ipynb)
+Edge detection module | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/samples/colab/edge_detection.ipynb)
+Pretrained ResNet50 inference | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/samples/colab/resnet.ipynb)
+TensorFlow Hub Import | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/samples/colab/tensorflow_hub_import.ipynb)
 
 End-to-end execution tests can be found in IREE's
 [integrations/tensorflow/e2e/](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e)

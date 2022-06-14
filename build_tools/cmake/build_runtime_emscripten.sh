@@ -41,11 +41,20 @@ cd build-emscripten
 # Configure using Emscripten's CMake wrapper, then build.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \
   -DIREE_HOST_BINARY_ROOT=$PWD/../build-host/install \
-  -DIREE_HAL_DRIVER_DEFAULTS=OFF \
-  -DIREE_HAL_DRIVER_VMVX=ON \
   -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_BUILD_TESTS=OFF \
+  -DIREE_HAL_DRIVER_DEFAULTS=OFF \
+  -DIREE_HAL_DRIVER_LOCAL_SYNC=ON \
+  -DIREE_HAL_DRIVER_LOCAL_TASK=ON \
+  -DIREE_HAL_EXECUTABLE_LOADER_DEFAULTS=OFF \
+  -DIREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE=ON \
+  -DIREE_ENABLE_CPUINFO=OFF \
+  -DIREE_BUILD_TESTS=ON \
   -DIREE_BUILD_SAMPLES=ON
 
-# TODO(scotttodd): expand this list of targets
-"${CMAKE_BIN?}" --build . --target iree_samples_simple_embedding_simple_embedding_vmvx_sync -- -k 0
+echo "Building default targets"
+echo "------------------------"
+"${CMAKE_BIN?}" --build . -- -k 0
+
+echo "Building test deps"
+echo "------------------"
+"${CMAKE_BIN?}" --build . --target iree-test-deps -- -k 0
