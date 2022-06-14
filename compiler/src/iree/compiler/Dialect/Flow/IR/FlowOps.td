@@ -552,6 +552,7 @@ def FLOW_ExecutableEndOp : FLOW_Op<"executable_end", [
 def FLOW_ExecutableExportOp : FLOW_Op<"executable.export", [
   HasParent<"IREE::Flow::ExecutableOp">,
   Symbol,
+  IsolatedFromAbove,
 ]> {
   let summary = [{defines an executable entry point for dispatch operations}];
   let description = [{
