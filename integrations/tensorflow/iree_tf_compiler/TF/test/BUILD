@@ -31,7 +31,11 @@ iree_lit_test_suite(
         include = ["*.mlir"],
     ),
     tools = [
-        "//iree_tf_compiler:iree-tf-opt",
+
+
+
+
+
         "@llvm-project//llvm:FileCheck",
     ],
 )
