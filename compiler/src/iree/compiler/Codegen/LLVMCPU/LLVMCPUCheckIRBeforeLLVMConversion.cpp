@@ -6,11 +6,17 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
 namespace iree_compiler {
+
+static llvm::cl::opt<int> clMaxAllocationSizeInBytes(
+    "iree-llvmcpu-stack-allocation-limit",
+    llvm::cl::desc("maximum allowed stack allocation size in bytes"),
+    llvm::cl::init(32768));
 
 namespace {
 struct LLVMCPUCheckIRBeforeLLVMConversionPass
@@ -49,11 +55,11 @@ void LLVMCPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
   if (walkResult.wasInterrupted()) {
     return signalPassFailure();
   }
-  constexpr int k32KBInBits = 32 * 1024 * 8;
-  if (totalBits > k32KBInBits) {
+  int maxAllocationSizeInBits = clMaxAllocationSizeInBytes * 8;
+  if (totalBits > maxAllocationSizeInBits) {
     moduleOp.emitOpError(
-        "expected total size of stack allocation is not greater than 32 KB, "
-        "but got ")
+        "expected total size of stack allocation is not greater than ")
+        << clMaxAllocationSizeInBytes.getValue() << " bytes, but got "
         << llvm::divideCeil(totalBits, 8) << " bytes";
     return signalPassFailure();
   }
