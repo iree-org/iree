@@ -54,9 +54,9 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_target_t)(
     iree_vm_stack_t* stack, void* module, void* module_state);
 
 typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_shim_t)(
-    iree_vm_stack_t* stack, const iree_vm_function_call_t* call,
-    iree_vm_native_function_target_t target_fn, void* module,
-    void* module_state, iree_vm_execution_result_t* out_result);
+    iree_vm_stack_t* stack, iree_byte_span_t args_storage,
+    iree_byte_span_t rets_storage, iree_vm_native_function_target_t target_fn,
+    void* module, void* module_state, iree_vm_execution_result_t* out_result);
 
 // An entry in the function pointer table.
 typedef struct iree_vm_native_function_ptr_t {

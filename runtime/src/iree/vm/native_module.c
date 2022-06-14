@@ -313,7 +313,8 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_begin_call(
   const iree_vm_native_function_ptr_t* function_ptr =
       &module->descriptor->functions[call->function.ordinal];
   iree_vm_module_state_t* module_state = callee_frame->module_state;
-  iree_status_t status = function_ptr->shim(stack, call, function_ptr->target,
+  iree_status_t status = function_ptr->shim(stack, call->arguments,
+                                            call->results, function_ptr->target,
                                             module, module_state, out_result);
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
 #if IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS

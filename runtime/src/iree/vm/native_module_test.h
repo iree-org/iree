@@ -45,7 +45,9 @@ typedef iree_status_t (*call_i32_i32_t)(iree_vm_stack_t* stack,
 // non-VM code or may be internally referenced using a target-specific ABI.
 // TODO(benvanik): generate/export these shims/call functions in stack.h.
 static iree_status_t call_shim_i32_i32(iree_vm_stack_t* stack,
-                                       const iree_vm_function_call_t* call,
+                                       iree_vm_native_function_flags_t flags,
+                                       iree_byte_span_t args_storage,
+                                       iree_byte_span_t rets_storage,
                                        call_i32_i32_t target_fn, void* module,
                                        void* module_state,
                                        iree_vm_execution_result_t* out_result) {
@@ -59,8 +61,8 @@ static iree_status_t call_shim_i32_i32(iree_vm_stack_t* stack,
     int32_t ret0;
   } results_t;
 
-  const args_t* args = (const args_t*)call->arguments.data;
-  results_t* results = (results_t*)call->results.data;
+  const args_t* args = (const args_t*)args_storage.data;
+  results_t* results = (results_t*)rets_storage.data;
 
   // For simple cases like this (zero or 1 result) we can tail-call.
   return target_fn(stack, module, module_state, args->arg0, &results->ret0);
