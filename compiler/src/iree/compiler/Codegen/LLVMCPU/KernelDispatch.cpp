@@ -540,7 +540,7 @@ static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,
   assert(succeeded(variantOp) && "ExecutableVariantOp not found");
 
   if (isX86(*variantOp) || isRISCV(*variantOp)) {
-    matmulTileSizes = {8, 32, 16};
+    matmulTileSizes = {8, 32, 1};
   } else if (isAArch64(*variantOp)) {
     if (isQuantized) {
       matmulTileSizes = {vectorSize, vectorSize * 4, vectorSize};
