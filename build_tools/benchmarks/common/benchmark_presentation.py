@@ -10,9 +10,9 @@ import urllib.parse
 import markdown_strings as md
 
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Generic, Optional, Sequence, Tuple, TypeVar
+from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, Tuple, TypeVar
 
-from .benchmark_definition import BenchmarkResults, CompilationResults
+from .benchmark_definition import BenchmarkResults, CompilationInfo, CompilationResults
 from .benchmark_thresholds import BENCHMARK_THRESHOLDS, COMPILATION_TIME_THRESHOLDS, TOTAL_DISPATCH_SIZE_THRESHOLDS, BenchmarkThreshold, ThresholdUnit
 
 GetMetricFunc = Callable[[Any], Tuple[int, Optional[int]]]
@@ -42,6 +42,7 @@ class AggregateBenchmarkLatency:
 @dataclass
 class CompilationMetrics:
   """An object for describing the summary of statistics and the reference."""
+  compilation_info: CompilationInfo
   compilation_time: int
   total_dispatch_component_size: int
   base_compilation_time: Optional[int] = None
@@ -128,10 +129,11 @@ class TotalDispatchSizeToTable(MetricsToTableMapper[CompilationMetrics]):
     return "Total Dispatch Size (bytes)"
 
 
-COMPILATION_METRICS_TO_TABLE_MAPPERS = [
-    CompilationTimeToTable(),
-    TotalDispatchSizeToTable(),
-]
+COMPILATION_METRICS_TO_TABLE_MAPPERS: List[
+    MetricsToTableMapper[CompilationMetrics]] = [
+        CompilationTimeToTable(),
+        TotalDispatchSizeToTable(),
+    ]
 
 
 def aggregate_all_benchmarks(
@@ -206,6 +208,7 @@ def collect_all_compilation_metrics(
       component_sizes = compile_stats.module_component_sizes
       name = str(compile_stats.compilation_info)
       compile_metrics[name] = CompilationMetrics(
+          compilation_info=compile_stats.compilation_info,
           compilation_time=compile_stats.compilation_time,
           total_dispatch_component_size=component_sizes.
           total_dispatch_component_size)
