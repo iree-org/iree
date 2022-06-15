@@ -183,7 +183,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   int64_t flatWorkgroupSize =
       workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
   int subgroupSize =
-      getSPIRVTargetEnvAttr(funcOp).getResourceLimits().getSubgroup_size();
+      getSPIRVTargetEnvAttr(funcOp).getResourceLimits().getSubgroupSize();
 
   funcOp.walk([&](Operation *op) {
     if (isa<linalg::FillOp, linalg::GenericOp>(op)) {

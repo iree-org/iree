@@ -92,7 +92,7 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
   // TODO: Use some heuristics to deduce how many subgroups should be used and
   // the tile sizes for each subgroup, considering the input workload size and
   // native cooperative matrix size choices.
-  int subgroupSize = resourceLimits.getSubgroup_size();
+  int subgroupSize = resourceLimits.getSubgroupSize();
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
 
   TileSizesListType tileSizes;
@@ -140,7 +140,7 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
 
 LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
                                      Operation *rootOp) {
-  int subgroupSize = targetEnv.getResourceLimits().getSubgroup_size();
+  int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
 
   // First try to see if we can use tensor cores.
   if (auto matmulOp = dyn_cast<linalg::MatmulOp>(rootOp)) {
