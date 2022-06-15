@@ -207,7 +207,8 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
           CU_RESULT_TO_STATUS(allocator->context->syms,
                               cuMemAllocManaged(&device_ptr, allocation_size,
                                                 CU_MEM_ATTACH_GLOBAL));
-      if (iree_status_is_ok(status)) {
+      if (iree_status_is_ok(status) &&
+          allocator->supports_concurrent_managed_access) {
         // Prefetch the buffer on the GPU device.
         status = CU_RESULT_TO_STATUS(
             allocator->context->syms,

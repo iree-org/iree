@@ -152,7 +152,7 @@ static LogicalResult deriveAllowedResourceBufferBits(
       // Today we assume they are device-local|host-visible just for
       // practical purposes but that does not have to be true. We really
       // want this to be something we analyze and handle on the edges
-      // (transfering devices/etc if needed).
+      // (transferring devices/etc if needed).
       memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal |
                     IREE::HAL::MemoryTypeBitfield::HostVisible;
       // NOTE: we may not map it but users may after they get them back.
