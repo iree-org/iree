@@ -1,0 +1,56 @@
+cff-version: 1.2.0
+title: >-
+  TinyIREE: An ML Execution Environment for Embedded
+  Systems from Compilation to Deployment
+message: >-
+  If you use IREE in your research, please cite it
+  using these metadata. Software is available from
+  https://google.github.io/iree/.
+abstract: >-
+  Deep learning frameworks automate the deployment,
+  distribution, synchronization, memory allocation,
+  and hardware acceleration of models represented as
+  graphs of computational operators. These operators
+  wrap high-performance libraries such as cuDNN or
+  NNPACK. When the computation does not match any
+  predefined library call, custom operators must be
+  implemented, often at high engineering cost and
+  performance penalty, limiting the pace of innovation.
+  To address this productivity gap, we propose and
+  evaluate: (1) a domain-specific language with a
+  tensor notation close to the mathematics of deep
+  learning; (2) a Just-In-Time optimizing compiler
+  based on the polyhedral framework; (3) carefully
+  coordinated linear optimization and evolutionary
+  algorithms to synthesize high-performance CUDA
+  kernels; (4) the transparent integration of our flow
+  into PyTorch and Caffe2, providing the fully automatic
+  synthesis of high-performance GPU kernels from simple
+  tensor algebra. The performance is comparable to, and
+  often exceeds the performance of, highly tuned
+  libraries.
+authors:
+  - family-names: Cindy Liu
+    given-names: Hsin-I
+    affiliation: Google
+  - family-names: Brehler
+    given-names: Marius
+    affiliation: Google
+  - family-names: Ravishankar
+    given-names: Mahesh
+    affiliation: Google
+  - family-names: Vasilache
+    given-names: Nicolas
+  - given-names: Ben
+    family-names: Vanik
+    affiliation: Google
+  - given-names: Stella
+    family-names: Laurenzo
+    affiliation: Google
+identifiers:
+  - type: doi
+    value: 10.48550/arXiv.2205.14479
+    description: The concept DOI for the collection containing all versions of the Citation File Format.
+date-released: "2022-05-28"
+license: "Apache-2.0"
+doi: 10.48550/arXiv.2205.14479
