@@ -1,4 +1,5 @@
-// RUN: iree-dialects-opt --transform-dialect-interpreter %s | FileCheck %s
+// TODO(#9510): Enable the test.
+// NO-RUN: iree-dialects-opt --transform-dialect-interpreter %s | FileCheck %s
 
 func.func @fun_to_benchmark(%arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32>) ->
     tensor<128x128xf32> attributes {passthrough = ["noinline", ["target-cpu", "skylake-avx512"], ["prefer-vector-width", "512"]]} {

@@ -1,4 +1,5 @@
-// RUN: iree-dialects-opt --transform-dialect-interpreter %s | FileCheck %s
+// TODO(#9510): Enable the test.
+// NO-RUN: iree-dialects-opt --transform-dialect-interpreter %s | FileCheck %s
 
 // CHECK-LABEL: func.func @matmul_tensors(
 func.func @matmul_tensors(
