@@ -32,19 +32,19 @@ jobs:
       matrix:
         include:
           # Ubuntu packages.
-          - runner: [self-hosted, cpu]
+          - runner: [self-hosted, cpu, trust=high, releaser, Linux, X64]
             build_family: linux
             build_package: main-dist-linux
             experimental: false
-          - runner: [self-hosted, cpu]
+          - runner: [self-hosted, cpu, trust=high, releaser, Linux, X64]
             build_family: linux
             build_package: py-compiler-pkg
             experimental: false
-          - runner: [self-hosted, cpu]
+          - runner: [self-hosted, cpu, trust=high, releaser, Linux, X64]
             build_family: linux
             build_package: py-runtime-pkg
             experimental: false
-          - runner: [self-hosted, cpu]
+          - runner: [self-hosted, cpu, trust=high, releaser, Linux, X64]
             build_family: linux
             build_package: py-tf-compiler-tools-pkg
             experimental: false
