@@ -110,6 +110,15 @@ static llvm::cl::opt<std::string> clDumpGraphAfterOutliningOutputFile(
     llvm::cl::desc("Output file name for the graph after outlining"),
     llvm::cl::init("graph-after-outlining.dot"));
 
+static llvm::cl::opt<bool> clDumpGraphAfterDeduplication(
+    "iree-flow-dump-graph-after-deduplication",
+    llvm::cl::desc("Dump a graph after deduplication"), llvm::cl::init(false));
+
+static llvm::cl::opt<std::string> clDumpGraphAfterDeduplicationOutputFile(
+    "iree-flow-dump-graph-after-deduplication-output-file",
+    llvm::cl::desc("Output file name for the graph after deduplication"),
+    llvm::cl::init("graph-after-deduplication.dot"));
+
 static llvm::cl::opt<bool> clDumpStatsAfterOutlining(
     "iree-flow-dump-stats-after-outlining",
     llvm::cl::desc("Dump operation statistis after outlining dispatches"),
@@ -119,6 +128,16 @@ static llvm::cl::opt<std::string> clDumpStatsAfterOutliningOutputtFile(
     "iree-flow-dump-stats-after-outlining-output-file",
     llvm::cl::desc("Output file name for the statistics after outlining"),
     llvm::cl::init("stats-after-outlining.json"));
+
+static llvm::cl::opt<bool> clDumpStatsAfterDeduplication(
+    "iree-flow-dump-stats-after-deduplication",
+    llvm::cl::desc("Dump operation statistis after deduplication dispatches"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<std::string> clDumpStatsAfterDeduplicationOutputtFile(
+    "iree-flow-dump-stats-after-deduplication-output-file",
+    llvm::cl::desc("Output file name for the statistics after deduplication"),
+    llvm::cl::init("stats-after-deduplication.json"));
 
 namespace mlir {
 namespace iree_compiler {
@@ -317,6 +336,32 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // generalize executables to prune further (e.g. by promoting a dimension to
   // an argument if two executables differ only in that one dimension).
   passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
+
+  if (clDumpGraphAfterDeduplication) {
+    std::string errorMessage;
+    static auto dotFile =
+        openOutputFile(clDumpGraphAfterDeduplicationOutputFile, &errorMessage);
+    if (!dotFile) {
+      llvm::errs() << errorMessage << "\n";
+    } else {
+      passManager.addPass(
+          IREE::Flow::createDumpDispatchGraphPass(dotFile->os()));
+      dotFile->keep();
+    }
+  }
+
+  if (clDumpStatsAfterDeduplication) {
+    std::string errorMessage;
+    static auto outFile =
+        openOutputFile(clDumpStatsAfterDeduplicationOutputtFile, &errorMessage);
+    if (!outFile) {
+      llvm::errs() << errorMessage << "\n";
+    } else {
+      passManager.addPass(
+          mlir::createPrintOpStatsPass(outFile->os(), /*json=*/true));
+      outFile->keep();
+    }
+  }
 
   // Create one function per remaining flow.executable that can be used with
   // iree-benchmark-module to benchmark each dispatch individually, as well as
