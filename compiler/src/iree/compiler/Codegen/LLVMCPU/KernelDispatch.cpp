@@ -798,7 +798,9 @@ static LogicalResult setDefaultGenericOpRootConfig(
 
   SmallVector<int64_t> minTileSizes =
       getMinTilingSizesForEachDim(entryPointFn, genericOp);
-  SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
+  // For generic ops we'll use the default divided by 2 to control the stack
+  // allocation limit See #9469 for example.
+  SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize / 2);
   if (llvm::all_of(minTileSizes, [](int64_t vs) { return vs == 1; })) {
     // Nothing to vectorize just lower to loops.
     return success();
