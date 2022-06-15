@@ -192,8 +192,8 @@ static iree_status_t iree_vm_invoke_within(
   call.function = function;
   call.arguments = arguments;
   call.results = results;
-  IREE_TRACE_FIBER_ENTER((char*)iree_vm_context_id(context));
   iree_vm_execution_result_t result;
+  IREE_TRACE_FIBER_ENTER(iree_vm_stack_context_id(stack));
   iree_status_t status =
       function.module->begin_call(function.module->self, stack, &call, &result);
   IREE_TRACE_FIBER_LEAVE();

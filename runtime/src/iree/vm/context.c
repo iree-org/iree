@@ -80,8 +80,10 @@ static iree_status_t iree_vm_context_run_function(
     return status;
   }
 
+  IREE_TRACE_FIBER_ENTER(context->context_id);
   iree_vm_execution_result_t result;
   status = module->begin_call(module->self, stack, &call, &result);
+  IREE_TRACE_FIBER_LEAVE();
   if (!iree_status_is_ok(status)) {
     status = IREE_VM_STACK_ANNOTATE_BACKTRACE_IF_ENABLED(stack, status);
   }
