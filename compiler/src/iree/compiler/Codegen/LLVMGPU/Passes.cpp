@@ -248,6 +248,12 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   }
 }
 
+extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName;
+
+void addGPUTransformDialectInterpreterPasses(OpPassManager &passManager) {
+  assert(0 && "TODO: implement transform dialect path for LLVMGPU");
+}
+
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   pm.nest<ModuleOp>().nest<func::FuncOp>().addPass(createTypePropagationPass());
   pm.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass());

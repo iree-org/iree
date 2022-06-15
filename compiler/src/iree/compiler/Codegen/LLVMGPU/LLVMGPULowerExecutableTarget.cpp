@@ -157,6 +157,10 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
             executableLoweringPipeline,
             translationInfo.getValue().getSoftwarePipelineDepth());
         break;
+      case IREE::Codegen::DispatchLoweringPassPipeline::
+          TransformDialectInterpreterCodegen:
+        addGPUTransformDialectInterpreterPasses(executableLoweringPipeline);
+        break;
       default:
         variantOp.emitOpError("Unsupported pipeline on GPU target.");
         return signalPassFailure();
