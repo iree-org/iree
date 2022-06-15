@@ -1,3 +1,5 @@
+// TODO(#9510): Enable the test.
+// XFAIL:*
 // RUN: iree-dialects-opt --transform-dialect-interpreter %s | FileCheck %s
 
 func.func @fun_to_benchmark(%arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32>) ->

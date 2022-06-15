@@ -36,7 +36,7 @@ iree_compiler_cc_library(
         "//runtime/src/iree/schemas:metal_executable_def_c_fbs",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:GPUDialect",
-        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:SPIRVSerialization",
         "@llvm-project//mlir:VectorOps",

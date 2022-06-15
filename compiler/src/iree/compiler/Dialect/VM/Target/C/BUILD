@@ -25,7 +25,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:ControlFlowOps",
+        "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:EmitC",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
@@ -58,6 +58,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
-        "@llvm-project//mlir:Translation",
+        "@llvm-project//mlir:TranslateLib",
     ],
 )

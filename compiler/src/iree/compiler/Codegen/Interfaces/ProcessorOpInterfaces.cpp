@@ -8,7 +8,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 
 /// Include the generated interface definitions.
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.cpp.inc"

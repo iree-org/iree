@@ -27,7 +27,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/Stream/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithmeticDialect",
-        "@llvm-project//mlir:ControlFlowOps",
+        "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MemRefDialect",
