@@ -160,7 +160,7 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
           .result();
 
   SmallVector<Type> parallelTopkResultTypes = {outputValuesExpandedType,
-                                            outputIndicesExpandedType};
+                                               outputIndicesExpandedType};
   SmallVector<Value> parallelTopkIns = {valuesExpanded};
   SmallVector<Value> parallelTopkOuts = {negInfTensor, posInfTensor};
 
@@ -253,12 +253,6 @@ TopkOp computeReductionTopk(Location loc, PatternRewriter &rewriter,
   return reductionTopkOp;
 }
 
-/// Function signature to control reduction splitting. This returns the split
-/// reduction ratio used to split the reduction dimension. The ratio is applied
-/// to the reduction dimension of TopK. If the ratio value is less or equal to 1
-/// then nothing will be done.
-using TopkSplitReductionControlFn = std::function<int64_t(TopkOp topkOp)>;
-
 struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -294,9 +288,7 @@ struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
         topkOp.getResult(0).getType().cast<ShapedType>().getDimSize(kDimOrig);
     int64_t splitReductionRatio = splitReductionFn(topkOp);
     SmallVector<ReassociationIndices> reassociationIndices =
-        getReassociationIndices(
-            topkOp.getInputRank(),
-            splitDimParallel);
+        getReassociationIndices(topkOp.getInputRank(), splitDimParallel);
 
     // Determine if should compute parallel topk
     LogicalResult shouldParallelTopkResult =
@@ -348,6 +340,8 @@ struct TopkSplitReductionPass
   }
 
   void runOnOperation() override {
+    if (splitRatio.getValue() <= 1)
+      return;
 
     RewritePatternSet patterns(&getContext());
     TopkSplitReductionControlFn splitReductionFn =
@@ -366,6 +360,14 @@ struct TopkSplitReductionPass
   }
 };
 } // namespace
+
+void mlir::iree_compiler::IREE::LinalgExt::populateSplitReductionPattern(
+    RewritePatternSet &patterns,
+    const TopkSplitReductionControlFn &splitReductionFn,
+    const linalg::LinalgTransformationFilter &f) {
+  patterns.add<TopkOpSplitReduction>(patterns.getContext(), splitReductionFn,
+                                     f);
+}
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::iree_compiler::IREE::LinalgExt::createTopkSplitReductionPass() {

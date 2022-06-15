@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -25,6 +26,10 @@ namespace Flow {
 // TODO(thomasraoux): Move to attributes.
 static llvm::cl::opt<int64_t> splitReductionRatio(
     "iree-flow-split-matmul-reduction", llvm::cl::desc("split ratio"),
+    llvm::cl::init(1));
+
+static llvm::cl::opt<int64_t> topkSplitReductionRatio(
+    "iree-flow-topk-split--reduction", llvm::cl::desc("split ratio"),
     llvm::cl::init(1));
 
 namespace {
@@ -91,6 +96,17 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
         },
         linalg::LinalgTransformationFilter(
             ArrayRef<StringAttr>{}, StringAttr::get(&getContext(), "SPLIT")));
+
+    LinalgExt::TopkSplitReductionControlFn splitReductionFn =
+        [&](mlir::iree_compiler::IREE::LinalgExt::TopkOp topkOp) {
+          return topkSplitReductionRatio.getValue();
+        };
+    LinalgExt::populateSplitReductionPattern(
+        patterns, splitReductionFn,
+        mlir::linalg::LinalgTransformationFilter(
+            ArrayRef<StringAttr>{},
+            StringAttr::get(patterns.getContext(), "SPLIT_REDUCTION")));
+
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
