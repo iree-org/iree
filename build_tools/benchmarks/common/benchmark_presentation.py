@@ -14,7 +14,7 @@ from common.benchmark_definition import BenchmarkResults
 from common.benchmark_thresholds import BENCHMARK_THRESHOLDS, BenchmarkThreshold, ThresholdUnit
 
 GetMetricFunc = Callable[[Any], Tuple[int, Optional[int]]]
-GetTableRowFunc = Callable[[str, Any], Tuple[float, Tuple]]
+GetTableRowFunc = Callable[[str, Any], Tuple]
 
 PERFBOARD_SERIES_PREFIX = "https://perf.iree.dev/serie?IREE?"
 BENCHMARK_RESULTS_HEADERS = [
@@ -125,28 +125,29 @@ T = TypeVar("T")
 
 
 def _categorize_on_single_metric(
-    benchmarks_map: Dict[str, T],
+    metrics_map: Dict[str, T],
     metric_func: GetMetricFunc,
     thresholds: Sequence[BenchmarkThreshold],
 ) -> Tuple[Dict[str, T], Dict[str, T], Dict[str, T], Dict[str, T]]:
-  """Categorize the benchmarks into regressed, improved, similar, and raw group.
+  """Categorize the metrics object into regressed, improved, similar, and the
+    raw group (the group with no base to compare to).
 
     Args:
-      benchmarks_map: map of (name, benchmark object).
-      metric_func: the function returns current and base value of a benchmark.
-      thresholds: list of threshold settings for categorizing.
+      metrics_map: map of (name, metrics object).
+      metric_func: the function returns current and base value of the metric.
+      thresholds: list of threshold settings to match for categorizing.
     Returns: 
-      A tuple of (regressed, improved, similar, raw) benchmark groups.
+      A tuple of (regressed, improved, similar, raw) groups.
   """
 
   regressed_map = {}
   improved_map = {}
   similar_map = {}
   raw_map = {}
-  for name, benchmark_obj in benchmarks_map.items():
-    current, base = metric_func(benchmark_obj)
+  for name, metrics_obj in metrics_map.items():
+    current, base = metric_func(metrics_obj)
     if base is None:
-      raw_map[name] = benchmark_obj
+      raw_map[name] = metrics_obj
       continue
 
     similar_threshold = None
@@ -163,37 +164,13 @@ def _categorize_on_single_metric(
       ratio = abs(current - base)
 
     if ratio <= similar_threshold.threshold:
-      similar_map[name] = benchmark_obj
+      similar_map[name] = metrics_obj
     elif current > base:
-      regressed_map[name] = benchmark_obj
+      regressed_map[name] = metrics_obj
     else:
-      improved_map[name] = benchmark_obj
+      improved_map[name] = metrics_obj
 
   return (regressed_map, improved_map, similar_map, raw_map)
-
-
-def _sort_benchmarks_and_get_table(benchmarks_map: Dict[str, Any],
-                                   row_func: GetTableRowFunc,
-                                   headers: Sequence[str],
-                                   size_cut: Optional[int] = None) -> str:
-  """Sorts all benchmarks according to the improvement/regression ratio and
-    returns a markdown table for it.
-
-    Args:
-      benchmarks_map: map of (name, benchmark object).
-      row_func: function generates a table row for a pair of
-        (name, benchmark object).
-      headers: list of table headers.
-      size_cut: If not None, only show the top N results for each table.
-  """
-  sorted_rows = []
-  for name, benchmark_obj in benchmarks_map.items():
-    weight, row = row_func(name, benchmark_obj)
-    sorted_rows.append((weight, row))
-  sorted_rows.sort(key=lambda row: row[0], reverse=True)
-
-  return _add_header_and_get_markdown_table(
-      headers=headers, rows=[row[1] for row in sorted_rows], size_cut=size_cut)
 
 
 def _get_compare_text(current: int, base: Optional[int]) -> str:
@@ -209,6 +186,33 @@ def _get_compare_text(current: int, base: Optional[int]) -> str:
   return f"{current} (vs. {base}, {ratio:.2%}{direction})"
 
 
+def _sort_benchmarks_and_get_table(benchmarks: Dict[str,
+                                                    AggregateBenchmarkLatency],
+                                   size_cut: Optional[int] = None) -> str:
+  """Sorts all benchmarks according to the improvement/regression ratio and
+    returns a markdown table for it.
+
+    Args:
+      benchmarks_map: map of (name, benchmark object).
+      size_cut: If not None, only show the top N results for each table.
+  """
+  sorted_rows = []
+  for name, benchmark in benchmarks.items():
+    current = benchmark.mean_time
+    base = benchmark.base_mean_time
+    ratio = abs(current - base) / base
+    str_mean = _get_compare_text(current, base)
+    clickable_name = _make_series_link(name)
+    sorted_rows.append((ratio, (clickable_name, str_mean, benchmark.median_time,
+                                benchmark.stddev_time)))
+  sorted_rows.sort(key=lambda row: row[0], reverse=True)
+
+  return _add_header_and_get_markdown_table(
+      headers=BENCHMARK_RESULTS_HEADERS,
+      rows=[row[1] for row in sorted_rows],
+      size_cut=size_cut)
+
+
 def categorize_benchmarks_into_tables(benchmarks: Dict[
     str, AggregateBenchmarkLatency],
                                       size_cut: Optional[int] = None) -> str:
@@ -219,17 +223,6 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
       benchmarks: A dictionary of benchmark names to its aggregate info.
       size_cut: If not None, only show the top N results for each table.
   """
-
-  def _map_benchmark_to_row(
-      name: str, benchmark: AggregateBenchmarkLatency) -> Tuple[float, Tuple]:
-    current = benchmark.mean_time
-    base = benchmark.base_mean_time
-    ratio = abs(current - base) / base
-    str_mean = _get_compare_text(current, base)
-    clickable_name = _make_series_link(name)
-    return ratio, (clickable_name, str_mean, benchmark.median_time,
-                   benchmark.stddev_time)
-
   regressed, improved, similar, raw = _categorize_on_single_metric(
       benchmarks, lambda results: (results.mean_time, results.base_mean_time),
       BENCHMARK_THRESHOLDS)
@@ -237,20 +230,14 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
   tables = []
   if regressed:
     tables.append(md.header("Regressed Benchmarks 🚩", 3))
-    tables.append(
-        _sort_benchmarks_and_get_table(regressed, _map_benchmark_to_row,
-                                       BENCHMARK_RESULTS_HEADERS, size_cut))
+    tables.append(_sort_benchmarks_and_get_table(regressed, size_cut))
   if improved:
     tables.append(md.header("Improved Benchmarks 🎉", 3))
-    tables.append(
-        _sort_benchmarks_and_get_table(improved, _map_benchmark_to_row,
-                                       BENCHMARK_RESULTS_HEADERS, size_cut))
+    tables.append(_sort_benchmarks_and_get_table(improved, size_cut))
   # If we want to abbreviate, similar results won't be interesting.
   if similar and size_cut is None:
     tables.append(md.header("Similar Benchmarks", 3))
-    tables.append(
-        _sort_benchmarks_and_get_table(similar, _map_benchmark_to_row,
-                                       BENCHMARK_RESULTS_HEADERS, size_cut))
+    tables.append(_sort_benchmarks_and_get_table(similar, size_cut))
   if raw:
     tables.append(md.header("Raw Benchmarks", 3))
     raw_list = [(_make_series_link(k), v.mean_time, v.median_time,
