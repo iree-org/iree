@@ -392,10 +392,10 @@ static iree_status_t iree_vm_stack_grow(iree_vm_stack_t* stack,
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t
-iree_vm_stack_wait_enter(iree_vm_stack_t* stack, iree_vm_wait_type_t wait_type,
-                         iree_host_size_t wait_count, iree_timeout_t timeout,
-                         iree_vm_wait_frame_t** out_wait_frame) {
+IREE_API_EXPORT iree_status_t iree_vm_stack_wait_enter(
+    iree_vm_stack_t* stack, iree_vm_wait_type_t wait_type,
+    iree_host_size_t wait_count, iree_timeout_t timeout,
+    iree_zone_id_t trace_zone, iree_vm_wait_frame_t** out_wait_frame) {
   IREE_ASSERT_ARGUMENT(out_wait_frame);
   *out_wait_frame = NULL;
 
@@ -464,15 +464,16 @@ iree_vm_stack_wait_enter(iree_vm_stack_t* stack, iree_vm_wait_type_t wait_type,
       (iree_vm_wait_frame_t*)iree_vm_stack_frame_storage(callee_frame);
   wait_frame->wait_type = wait_type;
   wait_frame->deadline_ns = iree_timeout_as_deadline_ns(timeout);
+  IREE_TRACE(wait_frame->trace_zone = trace_zone);
   wait_frame->count = wait_count;
   *out_wait_frame = wait_frame;
   return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_stack_wait_leave(
-    iree_vm_stack_t* stack, iree_status_t* out_wait_status) {
-  IREE_ASSERT_ARGUMENT(out_wait_status);
-  *out_wait_status = iree_ok_status();
+    iree_vm_stack_t* stack, iree_vm_wait_result_t* out_wait_result) {
+  IREE_ASSERT_ARGUMENT(out_wait_result);
+  memset(out_wait_result, 0, sizeof(*out_wait_result));
 
   if (IREE_UNLIKELY(!stack->top)) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
@@ -485,7 +486,7 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_wait_leave(
   // Fetch wait status from the wait storage.
   iree_vm_wait_frame_t* wait_frame =
       iree_vm_stack_frame_storage(&stack->top->frame);
-  *out_wait_status = wait_frame->wait_status;
+  out_wait_result->status = wait_frame->wait_status;
 
   // Call (optional) frame storage cleanup function.
   if (stack->top->frame_cleanup_fn) {
@@ -496,6 +497,7 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_wait_leave(
     if (stack->top->trace_zone) {
       IREE_TRACE_ZONE_END(stack->top->trace_zone);
     }
+    out_wait_result->trace_zone = wait_frame->trace_zone;
   });
 
   // Restore the frame pointer to the caller.

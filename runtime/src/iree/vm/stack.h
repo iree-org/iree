@@ -121,11 +121,25 @@ typedef struct iree_vm_wait_frame_t {
   // Maximum time to wait before failing the wait with
   // IREE_STATUS_DEADLINE_EXCEEDED.
   iree_time_t deadline_ns;
+  // Optional tracing zone that marks the beginning of the wait operation.
+  // Waiters are expected to end this zone after leaving the wait frame.
+  IREE_TRACE(iree_zone_id_t trace_zone;)
   // Total number of wait sources.
   iree_host_size_t count;
   // List of wait source to wait on.
   iree_wait_source_t wait_sources[];
 } iree_vm_wait_frame_t;
+
+// Result of a wait operation.
+typedef struct iree_vm_wait_result_t {
+  // Final status of the wait operation; OK if successful and DEADLINE_EXCEEDED
+  // if the deadline was reached before all conditions were met. Other failures
+  // may occur if for example the context is aborted.
+  iree_status_t status;
+  // Optional tracing zone provided by the waiter when entering the frame.
+  // The caller performing the wait frame leave must end it.
+  IREE_TRACE(iree_zone_id_t trace_zone;)
+} iree_vm_wait_result_t;
 
 // Returns the implementation-defined frame storage associated with |frame|.
 // The pointer will contain at least as many bytes as requested by frame_size.
@@ -251,19 +265,24 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_query_module_state(
 // by the caller upon return. Callers should then return to the scheduling loop
 // by propagating an IREE_STATUS_DEFERRED result to ancestors.
 //
+// If the caller has an open trace zone it can provide it here to then retrieve
+// it from iree_vm_stack_wait_leave in order to leave it.
+//
 // After the wait has completed (successfully or otherwise) the scheduler must
 // call iree_vm_stack_wait_leave to pop the wait from the stack and resume
 // execution.
-IREE_API_EXPORT iree_status_t
-iree_vm_stack_wait_enter(iree_vm_stack_t* stack, iree_vm_wait_type_t wait_type,
-                         iree_host_size_t wait_count, iree_timeout_t timeout,
-                         iree_vm_wait_frame_t** out_wait_frame);
+IREE_API_EXPORT iree_status_t iree_vm_stack_wait_enter(
+    iree_vm_stack_t* stack, iree_vm_wait_type_t wait_type,
+    iree_host_size_t wait_count, iree_timeout_t timeout,
+    iree_zone_id_t trace_zone, iree_vm_wait_frame_t** out_wait_frame);
 
 // Leaves the current wait frame on the top of the stack.
-// |out_wait_status| will be set to the result of the wait, such as
-// IREE_STATUS_DEADLINE_EXCEEDED or IREE_STATUS_ABORTED.
+// |out_wait_result| will be populated with the results of the wait, such as
+// IREE_STATUS_DEADLINE_EXCEEDED or IREE_STATUS_ABORTED if it failed.
+// If a trace zone was passed to the iree_vm_stack_wait_enter it will be
+// available for the caller to leave.
 IREE_API_EXPORT iree_status_t iree_vm_stack_wait_leave(
-    iree_vm_stack_t* stack, iree_status_t* out_wait_status);
+    iree_vm_stack_t* stack, iree_vm_wait_result_t* out_wait_result);
 
 // Enters into the given |function| and returns the callee stack frame.
 // May invalidate any pointers to stack frames and the only pointer that can be

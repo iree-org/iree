@@ -418,12 +418,17 @@ enum {
 #define IREE_TRACE(expr)
 #define IREE_TRACE_FIBER_ENTER(fiber)
 #define IREE_TRACE_FIBER_LEAVE()
-#define IREE_TRACE_ZONE_BEGIN(zone_id)
-#define IREE_TRACE_ZONE_BEGIN_NAMED(zone_id, name_literal)
-#define IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(zone_id, name, name_length)
+#define IREE_TRACE_ZONE_BEGIN(zone_id) \
+  iree_zone_id_t zone_id = 0;          \
+  (void)zone_id;
+#define IREE_TRACE_ZONE_BEGIN_NAMED(zone_id, name_literal) \
+  IREE_TRACE_ZONE_BEGIN(zone_id)
+#define IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(zone_id, name, name_length) \
+  IREE_TRACE_ZONE_BEGIN(zone_id)
 #define IREE_TRACE_ZONE_BEGIN_EXTERNAL(                        \
     zone_id, file_name, file_name_length, line, function_name, \
-    function_name_length, name, name_length)
+    function_name_length, name, name_length)                   \
+  IREE_TRACE_ZONE_BEGIN(zone_id)
 #define IREE_TRACE_ZONE_SET_COLOR(zone_id, color_xrgb)
 #define IREE_TRACE_ZONE_APPEND_VALUE(zone_id, value)
 #define IREE_TRACE_ZONE_APPEND_TEXT(zone_id, ...)
