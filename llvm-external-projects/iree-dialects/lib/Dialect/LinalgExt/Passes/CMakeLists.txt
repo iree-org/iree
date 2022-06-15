@@ -11,16 +11,16 @@ add_mlir_library(IREELinalgExtPasses
   LINK_LIBS PUBLIC
   IREEInputDialect
   IREELinalgExtDialect
-  MLIRAffine
+  MLIRAffineDialect
   MLIRIR
-  MLIRLinalg
+  MLIRLinalgDialect
   MLIRLinalgTransforms
-  MLIRMath
-  MLIRMemRef
+  MLIRMathDialect
+  MLIRMemRefDialect
   MLIRPass
-  MLIRSCF
-  MLIRFunc
+  MLIRSCFDialect
+  MLIRFuncDialect
   MLIRSupport
-  MLIRTensor
+  MLIRTensorDialect
   MLIRTransforms
 )
