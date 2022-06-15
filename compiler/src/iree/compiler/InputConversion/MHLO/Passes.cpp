@@ -111,6 +111,11 @@ void buildXLACleanupPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 }
 
+void buildMHLOCleanupPassPipeline(OpPassManager &passManager) {
+  passManager.addNestedPass<func::FuncOp>(
+      mhlo::createLegalizeControlFlowPass());
+}
+
 namespace {
 #define GEN_PASS_REGISTRATION
 #include "iree/compiler/InputConversion/MHLO/Passes.h.inc"  // IWYU pragma: export

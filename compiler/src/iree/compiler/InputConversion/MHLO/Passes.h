@@ -22,6 +22,11 @@ namespace MHLO {
 // Performs input legalization for specific combination of input dialects.
 void buildMHLOInputConversionPassPipeline(OpPassManager &passManager);
 
+// Performs some cleanup activities on programs that standardizes further
+// lowering. This involves:
+//   - Convert XLA control flow to SCF
+void buildMHLOCleanupPassPipeline(OpPassManager &passManager);
+
 // Performs some cleanup activities on programs that may have originated from
 // an XLA import (or made to interop with it). This involves:
 //   - Convert XLA control flow to SCF
