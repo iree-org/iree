@@ -63,7 +63,7 @@ SmallVector<Value> tileToSCF(PatternRewriter &rewriter, TilingInterface op,
         SmallVector<Value> offsets =
             linalg::computeTileOffsets(b, loc, localIvs, tileSizesVec);
         SmallVector<Value> sizes =
-            linalg::computeTileSizes(b, loc, localIvs, tileSizesVec, allDims);
+            linalg::computeTileSizes(b, loc, tileSizesVec, allDims);
         // Create ExtractSliceOp: Extract a tile from the PadOp.
         // Note: The PadOp is located outside of the loop nest. It is
         // later moved inside by ExtractSliceOfPadTensorSwapPattern.
