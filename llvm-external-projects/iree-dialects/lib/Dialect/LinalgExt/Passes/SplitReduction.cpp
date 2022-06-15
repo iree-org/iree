@@ -30,15 +30,15 @@ using namespace mlir::iree_compiler::IREE::LinalgExt;
 
 namespace {
 
-SmallVector<int64_t> getExpandedShape(ArrayRef<int64_t> inputShape,
+SmallVector<int64_t> getExpandedShape(ArrayRef<int64_t> shape,
                                       int64_t splitReductionRatio,
                                       int64_t splitDimParallel) {
   SmallVector<int64_t> ans;
-  ans.reserve(inputShape.size() + 1);
-  ans.assign(inputShape.begin(), inputShape.end());
+  ans.reserve(shape.size() + 1);
+  ans.assign(shape.begin(), shape.end());
   ans[splitDimParallel] = splitReductionRatio;
   ans.insert(std::next(ans.begin(), splitDimParallel + 1),
-             inputShape[splitDimParallel] / splitReductionRatio);
+             shape[splitDimParallel] / splitReductionRatio);
 
   return ans;
 }
@@ -71,7 +71,7 @@ LogicalResult shouldParallelTopk(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
                                  int64_t splitReductionRatio) {
   // Determine if we should split the reduction. Requires aligned static shapes
   // and no input indicies.
-  auto valuesOrigType = topkOp.values().getType().cast<ShapedType>();
+  auto valuesOrigType = topkOp.getInputType();
   if (valuesOrigType.isDynamicDim(kDimOrig)) {
     return rewriter.notifyMatchFailure(topkOp,
                                        "cannot split dynamic dimension");
@@ -101,14 +101,14 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
                     int64_t splitReductionRatio, int64_t splitDimParallel,
                     int64_t kDimParallel, int64_t kSize) {
   Value valuesOrig = topkOp.values();
-  ShapedType valuesOrigType = valuesOrig.getType().cast<ShapedType>();
+  auto valuesOrigType = valuesOrig.getType().cast<ShapedType>();
   Type valueElementType = valuesOrigType.getElementType();
   Type indicesElementType =
       topkOp.getResultTypes()[1].cast<ShapedType>().getElementType();
 
   SmallVector<int64_t> expandedShape = getExpandedShape(
       valuesOrigType.getShape(), splitReductionRatio, splitDimParallel);
-  RankedTensorType valuesExpandedType =
+  auto valuesExpandedType =
       RankedTensorType::get(expandedShape, valueElementType);
 
   // Expand input values shape for parallel processing
@@ -118,9 +118,9 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
   // Define the expanded output types
   SmallVector<int64_t> expandedResultShape = expandedShape;
   expandedResultShape[kDimParallel] = kSize;
-  RankedTensorType outputValuesExpandedType =
+  auto outputValuesExpandedType =
       RankedTensorType::get(expandedResultShape, valueElementType);
-  RankedTensorType outputIndicesExpandedType =
+  auto outputIndicesExpandedType =
       RankedTensorType::get(expandedResultShape, indicesElementType);
 
   // Initialize the expanded output values
@@ -159,7 +159,7 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
       rewriter.create<linalg::FillOp>(loc, posInf, initTensorOutputIndices)
           .result();
 
-  SmallVector<Type> parallelTopkResultTypes{outputValuesExpandedType,
+  SmallVector<Type> parallelTopkResultTypes = {outputValuesExpandedType,
                                             outputIndicesExpandedType};
   SmallVector<Value> parallelTopkIns = {valuesExpanded};
   SmallVector<Value> parallelTopkOuts = {negInfTensor, posInfTensor};
@@ -186,11 +186,11 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
 Value offsetParallelIndices(Location loc, PatternRewriter &rewriter,
                             Value parallelIndices, int64_t splitReductionRatio,
                             int64_t splitDimParallel) {
-  ShapedType parallelIndicesType = parallelIndices.getType().cast<ShapedType>();
+  auto parallelIndicesType = parallelIndices.getType().cast<ShapedType>();
   size_t parallelIndicesRank = parallelIndicesType.getRank();
   AffineMap mapIdentity = rewriter.getMultiDimIdentityMap(parallelIndicesRank);
-  SmallVector<AffineMap> indexingMaps{mapIdentity};
-  SmallVector<StringRef> iterators{parallelIndicesRank, "parallel"};
+  SmallVector<AffineMap> indexingMaps = {mapIdentity};
+  SmallVector<StringRef> iterators(parallelIndicesRank, "parallel");
   Value mSplitVal = rewriter.create<arith::ConstantIntOp>(
       loc, splitReductionRatio, parallelIndicesType.getElementType());
   return rewriter
@@ -221,7 +221,7 @@ TopkOp computeReductionTopk(Location loc, PatternRewriter &rewriter,
                             int64_t splitReductionRatio, int64_t kDimOrig,
                             int64_t kSize) {
   Value valuesOrig = topkOp.values();
-  ShapedType valuesOrigType = valuesOrig.getType().cast<ShapedType>();
+  auto valuesOrigType = valuesOrig.getType().cast<ShapedType>();
   Type valueElementType = valuesOrigType.getElementType();
   Type indicesElementType =
       topkOp.getResultTypes()[1].cast<ShapedType>().getElementType();
@@ -229,9 +229,9 @@ TopkOp computeReductionTopk(Location loc, PatternRewriter &rewriter,
   // Define the collapsed input shapes
   SmallVector<int64_t> collapsedShape = getCollapsedShape(
       valuesOrigType.getShape(), splitReductionRatio, kSize, kDimOrig);
-  RankedTensorType valuesCollapsedType =
+  auto valuesCollapsedType =
       RankedTensorType::get(collapsedShape, valueElementType);
-  RankedTensorType indicesCollapsedType =
+  auto indicesCollapsedType =
       RankedTensorType::get(collapsedShape, indicesElementType);
 
   // Collapse collapse parallel output for the input of final reduction
@@ -295,7 +295,7 @@ struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
     int64_t splitReductionRatio = splitReductionFn(topkOp);
     SmallVector<ReassociationIndices> reassociationIndices =
         getReassociationIndices(
-            topkOp.values().getType().cast<ShapedType>().getRank(),
+            topkOp.getInputRank(),
             splitDimParallel);
 
     // Determine if should compute parallel topk
