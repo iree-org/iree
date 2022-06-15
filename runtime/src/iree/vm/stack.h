@@ -52,8 +52,6 @@ enum iree_vm_invocation_flag_bits_t {
 };
 typedef uint32_t iree_vm_invocation_flags_t;
 
-typedef intptr_t iree_vm_context_id_t;
-
 typedef enum iree_vm_stack_frame_type_e {
   // Represents an `[external]` frame that needs to marshal args/results.
   // These frames have no source location and are tracked so that we know when
@@ -162,20 +160,18 @@ typedef struct iree_vm_stack_t iree_vm_stack_t;
 //  IREE_VM_INLINE_STACK_INITIALIZE(
 //      stack,
 //      IREE_VM_INVOCATION_FLAG_NONE,
-//      iree_vm_context_id(context),
 //      iree_vm_context_state_resolver(context),
 //      iree_allocator_system());
 //  ...
 //  iree_vm_stack_deinitialize(stack);
-#define IREE_VM_INLINE_STACK_INITIALIZE(stack, flags, context_id,            \
-                                        state_resolver, allocator)           \
-  uint8_t __stack_storage[IREE_VM_STACK_DEFAULT_SIZE];                       \
-  iree_byte_span_t __stack_storage_span =                                    \
-      iree_make_byte_span(__stack_storage, sizeof(__stack_storage));         \
-  iree_vm_stack_t* stack = NULL;                                             \
-  IREE_IGNORE_ERROR(iree_vm_stack_initialize(__stack_storage_span, (flags),  \
-                                             (context_id), (state_resolver), \
-                                             (allocator), &stack));
+#define IREE_VM_INLINE_STACK_INITIALIZE(stack, flags, state_resolver, \
+                                        allocator)                    \
+  uint8_t __stack_storage[IREE_VM_STACK_DEFAULT_SIZE];                \
+  iree_byte_span_t __stack_storage_span =                             \
+      iree_make_byte_span(__stack_storage, sizeof(__stack_storage));  \
+  iree_vm_stack_t* stack = NULL;                                      \
+  IREE_IGNORE_ERROR(iree_vm_stack_initialize(                         \
+      __stack_storage_span, (flags), (state_resolver), (allocator), &stack));
 
 // Initializes a statically-allocated stack in |storage|.
 // The contents of the |storage| can be anything upon initialization and the
@@ -198,8 +194,8 @@ typedef struct iree_vm_stack_t iree_vm_stack_t;
 //  // stack_storage can now be reused/freed/etc
 IREE_API_EXPORT iree_status_t iree_vm_stack_initialize(
     iree_byte_span_t storage, iree_vm_invocation_flags_t flags,
-    iree_vm_context_id_t context_id, iree_vm_state_resolver_t state_resolver,
-    iree_allocator_t allocator, iree_vm_stack_t** out_stack);
+    iree_vm_state_resolver_t state_resolver, iree_allocator_t allocator,
+    iree_vm_stack_t** out_stack);
 
 // Deinitializes a statically-allocated |stack| previously initialized with
 // iree_vm_stack_initialize.
@@ -220,9 +216,8 @@ IREE_API_EXPORT void iree_vm_stack_deinitialize(iree_vm_stack_t* stack);
 //  ...
 //  iree_vm_stack_free(stack);
 IREE_API_EXPORT iree_status_t iree_vm_stack_allocate(
-    iree_vm_invocation_flags_t flags, iree_vm_context_id_t context_id,
-    iree_vm_state_resolver_t state_resolver, iree_allocator_t allocator,
-    iree_vm_stack_t** out_stack);
+    iree_vm_invocation_flags_t flags, iree_vm_state_resolver_t state_resolver,
+    iree_allocator_t allocator, iree_vm_stack_t** out_stack);
 
 // Frees a dynamically-allocated |stack| from iree_vm_stack_allocate.
 IREE_API_EXPORT void iree_vm_stack_free(iree_vm_stack_t* stack);
@@ -230,10 +225,6 @@ IREE_API_EXPORT void iree_vm_stack_free(iree_vm_stack_t* stack);
 // Returns the flags controlling the invocation this stack is used with.
 IREE_API_EXPORT iree_vm_invocation_flags_t
 iree_vm_stack_invocation_flags(const iree_vm_stack_t* stack);
-
-// Returns the process-unique context ID.
-IREE_API_EXPORT iree_vm_context_id_t
-iree_vm_stack_context_id(const iree_vm_stack_t* stack);
 
 // Returns the top stack execution frame, ignore wait frames.
 IREE_API_EXPORT iree_vm_stack_frame_t* iree_vm_stack_top(

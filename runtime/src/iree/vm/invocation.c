@@ -193,7 +193,7 @@ static iree_status_t iree_vm_invoke_within(
   call.arguments = arguments;
   call.results = results;
   iree_vm_execution_result_t result;
-  IREE_TRACE_FIBER_ENTER(iree_vm_stack_context_id(stack));
+  IREE_TRACE_FIBER_ENTER(iree_vm_context_id(context));
   iree_status_t status =
       function.module->begin_call(function.module->self, stack, &call, &result);
   IREE_TRACE_FIBER_LEAVE();
@@ -213,7 +213,7 @@ IREE_API_EXPORT iree_status_t iree_vm_invoke(
     iree_vm_context_t* context, iree_vm_function_t function,
     iree_vm_invocation_flags_t flags, const iree_vm_invocation_policy_t* policy,
     iree_vm_list_t* inputs, iree_vm_list_t* outputs,
-    iree_allocator_t allocator) {
+    iree_allocator_t host_allocator) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Force tracing if specified on the context.
@@ -222,9 +222,8 @@ IREE_API_EXPORT iree_status_t iree_vm_invoke(
   }
 
   // Allocate a VM stack on the host stack and initialize it.
-  IREE_VM_INLINE_STACK_INITIALIZE(stack, flags, iree_vm_context_id(context),
-                                  iree_vm_context_state_resolver(context),
-                                  allocator);
+  IREE_VM_INLINE_STACK_INITIALIZE(
+      stack, flags, iree_vm_context_state_resolver(context), host_allocator);
   iree_status_t status =
       iree_vm_invoke_within(context, stack, function, policy, inputs, outputs);
   if (!iree_status_is_ok(status)) {

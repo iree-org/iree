@@ -45,7 +45,7 @@ IREE_API_EXPORT iree_status_t iree_vm_invoke(
     iree_vm_context_t* context, iree_vm_function_t function,
     iree_vm_invocation_flags_t flags, const iree_vm_invocation_policy_t* policy,
     iree_vm_list_t* inputs, iree_vm_list_t* outputs,
-    iree_allocator_t allocator);
+    iree_allocator_t host_allocator);
 
 //===----------------------------------------------------------------------===//
 // Asynchronous stateful invocation

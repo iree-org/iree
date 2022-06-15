@@ -181,11 +181,6 @@ struct iree_vm_stack_t {
   // may transition to owning it on dynamic growth.
   bool owns_frame_storage;
 
-  // An opaque ID unique for the entire process lifetime.
-  // If tracing then this points at a NUL-terminated string with process
-  // lifetime.
-  iree_vm_context_id_t context_id;
-
   // Resolves a module to a module state within a context.
   // This will be called on function entry whenever module transitions occur.
   iree_vm_state_resolver_t state_resolver;
@@ -201,8 +196,8 @@ struct iree_vm_stack_t {
 
 IREE_API_EXPORT iree_status_t iree_vm_stack_initialize(
     iree_byte_span_t storage, iree_vm_invocation_flags_t flags,
-    iree_vm_context_id_t context_id, iree_vm_state_resolver_t state_resolver,
-    iree_allocator_t allocator, iree_vm_stack_t** out_stack) {
+    iree_vm_state_resolver_t state_resolver, iree_allocator_t allocator,
+    iree_vm_stack_t** out_stack) {
   IREE_ASSERT_ARGUMENT(out_stack);
   *out_stack = NULL;
   if (storage.data_length < IREE_VM_STACK_MIN_SIZE) {
@@ -218,7 +213,6 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_initialize(
   memset(stack, 0, sizeof(iree_vm_stack_t));
   stack->owns_frame_storage = false;
   stack->flags = flags;
-  stack->context_id = context_id;
   stack->state_resolver = state_resolver;
   stack->allocator = allocator;
 
@@ -251,9 +245,8 @@ IREE_API_EXPORT void iree_vm_stack_deinitialize(iree_vm_stack_t* stack) {
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_stack_allocate(
-    iree_vm_invocation_flags_t flags, iree_vm_context_id_t context_id,
-    iree_vm_state_resolver_t state_resolver, iree_allocator_t allocator,
-    iree_vm_stack_t** out_stack) {
+    iree_vm_invocation_flags_t flags, iree_vm_state_resolver_t state_resolver,
+    iree_allocator_t allocator, iree_vm_stack_t** out_stack) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   *out_stack = NULL;
@@ -265,8 +258,8 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_allocate(
   iree_vm_stack_t* stack = NULL;
   if (iree_status_is_ok(status)) {
     iree_byte_span_t storage_span = iree_make_byte_span(storage, storage_size);
-    status = iree_vm_stack_initialize(storage_span, flags, context_id,
-                                      state_resolver, allocator, &stack);
+    status = iree_vm_stack_initialize(storage_span, flags, state_resolver,
+                                      allocator, &stack);
   }
 
   *out_stack = stack;
@@ -288,11 +281,6 @@ IREE_API_EXPORT void iree_vm_stack_free(iree_vm_stack_t* stack) {
 IREE_API_EXPORT iree_vm_invocation_flags_t
 iree_vm_stack_invocation_flags(const iree_vm_stack_t* stack) {
   return stack->flags;
-}
-
-IREE_API_EXPORT iree_vm_context_id_t
-iree_vm_stack_context_id(const iree_vm_stack_t* stack) {
-  return stack->context_id;
 }
 
 IREE_API_EXPORT iree_vm_stack_frame_t* iree_vm_stack_top(

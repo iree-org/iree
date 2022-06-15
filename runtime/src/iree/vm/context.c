@@ -207,8 +207,7 @@ static void iree_vm_context_release_modules(iree_vm_context_t* context,
       context->flags & IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
           ? IREE_VM_INVOCATION_FLAG_TRACE_EXECUTION
           : IREE_VM_INVOCATION_FLAG_NONE,
-      iree_vm_context_id(context), iree_vm_context_state_resolver(context),
-      context->allocator);
+      iree_vm_context_state_resolver(context), context->allocator);
   for (int i = (int)end; i >= (int)start; --i) {
     iree_vm_module_t* module = context->list.modules[i];
     iree_vm_module_state_t* module_state = context->list.module_states[i];
@@ -412,8 +411,7 @@ IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
       context->flags & IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
           ? IREE_VM_INVOCATION_FLAG_TRACE_EXECUTION
           : IREE_VM_INVOCATION_FLAG_NONE,
-      iree_vm_context_id(context), iree_vm_context_state_resolver(context),
-      context->allocator);
+      iree_vm_context_state_resolver(context), context->allocator);
 
   // Retain all modules and allocate their state.
   assert(context->list.capacity >= context->list.count + module_count);
@@ -631,8 +629,7 @@ IREE_API_EXPORT iree_status_t iree_vm_context_notify(iree_vm_context_t* context,
       context->flags & IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
           ? IREE_VM_INVOCATION_FLAG_TRACE_EXECUTION
           : IREE_VM_INVOCATION_FLAG_NONE,
-      iree_vm_context_id(context), iree_vm_context_state_resolver(context),
-      context->allocator);
+      iree_vm_context_state_resolver(context), context->allocator);
 
   // Resumes are walked forward while suspends are walked backward.
   // This follows the expected construction/destruction pattern where for

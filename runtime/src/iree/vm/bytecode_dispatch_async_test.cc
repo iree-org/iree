@@ -68,9 +68,9 @@ TEST_F(VMBytecodeDispatchAsyncTest, YieldSequence) {
   IREE_ASSERT_OK(iree_vm_module_lookup_function_by_name(
       bytecode_module_, IREE_VM_FUNCTION_LINKAGE_EXPORT,
       IREE_SV("yield_sequence"), &function));
-  IREE_VM_INLINE_STACK_INITIALIZE(
-      stack, IREE_VM_CONTEXT_FLAG_NONE, iree_vm_context_id(context_),
-      iree_vm_context_state_resolver(context_), iree_allocator_system());
+  IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_CONTEXT_FLAG_NONE,
+                                  iree_vm_context_state_resolver(context_),
+                                  iree_allocator_system());
 
   uint32_t arg_value = 97;
   uint32_t ret_value = 0;
@@ -116,9 +116,9 @@ TEST_F(VMBytecodeDispatchAsyncTest, YieldDivergent) {
   IREE_ASSERT_OK(iree_vm_module_lookup_function_by_name(
       bytecode_module_, IREE_VM_FUNCTION_LINKAGE_EXPORT,
       IREE_SV("yield_divergent"), &function));
-  IREE_VM_INLINE_STACK_INITIALIZE(
-      stack, IREE_VM_CONTEXT_FLAG_NONE, iree_vm_context_id(context_),
-      iree_vm_context_state_resolver(context_), iree_allocator_system());
+  IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_CONTEXT_FLAG_NONE,
+                                  iree_vm_context_state_resolver(context_),
+                                  iree_allocator_system());
 
   // result = %arg0 ? %arg1 : %arg2
   struct {

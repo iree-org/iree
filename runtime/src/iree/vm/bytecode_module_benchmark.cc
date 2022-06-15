@@ -106,9 +106,9 @@ static iree_status_t RunFunction(benchmark::State& state,
       iree_make_byte_span(iree_alloca(result_count * sizeof(int32_t)),
                           result_count * sizeof(int32_t));
 
-  IREE_VM_INLINE_STACK_INITIALIZE(
-      stack, IREE_VM_INVOCATION_FLAG_NONE, iree_vm_context_id(context),
-      iree_vm_context_state_resolver(context), iree_allocator_system());
+  IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_INVOCATION_FLAG_NONE,
+                                  iree_vm_context_state_resolver(context),
+                                  iree_allocator_system());
   while (state.KeepRunningBatch(batch_size)) {
     for (iree_host_size_t i = 0; i < i32_args.size(); ++i) {
       reinterpret_cast<int32_t*>(call.arguments.data)[i] = i32_args[i];
