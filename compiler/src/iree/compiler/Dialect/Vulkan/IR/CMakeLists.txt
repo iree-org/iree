@@ -30,7 +30,7 @@ iree_cc_library(
     ::VulkanEnumsGen
     LLVMSupport
     MLIRIR
-    MLIRSPIRV
+    MLIRSPIRVDialect
     MLIRSupport
     iree::compiler::Dialect::Util::IR
   PUBLIC

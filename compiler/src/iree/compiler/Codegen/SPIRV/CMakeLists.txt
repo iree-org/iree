@@ -51,16 +51,16 @@ iree_cc_library(
     MLIRArithmeticToSPIRV
     MLIRArithmeticTransforms
     MLIRArithmeticUtils
-    MLIRBufferization
+    MLIRBufferizationDialect
     MLIRControlFlowToSPIRV
     MLIRFuncDialect
     MLIRFuncToSPIRV
     MLIRFuncTransforms
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRGPUToSPIRV
     MLIRGPUTransforms
     MLIRIR
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRMathToSPIRV
     MLIRMathTransforms
@@ -68,20 +68,20 @@ iree_cc_library(
     MLIRMemRefToSPIRV
     MLIRMemRefTransforms
     MLIRPass
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSCFToGPU
     MLIRSCFToSPIRV
     MLIRSCFTransforms
     MLIRSCFUtils
-    MLIRSPIRV
     MLIRSPIRVConversion
+    MLIRSPIRVDialect
     MLIRSPIRVTransforms
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorToSPIRV
     MLIRTensorTransforms
-    MLIRTosa
+    MLIRTosaDialect
     MLIRTosaToArith
     MLIRTransforms
     MLIRVector

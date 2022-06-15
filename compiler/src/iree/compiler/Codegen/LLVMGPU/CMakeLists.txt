@@ -44,25 +44,25 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFuncToLLVM
     MLIRFuncTransforms
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRGPUToNVVMTransforms
     MLIRGPUToROCDLTransforms
     MLIRGPUTransforms
     MLIRIR
     MLIRLLVMCommonConversion
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgTransforms
-    MLIRMath
+    MLIRMathDialect
     MLIRMathToLLVM
     MLIRMemRefDialect
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
     MLIRNVGPU
     MLIRNVGPUToNVVM
-    MLIRNVVMIR
+    MLIRNVVMDialect
     MLIRPass
-    MLIRROCDLIR
-    MLIRSCF
+    MLIRROCDLDialect
+    MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRSupport

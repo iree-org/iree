@@ -33,7 +33,7 @@ iree_cc_library(
     MLIREmitC
     MLIRFuncDialect
     MLIRIR
-    MLIRMath
+    MLIRMathDialect
     MLIRPass
     MLIRTransforms
     iree::compiler::Dialect::Util::Conversion

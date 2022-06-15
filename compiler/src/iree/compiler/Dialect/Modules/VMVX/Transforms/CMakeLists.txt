@@ -28,14 +28,14 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFuncTransforms
     MLIRIR
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgTransforms
-    MLIRMath
+    MLIRMathDialect
     MLIRMathTransforms
     MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRPass
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSupport
     MLIRTensorDialect

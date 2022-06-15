@@ -71,20 +71,20 @@ iree_cc_library(
     MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgTransforms
-    MLIRMath
+    MLIRMathDialect
     MLIRMemRefDialect
     MLIRMemRefTransforms
-    MLIRPDL
-    MLIRPDLInterp
+    MLIRPDLDialect
+    MLIRPDLInterpDialect
     MLIRParser
     MLIRPass
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorUtils
-    MLIRTosa
+    MLIRTosaDialect
     MLIRTransformDialect
     MLIRTransformUtils
     MLIRTransforms

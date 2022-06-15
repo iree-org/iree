@@ -24,7 +24,7 @@ iree_cc_library(
     MLIRArithmeticDialect
     MLIRFuncDialect
     MLIRIR
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRSupport
     MLIRTensorDialect
     iree::compiler::Dialect::Util::Analysis

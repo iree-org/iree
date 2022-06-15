@@ -63,22 +63,22 @@ iree_cc_library(
     MLIRAnalysis
     MLIRArithmeticDialect
     MLIRArithmeticTransforms
-    MLIRBufferization
+    MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncDialect
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRIR
     MLIRLLVMCommonConversion
-    MLIRLLVMIR
-    MLIRLinalg
+    MLIRLLVMDialect
+    MLIRLinalgDialect
     MLIRLinalgTransforms
-    MLIRMath
+    MLIRMathDialect
     MLIRMathTransforms
     MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRNVGPU
     MLIRPass
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRSideEffectInterfaces

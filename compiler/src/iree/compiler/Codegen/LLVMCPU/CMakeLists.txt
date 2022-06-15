@@ -40,32 +40,32 @@ iree_cc_library(
     MLIRArithmeticTransforms
     MLIRArmNeon
     MLIRArmNeon2dToIntr
-    MLIRBufferization
+    MLIRBufferizationDialect
     MLIRControlFlowToLLVM
     MLIRFuncDialect
     MLIRFuncToLLVM
     MLIRFuncTransforms
     MLIRIR
     MLIRLLVMCommonConversion
-    MLIRLLVMIR
-    MLIRLinalg
+    MLIRLLVMDialect
+    MLIRLinalgDialect
     MLIRLinalgToLLVM
     MLIRLinalgTransforms
-    MLIRMath
+    MLIRMathDialect
     MLIRMathToLLVM
     MLIRMathTransforms
     MLIRMemRefDialect
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
-    MLIRPDL
-    MLIRPDLInterp
+    MLIRPDLDialect
+    MLIRPDLInterpDialect
     MLIRPass
     MLIRReconcileUnrealizedCasts
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRTensorDialect
-    MLIRTosa
+    MLIRTosaDialect
     MLIRTosaToArith
     MLIRTransformDialect
     MLIRTransforms

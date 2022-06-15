@@ -38,10 +38,10 @@ iree_cc_library(
     LLVMLinker
     LLVMSupport
     MLIRArmNeon
-    MLIRLLVMIR
+    MLIRLLVMDialect
     MLIRLLVMToLLVMIRTranslation
-    MLIRPDL
-    MLIRPDLInterp
+    MLIRPDLDialect
+    MLIRPDLInterpDialect
     MLIRTargetLLVMIRExport
     MLIRTransformDialect
     iree::compiler::Codegen::Common

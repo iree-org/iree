@@ -20,7 +20,7 @@ iree_cc_library(
   DEPS
     MLIRFuncDialect
     MLIRIR
-    MLIRMath
+    MLIRMathDialect
     MLIRPass
     MLIRTransformUtils
     MLIRTransforms

@@ -49,12 +49,12 @@ iree_cc_library(
     MLIRAffine
     MLIRArithmeticDialect
     MLIRControlFlowDialect
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRMemRefDialect
     MLIRParser
     MLIRPass
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSCFUtils
     MLIRTensorDialect
     MLIRTransforms

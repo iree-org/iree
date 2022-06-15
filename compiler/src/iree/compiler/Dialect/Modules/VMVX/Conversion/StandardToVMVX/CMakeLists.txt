@@ -21,8 +21,8 @@ iree_cc_library(
     MLIRAffine
     MLIRFuncDialect
     MLIRIR
-    MLIRLinalg
-    MLIRMath
+    MLIRLinalgDialect
+    MLIRMathDialect
     MLIRMemRefDialect
     MLIRPass
     MLIRSupport

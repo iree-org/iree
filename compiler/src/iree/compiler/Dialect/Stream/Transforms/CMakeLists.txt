@@ -50,10 +50,10 @@ iree_cc_library(
     MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRMemRefDialect
     MLIRPass
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSupport
     MLIRTensorDialect
     MLIRTransformUtils

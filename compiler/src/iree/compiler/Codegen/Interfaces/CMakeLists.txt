@@ -36,7 +36,7 @@ iree_cc_library(
   DEPS
     IREELinalgExtDialect
     MLIRArithmeticTransforms
-    MLIRBufferization
+    MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncTransforms
     MLIRLinalgTransforms
@@ -62,7 +62,7 @@ iree_cc_library(
     "ProcessorOpInterfaces.cpp"
   DEPS
     ::ProcessorOpInterfaceGen
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRIR
     iree::compiler::Dialect::HAL::IR
   PUBLIC

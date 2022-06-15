@@ -62,13 +62,13 @@ iree_cc_library(
     MLIRAffine
     MLIRAffineUtils
     MLIRArithmeticDialect
-    MLIRComplex
+    MLIRComplexDialect
     MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgTransforms
-    MLIRMath
+    MLIRMathDialect
     MLIRMemRefDialect
     MLIRMhloUtils
     MLIRPass

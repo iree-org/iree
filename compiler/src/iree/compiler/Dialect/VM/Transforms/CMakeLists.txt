@@ -33,7 +33,7 @@ iree_cc_library(
     MLIRArithmeticTransforms
     MLIRFuncDialect
     MLIRIR
-    MLIRMath
+    MLIRMathDialect
     MLIRMemRefDialect
     MLIRPass
     MLIRSCFToControlFlow

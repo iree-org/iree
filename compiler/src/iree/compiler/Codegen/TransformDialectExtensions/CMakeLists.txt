@@ -39,14 +39,14 @@ iree_cc_library(
     MLIRAffine
     MLIRAffineUtils
     MLIRArithmeticDialect
-    MLIRBufferization
+    MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncDialect
     MLIRIR
-    MLIRLinalg
-    MLIRPDL
+    MLIRLinalgDialect
+    MLIRPDLDialect
     MLIRPass
-    MLIRSCF
+    MLIRSCFDialect
     MLIRTensorDialect
     MLIRTransformDialect
     MLIRTransformUtils

@@ -20,7 +20,7 @@ iree_cc_library(
   DEPS
     MLIRAffine
     MLIRArithmeticDialect
-    MLIRBufferization
+    MLIRBufferizationDialect
     MLIRFuncDialect
     MLIRIR
     MLIRMemRefDialect

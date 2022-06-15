@@ -21,7 +21,7 @@ iree_cc_library(
     MLIRArithmeticDialect
     MLIRFuncDialect
     MLIRIR
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRMemRefTransforms
     MLIRTensorDialect
     iree::compiler::Dialect::Flow::IR

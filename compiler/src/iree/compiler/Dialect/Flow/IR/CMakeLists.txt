@@ -124,7 +124,7 @@ iree_cc_library(
     IREELinalgExtDialect
     LLVMSupport
     MLIRIR
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgStructuredOpsIncGenLib
     MLIRTensorDialect
   PUBLIC

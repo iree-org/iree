@@ -23,7 +23,7 @@ iree_cc_library(
     MLIREmitC
     MLIRFuncDialect
     MLIRIR
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSupport
   DEFINES
     "IREE_HAVE_C_OUTPUT_FORMAT"

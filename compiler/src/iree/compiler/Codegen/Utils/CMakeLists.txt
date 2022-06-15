@@ -26,9 +26,9 @@ iree_cc_library(
     LLVMSupport
     MLIRAffine
     MLIRArithmeticDialect
-    MLIRGPUOps
+    MLIRGPUDialect
     MLIRIR
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRMemRefDialect
     MLIRSupport
