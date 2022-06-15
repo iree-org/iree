@@ -197,6 +197,7 @@ iree_cc_test(
   NAME
     bytecode_module_test
   SRCS
+    "bytecode_dispatch_async_test.cc"
     "bytecode_dispatch_test.cc"
     "bytecode_module_test.cc"
   DEPS
@@ -207,8 +208,7 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm::test::all_bytecode_modules_c
-  LABELS
-    "notap"
+    iree::vm::test::async_bytecode_modules_c
 )
 
 iree_cc_binary_benchmark(

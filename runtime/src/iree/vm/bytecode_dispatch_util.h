@@ -79,6 +79,9 @@ typedef struct iree_vm_registers_t {
 // NOTE: we cannot store pointers to the stack in here as the stack may be
 // reallocated.
 typedef struct iree_vm_bytecode_frame_storage_t {
+  // Calling convention results fragment.
+  iree_string_view_t cconv_results;
+
   // Pointer to a register list within the stack frame where return registers
   // will be stored by callees upon return.
   const iree_vm_register_list_t* return_registers;
