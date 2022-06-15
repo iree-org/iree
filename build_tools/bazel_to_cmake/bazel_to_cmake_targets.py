@@ -46,7 +46,6 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:DialectUtils": [""],
     "@llvm-project//mlir:GPUDialect": ["MLIRGPUOps"],
     "@llvm-project//mlir:GPUTransforms": ["MLIRGPUTransforms"],
-    "@llvm-project//mlir:LinalgInterfaces": ["MLIRLinalg"],
     "@llvm-project//mlir:LinalgStructuredOpsIncGen": [
         "MLIRLinalgStructuredOpsIncGenLib"
     ],
