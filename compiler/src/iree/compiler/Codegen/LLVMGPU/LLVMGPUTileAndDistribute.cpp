@@ -206,8 +206,12 @@ static void populatePromotionPatterns(MLIRContext *context,
           .addFilter([](Operation *op) {
             auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
             if (!linalgOp) return failure();
+            // Limit promotion to matmul and batch matmul, there may be generic
+            // ops with more batch dimensions we didn't distribute and therefore
+            // cannot find a higher bound.
             return success(linalg::isaContractionOpInterface(op) &&
-                           linalgOp.getNumParallelLoops() >= 2);
+                           linalgOp.getNumParallelLoops() >= 2 &&
+                           linalgOp.getNumParallelLoops() <= 3);
           }));
 }
 

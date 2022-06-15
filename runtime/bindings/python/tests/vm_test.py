@@ -123,7 +123,7 @@ class VmTest(unittest.TestCase):
     instance = iree.runtime.VmInstance()
     context1 = iree.runtime.VmContext(instance)
     context2 = iree.runtime.VmContext(instance)
-    self.assertGreater(context2.context_id, context1.context_id)
+    self.assertNotEqual(context2.context_id, context1.context_id)
 
   def test_module_basics(self):
     m = create_simple_static_mul_module()

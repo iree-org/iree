@@ -355,8 +355,9 @@ def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
 def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TiledOpInterface,
-    ["generateScalarImplementation", "getPartitionableLoops", "getTiledImplementation"]>
-]> {
+    ["generateScalarImplementation", "getPartitionableLoops", "getTiledImplementation"]>,
+  SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
+]>{
   let summary = "Top-K operator";
   let description = [{
    A Top-K operation for N-D tensors. Reduces the target dimension from the input
