@@ -32,9 +32,9 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRAnalysis
-    MLIRArithmetic
-    MLIRControlFlow
-    MLIRFunc
+    MLIRArithmeticDialect
+    MLIRControlFlowDialect
+    MLIRFuncDialect
     MLIRIR
     MLIRPass
     MLIRSupport

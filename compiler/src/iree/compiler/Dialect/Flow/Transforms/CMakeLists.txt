@@ -66,15 +66,15 @@ iree_cc_library(
     IREELinalgTransformDialectPasses
     LLVMSupport
     MLIRAffine
-    MLIRArithmetic
+    MLIRArithmeticDialect
     MLIRArithmeticUtils
-    MLIRControlFlow
-    MLIRFunc
+    MLIRControlFlowDialect
+    MLIRFuncDialect
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
     MLIRMath
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRPDL
     MLIRPDLInterp
@@ -82,7 +82,7 @@ iree_cc_library(
     MLIRPass
     MLIRSCF
     MLIRSupport
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTensorUtils
     MLIRTosa
     MLIRTransformDialect

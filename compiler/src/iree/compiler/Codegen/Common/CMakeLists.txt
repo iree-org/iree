@@ -61,11 +61,11 @@ iree_cc_library(
     MLIRAffine
     MLIRAffineUtils
     MLIRAnalysis
-    MLIRArithmetic
+    MLIRArithmeticDialect
     MLIRArithmeticTransforms
     MLIRBufferization
     MLIRBufferizationTransforms
-    MLIRFunc
+    MLIRFuncDialect
     MLIRGPUOps
     MLIRIR
     MLIRLLVMCommonConversion
@@ -74,7 +74,7 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRMath
     MLIRMathTransforms
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRNVGPU
     MLIRPass
@@ -83,7 +83,7 @@ iree_cc_library(
     MLIRSCFTransforms
     MLIRSideEffectInterfaces
     MLIRSupport
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTransforms
     MLIRVector
     MLIRVectorTransforms

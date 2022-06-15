@@ -38,16 +38,16 @@ iree_cc_library(
     LLVMSupport
     MLIRAffine
     MLIRAffineUtils
-    MLIRArithmetic
+    MLIRArithmeticDialect
     MLIRBufferization
     MLIRBufferizationTransforms
-    MLIRFunc
+    MLIRFuncDialect
     MLIRIR
     MLIRLinalg
     MLIRPDL
     MLIRPass
     MLIRSCF
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTransformDialect
     MLIRTransformUtils
     iree::compiler::Codegen

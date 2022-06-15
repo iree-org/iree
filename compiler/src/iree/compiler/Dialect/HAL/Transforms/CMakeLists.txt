@@ -35,10 +35,10 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRAffineToStandard
-    MLIRArithmetic
+    MLIRArithmeticDialect
     MLIRBufferization
-    MLIRControlFlow
-    MLIRFunc
+    MLIRControlFlowDialect
+    MLIRFuncDialect
     MLIRIR
     MLIRPass
     MLIRSCF

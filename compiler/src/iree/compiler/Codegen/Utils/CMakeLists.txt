@@ -25,14 +25,14 @@ iree_cc_library(
     IREELinalgExtDialect
     LLVMSupport
     MLIRAffine
-    MLIRArithmetic
+    MLIRArithmeticDialect
     MLIRGPUOps
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRSupport
-    MLIRTensor
+    MLIRTensorDialect
     iree::compiler::Codegen::Interfaces::ProcessorOpInterfaces
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::IR::PartitionableLoopsInterface

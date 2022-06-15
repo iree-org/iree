@@ -23,10 +23,10 @@ iree_cc_library(
     LLVMSupport
     MLIRAffine
     MLIRAffineUtils
-    MLIRFunc
+    MLIRFuncDialect
     MLIRIR
     MLIRLinalg
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRPass
     MLIRSupport
     MLIRTransforms

@@ -37,11 +37,11 @@ iree_cc_library(
     LLVMSupport
     MLIRAffine
     MLIRAffineToStandard
-    MLIRArithmetic
+    MLIRArithmeticDialect
     MLIRArithmeticToLLVM
     MLIRArithmeticTransforms
     MLIRControlFlowToLLVM
-    MLIRFunc
+    MLIRFuncDialect
     MLIRFuncToLLVM
     MLIRFuncTransforms
     MLIRGPUOps
@@ -54,7 +54,7 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRMath
     MLIRMathToLLVM
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
     MLIRNVGPU

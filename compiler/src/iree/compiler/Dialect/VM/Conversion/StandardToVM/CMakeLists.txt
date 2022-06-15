@@ -19,9 +19,9 @@ iree_cc_library(
     "ConvertStandardToVM.cpp"
     "ConvertStandardToVMTest.cpp"
   DEPS
-    MLIRArithmetic
-    MLIRControlFlow
-    MLIRFunc
+    MLIRArithmeticDialect
+    MLIRControlFlowDialect
+    MLIRFuncDialect
     MLIRIR
     MLIRMath
     MLIRPass

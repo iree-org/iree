@@ -35,14 +35,14 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineToStandard
     MLIRAnalysis
-    MLIRArithmetic
+    MLIRArithmeticDialect
     MLIRArithmeticToLLVM
     MLIRArithmeticTransforms
     MLIRArmNeon
     MLIRArmNeon2dToIntr
     MLIRBufferization
     MLIRControlFlowToLLVM
-    MLIRFunc
+    MLIRFuncDialect
     MLIRFuncToLLVM
     MLIRFuncTransforms
     MLIRIR
@@ -54,7 +54,7 @@ iree_cc_library(
     MLIRMath
     MLIRMathToLLVM
     MLIRMathTransforms
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
     MLIRPDL
@@ -64,7 +64,7 @@ iree_cc_library(
     MLIRSCF
     MLIRSCFToControlFlow
     MLIRSCFTransforms
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTosa
     MLIRTosaToArith
     MLIRTransformDialect

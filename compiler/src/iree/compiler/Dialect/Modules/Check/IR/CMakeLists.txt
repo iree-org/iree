@@ -21,8 +21,8 @@ iree_cc_library(
     "CheckOps.cpp.inc"
   DEPS
     ::check_ops_gen
-    MLIRArithmetic
-    MLIRFunc
+    MLIRArithmeticDialect
+    MLIRFuncDialect
     MLIRIR
     iree::compiler::Dialect::HAL::IR
   PUBLIC

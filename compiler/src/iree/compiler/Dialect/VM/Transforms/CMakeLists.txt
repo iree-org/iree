@@ -31,10 +31,10 @@ iree_cc_library(
     MLIRAffineTransforms
     MLIRAffineUtils
     MLIRArithmeticTransforms
-    MLIRFunc
+    MLIRFuncDialect
     MLIRIR
     MLIRMath
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRPass
     MLIRSCFToControlFlow
     MLIRSideEffectInterfaces

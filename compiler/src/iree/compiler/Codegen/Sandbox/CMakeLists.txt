@@ -47,16 +47,16 @@ iree_cc_library(
     ::PassesIncGen
     LLVMSupport
     MLIRAffine
-    MLIRArithmetic
-    MLIRControlFlow
+    MLIRArithmeticDialect
+    MLIRControlFlowDialect
     MLIRLinalg
     MLIRLinalgTransforms
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRParser
     MLIRPass
     MLIRSCF
     MLIRSCFUtils
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTransforms
     MLIRVector
     MLIRVectorTransforms

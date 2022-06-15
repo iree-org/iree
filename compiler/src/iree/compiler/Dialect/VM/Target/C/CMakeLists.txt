@@ -19,9 +19,9 @@ iree_cc_library(
     "TranslateToCpp.cpp"
   DEPS
     LLVMSupport
-    MLIRControlFlow
+    MLIRControlFlowDialect
     MLIREmitC
-    MLIRFunc
+    MLIRFuncDialect
     MLIRIR
     MLIRSCF
     MLIRSupport

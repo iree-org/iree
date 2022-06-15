@@ -25,20 +25,20 @@ iree_cc_library(
     MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRArithmeticTransforms
-    MLIRFunc
+    MLIRFuncDialect
     MLIRFuncTransforms
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
     MLIRMath
     MLIRMathTransforms
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRPass
     MLIRSCF
     MLIRSCFToControlFlow
     MLIRSupport
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTosaToArith
     MLIRTransforms
     MLIRVector

@@ -46,16 +46,16 @@ iree_cc_library(
     LLVMSupport
     MLIRAffine
     MLIRAnalysis
-    MLIRArithmetic
-    MLIRControlFlow
-    MLIRFunc
+    MLIRArithmeticDialect
+    MLIRControlFlowDialect
+    MLIRFuncDialect
     MLIRIR
     MLIRLinalg
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRPass
     MLIRSCF
     MLIRSupport
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTransformUtils
     MLIRTransforms
     MLIRVector
