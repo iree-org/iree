@@ -42,8 +42,8 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtPasses
     LLVMSupport
-    MLIRAffine
     MLIRAffineAnalysis
+    MLIRAffineDialect
     MLIRAffineToStandard
     MLIRAffineUtils
     MLIRAnalysis
@@ -84,7 +84,7 @@ iree_cc_library(
     MLIRTosaDialect
     MLIRTosaToArith
     MLIRTransforms
-    MLIRVector
+    MLIRVectorDialect
     MLIRVectorInterfaces
     MLIRVectorToSPIRV
     MLIRVectorTransforms

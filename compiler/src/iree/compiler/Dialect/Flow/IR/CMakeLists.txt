@@ -38,7 +38,7 @@ iree_cc_library(
     ::FlowOpsGen
     ::FlowTypesGen
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAnalysis
     MLIRArithmeticDialect
     MLIRArithmeticUtils

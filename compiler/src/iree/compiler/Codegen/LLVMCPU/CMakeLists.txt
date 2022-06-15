@@ -69,7 +69,7 @@ iree_cc_library(
     MLIRTosaToArith
     MLIRTransformDialect
     MLIRTransforms
-    MLIRVector
+    MLIRVectorDialect
     MLIRVectorToLLVM
     MLIRVectorToSCF
     MLIRVectorTransforms

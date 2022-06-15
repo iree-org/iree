@@ -35,7 +35,7 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtPasses
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAffineToStandard
     MLIRArithmeticDialect
     MLIRArithmeticToLLVM
@@ -67,7 +67,7 @@ iree_cc_library(
     MLIRSCFTransforms
     MLIRSupport
     MLIRTransforms
-    MLIRVector
+    MLIRVectorDialect
     MLIRVectorToGPU
     MLIRVectorToLLVM
     MLIRVectorToSCF

@@ -18,7 +18,7 @@ iree_cc_library(
   SRCS
     "ConvertStandardToVMVX.cpp"
   DEPS
-    MLIRAffine
+    MLIRAffineDialect
     MLIRFuncDialect
     MLIRIR
     MLIRLinalgDialect

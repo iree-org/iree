@@ -59,7 +59,7 @@ iree_cc_library(
     IREELinalgExtPasses
     LLVMSupport
     LmhloDialect
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAffineUtils
     MLIRArithmeticDialect
     MLIRComplexDialect

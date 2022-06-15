@@ -21,7 +21,7 @@ iree_cc_library(
   DEPS
     IREELinalgExtPasses
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRArithmeticTransforms
@@ -41,7 +41,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTosaToArith
     MLIRTransforms
-    MLIRVector
+    MLIRVectorDialect
     MLIRVectorToSCF
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::LLVMCPU

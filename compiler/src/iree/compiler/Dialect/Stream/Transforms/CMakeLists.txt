@@ -44,7 +44,7 @@ iree_cc_library(
   DEPS
     ::PassesIncGen
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAnalysis
     MLIRArithmeticDialect
     MLIRControlFlowDialect
@@ -58,7 +58,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTransformUtils
     MLIRTransforms
-    MLIRVector
+    MLIRVectorDialect
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Stream::Analysis

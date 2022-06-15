@@ -58,7 +58,7 @@ iree_cc_library(
     IREELinalgExtPasses
     IREELinalgExtTransforms
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAffineUtils
     MLIRAnalysis
     MLIRArithmeticDialect
@@ -85,7 +85,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRTransforms
-    MLIRVector
+    MLIRVectorDialect
     MLIRVectorTransforms
     MLIRViewLikeInterface
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen

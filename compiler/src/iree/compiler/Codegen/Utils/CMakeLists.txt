@@ -24,7 +24,7 @@ iree_cc_library(
   DEPS
     IREELinalgExtDialect
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRArithmeticDialect
     MLIRGPUOps
     MLIRIR

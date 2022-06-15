@@ -26,7 +26,7 @@ iree_cc_library(
     "SinkDefiningOps.cpp"
   DEPS
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRAffineUtils

@@ -94,7 +94,7 @@ iree_cc_library(
     MLIRArmNeon2dToIntr
     MLIRBufferizationDialect
     MLIRControlFlowDialect
-    MLIRGPUDialect
+    MLIRGPUOps
     MLIRGPUToSPIRV
     MLIRIR
     MLIRLLVMDialect

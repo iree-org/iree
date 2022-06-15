@@ -46,7 +46,7 @@ iree_cc_library(
     ::PassHeaders
     ::PassesIncGen
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRArithmeticDialect
     MLIRControlFlowDialect
     MLIRLinalgDialect
@@ -58,7 +58,7 @@ iree_cc_library(
     MLIRSCFUtils
     MLIRTensorDialect
     MLIRTransforms
-    MLIRVector
+    MLIRVectorDialect
     MLIRVectorTransforms
     MLIRX86VectorTransforms
     iree::compiler::Codegen::Dialect::IREECodegenDialect
