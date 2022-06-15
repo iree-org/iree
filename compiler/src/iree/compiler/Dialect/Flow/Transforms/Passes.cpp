@@ -95,20 +95,20 @@ static llvm::cl::opt<bool> clNormalizeInputIndexingMap(
     llvm::cl::desc("Enable normalizing input indexing map to identity"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clDumpDispatchGraph(
-    "iree-flow-dump-dispatch-graph",
-    llvm::cl::desc("Dump a dot graph for dispatches"), llvm::cl::init(false));
-
-static llvm::cl::opt<std::string> clDumpDispatchGraphOutputFile(
-    "iree-flow-dump-dispatch-graph-output-file",
-    llvm::cl::desc("Output file name for a dispatch graph dump"),
-    llvm::cl::init("dispatch.dot"));
-
 static llvm::cl::opt<std::string> clDispatchTransformFileName(
     "iree-flow-dispatch-use-transform-dialect",
     llvm::cl::desc("mlir file containing a top-level module that specifies "
                    "the transformations to apply to form dispatch regions."),
     llvm::cl::init(""));
+
+static llvm::cl::opt<bool> clDumpGraphAfterOutlining(
+    "iree-flow-dump-graph-after-outlining",
+    llvm::cl::desc("Dump a graph after outlining"), llvm::cl::init(false));
+
+static llvm::cl::opt<std::string> clDumpGraphAfterOutliningOutputFile(
+    "iree-flow-dump-graph-after-outlining-output-file",
+    llvm::cl::desc("Output file name for the graph after outlining"),
+    llvm::cl::init("graph-after-outlining.dot"));
 
 static llvm::cl::opt<bool> clDumpStatsAfterOutlining(
     "iree-flow-dump-stats-after-outlining",
@@ -277,10 +277,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
 
   /// Print the dispatch graph in the Graphviz format.
-  if (clDumpDispatchGraph) {
+  if (clDumpGraphAfterOutlining) {
     std::string errorMessage;
     static auto dotFile =
-        openOutputFile(clDumpDispatchGraphOutputFile, &errorMessage);
+        openOutputFile(clDumpGraphAfterOutliningOutputFile, &errorMessage);
     if (!dotFile) {
       llvm::errs() << errorMessage << "\n";
     } else {
