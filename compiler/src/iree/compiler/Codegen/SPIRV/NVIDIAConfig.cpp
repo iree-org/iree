@@ -34,16 +34,16 @@ struct CooperativeMatrixSize {
 static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
     spirv::ResourceLimitsAttr resourceLimits, Type lhsType, Type rhsType,
     Type resultType, int64_t m, int64_t n, int64_t k) {
-  auto properties = resourceLimits.getCooperative_matrix_properties_nv()
+  auto properties = resourceLimits.getCooperativeMatrixPropertiesNv()
                         .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>();
   for (auto property : properties) {
-    if (property.getA_type() == lhsType && property.getB_type() == rhsType &&
-        property.getC_type() == resultType &&
-        property.getResult_type() == resultType &&
+    if (property.getAType() == lhsType && property.getBType() == rhsType &&
+        property.getCType() == resultType &&
+        property.getResultType() == resultType &&
         property.getScope().getValue() == spirv::Scope::Subgroup) {
-      int matmulM = property.getM_size();
-      int matmulN = property.getN_size();
-      int matmulK = property.getK_size();
+      int matmulM = property.getMSize();
+      int matmulN = property.getNSize();
+      int matmulK = property.getKSize();
       if (m % matmulM == 0 && n % matmulN == 0 && k % matmulK == 0) {
         return CooperativeMatrixSize{matmulM, matmulN, matmulK};
       }
