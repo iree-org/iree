@@ -36,7 +36,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/VM/IR",
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineToStandard",
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:ArithmeticTransforms",
@@ -56,7 +56,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TosaToArith",
         "@llvm-project//mlir:Transforms",
-        "@llvm-project//mlir:VectorOps",
+        "@llvm-project//mlir:VectorDialect",
         "@llvm-project//mlir:VectorToSCF",
     ],
 )

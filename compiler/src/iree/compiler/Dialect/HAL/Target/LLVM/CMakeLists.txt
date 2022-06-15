@@ -37,7 +37,7 @@ iree_cc_library(
     LLVMCore
     LLVMLinker
     LLVMSupport
-    MLIRArmNeon
+    MLIRArmNeonDialect
     MLIRLLVMDialect
     MLIRLLVMToLLVMIRTranslation
     MLIRPDLDialect

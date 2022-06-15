@@ -27,7 +27,7 @@ iree_cc_library(
     MLIRIR
     MLIRMemRefDialect
     MLIRPass
-    MLIRShape
+    MLIRShapeDialect
     MLIRTensorDialect
     MLIRTransforms
     iree::compiler::Dialect::Stream::Conversion

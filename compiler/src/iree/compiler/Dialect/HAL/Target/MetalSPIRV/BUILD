@@ -34,12 +34,12 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/HAL/Target",
         "//compiler/src/iree/compiler/Utils",
         "//runtime/src/iree/schemas:metal_executable_def_c_fbs",
-        "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:SPIRVSerialization",
-        "@llvm-project//mlir:VectorOps",
+        "@llvm-project//mlir:VectorDialect",
     ],
 )
 

@@ -37,7 +37,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/VM/Conversion/UtilToVM",
         "//compiler/src/iree/compiler/Dialect/VM/IR",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineToStandard",
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:AffineUtils",

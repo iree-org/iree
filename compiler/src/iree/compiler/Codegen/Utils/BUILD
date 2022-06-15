@@ -33,7 +33,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",

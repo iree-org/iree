@@ -63,7 +63,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/Util/Transforms",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ControlFlowDialect",
@@ -78,7 +78,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
-        "@llvm-project//mlir:VectorOps",
+        "@llvm-project//mlir:VectorDialect",
     ],
 )
 

@@ -26,7 +26,7 @@ iree_compiler_cc_library(
     deps = [
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ControlFlowDialect",
-        "@llvm-project//mlir:EmitC",
+        "@llvm-project//mlir:EmitCDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:SCFDialect",

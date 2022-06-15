@@ -38,8 +38,8 @@ iree_cc_library(
     MLIRArithmeticDialect
     MLIRArithmeticToLLVM
     MLIRArithmeticTransforms
-    MLIRArmNeon
     MLIRArmNeon2dToIntr
+    MLIRArmNeonDialect
     MLIRBufferizationDialect
     MLIRControlFlowToLLVM
     MLIRFuncDialect

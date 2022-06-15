@@ -66,7 +66,7 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncDialect
-    MLIRGPUDialect
+    MLIRGPUOps
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
@@ -76,7 +76,7 @@ iree_cc_library(
     MLIRMathTransforms
     MLIRMemRefDialect
     MLIRMemRefTransforms
-    MLIRNVGPU
+    MLIRNVGPUDialect
     MLIRPass
     MLIRSCFDialect
     MLIRSCFToControlFlow

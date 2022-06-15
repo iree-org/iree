@@ -30,7 +30,7 @@ iree_cc_library(
     LLVMSupport
     MLIRArithmeticDialect
     MLIRControlFlowDialect
-    MLIREmitC
+    MLIREmitCDialect
     MLIRFuncDialect
     MLIRIR
     MLIRMathDialect

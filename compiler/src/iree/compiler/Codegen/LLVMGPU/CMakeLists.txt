@@ -44,7 +44,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFuncToLLVM
     MLIRFuncTransforms
-    MLIRGPUDialect
+    MLIRGPUOps
     MLIRGPUToNVVMTransforms
     MLIRGPUToROCDLTransforms
     MLIRGPUTransforms
@@ -57,7 +57,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
-    MLIRNVGPU
+    MLIRNVGPUDialect
     MLIRNVGPUToNVVM
     MLIRNVVMDialect
     MLIRPass

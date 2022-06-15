@@ -75,7 +75,7 @@ iree_cc_library(
     MLIRReconcileUnrealizedCasts
     MLIRSCFToControlFlow
     MLIRSCFTransforms
-    MLIRShape
+    MLIRShapeDialect
     MLIRShapeOpsTransforms
     MLIRShapeToStandard
     MLIRSupport

@@ -42,6 +42,7 @@ EXPLICIT_TARGET_MAPPING = {
     # MLIR
     "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
     "@llvm-project//mlir:DialectUtils": [""],
+    "@llvm-project//mlir:GPUDialect": ["MLIRGPUOps"],
     "@llvm-project//mlir:GPUTransforms": ["MLIRGPUTransforms"],
     "@llvm-project//mlir:LinalgStructuredOpsIncGen": [
         "MLIRLinalgStructuredOpsIncGenLib"

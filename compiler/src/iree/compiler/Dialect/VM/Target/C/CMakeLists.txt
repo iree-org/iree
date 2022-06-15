@@ -20,7 +20,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRControlFlowDialect
-    MLIREmitC
+    MLIREmitCDialect
     MLIRFuncDialect
     MLIRIR
     MLIRSCFDialect

@@ -62,7 +62,7 @@ iree_cc_library(
     "ProcessorOpInterfaces.cpp"
   DEPS
     ::ProcessorOpInterfaceGen
-    MLIRGPUDialect
+    MLIRGPUOps
     MLIRIR
     iree::compiler::Dialect::HAL::IR
   PUBLIC
