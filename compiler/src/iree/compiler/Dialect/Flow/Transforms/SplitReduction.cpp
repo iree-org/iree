@@ -101,7 +101,7 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
         [&](mlir::iree_compiler::IREE::LinalgExt::TopkOp topkOp) {
           return topkSplitReductionRatio.getValue();
         };
-    LinalgExt::populateSplitReductionPattern(
+    LinalgExt::populateTopkSplitReductionPattern(
         patterns, splitReductionFn,
         mlir::linalg::LinalgTransformationFilter(
             ArrayRef<StringAttr>{},

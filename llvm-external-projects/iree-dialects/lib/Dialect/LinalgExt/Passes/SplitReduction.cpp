@@ -340,8 +340,9 @@ struct TopkSplitReductionPass
   }
 
   void runOnOperation() override {
-    if (splitRatio.getValue() <= 1)
+    if (splitRatio.getValue() <= 1) {
       return;
+    }
 
     RewritePatternSet patterns(&getContext());
     TopkSplitReductionControlFn splitReductionFn =
@@ -361,7 +362,7 @@ struct TopkSplitReductionPass
 };
 } // namespace
 
-void mlir::iree_compiler::IREE::LinalgExt::populateSplitReductionPattern(
+void mlir::iree_compiler::IREE::LinalgExt::populateTopkSplitReductionPattern(
     RewritePatternSet &patterns,
     const TopkSplitReductionControlFn &splitReductionFn,
     const linalg::LinalgTransformationFilter &f) {

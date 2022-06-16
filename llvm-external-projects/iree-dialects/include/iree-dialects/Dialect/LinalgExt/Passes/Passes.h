@@ -29,8 +29,8 @@ std::unique_ptr<OperationPass<>> createPadContractionToBlockSizePass();
 /// then nothing will be done.
 using TopkSplitReductionControlFn = std::function<int64_t(TopkOp topkOp)>;
 
-/// Patterns to apply `splitReduction` below.
-void populateSplitReductionPattern(
+/// Patterns to apply `topk split reduction` pass.
+void populateTopkSplitReductionPattern(
     RewritePatternSet &patterns,
     const TopkSplitReductionControlFn &splitReductionFn,
     const linalg::LinalgTransformationFilter &f =
