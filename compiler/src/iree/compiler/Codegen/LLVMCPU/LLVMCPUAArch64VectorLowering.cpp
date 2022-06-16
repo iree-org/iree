@@ -71,6 +71,22 @@ void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
     });
   }
 
+  {
+    // Special-case vector.contract codegen paths. This needs to happen
+    // just before the generic vector ops lowerings.
+    CustomKernelsTargetInfo info;
+    if (succeeded(InferCustomKernelsTargetInfoFromParent(funcOp, info))) {
+      if (clMmt4dUseIntrinsics) {
+        info.add(CustomKernelTargetFeature::Intrinsics);
+      }
+      RewritePatternSet patterns(context);
+      populateVectorContractCustomKernelsPatterns(info, patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+  }
+
   // Apply vector unroll
   {
     RewritePatternSet vectorUnrollPatterns(context);
@@ -93,22 +109,6 @@ void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
-  }
-
-  {
-    // Special-case vector.contract codegen paths. This needs to happen
-    // just before the generic vector ops lowerings.
-    CustomKernelsTargetInfo info;
-    if (succeeded(InferCustomKernelsTargetInfoFromParent(funcOp, info))) {
-      if (clMmt4dUseIntrinsics) {
-        info.add(CustomKernelTargetFeature::Intrinsics);
-      }
-      RewritePatternSet patterns(context);
-      populateVectorContractCustomKernelsPatterns(info, patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
   }
 
   // Apply vector specific operation lowering.
