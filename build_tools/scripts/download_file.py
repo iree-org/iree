@@ -10,7 +10,9 @@
 import argparse
 import gzip
 import os
-import requests
+import shutil
+import tarfile
+import urllib.request
 
 
 def parse_arguments():
@@ -35,17 +37,26 @@ def main(args):
   if not os.path.isdir(output_dir):
     os.makedirs(output_dir)
 
-  response = requests.get(args.source_url)
-  if response.status_code != 200:
-    raise requests.RequestException(
-        f"Failed to download file with status code {response.status_code}")
+  with urllib.request.urlopen(args.source_url) as response:
+    if response.status != 200:
+      raise RuntimeError(
+          f"Failed to download file with status code {response.status}")
 
-  data = response.content
-  if args.source_url.endswith(".gz"):
-    data = gzip.decompress(data)
+    if args.source_url.endswith(".tar.gz"):
+      with tarfile.open(fileobj=response, mode="r|*") as tar_file:
+        if os.path.exists(args.output):
+          shutil.rmtree(args.output)
+        os.makedirs(args.output)
+        tar_file.extractall(args.output)
 
-  with open(args.output, "wb") as f:
-    f.write(data)
+    elif args.source_url.endswith(".gz"):
+      with gzip.open(filename=response, mode="rb") as input_file:
+        with open(args.output, "wb") as output_file:
+          shutil.copyfileobj(input_file, output_file)
+
+    else:
+      with open(args.output, "wb") as output_file:
+        shutil.copyfileobj(response, output_file)
 
 
 if __name__ == "__main__":

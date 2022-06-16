@@ -121,8 +121,8 @@ function(iree_benchmark_suite)
       list(POP_BACK _SOURCE_URL_SEGMENTS _LAST_URL_SEGMENT)
       set(_DOWNLOAD_TARGET "${_PACKAGE_NAME}_iree-download-benchmark-source-${_LAST_URL_SEGMENT}")
 
-      # Strip off gzip suffix if present (downloader unzips if necessary)
-      string(REGEX REPLACE "\.gz$" "" _SOURCE_FILE_BASENAME "${_LAST_URL_SEGMENT}")
+      # Strip off gzip/tar suffix if present (downloader unpacks if necessary)
+      string(REGEX REPLACE "(\.gz)|(\.tar\.gz)$" "" _SOURCE_FILE_BASENAME "${_LAST_URL_SEGMENT}")
       set(_MODULE_SOURCE "${_ROOT_ARTIFACTS_DIR}/${_SOURCE_FILE_BASENAME}")
       if(NOT TARGET "${_DOWNLOAD_TARGET}")
         add_custom_command(
@@ -172,6 +172,40 @@ function(iree_benchmark_suite)
         add_dependencies(iree-benchmark-import-models "${_TFLITE_IMPORT_TARGET}")
       endif()
       set(_MODULE_SOURCE_TARGET "${_TFLITE_IMPORT_TARGET}")
+    endif()
+
+    # If the source is a TF model directory, import it.
+    if("${_MODULE_SOURCE}" MATCHES "-tf-model$")
+      if(NOT IREE_IMPORT_TF_PATH)
+        message(SEND_ERROR "Benchmarks of ${_MODULE_SOURCE} require"
+                          " that iree-import-tf be available "
+                          " (either on PATH or via IREE_IMPORT_TF_PATH)")
+      endif()
+      set(_TF_MODEL_DIR "${_MODULE_SOURCE}")
+      set(_MODULE_SOURCE "${_TF_MODEL_DIR}.mlir")
+      get_filename_component(_TF_MODEL_BASENAME "${_TF_MODEL_DIR}" NAME)
+      set(_TF_IMPORT_TARGET "${_PACKAGE_NAME}_iree-import-tf-${_TF_MODEL_BASENAME}")
+      if(NOT TARGET "${_TF_IMPORT_TARGET}")
+        add_custom_command(
+          OUTPUT "${_MODULE_SOURCE}"
+          COMMAND
+            "${IREE_IMPORT_TF_PATH}"
+            "--tf-savedmodel-exported-names=${_MODULE_ENTRY_FUNCTION}"
+            "${_TF_MODEL_DIR}"
+            "-o=${_MODULE_SOURCE}"
+          DEPENDS
+            "${_TF_MODEL_DIR}"
+          COMMENT "Importing TF model ${_TF_MODEL_BASENAME}"
+        )
+        add_custom_target("${_TF_IMPORT_TARGET}"
+          DEPENDS
+            "${_MODULE_SOURCE}"
+          COMMENT
+            "Importing ${_TF_MODEL_BASENAME} into MLIR"
+        )
+        add_dependencies(iree-benchmark-import-models "${_TF_IMPORT_TARGET}")
+      endif()
+      set(_MODULE_SOURCE_TARGET "${_TF_IMPORT_TARGET}")
     endif()
 
     # Next create the command and target for compiling the input module into

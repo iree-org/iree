@@ -27,6 +27,7 @@ LICENSE_HEADER_FORMATTER = """{shebang}{start_comment} Copyright {year} {holder}
 
 """
 
+
 class CommentSyntax(object):
 
   def __init__(self, start_comment, middle_comment=None, end_comment=""):
