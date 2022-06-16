@@ -12,8 +12,8 @@ import markdown_strings as md
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, Tuple, TypeVar
 
-from .benchmark_definition import BenchmarkResults, CompilationInfo, CompilationResults
-from .benchmark_thresholds import BENCHMARK_THRESHOLDS, COMPILATION_TIME_THRESHOLDS, TOTAL_DISPATCH_SIZE_THRESHOLDS, BenchmarkThreshold, ThresholdUnit
+from common.benchmark_definition import BenchmarkResults, CompilationInfo, CompilationResults
+from common.benchmark_thresholds import BENCHMARK_THRESHOLDS, COMPILATION_TIME_THRESHOLDS, TOTAL_DISPATCH_SIZE_THRESHOLDS, BenchmarkThreshold, ThresholdUnit
 
 GetMetricFunc = Callable[[Any], Tuple[int, Optional[int]]]
 GetTableRowFunc = Callable[[str, Any], Tuple]
@@ -417,6 +417,14 @@ def _sort_metrics_objects_and_get_table(metrics_objs: Dict[str, T],
 def categorize_compilation_metrics_into_tables(
     compile_metrics_map: Dict[str, CompilationMetrics],
     size_cut: Optional[int] = None) -> str:
+  """Splits compilation metrics into regressed/improved/similar/raw categories
+    and returns their markdown tables.
+
+    Args:
+      compile_metrics_map: A dictionary of benchmark names to its compilation
+        metrics.
+      size_cut: If not None, only show the top N results for each table.
+  """
 
   tables = []
   for mapper in COMPILATION_METRICS_TO_TABLE_MAPPERS:

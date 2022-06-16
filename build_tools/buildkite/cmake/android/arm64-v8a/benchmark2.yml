@@ -88,11 +88,10 @@ steps:
   - wait
 
   - label: "Comment benchmark results on pull request"
-    commands: |
-      git clean -fdx
-      buildkite-agent artifact download "benchmark-results-*.json" ./
-      python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py \
-        --verbose --query-base --benchmark_files benchmark-results-*.json
+    commands:
+      - "git clean -fdx"
+      - "buildkite-agent artifact download benchmark-results-*.json ./"
+      - "python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py --verbose --query-base benchmark-results-*.json"
     key: "post-on-pr"
     if: "build.pull_request.id != null && (build.pull_request.labels includes 'buildkite:benchmark')"
     agents:

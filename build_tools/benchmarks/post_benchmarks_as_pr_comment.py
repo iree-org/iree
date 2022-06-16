@@ -150,12 +150,14 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
       base_commit = md.link(base_commit,
                             f"{GITHUB_IREE_REPO_PREFIX}/commit/{base_commit}")
 
+      # TODO(#9167): Searching with keys from compilation metrics.
       # Skip if the base doesn't contain all benchmarks to be compared.
       if not (set(all_benchmarks.keys()) <= set(base_benchmarks.keys())):
         commit_info = (f"@ commit {pr_commit} (no previous benchmark results to"
                        f" compare against since {base_commit})")
         continue
 
+      # TODO(#9167): Update bases of compilation metrics.
       # Update the aggregate benchmarks with base numbers.
       for bench in all_benchmarks:
         all_benchmarks[bench].base_mean_time = base_benchmarks[bench]
@@ -180,12 +182,12 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
   abbr_table = [md.header(comment_title, 2)]
   abbr_table.append(commit_info)
 
-  abbr_benchmark_tables = categorize_benchmarks_into_tables(
+  abbr_benchmarks_tables = categorize_benchmarks_into_tables(
       all_benchmarks, TABLE_SIZE_CUT)
-  if len(abbr_benchmark_tables) == 0:
+  if len(abbr_benchmarks_tables) == 0:
     abbr_table.append("No improved or regressed benchmarks 🏖️")
   else:
-    abbr_table.append(abbr_benchmark_tables)
+    abbr_table.append(abbr_benchmarks_tables)
 
   abbr_compilation_metrics_tables = categorize_compilation_metrics_into_tables(
       all_compilation_metrics, TABLE_SIZE_CUT)
