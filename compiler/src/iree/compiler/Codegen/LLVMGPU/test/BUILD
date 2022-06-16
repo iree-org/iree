@@ -27,14 +27,19 @@ iree_lit_test_suite(
             "reduce_bank_conflicts.mlir",
             "rocdl_pipeline_test.mlir",
             "illegal_configuration.mlir",
+            "linalg_transform.mlir",
             "legalize.mlir",
             "tensorcore_vectorization.mlir",
             "vector_to_gpu.mlir",
             "vectorization.mlir",
         ],
         include = ["*.mlir"],
+        # linalg_transform_spec is a an MLIR file that specifies a
+        # transformation, it needs to be included as data.
+        exclude = ["linalg_transform_spec.mlir"],
     ),
     cfg = "//compiler:lit.cfg.py",
+    data = ["linalg_transform_spec.mlir"],
     tools = [
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",

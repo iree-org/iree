@@ -34,6 +34,8 @@ iree_cc_library(
   DEPS
     IREELinalgExtDialect
     IREELinalgExtPasses
+    IREELinalgTransformDialect
+    IREELinalgTransformDialectPasses
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineToStandard
@@ -60,12 +62,15 @@ iree_cc_library(
     MLIRNVGPUDialect
     MLIRNVGPUToNVVM
     MLIRNVVMDialect
+    MLIRPDLDialect
+    MLIRPDLInterpDialect
     MLIRPass
     MLIRROCDLDialect
     MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRSupport
+    MLIRTransformDialect
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorToGPU

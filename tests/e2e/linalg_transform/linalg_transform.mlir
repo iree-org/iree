@@ -2,7 +2,7 @@
 /// Specify the dispatch region formation with the transform dialect.
 // RUN:   --iree-flow-dispatch-use-transform-dialect=%p/transform_dialect_dispatch_spec.mlir \
 /// Specify the codegen strategy with the transform dialect.
-// RUN:   --iree-codegen-use-transform-dialect=%p/transform_dialect_codegen_spec.mlir \
+// RUN:   --iree-codegen-llvmcpu-use-transform-dialect=%p/transform_dialect_codegen_spec.mlir \
 // RUN: | FileCheck %s
 
 func.func @matmul_static() -> tensor<5x5xf32> {
