@@ -1,4 +1,4 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2022 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -25,37 +25,42 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-llvmcpu-tile-fuse-and-vectorize"
+#define DEBUG_TYPE "iree-llvmcpu-aarc64-vector-lowering"
+
+// A flag to switch between inline asm and intrinsics while we develop these two
+//  parallel paths.
+static llvm::cl::opt<bool> clMmt4dUseIntrinsics(
+    "iree-codegen-mmt4d-use-intrinsics",
+    llvm::cl::desc("Whether to use instrinsics when lowering vector contracts "
+                   "generated from mmt4d matmuls (as opposed to inline asm). "
+                   "Not for production use."),
+    llvm::cl::init(false));
 
 namespace mlir {
 namespace iree_compiler {
 
 namespace {
-struct LLVMCPUAArchVectorLoweringPass
-    : public LLVMCPUAArchVectorLoweringBase<LLVMCPUAArchVectorLoweringPass> {
+struct LLVMCPUAArch64VectorLoweringPass
+    : public LLVMCPUAArch64VectorLoweringBase<
+          LLVMCPUAArch64VectorLoweringPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, memref::MemRefDialect,
                     vector::VectorDialect>();
   }
   void runOnOperation() override;
 };
-
-LogicalResult applyTileAndFuseCanonicalizationPatterns(func::FuncOp funcOp) {
-  auto context = funcOp.getContext();
-  RewritePatternSet patterns(context);
-  linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
-  tensor::DimOp::getCanonicalizationPatterns(patterns, context);
-  memref::DimOp::getCanonicalizationPatterns(patterns, context);
-  memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
-  memref::populateResolveShapedTypeResultDimsPatterns(patterns);
-  scf::populateSCFForLoopCanonicalizationPatterns(patterns);
-  return applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
-}
 }  // namespace
 
-void LLVMCPUAArchVectorLoweringPass::runOnOperation() {
+void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
+
+  Optional<int64_t> numLoops;
+  funcOp.walk([&](vector::ContractionOp op) {
+    if (numLoops) return signalPassFailure();
+    numLoops = op.getIndexingMaps()[0].getNumDims();
+  });
+  if (!numLoops) return signalPassFailure();
 
   {
     // Fold consumer add ops into the contraction op itself.
@@ -79,14 +84,15 @@ void LLVMCPUAArchVectorLoweringPass::runOnOperation() {
   // Apply vector unroll
   {
     RewritePatternSet vectorUnrollPatterns(context);
-    // TODO(hanchung): Set different vector sizes for different operations. Also
-    // it seems that `{16, 16, 16}` is not a good config. We should tune it.
     // There are issues when unrolling 1Dx1D->0D vector.contract op. Only unroll
     // the op when there are more than one loop.
-    SmallVector<int64_t> vectorTiles(3, 4);
-    vector::populateVectorUnrollPatterns(
-        vectorUnrollPatterns,
-        vector::UnrollVectorOptions().setNativeShape(vectorTiles));
+    constexpr int64_t kVectorSize = 4;
+    SmallVector<int64_t> vectorTiles(numLoops.getValue(), kVectorSize);
+    if (numLoops.getValue() > 1) {
+      vector::populateVectorUnrollPatterns(
+          vectorUnrollPatterns,
+          vector::UnrollVectorOptions().setNativeShape(vectorTiles));
+    }
 
     if (failed(applyPatternsAndFoldGreedily(funcOp,
                                             std::move(vectorUnrollPatterns)))) {
@@ -97,6 +103,22 @@ void LLVMCPUAArchVectorLoweringPass::runOnOperation() {
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
+  }
+
+  {
+    // Special-case vector.contract codegen paths. This needs to happen
+    // just before the generic vector ops lowerings.
+    CustomKernelsTargetInfo info;
+    if (succeeded(InferCustomKernelsTargetInfoFromParent(funcOp, info))) {
+      if (clMmt4dUseIntrinsics) {
+        info.add(CustomKernelTargetFeature::Intrinsics);
+      }
+      RewritePatternSet patterns(context);
+      populateVectorContractCustomKernelsPatterns(info, patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
   }
 
   // Apply vector specific operation lowering.
@@ -125,8 +147,8 @@ void LLVMCPUAArchVectorLoweringPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUAArchVectorLoweringPass() {
-  return std::make_unique<LLVMCPUAArchVectorLoweringPass>();
+createLLVMCPUAArch64VectorLoweringPass() {
+  return std::make_unique<LLVMCPUAArch64VectorLoweringPass>();
 }
 
 }  // namespace iree_compiler

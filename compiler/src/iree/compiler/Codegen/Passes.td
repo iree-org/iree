@@ -248,11 +248,11 @@ def LLVMCPUTileFuseAndVectorize
       "mlir::iree_compiler::createLLVMCPUTileFuseAndVectorizePass()";
 }
 
-def LLVMCPUAArchVectorLowering
-    : Pass<"iree-llvmcpu-aarch-vector-lowering", "func::FuncOp"> {
+def LLVMCPUAArch64VectorLowering
+    : Pass<"iree-llvmcpu-aarch64-vector-lowering", "func::FuncOp"> {
   let summary = "Apply vector lowering logic to vector ops";
   let constructor =
-      "mlir::iree_compiler::createLLVMCPUAArchVectorLoweringPass()";
+      "mlir::iree_compiler::createLLVMCPUAArch64VectorLoweringPass()";
 }
 
 def LLVMCPUUnfuseFMAOps :

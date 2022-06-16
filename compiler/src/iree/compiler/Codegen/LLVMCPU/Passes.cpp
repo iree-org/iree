@@ -438,7 +438,6 @@ void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
-  // Tile and vectorize linalg ops on tensors.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTileFuseAndVectorizePass(lowerToVectors));
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
@@ -450,42 +449,9 @@ void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
 
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
-}
-
-void addAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
-  addTileAndDistributePasses(passManager);
-
-  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  // Run LinalgFusePass firstly in case that we have fill + matmul + generic
-  // ops. At this stage, we do not apply vectorization. The reduction dim won't
-  // get tiled if the case is matmul + generic op. In this case, we have to tile
-  // along reduction dim again, which needs them to be Linalg ops form.
-  {
-    LinalgFusePassOptions options;
-    options.tilingLevel =
-        static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
-    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
-  }
-
-  // Add the sandbox single tiling expert to tile and vectorize.
-  {
-    LinalgSingleTilingExpertPassOptions options;
-    options.vectorize = true;
-    options.tilingLevel =
-        static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createLinalgSingleTilingExpertPass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
-  }
-
-  addBufferizePasses(nestedModulePM);
-
+      createLLVMCPUAArch64VectorLoweringPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUAArchVectorLoweringPass());
+      createOptimizeVectorTransferPass());
 }
 
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
