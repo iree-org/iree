@@ -43,7 +43,7 @@ cc_library(
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:Shape",
+        "@llvm-project//mlir:ShapeDialect",
         "@llvm-project//mlir:ShapeTransforms",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",

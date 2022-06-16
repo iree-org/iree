@@ -21,16 +21,16 @@ iree_cc_library(
     "Transforms.cpp"
   DEPS
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAffineUtils
-    MLIRFunc
+    MLIRFuncDialect
     MLIRIR
-    MLIRLinalg
-    MLIRMemRef
+    MLIRLinalgDialect
+    MLIRMemRefDialect
     MLIRPass
     MLIRSupport
     MLIRTransforms
-    MLIRVector
+    MLIRVectorDialect
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR
   PUBLIC

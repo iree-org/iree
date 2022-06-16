@@ -34,16 +34,16 @@ struct CooperativeMatrixSize {
 static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
     spirv::ResourceLimitsAttr resourceLimits, Type lhsType, Type rhsType,
     Type resultType, int64_t m, int64_t n, int64_t k) {
-  auto properties = resourceLimits.getCooperative_matrix_properties_nv()
+  auto properties = resourceLimits.getCooperativeMatrixPropertiesNv()
                         .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>();
   for (auto property : properties) {
-    if (property.getA_type() == lhsType && property.getB_type() == rhsType &&
-        property.getC_type() == resultType &&
-        property.getResult_type() == resultType &&
+    if (property.getAType() == lhsType && property.getBType() == rhsType &&
+        property.getCType() == resultType &&
+        property.getResultType() == resultType &&
         property.getScope().getValue() == spirv::Scope::Subgroup) {
-      int matmulM = property.getM_size();
-      int matmulN = property.getN_size();
-      int matmulK = property.getK_size();
+      int matmulM = property.getMSize();
+      int matmulN = property.getNSize();
+      int matmulK = property.getKSize();
       if (m % matmulM == 0 && n % matmulN == 0 && k % matmulK == 0) {
         return CooperativeMatrixSize{matmulM, matmulN, matmulK};
       }
@@ -92,7 +92,7 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
   // TODO: Use some heuristics to deduce how many subgroups should be used and
   // the tile sizes for each subgroup, considering the input workload size and
   // native cooperative matrix size choices.
-  int subgroupSize = resourceLimits.getSubgroup_size();
+  int subgroupSize = resourceLimits.getSubgroupSize();
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
 
   TileSizesListType tileSizes;
@@ -140,7 +140,7 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
 
 LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
                                      Operation *rootOp) {
-  int subgroupSize = targetEnv.getResourceLimits().getSubgroup_size();
+  int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
 
   // First try to see if we can use tensor cores.
   if (auto matmulOp = dyn_cast<linalg::MatmulOp>(rootOp)) {

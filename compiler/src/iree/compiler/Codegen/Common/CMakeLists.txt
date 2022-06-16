@@ -58,34 +58,34 @@ iree_cc_library(
     IREELinalgExtPasses
     IREELinalgExtTransforms
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAffineUtils
     MLIRAnalysis
-    MLIRArithmetic
+    MLIRArithmeticDialect
     MLIRArithmeticTransforms
-    MLIRBufferization
+    MLIRBufferizationDialect
     MLIRBufferizationTransforms
-    MLIRFunc
+    MLIRFuncDialect
     MLIRGPUOps
     MLIRIR
     MLIRLLVMCommonConversion
-    MLIRLLVMIR
-    MLIRLinalg
+    MLIRLLVMDialect
+    MLIRLinalgDialect
     MLIRLinalgTransforms
-    MLIRMath
+    MLIRMathDialect
     MLIRMathTransforms
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRMemRefTransforms
-    MLIRNVGPU
+    MLIRNVGPUDialect
     MLIRPass
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRSideEffectInterfaces
     MLIRSupport
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTransforms
-    MLIRVector
+    MLIRVectorDialect
     MLIRVectorTransforms
     MLIRViewLikeInterface
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen

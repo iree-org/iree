@@ -4,7 +4,7 @@ add_mlir_library(IREEPyDMUtils
   LINK_LIBS PUBLIC
   IREEPyDMDialect
   MLIRIR
-  MLIRFunc
+  MLIRFuncDialect
   MLIRTransformUtils
 )
 

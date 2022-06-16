@@ -42,49 +42,50 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtPasses
     LLVMSupport
-    MLIRAffine
     MLIRAffineAnalysis
+    MLIRAffineDialect
     MLIRAffineToStandard
     MLIRAffineUtils
     MLIRAnalysis
-    MLIRArithmetic
+    MLIRArithmeticDialect
     MLIRArithmeticToSPIRV
     MLIRArithmeticTransforms
     MLIRArithmeticUtils
-    MLIRBufferization
+    MLIRBufferizationDialect
     MLIRControlFlowToSPIRV
-    MLIRFunc
+    MLIRFuncDialect
     MLIRFuncToSPIRV
     MLIRFuncTransforms
     MLIRGPUOps
     MLIRGPUToSPIRV
     MLIRGPUTransforms
     MLIRIR
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgTransforms
+    MLIRLinalgUtils
     MLIRMathToSPIRV
     MLIRMathTransforms
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRMemRefToSPIRV
     MLIRMemRefTransforms
     MLIRPass
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSCFToGPU
     MLIRSCFToSPIRV
     MLIRSCFTransforms
     MLIRSCFUtils
-    MLIRSPIRV
     MLIRSPIRVConversion
+    MLIRSPIRVDialect
     MLIRSPIRVTransforms
     MLIRSideEffectInterfaces
     MLIRSupport
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTensorToSPIRV
     MLIRTensorTransforms
-    MLIRTosa
+    MLIRTosaDialect
     MLIRTosaToArith
     MLIRTransforms
-    MLIRVector
+    MLIRVectorDialect
     MLIRVectorInterfaces
     MLIRVectorToSPIRV
     MLIRVectorTransforms

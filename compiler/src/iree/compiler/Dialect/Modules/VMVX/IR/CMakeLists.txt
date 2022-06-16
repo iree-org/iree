@@ -31,7 +31,7 @@ iree_cc_library(
     ::VMVXOpInterfaceGen
     ::VMVXOpsGen
     LLVMSupport
-    MLIRFunc
+    MLIRFuncDialect
     MLIRIR
     MLIRSideEffectInterfaces
     MLIRSupport
@@ -52,7 +52,7 @@ iree_cc_library(
   DEPS
     ::IR
     LLVMSupport
-    MLIRFunc
+    MLIRFuncDialect
     MLIRIR
     MLIRParser
     MLIRSupport

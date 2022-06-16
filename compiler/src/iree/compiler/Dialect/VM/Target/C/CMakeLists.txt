@@ -19,11 +19,11 @@ iree_cc_library(
     "TranslateToCpp.cpp"
   DEPS
     LLVMSupport
-    MLIRControlFlow
-    MLIREmitC
-    MLIRFunc
+    MLIRControlFlowDialect
+    MLIREmitCDialect
+    MLIRFuncDialect
     MLIRIR
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSupport
   DEFINES
     "IREE_HAVE_C_OUTPUT_FORMAT"

@@ -27,7 +27,7 @@ namespace detail {
 
 LogicalResult setAppleCodeGenConfig(const spirv::TargetEnv &targetEnv,
                                     Operation *rootOp) {
-  int subgroupSize = targetEnv.getResourceLimits().getSubgroup_size();
+  int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([subgroupSize](auto op) {
         std::array<int64_t, 2> workgroupXY = {256, 1};

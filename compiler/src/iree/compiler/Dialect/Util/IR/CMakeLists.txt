@@ -42,16 +42,16 @@ iree_cc_library(
     ::UtilInterfacesGen
     ::UtilOpsGen
     LLVMSupport
-    MLIRArithmetic
-    MLIRControlFlow
+    MLIRArithmeticDialect
+    MLIRControlFlowDialect
     MLIRControlFlowInterfaces
-    MLIRFunc
+    MLIRFuncDialect
     MLIRIR
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRParser
     MLIRSideEffectInterfaces
     MLIRSupport
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTransforms
   PUBLIC
 )
