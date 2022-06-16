@@ -48,7 +48,6 @@ iree_compiler_cc_library(
         "GPUDistributeSharedMemoryCopy.cpp",
         "GPUPipelining.cpp",
         "IREEComprehensiveBufferizePass.cpp",
-        "InsertDistributionInfoPass.cpp",
         "MemrefCopyToLinalg.cpp",
         "OptimizeVectorTransferPass.cpp",
         "PadDynamicAlloc.cpp",
