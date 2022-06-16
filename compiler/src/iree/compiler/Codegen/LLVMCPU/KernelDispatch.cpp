@@ -352,9 +352,8 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
   builder.setInsertionPoint(linalgOp);
   SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
   SmallVector<int64_t> ubs = linalgOp.getStaticLoopRanges();
-  auto loops =
-      cast<IREE::Flow::PartitionableLoopsInterface>(linalgOp.getOperation())
-          .getPartitionableLoops(kNumMaxParallelDims);
+  auto loops = cast<PartitionableLoopsInterface>(linalgOp.getOperation())
+                   .getPartitionableLoops(kNumMaxParallelDims);
   return getDefaultDistributedLevelTileSizes(loops, lbs, ubs, minTileSizes,
                                              maxTileSizes, allowIncompleteTile,
                                              vectorSizeHints);
@@ -397,7 +396,7 @@ static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
 /// `PartitionableLoopsInterface`, given the `lbs` and `ubs` of all the loops.
 static LogicalResult setDefaultRootConfig(
     func::FuncOp entryPointFn,
-    IREE::Flow::PartitionableLoopsInterface partitionableLoopsInterfaceOp,
+    PartitionableLoopsInterface partitionableLoopsInterfaceOp,
     ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs) {
   if (getLoweringConfig(partitionableLoopsInterfaceOp)) return success();
 
@@ -993,7 +992,7 @@ static LogicalResult setRootConfig(
   if (getLoweringConfig(linalgOp)) return success();
 
   auto partitionableLoopOp =
-      cast<IREE::Flow::PartitionableLoopsInterface>(linalgOp.getOperation());
+      cast<PartitionableLoopsInterface>(linalgOp.getOperation());
   SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
   SmallVector<int64_t> ubs = linalgOp.getStaticLoopRanges();
   return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
@@ -1007,8 +1006,8 @@ static LogicalResult setRootConfig(
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   if (getLoweringConfig(tiledOpInterfaceOp)) return success();
 
-  auto partitionableLoopOp = cast<IREE::Flow::PartitionableLoopsInterface>(
-      tiledOpInterfaceOp.getOperation());
+  auto partitionableLoopOp =
+      cast<PartitionableLoopsInterface>(tiledOpInterfaceOp.getOperation());
 
   // TODO(hanchung): Implement getStaticLoopRanges method for TiledOpInterface.
   OpBuilder builder(tiledOpInterfaceOp.getContext());

@@ -306,7 +306,7 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
 
-  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
 
@@ -342,7 +342,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                         bool allowVectorization = true) {
   LLVM_DEBUG(llvm::dbgs() << "Using default config for op: " << *op << "\n");
   func::FuncOp funcOp = op->getParentOfType<func::FuncOp>();
-  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
 

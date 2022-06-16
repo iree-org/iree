@@ -113,6 +113,11 @@ std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass();
 
+
+/// Pass to test Partitionable loop interface
+std::unique_ptr<OperationPass<void>>
+createTestPartitionableLoopsInterfacePass();
+
 /// Pass to tile and distribute to workgroups.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createTileAndDistributeToWorkgroupsPass();

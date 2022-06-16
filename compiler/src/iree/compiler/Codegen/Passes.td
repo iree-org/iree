@@ -92,6 +92,13 @@ def OptimizeVectorTransfer :
   let constructor = "mlir::iree_compiler::createOptimizeVectorTransferPass()";
 }
 
+
+def TestPartitionableLoopsInterface :
+    Pass<"iree-codegen-test-partitionable-loop-interface", ""> {
+  let summary = "Test the PartitionableLoopsInterface";
+  let constructor = "mlir::iree_compiler::createTestPartitionableLoopsInterfacePass()";
+}
+
 def TileAndDistributeToWorkgroups :
     Pass<"iree-codegen-tile-and-distribute-to-workgroups", "IREE::HAL::ExecutableVariantOp"> {
   let summary = "Tile and distribute operations to workgroups";

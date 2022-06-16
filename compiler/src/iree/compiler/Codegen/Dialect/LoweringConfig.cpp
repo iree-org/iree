@@ -347,8 +347,7 @@ LogicalResult getDistributionTileConfigFromLoweringConfig(
   if (computeOps.empty()) return success();
 
   for (auto op : computeOps) {
-    auto partitionbleLoopInterface =
-        dyn_cast<IREE::Flow::PartitionableLoopsInterface>(op);
+    auto partitionbleLoopInterface = dyn_cast<PartitionableLoopsInterface>(op);
     if (!partitionbleLoopInterface) continue;
     IREE::Codegen::LoweringConfigAttr currLoweringConfig =
         getLoweringConfig(op);

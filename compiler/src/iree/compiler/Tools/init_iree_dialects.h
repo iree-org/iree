@@ -51,7 +51,6 @@ inline void registerIreeDialects(DialectRegistry &registry) {
   // clang-format on
 
   // External models.
-  IREE::Flow::registerPartitionableLoopsInterfaceModels(registry);
   IREE::LinalgExt::registerTiledOpInterfaceExternalModels(registry);
   IREE::LinalgExt::registerTilingInterfaceExternalModels(registry);
   IREE::Util::registerUtilExternalModels(registry);
