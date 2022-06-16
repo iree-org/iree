@@ -61,6 +61,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:LinalgUtils",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",

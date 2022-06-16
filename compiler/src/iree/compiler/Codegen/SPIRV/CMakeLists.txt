@@ -62,6 +62,7 @@ iree_cc_library(
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgTransforms
+    MLIRLinalgUtils
     MLIRMathToSPIRV
     MLIRMathTransforms
     MLIRMemRefDialect

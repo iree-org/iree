@@ -53,6 +53,7 @@ iree_cc_library(
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgTransforms
+    MLIRLinalgUtils
     MLIRMemRefTransforms
     MLIRPass
     MLIRSCFDialect

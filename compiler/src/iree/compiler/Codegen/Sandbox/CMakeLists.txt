@@ -51,6 +51,7 @@ iree_cc_library(
     MLIRControlFlowDialect
     MLIRLinalgDialect
     MLIRLinalgTransforms
+    MLIRLinalgUtils
     MLIRMemRefDialect
     MLIRParser
     MLIRPass
