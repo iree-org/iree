@@ -88,8 +88,7 @@ system's `PATH`):
 
 ``` shell hl_lines="3"
 iree-compile \
-    --iree-mlir-to-vm-bytecode-module \
-    --iree-hal-target-backends=dylib-llvm-aot \
+    --iree-hal-target-backends=cpu \
     iree_input.mlir -o mobilenet_cpu.vmfb
 ```
 
@@ -126,7 +125,7 @@ In the build directory, run the following command:
 
 ``` shell hl_lines="2"
 tools/iree-run-module \
-    --driver=local-task \
+    --device=local-task \
     --module_file=mobilenet_cpu.vmfb \
     --entry_function=predict \
     --function_input="1x224x224x3xf32=0"

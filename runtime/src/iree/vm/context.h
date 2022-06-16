@@ -41,6 +41,12 @@ enum iree_vm_context_flag_bits_t {
   // All invocations made to this context - including initializers - will be
   // traced. For fine-grained control use `iree_vm_invocation_flags_t`.
   IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION = 1u << 0,
+
+  // Context allows concurrent execution.
+  // Multiple OS threads may call into the context concurrently. Synchronization
+  // is not performed by the context and callers must ensure the executing
+  // programs support concurrency.
+  IREE_VM_CONTEXT_FLAG_CONCURRENT = 1u << 1,
 };
 typedef uint32_t iree_vm_context_flags_t;
 
@@ -67,7 +73,8 @@ IREE_API_EXPORT void iree_vm_context_retain(iree_vm_context_t* context);
 IREE_API_EXPORT void iree_vm_context_release(iree_vm_context_t* context);
 
 // Returns a process-unique ID for the |context|.
-IREE_API_EXPORT intptr_t iree_vm_context_id(const iree_vm_context_t* context);
+IREE_API_EXPORT iree_vm_context_id_t
+iree_vm_context_id(const iree_vm_context_t* context);
 
 // Returns |context| flags.
 IREE_API_EXPORT iree_vm_context_flags_t

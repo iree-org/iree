@@ -20,7 +20,7 @@ iree_cc_library(
     "InferCustomKernelsTargetInfoFromParent.cpp"
   DEPS
     LLVMSupport
-    MLIRFunc
+    MLIRFuncDialect
     MLIRIR
     MLIRSupport
     MLIRTransforms

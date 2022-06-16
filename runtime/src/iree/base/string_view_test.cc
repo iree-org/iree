@@ -4,14 +4,21 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <array>
 #include <string>
 
 #include "iree/base/api.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace {
 
-std::string ToString(iree_string_view_t value) {
+using iree::StatusCode;
+using iree::testing::status::IsOkAndHolds;
+using iree::testing::status::StatusIs;
+using testing::ElementsAre;
+
+static std::string ToString(iree_string_view_t value) {
   return std::string(value.data, value.size);
 }
 
@@ -360,6 +367,106 @@ TEST(StringViewTest, ReplaceChar) {
   EXPECT_EQ(replace_char("x", 'x', 'y'), "y");
   EXPECT_EQ(replace_char("xx", 'x', 'y'), "yy");
   EXPECT_EQ(replace_char("axbxc", 'x', 'y'), "aybyc");
+}
+
+template <size_t N>
+static iree::StatusOr<std::array<uint8_t, N>> ParseHex(const char* value) {
+  std::array<uint8_t, N> buffer;
+  if (!iree_string_view_parse_hex_bytes(iree_make_cstring_view(value),
+                                        buffer.size(), buffer.data())) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT);
+  }
+  return {buffer};
+}
+
+TEST(StringViewTest, ParseHex0) {
+  EXPECT_THAT(ParseHex<0>(""), IsOkAndHolds(ElementsAre()));
+  EXPECT_THAT(ParseHex<0>(" "), IsOkAndHolds(ElementsAre()));
+  EXPECT_THAT(ParseHex<0>("  "), IsOkAndHolds(ElementsAre()));
+}
+
+TEST(StringViewTest, ParseHex1) {
+  EXPECT_THAT(ParseHex<1>("EF"), IsOkAndHolds(ElementsAre(0xEF)));
+  EXPECT_THAT(ParseHex<1>("Ef"), IsOkAndHolds(ElementsAre(0xEF)));
+  EXPECT_THAT(ParseHex<1>("00"), IsOkAndHolds(ElementsAre(0x00)));
+  EXPECT_THAT(ParseHex<1>("FF"), IsOkAndHolds(ElementsAre(0xFF)));
+  EXPECT_THAT(ParseHex<1>(" EF "), IsOkAndHolds(ElementsAre(0xEF)));
+}
+
+TEST(StringViewTest, ParseHex2) {
+  // No separators:
+  EXPECT_THAT(ParseHex<2>("ABEF"), IsOkAndHolds(ElementsAre(0xAB, 0xEF)));
+  // Mixed-case with separators:
+  EXPECT_THAT(ParseHex<2>("Ab-eF"), IsOkAndHolds(ElementsAre(0xAB, 0xEF)));
+  // Upper-case with separators:
+  EXPECT_THAT(ParseHex<2>("AB-EF"), IsOkAndHolds(ElementsAre(0xAB, 0xEF)));
+  // Lower-case with separators:
+  EXPECT_THAT(ParseHex<2>("ab-ef"), IsOkAndHolds(ElementsAre(0xAB, 0xEF)));
+  // Min:
+  EXPECT_THAT(ParseHex<2>("00-00"), IsOkAndHolds(ElementsAre(0x00, 0x00)));
+  // Max:
+  EXPECT_THAT(ParseHex<2>("FF-FF"), IsOkAndHolds(ElementsAre(0xFF, 0xFF)));
+}
+
+TEST(StringViewTest, ParseHex16) {
+  // No separators:
+  EXPECT_THAT(ParseHex<16>("000102030405060708090A0B0C0D0E0F"),
+              IsOkAndHolds(ElementsAre(0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+                                       0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
+                                       0x0E, 0x0F)));
+  // Mixed-case with separators:
+  EXPECT_THAT(ParseHex<16>("00010203-0405-0607-0809-0a0B0c0D0e0F"),
+              IsOkAndHolds(ElementsAre(0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+                                       0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
+                                       0x0E, 0x0F)));
+  // Upper-case with separators:
+  EXPECT_THAT(ParseHex<16>("00010203-0405-0607-0809-0A0B0C0D0E0F"),
+              IsOkAndHolds(ElementsAre(0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+                                       0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
+                                       0x0E, 0x0F)));
+  // Lower-case with separators:
+  EXPECT_THAT(ParseHex<16>("00010203-0405-0607-0809-0a0b0c0d0e0f"),
+              IsOkAndHolds(ElementsAre(0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+                                       0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
+                                       0x0E, 0x0F)));
+  // Min:
+  EXPECT_THAT(ParseHex<16>("00000000-0000-0000-0000-000000000000"),
+              IsOkAndHolds(ElementsAre(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                       0x00, 0x00)));
+  // Max:
+  EXPECT_THAT(ParseHex<16>("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF"),
+              IsOkAndHolds(ElementsAre(0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                                       0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                                       0xFF, 0xFF)));
+  // Morse code:
+  EXPECT_THAT(ParseHex<16>("00-01-02-03-04-05-06-07-08-09-0a-0b-0c-0d-0e-0f"),
+              IsOkAndHolds(ElementsAre(0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+                                       0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
+                                       0x0E, 0x0F)));
+}
+
+TEST(StringViewTest, InvalidParseHex) {
+  // Leading/trailing -'s:
+  EXPECT_THAT(ParseHex<1>("-"), StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseHex<1>("-ab"), StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseHex<1>("ab-"), StatusIs(StatusCode::kInvalidArgument));
+
+  // Too little data:
+  EXPECT_THAT(ParseHex<1>(""), StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseHex<1>("a"), StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseHex<2>("abc"), StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseHex<2>("ab-a"), StatusIs(StatusCode::kInvalidArgument));
+
+  // Too much data:
+  EXPECT_THAT(ParseHex<0>("ab"), StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseHex<1>("abc"), StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseHex<1>("abcd"), StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseHex<1>("ab-"), StatusIs(StatusCode::kInvalidArgument));
+
+  // Invalid characters:
+  EXPECT_THAT(ParseHex<1>("ZF"), StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseHex<2>("AB-C?"), StatusIs(StatusCode::kInvalidArgument));
 }
 
 }  // namespace

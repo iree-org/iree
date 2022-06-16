@@ -67,157 +67,6 @@ static LogicalResult parseOptionalEnumAttr(AsmParser &parser,
   return parseEnumAttr<AttrType>(parser, attrName, attr);
 }
 
-static LogicalResult parseMemoryType(AsmParser &parser, Attribute &attr) {
-  if (succeeded(parser.parseOptionalQuestion())) {
-    attr = parser.getBuilder().getI32IntegerAttr(0);
-    return success();
-  }
-
-  std::string fullString;
-  if (succeeded(parser.parseOptionalString(&fullString))) {
-    auto symbolized = symbolizeEnum<MemoryTypeBitfield>(fullString);
-    if (!symbolized.hasValue()) {
-      return parser.emitError(parser.getCurrentLocation())
-             << "failed to parse memory type enum value";
-    }
-    attr = parser.getBuilder().getI32IntegerAttr(
-        static_cast<int32_t>(symbolized.getValue()));
-    return success();
-  }
-
-  StringRef shortString;
-  if (failed(parser.parseKeyword(&shortString))) {
-    return parser.emitError(parser.getCurrentLocation())
-           << "failed to find memory type short string";
-  }
-  MemoryTypeBitfield memoryType = MemoryTypeBitfield::None;
-  for (char c : shortString) {
-    switch (c) {
-      case 'T':
-        memoryType = memoryType | MemoryTypeBitfield::Transient;
-        break;
-      case 'h':
-        memoryType = memoryType | MemoryTypeBitfield::HostVisible;
-        break;
-      case 'H':
-        memoryType = memoryType | MemoryTypeBitfield::HostLocal;
-        break;
-      case 'c':
-        memoryType = memoryType | MemoryTypeBitfield::HostCoherent;
-        break;
-      case 'C':
-        memoryType = memoryType | MemoryTypeBitfield::HostCached;
-        break;
-      case 'd':
-        memoryType = memoryType | MemoryTypeBitfield::DeviceVisible;
-        break;
-      case 'D':
-        memoryType = memoryType | MemoryTypeBitfield::DeviceLocal;
-        break;
-      default:
-        return parser.emitError(parser.getCurrentLocation())
-               << "unknown memory type short-form char: " << c;
-    }
-  }
-  attr =
-      parser.getBuilder().getI32IntegerAttr(static_cast<int32_t>(memoryType));
-  return success();
-}
-
-static void printMemoryType(AsmPrinter &printer,
-                            MemoryTypeBitfield memoryType) {
-  if (memoryType == MemoryTypeBitfield::None) {
-    printer << '?';
-    return;
-  }
-  if (allEnumBitsSet(memoryType, MemoryTypeBitfield::Transient)) {
-    printer << 't';
-  }
-  if (allEnumBitsSet(memoryType, MemoryTypeBitfield::HostLocal)) {
-    printer << 'H';
-  } else if (allEnumBitsSet(memoryType, MemoryTypeBitfield::HostVisible)) {
-    printer << 'h';
-  }
-  if (allEnumBitsSet(memoryType, MemoryTypeBitfield::HostCoherent)) {
-    printer << 'c';
-  }
-  if (allEnumBitsSet(memoryType, MemoryTypeBitfield::HostCached)) {
-    printer << 'C';
-  }
-  if (allEnumBitsSet(memoryType, MemoryTypeBitfield::DeviceLocal)) {
-    printer << 'D';
-  } else if (allEnumBitsSet(memoryType, MemoryTypeBitfield::DeviceVisible)) {
-    printer << 'd';
-  }
-}
-
-static LogicalResult parseBufferUsage(DialectAsmParser &parser,
-                                      Attribute &attr) {
-  if (succeeded(parser.parseOptionalQuestion())) {
-    attr = parser.getBuilder().getI32IntegerAttr(0);
-    return success();
-  }
-
-  std::string fullString;
-  if (succeeded(parser.parseOptionalString(&fullString))) {
-    auto symbolized = symbolizeEnum<BufferUsageBitfield>(fullString);
-    if (!symbolized.hasValue()) {
-      return parser.emitError(parser.getCurrentLocation())
-             << "failed to parse buffer usage enum value";
-    }
-    attr = parser.getBuilder().getI32IntegerAttr(
-        static_cast<int32_t>(symbolized.getValue()));
-    return success();
-  }
-
-  StringRef shortString;
-  if (failed(parser.parseKeyword(&shortString))) {
-    return parser.emitError(parser.getCurrentLocation())
-           << "failed to find buffer usage short string";
-  }
-  BufferUsageBitfield usage = BufferUsageBitfield::None;
-  for (char c : shortString) {
-    switch (c) {
-      case 'C':
-        usage = usage | BufferUsageBitfield::Constant;
-        break;
-      case 'T':
-        usage = usage | BufferUsageBitfield::Transfer;
-        break;
-      case 'M':
-        usage = usage | BufferUsageBitfield::Mapping;
-        break;
-      case 'D':
-        usage = usage | BufferUsageBitfield::Dispatch;
-        break;
-      default:
-        return parser.emitError(parser.getCurrentLocation())
-               << "unknown buffer usage short-form char: " << c;
-    }
-  }
-  attr = parser.getBuilder().getI32IntegerAttr(static_cast<int32_t>(usage));
-  return success();
-}
-
-static void printBufferUsage(AsmPrinter &printer, BufferUsageBitfield usage) {
-  if (usage == BufferUsageBitfield::None) {
-    printer << '?';
-    return;
-  }
-  if (allEnumBitsSet(usage, BufferUsageBitfield::Constant)) {
-    printer << 'C';
-  }
-  if (allEnumBitsSet(usage, BufferUsageBitfield::Transfer)) {
-    printer << 'T';
-  }
-  if (allEnumBitsSet(usage, BufferUsageBitfield::Mapping)) {
-    printer << 'M';
-  }
-  if (allEnumBitsSet(usage, BufferUsageBitfield::Dispatch)) {
-    printer << 'D';
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // Element types
 //===----------------------------------------------------------------------===//
@@ -229,6 +78,7 @@ enum class NumericalType : uint32_t {
   kInteger = 0x10,
   kIntegerSigned = kInteger | 0x01,
   kIntegerUnsigned = kInteger | 0x02,
+  kBoolean = kInteger | 0x03,
   kFloat = 0x20,
   kFloatIEEE = kFloat | 0x01,
   kFloatBrain = kFloat | 0x02,
@@ -242,7 +92,9 @@ constexpr inline int32_t makeElementTypeValue(NumericalType numericalType,
 llvm::Optional<int32_t> getElementTypeValue(Type type) {
   if (auto intType = type.dyn_cast_or_null<IntegerType>()) {
     NumericalType numericalType;
-    if (intType.isSigned()) {
+    if (intType.isInteger(1)) {
+      return makeElementTypeValue(NumericalType::kBoolean, 8);
+    } else if (intType.isSigned()) {
       numericalType = NumericalType::kIntegerSigned;
     } else if (intType.isUnsigned()) {
       numericalType = NumericalType::kIntegerUnsigned;

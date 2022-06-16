@@ -42,8 +42,6 @@
 
 IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
 
-IREE_FLAG(string, driver, "local-task", "Backend driver to use.");
-
 IREE_FLAG(
     bool, expect_failure, false,
     "Whether running module is expected to fail. If set, failing "
@@ -113,9 +111,8 @@ iree_status_t Run(std::string module_file_path, int* out_exit_code) {
       iree_allocator_system(), &input_module));
 
   iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(iree_hal_create_device(
-      iree_hal_available_driver_registry(), IREE_SV(FLAG_driver),
-      iree_allocator_system(), &device));
+  IREE_RETURN_IF_ERROR(iree_hal_create_device_from_flags(
+      iree_hal_default_device_uri(), iree_allocator_system(), &device));
   iree_vm_module_t* hal_module = nullptr;
   IREE_RETURN_IF_ERROR(
       iree_hal_module_create(device, iree_allocator_system(), &hal_module));

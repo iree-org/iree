@@ -7,8 +7,10 @@
 #include "iree/compiler/Dialect/Vulkan/Utils/TargetEnvironment.h"
 
 #include "iree/compiler/Dialect/Vulkan/Utils/TargetTriple.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVTypes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -87,8 +89,8 @@ void convertCapabilities(Vulkan::TargetEnvAttr vkTargetEnv,
 
   auto vkCapabilities = vkTargetEnv.getCapabilitiesAttr();
 
-#define MAP_PRIMITIVE_TYPE(type)     \
-  if (vkCapabilities.shader##type()) \
+#define MAP_PRIMITIVE_TYPE(type)        \
+  if (vkCapabilities.getShader##type()) \
   capabilities.push_back(spirv::Capability::type)
 
   MAP_PRIMITIVE_TYPE(Float64);
@@ -102,16 +104,16 @@ void convertCapabilities(Vulkan::TargetEnvAttr vkTargetEnv,
   if (vkCapabilities.vkFeature())               \
   capabilities.push_back(spirv::Capability::spvCap)
 
-  MAP_8_16_BIT_STORAGE(storageBuffer16BitAccess, StorageBuffer16BitAccess);
-  MAP_8_16_BIT_STORAGE(uniformAndStorageBuffer16BitAccess, StorageUniform16);
-  MAP_8_16_BIT_STORAGE(storagePushConstant16, StoragePushConstant16);
-  MAP_8_16_BIT_STORAGE(storageBuffer8BitAccess, StorageBuffer8BitAccess);
-  MAP_8_16_BIT_STORAGE(uniformAndStorageBuffer8BitAccess,
+  MAP_8_16_BIT_STORAGE(getStorageBuffer16BitAccess, StorageBuffer16BitAccess);
+  MAP_8_16_BIT_STORAGE(getUniformAndStorageBuffer16BitAccess, StorageUniform16);
+  MAP_8_16_BIT_STORAGE(getStoragePushConstant16, StoragePushConstant16);
+  MAP_8_16_BIT_STORAGE(getStorageBuffer8BitAccess, StorageBuffer8BitAccess);
+  MAP_8_16_BIT_STORAGE(getUniformAndStorageBuffer8BitAccess,
                        UniformAndStorageBuffer8BitAccess);
-  MAP_8_16_BIT_STORAGE(storagePushConstant8, StoragePushConstant8);
+  MAP_8_16_BIT_STORAGE(getStoragePushConstant8, StoragePushConstant8);
 #undef MAP_8_16_BIT_STORAGE
 
-  auto subgroupFeatures = vkCapabilities.subgroupFeatures().getValue();
+  auto subgroupFeatures = vkCapabilities.getSubgroupFeatures().getValue();
 
 #define MAP_SUBGROUP_FEATURE(featureBit)                  \
   if ((subgroupFeatures & SubgroupFeature::featureBit) == \
@@ -131,13 +133,13 @@ void convertCapabilities(Vulkan::TargetEnvAttr vkTargetEnv,
   MAP_SUBGROUP_FEATURE(PartitionedNV);
 #undef MAP_SUBGROUP_FEATURE
 
-  if (vkCapabilities.variablePointers()) {
+  if (vkCapabilities.getVariablePointers()) {
     capabilities.push_back(spirv::Capability::VariablePointers);
   }
-  if (vkCapabilities.variablePointersStorageBuffer()) {
+  if (vkCapabilities.getVariablePointersStorageBuffer()) {
     capabilities.push_back(spirv::Capability::VariablePointersStorageBuffer);
   }
-  if (ArrayAttr attr = vkCapabilities.cooperativeMatrixPropertiesNV()) {
+  if (ArrayAttr attr = vkCapabilities.getCooperativeMatrixPropertiesNV()) {
     if (!attr.empty()) {
       capabilities.push_back(spirv::Capability::CooperativeMatrixNV);
     }
@@ -149,28 +151,28 @@ void convertCapabilities(Vulkan::TargetEnvAttr vkTargetEnv,
 spirv::ResourceLimitsAttr convertResourceLimits(
     Vulkan::TargetEnvAttr vkTargetEnv) {
   MLIRContext *context = vkTargetEnv.getContext();
+  Builder builder(context);
   auto vkCapabilities = vkTargetEnv.getCapabilitiesAttr();
   SmallVector<Attribute, 1> spvAttrs;
-  if (ArrayAttr attr = vkCapabilities.cooperativeMatrixPropertiesNV()) {
-    for (auto cooperativeMatrixPropertiesNV :
+  if (ArrayAttr attr = vkCapabilities.getCooperativeMatrixPropertiesNV()) {
+    for (auto props :
          attr.getAsRange<Vulkan::CooperativeMatrixPropertiesNVAttr>()) {
+      auto scope = static_cast<spirv::Scope>(props.getScope().getValue());
       spvAttrs.push_back(spirv::CooperativeMatrixPropertiesNVAttr::get(
-          cooperativeMatrixPropertiesNV.mSize(),
-          cooperativeMatrixPropertiesNV.nSize(),
-          cooperativeMatrixPropertiesNV.kSize(),
-          cooperativeMatrixPropertiesNV.aType(),
-          cooperativeMatrixPropertiesNV.bType(),
-          cooperativeMatrixPropertiesNV.cType(),
-          cooperativeMatrixPropertiesNV.resultType(),
-          cooperativeMatrixPropertiesNV.scope().cast<spirv::ScopeAttr>(),
-          context));
+          context, props.getMSize(), props.getNSize(), props.getKSize(),
+          props.getAType(), props.getBType(), props.getCType(),
+          props.getResultType(), spirv::ScopeAttr::get(context, scope)));
     }
   }
+  auto sizeValues =
+      vkCapabilities.getMaxComputeWorkGroupSize().getValues<int32_t>();
+  SmallVector<int64_t, 4> sizes;
+  sizes.insert(sizes.end(), sizeValues.begin(), sizeValues.end());
   return spirv::ResourceLimitsAttr::get(
-      vkCapabilities.maxComputeSharedMemorySize(),
-      vkCapabilities.maxComputeWorkGroupInvocations(),
-      vkCapabilities.maxComputeWorkGroupSize(), vkCapabilities.subgroupSize(),
-      ArrayAttr::get(context, spvAttrs), context);
+      context, vkCapabilities.getMaxComputeSharedMemorySize(),
+      vkCapabilities.getMaxComputeWorkGroupInvocations(),
+      builder.getI64ArrayAttr(sizes), vkCapabilities.getSubgroupSize(),
+      ArrayAttr::get(context, spvAttrs));
 }
 }  // anonymous namespace
 

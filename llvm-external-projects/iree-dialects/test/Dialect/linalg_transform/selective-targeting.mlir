@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s --linalg-transform-interp --split-input-file | FileCheck %s
+// RUN: iree-dialects-opt %s --transform-dialect-interpreter --split-input-file | FileCheck %s
 
 // CHECK-LABEL: func.func @matmul_tensors_1(
 func.func @matmul_tensors_1(

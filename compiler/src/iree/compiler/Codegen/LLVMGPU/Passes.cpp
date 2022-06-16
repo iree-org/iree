@@ -64,11 +64,9 @@ static void addBufferizePasses(OpPassManager &passManager) {
 }
 
 static void tileAndBufferize(OpPassManager &pm) {
-  pm.addPass(createInsertDistributionInfoPass());
+  pm.addPass(createTileAndDistributeToWorkgroupsPass());
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createTileAndDistributeToWorkgroupsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createConvertToDestinationPassingStylePass());
   nestedModulePM.addPass(createCanonicalizerPass());
@@ -246,6 +244,12 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
     // convert to NVVM.
     pm.addPass(createConvertToNVVMPass());
   }
+}
+
+extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName;
+
+void addGPUTransformDialectInterpreterPasses(OpPassManager &passManager) {
+  assert(0 && "TODO: implement transform dialect path for LLVMGPU");
 }
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {

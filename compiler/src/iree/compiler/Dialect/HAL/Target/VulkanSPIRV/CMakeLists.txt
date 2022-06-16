@@ -26,7 +26,7 @@ iree_cc_library(
     MLIRGPUOps
     MLIRIR
     MLIRParser
-    MLIRSPIRV
+    MLIRSPIRVDialect
     MLIRSPIRVModuleCombiner
     MLIRSPIRVSerialization
     MLIRSupport

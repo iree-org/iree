@@ -11,13 +11,18 @@
 #include <string.h>
 
 #include "iree/base/internal/atomics.h"
+#include "iree/base/internal/debugging.h"
 #include "iree/base/tracing.h"
 
 struct iree_vm_context_t {
   iree_atomic_ref_count_t ref_count;
   iree_vm_instance_t* instance;
   iree_allocator_t allocator;
-  intptr_t context_id;
+
+  // An opaque ID unique for the entire process lifetime.
+  // If tracing then this points at a NUL-terminated string with process
+  // lifetime.
+  iree_vm_context_id_t context_id;
 
   // Context has been frozen and can no longer be modified.
   uint32_t is_frozen : 1;
@@ -37,10 +42,28 @@ struct iree_vm_context_t {
 
 static void iree_vm_context_destroy(iree_vm_context_t* context);
 
+// Allocates a process-unique ID for a context to use.
+static iree_vm_context_id_t iree_vm_context_allocate_id(void) {
+  static iree_atomic_int32_t next_context_id = IREE_ATOMIC_VAR_INIT(1);
+  uint32_t context_id = iree_atomic_fetch_add_int32(&next_context_id, 1,
+                                                    iree_memory_order_seq_cst);
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FIBERS
+  // This is what we pass to Tracy as the fiber name.
+  // The string must remain live for the lifetime of the process.
+  IREE_LEAK_CHECK_DISABLE_PUSH();
+  char* name = (char*)malloc(32);
+  snprintf(name, 32, "ctx-%04d", context_id - 1);
+  IREE_LEAK_CHECK_DISABLE_POP();
+  return (iree_vm_context_id_t)name;
+#else
+  return (iree_vm_context_id_t)context_id;
+#endif  // IREE_TRACING_FEATURE_FIBERS
+}
+
 // Runs a single `() -> ()` function from the module if it exists.
 static iree_status_t iree_vm_context_run_function(
-    iree_vm_stack_t* stack, iree_vm_module_t* module,
-    iree_string_view_t function_name) {
+    iree_vm_context_t* context, iree_vm_stack_t* stack,
+    iree_vm_module_t* module, iree_string_view_t function_name) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_vm_function_call_t call;
@@ -182,7 +205,8 @@ static void iree_vm_context_release_modules(iree_vm_context_t* context,
       context->flags & IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
           ? IREE_VM_INVOCATION_FLAG_TRACE_EXECUTION
           : IREE_VM_INVOCATION_FLAG_NONE,
-      iree_vm_context_state_resolver(context), context->allocator);
+      iree_vm_context_id(context), iree_vm_context_state_resolver(context),
+      context->allocator);
   for (int i = (int)end; i >= (int)start; --i) {
     iree_vm_module_t* module = context->list.modules[i];
     iree_vm_module_state_t* module_state = context->list.module_states[i];
@@ -191,7 +215,7 @@ static void iree_vm_context_release_modules(iree_vm_context_t* context,
       continue;
     }
     IREE_IGNORE_ERROR(iree_vm_context_run_function(
-        stack, module, iree_make_cstring_view("__deinit")));
+        context, stack, module, iree_make_cstring_view("__deinit")));
   }
   iree_vm_stack_deinitialize(stack);
 
@@ -244,9 +268,7 @@ IREE_API_EXPORT iree_status_t iree_vm_context_create_with_modules(
   iree_vm_instance_retain(context->instance);
   context->allocator = allocator;
 
-  static iree_atomic_int32_t next_context_id = IREE_ATOMIC_VAR_INIT(1);
-  context->context_id = iree_atomic_fetch_add_int32(&next_context_id, 1,
-                                                    iree_memory_order_seq_cst);
+  context->context_id = iree_vm_context_allocate_id();
 
   // TODO(benvanik): allow for non-frozen but static contexts.
   context->is_frozen = module_count > 0;
@@ -312,7 +334,8 @@ IREE_API_EXPORT void iree_vm_context_release(iree_vm_context_t* context) {
   }
 }
 
-IREE_API_EXPORT intptr_t iree_vm_context_id(const iree_vm_context_t* context) {
+IREE_API_EXPORT iree_vm_context_id_t
+iree_vm_context_id(const iree_vm_context_t* context) {
   if (!context) {
     return -1;
   }
@@ -387,7 +410,8 @@ IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
       context->flags & IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
           ? IREE_VM_INVOCATION_FLAG_TRACE_EXECUTION
           : IREE_VM_INVOCATION_FLAG_NONE,
-      iree_vm_context_state_resolver(context), context->allocator);
+      iree_vm_context_id(context), iree_vm_context_state_resolver(context),
+      context->allocator);
 
   // Retain all modules and allocate their state.
   assert(context->list.capacity >= context->list.count + module_count);
@@ -424,7 +448,7 @@ IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
     // Run module __init functions, if present.
     // As initialization functions may reference imports we need to perform
     // all of these after we have resolved the imports above.
-    status = iree_vm_context_run_function(stack, module,
+    status = iree_vm_context_run_function(context, stack, module,
                                           iree_make_cstring_view("__init"));
     if (!iree_status_is_ok(status)) {
       // Cleanup handled below.
@@ -605,7 +629,8 @@ IREE_API_EXPORT iree_status_t iree_vm_context_notify(iree_vm_context_t* context,
       context->flags & IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
           ? IREE_VM_INVOCATION_FLAG_TRACE_EXECUTION
           : IREE_VM_INVOCATION_FLAG_NONE,
-      iree_vm_context_state_resolver(context), context->allocator);
+      iree_vm_context_id(context), iree_vm_context_state_resolver(context),
+      context->allocator);
 
   // Resumes are walked forward while suspends are walked backward.
   // This follows the expected construction/destruction pattern where for

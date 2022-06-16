@@ -103,7 +103,7 @@ static void iree_vm_bytecode_stack_frame_cleanup(iree_vm_stack_frame_t* frame) {
 
 static iree_status_t iree_vm_bytecode_function_enter(
     iree_vm_stack_t* stack, const iree_vm_function_t function,
-    iree_vm_stack_frame_t** out_callee_frame,
+    iree_string_view_t cconv_results, iree_vm_stack_frame_t** out_callee_frame,
     iree_vm_registers_t* out_callee_registers) {
   iree_vm_bytecode_module_t* module =
       (iree_vm_bytecode_module_t*)function.module->self;
@@ -160,6 +160,7 @@ static iree_status_t iree_vm_bytecode_function_enter(
   iree_vm_bytecode_frame_storage_t* stack_storage =
       (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(
           *out_callee_frame);
+  stack_storage->cconv_results = cconv_results;
   stack_storage->i32_register_count = i32_register_count;
   stack_storage->ref_register_count = ref_register_count;
   stack_storage->i32_register_offset = header_size;
@@ -180,11 +181,11 @@ static iree_status_t iree_vm_bytecode_function_enter(
 static iree_status_t iree_vm_bytecode_external_enter(
     iree_vm_stack_t* stack, const iree_vm_function_t function,
     iree_string_view_t cconv_arguments, iree_byte_span_t arguments,
-    iree_vm_stack_frame_t** out_callee_frame,
+    iree_string_view_t cconv_results, iree_vm_stack_frame_t** out_callee_frame,
     iree_vm_registers_t* out_callee_registers) {
   // Enter the bytecode function and allocate registers.
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_function_enter(
-      stack, function, out_callee_frame, out_callee_registers));
+      stack, function, cconv_results, out_callee_frame, out_callee_registers));
 
   // Marshal arguments from the ABI format to the VM registers.
   iree_vm_registers_t callee_registers = *out_callee_registers;
@@ -232,8 +233,13 @@ static iree_status_t iree_vm_bytecode_external_leave(
     iree_vm_stack_t* stack, iree_vm_stack_frame_t* callee_frame,
     const iree_vm_registers_t* IREE_RESTRICT callee_registers,
     const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
-    iree_string_view_t cconv_results, iree_byte_span_t results) {
+    iree_byte_span_t results) {
+  const iree_vm_bytecode_frame_storage_t* stack_storage =
+      (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(
+          callee_frame);
+
   // Marshal results from registers to the ABI results buffer.
+  iree_string_view_t cconv_results = stack_storage->cconv_results;
   uint8_t* p = results.data;
   for (iree_host_size_t i = 0; i < cconv_results.size; ++i) {
     uint16_t src_reg = src_reg_list->registers[i];
@@ -289,8 +295,9 @@ static iree_status_t iree_vm_bytecode_internal_enter(
   function.module = module;
   function.linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
   function.ordinal = function_ordinal;
-  IREE_RETURN_IF_ERROR(iree_vm_bytecode_function_enter(
-      stack, function, out_callee_frame, out_callee_registers));
+  IREE_RETURN_IF_ERROR(
+      iree_vm_bytecode_function_enter(stack, function, iree_string_view_empty(),
+                                      out_callee_frame, out_callee_registers));
 
   // Remaps argument/result registers from a source list in the caller/callee
   // frame to the 0-N ABI registers in the callee/caller frame.
@@ -634,24 +641,49 @@ static iree_status_t iree_vm_bytecode_call_import_variadic(
 // Main interpreter dispatch routine
 //===----------------------------------------------------------------------===//
 
-iree_status_t iree_vm_bytecode_dispatch(
+static iree_status_t iree_vm_bytecode_dispatch(
+    iree_vm_stack_t* stack, iree_vm_bytecode_module_t* module,
+    iree_vm_stack_frame_t* current_frame, iree_vm_registers_t regs,
+    iree_byte_span_t call_results, iree_vm_execution_result_t* out_result);
+
+iree_status_t iree_vm_bytecode_dispatch_begin(
     iree_vm_stack_t* stack, iree_vm_bytecode_module_t* module,
     const iree_vm_function_call_t* call, iree_string_view_t cconv_arguments,
     iree_string_view_t cconv_results, iree_vm_execution_result_t* out_result) {
-  memset(out_result, 0, sizeof(*out_result));
-
-  // When required emit the dispatch tables here referencing the labels we are
-  // defining below.
-  DEFINE_DISPATCH_TABLES();
-
   // Enter function (as this is the initial call).
   // The callee's return will take care of storing the output registers when it
   // actually does return, either immediately or in the future via a resume.
   iree_vm_stack_frame_t* current_frame = NULL;
   iree_vm_registers_t regs;
-  IREE_RETURN_IF_ERROR(
-      iree_vm_bytecode_external_enter(stack, call->function, cconv_arguments,
-                                      call->arguments, &current_frame, &regs));
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_external_enter(
+      stack, call->function, cconv_arguments, call->arguments, cconv_results,
+      &current_frame, &regs));
+
+  return iree_vm_bytecode_dispatch(stack, module, current_frame, regs,
+                                   call->results, out_result);
+}
+
+iree_status_t iree_vm_bytecode_dispatch_resume(
+    iree_vm_stack_t* stack, iree_vm_bytecode_module_t* module,
+    iree_byte_span_t call_results, iree_vm_execution_result_t* out_result) {
+  iree_vm_stack_frame_t* current_frame = iree_vm_stack_current_frame(stack);
+  iree_vm_registers_t regs =
+      iree_vm_bytecode_get_register_storage(current_frame);
+  // TODO(benvanik): assert the module is at the top of the frame? We should
+  // only be coming in from a call based on the current frame.
+  return iree_vm_bytecode_dispatch(stack, module, current_frame, regs,
+                                   call_results, out_result);
+}
+
+static iree_status_t iree_vm_bytecode_dispatch(
+    iree_vm_stack_t* stack, iree_vm_bytecode_module_t* module,
+    iree_vm_stack_frame_t* current_frame, iree_vm_registers_t regs,
+    iree_byte_span_t call_results, iree_vm_execution_result_t* out_result) {
+  memset(out_result, 0, sizeof(*out_result));
+
+  // When required emit the dispatch tables here referencing the labels we are
+  // defining below.
+  DEFINE_DISPATCH_TABLES();
 
   // Primary dispatch state. This is our 'native stack frame' and really
   // just enough to make dereferencing common addresses (like the current
@@ -667,7 +699,6 @@ iree_status_t iree_vm_bytecode_dispatch(
       module->function_descriptor_table[current_frame->function.ordinal]
           .bytecode_offset;
   iree_vm_source_offset_t pc = current_frame->pc;
-  const int32_t entry_frame_depth = current_frame->depth;
 
   BEGIN_DISPATCH_CORE() {
     //===------------------------------------------------------------------===//
@@ -1703,11 +1734,13 @@ iree_status_t iree_vm_bytecode_dispatch(
           VM_DecVariadicOperands("operands");
       current_frame->pc = pc;
 
-      if (current_frame->depth <= entry_frame_depth) {
+      // TODO(benvanik): faster check for escaping; this is slow (cache misses).
+      iree_vm_stack_frame_t* parent_frame = iree_vm_stack_parent_frame(stack);
+      if (!parent_frame ||
+          parent_frame->module_state != current_frame->module_state) {
         // Return from the top-level entry frame - return back to call().
         return iree_vm_bytecode_external_leave(stack, current_frame, &regs,
-                                               src_reg_list, cconv_results,
-                                               call->results);
+                                               src_reg_list, call_results);
       }
 
       // Store results into the caller frame and pop back to the parent.
@@ -1757,7 +1790,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       const iree_vm_register_remap_list_t* remap_list =
           VM_DecBranchOperands("operands");
       iree_vm_bytecode_dispatch_remap_branch_registers(regs, remap_list);
-      pc = block_pc;
+      current_frame->pc = block_pc;
 
       // Return magic status code indicating a yield.
       // This isn't an error, though callers not supporting coroutines will

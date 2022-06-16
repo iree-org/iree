@@ -87,8 +87,7 @@ static void iree_runtime_demo_perform_mul(iree_runtime_session_t* session) {
       (iree_hal_buffer_params_t){
           .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
           .access = IREE_HAL_MEMORY_ACCESS_READ,
-          .usage =
-              IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
+          .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
       },
       iree_make_const_byte_span(arg0_data, sizeof(arg0_data)), &arg0));
   IREE_CHECK_OK(iree_hal_buffer_view_fprint(
@@ -110,8 +109,7 @@ static void iree_runtime_demo_perform_mul(iree_runtime_session_t* session) {
       (iree_hal_buffer_params_t){
           .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
           .access = IREE_HAL_MEMORY_ACCESS_READ,
-          .usage =
-              IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
+          .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
       },
       iree_make_const_byte_span(arg1_data, sizeof(arg1_data)), &arg1));
   IREE_CHECK_OK(iree_hal_buffer_view_fprint(

@@ -75,6 +75,11 @@
 // the Tracy UI.
 #define IREE_TRACING_FEATURE_LOG_MESSAGES (1 << 6)
 
+// Enables fiber support in the Tracy UI.
+// Comes with a per-event overhead (less efficient queue insertion) but is
+// required when running with asynchronous VM invocations.
+#define IREE_TRACING_FEATURE_FIBERS (1 << 7)
+
 #if !defined(IREE_TRACING_MAX_CALLSTACK_DEPTH)
 // Tracing functions that capture stack traces will only capture up to N frames.
 // The overhead for stack walking scales linearly with the number of frames
@@ -99,28 +104,29 @@
 // IREE_TRACING_MODE = 4: same as 3 with callstacks for all instrumentation
 #if !defined(IREE_TRACING_FEATURES)
 #if defined(IREE_TRACING_MODE) && IREE_TRACING_MODE == 1
-#define IREE_TRACING_FEATURES \
-  (IREE_TRACING_FEATURE_INSTRUMENTATION | IREE_TRACING_FEATURE_LOG_MESSAGES)
+#define IREE_TRACING_FEATURES                                                 \
+  (IREE_TRACING_FEATURE_INSTRUMENTATION | IREE_TRACING_FEATURE_LOG_MESSAGES | \
+   IREE_TRACING_FEATURE_FIBERS)
 #undef IREE_TRACING_MAX_CALLSTACK_DEPTH
 #define IREE_TRACING_MAX_CALLSTACK_DEPTH 0
 #elif defined(IREE_TRACING_MODE) && IREE_TRACING_MODE == 2
 #define IREE_TRACING_FEATURES                 \
   (IREE_TRACING_FEATURE_INSTRUMENTATION |     \
    IREE_TRACING_FEATURE_ALLOCATION_TRACKING | \
-   IREE_TRACING_FEATURE_LOG_MESSAGES)
+   IREE_TRACING_FEATURE_LOG_MESSAGES | IREE_TRACING_FEATURE_FIBERS)
 #elif defined(IREE_TRACING_MODE) && IREE_TRACING_MODE == 3
 #define IREE_TRACING_FEATURES                   \
   (IREE_TRACING_FEATURE_INSTRUMENTATION |       \
    IREE_TRACING_FEATURE_ALLOCATION_TRACKING |   \
    IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS | \
-   IREE_TRACING_FEATURE_LOG_MESSAGES)
+   IREE_TRACING_FEATURE_LOG_MESSAGES | IREE_TRACING_FEATURE_FIBERS)
 #elif defined(IREE_TRACING_MODE) && IREE_TRACING_MODE >= 4
 #define IREE_TRACING_FEATURES                        \
   (IREE_TRACING_FEATURE_INSTRUMENTATION |            \
    IREE_TRACING_FEATURE_INSTRUMENTATION_CALLSTACKS | \
    IREE_TRACING_FEATURE_ALLOCATION_TRACKING |        \
    IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS |      \
-   IREE_TRACING_FEATURE_LOG_MESSAGES)
+   IREE_TRACING_FEATURE_LOG_MESSAGES | IREE_TRACING_FEATURE_FIBERS)
 #else
 #define IREE_TRACING_FEATURES 0
 #endif  // IREE_TRACING_MODE
@@ -164,6 +170,13 @@
 // this as a tracing feature flag.
 #define TRACY_NO_VSYNC_CAPTURE 1
 
+// Enable fibers support.
+// The manual warns that this adds overheads but it's the only way we can
+// support fiber migration across OS threads.
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FIBERS
+#define TRACY_FIBERS 1
+#endif  // IREE_TRACING_FEATURE_FIBERS
+
 // Flush the settings we have so far; settings after this point will be
 // overriding values set by Tracy itself.
 #if defined(TRACY_ENABLE)
@@ -192,8 +205,6 @@ extern "C" {
 #endif  // __cplusplus
 
 #if IREE_TRACING_FEATURES
-
-void iree_tracing_set_thread_name_impl(const char* name);
 
 typedef struct ___tracy_source_location_data iree_tracing_location_t;
 
@@ -268,7 +279,7 @@ enum {
 // This will only set the thread name as it appears in the tracing backend and
 // not set the OS thread name as it would appear in a debugger.
 // The C-string |name| will be copied and does not need to be a literal.
-#define IREE_TRACE_SET_THREAD_NAME(name) iree_tracing_set_thread_name_impl(name)
+#define IREE_TRACE_SET_THREAD_NAME(name) ___tracy_set_thread_name(name)
 
 // Evalutes the expression code only if tracing is enabled.
 //
@@ -278,6 +289,17 @@ enum {
 //  } my_object;
 //  IREE_TRACE(my_object.trace_only_value = 5);
 #define IREE_TRACE(expr) expr
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FIBERS
+// Enters a fiber context.
+// |fiber| must be unique and remain live for the process lifetime.
+#define IREE_TRACE_FIBER_ENTER(fiber) ___tracy_fiber_enter((const char*)fiber)
+// Exits a fiber context.
+#define IREE_TRACE_FIBER_LEAVE() ___tracy_fiber_leave()
+#else
+#define IREE_TRACE_FIBER_ENTER(fiber)
+#define IREE_TRACE_FIBER_LEAVE()
+#endif  // IREE_TRACING_FEATURE_FIBERS
 
 // Begins a new zone with the parent function name.
 #define IREE_TRACE_ZONE_BEGIN(zone_id) \
@@ -395,6 +417,8 @@ enum {
 #define IREE_TRACE_SET_APP_INFO(value, value_length)
 #define IREE_TRACE_SET_THREAD_NAME(name)
 #define IREE_TRACE(expr)
+#define IREE_TRACE_FIBER_ENTER(fiber)
+#define IREE_TRACE_FIBER_LEAVE()
 #define IREE_TRACE_ZONE_BEGIN(zone_id)
 #define IREE_TRACE_ZONE_BEGIN_NAMED(zone_id, name_literal)
 #define IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(zone_id, name, name_length)

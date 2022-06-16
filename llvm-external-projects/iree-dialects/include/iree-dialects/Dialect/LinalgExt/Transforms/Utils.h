@@ -50,13 +50,6 @@ Value createSubsetInsertOpFromLeadingOffsetsSizesAndStrides(
     ArrayRef<Value> leadingOffsets, ArrayRef<Value> leadingSizes,
     ArrayRef<Value> leadingStrides);
 
-/// Create a linalg_ext::ParallelInsertSliceOp by auto-completing the missing
-/// trailing dimensions to always be offset = 0, size = dim, stride = 1.
-Operation *createParallelInsertSliceOpFromLeadingOffsetsSizesAndStrides(
-    OpBuilder &b, Location loc, Value tensor, Value dest,
-    ArrayRef<Value> leadingOffsets, ArrayRef<Value> leadingSizes,
-    ArrayRef<Value> leadingStrides);
-
 /// Insert the `source` tensor into the `dest` tensor by creating the relevant
 /// `subset_insert` op. The details of the `subset_insert` op are retrieved
 /// from the `subset_extract` op so that they form a matching extract/insert

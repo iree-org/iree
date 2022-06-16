@@ -38,19 +38,19 @@ iree_cc_library(
     ::FlowOpsGen
     ::FlowTypesGen
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAnalysis
-    MLIRArithmetic
+    MLIRArithmeticDialect
     MLIRArithmeticUtils
     MLIRControlFlowInterfaces
-    MLIRFunc
+    MLIRFuncDialect
     MLIRIR
     MLIRInferTypeOpInterface
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRParser
     MLIRSideEffectInterfaces
     MLIRSupport
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTransformUtils
     iree::compiler::Dialect::Util::IR
   PUBLIC
@@ -124,9 +124,9 @@ iree_cc_library(
     IREELinalgExtDialect
     LLVMSupport
     MLIRIR
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgStructuredOpsIncGenLib
-    MLIRTensor
+    MLIRTensorDialect
   PUBLIC
 )
 

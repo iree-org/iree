@@ -40,5 +40,8 @@ Note that the command can only be run under `integrations/tensorflow/test/python
 5. This will create an `iree_input.mlir` in the temp directory specified. Those can then be fed into `iree-compile` (built locally to reproduce the error)
 
 ```
-iree-compile --iree-mlir-to-vm-bytecode-module --iree-hal-target-backends=dylib-llvm-aot --iree-input-type=mhlo iree_input.mlir
+iree-compile \
+  --iree-hal-target-backends=dylib-llvm-aot \
+  --iree-input-type=mhlo \
+  iree_input.mlir
 ```

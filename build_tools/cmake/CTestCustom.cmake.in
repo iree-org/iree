@@ -1,0 +1,15 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# We could delete directories at the end instead, but I think it's actually nice
+# for people to be able to go and inspect the temporary directories. They're not
+# very big in general and they are only in the build directory. When this was
+# created, the test temp directories constituted about 0.1% of the build
+# directory size.
+set(CTEST_CUSTOM_PRE_TEST
+"cmake -E rm -rf @IREE_TEST_TMPDIR_ROOT@"
+@IREE_CREATE_TEST_TMPDIRS_COMMANDS@
+)

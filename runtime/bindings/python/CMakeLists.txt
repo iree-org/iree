@@ -63,6 +63,7 @@ iree_py_library(
     "iree/runtime/__init__.py"
     "iree/runtime/_binding.py"
     "iree/runtime/array_interop.py"
+    "iree/runtime/benchmark.py"
     "iree/runtime/flags.py"
     "iree/runtime/function.py"
     "iree/runtime/system_api.py"

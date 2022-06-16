@@ -358,3 +358,71 @@ hal.executable private @conv_dispatch  {
 //       CHECK:           linalg.fill
 //       CHECK:         scf.for
 //       CHECK:           linalg.conv_2d_nchw_fchw
+
+
+// -----
+
+// Check contract-4d, we currently emit suboptimal code as we don't distribute
+// more than 3 dimensions but make sure we emit correct code.
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 2, 256, 4]]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workload_per_wg = [256, 2]>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @contract_4d  {
+  hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
+    hal.executable.export @contract_4d layout(#executable_layout) {
+      workgroup_size = [64 : index, 8 : index, 1 : index]
+    }
+    builtin.module {
+      func.func @contract_4d() {
+        %c12 = arith.constant 12 : index
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 8.000000e+00 : f32
+        %cst_0 = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.constant.load[0] : i32
+        %6 = arith.index_cast %0 : i32 to index
+        %12 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%6) alignment(64) : memref<?x?x12x64xf32>{%6, %6}
+        %13 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%6) alignment(64) : memref<?x?x12x64xf32>{%6, %6}
+        %15 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : memref<?x12x?x?xf32>{%6, %6, %6}
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %workgroup_count_y = hal.interface.workgroup.count[1] : index
+        %workgroup_id_z = hal.interface.workgroup.id[2] : index
+        %workgroup_count_z = hal.interface.workgroup.count[2] : index
+        scf.for %arg0 = %workgroup_id_z to %c12 step %workgroup_count_z {
+          %16 = affine.apply affine_map<()[s0] -> (s0 * 2)>()[%workgroup_id_y]
+          %17 = affine.apply affine_map<()[s0] -> (s0 * 2)>()[%workgroup_count_y]
+          scf.for %arg1 = %16 to %6 step %17 {
+            %18 = affine.apply affine_map<()[s0] -> (s0 * 256)>()[%workgroup_id_x]
+            %19 = affine.apply affine_map<()[s0] -> (s0 * 256)>()[%workgroup_count_x]
+            scf.for %arg2 = %18 to %6 step %19 {
+              %20 = affine.min affine_map<(d0)[s0] -> (-d0 + s0, 2)>(%arg1)[%6]
+              %21 = affine.min affine_map<(d0)[s0] -> (-d0 + s0, 256)>(%arg2)[%6]
+              %22 = memref.subview %15[0, %arg0, %arg1, %arg2] [%6, 1, %20, %21] [1, 1, 1, 1] : memref<?x12x?x?xf32> to memref<?x1x?x?xf32, affine_map<(d0, d1, d2, d3)[s0, s1, s2, s3] -> (d0 * s1 + s0 + d1 * s2 + d2 * s3 + d3)>>
+              %24 = memref.subview %12[0, %arg1, %arg0, 0] [%6, %20, 1, 64] [1, 1, 1, 1] : memref<?x?x12x64xf32> to memref<?x?x1x64xf32, affine_map<(d0, d1, d2, d3)[s0, s1] -> (d0 * s1 + s0 + d1 * 768 + d2 * 64 + d3)>>
+              %25 = memref.subview %13[0, %arg2, %arg0, 0] [%6, %21, 1, 64] [1, 1, 1, 1] : memref<?x?x12x64xf32> to memref<?x?x1x64xf32, affine_map<(d0, d1, d2, d3)[s0, s1] -> (d0 * s1 + s0 + d1 * 768 + d2 * 64 + d3)>>
+              linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 2, 256, 4]]>} ins(%cst_0 : f32) outs(%22 : memref<?x1x?x?xf32, affine_map<(d0, d1, d2, d3)[s0, s1, s2, s3] -> (d0 * s1 + s0 + d1 * s2 + d2 * s3 + d3)>>)
+              linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d1, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d1, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]} ins(%24, %25 : memref<?x?x1x64xf32, affine_map<(d0, d1, d2, d3)[s0, s1] -> (d0 * s1 + s0 + d1 * 768 + d2 * 64 + d3)>>, memref<?x?x1x64xf32, affine_map<(d0, d1, d2, d3)[s0, s1] -> (d0 * s1 + s0 + d1 * 768 + d2 * 64 + d3)>>) outs(%22 : memref<?x1x?x?xf32, affine_map<(d0, d1, d2, d3)[s0, s1, s2, s3] -> (d0 * s1 + s0 + d1 * s2 + d2 * s3 + d3)>>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 2, 256, 4]]>} {
+              ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
+                %26 = arith.mulf %arg3, %arg4 : f32
+                %27 = arith.addf %26, %arg5 : f32
+                linalg.yield %27 : f32
+              }
+            }
+          }
+        }
+        return
+      }
+    }
+  }
+}
+
+// Check that we are able to distribute correctly
+// CHECK-LABEL: func.func @contract_4d

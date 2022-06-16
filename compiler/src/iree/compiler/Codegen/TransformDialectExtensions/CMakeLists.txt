@@ -36,25 +36,27 @@ iree_cc_library(
     IREELinalgExtTransforms
     IREELinalgTransformDialect
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAffineUtils
-    MLIRArithmetic
-    MLIRBufferization
+    MLIRArithmeticDialect
+    MLIRBufferizationDialect
     MLIRBufferizationTransforms
-    MLIRFunc
+    MLIRFuncDialect
     MLIRIR
-    MLIRLinalg
-    MLIRPDL
+    MLIRLinalgDialect
+    MLIRPDLDialect
     MLIRPass
-    MLIRSCF
-    MLIRTensor
+    MLIRSCFDialect
+    MLIRTensorDialect
     MLIRTransformDialect
     MLIRTransformUtils
     iree::compiler::Codegen
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
     iree::compiler::Codegen::PassHeaders
+    iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
   PUBLIC
 )

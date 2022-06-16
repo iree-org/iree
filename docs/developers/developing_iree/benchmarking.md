@@ -20,7 +20,6 @@ To use `iree-benchmark-module`, generate an IREE module for the target backend:
 
 ```shell
 $ bazel run //tools:iree-compile -- \
-  --iree-mlir-to-vm-bytecode-module \
   --iree-hal-target-backends=vmvx \
   $PWD/samples/models/simple_abs.mlir \
   -o /tmp/module.fb
@@ -31,7 +30,7 @@ and then benchmark an exported function in that module:
 ```shell
 $ bazel run //tools:iree-benchmark-module -- \
   --module_file=/tmp/module.fb \
-  --driver=local-task \
+  --device=local-task \
   --entry_function=abs \
   --function_input=f32=-2
 ```
@@ -78,7 +77,7 @@ Now we'll actually invoke the binary:
 ```shell
 $ ./bazel-bin/tools/iree-benchmark-module \
   --module_file=/tmp/module.fb \
-  --driver=local-task \
+  --device=local-task \
   --entry_function=abs \
   --function_input=f32=-2
 ```
@@ -109,7 +108,6 @@ dispatch functions, generate an IREE module with the
 ```shell
 $ build/tools/iree-compile \
   --iree-input-type=mhlo \
-  --iree-mlir-to-vm-bytecode-module \
   --iree-flow-export-benchmark-funcs \
   --iree-hal-target-backends=vmvx \
   tests/e2e/models/fullyconnected.mlir \
@@ -122,7 +120,7 @@ in that module:
 ```shell
 $ build/tools/iree-benchmark-module
   --module_file=/tmp/fullyconnected.vmfb
-  --driver=local-task
+  --device=local-task
 ```
 
 If no `entry_function` is specified, `iree-benchmark-module` will register a

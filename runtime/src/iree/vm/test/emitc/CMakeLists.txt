@@ -6,7 +6,7 @@
 
 iree_add_all_subdirs()
 
-if(IREE_ENABLE_EMITC)
+if(IREE_OUTPUT_FORMAT_C)
 
 iree_cc_test(
   NAME
@@ -53,8 +53,7 @@ iree_c_module(
     "arithmetic_ops.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -67,8 +66,7 @@ iree_c_module(
     "arithmetic_ops_f32.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -81,8 +79,7 @@ iree_c_module(
     "arithmetic_ops_i64.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -95,8 +92,7 @@ iree_c_module(
     "assignment_ops.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -109,8 +105,7 @@ iree_c_module(
     "assignment_ops_f32.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -123,8 +118,7 @@ iree_c_module(
     "assignment_ops_i64.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-    TRANSLATE_TOOL
+    COMPILE_TOOL
     iree-compile
 )
 
@@ -137,8 +131,7 @@ iree_c_module(
     "buffer_ops.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -151,8 +144,7 @@ iree_c_module(
     "call_ops.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -165,8 +157,7 @@ iree_c_module(
     "comparison_ops.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-    TRANSLATE_TOOL
+    COMPILE_TOOL
     iree-compile
 )
 
@@ -179,8 +170,7 @@ iree_c_module(
     "comparison_ops_f32.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -193,8 +183,7 @@ iree_c_module(
     "comparison_ops_i64.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -207,8 +196,7 @@ iree_c_module(
     "control_flow_ops.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -221,8 +209,7 @@ iree_c_module(
     "conversion_ops.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -235,8 +222,7 @@ iree_c_module(
     "conversion_ops_f32.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -249,8 +235,7 @@ iree_c_module(
     "conversion_ops_i64.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -263,8 +248,7 @@ iree_c_module(
     "global_ops.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -277,8 +261,7 @@ iree_c_module(
     "global_ops_f32.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -291,8 +274,7 @@ iree_c_module(
     "global_ops_i64.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -305,8 +287,7 @@ iree_c_module(
     "list_ops.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -319,8 +300,7 @@ iree_c_module(
     "list_variant_ops.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -333,8 +313,7 @@ iree_c_module(
     "ref_ops.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -347,8 +326,7 @@ iree_c_module(
     "shift_ops.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 
@@ -361,8 +339,7 @@ iree_c_module(
     "shift_ops_i64.h"
   FLAGS
     "--compile-mode=vm"
-    "--output-format=vm-c"
-  TRANSLATE_TOOL
+  COMPILE_TOOL
     iree-compile
 )
 

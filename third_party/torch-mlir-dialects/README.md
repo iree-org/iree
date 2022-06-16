@@ -7,6 +7,7 @@ to mlir core as planned, this directory should no longer be needed.
 https://github.com/llvm/torch-mlir
 
 ## Update command:
+```shell
 rsync -av --exclude=tools \
   --exclude=test \
   --exclude=lib/Dialect/TMTensor/Transforms \
@@ -14,3 +15,4 @@ rsync -av --exclude=tools \
   --exclude=README.md \
   PATH_TO_TORCH_MLIR_REPO/external/llvm-external-projects/torch-mlir-dialects \
   PATH_TO_IREE_REPO/third_party
+```

@@ -80,7 +80,10 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     Variadic<AnyType>:$results
   );
 
-  let regions = (region AnyRegion:$workgroup_body);
+  let regions = (region
+    AnyRegion:$workgroup_body,
+    AnyRegion:$workgroup_count
+  );
 
   let assemblyFormat = [{
     (`[` $workload^ `]`)? ``
@@ -94,6 +97,7 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     custom<DispatchWorkgroupBody>(ref(type($operands)),
                                   ref(type($results)),
                                   $workgroup_body)
+    `` custom<DispatchWorkgroupsCountRegion>($workgroup_count)
   }];
 
   let skipDefaultBuilders = 1;
@@ -548,6 +552,7 @@ def FLOW_ExecutableEndOp : FLOW_Op<"executable_end", [
 def FLOW_ExecutableExportOp : FLOW_Op<"executable.export", [
   HasParent<"IREE::Flow::ExecutableOp">,
   Symbol,
+  IsolatedFromAbove,
 ]> {
   let summary = [{defines an executable entry point for dispatch operations}];
   let description = [{

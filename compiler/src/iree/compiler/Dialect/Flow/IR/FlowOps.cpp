@@ -183,13 +183,8 @@ static Optional<BlockArgument> getBindingArgument(Value v) {
 // custom<WorkgroupCountRegion>($body)
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseWorkgroupCountRegion(OpAsmParser &parser,
-                                             Region &body) {
-  if (failed(parser.parseOptionalKeyword("workgroups"))) {
-    // Omitted.
-    return success();
-  }
-
+static ParseResult parseWorkgroupCountRegionWithoutKeyword(OpAsmParser &parser,
+                                                           Region &body) {
   SmallVector<OpAsmParser::Argument> args;
   if (failed(parser.parseArgumentList(args, AsmParser::Delimiter::Paren,
                                       /*allowType=*/true,
@@ -226,10 +221,11 @@ static ParseResult parseWorkgroupCountRegion(OpAsmParser &parser,
   return success();
 }
 
-static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
-                                      Region &body) {
+static void printWorkgroupCountRegionWithoutKeyword(OpAsmPrinter &p,
+                                                    Operation *op,
+                                                    Region &body) {
   if (body.empty()) return;
-  p << "workgroups(";
+  p << "(";
   auto args = body.getArguments();
   for (unsigned i = 0; i < args.size(); ++i) {
     if (i > 0) p << ", ";
@@ -241,6 +237,38 @@ static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
   p << " ";
   p.printRegion(body, /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true);
+}
+
+// TODO(benvanik): make these keywords required or consistent.
+
+static ParseResult parseWorkgroupCountRegion(OpAsmParser &parser,
+                                             Region &body) {
+  if (failed(parser.parseOptionalKeyword("workgroups"))) {
+    return success();  // Omitted.
+  }
+  return parseWorkgroupCountRegionWithoutKeyword(parser, body);
+}
+
+static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
+                                      Region &body) {
+  if (body.empty()) return;
+  p << "workgroups";
+  printWorkgroupCountRegionWithoutKeyword(p, op, body);
+}
+
+static ParseResult parseDispatchWorkgroupsCountRegion(OpAsmParser &parser,
+                                                      Region &body) {
+  if (failed(parser.parseOptionalKeyword("count"))) {
+    return success();  // Omitted.
+  }
+  return parseWorkgroupCountRegionWithoutKeyword(parser, body);
+}
+
+static void printDispatchWorkgroupsCountRegion(OpAsmPrinter &p, Operation *op,
+                                               Region &body) {
+  if (body.empty()) return;
+  p << " count";
+  printWorkgroupCountRegionWithoutKeyword(p, op, body);
 }
 
 //===----------------------------------------------------------------------===//
@@ -574,6 +602,10 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
     workgroupBody->addArgument(type, state.location);
   }
   assert(std::next(workgroupBody->begin()) == workgroupBody->end());
+
+  // NOTE: workgroup count region is empty; callers are expected to populate it
+  // if they want it.
+  state.addRegion();
 }
 
 static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
@@ -619,6 +651,38 @@ static void printDispatchWorkgroupBody(OpAsmPrinter &p, Operation *op,
                 /*printBlockTerminators=*/true);
 }
 
+LogicalResult verifyWorkgroupCountRegion(Operation *op, ValueRange workload,
+                                         Region &region) {
+  // Verify the workload operands match the expected capture args.
+  if (workload.size() != region.getNumArguments()) {
+    return op->emitOpError()
+           << "workload operands and workgroup count args mismatch ("
+           << workload.size() << " vs " << region.getNumArguments() << ")";
+  }
+  for (auto it : llvm::enumerate(llvm::zip(workload, region.getArguments()))) {
+    auto workloadValue = std::get<0>(it.value());
+    auto capturedArg = std::get<1>(it.value());
+    if (workloadValue.getType() != capturedArg.getType()) {
+      return op->emitOpError()
+             << "workload value " << it.index() << " type mismatch; operand is "
+             << workloadValue.getType() << " but region captures "
+             << capturedArg.getType();
+    }
+  }
+
+  // Verify the return ops all provide XYZ values.
+  for (auto returnOp : region.getOps<IREE::Flow::ReturnOp>()) {
+    if (returnOp.getNumOperands() != 3 ||
+        !llvm::all_of(returnOp.getOperandTypes(),
+                      [](Type type) { return type.isIndex(); })) {
+      return returnOp.emitOpError() << "workgroup count region must return "
+                                       "the XYZ dimension counts";
+    }
+  }
+
+  return success();
+}
+
 LogicalResult DispatchWorkgroupsOp::verify() {
   Operation *op = getOperation();
 
@@ -642,6 +706,13 @@ LogicalResult DispatchWorkgroupsOp::verify() {
   }
   for (auto type : getResultTypes()) {
     if (failed(verifyIOType(type))) return failure();
+  }
+
+  // Workgroup count region is optional.
+  if (!workgroup_count().empty()) {
+    if (failed(verifyWorkgroupCountRegion(op, workload(), workgroup_count()))) {
+      return failure();
+    }
   }
 
   return success();

@@ -33,6 +33,18 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_query_available_devices(
   return status;
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_driver_dump_device_info(
+    iree_hal_driver_t* driver, iree_hal_device_id_t device_id,
+    iree_string_builder_t* builder) {
+  IREE_ASSERT_ARGUMENT(driver);
+  IREE_ASSERT_ARGUMENT(builder);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status =
+      _VTABLE_DISPATCH(driver, dump_device_info)(driver, device_id, builder);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_driver_create_device_by_ordinal(
     iree_hal_driver_t* driver, iree_host_size_t device_ordinal,
     iree_host_size_t param_count, const iree_string_pair_t* params,

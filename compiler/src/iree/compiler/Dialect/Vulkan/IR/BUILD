@@ -58,11 +58,11 @@ iree_gentbl_cc_library(
     name = "VulkanAttrsGen",
     tbl_outs = [
         (
-            ["--gen-struct-attr-decls"],
+            ["--gen-attrdef-decls"],
             "VulkanAttributes.h.inc",
         ),
         (
-            ["--gen-struct-attr-defs"],
+            ["--gen-attrdef-defs"],
             "VulkanAttributes.cpp.inc",
         ),
     ],

@@ -191,11 +191,7 @@ def invoke_immediate(command_line: List[str],
     elif immediate_input is not None:
       run_args["input"] = immediate_input
 
-    # Capture output.
-    # TODO(#4131) python>=3.7: Use capture_output=True.
-    run_args["stdout"] = subprocess.PIPE
-    run_args["stderr"] = subprocess.PIPE
-    process = subprocess.run(command_line, **run_args)
+    process = subprocess.run(command_line, capture_output=True, **run_args)
     if process.returncode != 0:
       raise CompilerToolError(process)
     # Emit stderr contents.

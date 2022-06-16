@@ -1030,8 +1030,31 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
 
   // Jump into the dispatch routine to execute bytecode until the function
   // either returns (synchronous) or yields (asynchronous).
-  iree_status_t status = iree_vm_bytecode_dispatch(
+  IREE_TRACE_FIBER_ENTER(iree_vm_stack_context_id(stack));
+  iree_status_t status = iree_vm_bytecode_dispatch_begin(
       stack, module, call, cconv_arguments, cconv_results, out_result);
+  IREE_TRACE_FIBER_LEAVE();
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static iree_status_t iree_vm_bytecode_module_resume_call(
+    void* self, iree_vm_stack_t* stack, iree_byte_span_t call_results,
+    iree_vm_execution_result_t* out_result) {
+  // NOTE: any work here adds directly to the invocation time.
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_ASSERT_ARGUMENT(out_result);
+  memset(out_result, 0, sizeof(iree_vm_execution_result_t));
+
+  iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
+
+  // Resume the call by jumping back into the bytecode dispatch.
+  IREE_TRACE_FIBER_ENTER(iree_vm_stack_context_id(stack));
+  iree_status_t status =
+      iree_vm_bytecode_dispatch_resume(stack, module, call_results, out_result);
+  IREE_TRACE_FIBER_LEAVE();
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -1120,6 +1143,7 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
   module->interface.resolve_import = iree_vm_bytecode_module_resolve_import;
   module->interface.notify = iree_vm_bytecode_module_notify;
   module->interface.begin_call = iree_vm_bytecode_module_begin_call;
+  module->interface.resume_call = iree_vm_bytecode_module_resume_call;
   module->interface.get_function_reflection_attr =
       iree_vm_bytecode_module_get_function_reflection_attr;
 

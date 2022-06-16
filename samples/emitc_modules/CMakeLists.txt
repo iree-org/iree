@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-if(NOT IREE_ENABLE_EMITC)
+if(NOT IREE_OUTPUT_FORMAT_C)
   return()
 endif()
 
@@ -16,8 +16,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "add_module.h"
   FLAGS
-    "--iree-mlir-to-vm-c-module"
-    "--iree-hal-target-backends=vmvx"
+    "--compile-mode=vm"
 )
 
 iree_cc_test(
@@ -59,8 +58,7 @@ iree_c_module(
   H_FILE_OUTPUT
     "import_module_a.h"
   FLAGS
-    "--iree-mlir-to-vm-c-module"
-    "--iree-hal-target-backends=vmvx"
+    "--compile-mode=vm"
 )
 
 iree_c_module(
@@ -71,6 +69,5 @@ iree_c_module(
   H_FILE_OUTPUT
     "import_module_b.h"
   FLAGS
-    "--iree-mlir-to-vm-c-module"
-    "--iree-hal-target-backends=vmvx"
+    "--compile-mode=vm"
 )

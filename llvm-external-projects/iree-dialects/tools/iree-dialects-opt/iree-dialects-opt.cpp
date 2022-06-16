@@ -7,7 +7,6 @@
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
-#include "iree-dialects/Dialect/LinalgExt/LinalgExtBufferization.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
@@ -61,13 +60,13 @@ int main(int argc, char **argv) {
       // Upstream dialects
       mlir::async::AsyncDialect,
       mlir::arith::ArithmeticDialect,
-      mlir::AffineDialect, 
+      mlir::AffineDialect,
       mlir::cf::ControlFlowDialect,
-      mlir::func::FuncDialect, 
-      mlir::linalg::LinalgDialect, 
+      mlir::func::FuncDialect,
+      mlir::linalg::LinalgDialect,
       mlir::memref::MemRefDialect,
-      mlir::pdl::PDLDialect, 
-      mlir::pdl_interp::PDLInterpDialect, 
+      mlir::pdl::PDLDialect,
+      mlir::pdl_interp::PDLInterpDialect,
       mlir::scf::SCFDialect,
       mlir::tensor::TensorDialect,
       mlir::transform::TransformDialect
@@ -80,7 +79,7 @@ int main(int argc, char **argv) {
   // Local dialect passes.
   mlir::iree_compiler::IREE::PYDM::registerPasses();
   mlir::iree_compiler::IREE::LinalgExt::registerPasses();
-  mlir::linalg::transform::registerLinalgTransformInterpreterPass();
+  mlir::linalg::transform::registerTransformDialectInterpreterPass();
   mlir::linalg::transform::registerLinalgTransformExpertExpansionPass();
   mlir::linalg::transform::registerDropSchedulePass();
   // Local test passes.
@@ -90,7 +89,6 @@ int main(int argc, char **argv) {
   // External models.
   IREE::LinalgExt::registerTiledOpInterfaceExternalModels(registry);
   IREE::LinalgExt::registerTilingInterfaceExternalModels(registry);
-  IREE::LinalgExt::registerBufferizableOpInterfaceExternalModels(registry);
 
   registry.addExtensions<IREE::LinalgExt::LinalgExtTransformOpsExtension,
                          transform_ext::StructuredTransformOpsExtension>();

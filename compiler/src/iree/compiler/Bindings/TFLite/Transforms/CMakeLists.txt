@@ -21,14 +21,14 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRAffineUtils
-    MLIRControlFlow
-    MLIRFunc
+    MLIRControlFlowDialect
+    MLIRFuncDialect
     MLIRIR
     MLIRPass
-    MLIRShape
+    MLIRShapeDialect
     MLIRShapeOpsTransforms
     MLIRSupport
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR

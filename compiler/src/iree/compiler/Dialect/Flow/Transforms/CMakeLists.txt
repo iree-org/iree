@@ -35,6 +35,7 @@ iree_cc_library(
     "ConvertLinalgMatmulToMmt4D.cpp"
     "DeduplicateExecutables.cpp"
     "DispatchLinalgOnTensors.cpp"
+    "DispatchWithTransformDialect.cpp"
     "DumpDispatchGraph.cpp"
     "ExpandTensorShapes.cpp"
     "ExportBenchmarkFuncs.cpp"
@@ -60,24 +61,31 @@ iree_cc_library(
     ::PassesIncGen
     IREELinalgExtDialect
     IREELinalgExtPasses
+    IREELinalgExtTransformOps
+    IREELinalgTransformDialect
+    IREELinalgTransformDialectPasses
     LLVMSupport
-    MLIRAffine
-    MLIRArithmetic
+    MLIRAffineDialect
+    MLIRArithmeticDialect
     MLIRArithmeticUtils
-    MLIRControlFlow
-    MLIRFunc
+    MLIRControlFlowDialect
+    MLIRFuncDialect
     MLIRIR
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgTransforms
-    MLIRMath
-    MLIRMemRef
+    MLIRMathDialect
+    MLIRMemRefDialect
     MLIRMemRefTransforms
+    MLIRPDLDialect
+    MLIRPDLInterpDialect
+    MLIRParser
     MLIRPass
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSupport
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTensorUtils
-    MLIRTosa
+    MLIRTosaDialect
+    MLIRTransformDialect
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow

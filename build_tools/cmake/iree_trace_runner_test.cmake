@@ -16,8 +16,8 @@ include(CMakeParseArguments)
 #   SRC: mlir source file to be compiled to an IREE module.
 #   TARGET_BACKEND: target backend to compile for.
 #   DRIVER: driver to run the module with.
-#   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode
-#       translation and backend flags are passed automatically.
+#   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode output
+#       format and backend flags are passed automatically.
 #   RUNNER_ARGS: additional args to pass to the trace-runner program. The driver
 #       and input file flags are passed automatically.
 #   LABELS: Additional labels to apply to the test. The package path and
@@ -116,8 +116,8 @@ endfunction()
 #   GENERATOR_ARGS: additional args to pass to the generator program.
 #   TARGET_BACKEND: target backend to compile for.
 #   DRIVER: driver to run the module with.
-#   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode
-#       translation and backend flags are passed automatically.
+#   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode output
+#       format and backend flags are passed automatically.
 #   RUNNER_ARGS: additional args to pass to the trace-runner program. The driver
 #       and input file flags are passed automatically.
 #   LABELS: Additional labels to apply to the test. The package path and
@@ -268,8 +268,8 @@ endfunction()
 #       TARGET_BACKENDS argument (due to cmake limitations they are separate list
 #       arguments). The lengths must exactly match. If no backends or drivers are
 #       specified, a test will be generated for every supported pair.
-#   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode
-#       translation and backend flags are passed automatically.
+#   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode output
+#       format and backend flags are passed automatically.
 #   RUNNER_ARGS: additional args to pass to the trace-runner program. The driver
 #       and input file flags are passed automatically.
 #   LABELS: Additional labels to apply to the test. The package path and

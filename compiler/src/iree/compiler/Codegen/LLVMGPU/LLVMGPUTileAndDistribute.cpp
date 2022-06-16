@@ -19,7 +19,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/GPU/Passes.h"
+#include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Support/MathExtras.h"
@@ -206,8 +206,12 @@ static void populatePromotionPatterns(MLIRContext *context,
           .addFilter([](Operation *op) {
             auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
             if (!linalgOp) return failure();
+            // Limit promotion to matmul and batch matmul, there may be generic
+            // ops with more batch dimensions we didn't distribute and therefore
+            // cannot find a higher bound.
             return success(linalg::isaContractionOpInterface(op) &&
-                           linalgOp.getNumParallelLoops() >= 2);
+                           linalgOp.getNumParallelLoops() >= 2 &&
+                           linalgOp.getNumParallelLoops() <= 3);
           }));
 }
 

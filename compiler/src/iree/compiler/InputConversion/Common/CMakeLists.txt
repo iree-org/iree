@@ -48,16 +48,17 @@ iree_cc_library(
     ::PassHeaders
     ::PassesIncGen
     IREEInputDialect
-    MLIRArithmetic
-    MLIRFunc
+    MLIRArithmeticDialect
+    MLIRFuncDialect
     MLIRIR
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgTransforms
+    MLIRLinalgUtils
     MLIRMemRefTransforms
     MLIRPass
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSCFToControlFlow
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR

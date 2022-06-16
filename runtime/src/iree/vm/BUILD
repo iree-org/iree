@@ -233,12 +233,9 @@ if(IREE_BUILD_COMPILER)
 iree_runtime_cc_test(
     name = "bytecode_module_test",
     srcs = [
+        "bytecode_dispatch_async_test.cc",
         "bytecode_dispatch_test.cc",
         "bytecode_module_test.cc",
-    ],
-    tags = [
-        # TODO(benvanik): Fix type casting errors for --config=android_arm.
-        "notap",
     ],
     deps = [
         ":bytecode_module",
@@ -248,6 +245,7 @@ iree_runtime_cc_test(
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
         "//runtime/src/iree/vm/test:all_bytecode_modules_c",
+        "//runtime/src/iree/vm/test:async_bytecode_modules_c",
     ],
 )
 
@@ -271,8 +269,8 @@ iree_bytecode_module(
     testonly = True,
     src = "bytecode_module_benchmark.mlir",
     c_identifier = "iree_vm_bytecode_module_benchmark_module",
+    compile_tool = "//tools:iree-compile",
     flags = ["--compile-mode=vm"],
-    translate_tool = "//tools:iree-compile",
 )
 
 cc_binary_benchmark(
@@ -291,8 +289,8 @@ iree_bytecode_module(
     testonly = True,
     src = "bytecode_module_size_benchmark.mlir",
     c_identifier = "iree_vm_bytecode_module_size_benchmark_module",
+    compile_tool = "//tools:iree-compile",
     flags = ["--compile-mode=vm"],
-    translate_tool = "//tools:iree-compile",
 )
 
 iree_cmake_extra_content(
@@ -334,3 +332,5 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base:core_headers",
     ],
 )
+
+exports_files(["module_impl_emitc.c"])

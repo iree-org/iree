@@ -28,12 +28,12 @@ class NonDeviceHalTest(unittest.TestCase):
 
     # Enum and/or operations on BufferUsage.
     self.assertEqual(
-        iree.runtime.BufferUsage.CONSTANT | iree.runtime.BufferUsage.TRANSFER,
-        int(iree.runtime.BufferUsage.CONSTANT) |
-        int(iree.runtime.BufferUsage.TRANSFER))
+        iree.runtime.BufferUsage.TRANSFER | iree.runtime.BufferUsage.MAPPING,
+        int(iree.runtime.BufferUsage.TRANSFER) |
+        int(iree.runtime.BufferUsage.MAPPING))
     self.assertEqual(
-        iree.runtime.BufferUsage.CONSTANT & iree.runtime.BufferUsage.CONSTANT,
-        int(iree.runtime.BufferUsage.CONSTANT))
+        iree.runtime.BufferUsage.TRANSFER & iree.runtime.BufferUsage.TRANSFER,
+        int(iree.runtime.BufferUsage.TRANSFER))
 
     # Enum and/or operations on MemoryAccess.
     self.assertEqual(
@@ -46,13 +46,13 @@ class NonDeviceHalTest(unittest.TestCase):
 
     # Enum and/or operations on MemoryType.
     self.assertEqual(
-        iree.runtime.MemoryType.TRANSIENT |
+        iree.runtime.MemoryType.DEVICE_LOCAL |
         iree.runtime.MemoryType.HOST_VISIBLE,
-        int(iree.runtime.MemoryType.TRANSIENT) |
+        int(iree.runtime.MemoryType.DEVICE_LOCAL) |
         int(iree.runtime.MemoryType.HOST_VISIBLE))
     self.assertEqual(
-        iree.runtime.MemoryType.TRANSIENT & iree.runtime.MemoryType.TRANSIENT,
-        int(iree.runtime.MemoryType.TRANSIENT))
+        iree.runtime.MemoryType.OPTIMAL & iree.runtime.MemoryType.OPTIMAL,
+        int(iree.runtime.MemoryType.OPTIMAL))
 
 
 class DeviceHalTest(unittest.TestCase):
@@ -82,9 +82,8 @@ class DeviceHalTest(unittest.TestCase):
   def testQueryCompatibility(self):
     compat = self.allocator.query_compatibility(
         memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
-        allowed_usage=iree.runtime.BufferUsage.CONSTANT,
-        intended_usage=iree.runtime.BufferUsage.CONSTANT |
-        iree.runtime.BufferUsage.TRANSFER,
+        allowed_usage=iree.runtime.BufferUsage.DEFAULT,
+        intended_usage=iree.runtime.BufferUsage.DEFAULT,
         allocation_size=1024)
     print("COMPAT:", compat)
     self.assertTrue(
@@ -100,7 +99,7 @@ class DeviceHalTest(unittest.TestCase):
   def testAllocateBuffer(self):
     buffer = self.allocator.allocate_buffer(
         memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
-        allowed_usage=iree.runtime.BufferUsage.CONSTANT,
+        allowed_usage=iree.runtime.BufferUsage.DEFAULT,
         allocation_size=13)
     print("BUFFER:", buffer)
 
@@ -108,23 +107,23 @@ class DeviceHalTest(unittest.TestCase):
     ary = np.zeros([3, 4], dtype=np.int32) + 2
     buffer = self.allocator.allocate_buffer_copy(
         memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
-        allowed_usage=iree.runtime.BufferUsage.CONSTANT,
+        allowed_usage=iree.runtime.BufferUsage.DEFAULT,
         buffer=ary)
     self.assertEqual(
         repr(buffer),
-        "<HalBuffer 48 bytes (at offset 0 into 48), memory_type=DEVICE_LOCAL|HOST_VISIBLE, allowed_access=ALL, allowed_usage=CONSTANT|TRANSFER|MAPPING>"
+        "<HalBuffer 48 bytes (at offset 0 into 48), memory_type=DEVICE_LOCAL|HOST_VISIBLE, allowed_access=ALL, allowed_usage=TRANSFER|DISPATCH_STORAGE|MAPPING>"
     )
 
   def testAllocateBufferViewCopy(self):
     ary = np.zeros([3, 4], dtype=np.int32) + 2
     buffer = self.allocator.allocate_buffer_copy(
         memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
-        allowed_usage=iree.runtime.BufferUsage.CONSTANT,
+        allowed_usage=iree.runtime.BufferUsage.DEFAULT,
         buffer=ary,
         element_type=iree.runtime.HalElementType.SINT_32)
     self.assertEqual(
         repr(buffer),
-        "<HalBufferView (3, 4), element_type=0x20000011, 48 bytes (at offset 0 into 48), memory_type=DEVICE_LOCAL|HOST_VISIBLE, allowed_access=ALL, allowed_usage=CONSTANT|TRANSFER|MAPPING>"
+        "<HalBufferView (3, 4), element_type=0x20000011, 48 bytes (at offset 0 into 48), memory_type=DEVICE_LOCAL|HOST_VISIBLE, allowed_access=ALL, allowed_usage=TRANSFER|DISPATCH_STORAGE|MAPPING>"
     )
 
 

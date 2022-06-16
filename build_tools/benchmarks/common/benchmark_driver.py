@@ -206,15 +206,8 @@ class BenchmarkDriver(object):
 
   def __get_benchmark_info_from_case(
       self, category: str, benchmark_case: BenchmarkCase) -> BenchmarkInfo:
-    model_name_with_tags = benchmark_case.model_name_with_tags
-    model_name_parts = model_name_with_tags.split("-", 1)
-    model_name = model_name_parts[0]
-    if len(model_name_parts) == 2:
-      model_tags = model_name_parts[1].split(",")
-    else:
-      model_tags = []
-    return BenchmarkInfo(model_name=model_name,
-                         model_tags=model_tags,
+    return BenchmarkInfo(model_name=benchmark_case.model_name,
+                         model_tags=benchmark_case.model_tags,
                          model_source=category,
                          bench_mode=benchmark_case.bench_mode,
                          runner=benchmark_case.config,

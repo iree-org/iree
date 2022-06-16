@@ -4,12 +4,12 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-iree_add_all_subdirs()
-
-if(IREE_ENABLE_EMITC)
-  set(IREE_VM_CONDITIONAL_TARGETS
-    iree::compiler::Dialect::VM::Target::C
-  )
+set(_INIT_INTERNAL_DEPS)
+add_subdirectory(Bytecode)
+list(APPEND _INIT_INTERNAL_DEPS iree::compiler::Dialect::VM::Target::Bytecode)
+if(IREE_OUTPUT_FORMAT_C)
+  add_subdirectory(C)
+  list(APPEND _INIT_INTERNAL_DEPS iree::compiler::Dialect::VM::Target::C)
 endif()
 
 iree_cc_library(
@@ -18,7 +18,6 @@ iree_cc_library(
   HDRS
     "init_targets.h"
   DEPS
-    iree::compiler::Dialect::VM::Target::Bytecode
-    ${IREE_VM_CONDITIONAL_TARGETS}
+    ${_INIT_INTERNAL_DEPS}
   PUBLIC
 )

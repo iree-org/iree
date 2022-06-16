@@ -33,8 +33,8 @@ td_library(
     ),
     deps = [
         "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
+        "@llvm-project//mlir:FuncTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:StdOpsTdFiles",
         "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
     ],
 )
@@ -80,7 +80,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Parser",
-        "@llvm-project//mlir:SideEffects",
+        "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:ViewLikeInterface",

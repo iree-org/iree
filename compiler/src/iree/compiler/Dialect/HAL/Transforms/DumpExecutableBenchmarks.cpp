@@ -150,7 +150,8 @@ static IREE::Util::GlobalOp appendGlobalBuffer(
       initBuilder.create<IREE::HAL::DeviceAllocatorOp>(loc, device).result();
 
   auto memoryTypes = IREE::HAL::MemoryTypeBitfield::DeviceLocal;
-  auto bufferUsage = IREE::HAL::BufferUsageBitfield::Dispatch;
+  auto bufferUsage = IREE::HAL::BufferUsageBitfield::Transfer |
+                     IREE::HAL::BufferUsageBitfield::DispatchStorage;
   auto allocateOp = initBuilder.create<IREE::HAL::AllocatorAllocateOp>(
       loc, globalOp.type(), allocator, memoryTypes, bufferUsage,
       indexSet.get(totalLength));

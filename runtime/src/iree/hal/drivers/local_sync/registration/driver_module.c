@@ -18,7 +18,7 @@ static iree_status_t iree_hal_local_sync_driver_factory_enumerate(
     const iree_hal_driver_info_t** out_driver_infos) {
   static const iree_hal_driver_info_t default_driver_info = {
       .driver_name = IREE_SVL("local-sync"),
-      .full_name = IREE_SVL("Local executable execution using a lightweight "
+      .full_name = IREE_SVL("Local execution using a lightweight "
                             "inline synchronous queue"),
   };
   *out_driver_info_count = 1;

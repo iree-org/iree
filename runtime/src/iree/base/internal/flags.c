@@ -418,7 +418,7 @@ void iree_flags_dump(iree_flag_dump_mode_t mode, FILE* file) {
                 "# "
                 "===-----------------------------------------------------------"
                 "-----------===\n");
-        fprintf(file, "# Flags in %s:%d\n", flag->file, flag->line);
+        fprintf(file, "# Flags in %s\n", flag->file);
         fprintf(file,
                 "# "
                 "===-----------------------------------------------------------"
@@ -538,7 +538,9 @@ IREE_FLAG_CALLBACK(iree_flags_parse_flagfile, iree_flags_print_flagfile, NULL,
                    "Parses a newline-separated list of flags from a file.\n"
                    "Flags are parsed at the point where the flagfile is "
                    "specified\nand following flags may override the parsed "
-                   "values.");
+                   "values.\nNOTE: this --help output is a flagfile! Pipe "
+                   "this to a file, tweak the\noptions from their defaults, "
+                   "and pass it back in using --flagfile=.");
 
 #endif  // IREE_FLAGS_ENABLE_FLAG_FILE
 

@@ -336,12 +336,13 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_begin_call(
   return iree_vm_stack_function_leave(stack);
 }
 
-static iree_status_t IREE_API_PTR
-iree_vm_native_module_resume_call(void* self, iree_vm_stack_t* stack,
-                                  iree_vm_execution_result_t* out_result) {
+static iree_status_t IREE_API_PTR iree_vm_native_module_resume_call(
+    void* self, iree_vm_stack_t* stack, iree_byte_span_t call_results,
+    iree_vm_execution_result_t* out_result) {
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
   if (module->user_interface.resume_call) {
-    return module->user_interface.resume_call(module->self, stack, out_result);
+    return module->user_interface.resume_call(module->self, stack, call_results,
+                                              out_result);
   }
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "native module does not support resume");

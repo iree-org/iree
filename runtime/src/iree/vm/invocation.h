@@ -21,7 +21,14 @@ extern "C" {
 typedef struct iree_vm_invocation_t iree_vm_invocation_t;
 typedef struct iree_vm_invocation_policy_t iree_vm_invocation_policy_t;
 
+//===----------------------------------------------------------------------===//
+// Synchronous invocation
+//===----------------------------------------------------------------------===//
+
 // Synchronously invokes a function in the VM.
+// The function will be run to completion and may block on external resources.
+// If more control is required or callers want to have multiple invocations
+// in-flight then iree_vm_invocation_t should be used.
 //
 // |policy| is used to schedule the invocation relative to other pending or
 // in-flight invocations. It may be omitted to leave the behavior up to the
@@ -39,6 +46,10 @@ IREE_API_EXPORT iree_status_t iree_vm_invoke(
     iree_vm_invocation_flags_t flags, const iree_vm_invocation_policy_t* policy,
     iree_vm_list_t* inputs, iree_vm_list_t* outputs,
     iree_allocator_t allocator);
+
+//===----------------------------------------------------------------------===//
+// Asynchronous stateful invocation
+//===----------------------------------------------------------------------===//
 
 // TODO(benvanik): document and implement.
 IREE_API_EXPORT iree_status_t iree_vm_invocation_create(
@@ -58,20 +69,20 @@ iree_vm_invocation_release(iree_vm_invocation_t* invocation);
 // Queries the completion status of the invocation.
 // Returns one of the following:
 //   IREE_STATUS_OK: the invocation completed successfully.
-//   IREE_STATUS_UNAVAILABLE: the invocation has not yet completed.
-//   IREE_STATUS_CANCELLED: the invocation was cancelled internally.
-//   IREE_STATUS_ABORTED: the invocation was aborted.
+//   IREE_STATUS_DEFERRED: the invocation has not yet completed.
+//   IREE_STATUS_CANCELLED: the invocation was cancelled by the user.
+//   IREE_STATUS_ABORTED: the invocation was aborted by the executor.
 //   IREE_STATUS_*: an error occurred during invocation.
 IREE_API_EXPORT iree_status_t
 iree_vm_invocation_query_status(iree_vm_invocation_t* invocation);
 
-// Returns a reference to the output of the invocation.
+// Returns a reference to the outputs of the invocation.
 // The returned structure is valid for the lifetime of the invocation and
 // callers must retain any refs they want to outlive the invocation once
 // released.
 //
-// Returns NULL if the invocation did not complete successfully.
-IREE_API_EXPORT const iree_vm_list_t* iree_vm_invocation_output(
+// Returns NULL if the invocation has not yet completed or if it failed.
+IREE_API_EXPORT const iree_vm_list_t* iree_vm_invocation_outputs(
     iree_vm_invocation_t* invocation);
 
 // Blocks the caller until the invocation completes (successfully or otherwise).
@@ -81,10 +92,11 @@ IREE_API_EXPORT const iree_vm_list_t* iree_vm_invocation_output(
 IREE_API_EXPORT iree_status_t iree_vm_invocation_await(
     iree_vm_invocation_t* invocation, iree_time_t deadline);
 
-// Attempts to abort the invocation if it is in-flight.
+// Attempts to cancel the invocation if it is in-flight.
+// Cancellation is not guaranteed to work and should be considered a hint.
 // A no-op if the invocation has already completed.
-IREE_API_EXPORT iree_status_t
-iree_vm_invocation_abort(iree_vm_invocation_t* invocation);
+IREE_API_EXPORT void iree_vm_invocation_cancel(
+    iree_vm_invocation_t* invocation);
 
 #ifdef __cplusplus
 }  // extern "C"

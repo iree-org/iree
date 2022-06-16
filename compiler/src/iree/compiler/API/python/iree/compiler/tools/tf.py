@@ -6,8 +6,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Imports TensorFlow artifacts via the `iree-import-tf tool."""
 
-# TODO(#4131) python>=3.7: Use postponed type annotations.
-
+from __future__ import annotations
+from dataclasses import dataclass, field
 from enum import Enum
 import logging
 import tempfile
@@ -57,7 +57,7 @@ class ImportType(Enum):
   V1 = "savedmodel_v1"
 
   @staticmethod
-  def parse(spec: Union[str, "ImportType"]) -> "ImportType":
+  def parse(spec: Union[str, ImportType]) -> ImportType:
     """Parses or returns an ImportType.
 
     Args:
@@ -75,54 +75,44 @@ class ImportType(Enum):
     return ImportType[spec]
 
 
-# TODO(#4131) python>=3.7: Consider using a dataclass.
+@dataclass
 class ImportOptions(CompilerOptions):
-  """Import options layer on top of the backend compiler options."""
+  """Import options layer on top of the backend compiler options.
 
-  def __init__(self,
-               exported_names: Sequence[str] = (),
-               import_only: bool = False,
-               import_type: Union[ImportType, str] = ImportType.OBJECT_GRAPH,
-               input_type: Union[InputType, str] = InputType.XLA,
-               saved_model_tags: Set[str] = set(),
-               import_extra_args: Sequence[str] = (),
-               save_temp_tf_input: Optional[str] = None,
-               save_temp_mid_level_input: Optional[str] = None,
-               save_temp_iree_input: Optional[str] = None,
-               use_tosa: bool = False,
-               **kwargs):
-    """Initialize options from keywords.
+  Args:
+    exported_names: Optional sequence representing the exported names to
+      keep (object graph/v2 models only).
+    import_only: Only import the module. If True, the result will be textual
+      MLIR that can be further fed to the IREE compiler. If False (default),
+      the result will be the fully compiled IREE binary. In both cases,
+      bytes-like output is returned. Note that if the output_file= is
+      specified and import_only=True, then the MLIR form will be written to
+      the output file.
+    import_type: Type of import to perform. See ImportType enum.
+    saved_model_tags: Set of tags to export (signature def/v1 saved models
+      only).
+    import_extra_args: Extra arguments to pass to the iree-import-tf tool.
+    save_temp_tf_input: Optionally save the IR that is input to the
+      TensorFlow pipeline.
+    save_temp_mid_level_input: Optionally save the IR that is input to the
+      mid level IR.
+    save_temp_iree_input: Optionally save the IR that is the result of the
+      import (ready to be passed to IREE).
+  """
 
-    Args:
-      exported_names: Optional sequence representing the exported names to
-        keep (object graph/v2 models only).
-      import_only: Only import the module. If True, the result will be textual
-        MLIR that can be further fed to the IREE compiler. If False (default),
-        the result will be the fully compiled IREE binary. In both cases,
-        bytes-like output is returned. Note that if the output_file= is
-        specified and import_only=True, then the MLIR form will be written to
-        the output file.
-      import_type: Type of import to perform. See ImportType enum.
-      saved_model_tags: Set of tags to export (signature def/v1 saved models
-        only).
-      import_extra_args: Extra arguments to pass to the iree-import-tf tool.
-      save_temp_tf_input: Optionally save the IR that is input to the
-        TensorFlow pipeline.
-      save_temp_mid_level_input: Optionally save the IR that is input to the
-        mid level IR.
-      save_temp_iree_input: Optionally save the IR that is the result of the
-        import (ready to be passed to IREE).
-    """
-    super().__init__(input_type=input_type, **kwargs)
-    self.exported_names = exported_names
-    self.import_only = import_only
-    self.import_type = ImportType.parse(import_type)
-    self.saved_model_tags = saved_model_tags
-    self.import_extra_args = import_extra_args
-    self.save_temp_tf_input = save_temp_tf_input
-    self.save_temp_mid_level_input = save_temp_mid_level_input
-    self.save_temp_iree_input = save_temp_iree_input
-    self.use_tosa = use_tosa
+  exported_names: Sequence[str] = ()
+  import_only: bool = False
+  import_type: Union[ImportType, str] = ImportType.OBJECT_GRAPH
+  input_type: Union[InputType, str] = InputType.XLA
+  saved_model_tags: Set[str] = field(default_factory=set)
+  import_extra_args: Sequence[str] = ()
+  save_temp_tf_input: Optional[str] = None
+  save_temp_mid_level_input: Optional[str] = None
+  save_temp_iree_input: Optional[str] = None
+  use_tosa: bool = False
+
+  def __post_init__(self):
+    self.import_type = ImportType.parse(self.import_type)
 
 
 def build_import_command_line(input_path: str, tfs: TempFileSaver,

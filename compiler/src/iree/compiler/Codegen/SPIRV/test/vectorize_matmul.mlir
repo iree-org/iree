@@ -1,7 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-spirv-vectorize %s | FileCheck %s
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[2, 128], [1, 4], [0, 0, 4]]>
-
 func.func @matmul_2x128x4() {
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
@@ -28,10 +26,10 @@ func.func @matmul_2x128x4() {
       %10 = scf.for %arg2 = %c0 to %c2 step %c1 iter_args(%arg3 = %9) -> (tensor<2x128xf32>) {
         %11 = scf.for %arg4 = %c0 to %c128 step %c4 iter_args(%arg5 = %arg3) -> (tensor<2x128xf32>) {
           %12 = tensor.extract_slice %arg5[%arg2, %arg4] [1, 4] [1, 1] : tensor<2x128xf32> to tensor<1x4xf32>
-          %13 = linalg.fill {lowering_config = #config} ins(%cst : f32) outs(%12 : tensor<1x4xf32>) -> tensor<1x4xf32>
+          %13 = linalg.fill ins(%cst : f32) outs(%12 : tensor<1x4xf32>) -> tensor<1x4xf32>
           %14 = tensor.extract_slice %7[%arg2, 0] [1, 4] [1, 1] : tensor<2x4xf32> to tensor<1x4xf32>
           %15 = tensor.extract_slice %8[0, %arg4] [4, 4] [1, 1] : tensor<4x128xf32> to tensor<4x4xf32>
-          %16 = linalg.matmul {lowering_config = #config} ins(%14, %15 : tensor<1x4xf32>, tensor<4x4xf32>) outs(%13 : tensor<1x4xf32>) -> tensor<1x4xf32>
+          %16 = linalg.matmul ins(%14, %15 : tensor<1x4xf32>, tensor<4x4xf32>) outs(%13 : tensor<1x4xf32>) -> tensor<1x4xf32>
           %17 = tensor.insert_slice %16 into %arg5[%arg2, %arg4] [1, 4] [1, 1] : tensor<1x4xf32> into tensor<2x128xf32>
           scf.yield %17 : tensor<2x128xf32>
         } {iree.spirv.distribute_dim = 0 : index}
@@ -91,7 +89,7 @@ func.func @matmul_8x8x2(%lhs: tensor<8x2xf32>, %rhs: tensor<2x8xf32>, %init: ten
 //  CHECK-COUNT-8: vector.transfer_read {{.*}} : tensor<8x2xf32>, vector<2xf32>
 //  CHECK-COUNT-4: vector.transfer_read {{.*}} : tensor<2x8xf32>, vector<4xf32>
 // CHECK-COUNT-16: vector.transfer_read {{.*}} : tensor<8x8xf32>, vector<4xf32>
-// CHECK-COUNT-16: vector.fma
+// CHECK-COUNT-16: vector.fma {{.*}} : vector<4xf32>
 // CHECK-COUNT-16: vector.transfer_write {{.*}} : vector<4xf32>, tensor<8x8xf32>
 
 // -----
@@ -108,9 +106,25 @@ func.func @matmul_8x8x1(%lhs: tensor<8x1xf32>, %rhs: tensor<1x8xf32>, %init: ten
 //  CHECK-COUNT-8: vector.transfer_read {{.*}} : tensor<8x1xf32>, vector<1xf32>
 //  CHECK-COUNT-2: vector.transfer_read {{.*}} : tensor<1x8xf32>, vector<4xf32>
 // CHECK-COUNT-16: vector.transfer_read {{.*}} : tensor<8x8xf32>, vector<4xf32>
-// CHECK-COUNT-16: vector.fma
+// CHECK-COUNT-16: vector.fma {{.*}} : vector<4xf32>
 // CHECK-COUNT-16: vector.transfer_write {{.*}} : vector<4xf32>, tensor<8x8xf32>
 
+// -----
+
+// Check that we can vectorize shape dimensions not divisible by 4/2 but divisible by 1.
+
+func.func @matmul_1x1x6(%lhs: tensor<1x6xf32>, %rhs: tensor<6x1xf32>, %init: tensor<1x1xf32>) -> tensor<1x1xf32> {
+  %0 = linalg.matmul ins(%lhs, %rhs: tensor<1x6xf32>, tensor<6x1xf32>) outs(%init: tensor<1x1xf32>) -> tensor<1x1xf32>
+  return %0 : tensor<1x1xf32>
+}
+
+//    CHECK-LABEL: func.func @matmul_1x1x6
+
+//  CHECK-COUNT-3: vector.transfer_read {{.*}} : tensor<1x6xf32>, vector<2xf32>
+//  CHECK-COUNT-6: vector.transfer_read {{.*}} : tensor<6x1xf32>, vector<1xf32>
+//          CHECK: vector.transfer_read {{.*}} : tensor<1x1xf32>, vector<1xf32>
+//  CHECK-COUNT-6: vector.fma {{.*}} : vector<1xf32>
+//          CHECK: vector.transfer_write {{.*}} : vector<1xf32>, tensor<1x1xf32>
 
 // -----
 

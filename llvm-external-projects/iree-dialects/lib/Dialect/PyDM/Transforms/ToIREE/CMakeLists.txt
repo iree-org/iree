@@ -9,11 +9,11 @@ add_mlir_library(IREEPyDMToIREEPasses
   LINK_LIBS PUBLIC
   IREEInputDialect
   IREEPyDMDialect
-  MLIRArithmetic
-  MLIRControlFlow
+  MLIRArithmeticDialect
+  MLIRControlFlowDialect
   MLIRIR
-  MLIRMath
-  MLIRFunc
+  MLIRMathDialect
+  MLIRFuncDialect
   MLIRTransformUtils
 )
 

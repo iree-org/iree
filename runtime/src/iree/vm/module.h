@@ -397,15 +397,29 @@ typedef struct iree_vm_module_t {
                                       iree_vm_signal_t signal);
 
   // Begins a function call with the given |call| arguments.
-  // Execution may yield in the case of asynchronous code and require one or
-  // more calls to the resume method to complete.
+  //
+  // Returns OK if execution completes immediately. If the call completes
+  // immediately the results will be written to |call|->results.
+  //
+  // Returns IREE_STATUS_DEFERRED if execution yielded and the call needs to be
+  // resumed. Depending on the program it may be unsafe to begin any other calls
+  // without first completing prior ones. |out_result| will contain information
+  // for when to reschedule the call.
   iree_status_t(IREE_API_PTR* begin_call)(
       void* self, iree_vm_stack_t* stack, const iree_vm_function_call_t* call,
       iree_vm_execution_result_t* out_result);
 
   // Resumes execution of a previously-yielded call.
+  //
+  // Returns OK if execution completes immediately. If the call completes
+  // immediately the results will be written to |call|->results.
+  //
+  // Returns IREE_STATUS_DEFERRED if execution yielded and the call needs to be
+  // resumed. Depending on the program it may be unsafe to begin any other calls
+  // without first completing prior ones. |out_result| will contain information
+  // for when to reschedule the call.
   iree_status_t(IREE_API_PTR* resume_call)(
-      void* self, iree_vm_stack_t* stack,
+      void* self, iree_vm_stack_t* stack, iree_byte_span_t call_results,
       iree_vm_execution_result_t* out_result);
 
   // TODO(benvanik): move this/refactor.

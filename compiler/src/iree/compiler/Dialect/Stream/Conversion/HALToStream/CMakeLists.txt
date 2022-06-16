@@ -18,8 +18,8 @@ iree_cc_library(
   SRCS
     "ConvertHALToStream.cpp"
   DEPS
-    MLIRArithmetic
-    MLIRFunc
+    MLIRArithmeticDialect
+    MLIRFuncDialect
     MLIRIR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Stream::Conversion

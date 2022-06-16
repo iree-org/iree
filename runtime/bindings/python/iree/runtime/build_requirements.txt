@@ -4,6 +4,6 @@
 #   python -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
 
 numpy>=1.19.4
-pybind11>=2.6.1
+pybind11>=2.8.0
 wheel
 PyYAML

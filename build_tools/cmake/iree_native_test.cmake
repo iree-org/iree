@@ -14,7 +14,7 @@ include(CMakeParseArguments)
 #
 # Parameters:
 # NAME: name of target
-# DRIVER: If specified, will pass --driver=DRIVER to the test binary and adds
+# DRIVER: If specified, will pass --device=DRIVER to the test binary and adds
 #     a driver label to the test.
 # TEST_INPUT_FILE_ARG: If specified, the input file will be added to DATA and
 #     its device path appended to ARGS. Note that the device path may be
@@ -24,7 +24,7 @@ include(CMakeParseArguments)
 #     a separate device (e.g. Android), these files will be pushed to the
 #     device. TEST_INPUT_FILE_ARG is automatically added if specified.
 # ARGS: additional arguments passed to the test binary. TEST_INPUT_FILE_ARG and
-#     --driver=DRIVER are automatically added if specified.
+#     --device=DRIVER are automatically added if specified.
 # SRC: binary target to run as the test.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
@@ -69,7 +69,7 @@ function(iree_native_test)
 
   # If driver was specified, add the corresponding test arg and label.
   if(DEFINED _RULE_DRIVER)
-    list(APPEND _RULE_ARGS "--driver=${_RULE_DRIVER}")
+    list(APPEND _RULE_ARGS "--device=${_RULE_DRIVER}")
     list(APPEND _RULE_LABELS "driver=${_RULE_DRIVER}")
   endif()
 
@@ -118,12 +118,10 @@ function(iree_native_test)
       NAME
         ${_TEST_NAME}
       COMMAND
-        "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
         "$<TARGET_FILE:${_SRC_TARGET}>"
         ${_RULE_ARGS}
     )
-    set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT "TEST_TMPDIR=${CMAKE_BINARY_DIR}/${_NAME}_test_tmpdir")
-    iree_add_test_environment_properties(${_TEST_NAME})
+    iree_configure_test(${_TEST_NAME})
   endif()
 
   if (NOT DEFINED _RULE_TIMEOUT)

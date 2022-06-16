@@ -42,12 +42,41 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    numpy_io
+  HDRS
+    "numpy_io.h"
+  SRCS
+    "numpy_io.c"
+  DEPS
+    iree::base
+    iree::base::tracing
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    numpy_io_test
+  SRCS
+    "numpy_io_test.cc"
+  DEPS
+    ::device_util
+    ::numpy_io
+    iree::base::internal::file_io
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree::tooling::testdata::npy
+)
+
+iree_cc_library(
+  NAME
     vm_util
   HDRS
     "vm_util.h"
   SRCS
     "vm_util.cc"
   DEPS
+    ::numpy_io
     iree::base
     iree::base::cc
     iree::base::internal::span
@@ -61,26 +90,22 @@ iree_cc_library(
   PUBLIC
 )
 
-if(IREE_HAL_DRIVER_LOCAL_SYNC)
-
 iree_cc_test(
   NAME
     vm_util_test
   SRCS
     "vm_util_test.cc"
   DEPS
+    ::device_util
     ::vm_util
     iree::base
     iree::hal
-    iree::hal::drivers::local_sync::registration
     iree::modules::hal
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm
     iree::vm::cc
 )
-
-endif()
 
 # libyaml does not build cleanly on bare-metal systems
 if(IREE_ENABLE_THREADING)

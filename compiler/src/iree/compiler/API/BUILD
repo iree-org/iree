@@ -70,6 +70,7 @@ iree_compiler_cc_library(
     deps = [
         "//compiler/src/iree/compiler/ConstEval",
         "//compiler/src/iree/compiler/Dialect/VM/IR",
+        "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",
         "//compiler/src/iree/compiler/Dialect/VM/Target/Bytecode",
         "//compiler/src/iree/compiler/InputConversion/MHLO",
         "//compiler/src/iree/compiler/InputConversion/TOSA",

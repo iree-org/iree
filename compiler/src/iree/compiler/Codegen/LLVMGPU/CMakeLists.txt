@@ -35,13 +35,13 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtPasses
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAffineToStandard
-    MLIRArithmetic
+    MLIRArithmeticDialect
     MLIRArithmeticToLLVM
     MLIRArithmeticTransforms
     MLIRControlFlowToLLVM
-    MLIRFunc
+    MLIRFuncDialect
     MLIRFuncToLLVM
     MLIRFuncTransforms
     MLIRGPUOps
@@ -50,24 +50,24 @@ iree_cc_library(
     MLIRGPUTransforms
     MLIRIR
     MLIRLLVMCommonConversion
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgTransforms
-    MLIRMath
+    MLIRMathDialect
     MLIRMathToLLVM
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
-    MLIRNVGPU
+    MLIRNVGPUDialect
     MLIRNVGPUToNVVM
-    MLIRNVVMIR
+    MLIRNVVMDialect
     MLIRPass
-    MLIRROCDLIR
-    MLIRSCF
+    MLIRROCDLDialect
+    MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRSupport
     MLIRTransforms
-    MLIRVector
+    MLIRVectorDialect
     MLIRVectorToGPU
     MLIRVectorToLLVM
     MLIRVectorToSCF

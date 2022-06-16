@@ -21,14 +21,14 @@ iree_cc_library(
     "ConvertStructuralOps.cpp"
   DEPS
     LLVMSupport
-    MLIRArithmetic
-    MLIRControlFlow
-    MLIRFunc
+    MLIRArithmeticDialect
+    MLIRControlFlowDialect
+    MLIRFuncDialect
     MLIRIR
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRPass
-    MLIRShape
-    MLIRTensor
+    MLIRShapeDialect
+    MLIRTensorDialect
     MLIRTransforms
     iree::compiler::Dialect::Stream::Conversion
     iree::compiler::Dialect::Stream::IR

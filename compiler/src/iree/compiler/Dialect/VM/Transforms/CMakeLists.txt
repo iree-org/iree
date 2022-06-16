@@ -26,15 +26,15 @@ iree_cc_library(
     "SinkDefiningOps.cpp"
   DEPS
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRAffineUtils
     MLIRArithmeticTransforms
-    MLIRFunc
+    MLIRFuncDialect
     MLIRIR
-    MLIRMath
-    MLIRMemRef
+    MLIRMathDialect
+    MLIRMemRefDialect
     MLIRPass
     MLIRSCFToControlFlow
     MLIRSideEffectInterfaces
