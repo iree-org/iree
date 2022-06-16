@@ -49,7 +49,8 @@ void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
     if (numLoops) return signalPassFailure();
     numLoops = op.getIndexingMaps()[0].getNumDims();
   });
-  if (!numLoops) return signalPassFailure();
+  // No vector.contract op to optimize.
+  if (!numLoops) return;
 
   {
     // Fold consumer add ops into the contraction op itself.
