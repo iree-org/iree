@@ -92,14 +92,8 @@ def OptimizeVectorTransfer :
   let constructor = "mlir::iree_compiler::createOptimizeVectorTransferPass()";
 }
 
-def InsertDistributionInfo :
-    Pass<"iree-codegen-insert-distribution-info", "IREE::HAL::ExecutableVariantOp"> {
-  let summary = "Insert the workgroup count region and translation info";
-  let constructor = "mlir::iree_compiler::createInsertDistributionInfoPass()";
-}
-
 def TileAndDistributeToWorkgroups :
-    Pass<"iree-codegen-tile-and-distribute-to-workgroups", "func::FuncOp"> {
+    Pass<"iree-codegen-tile-and-distribute-to-workgroups", "IREE::HAL::ExecutableVariantOp"> {
   let summary = "Tile and distribute operations to workgroups";
   let constructor = "mlir::iree_compiler::createTileAndDistributeToWorkgroupsPass()";
 }

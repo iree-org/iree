@@ -86,10 +86,8 @@ static void addBufferizePasses(OpPassManager &passManager) {
 }
 
 static void addTileAndDistributePasses(OpPassManager &pm) {
-  pm.addPass(createInsertDistributionInfoPass());
+  pm.addPass(createTileAndDistributeToWorkgroupsPass());
   auto &nestedModulePM = pm.nest<ModuleOp>();
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createTileAndDistributeToWorkgroupsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createConvertToDestinationPassingStylePass());
   nestedModulePM.addNestedPass<func::FuncOp>(
