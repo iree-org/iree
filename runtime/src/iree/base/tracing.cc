@@ -118,6 +118,10 @@ iree_zone_id_t iree_tracing_zone_begin_external_impl(
   return zone_id;
 }
 
+void iree_tracing_zone_end(iree_zone_id_t zone_id) {
+  ___tracy_emit_zone_end(iree_tracing_make_zone_ctx(zone_id));
+}
+
 void iree_tracing_set_plot_type_impl(const char* name_literal,
                                      uint8_t plot_type) {
   tracy::Profiler::ConfigurePlot(name_literal,

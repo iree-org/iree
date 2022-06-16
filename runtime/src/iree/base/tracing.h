@@ -222,6 +222,7 @@ IREE_MUST_USE_RESULT iree_zone_id_t iree_tracing_zone_begin_external_impl(
     const char* file_name, size_t file_name_length, uint32_t line,
     const char* function_name, size_t function_name_length, const char* name,
     size_t name_length);
+void iree_tracing_zone_end(iree_zone_id_t zone_id);
 
 void iree_tracing_set_plot_type_impl(const char* name_literal,
                                      uint8_t plot_type);
@@ -353,8 +354,7 @@ enum {
                           value_length)
 
 // Ends the current zone. Must be passed the |zone_id| from the _BEGIN.
-#define IREE_TRACE_ZONE_END(zone_id) \
-  ___tracy_emit_zone_end(iree_tracing_make_zone_ctx(zone_id))
+#define IREE_TRACE_ZONE_END(zone_id) iree_tracing_zone_end(zone_id)
 
 // Ends the current zone before returning on a failure.
 // Sugar for IREE_TRACE_ZONE_END+IREE_RETURN_IF_ERROR.
