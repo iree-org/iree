@@ -449,6 +449,8 @@ void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUAArch64VectorLoweringPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass());
 }
 
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {

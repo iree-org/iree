@@ -88,7 +88,7 @@ void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
   }
 
   // Apply vector unroll
-  if (0) {
+  {
     RewritePatternSet vectorUnrollPatterns(context);
     // There are issues when unrolling 1Dx1D->0D vector.contract op. Only unroll
     // the op when there are more than one loop.
