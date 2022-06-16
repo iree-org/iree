@@ -623,8 +623,7 @@ static LogicalResult setRootConfig(
         /*allowIncompleteTile=*/true);
   } else {
     flowTileSizes = getDefaultDistributedLevelTileSizes(
-        linalgOp, workgroupTileSizes, maxTileSizes,
-        /*allowIncompleteTile=*/true);
+        linalgOp, workgroupTileSizes, maxTileSizes);
   }
 
   // ARM codgen does not switch to use codegen driver based approach, so we have
