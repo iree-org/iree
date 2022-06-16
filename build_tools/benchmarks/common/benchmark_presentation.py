@@ -90,7 +90,7 @@ class CompilationTimeToTable(MetricsToTableMapper[CompilationMetrics]):
             compile_metrics.base_compilation_time)
 
   def get_series_name(self, name: str) -> str:
-    return f"{name}-{COMPILATION_TIME_SERIES_SUFFIX}"
+    return f"{name} [{COMPILATION_TIME_SERIES_SUFFIX}]"
 
   @staticmethod
   def get_metric_thresholds() -> Sequence[BenchmarkThreshold]:
@@ -114,7 +114,7 @@ class TotalDispatchSizeToTable(MetricsToTableMapper[CompilationMetrics]):
             compile_metrics.base_total_dispatch_component_size)
 
   def get_series_name(self, name: str) -> str:
-    return f"{name}-{TOTAL_DISPATCH_SIZE_SERIES_SUFFIX}"
+    return f"{name} [{TOTAL_DISPATCH_SIZE_SERIES_SUFFIX}]"
 
   @staticmethod
   def get_metric_thresholds() -> Sequence[BenchmarkThreshold]:
