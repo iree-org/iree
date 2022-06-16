@@ -15,10 +15,10 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-llvmcpu-aarc64-vector-lowering"
+#define DEBUG_TYPE "iree-llvmcpu-aarch64-vector-lowering"
 
 // A flag to switch between inline asm and intrinsics while we develop these two
-//  parallel paths.
+// parallel paths.
 static llvm::cl::opt<bool> clMmt4dUseIntrinsics(
     "iree-codegen-mmt4d-use-intrinsics",
     llvm::cl::desc("Whether to use instrinsics when lowering vector contracts "
