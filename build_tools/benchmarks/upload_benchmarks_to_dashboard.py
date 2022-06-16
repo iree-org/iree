@@ -354,7 +354,8 @@ def main(args):
                    verbose=args.verbose)
 
   all_compilation_metrics = collect_all_compilation_metrics(
-      args.compile_stats_files)
+      compile_stats_files=args.compile_stats_files,
+      expected_pr_commit=commit_hash)
   for name, compile_metrics in all_compilation_metrics.items():
     description = get_model_description(
         compile_metrics.compilation_info.model_name,
