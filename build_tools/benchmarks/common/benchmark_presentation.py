@@ -365,17 +365,17 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
 
   tables = []
   if regressed:
-    tables.append(md.header("Regressed Benchmarks 🚩", 3))
+    tables.append(md.header("Regressed Latencies 🚩", 3))
     tables.append(_sort_benchmarks_and_get_table(regressed, size_cut))
   if improved:
-    tables.append(md.header("Improved Benchmarks 🎉", 3))
+    tables.append(md.header("Improved Latencies 🎉", 3))
     tables.append(_sort_benchmarks_and_get_table(improved, size_cut))
   # If we want to abbreviate, similar results won't be interesting.
   if similar and size_cut is None:
-    tables.append(md.header("Similar Benchmarks", 3))
+    tables.append(md.header("Similar Latencies", 3))
     tables.append(_sort_benchmarks_and_get_table(similar, size_cut))
   if raw:
-    tables.append(md.header("Raw Benchmarks", 3))
+    tables.append(md.header("Raw Latencies", 3))
     raw_list = [(_make_series_link(k), v.mean_time, v.median_time,
                  v.stddev_time) for k, v in raw.items()]
     tables.append(
