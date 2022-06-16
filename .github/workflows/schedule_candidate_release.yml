@@ -13,10 +13,17 @@ jobs:
     # Don't run this in everyone's forks.
     if: github.repository == 'google/iree'
     steps:
+      - name: Get the last green commit
+        id: last_green_commit
+        uses: talentpair/last-green-commit-action@8b4b3bcd4ab5d9ab16875ce20ae012c4ce47ae68
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Checking out repository
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          ref: ${{ steps.last_green_commit.outputs.result }}
 
       - name: Compute version
         run: |
@@ -52,4 +59,4 @@ jobs:
           workflow: Build Native Release Packages
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           ref: "${{ env.tag_name }}"
-          inputs: '{"package_suffix": "", "package_version": "${{ env.package_version }}", "release_id": "${{ steps.create_release.outputs.id }}"}'
+          inputs: '{"package_suffix": "", "package_version": "${{ env.package_version }}", "release_id": "${{ steps.create_release.outputs.id }}", "commit": "${{ steps.last_green_commit.outputs.result }}"}'
