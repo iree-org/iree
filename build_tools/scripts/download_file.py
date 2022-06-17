@@ -5,7 +5,10 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Downloads a file from the web and decompresses it if necessary."""
+"""Downloads a file from the web and decompresses it if necessary. NEVER Use
+  this tool to download from untrusted sources, it doesn't unpack the file
+  safely.
+"""
 
 import argparse
 import gzip
@@ -17,7 +20,10 @@ import urllib.request
 
 def parse_arguments():
   """Parses command line arguments."""
-  parser = argparse.ArgumentParser()
+  parser = argparse.ArgumentParser(
+      description="Downloads a file from the web "
+      "and decompresses it if necessary. NEVER Use this tool to download from "
+      "untrusted sources, it doesn't unpack the file safely.")
   parser.add_argument("source_url",
                       type=str,
                       metavar="<source-url>",

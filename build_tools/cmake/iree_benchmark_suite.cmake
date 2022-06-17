@@ -57,7 +57,7 @@ endfunction()
 
 # iree_import_tf_model()
 #
-# Generates MLIR file from a Tensorflow saved model. The generated target will
+# Generates MLIR file from a TensorFlow SavedModel. The generated target will
 # be also added to the iree-benchmark-import-models.
 #
 # Parameters:
@@ -257,7 +257,7 @@ function(iree_benchmark_suite)
       set(_MODULE_SOURCE "${_MODULE_SOURCE}.mlir")
     endif()
 
-    # If the source is a Tensorflow saved model directory, import it.
+    # If the source is a TensorFlow SavedModel directory, import it.
     if("${_MODULE_SOURCE}" MATCHES "-tf-model$")
       cmake_path(GET _MODULE_SOURCE FILENAME _MODEL_BASENAME)
       set(_MODULE_SOURCE_TARGET "${_PACKAGE_NAME}_iree-import-tf-${_MODEL_BASENAME}")
