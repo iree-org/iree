@@ -44,12 +44,12 @@ iree_lit_test_suite(
             "verify_linalg_transform_legality.mlir",
         ],
         include = ["*.mlir"],
-        # linalg_transform_spec is a an MLIR file that specifies a
+        # transform_dialect_*_spec is a an MLIR file that specifies a
         # transformation, it needs to be included as data.
-        exclude = ["linalg_transform_spec.mlir"],
+        exclude = ["transform_dialect_codegen_bufferize_spec.mlir"],
     ),
     cfg = "//compiler:lit.cfg.py",
-    data = ["linalg_transform_spec.mlir"],
+    data = ["transform_dialect_codegen_bufferize_spec.mlir"],
     tools = [
         "//tools:iree-compile",
         "//tools:iree-opt",

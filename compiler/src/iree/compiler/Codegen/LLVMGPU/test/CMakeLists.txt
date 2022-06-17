@@ -31,7 +31,8 @@ iree_lit_test_suite(
     FileCheck
     iree-opt
   DATA
-    linalg_transform_spec.mlir
+    transform_dialect_codegen_bufferize_spec.mlir
+    transform_dialect_codegen_foreach_to_gpu_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
