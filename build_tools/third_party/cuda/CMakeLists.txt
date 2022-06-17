@@ -74,5 +74,6 @@ endforeach()
 file(REMOVE_RECURSE ${_DOWNLOAD_DIR})
 
 # Set vars for downloaded cuda deps
-set(IREE_CUDA_DOWNLOAD_LIBDEVICE_PATH "${_TARGET_DIR}/nvvm/libdevice/libdevice.10.bc" PARENT_SCOPE)
+set(IREE_CUDA_DOWNLOAD_LIBDEVICE_PATH
+    "${_TARGET_DIR}/nvvm/libdevice/libdevice.10.bc/libdevice.10.bc" PARENT_SCOPE)
 set(IREE_CUDA_DOWNLOAD_INCLUDE_PATH "${_TARGET_DIR}/include" PARENT_SCOPE)
