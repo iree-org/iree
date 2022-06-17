@@ -817,7 +817,7 @@ static LogicalResult setDefaultGenericOpRootConfig(
                            maxTileSizes, parallelTileSizes);
   splitParallelAndReductionTiles(genericOp, parallelTileSizes,
                                  reductionTileSizes);
-  //setAlwaysVectorizeSizes(genericOp, parallelTileSizes, reductionTileSizes);
+  setAlwaysVectorizeSizes(genericOp, parallelTileSizes, reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);

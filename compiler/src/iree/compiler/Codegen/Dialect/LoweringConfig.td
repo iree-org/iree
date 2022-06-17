@@ -17,33 +17,35 @@ def CPU_DoubleTilingExpert
     : I32EnumAttrCase<"CPUDoubleTilingExpert", 1>;
 def CPU_DoubleTilingPadExpert
     : I32EnumAttrCase<"CPUDoubleTilingPadExpert", 2>;
+def CPU_DoubleTilingPeelingExpert
+    : I32EnumAttrCase<"CPUDoubleTilingPeelingExpert", 3>;
 def CPU_ConvTileAndDecomposeExpert
-    : I32EnumAttrCase<"CPUConvTileAndDecomposeExpert", 3>;
+    : I32EnumAttrCase<"CPUConvTileAndDecomposeExpert", 4>;
 def CPU_TileFuseAndVectorize
-    : I32EnumAttrCase<"CPUTileFuseAndVectorize", 4>;
+    : I32EnumAttrCase<"CPUTileFuseAndVectorize", 5>;
 def CPU_BufferOpsTileAndVectorize
-    : I32EnumAttrCase<"CPUBufferOpsTileAndVectorize", 5>;
+    : I32EnumAttrCase<"CPUBufferOpsTileAndVectorize", 6>;
 
 def Linalg_TransformInterpCodegen
-    : I32EnumAttrCase<"TransformDialectInterpreterCodegen", 6>;
+    : I32EnumAttrCase<"TransformDialectInterpreterCodegen", 7>;
 
 def LLVMGPU_SimpleDistribute
-    : I32EnumAttrCase<"LLVMGPUDistribute", 7>;
+    : I32EnumAttrCase<"LLVMGPUDistribute", 8>;
 def LLVMGPU_Vectorize
-    : I32EnumAttrCase<"LLVMGPUVectorize", 8>;
+    : I32EnumAttrCase<"LLVMGPUVectorize", 9>;
 def LLVMGPU_MatmulSimt
-    : I32EnumAttrCase<"LLVMGPUMatmulSimt", 9>;
+    : I32EnumAttrCase<"LLVMGPUMatmulSimt", 10>;
 def LLVMGPU_MatmulTensorCore
-    : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 10>;
+    : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 11>;
 
 def SPIRV_Distribute
-    : I32EnumAttrCase<"SPIRVDistribute", 11>;
+    : I32EnumAttrCase<"SPIRVDistribute", 12>;
 def SPIRV_Vectorize
-    : I32EnumAttrCase<"SPIRVVectorize", 12>;
+    : I32EnumAttrCase<"SPIRVVectorize", 13>;
 def SPIRV_VectorizeToCooperativeOps
-    : I32EnumAttrCase<"SPIRVVectorizeToCooperativeOps", 13>;
+    : I32EnumAttrCase<"SPIRVVectorizeToCooperativeOps", 14>;
 def SPIRV_VectorizeWithWorkgroupMemory
-    : I32EnumAttrCase<"SPIRVVectorizeWithWorkgroupMemory", 14>;
+    : I32EnumAttrCase<"SPIRVVectorizeWithWorkgroupMemory", 15>;
 
 def None
     : I32EnumAttrCase<"None", 0xff>;
@@ -54,8 +56,9 @@ def DispatchLoweringPassPipelineEnum
     : I32EnumAttr<"DispatchLoweringPassPipeline",
                   "identifier for pass pipeline use to lower dispatch region", [
                     CPU_Default, CPU_DoubleTilingExpert,
-                    CPU_DoubleTilingPadExpert, CPU_ConvTileAndDecomposeExpert,
-                    CPU_TileFuseAndVectorize, CPU_BufferOpsTileAndVectorize,
+                    CPU_DoubleTilingPadExpert, CPU_DoubleTilingPeelingExpert,
+                    CPU_ConvTileAndDecomposeExpert, CPU_TileFuseAndVectorize,
+                    CPU_BufferOpsTileAndVectorize,
                     Linalg_TransformInterpCodegen, LLVMGPU_SimpleDistribute,
                     LLVMGPU_Vectorize, LLVMGPU_MatmulSimt,
                     LLVMGPU_MatmulTensorCore, SPIRV_Distribute, SPIRV_Vectorize,

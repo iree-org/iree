@@ -1,10 +1,10 @@
 // RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target))' -split-input-file %s | FileCheck %s
 
-// Test peeling + vectorization using CPUDoubleTilingExpert.
+// Test peeling + vectorization using CPUDoubleTilingPeelingExpert.
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config = <tile_sizes = [[64, 64, 0], [8, 32, 0], [0, 0, 16]]>,
-    translation_info  = <CPUDoubleTilingExpert>,
+    translation_info  = <CPUDoubleTilingPeelingExpert>,
     workgroup_size = []>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -56,7 +56,7 @@ hal.executable private @preset_config_matmul  {
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config = <tile_sizes = [[65, 65, 0], [8, 32, 0], [0, 0, 16]]>,
-    translation_info  = <CPUDoubleTilingExpert>,
+    translation_info  = <CPUDoubleTilingPeelingExpert>,
     workgroup_size = []>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -120,7 +120,7 @@ hal.executable private @preset_config_matmul  {
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config = <tile_sizes = [[64, 64, 0], [8, 32, 0], [0, 0, 16]]>,
-    translation_info  = <CPUDoubleTilingExpert>,
+    translation_info  = <CPUDoubleTilingPeelingExpert>,
     workgroup_size = []>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [

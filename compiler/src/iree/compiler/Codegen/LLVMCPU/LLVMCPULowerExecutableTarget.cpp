@@ -205,11 +205,18 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingExpert:
             addDoubleTilingExpertPassPipeline(executableLoweringPipeline,
+                                              /*enablePeeling=*/false,
                                               lowerToAVX2);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingPadExpert:
             addDoubleTilingPadExpertPassPipeline(executableLoweringPipeline);
+            break;
+          case IREE::Codegen::DispatchLoweringPassPipeline::
+              CPUDoubleTilingPeelingExpert:
+            addDoubleTilingExpertPassPipeline(executableLoweringPipeline,
+                                              /*enablePeeling=*/true,
+                                              lowerToAVX2);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUConvTileAndDecomposeExpert:
