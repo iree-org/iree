@@ -113,12 +113,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass();
 
-/// Pass to insert workgroup count region and update translation info.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createInsertDistributionInfoPass();
-
 /// Pass to tile and distribute to workgroups.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createTileAndDistributeToWorkgroupsPass();
 
 /// Pass to rewrite Linalg destructive updates, see DestructiveUpdateUtils.h for
