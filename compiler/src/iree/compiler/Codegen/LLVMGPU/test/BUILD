@@ -34,12 +34,18 @@ iree_lit_test_suite(
             "vectorization.mlir",
         ],
         include = ["*.mlir"],
-        # linalg_transform_spec is a an MLIR file that specifies a
+        # tensor_dialect_*_spec is a an MLIR file that specifies a
         # transformation, it needs to be included as data.
-        exclude = ["linalg_transform_spec.mlir"],
+        exclude = [
+            "transform_dialect_codegen_bufferize_spec.mlir",
+            "transform_dialect_codegen_foreach_to_gpu_spec.mlir",
+        ],
     ),
     cfg = "//compiler:lit.cfg.py",
-    data = ["linalg_transform_spec.mlir"],
+    data = [
+        "transform_dialect_codegen_bufferize_spec.mlir",
+        "transform_dialect_codegen_foreach_to_gpu_spec.mlir",
+    ],
     tools = [
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",

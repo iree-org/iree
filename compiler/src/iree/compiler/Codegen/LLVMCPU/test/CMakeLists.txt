@@ -41,7 +41,7 @@ iree_lit_test_suite(
     iree-compile
     iree-opt
   DATA
-    linalg_transform_spec.mlir
+    transform_dialect_codegen_bufferize_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
