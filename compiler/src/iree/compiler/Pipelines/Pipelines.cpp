@@ -41,7 +41,6 @@ void buildIREEVMTransformPassPipeline(
       buildTOSAInputConversionPassPipeline(passManager);
       break;
     case InputDialectOptions::Type::mhlo:
-      MHLO::buildMHLOCleanupPassPipeline(passManager);
       MHLO::buildMHLOInputConversionPassPipeline(passManager);
       break;
 #ifdef IREE_HAVE_TORCH_MLIR_DIALECTS
