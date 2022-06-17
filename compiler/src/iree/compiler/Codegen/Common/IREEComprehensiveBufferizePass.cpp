@@ -132,7 +132,6 @@ static LogicalResult runIREEOneShotBufferize(
     Operation *op, const OneShotBufferizationOptions &options) {
   OneShotAnalysisState state(op, options);
   if (failed(analyzeOp(op, state))) return failure();
-  if (failed(createSubSpanBuffers(op, state))) return failure();
   if (options.testAnalysisOnly) return success();
   return bufferizeOp(op, state);
 }
