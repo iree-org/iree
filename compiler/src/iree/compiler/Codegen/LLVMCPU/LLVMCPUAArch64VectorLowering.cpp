@@ -112,6 +112,10 @@ void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
   }
 
   // Apply vector specific operation lowering.
+  // TODO(hanchung): Have better control for choosing vector unrolling sizes.
+  // The lowering config is destroyed when lowering the op to vector ops. This
+  // can be fixed when moving to use transform dialect for scheduling. Because
+  // we still have the config when scheduling transforms.
   {
     vector::VectorTransformsOptions vectorTransformsOptions =
         vector::VectorTransformsOptions().setVectorTransformsOptions(
