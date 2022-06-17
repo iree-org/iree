@@ -147,7 +147,6 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   options.memCpyFn = memCpyFn;
   options.testAnalysisOnly = testAnalysisOnly;
   options.printConflicts = printConflicts;
-  options.alwaysAliasingWithDest = true;
 
   // bufferization.to_memref is used to bufferize constants in IREE. IREE has
   // it's own logic to handle constants. We'd like to leave the arith.constant

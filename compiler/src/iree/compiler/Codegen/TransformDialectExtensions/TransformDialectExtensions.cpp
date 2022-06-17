@@ -431,7 +431,8 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
 // IREE-specific transformations defined outside of iree_linalg_transform.
 //===---------------------------------------------------------------------===//
 
-LogicalResult transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::apply(
+DiagnosedSilenceableFailure
+transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::apply(
     transform::TransformResults &results, transform::TransformState &state) {
   if (state.getTopLevel()
           ->walk<WalkOrder::PostOrder>([&](scf::ForeachThreadOp op) {
@@ -442,11 +443,11 @@ LogicalResult transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::apply(
             return WalkResult::advance();
           })
           .wasInterrupted())
-    return failure();
-  return success();
+    return DiagnosedSilenceableFailure::definiteFailure();
+  return DiagnosedSilenceableFailure::success();
 }
 
-LogicalResult transform_dialect::IREEBufferizeOp::apply(
+DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     transform::TransformResults &results, transform::TransformState &state) {
   PassManager pm(getContext());
   // Bufferize the dispatch.
@@ -468,18 +469,24 @@ LogicalResult transform_dialect::IREEBufferizeOp::apply(
     }
     return WalkResult::advance();
   });
-  return failure(res.wasInterrupted());
+  return DiagnosedSilenceableFailure(failure(res.wasInterrupted()));
 }
 
-LogicalResult transform_dialect::IREESetNumWorkgroupToOneOp::apply(
+DiagnosedSilenceableFailure
+transform_dialect::IREESetNumWorkgroupToOneOp::apply(
     transform::TransformResults &results, transform::TransformState &state) {
   auto variantOp = dyn_cast<HAL::ExecutableVariantOp>(state.getTopLevel());
   if (!variantOp) {
-    return getOperation()->emitError()
-           << "top-level op is not a HAL::ExecutableVariantOp: "
-           << *state.getTopLevel();
+    DiagnosedSilenceableFailure diag = emitSilenceableError();
+    diag.attachNote(getLoc())
+        << "top-level op is not a HAL::ExecutableVariantOp: "
+        << *state.getTopLevel();
+    return diag;
   }
-  return iree_compiler::setNumWorkgroupsImpl(variantOp, {});
+  if (failed(iree_compiler::setNumWorkgroupsImpl(variantOp, {}))) {
+    return DiagnosedSilenceableFailure::definiteFailure();
+  }
+  return DiagnosedSilenceableFailure::success();
 }
 
 #define GET_OP_CLASSES
