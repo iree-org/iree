@@ -44,30 +44,50 @@ static Value cpuAllocationFunction(OpBuilder &builder, Location loc,
 }
 
 // Allocation callbacks to use with upstream comprehensive bufferization
-static FailureOr<Value> cpuComprehensiveBufferizeAllocationFn(
-    OpBuilder &builder, Location loc, MemRefType memRefType,
-    ValueRange dynamicSizes, unsigned alignment) {
+static FailureOr<Value> cpuAllocationFn(OpBuilder &builder, Location loc,
+                                        MemRefType memRefType,
+                                        ValueRange dynamicSizes,
+                                        unsigned alignment) {
   return builder
       .create<memref::AllocaOp>(loc, memRefType, dynamicSizes,
                                 builder.getI64IntegerAttr(alignment))
       .getResult();
 }
 
-static LogicalResult cpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
-                                                             Location loc,
-                                                             Value allocation) {
+static LogicalResult cpuDeallocationFn(OpBuilder &builder, Location loc,
+                                       Value allocation) {
   return success();
 }
 
-static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
-                                                     Location loc, Value from,
-                                                     Value to) {
+static LogicalResult cpuCopyFn(OpBuilder &builder, Location loc, Value from,
+                               Value to) {
   // TODO: ideally we should use linalg.copy which was recently reintroduced
   // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
   // post-bufferization copies do not trigger properly.
   // So we keep using `createLinalgCopyOp` which builds a GenericOp.
   // builder.create<linalg::CopyOp>(loc, from, to);
   mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
+  return success();
+}
+
+static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
+                                        MemRefType memRefType,
+                                        ValueRange dynamicSizes,
+                                        unsigned alignment) {
+  MemRefType allocType = MemRefType::get(memRefType.getShape(),
+                                         memRefType.getElementType(), {}, 3);
+  return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes)
+      .getResult();
+}
+
+static LogicalResult gpuDeallocationFn(OpBuilder &builder, Location loc,
+                                       Value allocation) {
+  return success();
+}
+
+static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
+                               Value to) {
+  createLinalgCopyOp(builder, loc, from, to);
   return success();
 }
 
@@ -80,11 +100,9 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   PassManager pm(getContext());
   // Bufferize the dispatch.
   using mlir::bufferization::BufferizationOptions;
-  BufferizationOptions::AllocationFn allocationFn =
-      cpuComprehensiveBufferizeAllocationFn;
-  BufferizationOptions::DeallocationFn deallocationFn =
-      cpuComprehensiveBufferizeDeallocationFn;
-  BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
+  BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
+  BufferizationOptions::DeallocationFn deallocationFn = gpuDeallocationFn;
+  BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
   mlir::iree_compiler::addIREEComprehensiveBufferizePasses(
       pm, allocationFn, deallocationFn, memcpyFn);
   WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
