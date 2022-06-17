@@ -1,4 +1,4 @@
-# Copyright 2019 The IREE Authors
+# Copyright 2022 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -19,7 +19,7 @@ td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
-            "TransformDialectExtensionsOps.td",
+            "TransformDialectCommonExtensionsOps.td",
         ],
         include = ["*.td"],
     ),
@@ -31,42 +31,40 @@ td_library(
 )
 
 iree_gentbl_cc_library(
-    name = "TransformDialectExtensionsOpGen",
+    name = "TransformDialectCommonExtensionsOpGen",
     tbl_outs = [
         (
             ["--gen-op-decls"],
-            "TransformDialectExtensionsOps.h.inc",
+            "TransformDialectCommonExtensionsOps.h.inc",
         ),
         (
             ["--gen-op-defs"],
-            "TransformDialectExtensionsOps.cpp.inc",
+            "TransformDialectCommonExtensionsOps.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "TransformDialectExtensionsOps.td",
+    td_file = "TransformDialectCommonExtensionsOps.td",
     deps = [":td_files"],
 )
 
 iree_compiler_cc_library(
-    name = "TransformDialectExtensions",
+    name = "TransformDialectCommonExtensions",
     srcs = [
-        "TransformDialectExtensions.cpp",
-        "TransformDialectExtensionsOps.cpp.inc",
+        "TransformDialectCommonExtensions.cpp",
+        "TransformDialectCommonExtensionsOps.cpp.inc",
     ],
     hdrs = [
-        "TransformDialectExtensions.h",
-        "TransformDialectExtensionsOps.h.inc",
+        "TransformDialectCommonExtensions.h",
+        "TransformDialectCommonExtensionsOps.h.inc",
     ],
     deps = [
-        ":TransformDialectExtensionsOpGen",
+        ":TransformDialectCommonExtensionsOpGen",
         "//compiler/src/iree/compiler/Codegen",
         "//compiler/src/iree/compiler/Codegen:PassHeaders",
         "//compiler/src/iree/compiler/Codegen/Common",
         "//compiler/src/iree/compiler/Codegen/Interfaces:BufferizationInterfaces",
         "//compiler/src/iree/compiler/Codegen/Transforms",
         "//compiler/src/iree/compiler/Codegen/Utils",
-        "//compiler/src/iree/compiler/Dialect/Flow/IR",
-        "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms",
