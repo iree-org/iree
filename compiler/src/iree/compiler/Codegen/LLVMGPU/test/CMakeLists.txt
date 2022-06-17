@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "gpu_set_num_workgroups.mlir"
     "illegal_configuration.mlir"
     "legalize.mlir"
+    "linalg_transform.mlir"
     "nvvm_pipeline_test.mlir"
     "reduce_bank_conflicts.mlir"
     "rocdl_pipeline_test.mlir"
@@ -29,6 +30,8 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree-opt
+  DATA
+    linalg_transform_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

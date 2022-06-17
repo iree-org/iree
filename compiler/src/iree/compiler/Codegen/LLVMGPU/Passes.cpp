@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
@@ -249,7 +250,15 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
 extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName;
 
 void addGPUTransformDialectInterpreterPasses(OpPassManager &passManager) {
-  assert(0 && "TODO: implement transform dialect path for LLVMGPU");
+  // Give control to the transform dialect.
+  passManager.addPass(createTransformDialectInterpreterPass(
+      clGPUCodegenTransformDialectFileName));
+
+  // Dropping the schedule is only needed if we want to embed the transform in
+  // the module: we should drop the schedule once applied.
+  // This pass does nothing in the case where we apply a separate policy
+  // through a file.
+  passManager.addPass(createDropSchedulePass());
 }
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {

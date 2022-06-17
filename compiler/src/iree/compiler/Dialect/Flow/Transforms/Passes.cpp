@@ -249,11 +249,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
                            return createDispatchWithTransformDialect(
                                clDispatchTransformFileName);
                          })
-      // TODO: we may only want to use the transform dialect for some dispatch
-      // regions and let the DispatchLinalgOnTensorsPass unconditionally handle
-      // the rest.
-      .addPredicatedPass(clDispatchTransformFileName.empty(),
-                         createDispatchLinalgOnTensorsPass)
+      // Only want use the transform dialect for some dispatch regions and let
+      // the DispatchLinalgOnTensorsPass unconditionally handle the rest.
+      .addPass(createDispatchLinalgOnTensorsPass)
       ////////////////////////////////////////////////////////////////////////
       .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(mlir::createCanonicalizerPass)

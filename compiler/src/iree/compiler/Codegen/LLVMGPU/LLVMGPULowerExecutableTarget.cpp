@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
@@ -14,7 +15,10 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/NVGPU/NVGPUDialect.h"
+#include "mlir/Dialect/PDL/IR/PDL.h"
+#include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -35,11 +39,22 @@ class LLVMGPULowerExecutableTargetPass
           LLVMGPULowerExecutableTargetPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
+    // clang-format off
     registry
-        .insert<IREE::Codegen::IREECodegenDialect, IREE::HAL::HALDialect,
-                linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect,
-                vector::VectorDialect, gpu::GPUDialect, nvgpu::NVGPUDialect,
-                scf::SCFDialect>();
+        .insert<IREE::Codegen::IREECodegenDialect,
+                IREE::HAL::HALDialect,
+                IREE::LinalgExt::IREELinalgExtDialect,
+                linalg::LinalgDialect,
+                linalg::transform::LinalgTransformDialect,
+                gpu::GPUDialect,
+                nvgpu::NVGPUDialect,
+                pdl::PDLDialect,
+                pdl_interp::PDLInterpDialect,
+                scf::SCFDialect,
+                tensor::TensorDialect,
+                transform::TransformDialect,
+                vector::VectorDialect>();
+    // clang-format on
   }
 
   LLVMGPULowerExecutableTargetPass() = default;

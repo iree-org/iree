@@ -70,7 +70,7 @@ static llvm::cl::opt<bool> disableMatmulPadPipeline(
     llvm::cl::init(false));
 
 llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName(
-    "iree-codegen-use-transform-dialect",
+    "iree-codegen-llvmcpu-use-transform-dialect",
     llvm::cl::desc(
         "MLIR file containing a transform dialect specification to apply"),
     llvm::cl::init(""));
