@@ -2782,6 +2782,7 @@ def Stream_ExecutableEndOp : Stream_Op<"executable.end", [
 def Stream_ExecutableExportOp : Stream_Op<"executable.export", [
   HasParent<"IREE::Stream::ExecutableOp">,
   Symbol,
+  IsolatedFromAbove,
 ]> {
   let summary = [{defines an executable entry point for dispatch operations}];
   let description = [{

@@ -24,9 +24,9 @@ namespace MHLO {
 
 namespace {
 
-struct ConstOpLowering : public OpRewritePattern<mhlo::ConstOp> {
+struct ConstOpLowering : public OpRewritePattern<mhlo::ConstantOp> {
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(mhlo::ConstOp op,
+  LogicalResult matchAndRewrite(mhlo::ConstantOp op,
                                 PatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, op.value());
     return success();
@@ -37,7 +37,7 @@ struct ConstOpLowering : public OpRewritePattern<mhlo::ConstOp> {
 
 void setupDirectMHLOToFlowLegality(MLIRContext *context,
                                    ConversionTarget &conversionTarget) {
-  conversionTarget.addIllegalOp<mhlo::ConstOp>();
+  conversionTarget.addIllegalOp<mhlo::ConstantOp>();
 }
 
 void populateMHLOToFlowPatterns(MLIRContext *context,

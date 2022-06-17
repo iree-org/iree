@@ -61,6 +61,7 @@ def lit_test(
         data = None,
         visibility = None,
         env = None,
+        timeout = None,
         **kwargs):
     """Runs a single test file with LLVM's lit tool.
 
@@ -82,6 +83,7 @@ def lit_test(
       visibility: visibility of the generated test target.
       env: string_dict. Environment variables available during test execution.
         See the common Bazel test attribute.
+      timeout: bazel test timeout string, as per common bazel definitions.
       **kwargs: additional keyword arguments to pass to all generated rules.
 
     See https://llvm.org/docs/CommandGuide/lit.html for details on lit
@@ -120,6 +122,7 @@ def lit_test(
         data = [test_file, cfg, tools_on_path_target_name] + data,
         visibility = visibility,
         env = env,
+        timeout = timeout,
         **kwargs
     )
 
@@ -133,6 +136,7 @@ def lit_test_suite(
         visibility = None,
         size = "small",
         env = None,
+        timeout = None,
         **kwargs):
     """Creates one lit test per source file and a test suite that bundles them.
 
@@ -155,6 +159,7 @@ def lit_test_suite(
       size: string. size of the generated tests.
       env: string_dict. Environment variables available during test execution.
         See the common Bazel test attribute.
+      timeout: timeout argument passed to the individual tests.
       **kwargs: additional keyword arguments to pass to all generated rules.
 
     See https://llvm.org/docs/CommandGuide/lit.html for details on lit
@@ -182,6 +187,7 @@ def lit_test_suite(
             data = data,
             visibility = visibility,
             env = env,
+            timeout = timeout,
             **kwargs
         )
 

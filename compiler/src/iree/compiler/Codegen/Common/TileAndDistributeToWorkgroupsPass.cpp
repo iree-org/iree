@@ -37,6 +37,97 @@
 namespace mlir {
 namespace iree_compiler {
 
+/// Compute the workload per workgroup to use based on the tile sizes passed.
+static SmallVector<int64_t> getWorkloadPerWorkgroup(
+    ArrayRef<int64_t> tileSizes) {
+  // TODO(ravishankarm): This for now assumes that we can just drop all the
+  // zero-dim tile sizes. We need to eventually change this so that we dont have
+  // to do this. It is implicity linked to the dispatch region workload having
+  // the consistent information. That needs to be changed to take the entire
+  // iteration domain size as the argument, and then we can use the distribute
+  // loop tile sizes directly.
+  SmallVector<int64_t> nonZeroTileSizes;
+  for (auto ts : tileSizes) {
+    if (!ts) continue;
+    nonZeroTileSizes.push_back(ts);
+  }
+  return llvm::to_vector(llvm::reverse(nonZeroTileSizes));
+}
+
+/// Defines the workgroup count region if the tile size for the distributed
+/// loops are known.
+/// IREE considers it without interchange at Flow level, so the arguments are
+/// not interchanged. In this context, we interchange the final yield values.
+static FailureOr<IREE::HAL::ExecutableExportOp> defineWorkgroupCountRegion(
+    IREE::HAL::ExecutableExportOp exportOp,
+    ArrayRef<int64_t> workloadPerWorkgroup, ArrayRef<int64_t> interchange) {
+  // TODO(hanchung): Look into partitionable loops to see if the configuraion
+  // is reasonable. The loops are paritioned at Flow level, any interchange on
+  // non-paritioned loops might triggers issues. It's not easy to check
+  // because the information is carried on op. It's much easier when we embed
+  // make partitionable loops also part of the lowering config. Otherwise, the
+  // logic should be considered everywhere.
+  if (interchange.size() > kNumMaxParallelDims) {
+    return exportOp.emitOpError(
+               "expected the number of loops is not greater than")
+           << kNumMaxParallelDims;
+  }
+
+  if (workloadPerWorkgroup.size() > kNumMaxParallelDims) {
+    // For now error out here.
+    return exportOp.emitOpError(
+               "expected workload per workgroup to be less than or equal to ")
+           << kNumMaxParallelDims;
+  }
+  WorkgroupCountRegionBuilder regionBuilder =
+      [&workloadPerWorkgroup, &interchange](
+          OpBuilder &b, Location loc, Value device,
+          std::array<Value, 3> workload) -> std::array<Value, 3> {
+    Value one = b.create<arith::ConstantIndexOp>(loc, 1);
+    std::array<Value, 3> numWorkgroups = {one, one, one};
+    for (auto it : llvm::enumerate(workloadPerWorkgroup)) {
+      // If tile size is 0, it implies this isnt tiled, and the number of
+      // workgroups is 1, i.e. the default.
+      if (it.value() == 0) continue;
+      numWorkgroups[it.index()] = applyMapToValues(
+          b, loc,
+          AffineMap::get(0, 1, b.getAffineSymbolExpr(0).ceilDiv(it.value())),
+          workload[it.index()])[0];
+    }
+    if (interchange.empty()) return numWorkgroups;
+
+    std::array<Value, 3> res = numWorkgroups;
+    for (auto en : llvm::enumerate(interchange)) {
+      res[en.value()] = numWorkgroups[en.index()];
+    }
+    return res;
+  };
+  OpBuilder builder(exportOp.getContext());
+  return defineWorkgroupCountRegion(builder, exportOp, regionBuilder);
+}
+
+/// Update the workload_per_wg value on the TranslationInfoAttr.
+// TODO(ravishankarm): The workload_per_wg field should be deprecated. This
+// is just transition before all dependencies on it can be removed.
+static LogicalResult updateTranslationInfoAttr(
+    IREE::HAL::ExecutableExportOp exportOp,
+    ArrayRef<int64_t> workloadPerWorkgroup) {
+  IREE::Codegen::DispatchLoweringPassPipeline passPipeline =
+      IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault;
+  if (auto translationInfo = getTranslationInfo(exportOp)) {
+    // Expect the `workload_per_wg` to be empty.
+    if (!translationInfo.getWorkloadPerWorkgroupVals().empty()) {
+      return exportOp.emitOpError(
+          "expected workload_per_wg to be empty at this stage");
+    }
+    passPipeline = translationInfo.getDispatchLoweringPassPipeline();
+  }
+  auto newTranslationInfoAttr = IREE::Codegen::TranslationInfoAttr::get(
+      exportOp.getContext(), passPipeline, workloadPerWorkgroup);
+  setTranslationInfo(exportOp, newTranslationInfoAttr);
+  return success();
+}
+
 //===---------------------------------------------------------------------===//
 // Patterns and methods for tile and distribute of Linalg ops to workgroups.
 //===---------------------------------------------------------------------===//
@@ -108,114 +199,141 @@ struct TileAndDistributeToWorkgroupsPass
 
 void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  func::FuncOp funcOp = getOperation();
-  if (!isEntryPoint(funcOp)) return;
+  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
+  ModuleOp innerModule = variantOp.getInnerModule();
+  llvm::StringMap<IREE::HAL::ExecutableExportOp> entryPoints =
+      getAllEntryPoints(innerModule);
 
-  SmallVector<Operation *> computeOps;
-  SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
-  if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
-    return signalPassFailure();
-  }
-  if (!tiledLoops.empty()) {
-    // The entry point already has distribution to workgroups. Do nothing.
-    return;
-  }
-  if (computeOps.empty()) {
-    // Ignore other operations.
-    return;
-  }
+  for (func::FuncOp funcOp : innerModule.getOps<func::FuncOp>()) {
+    auto exportOp = entryPoints.lookup(funcOp.getName());
+    if (!exportOp) continue;
 
-  // Get the tile sizes to use from lowering configuration if set.
-  SmallVector<int64_t> tileSizes, interchange;
-  if (failed(getDistributionTileConfigFromLoweringConfig(computeOps, tileSizes,
-                                                         interchange))) {
-    return signalPassFailure();
-  }
-  ArrayRef<int64_t> tileSizesRef(tileSizes);
+    SmallVector<Operation *> computeOps;
+    SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
+    if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
+      return signalPassFailure();
+    }
+    if (!tiledLoops.empty()) {
+      // The entry point already has distribution to workgroups. Do nothing.
+      return;
+    }
+    if (computeOps.empty()) {
+      // Ignore other operations.
+      return;
+    }
 
-  // Add a marker to the last operation in the list.
-  auto marker = StringAttr::get(context, "__workgroup_tiling__");
-  computeOps.back()->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker,
-                             marker);
+    // Get the tile sizes to use from lowering configuration if set.
+    SmallVector<int64_t> tileSizes, interchange;
+    if (failed(getDistributionTileConfigFromLoweringConfig(
+            computeOps, tileSizes, interchange))) {
+      return signalPassFailure();
+    }
+    ArrayRef<int64_t> tileSizesRef(tileSizes);
 
-  // Configure the linalg options.
-  // Tile size selection function.
-  auto tileSizeFn = [&](OpBuilder &builder,
-                        Operation *op) -> SmallVector<Value, 4> {
-    // Check if tile sizes are deduced from the configuration. If so use those.
-    return llvm::to_vector<4>(
-        llvm::map_range(tileSizesRef, [&](int64_t ts) -> Value {
-          return builder.create<arith::ConstantIndexOp>(op->getLoc(), ts);
-        }));
-  };
+    // Set the translation information.
+    SmallVector<int64_t> workloadPerWorkroup =
+        getWorkloadPerWorkgroup(tileSizesRef);
+    FailureOr<IREE::HAL::ExecutableExportOp> newExportOp =
+        defineWorkgroupCountRegion(exportOp, workloadPerWorkroup, interchange);
+    if (failed(newExportOp)) {
+      return signalPassFailure();
+    }
+    exportOp.erase();
 
-  auto linalgTilingOptions =
-      linalg::LinalgTilingOptions()
-          .setDistributionOptions(getIREELinalgLoopDistributionOptions())
-          .setInterchange(llvm::to_vector<4>(llvm::map_range(
-              interchange,
-              [](int64_t v) -> unsigned { return static_cast<unsigned>(v); })))
-          .setLoopType(linalg::LinalgTilingLoopType::Loops)
-          .setTileSizeComputationFunction(tileSizeFn);
+    if (failed(updateTranslationInfoAttr(newExportOp.getValue(),
+                                         workloadPerWorkroup))) {
+      return signalPassFailure();
+    }
 
-  RewritePatternSet patterns(context);
-  patterns.insert<TileAndDistributeLinalgOpsPattern,
-                  IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
-      context, linalgTilingOptions, linalg::LinalgTransformationFilter(marker));
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-    return signalPassFailure();
-  }
+    // Add a marker to the last operation in the list.
+    auto marker = StringAttr::get(context, "__workgroup_tiling__");
+    computeOps.back()->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker,
+                               marker);
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "--- After Tile + Distribute ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
+    // Configure the linalg options.
+    // Tile size selection function.
+    auto tileSizeFn = [&](OpBuilder &builder,
+                          Operation *op) -> SmallVector<Value, 4> {
+      // Check if tile sizes are deduced from the configuration. If so use
+      // those.
+      return llvm::to_vector<4>(
+          llvm::map_range(tileSizesRef, [&](int64_t ts) -> Value {
+            return builder.create<arith::ConstantIndexOp>(op->getLoc(), ts);
+          }));
+    };
 
-  // Apply linalg tiling optimization patterns.
-  RewritePatternSet canonicalizationPatterns(context);
-  linalg::populateLinalgTilingCanonicalizationPatterns(
-      canonicalizationPatterns);
-  if (failed(applyPatternsAndFoldGreedily(
-          funcOp, std::move(canonicalizationPatterns)))) {
-    return signalPassFailure();
-  }
+    auto linalgTilingOptions =
+        linalg::LinalgTilingOptions()
+            .setDistributionOptions(getIREELinalgLoopDistributionOptions())
+            .setInterchange(llvm::to_vector<4>(
+                llvm::map_range(interchange,
+                                [](int64_t v) -> unsigned {
+                                  return static_cast<unsigned>(v);
+                                })))
+            .setLoopType(linalg::LinalgTilingLoopType::Loops)
+            .setTileSizeComputationFunction(tileSizeFn);
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "--- After Canonicalize ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
+    RewritePatternSet patterns(context);
+    patterns.insert<TileAndDistributeLinalgOpsPattern,
+                    IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
+        context, linalgTilingOptions,
+        linalg::LinalgTransformationFilter(marker));
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
 
-  // Rewrite destructive updates and ensure no remaining store remains to the
-  // full output.
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After Tile + Distribute ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
 
-  // TODO(#...): Use of the destructive update rewrite is a hack! There needs to
-  // be a way to generate loops as we need, and use the tiled op generation
-  // implementation. This should be possible after moving everything to use the
-  // `TilingInterface`.
-  if (failed(rewriteLinalgDestructiveUpdates(funcOp))) {
-    funcOp->emitError("Failed to rewrite destructive updates in:\n")
-        << *funcOp.getOperation();
-    return signalPassFailure();
-  }
+    // Apply linalg tiling optimization patterns.
+    RewritePatternSet canonicalizationPatterns(context);
+    linalg::populateLinalgTilingCanonicalizationPatterns(
+        canonicalizationPatterns);
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(canonicalizationPatterns)))) {
+      return signalPassFailure();
+    }
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "--- After Rewriting destructive updates ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After Canonicalize ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
 
-  // After rewriting destructive updates, there might be uses of compute
-  // operations only in `tensor.dim` ops. Resolve these.
-  RewritePatternSet resolveDimOps(context);
-  memref::populateResolveRankedShapeTypeResultDimsPatterns(resolveDimOps);
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(resolveDimOps)))) {
-    return signalPassFailure();
+    // Rewrite destructive updates and ensure no remaining store remains to the
+    // full output.
+
+    // TODO(#...): Use of the destructive update rewrite is a hack! There needs
+    // to be a way to generate loops as we need, and use the tiled op generation
+    // implementation. This should be possible after moving everything to use
+    // the `TilingInterface`.
+    if (failed(rewriteLinalgDestructiveUpdates(funcOp))) {
+      funcOp->emitError("Failed to rewrite destructive updates in:\n")
+          << *funcOp.getOperation();
+      return signalPassFailure();
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After Rewriting destructive updates ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
+    // After rewriting destructive updates, there might be uses of compute
+    // operations only in `tensor.dim` ops. Resolve these.
+    RewritePatternSet resolveDimOps(context);
+    memref::populateResolveRankedShapeTypeResultDimsPatterns(resolveDimOps);
+    if (failed(
+            applyPatternsAndFoldGreedily(funcOp, std::move(resolveDimOps)))) {
+      return signalPassFailure();
+    }
   }
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createTileAndDistributeToWorkgroupsPass() {
   return std::make_unique<TileAndDistributeToWorkgroupsPass>();
 }

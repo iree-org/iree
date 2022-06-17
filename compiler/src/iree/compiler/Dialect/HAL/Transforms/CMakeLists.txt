@@ -35,13 +35,13 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRAffineToStandard
-    MLIRArithmetic
-    MLIRBufferization
-    MLIRControlFlow
-    MLIRFunc
+    MLIRArithmeticDialect
+    MLIRBufferizationDialect
+    MLIRControlFlowDialect
+    MLIRFuncDialect
     MLIRIR
     MLIRPass
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR

@@ -17,7 +17,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms.h"
@@ -182,8 +182,8 @@ void SPIRVTileAndPromotePass::runOnOperation() {
       [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
   int64_t flatWorkgroupSize =
       workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
-  auto subgroupSize =
-      getSPIRVTargetEnvAttr(funcOp).getResourceLimits().subgroup_size();
+  int subgroupSize =
+      getSPIRVTargetEnvAttr(funcOp).getResourceLimits().getSubgroupSize();
 
   funcOp.walk([&](Operation *op) {
     if (isa<linalg::FillOp, linalg::GenericOp>(op)) {
@@ -212,7 +212,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   });
 
   // Only promote to workgroup size if there are multiple warps.
-  if (flatWorkgroupSize > subgroupSize.getInt()) {
+  if (flatWorkgroupSize > subgroupSize) {
     RewritePatternSet promotionPatterns(&getContext());
     auto replaceMarker = StringAttr::get(context, getWorkgroupMemoryMarker());
     populatePromotionPatterns(promotionPatterns, replaceMarker);

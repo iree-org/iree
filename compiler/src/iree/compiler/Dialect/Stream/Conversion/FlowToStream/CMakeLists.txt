@@ -18,10 +18,10 @@ iree_cc_library(
   SRCS
     "ConvertFlowToStream.cpp"
   DEPS
-    MLIRArithmetic
-    MLIRFunc
+    MLIRArithmeticDialect
+    MLIRFuncDialect
     MLIRIR
-    MLIRTensor
+    MLIRTensorDialect
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Stream::Conversion
     iree::compiler::Dialect::Stream::IR

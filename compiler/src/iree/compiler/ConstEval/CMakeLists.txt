@@ -46,7 +46,7 @@ iree_cc_library(
     ::PassesIncGen
     ::Runtime
     LLVMSupport
-    MLIRFunc
+    MLIRFuncDialect
     MLIRIR
     MLIRPass
     iree::compiler::Pipelines

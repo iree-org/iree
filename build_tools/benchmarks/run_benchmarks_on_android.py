@@ -165,7 +165,7 @@ def adb_start_cmd(cmd_args: Sequence[str],
   if verbose:
     cmd_str = " ".join(cmd)
     print(f"cmd: {cmd_str}")
-  return subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)
+  return subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
 
 
 def get_vmfb_full_path_for_benchmark_case(benchmark_case_dir: str) -> str:

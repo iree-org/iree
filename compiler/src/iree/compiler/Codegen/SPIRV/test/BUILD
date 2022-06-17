@@ -27,6 +27,7 @@ iree_lit_test_suite(
             "config_default_matmul.mlir",
             "config_mali_conv.mlir",
             "config_mali_matmul.mlir",
+            "config_nvidia_matmul.mlir",
             "config_nvidia_matmul_cooperative_ops.mlir",
             "convert_to_spirv.mlir",
             "create_fast_slow_path.mlir",

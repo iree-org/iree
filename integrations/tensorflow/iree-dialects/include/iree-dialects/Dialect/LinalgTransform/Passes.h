@@ -10,7 +10,7 @@ namespace mlir {
 namespace linalg {
 namespace transform {
 
-void registerLinalgTransformInterpreterPass();
+void registerTransformDialectInterpreterPass();
 void registerLinalgTransformExpertExpansionPass();
 void registerDropSchedulePass();
 
@@ -20,6 +20,6 @@ void registerDropSchedulePass();
 
 namespace mlir {
 class Pass;
-std::unique_ptr<Pass> createLinalgTransformInterpreterPass();
+std::unique_ptr<Pass> createTransformDialectInterpreterPass();
 std::unique_ptr<Pass> createDropSchedulePass();
 } // namespace mlir

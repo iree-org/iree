@@ -17,10 +17,10 @@ add_mlir_library(IREELinalgTransformDialect
   IREELinalgExtDialect
   IREELinalgExtTransforms
 
-  MLIRAsync
+  MLIRAsyncDialect
   MLIRControlFlowInterfaces
-  MLIRLinalg
-  MLIRPDL
+  MLIRLinalgDialect
+  MLIRPDLDialect
   MLIRRewrite
   MLIRTransformDialect
 

@@ -8,7 +8,7 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
-if(NOT IREE_ENABLE_EMITC)
+if(NOT IREE_OUTPUT_FORMAT_C)
   return()
 endif()
 
@@ -28,12 +28,12 @@ iree_cc_library(
     "EmitCTypeConverter.cpp"
   DEPS
     LLVMSupport
-    MLIRArithmetic
-    MLIRControlFlow
-    MLIREmitC
-    MLIRFunc
+    MLIRArithmeticDialect
+    MLIRControlFlowDialect
+    MLIREmitCDialect
+    MLIRFuncDialect
     MLIRIR
-    MLIRMath
+    MLIRMathDialect
     MLIRPass
     MLIRTransforms
     iree::compiler::Dialect::Util::Conversion

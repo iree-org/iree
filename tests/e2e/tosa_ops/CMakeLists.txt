@@ -125,7 +125,6 @@ iree_check_single_backend_test_suite(
     "bitwise_xor.mlir"
     "ceil.mlir"
     "clamp.mlir"
-    "clz.mlir"
     "const.mlir"
     "equal.mlir"
     "exp.mlir"

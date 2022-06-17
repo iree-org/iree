@@ -35,41 +35,42 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineToStandard
     MLIRAnalysis
-    MLIRArithmetic
+    MLIRArithmeticDialect
     MLIRArithmeticToLLVM
     MLIRArithmeticTransforms
-    MLIRArmNeon
     MLIRArmNeon2dToIntr
-    MLIRBufferization
+    MLIRArmNeonDialect
+    MLIRBufferizationDialect
     MLIRControlFlowToLLVM
-    MLIRFunc
+    MLIRFuncDialect
     MLIRFuncToLLVM
     MLIRFuncTransforms
     MLIRIR
     MLIRLLVMCommonConversion
-    MLIRLLVMIR
-    MLIRLinalg
+    MLIRLLVMDialect
+    MLIRLinalgDialect
     MLIRLinalgToLLVM
     MLIRLinalgTransforms
-    MLIRMath
+    MLIRLinalgUtils
+    MLIRMathDialect
     MLIRMathToLLVM
     MLIRMathTransforms
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
-    MLIRPDL
-    MLIRPDLInterp
+    MLIRPDLDialect
+    MLIRPDLInterpDialect
     MLIRPass
     MLIRReconcileUnrealizedCasts
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSCFTransforms
-    MLIRTensor
-    MLIRTosa
+    MLIRTensorDialect
+    MLIRTosaDialect
     MLIRTosaToArith
     MLIRTransformDialect
     MLIRTransforms
-    MLIRVector
+    MLIRVectorDialect
     MLIRVectorToLLVM
     MLIRVectorToSCF
     MLIRVectorTransforms

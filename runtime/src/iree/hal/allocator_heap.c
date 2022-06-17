@@ -121,7 +121,8 @@ iree_hal_heap_allocator_query_compatibility(
     if (iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
       compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER;
     }
-    if (iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_DISPATCH)) {
+    if (iree_all_bits_set(params->usage,
+                          IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {
       compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH;
     }
   }

@@ -73,12 +73,6 @@ option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." 
 option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
 
 #-------------------------------------------------------------------------------
-# Derived flags based on primary options
-#-------------------------------------------------------------------------------
-
-cmake_dependent_option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ON ${IREE_BUILD_COMPILER} OFF)
-
-#-------------------------------------------------------------------------------
 # Runtime HAL Driver Options
 # By default, all runtime drivers supported by the current platform which do
 # not require external deps are enabled by default. This can be changed with:
@@ -202,6 +196,13 @@ cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler tar
 cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
 # Disable WebGPU by default - it has complex deps and is under development.
 cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
+
+#-------------------------------------------------------------------------------
+# Compiler Output Formats
+#-------------------------------------------------------------------------------
+
+# The 'vm-bytecode' and 'vm-asm' formats are always enabled.
+cmake_dependent_option(IREE_OUTPUT_FORMAT_C "Enables the 'vm-c' output format, using MLIR EmitC" ON ${IREE_BUILD_COMPILER} OFF)
 
 #-------------------------------------------------------------------------------
 # IREE compilation toolchain configuration
@@ -432,13 +433,21 @@ set(IREE_CUDA_LIBDEVICE_PATH "" CACHE STRING "Absolute path to an appropriate li
 if(IREE_TARGET_BACKEND_CUDA OR IREE_HAL_DRIVER_CUDA)
   find_package(CUDAToolkit)
 
-  # We define the magic IREE_CUDA_DEPS_DIR env var in our CI docker images if we
-  # have a stripped down CUDA toolkit suitable for compiling available. We
-  # trigger on this below as a fallback for locating headers and libdevice
-  # files.
-  if(NOT CUDAToolkit_FOUND AND DEFINED ENV{IREE_CUDA_DEPS_DIR})
-    set(CUDAToolkit_ROOT "$ENV{IREE_CUDA_DEPS_DIR}")
-    message(STATUS "CUDA SDK not found by CMake but using IREE_CUDA_DEPS = ${CUDAToolkit_ROOT}")
+  if(NOT CUDAToolkit_FOUND)
+    if(DEFINED ENV{IREE_CUDA_DEPS_DIR})
+      # We define the magic IREE_CUDA_DEPS_DIR env var in our CI docker images if we
+      # have a stripped down CUDA toolkit suitable for compiling available. We
+      # trigger on this below as a fallback for locating headers and libdevice
+      # files.
+      set(CUDAToolkit_ROOT "$ENV{IREE_CUDA_DEPS_DIR}")
+      message(STATUS "CUDA SDK not found by CMake but using IREE_CUDA_DEPS = ${CUDAToolkit_ROOT}")
+    else()
+      # If we haven't found CUDA deps, download at least enough to build for CUDA.
+      # This will define IREE_CUDA_DOWNLOAD_LIBDEVICE_PATH & IREE_CUDA_DOWNLOAD_INCLUDE_PATH
+      # vars with the target deps.
+      message(STATUS "CUDA SDK not found by CMake but downloading dependencies")
+      add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
+    endif()
   endif()
 endif()
 
@@ -460,6 +469,9 @@ if(IREE_TARGET_BACKEND_CUDA)
     # are hard and such. In this case, if the user went to the trouble to
     # tell us where it is, we have enough information.
     set(IREE_CUDA_LIBDEVICE_PATH "${CUDAToolkit_ROOT}/nvvm/libdevice/libdevice.10.bc")
+  elseif(IREE_CUDA_DOWNLOAD_LIBDEVICE_PATH)
+    message(STATUS "Using downloaded CUDA libdevice")
+    set(IREE_CUDA_LIBDEVICE_PATH "${IREE_CUDA_DOWNLOAD_LIBDEVICE_PATH}")
   else()
     message(FATAL_ERROR "Building with IREE_TARGET_BACKEND_CUDA requires either a CUDA SDK (consult CMake docs for your version: https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html) or an explicit path to libdevice (set with -DIREE_CUDA_LIBDEVICE_PATH=/path/to/libdevice.10.bc)")
   endif()
@@ -484,6 +496,9 @@ if(IREE_HAL_DRIVER_CUDA)
     else()
       message(SEND_ERROR "Using explicitly specified CUDAToolkit_ROOT, could not find cuda.h at: ${CUDAToolkit_INCLUDE_DIRS}")
     endif()
+  elseif(IREE_CUDA_DOWNLOAD_INCLUDE_PATH)
+    message(STATUS "Using downloaded CUDA includes")
+    set(CUDAToolkit_INCLUDE_DIRS "${IREE_CUDA_DOWNLOAD_INCLUDE_PATH}")
   else()
     message(SEND_ERROR "Cannot build IREE runtime CUDA components (-DIREE_HAL_DRIVER_CUDA=ON) because a CUDA SDK was not found. Consult CMake docs for your version: https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html")
   endif()

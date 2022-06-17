@@ -36,11 +36,11 @@ iree_cc_library(
   DEPS
     IREELinalgExtDialect
     MLIRArithmeticTransforms
-    MLIRBufferization
+    MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncTransforms
     MLIRLinalgTransforms
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRSCFTransforms
     MLIRSupport
     MLIRTensorTransforms

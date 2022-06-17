@@ -5,8 +5,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Imports TFLite binaries via the `iree-import-tflite` tool."""
-# TODO(#4131) python>=3.7: Use postponed type annotations.
 
+from dataclasses import dataclass
 from enum import Enum
 import logging
 import tempfile
@@ -37,45 +37,35 @@ def is_available():
   return True
 
 
-# TODO(#4131) python>=3.7: Consider using a dataclass.
+@dataclass
 class ImportOptions(CompilerOptions):
-  """Import options layer on top of the backend compiler options."""
+  """Import options layer on top of the backend compiler options.
 
-  def __init__(self,
-               input_arrays: Sequence[str] = (),
-               output_arrays: Sequence[str] = (),
-               import_only: bool = False,
-               import_extra_args: Sequence[str] = (),
-               save_temp_tfl_input: Optional[str] = None,
-               save_temp_iree_input: Optional[str] = None,
-               input_type: Optional[str] = "tosa",
-               **kwargs):
-    """Initialize options from keywords.
+  Args:
+    input_arrays: Sequence of input array node names (if different from
+      default).
+    output_arrays: Sequence of output array node names (if different from
+      default).
+    import_only: Only import the module. If True, the result will be textual
+      MLIR that can be further fed to the IREE compiler. If False (default),
+      the result will be the fully compiled IREE binary. In both cases,
+      bytes-like output is returned. Note that if the output_file= is
+      specified and import_only=True, then the MLIR form will be written to
+      the output file.
+    import_extra_args: Extra arguments to pass to the iree-import-tf tool.
+    save_temp_tfl_input: Optionally save the IR that results from importing
+      the flatbuffer (prior to any further transformations).
+    save_temp_iree_input: Optionally save the IR that is the result of the
+      import (ready to be passed to IREE).
+  """
 
-    Args:
-      input_arrays: Sequence of input array node names (if different from
-        default).
-      output_arrays: Sequence of output array node names (if different from
-        default).
-      import_only: Only import the module. If True, the result will be textual
-        MLIR that can be further fed to the IREE compiler. If False (default),
-        the result will be the fully compiled IREE binary. In both cases,
-        bytes-like output is returned. Note that if the output_file= is
-        specified and import_only=True, then the MLIR form will be written to
-        the output file.
-      import_extra_args: Extra arguments to pass to the iree-import-tf tool.
-      save_temp_tfl_input: Optionally save the IR that results from importing
-        the flatbuffer (prior to any further transformations).
-      save_temp_iree_input: Optionally save the IR that is the result of the
-        import (ready to be passed to IREE).
-    """
-    super().__init__(input_type=input_type, **kwargs)
-    self.input_arrays = input_arrays
-    self.output_arrays = output_arrays
-    self.import_only = import_only
-    self.import_extra_args = import_extra_args
-    self.save_temp_tfl_input = save_temp_tfl_input
-    self.save_temp_iree_input = save_temp_iree_input
+  input_arrays: Sequence[str] = ()
+  output_arrays: Sequence[str] = ()
+  import_only: bool = False
+  import_extra_args: Sequence[str] = ()
+  save_temp_tfl_input: Optional[str] = None
+  save_temp_iree_input: Optional[str] = None
+  input_type: Optional[str] = "tosa"
 
 
 def build_import_command_line(input_path: str, tfs: TempFileSaver,

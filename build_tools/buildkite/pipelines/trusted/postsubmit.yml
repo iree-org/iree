@@ -22,3 +22,10 @@ steps:
       ./build_tools/buildkite/scripts/wait_for_pipeline_success.py \
         --annotate \
         build-runtime-cmake
+
+  - label: "Executing build-and-test-tsan"
+    key: "build-and-test-tsan"
+    commands: |
+      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py \
+        --annotate \
+        build-and-test-tsan

@@ -14,7 +14,7 @@ and functions.
 # pylint: disable=unused-argument
 # pylint: disable=g-explicit-length-test
 
-# TODO(#4131) python>=3.7: Use postponed type annotations.
+from __future__ import annotations
 
 __all__ = [
     "load_vm_flatbuffer",
@@ -186,7 +186,7 @@ class BoundModule:
   Resolves item access (["foo"]) as function resolution.
   """
 
-  def __init__(self, context: "SystemContext", vm_module: _binding.VmModule):
+  def __init__(self, context: SystemContext, vm_module: _binding.VmModule):
     self._context = context
     self._tracer = self._context._config.tracer
     self._vm_module = vm_module

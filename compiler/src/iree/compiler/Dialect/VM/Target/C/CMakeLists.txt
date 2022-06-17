@@ -8,32 +8,7 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
-if(NOT IREE_ENABLE_EMITC)
-  # If the real "C" library is enabled, it will define IREE_ENABLE_EMITC,
-  # which can be used for conditionally switching.
-  iree_cc_library(
-    NAME Enabled
-  )
-  iree_cc_library(
-    NAME C
-  )
-  iree_cc_library(
-    NAME TranslateToCpp
-  )
-  return()
-endif()
-
 iree_add_all_subdirs()
-
-iree_cc_library(
-  NAME
-    Enabled
-  DEPS
-    MLIREmitC
-  DEFINES
-    "IREE_HAVE_EMITC_DIALECT"
-  PUBLIC
-)
 
 iree_cc_library(
   NAME
@@ -43,14 +18,15 @@ iree_cc_library(
   SRCS
     "TranslateToCpp.cpp"
   DEPS
-    ::Enabled
     LLVMSupport
-    MLIRControlFlow
-    MLIREmitC
-    MLIRFunc
+    MLIRControlFlowDialect
+    MLIREmitCDialect
+    MLIRFuncDialect
     MLIRIR
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSupport
+  DEFINES
+    "IREE_HAVE_C_OUTPUT_FORMAT"
   PUBLIC
 )
 
@@ -65,7 +41,6 @@ iree_cc_library(
     "TranslationFlags.cpp"
     "TranslationRegistration.cpp"
   DEPS
-    ::Enabled
     ::TranslateToCpp
     LLVMSupport
     MLIRIR

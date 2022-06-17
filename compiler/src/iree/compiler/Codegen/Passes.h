@@ -113,12 +113,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass();
 
-/// Pass to insert workgroup count region and update translation info.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createInsertDistributionInfoPass();
-
 /// Pass to tile and distribute to workgroups.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createTileAndDistributeToWorkgroupsPass();
 
 /// Pass to rewrite Linalg destructive updates, see DestructiveUpdateUtils.h for
@@ -282,7 +278,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager);
 /// Populates the passes from Sandbox for testing transformations from sandbox.
 /// Unlike other pipelines this pass mangaer is nested at the
 /// `hal.executable.variant` op.
-void addLinalgTransformInterpPasses(OpPassManager &passManager);
+void addTransformDialectInterpreterPasses(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize lowering
 /// of linalg ops on tensors to vectors operations.
@@ -320,6 +316,9 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
     ArrayRef<int64_t> workgroupSize);
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
                                         unsigned pipelineDepth);
+
+/// Experimental path for transform dialect.
+void addGPUTransformDialectInterpreterPasses(OpPassManager &pm);
 
 /// Simple lowering only distributute linalg ops on blocks and threads. This
 /// will result in scalar operations. Expects pass manager to be a module-level

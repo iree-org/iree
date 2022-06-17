@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -36,12 +36,37 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "numpy_io",
+    srcs = ["numpy_io.c"],
+    hdrs = ["numpy_io.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "numpy_io_test",
+    srcs = ["numpy_io_test.cc"],
+    deps = [
+        ":device_util",
+        ":numpy_io",
+        "//runtime/src/iree/base/internal:file_io",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/tooling/testdata/npy",
+    ],
+)
+
 # TODO(benvanik): fold these into iree/runtime and use that instead.
 cc_library(
     name = "vm_util",
     srcs = ["vm_util.cc"],
     hdrs = ["vm_util.h"],
     deps = [
+        ":numpy_io",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base:logging",
@@ -59,13 +84,13 @@ cc_test(
     name = "vm_util_test",
     srcs = ["vm_util_test.cc"],
     deps = [
+        ":device_util",
         ":vm_util",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
-        "//runtime/src/iree/tooling:device_util",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm:cc",
     ],

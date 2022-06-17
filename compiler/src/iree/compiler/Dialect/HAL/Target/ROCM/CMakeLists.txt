@@ -31,10 +31,10 @@ iree_cc_library(
     LLVMSupport
     LLVMTarget
     LLVMipo
-    MLIRLLVMIR
+    MLIRLLVMDialect
     MLIRLLVMToLLVMIRTranslation
     MLIRPass
-    MLIRROCDLIR
+    MLIRROCDLDialect
     MLIRROCDLToLLVMIRTranslation
     MLIRSupport
     MLIRTargetLLVMIRExport

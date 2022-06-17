@@ -40,6 +40,7 @@ from ._binding import (
 )
 
 from .array_interop import *
+from .benchmark import *
 from .system_api import *
 from .function import *
 from .tracing import *

@@ -233,12 +233,9 @@ if(IREE_BUILD_COMPILER)
 iree_runtime_cc_test(
     name = "bytecode_module_test",
     srcs = [
+        "bytecode_dispatch_async_test.cc",
         "bytecode_dispatch_test.cc",
         "bytecode_module_test.cc",
-    ],
-    tags = [
-        # TODO(benvanik): Fix type casting errors for --config=android_arm.
-        "notap",
     ],
     deps = [
         ":bytecode_module",
@@ -248,6 +245,7 @@ iree_runtime_cc_test(
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
         "//runtime/src/iree/vm/test:all_bytecode_modules_c",
+        "//runtime/src/iree/vm/test:async_bytecode_modules_c",
     ],
 )
 

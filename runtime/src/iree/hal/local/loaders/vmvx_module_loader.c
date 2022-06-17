@@ -395,6 +395,7 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   // TODO(benvanik): pass in an iree_arena_t that can be used for this.
   IREE_VM_INLINE_STACK_INITIALIZE(
       stack, IREE_VM_INVOCATION_FLAG_NONE,
+      iree_vm_context_id(executable->context),
       iree_vm_context_state_resolver(executable->context),
       executable->base.host_allocator);
 
@@ -562,7 +563,7 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
         bytecode_module,
     };
     status = iree_vm_context_create_with_modules(
-        executable_loader->instance, IREE_VM_CONTEXT_FLAG_NONE,
+        executable_loader->instance, IREE_VM_CONTEXT_FLAG_CONCURRENT,
         IREE_ARRAYSIZE(modules), modules, executable_loader->host_allocator,
         &context);
   }

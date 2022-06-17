@@ -63,7 +63,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
 
   // CHECK: util.global private mutable @ex0_embedded_elf_x86_64_dispatch0_512x1x1_buffer : !hal.buffer
   // CHECK-NEXT: util.initializer {
-  // CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%{{.+}} : !hal.allocator> type("DeviceVisible|DeviceLocal") usage(Dispatch) : !hal.buffer{%c768}
+  // CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%{{.+}} : !hal.allocator> type("DeviceVisible|DeviceLocal") usage("{{.+}}Dispatch{{.+}}") : !hal.buffer{%c768}
   // CHECK-NEXT: util.global.store %[[BUFFER]], @ex0_embedded_elf_x86_64_dispatch0_512x1x1_buffer : !hal.buffer
 
   // CHECK: func.func @ex0_embedded_elf_x86_64_dispatch0_512x1x1(%arg0: i32)

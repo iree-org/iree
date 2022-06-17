@@ -124,6 +124,8 @@ IREE_FLAG_CALLBACK(
     "  2x2xi32=[[1 2][3 4]]\n"
     "Raw binary files can be read to provide buffer contents:\n"
     "  2x2xi32=@some/file.bin\n"
+    "numpy npy files (from numpy.save) can be read to provide 1+ values:\n"
+    "  @some.npy\n"
     "Each occurrence of the flag indicates an input in the order they were\n"
     "specified on the command line.");
 
@@ -337,8 +339,8 @@ class IREEBenchmark {
     IREE_TRACE_SCOPE0("IREEBenchmark::RegisterSpecificFunction");
 
     iree_vm_function_t function;
-    IREE_RETURN_IF_ERROR(input_module_->lookup_function(
-        input_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+    IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_name(
+        input_module_, IREE_VM_FUNCTION_LINKAGE_EXPORT,
         iree_string_view_t{function_name.data(), function_name.size()},
         &function));
 

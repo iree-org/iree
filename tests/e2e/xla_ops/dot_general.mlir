@@ -111,8 +111,8 @@ func.func @dot_general_nontrivial_batching_dimension() {
 }
 
 func.func @large_dot_general() {
-  %lhs = util.unfoldable_constant dense<1.0> : tensor<4x32x1024xf32>
-  %rhs = util.unfoldable_constant dense<0.4> : tensor<4x1024x64xf32>
+  %lhs = util.unfoldable_constant dense<1.0> : tensor<4x8x128xf32>
+  %rhs = util.unfoldable_constant dense<0.4> : tensor<4x128x16xf32>
   %res = "mhlo.dot_general"(%lhs, %rhs) {
     dot_dimension_numbers = #mhlo.dot<
       lhs_batching_dimensions = [0],
@@ -121,24 +121,8 @@ func.func @large_dot_general() {
       rhs_contracting_dimensions = [1],
     >,
     precision_config = [#mhlo<"precision DEFAULT">, #mhlo<"precision DEFAULT">]
-  } : (tensor<4x32x1024xf32>, tensor<4x1024x64xf32>) -> tensor<4x32x64xf32>
-  check.expect_almost_eq_const(%res, dense<409.596> : tensor<4x32x64xf32>) : tensor<4x32x64xf32>
-  return
-}
-
-func.func @large_dot_general2() {
-  %lhs = util.unfoldable_constant dense<1.0> : tensor<4x32x1024xf32>
-  %rhs = util.unfoldable_constant dense<0.4> : tensor<4x1024x64xf32>
-  %res = "mhlo.dot_general"(%lhs, %rhs) {
-    dot_dimension_numbers = #mhlo.dot<
-      lhs_batching_dimensions = [0],
-      lhs_contracting_dimensions = [2],
-      rhs_batching_dimensions = [0],
-      rhs_contracting_dimensions = [1],
-    >,
-    precision_config = [#mhlo<"precision DEFAULT">, #mhlo<"precision DEFAULT">]
-  } : (tensor<4x32x1024xf32>, tensor<4x1024x64xf32>) -> tensor<4x32x64xf32>
-  check.expect_almost_eq_const(%res, dense<409.596> : tensor<4x32x64xf32>) : tensor<4x32x64xf32>
+  } : (tensor<4x8x128xf32>, tensor<4x128x16xf32>) -> tensor<4x8x16xf32>
+  check.expect_almost_eq_const(%res, dense<51.2> : tensor<4x8x16xf32>) : tensor<4x8x16xf32>
   return
 }
 

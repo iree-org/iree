@@ -53,7 +53,6 @@ iree_cc_library(
     "${ROCM_HEADERS_API_ROOT}"
   DEPS
     ::dynamic_symbols
-    rocm_headers
     iree::base
     iree::base::core_headers
     iree::base::internal
@@ -65,6 +64,8 @@ iree_cc_library(
     iree::hal::utils::buffer_transfer
     iree::hal::utils::semaphore_base
     iree::schemas::rocm_executable_def_c_fbs
+  COPTS
+    "-D__HIP_PLATFORM_HCC__=1"
   PUBLIC
 )
 
@@ -79,11 +80,11 @@ iree_cc_library(
     "rocm_headers.h"
     "dynamic_symbols.c"
   INCLUDES
+    "${ROCM_HEADERS_API_ROOT}"
     "${CMAKE_CURRENT_LIST_DIR}/../.."
   COPTS
     "-D__HIP_PLATFORM_HCC__=1"
   DEPS
-    rocm_headers
     iree::base::core_headers
     iree::base::internal::dynamic_library
     iree::base::tracing
@@ -102,4 +103,6 @@ iree_cc_test(
     iree::testing::gtest_main
   LABELS
     "driver=rocm"
+  COPTS
+    "-D__HIP_PLATFORM_HCC__=1"
 )

@@ -17,7 +17,7 @@
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -35,9 +35,9 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Dialect.h"
 
-#ifdef IREE_HAVE_EMITC_DIALECT
+#ifdef IREE_HAVE_C_OUTPUT_FORMAT
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
-#endif  // IREE_HAVE_EMITC_DIALECT
+#endif  // IREE_HAVE_C_OUTPUT_FORMAT
 
 namespace mlir {
 
@@ -68,9 +68,9 @@ inline void registerMlirDialects(DialectRegistry &registry) {
   // clang-format on
   tensor::registerInferTypeOpInterfaceExternalModels(registry);
 
-#ifdef IREE_HAVE_EMITC_DIALECT
+#ifdef IREE_HAVE_C_OUTPUT_FORMAT
   registry.insert<emitc::EmitCDialect>();
-#endif  // IREE_HAVE_EMITC_DIALECT
+#endif  // IREE_HAVE_C_OUTPUT_FORMAT
 }
 
 }  // namespace mlir

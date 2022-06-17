@@ -9,8 +9,7 @@
 #   ref: reference – for the reference CompiledModule
 #   tar: target - for one of the target CompiledModules
 
-# TODO(#4131) python>=3.7: Use postponed type annotations.
-
+from __future__ import annotations
 import copy
 import glob
 import inspect
@@ -34,7 +33,7 @@ def _zfill_width(length: int) -> Union[int, None]:
   return int(np.ceil(np.log10(length))) if length else None
 
 
-def get_trace_dir(artifacts_dir: str, trace: "Trace") -> str:
+def get_trace_dir(artifacts_dir: str, trace: Trace) -> str:
   trace_dir = os.path.join(artifacts_dir, trace.backend_id, "traces",
                            trace.function_name)
   os.makedirs(trace_dir, exist_ok=True)
@@ -135,7 +134,7 @@ class ModuleCall:
         pickle.dump(value, f)
 
   @staticmethod
-  def load(call_dir: str) -> "ModuleCall":
+  def load(call_dir: str) -> ModuleCall:
     """Loads and returns a trace serialized with ModuleCall.serialize."""
     with open(os.path.join(call_dir, "metadata.pkl"), "rb") as f:
       kwargs = pickle.load(f)
@@ -160,7 +159,7 @@ class Trace:
 
   def __init__(self,
                module: Union[module_utils.CompiledModule, None],
-               function: Union[Callable[["TracedModule"], None], None],
+               function: Union[Callable[[TracedModule], None], None],
                _load_dict: Optional[Dict[str, Any]] = None):
     """Extracts metadata from module and function and initializes.
 
@@ -295,7 +294,7 @@ class Trace:
           f.writelines(compiled_path + "\n")
 
   @staticmethod
-  def load(trace_dir: str) -> "Trace":
+  def load(trace_dir: str) -> Trace:
     """Loads and returns a trace serialized with Trace.serialize.
 
     Args:

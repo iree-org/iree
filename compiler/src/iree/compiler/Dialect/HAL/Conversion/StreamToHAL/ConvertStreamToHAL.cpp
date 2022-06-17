@@ -91,7 +91,8 @@ static LogicalResult deriveRequiredResourceBufferBits(
     case IREE::Stream::Lifetime::Constant:
       // Device local; copies required to get into external resources.
       memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
-      bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Constant;
+      bufferUsage =
+          bufferUsage | IREE::HAL::BufferUsageBitfield::SharingImmutable;
       break;
     case IREE::Stream::Lifetime::Variable:
       // Device local; copies required to get into external resources.
@@ -117,14 +118,13 @@ static LogicalResult deriveRequiredResourceBufferBits(
       break;
     case IREE::Stream::Lifetime::Transient:
       // Device local; copies required to get into external resources.
-      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal |
-                    IREE::HAL::MemoryTypeBitfield::Transient;
+      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
       break;
   }
 
   // TODO(benvanik): refine usage based on analysis.
   bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Transfer |
-                IREE::HAL::BufferUsageBitfield::Dispatch;
+                IREE::HAL::BufferUsageBitfield::DispatchStorage;
 
   return success();
 }
@@ -252,15 +252,14 @@ struct ResourceAllocaOpPattern
 
     // Transient allocations are device-local. Copies are required to get their
     // contents back on the host/another device.
-    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::DeviceLocal |
-                       IREE::HAL::MemoryTypeBitfield::Transient;
+    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::DeviceLocal;
 
     // TODO(benvanik): refine usage.
     // We know by construction that transient buffers are not host visible and
     // as such can only be used for device commands. We should be able to more
     // closely limit to just dispatch or transfer though.
-    auto bufferUsage = IREE::HAL::BufferUsageBitfield::Dispatch |
-                       IREE::HAL::BufferUsageBitfield::Transfer;
+    auto bufferUsage = IREE::HAL::BufferUsageBitfield::Transfer |
+                       IREE::HAL::BufferUsageBitfield::DispatchStorage;
 
     auto allocateOp = rewriter.create<IREE::HAL::AllocatorAllocateOp>(
         allocaOp.getLoc(), bufferType, allocator, memoryTypes, bufferUsage,
@@ -347,7 +346,8 @@ struct ResourceTryMapOpPattern
       case IREE::Stream::Lifetime::Constant:
         // Device local; copies required to get into external resources.
         memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
-        bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Constant;
+        bufferUsage =
+            bufferUsage | IREE::HAL::BufferUsageBitfield::SharingImmutable;
         break;
       case IREE::Stream::Lifetime::Staging:
         // Host local; copies required to get into device resources.
@@ -363,7 +363,7 @@ struct ResourceTryMapOpPattern
 
     // TODO(benvanik): refine usage based on analysis.
     bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Transfer |
-                  IREE::HAL::BufferUsageBitfield::Dispatch;
+                  IREE::HAL::BufferUsageBitfield::DispatchStorage;
 
     rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorTryMapOp>(
         tryMapOp, rewriter.getI1Type(), bufferType, allocator, memoryTypes,

@@ -36,18 +36,18 @@ iree_cc_library(
     IREELinalgExtTransforms
     IREELinalgTransformDialect
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAffineUtils
-    MLIRArithmetic
-    MLIRBufferization
+    MLIRArithmeticDialect
+    MLIRBufferizationDialect
     MLIRBufferizationTransforms
-    MLIRFunc
+    MLIRFuncDialect
     MLIRIR
-    MLIRLinalg
-    MLIRPDL
+    MLIRLinalgDialect
+    MLIRPDLDialect
     MLIRPass
-    MLIRSCF
-    MLIRTensor
+    MLIRSCFDialect
+    MLIRTensorDialect
     MLIRTransformDialect
     MLIRTransformUtils
     iree::compiler::Codegen

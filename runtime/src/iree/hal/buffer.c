@@ -28,7 +28,7 @@ IREE_API_EXPORT iree_string_view_t iree_hal_memory_type_format(
       {IREE_HAL_MEMORY_TYPE_HOST_LOCAL, IREE_SVL("HOST_LOCAL")},
       {IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL, IREE_SVL("DEVICE_LOCAL")},
       // Separate:
-      {IREE_HAL_MEMORY_TYPE_TRANSIENT, IREE_SVL("TRANSIENT")},
+      {IREE_HAL_MEMORY_TYPE_OPTIMAL, IREE_SVL("OPTIMAL")},
       {IREE_HAL_MEMORY_TYPE_HOST_VISIBLE, IREE_SVL("HOST_VISIBLE")},
       {IREE_HAL_MEMORY_TYPE_HOST_COHERENT, IREE_SVL("HOST_COHERENT")},
       {IREE_HAL_MEMORY_TYPE_HOST_CACHED, IREE_SVL("HOST_CACHED")},
@@ -57,13 +57,31 @@ IREE_API_EXPORT iree_string_view_t iree_hal_memory_access_format(
 
 IREE_API_EXPORT iree_string_view_t iree_hal_buffer_usage_format(
     iree_hal_buffer_usage_t value, iree_bitfield_string_temp_t* out_temp) {
+  // clang-format off
   static const iree_bitfield_string_mapping_t mappings[] = {
-      // Combined:
-      // Separate:
-      {IREE_HAL_BUFFER_USAGE_CONSTANT, IREE_SVL("CONSTANT")},
-      {IREE_HAL_BUFFER_USAGE_TRANSFER, IREE_SVL("TRANSFER")},
-      {IREE_HAL_BUFFER_USAGE_MAPPING, IREE_SVL("MAPPING")},
-      {IREE_HAL_BUFFER_USAGE_DISPATCH, IREE_SVL("DISPATCH")},
+    // Combined:
+    {IREE_HAL_BUFFER_USAGE_TRANSFER, IREE_SVL("TRANSFER")},
+    {IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE, IREE_SVL("DISPATCH_STORAGE")},
+    {IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE, IREE_SVL("DISPATCH_IMAGE")},
+    {IREE_HAL_BUFFER_USAGE_MAPPING, IREE_SVL("MAPPING")},
+    // Separate:
+    {IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE, IREE_SVL("TRANSFER_SOURCE")},
+    {IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET, IREE_SVL("TRANSFER_TARGET")},
+    {IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS, IREE_SVL("DISPATCH_INDIRECT_PARAMS")},
+    {IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ, IREE_SVL("DISPATCH_UNIFORM_READ")},
+    {IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_READ, IREE_SVL("DISPATCH_STORAGE_READ")},
+    {IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_WRITE, IREE_SVL("DISPATCH_STORAGE_WRITE")},
+    {IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE_READ, IREE_SVL("DISPATCH_IMAGE_READ")},
+    {IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE_WRITE, IREE_SVL("DISPATCH_IMAGE_WRITE")},
+    {IREE_HAL_BUFFER_USAGE_SHARING_EXPORT, IREE_SVL("SHARING_EXPORT")},
+    {IREE_HAL_BUFFER_USAGE_SHARING_REPLICATE, IREE_SVL("SHARING_REPLICATE")},
+    {IREE_HAL_BUFFER_USAGE_SHARING_CONCURRENT, IREE_SVL("SHARING_CONCURRENT")},
+    {IREE_HAL_BUFFER_USAGE_SHARING_IMMUTABLE, IREE_SVL("SHARING_IMMUTABLE")},
+    {IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED, IREE_SVL("MAPPING_SCOPED")},
+    {IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT, IREE_SVL("MAPPING_PERSISTENT")},
+    {IREE_HAL_BUFFER_USAGE_MAPPING_OPTIONAL, IREE_SVL("MAPPING_OPTIONAL")},
+    {IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_RANDOM, IREE_SVL("MAPPING_ACCESS_RANDOM")},
+    {IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_SEQUENTIAL_WRITE, IREE_SVL("MAPPING_ACCESS_SEQUENTIAL_WRITE")},
   };
   return iree_bitfield_format_inline(value, IREE_ARRAYSIZE(mappings), mappings,
                                      out_temp);
@@ -611,7 +629,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_fill(
   if (iree_status_is_ok(status) &&
       !iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
                          IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
-    status = iree_hal_buffer_flush_range(&target_mapping, 0, IREE_WHOLE_BUFFER);
+    status = iree_hal_buffer_mapping_flush_range(&target_mapping, 0,
+                                                 IREE_WHOLE_BUFFER);
   }
 
   status =
@@ -667,7 +686,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_write(
   iree_status_t status = iree_ok_status();
   if (!iree_all_bits_set(iree_hal_buffer_memory_type(target_buffer),
                          IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
-    status = iree_hal_buffer_flush_range(&target_mapping, 0, IREE_WHOLE_BUFFER);
+    status = iree_hal_buffer_mapping_flush_range(&target_mapping, 0,
+                                                 IREE_WHOLE_BUFFER);
   }
 
   iree_hal_buffer_unmap_range(&target_mapping);
@@ -743,8 +763,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_copy(
 
   if (!iree_all_bits_set(iree_hal_buffer_memory_type(target_buffer),
                          IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
-    status =
-        iree_hal_buffer_flush_range(&target_mapping, 0, adjusted_data_length);
+    status = iree_hal_buffer_mapping_flush_range(&target_mapping, 0,
+                                                 adjusted_data_length);
   }
 
   iree_hal_buffer_unmap_range(&source_mapping);
@@ -833,7 +853,7 @@ iree_hal_buffer_unmap_range(iree_hal_buffer_mapping_t* buffer_mapping) {
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_buffer_invalidate_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_mapping_invalidate_range(
     iree_hal_buffer_mapping_t* buffer_mapping, iree_device_size_t byte_offset,
     iree_device_size_t byte_length) {
   IREE_ASSERT_ARGUMENT(buffer_mapping);
@@ -847,7 +867,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_invalidate_range(
                                                     byte_length);
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_buffer_flush_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_mapping_flush_range(
     iree_hal_buffer_mapping_t* buffer_mapping, iree_device_size_t byte_offset,
     iree_device_size_t byte_length) {
   IREE_ASSERT_ARGUMENT(buffer_mapping);

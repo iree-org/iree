@@ -293,10 +293,11 @@ IREE_API_EXPORT iree_status_t iree_runtime_session_call_direct(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Allocate a VM stack on the host stack and initialize it.
-  IREE_VM_INLINE_STACK_INITIALIZE(
-      stack, IREE_VM_INVOCATION_FLAG_NONE,
-      iree_vm_context_state_resolver(iree_runtime_session_context(session)),
-      iree_runtime_session_host_allocator(session));
+  iree_vm_context_t* context = iree_runtime_session_context(session);
+  IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_INVOCATION_FLAG_NONE,
+                                  iree_vm_context_id(context),
+                                  iree_vm_context_state_resolver(context),
+                                  iree_runtime_session_host_allocator(session));
 
   // Issue the call.
   iree_vm_execution_result_t result;

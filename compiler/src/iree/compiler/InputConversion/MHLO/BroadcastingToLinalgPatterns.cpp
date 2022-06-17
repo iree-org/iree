@@ -320,7 +320,7 @@ struct ConvertConstantLikeOp
       return rewriter.notifyMatchFailure(op, "only supports ranked");
     // Lower to MHLO constant if statically shaped.
     if (resultTy.hasStaticShape()) {
-      rewriter.replaceOpWithNewOp<mhlo::ConstOp>(
+      rewriter.replaceOpWithNewOp<mhlo::ConstantOp>(
           op, DenseElementsAttr::get(resultTy, op.value()));
       return success();
     }
@@ -333,7 +333,7 @@ struct ConvertConstantLikeOp
     appendExtents(rewriter, loc, resultExtents, adaptor.operand(), resultTy);
 
     auto resultTy0D = RankedTensorType::get({}, resultTy.getElementType());
-    Value scalarConst = rewriter.create<mhlo::ConstOp>(
+    Value scalarConst = rewriter.create<mhlo::ConstantOp>(
         loc, DenseElementsAttr::get(resultTy0D, op.value()));
     Value broadcasted =
         broadcastScalar(rewriter, loc, scalarConst, resultExtents);
@@ -807,5 +807,5 @@ void mlir::iree_compiler::MHLO::populateMHLOBroadcastingToLinalgPatterns(
   // the corresponding setup legality, since that explicitly marks clamp as
   // conditionally legal.
   // TODO: Rename this upstream or find a better place to shove it.
-  mhlo::PopulateMaterializeBroadcastsPatterns(context, &patterns);
+  mhlo::populateMaterializeBroadcastsPatterns(context, &patterns);
 }

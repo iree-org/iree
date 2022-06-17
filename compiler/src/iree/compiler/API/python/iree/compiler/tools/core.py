@@ -7,8 +7,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# TODO(#4131) python>=3.7: Use postponed type annotations.
-
+from __future__ import annotations
+from dataclasses import dataclass
 from enum import Enum
 import logging
 import subprocess
@@ -46,7 +46,7 @@ class InputType(Enum):
   XLA = "xla"
 
   @staticmethod
-  def parse(spec: Union[str, "InputType"]) -> "InputType":
+  def parse(spec: Union[str, InputType]) -> InputType:
     """Parses or returns an InputType.
 
     Args:
@@ -71,7 +71,7 @@ class OutputFormat(Enum):
   MLIR_TEXT = "mlir-text"
 
   @staticmethod
-  def parse(spec: Union[str, "OutputFormat"]) -> "OutputFormat":
+  def parse(spec: Union[str, OutputFormat]) -> OutputFormat:
     """Parses or returns an OutputFormat.
 
     Args:
@@ -89,7 +89,7 @@ class OutputFormat(Enum):
     return OutputFormat[spec]
 
 
-# TODO(#4131) python>=3.7: Consider using a dataclass.
+@dataclass
 class CompilerOptions:
   """Options to the compiler backend.
 
@@ -128,37 +128,24 @@ class CompilerOptions:
       for benchmarking.
   """
 
-  def __init__(self,
-               *,
-               output_file: Optional[str] = None,
-               target_backends: Sequence[str] = (),
-               input_type: Union[InputType, str] = InputType.NONE,
-               output_format: Union[OutputFormat,
-                                    str] = OutputFormat.FLATBUFFER_BINARY,
-               extra_args: Sequence[str] = (),
-               optimize: bool = True,
-               output_mlir_debuginfo: bool = True,
-               output_generic_mlir: bool = False,
-               extended_diagnostics: bool = False,
-               strip_debug_ops: bool = False,
-               strip_source_map: bool = False,
-               crash_reproducer_path: Optional[str] = None,
-               enable_tflite_bindings: bool = False,
-               enable_benchmark: bool = False):
-    self.output_file = output_file
-    self.target_backends = target_backends
-    self.input_type = InputType.parse(input_type)
-    self.output_format = OutputFormat.parse(output_format)
-    self.extra_args = extra_args
-    self.optimize = optimize
-    self.output_mlir_debuginfo = output_mlir_debuginfo
-    self.output_generic_mlir = output_generic_mlir
-    self.extended_diagnostics = extended_diagnostics
-    self.strip_debug_ops = strip_debug_ops
-    self.strip_source_map = strip_source_map
-    self.crash_reproducer_path = crash_reproducer_path
-    self.enable_tflite_bindings = enable_tflite_bindings
-    self.enable_benchmark = enable_benchmark
+  output_file: Optional[str] = None
+  target_backends: Sequence[str] = ()
+  input_type: Union[InputType, str] = InputType.NONE
+  output_format: Union[OutputFormat, str] = OutputFormat.FLATBUFFER_BINARY
+  extra_args: Sequence[str] = ()
+  optimize: bool = True
+  output_mlir_debuginfo: bool = True
+  output_generic_mlir: bool = False
+  extended_diagnostics: bool = False
+  strip_debug_ops: bool = False
+  strip_source_map: bool = False
+  crash_reproducer_path: Optional[str] = None
+  enable_tflite_bindings: bool = False
+  enable_benchmark: bool = False
+
+  def __post_init__(self):
+    self.input_type = InputType.parse(self.input_type)
+    self.output_format = OutputFormat.parse(self.output_format)
 
 
 def build_compile_command_line(input_file: str, tfs: TempFileSaver,
