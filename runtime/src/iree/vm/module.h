@@ -247,14 +247,6 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_compute_cconv_fragment_size(
     const iree_vm_register_list_t* segment_size_list,
     iree_host_size_t* out_required_size);
 
-// Releases any retained refs within the call (either arguments or results).
-// This needs only be called if a call fails as implementations are required to
-// clean up the arguments as they are marshaled in and callers are required to
-// clean up the results as they are marshaled out.
-IREE_API_EXPORT void iree_vm_function_call_release(
-    iree_vm_function_call_t* call,
-    const iree_vm_function_signature_t* signature);
-
 // Results of an iree_vm_module_execute request.
 typedef struct iree_vm_execution_result_t {
   // TODO(benvanik): yield information.
