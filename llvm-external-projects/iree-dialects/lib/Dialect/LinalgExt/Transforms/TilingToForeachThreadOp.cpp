@@ -21,9 +21,9 @@
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::LinalgExt;
 
-static FailureOr<TilingResult> tileToForeachOp(PatternRewriter &rewriter,
-                                               TilingInterface op,
-                                               ValueRange numThreads) {
+static FailureOr<TilingResult>
+tileToForeachOp(PatternRewriter &rewriter, TilingInterface op,
+                ValueRange numThreads, ArrayRef<int64_t> threadDimMapping) {
   Location loc = op->getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   SmallVector<Range> loopRanges = op.getIterationDomain(rewriter);
@@ -38,9 +38,8 @@ static FailureOr<TilingResult> tileToForeachOp(PatternRewriter &rewriter,
 
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   Operation *tiledOp = nullptr;
-  Operation *tileOp = rewriter.create<scf::ForeachThreadOp>(
-      loc, llvm::to_vector<4>(nonZeroNumThreads),
-      /*threadDimMapping=*/ArrayRef<int64_t>{},
+  scf::ForeachThreadOp foreachThreadOp = rewriter.create<scf::ForeachThreadOp>(
+      loc, llvm::to_vector<4>(nonZeroNumThreads), threadDimMapping,
       [&](OpBuilder &b, Location loc, ValueRange threadIds) {
         // TODO: support `getTiledImplementation` with >1 produced tiled ops.
         int64_t nLoops = loopRanges.size();
@@ -113,7 +112,7 @@ static FailureOr<TilingResult> tileToForeachOp(PatternRewriter &rewriter,
               std::get<1>(it), std::get<2>(it));
         }
       });
-  return TilingResult{tileOp, tiledOp};
+  return TilingResult{foreachThreadOp, tiledOp};
 }
 
 FailureOr<TilingResult>
@@ -147,7 +146,7 @@ mlir::iree_compiler::IREE::LinalgExt::ForeachThreadTilingPattern::
   }
 
   FailureOr<TilingResult> tilingResult =
-      tileToForeachOp(rewriter, op, numThreads);
+      tileToForeachOp(rewriter, op, numThreads, threadDimMapping);
   if (failed(tilingResult))
     return failure();
 
