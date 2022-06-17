@@ -833,6 +833,45 @@ static LogicalResult setDefaultGenericOpRootConfig(
                                                tileSizes, passPipeline);
 }
 
+static LogicalResult setElementwiseGenericOpRootConfig(
+    func::FuncOp entryPointFn, linalg::GenericOp genericOp,
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+  if (getLoweringConfig(genericOp)) {
+    return success();
+  }
+
+  unsigned numLoops = genericOp.getNumLoops();
+  if (numLoops == 0) return success();
+  if (numLoops != genericOp.getNumParallelLoops()) return success();
+
+  SmallVector<int64_t> minTileSizes =
+      getMinTilingSizesForEachDim(entryPointFn, genericOp);
+  SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
+
+  // Set the flow level tiling to the default.
+  SmallVector<int64_t> flowTileSizes =
+      getDefaultDistributedLevelTileSizes(genericOp, minTileSizes, maxTileSizes,
+                                          /*allowIncompleteTile=*/true);
+
+  // Set the next level tile sizes.
+  SmallVector<int64_t> parallelTileSizes;
+  setX86WorkgroupTileSizes(genericOp, numLoops, flowTileSizes, minTileSizes,
+                           maxTileSizes, parallelTileSizes);
+  // Workaround to kick in peeling transform.
+  SmallVector<int64_t> reductionTileSizes(numLoops, 0);
+  TileSizesListType tileSizes;
+  tileSizes.push_back(flowTileSizes);
+  tileSizes.push_back(parallelTileSizes);
+  tileSizes.push_back(reductionTileSizes);
+
+  auto passPipeline =
+      genericOp.hasTensorSemantics()
+          ? DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert
+          : DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
+                                               tileSizes, passPipeline);
+}
+
 /// Sets the lowering configuration for a generic op implementing a
 /// transposition to use CPUDoubleTilingExpert pipeline.
 static LogicalResult setTransposeLikeOpRootConfig(
@@ -908,6 +947,8 @@ static LogicalResult setRootConfig(
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   if (failed(
           setTransposeLikeOpRootConfig(entryPointFn, genericOp, tiledLoops)) ||
+      failed(setElementwiseGenericOpRootConfig(entryPointFn, genericOp,
+                                               tiledLoops)) ||
       failed(
           setDefaultGenericOpRootConfig(entryPointFn, genericOp, tiledLoops))) {
     return failure();
