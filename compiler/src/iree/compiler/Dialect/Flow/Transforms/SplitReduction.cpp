@@ -29,7 +29,7 @@ static llvm::cl::opt<int64_t> splitReductionRatio(
     llvm::cl::init(1));
 
 static llvm::cl::opt<int64_t> topkSplitReductionRatio(
-    "iree-flow-topk-split--reduction", llvm::cl::desc("split ratio"),
+    "iree-flow-topk-split-reduction", llvm::cl::desc("split ratio"),
     llvm::cl::init(1));
 
 namespace {
@@ -80,7 +80,10 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
   }
 
   void runOnOperation() override {
-    if (splitReductionRatio <= 1) return;
+    if (splitReductionRatio.getValue() <= 1 &&
+        topkSplitReductionRatio.getValue() <= 1) {
+      return;
+    }
 
     RewritePatternSet patterns(&getContext());
     patterns.add<LinalgSplitReduction>(
@@ -115,6 +118,9 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
     // Remove all the markers at the end.
     auto funcOp = getOperation();
     funcOp->walk([&](linalg::LinalgOp op) {
+      op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+    });
+    funcOp->walk([&](LinalgExt::LinalgExtOp op) {
       op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
     });
   }

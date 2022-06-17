@@ -182,9 +182,9 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
 // selection, but the values are part of the large input space split into M =
 // splitReductionFn() ways. The following linalg.generic adds the appropriate
 // offset to reflect to values original position. "Updated pos" = "initial
-// pos" + m * "parallel computation index"
+// pos" + "splitDimParallel size * "splitDimParallel index"
 Value offsetParallelIndices(Location loc, PatternRewriter &rewriter,
-                            Value parallelIndices, int64_t splitReductionRatio,
+                            Value parallelIndices, int64_t kDimParallelSize,
                             int64_t splitDimParallel) {
   auto parallelIndicesType = parallelIndices.getType().cast<ShapedType>();
   size_t parallelIndicesRank = parallelIndicesType.getRank();
@@ -192,7 +192,7 @@ Value offsetParallelIndices(Location loc, PatternRewriter &rewriter,
   SmallVector<AffineMap> indexingMaps = {mapIdentity};
   SmallVector<StringRef> iterators(parallelIndicesRank, "parallel");
   Value mSplitVal = rewriter.create<arith::ConstantIntOp>(
-      loc, splitReductionRatio, parallelIndicesType.getElementType());
+      loc, kDimParallelSize, parallelIndicesType.getElementType());
   return rewriter
       .create<linalg::GenericOp>(
           loc,
@@ -304,8 +304,12 @@ struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
 
     // Update parallel indices to correct offsets
     Value parallelIndices = parallelTopkOp.getResult(1);
+    SmallVector<int64_t> expandedShape = getExpandedShape(
+        topkOp.values().getType().cast<ShapedType>().getShape(),
+        splitReductionRatio, splitDimParallel);
+    int64_t kDimParallelSize = expandedShape[kDimParallel];
     Value updatedParallelIndices = offsetParallelIndices(
-        loc, rewriter, parallelIndices, splitReductionRatio, splitDimParallel);
+        loc, rewriter, parallelIndices, kDimParallelSize, splitDimParallel);
 
     // Topk final reduction
     TopkOp reductionTopkOp = computeReductionTopk(

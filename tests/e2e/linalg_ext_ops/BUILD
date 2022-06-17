@@ -24,9 +24,6 @@ iree_check_single_backend_test_suite(
             "top-k.mlir",
         ],
         include = ["*.mlir"],
-        exclude = [
-            "top-k-split-reduction.mlir",
-        ],
     ),
     driver = "cuda",
     tags = [
@@ -44,17 +41,16 @@ iree_check_single_backend_test_suite(
     name = "check_cuda-topk-split-reduction",
     srcs = enforce_glob(
         [
-            "top-k-split-reduction.mlir",
+            "top-k.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
             "reverse.mlir",
             "scan.mlir",
             "sort.mlir",
-            "top-k.mlir",
         ],
     ),
-    compiler_flags = ["--iree-flow-topk-split--reduction=3"],
+    compiler_flags = ["--iree-flow-topk-split-reduction=2"],
     driver = "cuda",
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -78,9 +74,6 @@ iree_check_single_backend_test_suite(
             "top-k.mlir",
         ],
         include = ["*.mlir"],
-        exclude = [
-            "top-k-split-reduction.mlir",
-        ],
     ),
     driver = "local-task",
     target_backend = "dylib-llvm-aot",
@@ -97,9 +90,6 @@ iree_check_single_backend_test_suite(
             "top-k.mlir",
         ],
         include = ["*.mlir"],
-        exclude = [
-            "top-k-split-reduction.mlir",
-        ],
     ),
     driver = "local-task",
     target_backend = "vmvx",
@@ -121,7 +111,6 @@ iree_check_single_backend_test_suite(
             # Re-enable this once we have new devices with up-to-date drivers.
             "top-k.mlir",
             "scan.mlir",
-            "top-k-split-reduction.mlir",
         ],
     ),
     driver = "vulkan",

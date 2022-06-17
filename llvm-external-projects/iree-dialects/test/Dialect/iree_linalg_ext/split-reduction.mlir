@@ -20,7 +20,7 @@ func.func @topk_split_reduction_1d(%input_values: tensor<30xf32>, %out_values: t
 // SINGLE-SAME:                                       %[[ARG2:.*]]: tensor<3xi32>) -> (tensor<3xf32>, tensor<3xi32>) {
 // SINGLE-DAG:       %[[CNEG:.*]] = arith.constant 0xFF800000 : f32
 // SINGLE-DAG:       %[[CPOS:.*]] = arith.constant 2147483647 : i32
-// SINGLE-DAG:       %[[C3:.*]] = arith.constant 3 : i32
+// SINGLE-DAG:       %[[C10:.*]] = arith.constant 10 : i32
 // SINGLE:           %[[D0:.*]] = tensor.expand_shape %[[ARG0]] {{\[\[}}0, 1]] : tensor<30xf32> into tensor<3x10xf32>
 // SINGLE:           %[[D1:.*]] = linalg.init_tensor [3, 3] : tensor<3x3xf32>
 // SINGLE:           %[[D2:.*]] = linalg.init_tensor [3, 3] : tensor<3x3xi32>
@@ -35,7 +35,7 @@ func.func @topk_split_reduction_1d(%input_values: tensor<30xf32>, %out_values: t
 // SINGLE:           ^bb0(%[[ARG3:.*]]: i32):
 // SINGLE:             %[[D10:.*]] = linalg.index 0 : index
 // SINGLE:             %[[D11:.*]] = arith.index_cast %[[D10]] : index to i32
-// SINGLE:             %[[D12:.*]] = arith.muli %[[D11]], %[[C3]] : i32
+// SINGLE:             %[[D12:.*]] = arith.muli %[[D11]], %[[C10]] : i32
 // SINGLE:             %[[D13:.*]] = arith.addi %[[D12]], %[[ARG3]] : i32
 // SINGLE:             linalg.yield %[[D13]] : i32
 // SINGLE:           } -> tensor<3x3xi32>
@@ -70,7 +70,7 @@ func.func @topk_split_reduction_nd(%input_values: tensor<3x10x40x8xf32>, %out_va
 // MULTIPLE-SAME:                                    %[[ARG2:.*]]: tensor<3x10x4x8xi32>) -> (tensor<3x10x4x8xf32>, tensor<3x10x4x8xi32>) {
 // MULTIPLE-DAG:       %[[CNEG:.*]] = arith.constant 0xFF800000 : f32
 // MULTIPLE-DAG:       %[[CPOS:.*]] = arith.constant 2147483647 : i32
-// MULTIPLE-DAG:       %[[C3:.*]] = arith.constant 4 : i32
+// MULTIPLE-DAG:       %[[C10:.*]] = arith.constant 10 : i32
 // MULTIPLE:           %[[D0:.*]] = tensor.expand_shape %[[ARG0]] {{\[\[}}0], [1], [2, 3], [4]] : tensor<3x10x40x8xf32> into tensor<3x10x4x10x8xf32>
 // MULTIPLE:           %[[D1:.*]] = linalg.init_tensor [3, 10, 4, 4, 8] : tensor<3x10x4x4x8xf32>
 // MULTIPLE:           %[[D2:.*]] = linalg.init_tensor [3, 10, 4, 4, 8] : tensor<3x10x4x4x8xi32>
@@ -85,7 +85,7 @@ func.func @topk_split_reduction_nd(%input_values: tensor<3x10x40x8xf32>, %out_va
 // MULTIPLE:           ^bb0(%[[ARG3:.*]]: i32):
 // MULTIPLE:             %[[D10:.*]] = linalg.index 2 : index
 // MULTIPLE:             %[[D11:.*]] = arith.index_cast %[[D10]] : index to i32
-// MULTIPLE:             %[[D12:.*]] = arith.muli %[[D11]], %[[C3]] : i32
+// MULTIPLE:             %[[D12:.*]] = arith.muli %[[D11]], %[[C10]] : i32
 // MULTIPLE:             %[[D13:.*]] = arith.addi %[[D12]], %[[ARG3]] : i32
 // MULTIPLE:             linalg.yield %[[D13]] : i32
 // MULTIPLE:           } -> tensor<3x10x4x4x8xi32>

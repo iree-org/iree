@@ -34,13 +34,13 @@ iree_check_single_backend_test_suite(
   NAME
     check_cuda-topk-split-reduction
   SRCS
-    "top-k-split-reduction.mlir"
+    "top-k.mlir"
   TARGET_BACKEND
     "cuda"
   DRIVER
     "cuda"
   COMPILER_FLAGS
-    "--iree-flow-topk-split--reduction=3"
+    "--iree-flow-topk-split-reduction=2"
   LABELS
     "noasan"
     "nomsan"
