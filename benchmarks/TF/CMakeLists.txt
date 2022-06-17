@@ -1,8 +1,8 @@
-set(MINILM_I32_MODULE
+set(MINILM_L12_H384_UNCASED_INT32_MODULE
   NAME
-    "MiniLM"
+    "MiniLML12H384Uncased"
   TAGS
-    "i32"
+    "int32"
   SOURCE
     # Converted from https://huggingface.co/microsoft/MiniLM-L12-H384-uncased.
     "https://storage.googleapis.com/iree-model-artifacts/minilm-l12-h384-uncased-tf-model.tar.gz"

@@ -10,7 +10,7 @@ iree_benchmark_suite(
     "linux-x86_64"
 
   MODULES
-    "${MINILM_I32_MODULE}"
+    "${MINILM_L12_H384_UNCASED_INT32_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"
@@ -26,4 +26,82 @@ iree_benchmark_suite(
     "iree-dylib-sync"
   DRIVER
     "local-sync"
+)
+
+# CPU, Dylib, 1 thread, x86_64, full-inference
+iree_benchmark_suite(
+  GROUP_NAME
+    "linux-x86_64"
+
+  MODULES
+    "${MINILM_L12_H384_UNCASED_INT32_MODULE}"
+
+  BENCHMARK_MODES
+    "1-thread,full-inference,default-flags"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-x86_64-CascadeLake"
+  COMPILATION_FLAGS
+    ${LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS}
+  BENCHMARK_TOOL
+    iree-benchmark-module
+  CONFIG
+    "iree-dylib"
+  DRIVER
+    "local-task"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=1"
+)
+
+# CPU, Dylib, 4 threads, x86_64, full-inference
+iree_benchmark_suite(
+  GROUP_NAME
+    "linux-x86_64"
+
+  MODULES
+    "${MINILM_L12_H384_UNCASED_INT32_MODULE}"
+
+  BENCHMARK_MODES
+    "4-thread,full-inference,default-flags"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-x86_64-CascadeLake"
+  COMPILATION_FLAGS
+    ${LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS}
+  BENCHMARK_TOOL
+    iree-benchmark-module
+  CONFIG
+    "iree-dylib"
+  DRIVER
+    "local-task"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=4"
+)
+
+# CPU, Dylib, 8 threads, x86_64, full-inference
+iree_benchmark_suite(
+  GROUP_NAME
+    "linux-x86_64"
+
+  MODULES
+    "${MINILM_L12_H384_UNCASED_INT32_MODULE}"
+
+  BENCHMARK_MODES
+    "8-thread,full-inference,default-flags"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-x86_64-CascadeLake"
+  COMPILATION_FLAGS
+    ${LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS}
+  BENCHMARK_TOOL
+    iree-benchmark-module
+  CONFIG
+    "iree-dylib"
+  DRIVER
+    "local-task"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=8"
 )
