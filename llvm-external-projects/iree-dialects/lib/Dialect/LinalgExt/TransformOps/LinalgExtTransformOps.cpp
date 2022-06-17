@@ -39,7 +39,7 @@ static SmallVector<int64_t> extractI64Array(ArrayAttr attr) {
 // FuseProducersOp
 //===---------------------------------------------------------------------===//
 
-LogicalResult
+DiagnosedSilenceableFailure
 LinalgExt::FuseProducersOp::apply(transform::TransformResults &transformResults,
                                   transform::TransformState &state) {
   SmallVector<int64_t> operandsToFuse = extractI64Array(getOperandsToFuse());
@@ -54,7 +54,7 @@ LinalgExt::FuseProducersOp::apply(transform::TransformResults &transformResults,
         functional::applyReturningPatternAt(pattern,
                                             cast<linalg::LinalgOp>(target));
     if (failed(result))
-      return failure();
+      return DiagnosedSilenceableFailure::definiteFailure();
 
     // Update the fused operations.
     transformedOps.push_back(result->consumerOp);
@@ -65,7 +65,7 @@ LinalgExt::FuseProducersOp::apply(transform::TransformResults &transformResults,
   transformResults.set(getTransformed().cast<OpResult>(), transformedOps);
   for (size_t i = 0; i < numProducers; ++i)
     transformResults.set(getFusedOps()[i], fusedOps[i]);
-  return success();
+  return DiagnosedSilenceableFailure::success();
 }
 
 LogicalResult LinalgExt::FuseProducersOp::verify() {
@@ -121,7 +121,7 @@ void LinalgExt::FuseProducersOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
 }
 
-LogicalResult
+DiagnosedSilenceableFailure
 LinalgExt::TileToForeachOp::apply(transform::TransformResults &results,
                                   transform::TransformState &state) {
   linalg::LinalgTilingOptions tilingOptions;
@@ -138,22 +138,26 @@ LinalgExt::TileToForeachOp::apply(transform::TransformResults &results,
   if (targets.empty()) {
     results.set(getTiledOp().cast<OpResult>(), {});
     results.set(getTileOp().cast<OpResult>(), {});
-    return success();
+    return DiagnosedSilenceableFailure::success();
   }
   auto tilingInterfaceOp = dyn_cast<TilingInterface>(targets.front());
-  if (!tilingInterfaceOp)
-    return targets.front()->emitError("Cannot tile op: Not a TilingInterface");
+  if (!tilingInterfaceOp) {
+    DiagnosedSilenceableFailure diag = emitSilenceableError();
+    diag.attachNote(targets.front()->getLoc())
+        << "Cannot tile op: Not a TilingInterface";
+    return diag;
+  }
 
   FailureOr<iree_compiler::IREE::LinalgExt::TilingResult> result =
       functional::applyReturningPatternAt(pattern, tilingInterfaceOp);
   if (failed(result))
-    return failure();
+    return DiagnosedSilenceableFailure::definiteFailure();
   results.set(getTiledOp().cast<OpResult>(), result->tiledOp);
   results.set(getTileOp().cast<OpResult>(), result->tileOp);
-  return success();
+  return DiagnosedSilenceableFailure::success();
 }
 
-LogicalResult
+DiagnosedSilenceableFailure
 LinalgExt::FuseIntoContainingOp::apply(transform::TransformResults &results,
                                        transform::TransformState &state) {
 
@@ -164,14 +168,14 @@ LinalgExt::FuseIntoContainingOp::apply(transform::TransformResults &results,
     Operation *containingOp = std::get<1>(it);
     if (!producerOp) {
       std::get<0>(it)->emitError("Cannot fuse op: Not a LinalgOp");
-      return failure();
+      return DiagnosedSilenceableFailure::definiteFailure();
     }
     LinalgExt::LinalgExtFusionInContainingOpPattern pattern(this->getContext(),
                                                             containingOp);
     if (failed(functional::applyReturningPatternAt(pattern, producerOp)))
-      return failure();
+      return DiagnosedSilenceableFailure::definiteFailure();
   }
-  return success();
+  return DiagnosedSilenceableFailure::success();
 }
 
 FailureOr<Operation *> LinalgExt::RewriteForeachThreadToAsyncOp::applyToOne(

@@ -80,7 +80,7 @@ LogicalResult mlir::transform::applyTransformsInRegion(Region &transformRegion,
     transform::TransformState state(r, target);
     auto xform = cast<transform::TransformOpInterface>(b.clone(*transform));
     auto g = llvm::make_scope_exit([&]() { xform->erase(); });
-    if (failed(state.applyTransform(xform)))
+    if (failed(state.applyTransform(xform).checkAndReport()))
       return failure();
   }
   return success();
