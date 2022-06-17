@@ -138,6 +138,7 @@ LinalgExt::TileToForeachOp::apply(transform::TransformResults &results,
   if (targets.empty()) {
     results.set(getTiledOp().cast<OpResult>(), {});
     results.set(getTileOp().cast<OpResult>(), {});
+    getOperation()->emitWarning() << "no target to tile";
     return DiagnosedSilenceableFailure::success();
   }
   auto tilingInterfaceOp = dyn_cast<TilingInterface>(targets.front());
@@ -150,8 +151,11 @@ LinalgExt::TileToForeachOp::apply(transform::TransformResults &results,
 
   FailureOr<iree_compiler::IREE::LinalgExt::TilingResult> result =
       functional::applyReturningPatternAt(pattern, tilingInterfaceOp);
-  if (failed(result))
+  if (failed(result)) {
+    targets.front()->emitError("Failed to tile op to scf.foreach_thread:\n")
+        << *(targets.front());
     return DiagnosedSilenceableFailure::definiteFailure();
+  }
   results.set(getTiledOp().cast<OpResult>(), result->tiledOp);
   results.set(getTileOp().cast<OpResult>(), result->tileOp);
   return DiagnosedSilenceableFailure::success();

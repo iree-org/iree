@@ -43,9 +43,10 @@ iree_compiler_cc_library(
     deps = [
         ":BufferizationInterfaces",
         ":ProcessorOpInterfaces",
-        # TODO: Remove this dependency once the transform dialect extensions
-        # have a better registration mechanism.
-        "//compiler/src/iree/compiler/Codegen/TransformDialectExtensions",
+        "//compiler/src/iree/compiler/Codegen/Common/TransformDialectExtensions:TransformDialectCommonExtensions",
+        "//compiler/src/iree/compiler/Codegen/LLVMCPU/TransformDialectExtensions:TransformDialectLLVMCPUExtensions",
+        "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformDialectExtensions:TransformDialectLLVMGPUExtensions",
+        "//compiler/src/iree/compiler/Dialect/Flow/TransformDialectExtensions:TransformDialectFlowExtensions",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
     ],
