@@ -37,22 +37,6 @@ py_binary(
     "f32",
 ]]
 
-[iree_generated_trace_runner_test(
-    name = "e2e_matmul_direct_f32_small_no_padding",
-    compiler_flags = [
-        "--iree-codegen-disable-matmul-pad-pipeline",
-    ],
-    generator = ":generate_e2e_matmul_tests",
-    generator_args = [
-        "--lhs_rhs_type=f32",
-        "--shapes=small",
-    ],
-    target_backends_and_drivers = [
-        ("dylib-llvm-aot", "local-task"),
-    ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
-)]
-
 # Test asm
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_mmt4d_%s_small" % lhs_rhs_type,
@@ -252,4 +236,20 @@ iree_check_single_backend_test_suite(
         "requires-gpu-nvidia",
     ],
     target_backend = "cuda",
+)
+
+iree_generated_trace_runner_test(
+    name = "e2e_matmul_direct_f32_small_no_padding",
+    compiler_flags = [
+        "--iree-codegen-disable-matmul-pad-pipeline",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f32",
+        "--shapes=small",
+    ],
+    target_backends_and_drivers = [
+        ("dylib-llvm-aot", "local-task"),
+    ],
+    trace_runner = "//tools:iree-e2e-matmul-test",
 )

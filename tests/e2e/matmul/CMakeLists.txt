@@ -48,24 +48,6 @@ iree_generated_trace_runner_test(
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_direct_f32_small_no_padding
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=f32"
-    "--shapes=small"
-  TRACE_RUNNER
-    iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "dylib-llvm-aot"
-  DRIVERS
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-codegen-disable-matmul-pad-pipeline"
-)
-
-iree_generated_trace_runner_test(
-  NAME
     e2e_matmul_mmt4d_i8_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
@@ -323,6 +305,24 @@ iree_check_single_backend_test_suite(
     "notsan"
     "noubsan"
     "requires-gpu-nvidia"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_direct_f32_small_no_padding
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "dylib-llvm-aot"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-codegen-disable-matmul-pad-pipeline"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
