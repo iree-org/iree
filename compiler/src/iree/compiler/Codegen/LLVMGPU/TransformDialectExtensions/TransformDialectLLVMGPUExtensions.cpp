@@ -13,6 +13,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/Region.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;

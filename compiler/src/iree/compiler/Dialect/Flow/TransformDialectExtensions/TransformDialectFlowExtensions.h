@@ -7,21 +7,14 @@
 #ifndef IREE_COMPILER_CODEGEN_FLOW_TRANSFORMDIALECTEXTENSIONS_TRANSFORMDIALECTFLOWEXTENSIONS_H_
 #define IREE_COMPILER_CODEGEN_FLOW_TRANSFORMDIALECTEXTENSIONS_TRANSFORMDIALECTFLOWEXTENSIONS_H_
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
-#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
-#include "mlir/IR/DialectRegistry.h"
-#include "mlir/IR/Operation.h"
-#include "mlir/Pass/Pass.h"
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Flow/TransformDialectExtensions/TransformDialectFlowExtensionsOps.h.inc"
 
 namespace mlir {
+class DialectRegistry;
+
 namespace iree_compiler {
 
 /// Registers Flow transformations that require IREE-specific information into

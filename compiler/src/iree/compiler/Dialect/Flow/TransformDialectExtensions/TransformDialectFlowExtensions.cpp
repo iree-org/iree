@@ -9,6 +9,9 @@
 #include "iree-dialects/Transforms/Functional.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/Transforms/RegionUtils.h"
 
 using namespace mlir;
@@ -113,7 +116,7 @@ static void rewriteExtractSlices(PatternRewriter &rewriter,
                                  ValueRange tensorOperands,
                                  ValueRange tensorDynamicDims,
                                  BlockAndValueMapping tensorToFlowBvm) {
-  dispatchOp.walk([&](tensor::ExtractSliceOp extractSliceOp) {
+  dispatchOp->walk([&](tensor::ExtractSliceOp extractSliceOp) {
     Value source = extractSliceOp.source();
     auto it = llvm::find(tensorOperands, source);
     if (it == tensorOperands.end()) return;

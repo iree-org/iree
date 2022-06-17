@@ -32,29 +32,14 @@ iree_cc_library(
   DEPS
     ::TransformDialectFlowExtensionsOpGen
     IREEDialectsTransforms
-    IREELinalgExtDialect
-    IREELinalgExtTransforms
     IREELinalgTransformDialect
-    LLVMSupport
-    MLIRAffineDialect
-    MLIRAffineUtils
     MLIRArithmeticDialect
-    MLIRFuncDialect
     MLIRIR
-    MLIRLinalgDialect
-    MLIRPDLDialect
-    MLIRPass
     MLIRSCFDialect
     MLIRTensorDialect
     MLIRTransformDialect
     MLIRTransformUtils
-    iree::compiler::Codegen
-    iree::compiler::Codegen::Common
-    iree::compiler::Codegen::PassHeaders
-    iree::compiler::Codegen::Transforms
-    iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::HAL::IR
   PUBLIC
 )
 
