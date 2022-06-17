@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/debugging.h"
 #include "iree/base/tracing.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
@@ -179,24 +180,73 @@ static iree_status_t iree_vm_invoke_marshal_outputs(
 }
 
 //===----------------------------------------------------------------------===//
-// Synchronous invocation
+// Fiber tracing support
 //===----------------------------------------------------------------------===//
 
-static void iree_vm_invoke_fiber_enter(iree_vm_context_t* context) {
-  IREE_TRACE_FIBER_ENTER(iree_vm_context_id(context));
+// Fibers are tricky things to instrument as tooling support is often lacking.
+// We support two major modes (beyond when tracing is entirely disabled):
+//    IREE_TRACING_FEATURE_FIBERS: use Tracy's native fiber support.
+//        Does not support concurrent/interleaved coroutines.
+//   !IREE_TRACING_FEATURE_FIBERS: emulated support by trace stack fiddling.
+//        Supports concurrent/interleaved coroutines but messes with statistics
+//        as the trace stack is suspended/resumed and zones get extra counts.
+//
+// To make concurrent coroutines work when Tracy's fiber support is enabled we
+// go from treating each context as a fiber to treating each invocation as one.
+// This has the side-effect of creating one fiber per invocation and in
+// benchmarks that can be really noisy; best that can be done there is disabling
+// native fiber support.
+static iree_vm_invocation_id_t iree_vm_invoke_allocate_id(
+    iree_vm_context_t* context, const iree_vm_function_t* function) {
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FIBERS
+  if (iree_vm_context_flags(context) & IREE_VM_CONTEXT_FLAG_CONCURRENT) {
+    // Native Tracy fiber support does not handle interleaved coroutines.
+    // Instead we'll allocate a unique ID per invocation.
+    // The string must remain live for the lifetime of the process.
+    // TODO(benvanik): name it based on the function?
+    static iree_atomic_int32_t next_invocation_id = IREE_ATOMIC_VAR_INIT(1);
+    uint32_t invocation_id = iree_atomic_fetch_add_int32(
+        &next_invocation_id, 1, iree_memory_order_seq_cst);
+    IREE_LEAK_CHECK_DISABLE_PUSH();
+    char* name = (char*)malloc(32);
+    snprintf(name, 32, "invoke-%04d", invocation_id - 1);
+    IREE_LEAK_CHECK_DISABLE_POP();
+    return (iree_vm_invocation_id_t)name;
+  } else {
+    // Non-concurrent (sequential) execution can just reuse the context ID.
+    return (iree_vm_invocation_id_t)iree_vm_context_id(context);
+  }
+#else
+  return (iree_vm_invocation_id_t)iree_vm_context_id(context);
+#endif  // IREE_TRACING_FEATURE_FIBERS
 }
 
-static void iree_vm_invoke_fiber_reenter(iree_vm_context_t* context,
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+
+static void iree_vm_invoke_fiber_enter(iree_vm_invocation_id_t invocation_id) {
+  if (!invocation_id) return;
+  IREE_TRACE_FIBER_ENTER(invocation_id);
+}
+
+static void iree_vm_invoke_fiber_reenter(iree_vm_invocation_id_t invocation_id,
                                          iree_vm_stack_t* stack) {
-  IREE_TRACE_FIBER_ENTER(iree_vm_context_id(context));
+  if (!invocation_id) return;
+  IREE_TRACE_FIBER_ENTER(invocation_id);
   iree_vm_stack_resume_trace_zones(stack);
 }
 
-static void iree_vm_invoke_fiber_leave(iree_vm_context_t* context,
+static void iree_vm_invoke_fiber_leave(iree_vm_invocation_id_t invocation_id,
                                        iree_vm_stack_t* stack) {
+  if (!invocation_id) return;
   if (stack) iree_vm_stack_suspend_trace_zones(stack);
   IREE_TRACE_FIBER_LEAVE();
 }
+
+#endif  // IREE_TRACING_FEATURE_INSTRUMENTATION
+
+//===----------------------------------------------------------------------===//
+// Synchronous invocation
+//===----------------------------------------------------------------------===//
 
 IREE_API_EXPORT iree_status_t iree_vm_invoke(
     iree_vm_context_t* context, iree_vm_function_t function,
@@ -212,10 +262,16 @@ IREE_API_EXPORT iree_status_t iree_vm_invoke(
   iree_timeout_t timeout = iree_infinite_timeout();
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
 
+  // Allocate an invocation ID for tracing.
+  iree_vm_invocation_id_t invocation_id =
+      iree_any_bit_set(flags, IREE_VM_INVOCATION_FLAG_TRACE_INLINE)
+          ? 0
+          : iree_vm_invoke_allocate_id(context, &function);
+
   // Begin a zone outside the fiber to represent one tick of the loop.
   IREE_TRACE_ZONE_BEGIN_NAMED(zi, "iree_vm_invoke_tick");
   // Enter the fiber to start attributing zones to the context.
-  iree_vm_invoke_fiber_enter(context);
+  IREE_TRACE(iree_vm_invoke_fiber_enter(invocation_id));
 
   // Perform the initial invocation step, which if synchronous may fully
   // complete the invocation before returning. If it yields we'll need to resume
@@ -239,7 +295,7 @@ IREE_API_EXPORT iree_status_t iree_vm_invoke(
       // Perform the wait operation synchronously.
       // We do this outside of the fiber to match accounting with async
       // executors.
-      iree_vm_invoke_fiber_leave(context, state.stack);
+      IREE_TRACE(iree_vm_invoke_fiber_leave(invocation_id, state.stack));
       IREE_TRACE_ZONE_END(zi);
 
       iree_vm_wait_frame_t* wait_frame =
@@ -249,7 +305,7 @@ IREE_API_EXPORT iree_status_t iree_vm_invoke(
       // Restore tick zone and re-enter the fiber for the resume.
       IREE_TRACE_ZONE_BEGIN_NAMED(zi_next, "iree_vm_invoke_tick");
       zi = zi_next;
-      iree_vm_invoke_fiber_reenter(context, state.stack);
+      IREE_TRACE(iree_vm_invoke_fiber_reenter(invocation_id, state.stack));
       if (!iree_status_is_ok(status)) break;
     }
 
@@ -276,7 +332,7 @@ IREE_API_EXPORT iree_status_t iree_vm_invoke(
   }
 
   // Leave the fiber context now that execution has completed.
-  iree_vm_invoke_fiber_leave(context, state.stack);
+  IREE_TRACE(iree_vm_invoke_fiber_leave(invocation_id, state.stack));
   IREE_TRACE_ZONE_END(zi);
 
   // If we succeeded at invoking the status will be OK and the invoke_status
@@ -419,49 +475,52 @@ IREE_API_EXPORT iree_status_t iree_vm_begin_invoke(
 IREE_API_EXPORT iree_status_t
 iree_vm_resume_invoke(iree_vm_invoke_state_t* state) {
   IREE_ASSERT_ARGUMENT(state);
-  if (iree_status_is_deferred(state->status)) {
-    // Wait required; top of the stack should be a wait frame.
-    IREE_ASSERT_EQ(iree_vm_stack_current_frame(state->stack)->type,
-                   IREE_VM_STACK_FRAME_WAIT);
-    return iree_status_from_code(IREE_STATUS_DEFERRED);
-  } else if (!iree_status_is_ok(state->status)) {
-    // Invocation previously failed so return immediately. The user should then
-    // call end() to get the result. By returning OK here we are telling the
-    // user the resume operation succeeded.
-    return iree_ok_status();
-  }
 
-  // Get the top execution frame of the stack where we will resume execution.
-  iree_vm_stack_frame_t* resume_frame = iree_vm_stack_top(state->stack);
-  if (IREE_UNLIKELY(!resume_frame)) {
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "resume called with no parent frame");
-  }
+  // In a stackless world resuming may pop a stack frame that needs to be
+  // executed inline. We run here until either all stack frames have been popped
+  // (indicating the invocation has completed) or we yield/error and want to
+  // return to the scheduler.
+  do {
+    if (iree_status_is_deferred(state->status)) {
+      // Wait required; top of the stack should be a wait frame.
+      IREE_ASSERT_EQ(iree_vm_stack_current_frame(state->stack)->type,
+                     IREE_VM_STACK_FRAME_WAIT);
+      return iree_status_from_code(IREE_STATUS_DEFERRED);
+    } else if (!iree_status_is_ok(state->status)) {
+      // Invocation previously failed so return immediately. The user should
+      // then call end() to get the result. By returning OK here we are telling
+      // the user the resume operation succeeded.
+      return iree_ok_status();
+    }
 
-  // Call into the VM to resume the function. It may complete (returning OK),
-  // defer to be waited/resumed later, or fail.
-  iree_vm_function_t resume_function = resume_frame->function;
-  iree_vm_execution_result_t result;
-  state->status = resume_function.module->resume_call(
-      resume_function.module->self, state->stack, state->results, &result);
+    // Get the top execution frame of the stack where we will resume execution.
+    iree_vm_stack_frame_t* resume_frame = iree_vm_stack_top(state->stack);
+    if (IREE_UNLIKELY(!resume_frame)) {
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "resume called with no parent frame");
+    }
 
-  // If the call yielded then return that so the user knows to resume again.
-  if (iree_status_is_deferred(state->status)) {
-    return iree_status_from_code(IREE_STATUS_DEFERRED);
-  }
+    // Call into the VM to resume the function. It may complete (returning OK),
+    // defer to be waited/resumed later, or fail.
+    iree_vm_function_t resume_function = resume_frame->function;
+    iree_vm_execution_result_t result;
+    state->status = resume_function.module->resume_call(
+        resume_function.module->self, state->stack, state->results, &result);
 
-  // Stack resume: if the resume succeeded but the stack is not empty it means
-  // we've got to resume the parent frame. When we do a full yield up to the
-  // scheduler and then resume we're calling into the VM stack top from the host
-  // stack bottom - to have the same behavior as a normal stack pop we've got to
-  // continue running. We signal this as a DEFERRED so the same machinery for
-  // normal yields can be used.
-  // TODO(benvanik): use another result type in cases where we want to
-  // differentiate?
-  if (iree_status_is_ok(state->status) &&
-      iree_vm_stack_current_frame(state->stack) != NULL) {
-    return iree_status_from_code(IREE_STATUS_DEFERRED);
-  }
+    // If the call yielded then return that so the user knows to resume again.
+    if (iree_status_is_deferred(state->status)) {
+      return iree_status_from_code(IREE_STATUS_DEFERRED);
+    }
+
+    // Stack resume: if the resume succeeded but the stack is not empty it means
+    // we've got to resume the parent frame. When we do a full yield up to the
+    // scheduler and then resume we're calling into the VM stack top from the
+    // host stack bottom - to have the same behavior as a normal stack pop we've
+    // got to continue running. To keep the trace cleaner and reduce overhead we
+    // jump back up and pop the next frame, which also helps us avoid
+    // introducing latency between pops where otherwise there should be none.
+  } while (iree_status_is_ok(state->status) &&
+           iree_vm_stack_current_frame(state->stack) != NULL);
 
   // We're indicating the resume operation was successful, not the result of the
   // VM call; the user will call end() to get that.
@@ -585,4 +644,301 @@ IREE_API_EXPORT void iree_vm_abort_invoke(iree_vm_invoke_state_t* state) {
   state->status = iree_status_from_code(IREE_STATUS_INTERNAL);
 
   IREE_TRACE_ZONE_END(z0);
+}
+
+//===----------------------------------------------------------------------===//
+// Loop-based asynchronous invocation
+//===----------------------------------------------------------------------===//
+
+static iree_status_t iree_vm_async_begin_invoke(void* user_data,
+                                                iree_loop_t loop,
+                                                iree_status_t loop_status);
+static iree_status_t iree_vm_async_resume_invoke(void* user_data,
+                                                 iree_loop_t loop,
+                                                 iree_status_t loop_status);
+static iree_status_t iree_vm_async_tick_invoke(
+    iree_vm_async_invoke_state_t* state, iree_loop_t loop);
+static iree_status_t iree_vm_async_end_invoke(
+    iree_vm_async_invoke_state_t* state, iree_loop_t loop);
+static iree_status_t iree_vm_async_complete_invoke(
+    iree_vm_async_invoke_state_t* state, iree_loop_t loop,
+    iree_status_t status);
+
+IREE_API_EXPORT iree_status_t iree_vm_async_invoke(
+    iree_loop_t loop, iree_vm_async_invoke_state_t* state,
+    iree_vm_context_t* context, iree_vm_function_t function,
+    iree_vm_invocation_flags_t flags, const iree_vm_invocation_policy_t* policy,
+    iree_vm_list_t* inputs, iree_vm_list_t* outputs,
+    iree_allocator_t host_allocator,
+    iree_vm_async_invoke_callback_fn_t callback, void* user_data) {
+  IREE_ASSERT_ARGUMENT(state);
+  IREE_ASSERT_ARGUMENT(context);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Initialize to the pre-begin state.
+  state->begin_params.context = context;
+  iree_vm_context_retain(context);
+  state->begin_params.function = function;
+  state->begin_params.flags = flags;
+  state->begin_params.policy = policy;
+  state->begin_params.inputs = inputs;
+  iree_vm_list_retain(inputs);
+  state->deadline_ns = IREE_TIME_INFINITE_FUTURE;
+  state->host_allocator = host_allocator;
+  state->outputs = outputs;
+  iree_vm_list_retain(outputs);
+  state->callback = callback;
+  state->user_data = user_data;
+
+  // Launch the invocation; if this fails we'll need to cleanup the state we've
+  // already initialized.
+  // NOTE: based on the loop type THIS MAY COMPLETE THE INVOCATION IMMEDIATELY.
+  iree_status_t status = iree_loop_call(loop, IREE_LOOP_PRIORITY_DEFAULT,
+                                        iree_vm_async_begin_invoke, state);
+  if (!iree_status_is_ok(status)) {
+    iree_vm_list_release(state->outputs);
+    iree_vm_list_release(state->begin_params.inputs);
+    iree_vm_context_release(state->begin_params.context);
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+// Begins the invocation from the first loop callback.
+// The begin_params on the state will have everything we need to initialize the
+// call but since we alias with the base invocation state we must be sure to
+// copy out the args first.
+//
+// Note that |status| may indicate a failure already, such as if the loop
+// aborted. In that case we need to clean up the state before issuing the user
+// callback so they can do the same.
+static iree_status_t iree_vm_async_begin_invoke(void* user_data,
+                                                iree_loop_t loop,
+                                                iree_status_t loop_status) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_vm_async_invoke_state_t* state =
+      (iree_vm_async_invoke_state_t*)user_data;
+
+  // Check to see if the loop has failed before we even begin.
+  if (IREE_UNLIKELY(!iree_status_is_ok(loop_status))) {
+    // We release our retained resources because we don't guarantee they live to
+    // the callback. This allows callbacks to reuse memory.
+    iree_vm_list_release(state->outputs);
+    iree_vm_list_release(state->begin_params.inputs);
+    iree_vm_context_release(state->begin_params.context);
+
+    // Issue user callback notifying them of the failure and pass along the loop
+    // status; this is likely something like IREE_STATUS_ABORTED.
+    iree_status_t callback_status =
+        state->callback(state->user_data, loop, loop_status, NULL);
+    IREE_TRACE_ZONE_END(z0);
+    return callback_status;
+  }
+
+  // Pull fields locally so that we can reuse the aliased storage.
+  // Note that we have ownership of all these and must release them if we fail
+  // to begin the invocation.
+  iree_vm_context_t* context = state->begin_params.context;
+  iree_vm_function_t function = state->begin_params.function;
+  iree_vm_invocation_flags_t flags = state->begin_params.flags;
+  const iree_vm_invocation_policy_t* policy = state->begin_params.policy;
+  iree_vm_list_t* inputs = state->begin_params.inputs;
+
+  // Allocate an invocation ID for tracing.
+  IREE_TRACE({
+    state->invocation_id =
+        iree_any_bit_set(flags, IREE_VM_INVOCATION_FLAG_TRACE_INLINE)
+            ? 0
+            : iree_vm_invoke_allocate_id(context, &function);
+  });
+
+  // Try to begin the invocation. This may fail if the parameters are invalid.
+  // It may also complete inline if the entire invocation can be handled without
+  // blocking (in which case begin_status is OK).
+  IREE_TRACE(iree_vm_invoke_fiber_enter(state->invocation_id));
+  iree_status_t status =
+      iree_vm_begin_invoke(&state->base, context, function, flags, policy,
+                           inputs, state->host_allocator);
+  if (iree_status_is_ok(status) || iree_status_is_deferred(status)) {
+    // Ownership transferred.
+    iree_vm_list_release(inputs);
+    inputs = NULL;
+    iree_vm_context_release(context);
+    context = NULL;
+  }
+  if (iree_status_is_deferred(status)) {
+    IREE_TRACE({
+      iree_vm_invoke_fiber_leave(state->invocation_id, state->base.stack);
+    });
+    // Deferred until a wait completes or the next tick.
+    status = iree_vm_async_tick_invoke(state, loop);
+  } else if (iree_status_is_ok(status)) {
+    // Completed synchronously. This is the happy path and lets us complete the
+    // entire invocation in a single loop operation.
+    status = iree_vm_async_end_invoke(state, loop);
+  } else {
+    IREE_TRACE(iree_vm_invoke_fiber_leave(state->invocation_id, NULL));
+    // Failed to begin the invocation; release resources and call back.
+    // We know the state wasn't fully initialized and don't need to clean it up.
+    iree_vm_list_release(state->outputs);
+    iree_vm_list_release(inputs);
+    iree_vm_context_release(context);
+    status = state->callback(state->user_data, loop, status, NULL);
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  // If we began but failed to tick/end we need to propagate that to the user
+  // and clean up our state.
+  if (!iree_status_is_ok(status)) {
+    status = iree_vm_async_complete_invoke(state, loop, status);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static iree_status_t iree_vm_async_resume_invoke(void* user_data,
+                                                 iree_loop_t loop,
+                                                 iree_status_t loop_status) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_vm_async_invoke_state_t* state =
+      (iree_vm_async_invoke_state_t*)user_data;
+
+  // Resume the invocation and execute the next step.
+  IREE_TRACE({
+    iree_vm_invoke_fiber_reenter(state->invocation_id, state->base.stack);
+  });
+  iree_status_t status = iree_vm_resume_invoke(&state->base);
+  if (iree_status_is_deferred(status)) {
+    IREE_TRACE({
+      iree_vm_invoke_fiber_leave(state->invocation_id, state->base.stack);
+    });
+    // Deferred on a wait or yield. Enqueue waits/a resume.
+    status = iree_vm_async_tick_invoke(state, loop);
+  } else if (iree_status_is_ok(status)) {
+    // Completed synchronously.
+    status = iree_vm_async_end_invoke(state, loop);
+  } else {
+    IREE_TRACE({
+      iree_vm_invoke_fiber_leave(state->invocation_id, state->base.stack);
+    });
+  }
+
+  // If we failed to tick/end we need to propagate that to the user and clean up
+  // our state.
+  if (!iree_status_is_ok(status)) {
+    status = iree_vm_async_complete_invoke(state, loop, status);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static iree_status_t iree_vm_async_wake_invoke(void* user_data,
+                                               iree_loop_t loop,
+                                               iree_status_t loop_status) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_vm_async_invoke_state_t* state =
+      (iree_vm_async_invoke_state_t*)user_data;
+
+  // If we were aborted then we need to tear everything down.
+  // TODO(benvanik): maybe allow the failures through to the target? It'd be
+  // impossible to tell when the loop was in an invalid state if we did. May
+  // need to rework the loop callback on waits so that we can differentiate.
+  if (iree_status_is_aborted(loop_status)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_vm_async_complete_invoke(state, loop, loop_status);
+  }
+
+  // The loop_status we receive here is the result of the wait operation and
+  // something we need to propagate to the waiter.
+  iree_vm_stack_frame_t* current_frame =
+      iree_vm_stack_current_frame(state->base.stack);
+  iree_vm_wait_frame_t* wait_frame =
+      (iree_vm_wait_frame_t*)iree_vm_stack_frame_storage(current_frame);
+  wait_frame->wait_status = loop_status;
+
+  IREE_ASSERT(iree_status_is_deferred(state->base.status));
+  iree_status_free(state->base.status);
+  state->base.status = iree_ok_status();
+
+  IREE_TRACE_ZONE_END(z0);
+
+  // Resume the invocation and execute the next step.
+  // We do this inline instead of enqueuing a resume so that we avoid a needless
+  // operation in the loop. The invocation may immediately wait again and we
+  // want to keep the total wait-to-wait latency low.
+  return iree_vm_async_resume_invoke(user_data, loop, iree_ok_status());
+}
+
+static iree_status_t iree_vm_async_tick_invoke(
+    iree_vm_async_invoke_state_t* state, iree_loop_t loop) {
+  // Grab the wait frame from the stack holding the wait parameters.
+  // This is optional: if an invocation yields for cooperative scheduling
+  // purposes there will not be a wait frame on the stack and we'll just
+  // resume it below.
+  iree_vm_stack_frame_t* current_frame =
+      iree_vm_stack_current_frame(state->base.stack);
+  if (IREE_UNLIKELY(!current_frame)) {
+    // Unbalanced stack.
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "unbalanced stack after yield");
+  } else if (current_frame->type == IREE_VM_STACK_FRAME_WAIT) {
+    // Wait on a wait source.
+    iree_vm_wait_frame_t* wait_frame =
+        (iree_vm_wait_frame_t*)iree_vm_stack_frame_storage(current_frame);
+
+    // Combine the wait-invoke deadline with the one specified by the wait
+    // operation itself. This allows schedulers to timeslice waits without
+    // worrying whether user programs request to wait forever.
+    iree_timeout_t timeout = iree_make_deadline(
+        iree_min(state->deadline_ns, wait_frame->deadline_ns));
+    switch (wait_frame->wait_type) {
+      default:
+      case IREE_VM_WAIT_UNTIL:
+        return iree_loop_wait_until(loop, timeout, iree_vm_async_wake_invoke,
+                                    state);
+      case IREE_VM_WAIT_ANY:
+        return iree_loop_wait_any(loop, wait_frame->count,
+                                  wait_frame->wait_sources, timeout,
+                                  iree_vm_async_wake_invoke, state);
+      case IREE_VM_WAIT_ALL:
+        return iree_loop_wait_all(loop, wait_frame->count,
+                                  wait_frame->wait_sources, timeout,
+                                  iree_vm_async_wake_invoke, state);
+    }
+  } else {
+    // Resume from a yield point (cooperative scheduling).
+    return iree_loop_call(loop, IREE_LOOP_PRIORITY_DEFAULT,
+                          iree_vm_async_resume_invoke, state);
+  }
+}
+
+static iree_status_t iree_vm_async_end_invoke(
+    iree_vm_async_invoke_state_t* state, iree_loop_t loop) {
+  // End the invocation and retrieve the results.
+  iree_status_t invoke_status = iree_ok_status();
+  IREE_RETURN_IF_ERROR(
+      iree_vm_end_invoke(&state->base, state->outputs, &invoke_status));
+  IREE_TRACE({
+    // We leave the fiber before completing so that the callback is attributed
+    // to the thread running it instead.
+    iree_vm_invoke_fiber_leave(state->invocation_id, state->base.stack);
+  });
+  return iree_vm_async_complete_invoke(state, loop, invoke_status);
+}
+
+static iree_status_t iree_vm_async_complete_invoke(
+    iree_vm_async_invoke_state_t* state, iree_loop_t loop,
+    iree_status_t status) {
+  // Release all resources if we didn't already clean them up.
+  if (!iree_status_is_ok(status)) {
+    iree_vm_abort_invoke(&state->base);
+    iree_vm_list_release(state->outputs);
+    state->outputs = NULL;
+  }
+
+  // Issue callback.
+  iree_vm_list_t* outputs = state->outputs;
+  return state->callback(state->user_data, loop, status, outputs);
 }

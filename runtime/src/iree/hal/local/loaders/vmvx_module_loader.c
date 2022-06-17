@@ -119,10 +119,10 @@ static iree_status_t iree_hal_vmvx_executable_set_constants(
 
   // Copy the executable constants into the module state.
   if (iree_status_is_ok(status)) {
-    status =
-        iree_vm_invoke(executable->context, set_function,
-                       IREE_VM_INVOCATION_FLAG_NONE, /*policy=*/NULL, inputs,
-                       /*outputs=*/NULL, executable->base.host_allocator);
+    status = iree_vm_invoke(executable->context, set_function,
+                            IREE_VM_INVOCATION_FLAG_TRACE_INLINE,
+                            /*policy=*/NULL, inputs,
+                            /*outputs=*/NULL, executable->base.host_allocator);
   }
 
   // Inputs *must* be released here as we allocated it on the stack.
@@ -394,11 +394,13 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   // On-stack stack. We really do abuse the stack too much here.
   // TODO(benvanik): pass in an iree_arena_t that can be used for this.
   IREE_VM_INLINE_STACK_INITIALIZE(
-      stack, IREE_VM_INVOCATION_FLAG_NONE,
+      stack, IREE_VM_INVOCATION_FLAG_TRACE_INLINE,
       iree_vm_context_state_resolver(executable->context),
       executable->base.host_allocator);
 
   // Direct call interface.
+  // This only works because we know the exact signature and that these will
+  // never block (if they do it'll be handled as if it's an error).
   iree_vm_function_call_t call;
   memset(&call, 0, sizeof(call));
   call.function = entry_fn;

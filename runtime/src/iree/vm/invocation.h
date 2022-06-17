@@ -178,6 +178,118 @@ IREE_API_EXPORT iree_status_t iree_vm_end_invoke(iree_vm_invoke_state_t* state,
 IREE_API_EXPORT void iree_vm_abort_invoke(iree_vm_invoke_state_t* state);
 
 //===----------------------------------------------------------------------===//
+// Loop-based asynchronous invocation
+//===----------------------------------------------------------------------===//
+
+typedef intptr_t iree_vm_invocation_id_t;
+
+// Callback notifying the caller of an iree_vm_async_invoke that the invocation
+// has completed. If successful then |outputs| will contain the results and
+// ownership is transferred to the callee.
+//
+// |status| contains either the result of the invocation process if it failed or
+// the result of the invocation itself if it succeeded.
+//
+// This is executed from within a |loop| context and must not block. Handlers
+// are encouraged to defer all processing to another loop operation in order to
+// reduce stack utilization.
+typedef iree_status_t(IREE_API_PTR* iree_vm_async_invoke_callback_fn_t)(
+    void* user_data, iree_loop_t loop, iree_status_t status,
+    iree_vm_list_t* outputs);
+
+// Storage for iree_vm_async_invoke state.
+// This is intended to be embedded within higher-level invocation objects or on
+// the heap. When possible (and outputs are provided) the async invocation will
+// not allocate any additional memory.
+typedef struct iree_vm_async_invoke_state_t {
+  // Until we begin the invocation we don't need the state storage so we use
+  // that memory to store the parameters we'll need to begin. Kind of shady, but
+  // saves some ~128 bytes. Hooray C! 🥴
+  union {
+    struct {
+      // Retains the context the invocation is running within.
+      iree_vm_context_t* context;
+      // Target function.
+      iree_vm_function_t function;
+      // Flags controlling invocation behavior.
+      iree_vm_invocation_flags_t flags;
+      // TBD.
+      const iree_vm_invocation_policy_t* policy;
+      // Optional input storage list used to call the target function.
+      // Released after the function is entered.
+      iree_vm_list_t* inputs;
+    } begin_params;
+    // Base invoke state used to store the VM stack and resources.
+    iree_vm_invoke_state_t base;
+  };
+  // ID used for fiber tracing; either unique to the invocation or the context
+  // based on the context concurrency mode.
+  iree_vm_invocation_id_t invocation_id;
+  // TBD: deadline for when the invocation will be aborted.
+  iree_time_t deadline_ns;
+  // Allocator used for transient allocations required during invocation.
+  // If an arena it must remain valid for the duration of the invocation.
+  iree_allocator_t host_allocator;
+  // Optional preallocated output storage list that will receive the results.
+  iree_vm_list_t* outputs;
+  // Callback issued when the invocation completes.
+  iree_vm_async_invoke_callback_fn_t callback;
+  void* user_data;
+} iree_vm_async_invoke_state_t;
+
+// Asynchronously invokes |function| in |context| on the given |loop|.
+// The call will return immediately with the invocation pending on the loop.
+// Note that the |callback| may be issued before this function returns (such as
+// when using an inline loop or one running on another thread).
+//
+// |state| is opaque storage that must remain live until the callback is issued.
+// Callers should either allocate this from the heap to then free in the
+// callback or embed the storage within their higher-level invocation data
+// structures.
+//
+// |inputs| will be retained until no longer needed by the invocation and should
+// generally not be modified until the callback is issued. |outputs| will be
+// retained until the callback is made and must be released by the callback.
+//
+// The |callback| will receive |user_data| and is guaranteed to be called even
+// if the invocation fails due to an internal error. If the loop is aborted due
+// to a propagated scope failure the status passed to the callback will be
+// IREE_STATUS_ABORTED and no new work can be scheduled to the provided loop.
+//
+// Multiple invocations to the same context are only allowed to overlap if the
+// context was created with the IREE_VM_CONTEXT_FLAG_CONCURRENT flag set.
+//
+// Usage:
+//  iree_vm_async_invoke_state_t* state = malloc(...);
+//  iree_vm_async_invoke(
+//      loop,                  // loop to run in
+//      state,                 // state storage, must live until callback
+//      ...function...,        // target function
+//      inputs, outputs, ...,  // input values and output storage (if needed)
+//      callback, state);      // user callback and user_data
+//  ...
+//  iree_status_t callback(
+//      void* user_data,            // as passed to iree_vm_async_invoke
+//      iree_loop_t loop,           // if needing to schedule continuations
+//      iree_status_t status,       // result of invocation
+//      iree_vm_list_t* outputs) {  // retained output storage w/ result values
+//    if (iree_status_is_ok(status)) {
+//      // completed successfully! process outputs:
+//      do_something_with_outputs(outputs);
+//    }
+//    iree_vm_list_release(outputs);  // must be released!
+//    free(user_data);                // in this example the state storage
+//    return iree_ok_status();        // result propagated to loop scope
+//  }
+IREE_API_EXPORT iree_status_t iree_vm_async_invoke(
+    iree_loop_t loop, iree_vm_async_invoke_state_t* state,
+    iree_vm_context_t* context, iree_vm_function_t function,
+    iree_vm_invocation_flags_t flags, const iree_vm_invocation_policy_t* policy,
+    iree_vm_list_t* inputs, iree_vm_list_t* outputs,
+    iree_allocator_t host_allocator,
+    iree_vm_async_invoke_callback_fn_t callback, void* user_data);
+
+//===----------------------------------------------------------------------===//
 // Asynchronous stateful invocation
 //===----------------------------------------------------------------------===//
 

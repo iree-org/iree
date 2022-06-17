@@ -49,6 +49,10 @@ enum iree_vm_invocation_flag_bits_t {
   // functionality is available; specifically:
   //   -DIREE_VM_EXECUTION_TRACING_ENABLE=1
   IREE_VM_INVOCATION_FLAG_TRACE_EXECUTION = 1u << 0,
+
+  // Attributes invocation timings to the caller instead of a context or
+  // invocation-specific fiber.
+  IREE_VM_INVOCATION_FLAG_TRACE_INLINE = 1u << 1,
 };
 typedef uint32_t iree_vm_invocation_flags_t;
 

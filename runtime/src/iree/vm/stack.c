@@ -580,6 +580,9 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
   IREE_TRACE({
     frame_header->trace_zone =
         iree_vm_stack_trace_function_zone_begin(frame_type, function);
+    if (frame_header->trace_zone) {
+      IREE_TRACE_ZONE_APPEND_VALUE(frame_header->trace_zone, (uint64_t)stack);
+    }
   });
 
   if (out_callee_frame) *out_callee_frame = callee_frame;
@@ -719,30 +722,37 @@ IREE_API_EXPORT void iree_vm_stack_suspend_trace_zones(iree_vm_stack_t* stack) {
 }
 
 static void iree_vm_stack_resume_trace_zones_recursive(
-    iree_vm_stack_frame_header_t* frame_header) {
+    iree_vm_stack_t* stack, iree_vm_stack_frame_header_t* frame_header) {
   if (frame_header->parent) {
     // To get bottom->top ordering we recurse into parent frames first.
-    iree_vm_stack_resume_trace_zones_recursive(frame_header->parent);
+    iree_vm_stack_resume_trace_zones_recursive(stack, frame_header->parent);
   }
 
+  IREE_ASSERT_EQ(frame_header->trace_zone, 0);
   if (frame_header->frame.type == IREE_VM_STACK_FRAME_WAIT) {
     iree_vm_wait_frame_t* wait_frame =
         (iree_vm_wait_frame_t*)iree_vm_stack_frame_storage(
             &frame_header->frame);
+    // TODO(benvanik): find a good way to recover the wait zone; for now we just
+    // mark it as "?".
     IREE_ASSERT_EQ(wait_frame->trace_zone, 0);
-    wait_frame->trace_zone = iree_vm_stack_trace_wait_zone_begin(
+    IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_vm_stack_wait_recover_?");
+    wait_frame->trace_zone = z0;
+    frame_header->trace_zone = iree_vm_stack_trace_wait_zone_begin(
         wait_frame->wait_type, wait_frame->count);
   } else {
-    IREE_ASSERT_EQ(frame_header->trace_zone, 0);
     frame_header->trace_zone = iree_vm_stack_trace_function_zone_begin(
         frame_header->frame.type, &frame_header->frame.function);
+    if (frame_header->trace_zone) {
+      IREE_TRACE_ZONE_APPEND_VALUE(frame_header->trace_zone, (uint64_t)stack);
+    }
   }
 }
 IREE_API_EXPORT void iree_vm_stack_resume_trace_zones(iree_vm_stack_t* stack) {
   // Walking the stack bottom->top only happens in this case and it's not worth
   // storing additional metadata in order to make it efficient.
   if (stack->top) {
-    iree_vm_stack_resume_trace_zones_recursive(stack->top);
+    iree_vm_stack_resume_trace_zones_recursive(stack, stack->top);
   }
 }
 
