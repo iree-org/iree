@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_DIALECT_FLOW_TRANSFORMDIALECTEXTENSIONS_TRANSFORMDIALECTFLOWEXTENSIONS
 #define IREE_COMPILER_DIALECT_FLOW_TRANSFORMDIALECTEXTENSIONS_TRANSFORMDIALECTFLOWEXTENSIONS
 
-include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
