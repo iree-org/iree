@@ -616,7 +616,7 @@ static LogicalResult setRootConfig(
   // works for linalg.matmul cases. We can relax it once we have better
   // scheduling, e.g., transform dialect.
   SmallVector<int64_t> flowTileSizes;
-  if (!disableMatmulPadPipeline && (isX86(*variantOp) || isRISCV(*variantOp))) {
+  if (!disableMatmulPadPipeline && isX86(*variantOp)) {
     // It's inspired from Sandbox configuration. Sandbox has
     // [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192 because
     // 288/12*8=192
@@ -638,12 +638,12 @@ static LogicalResult setRootConfig(
   if (isAArch64(*variantOp) && !isQuantized) {
     return setAArch64RootConfig(entryPointFn, contractionOp, flowTileSizes,
                                 workgroupTileSizes, vectorSize);
-  } else if (disableMatmulPadPipeline) {
-    return setMatmulNoPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
-                                    workgroupTileSizes, vectorSize);
+  } else if (!disableMatmulPadPipeline && isX86(*variantOp)) {
+    return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
+                                  workgroupTileSizes, vectorSize);
   }
-  return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
-                                workgroupTileSizes, vectorSize);
+  return setMatmulNoPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
+                                  workgroupTileSizes, vectorSize);
 }
 
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d root
