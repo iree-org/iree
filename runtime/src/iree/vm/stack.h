@@ -320,6 +320,33 @@ iree_vm_stack_annotate_backtrace(iree_vm_stack_t* stack,
   (base_status)
 #endif  // IREE_VM_BACKTRACE_ENABLE && IREE_STATUS_FEATURE_ANNOTATIONS
 
+// Suspends active trace zones for all stack frames.
+// This returns the zone stack to a state before entering the stack. To restore
+// the zone stack use iree_vm_stack_resume_trace_zones.
+//
+// Trace zone suspend/resume is only required if the tracing library doesn't
+// natively support fibers. By doing this manual zone suspend/resume we can
+// leave the zone stack empty and avoid out-of-order zone events.
+//
+// At a yield point:
+//   z0 = [invoke]
+//    fiber:
+//     z1 = [function]
+//     z2 = [wait]
+// After suspend:
+//   z0 = [invoke]
+// After resume:
+//   z0 = [invoke]
+//    fiber:
+//     z1 = [function]
+//     z2 = [wait]
+IREE_API_EXPORT void iree_vm_stack_suspend_trace_zones(iree_vm_stack_t* stack);
+
+// Resumes trace zones for all stack frames.
+// This recovers the zone stack from a prior iree_vm_stack_suspend_trace_zones.
+// This is a no-op if the tracing library natively supports fibers.
+IREE_API_EXPORT void iree_vm_stack_resume_trace_zones(iree_vm_stack_t* stack);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

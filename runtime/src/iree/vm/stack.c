@@ -392,6 +392,29 @@ static iree_status_t iree_vm_stack_grow(iree_vm_stack_t* stack,
   return iree_ok_status();
 }
 
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+static iree_zone_id_t iree_vm_stack_trace_wait_zone_begin(
+    iree_vm_wait_type_t wait_type, iree_host_size_t wait_count) {
+  switch (wait_type) {
+    default:
+    case IREE_VM_WAIT_UNTIL: {
+      IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_vm_stack_wait_until");
+      return z0;
+    }
+    case IREE_VM_WAIT_ANY: {
+      IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_vm_stack_wait_any");
+      IREE_TRACE_ZONE_APPEND_VALUE(z0, wait_count);
+      return z0;
+    }
+    case IREE_VM_WAIT_ALL: {
+      IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_vm_stack_wait_all");
+      IREE_TRACE_ZONE_APPEND_VALUE(z0, wait_count);
+      return z0;
+    }
+  }
+}
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+
 IREE_API_EXPORT iree_status_t iree_vm_stack_wait_enter(
     iree_vm_stack_t* stack, iree_vm_wait_type_t wait_type,
     iree_host_size_t wait_count, iree_timeout_t timeout,
@@ -439,25 +462,8 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_wait_enter(
   stack->top = frame_header;
 
   IREE_TRACE({
-    switch (wait_type) {
-      case IREE_VM_WAIT_UNTIL: {
-        IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_vm_stack_wait_until");
-        frame_header->trace_zone = z0;
-        break;
-      }
-      case IREE_VM_WAIT_ANY: {
-        IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_vm_stack_wait_any");
-        IREE_TRACE_ZONE_APPEND_VALUE(z0, wait_count);
-        frame_header->trace_zone = z0;
-        break;
-      }
-      case IREE_VM_WAIT_ALL: {
-        IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_vm_stack_wait_all");
-        IREE_TRACE_ZONE_APPEND_VALUE(z0, wait_count);
-        frame_header->trace_zone = z0;
-        break;
-      }
-    }
+    frame_header->trace_zone =
+        iree_vm_stack_trace_wait_zone_begin(wait_type, wait_count);
   });
 
   iree_vm_wait_frame_t* wait_frame =
@@ -506,6 +512,21 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_wait_leave(
 
   return iree_ok_status();
 }
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+static iree_zone_id_t iree_vm_stack_trace_function_zone_begin(
+    iree_vm_stack_frame_type_t frame_type, const iree_vm_function_t* function) {
+  if (frame_type != IREE_VM_STACK_FRAME_NATIVE) {
+    // TODO(benvanik): cache source location and query from module.
+    iree_string_view_t function_name = iree_vm_function_name(function);
+    IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, function_name.data,
+                                        function_name.size);
+    return z0;
+  } else {
+    return 0;
+  }
+}
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
     iree_vm_stack_t* stack, const iree_vm_function_t* function,
@@ -557,16 +578,8 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
   stack->top = frame_header;
 
   IREE_TRACE({
-    if (frame_type != IREE_VM_STACK_FRAME_NATIVE) {
-      // TODO(benvanik): cache source location and query from module.
-      iree_string_view_t function_name = iree_vm_function_name(function);
-      IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, function_name.data,
-                                          function_name.size);
-      frame_header->trace_zone = z0;
-      if (frame_size) {
-        IREE_TRACE_ZONE_APPEND_VALUE(z0, frame_size);
-      }
-    }
+    frame_header->trace_zone =
+        iree_vm_stack_trace_function_zone_begin(frame_type, function);
   });
 
   if (out_callee_frame) *out_callee_frame = callee_frame;
@@ -662,6 +675,7 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_format_backtrace(
 
 IREE_API_EXPORT iree_status_t iree_vm_stack_annotate_backtrace(
     iree_vm_stack_t* stack, iree_status_t base_status) {
+  if (IREE_LIKELY(iree_status_is_ok(base_status))) return base_status;
   iree_string_builder_t builder;
   iree_string_builder_initialize(stack->allocator, &builder);
   iree_status_t status = iree_vm_stack_format_backtrace(stack, &builder);
@@ -675,3 +689,67 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_annotate_backtrace(
   iree_string_builder_deinitialize(&builder);
   return status;
 }
+
+#if (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION) && \
+    !(IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FIBERS)
+
+// These helpers perform manual fiber-like stack suspend/resume when not
+// natively supported by the tracing library. See
+// iree_vm_stack_suspend_trace_zones for more information.
+
+IREE_API_EXPORT void iree_vm_stack_suspend_trace_zones(iree_vm_stack_t* stack) {
+  // Walk top->bottom to unwind the trace zones.
+  iree_vm_stack_frame_header_t* frame_header = stack->top;
+  while (frame_header) {
+    if (frame_header->trace_zone) {
+      IREE_TRACE_ZONE_END(frame_header->trace_zone);
+      frame_header->trace_zone = 0;
+    }
+    if (frame_header->frame.type == IREE_VM_STACK_FRAME_WAIT) {
+      iree_vm_wait_frame_t* wait_frame =
+          (iree_vm_wait_frame_t*)iree_vm_stack_frame_storage(
+              &frame_header->frame);
+      if (wait_frame->trace_zone) {
+        IREE_TRACE_ZONE_END(wait_frame->trace_zone);
+        wait_frame->trace_zone = 0;
+      }
+    }
+    frame_header = frame_header->parent;
+  }
+}
+
+static void iree_vm_stack_resume_trace_zones_recursive(
+    iree_vm_stack_frame_header_t* frame_header) {
+  if (frame_header->parent) {
+    // To get bottom->top ordering we recurse into parent frames first.
+    iree_vm_stack_resume_trace_zones_recursive(frame_header->parent);
+  }
+
+  if (frame_header->frame.type == IREE_VM_STACK_FRAME_WAIT) {
+    iree_vm_wait_frame_t* wait_frame =
+        (iree_vm_wait_frame_t*)iree_vm_stack_frame_storage(
+            &frame_header->frame);
+    IREE_ASSERT_EQ(wait_frame->trace_zone, 0);
+    wait_frame->trace_zone = iree_vm_stack_trace_wait_zone_begin(
+        wait_frame->wait_type, wait_frame->count);
+  } else {
+    IREE_ASSERT_EQ(frame_header->trace_zone, 0);
+    frame_header->trace_zone = iree_vm_stack_trace_function_zone_begin(
+        frame_header->frame.type, &frame_header->frame.function);
+  }
+}
+IREE_API_EXPORT void iree_vm_stack_resume_trace_zones(iree_vm_stack_t* stack) {
+  // Walking the stack bottom->top only happens in this case and it's not worth
+  // storing additional metadata in order to make it efficient.
+  if (stack->top) {
+    iree_vm_stack_resume_trace_zones_recursive(stack->top);
+  }
+}
+
+#else
+
+IREE_API_EXPORT void iree_vm_stack_resume_trace_zones(iree_vm_stack_t* stack) {}
+IREE_API_EXPORT void iree_vm_stack_suspend_trace_zones(iree_vm_stack_t* stack) {
+}
+
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
