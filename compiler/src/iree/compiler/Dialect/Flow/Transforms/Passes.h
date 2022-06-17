@@ -90,6 +90,9 @@ std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass(
     CustomKernelsTargetInfo targetInfo);
 std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass(StringRef options);
 
+// Create a pass to detach elementwise ops from named Linalg ops.
+std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass();
+
 // Creates a pass to fuse Linalg operations on tensors.
 std::unique_ptr<Pass> createFusionOfTensorOpsPass();
 

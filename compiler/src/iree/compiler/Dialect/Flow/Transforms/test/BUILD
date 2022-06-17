@@ -23,6 +23,7 @@ iree_lit_test_suite(
             "conv1x1_to_matmul.mlir",
             "conv2d_to_img2col.mlir",
             "deduplicate_executables.mlir",
+            "detach_elementwise_from_named_ops.mlir",
             "dispatch_linalg_on_tensors.mlir",
             "dispatch_linalg_on_tensors_fusion.mlir",
             "dispatch_linalg_on_tensors_fusion_with_transpose.mlir",
