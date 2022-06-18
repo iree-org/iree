@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-FROM gcr.io/iree-oss/base@sha256:32a501b23abeae69eb33e5e78295312f5df28bacabc799dffe218764a66ed28e AS install-swiftshader
+FROM gcr.io/iree-oss/base@sha256:54e9b22bdcca5a8429a8442607ff0c3aa6fa767c27e30137e97c15f0b4499993 AS install-swiftshader
 WORKDIR /install-swiftshader
 
 RUN apt-get update && apt-get install -y git
@@ -29,7 +29,7 @@ RUN cp -rf build-swiftshader/Linux /swiftshader
 RUN echo "${SWIFTSHADER_COMMIT?}" > /swiftshader/git-commit
 
 # Ubuntu 18.04
-FROM gcr.io/iree-oss/base@sha256:32a501b23abeae69eb33e5e78295312f5df28bacabc799dffe218764a66ed28e AS final
+FROM gcr.io/iree-oss/base@sha256:54e9b22bdcca5a8429a8442607ff0c3aa6fa767c27e30137e97c15f0b4499993 AS final
 COPY --from=install-swiftshader /swiftshader /swiftshader
 
 # Set VK_ICD_FILENAMES so Vulkan loader can find the SwiftShader ICD.

@@ -24,6 +24,6 @@ steps:
         --volume="$$PWD:$$IREE_DOCKER_WORKDIR" \
         --workdir="$$IREE_DOCKER_WORKDIR" \
         --rm \
-        gcr.io/iree-oss/base@sha256:32a501b23abeae69eb33e5e78295312f5df28bacabc799dffe218764a66ed28e \
+        gcr.io/iree-oss/base@sha256:54e9b22bdcca5a8429a8442607ff0c3aa6fa767c27e30137e97c15f0b4499993 \
         ./build_tools/cmake/build_and_test_tsan.sh \
         "$${BUILD_DIR}"
