@@ -435,17 +435,19 @@ if(IREE_TARGET_BACKEND_CUDA OR IREE_HAL_DRIVER_CUDA)
     # We define the magic IREE_CUDA_DEPS_DIR env var in our CI docker images if we
     # have a stripped down CUDA toolkit suitable for compiling available. We
     # trigger on this below as a fallback for locating headers and libdevice
-    # files.
-    # TODO: Remove this in favor of a full CUDA toolkit.
+    # files. See build_tools/docker/base/fetch_cuda_deps.sh for what this
+    # includes (it does not include enough for the normal CMake toolkit search
+    # to succeed).
     set(CUDAToolkit_ROOT "$ENV{IREE_CUDA_DEPS_DIR}")
     message(STATUS "Using CUDA minimal deps for CI using IREE_CUDA_DEPS = ${CUDAToolkit_ROOT}")
-  elseif(NOT CUDAToolkit_ROOT)
-    # Auto-download and setup CUDAToolkit_ROOT
-    message(STATUS "CUDAToolkit_ROOT not defined: downloading expected version")
-    add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
+  else()
+    if(NOT CUDAToolkit_ROOT)
+      # Auto-download and setup CUDAToolkit_ROOT
+      message(STATUS "CUDAToolkit_ROOT not defined: downloading expected version")
+      add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
+    endif()
+    find_package(CUDAToolkit REQUIRED)
   endif()
-
-  find_package(CUDAToolkit REQUIRED)
 endif()
 
 # If an explicit libdevice file was not specified, and the compiler backend
