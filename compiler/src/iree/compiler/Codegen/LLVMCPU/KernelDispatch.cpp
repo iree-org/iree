@@ -791,17 +791,17 @@ static LogicalResult setDefaultGenericOpRootConfig(
 
   // If there are no loops, there is nothing to do.
   unsigned numLoops = genericOp.getNumLoops();
-  if (numLoops == 0) return success();
+  if (numLoops == 0) {
+    return setOpConfigAndEntryPointFnTranslation(
+        entryPointFn, genericOp, {{}},
+        DispatchLoweringPassPipeline::CPUDefault);
+  }
 
   SmallVector<int64_t> minTileSizes =
       getMinTilingSizesForEachDim(entryPointFn, genericOp);
   // For generic ops we'll use the default divided by 2 to control the stack
   // allocation limit See #9469 for example.
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize / 2);
-  if (llvm::all_of(minTileSizes, [](int64_t vs) { return vs == 1; })) {
-    // Nothing to vectorize just lower to loops.
-    return success();
-  }
 
   // Set the flow level tiling to the default.
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(

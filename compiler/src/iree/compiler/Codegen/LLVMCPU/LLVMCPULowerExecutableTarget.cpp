@@ -78,12 +78,6 @@ class LLVMCPULowerExecutableTargetPass
           "only one such operation. The specified pass pipeline is "
           "expected to work on the std.module op within the "
           "hal.executable.variant operation")};
-
-  ListOption<int> workloadPerWorkgroup{
-      *this, "workload-per-workgroup",
-      llvm::cl::desc(
-          "Specifies the workload per workgroup to use in x, y, z order. Is "
-          "expected for use only with use-lowering-pipeline option")};
 };
 }  // namespace
 
@@ -130,12 +124,6 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       IREE::HAL::ExecutableVariantOp::getOperationName());
 
   if (!useLoweringPipeline.empty()) {
-    // Use the pass pipeline specified in the command line.
-    SmallVector<int64_t, 4> workloadPerWorkgroupVec;
-    workloadPerWorkgroupVec.assign(workloadPerWorkgroup.begin(),
-                                   workloadPerWorkgroup.end());
-    executableLoweringPipeline.addPass(
-        createSetNumWorkgroupsPass(workloadPerWorkgroupVec));
     OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
     if (failed(parsePassPipeline(sanitizePipelineString(useLoweringPipeline),
                                  nestedModulePM))) {

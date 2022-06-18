@@ -148,13 +148,6 @@ void setCompilationInfo(Operation *op,
 /// operation.
 void eraseCompilationInfo(Operation *op);
 
-/// Get the lowering configuration for the operation within the dispatch.
-/// This looks for tile sizes by looking for lowering configuration.
-///
-LogicalResult getDistributionTileConfigFromLoweringConfig(
-    ArrayRef<Operation *> computeOps, SmallVectorImpl<int64_t> &tileSizes,
-    SmallVectorImpl<int64_t> &interchange);
-
 }  // namespace iree_compiler
 }  // namespace mlir
 

@@ -27,17 +27,6 @@ def ConvertToDestinationPassingStyle :
   let constructor = "mlir::iree_compiler::createConvertToDestinationPassingStylePass()";
 }
 
-def DistributeToWorkgroups :
-  Pass<"iree-codegen-distribute-to-workgroups", "IREE::HAL::ExecutableVariantOp"> {
-  let summary = "Distribute a computation to workgroups";
-  let constructor = "mlir::iree_compiler::createDistributeToWorkgroupsPass()";
-  let options = [
-    ListOption<"tileSizes", "tile-sizes", "int64_t",
-               "List of tile sizes to use for distributing the computation",
-               "llvm::cl::ZeroOrMore">
-  ];
-}
-
 def FlattenMemRefSubspan :
   Pass<"iree-codegen-flatten-memref-subspan", "ModuleOp"> {
   let summary =
@@ -120,16 +109,6 @@ def RemoveSingleIterationLoop :
     Pass<"iree-codegen-remove-single-iteration-loop", "func::FuncOp"> {
   let summary = "Remove distributed loop with single iteration.";
   let constructor = "mlir::iree_compiler::createRemoveSingleIterationLoopPass()";
-}
-
-// TODO: Consider removing or moving to HAL/Transforms in order to avoid
-// polluting common pass declarations with HAL specific ops.
-def SetNumWorkgroups :
-    Pass<"iree-set-num-workgroups",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
-  let summary =
-      "Set the number of workgroups for entry point functions";
-  let constructor = "mlir::iree_compiler::createSetNumWorkgroupsPass()";
 }
 
 // TODO: Rename argument to be fully qualified.
