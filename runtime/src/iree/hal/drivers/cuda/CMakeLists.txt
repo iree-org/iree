@@ -77,6 +77,8 @@ iree_cc_library(
     iree::base::core_headers
     iree::base::internal::dynamic_library
     iree::base::tracing
+    # Will define IREE_HAS_NCCL_HEADERS
+    iree_nccl_headers
   PUBLIC
 )
 
