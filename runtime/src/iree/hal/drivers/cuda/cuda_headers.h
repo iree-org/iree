@@ -7,6 +7,10 @@
 #ifndef IREE_HAL_DRIVERS_CUDA_CUDA_HEADERS_H_
 #define IREE_HAL_DRIVERS_CUDA_CUDA_HEADERS_H_
 
-#include "cuda.h"  // IWYU pragma: export
+#include <cuda.h>  // IWYU pragma: export
+
+#ifdef IREE_HAS_NCCL_HEADERS
+#include <nccl.h>  // IWYU pragma: export
+#endif
 
 #endif  // IREE_HAL_DRIVERS_CUDA_CUDA_HEADERS_H_
