@@ -268,6 +268,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize = {});
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
+                                       bool enablePeeling,
                                        bool lowerToAVX2 = false);
 void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager);
 

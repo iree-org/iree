@@ -323,7 +323,7 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
 }
 
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
-                                       bool lowerToAVX2) {
+                                       bool enablePeeling, bool lowerToAVX2) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -343,6 +343,7 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
   // Add the sandbox single tiling expert to tile and vectorize.
   {
     LinalgSingleTilingExpertPassOptions options;
+    options.peel = enablePeeling;
     options.vectorize = true;
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
