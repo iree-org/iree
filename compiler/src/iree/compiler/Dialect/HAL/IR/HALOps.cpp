@@ -818,6 +818,9 @@ static std::array<Value, 3> calculateWorkgroupCountFromRegion(
   BlockAndValueMapping bvm;
   bvm.map(body->getArgument(0), device);
   for (auto args : llvm::enumerate(workload)) {
+    assert(args.index() < body->getNumArguments() &&
+           "arg count in region computing workgroup count is greater than "
+           "workload");
     bvm.map(body->getArgument(/*device*/ 1 + args.index()), args.value());
   }
   for (Operation &op : body->without_terminator()) {

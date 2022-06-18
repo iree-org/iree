@@ -48,6 +48,24 @@ static FailureOr<Operation *> getRootOp(ArrayRef<Operation *> computeOps) {
   return failure();
 }
 
+/// Find the number of workload values. It is the number of loops of the last of
+/// the compute ops.
+/// TODO(ravishankarm): This is an implicit link between the way the dispatch is
+/// created and the backend codegen. Fix this by propagating the number of
+/// workload entries from Flow to HAL level.
+static FailureOr<unsigned> getNumWorkloadValues(
+    ArrayRef<Operation *> computeOps) {
+  if (computeOps.empty()) return failure();
+  PartitionableLoopsInterface tilingRoot =
+      dyn_cast<PartitionableLoopsInterface>(computeOps.back());
+  if (!tilingRoot) {
+    return tilingRoot->emitOpError(
+        "expected the root of tile and fuse operations to implement the "
+        "`PartitionableLoopsInterface`");
+  }
+  return tilingRoot.getNumLoops();
+}
+
 /// Method to find the root op, and based on the tile sizes and loops of the
 /// root op that are distributed, define the region on the
 /// `hal.executable.export` for the number of workgroups. Returns the tile
@@ -72,7 +90,12 @@ static LogicalResult defineWorkgroupCountRegion(
         "help define the workgroup count");
   }
 
-  unsigned numLoops = partitionableLoopInterface.getNumLoops();
+  FailureOr<unsigned> numWorkloadValues = getNumWorkloadValues(computeOps);
+  if (failed(numWorkloadValues)) {
+    return exportOp.emitOpError(
+        "unable to determined number of workload values");
+  }
+
   SmallVector<unsigned> partitionableLoops =
       partitionableLoopInterface.getPartitionableLoops(kNumMaxParallelDims);
 
@@ -86,17 +109,14 @@ static LogicalResult defineWorkgroupCountRegion(
   interchange.assign(rootOpConfig.getTileInterchangeVals(0));
 
   // Resize tile sizes to the number of loops setting inner loops to 0.
-  tileSizes.resize(numLoops, 0);
+  tileSizes.resize(*numWorkloadValues, 0);
   // Check that the interchange vector is also equal to the number of loops
   if (!interchange.empty()) {
-    if (interchange.size() < numLoops) {
-      auto seq = llvm::seq<int64_t>(interchange.size(), numLoops);
+    if (interchange.size() < *numWorkloadValues) {
+      auto seq = llvm::seq<int64_t>(interchange.size(), *numWorkloadValues);
       interchange.append(seq.begin(), seq.end());
     }
-    if (interchange.size() > numLoops) {
-      return rootOp.getValue()->emitOpError(
-          "intechange vector length cannot be greater than number of loops");
-    }
+    interchange.resize(*numWorkloadValues);
   }
   // For now assert that number of partitionable loops are less than the
   // supported max.
@@ -122,10 +142,10 @@ static LogicalResult defineWorkgroupCountRegion(
   bindSymbols(exportOp.getContext(), s0, s1);
   AffineMap numTilesMap = AffineMap::get(0, 2, s0.ceilDiv(s1));
   SmallVector<Value> numTiles;
-  numTiles.reserve(numLoops);
+  numTiles.reserve(*numWorkloadValues);
   builder.setInsertionPointToStart(entryBlock);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  for (auto loopNum : llvm::seq<unsigned>(0, numLoops)) {
+  for (auto loopNum : llvm::seq<unsigned>(0, *numWorkloadValues)) {
     Value workload = entryBlock->addArgument(indexType, loc);
     if (tileSizes[loopNum] == 0) {
       numTiles.push_back(one);
