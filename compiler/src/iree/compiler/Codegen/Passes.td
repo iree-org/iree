@@ -83,7 +83,7 @@ def OptimizeVectorTransfer :
 
 
 def TestPartitionableLoopsInterface :
-    Pass<"iree-codegen-test-partitionable-loop-interface", ""> {
+    Pass<"iree-codegen-test-partitionable-loops-interface", ""> {
   let summary = "Test the PartitionableLoopsInterface";
   let constructor = "mlir::iree_compiler::createTestPartitionableLoopsInterfacePass()";
 }
