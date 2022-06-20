@@ -107,7 +107,9 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_regression_cuda",
-    srcs = BACKEND_TESTS,
+    srcs = [
+        "large_reduction.mlir",
+    ] + BACKEND_TESTS,
     compiler_flags = ["--iree-input-type=mhlo"],
     driver = "cuda",
     tags = [

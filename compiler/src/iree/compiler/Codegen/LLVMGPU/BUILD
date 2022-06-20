@@ -28,6 +28,7 @@ iree_compiler_cc_library(
         "LLVMGPUVectorToGPU.cpp",
         "LLVMGPUVectorization.cpp",
         "Passes.cpp",
+        "VectorReductionToGPU.cpp",
         "Verifiers.cpp",
     ],
     hdrs = [
