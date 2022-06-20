@@ -40,7 +40,12 @@ iree_status_t iree_task_worker_initialize(
   out_worker->processor_id = 0;
   out_worker->processor_tag = 0;
 
-  iree_task_worker_state_t initial_state = IREE_TASK_WORKER_STATE_RUNNING;
+  iree_notification_initialize(&out_worker->wake_notification);
+  iree_notification_initialize(&out_worker->state_notification);
+  iree_atomic_task_slist_initialize(&out_worker->mailbox_slist);
+  iree_task_queue_initialize(&out_worker->local_task_queue);
+
+  iree_task_worker_state_t initial_state = IREE_TASK_WORKER_STATE_IDLE;
   if (executor->scheduling_mode &
       IREE_TASK_SCHEDULING_MODE_DEFER_WORKER_STARTUP) {
     // User is favoring startup latency vs. initial scheduling latency. Our
@@ -51,11 +56,6 @@ iree_status_t iree_task_worker_initialize(
   }
   iree_atomic_store_int32(&out_worker->state, initial_state,
                           iree_memory_order_seq_cst);
-
-  iree_notification_initialize(&out_worker->wake_notification);
-  iree_notification_initialize(&out_worker->state_notification);
-  iree_atomic_task_slist_initialize(&out_worker->mailbox_slist);
-  iree_task_queue_initialize(&out_worker->local_task_queue);
 
   iree_thread_create_params_t thread_params;
   memset(&thread_params, 0, sizeof(thread_params));
@@ -282,17 +282,20 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
     // structures we use.
     iree_wait_token_t wait_token =
         iree_notification_prepare_wait(&worker->wake_notification);
-    iree_atomic_task_affinity_set_fetch_and(&worker->executor->worker_idle_mask,
-                                            ~worker->worker_bit,
-                                            iree_memory_order_seq_cst);
-
-    // Check state to see if we've been asked to exit.
-    if (iree_atomic_load_int32(&worker->state, iree_memory_order_seq_cst) ==
-        IREE_TASK_WORKER_STATE_EXITING) {
-      // Thread exit requested - cancel pumping.
-      iree_notification_cancel_wait(&worker->wake_notification);
-      // TODO(benvanik): complete tasks before exiting?
-      break;
+    // State transition: IDLE -> PROCESSING
+    {
+      int32_t expected_state = IREE_TASK_WORKER_STATE_IDLE;
+      int32_t new_state = IREE_TASK_WORKER_STATE_PROCESSING;
+      iree_atomic_compare_exchange_strong_int32(
+          &worker->state, &expected_state, new_state, iree_memory_order_seq_cst,
+          iree_memory_order_seq_cst);
+      // If the old state wasn't IDLE then it is now stored in expected_state.
+      if (expected_state == IREE_TASK_WORKER_STATE_EXITING) {
+        // Thread exit requested - cancel pumping.
+        iree_notification_cancel_wait(&worker->wake_notification);
+        // TODO(benvanik): complete tasks before exiting?
+        break;
+      }
     }
 
     // TODO(benvanik): we could try to update the processor ID here before we
@@ -312,12 +315,16 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
       schedule_dirty = true;
     }
 
-    // We've finished all the work we have scheduled so set our idle flag.
+    // We've finished all the work we have scheduled so revert to IDLE state.
     // This ensures that if any other thread comes in and wants to give us
     // work we will properly coordinate/wake below.
-    iree_atomic_task_affinity_set_fetch_or(&worker->executor->worker_idle_mask,
-                                           worker->worker_bit,
-                                           iree_memory_order_seq_cst);
+    {
+      int32_t expected_state = IREE_TASK_WORKER_STATE_PROCESSING;
+      int32_t new_state = IREE_TASK_WORKER_STATE_IDLE;
+      iree_atomic_compare_exchange_strong_int32(
+          &worker->state, &expected_state, new_state, iree_memory_order_seq_cst,
+          iree_memory_order_seq_cst);
+    }
 
     // When we encounter a complete lack of work we can self-nominate to check
     // the global work queue and distribute work to other threads. Only one
@@ -366,11 +373,11 @@ static int iree_task_worker_main(iree_task_worker_t* worker) {
   // TODO(benvanik): call this after waking in case CPU hotplugging happens.
   iree_thread_request_affinity(worker->thread, worker->ideal_thread_affinity);
 
-  // Enter the running state immediately. Note that we could have been requested
+  // Enter the IDLE state immediately. Note that we could have been requested
   // to exit while suspended/still starting up, so check that here before we
   // mess with any data structures.
   const bool should_run =
-      iree_atomic_exchange_int32(&worker->state, IREE_TASK_WORKER_STATE_RUNNING,
+      iree_atomic_exchange_int32(&worker->state, IREE_TASK_WORKER_STATE_IDLE,
                                  iree_memory_order_seq_cst) !=
       IREE_TASK_WORKER_STATE_EXITING;
   if (IREE_LIKELY(should_run)) {

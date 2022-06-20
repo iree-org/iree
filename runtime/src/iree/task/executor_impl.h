@@ -86,22 +86,6 @@ struct iree_task_executor_t {
   // existing computation on the workers to finish).
   iree_task_poller_t poller;
 
-  // A bitset indicating which workers are live and usable; all attempts to
-  // push work onto a particular worker should check first with this mask. This
-  // may change over time either automatically or by user request ("don't use
-  // these cores for awhile I'm going to be using them" etc).
-  iree_atomic_task_affinity_set_t worker_live_mask;
-
-  // A bitset indicating which workers may be suspended and need to be resumed
-  // via iree_thread_resume prior to them being able to execute work.
-  iree_atomic_task_affinity_set_t worker_suspend_mask;
-
-  // A bitset indicating which workers are currently idle. Used to bias incoming
-  // tasks to workers that aren't doing much else. This is a balance of latency
-  // to wake the idle workers vs. latency to wait for existing work to complete
-  // on already woken workers.
-  iree_atomic_task_affinity_set_t worker_idle_mask;
-
   // Specifies how many workers threads there are.
   // For now this number is fixed per executor however if we wanted to enable
   // live join/leave behavior we could change this to a registration mechanism.

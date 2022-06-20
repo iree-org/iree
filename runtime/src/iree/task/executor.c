@@ -127,18 +127,7 @@ iree_status_t iree_task_executor_create(
     uint8_t* worker_local_memory =
         (uint8_t*)executor->workers + worker_list_size;
 
-    iree_task_affinity_set_t worker_idle_mask = 0;
-    iree_task_affinity_set_t worker_live_mask = 0;
-    iree_task_affinity_set_t worker_suspend_mask = 0;
     for (iree_host_size_t i = 0; i < worker_count; ++i) {
-      iree_task_affinity_set_t worker_bit = iree_task_affinity_for_worker(i);
-      worker_idle_mask |= worker_bit;
-      worker_live_mask |= worker_bit;
-      if (executor->scheduling_mode &
-          IREE_TASK_SCHEDULING_MODE_DEFER_WORKER_STARTUP) {
-        worker_suspend_mask |= worker_bit;
-      }
-
       iree_task_worker_t* worker = &executor->workers[i];
       status = iree_task_worker_initialize(
           executor, i, iree_task_topology_get_group(topology, i),
@@ -147,15 +136,6 @@ iree_status_t iree_task_executor_create(
       worker_local_memory += worker_local_memory_size;
       if (!iree_status_is_ok(status)) break;
     }
-    iree_atomic_task_affinity_set_store(&executor->worker_suspend_mask,
-                                        worker_suspend_mask,
-                                        iree_memory_order_relaxed);
-    iree_atomic_task_affinity_set_store(&executor->worker_idle_mask,
-                                        worker_idle_mask,
-                                        iree_memory_order_relaxed);
-    iree_atomic_task_affinity_set_store(&executor->worker_live_mask,
-                                        worker_live_mask,
-                                        iree_memory_order_release);
   }
 
   if (!iree_status_is_ok(status)) {
@@ -492,6 +472,11 @@ static iree_task_t* iree_task_executor_try_steal_task_from_affinity_set(
     worker_index += offset + 1;
     mask = iree_shr(mask, offset + 1);
     iree_task_worker_t* victim_worker = &executor->workers[victim_index];
+    if (iree_atomic_load_int32(&victim_worker->state,
+                               iree_memory_order_seq_cst) !=
+        IREE_TASK_WORKER_STATE_IDLE) {
+      continue;
+    }
 
     // Policy: steal a chunk of tasks at the tail of the victim queue.
     // This will steal multiple tasks from the victim up to the specified max
@@ -530,16 +515,6 @@ iree_task_t* iree_task_executor_try_steal_task(
     iree_task_queue_t* local_task_queue) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_task_affinity_set_t worker_live_mask =
-      iree_atomic_task_affinity_set_load(&executor->worker_live_mask,
-                                         iree_memory_order_acquire);
-  iree_task_affinity_set_t worker_idle_mask =
-      iree_atomic_task_affinity_set_load(&executor->worker_idle_mask,
-                                         iree_memory_order_relaxed);
-  // Limit the workers we will steal from to the ones that are currently live
-  // and not idle.
-  iree_task_affinity_set_t victim_mask = worker_live_mask & ~worker_idle_mask;
-
   // TODO(benvanik): it may be possible to rework this such that we better
   // use the prng; for example, instead of all this rotating stuff we could just
   // generate an 8-bit number (or even split it into two 4-bit numbers) per
@@ -553,13 +528,13 @@ iree_task_t* iree_task_executor_try_steal_task(
   // that we won't need to go back to main memory (or higher cache tiers) in the
   // event that the thief and victim are running close to each other in time.
   iree_task_t* task = iree_task_executor_try_steal_task_from_affinity_set(
-      executor, victim_mask & constructive_sharing_mask, max_theft_attempts,
-      rotation_offset, local_task_queue);
+      executor, constructive_sharing_mask, max_theft_attempts, rotation_offset,
+      local_task_queue);
   if (task) {
     IREE_TRACE_ZONE_APPEND_TEXT(z0, "local");
   } else {
     task = iree_task_executor_try_steal_task_from_affinity_set(
-        executor, victim_mask & ~constructive_sharing_mask, max_theft_attempts,
+        executor, ~constructive_sharing_mask, max_theft_attempts,
         rotation_offset, local_task_queue);
     if (task) {
       IREE_TRACE_ZONE_APPEND_TEXT(z0, "non-local");

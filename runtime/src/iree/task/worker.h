@@ -31,7 +31,7 @@ extern "C" {
 // the worker should transition to.
 //
 // Transition graph:
-//   SUSPENDED -> RUNNING (IDLE<->PROCESSING) -> EXITING -> ZOMBIE
+//   SUSPENDED -> (IDLE <-> PROCESSING) -> EXITING -> ZOMBIE
 //
 // NOTE: state values are ordered such that </> comparisons can be used; ensure
 // that for example all states after resuming are > SUSPENDED and all states
@@ -39,15 +39,17 @@ extern "C" {
 typedef enum iree_task_worker_state_e {
   // Worker has been created in a suspended state and must be resumed to wake.
   IREE_TASK_WORKER_STATE_SUSPENDED = 0,
-  // Worker is idle or actively processing tasks (either its own or others).
-  IREE_TASK_WORKER_STATE_RUNNING = 1,
+  // Worker is running, currently waiting for a task.
+  IREE_TASK_WORKER_STATE_IDLE = 1,
+  // Worker is running, has been given a task, and hasn't finished it yet.
+  IREE_TASK_WORKER_STATE_PROCESSING = 2,
   // Worker should exit (or is exiting) and will soon enter the zombie state.
   // Coordinators can request workers to exit by setting their state to this and
   // then waking.
-  IREE_TASK_WORKER_STATE_EXITING = 2,
+  IREE_TASK_WORKER_STATE_EXITING = 3,
   // Worker has exited and entered a 🧟 state (waiting for join).
   // The thread handle is still valid and must be destroyed.
-  IREE_TASK_WORKER_STATE_ZOMBIE = 3,
+  IREE_TASK_WORKER_STATE_ZOMBIE = 4,
 } iree_task_worker_state_t;
 
 // A worker within the executor pool.

@@ -32,21 +32,25 @@ iree_host_size_t iree_task_post_batch_worker_count(
   return post_batch->executor->worker_count;
 }
 
-static iree_host_size_t iree_task_post_batch_select_random_worker(
-    iree_task_post_batch_t* post_batch, iree_task_affinity_set_t affinity_set) {
-  iree_task_affinity_set_t worker_live_mask =
-      iree_atomic_task_affinity_set_load(
-          &post_batch->executor->worker_live_mask, iree_memory_order_acquire);
-  iree_task_affinity_set_t valid_worker_mask = affinity_set & worker_live_mask;
-  if (!valid_worker_mask) {
-    // No valid workers as desired; for now just bail to worker 0.
-    return 0;
-  }
-
+static bool iree_task_post_batch_select_random_worker(
+    iree_task_post_batch_t* post_batch, iree_task_affinity_set_t affinity_set,
+    iree_task_worker_state_t desired_state,
+    iree_host_size_t* out_selected_worker) {
   // TODO(benvanik): rotate through workers here. Instead, if the affinity set
   // has the current_worker allowed we just use that to avoid needing a
   // cross-thread hop.
-  return iree_task_affinity_set_count_trailing_zeros(valid_worker_mask);
+  while (affinity_set) {
+    iree_host_size_t trailing_zeros =
+        iree_task_affinity_set_count_trailing_zeros(affinity_set);
+    iree_task_worker_t* worker = &post_batch->executor->workers[trailing_zeros];
+    if (iree_atomic_load_int32(&worker->state, iree_memory_order_seq_cst) ==
+        desired_state) {
+      *out_selected_worker = trailing_zeros;
+      return true;
+    }
+    affinity_set = iree_shr(affinity_set, trailing_zeros + 1);
+  }
+  return false;
 }
 
 iree_host_size_t iree_task_post_batch_select_worker(
@@ -68,19 +72,25 @@ iree_host_size_t iree_task_post_batch_select_worker(
   // worker's queue to finish. Note that we only consider workers idle if we
   // ourselves in this batch haven't already queued work for them (as then they
   // aren't going to be idle).
-  iree_task_affinity_set_t worker_idle_mask =
-      iree_atomic_task_affinity_set_load(
-          &post_batch->executor->worker_idle_mask, iree_memory_order_relaxed);
-  worker_idle_mask &= ~post_batch->worker_pending_mask;
-  iree_task_affinity_set_t idle_affinity_set = affinity_set & worker_idle_mask;
-  if (idle_affinity_set) {
-    return iree_task_post_batch_select_random_worker(post_batch,
-                                                     idle_affinity_set);
+  iree_task_affinity_set_t nonpending_affinity_set =
+      affinity_set & ~post_batch->worker_pending_mask;
+  iree_host_size_t selected_worker;
+  if (iree_task_post_batch_select_random_worker(
+          post_batch, nonpending_affinity_set, IREE_TASK_WORKER_STATE_IDLE,
+          &selected_worker)) {
+    return selected_worker;
   }
 
-  // No more workers are idle; farm out at random. In the worst case work
+  // Fall back on workers currently processing a task. In the worst case work
   // stealing will help balance things out on the backend.
-  return iree_task_post_batch_select_random_worker(post_batch, affinity_set);
+  if (iree_task_post_batch_select_random_worker(
+          post_batch, affinity_set, IREE_TASK_WORKER_STATE_PROCESSING,
+          &selected_worker)) {
+    return selected_worker;
+  }
+
+  // Fall back on arbitrarily selecting worker 0 if this line is ever reached.
+  return 0;
 }
 
 void iree_task_post_batch_enqueue(iree_task_post_batch_t* post_batch,
@@ -100,50 +110,39 @@ static void iree_task_post_batch_wake_workers(
 
   iree_task_executor_t* executor = post_batch->executor;
 
-  // Wake workers that may be suspended. We fetch the set of workers we need to
-  // wake (hopefully none in the common case) and mark that we've woken them so
-  // that we don't double-resume.
-  iree_task_affinity_set_t resume_mask =
-      iree_atomic_task_affinity_set_fetch_and(&executor->worker_suspend_mask,
-                                              ~wake_mask,
-                                              iree_memory_order_acquire);
-  resume_mask &= wake_mask;
-  if (IREE_UNLIKELY(resume_mask)) {
-    int resume_count = iree_task_affinity_set_count_ones(resume_mask);
-    int worker_index = 0;
-    for (int i = 0; i < resume_count; ++i) {
-      int offset = iree_task_affinity_set_count_trailing_zeros(resume_mask) + 1;
-      int resume_index = worker_index + offset;
-      worker_index += offset + 1;
-      resume_mask = iree_shr(resume_mask, offset + 1);
-      iree_thread_resume(executor->workers[resume_index].thread);
+  if (IREE_UNLIKELY(wake_mask)) {
+    while (wake_mask) {
+      int wake_index =
+          iree_task_affinity_set_count_trailing_zeros(wake_mask) + 1;
+      if (wake_index >= post_batch->executor->worker_count) {
+        break;
+      }
+      iree_task_worker_t* worker = &executor->workers[wake_index];
+      wake_mask = iree_shr(wake_mask, wake_index + 1);
+      int32_t expected_state = IREE_TASK_WORKER_STATE_SUSPENDED;
+      int32_t new_state = IREE_TASK_WORKER_STATE_IDLE;
+      if (iree_atomic_compare_exchange_strong_int32(
+              &worker->state, &expected_state, new_state,
+              iree_memory_order_seq_cst, iree_memory_order_seq_cst)) {
+        iree_thread_resume(worker->thread);
+      }
+      // TODO(#4016): use a FUTEX_WAKE_BITSET here to wake all of the workers
+      // that have pending work in a single syscall (vs.
+      // popcnt(worker_pending_mask) syscalls). This will reduce wake latency
+      // for workers later in the set; for example today worker[31] will wait
+      // until workers[0-30] have had their syscalls performed before it's even
+      // requested to wake. This also loses information the kernel could use to
+      // avoid core migration as it knows when N threads will be needed
+      // simultaneously and can hopefully perform any needed migrations prior to
+      // beginning execution.
+      //
+      // Wake workers if they are waiting - workers are the only thing that can
+      // wait on this notification so this should almost always be either free
+      // (an atomic load) if a particular worker isn't waiting or it's required
+      // to actually wake it and we can't avoid it.
+      iree_notification_post(&worker->wake_notification, 1);
     }
   }
-
-  // TODO(#4016): use a FUTEX_WAKE_BITSET here to wake all of the workers that
-  // have pending work in a single syscall (vs. popcnt(worker_pending_mask)
-  // syscalls). This will reduce wake latency for workers later in the set;
-  // for example today worker[31] will wait until workers[0-30] have had their
-  // syscalls performed before it's even requested to wake. This also loses
-  // information the kernel could use to avoid core migration as it knows when N
-  // threads will be needed simultaneously and can hopefully perform any needed
-  // migrations prior to beginning execution.
-  int wake_count = iree_task_affinity_set_count_ones(wake_mask);
-  int worker_index = 0;
-  for (int i = 0; i < wake_count; ++i) {
-    int offset = iree_task_affinity_set_count_trailing_zeros(wake_mask);
-    int wake_index = worker_index + offset;
-    worker_index += offset + 1;
-    wake_mask = iree_shr(wake_mask, offset + 1);
-
-    // Wake workers if they are waiting - workers are the only thing that can
-    // wait on this notification so this should almost always be either free (an
-    // atomic load) if a particular worker isn't waiting or it's required to
-    // actually wake it and we can't avoid it.
-    iree_task_worker_t* worker = &executor->workers[wake_index];
-    iree_notification_post(&worker->wake_notification, 1);
-  }
-
   IREE_TRACE_ZONE_END(z0);
 }
 
