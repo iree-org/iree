@@ -34,9 +34,8 @@ class TaskTest : public ::testing::Test {
   }
 
   virtual void TearDown() {
-    iree_task_scope_deinitialize(&scope_);
-
     iree_task_executor_release(executor_);
+    iree_task_scope_deinitialize(&scope_);
   }
 
   // Submits a sequence of tasks with |head_task| at the head and |tail_task| at
