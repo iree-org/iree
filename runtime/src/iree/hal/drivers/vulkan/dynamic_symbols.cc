@@ -59,7 +59,7 @@ static constexpr const FunctionPtrInfo kDynamicFunctionPtrInfos[] = {
     IREE_VULKAN_DYNAMIC_SYMBOL_INSTANCE_DEVICE_TABLES(INS_PFN_FUNCTION_PTR,
                                                       DEV_PFN_FUNCTION_PTR)};
 
-static const char* kVulkanLoaderSearchNames[] = {
+static const char* kVulkanLoaderSearchNames[] = {NULL,
 #if defined(IREE_PLATFORM_ANDROID)
     "libvulkan.so",
 #elif defined(IREE_PLATFORM_IOS) || defined(IREE_PLATFORM_MACOS)

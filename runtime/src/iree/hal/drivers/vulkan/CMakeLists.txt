@@ -107,6 +107,10 @@ iree_cc_library(
     iree::hal::drivers::vulkan::util::ref_ptr
   PUBLIC
 )
+add_dependencies(iree_hal_drivers_vulkan_dynamic_symbols project_moltenVK)
+target_link_libraries(iree_hal_drivers_vulkan_dynamic_symbols PUBLIC moltenVK::runtime)
+# target_link_directories(iree_hal_drivers_vulkan_dynamic_symbols PUBLIC "/Users/nodlabs/nod/MoltenVK/Package/Latest/MoltenVK/MoltenVK.xcframework/macos-arm64_x86_64")
+# target_link_libraries(iree_hal_drivers_vulkan_dynamic_symbols PUBLIC "MoltenVK")
 
 iree_cc_test(
   NAME

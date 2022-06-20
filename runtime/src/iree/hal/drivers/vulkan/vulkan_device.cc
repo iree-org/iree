@@ -81,8 +81,8 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
   // extension are not fully conformant Vulkan implementations, the Vulkan
   // loader does not report those devices unless the application explicitly
   // asks for them.
-  ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_REQUIRED,
-          VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+  // ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_REQUIRED,
+  //         VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
 #endif
 
   // VK_KHR_storage_buffer_storage_class:

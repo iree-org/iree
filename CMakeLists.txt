@@ -613,6 +613,9 @@ if(IREE_HAL_DRIVER_VULKAN)
   add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 endif()
 
+if(APPLE AND IREE_HAL_DRIVER_VULKAN)
+  add_subdirectory(build_tools/third_party/moltenVK EXCLUDE_FROM_ALL)
+endif()
 # TODO(scotttodd): Iterate some more and find a better place for this.
 if(NOT CMAKE_CROSSCOMPILING)
   install(

@@ -39,6 +39,11 @@ endif()
 add_subdirectory(android)
 add_subdirectory(test)
 
+if(APPLE AND IREE_HAL_DRIVER_VULKAN)
+  # Add dependencies for Apple SoC GPU/MoltenVK.
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -framework QuartzCore -framework Metal -framework IOSurface -framework Cocoa -framework IOKit -framework CoreFoundation")
+endif()
+
 iree_cc_binary(
   NAME
     iree-benchmark-module
