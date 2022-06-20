@@ -321,12 +321,35 @@ void iree_notification_deinitialize(iree_notification_t* notification);
 // check to see if they need to do any additional work.
 // To notify all potential waiters pass IREE_ALL_WAITERS.
 //
-// Acts as (at least) a memory_order_release barrier:
-//   A store operation with this memory order performs the release operation: no
-//   reads or writes in the current thread can be reordered after this store.
-//   All writes in the current thread are visible in other threads that acquire
-//   the same atomic variable and writes that carry a dependency into the atomic
-//   variable become visible in other threads that consume the same atomic.
+// Acts as (at least) a memory_order_release store on `notification`.
+//
+// https://en.cppreference.com/w/cpp/atomic/memory_order#Release-Acquire_ordering
+//
+// Concretely this means that memory writes won't be reordered past this
+// from the point of view of another thread performing an acquire operation
+// (such as iree_notification_commit_wait) on the same `notification` object.
+//
+// Example:
+//
+//   Thread 1:
+//
+//     *some_value = 123;  // ordinary memory write (no atomic required)
+//     iree_notification_post(notification, ...);  // "release" atomic op
+//
+//    Thread 2:
+//
+//     iree_notification_commit_wait(notification, ...);  // "acquire" atomic op
+//     return some_value;  // ordinary memory read (no atomic required)
+//
+// Here, provided that both sides used the same `notification` object and that
+// the iree_notification_commit_wait actually observed the
+// iree_notification_post from Thread 1, it is guaranteed that the
+// `return some_value` on Thread 2 sees the value 123 written by Thread 1.
+//
+// On the Thread 1 side, the `*some_value = 123` cannot be reordered past the
+// iree_notification_post, thanks to `release` ordering.
+// On the Thread 2 side, the `return some_value` cannot be reordered before the
+// iree_notification_commit_wait thanks to `acquire` ordering.
 void iree_notification_post(iree_notification_t* notification, int32_t count);
 
 typedef uint32_t iree_wait_token_t;  // opaque
@@ -334,13 +357,8 @@ typedef uint32_t iree_wait_token_t;  // opaque
 // Prepares for a wait operation, returning a token that must be passed to
 // iree_notification_commit_wait to perform the actual wait.
 //
-// Acts as a memory_order_acq_rel barrier:
-//   A read-modify-write operation with this memory order is both an acquire
-//   operation and a release operation. No memory reads or writes in the current
-//   thread can be reordered before or after this store. All writes in other
-//   threads that release the same atomic variable are visible before the
-//   modification and the modification is visible in other threads that acquire
-//   the same atomic variable.
+// Acts as a memory_order_acq_rel (i.e. both acquire and release) load-store on
+// `notification`. See iree_notification_post comment.
 iree_wait_token_t iree_notification_prepare_wait(
     iree_notification_t* notification);
 
@@ -349,21 +367,18 @@ iree_wait_token_t iree_notification_prepare_wait(
 // is reached. Returns false if the deadline is reached before a notification is
 // posted.
 //
-// Acts as (at least) a memory_order_acquire barrier:
-//   A load operation with this memory order performs the acquire operation on
-//   the affected memory location: no reads or writes in the current thread can
-//   be reordered before this load. All writes in other threads that release the
-//   same atomic variable are visible in the current thread.
+// Acts as (at least) a memory_order_acquire load on `notification`.
+// See iree_notification_post comment.
 bool iree_notification_commit_wait(iree_notification_t* notification,
                                    iree_wait_token_t wait_token,
                                    iree_time_t deadline_ns);
 
 // Cancels a pending wait operation without blocking.
 //
-// Acts as (at least) a memory_order_relaxed barrier:
-//   Relaxed operation: there are no synchronization or ordering constraints
-//   imposed on other reads or writes, only this operation's atomicity is
-//   guaranteed.
+// Acts as (at least) a memory_order_relaxed operation on `notification`:
+// There are no synchronization or ordering constraints
+// imposed on other reads or writes, only this operation's atomicity is
+// guaranteed.
 void iree_notification_cancel_wait(iree_notification_t* notification);
 
 // Returns true if the condition is true.
