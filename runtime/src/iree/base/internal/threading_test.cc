@@ -126,15 +126,12 @@ TEST(ThreadTest, PriorityOverride) {
 
   struct entry_data_t {
     iree_atomic_int32_t value;
-    iree_notification_t barrier;
   } entry_data;
   iree_atomic_store_int32(&entry_data.value, 0, iree_memory_order_relaxed);
-  iree_notification_initialize(&entry_data.barrier);
   iree_thread_entry_t entry_fn = +[](void* entry_arg) -> int {
     auto* entry_data = reinterpret_cast<struct entry_data_t*>(entry_arg);
     iree_atomic_fetch_add_int32(&entry_data->value, 1,
-                                iree_memory_order_acq_rel);
-    iree_notification_post(&entry_data->barrier, IREE_ALL_WAITERS);
+                                iree_memory_order_release);
     return 0;
   };
 
@@ -155,15 +152,9 @@ TEST(ThreadTest, PriorityOverride) {
   EXPECT_NE(nullptr, override2);
 
   // Wait for the thread to finish.
-  iree_notification_await(
-      &entry_data.barrier,
-      +[](void* entry_arg) -> bool {
-        auto* entry_data = reinterpret_cast<struct entry_data_t*>(entry_arg);
-        return iree_atomic_load_int32(&entry_data->value,
-                                      iree_memory_order_relaxed) == 1;
-      },
-      &entry_data, iree_infinite_timeout());
-  iree_notification_deinitialize(&entry_data.barrier);
+  while (iree_atomic_load_int32(&entry_data.value, iree_memory_order_acquire) !=
+         1) {
+  }
 
   // Pop overrides (in opposite order intentionally).
   iree_thread_override_end(override0);
