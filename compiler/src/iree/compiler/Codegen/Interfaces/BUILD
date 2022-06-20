@@ -49,6 +49,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/Flow/TransformDialectExtensions:TransformDialectFlowExtensions",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
+        "@llvm-project//mlir:LinalgTransformOps",
     ],
 )
 

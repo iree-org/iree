@@ -92,6 +92,7 @@ set(_source_components
   MLIRPythonSources.Dialects.cf
   MLIRPythonSources.Dialects.func
   MLIRPythonSources.Dialects.pdl
+  MLIRPythonSources.Dialects.transform
   MLIRPythonSources.Passes
   IREEDialectsPythonSources
   IREEDialectsPythonExtensions

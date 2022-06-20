@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/TransformDialectExtensions/TransformDialectLLVMCPUExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformDialectExtensions/TransformDialectLLVMGPUExtensions.h"
 #include "iree/compiler/Dialect/Flow/TransformDialectExtensions/TransformDialectFlowExtensions.h"
+#include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -32,6 +33,7 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   registerTransformDialectFlowExtension(registry);
   registerTransformDialectLLVMCPUExtension(registry);
   registerTransformDialectLLVMGPUExtension(registry);
+  linalg::registerTransformDialectExtension(registry);
 }
 
 }  // namespace iree_compiler
