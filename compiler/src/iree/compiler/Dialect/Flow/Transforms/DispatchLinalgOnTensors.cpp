@@ -201,14 +201,28 @@ template <>
 SmallVector<Range> getLoopRanges<linalg::LinalgOp>(linalg::LinalgOp linalgOp,
                                                    Location loc,
                                                    PatternRewriter &rewriter) {
-  return linalgOp.createLoopRanges(rewriter, loc);
+  SmallVector<Range> loopRanges = linalgOp.createLoopRanges(rewriter, loc);
+  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  SmallVector<unsigned> reductionDims;
+  linalgOp.getReductionDims(reductionDims);
+  for (auto reductionDim : reductionDims) {
+    loopRanges[reductionDim].size = one;
+  }
+  return loopRanges;
 }
 
 template <>
 SmallVector<Range> getLoopRanges<IREE::LinalgExt::TiledOpInterface>(
     IREE::LinalgExt::TiledOpInterface tilableOp, Location loc,
     PatternRewriter &rewriter) {
-  return tilableOp.getIterationDomain(rewriter);
+  SmallVector<Range> loopRanges = tilableOp.getIterationDomain(rewriter);
+  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  for (auto iteratorType : llvm::enumerate(tilableOp.getLoopIteratorTypes())) {
+    if (iteratorType.value() == getReductionIteratorTypeName()) {
+      loopRanges[iteratorType.index()].size = one;
+    }
+  }
+  return loopRanges;
 }
 
 template <>
