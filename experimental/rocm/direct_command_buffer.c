@@ -245,12 +245,13 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_copy_buffer(
   hipDeviceptr_t source_device_buffer = iree_hal_rocm_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(source_buffer));
   source_offset += iree_hal_buffer_byte_offset(source_buffer);
+  hipDeviceptr_t dst = target_device_buffer + target_offset;
+  hipDeviceptr_t src = source_device_buffer + source_offset;
   // TODO(raikonenfnu): Currently using NULL stream, need to figure out way to
   // access proper stream from command buffer
   ROCM_RETURN_IF_ERROR(
       command_buffer->context->syms,
-      hipMemcpyAsync(target_device_buffer, source_device_buffer, length,
-                     hipMemcpyDeviceToDevice, 0),
+      hipMemcpyAsync(dst, src, length, hipMemcpyDeviceToDevice, 0),
       "hipMemcpyAsync");
   return iree_ok_status();
 }
