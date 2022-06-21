@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/GraphWriter.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
@@ -328,9 +329,7 @@ class DumpDispatchGraphPass
   }
 
   void annotateOperation(raw_ostream &os, Operation *op, AsmState &state) {
-    // A scalar constant op will be printed directly when printing the
-    // operand.
-    if (isScalarConstantOp(op)) return;
+    if (isa<arith::ConstantOp>(op)) return;
 
     if (isa<func::ReturnOp>(op)) return;
 
@@ -504,11 +503,8 @@ class DumpDispatchGraphPass
   Node processOperation(Operation *op) {
     Node node;
 
-    if (isScalarConstantOp(op)) {
-      // don't handle scalar constant because it creates too many edges
-      // from a single constant.
-      return node;
-    }
+    // Do not handle some noisy Operations.
+    if (isa<arith::ConstantOp>(op) || isa<Util::GlobalLoadOp>(op)) return node;
 
     if (op->getNumRegions() == 1) {
       // do not generate a cluster when there is one region.
