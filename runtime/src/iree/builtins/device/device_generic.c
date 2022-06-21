@@ -114,7 +114,15 @@ IREE_DEVICE_EXPORT float __gnu_h2f_ieee(short param) {
   return iree_h2f_ieee(param);
 }
 
+IREE_DEVICE_EXPORT float __extendhfsf2(short param) {
+  return iree_h2f_ieee(param);
+}
+
 IREE_DEVICE_EXPORT short __gnu_f2h_ieee(float param) {
+  return iree_f2h_ieee(param);
+}
+
+IREE_DEVICE_EXPORT short __truncsfhf2(float param) {
   return iree_f2h_ieee(param);
 }
 
