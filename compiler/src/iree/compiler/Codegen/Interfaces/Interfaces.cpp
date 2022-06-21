@@ -12,7 +12,11 @@
 // have a better registration mechanism.
 #include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
-#include "iree/compiler/Codegen/TransformDialectExtensions/TransformDialectExtensions.h"
+#include "iree/compiler/Codegen/Common/TransformDialectExtensions/TransformDialectCommonExtensions.h"
+#include "iree/compiler/Codegen/LLVMCPU/TransformDialectExtensions/TransformDialectLLVMCPUExtensions.h"
+#include "iree/compiler/Codegen/LLVMGPU/TransformDialectExtensions/TransformDialectLLVMGPUExtensions.h"
+#include "iree/compiler/Dialect/Flow/TransformDialectExtensions/TransformDialectFlowExtensions.h"
+#include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -25,7 +29,11 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   // TODO: when warranted, move to its own file.
   registry.addExtensions<IREE::LinalgExt::LinalgExtTransformOpsExtension,
                          transform_ext::StructuredTransformOpsExtension>();
-  registerLinalgTransformDialectExtension(registry);
+  registerTransformDialectCommonExtension(registry);
+  registerTransformDialectFlowExtension(registry);
+  registerTransformDialectLLVMCPUExtension(registry);
+  registerTransformDialectLLVMGPUExtension(registry);
+  linalg::registerTransformDialectExtension(registry);
 }
 
 }  // namespace iree_compiler

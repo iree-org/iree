@@ -60,9 +60,10 @@ namespace IREE {
 namespace Flow {
 
 /// External model implementation for all LinalgOps.
+template <typename OpTy>
 struct LinalgOpPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
-          LinalgOpPartitionableLoops, linalg::LinalgOp> {
+          LinalgOpPartitionableLoops<OpTy>, OpTy> {
   unsigned getNumLoops(Operation *op) const {
     auto linalgOp = cast<linalg::LinalgOp>(op);
     return linalgOp.getNumLoops();
@@ -102,9 +103,10 @@ struct Mmt4DOpPartitionableLoops
 
 /// External model implementation for all operations that implement the
 /// `TiledOpInterface`.
+template <typename OpTy>
 struct TiledOpInterfacePartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
-          TiledOpInterfacePartitionableLoops, LinalgExt::TiledOpInterface> {
+          TiledOpInterfacePartitionableLoops<OpTy>, OpTy> {
   unsigned getNumLoops(Operation *op) const {
     auto tiledOp = cast<LinalgExt::TiledOpInterface>(op);
     return tiledOp.getLoopIteratorTypes().size();
@@ -191,7 +193,7 @@ struct TensorInsertOpPartitionableLoops
 /// basis.
 template <typename OpTy>
 static void registerInterfaceForLinalgOps(MLIRContext *ctx) {
-  OpTy::template attachInterface<LinalgOpPartitionableLoops>(*ctx);
+  OpTy::template attachInterface<LinalgOpPartitionableLoops<OpTy>>(*ctx);
 }
 
 /// Specializations of the registration method to use a different external model
@@ -211,7 +213,8 @@ static void registerInterfaceForLinalgOps(MLIRContext *ctx) {
 /// Registers the `TiledOpInterfacePartitionableLoops` model for operations.
 template <typename OpTy>
 static void registerInterfaceForTiledOpInterfaceOps(MLIRContext *ctx) {
-  OpTy ::template attachInterface<TiledOpInterfacePartitionableLoops>(*ctx);
+  OpTy ::template attachInterface<TiledOpInterfacePartitionableLoops<OpTy>>(
+      *ctx);
 }
 
 /// Registers the external models for all TiledOpInterface operations.

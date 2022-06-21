@@ -519,7 +519,7 @@ static LogicalResult performEnablerTransformations(
   return failure(res.wasInterrupted());
 }
 
-LogicalResult transform_ext::CanonicalizedSequenceOp::apply(
+DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
     transform::TransformResults &results, transform::TransformState &state) {
 
   MLIRContext *ctx = getContext();
@@ -536,7 +536,7 @@ LogicalResult transform_ext::CanonicalizedSequenceOp::apply(
   auto detachListener = llvm::make_scope_exit(
       [&] { state.removeExtension<::detail::TrackingListener>(); });
   if (failed(mapBlockArguments(state)))
-    return failure();
+    return DiagnosedSilenceableFailure::definiteFailure();
 
   auto checkedListenerTransform =
       [&](function_ref<LogicalResult(Operation *, RewriteListener &)>
@@ -585,25 +585,26 @@ LogicalResult transform_ext::CanonicalizedSequenceOp::apply(
 
   LLVM_DEBUG(DBGS() << "begin canonicalizing sequence\n");
   if (failed(checkedListenerTransform(performCSE)))
-    return failure();
+    return DiagnosedSilenceableFailure::definiteFailure();
   if (failed(checkedListenerTransform(performCanonicalization)))
-    return failure();
+    return DiagnosedSilenceableFailure::definiteFailure();
 
   // Apply the sequenced ops one by one.
   for (Operation &transform : getBodyBlock()->without_terminator()) {
-    if (failed(state.applyTransform(
-            cast<transform::TransformOpInterface>(transform)))) {
+    DiagnosedSilenceableFailure result =
+        state.applyTransform(cast<transform::TransformOpInterface>(transform));
+    if (!result.succeeded()) {
       LLVM_DEBUG(DBGS() << "failed: " << transform << "\n");
-      return failure();
+      return result;
     }
     LLVM_DEBUG(DBGS() << "successfully performed: " << transform << "\n");
 
     if (failed(checkedListenerTransform(performCSE)))
-      return failure();
+      return DiagnosedSilenceableFailure::definiteFailure();
     if (failed(checkedListenerTransform(performEnabler)))
-      return failure();
+      return DiagnosedSilenceableFailure::definiteFailure();
     if (failed(checkedListenerTransform(performCanonicalization)))
-      return failure();
+      return DiagnosedSilenceableFailure::definiteFailure();
   }
 
   // Forward the operation mapping for values yielded from the sequence to the
@@ -617,7 +618,7 @@ LogicalResult transform_ext::CanonicalizedSequenceOp::apply(
   }
 
   LLVM_DEBUG(DBGS() << "end canonicalizing sequence\n");
-  return success();
+  return DiagnosedSilenceableFailure::success();
 }
 
 /// Returns `true` if the given op operand may be consuming the handle value in
@@ -793,7 +794,7 @@ static void applyBufferizationEnablingTransformations(ModuleOp moduleOp) {
   (void)applyPatternsAndFoldGreedily(moduleOp, std::move(patterns));
 }
 
-LogicalResult
+DiagnosedSilenceableFailure
 transform_ext::BufferizeOp::apply(mlir::transform::TransformResults &result,
                                   mlir::transform::TransformState &state) {
   bufferization::OneShotBufferizationOptions options;
@@ -806,19 +807,19 @@ transform_ext::BufferizeOp::apply(mlir::transform::TransformResults &result,
   auto moduleOp = cast<ModuleOp>(state.getTopLevel());
   applyBufferizationEnablingTransformations(moduleOp);
   if (failed(runOneShotModuleBufferize(moduleOp, options)))
-    return failure();
+    return DiagnosedSilenceableFailure::definiteFailure();
 
   // Perform buffer-level hoistings.
   state.getTopLevel()->walk(
       [&](func::FuncOp funcOp) { hoistRedundantVectorTransfers(funcOp); });
-  return success();
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
 // LowerToLLVMOp
 //===---------------------------------------------------------------------===//
 
-LogicalResult
+DiagnosedSilenceableFailure
 transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
                                     mlir::transform::TransformState &state) {
   // TODO: it is feasible to scope lowering at arbitrary level and introduce
@@ -854,7 +855,7 @@ transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
   pm.addPass(createConvertFuncToLLVMPass());
   pm.addPass(createReconcileUnrealizedCastsPass());
   if (failed(pm.run(state.getTopLevel())))
-    return failure();
+    return DiagnosedSilenceableFailure::definiteFailure();
 
   // Make all arguments noalias for now.
   // FIXME: this is a terrible hack!
@@ -867,7 +868,7 @@ transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
       funcOp.setArgAttr(i, "llvm.noalias", UnitAttr::get(funcOp.getContext()));
     }
   });
-  return success();
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
@@ -887,7 +888,7 @@ static bool stageIncluded(int stage,
 
 // Applies the transformation specified by the given lower vectors operation
 /// to the given function.
-LogicalResult
+DiagnosedSilenceableFailure
 transform_ext::LowerVectorsOp::apply(mlir::transform::TransformResults &results,
                                      mlir::transform::TransformState &state) {
   MLIRContext *ctx = getContext();
@@ -979,29 +980,29 @@ transform_ext::LowerVectorsOp::apply(mlir::transform::TransformResults &results,
   // LinalgTransformationFilter filter = makeTransformationFilter(target);
   if (failed(applyPatternsAndFoldGreedily(state.getTopLevel(),
                                           std::move(patterns))))
-    return failure();
+    return DiagnosedSilenceableFailure::definiteFailure();
 
   // TODO: make composable...
-  return success();
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
 // PrintOp
 //===---------------------------------------------------------------------===//
 
-LogicalResult
+DiagnosedSilenceableFailure
 transform_ext::PrintOp::apply(mlir::transform::TransformResults &results,
                               mlir::transform::TransformState &state) {
   if (!getTarget()) {
     llvm::outs() << "[[[ IR printer: " << getName() << " top-level ]]]\n";
     state.getTopLevel()->dump();
-    return success();
+    return DiagnosedSilenceableFailure::success();
   }
 
   llvm::outs() << "[[[ IR printer: " << getName() << " single op ]]]\n";
   ArrayRef<Operation *> targets = state.getPayloadOps(getTarget());
   targets.front()->dump();
-  return success();
+  return DiagnosedSilenceableFailure::success();
 }
 
 void transform_ext::PrintOp::getEffects(

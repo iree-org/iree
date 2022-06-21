@@ -141,6 +141,7 @@ VULKAN_SRCS = enforce_glob(
         "bitwise_xor.mlir",
         "ceil.mlir",
         "clamp.mlir",
+        "clz.mlir",
         "const.mlir",
         "equal.mlir",
         "exp.mlir",
@@ -174,9 +175,6 @@ VULKAN_SRCS = enforce_glob(
         "while.mlir",
     ],
     include = ["*.mlir"],
-    exclude = [
-        "clz.mlir",  # Fails only on Adreno GPUs
-    ],
 )
 
 iree_check_single_backend_test_suite(

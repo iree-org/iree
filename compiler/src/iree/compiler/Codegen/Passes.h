@@ -219,6 +219,9 @@ createLLVMCPUSynchronizeSymbolVisibilityPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUTileFuseAndVectorizePass(bool lowerToVectors = true);
 
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUAArch64VectorLoweringPass();
+
 /// Replaces llvm.intr.fma with its unfused mul and add ops.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUUnfuseFMAOpsPass();
 
@@ -268,6 +271,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize = {});
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
+                                       bool enablePeeling,
                                        bool lowerToAVX2 = false);
 void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager);
 

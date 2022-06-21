@@ -207,6 +207,7 @@ struct LinalgSingleTilingExpertPass
     this->generalize = options.generalize;
     this->iteratorInterchange = options.iteratorInterchange;
     this->decomposeToLowerDimOp = options.decomposeToLowerDimOp;
+    this->peel = options.peel;
     this->vectorize = options.vectorize;
     this->vectorizePadding = options.vectorizePadding;
     this->tilingLevel = options.tilingLevel;
@@ -412,6 +413,30 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
       SmallVector<int64_t>{hoistPaddings.begin(), hoistPaddings.end()});
   paddingOptions.setTransposePaddings(transposePaddingVectors);
 
+  // Gather tiled loops that aren't distribution loops from previous tiling
+  // stages.
+  LinalgPeelOptions peelingOptions;
+  peelingOptions.loopsToPeelComputationFunction =
+      [&](OpBuilder &builder, Operation *op,
+          SmallVectorImpl<scf::ForOp> &loopsToPeel) {
+        if (!tilingOptions.tileSizeComputationFunction) return;
+
+        auto maxNumLoopsToPeel =
+            tilingOptions.tileSizeComputationFunction(builder, op).size();
+
+        Operation *currentOp = op;
+        for (int i = 0; i < maxNumLoopsToPeel; ++i) {
+          currentOp = currentOp->getParentOfType<scf::ForOp>();
+          auto loop = llvm::cast_or_null<scf::ForOp>(currentOp);
+          if (!loop || iree_compiler::isTiledAndDistributedLoop(loop)) {
+            break;
+          }
+          loopsToPeel.push_back(loop);
+        }
+
+        std::reverse(loopsToPeel.begin(), loopsToPeel.end());
+      };
+
   CodegenStrategy strategy;
   StringRef genericOpName = GenericOp::getOperationName();
   strategy.tileIf(doTiling, anchorOpName, tilingOptions)
@@ -419,6 +444,7 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
       .decomposeIf(decomposeToLowerDimOp)
       .generalizeIf(generalize, anchorOpName)
       .interchangeIf(!iteratorInterchange.empty(), iteratorInterchange)
+      .peelIf(peel, generalize ? genericOpName : anchorOpName, peelingOptions)
       .vectorizeIf(vectorize, generalize ? genericOpName : anchorOpName,
                    nullptr, vectorizePadding);
 
@@ -482,6 +508,7 @@ void LinalgVectorLoweringPass::runOnOperation() {
           .enableTransferPartialRewrite(vectorLoweringStage >= 2 &&
                                         vectorTransferSplit !=
                                             vector::VectorTransferSplit::None)
+
           // Set the maximum vector load / store rank.
           .setMaxTransferRank(maxTransferRank)
           // Lower vector.transfer to vector.transfer of max rank.

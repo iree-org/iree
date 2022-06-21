@@ -57,7 +57,7 @@ struct WorkgroupIdOpInterface
 
 struct WorkgroupCountOpInterface
     : public ProcessorCountInterface::ExternalModel<
-          WorkgroupCountOpInterface, IREE::HAL::InterfaceWorkgroupIDOp> {
+          WorkgroupCountOpInterface, IREE::HAL::InterfaceWorkgroupCountOp> {
   unsigned getDimIndex(Operation *op) const {
     return cast<IREE::HAL::InterfaceWorkgroupCountOp>(op)
         .dimension()
@@ -67,7 +67,7 @@ struct WorkgroupCountOpInterface
 
 struct WorkgroupTileSizeOpInterface
     : public ProcessorTileSizeInterface::ExternalModel<
-          WorkgroupTileSizeOpInterface, IREE::HAL::InterfaceWorkgroupIDOp> {
+          WorkgroupTileSizeOpInterface, IREE::HAL::InterfaceWorkgroupSizeOp> {
   unsigned getDimIndex(Operation *op) const {
     return cast<IREE::HAL::InterfaceWorkgroupSizeOp>(op)
         .dimension()

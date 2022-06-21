@@ -132,7 +132,6 @@ static LogicalResult runIREEOneShotBufferize(
     Operation *op, const OneShotBufferizationOptions &options) {
   OneShotAnalysisState state(op, options);
   if (failed(analyzeOp(op, state))) return failure();
-  if (failed(createSubSpanBuffers(op, state))) return failure();
   if (options.testAnalysisOnly) return success();
   return bufferizeOp(op, state);
 }
@@ -147,7 +146,6 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   options.memCpyFn = memCpyFn;
   options.testAnalysisOnly = testAnalysisOnly;
   options.printConflicts = printConflicts;
-  options.alwaysAliasingWithDest = true;
 
   // bufferization.to_memref is used to bufferize constants in IREE. IREE has
   // it's own logic to handle constants. We'd like to leave the arith.constant

@@ -478,7 +478,7 @@ LogicalResult CompositeAttr::serializeToStream(llvm::support::endianness endian,
 // byte buffers.
 struct SerializableDenseElementsAttrModel
     : public SerializableAttrInterface::ExternalModel<
-          SerializableDenseElementsAttrModel, ElementsAttr> {
+          SerializableDenseElementsAttrModel, DenseIntOrFPElementsAttr> {
   int64_t getStorageSize(Attribute baseAttr) const {
     auto attr = baseAttr.cast<ElementsAttr>();
     int32_t bitwidth = attr.getType().getElementTypeBitWidth();

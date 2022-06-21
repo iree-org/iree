@@ -1,4 +1,4 @@
-# Copyright 2019 The IREE Authors
+# Copyright 2022 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -19,7 +19,7 @@ td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
-            "TransformDialectExtensionsOps.td",
+            "TransformDialectLLVMGPUExtensionsOps.td",
         ],
         include = ["*.td"],
     ),
@@ -31,60 +31,43 @@ td_library(
 )
 
 iree_gentbl_cc_library(
-    name = "TransformDialectExtensionsOpGen",
+    name = "TransformDialectLLVMGPUExtensionsOpGen",
     tbl_outs = [
         (
             ["--gen-op-decls"],
-            "TransformDialectExtensionsOps.h.inc",
+            "TransformDialectLLVMGPUExtensionsOps.h.inc",
         ),
         (
             ["--gen-op-defs"],
-            "TransformDialectExtensionsOps.cpp.inc",
+            "TransformDialectLLVMGPUExtensionsOps.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "TransformDialectExtensionsOps.td",
+    td_file = "TransformDialectLLVMGPUExtensionsOps.td",
     deps = [":td_files"],
 )
 
 iree_compiler_cc_library(
-    name = "TransformDialectExtensions",
+    name = "TransformDialectLLVMGPUExtensions",
     srcs = [
-        "TransformDialectExtensions.cpp",
-        "TransformDialectExtensionsOps.cpp.inc",
+        "TransformDialectLLVMGPUExtensions.cpp",
+        "TransformDialectLLVMGPUExtensionsOps.cpp.inc",
     ],
     hdrs = [
-        "TransformDialectExtensions.h",
-        "TransformDialectExtensionsOps.h.inc",
+        "TransformDialectLLVMGPUExtensions.h",
+        "TransformDialectLLVMGPUExtensionsOps.h.inc",
     ],
     deps = [
-        ":TransformDialectExtensionsOpGen",
-        "//compiler/src/iree/compiler/Codegen",
-        "//compiler/src/iree/compiler/Codegen:PassHeaders",
-        "//compiler/src/iree/compiler/Codegen/Common",
-        "//compiler/src/iree/compiler/Codegen/Interfaces:BufferizationInterfaces",
-        "//compiler/src/iree/compiler/Codegen/Transforms",
-        "//compiler/src/iree/compiler/Codegen/Utils",
-        "//compiler/src/iree/compiler/Dialect/Flow/IR",
+        ":TransformDialectLLVMGPUExtensionsOpGen",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
-        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
-        "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
-        "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:AffineDialect",
-        "@llvm-project//mlir:AffineUtils",
         "@llvm-project//mlir:ArithmeticDialect",
-        "@llvm-project//mlir:BufferizationDialect",
-        "@llvm-project//mlir:BufferizationTransforms",
         "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LinalgDialect",
-        "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",
-        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TransformDialect",
-        "@llvm-project//mlir:TransformUtils",
     ],
 )
