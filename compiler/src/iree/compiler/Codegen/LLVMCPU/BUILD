@@ -17,6 +17,7 @@ iree_compiler_cc_library(
     srcs = [
         "ConvertToLLVM.cpp",
         "KernelDispatch.cpp",
+        "LLVMCPUAArch64VectorLowering.cpp",
         "LLVMCPUCheckIRBeforeLLVMConversion.cpp",
         "LLVMCPUEmitVectorizationRemarks.cpp",
         "LLVMCPULowerExecutableTarget.cpp",
