@@ -32,7 +32,9 @@ func.func @simple_reduce() {
 //   CHECK-DAG:   %[[C8:.*]] = arith.constant 8 : i32
 //   CHECK-DAG:   %[[C16:.*]] = arith.constant 16 : i32
 //   CHECK-DAG:   %[[C32:.*]] = arith.constant 32 : i32
+//   CHECK-DAG:   %[[C32I:.*]] = arith.constant 32 : index
 //   CHECK-DAG:   %[[TID:.*]] = gpu.thread_id  x
+//   CHECK-DAG:   %[[LID:.*]] = arith.remui %[[TID]], %[[C32I]] : index
 //   CHECK-DAG:   %[[VCST:.*]] = arith.constant dense<0.000000e+00> : vector<1xf32>
 //       CHECK:   %[[F:.*]] = scf.for %{{.*}} = %{{.*}} to %{{.*}} step %{{.*}} iter_args(%[[V0:.*]] = %[[VCST]]) -> (vector<1xf32>) {
 //       CHECK:     %[[ID:.*]] = affine.apply
@@ -53,7 +55,7 @@ func.func @simple_reduce() {
 //       CHECK:     scf.yield %[[ADD]] : vector<1xf32>
 //       CHECK:   }
 //       CHECK:   %[[DIV:.*]] = arith.divf %[[F]], %{{.*}} : vector<1xf32>
-//       CHECK:   %[[CMP:.*]] = arith.cmpi eq, %[[TID]], %[[C0]] : index
+//       CHECK:   %[[CMP:.*]] = arith.cmpi eq, %[[LID]], %[[C0]] : index
 //       CHECK:   scf.if %[[CMP]] {
 //       CHECK:     vector.transfer_write %[[DIV]], {{.*}} : vector<1xf32>, memref<128xf32>
 //       CHECK:   }
