@@ -431,18 +431,17 @@ static LogicalResult setUserConfig(
 // TODO: this should be part of LinalgOp interface, the equivalent member
 // function currently only support the case where all the dimensions are static
 // while we want to support dynamic shapes.
-static int64_t getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
+static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
   for (auto map : llvm::enumerate(op.getIndexingMaps())) {
     for (auto dim : llvm::enumerate(map.value().getResults())) {
-      if (dim.value().cast<AffineDimExpr>().getPosition() == d)
-        return op->getOperand(map.index())
-            .getType()
-            .cast<ShapedType>()
-            .getDimSize(dim.index());
+      if (dim.value().cast<AffineDimExpr>().getPosition() == d) {
+        auto type = op->getOperand(map.index()).getType().cast<ShapedType>();
+        if (type.isDynamicDim(dim.index())) return llvm::None;
+        return type.getDimSize(dim.index());
+      }
     }
   }
-  assert("unknown dim");
-  return 0;
+  return llvm::None;
 }
 
 /// Set the configuration for reductions that can be mapped to warp reductions.
@@ -466,15 +465,17 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   if (!matchReduction(op.getRegionOutputArgs(), 0, combinerOps) ||
       combinerOps.size() != 1)
     return failure();
-  int64_t dimSize = getLinalgDimSize(op, reductionDims[0]);
-  if (dimSize % cudaWarpSize != 0) return failure();
+  Optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
+  if (!dimSize || *dimSize % cudaWarpSize != 0) return failure();
   SmallVector<unsigned> parallelDims;
   op.getParallelDims(parallelDims);
   unsigned *innerParallelDim =
       std::max_element(parallelDims.begin(), parallelDims.end());
-  int64_t innerParallelDimSize = getLinalgDimSize(op, *innerParallelDim);
+  Optional<int64_t> innerParallelDimSize =
+      getLinalgDimSize(op, *innerParallelDim);
 
-  int64_t numWarps = (innerParallelDimSize % 2 == 0) ? 2 : 1;
+  int64_t numWarps =
+      (innerParallelDimSize && (*innerParallelDimSize % 2 == 0)) ? 2 : 1;
 
   std::array<int64_t, 3> workgroupSize = {numWarps * cudaWarpSize, 1, 1};
 

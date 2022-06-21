@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
@@ -109,15 +110,21 @@ struct LLVMGPUReduceToGPUPass
     }
 
     // 2. Create the warp op and move the function body into it.
+    const int warpSize = 32;
     Location loc = funcOp.getLoc();
     OpBuilder builder(funcOp);
     auto threadX = builder.create<gpu::ThreadIdOp>(loc, builder.getIndexType(),
                                                    gpu::Dimension::x);
+    auto cstWarpSize = builder.create<arith::ConstantIndexOp>(loc, warpSize);
+    auto laneId =
+        builder.create<arith::RemUIOp>(loc, threadX.getResult(), cstWarpSize);
     auto warpOp = builder.create<vector::WarpExecuteOnLane0Op>(
-        loc, TypeRange(), threadX.getResult(), 32);
+        loc, TypeRange(), laneId, warpSize);
     warpOp.getWarpRegion().takeBody(funcOp.getBody());
     Block &newBlock = funcOp.getBody().emplaceBlock();
     threadX->moveBefore(&newBlock, newBlock.end());
+    cstWarpSize->moveBefore(&newBlock, newBlock.end());
+    laneId->moveBefore(&newBlock, newBlock.end());
     warpOp->moveBefore(&newBlock, newBlock.end());
     warpOp.getWarpRegion().getBlocks().back().back().moveBefore(&newBlock,
                                                                 newBlock.end());
