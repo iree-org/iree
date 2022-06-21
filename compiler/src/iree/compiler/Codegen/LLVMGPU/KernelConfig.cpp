@@ -448,6 +448,7 @@ static int64_t getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                             linalg::LinalgOp op) {
+  if (!isa<linalg::GenericOp>(op)) return failure();
   SmallVector<unsigned> reductionDims;
   op.getReductionDims(reductionDims);
   if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
@@ -482,7 +483,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
           .getPartitionableLoops(kNumMaxParallelDims);
   llvm::SmallDenseSet<unsigned, 4> partitionedLoopsSet;
   partitionedLoopsSet.insert(partitionedLoops.begin(), partitionedLoops.end());
-  size_t numLoops = partitionedLoops.back() + 1;
+  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
   // Don't try to vectorize the store op right now.
   unsigned vectorSize = 1;

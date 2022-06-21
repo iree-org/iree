@@ -40,6 +40,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineToStandard
+    MLIRAnalysis
     MLIRArithmeticDialect
     MLIRArithmeticToLLVM
     MLIRArithmeticTransforms
