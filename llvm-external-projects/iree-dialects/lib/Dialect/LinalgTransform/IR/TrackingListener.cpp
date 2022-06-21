@@ -6,11 +6,11 @@
 
 #include "iree-dialects/Dialect/LinalgTransform/TrackingListener.h"
 
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
-#include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 #define DEBUG_TYPE "tracking-listener"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
