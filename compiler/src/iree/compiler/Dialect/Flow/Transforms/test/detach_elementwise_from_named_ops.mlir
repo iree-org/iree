@@ -49,8 +49,24 @@ func.func @batch_matmul(%a: tensor<?x8x?xi32>, %b: tensor<?x?x16xi32>, %c: tenso
 //  CHECK-SAME:     ins(%[[A]], %[[B]] : tensor<?x8x?xi32>, tensor<?x?x16xi32>)
 //  CHECK-SAME:     outs(%[[FILL]] : tensor<?x8x16xi32>)
 //       CHECK:   %[[EW:.+]] = linalg.generic
-//  CHECK-SAME:     ins(%[[MM]], %arg2 : tensor<?x8x16xi32>, tensor<?x8x16xi32>)
+//  CHECK-SAME:     ins(%[[MM]], %[[C]] : tensor<?x8x16xi32>, tensor<?x8x16xi32>)
 //  CHECK-SAME:     outs(%[[FILL]] : tensor<?x8x16xi32>)
 //       CHECK:     %[[ADD:.+]] = arith.addi
 //       CHECK:     linalg.yield %[[ADD]] : i32
 //       CHECK:   return %[[EW]]
+
+// -----
+
+func.func @conv(%input: tensor<1x225x225x3xf32>, %filter: tensor<3x3x3x32xf32>, %init: tensor<1x112x112x32xf32>) -> tensor<1x112x112x32xf32> {
+  %0 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
+    ins(%input, %filter : tensor<1x225x225x3xf32>, tensor<3x3x3x32xf32>) outs(%init : tensor<1x112x112x32xf32>) -> tensor<1x112x112x32xf32>
+  return %0 : tensor<1x112x112x32xf32>
+}
+
+// CHECK-LABEL: func @conv
+//  CHECK-SAME: (%{{.+}}: tensor<1x225x225x3xf32>, %{{.+}}: tensor<3x3x3x32xf32>, %[[INIT:.+]]: tensor<1x112x112x32xf32>)
+//       CHECK:   %[[FILL:.+]] = linalg.fill
+//       CHECK:   %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     ins(%[[CONV]], %[[INIT]] : tensor<1x112x112x32xf32>, tensor<1x112x112x32xf32>)
+//  CHECK-SAME:     outs(%[[FILL]] : tensor<1x112x112x32xf32>)

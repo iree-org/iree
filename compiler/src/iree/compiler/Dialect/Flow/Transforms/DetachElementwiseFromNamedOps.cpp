@@ -31,16 +31,21 @@ namespace Flow {
 namespace {
 
 struct DetachElementwisePattern
-    : public OpInterfaceRewritePattern<linalg::ContractionOpInterface> {
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::ContractionOpInterface interfaceOp,
+  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    auto linalgOp = cast<linalg::LinalgOp>(interfaceOp.getOperation());
+    if (!linalg::isaContractionOpInterface(linalgOp) &&
+        !isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
+      return failure();
+    }
     if (!linalgOp.hasTensorSemantics()) return failure();
 
     // Nothing to do if the output tensor operand is already a fill op.
     linalg::OpOperandVector outputOperands = linalgOp.getOutputTensorOperands();
+    // Right now all the cases we see have one output. This can be relaxed once
+    // we see multiple output ops.
     if (outputOperands.size() != 1) return failure();
     Value outputOperand = outputOperands.front()->get();
     if (outputOperand.getDefiningOp<linalg::FillOp>()) return failure();
@@ -49,7 +54,7 @@ struct DetachElementwisePattern
     if (!outputType.getElementType().isIntOrFloat()) return failure();
     auto elementType = outputType.getElementType();
 
-    Location loc = interfaceOp.getLoc();
+    Location loc = linalgOp.getLoc();
 
     // Create a zero tensor as the new output tensor operand to the Linalg
     // contraction op.
