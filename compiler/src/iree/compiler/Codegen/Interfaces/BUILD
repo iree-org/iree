@@ -23,7 +23,7 @@ td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
-            "PartitionableLoopsInterfaces.td",
+            "PartitionableLoopsInterface.td",
             "ProcessorOpInterfaces.td",
         ],
         include = ["*.td"],
