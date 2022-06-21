@@ -800,3 +800,51 @@ hal.executable @mma_fused_fp16 {
 // Just check that compilation succeed.
 //     CHECK-LABEL: hal.executable public @pooling_dynamic
 //           CHECK:   hal.executable.variant public @cuda
+
+// -----
+
+#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
+#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 16384)>
+#map2 = affine_map<(d0)[s0] -> (-d0 + 16384, s0)>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
+#map4 = affine_map<(d0, d1) -> (d0)>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable @warp_reduction_dispatch {
+hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.export @warp_reduction_dispatch layout(#executable_layout)
+  builtin.module {
+    func.func @warp_reduction_dispatch() {
+      %c0 = arith.constant 0 : index
+      %c16384 = arith.constant 16384 : index
+      %cst = arith.constant 1.000000e+00 : f32
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:512x16384xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:512xf32>
+      %5 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [512, 16384], strides = [1, 1]
+          : !flow.dispatch.tensor<readonly:512x16384xf32> -> tensor<512x16384xf32>
+      %8 = linalg.init_tensor [512] : tensor<512xf32>
+      %9 = linalg.fill ins(%cst : f32) outs(%8 : tensor<512xf32>) -> tensor<512xf32>
+      %10 = linalg.generic {
+          indexing_maps = [#map3, #map4], iterator_types = ["parallel", "reduction"]}
+          ins(%5 : tensor<512x16384xf32>) outs(%9 : tensor<512xf32>) {
+        ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
+          %11 = arith.addf %arg1, %arg2 : f32
+          linalg.yield %11 : f32
+        } -> tensor<512xf32>
+      flow.dispatch.tensor.store %10, %1, offsets = [0], sizes = [512], strides = [1]
+          : tensor<512xf32> -> !flow.dispatch.tensor<writeonly:512xf32>
+      return
+    }
+  }
+}
+}
+
+// Check that we generate a warp reduce code sequence.
+//   CHECK-LABEL: hal.executable public @warp_reduction_dispatch
+//         CHECK:   hal.executable.variant public @cuda
+// CHECK-COUNT-5:     nvvm.shfl.sync  bfly
+

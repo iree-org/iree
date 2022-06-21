@@ -341,6 +341,12 @@ def LLVMGPUVectorToGPU :
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorToGPU()";
 }
 
+def LLVMGPUReduceToGPU :
+    Pass<"iree-llvmgpu-reduction-to-gpu", "func::FuncOp"> {
+  let summary = "Convert vector reduction to gpu ops.";
+  let constructor = "mlir::iree_compiler::createConvertVectorReductionToGPUPass()";
+}
+
 //------------------------------------------------------------------------------
 // SPIR-V
 //------------------------------------------------------------------------------

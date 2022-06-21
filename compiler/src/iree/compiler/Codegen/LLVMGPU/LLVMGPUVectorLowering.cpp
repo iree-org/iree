@@ -27,6 +27,27 @@ struct LLVMGPUVectorLoweringPass
   }
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
+
+    {
+      // Lower high level vector operations like contract or multidim reduce ops
+      // to lower level vector ops.
+      RewritePatternSet contractLoweringPatterns(funcOp.getContext());
+      vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
+      vector::populateVectorContractLoweringPatterns(
+          contractLoweringPatterns,
+          vector::VectorTransformsOptions().setVectorTransformsOptions(
+              vector::VectorContractLowering::OuterProduct));
+      vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
+      vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
+      vector::populateVectorMultiReductionLoweringPatterns(
+          contractLoweringPatterns,
+          vector::VectorMultiReductionLowering::InnerParallel);
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(contractLoweringPatterns)))) {
+        return signalPassFailure();
+      }
+    }
+
     RewritePatternSet vectorToLoopsPatterns(&getContext());
     VectorTransferToSCFOptions vectorToSCFOptions;
     vectorToSCFOptions.enableFullUnroll();

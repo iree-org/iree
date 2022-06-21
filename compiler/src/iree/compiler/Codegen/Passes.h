@@ -321,6 +321,9 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
                                         unsigned pipelineDepth);
 
+/// Lowering reductions to warp reductions.
+void addGPUWarpReductionPassPipeline(OpPassManager &pm);
+
 /// Experimental path for transform dialect.
 void addGPUTransformDialectInterpreterPasses(OpPassManager &pm);
 
@@ -349,7 +352,8 @@ std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMGPULowerExecutableTargetPass();
 
 /// Convert Linalg ops to Vector.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorizationPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorizationPass(
+    int64_t nativeVector = 4);
 
 /// Convert Linalg ops to Vector and prepare converstion to GPU MMA ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -369,6 +373,10 @@ createLLVMGPUReduceSharedMemoryBankConflicts();
 
 /// Converts vector ops to gpu dialect.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU();
+
+// Distribute vector ops.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createConvertVectorReductionToGPUPass();
 
 //------------------------------------------------------------------------------
 // SPIR-V Passes

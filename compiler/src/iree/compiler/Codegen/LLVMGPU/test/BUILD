@@ -32,6 +32,7 @@ iree_lit_test_suite(
             "tensorcore_vectorization.mlir",
             "vector_to_gpu.mlir",
             "vectorization.mlir",
+            "warp_reduction.mlir",
         ],
         include = ["*.mlir"],
         # tensor_dialect_*_spec is a an MLIR file that specifies a

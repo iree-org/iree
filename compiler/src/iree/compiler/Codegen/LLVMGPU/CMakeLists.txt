@@ -30,6 +30,7 @@ iree_cc_library(
     "LLVMGPUVectorToGPU.cpp"
     "LLVMGPUVectorization.cpp"
     "Passes.cpp"
+    "VectorReductionToGPU.cpp"
     "Verifiers.cpp"
   DEPS
     IREELinalgExtDialect
@@ -39,6 +40,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineToStandard
+    MLIRAnalysis
     MLIRArithmeticDialect
     MLIRArithmeticToLLVM
     MLIRArithmeticTransforms
