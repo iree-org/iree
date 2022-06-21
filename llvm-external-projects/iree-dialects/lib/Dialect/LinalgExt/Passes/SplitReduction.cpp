@@ -30,15 +30,15 @@ using namespace mlir::iree_compiler::IREE::LinalgExt;
 
 namespace {
 
-SmallVector<int64_t> getExpandedShape(ArrayRef<int64_t> inputShape,
+SmallVector<int64_t> getExpandedShape(ArrayRef<int64_t> shape,
                                       int64_t splitReductionRatio,
                                       int64_t splitDimParallel) {
   SmallVector<int64_t> ans;
-  ans.reserve(inputShape.size() + 1);
-  ans.assign(inputShape.begin(), inputShape.end());
+  ans.reserve(shape.size() + 1);
+  ans.assign(shape.begin(), shape.end());
   ans[splitDimParallel] = splitReductionRatio;
   ans.insert(std::next(ans.begin(), splitDimParallel + 1),
-             inputShape[splitDimParallel] / splitReductionRatio);
+             shape[splitDimParallel] / splitReductionRatio);
 
   return ans;
 }
@@ -71,7 +71,7 @@ LogicalResult shouldParallelTopk(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
                                  int64_t splitReductionRatio) {
   // Determine if we should split the reduction. Requires aligned static shapes
   // and no input indicies.
-  auto valuesOrigType = topkOp.values().getType().cast<ShapedType>();
+  auto valuesOrigType = topkOp.getInputType();
   if (valuesOrigType.isDynamicDim(kDimOrig)) {
     return rewriter.notifyMatchFailure(topkOp,
                                        "cannot split dynamic dimension");
@@ -101,14 +101,14 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
                     int64_t splitReductionRatio, int64_t splitDimParallel,
                     int64_t kDimParallel, int64_t kSize) {
   Value valuesOrig = topkOp.values();
-  ShapedType valuesOrigType = valuesOrig.getType().cast<ShapedType>();
+  auto valuesOrigType = valuesOrig.getType().cast<ShapedType>();
   Type valueElementType = valuesOrigType.getElementType();
   Type indicesElementType =
       topkOp.getResultTypes()[1].cast<ShapedType>().getElementType();
 
   SmallVector<int64_t> expandedShape = getExpandedShape(
       valuesOrigType.getShape(), splitReductionRatio, splitDimParallel);
-  RankedTensorType valuesExpandedType =
+  auto valuesExpandedType =
       RankedTensorType::get(expandedShape, valueElementType);
 
   // Expand input values shape for parallel processing
@@ -118,9 +118,9 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
   // Define the expanded output types
   SmallVector<int64_t> expandedResultShape = expandedShape;
   expandedResultShape[kDimParallel] = kSize;
-  RankedTensorType outputValuesExpandedType =
+  auto outputValuesExpandedType =
       RankedTensorType::get(expandedResultShape, valueElementType);
-  RankedTensorType outputIndicesExpandedType =
+  auto outputIndicesExpandedType =
       RankedTensorType::get(expandedResultShape, indicesElementType);
 
   // Initialize the expanded output values
@@ -159,8 +159,8 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
       rewriter.create<linalg::FillOp>(loc, posInf, initTensorOutputIndices)
           .result();
 
-  SmallVector<Type> parallelTopkResultTypes{outputValuesExpandedType,
-                                            outputIndicesExpandedType};
+  SmallVector<Type> parallelTopkResultTypes = {outputValuesExpandedType,
+                                               outputIndicesExpandedType};
   SmallVector<Value> parallelTopkIns = {valuesExpanded};
   SmallVector<Value> parallelTopkOuts = {negInfTensor, posInfTensor};
 
@@ -182,17 +182,17 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
 // selection, but the values are part of the large input space split into M =
 // splitReductionFn() ways. The following linalg.generic adds the appropriate
 // offset to reflect to values original position. "Updated pos" = "initial
-// pos" + m * "parallel computation index"
+// pos" + "splitDimParallel size * "splitDimParallel index"
 Value offsetParallelIndices(Location loc, PatternRewriter &rewriter,
-                            Value parallelIndices, int64_t splitReductionRatio,
+                            Value parallelIndices, int64_t kDimParallelSize,
                             int64_t splitDimParallel) {
-  ShapedType parallelIndicesType = parallelIndices.getType().cast<ShapedType>();
+  auto parallelIndicesType = parallelIndices.getType().cast<ShapedType>();
   size_t parallelIndicesRank = parallelIndicesType.getRank();
   AffineMap mapIdentity = rewriter.getMultiDimIdentityMap(parallelIndicesRank);
-  SmallVector<AffineMap> indexingMaps{mapIdentity};
-  SmallVector<StringRef> iterators{parallelIndicesRank, "parallel"};
+  SmallVector<AffineMap> indexingMaps = {mapIdentity};
+  SmallVector<StringRef> iterators(parallelIndicesRank, "parallel");
   Value mSplitVal = rewriter.create<arith::ConstantIntOp>(
-      loc, splitReductionRatio, parallelIndicesType.getElementType());
+      loc, kDimParallelSize, parallelIndicesType.getElementType());
   return rewriter
       .create<linalg::GenericOp>(
           loc,
@@ -221,7 +221,7 @@ TopkOp computeReductionTopk(Location loc, PatternRewriter &rewriter,
                             int64_t splitReductionRatio, int64_t kDimOrig,
                             int64_t kSize) {
   Value valuesOrig = topkOp.values();
-  ShapedType valuesOrigType = valuesOrig.getType().cast<ShapedType>();
+  auto valuesOrigType = valuesOrig.getType().cast<ShapedType>();
   Type valueElementType = valuesOrigType.getElementType();
   Type indicesElementType =
       topkOp.getResultTypes()[1].cast<ShapedType>().getElementType();
@@ -229,9 +229,9 @@ TopkOp computeReductionTopk(Location loc, PatternRewriter &rewriter,
   // Define the collapsed input shapes
   SmallVector<int64_t> collapsedShape = getCollapsedShape(
       valuesOrigType.getShape(), splitReductionRatio, kSize, kDimOrig);
-  RankedTensorType valuesCollapsedType =
+  auto valuesCollapsedType =
       RankedTensorType::get(collapsedShape, valueElementType);
-  RankedTensorType indicesCollapsedType =
+  auto indicesCollapsedType =
       RankedTensorType::get(collapsedShape, indicesElementType);
 
   // Collapse collapse parallel output for the input of final reduction
@@ -252,12 +252,6 @@ TopkOp computeReductionTopk(Location loc, PatternRewriter &rewriter,
                              reductionTopkOp.region().end());
   return reductionTopkOp;
 }
-
-/// Function signature to control reduction splitting. This returns the split
-/// reduction ratio used to split the reduction dimension. The ratio is applied
-/// to the reduction dimension of TopK. If the ratio value is less or equal to 1
-/// then nothing will be done.
-using TopkSplitReductionControlFn = std::function<int64_t(TopkOp topkOp)>;
 
 struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -294,9 +288,7 @@ struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
         topkOp.getResult(0).getType().cast<ShapedType>().getDimSize(kDimOrig);
     int64_t splitReductionRatio = splitReductionFn(topkOp);
     SmallVector<ReassociationIndices> reassociationIndices =
-        getReassociationIndices(
-            topkOp.values().getType().cast<ShapedType>().getRank(),
-            splitDimParallel);
+        getReassociationIndices(topkOp.getInputRank(), splitDimParallel);
 
     // Determine if should compute parallel topk
     LogicalResult shouldParallelTopkResult =
@@ -312,8 +304,12 @@ struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
 
     // Update parallel indices to correct offsets
     Value parallelIndices = parallelTopkOp.getResult(1);
+    SmallVector<int64_t> expandedShape = getExpandedShape(
+        topkOp.values().getType().cast<ShapedType>().getShape(),
+        splitReductionRatio, splitDimParallel);
+    int64_t kDimParallelSize = expandedShape[kDimParallel];
     Value updatedParallelIndices = offsetParallelIndices(
-        loc, rewriter, parallelIndices, splitReductionRatio, splitDimParallel);
+        loc, rewriter, parallelIndices, kDimParallelSize, splitDimParallel);
 
     // Topk final reduction
     TopkOp reductionTopkOp = computeReductionTopk(
@@ -348,6 +344,9 @@ struct TopkSplitReductionPass
   }
 
   void runOnOperation() override {
+    if (splitRatio.getValue() <= 1) {
+      return;
+    }
 
     RewritePatternSet patterns(&getContext());
     TopkSplitReductionControlFn splitReductionFn =
@@ -366,6 +365,14 @@ struct TopkSplitReductionPass
   }
 };
 } // namespace
+
+void mlir::iree_compiler::IREE::LinalgExt::populateTopkSplitReductionPattern(
+    RewritePatternSet &patterns,
+    const TopkSplitReductionControlFn &splitReductionFn,
+    const linalg::LinalgTransformationFilter &f) {
+  patterns.add<TopkOpSplitReduction>(patterns.getContext(), splitReductionFn,
+                                     f);
+}
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::iree_compiler::IREE::LinalgExt::createTopkSplitReductionPass() {
