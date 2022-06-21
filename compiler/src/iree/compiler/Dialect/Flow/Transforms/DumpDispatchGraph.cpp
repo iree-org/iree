@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/GraphWriter.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
@@ -502,10 +503,8 @@ class DumpDispatchGraphPass
   Node processOperation(Operation *op) {
     Node node;
 
-    if (isa<arith::ConstantOp>(op)) {
-      // Do not handle constant because it creates too many edges.
-      return node;
-    }
+    // Do not handle some noisy Operations.
+    if (isa<arith::ConstantOp>(op) || isa<Util::GlobalLoadOp>(op)) return node;
 
     if (op->getNumRegions() == 1) {
       // do not generate a cluster when there is one region.
