@@ -43,12 +43,15 @@ def main(args):
   if not os.path.isdir(output_dir):
     os.makedirs(output_dir)
 
+  # Open the URL and get the file-like streaming object.
   with urllib.request.urlopen(args.source_url) as response:
     if response.status != 200:
       raise RuntimeError(
-          f"Failed to download file with status code {response.status}")
+          f"Failed to download file with status {response.status} {response.msg}"
+      )
 
     if args.source_url.endswith(".tar.gz"):
+      # Open tar.gz in the streaming mode.
       with tarfile.open(fileobj=response, mode="r|*") as tar_file:
         if os.path.exists(args.output):
           shutil.rmtree(args.output)
@@ -56,12 +59,14 @@ def main(args):
         tar_file.extractall(args.output)
 
     elif args.source_url.endswith(".gz"):
+      # Open gzip from a file-like object, which will be in the streaming mode.
       with gzip.open(filename=response, mode="rb") as input_file:
         with open(args.output, "wb") as output_file:
           shutil.copyfileobj(input_file, output_file)
 
     else:
       with open(args.output, "wb") as output_file:
+        # Streaming copy.
         shutil.copyfileobj(response, output_file)
 
 
