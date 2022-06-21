@@ -434,7 +434,8 @@ static LogicalResult setUserConfig(
 static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
   for (auto map : llvm::enumerate(op.getIndexingMaps())) {
     for (auto dim : llvm::enumerate(map.value().getResults())) {
-      if (dim.value().cast<AffineDimExpr>().getPosition() == d) {
+      auto expr = dim.value().dyn_cast<AffineDimExpr>();
+      if (expr && expr.getPosition() == d) {
         auto type = op->getOperand(map.index()).getType().cast<ShapedType>();
         if (type.isDynamicDim(dim.index())) return llvm::None;
         return type.getDimSize(dim.index());
