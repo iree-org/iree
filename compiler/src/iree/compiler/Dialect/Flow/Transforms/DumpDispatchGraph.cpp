@@ -328,9 +328,7 @@ class DumpDispatchGraphPass
   }
 
   void annotateOperation(raw_ostream &os, Operation *op, AsmState &state) {
-    // A scalar constant op will be printed directly when printing the
-    // operand.
-    if (isScalarConstantOp(op)) return;
+    if (isa<arith::ConstantOp>(op)) return;
 
     if (isa<func::ReturnOp>(op)) return;
 
@@ -504,9 +502,8 @@ class DumpDispatchGraphPass
   Node processOperation(Operation *op) {
     Node node;
 
-    if (isScalarConstantOp(op)) {
-      // don't handle scalar constant because it creates too many edges
-      // from a single constant.
+    if (isa<arith::ConstantOp>(op)) {
+      // Do not handle constant because it creates too many edges.
       return node;
     }
 
