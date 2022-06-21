@@ -17,7 +17,7 @@ GPU_TYPE="mali"
 #GPU_TYPE="andreno"
 
 # Create root dir.
-ROOT_DIR=/tmp/mobilebert_benchmarks
+ROOT_DIR=/tmp/benchmarks
 rm -rf "${ROOT_DIR}"
 mkdir "${ROOT_DIR}"
 mkdir "${ROOT_DIR}/models"
@@ -29,7 +29,9 @@ mkdir "${ROOT_DIR}/output"
 
 wget https://storage.googleapis.com/iree-model-artifacts/tflite_squad_test_data.zip -O /tmp/tflite_squad_test_data.zip
 unzip /tmp/tflite_squad_test_data.zip -d "${ROOT_DIR}/test_data/"
-wget https://storage.googleapis.com/iree-model-artifacts/mobilebert_float_384_gpu.tflite -O "${ROOT_DIR}/models/tflite/mobilebert_float_384_gpu.tflite"
+wget https://storage.googleapis.com/iree-model-artifacts/mobilebert_float_384_gpu.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_224_1.0_uint8.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224.tflite -P "${ROOT_DIR}/models/tflite/"
 
 # Build IREE source.
 SOURCE_DIR=/tmp/github
@@ -60,57 +62,61 @@ IREE_COMPILE_PATH="${SOURCE_DIR}/iree-build/tools/iree-compile"
 TFLITE_MODEL_DIR="${ROOT_DIR}/models/tflite"
 IREE_MODEL_DIR="${ROOT_DIR}/models/iree"
 mkdir -p "${IREE_MODEL_DIR}/vulkan"
-mkdir -p "${IREE_MODEL_DIR}/dylib"
+mkdir -p "${IREE_MODEL_DIR}/local-task"
 
-MODEL_NAME="mobilebert_float_384_gpu"
-bazel-bin/iree_tf_compiler/iree-import-tflite "${TFLITE_MODEL_DIR}/${MODEL_NAME}.tflite" -o "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir"
-echo "Compiling ${MODEL_NAME}.vmfb for aarch64..."
-"${IREE_COMPILE_PATH}" \
-  --iree-input-type=tosa \
-  --iree-hal-target-backends=dylib-llvm-aot \
-  --iree-llvm-target-triple=aarch64-none-linux-android29 \
-  --iree-llvm-debug-symbols=false \
-  --iree-vm-bytecode-module-strip-source-map=true \
-  --iree-vm-emit-polyglot-zip=false \
-  "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
-  --o "${IREE_MODEL_DIR}/dylib/${MODEL_NAME}.vmfb"
+for i in "${ROOT_DIR}/models/tflite/"; do
 
-echo "Compiling ${MODEL_NAME}_mmt4d.vmfb for aarch64..."
-"${IREE_COMPILE_PATH}" \
-  --iree-input-type=tosa \
-  --iree-hal-target-backends=dylib-llvm-aot \
-  --iree-llvm-target-triple=aarch64-none-linux-android29 \
-  "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod" \
-  --iree-llvm-target-cpu-features=+dotprod \
-  --iree-llvm-debug-symbols=false \
-  --iree-vm-bytecode-module-strip-source-map=true \
-  --iree-vm-emit-polyglot-zip=false \
-  "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
-  --o "${IREE_MODEL_DIR}/dylib/${MODEL_NAME}_mmt4d.vmfb"
+  MODEL_NAME=$(basename $i)
 
-if [[ "${GPU_TYPE}" = "mali" ]]; then
-  echo "Compiling ${MODEL_NAME}.vmfb for vulkan mali..."
+  bazel-bin/iree_tf_compiler/iree-import-tflite "${TFLITE_MODEL_DIR}/${MODEL_NAME}.tflite" -o "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir"
+  echo "Compiling ${MODEL_NAME}.vmfb for aarch64..."
   "${IREE_COMPILE_PATH}" \
     --iree-input-type=tosa \
-    --iree-hal-target-backends=vulkan-spirv \
-    --iree-vulkan-target-triple=valhall-unknown-android11 \
+    --iree-hal-target-backends=dylib-llvm-aot \
+    --iree-llvm-target-triple=aarch64-none-linux-android29 \
     --iree-llvm-debug-symbols=false \
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \
     "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
-    --o "${IREE_MODEL_DIR}/vulkan/${MODEL_NAME}.vmfb"
-else
-  echo "Compiling ${MODEL_NAME}.vmfb for vulkan adreno..."
+    --o "${IREE_MODEL_DIR}/local-task/${MODEL_NAME}.vmfb"
+
+  echo "Compiling ${MODEL_NAME}_mmt4d.vmfb for aarch64..."
   "${IREE_COMPILE_PATH}" \
     --iree-input-type=tosa \
-    --iree-hal-target-backends=vulkan-spirv \
-    --iree-vulkan-target-triple=adreno-unknown-android11 \
+    --iree-hal-target-backends=dylib-llvm-aot \
+    --iree-llvm-target-triple=aarch64-none-linux-android29 \
+    "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod" \
+    --iree-llvm-target-cpu-features=+dotprod \
     --iree-llvm-debug-symbols=false \
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \
     "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
-    --o "${IREE_MODEL_DIR}/vulkan/${MODEL_NAME}.vmfb"
-fi
+    --o "${IREE_MODEL_DIR}/local-task/${MODEL_NAME}_mmt4d.vmfb"
+
+  if [[ "${GPU_TYPE}" = "mali" ]]; then
+    echo "Compiling ${MODEL_NAME}.vmfb for vulkan mali..."
+    "${IREE_COMPILE_PATH}" \
+      --iree-input-type=tosa \
+      --iree-hal-target-backends=vulkan-spirv \
+      --iree-vulkan-target-triple=valhall-unknown-android11 \
+      --iree-llvm-debug-symbols=false \
+      --iree-vm-bytecode-module-strip-source-map=true \
+      --iree-vm-emit-polyglot-zip=false \
+      "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
+      --o "${IREE_MODEL_DIR}/vulkan/${MODEL_NAME}.vmfb"
+  else
+    echo "Compiling ${MODEL_NAME}.vmfb for vulkan adreno..."
+    "${IREE_COMPILE_PATH}" \
+      --iree-input-type=tosa \
+      --iree-hal-target-backends=vulkan-spirv \
+      --iree-vulkan-target-triple=adreno-unknown-android11 \
+      --iree-llvm-debug-symbols=false \
+      --iree-vm-bytecode-module-strip-source-map=true \
+      --iree-vm-emit-polyglot-zip=false \
+      "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
+      --o "${IREE_MODEL_DIR}/vulkan/${MODEL_NAME}.vmfb"
+  fi
+done
 
 # Cross-compile IREE benchmark binary.
 cd "${SOURCE_DIR}/iree"
@@ -151,10 +157,10 @@ bazel build -c opt --config=android_arm64 \
 cp "${SOURCE_DIR}/tensorflow/bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model" "${ROOT_DIR}/"
 
 # Push benchmarking artifacts to device.
-adb shell rm -r /data/local/tmp/mobilebert_benchmarks
+DEVICE_ROOT_DIR=/data/local/tmp/benchmarks
+adb shell rm -r "${DEVICE_ROOT_DIR}"
 adb push "${ROOT_DIR}" /data/local/tmp
 
-DEVICE_ROOT_DIR=/data/local/tmp/mobilebert_benchmarks
 adb shell chmod +x "${DEVICE_ROOT_DIR}/benchmark_model"
 adb shell chmod +x "${DEVICE_ROOT_DIR}/iree-benchmark-module"
 
