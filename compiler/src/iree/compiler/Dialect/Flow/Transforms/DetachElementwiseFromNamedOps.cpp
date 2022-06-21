@@ -75,13 +75,24 @@ struct DetachElementwisePattern
     rewriter.updateRootInPlace(linalgOp,
                                [&]() { linalgOp.setOutputOperand(0, fill); });
 
+    auto outputMap = mlir::compressUnusedDims(
+        linalgOp.getTiedIndexingMap(outputOperands.front()));
+    // Only support identity map for output access for now; this is the case for
+    // all existing contraction/convolution ops.
+    if (!outputMap.isIdentity()) return failure();
+    SmallVector<AffineMap> maps(3, outputMap);
+
+    SmallVector<StringRef> iterators;
+    iterators.reserve(outputMap.getNumResults());
+    for (int i = 0, e = outputMap.getNumResults(); i < e; ++i) {
+      int pos = outputMap.getResult(i).cast<AffineDimExpr>().getPosition();
+      auto attr = linalgOp.getIteratorTypes()[pos].cast<StringAttr>();
+      if (!isParallelIterator(attr)) return failure();
+      iterators.push_back(attr.getValue());
+    }
+
     // Create a generic op to add back the original output tensor operand.
     rewriter.setInsertionPointAfter(linalgOp);
-    auto identityMap = AffineMap::getMultiDimIdentityMap(outputType.getRank(),
-                                                         linalgOp.getContext());
-    SmallVector<AffineMap> maps(3, identityMap);
-    SmallVector<StringRef> iterators(outputType.getRank(),
-                                     getParallelIteratorTypeName());
     auto genericOp = rewriter.create<linalg::GenericOp>(
         loc, outputType, ValueRange{linalgOp->getResult(0), outputOperand},
         fill, maps, iterators,
