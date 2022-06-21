@@ -267,6 +267,7 @@ IREE_API_EXPORT iree_status_t iree_vm_invoke(
       iree_any_bit_set(flags, IREE_VM_INVOCATION_FLAG_TRACE_INLINE)
           ? 0
           : iree_vm_invoke_allocate_id(context, &function);
+  (void)invocation_id;  // unused when tracing is disabled
 
   // Begin a zone outside the fiber to represent one tick of the loop.
   IREE_TRACE_ZONE_BEGIN_NAMED(zi, "iree_vm_invoke_tick");
