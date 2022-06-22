@@ -168,7 +168,18 @@ iree_task_t* iree_task_worker_try_steal_task(iree_task_worker_t* worker,
   if (task) return task;
 
   // If we still didn't steal any tasks then let's try the slist instead.
+  //
+  // Locking worker->local_task_queue.mutex looks out of place here as this is
+  // atomic list pop, but the problem is that we may be racing here against
+  // another thread calling iree_task_queue_flush_from_lifo_slist, copying
+  // linked list elements out of the atomic list, into a plain linked list,
+  // then doing a plain non-atomic pop on that. Fortunately,
+  // iree_task_queue_flush_from_lifo_slist locks worker->local_task_queue.mutex
+  // around that non-atomic operation, so we can avoid the race by also locking
+  // it here.
+  iree_slim_mutex_lock(&worker->local_task_queue.mutex);
   task = iree_atomic_task_slist_pop(&worker->mailbox_slist);
+  iree_slim_mutex_unlock(&worker->local_task_queue.mutex);
   if (task) return task;
 
   return NULL;

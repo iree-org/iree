@@ -16,12 +16,10 @@
 
 void iree_atomic_slist_initialize(iree_atomic_slist_t* out_list) {
   memset(out_list, 0, sizeof(*out_list));
-  iree_slim_mutex_initialize(&out_list->mutex);
 }
 
 void iree_atomic_slist_deinitialize(iree_atomic_slist_t* list) {
   // TODO(benvanik): assert empty.
-  iree_slim_mutex_deinitialize(&list->mutex);
   memset(list, 0, sizeof(*list));
 }
 
@@ -29,36 +27,51 @@ void iree_atomic_slist_concat(iree_atomic_slist_t* list,
                               iree_atomic_slist_entry_t* head,
                               iree_atomic_slist_entry_t* tail) {
   if (IREE_UNLIKELY(!head)) return;
-  iree_slim_mutex_lock(&list->mutex);
-  tail->next = list->head;
-  list->head = head;
-  iree_slim_mutex_unlock(&list->mutex);
+  while (true) {
+    intptr_t list_head =
+        iree_atomic_load_intptr(&list->head, iree_memory_order_relaxed);
+    iree_atomic_store_intptr(&tail->next, list_head, iree_memory_order_release);
+    if (iree_atomic_compare_exchange_weak_intptr(
+            &list->head, &list_head, (intptr_t)head, iree_memory_order_release,
+            iree_memory_order_relaxed)) {
+      break;
+    }
+  }
 }
 
 void iree_atomic_slist_push(iree_atomic_slist_t* list,
                             iree_atomic_slist_entry_t* entry) {
-  iree_slim_mutex_lock(&list->mutex);
-  iree_atomic_slist_push_unsafe(list, entry);
-  iree_slim_mutex_unlock(&list->mutex);
+  iree_atomic_slist_concat(list, entry, entry);
 }
 
 void iree_atomic_slist_push_unsafe(iree_atomic_slist_t* list,
                                    iree_atomic_slist_entry_t* entry) {
-  // NOTE: no lock is held here and no atomic operation will be used when this
-  // is actually made atomic.
-  entry->next = list->head;
-  list->head = entry;
+  intptr_t list_head =
+      iree_atomic_load_intptr(&list->head, iree_memory_order_relaxed);
+  iree_atomic_store_intptr(&entry->next, list_head, iree_memory_order_relaxed);
+  iree_atomic_store_intptr(&list->head, (intptr_t)entry,
+                           iree_memory_order_relaxed);
 }
 
 iree_atomic_slist_entry_t* iree_atomic_slist_pop(iree_atomic_slist_t* list) {
-  iree_slim_mutex_lock(&list->mutex);
-  iree_atomic_slist_entry_t* entry = list->head;
-  if (entry != NULL) {
-    list->head = entry->next;
-    entry->next = NULL;
+  // We are about to delete the old list head. Using memory_order_acquire here
+  // ensures that read accesses to it can't be reordered past this.
+  intptr_t list_head;
+  while (true) {
+    list_head = iree_atomic_load_intptr(&list->head, iree_memory_order_acquire);
+    if (!list_head) return NULL;
+    intptr_t list_head_next =
+        iree_atomic_load_intptr(&((iree_atomic_slist_entry_t*)list_head)->next,
+                                iree_memory_order_relaxed);
+    if (iree_atomic_compare_exchange_weak_intptr(
+            &list->head, &list_head, list_head_next, iree_memory_order_release,
+            iree_memory_order_relaxed)) {
+      break;
+    }
   }
-  iree_slim_mutex_unlock(&list->mutex);
-  return entry;
+  iree_atomic_slist_entry_t* popped = (iree_atomic_slist_entry_t*)list_head;
+  popped->next = 0;
+  return popped;
 }
 
 bool iree_atomic_slist_flush(iree_atomic_slist_t* list,
@@ -67,11 +80,17 @@ bool iree_atomic_slist_flush(iree_atomic_slist_t* list,
                              iree_atomic_slist_entry_t** out_tail) {
   // Exchange list head with NULL to steal the entire list. The list will be in
   // the native LIFO order of the slist.
-  iree_slim_mutex_lock(&list->mutex);
-  iree_atomic_slist_entry_t* head = list->head;
-  list->head = NULL;
-  iree_slim_mutex_unlock(&list->mutex);
-  if (!head) return false;
+  intptr_t list_head;
+  while (true) {
+    list_head = iree_atomic_load_intptr(&list->head, iree_memory_order_acquire);
+    if (!list_head) return false;
+    if (iree_atomic_compare_exchange_weak_intptr(&list->head, &list_head, 0,
+                                                 iree_memory_order_release,
+                                                 iree_memory_order_relaxed)) {
+      break;
+    }
+  }
+  iree_atomic_slist_entry_t* head = (iree_atomic_slist_entry_t*)list_head;
 
   switch (flush_order) {
     case IREE_ATOMIC_SLIST_FLUSH_ORDER_APPROXIMATE_LIFO: {
@@ -81,7 +100,9 @@ bool iree_atomic_slist_flush(iree_atomic_slist_t* list,
       *out_head = head;
       if (out_tail) {
         iree_atomic_slist_entry_t* p = head;
-        while (p->next) p = p->next;
+        while (p->next)
+          p = (iree_atomic_slist_entry_t*)iree_atomic_load_intptr(
+              &p->next, iree_memory_order_relaxed);
         *out_tail = p;
       }
       break;
@@ -94,12 +115,15 @@ bool iree_atomic_slist_flush(iree_atomic_slist_t* list,
       if (out_tail) *out_tail = tail;
       iree_atomic_slist_entry_t* p = head;
       do {
-        iree_atomic_slist_entry_t* next = p->next;
-        p->next = head;
+        iree_atomic_slist_entry_t* next =
+            (iree_atomic_slist_entry_t*)iree_atomic_load_intptr(
+                &p->next, iree_memory_order_relaxed);
+        iree_atomic_store_intptr(&p->next, (intptr_t)head,
+                                 iree_memory_order_relaxed);
         head = p;
         p = next;
       } while (p != NULL);
-      tail->next = NULL;
+      iree_atomic_store_intptr(&tail->next, 0, iree_memory_order_relaxed);
       *out_head = head;
       break;
     }
