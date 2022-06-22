@@ -294,9 +294,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // an argument if two executables differ only in that one dimension).
   passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
 
-  // Create one function per remaining flow.executable that can be used with
-  // iree-benchmark-module to benchmark each dispatch individually, as well as
-  // exporting all original model entry points.
+  // Create one function per exported program entry point that can be used with
+  // iree-benchmark-module to benchmark each function individually. Whether
+  // a model supports execution like this (handles zero/null args, has state
+  // resets, etc) is up to the author.
   if (clExportBenchmarkFuncs) {
     passManager.addPass(IREE::Flow::createExportBenchmarkFuncsPass());
   }
