@@ -182,6 +182,9 @@ struct BytecodeLocationDef {
 
 // Debug data for a single function mapping back into source IR.
 table FunctionSourceMapDef {
+  // Original function name in the module which may not match the exported name.
+  local_name:string;
+
   // Operation locations for all ops within the function.
   locations:[BytecodeLocationDef];
 }
