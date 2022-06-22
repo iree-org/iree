@@ -154,6 +154,10 @@ static LogicalResult defineWorkgroupCountRegion(
       numTiles.push_back(one);
       continue;
     }
+    if (tileSizes[loopNum] == 1) {
+      numTiles.push_back(workload);
+      continue;
+    }
     AffineExpr s0;
     bindSymbols(exportOp.getContext(), s0);
     AffineMap numTilesMap =
