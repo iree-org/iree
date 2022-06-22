@@ -442,8 +442,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
   }
 }
 
-void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager,
-                                         bool lowerToVectors) {
+void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();

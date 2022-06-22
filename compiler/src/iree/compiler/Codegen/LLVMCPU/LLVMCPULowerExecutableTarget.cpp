@@ -190,7 +190,6 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
         return signalPassFailure();
       }
 
-      bool lowerToVectors = !isVMVXBackend(variantOp);
       bool lowerToAVX2 = hasAVX2Feature(variantOp);
       if (!testLoweringConfiguration) {
         switch (translationInfo.getValue().getDispatchLoweringPassPipeline()) {
@@ -229,8 +228,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUAArchDoubleTilingExpert:
-            addCPUAArchDoubleTilingExpertPassPipeline(executableLoweringPipeline,
-                                                lowerToVectors);
+            addCPUAArchDoubleTilingExpertPassPipeline(
+                executableLoweringPipeline);
             break;
           default:
             variantOp.emitOpError("Unsupported pipeline on CPU target.");
