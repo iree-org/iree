@@ -16,9 +16,12 @@ namespace mlir {
 struct LinalgFusePassOptions {
   std::string anchorFuncOpName = "";
   std::string anchorOpName = "";
+  bool setAnchorOpToRootOp = false;
   SmallVector<int64_t> tileSizes = {};
   SmallVector<int64_t> tileInterchange = {};
   bool pad = false;
+  bool padParallelDims = false;
+  bool padReductionDims = false;
   SmallVector<std::string> paddingValues = {};
   SmallVector<int64_t> paddingDimensions = {};
   SmallVector<int64_t> packPaddings = {};

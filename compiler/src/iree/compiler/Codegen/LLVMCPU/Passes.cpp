@@ -254,21 +254,23 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  auto pad = [&](std::string anchorOpName, ArrayRef<int64_t> paddingDims,
+  auto pad = [&](std::string anchorOpName, bool setAnchorOpToRootOp = false,
                  ArrayRef<int64_t> packPaddings = {}) {
     LinalgFusePassOptions options;
-    options.pad = true;
-    options.anchorOpName = anchorOpName;
+    options.padParallelDims = true;
+    if (setAnchorOpToRootOp) {
+      options.setAnchorOpToRootOp = true;
+    } else {
+      options.anchorOpName = anchorOpName;
+    }
     options.packPaddings.assign(packPaddings.begin(), packPaddings.end());
-    options.paddingDimensions.assign(paddingDims.begin(), paddingDims.end());
     nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
   };
 
-  SmallVector<int64_t> paddingDims = {0, 1};
-  pad("linalg.fill", paddingDims);
-  pad("linalg.matmul", paddingDims);
+  pad("linalg.fill");
+  pad("", /*setAnchorOpToRootOp=*/true);
   // TODO(hanchung): pack and hoist padding for linalg.generic op.
-  pad("linalg.generic", paddingDims);
+  pad("linalg.generic");
 
   {
     LinalgSingleTilingExpertPassOptions options;
@@ -280,14 +282,23 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  paddingDims = {2};
   if (!clEnableHoistPadding) {
-    pad("linalg.matmul", paddingDims);
+    LinalgFusePassOptions options;
+    options.padReductionDims = true;
+    options.setAnchorOpToRootOp = true;
+    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
   } else {
-    pad("linalg.matmul", paddingDims, /*packPaddings=*/{1, 1, 0});
+    {
+      LinalgFusePassOptions options;
+      options.padReductionDims = true;
+      options.setAnchorOpToRootOp = true;
+      options.packPaddings = {1, 1, 0};
+      nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
+    }
+
     LinalgFusePassOptions options;
     options.pad = true;
-    options.anchorOpName = "linalg.matmul";
+    options.setAnchorOpToRootOp = true;
     options.hoistPaddings = SmallVector<int64_t>{2, 3, 0};
     nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());

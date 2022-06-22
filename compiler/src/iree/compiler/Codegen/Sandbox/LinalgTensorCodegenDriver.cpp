@@ -81,28 +81,59 @@ static LogicalResult getPaddingAttrs(func::FuncOp funcOp,
   return success();
 }
 
+/// Returns the op that contains lowering config. Returns failure if there are
+/// multiple op having lowering config.
+static FailureOr<Operation *> getRootOp(func::FuncOp funcOp) {
+  SmallVector<Operation *> computeOps;
+  SmallVector<mlir::iree_compiler::LoopTilingAndDistributionInfo> tiledLoops;
+  if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
+    return failure();
+  }
+  Operation *rootOp = nullptr;
+  for (auto op : computeOps) {
+    if (!iree_compiler::getLoweringConfig(op)) continue;
+    if (rootOp) {
+      return LogicalResult(funcOp.emitOpError(
+          "unhandled multiple lowering configurations in compute ops"));
+    }
+    rootOp = op;
+  }
+  return rootOp;
+}
+
+static LogicalResult getPaddingDims(func::FuncOp funcOp,
+                                    StringRef targetIterType,
+                                    SmallVectorImpl<int64_t> &paddingDims) {
+  FailureOr<Operation *> rootOp = getRootOp(funcOp);
+  if (failed(rootOp)) return failure();
+
+  // No need to set padding dims.
+  if (!rootOp.getValue()) return success();
+
+  linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(rootOp.getValue());
+  for (auto en : llvm::enumerate(linalgOp.getIteratorTypes())) {
+    if (en.value().cast<StringAttr>().getValue() == targetIterType) {
+      paddingDims.push_back(en.index());
+    }
+  }
+
+  return success();
+}
+
 /// Default method to initialize the tiling options for fusion in IREE. These
 /// could be ovveridden by the command line options if specified.
 static FailureOr<LinalgTilingAndFusionOptions> getTileAndFuseOptionsFromConfig(
     func::FuncOp funcOp, int64_t tilingLevel) {
-  SmallVector<Operation *> computeOps;
-  SmallVector<mlir::iree_compiler::LoopTilingAndDistributionInfo> tiledLoops;
-  mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr loweringConfig;
-  if (tilingLevel != -1 &&
-      succeeded(getComputeOps(funcOp, computeOps, tiledLoops))) {
-    for (auto op : computeOps) {
-      if (auto currLoweringConfig = iree_compiler::getLoweringConfig(op)) {
-        if (loweringConfig) {
-          return LogicalResult(funcOp.emitOpError(
-              "unhandled multiple lowering configurations in compute ops"));
-        }
-        loweringConfig = currLoweringConfig;
-      }
-    }
-  }
-  if (!loweringConfig) {
+  if (tilingLevel == -1) {
     return LinalgTilingAndFusionOptions();
   }
+
+  FailureOr<Operation *> rootOp = getRootOp(funcOp);
+  if (failed(rootOp) || !rootOp.getValue()) return failure();
+
+  iree_compiler::IREE::Codegen::LoweringConfigAttr loweringConfig =
+      iree_compiler::getLoweringConfig(rootOp.getValue());
+
   LinalgTilingAndFusionOptions options;
   options.tileSizes.assign(loweringConfig.getTileSizeVals(tilingLevel));
   options.tileInterchange.assign(
@@ -137,9 +168,12 @@ struct LinalgFusePass : public LinalgFuseBase<LinalgFusePass> {
   LinalgFusePass(const LinalgFusePassOptions &options) {
     this->anchorFuncOpName = options.anchorFuncOpName;
     this->anchorOpName = options.anchorOpName;
+    this->setAnchorOpToRootOp = options.setAnchorOpToRootOp;
     this->tileSizes = options.tileSizes;
     this->tileInterchange = options.tileInterchange;
     this->pad = options.pad;
+    this->padParallelDims = options.padParallelDims;
+    this->padReductionDims = options.padReductionDims;
     this->paddingValues = options.paddingValues;
     this->paddingDimensions = options.paddingDimensions;
     this->packPaddings = options.packPaddings;
@@ -251,6 +285,33 @@ void LinalgFusePass::runOnOperation() {
   if (doIREEDistribution) {
     tilingOptions.setDistributionOptions(
         ::mlir::iree_compiler::getIREELinalgLoopDistributionOptions());
+  }
+
+  if (setAnchorOpToRootOp) {
+    FailureOr<Operation *> rootOp = getRootOp(funcOp);
+    if (failed(rootOp)) return signalPassFailure();
+    StringRef str = rootOp.getValue()->getName().getStringRef();
+    anchorOpName = std::string(str.begin(), str.end());
+  }
+
+  assert(!(padParallelDims && padReductionDims) &&
+         "expected only one type of dims is set");
+  pad = pad || padParallelDims || padReductionDims;
+  if (padParallelDims) {
+    SmallVector<int64_t> dims;
+    assert(paddingDimensions.empty());
+    if (failed(getPaddingDims(funcOp, getParallelIteratorTypeName(), dims))) {
+      return signalPassFailure();
+    }
+    paddingDimensions = dims;
+  }
+  if (padReductionDims) {
+    SmallVector<int64_t> dims;
+    assert(paddingDimensions.empty());
+    if (failed(getPaddingDims(funcOp, getReductionIteratorTypeName(), dims))) {
+      return signalPassFailure();
+    }
+    paddingDimensions = dims;
   }
 
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! //
