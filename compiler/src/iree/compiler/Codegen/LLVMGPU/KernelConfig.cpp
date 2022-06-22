@@ -481,7 +481,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   std::array<int64_t, 3> workgroupSize = {numWarps * cudaWarpSize, 1, 1};
 
   SmallVector<unsigned> partitionedLoops =
-      cast<IREE::Flow::PartitionableLoopsInterface>(op.getOperation())
+      cast<PartitionableLoopsInterface>(op.getOperation())
           .getPartitionableLoops(kNumMaxParallelDims);
   llvm::SmallDenseSet<unsigned, 4> partitionedLoopsSet;
   partitionedLoopsSet.insert(partitionedLoops.begin(), partitionedLoops.end());

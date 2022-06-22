@@ -145,7 +145,13 @@ static LogicalResult defineWorkgroupCountRegion(
   numTiles.reserve(*numWorkloadValues);
   builder.setInsertionPointToStart(entryBlock);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  llvm::DenseSet<unsigned> partitionableLoopsSet;
+  partitionableLoopsSet.insert(partitionableLoops.begin(),
+                               partitionableLoops.end());
   for (auto loopNum : llvm::seq<unsigned>(0, *numWorkloadValues)) {
+    if (!partitionableLoopsSet.count(loopNum)) {
+      tileSizes[loopNum] = 0;
+    }
     Value workload = entryBlock->addArgument(indexType, loc);
     if (tileSizes[loopNum] == 0) {
       numTiles.push_back(one);
