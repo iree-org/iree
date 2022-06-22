@@ -105,7 +105,9 @@ steps:
       git clean -fdx
       buildkite-agent artifact download "benchmark-results-*.json" ./
       python3 build_tools/benchmarks/upload_benchmarks_to_dashboard.py \
-        --verbose benchmark-results-*.json
+        --verbose \
+        --benchmark_files benchmark-results-*.json \
+        --compile_stats_files compile-stats-results-*.json
     key: "upload-to-dashboard-x86_64"
     branches: "main"
     agents:

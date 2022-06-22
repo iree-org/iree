@@ -53,7 +53,12 @@ T = TypeVar("T")
 
 
 class MetricsToTableMapper(ABC, Generic[T]):
-  """Abstract class to help map benchmark metrics to table."""
+  """Abstract class to help map benchmark metrics to table.
+  
+    It contains a set of methods to help table generator get the required
+    information for a metric. For example, extract the current and base metric
+    value, the metric thresholds, the table header of the metrics, ...
+  """
 
   @abstractmethod
   def get_current_and_base_value(self, obj: T) -> Tuple[int, Optional[int]]:
@@ -158,8 +163,8 @@ def aggregate_all_benchmarks(
       content = f.read()
     file_results = BenchmarkResults.from_json_str(content)
 
-    if (expected_pr_commit is not None) and \
-            (file_results.commit != expected_pr_commit):
+    if ((expected_pr_commit is not None) and
+        (file_results.commit != expected_pr_commit)):
       raise ValueError("Inconsistent pull request commit")
 
     for benchmark_index in range(len(file_results.benchmarks)):
@@ -200,8 +205,8 @@ def collect_all_compilation_metrics(
     with open(compile_stats_file) as f:
       file_results = CompilationResults.from_json_object(json.load(f))
 
-    if (expected_pr_commit is not None) and \
-            (file_results.commit != expected_pr_commit):
+    if ((expected_pr_commit is not None) and
+        (file_results.commit != expected_pr_commit)):
       raise ValueError("Inconsistent pull request commit")
 
     for compile_stats in file_results.compilation_statistics:
@@ -355,6 +360,9 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
   """Splits benchmarks into regressed/improved/similar/raw categories and
     returns their markdown tables.
 
+    If size_cut is None, the table includes regressed/improved/similar/raw
+    categories; otherwise, the table includes regressed/improved/raw categories.
+
     Args:
       benchmarks: A dictionary of benchmark names to its aggregate info.
       size_cut: If not None, only show the top N results for each table.
@@ -393,7 +401,8 @@ def _sort_metrics_objects_and_get_table(metrics_objs: Dict[str, T],
     returns a markdown table for it.
 
     Args:
-      metrics_objs: map of (name, metrics object).
+      metrics_objs: map of (name, metrics object). All objects must contain base
+        value.
       mapper: MetricsToTableMapper for metrics_objs.
       headers: list of table headers.
       size_cut: If not None, only show the top N results for each table.
@@ -417,8 +426,11 @@ def _sort_metrics_objects_and_get_table(metrics_objs: Dict[str, T],
 def categorize_compilation_metrics_into_tables(
     compile_metrics_map: Dict[str, CompilationMetrics],
     size_cut: Optional[int] = None) -> str:
-  """Splits compilation metrics into regressed/improved/similar/raw categories
+  """Splits compilation metrics into regressed/improved/all categories
     and returns their markdown tables.
+
+    If size_cut is None, the table includes regressed/improved/all categories;
+    otherwise, the table includes regressed/improved categories.
 
     Args:
       compile_metrics_map: A dictionary of benchmark names to its compilation
@@ -447,7 +459,7 @@ def categorize_compilation_metrics_into_tables(
                                               ["Benchmark Name", table_header],
                                               size_cut))
 
-  # If we want to abbreviate, sall results won't be interesting.
+  # If we want to abbreviate, similar results won't be interesting.
   if size_cut is None:
     tables.append(md.header("All Compilation Metrics", 3))
     headers = ["Benchmark Name"] + [

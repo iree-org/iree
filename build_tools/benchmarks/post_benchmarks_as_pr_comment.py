@@ -314,19 +314,20 @@ def parse_arguments():
       raise ValueError(path)
 
   parser = argparse.ArgumentParser()
-  parser.add_argument("--benchmark_files",
-                      metavar="<benchmark-json-file>",
-                      type=check_file_path,
-                      default=[],
-                      nargs="+",
-                      help="Path to the JSON file containing benchmark results")
   parser.add_argument(
-      "--compile_stats_files",
-      metavar="<compile-stats-json-file>",
+      "--benchmark_files",
+      metavar="<benchmark-json-files>",
       type=check_file_path,
       default=[],
       nargs="+",
-      help="Path to the JSON file containing compilation statistics")
+      help="Paths to the JSON files containing benchmark results")
+  parser.add_argument(
+      "--compile_stats_files",
+      metavar="<compile-stats-json-files>",
+      type=check_file_path,
+      default=[],
+      nargs="+",
+      help="Paths to the JSON files containing compilation statistics")
   parser.add_argument("--dry-run",
                       action="store_true",
                       help="Print the comment instead of posting to GitHub")
