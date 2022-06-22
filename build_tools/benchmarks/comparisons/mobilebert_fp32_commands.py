@@ -108,11 +108,12 @@ class MobilebertFP32CommandFactory(BenchmarkCommandFactory):
                                              self._tflite_test_data_dir,
                                              driver="cpu")
 
-    tflite_mobilebert_noxnn = TfliteMobilebertFP32(self._tflite_benchmark_binary_path,
-                                                   self._model_name + "_noxnn",
-                                                   self._tflite_model_path,
-                                                   self._tflite_test_data_dir,
-                                                   driver="cpu")
+    tflite_mobilebert_noxnn = TfliteMobilebertFP32(
+        self._tflite_benchmark_binary_path,
+        self._model_name + "_noxnn",
+        self._tflite_model_path,
+        self._tflite_test_data_dir,
+        driver="cpu")
     tflite_mobilebert_noxnn.args.append("--use_xnnpack=false")
 
     # Generate IREE benchmarks.
@@ -147,11 +148,12 @@ class MobilebertFP32CommandFactory(BenchmarkCommandFactory):
                                              driver="gpu")
     tflite_mobilebert.args.append("--gpu_precision_loss_allowed=false")
 
-    tflite_mobilebert_noxnn = TfliteMobilebertFP32(self._tflite_benchmark_binary_path,
-                                                   self._model_name + "_noxnn",
-                                                   self._tflite_model_path,
-                                                   self._tflite_test_data_dir,
-                                                   driver="gpu")
+    tflite_mobilebert_noxnn = TfliteMobilebertFP32(
+        self._tflite_benchmark_binary_path,
+        self._model_name + "_noxnn",
+        self._tflite_model_path,
+        self._tflite_test_data_dir,
+        driver="gpu")
     tflite_mobilebert_noxnn.args.append("--gpu_precision_loss_allowed=false")
     tflite_mobilebert_noxnn.args.append("--use_xnnpack=false")
 
@@ -169,4 +171,7 @@ class MobilebertFP32CommandFactory(BenchmarkCommandFactory):
                                          self._model_name,
                                          iree_model_path,
                                          driver=driver)
-    return [tflite_mobilebert, tflite_mobilebert_noxnn, tflite_mobilebert_fp16, iree_mobilebert]
+    return [
+        tflite_mobilebert, tflite_mobilebert_noxnn, tflite_mobilebert_fp16,
+        iree_mobilebert
+    ]

@@ -26,6 +26,8 @@ mkdir "${ROOT_DIR}/models/iree"
 mkdir "${ROOT_DIR}/setup"
 mkdir "${ROOT_DIR}/test_data"
 mkdir "${ROOT_DIR}/output"
+# Touch result file as adb doesn't push empty dirs.
+touch "${ROOT_DIR}/output/result.csv"
 
 wget https://storage.googleapis.com/iree-model-artifacts/tflite_squad_test_data.zip -O /tmp/tflite_squad_test_data.zip
 unzip /tmp/tflite_squad_test_data.zip -d "${ROOT_DIR}/test_data/"
@@ -57,6 +59,9 @@ python configure_bazel.py
 cd integrations/tensorflow
 bazel build -c opt iree_tf_compiler:iree-import-tflite
 
+echo "Done building iree-import-tflite"
+echo
+
 IREE_COMPILE_PATH="${SOURCE_DIR}/iree-build/tools/iree-compile"
 
 TFLITE_MODEL_DIR="${ROOT_DIR}/models/tflite"
@@ -64,12 +69,12 @@ IREE_MODEL_DIR="${ROOT_DIR}/models/iree"
 mkdir -p "${IREE_MODEL_DIR}/vulkan"
 mkdir -p "${IREE_MODEL_DIR}/local-task"
 
-for i in "${ROOT_DIR}/models/tflite/"; do
+for i in $(ls ${ROOT_DIR}/models/tflite/); do
+  MODEL_NAME=$(basename $i .tflite)
 
-  MODEL_NAME=$(basename $i)
-
+  echo "Processing ${MODEL_NAME} ..."
   bazel-bin/iree_tf_compiler/iree-import-tflite "${TFLITE_MODEL_DIR}/${MODEL_NAME}.tflite" -o "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir"
-  echo "Compiling ${MODEL_NAME}.vmfb for aarch64..."
+  echo -e "\tCompiling ${MODEL_NAME}.vmfb for aarch64..."
   "${IREE_COMPILE_PATH}" \
     --iree-input-type=tosa \
     --iree-hal-target-backends=dylib-llvm-aot \
@@ -80,7 +85,7 @@ for i in "${ROOT_DIR}/models/tflite/"; do
     "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
     --o "${IREE_MODEL_DIR}/local-task/${MODEL_NAME}.vmfb"
 
-  echo "Compiling ${MODEL_NAME}_mmt4d.vmfb for aarch64..."
+  echo -e "\tCompiling ${MODEL_NAME}_mmt4d.vmfb for aarch64..."
   "${IREE_COMPILE_PATH}" \
     --iree-input-type=tosa \
     --iree-hal-target-backends=dylib-llvm-aot \
@@ -94,7 +99,7 @@ for i in "${ROOT_DIR}/models/tflite/"; do
     --o "${IREE_MODEL_DIR}/local-task/${MODEL_NAME}_mmt4d.vmfb"
 
   if [[ "${GPU_TYPE}" = "mali" ]]; then
-    echo "Compiling ${MODEL_NAME}.vmfb for vulkan mali..."
+    echo -e "\tCompiling ${MODEL_NAME}.vmfb for vulkan mali..."
     "${IREE_COMPILE_PATH}" \
       --iree-input-type=tosa \
       --iree-hal-target-backends=vulkan-spirv \
@@ -105,7 +110,7 @@ for i in "${ROOT_DIR}/models/tflite/"; do
       "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
       --o "${IREE_MODEL_DIR}/vulkan/${MODEL_NAME}.vmfb"
   else
-    echo "Compiling ${MODEL_NAME}.vmfb for vulkan adreno..."
+    echo -e "\tCompiling ${MODEL_NAME}.vmfb for vulkan adreno..."
     "${IREE_COMPILE_PATH}" \
       --iree-input-type=tosa \
       --iree-hal-target-backends=vulkan-spirv \
@@ -118,7 +123,7 @@ for i in "${ROOT_DIR}/models/tflite/"; do
   fi
 done
 
-# Cross-compile IREE benchmark binary.
+echo -e "\nCross-compile IREE benchmark binary.\n"
 cd "${SOURCE_DIR}/iree"
 cmake -GNinja -B ../iree-build/ \
   -DCMAKE_INSTALL_PREFIX=../iree-build/install \
@@ -147,8 +152,12 @@ export CXX=clang++
 cd "${SOURCE_DIR}"
 git clone https://github.com/tensorflow/tensorflow.git
 cd tensorflow
-# Select defaults. Answer Yes to configuring ./WORKSPACE for Android builds.
-# Use Version 21 for Android NDK, 29 for Android SDK.
+
+echo
+echo Configuring TensorFlow
+echo Select defaults. Answer Yes to configuring ./WORKSPACE for Android builds.
+echo Use Version 21 for Android NDK, 29 for Android SDK.
+echo
 python configure.py
 bazel build -c opt --config=android_arm64 \
   --copt="-Wno-error=implicit-function-declaration" \
@@ -156,15 +165,15 @@ bazel build -c opt --config=android_arm64 \
 
 cp "${SOURCE_DIR}/tensorflow/bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model" "${ROOT_DIR}/"
 
-# Push benchmarking artifacts to device.
+echo Pushing benchmarking artifacts to device.
 DEVICE_ROOT_DIR=/data/local/tmp/benchmarks
-adb shell rm -r "${DEVICE_ROOT_DIR}"
+adb shell rm -r "${DEVICE_ROOT_DIR}" || true
 adb push "${ROOT_DIR}" /data/local/tmp
 
 adb shell chmod +x "${DEVICE_ROOT_DIR}/benchmark_model"
 adb shell chmod +x "${DEVICE_ROOT_DIR}/iree-benchmark-module"
 
-# Setup device.
+echo Setup device.
 adb shell "su root sh ${DEVICE_ROOT_DIR}/setup/set_android_scaling_governor.sh performance"
 
 if [[ "${GPU_TYPE}" = "mali" ]]; then
@@ -173,7 +182,7 @@ else
   adb shell "su root sh ${DEVICE_ROOT_DIR}/setup/set_adreno_gpu_scaling_policy.sh performance"
 fi
 
-# Run benchmark.
-adb push "${SOURCE_DIR}/build_tools/benchmarks/comparisons" /data/local/tmp/
+echo Running benchmark.
+adb push "${SOURCE_DIR}/iree/build_tools/benchmarks/comparisons" /data/local/tmp/
 adb shell "su root /data/data/com.termux/files/usr/bin/python /data/local/tmp/comparisons/run_benchmarks.py --device_name=Pixel6  --mode=mobile --base_dir=${DEVICE_ROOT_DIR} --output_dir=${DEVICE_ROOT_DIR}/output"
-adb shell cat "${DEVICE_ROOT_DIR}/output/result.csv"
+adb shell cat "${DEVICE_ROOT_DIR}/output/result.csv" | tee ${ROOT_DIR}/output/result.csv

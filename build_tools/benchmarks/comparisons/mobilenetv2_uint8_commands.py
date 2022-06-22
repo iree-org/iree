@@ -15,7 +15,7 @@ _DEFAULT_NUM_THREADS = 1
 
 
 class TfliteMobilenetV2UINT8(TFLiteBenchmarkCommand):
-  """ Specializes the benchmark command to use TFLite. """
+  """Specializes the benchmark command to use TFLite."""
 
   def __init__(self,
                benchmark_binary: str,
@@ -38,7 +38,7 @@ class TfliteMobilenetV2UINT8(TFLiteBenchmarkCommand):
 
 
 class IreeMobilenetV2UINT8(IreeBenchmarkCommand):
-  """ Specializes the benchmark command to use IREE. """
+  """Specializes the benchmark command to use IREE."""
 
   def __init__(self,
                benchmark_binary: str,
@@ -56,12 +56,11 @@ class IreeMobilenetV2UINT8(IreeBenchmarkCommand):
                      taskset=taskset)
     self.driver = driver
     self.args.append("--entry_function=main")
-    self.args.append(
-        '--function_input="1x224x224x3xui8"')
+    self.args.append('--function_input="1x224x224x3xui8"')
 
 
 class MobilenetV2UINT8CommandFactory(BenchmarkCommandFactory):
-  """ Generates `BenchmarkCommand` objects specific to running MobileNet."""
+  """Generates `BenchmarkCommand` objects specific to running MobileNet."""
 
   def __init__(self, base_dir: str):
     self._model_name = "mobilenet_v2_224_1.0_uint8"
@@ -92,11 +91,12 @@ class MobilenetV2UINT8CommandFactory(BenchmarkCommandFactory):
 
   def _generate_cpu(self, device: str):
     # Generate TFLite benchmarks.
-    tflite_mobilenet = TfliteMobilenetV2UINT8(self._tflite_benchmark_binary_path,
-                                              self._model_name,
-                                              self._tflite_model_path,
-                                              self._tflite_test_data_dir,
-                                              driver="cpu")
+    tflite_mobilenet = TfliteMobilenetV2UINT8(
+        self._tflite_benchmark_binary_path,
+        self._model_name,
+        self._tflite_model_path,
+        self._tflite_test_data_dir,
+        driver="cpu")
 
     # Generate IREE benchmarks.
     driver = "local-task"
@@ -110,11 +110,12 @@ class MobilenetV2UINT8CommandFactory(BenchmarkCommandFactory):
     return commands
 
   def _generate_gpu(self, driver: str):
-    tflite_mobilenet = TfliteMobilenetV2UINT8(self._tflite_benchmark_binary_path,
-                                              self._model_name,
-                                              self._tflite_model_path,
-                                              self._tflite_test_data_dir,
-                                              driver="gpu")
+    tflite_mobilenet = TfliteMobilenetV2UINT8(
+        self._tflite_benchmark_binary_path,
+        self._model_name,
+        self._tflite_model_path,
+        self._tflite_test_data_dir,
+        driver="gpu")
     tflite_mobilenet.args.append("--gpu_precision_loss_allowed=true")
 
     iree_model_path = os.path.join(self._base_dir, "models", "iree", driver,

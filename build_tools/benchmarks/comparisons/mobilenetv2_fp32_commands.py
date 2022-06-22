@@ -15,7 +15,7 @@ _DEFAULT_NUM_THREADS = 1
 
 
 class TfliteMobilenetV2FP32(TFLiteBenchmarkCommand):
-  """ Specializes the benchmark command to use TFLite. """
+  """Specializes the benchmark command to use TFLite."""
 
   def __init__(self,
                benchmark_binary: str,
@@ -36,7 +36,7 @@ class TfliteMobilenetV2FP32(TFLiteBenchmarkCommand):
 
 
 class IreeMobilenetV2FP32(IreeBenchmarkCommand):
-  """ Specializes the benchmark command to use IREE. """
+  """Specializes the benchmark command to use IREE."""
 
   def __init__(self,
                benchmark_binary: str,
@@ -54,12 +54,11 @@ class IreeMobilenetV2FP32(IreeBenchmarkCommand):
                      taskset=taskset)
     self.driver = driver
     self.args.append("--entry_function=main")
-    self.args.append(
-        '--function_input="1x224x224x3xf32"')
+    self.args.append('--function_input="1x224x224x3xf32"')
 
 
 class MobilenetV2FP32CommandFactory(BenchmarkCommandFactory):
-  """ Generates `BenchmarkCommand` objects specific to running MobileNet."""
+  """Generates `BenchmarkCommand` objects specific to running MobileNet."""
 
   def __init__(self, base_dir: str):
     self._model_name = "mobilenet_v2_1.0_224"
@@ -139,7 +138,7 @@ class MobilenetV2FP32CommandFactory(BenchmarkCommandFactory):
     iree_model_path = os.path.join(self._base_dir, "models", "iree", driver,
                                    self._model_name + ".vmfb")
     iree_mobilenet = IreeMobilenetV2FP32(self._iree_benchmark_binary_path,
-                                          self._model_name,
-                                          iree_model_path,
-                                          driver=driver)
+                                         self._model_name,
+                                         iree_model_path,
+                                         driver=driver)
     return [tflite_mobilenet, tflite_mobilenet_fp16, iree_mobilenet]
