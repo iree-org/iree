@@ -138,9 +138,6 @@ static LogicalResult defineWorkgroupCountRegion(
   entryBlock->addArgument(builder.getType<IREE::HAL::DeviceType>(), loc);
 
   // AffineMap for the number of workgroups = ceilDiv(workload, tileSize)
-  AffineExpr s0, s1;
-  bindSymbols(exportOp.getContext(), s0, s1);
-  AffineMap numTilesMap = AffineMap::get(0, 2, s0.ceilDiv(s1));
   SmallVector<Value> numTiles;
   numTiles.reserve(*numWorkloadValues);
   builder.setInsertionPointToStart(entryBlock);
@@ -149,18 +146,19 @@ static LogicalResult defineWorkgroupCountRegion(
   partitionableLoopsSet.insert(partitionableLoops.begin(),
                                partitionableLoops.end());
   for (auto loopNum : llvm::seq<unsigned>(0, *numWorkloadValues)) {
+    Value workload = entryBlock->addArgument(indexType, loc);
     if (!partitionableLoopsSet.count(loopNum)) {
       tileSizes[loopNum] = 0;
     }
-    Value workload = entryBlock->addArgument(indexType, loc);
     if (tileSizes[loopNum] == 0) {
       numTiles.push_back(one);
       continue;
     }
-    Value tileSizeVal =
-        builder.create<arith::ConstantIndexOp>(loc, tileSizes[loopNum]);
-    Value nTiles = builder.create<AffineApplyOp>(
-        loc, numTilesMap, ValueRange{workload, tileSizeVal});
+    AffineExpr s0;
+    bindSymbols(exportOp.getContext(), s0);
+    AffineMap numTilesMap =
+        AffineMap::get(0, 1, s0.ceilDiv(tileSizes[loopNum]));
+    Value nTiles = builder.create<AffineApplyOp>(loc, numTilesMap, workload);
     numTiles.push_back(nTiles);
   }
 
