@@ -1,6 +1,6 @@
 // RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-tile-and-distribute-to-workgroups)), canonicalize, cse' --split-input-file %s | FileCheck %s
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [16, 4, 64], [4, 4, 4]]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [16, 4, 0], [0, 0, 64]]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -14,7 +14,7 @@
   native_vector_size = 16 : index,
   target_triple = "aarch64-unknown-unknown-eabi-elf"
 }>
-#translation = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @matmul_tensors {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
     hal.executable.export public @matmul_tensors layout(#executable_layout) {translation_info = #translation}
@@ -49,7 +49,7 @@ hal.executable private @matmul_tensors {
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize workload_per_wg = [64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 64]>
 //      CHECK: hal.executable.export public @matmul_tensors
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
@@ -236,7 +236,7 @@ hal.executable private @add4D {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 64, 0], [1, 16, 4, 64], [1, 4, 4, 4]]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 64, 0], [1, 16, 4, 0], [0, 0, 0, 64]]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -248,7 +248,7 @@ hal.executable private @add4D {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "aarch64-unknown-unknown-eabi-elf"}>
-#translation = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @batch_matmul_tensors {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
     hal.executable.export public @batch_matmul_tensors layout(#executable_layout) {translation_info = #translation}
@@ -281,7 +281,7 @@ hal.executable private @batch_matmul_tensors {
   }
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize workload_per_wg = [64, 64, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 64, 1]>
 //      CHECK: hal.executable.export public @batch_matmul_tensors
 // CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
 // CHECK-SAME:    %[[WORKLOAD_X:[a-zA-Z0-9_]+]]: index
@@ -846,7 +846,7 @@ hal.executable private @generic_static {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[28, 8, 0], [4, 4, 60], [4, 4, 4]]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[28, 8, 0], [4, 4, 0], [0, 0, 60]]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -858,7 +858,7 @@ hal.executable private @generic_static {
   data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "aarch64-none-linux-android30"}>
-#translation = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @matmul_static {
   hal.executable.variant public @system_elf_arm_64, target = #executable_target_system_elf_arm_64_ {
     hal.executable.export public @matmul_static layout(#executable_layout) {translation_info = #translation}
@@ -888,7 +888,7 @@ hal.executable private @matmul_static {
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 28)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize workload_per_wg = [8, 28]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [8, 28]>
 //      CHECK: hal.executable private @matmul_static
 //      CHECK: hal.executable.export public @matmul_static
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -1350,7 +1350,7 @@ hal.executable private @scalar {
   native_vector_size = 16 : index,
   target_triple = "aarch64-unknown-unknown-eabi-elf"
 }>
-#translation = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @rank_reduced_slice {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
     hal.executable.export public @rank_reduced_slice layout(#executable_layout) {translation_info = #translation}
