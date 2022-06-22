@@ -28,7 +28,7 @@
 using mlir::bufferization::AnalysisState;
 using mlir::bufferization::BufferizableOpInterface;
 using mlir::bufferization::BufferizationAliasInfo;
-using mlir::bufferization::BufferizationState;
+using mlir::bufferization::BufferizationOptions;
 using mlir::bufferization::DialectAnalysisState;
 using mlir::bufferization::eliminateAllocTensors;
 using mlir::bufferization::OneShotBufferizationOptions;
@@ -123,7 +123,7 @@ struct DispatchTensorLoadOpInterface
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                          BufferizationState &state) const {
+                          const BufferizationOptions &options) const {
     auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
     auto tensorSubspanOp =
         loadOp.source().getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
@@ -172,7 +172,7 @@ struct DispatchTensorStoreOpInterface
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                          BufferizationState &state) const {
+                          const BufferizationOptions &options) const {
     auto storeOp = cast<IREE::Flow::DispatchTensorStoreOp>(op);
     auto tensorSubspanOp =
         storeOp.target().getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
@@ -198,12 +198,12 @@ struct DispatchTensorStoreOpInterface
     }  // else: Writing the entire tensor, no subview required.
 
     Value srcMemref =
-        *state.getBuffer(rewriter, storeOp->getOpOperand(0) /*tensor*/);
+        getBuffer(rewriter, storeOp->getOpOperand(0).get(), options);
 
     // If everything bufferized inplace, no copy is needed. We wrote to the
     // target buffer already. The copy folds away in that case.
-    if (failed(state.getOptions().createMemCpy(rewriter, storeOp->getLoc(),
-                                               srcMemref, target)))
+    if (failed(options.createMemCpy(rewriter, storeOp->getLoc(), srcMemref,
+                                    target)))
       return failure();
 
     rewriter.eraseOp(storeOp);
@@ -215,7 +215,7 @@ struct DispatchTensorStoreOpInterface
 /// Generic conversion for any LinalgExtOp on tensors.
 static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
                                           IREE::LinalgExt::LinalgExtOp op,
-                                          BufferizationState &state) {
+                                          const BufferizationOptions &options) {
   // Take a guard before anything else.
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(op);
@@ -237,19 +237,18 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
       continue;
     }
     // Input operands are never written to.
-    newInputBuffers.push_back(*state.getBuffer(
-        rewriter, *opOperand,
-        BufferizationState::ForceInPlacability::FORCE_INPLACE));
+    newInputBuffers.push_back(getBuffer(rewriter, opOperand->get(), options));
   }
 
   // New output operands for the cloned op.
+  AnalysisState analysisState(options);
   SmallVector<Value> newOutputBuffers;
   for (OpResult opResult : op->getOpResults()) {
     SmallVector<OpOperand *> aliasingOpOperands =
-        state.getAnalysisState().getAliasingOpOperand(opResult);
+        analysisState.getAliasingOpOperand(opResult);
     assert(aliasingOpOperands.size() == 1 && "expected 1 OpOperand");
     FailureOr<Value> resultBuffer =
-        state.getBuffer(rewriter, *aliasingOpOperands.front());
+        getBuffer(rewriter, aliasingOpOperands.front()->get(), options);
     if (failed(resultBuffer)) return failure();
     newOutputBuffers.push_back(*resultBuffer);
   }
@@ -324,9 +323,9 @@ struct LinalgExtOpInterface
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                          BufferizationState &state) const {
-    return bufferizeLinalgExtOp(rewriter,
-                                cast<IREE::LinalgExt::LinalgExtOp>(op), state);
+                          const BufferizationOptions &options) const {
+    return bufferizeLinalgExtOp(
+        rewriter, cast<IREE::LinalgExt::LinalgExtOp>(op), options);
   }
 };
 

@@ -133,7 +133,7 @@ static LogicalResult runIREEOneShotBufferize(
   OneShotAnalysisState state(op, options);
   if (failed(analyzeOp(op, state))) return failure();
   if (options.testAnalysisOnly) return success();
-  return bufferizeOp(op, state);
+  return bufferization::runOneShotBufferize(op, options);
 }
 
 /// Run comprehensive bufferize.
