@@ -235,11 +235,11 @@ def LLVMCPUSynchronizeSymbolVisibility :
   let constructor = "mlir::iree_compiler::createLLVMCPUSynchronizeSymbolVisibilityPass()";
 }
 
-def LLVMCPUTileFuseAndVectorize
+def LLVMCPUAArchDoubleTilingExpert
     : Pass<"iree-llvmcpu-tile-fuse-and-vectorize", "func::FuncOp"> {
   let summary = "Tile, fuse and vectorize Linalg ops";
   let constructor =
-      "mlir::iree_compiler::createLLVMCPUTileFuseAndVectorizePass()";
+      "mlir::iree_compiler::createLLVMCPUAArchDoubleTilingExpertPass()";
 }
 
 def LLVMCPUAArch64VectorLowering

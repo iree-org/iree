@@ -442,20 +442,35 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
   }
 }
 
-void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
+void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager,
                                          bool lowerToVectors) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+  {
+    LinalgFusePassOptions options;
+    options.tilingLevel =
+        static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
+    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
 
+  // Add the sandbox single tiling expert to tile and vectorize.
+  {
+    LinalgSingleTilingExpertPassOptions options;
+    options.vectorize = true;
+    options.tilingLevel =
+        static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLinalgSingleTilingExpertPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTileFuseAndVectorizePass(lowerToVectors));
-  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+      createLinalgToVectorVectorizeMMT4dPass());
 
   addBufferizePasses(nestedModulePM);
-  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUAArch64VectorLoweringPass());

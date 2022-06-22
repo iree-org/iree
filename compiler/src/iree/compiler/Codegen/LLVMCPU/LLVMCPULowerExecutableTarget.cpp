@@ -228,8 +228,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             addTransformDialectInterpreterPasses(executableLoweringPipeline);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
-              CPUTileFuseAndVectorize:
-            addTileFuseAndVectorizePassPipeline(executableLoweringPipeline,
+              CPUAArchDoubleTilingExpert:
+            addCPUAArchDoubleTilingExpertPassPipeline(executableLoweringPipeline,
                                                 lowerToVectors);
             break;
           default:

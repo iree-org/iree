@@ -22,7 +22,6 @@ iree_compiler_cc_library(
         "LLVMCPUEmitVectorizationRemarks.cpp",
         "LLVMCPULowerExecutableTarget.cpp",
         "LLVMCPUSynchronizeSymbolVisibility.cpp",
-        "LLVMCPUTileFuseAndVectorizeLinalgTensorOps.cpp",
         "LLVMCPUUnfuseFMAOps.cpp",
         "Passes.cpp",
         "VectorContractCustomKernels.cpp",
