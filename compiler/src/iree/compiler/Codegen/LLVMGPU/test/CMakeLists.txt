@@ -25,6 +25,7 @@ iree_lit_test_suite(
     "reduce_bank_conflicts.mlir"
     "rocdl_pipeline_test.mlir"
     "tensorcore_vectorization.mlir"
+    "transform_dialect_vector_distribution.mlir"
     "vector_to_gpu.mlir"
     "vectorization.mlir"
     "warp_reduction.mlir"
@@ -34,6 +35,7 @@ iree_lit_test_suite(
   DATA
     transform_dialect_codegen_bufferize_spec.mlir
     transform_dialect_codegen_foreach_to_gpu_spec.mlir
+    transform_dialect_codegen_vector_distribution_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
