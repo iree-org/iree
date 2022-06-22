@@ -87,7 +87,7 @@ def RewriteForeachThreadToAsyncOp :
 
   let extraClassDeclaration = [{
     ::mlir::FailureOr<::mlir::Operation *> applyToOne(
-      ::mlir::scf::ForeachThreadOp target);
+      ::mlir::scf::ForeachThreadOp target, transform::TransformState &state);
   }];
 }
 
@@ -109,7 +109,7 @@ def RewriteForeachThreadToScfForOp :
 
   let extraClassDeclaration = [{
     ::mlir::FailureOr<::mlir::scf::ForOp> applyToOne(
-        ::mlir::scf::ForeachThreadOp target);
+        ::mlir::scf::ForeachThreadOp target, transform::TransformState &state);
   }];
 }
 

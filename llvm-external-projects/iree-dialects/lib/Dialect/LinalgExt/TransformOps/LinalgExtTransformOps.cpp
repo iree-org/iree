@@ -183,7 +183,7 @@ LinalgExt::FuseIntoContainingOp::apply(transform::TransformResults &results,
 }
 
 FailureOr<Operation *> LinalgExt::RewriteForeachThreadToAsyncOp::applyToOne(
-    scf::ForeachThreadOp target) {
+    scf::ForeachThreadOp target, transform::TransformState &state) {
   LinalgExt::ForeachThreadOpToAsyncRewriter pattern(this->getContext());
   auto functionalRewrite =
       [&](scf::ForeachThreadOp op,
@@ -197,7 +197,7 @@ FailureOr<Operation *> LinalgExt::RewriteForeachThreadToAsyncOp::applyToOne(
 }
 
 FailureOr<scf::ForOp> LinalgExt::RewriteForeachThreadToScfForOp::applyToOne(
-    scf::ForeachThreadOp target) {
+    scf::ForeachThreadOp target, transform::TransformState &state) {
   LinalgExt::ForeachThreadOpToScfForRewriter pattern(this->getContext());
   auto functionalRewrite =
       [&](scf::ForeachThreadOp op,

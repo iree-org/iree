@@ -475,7 +475,7 @@ static OpTy getSelfOrParentOfType(Operation *op) {
 }
 
 LogicalResult transform_dialect::VectorDistributionOp::applyToOne(
-    Operation *target) {
+    Operation *target, transform::TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     InFlightDiagnostic diag = emitOpError()
                               << "applies only to isolated-from-above targets";
