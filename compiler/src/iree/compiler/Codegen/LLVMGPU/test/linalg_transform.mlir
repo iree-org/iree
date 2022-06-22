@@ -46,8 +46,6 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
           // FOREACH-TO-GPU: %[[LT1:.*]]  = arith.cmpi ult, %[[TIDY]], %[[C1]] : index
           // FOREACH-TO-GPU: %[[COND:.*]]  = arith.andi %[[LT5]], %[[LT1]] : i1
           // FOREACH-TO-GPU: scf.if %[[COND]] {
-          // FOREACH-TO-GPU:   affine.min #{{.*}}()[%[[TIDX]]]
-          // FOREACH-TO-GPU:   affine.min #{{.*}}()[%[[TIDY]]]
           // FOREACH-TO-GPU:   affine.apply #{{.*}}()[%[[TIDX]]]
           // FOREACH-TO-GPU:   affine.apply #{{.*}}()[%[[TIDY]]]
           // FOREACH-TO-GPU:   linalg.fill
