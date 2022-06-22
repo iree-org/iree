@@ -136,14 +136,14 @@ static bool GenerateImpl(const std::string& identifier,
   f << "#include <stdint.h>\n";
   f << R"(
 #if !defined(IREE_DATA_ALIGNAS_PTR)
+// Default set to 512b alignment.
 #if defined(_MSC_VER)
-#define IREE_DATA_ALIGNAS_PTR __declspec(align(8))
+#define IREE_DATA_ALIGNAS_PTR __declspec(align(64))
 #else
-#include <stdalign.h>
-#define IREE_DATA_ALIGNAS_PTR alignas(alignof(void*))
+#define IREE_DATA_ALIGNAS_PTR _Alignas(64)
 #endif  // _MSC_VER
 #endif  // !IREE_DATA_ALIGNAS_PTR
-  )";
+)";
   GenerateTocStruct(f);
   for (size_t i = 0, e = input_files.size(); i < e; ++i) {
     f << "IREE_DATA_ALIGNAS_PTR static uint8_t const file_" << i << "[] = {\n";
