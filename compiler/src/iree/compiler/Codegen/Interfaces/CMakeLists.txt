@@ -19,6 +19,7 @@ iree_cc_library(
     "Interfaces.cpp"
   DEPS
     ::BufferizationInterfaces
+    ::PartitionableLoopsInterface
     ::ProcessorOpInterfaces
     IREELinalgExtTransformOps
     IREELinalgTransformDialect
@@ -52,6 +53,37 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    PartitionableLoopsInterface
+  HDRS
+    "PartitionableLoopsInterface.h"
+  TEXTUAL_HDRS
+    "PartitionableLoopsInterface.cpp.inc"
+    "PartitionableLoopsInterface.h.inc"
+  SRCS
+    "PartitionableLoopsInterface.cpp"
+  DEPS
+    ::PartitionableLoopsInterfaceGen
+    IREELinalgExtDialect
+    LLVMSupport
+    MLIRIR
+    MLIRLinalgDialect
+    MLIRLinalgStructuredOpsIncGenLib
+    MLIRTensorDialect
+  PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    PartitionableLoopsInterfaceGen
+  TD_FILE
+    "PartitionableLoopsInterface.td"
+  OUTS
+    --gen-op-interface-decls PartitionableLoopsInterface.h.inc
+    --gen-op-interface-defs PartitionableLoopsInterface.cpp.inc
 )
 
 iree_cc_library(

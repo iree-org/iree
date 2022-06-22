@@ -51,12 +51,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createCleanupBufferAllocViewPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createBufferizeCopyOnlyDispatchesPass();
 
-/// Distributes the computation amongst workgroups. Unlike
-/// `TileAndDistributeToWorkgroupsPass`, just splits the output of the
-/// dispatch such that each workgroups computes a slice of the outpt.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createDistributeToWorkgroupsPass();
-
 /// Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets on
 /// subspan ops to the consumer load/store ops, in preparation for lowering to
 /// backends that require linearized access.
@@ -113,6 +107,10 @@ std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass();
 
+/// Pass to test Partitionable loop interface
+std::unique_ptr<OperationPass<void>>
+createTestPartitionableLoopsInterfacePass();
+
 /// Pass to tile and distribute to workgroups.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createTileAndDistributeToWorkgroupsPass();
@@ -124,11 +122,6 @@ createRewriteLinalgDestructiveUpdatesPass();
 
 /// Pass to propagate type to avoid generating load/stores of illegal types.
 std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass();
-
-/// Sets the number of workgroups to use for each entry point in the dispatch
-/// region.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize = {});
 
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass();

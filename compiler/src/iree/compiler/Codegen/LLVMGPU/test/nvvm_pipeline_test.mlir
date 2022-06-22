@@ -801,7 +801,7 @@ hal.executable @mma_fused_fp16 {
 //     CHECK-LABEL: hal.executable public @pooling_dynamic
 //           CHECK:   hal.executable.variant public @cuda
 
-// -----
+// // -----
 
 #map0 = affine_map<()[s0, s1] -> (s0 * s1)>
 #map1 = affine_map<(d0)[s0] -> (s0, -d0 + 16384)>
@@ -847,4 +847,3 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //   CHECK-LABEL: hal.executable public @warp_reduction_dispatch
 //         CHECK:   hal.executable.variant public @cuda
 // CHECK-COUNT-5:     nvvm.shfl.sync  bfly
-

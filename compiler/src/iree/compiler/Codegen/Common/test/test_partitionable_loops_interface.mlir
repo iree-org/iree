@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-flow-test-partitionable-loops-interface --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-test-partitionable-loops-interface --split-input-file %s | FileCheck %s
 
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>

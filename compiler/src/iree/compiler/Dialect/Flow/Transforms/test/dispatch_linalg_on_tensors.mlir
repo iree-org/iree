@@ -10,6 +10,7 @@ func.func @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[ARG0_DIM0:.+]] = tensor.dim %[[ARG0]], %c0
 //  CHECK-DAG:   %[[ARG0_DIM1:.+]] = tensor.dim %[[ARG0]], %c1
 //  CHECK-DAG:   %[[ARG1_DIM0:.+]] = tensor.dim %[[ARG1]], %c0
@@ -17,6 +18,7 @@ func.func @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
 //  CHECK-DAG:   %[[ARG2_DIM0:.+]] = tensor.dim %[[ARG2]], %c0
 //  CHECK-DAG:   %[[ARG2_DIM1:.+]] = tensor.dim %[[ARG2]], %c1
 //      CHECK:   flow.dispatch.workgroups
+// CHECK-SAME:     [%[[ARG0_DIM0]], %[[ARG1_DIM1]], %[[C1]]]
 // CHECK-SAME:     (%[[ARG0]], %[[ARG0_DIM0]], %[[ARG0_DIM1]], %[[ARG1]], %[[ARG1_DIM0]], %[[ARG1_DIM1]], %[[ARG2]], %[[ARG2_DIM0]], %[[ARG2_DIM1]])
 // CHECK-NEXT:     %[[ARG3:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
 // CHECK-SAME:     %[[ARG4:[a-zA-Z0-9_]+]]: index
@@ -69,7 +71,7 @@ func.func @generic_op_alone(%A: tensor<?x?xf32>, %B: tensor<?xf32>) -> tensor<?x
 //  CHECK-DAG:   %[[ARG0_D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //  CHECK-DAG:   %[[ARG1_D0:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //      CHECK:   flow.dispatch.workgroups
-// CHECK-SAME:     [%[[ARG0_D1]], %[[ARG0_D0]], %[[C1]]](%[[ARG0]], %[[ARG0_D0]], %[[ARG0_D1]], %[[ARG1]], %[[ARG1_D0]])
+// CHECK-SAME:     [%[[ARG0_D0]], %[[ARG0_D1]]](%[[ARG0]], %[[ARG0_D0]], %[[ARG0_D1]], %[[ARG1]], %[[ARG1_D0]])
 // CHECK-NEXT:     %[[ARG0_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>, %[[ARG0_D0_CAPTURE:[a-zA-Z0-9_]+]]: index, %[[ARG0_D1_CAPTURE:[a-zA-Z0-9_]+]]: index,
 // CHECK-SAME:     %[[ARG1_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?xf32>, %[[ARG1_D0_CAPTURE:[a-zA-Z0-9_]+]]: index,
 // CHECK-SAME:     %[[RET0_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
@@ -104,7 +106,7 @@ func.func @fuse_matmul_with_fill(%A : tensor<?x?xf32>, %B : tensor<?x?xf32>) -> 
 //   CHECK-DAG:     %[[ARG0_DIM1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //   CHECK-DAG:     %[[ARG1_DIM0:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //   CHECK-DAG:     %[[ARG1_DIM1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
-//  CHECK-NEXT:     flow.dispatch.workgroups[%[[ARG1_DIM1]], %[[ARG0_DIM0]], %[[C1]]]
+//  CHECK-NEXT:     flow.dispatch.workgroups[%[[ARG0_DIM0]], %[[ARG1_DIM1]], %[[C1]]]
 //  CHECK-SAME:       (%[[ARG0_DIM0]], %[[ARG1_DIM1]], %[[ARG0]], %[[ARG0_DIM1]], %[[ARG1]], %[[ARG1_DIM0]])
 //  CHECK-NEXT:       (%[[ARG0_DIM0_CAPTURE:[a-zA-Z0-9_]+]]: index,
 //  CHECK-SAME:        %[[ARG1_DIM1_CAPTURE:[a-zA-Z0-9_]+]]: index
@@ -160,7 +162,7 @@ func.func @keep_separate_dispatches_for_producer(%A : tensor<?x?xf32>, %B : tens
 //   CHECK-DAG:     %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //   CHECK-DAG:     %[[N:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //   CHECK-DAG:     %[[K:.+]] = tensor.dim %[[ARG0]], %[[C1]]
-//       CHECK:     %[[RESULT1:.+]] = flow.dispatch.workgroups[%[[K]], %[[M]], %[[C1]]]
+//       CHECK:     %[[RESULT1:.+]] = flow.dispatch.workgroups[%[[M]], %[[K]]]
 //  CHECK-SAME:       (%[[ARG0]], %[[M]], %[[K]])
 //  CHECK-NEXT:       (%[[ARG0_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
 //  CHECK-SAME:        %[[RET0_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>) {
@@ -173,7 +175,7 @@ func.func @keep_separate_dispatches_for_producer(%A : tensor<?x?xf32>, %B : tens
 //       CHECK:          flow.dispatch.tensor.store %[[RESULT]], %[[RET0_CAPTURE]]
 //       CHECK:          flow.return
 //       CHECK:     }
-//       CHECK:     flow.dispatch.workgroups[%[[N]], %[[M]], %[[C1]]]
+//       CHECK:     flow.dispatch.workgroups[%[[M]], %[[N]], %[[C1]]]
 //       CHECK:       %[[ZERO:.+]] = arith.constant 0.0
 //       CHECK:       %[[INIT:.+]] = linalg.init_tensor
 //       CHECK:       %[[FILL:.+]] = linalg.fill
@@ -220,7 +222,7 @@ func.func @tile_4d_generic_op_alone
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG0]], %[[C2]]
 //  CHECK-DAG:   %[[D3:.+]] = tensor.dim %[[ARG0]], %[[C3]]
-//  CHECK-DAG:   flow.dispatch.workgroups[%[[D3]], %[[D2]], %[[D1]]]
+//  CHECK-DAG:   flow.dispatch.workgroups[%[[D0]], %[[D1]], %[[D2]], %[[D3]]]
 
 // -----
 
@@ -257,12 +259,12 @@ func.func @always_fuse_cast
 //      CHECK:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[N1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG0]], %[[C1]]
-//      CHECK:   %[[RESULT1:.+]] = flow.dispatch.workgroups[%[[N1]], %[[M]], %[[C1]]]
+//      CHECK:   %[[RESULT1:.+]] = flow.dispatch.workgroups[%[[M]], %[[N]], %[[C1]]]
 // CHECK-SAME:     (%[[M]], %[[N1]], %[[ARG0]], %[[K]], %[[RHS1]])
 //      CHECK:     tensor.cast
 //      CHECK:     flow.return
 //      CHECK:   %[[N2:.+]] = tensor.dim %[[RHS2]], %[[C1]]
-//      CHECK:   %[[RESULT2:.+]] = flow.dispatch.workgroups[%[[N2]], %[[M]], %[[C1]]]
+//      CHECK:   %[[RESULT2:.+]] = flow.dispatch.workgroups[%[[M]], %[[N2]], %[[C1]]]
 // CHECK-SAME:     (%[[M]], %[[N2]], %[[ARG0]], %[[K]], %[[RHS2]])
 //      CHECK:     tensor.cast
 //      CHECK:     flow.return
@@ -270,7 +272,6 @@ func.func @always_fuse_cast
 
 // -----
 
-// A subsequent pass is expected to convert linalg.fill and flow.tensor.update into DMA ops.
 func.func @dont_fuse_tensor_update_with_fill(
     %arg0: tensor<?x?xf32>, %arg1: tensor<f32>,
     %arg2: index, %arg3: index, %arg4: index, %arg5: index)
@@ -360,7 +361,7 @@ func.func @keep_original_producer_uses(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>,
 //  CHECK-DAG: %[[D3:.+]] = tensor.dim %[[ARG2]], %[[C1]]
 //  CHECK-DAG: %[[D4:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //  CHECK-DAG: %[[D5:.+]] = tensor.dim %[[ARG1]], %[[C0]]
-//      CHECK: %[[origCC:.+]]:2 = flow.dispatch.workgroups[%[[D1]], %[[D0]], %[[C1]]]
+//      CHECK: %[[origCC:.+]]:2 = flow.dispatch.workgroups[%[[D0]], %[[D1]], %[[C1]]]
 // CHECK-SAME:     (%[[ARG2]], %[[D2]], %[[D3]], %[[ARG0]], %[[D0]], %[[D4]], %[[ARG1]], %[[D5]], %[[D1]])
 // CHECK-NEXT:   %[[ARG2_CAPTURE:.+]]: !flow.dispatch.tensor<readwrite:?x?xf32>
 // CHECK-SAME:   %[[RESULT_CAPTURE:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
@@ -388,9 +389,10 @@ func.func @conv2d(%input: tensor<1x225x225x16xf32>, %filter: tensor<3x3x16x32xf3
 }
 
 // CHECK-LABEL: func.func @conv2d
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //   CHECK-DAG:   %[[C32:.+]] = arith.constant 32
 //   CHECK-DAG:   %[[C112:.+]] = arith.constant 112
-//       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups[%[[C32]], %[[C112]], %[[C112]]]
+//       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups[%[[C1]], %[[C112]], %[[C112]], %[[C32]], %[[C1]], %[[C1]], %[[C1]]]
 //       CHECK:     linalg.conv_2d_nhwc_hwcf
 //       CHECK:     flow.return
 //       CHECK:   return %[[RESULT]]
@@ -406,9 +408,10 @@ func.func @depthwise_conv2d(%input: tensor<1x113x113x96xf32>, %filter: tensor<3x
 }
 
 // CHECK-LABEL: func.func @depthwise_conv2d
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //   CHECK-DAG:   %[[C56:.+]] = arith.constant 56
 //   CHECK-DAG:   %[[C96:.+]] = arith.constant 96
-//       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups[%[[C96]], %[[C56]], %[[C56]]]
+//       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups[%[[C1]], %[[C56]], %[[C56]], %[[C96]], %[[C1]], %[[C1]]]
 //       CHECK:     linalg.depthwise_conv_2d_nhwc_hwc
 //       CHECK:     flow.return
 //       CHECK:   return %[[RESULT]]
@@ -434,7 +437,7 @@ func.func @subtensor_insert(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>,
 //  CHECK-DAG:   %[[ARG0_D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //  CHECK-DAG:   %[[ARG1_D0:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[ARG1_D1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
-//      CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups[%[[ARG0_D1]], %[[ARG0_D0]], %[[C1]]]
+//      CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups[%[[ARG0_D0]], %[[ARG0_D1]]]
 // CHECK-SAME:       (%[[ARG0]], %[[ARG0_D0]], %[[ARG0_D1]], %[[ARG1]],
 // CHECK-SAME:        %[[ARG2]], %[[ARG3]], %[[ARG4]], %[[ARG5]], %[[ARG1_D0]], %[[ARG1_D1]])
 // CHECK-SAME:       tensor<?x?xf32>{%[[ARG0_D0]], %[[ARG0_D1]]}
@@ -482,7 +485,7 @@ func.func @fuse_non_tiled_reduction_fill(%input1: tensor<1000xf32>, %input2: ten
 // CHECK-LABEL: func.func @fuse_non_tiled_reduction_fill
 
 //      CHECK: %[[C1:.+]] = arith.constant 1 : index
-//      CHECK: flow.dispatch.workgroups[%[[C1]], %[[C1]], %[[C1]]]({{.+}}) : (tensor<1000xf32>, tensor<1000xf32>, tensor<f32>) -> tensor<f32> =
+//      CHECK: flow.dispatch.workgroups[%[[C1]]]({{.+}}) : (tensor<1000xf32>, tensor<1000xf32>, tensor<f32>) -> tensor<f32> =
 // CHECK-NEXT:     (%[[INPUT1:[a-z0-9]+]]: !flow.dispatch.tensor<readonly:1000xf32>,
 // CHECK-SAME:      %[[INPUT2:[a-z0-9]+]]: !flow.dispatch.tensor<readonly:1000xf32>,
 // CHECK-SAME:      %[[OFFSET:[a-z0-9]+]]: !flow.dispatch.tensor<readonly:f32>,
@@ -854,7 +857,7 @@ func.func @scatter(
 //  CHECK-DAG:   %[[ARG0_D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[ARG0_D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //  CHECK-DAG:   %[[ARG1_D0:.+]] = tensor.dim %[[ARG1]], %[[C0]]
-//      CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups[%[[ARG2_D1]], %[[ARG2_D0]], %[[C1]]]
+//      CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups[%[[ARG2_D0]], %[[ARG2_D1]]]
 // CHECK-SAME:       (%[[ARG2]], %[[ARG2_D0]], %[[ARG2_D1]], %[[ARG1]], %[[ARG1_D0]], %[[ARG0]], %[[ARG0_D0]], %[[ARG0_D1]])
 // CHECK-NEXT:       %[[ARG2_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
 // CHECK-SAME:       %[[ARG1_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x1xi32>
@@ -893,7 +896,7 @@ func.func @sort_3d(%arg0: tensor<?x?x?xi32>, %arg1 : tensor<?x?x?xf32>)
 //  CHECK-DAG:   %[[ARG1_D0:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[ARG1_D1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //  CHECK-DAG:   %[[ARG1_D2:.+]] = tensor.dim %[[ARG1]], %[[C2]]
-//      CHECK:   %[[RESULT_OUT:.+]]:2 = flow.dispatch.workgroups[%[[ARG0_D2]], %[[ARG0_D1]], %[[C1]]]
+//      CHECK:   %[[RESULT_OUT:.+]]:2 = flow.dispatch.workgroups[%[[C1]], %[[ARG0_D1]], %[[ARG0_D2]]]
 // CHECK-SAME:       (%[[ARG0]], %[[ARG0_D0]], %[[ARG0_D1]], %[[ARG0_D2]], %[[ARG1]], %[[ARG1_D0]], %[[ARG1_D1]], %[[ARG1_D2]])
 // CHECK-NEXT:       (%[[ARG0_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readwrite:?x?x?xi32>
 // CHECK-SAME:        %[[ARG0_D0_CAPTURE:[a-zA-Z0-9_]+]]: index, %[[ARG0_D1_CAPTURE:[a-zA-Z0-9_]+]]: index, %[[ARG0_D2_CAPTURE:[a-zA-Z0-9_]+]]: index,
@@ -956,9 +959,10 @@ func.func @pooling_nwhc_sum_static(%input: tensor<1x33x33x160xf32>) -> tensor<1x
 }
 
 // CHECK-LABEL: func.func @pooling_nwhc_sum_static
-//  CHECK-DAG:    %[[C3:.+]] = arith.constant 3 : index
-//  CHECK-DAG:    %[[C160:.+]] = arith.constant 160 : index
-//       CHECK:   flow.dispatch.workgroups[%[[C160]], %[[C3]], %[[C3]]]
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1
+//   CHECK-DAG:    %[[C3:.+]] = arith.constant 3 : index
+//   CHECK-DAG:    %[[C160:.+]] = arith.constant 160 : index
+//       CHECK:   flow.dispatch.workgroups[%[[C1]], %[[C3]], %[[C3]], %[[C160]], %[[C1]], %[[C1]]]
 
 // -----
 
@@ -1015,7 +1019,7 @@ func.func @dynamic_slice(%arg0 : i32, %arg1 : i32, %arg2 : tensor<?xi32>,
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG2]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG3]], %[[C0]]
 //   CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG3]], %[[C1]]
-//       CHECK:   flow.dispatch.workgroups[%[[D0]], %[[C1]], %[[C1]]]
+//       CHECK:   flow.dispatch.workgroups[%[[D0]]]
 //  CHECK-SAME:       tensor<?xi32>{%[[D0]]}
 //  CHECK-SAME:       tensor<?x?xi32>{%[[D1]], %[[D2]]}
 //  CHECK-NEXT:     !flow.dispatch.tensor<readonly:?xi32>
@@ -1042,7 +1046,7 @@ func.func @extract_slice(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //      CHECK:   flow.dispatch.workgroups
-// CHECK-SAME:       [%[[ARG4]], %[[ARG3]], %[[C1]]]
+// CHECK-SAME:       [%[[ARG3]], %[[ARG4]]]
 // CHECK-SAME:       (%[[ARG0]], %[[D0]], %[[D1]], %[[ARG1]], %[[ARG2]], %[[ARG3]], %[[ARG4]], %[[ARG5]], %[[ARG6]])
 // CHECK-NEXT:     %[[INPUT:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
 // CHECK-SAME:     %[[ARG8:[a-zA-Z0-9]+]]: index
@@ -1157,7 +1161,7 @@ func.func @gemm_unitM(%arg0 : tensor<1x?xf32>, %arg1 : tensor<?x?xf32>,
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1:.+]], %[[C1]]
-//      CHECK:   flow.dispatch.workgroups[%[[N]], %[[C1]], %[[C1]]]
+//      CHECK:   flow.dispatch.workgroups[%[[C1]], %[[N]], %[[C1]]]
 
 // -----
 
@@ -1186,7 +1190,7 @@ func.func @unit_dim_generic(%arg0 : tensor<1x?x1x1x?x?x1x?xf32>,
 //  CHECK-DAG:   %[[D4:.+]] = tensor.dim %[[ARG0]], %[[C4]]
 //  CHECK-DAG:   %[[D5:.+]] = tensor.dim %[[ARG0]], %[[C5]]
 //  CHECK-DAG:   %[[D7:.+]] = tensor.dim %[[ARG0]], %[[C7]]
-//      CHECK:   flow.dispatch.workgroups[%[[D7]], %[[D5]], %[[D4]]]
+//      CHECK:   flow.dispatch.workgroups[%[[C1]], %[[D1]], %[[C1]], %[[C1]], %[[D4]], %[[D5]], %[[C1]], %[[D7]]]
 // CHECK-SAME:       (%[[ARG0]], %[[D1]], %[[D4]], %[[D5]], %[[D7]]
 
 // -----
@@ -1351,7 +1355,7 @@ func.func @generic_tensor_insert(%arg0 : tensor<?x?xf32>,
 //  CHECK-DAG:   %[[SOURCE_D0:.+]] = tensor.dim %[[SOURCE]], %[[C0]]
 //  CHECK-DAG:   %[[SOURCE_D1:.+]] = tensor.dim %[[SOURCE]], %[[C1]]
 //      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
-// CHECK-SAME:       [%[[SLICE_SIZE]], %[[C1]], %[[C1]]]
+// CHECK-SAME:       [%[[SLICE_SIZE]]]
 // CHECK-SAME:       (%[[SOURCE]], %[[SOURCE_D0]], %[[SOURCE_D1]],
 // CHECK-SAME:        %[[SOURCE_OFFSET_Y]], %[[SOURCE_OFFSET_X]]
 // CHECK-SAME:        %[[SOURCE_STRIDE_Y]], %[[SOURCE_STRIDE_X]], %[[DEST]]
@@ -1415,7 +1419,7 @@ func.func @multi_use_producer_fusion(%arg0 : tensor<?x8xf32>, %arg1 : tensor<8x?
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG2]], %[[C0]]
-//      CHECK:   %[[DISPATCH:.+]]:2 = flow.dispatch.workgroups[%[[D1]], %[[D0]], %[[C1]]]
+//      CHECK:   %[[DISPATCH:.+]]:2 = flow.dispatch.workgroups[%[[D0]], %[[D1]]]
 // CHECK-SAME:       (%[[D0]], %[[D1]], %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[D2]])
 // CHECK-NEXT:     %[[D0_CAPTURE:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[D1_CAPTURE:[a-zA-Z0-9]+]]: index

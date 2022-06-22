@@ -17,7 +17,6 @@ iree_compiler_cc_library(
     srcs = [
         "AffineMinDistributedSCFCanonicalization.cpp",
         "RemoveSingleIterationLoop.cpp",
-        "Transforms.cpp",
     ],
     hdrs = [
         "Transforms.h",

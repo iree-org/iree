@@ -352,9 +352,8 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
   builder.setInsertionPoint(linalgOp);
   SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
   SmallVector<int64_t> ubs = linalgOp.getStaticLoopRanges();
-  auto loops =
-      cast<IREE::Flow::PartitionableLoopsInterface>(linalgOp.getOperation())
-          .getPartitionableLoops(kNumMaxParallelDims);
+  auto loops = cast<PartitionableLoopsInterface>(linalgOp.getOperation())
+                   .getPartitionableLoops(kNumMaxParallelDims);
   return getDefaultDistributedLevelTileSizes(loops, lbs, ubs, minTileSizes,
                                              maxTileSizes, allowIncompleteTile,
                                              vectorSizeHints);
@@ -397,7 +396,7 @@ static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
 /// `PartitionableLoopsInterface`, given the `lbs` and `ubs` of all the loops.
 static LogicalResult setDefaultRootConfig(
     func::FuncOp entryPointFn,
-    IREE::Flow::PartitionableLoopsInterface partitionableLoopsInterfaceOp,
+    PartitionableLoopsInterface partitionableLoopsInterfaceOp,
     ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs) {
   if (getLoweringConfig(partitionableLoopsInterfaceOp)) return success();
 
@@ -792,17 +791,17 @@ static LogicalResult setDefaultGenericOpRootConfig(
 
   // If there are no loops, there is nothing to do.
   unsigned numLoops = genericOp.getNumLoops();
-  if (numLoops == 0) return success();
+  if (numLoops == 0) {
+    return setOpConfigAndEntryPointFnTranslation(
+        entryPointFn, genericOp, {{}},
+        DispatchLoweringPassPipeline::CPUDefault);
+  }
 
   SmallVector<int64_t> minTileSizes =
       getMinTilingSizesForEachDim(entryPointFn, genericOp);
   // For generic ops we'll use the default divided by 2 to control the stack
   // allocation limit See #9469 for example.
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize / 2);
-  if (llvm::all_of(minTileSizes, [](int64_t vs) { return vs == 1; })) {
-    // Nothing to vectorize just lower to loops.
-    return success();
-  }
 
   // Set the flow level tiling to the default.
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
@@ -993,7 +992,7 @@ static LogicalResult setRootConfig(
   if (getLoweringConfig(linalgOp)) return success();
 
   auto partitionableLoopOp =
-      cast<IREE::Flow::PartitionableLoopsInterface>(linalgOp.getOperation());
+      cast<PartitionableLoopsInterface>(linalgOp.getOperation());
   SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
   SmallVector<int64_t> ubs = linalgOp.getStaticLoopRanges();
   return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
@@ -1007,8 +1006,8 @@ static LogicalResult setRootConfig(
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   if (getLoweringConfig(tiledOpInterfaceOp)) return success();
 
-  auto partitionableLoopOp = cast<IREE::Flow::PartitionableLoopsInterface>(
-      tiledOpInterfaceOp.getOperation());
+  auto partitionableLoopOp =
+      cast<PartitionableLoopsInterface>(tiledOpInterfaceOp.getOperation());
 
   // TODO(hanchung): Implement getStaticLoopRanges method for TiledOpInterface.
   OpBuilder builder(tiledOpInterfaceOp.getContext());
