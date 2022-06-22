@@ -201,7 +201,6 @@ iree_check_single_backend_test_suite(
             "dynamic_slice.mlir",
             "dynamic_update_slice.mlir",
             "exponential.mlir",
-            "exponential_fp16.mlir",
             "exponential_minus_one.mlir",
             "fft.mlir",
             "finite.mlir",
@@ -239,6 +238,10 @@ iree_check_single_backend_test_suite(
             "while.mlir",
         ],
         include = ["*.mlir"],
+        exclude = [
+            # Excluded due to LLVM bug #56156
+            "exponential_fp16.mlir",
+        ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],
     driver = "local-task",
