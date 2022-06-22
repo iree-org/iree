@@ -134,8 +134,23 @@ extern "C" {
 // operands without caring about the exact bit sizes at each site.
 
 typedef iree_atomic_int32_t iree_atomic_ref_count_t;
+
+// TODO: This should be a non-atomic operation (a relaxed atomic only serves to
+// sweep TSan reports under the rug in case of a race on initialization) and
+// should use IREE_ATOMIC_VAR_INIT, but apparently this has to be fixed
+// at call sites (where the variables are initialized in the first place).
+#define iree_atomic_ref_count_init_value(count_ptr, value) \
+  iree_atomic_store_int32(count_ptr, value, iree_memory_order_relaxed)
+
 #define iree_atomic_ref_count_init(count_ptr) \
-  iree_atomic_store_int32(count_ptr, 1, iree_memory_order_relaxed)
+  iree_atomic_ref_count_init_value(count_ptr, 1)
+
+// Why relaxed order:
+// https://www.boost.org/doc/libs/1_57_0/doc/html/atomic/usage_examples.html#boost_atomic.usage_examples.example_reference_counters.discussion
+// > New references to an object can only be formed from an existing
+// > reference, and passing an existing reference from one thread to another
+// > must already provide any required synchronization.
+//
 // Callers of iree_atomic_ref_count_inc typically don't need it to return a
 // value (unlike iree_atomic_ref_count_dec), so we make sure that it does not,
 // which allows the implementation to use faster atomic instructions where
@@ -143,9 +158,24 @@ typedef iree_atomic_int32_t iree_atomic_ref_count_t;
 #define iree_atomic_ref_count_inc(count_ptr)                              \
   do {                                                                    \
     iree_atomic_fetch_add_int32(count_ptr, 1, iree_memory_order_relaxed); \
-  } while (0)
+  } while (false)
+
+// For now we stick to acq_rel order. TODO: should we follow Boost's advice?
+// https://www.boost.org/doc/libs/1_57_0/doc/html/atomic/usage_examples.html#boost_atomic.usage_examples.example_reference_counters.discussion
+// > It would be possible to use memory_order_acq_rel for the fetch_sub
+// > operation, but this results in unneeded "acquire" operations when the
+// > reference counter does not yet reach zero [...].
+// It doesn't mention that replacing an acquire-load by an acquire-thread-fence
+// may be a pessimization... I would like to hear a second opinion on this,
+// particularly regarding how x86-centric this might be.
 #define iree_atomic_ref_count_dec(count_ptr) \
   iree_atomic_fetch_sub_int32(count_ptr, 1, iree_memory_order_acq_rel)
+
+// memory_order_acquire order ensures that this sees decrements from
+// iree_atomic_ref_count_dec. On the other hand, there is no ordering with
+// iree_atomic_ref_count_inc.
+#define iree_atomic_ref_count_load(count_ptr) \
+  iree_atomic_load_int32(count_ptr, iree_memory_order_acquire)
 
 // Aborts the program if the given reference count value is not 1.
 // This should be avoided in all situations but those where continuing execution
@@ -153,16 +183,15 @@ typedef iree_atomic_int32_t iree_atomic_ref_count_t;
 // parent function is about to return it *must* have a ref count of 1: anything
 // else that may be retaining the object will hold a pointer to (effectively)
 // uninitialized stack memory.
-#define iree_atomic_ref_count_abort_if_uses(count_ptr)                         \
-  if (IREE_UNLIKELY(iree_atomic_load_int32(count_ptr,                          \
-                                           iree_memory_order_seq_cst) != 1)) { \
-    abort();                                                                   \
+#define iree_atomic_ref_count_abort_if_uses(count_ptr)             \
+  if (IREE_UNLIKELY(iree_atomic_ref_count_load(count_ptr) != 1)) { \
+    abort();                                                       \
   }
 
 // Asserts that the given reference count value is zero.
-#define IREE_ASSERT_REF_COUNT_ZERO(count_ptr)                                  \
-  IREE_ASSERT_EQ(iree_atomic_load_int32(count_ptr, iree_memory_order_seq_cst), \
-                 0, "ref counted object still has uses")
+#define IREE_ASSERT_REF_COUNT_ZERO(count_ptr)              \
+  IREE_ASSERT_EQ(iree_atomic_ref_count_load(count_ptr), 0, \
+                 "ref counted object still has uses")
 
 #ifdef __cplusplus
 }  // extern "C"
