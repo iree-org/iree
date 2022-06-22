@@ -17,7 +17,6 @@
 
 #include "iree/base/alignment.h"
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/synchronization.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,7 +28,7 @@ typedef void* iree_atomic_slist_intrusive_ptr_t;
 
 // DO NOT USE: implementation detail.
 typedef struct iree_atomic_slist_entry_t {
-  struct iree_atomic_slist_entry_t* next;
+  iree_atomic_intptr_t next;
 } iree_atomic_slist_entry_t;
 
 // Lightweight contention-avoiding singly linked list.
@@ -79,8 +78,7 @@ typedef struct iree_atomic_slist_entry_t {
 // single heavily tested implementation seems more worthwhile than several.
 typedef iree_alignas(iree_max_align_t) struct {
   // TODO(benvanik): spend some time golfing this. Unblocking myself for now :)
-  iree_slim_mutex_t mutex;
-  iree_atomic_slist_entry_t* head;
+  iree_atomic_intptr_t head;
 } iree_atomic_slist_t;
 
 // Initializes an slist handle to an empty list.
@@ -186,68 +184,71 @@ bool iree_atomic_slist_flush(iree_atomic_slist_t* list,
 //  my_type_t* entry = allocate_my_type(123);
 //  my_type_slist_push(&list, entry);
 //  entry = my_type_slist_pop(&list);
-#define IREE_TYPED_ATOMIC_SLIST_WRAPPER(name, type, next_offset)               \
-  static inline iree_atomic_slist_entry_t* name##_slist_entry_from_ptr(        \
-      type* entry) {                                                           \
-    return entry                                                               \
-               ? ((iree_atomic_slist_entry_t*)((uint8_t*)entry + next_offset)) \
-               : NULL;                                                         \
-  }                                                                            \
-  static inline type* name##_slist_entry_to_ptr(                               \
-      iree_atomic_slist_entry_t* entry) {                                      \
-    return entry ? (type*)(((uint8_t*)entry) - next_offset) : NULL;            \
-  }                                                                            \
-                                                                               \
-  static inline type* name##_slist_get_next(type* entry) {                     \
-    if (!entry) return NULL;                                                   \
-    return name##_slist_entry_to_ptr(                                          \
-        ((iree_atomic_slist_entry_t*)((uint8_t*)entry + next_offset))->next);  \
-  }                                                                            \
-  static inline void name##_slist_set_next(type* entry, type* next) {          \
-    name##_slist_entry_from_ptr(entry)->next =                                 \
-        name##_slist_entry_from_ptr(next);                                     \
-  }                                                                            \
-                                                                               \
-  typedef iree_alignas(iree_max_align_t) struct {                              \
-    iree_atomic_slist_t impl;                                                  \
-  } name##_slist_t;                                                            \
-                                                                               \
-  static inline void name##_slist_initialize(name##_slist_t* out_list) {       \
-    iree_atomic_slist_initialize(&out_list->impl);                             \
-  }                                                                            \
-  static inline void name##_slist_deinitialize(name##_slist_t* list) {         \
-    iree_atomic_slist_deinitialize(&list->impl);                               \
-  }                                                                            \
-                                                                               \
-  static inline void name##_slist_push(name##_slist_t* list, type* entry) {    \
-    iree_atomic_slist_push(&list->impl, name##_slist_entry_from_ptr(entry));   \
-  }                                                                            \
-  static inline void name##_slist_push_unsafe(name##_slist_t* list,            \
-                                              type* entry) {                   \
-    iree_atomic_slist_push_unsafe(&list->impl,                                 \
-                                  name##_slist_entry_from_ptr(entry));         \
-  }                                                                            \
-  static inline void name##_slist_concat(name##_slist_t* list, type* head,     \
-                                         type* tail) {                         \
-    iree_atomic_slist_concat(&list->impl, name##_slist_entry_from_ptr(head),   \
-                             name##_slist_entry_from_ptr(tail));               \
-  }                                                                            \
-  static inline type* name##_slist_pop(name##_slist_t* list) {                 \
-    return name##_slist_entry_to_ptr(iree_atomic_slist_pop(&list->impl));      \
-  }                                                                            \
-                                                                               \
-  static inline bool name##_slist_flush(                                       \
-      name##_slist_t* list, iree_atomic_slist_flush_order_t flush_order,       \
-      type** out_head, type** out_tail) {                                      \
-    iree_atomic_slist_entry_t* head = NULL;                                    \
-    iree_atomic_slist_entry_t* tail = NULL;                                    \
-    if (!iree_atomic_slist_flush(&list->impl, flush_order, &head,              \
-                                 out_tail ? &tail : NULL)) {                   \
-      return false; /* empty list */                                           \
-    }                                                                          \
-    *out_head = name##_slist_entry_to_ptr(head);                               \
-    if (out_tail) *out_tail = name##_slist_entry_to_ptr(tail);                 \
-    return true;                                                               \
+#define IREE_TYPED_ATOMIC_SLIST_WRAPPER(name, type, next_offset)             \
+  static inline iree_atomic_slist_entry_t* name##_slist_entry_from_ptr(      \
+      type* ptr) {                                                           \
+    return ptr ? ((iree_atomic_slist_entry_t*)((uint8_t*)ptr + next_offset)) \
+               : NULL;                                                       \
+  }                                                                          \
+  static inline type* name##_slist_entry_to_ptr(                             \
+      iree_atomic_slist_entry_t* entry) {                                    \
+    return entry ? (type*)(((uint8_t*)entry) - next_offset) : NULL;          \
+  }                                                                          \
+                                                                             \
+  static inline type* name##_slist_get_next(type* ptr) {                     \
+    iree_atomic_slist_entry_t* entry = name##_slist_entry_from_ptr(ptr);     \
+    if (!entry) return NULL;                                                 \
+    iree_atomic_slist_entry_t* next =                                        \
+        (iree_atomic_slist_entry_t*)iree_atomic_load_intptr(                 \
+            &entry->next, iree_memory_order_relaxed);                        \
+    return name##_slist_entry_to_ptr(next);                                  \
+  }                                                                          \
+  static inline void name##_slist_set_next(type* entry, type* next) {        \
+    iree_atomic_store_intptr(&name##_slist_entry_from_ptr(entry)->next,      \
+                             (intptr_t)name##_slist_entry_from_ptr(next),    \
+                             iree_memory_order_relaxed);                     \
+  }                                                                          \
+                                                                             \
+  typedef iree_alignas(iree_max_align_t) struct {                            \
+    iree_atomic_slist_t impl;                                                \
+  } name##_slist_t;                                                          \
+                                                                             \
+  static inline void name##_slist_initialize(name##_slist_t* out_list) {     \
+    iree_atomic_slist_initialize(&out_list->impl);                           \
+  }                                                                          \
+  static inline void name##_slist_deinitialize(name##_slist_t* list) {       \
+    iree_atomic_slist_deinitialize(&list->impl);                             \
+  }                                                                          \
+                                                                             \
+  static inline void name##_slist_push(name##_slist_t* list, type* entry) {  \
+    iree_atomic_slist_push(&list->impl, name##_slist_entry_from_ptr(entry)); \
+  }                                                                          \
+  static inline void name##_slist_push_unsafe(name##_slist_t* list,          \
+                                              type* entry) {                 \
+    iree_atomic_slist_push_unsafe(&list->impl,                               \
+                                  name##_slist_entry_from_ptr(entry));       \
+  }                                                                          \
+  static inline void name##_slist_concat(name##_slist_t* list, type* head,   \
+                                         type* tail) {                       \
+    iree_atomic_slist_concat(&list->impl, name##_slist_entry_from_ptr(head), \
+                             name##_slist_entry_from_ptr(tail));             \
+  }                                                                          \
+  static inline type* name##_slist_pop(name##_slist_t* list) {               \
+    return name##_slist_entry_to_ptr(iree_atomic_slist_pop(&list->impl));    \
+  }                                                                          \
+                                                                             \
+  static inline bool name##_slist_flush(                                     \
+      name##_slist_t* list, iree_atomic_slist_flush_order_t flush_order,     \
+      type** out_head, type** out_tail) {                                    \
+    iree_atomic_slist_entry_t* head = NULL;                                  \
+    iree_atomic_slist_entry_t* tail = NULL;                                  \
+    if (!iree_atomic_slist_flush(&list->impl, flush_order, &head,            \
+                                 out_tail ? &tail : NULL)) {                 \
+      return false; /* empty list */                                         \
+    }                                                                        \
+    *out_head = name##_slist_entry_to_ptr(head);                             \
+    if (out_tail) *out_tail = name##_slist_entry_to_ptr(tail);               \
+    return true;                                                             \
   }
 
 #ifdef __cplusplus
