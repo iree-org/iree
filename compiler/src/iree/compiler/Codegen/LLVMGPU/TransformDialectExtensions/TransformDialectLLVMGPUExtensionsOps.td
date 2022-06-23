@@ -148,7 +148,8 @@ def VectorDistributionOp : Op<Transform_Dialect, "iree.vector_distribution",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let extraClassDeclaration = [{
-    ::mlir::LogicalResult applyToOne(::mlir::Operation *target);
+    ::mlir::LogicalResult applyToOne(::mlir::Operation *target, 
+      ::mlir::transform::TransformState &state);
   }];
 }
 

@@ -262,8 +262,8 @@ appendTransformResultToVector(Ty result,
 /// results of transforms, if any, in `results` in the same order. Fails if any
 /// of the application fails. Individual transforms must be callable with
 /// one of the following signatures:
-///   - FailureOr<convertible-to-Operation*>(OpTy)
-///   - LogicalResult(OpTy)
+///   - FailureOr<convertible-to-Operation*>(OpTy, TransformState state)
+///   - LogicalResult(OpTy, TransforState)
 /// where OpTy is either
 ///   - Operation *, in which case the transform is always applied;
 ///   - a concrete Op class, in which case a check is performed whether
@@ -295,8 +295,8 @@ LogicalResult applyTransformToEach(ArrayRef<Operation *> targets,
 /// Trait implementing the TransformOpInterface for operations applying a
 /// transformation to a single operation handle and producing a single operation
 /// handle. The op must implement a method with one of the following signatures:
-///   - FailureOr<convertible-to-Operation*> applyToOne(OpTy)
-///   - LogicalResult applyToOne(OpTy)
+///   - FailureOr<convertible-to-Operation*> applyToOne(OpTy, TransformState)
+///   - LogicalResult applyToOne(OpTy, TransformState)
 /// to perform a transformation that is applied in turn to all payload IR
 /// operations that correspond to the handle of the transform IR operation.
 /// In the functions above, OpTy is either Operation * or a concrete payload IR
@@ -317,7 +317,7 @@ public:
     SmallVector<Operation *> results;
     if (failed(applyTransformToEach(
             targets, results, [&](TransformOpType specificOp) {
-              return static_cast<OpTy *>(this)->applyToOne(specificOp);
+              return static_cast<OpTy *>(this)->applyToOne(specificOp, state);
             })))
       return failure();
     if (OpTy::template hasTrait<OpTrait::OneResult>()) {
