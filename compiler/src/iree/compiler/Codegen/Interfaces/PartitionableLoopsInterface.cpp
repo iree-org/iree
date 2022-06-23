@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.h"
+#include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -15,7 +15,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 
 // clang-format off
-#include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.cpp.inc"  // IWYU pragma: export
+#include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.cpp.inc"  // IWYU pragma: export
 // clang-format on
 
 namespace mlir {
@@ -55,9 +55,6 @@ static llvm::SmallVector<llvm::StringRef> getIteratorTypesFromAttr(
     return attr.cast<StringAttr>().getValue();
   }));
 }
-
-namespace IREE {
-namespace Flow {
 
 /// External model implementation for all LinalgOps.
 template <typename OpTy>
@@ -108,7 +105,7 @@ struct TiledOpInterfacePartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
           TiledOpInterfacePartitionableLoops<OpTy>, OpTy> {
   unsigned getNumLoops(Operation *op) const {
-    auto tiledOp = cast<LinalgExt::TiledOpInterface>(op);
+    auto tiledOp = cast<IREE::LinalgExt::TiledOpInterface>(op);
     return tiledOp.getLoopIteratorTypes().size();
   }
 
@@ -118,12 +115,12 @@ struct TiledOpInterfacePartitionableLoops
     // `TiledOpInterface`. This needs to be further pruned to remove unit-dim
     // loops, but that needs the interface to return the static sizes of the
     // loops.
-    auto tiledOp = cast<LinalgExt::TiledOpInterface>(op);
+    auto tiledOp = cast<IREE::LinalgExt::TiledOpInterface>(op);
     return tiledOp.getPartitionableLoops(maxNumPartitionedLoops);
   }
 
   llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
-    auto tiledOp = cast<LinalgExt::TiledOpInterface>(op);
+    auto tiledOp = cast<IREE::LinalgExt::TiledOpInterface>(op);
     return tiledOp.getLoopIteratorTypes();
   }
 };
@@ -234,13 +231,14 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
         >(ctx);
   });
 
-  registry.insert<LinalgExt::IREELinalgExtDialect>();
+  registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
 
   registry.addExtension(
-      +[](MLIRContext *ctx, LinalgExt::IREELinalgExtDialect *dialect) {
+      +[](MLIRContext *ctx, IREE::LinalgExt::IREELinalgExtDialect *dialect) {
         registerInterfaceForTiledOpInterfaceOps<
-            LinalgExt::FftOp, LinalgExt::ReverseOp, LinalgExt::ScanOp,
-            LinalgExt::ScatterOp, LinalgExt::SortOp, LinalgExt::TopkOp>(ctx);
+            IREE::LinalgExt::FftOp, IREE::LinalgExt::ReverseOp,
+            IREE::LinalgExt::ScanOp, IREE::LinalgExt::ScatterOp,
+            IREE::LinalgExt::SortOp, IREE::LinalgExt::TopkOp>(ctx);
       });
   registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
     tensor::ExtractSliceOp::attachInterface<TensorExtractOpPartitionableLoops>(
@@ -250,7 +248,5 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   });
 }
 
-}  // namespace Flow
-}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

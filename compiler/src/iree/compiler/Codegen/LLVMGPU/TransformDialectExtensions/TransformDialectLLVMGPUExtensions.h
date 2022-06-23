@@ -9,11 +9,12 @@
 
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 
-#define GET_OP_CLASSES
-#include "iree/compiler/Codegen/LLVMGPU/TransformDialectExtensions/TransformDialectLLVMGPUExtensionsOps.h.inc"
-
 namespace mlir {
 class DialectRegistry;
+
+namespace vector {
+class VectorDialect;
+}  // namespace vector
 
 namespace iree_compiler {
 
@@ -34,5 +35,8 @@ class TransformDialectLLVMGPUExtensions
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
+
+#define GET_OP_CLASSES
+#include "iree/compiler/Codegen/LLVMGPU/TransformDialectExtensions/TransformDialectLLVMGPUExtensionsOps.h.inc"
 
 #endif  // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMDIALECTEXTENSIONS_TRANSFORMDIALECTLLVMGPUEXTENSIONS_H_

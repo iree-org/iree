@@ -4,8 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
+#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -14,8 +16,6 @@ static const char kAttributeName[] = "__test_interface__";
 
 namespace mlir {
 namespace iree_compiler {
-namespace IREE {
-namespace Flow {
 
 namespace {
 
@@ -43,8 +43,8 @@ struct TestPartitionableLoopsInterfacePattern
     }
     auto type = RankedTensorType::get(numLoops, rewriter.getIndexType());
     auto constantAttr = DenseIntElementsAttr::get(type, loopInfo);
-    rewriter.create<Util::UnfoldableConstantOp>(interfaceOp.getLoc(),
-                                                constantAttr);
+    rewriter.create<IREE::Util::UnfoldableConstantOp>(interfaceOp.getLoc(),
+                                                      constantAttr);
     rewriter.updateRootInPlace(
         interfaceOp, [&] { interfaceOp->removeAttr(kAttributeName); });
     return success();
@@ -52,22 +52,10 @@ struct TestPartitionableLoopsInterfacePattern
 };
 
 struct TestPartitionableLoopsInterfacePass
-    : public PassWrapper<TestPartitionableLoopsInterfacePass,
-                         OperationPass<void>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(
-      TestPartitionableLoopsInterfacePass)
-
-  StringRef getArgument() const override {
-    return "iree-flow-test-partitionable-loops-interface";
-  }
-
-  StringRef getDescription() const override {
-    return "Test the PartitionableLoopsInterface using operations that "
-           "implement that interface.";
-  }
-
+    : public TestPartitionableLoopsInterfaceBase<
+          TestPartitionableLoopsInterfacePass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<FlowDialect>();
+    registry.insert<IREE::Util::UtilDialect>();
   }
 
   void runOnOperation() override {
@@ -87,9 +75,5 @@ createTestPartitionableLoopsInterfacePass() {
   return std::make_unique<TestPartitionableLoopsInterfacePass>();
 }
 
-static PassRegistration<TestPartitionableLoopsInterfacePass> pass;
-
-}  // namespace Flow
-}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

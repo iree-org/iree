@@ -17,7 +17,6 @@ python. This allows easy benchmarking results from within python.
 
 from collections import namedtuple
 
-import iree.compiler
 import iree.runtime
 import numpy
 import os

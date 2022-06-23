@@ -27,9 +27,9 @@ iree_compiler_cc_library(
         "Utils.h",
     ],
     deps = [
+        "//compiler/src/iree/compiler/Codegen/Interfaces:PartitionableLoopsInterface",
         "//compiler/src/iree/compiler/Codegen/Interfaces:ProcessorOpInterfaces",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
-        "//compiler/src/iree/compiler/Dialect/Flow/IR:PartitionableLoopsInterface",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "@llvm-project//llvm:Support",

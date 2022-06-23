@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 #define IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 
-#include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.h"
+#include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/Triple.h"

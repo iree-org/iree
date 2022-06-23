@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Interfaces/Interfaces.h"
 
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
+#include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
 // TODO: Remove this dependency once the transform dialect extensions
 // have a better registration mechanism.
@@ -29,6 +30,7 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   // TODO: when warranted, move to its own file.
   registry.addExtensions<IREE::LinalgExt::LinalgExtTransformOpsExtension,
                          transform_ext::StructuredTransformOpsExtension>();
+  registerPartitionableLoopsInterfaceModels(registry);
   registerTransformDialectCommonExtension(registry);
   registerTransformDialectFlowExtension(registry);
   registerTransformDialectLLVMCPUExtension(registry);

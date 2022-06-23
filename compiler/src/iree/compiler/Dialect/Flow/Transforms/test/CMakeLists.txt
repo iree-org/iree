@@ -39,7 +39,6 @@ iree_lit_test_suite(
     "pad_tensor_to_tensor.mlir"
     "strip_and_splat_constant_variables.mlir"
     "strip_signedness.mlir"
-    "test_partitionable_loops_interface.mlir"
     "transformation.mlir"
     "verify_input_ir.mlir"
   TOOLS

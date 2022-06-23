@@ -37,9 +37,14 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRGPUOps
     MLIRIR
+    MLIRMemRefDialect
+    MLIRPDLDialect
     MLIRPass
     MLIRSCFDialect
     MLIRTransformDialect
+    MLIRTransforms
+    MLIRVectorDialect
+    MLIRVectorTransforms
     iree::compiler::Dialect::HAL::IR
   PUBLIC
 )

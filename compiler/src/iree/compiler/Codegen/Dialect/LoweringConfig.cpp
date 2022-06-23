@@ -338,49 +338,5 @@ void eraseCompilationInfo(Operation *op) {
   op->removeAttr(kCompilationInfoAttrName);
 }
 
-LogicalResult getDistributionTileConfigFromLoweringConfig(
-    ArrayRef<Operation *> computeOps,
-    SmallVectorImpl<int64_t> &distributedTileSizes,
-    SmallVectorImpl<int64_t> &interchange) {
-  distributedTileSizes.clear();
-  interchange.clear();
-  if (computeOps.empty()) return success();
-
-  for (auto op : computeOps) {
-    auto partitionbleLoopInterface =
-        dyn_cast<IREE::Flow::PartitionableLoopsInterface>(op);
-    if (!partitionbleLoopInterface) continue;
-    IREE::Codegen::LoweringConfigAttr currLoweringConfig =
-        getLoweringConfig(op);
-    if (!currLoweringConfig) continue;
-
-    SmallVector<unsigned> partitionableLoops =
-        partitionbleLoopInterface.getPartitionableLoops(kNumMaxParallelDims);
-
-    SmallVector<int64_t> tileSizes = currLoweringConfig.getTileSizeVals(0);
-    SmallVector<int64_t> currInterchange =
-        currLoweringConfig.getTileInterchangeVals(0);
-    SmallVector<int64_t> currDistributedTileSizes;
-    if (!partitionableLoops.empty()) {
-      currDistributedTileSizes.resize(partitionableLoops.back() + 1, 0);
-    }
-    for (auto loopID : partitionableLoops) {
-      if (loopID < tileSizes.size()) {
-        currDistributedTileSizes[loopID] = tileSizes[loopID];
-      }
-    }
-    if (distributedTileSizes.empty()) {
-      distributedTileSizes.assign(currDistributedTileSizes);
-      interchange.assign(currInterchange);
-    } else if (currDistributedTileSizes != distributedTileSizes ||
-               currInterchange != interchange) {
-      return computeOps.front()->emitOpError(
-          "inconsistent distribution of ops "
-          "for first level of distribution");
-    }
-  }
-  return success();
-}
-
 }  // namespace iree_compiler
 }  // namespace mlir

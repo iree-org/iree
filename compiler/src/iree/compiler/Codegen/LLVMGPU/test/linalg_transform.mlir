@@ -12,8 +12,6 @@
 module attributes {hal.device.targets = [#device_target_cuda]} {
   hal.executable private @matmul_static_dispatch_0 {
     hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
-
-      // FOREACH-TO-GPU: hal.executable.export {{.*}} workgroup_size = [7 : index, 9 : index, 1 : index]
       hal.executable.export public @matmul_static_dispatch_0 ordinal(0) layout(#executable_layout)
       builtin.module {
         func.func @matmul_static_dispatch_0() {
@@ -34,8 +32,29 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
           // CHECK-NEXT: return
 
 
+          // Fill is tiled by 5x1 matmul is tiled by 7x9, the joined workgroup_size is 7x9.
+          // FOREACH-TO-GPU-DAG: hal.executable.export {{.*}}{translation_info = #translation, workgroup_size = [7 : index, 9 : index, 1 : index]}
+          // FOREACH-TO-GPU-DAG: %[[C0:.*]] = arith.constant 0 : index
+          // FOREACH-TO-GPU-DAG: %[[C1:.*]] = arith.constant 1 : index
+          // FOREACH-TO-GPU-DAG: %[[C5:.*]] = arith.constant 5 : index
+          // FOREACH-TO-GPU-DAG: %[[CF0:.*]] = arith.constant 0.000000e+00 : f32
           // FOREACH-TO-GPU: %[[TIDX:.*]] = gpu.thread_id  x
           // FOREACH-TO-GPU: %[[TIDY:.*]] = gpu.thread_id  y
+          //
+          // Fill is tiled by 5x1 in a 7x9 workgroup_size, predicate appropriately.
+          // FOREACH-TO-GPU: %[[LT5:.*]]  = arith.cmpi ult, %[[TIDX]], %[[C5]] : index
+          // FOREACH-TO-GPU: %[[LT1:.*]]  = arith.cmpi ult, %[[TIDY]], %[[C1]] : index
+          // FOREACH-TO-GPU: %[[COND:.*]]  = arith.andi %[[LT5]], %[[LT1]] : i1
+          // FOREACH-TO-GPU: scf.if %[[COND]] {
+          // FOREACH-TO-GPU:   affine.min #{{.*}}()[%[[TIDX]]]
+          // FOREACH-TO-GPU:   affine.min #{{.*}}()[%[[TIDY]]]
+          // FOREACH-TO-GPU:   affine.apply #{{.*}}()[%[[TIDX]]]
+          // FOREACH-TO-GPU:   affine.apply #{{.*}}()[%[[TIDY]]]
+          // FOREACH-TO-GPU:   linalg.fill
+          // FOREACH-TO-GPU: }
+          // FOREACH-TO-GPU: gpu.barrier
+          //
+          // Matmul does not need to be predicated.
           // FOREACH-TO-GPU: affine.min #{{.*}}()[%[[TIDX]]]
           // FOREACH-TO-GPU: affine.min #{{.*}}()[%[[TIDY]]]
           // FOREACH-TO-GPU: affine.apply #{{.*}}()[%[[TIDX]]]
@@ -44,6 +63,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
           // FOREACH-TO-GPU: %[[svB:.*]] = memref.subview {{.*}} : memref<500x1020xf32> to memref<500x?xf32
           // FOREACH-TO-GPU: %[[svC:.*]] = memref.subview {{.*}} : memref<250x1020xf32> to memref<?x?xf32
           // FOREACH-TO-GPU: linalg.matmul ins(%[[svA]], %[[svB]] : memref<?x500xf32{{.*}}>, memref<500x?xf32{{.*}}>) outs(%[[svC]] : memref<?x?xf32{{.*}}>)
+          // FOREACH-TO-GPU: gpu.barrier
 
           %6 = linalg.matmul ins(%3, %4 : tensor<250x500xf32>, tensor<500x1020xf32>) outs(%5 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
           flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [250, 1020], strides = [1, 1] : tensor<250x1020xf32> -> !flow.dispatch.tensor<readwrite:250x1020xf32>

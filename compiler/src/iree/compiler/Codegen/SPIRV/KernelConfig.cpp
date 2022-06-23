@@ -306,16 +306,15 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
 
-  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
-  auto partitionedLoops =
-      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
-
-  unsigned loopDepth = partitionedLoops.back() + 1;
+  SmallVector<StringRef> loopIteratorTypes = op.getLoopIteratorTypes();
+  unsigned loopDepth = loopIteratorTypes.size();
   SmallVector<int64_t> workgroupTileSize(loopDepth, 0);
 
   // Tiling along partitioned loops with size 1.
-  for (int64_t loopIndex : partitionedLoops) {
-    workgroupTileSize[loopIndex] = 1;
+  for (auto iteratorType : llvm::enumerate(loopIteratorTypes)) {
+    if (iteratorType.value() == getParallelIteratorTypeName()) {
+      workgroupTileSize[iteratorType.index()] = 1;
+    }
   }
   auto rank = op.getOperandRank();
   if (workgroupTileSize.size() >= rank && workgroupTileSize[rank - 1] != 0) {
@@ -342,7 +341,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                         bool allowVectorization = true) {
   LLVM_DEBUG(llvm::dbgs() << "Using default config for op: " << *op << "\n");
   func::FuncOp funcOp = op->getParentOfType<func::FuncOp>();
-  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
 

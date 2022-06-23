@@ -30,6 +30,7 @@ iree_lit_test_suite(
             "linalg_transform.mlir",
             "legalize.mlir",
             "tensorcore_vectorization.mlir",
+            "transform_dialect_vector_distribution.mlir",
             "vector_to_gpu.mlir",
             "vectorization.mlir",
             "warp_reduction.mlir",
@@ -40,12 +41,14 @@ iree_lit_test_suite(
         exclude = [
             "transform_dialect_codegen_bufferize_spec.mlir",
             "transform_dialect_codegen_foreach_to_gpu_spec.mlir",
+            "transform_dialect_codegen_vector_distribution_spec.mlir",
         ],
     ),
     cfg = "//compiler:lit.cfg.py",
     data = [
         "transform_dialect_codegen_bufferize_spec.mlir",
         "transform_dialect_codegen_foreach_to_gpu_spec.mlir",
+        "transform_dialect_codegen_vector_distribution_spec.mlir",
     ],
     tools = [
         "//tools:iree-opt",

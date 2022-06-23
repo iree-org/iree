@@ -60,7 +60,6 @@ iree_compiler_cc_library(
         "SplitReduction.cpp",
         "StripAndSplatConstantVariables.cpp",
         "StripSignedness.cpp",
-        "TestPartitionableLoopsInterface.cpp",
         "VerifyInputLegality.cpp",
     ],
     hdrs = [
@@ -72,7 +71,6 @@ iree_compiler_cc_library(
         ":PassesIncGen",
         "//compiler/src/iree/compiler/Dialect/Flow/Conversion/TensorToFlow",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
-        "//compiler/src/iree/compiler/Dialect/Flow/IR:PartitionableLoopsInterface",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//compiler/src/iree/compiler/Dialect/Util/Analysis",
         "//compiler/src/iree/compiler/Dialect/Util/Analysis/Attributes",

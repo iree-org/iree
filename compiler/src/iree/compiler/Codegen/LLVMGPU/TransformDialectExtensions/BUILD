@@ -66,8 +66,13 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:TransformDialect",
+        "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:VectorDialect",
+        "@llvm-project//mlir:VectorTransforms",
     ],
 )

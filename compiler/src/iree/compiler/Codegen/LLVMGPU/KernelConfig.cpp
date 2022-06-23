@@ -143,7 +143,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
         workgroupTileSizes.append(op.getNumReductionLoops(), tileK);
 
         SmallVector<unsigned> partitionedLoops =
-            cast<IREE::Flow::PartitionableLoopsInterface>(op.getOperation())
+            cast<PartitionableLoopsInterface>(op.getOperation())
                 .getPartitionableLoops(kNumMaxParallelDims);
         llvm::SmallDenseSet<unsigned, 4> partitionedLoopsSet;
         partitionedLoopsSet.insert(partitionedLoops.begin(),
@@ -256,7 +256,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
 
 static LogicalResult setFftConfig(func::FuncOp entryPoint,
                                   IREE::LinalgExt::FftOp op) {
-  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   unsigned loopDepth = partitionedLoops.back() + 1;
@@ -286,7 +286,7 @@ static LogicalResult setFftConfig(func::FuncOp entryPoint,
 
 static LogicalResult setSortConfig(func::FuncOp entryPoint, Operation *op) {
   TileSizesListType tileSizes;
-  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   if (partitionedLoops.empty()) {
@@ -329,7 +329,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
   IREE::Codegen::DispatchLoweringPassPipeline passPipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute;
   TileSizesListType tileSizes;
-  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   if (partitionedLoops.empty()) {
@@ -449,6 +449,8 @@ static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
 static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                             linalg::LinalgOp op) {
   if (!isa<linalg::GenericOp>(op)) return failure();
+  // TODO(thomasraoux): Enable dynamic shape.
+  if (op.hasDynamicShape()) return failure();
   SmallVector<unsigned> reductionDims;
   op.getReductionDims(reductionDims);
   if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
@@ -481,7 +483,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   std::array<int64_t, 3> workgroupSize = {numWarps * cudaWarpSize, 1, 1};
 
   SmallVector<unsigned> partitionedLoops =
-      cast<IREE::Flow::PartitionableLoopsInterface>(op.getOperation())
+      cast<PartitionableLoopsInterface>(op.getOperation())
           .getPartitionableLoops(kNumMaxParallelDims);
   llvm::SmallDenseSet<unsigned, 4> partitionedLoopsSet;
   partitionedLoopsSet.insert(partitionedLoops.begin(), partitionedLoops.end());
