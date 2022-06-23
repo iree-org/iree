@@ -451,23 +451,25 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
     nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  // Add the sandbox single tiling expert to tile and vectorize.
   {
     LinalgSingleTilingExpertPassOptions options;
-    options.vectorize = true;
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
+
+  // Apply op specific vectorization and then general vectorization.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLinalgToVectorVectorizeMMT4dPass());
+  {
+    LinalgSingleTilingExpertPassOptions options;
+    options.vectorize = true;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLinalgSingleTilingExpertPass(options));
+  }
 
   addBufferizePasses(nestedModulePM);
 
