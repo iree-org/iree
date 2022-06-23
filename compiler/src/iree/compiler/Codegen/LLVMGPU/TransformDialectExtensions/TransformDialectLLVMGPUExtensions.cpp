@@ -6,7 +6,7 @@
 
 #include "TransformDialectLLVMGPUExtensions.h"
 
-#include "iree-dialects/Transforms/Functional.h"
+#include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -65,28 +65,9 @@ static FailureOr<SmallVector<int64_t>> joinStaticRanges(
 // Patterns for ForeachThreadToGpu rewrite.
 //===---------------------------------------------------------------------===//
 
-struct ForeachThreadToGpuRewriter
-    : public OpRewritePattern<scf::ForeachThreadOp> {
-  ForeachThreadToGpuRewriter(ArrayRef<int64_t> globalWorkgroupSizes,
-                             MLIRContext *context)
-      : OpRewritePattern<scf::ForeachThreadOp>(context),
-        globalWorkgroupSizes(globalWorkgroupSizes.begin(),
-                             globalWorkgroupSizes.end()) {}
-
-  FailureOr<SmallVector<Value>> returningMatchAndRewrite(
-      scf::ForeachThreadOp foreachThreadOp, PatternRewriter &rewriter) const;
-
-  LogicalResult matchAndRewrite(scf::ForeachThreadOp foreachThreadOp,
-                                PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(foreachThreadOp, rewriter);
-  }
-
-  SmallVector<int64_t> globalWorkgroupSizes;
-};
-
-FailureOr<SmallVector<Value>>
-ForeachThreadToGpuRewriter::returningMatchAndRewrite(
-    scf::ForeachThreadOp foreachThreadOp, PatternRewriter &rewriter) const {
+FailureOr<SmallVector<Value>> rewriteForeachThreadToGpu(
+    scf::ForeachThreadOp foreachThreadOp,
+    SmallVector<int64_t> &globalWorkgroupSizes, PatternRewriter &rewriter) {
   if (foreachThreadOp.getNumResults() > 0)
     return foreachThreadOp->emitError(
         "only bufferized scf.foreach_thread lowers to gpu.thread");
@@ -203,18 +184,18 @@ transform_dialect::ForeachThreadToGpuAndTranslationInfo::apply(
 
   walkResult =
       state.getTopLevel()->walk<WalkOrder::PostOrder>([&](func::FuncOp funcOp) {
+        SimplePatternRewriter rewriter(funcOp);
         auto maybeJoinedRanges =
             joinStaticRanges(foreachThreadsPerFunc.lookup(funcOp));
         if (failed(maybeJoinedRanges)) return WalkResult::interrupt();
-        for (auto foreachThreadOp : foreachThreadsPerFunc.lookup(funcOp)) {
-          auto workgroupSize = functional::applyReturningPatternAt(
-              ForeachThreadToGpuRewriter(*maybeJoinedRanges, getContext()),
-              foreachThreadOp);
-          if (failed(workgroupSize)) return WalkResult::interrupt();
+        for (auto foreachOp : foreachThreadsPerFunc.lookup(funcOp)) {
+          rewriter.setInsertionPoint(foreachOp);
+          if (failed(rewriteForeachThreadToGpu(foreachOp, *maybeJoinedRanges,
+                                               rewriter)))
+            return WalkResult::interrupt();
         }
         auto exportOp = exportOps.lookup(funcOp.getName());
-        OpBuilder b(exportOp);
-        auto newAttr = b.getIndexArrayAttr(*maybeJoinedRanges);
+        auto newAttr = rewriter.getIndexArrayAttr(*maybeJoinedRanges);
         exportOp->setAttr(exportOp.workgroup_sizeAttrName(), newAttr);
         return WalkResult::advance();
       });
@@ -334,9 +315,6 @@ struct VectorDistributionResult {
 static FailureOr<VectorDistributionResult> vectorDistribution(
     PatternRewriter &rewriter, Location loc, scf::IfOp ifOp,
     int64_t workgroupSizeX, int64_t warpSize) {
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(ifOp);
-
   // Bail if cond is not `if (threadIdx.x == 0)`.
   if (failed(isThreadIdxxZeroPredicate(ifOp)))
     return ifOp->emitError("unmet prerequisite: isThreadIdxxZeroPredicate");
@@ -506,8 +484,7 @@ LogicalResult transform_dialect::VectorDistributionOp::applyToOne(
   }
 
   WalkResult walkResult = target->walk([&](scf::IfOp ifOp) {
-    functional::detail::SimpleRewriter rewriter(getContext());
-    rewriter.setInsertionPoint(ifOp);
+    SimplePatternRewriter rewriter(ifOp);
     FailureOr<VectorDistributionResult> vectorDistributionResult =
         vectorDistribution(rewriter, target->getLoc(), ifOp, workgroupSizeX,
                            warpSize);

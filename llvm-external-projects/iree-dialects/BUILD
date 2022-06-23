@@ -721,9 +721,6 @@ cc_library(
     srcs = glob([
         "lib/Dialect/LinalgTransform/Passes/*.cpp",
     ]),
-    hdrs = [
-        "include/iree-dialects/Dialect/LinalgTransform/TrackingRewriteDriver.h",
-    ],
     deps = [
         ":IREEDialectsTransforms",
         ":IREELinalgExtDialect",
