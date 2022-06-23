@@ -27,7 +27,7 @@ mkdir "${ROOT_DIR}/setup"
 mkdir "${ROOT_DIR}/test_data"
 mkdir "${ROOT_DIR}/output"
 # Touch result file as adb doesn't push empty dirs.
-touch "${ROOT_DIR}/output/result.csv"
+touch "${ROOT_DIR}/output/results.csv"
 
 wget https://storage.googleapis.com/iree-model-artifacts/tflite_squad_test_data.zip -O /tmp/tflite_squad_test_data.zip
 unzip /tmp/tflite_squad_test_data.zip -d "${ROOT_DIR}/test_data/"
@@ -185,4 +185,4 @@ fi
 echo Running benchmark.
 adb push "${SOURCE_DIR}/iree/build_tools/benchmarks/comparisons" /data/local/tmp/
 adb shell "su root /data/data/com.termux/files/usr/bin/python /data/local/tmp/comparisons/run_benchmarks.py --device_name=Pixel6  --mode=mobile --base_dir=${DEVICE_ROOT_DIR} --output_dir=${DEVICE_ROOT_DIR}/output"
-adb shell cat "${DEVICE_ROOT_DIR}/output/result.csv" | tee ${ROOT_DIR}/output/result.csv
+adb shell cat "${DEVICE_ROOT_DIR}/output/results.csv" | tee ${ROOT_DIR}/output/results.csv
