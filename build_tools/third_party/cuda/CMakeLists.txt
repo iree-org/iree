@@ -40,7 +40,9 @@ message(STATUS "Extracting to ${_TARGET_DIR}")
 file(MAKE_DIRECTORY ${_DOWNLOAD_DIR})
 
 # First fetch the download script to the tmp dir.
-file(DOWNLOAD ${_DOWNLOAD_SCRIPT_URL} ${_DOWNLOAD_SCRIPT_PATH})
+if(NOT EXISTS "${_DOWNLOAD_SCRIPT_PATH}")
+  file(DOWNLOAD ${_DOWNLOAD_SCRIPT_URL} ${_DOWNLOAD_SCRIPT_PATH})
+endif()
 
 # Then use the download script to fetch and flatten each component we want
 # into the tmp dir.
@@ -67,7 +69,9 @@ foreach(REL_PATH ${_RETAIN_PATHS})
   set(SRC_FILE "${SRC_DIR}/${REL_PATH}")
   set(TARGET_FILE "${_TARGET_DIR}/${REL_PATH}")
   message(STATUS "Copy ${SRC_FILE} -> ${TARGET_FILE}")
-  file(COPY ${SRC_FILE} DESTINATION ${TARGET_FILE})
+  # file(COPY) expects a destination directory.
+  get_filename_component(TARGET_DIR "${TARGET_FILE}" DIRECTORY)
+  file(COPY ${SRC_FILE} DESTINATION ${TARGET_DIR})
 endforeach()
 
 # Delete tmp directory.
@@ -75,5 +79,5 @@ file(REMOVE_RECURSE ${_DOWNLOAD_DIR})
 
 # Set vars for downloaded cuda deps
 set(IREE_CUDA_DOWNLOAD_LIBDEVICE_PATH
-    "${_TARGET_DIR}/nvvm/libdevice/libdevice.10.bc/libdevice.10.bc" PARENT_SCOPE)
+    "${_TARGET_DIR}/nvvm/libdevice/libdevice.10.bc" PARENT_SCOPE)
 set(IREE_CUDA_DOWNLOAD_INCLUDE_PATH "${_TARGET_DIR}/include" PARENT_SCOPE)
