@@ -7,7 +7,6 @@
 #ifndef MLIR_DIALECT_LINALG_TRANSFORMS_TRACKINGREWRITEDRIVER_H
 #define MLIR_DIALECT_LINALG_TRANSFORMS_TRACKINGREWRITEDRIVER_H
 
-#include "iree-dialects/Dialect/LinalgTransform/TransformOpMapping.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {

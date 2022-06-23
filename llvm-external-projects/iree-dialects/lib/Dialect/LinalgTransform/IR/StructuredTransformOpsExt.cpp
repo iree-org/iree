@@ -591,6 +591,7 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
 
   // Apply the sequenced ops one by one.
   for (Operation &transform : getBodyBlock()->without_terminator()) {
+    llvm::errs() << "Apply: " << transform << "\n";
     DiagnosedSilenceableFailure result =
         state.applyTransform(cast<transform::TransformOpInterface>(transform));
     if (!result.succeeded()) {
