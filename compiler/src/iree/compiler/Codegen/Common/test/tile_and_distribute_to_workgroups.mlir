@@ -1387,7 +1387,7 @@ hal.executable private @rank_reduced_slice {
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 2)>
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 + 10)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize workload_per_wg = [2]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [2]>
 //      CHECK: hal.executable.export public @rank_reduced_slice
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-NEXT:   %[[WORKLOAD:[a-zA-Z0-9]+]]: index

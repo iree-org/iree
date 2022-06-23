@@ -461,6 +461,8 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   }
 
   // Apply op specific vectorization and then general vectorization.
+  // TODO(bjacob): Retire LinalgToVectorVectorizeMMT4d pass and use upstream
+  // vectorization patterns.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLinalgToVectorVectorizeMMT4dPass());
   {
