@@ -644,6 +644,10 @@ struct ConvertMHLOToLinalgExtPass
         IREE::Flow::FlowDialect, mlir::cf::ControlFlowDialect,
         mlir::math::MathDialect, mlir::arith::ArithmeticDialect,
         tensor::TensorDialect, complex::ComplexDialect>();
+    // TODO: Scatter is not marked as illegal to allow falling back to the
+    // generic LinAlg lowering, the generic lowering is not always performant
+    // and even though only used in fallback here, may hide performance
+    // issues and we'd rather know when the optimized lowering fails.
     target.addIllegalOp<mhlo::SortOp, mhlo::FftOp, mhlo::ReverseOp>();
     // FFT conversion creates complex ops which will be converted by the normal
     // MHLO lowering, but these should still be converted if present inside
