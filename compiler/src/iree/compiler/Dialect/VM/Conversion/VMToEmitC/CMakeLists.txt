@@ -20,11 +20,13 @@ iree_cc_library(
   HDRS
     "ConvertVMToEmitC.h"
     "DropExcludedExports.h"
+    "EmitCBuilders.h"
     "EmitCTypeConverter.h"
     "VMAnalysis.h"
   SRCS
     "ConvertVMToEmitC.cpp"
     "DropExcludedExports.cpp"
+    "EmitCBuilders.cpp"
     "EmitCTypeConverter.cpp"
   DEPS
     LLVMSupport
