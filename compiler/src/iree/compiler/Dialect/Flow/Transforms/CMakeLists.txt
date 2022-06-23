@@ -34,6 +34,7 @@ iree_cc_library(
     "ConvertConv2DToImg2Col.cpp"
     "ConvertLinalgMatmulToMmt4D.cpp"
     "DeduplicateExecutables.cpp"
+    "DetachElementwiseFromNamedOps.cpp"
     "DispatchLinalgOnTensors.cpp"
     "DispatchWithTransformDialect.cpp"
     "DumpDispatchGraph.cpp"
@@ -55,7 +56,6 @@ iree_cc_library(
     "SplitReduction.cpp"
     "StripAndSplatConstantVariables.cpp"
     "StripSignedness.cpp"
-    "TestPartitionableLoopsInterface.cpp"
     "VerifyInputLegality.cpp"
   DEPS
     ::PassesIncGen
@@ -65,32 +65,31 @@ iree_cc_library(
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
     LLVMSupport
-    MLIRAffine
-    MLIRArithmetic
+    MLIRAffineDialect
+    MLIRArithmeticDialect
     MLIRArithmeticUtils
-    MLIRControlFlow
-    MLIRFunc
+    MLIRControlFlowDialect
+    MLIRFuncDialect
     MLIRIR
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgTransforms
-    MLIRMath
-    MLIRMemRef
+    MLIRMathDialect
+    MLIRMemRefDialect
     MLIRMemRefTransforms
-    MLIRPDL
-    MLIRPDLInterp
+    MLIRPDLDialect
+    MLIRPDLInterpDialect
     MLIRParser
     MLIRPass
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSupport
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTensorUtils
-    MLIRTosa
+    MLIRTosaDialect
     MLIRTransformDialect
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::IR::PartitionableLoopsInterface
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::Attributes

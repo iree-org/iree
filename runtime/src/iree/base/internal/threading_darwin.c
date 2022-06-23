@@ -13,6 +13,7 @@
 #include <mach/mach.h>
 #include <mach/thread_act.h>
 #include <pthread.h>
+#include <sched.h>
 #include <string.h>
 
 #include "iree/base/internal/atomics.h"
@@ -246,5 +247,7 @@ void iree_thread_resume(iree_thread_t* thread) {
 
   IREE_TRACE_ZONE_END(z0);
 }
+
+void iree_thread_yield(void) { sched_yield(); }
 
 #endif  // IREE_PLATFORM_APPLE

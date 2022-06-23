@@ -70,7 +70,7 @@ static llvm::cl::opt<bool> disableMatmulPadPipeline(
     llvm::cl::init(false));
 
 llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName(
-    "iree-codegen-use-transform-dialect",
+    "iree-codegen-llvmcpu-use-transform-dialect",
     llvm::cl::desc(
         "MLIR file containing a transform dialect specification to apply"),
     llvm::cl::init(""));
@@ -352,9 +352,8 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
   builder.setInsertionPoint(linalgOp);
   SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
   SmallVector<int64_t> ubs = linalgOp.getStaticLoopRanges();
-  auto loops =
-      cast<IREE::Flow::PartitionableLoopsInterface>(linalgOp.getOperation())
-          .getPartitionableLoops(kNumMaxParallelDims);
+  auto loops = cast<PartitionableLoopsInterface>(linalgOp.getOperation())
+                   .getPartitionableLoops(kNumMaxParallelDims);
   return getDefaultDistributedLevelTileSizes(loops, lbs, ubs, minTileSizes,
                                              maxTileSizes, allowIncompleteTile,
                                              vectorSizeHints);
@@ -397,7 +396,7 @@ static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
 /// `PartitionableLoopsInterface`, given the `lbs` and `ubs` of all the loops.
 static LogicalResult setDefaultRootConfig(
     func::FuncOp entryPointFn,
-    IREE::Flow::PartitionableLoopsInterface partitionableLoopsInterfaceOp,
+    PartitionableLoopsInterface partitionableLoopsInterfaceOp,
     ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs) {
   if (getLoweringConfig(partitionableLoopsInterfaceOp)) return success();
 
@@ -616,13 +615,14 @@ static LogicalResult setRootConfig(
   // works for linalg.matmul cases. We can relax it once we have better
   // scheduling, e.g., transform dialect.
   SmallVector<int64_t> flowTileSizes;
-  if (!disableMatmulPadPipeline && (isX86(*variantOp) || isRISCV(*variantOp)) &&
-      numLoops == 3) {
+  if (!disableMatmulPadPipeline && (isX86(*variantOp) || isRISCV(*variantOp))) {
     // It's inspired from Sandbox configuration. Sandbox has
     // [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192 because
     // 288/12*8=192
-    maxTileSizes[0] = 192;
-    maxTileSizes[1] = 128;
+    if (numLoops == 3) {
+      maxTileSizes[0] = 192;
+      maxTileSizes[1] = 128;
+    }
     flowTileSizes = getDefaultDistributedLevelTileSizes(
         linalgOp, workgroupTileSizes, maxTileSizes,
         /*allowIncompleteTile=*/true);
@@ -637,16 +637,13 @@ static LogicalResult setRootConfig(
   if (isAArch64(*variantOp) && !isQuantized) {
     return setAArch64RootConfig(entryPointFn, contractionOp, flowTileSizes,
                                 workgroupTileSizes, vectorSize);
-  } else if (isX86(*variantOp) || isRISCV(*variantOp) ||
-             isAArch64(*variantOp)) {
-    if (disableMatmulPadPipeline || numLoops != 3) {
-      return setMatmulNoPadRootConfig(entryPointFn, contractionOp,
-                                      flowTileSizes, workgroupTileSizes,
-                                      vectorSize);
-    }
+  } else if (!disableMatmulPadPipeline &&
+             (isX86(*variantOp) || isRISCV(*variantOp))) {
+    return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
+                                  workgroupTileSizes, vectorSize);
   }
-  return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
-                                workgroupTileSizes, vectorSize);
+  return setMatmulNoPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
+                                  workgroupTileSizes, vectorSize);
 }
 
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d root
@@ -794,17 +791,17 @@ static LogicalResult setDefaultGenericOpRootConfig(
 
   // If there are no loops, there is nothing to do.
   unsigned numLoops = genericOp.getNumLoops();
-  if (numLoops == 0) return success();
+  if (numLoops == 0) {
+    return setOpConfigAndEntryPointFnTranslation(
+        entryPointFn, genericOp, {{}},
+        DispatchLoweringPassPipeline::CPUDefault);
+  }
 
   SmallVector<int64_t> minTileSizes =
       getMinTilingSizesForEachDim(entryPointFn, genericOp);
   // For generic ops we'll use the default divided by 2 to control the stack
   // allocation limit See #9469 for example.
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize / 2);
-  if (llvm::all_of(minTileSizes, [](int64_t vs) { return vs == 1; })) {
-    // Nothing to vectorize just lower to loops.
-    return success();
-  }
 
   // Set the flow level tiling to the default.
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
@@ -995,7 +992,7 @@ static LogicalResult setRootConfig(
   if (getLoweringConfig(linalgOp)) return success();
 
   auto partitionableLoopOp =
-      cast<IREE::Flow::PartitionableLoopsInterface>(linalgOp.getOperation());
+      cast<PartitionableLoopsInterface>(linalgOp.getOperation());
   SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
   SmallVector<int64_t> ubs = linalgOp.getStaticLoopRanges();
   return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
@@ -1009,8 +1006,8 @@ static LogicalResult setRootConfig(
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   if (getLoweringConfig(tiledOpInterfaceOp)) return success();
 
-  auto partitionableLoopOp = cast<IREE::Flow::PartitionableLoopsInterface>(
-      tiledOpInterfaceOp.getOperation());
+  auto partitionableLoopOp =
+      cast<PartitionableLoopsInterface>(tiledOpInterfaceOp.getOperation());
 
   // TODO(hanchung): Implement getStaticLoopRanges method for TiledOpInterface.
   OpBuilder builder(tiledOpInterfaceOp.getContext());

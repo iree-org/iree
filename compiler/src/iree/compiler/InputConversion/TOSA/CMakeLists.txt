@@ -46,7 +46,7 @@ iree_cc_library(
     ::PassesIncGen
     MLIRPass
     MLIRSCFToControlFlow
-    MLIRTosa
+    MLIRTosaDialect
     MLIRTosaToArith
     MLIRTosaToLinalg
     MLIRTosaToSCF

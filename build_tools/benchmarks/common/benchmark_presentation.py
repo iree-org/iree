@@ -8,12 +8,21 @@ import urllib.parse
 import markdown_strings as md
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple, TypeVar
 
-from .benchmark_definition import BenchmarkResults
-from .benchmark_thresholds import BENCHMARK_THRESHOLDS, ThresholdUnit
+from common.benchmark_definition import BenchmarkResults
+from common.benchmark_thresholds import BENCHMARK_THRESHOLDS, BenchmarkThreshold, ThresholdUnit
+
+GetMetricFunc = Callable[[Any], Tuple[int, Optional[int]]]
+GetTableRowFunc = Callable[[str, Any], Tuple]
 
 PERFBOARD_SERIES_PREFIX = "https://perf.iree.dev/serie?IREE?"
+BENCHMARK_RESULTS_HEADERS = [
+    "Benchmark Name",
+    "Average Latency (ms)",
+    "Median Latency (ms)",
+    "Latency Standard Deviation (ms)",
+]
 
 
 @dataclass
@@ -71,113 +80,152 @@ def aggregate_all_benchmarks(
   return aggregate_results
 
 
-def _make_benchmark_clickable(name: str) -> str:
-  """Add link to the given benchmark name."""
-  url = PERFBOARD_SERIES_PREFIX + urllib.parse.quote(name, safe="()[]@,")
+def _make_series_link(name: str, series: Optional[str] = None) -> str:
+  """Add link to the given benchmark name.
+
+    Args:
+      name: the text to show on the link.
+      series: the dashboard series name. Use name if None.
+  """
+  if series is None:
+    series = name
+  url = PERFBOARD_SERIES_PREFIX + urllib.parse.quote(series, safe="()[]@,")
   return md.link(name, url)
 
 
-def _add_header_and_get_markdown_table(names: Tuple[str],
-                                       means: Tuple[Any],
-                                       medians: Tuple[int],
-                                       stddevs: Tuple[int],
+def _add_header_and_get_markdown_table(headers: Sequence[str],
+                                       rows: Sequence[Tuple],
                                        size_cut: Optional[int] = None) -> str:
-  """Generates a markdown table with proper headers for benchmarks.
+  """Generates a markdown table with headers.
 
   Args:
-  - size_cut: If not None, only show the top N results for each table.
+    headers: list of table headers.
+    rows: list of rows. Each row is a tuple with the same length as headers.
+    size_cut: If not None, only show the top N results for each table.
   """
-  total_size = len(names)
+
+  total_size = len(rows)
   if size_cut is not None:
-    names = names[0:size_cut]
-    means = means[0:size_cut]
-    medians = medians[0:size_cut]
-    stddevs = stddevs[0:size_cut]
+    rows = rows[0:size_cut]
 
-  names = tuple([_make_benchmark_clickable(name) for name in names])
-  names = ("Benchmark Name",) + names
-  means = ("Average Latency (ms)",) + means
-  medians = ("Median Latency (ms)",) + medians
-  stddevs = ("Latency Standard Deviation (ms)",) + stddevs
+  columns = [[header] for header in headers]
+  for row in rows:
+    for column, item in zip(columns, row):
+      column.append(item)
 
-  table_str = md.table([names, means, medians, stddevs])
+  table_str = md.table(columns)
   if size_cut is not None and size_cut < total_size:
     table_str += "\n\n"
     table_str += md.italics(
-        f"[Top {size_cut} out of {total_size} benchmark results showed]")
+        f"[Top {size_cut} out of {total_size} results showed]")
   return table_str
 
 
-def _sort_benchmarks_and_get_table(benchmarks: Dict[str,
-                                                    AggregateBenchmarkLatency],
-                                   size_cut: Optional[int] = None):
-  """Sorts all benchmarks according to the improvement/regression ratio and
-  returns a markdown table for it.
-
-  Args:
-  - size_cut: If not None, only show the top N results for each table.
-  """
-  sorted_benchmarks = []
-  for k, v in benchmarks.items():
-    ratio = abs(v.mean_time - v.base_mean_time) / v.base_mean_time
-    sorted_benchmarks.append((k, (v.mean_time, v.base_mean_time, ratio),
-                              v.median_time, v.stddev_time))
-  # Sort according to ratio in the reverse order.
-  sorted_benchmarks.sort(key=lambda benchmark: benchmark[1][2], reverse=True)
-
-  # Split each field into its own tuple in prepration for markdown table.
-  names, means, medians, stddevs = zip(*sorted_benchmarks)
-
-  # Turn the tuple about means into a string representation.
-  str_means = []
-  for pr, base, ratio in means:
-    direction = "↑" if pr > base else ("↓" if pr < base else "")
-    str_means.append(f"{pr} (vs. {base}, {ratio:.2%}{direction})")
-  str_means = tuple(str_means)
-
-  return _add_header_and_get_markdown_table(names, str_means, medians, stddevs,
-                                            size_cut)
+T = TypeVar("T")
 
 
-def categorize_benchmarks_into_tables(benchmarks: Dict[
-    str, AggregateBenchmarkLatency],
-                                      size_cut: Optional[int] = None) -> str:
-  """Splits benchmarks into regressed/improved/similar/raw categories and
-  returns their markdown tables.
+def _categorize_on_single_metric(
+    metrics_map: Dict[str, T],
+    metric_func: GetMetricFunc,
+    thresholds: Sequence[BenchmarkThreshold],
+) -> Tuple[Dict[str, T], Dict[str, T], Dict[str, T], Dict[str, T]]:
+  """Categorize the metrics object into regressed, improved, similar, and the
+    raw group (the group with no base to compare to).
 
     Args:
-    - benchmarks: A dictionary of benchmark names to its aggregate info.
-    - size_cut: If not None, only show the top N results for each table.
-    """
-  regressed, improved, similar, raw = {}, {}, {}, {}
+      metrics_map: map of (name, metrics object).
+      metric_func: the function returns current and base value of the metric.
+      thresholds: list of threshold settings to match for categorizing.
+    Returns: 
+      A tuple of (regressed, improved, similar, raw) groups.
+  """
 
-  for name, results in benchmarks.items():
-    # If no informatio about the base result. Then we cannot analyze.
-    if results.base_mean_time is None:
-      raw[name] = results
+  regressed_map = {}
+  improved_map = {}
+  similar_map = {}
+  raw_map = {}
+  for name, metrics_obj in metrics_map.items():
+    current, base = metric_func(metrics_obj)
+    if base is None:
+      raw_map[name] = metrics_obj
       continue
 
     similar_threshold = None
-    for threshold in BENCHMARK_THRESHOLDS:
+    for threshold in thresholds:
       if threshold.regex.match(name):
         similar_threshold = threshold
         break
     if similar_threshold is None:
-      raise ValueError(f"no matched threshold setting for benchmark: {name}")
+      raise ValueError(f"No matched threshold setting for: {name}")
 
-    current = results.mean_time
-    base = results.base_mean_time
     if similar_threshold.unit == ThresholdUnit.PERCENTAGE:
       ratio = abs(current - base) / base * 100
     else:
       ratio = abs(current - base)
 
     if ratio <= similar_threshold.threshold:
-      similar[name] = results
+      similar_map[name] = metrics_obj
     elif current > base:
-      regressed[name] = results
+      regressed_map[name] = metrics_obj
     else:
-      improved[name] = results
+      improved_map[name] = metrics_obj
+
+  return (regressed_map, improved_map, similar_map, raw_map)
+
+
+def _get_compare_text(current: int, base: Optional[int]) -> str:
+  """Generates the text of comparison between current and base value. Returns
+    the current value if the base value is None.
+  """
+  # If base is None, don't need to do compare.
+  if base is None:
+    return f"{current}"
+
+  ratio = abs(current - base) / base
+  direction = "↑" if current > base else ("↓" if current < base else "")
+  return f"{current} (vs. {base}, {ratio:.2%}{direction})"
+
+
+def _sort_benchmarks_and_get_table(benchmarks: Dict[str,
+                                                    AggregateBenchmarkLatency],
+                                   size_cut: Optional[int] = None) -> str:
+  """Sorts all benchmarks according to the improvement/regression ratio and
+    returns a markdown table for it.
+
+    Args:
+      benchmarks_map: map of (name, benchmark object).
+      size_cut: If not None, only show the top N results for each table.
+  """
+  sorted_rows = []
+  for name, benchmark in benchmarks.items():
+    current = benchmark.mean_time
+    base = benchmark.base_mean_time
+    ratio = abs(current - base) / base
+    str_mean = _get_compare_text(current, base)
+    clickable_name = _make_series_link(name)
+    sorted_rows.append((ratio, (clickable_name, str_mean, benchmark.median_time,
+                                benchmark.stddev_time)))
+  sorted_rows.sort(key=lambda row: row[0], reverse=True)
+
+  return _add_header_and_get_markdown_table(
+      headers=BENCHMARK_RESULTS_HEADERS,
+      rows=[row[1] for row in sorted_rows],
+      size_cut=size_cut)
+
+
+def categorize_benchmarks_into_tables(benchmarks: Dict[
+    str, AggregateBenchmarkLatency],
+                                      size_cut: Optional[int] = None) -> str:
+  """Splits benchmarks into regressed/improved/similar/raw categories and
+    returns their markdown tables.
+
+    Args:
+      benchmarks: A dictionary of benchmark names to its aggregate info.
+      size_cut: If not None, only show the top N results for each table.
+  """
+  regressed, improved, similar, raw = _categorize_on_single_metric(
+      benchmarks, lambda results: (results.mean_time, results.base_mean_time),
+      BENCHMARK_THRESHOLDS)
 
   tables = []
   if regressed:
@@ -192,14 +240,10 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
     tables.append(_sort_benchmarks_and_get_table(similar, size_cut))
   if raw:
     tables.append(md.header("Raw Benchmarks", 3))
-    raw_list = [
-        (k, v.mean_time, v.median_time, v.stddev_time) for k, v in raw.items()
-    ]
-    names, means, medians, stddevs = zip(*raw_list)
+    raw_list = [(_make_series_link(k), v.mean_time, v.median_time,
+                 v.stddev_time) for k, v in raw.items()]
     tables.append(
-        _add_header_and_get_markdown_table(names=names,
-                                           means=means,
-                                           medians=medians,
-                                           stddevs=stddevs,
+        _add_header_and_get_markdown_table(BENCHMARK_RESULTS_HEADERS,
+                                           raw_list,
                                            size_cut=size_cut))
   return "\n\n".join(tables)

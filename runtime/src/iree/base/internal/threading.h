@@ -172,6 +172,8 @@ void iree_thread_request_affinity(iree_thread_t* thread,
 // This has no effect if the thread is not suspended.
 void iree_thread_resume(iree_thread_t* thread);
 
+void iree_thread_yield(void);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif

@@ -17,7 +17,6 @@ iree_compiler_cc_library(
     srcs = [
         "AffineMinDistributedSCFCanonicalization.cpp",
         "RemoveSingleIterationLoop.cpp",
-        "Transforms.cpp",
     ],
     hdrs = [
         "Transforms.h",
@@ -26,7 +25,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineUtils",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
@@ -35,6 +34,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
-        "@llvm-project//mlir:VectorOps",
+        "@llvm-project//mlir:VectorDialect",
     ],
 )

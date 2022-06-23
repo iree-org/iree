@@ -162,8 +162,7 @@ class CompilerTest(unittest.TestCase):
         strip_debug_ops=True,
         strip_source_map=True,
         crash_reproducer_path="foobar.txt",
-        # Re-enable when benchmarking pass is fixed: #6196
-        # enable_benchmark=True,
+        enable_benchmark=True,
         target_backends=iree.compiler.tools.DEFAULT_TESTING_BACKENDS)
 
   def testException(self):

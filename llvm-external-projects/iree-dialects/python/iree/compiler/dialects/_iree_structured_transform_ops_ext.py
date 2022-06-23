@@ -101,13 +101,13 @@ class LowerVectorsOp:
     unroll_vector_transfers = _ensure_bool_attr(unroll_vector_transfers, True)
     transpose_lowering = _ensure_string_attr(transpose_lowering, "eltwise")
     transpose_avx2_lowering = _ensure_bool_attr(transpose_avx2_lowering, False)
-    super().__init__(stages,
-                     contraction_lowering,
-                     multireduction_lowering,
-                     split_transfers,
-                     unroll_vector_transfers,
-                     transpose_lowering,
-                     transpose_avx2_lowering,
+    super().__init__(stages=stages,
+                     contraction_lowering=contraction_lowering,
+                     multireduction_lowering=multireduction_lowering,
+                     split_transfers=split_transfers,
+                     unroll_vector_transfers=unroll_vector_transfers,
+                     transpose_lowering=transpose_lowering,
+                     transpose_avx2_lowering=transpose_avx2_lowering,
                      loc=loc,
                      ip=ip)
 
@@ -146,4 +146,4 @@ class PrintOp:
                loc=None,
                ip=None):
     name = _ensure_string_attr(name)
-    super().__init__(target, name, loc=loc, ip=ip)
+    super().__init__(name, target=target, loc=loc, ip=ip)

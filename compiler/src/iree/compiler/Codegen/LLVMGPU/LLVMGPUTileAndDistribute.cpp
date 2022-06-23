@@ -41,7 +41,7 @@ extern llvm::cl::opt<bool> llvmgpuUseMMASync;
 static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
   auto tileSizesFn = [&](OpBuilder &builder,
                          Operation *op) -> SmallVector<Value, 4> {
-    auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+    auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
     auto partitionedLoops =
         interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
     SmallVector<Value, 4> tileSizes = getTileSizes(builder, op, 0);
@@ -76,7 +76,7 @@ static SmallVector<Value, 4> calculateDistributedTileSize(
   SmallVector<int64_t> blockTileSize = getTileSizes(operation, 0);
   SmallVector<Value, 4> tileSizesVal;
   // Use partitionedLoop to know what loop needs to be distributed.
-  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*operation);
+  auto interfaceOp = cast<PartitionableLoopsInterface>(*operation);
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   if (partitionedLoops.empty()) {

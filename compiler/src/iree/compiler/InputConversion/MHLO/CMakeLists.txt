@@ -59,27 +59,27 @@ iree_cc_library(
     IREELinalgExtPasses
     LLVMSupport
     LmhloDialect
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAffineUtils
-    MLIRArithmetic
-    MLIRComplex
-    MLIRControlFlow
-    MLIRFunc
+    MLIRArithmeticDialect
+    MLIRComplexDialect
+    MLIRControlFlowDialect
+    MLIRFuncDialect
     MLIRIR
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgTransforms
-    MLIRMath
-    MLIRMemRef
+    MLIRMathDialect
+    MLIRMemRefDialect
     MLIRMhloUtils
     MLIRPass
     MLIRReconcileUnrealizedCasts
     MLIRSCFToControlFlow
     MLIRSCFTransforms
-    MLIRShape
+    MLIRShapeDialect
     MLIRShapeOpsTransforms
     MLIRShapeToStandard
     MLIRSupport
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTransforms
     MhloDialect
     MhloPasses

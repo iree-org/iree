@@ -4,6 +4,110 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# iree_import_tflite_model()
+#
+# Generates MLIR file from a TFLite model file. The generated target will be
+# also added to the iree-benchmark-import-models.
+#
+# Parameters:
+#   TARGET_NAME: The target name to be created for this module.
+#   SOURCE: Source TF model direcotry
+#   OUTPUT_MLIR_FILE: The path to output the generated MLIR file.
+function(iree_import_tflite_model)
+  cmake_parse_arguments(
+    PARSE_ARGV 0
+    _RULE
+    ""
+    "TARGET_NAME;SOURCE;OUTPUT_MLIR_FILE"
+    ""
+  )
+  iree_validate_required_arguments(
+    _RULE
+    "TARGET_NAME;SOURCE;OUTPUT_MLIR_FILE"
+    ""
+  )
+
+  if(NOT IREE_IMPORT_TFLITE_PATH)
+    message(SEND_ERROR "Benchmarks of ${_RULE_SOURCE} require"
+                      " that iree-import-tflite be available "
+                      " (either on PATH or via IREE_IMPORT_TFLITE_PATH)")
+  endif()
+
+  if(NOT TARGET "${_RULE_TARGET_NAME}")
+    cmake_path(GET _RULE_SOURCE FILENAME _MODEL_BASENAME)
+    add_custom_command(
+      OUTPUT "${_RULE_OUTPUT_MLIR_FILE}"
+      COMMAND
+        "${IREE_IMPORT_TFLITE_PATH}"
+        "${_RULE_SOURCE}"
+        "-o=${_RULE_OUTPUT_MLIR_FILE}"
+      DEPENDS
+        "${_RULE_SOURCE}"
+      COMMENT "Importing TFLite model ${_MODEL_BASENAME}"
+    )
+    add_custom_target("${_RULE_TARGET_NAME}"
+      DEPENDS
+        "${_RULE_OUTPUT_MLIR_FILE}"
+      COMMENT
+        "Importing ${_MODEL_BASENAME} into MLIR"
+    )
+    add_dependencies(iree-benchmark-import-models "${_RULE_TARGET_NAME}")
+  endif()
+endfunction()
+
+# iree_import_tf_model()
+#
+# Generates MLIR file from a TensorFlow SavedModel. The generated target will
+# be also added to the iree-benchmark-import-models.
+#
+# Parameters:
+#   TARGET_NAME: The target name to be created for this module.
+#   SOURCE: Source TF model direcotry
+#   ENTRY_FUNCTION: The entry function name for the input module.
+#   OUTPUT_MLIR_FILE: The path to output the generated MLIR file.
+function(iree_import_tf_model)
+  cmake_parse_arguments(
+    PARSE_ARGV 0
+    _RULE
+    ""
+    "TARGET_NAME;SOURCE;ENTRY_FUNCTION;OUTPUT_MLIR_FILE"
+    ""
+  )
+  iree_validate_required_arguments(
+    _RULE
+    "TARGET_NAME;SOURCE;ENTRY_FUNCTION;OUTPUT_MLIR_FILE"
+    ""
+  )
+
+  if(NOT IREE_IMPORT_TF_PATH)
+    message(SEND_ERROR "Benchmarks of ${_RULE_SOURCE} require"
+                      " that iree-import-tf be available "
+                      " (either on PATH or via IREE_IMPORT_TF_PATH)")
+  endif()
+
+  if(NOT TARGET "${_RULE_TARGET_NAME}")
+    cmake_path(GET _RULE_SOURCE FILENAME _MODEL_BASENAME)
+    add_custom_command(
+      OUTPUT "${_RULE_OUTPUT_MLIR_FILE}"
+      COMMAND
+        "${IREE_IMPORT_TF_PATH}"
+        "--tf-savedmodel-exported-names=${_RULE_ENTRY_FUNCTION}"
+        "${_RULE_SOURCE}"
+        "-o=${_RULE_OUTPUT_MLIR_FILE}"
+      DEPENDS
+        "${_RULE_SOURCE}"
+      COMMENT "Importing TF model ${_MODEL_BASENAME}"
+    )
+    add_custom_target("${_RULE_TARGET_NAME}"
+      DEPENDS
+        "${_RULE_OUTPUT_MLIR_FILE}"
+      COMMENT
+        "Importing ${_MODEL_BASENAME} into MLIR"
+    )
+    add_dependencies(iree-benchmark-import-models "${_RULE_TARGET_NAME}")
+  endif()
+endfunction()
+
 # iree_benchmark_suite()
 #
 # Generates benchmark suites for MLIR input modules. The generated artifacts
@@ -121,8 +225,8 @@ function(iree_benchmark_suite)
       list(POP_BACK _SOURCE_URL_SEGMENTS _LAST_URL_SEGMENT)
       set(_DOWNLOAD_TARGET "${_PACKAGE_NAME}_iree-download-benchmark-source-${_LAST_URL_SEGMENT}")
 
-      # Strip off gzip suffix if present (downloader unzips if necessary)
-      string(REGEX REPLACE "\.gz$" "" _SOURCE_FILE_BASENAME "${_LAST_URL_SEGMENT}")
+      # Strip off gzip/tar suffix if present (downloader unpacks if necessary)
+      string(REGEX REPLACE "(\.gz)|(\.tar\.gz)$" "" _SOURCE_FILE_BASENAME "${_LAST_URL_SEGMENT}")
       set(_MODULE_SOURCE "${_ROOT_ARTIFACTS_DIR}/${_SOURCE_FILE_BASENAME}")
       if(NOT TARGET "${_DOWNLOAD_TARGET}")
         add_custom_command(
@@ -143,35 +247,27 @@ function(iree_benchmark_suite)
 
     # If the source is a TFLite file, import it.
     if("${_MODULE_SOURCE}" MATCHES "\.tflite$")
-      if(NOT IREE_IMPORT_TFLITE_PATH)
-        message(SEND_ERROR "Benchmarks of ${_MODULE_SOURCE} require"
-                          " that iree-import-tflite be available "
-                          " (either on PATH or via IREE_IMPORT_TFLITE_PATH)")
-      endif()
-      set(_TFLITE_FILE "${_MODULE_SOURCE}")
-      set(_MODULE_SOURCE "${_TFLITE_FILE}.mlir")
-      get_filename_component(_TFLITE_FILE_BASENAME "${_TFLITE_FILE}" NAME)
-      set(_TFLITE_IMPORT_TARGET "${_PACKAGE_NAME}_iree-import-tflite-${_TFLITE_FILE_BASENAME}")
-      if(NOT TARGET "${_TFLITE_IMPORT_TARGET}")
-        add_custom_command(
-          OUTPUT "${_MODULE_SOURCE}"
-          COMMAND
-            "${IREE_IMPORT_TFLITE_PATH}"
-            "${_TFLITE_FILE}"
-            "-o=${_MODULE_SOURCE}"
-          DEPENDS
-            "${_TFLITE_FILE}"
-          COMMENT "Importing TFLite file ${_TFLITE_FILE_BASENAME}"
-        )
-        add_custom_target("${_TFLITE_IMPORT_TARGET}"
-          DEPENDS
-            "${_MODULE_SOURCE}"
-          COMMENT
-            "Importing ${_TFLITE_FILE_BASENAME} into MLIR"
-        )
-        add_dependencies(iree-benchmark-import-models "${_TFLITE_IMPORT_TARGET}")
-      endif()
-      set(_MODULE_SOURCE_TARGET "${_TFLITE_IMPORT_TARGET}")
+      cmake_path(GET _MODULE_SOURCE FILENAME _MODEL_BASENAME)
+      set(_MODULE_SOURCE_TARGET "${_PACKAGE_NAME}_iree-import-tf-${_MODEL_BASENAME}")
+      iree_import_tflite_model(
+        TARGET_NAME "${_MODULE_SOURCE_TARGET}"
+        SOURCE "${_MODULE_SOURCE}"
+        OUTPUT_MLIR_FILE "${_MODULE_SOURCE}.mlir"
+      )
+      set(_MODULE_SOURCE "${_MODULE_SOURCE}.mlir")
+    endif()
+
+    # If the source is a TensorFlow SavedModel directory, import it.
+    if("${_MODULE_SOURCE}" MATCHES "-tf-model$")
+      cmake_path(GET _MODULE_SOURCE FILENAME _MODEL_BASENAME)
+      set(_MODULE_SOURCE_TARGET "${_PACKAGE_NAME}_iree-import-tf-${_MODEL_BASENAME}")
+      iree_import_tf_model(
+        TARGET_NAME "${_MODULE_SOURCE_TARGET}"
+        SOURCE "${_MODULE_SOURCE}"
+        ENTRY_FUNCTION "${_MODULE_ENTRY_FUNCTION}"
+        OUTPUT_MLIR_FILE "${_MODULE_SOURCE}.mlir"
+      )
+      set(_MODULE_SOURCE "${_MODULE_SOURCE}.mlir")
     endif()
 
     # Next create the command and target for compiling the input module into

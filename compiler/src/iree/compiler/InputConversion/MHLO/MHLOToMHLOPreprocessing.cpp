@@ -58,7 +58,7 @@ static DenseIntElementsAttr make1DElementsAttr(OpBuilder &b, int64_t start,
 static Value getF32Const(ImplicitLocOpBuilder b, ArrayRef<int64_t> shapes,
                          ArrayRef<float> values) {
   RankedTensorType ty = RankedTensorType::get(shapes, b.getF32Type());
-  return b.create<mhlo::ConstOp>(DenseFPElementsAttr::get(ty, values))
+  return b.create<mhlo::ConstantOp>(DenseFPElementsAttr::get(ty, values))
       .getResult();
 }
 
@@ -549,7 +549,7 @@ class MulCastOfBool : public OpRewritePattern<mhlo::MulOp> {
     auto lhsTy = lhs.getType().cast<ShapedType>();
     Value lhsBool = rewriter.create<mhlo::ConvertOp>(
         op.getLoc(), lhsTy.clone(rewriter.getIntegerType(1)), lhs);
-    Value zero = rewriter.create<mhlo::ConstOp>(
+    Value zero = rewriter.create<mhlo::ConstantOp>(
         op.getLoc(), DenseElementsAttr::get(RankedTensorType::get({}, eType),
                                             rewriter.getZeroAttr(eType)));
 
@@ -759,14 +759,14 @@ struct MHLOToMHLOPreprocessingPass
 
     RewritePatternSet patterns(&getContext());
     // TODO: Remove once we have a general contraction to matmul pass.
-    mhlo::PopulateEinsumToDotGeneralPatterns(context, &patterns);
-    mhlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
-    mhlo::PopulateComplexLoweringPatterns(context, &patterns);
-    mhlo::PopulateGatherToTorchIndexSelectPatterns(context, &patterns);
+    mhlo::populateEinsumToDotGeneralPatterns(context, &patterns);
+    mhlo::populateUnfuseBatchNormPatterns(context, &patterns);
+    mhlo::populateComplexLoweringPatterns(context, &patterns);
+    mhlo::populateGatherToTorchIndexSelectPatterns(context, &patterns);
     patterns.insert<ScatterRank0Value, ExpandRngNormal, MulCastOfBool>(context);
 
     // dot_general canoncalization patterns.
-    mhlo::PopulateGeneralDotOpLoweringPatterns(&patterns, context);
+    mhlo::populateGeneralDotOpLoweringPatterns(&patterns, context);
     patterns.insert<TransposeReshapeGenericDotGeneral>(context);
 
     // Unary elementwise op.

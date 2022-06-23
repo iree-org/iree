@@ -53,7 +53,7 @@ COMPONENTS=(
 RETAIN_PATHS=(
   LICENSE
   nvvm/libdevice/libdevice.10.bc
-  include/cuda.h
+  include
 )
 
 echo "Extracting to $TARGET_DIR"
@@ -90,7 +90,7 @@ for rel_path in ${RETAIN_PATHS[@]}; do
   target_file="$TARGET_DIR/$rel_path"
   echo "Copy $src_file -> $target_file"
   mkdir -p "$(dirname $target_file)"
-  cp -f $src_file $target_file
+  cp -Rf $src_file $target_file
 done
 
 # Delete tmp directory (saves ~100MiB in docker images).

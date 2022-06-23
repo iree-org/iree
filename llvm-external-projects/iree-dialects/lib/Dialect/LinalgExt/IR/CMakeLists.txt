@@ -11,20 +11,20 @@ add_mlir_library(IREELinalgExtDialect
   IREELinalgExtIncGen
 
   LINK_LIBS PUBLIC
-  MLIRAffine
+  MLIRAffineDialect
   MLIRArithmeticUtils
   MLIRDialectUtils
   MLIRIR
   MLIRInferTypeOpInterface
-  MLIRLinalg
-  MLIRMath
-  MLIRMemRef
+  MLIRLinalgDialect
+  MLIRMathDialect
+  MLIRMemRefDialect
   MLIRPass
   MLIRSideEffectInterfaces
   MLIRSupport
-  MLIRSCF
-  MLIRFunc
-  MLIRTensor
+  MLIRSCFDialect
+  MLIRFuncDialect
+  MLIRTensorDialect
   MLIRViewLikeInterface
 )
 

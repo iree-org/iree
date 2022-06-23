@@ -341,6 +341,7 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
   }
 
   FunctionSourceMap sourceMap;
+  sourceMap.localName = funcOp.getName().str();
 
   V0BytecodeEncoder encoder(&typeTable, &registerAllocation);
   for (auto &block : funcOp.getBlocks()) {

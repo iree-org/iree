@@ -30,15 +30,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-// A flag to switch between inline asm and intrinsics while we develop these two
-//  parallel paths.
-static llvm::cl::opt<bool> clMmt4dUseIntrinsics(
-    "iree-codegen-mmt4d-use-intrinsics",
-    llvm::cl::desc("Whether to use instrinsics when lowering vector contracts "
-                   "generated from mmt4d matmuls (as opposed to inline asm). "
-                   "Not for production use."),
-    llvm::cl::init(false));
-
 namespace {
 // Could just be linalg::TilingPattern with a ContractionOpInterface filter, but
 // that is always templated on an op.
@@ -305,51 +296,6 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     });
   }
 
-  {
-    // Fold consumer add ops into the contraction op itself.
-    RewritePatternSet canonicalizationPatterns(context);
-    vector::ContractionOp::getCanonicalizationPatterns(canonicalizationPatterns,
-                                                       context);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(canonicalizationPatterns)))) {
-      return signalPassFailure();
-    }
-
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
-      llvm::dbgs()
-          << "\n--- After folding consumer add ops into contraction op "
-             "iteself ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-  }
-
-  // Apply vector unroll
-  {
-    RewritePatternSet vectorUnrollPatterns(context);
-    // TODO(hanchung): Set different vector sizes for different operations. Also
-    // it seems that `{16, 16, 16}` is not a good config. We should tune it.
-    // There are issues when unrolling 1Dx1D->0D vector.contract op. Only unroll
-    // the op when there are more than one loop.
-    auto vectorTiles =
-        config.getTileSizeVals(static_cast<unsigned>(TilingLevel::VectorTiles));
-    if (vectorTiles.size() > 1) {
-      vector::populateVectorUnrollPatterns(
-          vectorUnrollPatterns,
-          vector::UnrollVectorOptions().setNativeShape(vectorTiles));
-    }
-
-    if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                            std::move(vectorUnrollPatterns)))) {
-      return signalPassFailure();
-    }
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
-      llvm::dbgs() << "\n--- After vector unrolling ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-  }
-
   linalg::hoistRedundantVectorTransfersOnTensor(funcOp);
   linalg::hoistRedundantVectorTransfers(funcOp);
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
@@ -357,46 +303,6 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
-
-  {
-    // Special-case vector.contract codegen paths. This needs to happen
-    // just before the generic vector ops lowerings.
-    CustomKernelsTargetInfo info;
-    if (succeeded(InferCustomKernelsTargetInfoFromParent(funcOp, info))) {
-      if (clMmt4dUseIntrinsics) {
-        info.add(CustomKernelTargetFeature::Intrinsics);
-      }
-      RewritePatternSet patterns(context);
-      populateVectorContractCustomKernelsPatterns(info, patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
-  }
-
-  // Apply vector specific operation lowering.
-  {
-    vector::VectorTransformsOptions vectorTransformsOptions =
-        vector::VectorTransformsOptions().setVectorTransformsOptions(
-            vector::VectorContractLowering::OuterProduct);
-    RewritePatternSet vectorContractLoweringPatterns(&getContext());
-    vectorContractLoweringPatterns.insert<
-        vector::ContractionOpToOuterProductOpLowering,
-        vector::ContractionOpToMatmulOpLowering, vector::ContractionOpLowering>(
-        vectorTransformsOptions, context);
-    vector::populateVectorTransferPermutationMapLoweringPatterns(
-        vectorContractLoweringPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(vectorContractLoweringPatterns)))) {
-      return signalPassFailure();
-    }
-
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
-      llvm::dbgs() << "\n--- After vector specific operatrion lowering ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-  }
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

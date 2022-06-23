@@ -10,12 +10,14 @@
 #include <string.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/threading.h"
 
 void iree_task_scope_initialize(iree_string_view_t name,
                                 iree_task_scope_t* out_scope) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   memset(out_scope, 0, sizeof(*out_scope));
+  iree_atomic_ref_count_init_value(&out_scope->pending_submissions, 0);
 
   iree_host_size_t name_length =
       iree_min(name.size, IREE_ARRAYSIZE(out_scope->name) - 1);
@@ -25,7 +27,6 @@ void iree_task_scope_initialize(iree_string_view_t name,
   // TODO(benvanik): pick trace colors based on name hash.
   IREE_TRACE(out_scope->task_trace_color = 0xFFFF0000u);
 
-  iree_slim_mutex_initialize(&out_scope->mutex);
   iree_notification_initialize(&out_scope->idle_notification);
 
   IREE_TRACE_ZONE_END(z0);
@@ -49,8 +50,11 @@ void iree_task_scope_deinitialize(iree_task_scope_t* scope) {
       &scope->permanent_status, (intptr_t)NULL, iree_memory_order_acquire);
   IREE_IGNORE_ERROR(status);
 
+  while (iree_atomic_load_int32(&scope->pending_idle_notification_posts,
+                                iree_memory_order_acquire)) {
+    iree_thread_yield();
+  }
   iree_notification_deinitialize(&scope->idle_notification);
-  iree_slim_mutex_deinitialize(&scope->mutex);
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -115,26 +119,22 @@ void iree_task_scope_fail(iree_task_scope_t* scope, iree_status_t status) {
 }
 
 void iree_task_scope_begin(iree_task_scope_t* scope) {
-  iree_slim_mutex_lock(&scope->mutex);
-  ++scope->pending_submissions;
-  iree_slim_mutex_unlock(&scope->mutex);
+  iree_atomic_ref_count_inc(&scope->pending_submissions);
+  iree_atomic_store_int32(&scope->pending_idle_notification_posts, 1,
+                          iree_memory_order_relaxed);
 }
 
 void iree_task_scope_end(iree_task_scope_t* scope) {
-  iree_slim_mutex_lock(&scope->mutex);
-  bool signal = (--scope->pending_submissions == 0);
-  iree_slim_mutex_unlock(&scope->mutex);
-  if (signal) {
+  if (iree_atomic_ref_count_dec(&scope->pending_submissions) == 1) {
     // All submissions have completed in this scope - notify any waiters.
     iree_notification_post(&scope->idle_notification, IREE_ALL_WAITERS);
+    iree_atomic_store_int32(&scope->pending_idle_notification_posts, 0,
+                            iree_memory_order_release);
   }
 }
 
 bool iree_task_scope_is_idle(iree_task_scope_t* scope) {
-  iree_slim_mutex_lock(&scope->mutex);
-  bool is_idle = scope->pending_submissions == 0;
-  iree_slim_mutex_unlock(&scope->mutex);
-  return is_idle;
+  return (iree_atomic_ref_count_load(&scope->pending_submissions) == 0);
 }
 
 iree_status_t iree_task_scope_wait_idle(iree_task_scope_t* scope,

@@ -88,35 +88,35 @@ iree_cc_library(
     "init_mlir_dialects.h"
     "init_mlir_passes.h"
   DEPS
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAffineTransforms
-    MLIRArmNeon
+    MLIRArmNeonDialect
     MLIRArmNeon2dToIntr
-    MLIRBufferization
-    MLIRControlFlow
+    MLIRBufferizationDialect
+    MLIRControlFlowDialect
     MLIRGPUOps
     MLIRGPUToSPIRV
     MLIRIR
-    MLIRLLVMIR
-    MLIRLinalg
+    MLIRLLVMDialect
+    MLIRLinalgDialect
     MLIRLinalgToLLVM
     MLIRLinalgToSPIRV
     MLIRLinalgTransforms
-    MLIRQuant
+    MLIRQuantDialect
     MLIRQuantTransforms
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSCFToGPU
     MLIRSCFTransforms
-    MLIRSPIRV
+    MLIRSPIRVDialect
     MLIRSPIRVTransforms
-    MLIRShape
-    MLIRFunc
+    MLIRShapeDialect
+    MLIRFuncDialect
     MLIRFuncToSPIRV
     MLIRTensorInferTypeOpInterfaceImpl
-    MLIRTosa
+    MLIRTosaDialect
     MLIRTosaTransforms
     MLIRTransforms
-    MLIRVector
+    MLIRVectorDialect
     iree::compiler::Dialect::VM::Target::init_targets
   PUBLIC
 )

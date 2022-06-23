@@ -15,11 +15,6 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
 
-def FunctionalStyleMultiOperandMultiResultTransformOpTrait
-    : NativeOpTrait<"FunctionalStyleMultiOperandMultiResultTransformOpTrait"> {
-  let cppNamespace = "::mlir::transform";
-}
-
 def CanonicalizedSequenceOp
     : TransformDialectOp<"structured.canonicalized_sequence",
       [DeclareOpInterfaceMethods<RegionBranchOpInterface,
@@ -56,7 +51,7 @@ def CanonicalizedSequenceOp
 
 def BufferizeOp : Op<Transform_Dialect, "bufferize",
     [DeclareOpInterfaceMethods<TransformOpInterface>, 
-     FunctionalStyleMultiOperandMultiResultTransformOpTrait,
+     FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformOpInterface]> {
   let description = [{Indicates that the entire module should be bufferized.}];
@@ -66,7 +61,7 @@ def BufferizeOp : Op<Transform_Dialect, "bufferize",
 
 def LowerVectorsOp : Op<Transform_Dialect, "lower_vectors",
     [DeclareOpInterfaceMethods<TransformOpInterface>, 
-     FunctionalStyleMultiOperandMultiResultTransformOpTrait,
+     FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface]> {
   let description = [{Indicates that the vector operations in the entire
   module should be lowered to simpler primitives (multiple stages of lowering
@@ -88,7 +83,7 @@ def LowerVectorsOp : Op<Transform_Dialect, "lower_vectors",
 
 def LowerToLLVMOp : Op<Transform_Dialect, "lower_to_llvm",
     [DeclareOpInterfaceMethods<TransformOpInterface>,
-     FunctionalStyleMultiOperandMultiResultTransformOpTrait,
+     FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface]> {
   let description = [{Indicates that the entire module should be converted
   to the LLVM dialect. This is expected to be the last transformation in

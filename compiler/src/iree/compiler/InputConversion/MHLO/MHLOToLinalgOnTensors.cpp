@@ -312,7 +312,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
     // TODO: Collapse/rework all of these patterns once the consolidation
     // lands. There is little reason to have these so spread out.
     populateMHLOToFlowPatterns(context, patterns);
-    chlo::PopulateDecomposeChloPatterns(context, &patterns);
+    chlo::populateDecomposeChloPatterns(context, &patterns);
     populateMHLOBroadcastingToLinalgPatterns(context, *typeConverter, patterns);
     populateMHLOToLinalgOnTensorsConversionPatterns(context, *typeConverter,
                                                     patterns);
@@ -377,7 +377,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
 void populateMHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     RewritePatternSet &patterns) {
-  mhlo::populateHLOToLinalgConversionPattern(context, typeConverter, &patterns);
+  mhlo::populateHloToLinalgConversionPattern(context, typeConverter, &patterns);
   // TODO(#5809): Drop ConcatenateOp lowering in favor of the upstream version
   //              then remove the PatternBenefit here
   patterns.insert<ConcatenateOpConversion, FftOpConversion>(

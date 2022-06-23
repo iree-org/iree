@@ -16,17 +16,17 @@ add_mlir_library(IREELinalgExtTransforms
   IREELinalgExtDialect
 
   MLIRAffineToStandard
-  MLIRAsync
+  MLIRAsyncDialect
   MLIRSCFToControlFlow
   MLIRLinalgToLLVM
   MLIRVectorToLLVM
   MLIRMathToLLVM
   MLIRMemRefToLLVM
   MLIRIR
-  MLIRMath
-  MLIRLinalg
+  MLIRMathDialect
+  MLIRLinalgDialect
   MLIRLinalgTransforms
   MLIRPass
-  MLIRSCF
+  MLIRSCFDialect
   MLIRTransforms
 )

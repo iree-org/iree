@@ -7,11 +7,10 @@
 #ifndef LINALG_TRANSFORM_OPS
 #define LINALG_TRANSFORM_OPS
 
-include "iree-dialects/Dialect/LinalgTransform/TransformOpInterface.td"
-
 include "mlir/IR/OpBase.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/Dialect/PDL/IR/PDLTypes.td"
+include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
 def Linalg_Transform_Dialect : Dialect {

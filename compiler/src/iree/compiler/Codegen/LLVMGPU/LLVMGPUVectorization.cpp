@@ -40,12 +40,13 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   vector::populateVectorReductionToContractPatterns(patterns);
 }
 
-static Optional<SmallVector<int64_t, 4>> getGPUNativeVectorSize(Operation *op) {
+static Optional<SmallVector<int64_t, 4>> getGPUNativeVectorSize(
+    Operation *op, int64_t nativeVector) {
   if ((OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1)) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
       // Map elementwise ops to vec4.
       SmallVector<int64_t, 4> nativeSize(vecType.getRank(), 1);
-      nativeSize.back() = 4;
+      nativeSize.back() = nativeVector;
       return nativeSize;
     }
   } else if (auto vt = dyn_cast<VectorTransferOpInterface>(op)) {
@@ -55,7 +56,7 @@ static Optional<SmallVector<int64_t, 4>> getGPUNativeVectorSize(Operation *op) {
     for (auto dim : llvm::enumerate(vt.permutation_map().getResults())) {
       if (auto dimExpr = dim.value().dyn_cast<AffineDimExpr>()) {
         if (dimExpr.getPosition() == vt.permutation_map().getNumDims() - 1) {
-          nativeSize[dim.index()] = 4;
+          nativeSize[dim.index()] = nativeVector;
         }
       }
     }
@@ -66,21 +67,25 @@ static Optional<SmallVector<int64_t, 4>> getGPUNativeVectorSize(Operation *op) {
       if (isParallelIterator(it.value())) lastParalleldim = it.index();
     }
     SmallVector<int64_t, 4> nativeSize(contract.getIteratorTypes().size(), 1);
-    nativeSize[lastParalleldim] = 4;
+    nativeSize[lastParalleldim] = nativeVector;
     return nativeSize;
   }
   return llvm::None;
 }
 
-static void populateVectorUnrollPatterns(RewritePatternSet &patterns) {
+static void populateVectorUnrollPatterns(RewritePatternSet &patterns,
+                                         int64_t nativeVector) {
   vector::populateVectorUnrollPatterns(
-      patterns,
-      vector::UnrollVectorOptions().setNativeShapeFn(getGPUNativeVectorSize));
+      patterns, vector::UnrollVectorOptions().setNativeShapeFn(
+                    [nativeVector](Operation *op) {
+                      return getGPUNativeVectorSize(op, nativeVector);
+                    }));
 }
 
 namespace {
 struct LLVMGPUVectorizationPass
     : public LLVMGPUVectorizationBase<LLVMGPUVectorizationPass> {
+  LLVMGPUVectorizationPass(int64_t nativeVector) : nativeVector(nativeVector) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -107,7 +112,7 @@ struct LLVMGPUVectorizationPass
       }
 
       RewritePatternSet vectorUnrollPatterns(context);
-      populateVectorUnrollPatterns(vectorUnrollPatterns);
+      populateVectorUnrollPatterns(vectorUnrollPatterns, nativeVector);
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(vectorUnrollPatterns)))) {
         return signalPassFailure();
@@ -154,36 +159,16 @@ struct LLVMGPUVectorizationPass
         llvm::dbgs() << "\n\n";
       });
     }
-    {
-      // Step 4. Lower contract op to outer product.
-      RewritePatternSet contractLoweringPatterns(funcOp.getContext());
-      vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
-      vector::populateVectorContractLoweringPatterns(
-          contractLoweringPatterns,
-          vector::VectorTransformsOptions().setVectorTransformsOptions(
-              vector::VectorContractLowering::OuterProduct));
-      vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
-      vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
-      vector::populateVectorMultiReductionLoweringPatterns(
-          contractLoweringPatterns,
-          vector::VectorMultiReductionLowering::InnerParallel);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(contractLoweringPatterns)))) {
-        return signalPassFailure();
-      }
-      DEBUG_WITH_TYPE(DEBUG_TYPE, {
-        llvm::dbgs()
-            << "\n--- After Step 4: Lower contract op to outer product. ---\n";
-        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-        llvm::dbgs() << "\n\n";
-      });
-    }
   }
+
+ private:
+  int64_t nativeVector;
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorizationPass() {
-  return std::make_unique<LLVMGPUVectorizationPass>();
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorizationPass(
+    int64_t nativeVector) {
+  return std::make_unique<LLVMGPUVectorizationPass>(nativeVector);
 }
 
 }  // namespace iree_compiler

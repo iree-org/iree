@@ -1,11 +1,3 @@
-function(_add_interface)
-  set(LLVM_TARGET_DEFINITIONS TransformOpInterface.td)
-  mlir_tablegen(TransformOpInterface.h.inc -gen-op-interface-decls)
-  mlir_tablegen(TransformOpInterface.cpp.inc -gen-op-interface-defs)
-  add_public_tablegen_target(IREELinalgTransformOpInterface)
-  add_dependencies(IREELinalgExtIncGen IREELinalgTransformOpInterface)
-endfunction()
-
 function(_add_dialect)
   set(LLVM_TARGET_DEFINITIONS LinalgTransformOps.td)
   mlir_tablegen(LinalgTransformOps.h.inc -gen-op-decls)
@@ -24,6 +16,5 @@ function(_add_transform_dialect_extension)
   add_dependencies(mlir-headers IREELinalgTransformExtIncGen)
 endfunction()
 
-_add_interface()
 _add_dialect()
 _add_transform_dialect_extension()

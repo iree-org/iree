@@ -25,12 +25,13 @@ posting results compared against their base commit as comments.
    model can optionally include trained weights if those are important for
    benchmarking.
 
-2. If this is a TFLite Flatbuffer, the benchmark flow can automatically import
-   it into the corresponding MLIR file. Otherwise, manually import the model
-   into an MLIR file that IREE can compile using the corresponding import tool.
-   For example, `iree-import-tf` for TensorFlow SavedModels. Take notes for where
-   the model came from and how it was imported in case the MLIR file needs to
-   be regenerated in the future.
+2. If this is a TFLite Flatbuffer or a TensorFlow SavedModel, the benchmark flow
+   can automatically import it into the corresponding MLIR file. Make sure the
+   TFLite Flatbuffer ends with `.tflite` and TensorFlow SavedModel ends with
+   `tf-model`. Otherwise, manually import the model into an MLIR file that IREE
+   can compile using the corresponding import tool. Take notes for where the
+   model came from and how it was imported in case the MLIR file needs to be
+   regenerated in the future.
 
 3. Package the source model or imported MLIR file file(s) for storage (see
    [iree_mlir_benchmark_suite.cmake](../build_tools/cmake/iree_mlir_benchmark_suite.cmake)

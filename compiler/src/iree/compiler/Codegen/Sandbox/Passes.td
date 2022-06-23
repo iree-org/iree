@@ -17,6 +17,8 @@ def LinalgFuse : Pass<"linalg-fuse", "func::FuncOp"> {
       "Which func op is the anchor to latch on.">,
     Option<"anchorOpName", "anchor-op", "std::string", /*default=*/"",
       "Which linalg op within the func is the anchor to latch on.">,
+    Option<"setAnchorOpToRootOp", "set-anchor-op-to-root-op", "bool", /*default=*/"false",
+      "Set anchor op to root op">,
 
     // Tiling options.
     ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes",
@@ -26,6 +28,10 @@ def LinalgFuse : Pass<"linalg-fuse", "func::FuncOp"> {
                 "llvm::cl::ZeroOrMore">,
     Option<"pad", "pad", "bool", /*default=*/"false",
       "Pad the anchor op operands.">,
+    Option<"padParallelDims", "pad-parallel-dims", "bool", /*default=*/"false",
+      "Pad all the parallel dims for the anchor op operands.">,
+    Option<"padReductionDims", "pad-reduction-dims", "bool", /*default=*/"false",
+      "Pad all the reduction dims for the anchor op operands.">,
     ListOption<"paddingValues", "padding-values", "std::string",
                "Operand padding values."
                "llvm::cl::ZeroOrMore">,
@@ -111,6 +117,10 @@ def LinalgSingleTilingExpert
     Option<"decomposeToLowerDimOp", "decompose-to-lower-dim", "bool",
       /*default=*/"false",
       "Convert named operations to lower-D named operations.">,
+
+    // Peeling options.
+    Option<"peel", "peel", "bool", /*default=*/"false",
+      "Peel loops enclosing the linalg op.">,
 
     // Vectorization options.
     Option<"vectorize", "vectorize", "bool", /*default=*/"false",

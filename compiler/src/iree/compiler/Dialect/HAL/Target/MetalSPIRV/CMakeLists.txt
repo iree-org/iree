@@ -23,12 +23,12 @@ iree_cc_library(
     "MetalSPIRVTarget.cpp"
   DEPS
     ::SPIRVToMSL
-    MLIRAffine
+    MLIRAffineDialect
     MLIRGPUOps
-    MLIRLinalg
-    MLIRSPIRV
+    MLIRLinalgDialect
+    MLIRSPIRVDialect
     MLIRSPIRVSerialization
-    MLIRVector
+    MLIRVectorDialect
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::PassHeaders

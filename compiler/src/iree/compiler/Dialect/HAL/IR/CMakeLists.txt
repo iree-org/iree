@@ -43,10 +43,10 @@ iree_cc_library(
     ::HALStructsGen
     ::HALTypesGen
     LLVMSupport
-    MLIRArithmetic
-    MLIRFunc
+    MLIRArithmeticDialect
+    MLIRFuncDialect
     MLIRIR
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRParser
     MLIRSideEffectInterfaces
     MLIRSupport
@@ -66,10 +66,10 @@ iree_cc_library(
   DEPS
     ::IR
     LLVMSupport
-    MLIRArithmetic
-    MLIRFunc
+    MLIRArithmeticDialect
+    MLIRFuncDialect
     MLIRIR
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRParser
     MLIRTransformUtils
     iree::compiler::Dialect::HAL::Conversion::HALToVM

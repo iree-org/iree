@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
@@ -64,11 +65,9 @@ static void addBufferizePasses(OpPassManager &passManager) {
 }
 
 static void tileAndBufferize(OpPassManager &pm) {
-  pm.addPass(createInsertDistributionInfoPass());
+  pm.addPass(createTileAndDistributeToWorkgroupsPass());
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createTileAndDistributeToWorkgroupsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createConvertToDestinationPassingStylePass());
   nestedModulePM.addPass(createCanonicalizerPass());
@@ -184,6 +183,45 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
       createGPUPipeliningPass(pipelineDepth));
 }
 
+void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
+  tileAndBufferize(pm);
+
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  // Distribute linalg onto warps within the workgroup.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPUTileAndDistribute(/*distributeToWarp=*/true));
+
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+
+  const int64_t nativeVector = 32;
+  // Linalg -> vector
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPUVectorizationPass(nativeVector));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLoopInvariantCodeMotionPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      memref::createFoldSubViewOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLoopInvariantCodeMotionPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+
+  // vector -> simt gpu + vector
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createConvertVectorReductionToGPUPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+}
+
 void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
   tileAndBufferize(pm);
 
@@ -251,7 +289,15 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
 extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName;
 
 void addGPUTransformDialectInterpreterPasses(OpPassManager &passManager) {
-  assert(0 && "TODO: implement transform dialect path for LLVMGPU");
+  // Give control to the transform dialect.
+  passManager.addPass(createTransformDialectInterpreterPass(
+      clGPUCodegenTransformDialectFileName));
+
+  // Dropping the schedule is only needed if we want to embed the transform in
+  // the module: we should drop the schedule once applied.
+  // This pass does nothing in the case where we apply a separate policy
+  // through a file.
+  passManager.addPass(createDropSchedulePass());
 }
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {

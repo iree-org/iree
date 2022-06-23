@@ -21,27 +21,27 @@ iree_cc_library(
   DEPS
     IREELinalgExtPasses
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRArithmeticTransforms
-    MLIRFunc
+    MLIRFuncDialect
     MLIRFuncTransforms
     MLIRIR
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgTransforms
-    MLIRMath
+    MLIRMathDialect
     MLIRMathTransforms
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRPass
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSupport
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTosaToArith
     MLIRTransforms
-    MLIRVector
+    MLIRVectorDialect
     MLIRVectorToSCF
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::LLVMCPU

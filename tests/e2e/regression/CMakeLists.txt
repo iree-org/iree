@@ -121,6 +121,7 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_negative.mlir"
     "dynamic_torch_index_select_scalar.mlir"
     "dynamic_torch_index_select_vector.mlir"
+    "large_reduction.mlir"
     "linalg_ops.mlir"
     "strided_slice.mlir"
   TARGET_BACKEND

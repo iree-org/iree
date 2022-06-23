@@ -40,9 +40,6 @@ class FlowDialect : public Dialect {
   void registerTypes();
 };
 
-/// Register external models for PartitionableLoopsInterface.
-void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry);
-
 }  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler

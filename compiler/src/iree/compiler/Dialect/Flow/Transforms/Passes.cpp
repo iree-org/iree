@@ -187,6 +187,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(IREE::Flow::createConvertConv2D1x1ToMatmulPass)
       .addPredicatedPass(clEnableConvToImg2Col,
                          IREE::Flow::createConvertConv2DToImg2ColPass)
+      .addPass(IREE::Flow::createDetachElementwiseFromNamedOpsPass)
       // Input should now be legal.
       .addPass(IREE::Flow::createVerifyInputLegalityPass)
       // Catch matmul ops before we do anything else with them.
@@ -249,11 +250,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
                            return createDispatchWithTransformDialect(
                                clDispatchTransformFileName);
                          })
-      // TODO: we may only want to use the transform dialect for some dispatch
-      // regions and let the DispatchLinalgOnTensorsPass unconditionally handle
-      // the rest.
-      .addPredicatedPass(clDispatchTransformFileName.empty(),
-                         createDispatchLinalgOnTensorsPass)
+      // Only want use the transform dialect for some dispatch regions and let
+      // the DispatchLinalgOnTensorsPass unconditionally handle the rest.
+      .addPass(createDispatchLinalgOnTensorsPass)
       ////////////////////////////////////////////////////////////////////////
       .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(mlir::createCanonicalizerPass)
@@ -295,9 +294,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // an argument if two executables differ only in that one dimension).
   passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
 
-  // Create one function per remaining flow.executable that can be used with
-  // iree-benchmark-module to benchmark each dispatch individually, as well as
-  // exporting all original model entry points.
+  // Create one function per exported program entry point that can be used with
+  // iree-benchmark-module to benchmark each function individually. Whether
+  // a model supports execution like this (handles zero/null args, has state
+  // resets, etc) is up to the author.
   if (clExportBenchmarkFuncs) {
     passManager.addPass(IREE::Flow::createExportBenchmarkFuncsPass());
   }
@@ -336,21 +336,9 @@ namespace {
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"  // IWYU pragma: export
 }  // namespace
 
-/// Test passes.
-std::unique_ptr<OperationPass<void>>
-createTestPartitionableLoopsInterfacePass();
-
-/// Register test passes.
-inline void registerTestPasses() {
-  createTestPartitionableLoopsInterfacePass();
-}
-
 void registerFlowPasses() {
   // Generated.
   registerPasses();
-
-  // Test passes.
-  registerTestPasses();
 
   // Pipelines.
   registerFlowTransformPassPipeline();

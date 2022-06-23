@@ -41,35 +41,18 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//llvm:FileCheck": ["FileCheck"],
     # MLIR
     "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
-    "@llvm-project//mlir:ControlFlowDialect": ["MLIRControlFlow"],
-    "@llvm-project//mlir:ComplexDialect": ["MLIRComplex"],
     "@llvm-project//mlir:DialectUtils": [""],
     "@llvm-project//mlir:GPUDialect": ["MLIRGPUOps"],
     "@llvm-project//mlir:GPUTransforms": ["MLIRGPUTransforms"],
     "@llvm-project//mlir:LinalgStructuredOpsIncGen": [
         "MLIRLinalgStructuredOpsIncGenLib"
     ],
-    "@llvm-project//mlir:LinalgDialect": ["MLIRLinalg"],
-    "@llvm-project//mlir:LLVMDialect": ["MLIRLLVMIR"],
-    "@llvm-project//mlir:MathDialect": ["MLIRMath"],
-    "@llvm-project//mlir:ArithmeticDialect": ["MLIRArithmetic"],
-    "@llvm-project//mlir:BufferizationDialect": ["MLIRBufferization"],
-    "@llvm-project//mlir:MemRefDialect": ["MLIRMemRef"],
-    "@llvm-project//mlir:SCFDialect": ["MLIRSCF"],
-    "@llvm-project//mlir:FuncDialect": ["MLIRFunc"],
     "@llvm-project//mlir:ShapeTransforms": ["MLIRShapeOpsTransforms"],
-    "@llvm-project//mlir:SPIRVDialect": ["MLIRSPIRV"],
-    "@llvm-project//mlir:TosaDialect": ["MLIRTosa"],
     "@llvm-project//mlir:ToLLVMIRTranslation": ["MLIRTargetLLVMIRExport"],
     "@llvm-project//mlir:mlir-translate": ["mlir-translate"],
     "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
     "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
     "@llvm-project//mlir:VectorOps": ["MLIRVector"],
-    "@llvm-project//mlir:TensorDialect": ["MLIRTensor"],
-    "@llvm-project//mlir:NVVMDialect": ["MLIRNVVMIR"],
-    "@llvm-project//mlir:ROCDLDialect": ["MLIRROCDLIR"],
-    "@llvm-project//mlir:PDLDialect": ["MLIRPDL"],
-    "@llvm-project//mlir:PDLInterpDialect": ["MLIRPDLInterp"],
     # MHLO.
     # TODO: Rework this upstream so that Bazel and CMake rules match up
     # better.

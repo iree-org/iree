@@ -49,9 +49,9 @@ iree_cc_library(
     LLVMSupport
     LLVMTarget
     MLIRGPUOps
-    MLIRLLVMIR
+    MLIRLLVMDialect
     MLIRLLVMToLLVMIRTranslation
-    MLIRNVVMIR
+    MLIRNVVMDialect
     MLIRNVVMToLLVMIRTranslation
     MLIRPass
     MLIRSupport

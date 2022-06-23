@@ -38,19 +38,19 @@ iree_cc_library(
     ::FlowOpsGen
     ::FlowTypesGen
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAnalysis
-    MLIRArithmetic
+    MLIRArithmeticDialect
     MLIRArithmeticUtils
     MLIRControlFlowInterfaces
-    MLIRFunc
+    MLIRFuncDialect
     MLIRIR
     MLIRInferTypeOpInterface
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRParser
     MLIRSideEffectInterfaces
     MLIRSupport
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTransformUtils
     iree::compiler::Dialect::Util::IR
   PUBLIC
@@ -107,37 +107,6 @@ iree_tablegen_doc(
     "FlowOps.td"
   OUTS
     --gen-dialect-doc -dialect=flow FlowDialect.md
-)
-
-iree_cc_library(
-  NAME
-    PartitionableLoopsInterface
-  HDRS
-    "PartitionableLoopsInterface.h"
-  TEXTUAL_HDRS
-    "PartitionableLoopsInterface.cpp.inc"
-    "PartitionableLoopsInterface.h.inc"
-  SRCS
-    "PartitionableLoopsInterface.cpp"
-  DEPS
-    ::PartitionableLoopsInterfaceGen
-    IREELinalgExtDialect
-    LLVMSupport
-    MLIRIR
-    MLIRLinalg
-    MLIRLinalgStructuredOpsIncGenLib
-    MLIRTensor
-  PUBLIC
-)
-
-iree_tablegen_library(
-  NAME
-    PartitionableLoopsInterfaceGen
-  TD_FILE
-    "PartitionableLoopsInterface.td"
-  OUTS
-    --gen-op-interface-decls PartitionableLoopsInterface.h.inc
-    --gen-op-interface-defs PartitionableLoopsInterface.cpp.inc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

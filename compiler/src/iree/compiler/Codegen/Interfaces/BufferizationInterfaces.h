@@ -17,9 +17,6 @@ namespace iree_compiler {
 // Register all interfaces needed for bufferization.
 void registerBufferizationInterfaces(DialectRegistry &registry);
 
-LogicalResult createSubSpanBuffers(Operation *op,
-                                   bufferization::AnalysisState &state);
-
 // Eliminate init_tensor ops that are anchored on flow store ops.
 LogicalResult storeTensorOpAnchoredInitTensorEliminationStep(
     RewriterBase &rewriter, Operation *op, bufferization::AnalysisState &state);

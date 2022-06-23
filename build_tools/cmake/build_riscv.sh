@@ -19,6 +19,7 @@ set -e
 ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 RISCV_CONFIG="${RISCV_CONFIG:-rv64}"
+RISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS:--O3}"
 
 "${CMAKE_BIN?}" --version
 ninja --version
@@ -67,6 +68,7 @@ args=(
   -DCMAKE_TOOLCHAIN_FILE="$(realpath ${ROOT_DIR?}/build_tools/cmake/riscv.toolchain.cmake)"
   -DIREE_HOST_BINARY_ROOT="$(realpath ${BUILD_HOST_DIR?}/install)"
   -DRISCV_CPU="${RISCV_CONFIG?}"
+  -DRISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS?}"
   -DIREE_ENABLE_ASSERTIONS=ON
   -DIREE_BUILD_COMPILER=OFF
   -DIREE_BUILD_SAMPLES=ON

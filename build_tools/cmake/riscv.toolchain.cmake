@@ -6,6 +6,16 @@
 
 cmake_minimum_required(VERSION 3.13)
 
+# CMake invokes the toolchain file twice during the first build, but only once
+# during subsequent rebuilds. This was causing the various flags to be added
+# twice on the first build, and on a rebuild ninja would see only one set of the
+# flags and rebuild the world.
+# https://github.com/android-ndk/ndk/issues/323
+if(RISCV_TOOLCHAIN_INCLUDED)
+  return()
+endif(RISCV_TOOLCHAIN_INCLUDED)
+set(RISCV_TOOLCHAIN_INCLUDED true)
+
 set(CMAKE_SYSTEM_PROCESSOR riscv)
 
 if(CMAKE_HOST_SYSTEM_NAME STREQUAL Linux)
@@ -38,7 +48,7 @@ set(RISCV_LINKER_FLAGS_EXE)
 if(RISCV_CPU STREQUAL "rv64")
   set(CMAKE_SYSTEM_NAME Linux)
   set(CMAKE_SYSTEM_LIBRARY_PATH "${RISCV_TOOLCHAIN_ROOT}/sysroot/usr/lib")
-  list(APPEND RISCV_COMPILER_FLAGS "-march=rv64gc -mabi=lp64d")
+  set(RISCV_COMPILER_FLAGS "${RISCV_COMPILER_FLAGS} -march=rv64gc -mabi=lp64d")
   set(RISCV_LINKER_FLAGS "${RISCV_LINKER_FLAGS} -lstdc++ -lpthread -lm -ldl")
 elseif(RISCV_CPU STREQUAL "rv32-baremetal")
   set(CMAKE_SYSTEM_NAME Generic)
