@@ -58,10 +58,12 @@ vm.module @conversion_ops_f32 {
 
   vm.export @test_cast_f32_si32_int_max
   vm.func @test_cast_f32_si32_int_max() {
-    %c1 = vm.const.f32 2147483647.0
+    // This is the maximum value that is representable precisely as both i32
+    // and f32. An exponent of 30 with all mantissa bits set.
+    %c1 = vm.const.f32 0x4effffff
     %c1dno = util.do_not_optimize(%c1) : f32
     %v = vm.cast.f32.si32 %c1dno : f32 -> i32
-    %c2 = vm.const.i32 -2147483648
+    %c2 = vm.const.i32 0x7FFFFF80
     vm.check.eq %v, %c2, "cast floating-point value to a signed integer" : i32
     vm.return
   }
@@ -96,12 +98,14 @@ vm.module @conversion_ops_f32 {
     vm.return
   }
 
-  vm.export @test_cast_f32_ui32_int_max
-  vm.func @test_cast_f32_ui32_int_max() {
-    %c1 = vm.const.f32 4294967295.0
+  vm.export @test_cast_f32_ui32_int_big
+  vm.func @test_cast_f32_ui32_int_big() {
+    // This is the maximum value that is representable precisely as both ui32
+    // and f32. An exponent of 31 with all mantissa bits set.
+    %c1 = vm.const.f32 0x4f7fffff
     %c1dno = util.do_not_optimize(%c1) : f32
     %v = vm.cast.f32.ui32 %c1dno : f32 -> i32
-    %c2 = vm.const.i32 0
+    %c2 = vm.const.i32 0xFFFFFF00
     vm.check.eq %v, %c2, "cast floating-point value to an unsigned integer" : i32
     vm.return
   }

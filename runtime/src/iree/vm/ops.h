@@ -324,7 +324,7 @@ static inline int32_t vm_cast_f32si32(float operand) {
   return (int32_t)lroundf(operand);
 }
 static inline int32_t vm_cast_f32ui32(float operand) {
-  return (uint32_t)lroundf(operand);
+  return (uint32_t)llroundf(operand);
 }
 static inline float vm_bitcast_i32f32(int32_t operand) {
   float result;
