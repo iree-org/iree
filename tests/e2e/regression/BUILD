@@ -37,6 +37,7 @@ iree_lit_test_suite(
         [
             "fill_i64.mlir",
             "globals.mlir",
+            "globals_ml_program.mlir",
             "libm_linking.mlir",
             "scalar.mlir",
             "trace_dispatch_tensors.mlir",
