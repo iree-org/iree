@@ -97,16 +97,8 @@ $ cmake -DIREE_BUILD_TRACY=ON .
 That enables building the Tracy server tools, `iree-tracy-profiler` and
 `iree-tracy-capture`, introduced above.
 
-You might need to patch
-[Tracy PR #383](https://github.com/wolfpld/tracy/pull/383) in order for Tracy to
-get IREE module symbols, but it's a gross hack that I hesitate to recommend
-unless you know you need it. The symptom would be that Tracy can't see the IREE
-module code symbols at all. This has happened on Android so far.
-
-*   Download
-    [383.diff](https://patch-diff.githubusercontent.com/raw/wolfpld/tracy/pull/383.diff)
-*   In IREE source tree: `cd third_party/tracy && patch -p1 <
-    ~/Downloads/383.diff`
+If profiling on Android/ARM, you might need the patch discussed in the next
+paragraph.
 
 Consider building **without** assertions (`cmake -DIREE_ENABLE_ASSERTIONS=OFF`).
 At least `iree-tracy-profiler` has some
@@ -127,6 +119,23 @@ $ find . -name iree-tracy-*
 ./tracy/iree-tracy-profiler
 ./tracy/iree-tracy-capture
 ```
+
+### Patch needed for Android/ARM
+
+You might need to patch
+[Tracy PR #383](https://github.com/wolfpld/tracy/pull/383) in order for Tracy to
+get IREE module symbols, but it's a gross hack that I hesitate to recommend
+unless you know you need it. The symptom would be that Tracy can't see the IREE
+module code symbols at all. This has happened on Android/ARM(64bit) so far.
+
+It won't even work on x86 as it assumes that all instructions are 4 bytes.
+
+To patch:
+
+*   Download
+    [383.diff](https://patch-diff.githubusercontent.com/raw/wolfpld/tracy/pull/383.diff).
+*   In IREE source tree: `cd third_party/tracy && patch -p1 <
+    ~/Downloads/383.diff`
 
 ## Build IREE binaries with Tracy instrumentation ("clients")
 
