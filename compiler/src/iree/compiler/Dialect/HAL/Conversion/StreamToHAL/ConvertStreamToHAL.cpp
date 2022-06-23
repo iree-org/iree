@@ -392,10 +392,8 @@ struct ResourceStoreOpPattern
   LogicalResult matchAndRewrite(
       IREE::Stream::ResourceStoreOp storeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.create<IREE::HAL::BufferStoreOp>(storeOp.getLoc(), adaptor.value(),
-                                              adaptor.target(),
-                                              adaptor.target_offset());
-    rewriter.replaceOp(storeOp, adaptor.target());
+    rewriter.replaceOpWithNewOp<IREE::HAL::BufferStoreOp>(
+        storeOp, adaptor.value(), adaptor.target(), adaptor.target_offset());
     return success();
   }
 };
