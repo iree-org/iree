@@ -123,8 +123,9 @@ class FuncOpConversion : public OpConversionPattern<func::FuncOp> {
     // materialize high level API-friendly wrappers.
     if (srcOp.isPublic()) {
       StringRef exportName = newFuncOp.getName();
-      rewriter.create<IREE::VM::ExportOp>(srcOp.getLoc(), newFuncOp,
-                                          exportName);
+      auto exportOp = rewriter.create<IREE::VM::ExportOp>(
+          srcOp.getLoc(), newFuncOp, exportName);
+      exportOp->setDialectAttrs(srcOp->getDialectAttrs());
     }
     // VM functions are private by default and exported via the dedicated
     // vm.export ops.

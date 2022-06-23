@@ -468,6 +468,24 @@ static iree_vm_module_signature_t iree_vm_bytecode_module_signature(
   return signature;
 }
 
+// Tries to return the original function name for internal function |ordinal|.
+// Empty if the debug database has been stripped from the flatbuffer.
+static flatbuffers_string_t
+iree_vm_bytecode_module_lookup_internal_function_name(
+    iree_vm_BytecodeModuleDef_table_t module_def, iree_host_size_t ordinal) {
+  iree_vm_DebugDatabaseDef_table_t debug_database_def =
+      iree_vm_BytecodeModuleDef_debug_database(module_def);
+  if (!debug_database_def) return NULL;
+  iree_vm_FunctionSourceMapDef_vec_t source_maps_vec =
+      iree_vm_DebugDatabaseDef_functions(debug_database_def);
+  iree_vm_FunctionSourceMapDef_table_t source_map_def =
+      ordinal < iree_vm_FunctionSourceMapDef_vec_len(source_maps_vec)
+          ? iree_vm_FunctionSourceMapDef_vec_at(source_maps_vec, ordinal)
+          : NULL;
+  if (!source_map_def) return NULL;
+  return iree_vm_FunctionSourceMapDef_local_name(source_map_def);
+}
+
 static iree_status_t iree_vm_bytecode_module_get_function(
     void* self, iree_vm_function_linkage_t linkage, iree_host_size_t ordinal,
     iree_vm_function_t* out_function, iree_string_view_t* out_name,
@@ -516,6 +534,11 @@ static iree_status_t iree_vm_bytecode_module_get_function(
         iree_vm_ExportFunctionDef_vec_at(exported_functions, ordinal);
     name = iree_vm_ExportFunctionDef_local_name(export_def);
     signature = iree_vm_ExportFunctionDef_signature(export_def);
+  } else if (linkage == IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
+#if IREE_VM_BACKTRACE_ENABLE
+    name = iree_vm_bytecode_module_lookup_internal_function_name(module->def,
+                                                                 ordinal);
+#endif  // IREE_VM_BACKTRACE_ENABLE
   }
 
   if (out_function) {
@@ -998,11 +1021,17 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
   // Map the (potentially) export ordinal into the internal function ordinal in
   // the function descriptor table.
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
-  uint16_t ordinal = 0;
+  uint16_t internal_ordinal = 0;
   iree_vm_FunctionSignatureDef_table_t signature_def = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_vm_bytecode_map_internal_ordinal(module, call->function,
-                                                &ordinal, &signature_def));
+      z0, iree_vm_bytecode_map_internal_ordinal(
+              module, call->function, &internal_ordinal, &signature_def));
+
+  // TODO(benvanik): rework this call type to avoid the need to copy it while
+  // plumbing.
+  iree_vm_function_call_t internal_call = *call;
+  internal_call.function.linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
+  internal_call.function.ordinal = internal_ordinal;
 
   // Grab calling convention string. This is not great as we are guaranteed to
   // have a bunch of cache misses, but without putting it on the descriptor
@@ -1032,7 +1061,8 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
   // either returns (synchronous) or yields (asynchronous).
   IREE_TRACE_FIBER_ENTER(iree_vm_stack_context_id(stack));
   iree_status_t status = iree_vm_bytecode_dispatch_begin(
-      stack, module, call, cconv_arguments, cconv_results, out_result);
+      stack, module, &internal_call, cconv_arguments, cconv_results,
+      out_result);
   IREE_TRACE_FIBER_LEAVE();
 
   IREE_TRACE_ZONE_END(z0);
