@@ -34,9 +34,8 @@ static void expandStrategyOps(ModuleOp module, ModuleOp expansions) {
   PatternApplicator applicator(frozen);
   applicator.applyDefaultCostModel();
 
-  SimplePatternRewriter rewriter(module.getContext());
   module.walk([&](linalg::transform::ExpertOp expertOp) {
-    rewriter.setInsertionPoint(expertOp);
+    SimplePatternRewriter rewriter(expertOp);
     if (failed(applicator.matchAndRewrite(expertOp, rewriter))) {
       LLVM_DEBUG(DBGS() << "failed to rewrite strategy \""
                         << expertOp.expertName() << "\"\n");

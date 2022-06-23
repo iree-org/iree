@@ -8,12 +8,11 @@
 
 #include <algorithm>
 
-#include "FunctionHelpers.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree-dialects/Dialect/LinalgTransform/ScopedTransform.h"
-#include "iree-dialects/Dialect/LinalgTransform/TrackingRewriteDriver.h"
 #include "iree-dialects/Transforms/Listener.h"
+#include "iree-dialects/Transforms/ListenerGreedyPatternRewriteDriver.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/AsyncToLLVM/AsyncToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"

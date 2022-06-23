@@ -31,9 +31,10 @@ def FuseProducersOp : Op<Transform_Dialect, "fuse_producers",
 
 def TileToForeachOp :
     Op<Transform_Dialect, "tile_to_foreach_thread_op",
-      [DeclareOpInterfaceMethods<TransformOpInterface>,
-       FunctionalStyleTransformOpTrait,
-       MemoryEffectsOpInterface]> {
+      [FunctionalStyleTransformOpTrait,
+       MemoryEffectsOpInterface,
+       TransformEachOpTrait,
+       TransformOpInterface]> {
   let description = [{Tile a linalg op to `scf.foreach_thread`.}];
 
   let summary = [{
@@ -48,6 +49,11 @@ def TileToForeachOp :
 
   let assemblyFormat = "$target attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
+
+  let extraClassDeclaration = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::Operation *>> applyToOne(
+      ::mlir::linalg::LinalgOp target, transform::TransformState &state);
+  }];
 }
 
 def FuseIntoContainingOp :

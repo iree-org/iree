@@ -7,7 +7,7 @@
 #include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
-#include "iree-dialects/Transforms/Functional.h"
+#include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "mlir/IR/OpImplementation.h"
 #include "llvm/Support/FormatVariadic.h"
 
@@ -50,9 +50,9 @@ LinalgExt::FuseProducersOp::apply(transform::TransformResults &transformResults,
   SmallVector<SmallVector<Operation *>> fusedOps(numProducers);
   for (Operation *target : state.getPayloadOps(getTarget())) {
     // Apply the pattern.
+    SimplePatternRewriter rewriter(target);
     FailureOr<LinalgExt::FusionResult> result =
-        functional::applyReturningPatternAt(pattern,
-                                            cast<linalg::LinalgOp>(target));
+        pattern.returningMatchAndRewrite(target, rewriter);
     if (failed(result))
       return DiagnosedSilenceableFailure::definiteFailure();
 
@@ -121,9 +121,9 @@ void LinalgExt::FuseProducersOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
 }
 
-DiagnosedSilenceableFailure
-LinalgExt::TileToForeachOp::apply(transform::TransformResults &results,
-                                  transform::TransformState &state) {
+FailureOr<SmallVector<Operation *>>
+LinalgExt::TileToForeachOp::applyToOne(::mlir::linalg::LinalgOp target,
+                                       transform::TransformState &state) {
   linalg::LinalgTilingOptions tilingOptions;
   SmallVector<int64_t> numThreads = extractI64Array(getNumThreads());
   if (!numThreads.empty())
@@ -131,40 +131,21 @@ LinalgExt::TileToForeachOp::apply(transform::TransformResults &results,
 
   LinalgExt::ForeachThreadTilingPattern pattern(this->getContext(),
                                                 tilingOptions);
-  ArrayRef<Operation *> targets = state.getPayloadOps(getTarget());
-  // Failure to match produces empty targets but should not fail the whole pass.
-  // Tolerate empty targets and propagate empty results.
-  // TODO: The transform dialect should have n-ary state, beyond LogicalResult.
-  if (targets.empty()) {
-    results.set(getTiledOp().cast<OpResult>(), {});
-    results.set(getTileOp().cast<OpResult>(), {});
-    getOperation()->emitWarning() << "no target to tile";
-    return DiagnosedSilenceableFailure::success();
-  }
-  auto tilingInterfaceOp = dyn_cast<TilingInterface>(targets.front());
-  if (!tilingInterfaceOp) {
-    DiagnosedSilenceableFailure diag = emitSilenceableError();
-    diag.attachNote(targets.front()->getLoc())
-        << "Cannot tile op: Not a TilingInterface";
-    return diag;
-  }
-
+  // Apply the pattern.
+  SimplePatternRewriter rewriter(target);
   FailureOr<iree_compiler::IREE::LinalgExt::TilingResult> result =
-      functional::applyReturningPatternAt(pattern, tilingInterfaceOp);
+      pattern.returningMatchAndRewrite(
+          cast<TilingInterface>(target.getOperation()), rewriter);
   if (failed(result)) {
-    targets.front()->emitError("Failed to tile op to scf.foreach_thread:\n")
-        << *(targets.front());
-    return DiagnosedSilenceableFailure::definiteFailure();
+    target->emitError("Failed to tile op to scf.foreach_thread:\n") << target;
+    return failure();
   }
-  results.set(getTiledOp().cast<OpResult>(), result->tiledOp);
-  results.set(getTileOp().cast<OpResult>(), result->tileOp);
-  return DiagnosedSilenceableFailure::success();
+  return SmallVector<Operation *>{result->tiledOp, result->tileOp};
 }
 
 DiagnosedSilenceableFailure
 LinalgExt::FuseIntoContainingOp::apply(transform::TransformResults &results,
                                        transform::TransformState &state) {
-
   ArrayRef<Operation *> producerOps = state.getPayloadOps(getProducerOp());
   ArrayRef<Operation *> containingOps = state.getPayloadOps(getContainingOp());
   for (auto it : llvm::zip(producerOps, containingOps)) {
@@ -176,7 +157,10 @@ LinalgExt::FuseIntoContainingOp::apply(transform::TransformResults &results,
     }
     LinalgExt::LinalgExtFusionInContainingOpPattern pattern(this->getContext(),
                                                             containingOp);
-    if (failed(functional::applyReturningPatternAt(pattern, producerOp)))
+
+    // Apply the pattern.
+    SimplePatternRewriter rewriter(producerOp);
+    if (failed(pattern.returningMatchAndRewrite(producerOp, rewriter)))
       return DiagnosedSilenceableFailure::definiteFailure();
   }
   return DiagnosedSilenceableFailure::success();
@@ -185,29 +169,15 @@ LinalgExt::FuseIntoContainingOp::apply(transform::TransformResults &results,
 FailureOr<Operation *> LinalgExt::RewriteForeachThreadToAsyncOp::applyToOne(
     scf::ForeachThreadOp target, transform::TransformState &state) {
   LinalgExt::ForeachThreadOpToAsyncRewriter pattern(this->getContext());
-  auto functionalRewrite =
-      [&](scf::ForeachThreadOp op,
-          PatternRewriter &rewriter) -> FailureOr<Operation *> {
-    auto result = pattern.returningMatchAndRewrite(op, rewriter);
-    if (failed(result))
-      return failure();
-    return result;
-  };
-  return functional::applyAt(target, functionalRewrite);
+  SimplePatternRewriter rewriter(target);
+  return pattern.returningMatchAndRewrite(target, rewriter);
 }
 
 FailureOr<scf::ForOp> LinalgExt::RewriteForeachThreadToScfForOp::applyToOne(
     scf::ForeachThreadOp target, transform::TransformState &state) {
   LinalgExt::ForeachThreadOpToScfForRewriter pattern(this->getContext());
-  auto functionalRewrite =
-      [&](scf::ForeachThreadOp op,
-          PatternRewriter &rewriter) -> FailureOr<scf::ForOp> {
-    auto result = pattern.returningMatchAndRewrite(op, rewriter);
-    if (failed(result))
-      return failure();
-    return result;
-  };
-  return functional::applyAt(target, functionalRewrite);
+  SimplePatternRewriter rewriter(target);
+  return pattern.returningMatchAndRewrite(target, rewriter);
 }
 
 #define GET_OP_CLASSES
