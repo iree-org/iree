@@ -23,12 +23,12 @@ func.func @allocator_map_byte_buffer(%allocator: !hal.allocator, %arg1: !util.by
   %offset = arith.constant 100 : index
   // CHECK-DAG: %[[LENGTH:.+]] = arith.constant 200
   %length = arith.constant 200 : index
-  //      CHECK: = hal.allocator.map<%[[ALLOCATOR]] : !hal.allocator>
+  //      CHECK: = hal.allocator.allocate.initialized<%[[ALLOCATOR]] : !hal.allocator>
   // CHECK-SAME:   source(%arg1 : !util.byte_buffer)[%[[OFFSET]], %[[LENGTH]]]
   // CHECK-SAME:   type("DeviceVisible|DeviceLocal")
   // CHECK-SAME:   usage("TransferSource|TransferTarget|Transfer")
   // CHECK-SAME:   : !hal.buffer
-  %ref = hal.allocator.map<%allocator : !hal.allocator>
+  %ref = hal.allocator.allocate.initialized<%allocator : !hal.allocator>
                     source(%arg1 : !util.byte_buffer)[%offset, %length]
                     type(DeviceLocal) usage(Transfer) : !hal.buffer
   return

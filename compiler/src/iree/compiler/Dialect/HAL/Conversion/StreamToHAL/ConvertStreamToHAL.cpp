@@ -318,7 +318,7 @@ struct ResourceMapOpPattern
     auto bufferUsage = IREE::HAL::BufferUsageBitfield::Mapping |
                        IREE::HAL::BufferUsageBitfield::Transfer;
 
-    rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorMapOp>(
+    rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorAllocateInitializedOp>(
         mapOp, bufferType, allocator, memoryTypes, bufferUsage,
         adaptor.source(), adaptor.source_offset(), adaptor.result_size());
     return success();

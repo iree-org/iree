@@ -87,7 +87,7 @@ func.func @resourceSize(%arg0: !stream.resource<transient>) -> index {
 func.func @resourceMap(%arg0: !util.byte_buffer) -> !stream.resource<staging> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
-  // CHECK: %[[MAPPING:.+]] = hal.allocator.map
+  // CHECK: %[[MAPPING:.+]] = hal.allocator.allocate.initialized
   // CHECK-SAME: source(%arg0 : !util.byte_buffer)[%c0, %c128]
   // CHECK-SAME: type("HostVisible|HostCoherent|HostLocal|DeviceVisible")
   // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Mapping{{.+}}") : !hal.buffer
