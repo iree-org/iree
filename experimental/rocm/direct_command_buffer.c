@@ -178,28 +178,6 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_discard_buffer(
   return iree_ok_status();
 }
 
-// Splats a pattern value of 1, 2, or 4 bytes out to a 4 byte value.
-static uint32_t iree_hal_rocm_splat_pattern(const void* pattern,
-                                            size_t pattern_length) {
-  switch (pattern_length) {
-    case 1: {
-      uint32_t pattern_value = *(const uint8_t*)(pattern);
-      return (pattern_value << 24) | (pattern_value << 16) |
-             (pattern_value << 8) | pattern_value;
-    }
-    case 2: {
-      uint32_t pattern_value = *(const uint16_t*)(pattern);
-      return (pattern_value << 16) | pattern_value;
-    }
-    case 4: {
-      uint32_t pattern_value = *(const uint32_t*)(pattern);
-      return pattern_value;
-    }
-    default:
-      return 0;  // Already verified that this should not be possible.
-  }
-}
-
 static iree_status_t iree_hal_rocm_direct_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
@@ -211,15 +189,36 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_fill_buffer(
   hipDeviceptr_t target_device_buffer = iree_hal_rocm_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(target_buffer));
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
-  uint32_t dword_pattern = iree_hal_rocm_splat_pattern(pattern, pattern_length);
   hipDeviceptr_t dst = target_device_buffer + target_offset;
-  int value = dword_pattern;
-  size_t sizeBytes = length;
+  size_t num_elements = length / pattern_length;
   // TODO(raikonenfnu): Currently using NULL stream, need to figure out way to
   // access proper stream from command buffer
-  ROCM_RETURN_IF_ERROR(command_buffer->context->syms,
-                       hipMemsetAsync(dst, value, sizeBytes, 0),
-                       "hipMemsetAsync");
+  switch (pattern_length) {
+    case 4: {
+      ROCM_RETURN_IF_ERROR(
+          command_buffer->context->syms,
+          hipMemsetD32Async(dst, *(const uint32_t*)(pattern), num_elements, 0),
+          "hipMemsetD32Async");
+      break;
+    }
+    case 2: {
+      ROCM_RETURN_IF_ERROR(
+          command_buffer->context->syms,
+          hipMemsetD16Async(dst, *(const uint16_t*)(pattern), num_elements, 0),
+          "hipMemsetD16Async");
+      break;
+    }
+    case 1: {
+      ROCM_RETURN_IF_ERROR(
+          command_buffer->context->syms,
+          hipMemsetD8Async(dst, *(const uint8_t*)(pattern), num_elements, 0),
+          "hipMemsetD*Async");
+      break;
+    }
+    default:
+      return iree_make_status(IREE_STATUS_INTERNAL,
+                              "unsupported fill pattern length");
+  }
   return iree_ok_status();
 }
 
