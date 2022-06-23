@@ -98,7 +98,7 @@ VmContext VmContext::Create(VmInstance* instance,
     CheckApiStatus(status, "Error creating vm context with modules");
   }
 
-  IREE_CHECK(context);
+  IREE_ASSERT(context);
   return VmContext::StealFromRawPtr(context);
 }
 

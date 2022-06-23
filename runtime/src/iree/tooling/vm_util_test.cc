@@ -26,8 +26,7 @@ class VmUtilTest : public ::testing::Test {
         iree_hal_available_driver_registry(), IREE_SV("local-sync"),
         iree_allocator_system(), &device_);
     if (iree_status_is_not_found(status)) {
-      IREE_LOG(WARNING)
-          << "Skipping test as 'local-sync' driver was not found:";
+      fprintf(stderr, "Skipping test as 'local-sync' driver was not found:\n");
       iree_status_fprint(stderr, status);
       iree_status_free(status);
       GTEST_SKIP();

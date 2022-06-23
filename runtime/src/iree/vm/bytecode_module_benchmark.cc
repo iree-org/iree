@@ -9,7 +9,6 @@
 
 #include "benchmark/benchmark.h"
 #include "iree/base/api.h"
-#include "iree/base/logging.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/bytecode_module_benchmark_module_c.h"

@@ -9,6 +9,7 @@
 
 #include <array>
 #include <chrono>
+#include <sstream>
 #include <string>
 #include <thread>
 

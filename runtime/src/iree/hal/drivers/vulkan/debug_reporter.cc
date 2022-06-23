@@ -7,9 +7,8 @@
 #include "iree/hal/drivers/vulkan/debug_reporter.h"
 
 #include <cstddef>
-#include <ostream>
+#include <cstdio>
 
-#include "iree/base/logging.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 
@@ -35,9 +34,9 @@ iree_hal_vulkan_debug_utils_message_callback(
     const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
     void* user_data) {
   if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-    IREE_LOG(ERROR) << callback_data->pMessage;
+    fprintf(stderr, "[VULKAN] ! %s\n", callback_data->pMessage);
   } else {
-    IREE_VLOG(1) << callback_data->pMessage;
+    fprintf(stderr, "[VULKAN] w %s\n", callback_data->pMessage);
   }
   return VK_FALSE;  // VK_TRUE is reserved for future use.
 }

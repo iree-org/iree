@@ -18,7 +18,6 @@ iree_runtime_cc_library(
     hdrs = ["arena.h"],
     deps = [
         "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base:logging",
     ],
 )
 
@@ -39,7 +38,7 @@ iree_runtime_cc_library(
         "intrusive_list_unique_ptr.inc",
     ],
     deps = [
-        "//runtime/src/iree/base:logging",
+        "//runtime/src/iree/base",
     ],
 )
 
@@ -60,8 +59,7 @@ iree_runtime_cc_library(
     name = "ref_ptr",
     hdrs = ["ref_ptr.h"],
     deps = [
-        "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base:logging",
+        "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
     ],
 )

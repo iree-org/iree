@@ -19,7 +19,6 @@ iree_cc_library(
     "arena.cc"
   DEPS
     iree::base::core_headers
-    iree::base::logging
   PUBLIC
 )
 
@@ -41,7 +40,7 @@ iree_cc_library(
     "intrusive_list.h"
     "intrusive_list_unique_ptr.inc"
   DEPS
-    iree::base::logging
+    iree::base
   PUBLIC
 )
 
@@ -63,9 +62,8 @@ iree_cc_library(
   HDRS
     "ref_ptr.h"
   DEPS
-    iree::base::core_headers
+    iree::base
     iree::base::internal
-    iree::base::logging
   PUBLIC
 )
 
