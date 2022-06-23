@@ -762,6 +762,11 @@ iree_status_t iree_hal_vulkan_device_create(
   dispatch_queue_priorities.resize(dispatch_queue_info.queueCount);
   dispatch_queue_info.pQueuePriorities = dispatch_queue_priorities.data();
 
+  // Collect supported physical device features.
+  VkPhysicalDeviceFeatures physical_device_features;
+  instance_syms->vkGetPhysicalDeviceFeatures(physical_device,
+                                             &physical_device_features);
+
   // Create device and its queues.
   VkDeviceCreateInfo device_create_info;
   memset(&device_create_info, 0, sizeof(device_create_info));
@@ -778,6 +783,9 @@ iree_status_t iree_hal_vulkan_device_create(
   memset(&features2, 0, sizeof(features2));
   features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
   device_create_info.pNext = &features2;
+  if (physical_device_features.shaderInt64) {
+    features2.features.shaderInt64 = VK_TRUE;
+  }
 
   VkPhysicalDeviceTimelineSemaphoreFeatures semaphore_features;
   memset(&semaphore_features, 0, sizeof(semaphore_features));
