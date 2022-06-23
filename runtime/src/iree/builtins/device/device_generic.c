@@ -23,12 +23,12 @@ IREE_DEVICE_EXPORT float iree_h2f_ieee(short param) {
     // nan
     if (mantissa16 > 0) {
       int res = (0x7FC00000 | sign);
-      float fres = *((float*)(&res));
+      float fres = *((float *)(&res));
       return fres;
     }
     // inf
     int res = (0x7F800000 | sign);
-    float fres = *((float*)(&res));
+    float fres = *((float *)(&res));
     return fres;
   }
   if (expHalf16 != 0) {
@@ -36,7 +36,7 @@ IREE_DEVICE_EXPORT float iree_h2f_ieee(short param) {
     int res = (exp1 | mantissa1);
     res = res << 13;
     res = (res | sign);
-    float fres = *((float*)(&res));
+    float fres = *((float *)(&res));
     return fres;
   }
 
@@ -46,13 +46,13 @@ IREE_DEVICE_EXPORT float iree_h2f_ieee(short param) {
   xmm1 = xmm1 | sign;               // Combine with the sign mask
 
   float res = (float)mantissa1;  // Convert mantissa to float
-  res *= *((float*)(&xmm1));
+  res *= *((float *)(&xmm1));
 
   return res;
 }
 
 IREE_DEVICE_EXPORT short iree_f2h_ieee(float param) {
-  unsigned int param_bit = *((unsigned int*)(&param));
+  unsigned int param_bit = *((unsigned int *)(&param));
   int sign = param_bit >> 31;
   int mantissa = param_bit & 0x007FFFFF;
   int exp = ((param_bit & 0x7F800000) >> 23) + 15 - 127;
@@ -114,16 +114,17 @@ IREE_DEVICE_EXPORT float __gnu_h2f_ieee(short param) {
   return iree_h2f_ieee(param);
 }
 
-IREE_DEVICE_EXPORT float __extendhfsf2(short param) {
-  return iree_h2f_ieee(param);
+IREE_DEVICE_EXPORT float __extendhfsf2(float param) {
+  return iree_h2f_ieee(*((short *)&param));
 }
 
 IREE_DEVICE_EXPORT short __gnu_f2h_ieee(float param) {
   return iree_f2h_ieee(param);
 }
 
-IREE_DEVICE_EXPORT short __truncsfhf2(float param) {
-  return iree_f2h_ieee(param);
+IREE_DEVICE_EXPORT float __truncsfhf2(float param) {
+  short ret = iree_f2h_ieee(param);
+  return *((float *)&ret);
 }
 
 #endif  // IREE_DEVICE_STANDALONE
