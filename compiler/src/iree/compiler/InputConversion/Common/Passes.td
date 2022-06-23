@@ -15,6 +15,12 @@ def IREEImportPublic :
   let constructor = "mlir::iree_compiler::createIREEImportPublicPass()";
 }
 
+def ImportMLProgram :
+    Pass<"iree-import-ml-program", "ModuleOp"> {
+  let summary = "Imports MLProgram dialect to IREE Equivalents.";
+  let constructor = "mlir::iree_compiler::createImportMLProgramPass()";
+}
+
 def LinalgQuantizedMatmulToMatmulPass
     : Pass<"iree-linalg-quantized-matmul-to-matmul", "func::FuncOp"> {
   let summary = "lower quantized_matmul to matmul";

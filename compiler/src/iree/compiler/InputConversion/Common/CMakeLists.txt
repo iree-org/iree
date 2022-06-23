@@ -40,6 +40,7 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "IREEImportPublic.cpp"
+    "ImportMLProgram.cpp"
     "Passes.cpp"
     "QuantizedMatmulToMatmul.cpp"
     "SanitizeModuleNames.cpp"
@@ -54,6 +55,7 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRLinalgUtils
+    MLIRMLProgramDialect
     MLIRMemRefTransforms
     MLIRPass
     MLIRSCFDialect

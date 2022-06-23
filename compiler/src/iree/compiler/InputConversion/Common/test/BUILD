@@ -19,6 +19,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "import_ml_program.mlir",
             "iree_import_public.mlir",
             "linalg_quantized_matmul_to_matmul.mlir",
             "sanitize_module_names.mlir",
