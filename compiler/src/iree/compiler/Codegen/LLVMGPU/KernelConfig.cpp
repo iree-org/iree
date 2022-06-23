@@ -449,6 +449,8 @@ static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
 static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                             linalg::LinalgOp op) {
   if (!isa<linalg::GenericOp>(op)) return failure();
+  // TODO(thomasraoux): Enable dynamic shape.
+  if (op.hasDynamicShape()) return failure();
   SmallVector<unsigned> reductionDims;
   op.getReductionDims(reductionDims);
   if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
