@@ -272,8 +272,10 @@ class ValueAlignment
     llvm::MaybeAlign alignment;
     for (auto value : set) {
       APInt valueDivisor = (value & (~(value - 1)));
-      alignment = llvm::commonAlignment(
-          alignment, llvm::MaybeAlign(valueDivisor.getZExtValue()));
+      if (alignment) {
+        alignment = llvm::commonAlignment(alignment.getValue(),
+                                          valueDivisor.getZExtValue());
+      }
     }
     return alignment;
   }
@@ -413,8 +415,10 @@ class ArgumentAnalysis {
       auto element = solver.lookupElementFor<ValueAlignment>(
           Position::forValue(dispatchOp.operands()[operandIdx]));
       if (!element || !element->isValidState()) return llvm::MaybeAlign();
-      alignment =
-          llvm::commonAlignment(alignment, element->getAssumedAlignment());
+      if (alignment) {
+        alignment = llvm::commonAlignment(
+            alignment.getValue(), element->getAssumedAlignment().getValue());
+      }
     }
     if (alignment.valueOrOne().value() == kMaximumAlignment) {
       return llvm::MaybeAlign();
@@ -431,8 +435,10 @@ class ArgumentAnalysis {
       auto element = solver.lookupElementFor<ValueAlignment>(
           Position::forValue(dispatchOp.resource_offsets()[resourceIdx]));
       if (!element || !element->isValidState()) return llvm::MaybeAlign();
-      alignment =
-          llvm::commonAlignment(alignment, element->getAssumedAlignment());
+      if (alignment) {
+        alignment = llvm::commonAlignment(
+            alignment.getValue(), element->getAssumedAlignment().getValue());
+      }
     }
     if (alignment.valueOrOne().value() == kMaximumAlignment) {
       // Alignment is natural, which for resources means the base resource
