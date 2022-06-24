@@ -14,14 +14,15 @@ _DEFAULT_NUM_BENCHMARK_RUNS = 50
 _DEFAULT_NUM_THREADS = 1
 
 
-class TfliteMobilenetV2FP32(TFLiteBenchmarkCommand):
+class TfliteWrapper(TFLiteBenchmarkCommand):
   """Specializes the benchmark command to use TFLite."""
 
   def __init__(self,
                benchmark_binary: str,
                model_name: str,
                model_path: str,
-               test_data_dir: str,
+               input_layer: Optional[str] = None,
+               input_shape: Optional[str] = None,
                driver: str = "cpu",
                num_threads: int = _DEFAULT_NUM_THREADS,
                num_runs: int = _DEFAULT_NUM_BENCHMARK_RUNS,
@@ -33,15 +34,19 @@ class TfliteMobilenetV2FP32(TFLiteBenchmarkCommand):
                      num_runs,
                      taskset=taskset)
     self.driver = driver
+    if input_layer and input_shape:
+      self.args.append("--input_layer=%s" % input_layer)
+      self.args.append("--input_layer_shape=%s" % input_shape)
 
 
-class IreeMobilenetV2FP32(IreeBenchmarkCommand):
+class IreeWrapper(IreeBenchmarkCommand):
   """Specializes the benchmark command to use IREE."""
 
   def __init__(self,
                benchmark_binary: str,
                model_name: str,
                model_path: str,
+               function_input: str,
                driver: str = "local-task",
                num_threads: int = _DEFAULT_NUM_THREADS,
                num_runs: int = _DEFAULT_NUM_BENCHMARK_RUNS,
@@ -54,24 +59,34 @@ class IreeMobilenetV2FP32(IreeBenchmarkCommand):
                      taskset=taskset)
     self.driver = driver
     self.args.append("--entry_function=main")
-    self.args.append('--function_input="1x224x224x3xf32"')
+    self.args.append('--function_input="%s"' % function_input)
 
 
-class MobilenetV2FP32CommandFactory(BenchmarkCommandFactory):
-  """Generates `BenchmarkCommand` objects specific to running MobileNet."""
+class SimpleCommandFactory(BenchmarkCommandFactory):
+  """
+  Generates `BenchmarkCommand` objects specific to running series of simple models.
 
-  def __init__(self, base_dir: str):
-    self._model_name = "mobilenet_v2_1.0_224"
+  A model is considered simple if its inputs can be generically generated based
+  on expected signature only without affecting behavior.
+  """
+
+  def __init__(self,
+               base_dir: str,
+               model_name: str,
+               function_input: str,
+               input_name: Optional[str] = None,
+               input_layer: Optional[str] = None):
+    self._model_name = model_name
+    self._function_input = function_input
+    self._input_name = input_name
+    self._input_layer = input_layer
     self._base_dir = base_dir
     self._iree_benchmark_binary_path = os.path.join(base_dir,
                                                     "iree-benchmark-module")
     self._tflite_benchmark_binary_path = os.path.join(base_dir,
                                                       "benchmark_model")
-    self._tflite_model_path = os.path.join(self._base_dir, "models", "tflite",
-                                           self._model_name + ".tflite")
     # Required to be set, but no test data used yet.
-    self._tflite_test_data_dir = os.path.join(self._base_dir, "test_data",
-                                              "squad")
+    self._tflite_test_data_dir = os.path.join(self._base_dir, "test_data")
 
   def generate_benchmark_commands(self, device: str,
                                   driver: str) -> list[BenchmarkCommand]:
@@ -88,57 +103,62 @@ class MobilenetV2FP32CommandFactory(BenchmarkCommandFactory):
       return []
 
   def _generate_cpu(self, device: str):
+    commands = []
     # Generate TFLite benchmarks.
-    tflite_mobilenet = TfliteMobilenetV2FP32(self._tflite_benchmark_binary_path,
-                                             self._model_name,
-                                             self._tflite_model_path,
-                                             self._tflite_test_data_dir,
-                                             driver="cpu")
+    tflite_model_path = os.path.join(self._base_dir, "models", "tflite",
+                                     self._model_name + ".tflite")
+    tflite = TfliteWrapper(self._tflite_benchmark_binary_path,
+                           self._model_name,
+                           tflite_model_path,
+                           self._input_name,
+                           driver="cpu")
+    commands.append(tflite)
 
     # Generate IREE benchmarks.
     driver = "local-task"
+
     iree_model_path = os.path.join(self._base_dir, "models", "iree", driver,
                                    self._model_name + ".vmfb")
-    iree_mobilenet = IreeMobilenetV2FP32(self._iree_benchmark_binary_path,
-                                         self._model_name,
-                                         iree_model_path,
-                                         driver=driver)
-    commands = [tflite_mobilenet, iree_mobilenet]
+    iree = IreeWrapper(self._iree_benchmark_binary_path,
+                       self._model_name,
+                       iree_model_path,
+                       self._function_input,
+                       driver=driver)
+    commands.append(iree)
 
     # Test mmt4d only on mobile.
     if device == "mobile":
       model_mmt4d_name = self._model_name + "_mmt4d"
       iree_mmt4d_model_path = os.path.join(self._base_dir, "models", "iree",
                                            driver, model_mmt4d_name + ".vmfb")
-      iree_mmt4d_mobilenet = IreeMobilenetV2FP32(
-          self._iree_benchmark_binary_path,
-          model_mmt4d_name,
-          iree_mmt4d_model_path,
-          driver=driver)
-      commands.append(iree_mmt4d_mobilenet)
+      iree_mmt4d = IreeWrapper(self._iree_benchmark_binary_path,
+                               model_mmt4d_name,
+                               iree_mmt4d_model_path,
+                               self._function_input,
+                               driver=driver)
+      commands.append(iree_mmt4d)
 
     return commands
 
   def _generate_gpu(self, driver: str):
-    tflite_mobilenet = TfliteMobilenetV2FP32(self._tflite_benchmark_binary_path,
-                                             self._model_name,
-                                             self._tflite_model_path,
-                                             self._tflite_test_data_dir,
-                                             driver="gpu")
-    tflite_mobilenet.args.append("--gpu_precision_loss_allowed=false")
-
-    tflite_mobilenet_fp16 = TfliteMobilenetV2FP32(
-        self._tflite_benchmark_binary_path,
-        self._model_name + "_fp16",
-        self._tflite_model_path,
-        self._tflite_test_data_dir,
-        driver="gpu")
-    tflite_mobilenet_fp16.args.append("--gpu_precision_loss_allowed=true")
+    commands = []
+    tflite_model_path = os.path.join(self._base_dir, "models", "tflite",
+                                     self._model_name + ".tflite")
+    tflite = TfliteWrapper(self._tflite_benchmark_binary_path,
+                           self._model_name,
+                           tflite_model_path,
+                           self._input_name,
+                           self._input_layer,
+                           driver="gpu")
+    tflite.args.append("--gpu_precision_loss_allowed=false")
+    commands.append(tflite)
 
     iree_model_path = os.path.join(self._base_dir, "models", "iree", driver,
                                    self._model_name + ".vmfb")
-    iree_mobilenet = IreeMobilenetV2FP32(self._iree_benchmark_binary_path,
-                                         self._model_name,
-                                         iree_model_path,
-                                         driver=driver)
-    return [tflite_mobilenet, tflite_mobilenet_fp16, iree_mobilenet]
+    iree = IreeWrapper(self._iree_benchmark_binary_path,
+                       self._model_name,
+                       iree_model_path,
+                       self._function_input,
+                       driver=driver)
+    commands.append(iree)
+    return commands
