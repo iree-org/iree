@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -48,6 +49,8 @@ static llvm::cl::opt<unsigned> benchmarkDispatchRepeatCount{
 
 }  // namespace
 
+using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
+
 static void addCleanupPatterns(OpPassManager &passManager) {
   // Standard MLIR cleanup.
   passManager.addPass(mlir::createCanonicalizerPass());
@@ -55,10 +58,8 @@ static void addCleanupPatterns(OpPassManager &passManager) {
 
   // Simplify util.global accesses; this can help with data flow tracking as
   // redundant store-loads are removed.
-  passManager.addNestedPass<IREE::Util::InitializerOp>(
-      IREE::Util::createSimplifyGlobalAccessesPass());
-  passManager.addNestedPass<mlir::func::FuncOp>(
-      IREE::Util::createSimplifyGlobalAccessesPass());
+  FunctionLikeNest(passManager)
+      .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
 
   // Cleanup and canonicalization of util.global (and other util ops).
   passManager.addPass(IREE::Util::createApplyPatternsPass());
@@ -164,10 +165,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   // Inline hal.device.switch ops and memoize their queries such that we can
   // better CSE/fold dispatch logic.
-  passManager.addNestedPass<IREE::Util::InitializerOp>(
-      createInlineDeviceSwitchesPass());
-  passManager.addNestedPass<mlir::func::FuncOp>(
-      createInlineDeviceSwitchesPass());
+  FunctionLikeNest(passManager).addPass(createInlineDeviceSwitchesPass);
 
   // Memoize device queries such that we don't need to repeatedly ask the same
   // information at runtime.
@@ -183,10 +181,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   }
 
   // Elide redundant command buffer state ops created during conversion.
-  passManager.addNestedPass<IREE::Util::InitializerOp>(
-      createElideRedundantCommandsPass());
-  passManager.addNestedPass<mlir::func::FuncOp>(
-      createElideRedundantCommandsPass());
+  FunctionLikeNest(passManager).addPass(createElideRedundantCommandsPass);
 
   // Fixup workgroup count calculations that may have used the affine dialect.
   // Kind of random here but can happen if the benchmarking code does things.
