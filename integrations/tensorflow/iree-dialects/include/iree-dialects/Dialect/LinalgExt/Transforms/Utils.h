@@ -50,13 +50,6 @@ Value createSubsetInsertOpFromLeadingOffsetsSizesAndStrides(
     ArrayRef<Value> leadingOffsets, ArrayRef<Value> leadingSizes,
     ArrayRef<Value> leadingStrides);
 
-/// Create a linalg_ext::ParallelInsertSliceOp by auto-completing the missing
-/// trailing dimensions to always be offset = 0, size = dim, stride = 1.
-Operation *createParallelInsertSliceOpFromLeadingOffsetsSizesAndStrides(
-    OpBuilder &b, Location loc, Value tensor, Value dest,
-    ArrayRef<Value> leadingOffsets, ArrayRef<Value> leadingSizes,
-    ArrayRef<Value> leadingStrides);
-
 /// Insert the `source` tensor into the `dest` tensor by creating the relevant
 /// `subset_insert` op. The details of the `subset_insert` op are retrieved
 /// from the `subset_extract` op so that they form a matching extract/insert
@@ -64,6 +57,12 @@ Operation *createParallelInsertSliceOpFromLeadingOffsetsSizesAndStrides(
 Value createMatchingSubsetInsertOp(OpBuilder &b, Location loc,
                                    tensor::ExtractSliceOp subsetExtractOp,
                                    Value source, Value dest);
+
+/// Create the parallel insertion terminator version of
+/// `createMatchingSubsetInsertOp`.
+void createMatchingParallelSubsetInsertOp(
+    OpBuilder &b, Location loc, tensor::ExtractSliceOp subsetExtractOp,
+    Value source, Value dest);
 
 struct AffineValueExpr {
   explicit AffineValueExpr(AffineExpr e) : e(e) {}
@@ -105,7 +104,7 @@ struct AffineBuilder {
         vals);
   }
   Value max(ValueRange vals) {
-    return b.createOrFold<AffineMinOp>(
+    return b.createOrFold<AffineMaxOp>(
         loc, AffineMap::getMultiDimIdentityMap(vals.size(), b.getContext()),
         vals);
   }

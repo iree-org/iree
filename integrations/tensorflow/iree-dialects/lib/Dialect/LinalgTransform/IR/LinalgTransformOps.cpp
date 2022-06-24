@@ -8,19 +8,11 @@
 
 #include <algorithm>
 
-#include "FunctionHelpers.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree-dialects/Dialect/LinalgTransform/ScopedTransform.h"
-#include "iree-dialects/Dialect/LinalgTransform/TrackingListener.h"
-#include "iree-dialects/Dialect/LinalgTransform/TrackingRewriteDriver.h"
-#include "iree-dialects/Dialect/LinalgTransform/TransformOpInterface.h"
 #include "iree-dialects/Transforms/Listener.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/ScopeExit.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/FormatVariadic.h"
+#include "iree-dialects/Transforms/ListenerGreedyPatternRewriteDriver.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/AsyncToLLVM/AsyncToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"
@@ -43,6 +35,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
@@ -53,17 +46,21 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/InliningUtils.h"
 #include "mlir/Transforms/Passes.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/ScopeExit.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #define DEBUG_TYPE "linalg-transform-dialect"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 
 using namespace mlir;
-using namespace mlir::linalg;
 using namespace mlir::iree_compiler::IREE;
 
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformDialect.cpp.inc"
 
-void transform::LinalgTransformDialect::initialize() {
+void linalg::transform::LinalgTransformDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.cpp.inc"
@@ -74,7 +71,7 @@ void transform::LinalgTransformDialect::initialize() {
 // ScopeOp
 //===---------------------------------------------------------------------===//
 
-void transform::ScopeOp::getSuccessorRegions(
+void linalg::transform::ScopeOp::getSuccessorRegions(
     Optional<unsigned> index, ArrayRef<Attribute> operands,
     SmallVectorImpl<RegionSuccessor> &regions) {
   if (index)

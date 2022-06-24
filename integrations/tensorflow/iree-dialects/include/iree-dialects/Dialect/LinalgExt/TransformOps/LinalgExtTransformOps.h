@@ -8,6 +8,8 @@
 #define IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMOPS_LINALGEXTTRANSFORMOPS_H
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
@@ -16,16 +18,8 @@
 namespace mlir {
 namespace scf {
 class ForOp;
+class ForeachThreadOp;
 } // namespace scf
-
-namespace iree_compiler {
-namespace IREE {
-namespace LinalgExt {
-class InParallelOp;
-class TileOp;
-} // namespace LinalgExt
-} // namespace IREE
-} // namespace iree_compiler
 } // namespace mlir
 
 #define GET_OP_CLASSES

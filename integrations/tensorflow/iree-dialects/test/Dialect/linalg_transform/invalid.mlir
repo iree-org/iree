@@ -12,7 +12,7 @@ transform.structured.canonicalized_sequence {
 transform.structured.canonicalized_sequence {
 ^bb0(%arg0: !pdl.operation):
   %0 = pdl_match @match in %arg0
-  // expected-error@below {{expected `tile_sizes` attribute}}
+  // expected-error@below {{expected 'tile_sizes' attribute}}
   transform.structured.fuse %0
 }
 
