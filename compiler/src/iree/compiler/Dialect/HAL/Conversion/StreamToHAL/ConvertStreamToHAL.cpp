@@ -318,7 +318,7 @@ struct ResourceMapOpPattern
     auto bufferUsage = IREE::HAL::BufferUsageBitfield::Mapping |
                        IREE::HAL::BufferUsageBitfield::Transfer;
 
-    rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorMapOp>(
+    rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorAllocateInitializedOp>(
         mapOp, bufferType, allocator, memoryTypes, bufferUsage,
         adaptor.source(), adaptor.source_offset(), adaptor.result_size());
     return success();
@@ -392,10 +392,8 @@ struct ResourceStoreOpPattern
   LogicalResult matchAndRewrite(
       IREE::Stream::ResourceStoreOp storeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.create<IREE::HAL::BufferStoreOp>(storeOp.getLoc(), adaptor.value(),
-                                              adaptor.target(),
-                                              adaptor.target_offset());
-    rewriter.replaceOp(storeOp, adaptor.target());
+    rewriter.replaceOpWithNewOp<IREE::HAL::BufferStoreOp>(
+        storeOp, adaptor.value(), adaptor.target(), adaptor.target_offset());
     return success();
   }
 };

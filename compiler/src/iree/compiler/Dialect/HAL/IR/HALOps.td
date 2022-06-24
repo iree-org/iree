@@ -215,7 +215,7 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
   }];
 }
 
-def HAL_AllocatorMapOp : HAL_Op<"allocator.map", [
+def HAL_AllocatorAllocateInitializedOp : HAL_Op<"allocator.allocate.initialized", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     DeclareOpInterfaceMethods<Util_SizeAwareOp>,
   ]> {

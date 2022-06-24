@@ -285,6 +285,46 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_allocate,  //
   return iree_ok_status();
 }
 
+IREE_VM_ABI_EXPORT(iree_hal_module_allocator_allocate_initialized,  //
+                   iree_hal_module_state_t,                         //
+                   riirII, r) {
+  iree_hal_allocator_t* allocator = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_check_deref(args->r0, &allocator));
+  iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i1;
+  iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i2;
+  iree_vm_buffer_t* source = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r3, &source));
+  iree_device_size_t offset = iree_hal_cast_device_size(args->i4);
+  iree_device_size_t length = iree_hal_cast_device_size(args->i5);
+
+  iree_host_size_t buffer_length = source->data.data_length;
+  if (length == -1) {
+    length = buffer_length;
+  }
+  if (length < 0 || offset < 0 || offset > buffer_length ||
+      offset + length > buffer_length) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "byte range out of bounds (requested %" PRIdsz
+                            "-%" PRIdsz " of available %" PRIhsz ")",
+                            offset, (offset + length - 1), buffer_length);
+  }
+
+  const iree_hal_buffer_params_t params = {
+      .type = memory_types,
+      .usage = buffer_usage,
+  };
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_allocator_allocate_buffer(
+          allocator, params, length,
+          iree_make_const_byte_span(source->data.data + offset, length),
+          &buffer),
+      "failed to allocate buffer of length %" PRIdsz, length);
+
+  rets->r0 = iree_hal_buffer_move_ref(buffer);
+  return iree_ok_status();
+}
+
 static void iree_hal_module_mapped_buffer_release(void* user_data,
                                                   iree_hal_buffer_t* buffer) {
   iree_vm_buffer_t* backing_buffer = (iree_vm_buffer_t*)user_data;
@@ -375,47 +415,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_map_byte_buffer,  //
     return iree_ok_status();
   }
   return status;
-}
-
-// TODO(#7277): drop this method (use map instead) with streams.
-IREE_VM_ABI_EXPORT(iree_hal_module_allocator_wrap_byte_buffer,  //
-                   iree_hal_module_state_t,                     //
-                   riirII, r) {
-  iree_hal_allocator_t* allocator = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_check_deref(args->r0, &allocator));
-  iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i1;
-  iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i2;
-  iree_vm_buffer_t* source = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r3, &source));
-  iree_device_size_t offset = iree_hal_cast_device_size(args->i4);
-  iree_device_size_t length = iree_hal_cast_device_size(args->i5);
-
-  iree_host_size_t buffer_length = source->data.data_length;
-  if (length == -1) {
-    length = buffer_length;
-  }
-  if (length < 0 || offset < 0 || offset > buffer_length ||
-      offset + length > buffer_length) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "byte range out of bounds (requested %" PRIdsz
-                            "-%" PRIdsz " of available %" PRIhsz ")",
-                            offset, (offset + length - 1), buffer_length);
-  }
-
-  const iree_hal_buffer_params_t params = {
-      .type = memory_types,
-      .usage = buffer_usage,
-  };
-  iree_hal_buffer_t* buffer = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_allocator_allocate_buffer(
-          allocator, params, length,
-          iree_make_const_byte_span(source->data.data + offset, length),
-          &buffer),
-      "failed to allocate buffer of length %" PRIdsz, length);
-
-  rets->r0 = iree_hal_buffer_move_ref(buffer);
-  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
