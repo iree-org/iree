@@ -17,6 +17,9 @@ namespace mlir {
 namespace iree_compiler {
 namespace emitc_builders {
 
+Value structMember(OpBuilder builder, Location location, Type type,
+                   StringRef memberName, Value operand);
+
 Value structPtrMember(OpBuilder builder, Location location, Type type,
                       StringRef memberName, Value operand);
 
