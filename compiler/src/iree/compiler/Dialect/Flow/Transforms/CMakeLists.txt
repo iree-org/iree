@@ -66,6 +66,7 @@ iree_cc_library(
     IREELinalgTransformDialectPasses
     LLVMSupport
     MLIRAffineDialect
+    MLIRAnalysis
     MLIRArithmeticDialect
     MLIRArithmeticUtils
     MLIRControlFlowDialect
@@ -73,6 +74,7 @@ iree_cc_library(
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgTransforms
+    MLIRLinalgUtils
     MLIRMathDialect
     MLIRMemRefDialect
     MLIRMemRefTransforms
