@@ -10,9 +10,11 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -22,16 +24,17 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
+using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
+
 void buildVMTransformPassPipeline(OpPassManager &passManager,
                                   TargetOptions targetOptions) {
   passManager.addNestedPass<mlir::func::FuncOp>(createLoopCoalescingPass());
-  passManager.addNestedPass<IREE::Util::InitializerOp>(
-      createLoopInvariantCodeMotionPass());
   passManager.addNestedPass<mlir::func::FuncOp>(
-      createLoopInvariantCodeMotionPass());
-  passManager.addNestedPass<IREE::Util::InitializerOp>(
-      createConvertSCFToCFPass());
-  passManager.addNestedPass<mlir::func::FuncOp>(createConvertSCFToCFPass());
+      createSCFForLoopCanonicalizationPass());
+  FunctionLikeNest(passManager)
+      .addPass(createLoopInvariantCodeMotionPass)
+      .addPass(createConvertSCFToCFPass);
+
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
