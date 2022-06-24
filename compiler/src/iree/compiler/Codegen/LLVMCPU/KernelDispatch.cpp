@@ -531,8 +531,10 @@ static LogicalResult setMatmulNoPadRootConfig(
   reductionTileSizes.push_back(
       getMaxTileSize(0, K, workgroupTileSizes.back(), vectorSize));
 
-  setVectorSizesForDynamicShapes(op.getOperation(), parallelTileSizes,
-                                 reductionTileSizes);
+  setAlwaysVectorizeSizes(op.getOperation(), parallelTileSizes,
+                          reductionTileSizes);
+  //setVectorSizesForDynamicShapes(op.getOperation(), parallelTileSizes,
+  //                               reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
@@ -541,7 +543,7 @@ static LogicalResult setMatmulNoPadRootConfig(
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
-      isPeelingBeneficial(linalgOp)
+      false //isPeelingBeneficial(linalgOp)
           ? DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert
           : DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
 }
@@ -670,8 +672,8 @@ static LogicalResult setRootConfig(
   // works for linalg.matmul cases. We can relax it once we have better
   // scheduling, e.g., transform dialect.
   SmallVector<int64_t> flowTileSizes;
-  bool usePaddingPipeline =
-      !disableMatmulPadPipeline && isPaddingBeneficial(linalgOp);
+  bool usePaddingPipeline = true;
+      //!disableMatmulPadPipeline && isPaddingBeneficial(linalgOp);
   if (usePaddingPipeline) {
     // It's inspired from Sandbox configuration. Sandbox has
     // [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192 because
@@ -870,7 +872,9 @@ static LogicalResult setDefaultGenericOpRootConfig(
                            maxTileSizes, parallelTileSizes);
   splitParallelAndReductionTiles(genericOp, parallelTileSizes,
                                  reductionTileSizes);
-  setAlwaysVectorizeSizes(genericOp, parallelTileSizes, reductionTileSizes);
+
+  setVectorSizesForDynamicShapes(genericOp, parallelTileSizes,
+                                 reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
@@ -878,10 +882,16 @@ static LogicalResult setDefaultGenericOpRootConfig(
   tileSizes.push_back(reductionTileSizes);
 
   // For non-tensor based ops use the Buffer ops pipeline.
-  auto passPipeline =
-      genericOp.hasTensorSemantics()
-          ? DispatchLoweringPassPipeline::CPUDoubleTilingExpert
-          : DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
+  DispatchLoweringPassPipeline passPipeline;
+  if (genericOp.hasTensorSemantics()) {
+    passPipeline =
+        isPeelingBeneficial(genericOp)
+            ? DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert
+            : DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
+  } else {
+    passPipeline = DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
+  }
+
   return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
                                                tileSizes, passPipeline);
 }
