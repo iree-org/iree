@@ -54,7 +54,7 @@ iree_compiler_cc_library(
         "OptimizeNumerics.cpp",
         "OutlineDispatchRegions.cpp",
         "PadLinalgOps.cpp",
-        "PadTensorToSubTensorInsert.cpp",
+        "PadTensorToTensorInsertSlice.cpp",
         "PassDetail.h",
         "Passes.cpp",
         "SplitReduction.cpp",
