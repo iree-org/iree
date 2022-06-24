@@ -1,4 +1,10 @@
-// RUN: iree-opt %s --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass))' --iree-codegen-llvmgpu-use-transform-dialect=%p/transform_dialect_codegen_vector_distribution_spec.mlir | FileCheck %s
+// RUN: iree-opt %s --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass))' \
+// RUN: --iree-codegen-llvmgpu-use-transform-dialect=%p/transform_dialect_codegen_vector_warp_execute_on_lane_0_spec.mlir | \
+// RUN: FileCheck %s --check-prefix=WARP-EXECUTE
+
+// RUN: iree-opt %s --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass))' \
+// RUN: --iree-codegen-llvmgpu-use-transform-dialect=%p/transform_dialect_codegen_vector_distribution_spec.mlir | \
+// RUN: FileCheck %s
 
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>]>]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}>
@@ -14,6 +20,16 @@ hal.executable private @reduce_dispatch_0 {
         memref.assume_alignment %0, 64 : memref<128xf32>
         %1 = gpu.thread_id  x
         %2 = arith.cmpi ult, %1, %c1 : index
+
+        // WARP-EXECUTE-DAG: %[[C0:.*]] = arith.constant 0 : index
+        // WARP-EXECUTE-DAG: %[[C32:.*]] = arith.constant 32 : index
+        // WARP-EXECUTE-DAG: %[[V128:.*]] = arith.constant dense<1.000000e+00> : vector<128xf32>
+        // WARP-EXECUTE: %[[TIDX:.*]] = gpu.thread_id  x
+        // WARP-EXECUTE: %[[COND32:.*]] = arith.cmpi ult, %[[TIDX]], %[[C32]] : index
+        // Single-warp guard filters out threads 32-63.
+        // WARP-EXECUTE: scf.if %[[COND32]] {
+        // WARP-EXECUTE:   vector.warp_execute_on_lane_0(%[[TIDX]])[32] {
+        // WARP-EXECUTE:     vector.transfer_write %[[V128]], %{{.*}} {in_bounds = [true]} : vector<128xf32>, memref<128xf32>
 
         // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
         // CHECK-DAG: %[[C4:.*]] = arith.constant 4 : index
@@ -35,8 +51,6 @@ hal.executable private @reduce_dispatch_0 {
           %3 = arith.constant dense<1.0> : vector<128xf32>
           vector.transfer_write %3, %0[%c0] : vector<128xf32>, memref<128xf32>
         }
-
-        
         return
       }
     }

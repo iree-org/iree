@@ -7,13 +7,19 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMDIALECTEXTENSIONS_TRANSFORMDIALECTLLVMGPUEXTENSIONS_H_
 #define IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMDIALECTEXTENSIONS_TRANSFORMDIALECTLLVMGPUEXTENSIONS_H_
 
+#include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 
 namespace mlir {
 class DialectRegistry;
 
+namespace scf {
+class IfOp;
+}  // namespace scf
+
 namespace vector {
 class VectorDialect;
+class WarpExecuteOnLane0Op;
 }  // namespace vector
 
 namespace iree_compiler {
