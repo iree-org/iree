@@ -148,7 +148,6 @@ iree_runtime_cc_test(
         ":file_io",
         "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base:logging",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],

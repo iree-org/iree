@@ -10,7 +10,6 @@
 #include <cstdint>
 #include <ostream>
 
-#include "iree/base/logging.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 
@@ -27,8 +26,8 @@ static constexpr int kMaxDescriptorSets = 4096;
 }  // namespace
 
 DescriptorSetGroup::~DescriptorSetGroup() {
-  IREE_CHECK(descriptor_pools_.empty())
-      << "DescriptorSetGroup must be reset explicitly";
+  IREE_ASSERT_TRUE(descriptor_pools_.empty(),
+                   "DescriptorSetGroup must be reset explicitly");
 }
 
 iree_status_t DescriptorSetGroup::Reset() {

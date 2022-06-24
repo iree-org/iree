@@ -40,9 +40,9 @@ PYBIND11_MODULE(_runtime, m) {
 
     char **argv = &flag_ptrs[0];
     int argc = flag_ptrs.size();
-    CheckApiStatus(
-        iree_flags_parse(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv),
-        "Error parsing flags");
+    CheckApiStatus(iree_flags_parse(IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
+                                    &argc, &argv),
+                   "Error parsing flags");
   });
 }
 

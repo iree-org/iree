@@ -257,8 +257,7 @@ static void IREE_API_PTR iree_vm_native_module_free_state(
     return;
   }
   // No-op in the default implementation.
-  // TODO(#2843): IREE_DCHECK_EQ(NULL, module_state);
-  assert(!module_state);
+  IREE_ASSERT_EQ(module_state, NULL);
 }
 
 static iree_status_t IREE_API_PTR iree_vm_native_module_resolve_import(

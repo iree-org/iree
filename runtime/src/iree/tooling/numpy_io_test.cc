@@ -26,8 +26,7 @@ class NumpyIOTest : public ::testing::Test {
         iree_hal_available_driver_registry(), IREE_SV("local-sync"),
         iree_allocator_system(), &device_);
     if (iree_status_is_not_found(status)) {
-      IREE_LOG(WARNING)
-          << "Skipping test as 'local-sync' driver was not found:";
+      fprintf(stderr, "Skipping test as 'local-sync' driver was not found:\n");
       iree_status_fprint(stderr, status);
       iree_status_free(status);
       GTEST_SKIP();
@@ -46,7 +45,10 @@ class NumpyIOTest : public ::testing::Test {
     if (!test_tmpdir) {
       test_tmpdir = getenv("TEMP");
     }
-    IREE_CHECK(test_tmpdir) << "TEST_TMPDIR/TMPDIR/TEMP not defined";
+    if (!test_tmpdir) {
+      std::cerr << "TEST_TMPDIR/TMPDIR/TEMP not defined\n";
+      exit(1);
+    }
     return test_tmpdir + std::string("/iree_test_") +
            std::to_string(unique_id++) + '_' + suffix;
   }

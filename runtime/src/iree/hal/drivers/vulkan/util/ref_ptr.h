@@ -10,15 +10,17 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <type_traits>
+#include <typeinfo>
 #include <utility>
 
 #include "iree/base/attributes.h"
-#include "iree/base/logging.h"
 
 namespace iree {
 
-// Use this to get really verbose refptr logging:
+// Use this to get really verbose refptr logging (at the point you need this:
+// I'm sorry):
 // #define IREE_VERBOSE_REF_PTR
 
 template <class T>
@@ -247,9 +249,8 @@ class RefObject {
       auto ref_obj = static_cast<RefObject<V>*>(p);
       int previous_count = ref_obj->counter_.fetch_sub(1);
 #ifdef IREE_VERBOSE_REF_PTR
-      IREE_LOG(INFO) << "ro-- " << typeid(V).name() << " " << p << " now "
-                     << previous_count - 1
-                     << (previous_count == 1 ? " DEAD (CUSTOM)" : "");
+      fprintf(stdout, "ro-- %s %p now %d%s", typeid(V).name(), p,
+              previous_count - 1, previous_count == 1 ? " DEAD (CUSTOM)" : "");
 #endif  // IREE_VERBOSE_REF_PTR
       if (previous_count == 1) {
         // We delete type T pointer here to avoid the need for a virtual dtor.
@@ -265,9 +266,8 @@ class RefObject {
       auto ref_obj = static_cast<RefObject<V>*>(p);
       int previous_count = ref_obj->counter_.fetch_sub(1);
 #ifdef IREE_VERBOSE_REF_PTR
-      IREE_LOG(INFO) << "ro-- " << typeid(V).name() << " " << p << " now "
-                     << previous_count - 1
-                     << (previous_count == 1 ? " DEAD" : "");
+      fprintf(stdout, "ro-- %s %p now %d%s", typeid(V).name(), p,
+              previous_count - 1, previous_count == 1 ? " DEAD" : "");
 #endif  // IREE_VERBOSE_REF_PTR
       if (previous_count == 1) {
         // We delete type T pointer here to avoid the need for a virtual dtor.
@@ -284,8 +284,8 @@ class RefObject {
     ++ref_obj->counter_;
 
 #ifdef IREE_VERBOSE_REF_PTR
-    IREE_LOG(INFO) << "ro++ " << typeid(T).name() << " " << p << " now "
-                   << ref_obj->counter_;
+    fprintf(stdout, "ro++ %s %p now %d", typeid(T).name(), p,
+            ref_obj->counter_.load());
 #endif  // IREE_VERBOSE_REF_PTR
   }
 

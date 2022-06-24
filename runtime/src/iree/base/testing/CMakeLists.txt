@@ -40,7 +40,6 @@ iree_cc_test(
     iree::base
     iree::base::internal::dynamic_library
     iree::base::internal::file_io
-    iree::base::logging
     iree::testing::gtest
     iree::testing::gtest_main
 )

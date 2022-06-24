@@ -41,7 +41,6 @@ iree_runtime_cc_test(
         ":shift_ops",
         ":shift_ops_i64",
         "//runtime/src/iree/base:cc",
-        "//runtime/src/iree/base:logging",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
         "//runtime/src/iree/vm",

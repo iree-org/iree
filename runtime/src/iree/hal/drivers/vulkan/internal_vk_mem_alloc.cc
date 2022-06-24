@@ -9,11 +9,11 @@
 
 #include <ostream>
 
+#include "iree/base/api.h"
 #include "iree/base/internal/synchronization.h"
-#include "iree/base/logging.h"
 
-#define VMA_ASSERT IREE_DCHECK
-#define VMA_HEAVY_ASSERT IREE_DCHECK
+#define VMA_ASSERT IREE_ASSERT
+#define VMA_HEAVY_ASSERT IREE_ASSERT
 
 // NOTE: logging is disabled by default as unless you are debugging VMA itself
 // the information is not useful and just slows things down.

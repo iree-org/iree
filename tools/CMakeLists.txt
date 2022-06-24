@@ -92,7 +92,6 @@ iree_cc_binary(
     iree::base::core_headers
     iree::base::internal::file_io
     iree::base::internal::flags
-    iree::base::logging
     iree::base::tracing
     iree::hal
     iree::modules::check
@@ -253,7 +252,6 @@ if(IREE_BUILD_COMPILER)
       iree::base
       iree::base::cc
       iree::base::internal::flags
-      iree::base::logging
       iree::base::tracing
       iree::compiler::Dialect::HAL::Target
       iree::compiler::Dialect::VM::Target::Bytecode
