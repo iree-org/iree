@@ -533,8 +533,6 @@ static LogicalResult setMatmulNoPadRootConfig(
 
   setAlwaysVectorizeSizes(op.getOperation(), parallelTileSizes,
                           reductionTileSizes);
-  //setVectorSizesForDynamicShapes(op.getOperation(), parallelTileSizes,
-  //                               reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
@@ -543,9 +541,7 @@ static LogicalResult setMatmulNoPadRootConfig(
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
-      false //isPeelingBeneficial(linalgOp)
-          ? DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert
-          : DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
+      DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
 }
 
 static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
@@ -672,9 +668,7 @@ static LogicalResult setRootConfig(
   // works for linalg.matmul cases. We can relax it once we have better
   // scheduling, e.g., transform dialect.
   SmallVector<int64_t> flowTileSizes;
-  bool usePaddingPipeline = true;
-      //!disableMatmulPadPipeline && isPaddingBeneficial(linalgOp);
-  if (usePaddingPipeline) {
+  if (!disableMatmulPadPipeline && (isX86(*variantOp) || isRISCV(*variantOp))) {
     // It's inspired from Sandbox configuration. Sandbox has
     // [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192 because
     // 288/12*8=192
@@ -696,7 +690,8 @@ static LogicalResult setRootConfig(
   if (isAArch64(*variantOp) && !isQuantized) {
     return setAArch64RootConfig(entryPointFn, contractionOp, flowTileSizes,
                                 workgroupTileSizes, vectorSize);
-  } else if (usePaddingPipeline) {
+  } else if (!disableMatmulPadPipeline &&
+             (isX86(*variantOp) || isRISCV(*variantOp))) {
     return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
                                   workgroupTileSizes, vectorSize);
   }
