@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- PadTensorToSubTensorInsert.cpp - Pass to legalize linalg.pad_tensor-===//
+//===- PadTensorToInsertSlice.cpp - Pass to legalize linalg.pad_tensor-===//
 //
-// Pass to convert linalg.pad_tensor to linalg.fill + subtensor_insert
+// Pass to convert linalg.pad_tensor to linalg.fill + tensor.insert_slice
 // operations which is the only way Vulkan backend can lower it to a single
 // kernel.
 //
@@ -31,8 +31,9 @@ namespace IREE {
 namespace Flow {
 
 namespace {
-/// Pattern to convert a linalg.pad_tensor operation into a fill + subtensor
-/// insert. This is needed till pad_tensor op can be fused with its consumers.
+/// Pattern to convert a linalg.pad_tensor operation into a fill + tensor
+/// insert_slice. This is needed till pad_tensor op can be fused with its
+/// consumers.
 struct PadTensorOpConversion : public OpRewritePattern<tensor::PadOp> {
   using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
 
@@ -102,8 +103,9 @@ struct PadTensorOpConversion : public OpRewritePattern<tensor::PadOp> {
   }
 };
 
-struct PadTensorToSubTensorInsertPass
-    : public PadTensorToSubTensorInsertBase<PadTensorToSubTensorInsertPass> {
+struct PadTensorToTensorInsertSlicePass
+    : public PadTensorToTensorInsertSliceBase<
+          PadTensorToTensorInsertSlicePass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<linalg::LinalgDialect, memref::MemRefDialect, func::FuncDialect,
@@ -123,8 +125,8 @@ struct PadTensorToSubTensorInsertPass
 
 }  // namespace
 
-std::unique_ptr<Pass> createPadTensorToSubTensorInsertPass() {
-  return std::make_unique<PadTensorToSubTensorInsertPass>();
+std::unique_ptr<Pass> createPadTensorToTensorInsertSlicePass() {
+  return std::make_unique<PadTensorToTensorInsertSlicePass>();
 }
 
 }  // namespace Flow
