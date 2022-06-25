@@ -63,6 +63,8 @@ iree_benchmark_suite(
     "${MOBILEBERT_FP32_MODULE}"
     "${MOBILEBERT_INT8_MODULE}"
     "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V2_INT8_MODULE}"
+    "${MOBILENET_V2_UINT8_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
@@ -309,6 +311,8 @@ iree_benchmark_suite(
 
   MODULES
     "${MOBILEBERT_INT8_MODULE}"
+    "${MOBILENET_V2_INT8_MODULE}"
+    "${MOBILENET_V2_UINT8_MODULE}"
 
   BENCHMARK_MODES
     "1-thread,big-core,full-inference,experimental-flags"

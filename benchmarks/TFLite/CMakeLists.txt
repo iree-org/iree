@@ -132,6 +132,32 @@ set(MOBILENET_V2_MODULE
     "1x224x224x3xf32"
 )
 
+set(MOBILENET_V2_UINT8_MODULE
+  NAME
+    "MobileNetV2Uint8"
+  TAGS
+    "uint8,imagenet"
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_224_1.0_uint8.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x224x224x3xui8"
+)
+
+set(MOBILENET_V2_INT8_MODULE
+  NAME
+    "MobileNetV2Int8"
+  TAGS
+    "int8,imagenet"
+  SOURCE
+    "https://storage.googleapis.com/tf_model_garden/vision/mobilenet/v2_1.0_int8/mobilenet_v2_1.00_224_int8.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x224x224x3xf32"
+)
+
 set(MOBILENET_V3SMALL_MODULE
   NAME
     "MobileNetV3Small"
