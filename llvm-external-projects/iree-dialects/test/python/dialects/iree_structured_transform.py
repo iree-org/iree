@@ -1,5 +1,4 @@
 # RUN: %PYTHON %s | FileCheck %s
-# XFAIL: *
 
 import iree.compiler.ir as ir
 import iree.compiler.dialects.transform.iree_structured as iree_structured_transform

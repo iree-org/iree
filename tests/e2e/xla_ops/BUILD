@@ -82,7 +82,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "fft.mlir",
+            "fft.mlir", #TODO(9583)
         ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],
@@ -163,7 +163,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "fft.mlir",
+            "fft.mlir", #TODO(9583)
         ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],
@@ -382,8 +382,8 @@ iree_check_single_backend_test_suite(
         exclude = [
             "bitcast_convert.mlir",
             "exponential_fp16.mlir",
-            "fft.mlir",
-            "round.mlir",
+            "fft.mlir", # TODO(#9583)
+            "round.mlir", # TODO(#9617)
         ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],
