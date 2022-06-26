@@ -77,7 +77,7 @@ static bool hasDestructiveUpdateUses(BlockArgument arg,
         reads.push_back(&u);
       }
     } else if (auto sliceOp = dyn_cast<tensor::InsertSliceOp>(user)) {
-      if (sliceOp.dest() == u.get()) {
+      if (sliceOp.getDest() == u.get()) {
         writes.push_back(&u);
       } else {
         reads.push_back(&u);
@@ -208,9 +208,9 @@ static LogicalResult foldExtractSliceOp(OpBuilder &b,
                                         tensor::ExtractSliceOp op) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(op);
-  auto sourceOp = op.source().getDefiningOp();
+  auto sourceOp = op.getSource().getDefiningOp();
   if (!sourceOp) {
-    BlockArgument val = op.source().dyn_cast<BlockArgument>();
+    BlockArgument val = op.getSource().dyn_cast<BlockArgument>();
     while (val) {
       auto forOp = dyn_cast<scf::ForOp>(val.getOwner()->getParentOp());
       // val is a block argument but not to an scf::ForOp -> bail.
@@ -304,7 +304,7 @@ LogicalResult rewriteDestructiveUpdateInPlace<tensor::InsertSliceOp>(
   if (insertSliceOp.use_empty()) return success();
   LLVM_DEBUG(llvm::dbgs() << "RewriteDestructiveUpdateInPlace: "
                           << *insertSliceOp.getOperation() << "\n");
-  if (operand->get() != insertSliceOp.dest()) {
+  if (operand->get() != insertSliceOp.getDest()) {
     return insertSliceOp.emitOpError("expected operand to be the dest");
   }
   if (!insertSliceOp->hasOneUse()) {
@@ -314,7 +314,7 @@ LogicalResult rewriteDestructiveUpdateInPlace<tensor::InsertSliceOp>(
   OpOperand &use = *(insertSliceOp->use_begin());
   if (isa<scf::YieldOp>(use.getOwner())) {
     OpResult usedResult = use.get().cast<OpResult>();
-    Value dest = insertSliceOp.dest();
+    Value dest = insertSliceOp.getDest();
     if (!dest || !dest.isa<BlockArgument>()) {
       return insertSliceOp.emitError("dest is not a argument to the loop");
     }
@@ -334,7 +334,7 @@ LogicalResult rewriteDestructiveUpdateInPlace<tensor::InsertSliceOp>(
       }
 
       b.create<IREE::Flow::DispatchTensorStoreOp>(
-          insertSliceOp->getLoc(), insertSliceOp.source(), storeOp->target(),
+          insertSliceOp->getLoc(), insertSliceOp.getSource(), storeOp->target(),
           storeOp->target_dims(), offsets, sizes, strides);
     }
 

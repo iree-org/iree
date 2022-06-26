@@ -112,7 +112,7 @@ struct CreateFastSlowPath final : public OpRewritePattern<scf::ForOp> {
       for (Operation *op : cloneOps) {
         if (op == padOp.getOperation()) {
           // We can elide the tensor.pad op. Just use its source.
-          bvm.map(padOp.getResult(), bvm.lookupOrDefault(padOp.source()));
+          bvm.map(padOp.getResult(), bvm.lookupOrDefault(padOp.getSource()));
         } else {
           builder.clone(*op, bvm);
         }

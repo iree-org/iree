@@ -201,7 +201,7 @@ static void insertConstantTableLookup(mlir::func::FuncOp funcOp,
                                         siteId,
                                         indexSet.get(operandValues.index()),
                                     })
-                                .result();
+                                .getResult();
       if (extractedValue.getType() != arg.getType()) {
         extractedValue = builder.create<arith::IndexCastOp>(
             arg.getLoc(), arg.getType(), extractedValue);
