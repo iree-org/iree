@@ -528,8 +528,8 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
                   plan);
             })
         .Case<tensor::CastOp>([&](tensor::CastOp castOp) {
-          return analyseSingleOperandResultOp(castOp.getSource(), castOp.getDest(),
-                                              plan);
+          return analyseSingleOperandResultOp(castOp.getSource(),
+                                              castOp.getDest(), plan);
         })
         .Case<tensor::InsertOp>([&](tensor::InsertOp insertOp) {
           return analyseDestructiveUpdateOp(insertOp, /*source =*/nullptr,

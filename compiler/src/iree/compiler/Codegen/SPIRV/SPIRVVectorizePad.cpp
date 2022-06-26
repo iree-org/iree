@@ -195,8 +195,8 @@ struct VectorizePadWithConditions final
           loc, sliceVectorType, condition,
           [&](OpBuilder builder, Location Loc) {
             Value read = builder.create<vector::TransferReadOp>(
-                loc, sliceVectorType, padOp.getSource(), readIndices, paddingValue,
-                llvm::makeArrayRef(inBounds));
+                loc, sliceVectorType, padOp.getSource(), readIndices,
+                paddingValue, llvm::makeArrayRef(inBounds));
             builder.create<scf::YieldOp>(loc, read);
           },
           [&](OpBuilder builder, Location Loc) {
