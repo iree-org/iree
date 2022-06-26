@@ -117,7 +117,7 @@ static void rewriteExtractSlices(PatternRewriter &rewriter,
                                  ValueRange tensorDynamicDims,
                                  BlockAndValueMapping tensorToFlowBvm) {
   dispatchOp->walk([&](tensor::ExtractSliceOp extractSliceOp) {
-    Value source = extractSliceOp.source();
+    Value source = extractSliceOp.getSource();
     auto it = llvm::find(tensorOperands, source);
     if (it == tensorOperands.end()) return;
     int64_t index = std::distance(tensorOperands.begin(), it);

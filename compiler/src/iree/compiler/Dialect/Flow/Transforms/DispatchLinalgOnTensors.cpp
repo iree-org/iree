@@ -231,7 +231,7 @@ SmallVector<Range> getLoopRanges<tensor::InsertSliceOp>(
     PatternRewriter &rewriter) {
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-  Value source = insertSliceOp.source();
+  Value source = insertSliceOp.getSource();
   SmallVector<Range> loopRanges(insertSliceOp.getSourceType().getRank(),
                                 Range{zero, one, one});
   for (auto dim : llvm::seq<unsigned>(0, loopRanges.size())) {
@@ -529,7 +529,7 @@ static bool hasUnfusableUseInDispatch(
 
     // Cannot fuse producer of `dest` with `tensor.insert_slice`.
     if (auto insertSliceUser = dyn_cast<tensor::InsertSliceOp>(user)) {
-      if (insertSliceUser.dest() == v) return true;
+      if (insertSliceUser.getDest() == v) return true;
     }
   }
   return false;
@@ -616,7 +616,7 @@ static BlockArgument getTiedOperandBlockArgument(BlockArgument resultArg) {
           .Case<tensor::InsertSliceOp>([&](tensor::InsertSliceOp insertOp)
                                            -> BlockArgument {
             auto loadOp =
-                insertOp.dest()
+                insertOp.getDest()
                     .template getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
             if (!loadOp) return nullptr;
             return loadOp.source().dyn_cast<BlockArgument>();

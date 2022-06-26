@@ -188,7 +188,7 @@ static LogicalResult analyseInterfaceBindingSubspanOp(
 
 static LogicalResult analysePadTensorOp(tensor::PadOp padTensorOp,
                                         BufferizationPlan &plan) {
-  plan.insert(padTensorOp.source());
+  plan.insert(padTensorOp.getSource());
   plan.insert(padTensorOp.getResult());
   return success();
 }
@@ -261,11 +261,11 @@ static LogicalResult analyseSingleOperandResultOp(Value source, Value result,
 static LogicalResult analyseSubTensorOp(tensor::ExtractSliceOp subTensorOp,
                                         BufferizationPlan &plan) {
   if (!canUsersHandleSubviews(subTensorOp)) {
-    plan.insert(subTensorOp.source());
+    plan.insert(subTensorOp.getSource());
     plan.insert(subTensorOp.getResult());
     return success();
   }
-  return analyseSingleOperandResultOp(subTensorOp.source(),
+  return analyseSingleOperandResultOp(subTensorOp.getSource(),
                                       subTensorOp.getResult(), plan);
 }
 
@@ -346,7 +346,7 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
   };
   auto getDest = [](Operation *op) -> Value {
     if (auto insertSliceOp = dyn_cast<tensor::InsertSliceOp>(op)) {
-      return insertSliceOp.dest();
+      return insertSliceOp.getDest();
     }
     if (auto transferWriteOp = dyn_cast<vector::TransferWriteOp>(op)) {
       return transferWriteOp.getSource();
@@ -355,7 +355,7 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
   };
   auto getSource = [](Operation *op) -> Value {
     if (auto extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(op)) {
-      return extractSliceOp.source();
+      return extractSliceOp.getSource();
     }
     if (auto transferReadOp = dyn_cast<vector::TransferReadOp>(op)) {
       return transferReadOp.getSource();
@@ -419,12 +419,12 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
   // - insert_slice value and dest
   for (Operation *user : source.getUsers()) {
     if (auto extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(user)) {
-      plan.unionSets(extractSliceOp.source(), extractSliceOp.getResult());
+      plan.unionSets(extractSliceOp.getSource(), extractSliceOp.getResult());
       continue;
     }
     if (auto insertSliceOp = dyn_cast<tensor::InsertSliceOp>(user)) {
-      if (!isFromReadOnlyTensor(insertSliceOp.source(), plan)) {
-        plan.unionSets(insertSliceOp.source(), insertSliceOp.dest());
+      if (!isFromReadOnlyTensor(insertSliceOp.getSource(), plan)) {
+        plan.unionSets(insertSliceOp.getSource(), insertSliceOp.getDest());
       }
     }
   }
@@ -514,7 +514,7 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
             })
         .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
             [&](auto reshapeOp) {
-              return analyseSingleOperandResultOp(reshapeOp.src(),
+              return analyseSingleOperandResultOp(reshapeOp.getSrc(),
                                                   reshapeOp.getResult(), plan);
             })
         .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
@@ -523,17 +523,17 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
         .Case<tensor::InsertSliceOp>(
             [&](tensor::InsertSliceOp subTensorInsertOp) {
               return analyseDestructiveUpdateOp(
-                  subTensorInsertOp, subTensorInsertOp.source(),
-                  subTensorInsertOp.dest(), subTensorInsertOp.getResult(),
+                  subTensorInsertOp, subTensorInsertOp.getSource(),
+                  subTensorInsertOp.getDest(), subTensorInsertOp.getResult(),
                   plan);
             })
         .Case<tensor::CastOp>([&](tensor::CastOp castOp) {
-          return analyseSingleOperandResultOp(castOp.source(), castOp.dest(),
-                                              plan);
+          return analyseSingleOperandResultOp(castOp.getSource(),
+                                              castOp.getDest(), plan);
         })
         .Case<tensor::InsertOp>([&](tensor::InsertOp insertOp) {
           return analyseDestructiveUpdateOp(insertOp, /*source =*/nullptr,
-                                            insertOp.dest(),
+                                            insertOp.getDest(),
                                             insertOp.getResult(), plan);
         })
         .Case<vector::TransferReadOp>([&](vector::TransferReadOp
@@ -581,7 +581,7 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
 
   funcOp.walk([&](Operation *updateOp) {
     if (auto insertSliceOp = dyn_cast<tensor::InsertSliceOp>(updateOp)) {
-      hasDestructiveUpdatePattern(insertSliceOp.dest(), plan);
+      hasDestructiveUpdatePattern(insertSliceOp.getDest(), plan);
       return;
     }
     if (auto vectorWriteOp = dyn_cast<vector::TransferWriteOp>(updateOp)) {

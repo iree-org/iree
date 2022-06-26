@@ -89,7 +89,7 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
     staticShape.reserve(rank);
 
     auto sourceIfxOp = dyn_cast_or_null<OffsetSizeAndStrideOpInterface>(
-        padOp.source().getDefiningOp());
+        padOp.getSource().getDefiningOp());
     if (!sourceIfxOp) return failure();
 
     SmallVector<OpFoldResult> lowPad = padOp.getMixedLowPad();
@@ -149,8 +149,8 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
         staticShape, padOp.getResultType().getElementType(),
         padOp.getResultType().getEncoding());
 
-    rewriter.updateRootInPlace(padOp,
-                               [&]() { padOp.result().setType(resultType); });
+    rewriter.updateRootInPlace(
+        padOp, [&]() { padOp.getResult().setType(resultType); });
     return success();
   }
 };

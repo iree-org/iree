@@ -41,11 +41,11 @@ struct PadTensorOpConversion : public OpRewritePattern<tensor::PadOp> {
                                 PatternRewriter &rewriter) const override {
     // Check that the region is just a yield operation which is returning a
     // scalar that is not one of the arguments of the linalg operation.
-    Region &region = padTensorOp.region();
+    Region &region = padTensorOp.getRegion();
     Block &block = region.front();
     if (!llvm::hasSingleElement(block)) return failure();
     auto yieldOp = cast<tensor::YieldOp>(block.getTerminator());
-    Value yieldVal = yieldOp.value();
+    Value yieldVal = yieldOp.getValue();
     if (llvm::any_of(block.getArguments(),
                      [&](Value v) { return v == yieldVal; })) {
       return failure();
@@ -55,7 +55,7 @@ struct PadTensorOpConversion : public OpRewritePattern<tensor::PadOp> {
     Location loc = padTensorOp.getLoc();
     auto lowPad = padTensorOp.getMixedLowPad();
     auto highPad = padTensorOp.getMixedHighPad();
-    Value source = padTensorOp.source();
+    Value source = padTensorOp.getSource();
     RankedTensorType sourceType = padTensorOp.getSourceType();
     int64_t rank = sourceType.getRank();
 

@@ -65,7 +65,7 @@ static void setAsyncAnnotations(Operation* op,
                                 scf::PipeliningOption::PipelinerPart part,
                                 unsigned iteration, unsigned depth) {
   auto waitOp = dyn_cast<nvgpu::DeviceAsyncWaitOp>(op);
-  if (!waitOp || waitOp.numGroups()) return;
+  if (!waitOp || waitOp.getNumGroups()) return;
   int numGroupInFlight = 0;
   if (part == scf::PipeliningOption::PipelinerPart::Kernel) {
     numGroupInFlight = depth - 1;
@@ -78,7 +78,7 @@ static void setAsyncAnnotations(Operation* op,
     numGroupInFlight = depth - 1 - iteration;
   }
   OpBuilder b(op);
-  waitOp->setAttr(waitOp.numGroupsAttrName(),
+  waitOp->setAttr(waitOp.getNumGroupsAttrName(),
                   b.getI32IntegerAttr(numGroupInFlight));
 }
 
