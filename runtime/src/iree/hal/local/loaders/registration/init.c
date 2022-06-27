@@ -67,8 +67,9 @@ IREE_API_EXPORT iree_status_t iree_hal_create_all_available_executable_loaders(
 
 #if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vmvx_module_loader_create_isolated(host_allocator,
-                                                         &loaders[count++]);
+    status = iree_hal_vmvx_module_loader_create_isolated(
+        /*user_module_count=*/0, /*user_modules=*/NULL, host_allocator,
+        &loaders[count++]);
   }
 #endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_VMVX_MODULE
 
@@ -103,8 +104,9 @@ IREE_API_EXPORT iree_status_t iree_hal_create_executable_loader_by_name(
 
 #if defined(IREE_HAVE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
   if (iree_string_view_starts_with(name, IREE_SV("vmvx-module"))) {
-    return iree_hal_vmvx_module_loader_create_isolated(host_allocator,
-                                                       out_executable_loader);
+    return iree_hal_vmvx_module_loader_create_isolated(
+        /*user_module_count=*/0, /*user_modules=*/NULL, host_allocator,
+        out_executable_loader);
   }
 #endif  // IREE_HAVE_HAL_EXECUTABLE_LOADER_VMVX_MODULE
 
