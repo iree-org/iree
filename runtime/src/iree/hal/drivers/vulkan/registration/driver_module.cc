@@ -14,9 +14,15 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/api.h"
 
-IREE_FLAG(bool, vulkan_validation_layers, true,
+#ifndef NDEBUG
+#define IREE_HAL_VULKAN_DEBUG_FLAG_DEFAULT true
+#else
+#define IREE_HAL_VULKAN_DEBUG_FLAG_DEFAULT false
+#endif  // !NDEBUG
+
+IREE_FLAG(bool, vulkan_validation_layers, IREE_HAL_VULKAN_DEBUG_FLAG_DEFAULT,
           "Enables standard Vulkan validation layers.");
-IREE_FLAG(bool, vulkan_debug_utils, true,
+IREE_FLAG(bool, vulkan_debug_utils, IREE_HAL_VULKAN_DEBUG_FLAG_DEFAULT,
           "Enables VK_EXT_debug_utils, records markers, and logs errors.");
 
 IREE_FLAG(bool, vulkan_tracing, true,
