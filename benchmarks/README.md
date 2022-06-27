@@ -85,7 +85,7 @@ These steps help reproduce the failures in TFLite models.
 
 ### Running benchmark suites locally
 
-First you need to have [`iree-import-tflite`](https://google.github.io/iree/getting-started/tflite/)
+First you need to have [`iree-import-tflite`](https://iree-org.github.io/iree/getting-started/tflite/)
 and `requests` in your python environment. Then you can build the target
 `iree-benchmark-suites` to generate the required files:
 

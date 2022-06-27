@@ -1,5 +1,5 @@
 site_name: IREE
-site_url: https://google.github.io/iree/
+site_url: https://iree-org.github.io/iree/
 
 theme:
   name: material
