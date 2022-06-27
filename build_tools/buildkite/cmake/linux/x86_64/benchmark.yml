@@ -17,27 +17,28 @@ steps:
         --rm \
         gcr.io/iree-oss/frontends@sha256:908d7e0ba3e3a6d448b3c07b39cc0f786a120dd2ced8653993f62fa933e882f7 \
         build_tools/cmake/build_linux_benchmark.sh
-      tar --exclude="*.tar.gz" \
-        --exclude="*.tgz" \
-        --exclude="*.mlir" \
-        --exclude="*.tflite" \
-        --exclude="*-tf-model" \
-        -czvf "benchmark-suites-$${BUILDKITE_BUILD_NUMBER}.tgz" \
-        build-host/benchmark_suites build-host/.ninja_log
       find build-host/benchmark_suites -name "*.mlir" | \
         tar -czvf "source-mlir-models-$${BUILDKITE_BUILD_NUMBER}.tgz" -T -
-      tar -czvf "iree-linux-x86_64-tools-$${BUILDKITE_BUILD_NUMBER}.tgz" \
-        build-linux-x86_64/tools/iree-benchmark-module \
-        build-linux-x86_64/tools/build_config.txt
+      # Scan all target builds and pack their benchmark suites.
+      ls build-targets | xargs -I "{target}" -- \
+        tar --exclude="*.tar.gz" \
+          --exclude="*.tgz" \
+          --exclude="*.mlir" \
+          --exclude="*.tflite" \
+          --exclude="*-tf-model" \
+          -czvf "benchmark-suites-{target}-$${BUILDKITE_BUILD_NUMBER}.tgz" \
+          "build-targets/{target}/benchmark_suites" \
+          "build-targets/{target}/tools/iree-benchmark-module" \
+          "build-targets/{target}/tools/build_config.txt" \
+          "build-targets/{target}/.ninja_log"
     if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86_64')"
     agents:
       - "queue=build"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     artifact_paths:
-      - "benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz"
+      - "benchmark-suites-*-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "source-mlir-models-${BUILDKITE_BUILD_NUMBER}.tgz"
-      - "iree-linux-x86_64-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
 
   - wait
 
@@ -45,18 +46,15 @@ steps:
     commands: |
       git clean -fdx
       buildkite-agent artifact download --step \
-        build "benchmark-suites-$${BUILDKITE_BUILD_NUMBER}.tgz" ./
-      buildkite-agent artifact download --step \
-        build "iree-linux-x86_64-tools-$${BUILDKITE_BUILD_NUMBER}.tgz" ./
-      tar -xzvf "benchmark-suites-$${BUILDKITE_BUILD_NUMBER}.tgz"
-      tar -xzvf "iree-linux-x86_64-tools-$${BUILDKITE_BUILD_NUMBER}.tgz"
+        build "benchmark-suites-linux-x86_64-$${BUILDKITE_BUILD_NUMBER}.tgz" ./
+      tar -xzvf "benchmark-suites-linux-x86_64-$${BUILDKITE_BUILD_NUMBER}.tgz"
       python3 build_tools/benchmarks/run_benchmarks_on_linux.py \
         --device_model=GCP-c2-standard-16 \
         --cpu_uarch=CascadeLake \
         --normal_benchmark_tool_dir=build-linux-x86_64/tools/ \
         -o "benchmark-results-gcp-cpu-$${BUILDKITE_BUILD_NUMBER}.json" \
         --verbose \
-        build-host/
+        build-targets/linux-x86_64
     if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86_64')"
     agents:
       - "gcp:machine-type=c2-standard-16"
@@ -69,17 +67,19 @@ steps:
     commands: |
       git clean -fdx
       buildkite-agent artifact download --step build \
-        "benchmark-suites-$${BUILDKITE_BUILD_NUMBER}.tgz" ./
-      tar -xzvf "benchmark-suites-$${BUILDKITE_BUILD_NUMBER}.tgz"
-      python3 build_tools/benchmarks/collect_compilation_statistics.py \
-        --verbose \
-        --output "compile-stats-results-linux-$${BUILDKITE_BUILD_NUMBER}.json" \
-        build-host/
+        "benchmark-suites-*-$${BUILDKITE_BUILD_NUMBER}.tgz" ./
+      ls benchmark-suites-*-$${BUILDKITE_BUILD_NUMBER}.tgz | xargs -I "{}" -- \
+        tar -xzvf "{}"
+      ls build-targets | xargs -I "{target}" -- \
+        python3 build_tools/benchmarks/collect_compilation_statistics.py \
+          --verbose \
+          --output "compile-stats-results-{target}-$${BUILDKITE_BUILD_NUMBER}.json" \
+          "build-targets/{target}"
     if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark-x86_64')"
     agents:
       - "queue=build"
     artifact_paths:
-      - "compile-stats-results-linux-${BUILDKITE_BUILD_NUMBER}.json"
+      - "compile-stats-results-*.json"
     timeout_in_minutes: "10"
 
   - wait

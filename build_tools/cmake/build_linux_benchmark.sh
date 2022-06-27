@@ -57,13 +57,12 @@ cd build-host
   -DCMAKE_INSTALL_PREFIX=./install \
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
+  -DIREE_BUILD_SAMPLES=OFF \
   -DIREE_BUILD_BENCHMARKS=ON \
-  -DIREE_ENABLE_COMPILATION_BENCHMARKS=ON \
-  -DIREE_BUILD_MICROBENCHMARKS=ON \
-  -DIREE_BUILD_SAMPLES=OFF
+  -DIREE_BUILD_MICROBENCHMARKS=ON
 
 "${CMAKE_BIN}" --build . --target install -- -k 0
-"${CMAKE_BIN}" --build . --target iree-benchmark-suites-linux-x86_64 -- -k 0
+"${CMAKE_BIN}" --build . --target iree-benchmark-import-models -- -k 0
 "${CMAKE_BIN}" --build . --target iree-microbenchmark-suites -- -k 0
 # --------------------------------------------------------------------------- #
 
@@ -72,20 +71,23 @@ cd build-host
 
 cd "${ROOT_DIR}"
 
-if [ -d "build-linux-x86_64" ]
+if [ -d "build-targets/linux-x86_64" ]
 then
-  echo "build-linux-x86_64 directory already exists. Will use cached results there."
+  echo "linux-x86_64 directory already exists. Will use cached results there."
 else
-  echo "build-linux-x86_64 directory does not already exist. Creating a new one."
-  mkdir build-linux-x86_64
+  echo "linux-x86_64 directory does not already exist. Creating a new one."
+  mkdir -p build-targets/linux-x86_64
 fi
-cd build-linux-x86_64
+cd build-targets/linux-x86_64
 
-"${CMAKE_BIN}" -G Ninja .. \
-  -DIREE_HOST_BINARY_ROOT="${PWD}/../build-host/install" \
+"${CMAKE_BIN}" -G Ninja ../.. \
+  -DIREE_HOST_BINARY_ROOT="${PWD}/../../build-host/install" \
   -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_BUILD_TESTS=ON \
-  -DIREE_BUILD_SAMPLES=OFF
-"${CMAKE_BIN}" --build . --target iree-benchmark-module -- -k 0
+  -DIREE_BUILD_TESTS=OFF \
+  -DIREE_BUILD_SAMPLES=OFF \
+  -DIREE_BUILD_BENCHMARKS=ON \
+  -DIREE_ENABLE_COMPILATION_BENCHMARKS=ON
 
+"${CMAKE_BIN}" --build . --target iree-benchmark-module -- -k 0
+"${CMAKE_BIN}" --build . --target iree-benchmark-suites-linux-x86_64 -- -k 0
 # --------------------------------------------------------------------------- #
