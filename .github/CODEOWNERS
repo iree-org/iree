@@ -16,6 +16,7 @@
 /third_party/ @GMNGeoffrey @ScottTodd @stellaraccident
 # Except for routinely-updated submodules
 /third_party/llvm-project @ghost
+/third_party/llvm-project.branch-pin @ghost
 /third_party/tensorflow @ghost
 /third_party/mlir-hlo @ghost
 
