@@ -19,9 +19,6 @@ IREE_FLAG(bool, vulkan_validation_layers, true,
 IREE_FLAG(bool, vulkan_debug_utils, true,
           "Enables VK_EXT_debug_utils, records markers, and logs errors.");
 
-IREE_FLAG(int32_t, vulkan_default_index, 0,
-          "Index of the default Vulkan device.");
-
 IREE_FLAG(bool, vulkan_tracing, true,
           "Enables Vulkan tracing (if IREE tracing is enabled).");
 
@@ -56,8 +53,6 @@ static iree_status_t iree_hal_vulkan_create_driver_with_flags(
   if (FLAG_vulkan_tracing) {
     driver_options.requested_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING;
   }
-
-  driver_options.default_device_index = FLAG_vulkan_default_index;
 
   // Load the Vulkan library. This will fail if the library cannot be found or
   // does not have the expected functions.

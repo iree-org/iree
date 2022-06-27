@@ -33,7 +33,6 @@ typedef struct iree_hal_vulkan_driver_t {
   iree_string_view_t identifier;
 
   iree_hal_vulkan_device_options_t device_options;
-  int default_device_index;
 
   iree_hal_vulkan_features_t enabled_features;
 
@@ -69,7 +68,6 @@ IREE_API_EXPORT void iree_hal_vulkan_driver_options_initialize(
   out_options->api_version = VK_API_VERSION_1_2;
   out_options->requested_features = 0;
   iree_hal_vulkan_device_options_initialize(&out_options->device_options);
-  out_options->default_device_index = 0;
 }
 
 // Returns a VkApplicationInfo struct populated with the default app info.
@@ -128,7 +126,6 @@ static iree_status_t iree_hal_vulkan_driver_create_internal(
       (char*)driver + total_size - identifier.size);
   memcpy(&driver->device_options, &options->device_options,
          sizeof(driver->device_options));
-  driver->default_device_index = options->default_device_index;
   driver->enabled_features = options->requested_features;
   driver->syms = iree::add_ref(instance_syms);
   driver->instance = instance;
@@ -562,14 +559,13 @@ static iree_status_t iree_hal_vulkan_driver_create_device_by_id(
   iree_hal_vulkan_driver_t* driver = iree_hal_vulkan_driver_cast(base_driver);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Use either the specified device (enumerated earlier) or whatever default
-  // one was specified when the driver was created.
+  // Use either the specified device (enumerated earlier) or whatever the Vulkan
+  // driver considers device 0.
   VkPhysicalDevice physical_device = (VkPhysicalDevice)device_id;
   if (physical_device == VK_NULL_HANDLE) {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_vulkan_driver_find_device_by_index(
-                base_driver, driver->default_device_index, host_allocator,
-                &physical_device));
+                base_driver, 0, host_allocator, &physical_device));
   }
 
   // TODO(benvanik): remove HAL module dependence on the identifier for matching

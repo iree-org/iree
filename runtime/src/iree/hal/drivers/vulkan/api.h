@@ -224,13 +224,6 @@ typedef struct iree_hal_vulkan_driver_options_t {
   // options.
   // Options to use for all devices created by the driver.
   iree_hal_vulkan_device_options_t device_options;
-
-  // TODO(benvanik): change to something more canonically vulkan (like
-  // VkPhysicalDeviceProperties::deviceID).
-  // Index of the default Vulkan device to use within the list of available
-  // devices. Devices are discovered via vkEnumeratePhysicalDevices then
-  // considered "available" if compatible with the |requested_features|.
-  int default_device_index;
 } iree_hal_vulkan_driver_options_t;
 
 IREE_API_EXPORT void iree_hal_vulkan_driver_options_initialize(
