@@ -30,7 +30,7 @@ from common.benchmark_definition import (BenchmarkInfo, BenchmarkResults,
                                          execute_cmd_and_get_output)
 from common.benchmark_thresholds import BENCHMARK_THRESHOLDS
 
-IREE_GITHUB_COMMIT_URL_PREFIX = 'https://github.com/google/iree/commit'
+IREE_GITHUB_COMMIT_URL_PREFIX = 'https://github.com/iree-org/iree/commit'
 IREE_PROJECT_ID = 'IREE'
 THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 
@@ -39,8 +39,8 @@ COMMON_DESCRIIPTION = """
 For the graph, the x axis is the Git commit index, and the y axis is the
 measured latency in milliseconds.
 <br>
-See <a href="https://github.com/google/iree/tree/main/benchmarks/dashboard.md">
-https://github.com/google/iree/tree/main/benchmarks/dashboard.md
+See <a href="https://github.com/iree-org/iree/tree/main/benchmarks/dashboard.md">
+https://github.com/iree-org/iree/tree/main/benchmarks/dashboard.md
 </a> for benchmark philosophy, specification, and definitions.
 """
 

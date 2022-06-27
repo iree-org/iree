@@ -12,7 +12,7 @@ documented separately, as they require further setup.
 ### Install Bazel
 
 Install Bazel, matching IREE's
-[`.bazelversion`](https://github.com/google/iree/blob/main/.bazelversion) by
+[`.bazelversion`](https://github.com/iree-org/iree/blob/main/.bazelversion) by
 following the
 [official docs](https://docs.bazel.build/versions/master/install.html).
 
@@ -105,7 +105,7 @@ $ ./bazel-bin/tools/iree-compile --help
 ```
 
 Translate a
-[MLIR file](https://github.com/google/iree/blob/main/samples/models/simple_abs.mlir)
+[MLIR file](https://github.com/iree-org/iree/blob/main/samples/models/simple_abs.mlir)
 and execute a function in the compiled module:
 
 ```shell

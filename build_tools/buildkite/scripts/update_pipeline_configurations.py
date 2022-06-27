@@ -66,11 +66,11 @@ def prepend_header(configuration, *, organization, running_pipeline,
 
   new_build_url = f"https://buildkite.com/{organization}/{running_pipeline}/builds/{running_build_number}"
   script_relpath = os.path.relpath(__file__)
-  new_script_url = f"https://github.com/google/iree/blob/{short_running_commit}/{script_relpath}"
+  new_script_url = f"https://github.com/iree-org/iree/blob/{short_running_commit}/{script_relpath}"
 
   bootstrap_pipeline_path = TRUSTED_BOOTSTRAP_PIPELINE_PATH if trusted else UNTRUSTED_BOOTSTRAP_PIPELINE_PATH
 
-  new_pipeline_file_url = f"https://github.com/google/iree/blob/{short_running_commit}/{bootstrap_pipeline_path}"
+  new_pipeline_file_url = f"https://github.com/iree-org/iree/blob/{short_running_commit}/{bootstrap_pipeline_path}"
 
   header = UPDATE_INFO_HEADER.format(build_url=new_build_url,
                                      script_url=new_script_url,

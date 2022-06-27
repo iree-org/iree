@@ -23,7 +23,7 @@ allowing them to be patched out of band. These repositories are:
 By the time you read this, they may be on a cron to advance automatically, but
 even so, it is a good idea to advance them prior to any integrate activities
 so that you have freshest commits available. Iree repository has an
-action named [Advance Upstream Forks](https://github.com/google/iree/actions/workflows/advance_upstream_forks.yml)
+action named [Advance Upstream Forks](https://github.com/iree-org/iree/actions/workflows/advance_upstream_forks.yml)
 to update the forks. Just select `Run Workflow` on that action and give it a
 minute. You should see the fork repository mainline branch move forward.
 
@@ -324,7 +324,7 @@ cmake -G Ninja \
   ..
 ```
 
-To repro failures in CI `bazel_linux_x86-swiftshader_core`, we can follow the [doc](https://github.com/google/iree/blob/main/docs/developers/get_started/building_with_bazel_linux.md) to build IREE using bazel. E.g.,
+To repro failures in CI `bazel_linux_x86-swiftshader_core`, we can follow the [doc](https://github.com/iree-org/iree/blob/main/docs/developers/get_started/building_with_bazel_linux.md) to build IREE using bazel. E.g.,
 
 ```bash
 export CC=clang

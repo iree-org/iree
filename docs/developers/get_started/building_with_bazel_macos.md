@@ -108,7 +108,7 @@ $ ./bazel-bin/tools/iree-compile --help
 ```
 
 Translate a
-[MLIR file](https://github.com/google/iree/blob/main/samples/models/simple_abs.mlir)
+[MLIR file](https://github.com/iree-org/iree/blob/main/samples/models/simple_abs.mlir)
 and execute a function in the compiled module:
 
 ```shell

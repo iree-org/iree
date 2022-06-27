@@ -55,7 +55,7 @@ and create the PR from there.
     URL explicitly before pushing.
 
 3.  Use a script like
-    [git_update.sh](https://github.com/google/iree/blob/main/scripts/git/git_update.sh)
+    [git_update.sh](https://github.com/iree-org/iree/blob/main/scripts/git/git_update.sh)
     to easily synchronize `main` with `upstream`. Submodules make this is a
     little trickier than it should be. You can also add this as a git alias.
 

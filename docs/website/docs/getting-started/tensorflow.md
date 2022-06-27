@@ -29,7 +29,7 @@ python -m pip install \
 !!! warning
     The TensorFlow package is currently only available on Linux and macOS. It
     is not available on Windows yet (see
-    [this issue](https://github.com/google/iree/issues/6417)).
+    [this issue](https://github.com/iree-org/iree/issues/6417)).
 
 ## Importing models
 
@@ -103,7 +103,7 @@ Pretrained ResNet50 inference | [![Open In Colab](https://colab.research.google.
 TensorFlow Hub Import | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/samples/colab/tensorflow_hub_import.ipynb)
 
 End-to-end execution tests can be found in IREE's
-[integrations/tensorflow/e2e/](https://github.com/google/iree/tree/main/integrations/tensorflow/e2e)
+[integrations/tensorflow/e2e/](https://github.com/iree-org/iree/tree/main/integrations/tensorflow/e2e)
 directory.
 
 ## Troubleshooting
