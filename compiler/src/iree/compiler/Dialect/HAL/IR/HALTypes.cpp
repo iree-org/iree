@@ -82,6 +82,7 @@ enum class NumericalType : uint32_t {
   kFloat = 0x20,
   kFloatIEEE = kFloat | 0x01,
   kFloatBrain = kFloat | 0x02,
+  kFloatComplex = kFloat | 0x03,
 };
 constexpr inline int32_t makeElementTypeValue(NumericalType numericalType,
                                               int32_t bitCount) {
@@ -120,6 +121,10 @@ llvm::Optional<int32_t> getElementTypeValue(Type type) {
       default:
         return llvm::None;
     }
+  } else if (auto complexType = type.dyn_cast_or_null<ComplexType>()) {
+    return makeElementTypeValue(
+        NumericalType::kFloatComplex,
+        complexType.getElementType().getIntOrFloatBitWidth() * 2);
   }
   return llvm::None;
 }
