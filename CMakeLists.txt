@@ -25,6 +25,8 @@ else()
   enable_language(ASM)
 endif()
 
+# Set the default CMake build type so some of the build type dependent setting
+# in the submodules and functions (IREE assertion) can be set properly.
 set(DEFAULT_CMAKE_BUILD_TYPE "Release")
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "No build type selected, default to ${DEFAULT_CMAKE_BUILD_TYPE}")
