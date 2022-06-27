@@ -25,8 +25,8 @@ BENCHMARK_RESULTS_HEADERS = [
     "Median Latency (ms)",
     "Latency Standard Deviation (ms)",
 ]
-COMPILATION_TIME_SERIES_SUFFIX = "compilation-time"
-TOTAL_DISPATCH_SIZE_SERIES_SUFFIX = "total-dispatch-size"
+COMPILATION_TIME_SERIES_SUFFIX = "compilation:module:compilation-time"
+TOTAL_DISPATCH_SIZE_SERIES_SUFFIX = "compilation:module:component-size:total-dispatch-size"
 
 
 @dataclass
@@ -460,7 +460,7 @@ def categorize_compilation_metrics_into_tables(
                                               size_cut))
 
   # If we want to abbreviate, similar results won't be interesting.
-  if size_cut is None:
+  if size_cut is None and compile_metrics_map:
     tables.append(md.header("All Compilation Metrics", 3))
     headers = ["Benchmark Name"] + [
         mapper.get_table_header()

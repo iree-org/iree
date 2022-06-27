@@ -104,6 +104,7 @@ steps:
     commands: |
       git clean -fdx
       buildkite-agent artifact download "benchmark-results-*.json" ./
+      buildkite-agent artifact download "compile-stats-results-*.json" ./
       python3 build_tools/benchmarks/upload_benchmarks_to_dashboard.py \
         --verbose \
         --benchmark_files benchmark-results-*.json \
