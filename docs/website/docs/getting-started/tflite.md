@@ -151,7 +151,7 @@ is available
 
 | Colab notebooks |  |
 | -- | -- |
-Text classification with TFLite and IREE | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/samples/colab/tflite_text_classification.ipynb)
+Text classification with TFLite and IREE | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/tflite_text_classification.ipynb)
 
 !!! todo
 

@@ -42,7 +42,7 @@ and create the PR from there.
     # From whatever directory under which you want to nest your repo
     $ git clone git@github.com:<github_username>/iree.git
     $ cd iree
-    $ git remote add upstream git@github.com:google/iree.git
+    $ git remote add upstream git@github.com:iree-org/iree.git
     ```
 
     This is especially important for maintainers who have write access (so can

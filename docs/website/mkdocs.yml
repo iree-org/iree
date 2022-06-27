@@ -46,7 +46,7 @@ theme:
         name: Switch to light mode
 
 repo_url: https://github.com/iree-org/iree
-repo_name: google/iree
+repo_name: iree-org/iree
 edit_uri: ""  # Omit edit button (linking to GitHub) from each document
 
 extra:
