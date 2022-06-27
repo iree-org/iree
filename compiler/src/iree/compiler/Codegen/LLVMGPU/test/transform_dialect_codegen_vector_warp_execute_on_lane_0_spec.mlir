@@ -1,17 +1,18 @@
 transform.with_pdl_patterns {
 ^bb0(%arg0: !pdl.operation):
-  pdl.pattern @pdl_matmul_target : benefit(1) {
+
+  pdl.pattern @pdl_if_op_target : benefit(1) {
     %args = operands
     %results = types
-    %0 = operation "linalg.matmul"(%args : !pdl.range<value>) -> (%results : !pdl.range<type>)
+    %0 = operation "scf.if"(%args : !pdl.range<value>) -> (%results : !pdl.range<type>)
+    
     // TODO: we don't want this, but it is the required terminator for pdl.pattern
     rewrite %0 with "transform.dialect"
   }
 
   transform.structured.canonicalized_sequence %arg0 {
   ^bb1(%arg1: !pdl.operation):
-    %0 = pdl_match @pdl_matmul_target in %arg1
-    %tiling_1_result:2 = tile_to_foreach_thread_op %0 {num_threads = [42, 67]}
-    transform.iree.foreach_thread_to_flow
+    %if_op = pdl_match @pdl_if_op_target in %arg1
+    transform.iree.vector.warp_execute_on_lane_0 %if_op { warp_size = 32 }
   }
 }

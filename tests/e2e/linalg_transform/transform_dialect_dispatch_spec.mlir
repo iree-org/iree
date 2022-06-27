@@ -1,5 +1,3 @@
-// RUN: iree-opt %s
-
 transform.with_pdl_patterns {
 ^bb0(%arg0: !pdl.operation):
   pdl.pattern @pdl_matmul_target : benefit(1) {

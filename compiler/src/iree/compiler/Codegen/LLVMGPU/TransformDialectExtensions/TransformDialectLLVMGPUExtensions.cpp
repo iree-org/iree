@@ -22,7 +22,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
-using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::IREE;
 
 iree_compiler::IREE::transform_dialect::TransformDialectLLVMGPUExtensions::
@@ -178,9 +177,9 @@ transform_dialect::ForeachThreadToGpuAndTranslationInfo::apply(
   if (walkResult.wasInterrupted())
     return DiagnosedSilenceableFailure::definiteFailure();
 
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps;
+  llvm::StringMap<HAL::ExecutableExportOp> exportOps;
   state.getTopLevel()->walk(
-      [&](IREE::HAL::ExecutableExportOp op) { exportOps[op.sym_name()] = op; });
+      [&](HAL::ExecutableExportOp op) { exportOps[op.sym_name()] = op; });
 
   walkResult =
       state.getTopLevel()->walk<WalkOrder::PostOrder>([&](func::FuncOp funcOp) {
@@ -206,7 +205,163 @@ transform_dialect::ForeachThreadToGpuAndTranslationInfo::apply(
 }
 
 //===---------------------------------------------------------------------===//
-// VectorDistributionOp.
+// VectorWarpExecuteOnLane0Op.
+//===---------------------------------------------------------------------===//
+
+// TODO: Figure out the proper canonicalization and drop the complexity here.
+// TODO: More sophisticated detection for matching
+//   (threadIdx.x == 0 && other stuff not involving threadIdx.x)
+static LogicalResult isThreadIdxxZeroPredicate(scf::IfOp ifOp) {
+  if (!ifOp || ifOp.getNumResults() > 0 ||
+      ifOp.getThenRegion().getBlocks().size() != 1 ||
+      !ifOp.getElseRegion().empty())
+    return failure();
+  auto pred = ifOp.getCondition().getDefiningOp<arith::CmpIOp>();
+  if (!pred) return failure();
+  auto EQ = arith::CmpIPredicate::eq;
+  auto SLT = arith::CmpIPredicate::slt;
+  auto SLE = arith::CmpIPredicate::sle;
+  auto ULT = arith::CmpIPredicate::ult;
+  auto ULE = arith::CmpIPredicate::ule;
+  if (auto threadIdOp = pred.getLhs().getDefiningOp<gpu::ThreadIdOp>()) {
+    if (pred.getPredicate() == EQ && isConstantIntValue(pred.getRhs(), 0))
+      return success();
+    if (pred.getPredicate() == SLE && isConstantIntValue(pred.getRhs(), 0))
+      return success();
+    if (pred.getPredicate() == ULE && isConstantIntValue(pred.getRhs(), 0))
+      return success();
+    if (pred.getPredicate() == SLT && isConstantIntValue(pred.getRhs(), 1))
+      return success();
+    if (pred.getPredicate() == ULT && isConstantIntValue(pred.getRhs(), 1))
+      return success();
+  }
+  auto SGT = arith::CmpIPredicate::sgt;
+  auto SGE = arith::CmpIPredicate::sge;
+  auto UGT = arith::CmpIPredicate::ugt;
+  auto UGE = arith::CmpIPredicate::uge;
+  if (auto threadIdOp = pred.getRhs().getDefiningOp<gpu::ThreadIdOp>()) {
+    if (pred.getPredicate() == EQ && isConstantIntValue(pred.getLhs(), 0))
+      return success();
+    if (pred.getPredicate() == SGE && isConstantIntValue(pred.getLhs(), 0))
+      return success();
+    if (pred.getPredicate() == UGE && isConstantIntValue(pred.getLhs(), 0))
+      return success();
+    if (pred.getPredicate() == SGT && isConstantIntValue(pred.getLhs(), 1))
+      return success();
+    if (pred.getPredicate() == UGT && isConstantIntValue(pred.getLhs(), 1))
+      return success();
+  }
+  return failure();
+}
+
+struct VectorDistributionResult {
+  vector::WarpExecuteOnLane0Op warpOp;
+};
+
+static FailureOr<VectorDistributionResult> vectorDistribution(
+    PatternRewriter &rewriter, Location loc, scf::IfOp ifOp,
+    int64_t workgroupSizeX, int64_t warpSize) {
+  // Bail if cond is not `if (threadIdx.x == 0)`.
+  if (failed(isThreadIdxxZeroPredicate(ifOp)))
+    return ifOp->emitError("unmet prerequisite: isThreadIdxxZeroPredicate");
+
+  // All the code below will be executed on a single warp given a fixed
+  // (threadIdxy, threadIdxz).
+  Value threadIdxx = rewriter.create<gpu::ThreadIdOp>(
+      loc, rewriter.getIndexType(), gpu::Dimension::x);
+
+  assert(workgroupSizeX % warpSize == 0);
+  if (workgroupSizeX != warpSize) {
+    // Add a guard for `threadIdxx < warp size` around the WarpExecuteOnLane0Op.
+    Value predicate = rewriter.create<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::ult, threadIdxx,
+        rewriter.create<arith::ConstantIndexOp>(loc, warpSize));
+    // Note: return-less IfOp is built with a terminator, no need to add one.
+    auto newIfOp =
+        rewriter.create<scf::IfOp>(loc, predicate, /*withElseRegion=*/false);
+    rewriter.setInsertionPointToStart(&newIfOp.getThenRegion().front());
+  }
+  auto warpOp = rewriter.create<vector::WarpExecuteOnLane0Op>(
+      loc, TypeRange(), threadIdxx, warpSize);
+
+  // Move the code from the previous ifOp to the WarpExecuteOnLane0Op.
+  Block &sourceBlock = ifOp.getThenRegion().front();
+  Block &targetBlock = warpOp.getWarpRegion().front();
+  Block::iterator insertionPoint = targetBlock.begin();
+  targetBlock.getOperations().splice(insertionPoint,
+                                     sourceBlock.getOperations(),
+                                     sourceBlock.without_terminator().begin(),
+                                     sourceBlock.without_terminator().end());
+  rewriter.setInsertionPointToEnd(&targetBlock);
+  rewriter.create<vector::YieldOp>(loc);
+
+  // Erase old op.
+  rewriter.eraseOp(ifOp);
+
+  // Hoist the scalar code outside of the warp region.
+  // Note: moving code does not require a listener.
+  vector::moveScalarUniformCode(warpOp);
+
+  return VectorDistributionResult{warpOp};
+}
+
+// TODO: Refactor in a generic util that can be reused.
+static HAL::ExecutableExportOp getExecutableExportOpForFunc(
+    HAL::ExecutableVariantOp halExecutableVariantOp, func::FuncOp funcOp) {
+  if (!halExecutableVariantOp || !funcOp) return {};
+  HAL::ExecutableExportOp exportOp;
+  halExecutableVariantOp->walk([&](HAL::ExecutableExportOp op) {
+    if (op.sym_name() != funcOp.getName()) return WalkResult::advance();
+    exportOp = op;
+    return WalkResult::interrupt();
+  });
+  return exportOp;
+}
+
+FailureOr<vector::WarpExecuteOnLane0Op>
+transform_dialect::VectorWarpExecuteOnLane0Op::applyToOne(
+    scf::IfOp ifOp, transform::TransformState &state) {
+  assert(isa<HAL::ExecutableVariantOp>(state.getTopLevel()) &&
+         "requires HAL::ExecutableVariantOp toplevel so that IR is properly "
+         "isolated. This is required so we can safely inspect the "
+         "HAL::ExecutableExportOp under multi-threaded pass assumptions.");
+
+  auto halExecutableVariantOp =
+      ifOp->getParentOfType<HAL::ExecutableVariantOp>();
+  auto funcOp = ifOp->getParentOfType<func::FuncOp>();
+  HAL::ExecutableExportOp exportOp =
+      getExecutableExportOpForFunc(halExecutableVariantOp, funcOp);
+  assert(halExecutableVariantOp && funcOp && exportOp && "missing export op");
+
+  Optional<ArrayAttr> maybeAttr = exportOp.workgroup_size();
+  // TODO: Pervasive 3 constant in IREE.
+  if (!maybeAttr || maybeAttr->size() != 3)
+    return exportOp->emitError(
+        "export op must have workgroup_size attribute set with 3 entries");
+
+  int64_t workgroupSizeX = (*maybeAttr)[0].cast<IntegerAttr>().getInt();
+  int64_t warpSize = getWarpSize();
+  if (workgroupSizeX % warpSize != 0) {
+    exportOp->emitWarning()
+        << "vector distribution requires workgroup size for x to be a "
+        << "multiple of the warp size: " << workgroupSizeX << " vs " << warpSize
+        << " --- the transform is not applied";
+    // Explicitly return a null WarpExecuteOnLane0Op. This is not a failure but
+    // the transformation is not applied and the null result is propagated.
+    return vector::WarpExecuteOnLane0Op();
+  }
+
+  SimplePatternRewriter rewriter(ifOp);
+  FailureOr<VectorDistributionResult> vectorDistributionResult =
+      vectorDistribution(rewriter, ifOp->getLoc(), ifOp, workgroupSizeX,
+                         warpSize);
+  if (failed(vectorDistributionResult))
+    return ifOp->emitError("error when trying to apply");
+  return vectorDistributionResult->warpOp;
+}
+
+//===---------------------------------------------------------------------===//
+// VectorWarpDistributionOp.
 //===---------------------------------------------------------------------===//
 
 /// Emit shared local memory allocation in case it is needed when lowering the
@@ -262,103 +417,6 @@ class InsertElementToBroadcast final
 
 }  // namespace
 
-// TODO: Figure out the proper canonicalization and drop the complexity here.
-// TODO: More sophisticated detection for matching
-//   (threadIdx.x == 0 && other stuff not involving threadIdx.x)
-static LogicalResult isThreadIdxxZeroPredicate(scf::IfOp ifOp) {
-  if (!ifOp || ifOp.getNumResults() > 0 ||
-      ifOp.getThenRegion().getBlocks().size() != 1 ||
-      !ifOp.getElseRegion().empty())
-    return failure();
-  auto pred = ifOp.getCondition().getDefiningOp<arith::CmpIOp>();
-  if (!pred) return failure();
-  auto EQ = arith::CmpIPredicate::eq;
-  auto SLT = arith::CmpIPredicate::slt;
-  auto SLE = arith::CmpIPredicate::sle;
-  auto ULT = arith::CmpIPredicate::ult;
-  auto ULE = arith::CmpIPredicate::ule;
-  if (auto threadIdOp = pred.getLhs().getDefiningOp<gpu::ThreadIdOp>()) {
-    if (pred.getPredicate() == EQ && isConstantIntValue(pred.getRhs(), 0))
-      return success();
-    if (pred.getPredicate() == SLE && isConstantIntValue(pred.getRhs(), 0))
-      return success();
-    if (pred.getPredicate() == ULE && isConstantIntValue(pred.getRhs(), 0))
-      return success();
-    if (pred.getPredicate() == SLT && isConstantIntValue(pred.getRhs(), 1))
-      return success();
-    if (pred.getPredicate() == ULT && isConstantIntValue(pred.getRhs(), 1))
-      return success();
-  }
-  auto SGT = arith::CmpIPredicate::sgt;
-  auto SGE = arith::CmpIPredicate::sge;
-  auto UGT = arith::CmpIPredicate::ugt;
-  auto UGE = arith::CmpIPredicate::uge;
-  if (auto threadIdOp = pred.getRhs().getDefiningOp<gpu::ThreadIdOp>()) {
-    if (pred.getPredicate() == EQ && isConstantIntValue(pred.getLhs(), 0))
-      return success();
-    if (pred.getPredicate() == SGE && isConstantIntValue(pred.getLhs(), 0))
-      return success();
-    if (pred.getPredicate() == UGE && isConstantIntValue(pred.getLhs(), 0))
-      return success();
-    if (pred.getPredicate() == SGT && isConstantIntValue(pred.getLhs(), 1))
-      return success();
-    if (pred.getPredicate() == UGT && isConstantIntValue(pred.getLhs(), 1))
-      return success();
-  }
-  return failure();
-}
-
-struct VectorDistributionResult {
-  Operation *res;
-};
-
-static FailureOr<VectorDistributionResult> vectorDistribution(
-    PatternRewriter &rewriter, Location loc, scf::IfOp ifOp,
-    int64_t workgroupSizeX, int64_t warpSize) {
-  // Bail if cond is not `if (threadIdx.x == 0)`.
-  if (failed(isThreadIdxxZeroPredicate(ifOp)))
-    return ifOp->emitError("unmet prerequisite: isThreadIdxxZeroPredicate");
-
-  // All the code below will be executed on a single warp given a fixed
-  // (threadIdxy, threadIdxz).
-  Value threadIdxx = rewriter.create<gpu::ThreadIdOp>(
-      loc, rewriter.getIndexType(), gpu::Dimension::x);
-
-  assert(workgroupSizeX % warpSize == 0);
-  if (workgroupSizeX != warpSize) {
-    // Add a guard for `threadIdxx < warp size` around the WarpExecuteOnLane0Op.
-    Value predicate = rewriter.create<arith::CmpIOp>(
-        loc, arith::CmpIPredicate::ult, threadIdxx,
-        rewriter.create<arith::ConstantIndexOp>(loc, warpSize));
-    // Note: return-less IfOp is built with a terminator, no need to add one.
-    auto newIfOp =
-        rewriter.create<scf::IfOp>(loc, predicate, /*withElseRegion=*/false);
-    rewriter.setInsertionPointToStart(&newIfOp.getThenRegion().front());
-  }
-  auto warpOp = rewriter.create<vector::WarpExecuteOnLane0Op>(
-      loc, TypeRange(), threadIdxx, warpSize);
-
-  // Move the code from the previous ifOp to the WarpExecuteOnLane0Op.
-  Block &sourceBlock = ifOp.getThenRegion().front();
-  Block &targetBlock = warpOp.getWarpRegion().front();
-  Block::iterator insertionPoint = targetBlock.begin();
-  targetBlock.getOperations().splice(insertionPoint,
-                                     sourceBlock.getOperations(),
-                                     sourceBlock.without_terminator().begin(),
-                                     sourceBlock.without_terminator().end());
-  rewriter.setInsertionPointToEnd(&targetBlock);
-  rewriter.create<vector::YieldOp>(loc);
-
-  // Erase old op.
-  rewriter.eraseOp(ifOp);
-
-  // Hoist the scalar code outside of the warp region.
-  // Note: moving code does not require a listener.
-  vector::moveScalarUniformCode(warpOp);
-
-  return VectorDistributionResult{warpOp};
-}
-
 static LogicalResult applyMultiReductionLoweringPatterns(Operation *target) {
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
 
@@ -412,10 +470,13 @@ static LogicalResult applyWarpExecuteOnLane0ToScf(Operation *target) {
   return applyPatternsAndFoldGreedily(target, std::move(patterns));
 }
 
-LogicalResult distributeWarpExecuteOnLane0(Operation *target) {
-  assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
+LogicalResult transform_dialect::VectorWarpDistributionOp::applyToOne(
+    Operation *target, transform::TransformState &state) {
+  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>())
+    return emitOpError() << "applies only to isolated-from-above targets "
+                            "because it needs to apply patterns greedily";
 
-  // TODO: Pass transform::TransformState &state and attach Listener with
+  // TODO: Attach and use Listener.
   // auto &listener = state.addExtension<::detail::TrackingListener>();
   // auto detachListener = llvm::make_scope_exit(
   //   [&] { state.removeExtension<::detail::TrackingListener>(); });
@@ -428,74 +489,8 @@ LogicalResult distributeWarpExecuteOnLane0(Operation *target) {
   if (failed(applyVectorTransferWriteDistribution(target))) return failure();
   if (failed(applyPropagateVectorDistribution(target))) return failure();
   if (failed(applyWarpExecuteOnLane0ToScf(target))) return failure();
+
   return success();
-}
-
-// TODO: Refactor in a generic util that can be reused.
-static IREE::HAL::ExecutableExportOp getExecutableExportOpForFunc(
-    IREE::HAL::ExecutableVariantOp halExecutableVariantOp,
-    func::FuncOp funcOp) {
-  IREE::HAL::ExecutableExportOp exportOp;
-  halExecutableVariantOp->walk([&](IREE::HAL::ExecutableExportOp op) {
-    if (op.sym_name() != funcOp.getName()) WalkResult::advance();
-    exportOp = op;
-    WalkResult::interrupt();
-  });
-  return exportOp;
-}
-
-// TODO: Upstream this.
-template <typename OpTy>
-static OpTy getSelfOrParentOfType(Operation *op) {
-  auto opOfType = dyn_cast<OpTy>(op);
-  if (!opOfType) opOfType = op->getParentOfType<OpTy>();
-  return opOfType;
-}
-
-LogicalResult transform_dialect::VectorDistributionOp::applyToOne(
-    Operation *target, transform::TransformState &state) {
-  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
-    InFlightDiagnostic diag = emitOpError()
-                              << "applies only to isolated-from-above targets";
-    diag.attachNote(target->getLoc()) << "non-isolated target";
-    return diag;
-  }
-
-  auto halExecutableVariantOp =
-      getSelfOrParentOfType<IREE::HAL::ExecutableVariantOp>(target);
-  auto funcOp = getSelfOrParentOfType<func::FuncOp>(target);
-  assert(funcOp);
-  IREE::HAL::ExecutableExportOp exportOp =
-      getExecutableExportOpForFunc(halExecutableVariantOp, funcOp);
-  assert(exportOp && "missing export op");
-
-  auto maybeAttr = exportOp.workgroup_size();
-  if (!maybeAttr)
-    return exportOp->emitError("export op must have workgroup_size attribute");
-
-  int64_t workgroupSizeX = (*maybeAttr)[0].cast<IntegerAttr>().getInt();
-
-  int64_t warpSize = getWarpSize();
-  if (workgroupSizeX % warpSize != 0) {
-    return exportOp->emitError()
-           << "vector distribution requires workgroup size for x to be a "
-           << "multiple of the warp size: " << workgroupSizeX << " vs "
-           << warpSize;
-  }
-
-  WalkResult walkResult = target->walk([&](scf::IfOp ifOp) {
-    SimplePatternRewriter rewriter(ifOp);
-    FailureOr<VectorDistributionResult> vectorDistributionResult =
-        vectorDistribution(rewriter, target->getLoc(), ifOp, workgroupSizeX,
-                           warpSize);
-    if (failed(vectorDistributionResult) ||
-        failed(distributeWarpExecuteOnLane0(target))) {
-      target->emitError("failed to apply");
-      return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
-  return walkResult.wasInterrupted() ? failure() : success();
 }
 
 #define GET_OP_CLASSES
