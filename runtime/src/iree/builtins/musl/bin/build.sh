@@ -51,7 +51,7 @@ function make_arch_bc {
   do
     # Run full LLVM optimizations.
     # TODO(benvanik): defer this? Some of these opts may not be portable/safe.
-    ${LLVM_OPT?} ${file} -O3 -S -o ${file}.opt.ll
+    ${LLVM_OPT?} ${file} -O3 -S -opaque-pointers=0 -o ${file}.opt.ll
 
     # Clang adds a bunch of bad attributes and host-specific information that we
     # don't want (so we get at least somewhat deterministic builds).
@@ -64,13 +64,13 @@ function make_arch_bc {
     # Generate a binary bitcode file embedded into the compiler binary.
     # NOTE: we do this from stdin so that the filename on the user's system is not
     # embedded in the bitcode file (making it non-deterministic).
-    cat ${file}.opt.ll | ${LLVM_AS?} -o=${file}.opt.ll.bc
+    cat ${file}.opt.ll | ${LLVM_AS?} -opaque-pointers=0 -o=${file}.opt.ll.bc
     rm ${file}.opt.ll
   done
   rm ${ALL_LL_FILES}
 
   ALL_BC_FILES=`ls *.ll.bc`
-  ${LLVM_LINK?} ${ALL_BC_FILES} -o ${FILE_BASENAME}.bc
+  ${LLVM_LINK?} -opaque-pointers=0 ${ALL_BC_FILES} -o ${FILE_BASENAME}.bc
   rm ${ALL_BC_FILES}
 }
 

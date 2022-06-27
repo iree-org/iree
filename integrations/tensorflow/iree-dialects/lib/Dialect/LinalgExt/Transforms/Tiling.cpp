@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Utils.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -62,7 +63,7 @@ SmallVector<Value> tileToSCF(PatternRewriter &rewriter, TilingInterface op,
         SmallVector<Value> offsets =
             linalg::computeTileOffsets(b, loc, localIvs, tileSizesVec);
         SmallVector<Value> sizes =
-            linalg::computeTileSizes(b, loc, localIvs, tileSizesVec, allDims);
+            linalg::computeTileSizes(b, loc, tileSizesVec, allDims);
         // Create ExtractSliceOp: Extract a tile from the PadOp.
         // Note: The PadOp is located outside of the loop nest. It is
         // later moved inside by ExtractSliceOfPadTensorSwapPattern.
@@ -181,35 +182,21 @@ private:
   linalg::LinalgTilingOptions options;
   linalg::LinalgTransformationFilter filter;
 };
+} // namespace
 
 /// Second pattern to implement the switch of `TilingInterface ->
 /// tensor.extract_slice` to `tensor.extract_slice -> `TilingInterface`.
-struct SliceOpTiledOpSwapPattern
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
-  SliceOpTiledOpSwapPattern(MLIRContext *context,
-                            linalg::LinalgTilingOptions opt,
-                            linalg::LinalgTransformationFilter filt)
-      : OpRewritePattern<tensor::ExtractSliceOp>(context), options(opt),
-        filter(filt) {}
-
-  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
-                                PatternRewriter &rewriter) const override {
-    auto sourceOp = sliceOp.source().getDefiningOp<TilingInterface>();
-    if (!sourceOp || !filter.hasReplacementFilter(sourceOp))
-      return failure();
-    SmallVector<Operation *> tiledOps = sourceOp.getTiledImplementation(
-        rewriter, sourceOp.getDestinationOperands(rewriter),
-        sliceOp.getMixedOffsets(), sliceOp.getMixedSizes(),
-        /*tileDestOperands=*/true);
-    assert(tiledOps.size() && "expected single tiled op");
-    Operation *tiledOp = tiledOps.front();
-    rewriter.replaceOp(sliceOp, tiledOp->getResults());
-    return success();
-  }
-
-private:
-  linalg::LinalgTilingOptions options;
-  linalg::LinalgTransformationFilter filter;
-};
-
-} // namespace
+FailureOr<Operation *> SwapTilingInterfaceOp::returningMatchAndRewrite(
+    tensor::ExtractSliceOp sliceOp, PatternRewriter &rewriter) const {
+  auto sourceOp = sliceOp.source().getDefiningOp<TilingInterface>();
+  if (!sourceOp)
+    return failure();
+  SmallVector<Operation *> tiledOps = sourceOp.getTiledImplementation(
+      rewriter, sourceOp.getDestinationOperands(rewriter),
+      sliceOp.getMixedOffsets(), sliceOp.getMixedSizes(),
+      /*tileDestOperands=*/true);
+  assert(tiledOps.size() && "expected single tiled op");
+  Operation *tiledOp = tiledOps.front();
+  rewriter.replaceOp(sliceOp, tiledOp->getResults());
+  return tiledOp;
+}

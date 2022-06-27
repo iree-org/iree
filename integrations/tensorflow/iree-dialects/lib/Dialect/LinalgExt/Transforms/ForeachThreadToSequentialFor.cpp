@@ -4,13 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -25,26 +24,37 @@ using namespace mlir::iree_compiler::IREE::LinalgExt;
 
 namespace {
 
-SmallVector<Value> getValuesToYield(PerformConcurrentlyOp op) {
-  return llvm::to_vector(llvm::map_range(
-      op.yieldingOps(), [](ParallelInsertSliceOp op) { return op.dest(); }));
+SmallVector<Value> getValuesToYield(scf::PerformConcurrentlyOp op) {
+  return llvm::to_vector(llvm::map_range(op.yieldingOps(), [](Operation &op) {
+    return cast<scf::ParallelInsertSliceOp>(&op).getDest();
+  }));
 }
 
 } // namespace
 
-FailureOr<scf::ForOp> InParallelOpToScfForRewriter::returningMatchAndRewrite(
-    InParallelOp inParallelOp, PatternRewriter &rewriter) const {
+FailureOr<scf::ForOp> ForeachThreadOpToScfForRewriter::returningMatchAndRewrite(
+    scf::ForeachThreadOp foreachThreadOp, PatternRewriter &rewriter) const {
+  if (foreachThreadOp.getNumResults() > 0)
+    return foreachThreadOp->emitError(
+        "only bufferized scf.foreach_thread lowers to scf.for");
+
+  if (foreachThreadOp.getNumThreads().size() > 1)
+    return foreachThreadOp->emitError(
+        "only single-dimension scf.foreach_thread lowers to scf.for");
+
   // Construct the loop bounds based on the canonical arithmetic progression.
-  Location loc = inParallelOp.getLoc();
+  Location loc = foreachThreadOp.getLoc();
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-  Value numThreads = inParallelOp.num_threads();
+  // TODO: allow multi-dim.
+  Value numThreads = foreachThreadOp.getNumThreads().front();
 
   // Construct the op without a body builder: we need to clone the ops in the
   // body explicitly after having access to the new bbArgs.
   // As a consequence, `ensureTerminator` is not called and the `forOp` body
   // has no terminator.
-  PerformConcurrentlyOp performConcurrentlyOp = inParallelOp.getTerminator();
+  scf::PerformConcurrentlyOp performConcurrentlyOp =
+      foreachThreadOp.getTerminator();
   SmallVector<Value> valuesToYield = getValuesToYield(performConcurrentlyOp);
   scf::ForOp forOp =
       rewriter.create<scf::ForOp>(loc, zero, numThreads, one, valuesToYield);
@@ -55,10 +65,10 @@ FailureOr<scf::ForOp> InParallelOpToScfForRewriter::returningMatchAndRewrite(
   bool hasTerminator =
       !body->empty() && body->back().hasTrait<OpTrait::IsTerminator>();
   if (hasTerminator) {
-    rewriter.mergeBlockBefore(&inParallelOp.region().front(),
+    rewriter.mergeBlockBefore(&foreachThreadOp.getRegion().front(),
                               body->getTerminator(), bbArgsTranslated);
   } else {
-    rewriter.mergeBlocks(&inParallelOp.region().front(), body,
+    rewriter.mergeBlocks(&foreachThreadOp.getRegion().front(), body,
                          bbArgsTranslated);
   }
 
@@ -69,9 +79,11 @@ FailureOr<scf::ForOp> InParallelOpToScfForRewriter::returningMatchAndRewrite(
   // Create sequential insertSlice ops.
   SmallVector<Value> toYield;
   rewriter.setInsertionPoint(performConcurrentlyOp);
-  for (ParallelInsertSliceOp op : performConcurrentlyOp.yieldingOps()) {
+  for (Operation &operation : performConcurrentlyOp.yieldingOps()) {
+    scf::ParallelInsertSliceOp op =
+        cast<scf::ParallelInsertSliceOp>(&operation);
     toYield.push_back(rewriter.createOrFold<tensor::InsertSliceOp>(
-        loc, op.source(), bvm.lookup(op.dest()), op.getMixedOffsets(),
+        loc, op.getSource(), bvm.lookup(op.getDest()), op.getMixedOffsets(),
         op.getMixedSizes(), op.getMixedStrides()));
   }
 
@@ -104,7 +116,7 @@ FailureOr<scf::ForOp> InParallelOpToScfForRewriter::returningMatchAndRewrite(
 
   // Cleanup and replace.
   rewriter.eraseOp(performConcurrentlyOp);
-  rewriter.replaceOp(inParallelOp, forOp.getResults());
+  rewriter.replaceOp(foreachThreadOp, forOp.getResults());
 
   return forOp;
 }

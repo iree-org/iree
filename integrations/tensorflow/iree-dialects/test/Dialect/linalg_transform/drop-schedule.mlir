@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt --linalg-drop-schedule %s | FileCheck %s
+// RUN: iree-dialects-opt --transform-dialect-drop-schedule %s | FileCheck %s
 
 func.func @matmul_tensors(
   %arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32> { linalg.inplaceable = true})

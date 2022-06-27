@@ -6,14 +6,13 @@
 
 #include <cstdlib>
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Async/IR/Async.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -26,28 +25,33 @@
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::LinalgExt;
 
-FailureOr<Operation *> mlir::iree_compiler::IREE::LinalgExt::
-    InParallelOpToAsyncRewriter::returningMatchAndRewrite(
-        iree_compiler::IREE::LinalgExt::InParallelOp inParallelOp,
-        PatternRewriter &rewriter) const {
-  assert(inParallelOp.getNumResults() == 0 &&
-         "expected bufferized InParallelOp");
+FailureOr<Operation *>
+mlir::iree_compiler::IREE::LinalgExt::ForeachThreadOpToAsyncRewriter::
+    returningMatchAndRewrite(scf::ForeachThreadOp foreachThreadOp,
+                             PatternRewriter &rewriter) const {
+  if (foreachThreadOp.getNumResults() > 0)
+    return foreachThreadOp->emitError(
+        "only bufferized scf.foreach_thread lowers to async");
 
-  // Only consider the top level InParallelOp op and skip if it already
+  if (foreachThreadOp.getNumThreads().size() > 1)
+    return foreachThreadOp->emitError(
+        "only single-dimension scf.foreach_thread lowers to async");
+
+  // Only consider the top level ForeachThreadOp op and skip if it already
   // contains an ExecuteOp.
-  if (inParallelOp
-          ->getParentOfType<iree_compiler::IREE::LinalgExt::InParallelOp>() ||
-      llvm::any_of(inParallelOp.getBody()->getOperations(),
+  if (foreachThreadOp->getParentOfType<scf::ForeachThreadOp>() ||
+      llvm::any_of(foreachThreadOp.getBody()->getOperations(),
                    [](Operation &op) { return isa<async::ExecuteOp>(&op); }))
     return failure();
 
-  auto *ctx = inParallelOp.getContext();
-  Location loc = inParallelOp.getLoc();
+  auto *ctx = foreachThreadOp.getContext();
+  Location loc = foreachThreadOp.getLoc();
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-  Value numThreads = inParallelOp.num_threads();
+  // TODO: allow multi-dim.
+  Value numThreads = foreachThreadOp.getNumThreads().front();
 
-  // Wrap the linalg_ext.in_parallel into an async::ExecuteOp.
+  // Wrap the scf.foreach_thread into an async::ExecuteOp.
   // 1. Create the async::GroupType object on which we synchronize.
   Value asyncGroup = rewriter.create<async::CreateGroupOp>(
       loc, async::GroupType::get(ctx), numThreads);
@@ -64,16 +68,15 @@ FailureOr<Operation *> mlir::iree_compiler::IREE::LinalgExt::
                                         /*dependencies=*/ValueRange(),
                                         /*operands=*/ValueRange(), noopExec);
 
-  // 3. Steal the iree_compiler::IREE::LinalgExt::InParallel ops, except the
-  // terminator, into the body of the async::ExecuteOp, just before the
-  // terminator.
+  // 3. Steal the ops nested under scf::ForeachThread, except the terminator,
+  // into the body of the async::ExecuteOp, just before the terminator.
   SmallVector<Value> bbArgsTranslated{forOp.getInductionVar()};
-  rewriter.mergeBlocks(&inParallelOp.region().front(), executeOp.getBody(),
-                       bbArgsTranslated);
-  // 3.b. Erase the terminator stolen from inParallelOp.
+  rewriter.mergeBlocks(&foreachThreadOp.getRegion().front(),
+                       executeOp.getBody(), bbArgsTranslated);
+  // 3.b. Erase the terminator stolen from foreachThreadOp.
   rewriter.eraseOp(&executeOp.getBody()->back());
-  // 3.c. Erase inParallelOp.
-  rewriter.eraseOp(inParallelOp);
+  // 3.c. Erase foreachThreadOp.
+  rewriter.eraseOp(foreachThreadOp);
   // 3.d. Add ExecuteOp terminator.
   rewriter.setInsertionPointToEnd(executeOp.getBody());
   rewriter.create<async::YieldOp>(loc, ValueRange{});
@@ -82,7 +85,7 @@ FailureOr<Operation *> mlir::iree_compiler::IREE::LinalgExt::
   rewriter.create<async::AddToGroupOp>(loc, rewriter.getIndexType(),
                                        executeOp.token(), asyncGroup);
 
-  // 4. After the iree_compiler::IREE::LinalgExt::InParallel, await all async
+  // 4. After the iree_compiler::IREE::LinalgExt::ForeachThread, await all async
   // tasks in `asyncGroup`.
   rewriter.setInsertionPointAfter(forOp);
   return rewriter.create<async::AwaitAllOp>(loc, asyncGroup).getOperation();

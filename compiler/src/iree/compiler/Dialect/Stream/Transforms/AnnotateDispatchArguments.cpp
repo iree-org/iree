@@ -61,6 +61,11 @@ static std::string getPVSAsStr(
   return str;
 }
 
+static llvm::MaybeAlign commonAlignment(llvm::MaybeAlign A,
+                                        llvm::MaybeAlign B) {
+  return A && B ? llvm::commonAlignment(*A, *B) : A ? A : B;
+}
+
 class GlobalPVS : public DFX::StateWrapper<
                       DFX::PotentialConstantIntValuesState,
                       DFX::TypedOperationElement<IREE::Util::GlobalOp>> {
@@ -272,7 +277,7 @@ class ValueAlignment
     llvm::MaybeAlign alignment;
     for (auto value : set) {
       APInt valueDivisor = (value & (~(value - 1)));
-      alignment = llvm::commonAlignment(
+      alignment = commonAlignment(
           alignment, llvm::MaybeAlign(valueDivisor.getZExtValue()));
     }
     return alignment;
@@ -413,8 +418,7 @@ class ArgumentAnalysis {
       auto element = solver.lookupElementFor<ValueAlignment>(
           Position::forValue(dispatchOp.operands()[operandIdx]));
       if (!element || !element->isValidState()) return llvm::MaybeAlign();
-      alignment =
-          llvm::commonAlignment(alignment, element->getAssumedAlignment());
+      alignment = commonAlignment(alignment, element->getAssumedAlignment());
     }
     if (alignment.valueOrOne().value() == kMaximumAlignment) {
       return llvm::MaybeAlign();
@@ -431,8 +435,7 @@ class ArgumentAnalysis {
       auto element = solver.lookupElementFor<ValueAlignment>(
           Position::forValue(dispatchOp.resource_offsets()[resourceIdx]));
       if (!element || !element->isValidState()) return llvm::MaybeAlign();
-      alignment =
-          llvm::commonAlignment(alignment, element->getAssumedAlignment());
+      alignment = commonAlignment(alignment, element->getAssumedAlignment());
     }
     if (alignment.valueOrOne().value() == kMaximumAlignment) {
       // Alignment is natural, which for resources means the base resource

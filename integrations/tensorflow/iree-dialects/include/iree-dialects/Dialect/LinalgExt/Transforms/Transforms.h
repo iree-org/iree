@@ -14,7 +14,8 @@
 namespace mlir {
 namespace scf {
 class ForOp;
-}
+class ForeachThreadOp;
+} // namespace scf
 namespace linalg {
 class LinalgOp;
 }
@@ -24,14 +25,15 @@ namespace IREE {
 namespace LinalgExt {
 
 struct TilingResult {
-  TileOp tileOp;
+  Operation *tileOp;
   Operation *tiledOp;
 };
 
-/// Pattern to tile a TilingInterface op using a TileOp.
-struct LinalgExtTilingPattern
+/// Pattern to tile a TilingInterface op using a scf::ForeachThreadOp.
+struct ForeachThreadTilingPattern
     : public OpInterfaceRewritePattern<TilingInterface> {
-  LinalgExtTilingPattern(MLIRContext *context, linalg::LinalgTilingOptions opt)
+  ForeachThreadTilingPattern(MLIRContext *context,
+                             linalg::LinalgTilingOptions opt)
       : OpInterfaceRewritePattern<TilingInterface>(context), options(opt) {}
 
   FailureOr<TilingResult>
@@ -46,71 +48,47 @@ private:
   linalg::LinalgTilingOptions options;
 };
 
-/// Pattern to rewrite a TileOp to an scf::ForOp.
-struct TileOpToSCFRewriter : public OpRewritePattern<TileOp> {
-  using OpRewritePattern::OpRewritePattern;
+/// Pattern to swap a `TilingInterface` op -> `tensor::ExtractSliceOp`.
+struct SwapTilingInterfaceOp : public OpRewritePattern<tensor::ExtractSliceOp> {
+  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
 
-  FailureOr<scf::ForOp>
-  returningMatchAndRewrite(TileOp tileOp, PatternRewriter &rewriter) const;
+  FailureOr<Operation *>
+  returningMatchAndRewrite(tensor::ExtractSliceOp sliceOp,
+                           PatternRewriter &rewriter) const;
 
-  LogicalResult matchAndRewrite(TileOp tileOp,
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(tileOp, rewriter);
+    return returningMatchAndRewrite(sliceOp, rewriter);
   }
 };
 
-/// Pattern to rewrite a TileOp to a InParallelOp.
-struct TileOpToInParallelRewriter : public OpRewritePattern<TileOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  FailureOr<InParallelOp>
-  returningMatchAndRewrite(TileOp tileOp, PatternRewriter &rewriter) const;
-
-  LogicalResult matchAndRewrite(TileOp tileOp,
-                                PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(tileOp, rewriter);
-  }
-};
-
-/// Pattern to rewrite a InParallelOp to the async dialect.
-struct InParallelOpToAsyncRewriter : public OpRewritePattern<InParallelOp> {
+/// Pattern to rewrite a scf::ForEachThreadOp to the async dialect.
+struct ForeachThreadOpToAsyncRewriter
+    : public OpRewritePattern<scf::ForeachThreadOp> {
   using OpRewritePattern::OpRewritePattern;
 
   FailureOr<Operation *>
-  returningMatchAndRewrite(InParallelOp inParallelOp,
+  returningMatchAndRewrite(scf::ForeachThreadOp foreachThreadOp,
                            PatternRewriter &rewriter) const;
 
-  LogicalResult matchAndRewrite(InParallelOp inParallelOp,
+  LogicalResult matchAndRewrite(scf::ForeachThreadOp foreachThreadOp,
                                 PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(inParallelOp, rewriter);
+    return returningMatchAndRewrite(foreachThreadOp, rewriter);
   }
 };
 
-/// Pattern to rewrite a InParallelOp to the HAL dialect.
-struct InParallelOpToHALRewriter : public OpRewritePattern<InParallelOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  FailureOr<SmallVector<Operation *>>
-  returningMatchAndRewrite(InParallelOp inParallelOp,
-                           PatternRewriter &rewriter) const;
-
-  LogicalResult matchAndRewrite(InParallelOp inParallelOp,
-                                PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(inParallelOp, rewriter);
-  }
-};
-
-/// Pattern to rewrite a InParallelOp to an scf::ForOp.
-struct InParallelOpToScfForRewriter : public OpRewritePattern<InParallelOp> {
+/// Pattern to rewrite a ForeachThreadOp to an scf::ForOp.
+struct ForeachThreadOpToScfForRewriter
+    : public OpRewritePattern<scf::ForeachThreadOp> {
   using OpRewritePattern::OpRewritePattern;
 
   FailureOr<scf::ForOp>
-  returningMatchAndRewrite(InParallelOp inParallelOp,
+  returningMatchAndRewrite(scf::ForeachThreadOp foreachThreadOp,
                            PatternRewriter &rewriter) const;
 
-  LogicalResult matchAndRewrite(InParallelOp inParallelOp,
+  LogicalResult matchAndRewrite(scf::ForeachThreadOp foreachThreadOp,
                                 PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(inParallelOp, rewriter);
+    return returningMatchAndRewrite(foreachThreadOp, rewriter);
   }
 };
 

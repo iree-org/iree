@@ -44,4 +44,19 @@ def PadContractionToBlockSize :
   ];
 }
 
+def TopkSplitReduction:
+    Pass<"iree-linalg-ext-topk-split-reduction", "func::FuncOp"> {
+  let summary = "Topk split reduction pass.";
+  let description = [{
+    Produces a "map-reduce" style of parallelizing a Topk Op. The op is split
+    into two, on containing reducitons in parallel and the other contianing the
+    combination of the parallel reductions into a final result.
+  }];
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createTopkSplitReductionPass()";
+  let options = [
+    Option<"splitRatio", "split-ratio", "int", /*default=*/"1",
+           "Split reduction ratio">,
+  ];
+}
+
 #endif  // IREE_DIALECT_LINALGEXT_PASSES
