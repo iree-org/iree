@@ -12,7 +12,7 @@ TENSORFLOW_COMMIT = "5b1b6ca21ea659027dd0ada2d3d8328d0f984fa4"
 git_repository(
     name = "org_tensorflow",
     commit = TENSORFLOW_COMMIT,
-    remote = "https://github.com/google/iree-tf-fork.git",
+    remote = "https://github.com/iree-org/iree-tf-fork.git",
 )
 
 # Import all of the tensorflow dependencies.

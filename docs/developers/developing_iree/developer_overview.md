@@ -28,7 +28,7 @@ developers.
 [samples/](https://github.com/iree-org/iree/blob/main/samples/)
 
 *   Samples built using IREE's runtime and compiler
-*   Also see the separate https://github.com/google/iree-samples repository
+*   Also see the separate https://github.com/iree-org/iree-samples repository
 
 ## IREE Compiler Code Layout
 

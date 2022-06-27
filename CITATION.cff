@@ -17,7 +17,7 @@ contact:
     affiliation: Google
 license: "Apache-2.0 WITH LLVM-exception"
 url: "https://iree-org.github.io/iree/"
-repository-code: "https://github.com/google/iree"
+repository-code: "https://github.com/iree-org/iree"
 keywords:
   - compiler
   - "machine learning"

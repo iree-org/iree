@@ -139,8 +139,8 @@ those than use dynamic shapes. File an issue to IREE's TFLite model support
 ## Additional Samples
 
 * The
-[tflitehub folder](https://github.com/google/iree-samples/tree/main/tflitehub)
-in the [iree-samples repository](https://github.com/google/iree-samples)
+[tflitehub folder](https://github.com/iree-org/iree-samples/tree/main/tflitehub)
+in the [iree-samples repository](https://github.com/iree-org/iree-samples)
 contains test scripts to compile, run, and compare various TensorFlow Lite
 models sourced from [TensorFlow Hub](https://tfhub.dev/).
 

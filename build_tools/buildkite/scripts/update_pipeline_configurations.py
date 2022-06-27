@@ -31,7 +31,7 @@ from pybuildkite import buildkite
 
 from common.buildkite_utils import get_pipeline
 
-GIT_REPO = "https://github.com/google/iree"
+GIT_REPO = "https://github.com/iree-org/iree"
 PIPELINE_ROOT_PATH = "build_tools/buildkite/pipelines"
 TRUSTED_BOOTSTRAP_PIPELINE_PATH = os.path.join(PIPELINE_ROOT_PATH, "fragment",
                                                "bootstrap-trusted.yml")

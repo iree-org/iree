@@ -13,7 +13,7 @@ using it.
 We tend to use the "triangular" or "forking" workflow. Develop primarily on a
 clone of the repository on your development machine. Any local branches named
 the same as persistent branches from the
-[main repository](https://github.com/google/iree) (currently `main`, `google`,
+[main repository](https://github.com/iree-org/iree) (currently `main`, `google`,
 and `stable`) are pristine (though potentially stale) copies. You only
 fastforward these to match upstream and otherwise do development on other
 branches. When sending PRs, you push to a different branch on your public fork

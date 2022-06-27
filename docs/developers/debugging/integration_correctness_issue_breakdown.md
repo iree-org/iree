@@ -14,7 +14,7 @@ for tracking this.
 
 ## iree-samples
 
-Follow [README](https://github.com/google/iree-samples#readme) to run the model.
+Follow [README](https://github.com/iree-org/iree-samples#readme) to run the model.
 The MLIR files will be generated. You'll find the saved file from log. E.g.,
 
 ```

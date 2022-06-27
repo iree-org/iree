@@ -3,7 +3,7 @@
 	url = https://github.com/google/googletest.git
 [submodule "third_party/llvm-project"]
 	path = third_party/llvm-project
-	url = https://github.com/google/iree-llvm-fork.git
+	url = https://github.com/iree-org/iree-llvm-fork.git
 [submodule "third_party/vulkan_headers"]
 	path = third_party/vulkan_headers
 	url = https://github.com/KhronosGroup/Vulkan-Headers.git
@@ -37,7 +37,7 @@
 	url = https://github.com/axboe/liburing.git
 [submodule "third_party/mlir-hlo"]
 	path = third_party/mlir-hlo
-	url = https://github.com/google/iree-mhlo-fork.git
+	url = https://github.com/iree-org/iree-mhlo-fork.git
 [submodule "third_party/libyaml"]
 	path = third_party/libyaml
 	url = https://github.com/yaml/libyaml.git
