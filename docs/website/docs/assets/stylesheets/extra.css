@@ -13,3 +13,12 @@
   50% { filter: drop-shadow(0px 2px 0px black); }
   100% { filter: drop-shadow(0px 2px 3px black); }
 }
+
+/* Hide the "latest GitHub release", since we don't use concise version tags
+   https://squidfunk.github.io/mkdocs-material/setup/adding-a-git-repository/ */
+.md-source__fact--version {
+  display: none;
+}
+.md-source__fact:nth-child(1n+2)::before {
+  margin-left: 0;
+}
