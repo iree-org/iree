@@ -239,32 +239,13 @@ static iree_vm_FunctionSignatureDef_ref_t createFunctionSignatureDef(
     StringRef callingConvention,
     iree_vm_ReflectionAttrDef_vec_ref_t reflectionAttrsRef,
     FlatbufferBuilder &fbb) {
-  auto resultTypesRef = fbb.createInt32Vec(
-      llvm::map_range(functionType.getResults(), [&](Type type) {
-        if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
-          type = refPtrType.getObjectType();
-        }
-        return typeTable.lookup(type);
-      }));
-  auto argumentTypesRef = fbb.createInt32Vec(
-      llvm::map_range(functionType.getInputs(), [&](Type type) {
-        if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
-          type = refPtrType.getObjectType();
-        }
-        return typeTable.lookup(type);
-      }));
-
-  auto callingConventionRef = fbb.createString(callingConvention);
-
   // If the signature would be empty then let's avoid writing the empty table.
-  if (!argumentTypesRef && !resultTypesRef && !callingConventionRef &&
-      !reflectionAttrsRef) {
+  auto callingConventionRef = fbb.createString(callingConvention);
+  if (!callingConventionRef && !reflectionAttrsRef) {
     return 0;
   }
 
   iree_vm_FunctionSignatureDef_start(fbb);
-  iree_vm_FunctionSignatureDef_argument_types_add(fbb, argumentTypesRef);
-  iree_vm_FunctionSignatureDef_result_types_add(fbb, resultTypesRef);
   iree_vm_FunctionSignatureDef_calling_convention_add(fbb,
                                                       callingConventionRef);
   iree_vm_FunctionSignatureDef_reflection_attrs_add(fbb, reflectionAttrsRef);

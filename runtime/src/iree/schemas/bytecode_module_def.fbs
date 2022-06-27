@@ -24,14 +24,6 @@ table TypeDef {
 
 // Defines a function signature.
 table FunctionSignatureDef {
-  // Arguments, in order, as described in the FunctionSignatureDef.
-  // Maps to an entry in the module type table.
-  argument_types:[int32];
-
-  // Results, in order, as described in the FunctionSignatureDef.
-  // Maps to an entry in the module type table.
-  result_types:[int32];
-
   // The VM calling convention declaration used to marshal arguments and
   // results into and out of the function.
   // Optional for imports and internal functions but required for exports.
