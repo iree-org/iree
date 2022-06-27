@@ -113,6 +113,8 @@
   (IREE_TRACING_FEATURE_INSTRUMENTATION |     \
    IREE_TRACING_FEATURE_ALLOCATION_TRACKING | \
    IREE_TRACING_FEATURE_LOG_MESSAGES)
+// TODO(#9627): make tracy fibers faster; too slow for on-by-default!
+// | IREE_TRACING_FEATURE_FIBERS)
 #elif defined(IREE_TRACING_MODE) && IREE_TRACING_MODE == 3
 #define IREE_TRACING_FEATURES                   \
   (IREE_TRACING_FEATURE_INSTRUMENTATION |       \
@@ -222,6 +224,7 @@ IREE_MUST_USE_RESULT iree_zone_id_t iree_tracing_zone_begin_external_impl(
     const char* file_name, size_t file_name_length, uint32_t line,
     const char* function_name, size_t function_name_length, const char* name,
     size_t name_length);
+void iree_tracing_zone_end(iree_zone_id_t zone_id);
 
 void iree_tracing_set_plot_type_impl(const char* name_literal,
                                      uint8_t plot_type);
@@ -353,8 +356,7 @@ enum {
                           value_length)
 
 // Ends the current zone. Must be passed the |zone_id| from the _BEGIN.
-#define IREE_TRACE_ZONE_END(zone_id) \
-  ___tracy_emit_zone_end(iree_tracing_make_zone_ctx(zone_id))
+#define IREE_TRACE_ZONE_END(zone_id) iree_tracing_zone_end(zone_id)
 
 // Ends the current zone before returning on a failure.
 // Sugar for IREE_TRACE_ZONE_END+IREE_RETURN_IF_ERROR.
@@ -418,12 +420,17 @@ enum {
 #define IREE_TRACE(expr)
 #define IREE_TRACE_FIBER_ENTER(fiber)
 #define IREE_TRACE_FIBER_LEAVE()
-#define IREE_TRACE_ZONE_BEGIN(zone_id)
-#define IREE_TRACE_ZONE_BEGIN_NAMED(zone_id, name_literal)
-#define IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(zone_id, name, name_length)
+#define IREE_TRACE_ZONE_BEGIN(zone_id) \
+  iree_zone_id_t zone_id = 0;          \
+  (void)zone_id;
+#define IREE_TRACE_ZONE_BEGIN_NAMED(zone_id, name_literal) \
+  IREE_TRACE_ZONE_BEGIN(zone_id)
+#define IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(zone_id, name, name_length) \
+  IREE_TRACE_ZONE_BEGIN(zone_id)
 #define IREE_TRACE_ZONE_BEGIN_EXTERNAL(                        \
     zone_id, file_name, file_name_length, line, function_name, \
-    function_name_length, name, name_length)
+    function_name_length, name, name_length)                   \
+  IREE_TRACE_ZONE_BEGIN(zone_id)
 #define IREE_TRACE_ZONE_SET_COLOR(zone_id, color_xrgb)
 #define IREE_TRACE_ZONE_APPEND_VALUE(zone_id, value)
 #define IREE_TRACE_ZONE_APPEND_TEXT(zone_id, ...)

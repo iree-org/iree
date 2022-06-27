@@ -22,13 +22,14 @@ typedef struct native_import_module_state_t native_import_module_state_t;
 
 // vm.import @native_import_module.add_1(%arg0 : i32) -> i32
 static iree_status_t native_import_module_add_1(
-    iree_vm_stack_t* stack, const iree_vm_function_call_t* call,
+    iree_vm_stack_t* stack, iree_vm_native_function_flags_t flags,
+    iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
     iree_vm_native_function_target_t target_fn, void* module,
     void* module_state, iree_vm_execution_result_t* out_result) {
   // Add 1 to arg0 and return.
-  int32_t arg0 = *reinterpret_cast<int32_t*>(call->arguments.data);
+  int32_t arg0 = *reinterpret_cast<int32_t*>(args_storage.data);
   int32_t ret0 = arg0 + 1;
-  *reinterpret_cast<int32_t*>(call->results.data) = ret0;
+  *reinterpret_cast<int32_t*>(rets_storage.data) = ret0;
   return iree_ok_status();
 }
 
@@ -105,9 +106,9 @@ static iree_status_t RunFunction(benchmark::State& state,
       iree_make_byte_span(iree_alloca(result_count * sizeof(int32_t)),
                           result_count * sizeof(int32_t));
 
-  IREE_VM_INLINE_STACK_INITIALIZE(
-      stack, IREE_VM_INVOCATION_FLAG_NONE, iree_vm_context_id(context),
-      iree_vm_context_state_resolver(context), iree_allocator_system());
+  IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_INVOCATION_FLAG_NONE,
+                                  iree_vm_context_state_resolver(context),
+                                  iree_allocator_system());
   while (state.KeepRunningBatch(batch_size)) {
     for (iree_host_size_t i = 0; i < i32_args.size(); ++i) {
       reinterpret_cast<int32_t*>(call.arguments.data)[i] = i32_args[i];

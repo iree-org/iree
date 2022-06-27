@@ -1014,7 +1014,6 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
   // NOTE: any work here adds directly to the invocation time. Avoid doing too
   // much work or touching too many unlikely-to-be-cached structures (such as
   // walking the FlatBuffer, which may cause page faults).
-  IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(out_result);
   memset(out_result, 0, sizeof(iree_vm_execution_result_t));
 
@@ -1023,9 +1022,8 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
   uint16_t internal_ordinal = 0;
   iree_vm_FunctionSignatureDef_table_t signature_def = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_vm_bytecode_map_internal_ordinal(
-              module, call->function, &internal_ordinal, &signature_def));
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_map_internal_ordinal(
+      module, call->function, &internal_ordinal, &signature_def));
 
   // TODO(benvanik): rework this call type to avoid the need to copy it while
   // plumbing.
@@ -1053,40 +1051,26 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
       flatbuffers_string_len(calling_convention);
   iree_string_view_t cconv_arguments = iree_string_view_empty();
   iree_string_view_t cconv_results = iree_string_view_empty();
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_vm_function_call_get_cconv_fragments(
-              &signature, &cconv_arguments, &cconv_results));
+  IREE_RETURN_IF_ERROR(iree_vm_function_call_get_cconv_fragments(
+      &signature, &cconv_arguments, &cconv_results));
 
   // Jump into the dispatch routine to execute bytecode until the function
   // either returns (synchronous) or yields (asynchronous).
-  IREE_TRACE_FIBER_ENTER(iree_vm_stack_context_id(stack));
-  iree_status_t status = iree_vm_bytecode_dispatch_begin(
-      stack, module, &internal_call, cconv_arguments, cconv_results,
-      out_result);
-  IREE_TRACE_FIBER_LEAVE();
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_vm_bytecode_dispatch_begin(stack, module, &internal_call,
+                                         cconv_arguments, cconv_results,
+                                         out_result);  // tail
 }
 
 static iree_status_t iree_vm_bytecode_module_resume_call(
     void* self, iree_vm_stack_t* stack, iree_byte_span_t call_results,
     iree_vm_execution_result_t* out_result) {
-  // NOTE: any work here adds directly to the invocation time.
-  IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(out_result);
   memset(out_result, 0, sizeof(iree_vm_execution_result_t));
 
-  iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
-
   // Resume the call by jumping back into the bytecode dispatch.
-  IREE_TRACE_FIBER_ENTER(iree_vm_stack_context_id(stack));
-  iree_status_t status =
-      iree_vm_bytecode_dispatch_resume(stack, module, call_results, out_result);
-  IREE_TRACE_FIBER_LEAVE();
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
+  iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
+  return iree_vm_bytecode_dispatch_resume(stack, module, call_results,
+                                          out_result);  // tail
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(

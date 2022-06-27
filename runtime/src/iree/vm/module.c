@@ -171,40 +171,6 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_compute_cconv_fragment_size(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT void iree_vm_function_call_release(
-    iree_vm_function_call_t* call,
-    const iree_vm_function_signature_t* signature) {
-  if (!call->arguments.data_length || !call->results.data_length) {
-    return;
-  }
-  iree_string_view_t cconv = signature->calling_convention;
-  if (cconv.size == 0 || cconv.data[0] != '0') return;
-  uint8_t* p = call->arguments.data;
-  for (iree_host_size_t i = 1; i < cconv.size; ++i) {
-    char c = cconv.data[i];
-    if (c == '_') {
-      // Switch to results.
-      p = call->results.data;
-    }
-    switch (c) {
-      case IREE_VM_CCONV_TYPE_VOID:
-        break;
-      case IREE_VM_CCONV_TYPE_I32:
-      case IREE_VM_CCONV_TYPE_F32:
-        p += sizeof(int32_t);
-        break;
-      case IREE_VM_CCONV_TYPE_I64:
-      case IREE_VM_CCONV_TYPE_F64:
-        p += sizeof(int64_t);
-        break;
-      case IREE_VM_CCONV_TYPE_REF:
-        iree_vm_ref_release((iree_vm_ref_t*)p);
-        p += sizeof(iree_vm_ref_t);
-        break;
-    }
-  }
-}
-
 IREE_API_EXPORT iree_status_t
 iree_vm_module_initialize(iree_vm_module_t* module, void* self) {
   IREE_TRACE_ZONE_BEGIN(z0);

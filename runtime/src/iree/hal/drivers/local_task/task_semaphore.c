@@ -208,6 +208,7 @@ static iree_status_t iree_hal_task_semaphore_acquire_timepoint(
     iree_timeout_t timeout, iree_hal_task_timepoint_t* out_timepoint) {
   IREE_RETURN_IF_ERROR(
       iree_event_pool_acquire(semaphore->event_pool, 1, &out_timepoint->event));
+  out_timepoint->semaphore = &semaphore->base;
   iree_hal_semaphore_acquire_timepoint(
       &semaphore->base, minimum_value, timeout,
       (iree_hal_semaphore_callback_t){
@@ -370,7 +371,6 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
         status = iree_hal_task_semaphore_acquire_timepoint(
             semaphore, semaphore_list->payload_values[i], timeout, timepoint);
         if (iree_status_is_ok(status)) {
-          timepoint->semaphore = &semaphore->base;
           status = iree_wait_set_insert(wait_set, timepoint->event);
         }
       }

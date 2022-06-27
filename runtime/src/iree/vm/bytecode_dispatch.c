@@ -304,8 +304,10 @@ static iree_status_t iree_vm_bytecode_internal_enter(
   // This assumes that the destination stack frame registers are unused and ok
   // to overwrite directly. Each bank begins left-aligned at 0 and increments
   // per arg of its type.
+  iree_vm_stack_frame_t* caller_frame = iree_vm_stack_parent_frame(stack);
+  IREE_ASSERT(caller_frame);
   iree_vm_registers_t src_regs =
-      iree_vm_bytecode_get_register_storage(iree_vm_stack_parent_frame(stack));
+      iree_vm_bytecode_get_register_storage(caller_frame);
   iree_vm_registers_t* dst_regs = out_callee_registers;
   int i32_reg_offset = 0;
   int ref_reg_offset = 0;
@@ -344,10 +346,15 @@ static iree_status_t iree_vm_bytecode_internal_leave(
   // mappings provided by |src_reg_list| and |dst_reg_list|. It's assumed that
   // the mappings are matching by type and - in the case that they aren't -
   // things will get weird (but not crash).
-  *out_caller_frame = iree_vm_stack_parent_frame(stack);
+  iree_vm_stack_frame_t* caller_frame = iree_vm_stack_parent_frame(stack);
+  if (IREE_UNLIKELY(!caller_frame)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "unbalanced internal leave stack; stack root cannot not be internal");
+  }
   iree_vm_bytecode_frame_storage_t* caller_storage =
       (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(
-          *out_caller_frame);
+          caller_frame);
   const iree_vm_register_list_t* dst_reg_list =
       caller_storage->return_registers;
   VMCHECK(src_reg_list->size <= dst_reg_list->size);
@@ -356,7 +363,7 @@ static iree_status_t iree_vm_bytecode_internal_leave(
                             "src/dst reg count mismatch on internal return");
   }
   iree_vm_registers_t caller_registers =
-      iree_vm_bytecode_get_register_storage(*out_caller_frame);
+      iree_vm_bytecode_get_register_storage(caller_frame);
   for (int i = 0; i < src_reg_list->size; ++i) {
     // TODO(benvanik): change encoding to avoid this branching.
     // Could write two arrays: one for prims and one for refs.
@@ -374,6 +381,7 @@ static iree_status_t iree_vm_bytecode_internal_leave(
   }
 
   // Leave and deallocate bytecode stack frame.
+  *out_caller_frame = caller_frame;
   *out_caller_registers = caller_registers;
   return iree_vm_stack_function_leave(stack);
 }
@@ -479,7 +487,9 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
   // Call external function.
   iree_status_t call_status = call.function.module->begin_call(
       call.function.module->self, stack, &call, out_result);
-  if (IREE_UNLIKELY(!iree_status_is_ok(call_status))) {
+  if (iree_status_is_deferred(call_status)) {
+    return call_status;  // deferred for future resume
+  } else if (IREE_UNLIKELY(!iree_status_is_ok(call_status))) {
     // TODO(benvanik): set execution result to failure/capture stack.
     return iree_status_annotate(call_status,
                                 iree_make_cstring_view("while calling import"));
@@ -666,7 +676,11 @@ iree_status_t iree_vm_bytecode_dispatch_begin(
 iree_status_t iree_vm_bytecode_dispatch_resume(
     iree_vm_stack_t* stack, iree_vm_bytecode_module_t* module,
     iree_byte_span_t call_results, iree_vm_execution_result_t* out_result) {
-  iree_vm_stack_frame_t* current_frame = iree_vm_stack_current_frame(stack);
+  iree_vm_stack_frame_t* current_frame = iree_vm_stack_top(stack);
+  if (IREE_UNLIKELY(!current_frame)) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "no frame at top of stack to resume");
+  }
   iree_vm_registers_t regs =
       iree_vm_bytecode_get_register_storage(current_frame);
   // TODO(benvanik): assert the module is at the top of the frame? We should

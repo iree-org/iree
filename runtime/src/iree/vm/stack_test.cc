@@ -37,7 +37,7 @@ static iree_status_t SentinelStateResolver(
 // Tests simple stack usage, mainly just for demonstration.
 TEST(VMStackTest, Usage) {
   iree_vm_state_resolver_t state_resolver = {nullptr, SentinelStateResolver};
-  IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_INVOCATION_FLAG_NONE, 0,
+  IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_INVOCATION_FLAG_NONE,
                                   state_resolver, iree_allocator_system());
 
   EXPECT_EQ(nullptr, iree_vm_stack_current_frame(stack));
@@ -74,7 +74,7 @@ TEST(VMStackTest, Usage) {
 // Tests stack cleanup with unpopped frames (like during failure teardown).
 TEST(VMStackTest, DeinitWithRemainingFrames) {
   iree_vm_state_resolver_t state_resolver = {nullptr, SentinelStateResolver};
-  IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_INVOCATION_FLAG_NONE, 0,
+  IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_INVOCATION_FLAG_NONE,
                                   state_resolver, iree_allocator_system());
 
   iree_vm_function_t function_a = {MODULE_A_SENTINEL,
@@ -93,7 +93,7 @@ TEST(VMStackTest, DeinitWithRemainingFrames) {
 // Tests stack overflow detection.
 TEST(VMStackTest, StackOverflow) {
   iree_vm_state_resolver_t state_resolver = {nullptr, SentinelStateResolver};
-  IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_INVOCATION_FLAG_NONE, 0,
+  IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_INVOCATION_FLAG_NONE,
                                   state_resolver, iree_allocator_system());
 
   EXPECT_EQ(nullptr, iree_vm_stack_current_frame(stack));
@@ -123,7 +123,7 @@ TEST(VMStackTest, StackOverflow) {
 // Tests unbalanced stack popping.
 TEST(VMStackTest, UnbalancedPop) {
   iree_vm_state_resolver_t state_resolver = {nullptr, SentinelStateResolver};
-  IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_INVOCATION_FLAG_NONE, 0,
+  IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_INVOCATION_FLAG_NONE,
                                   state_resolver, iree_allocator_system());
 
   iree_status_t status = iree_vm_stack_function_leave(stack);
@@ -136,7 +136,7 @@ TEST(VMStackTest, UnbalancedPop) {
 // Tests module state reuse and querying.
 TEST(VMStackTest, ModuleStateQueries) {
   iree_vm_state_resolver_t state_resolver = {nullptr, SentinelStateResolver};
-  IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_INVOCATION_FLAG_NONE, 0,
+  IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_INVOCATION_FLAG_NONE,
                                   state_resolver, iree_allocator_system());
 
   EXPECT_EQ(nullptr, iree_vm_stack_current_frame(stack));
@@ -185,7 +185,7 @@ TEST(VMStackTest, ModuleStateQueryFailure) {
         // NOTE: always failing.
         return iree_make_status(IREE_STATUS_INTERNAL);
       }};
-  IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_INVOCATION_FLAG_NONE, 0,
+  IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_INVOCATION_FLAG_NONE,
                                   state_resolver, iree_allocator_system());
 
   // Push should fail if we can't query state, status should propagate.
