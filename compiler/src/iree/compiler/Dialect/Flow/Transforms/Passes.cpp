@@ -266,20 +266,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // wrapped in executables.
   passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
 
-  /// Print the dispatch graph in the Graphviz format.
-  if (clDumpDispatchGraph) {
-    std::string errorMessage;
-    static auto dotFile =
-        openOutputFile(clDumpDispatchGraphOutputFile, &errorMessage);
-    if (!dotFile) {
-      llvm::errs() << errorMessage << "\n";
-    } else {
-      passManager.addPass(
-          IREE::Flow::createDumpDispatchGraphPass(dotFile->os()));
-      dotFile->keep();
-    }
-  }
-
   // Strip assertions from executables. We could support them with a bunch of
   // work but our generated executables are designed to be safe in the face of
   // invalid values and it'd only be useful for debugging.
@@ -321,6 +307,20 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // Symbol DCE any remaining variables/functions that are now no longer
   // required.
   passManager.addPass(mlir::createSymbolDCEPass());
+
+  /// Print the dispatch graph in the Graphviz format.
+  if (clDumpDispatchGraph) {
+    std::string errorMessage;
+    static auto dotFile =
+        openOutputFile(clDumpDispatchGraphOutputFile, &errorMessage);
+    if (!dotFile) {
+      llvm::errs() << errorMessage << "\n";
+    } else {
+      passManager.addPass(
+          IREE::Flow::createDumpDispatchGraphPass(dotFile->os()));
+      dotFile->keep();
+    }
+  }
 }
 
 void registerFlowTransformPassPipeline() {
