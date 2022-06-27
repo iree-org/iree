@@ -39,6 +39,7 @@ set(CMAKE_PLATFORM_NO_VERSIONED_SONAME 1)
 declare_mlir_python_sources(IREECompilerAPIPythonSources
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   SOURCES
+    _mlir_libs/_site_initialize_0.py
     transforms/ireec.py
 )
 declare_mlir_python_sources(IREECompilerAPIPythonExtensions)
