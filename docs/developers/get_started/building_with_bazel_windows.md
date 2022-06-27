@@ -52,7 +52,7 @@ Using your shell of choice (such as PowerShell or [cmder](https://cmder.net/)),
 clone the repository, initialize its submodules, and configure:
 
 ```powershell
-> git clone https://github.com/google/iree.git
+> git clone https://github.com/iree-org/iree.git
 > cd iree
 > git submodule update --init
 > python configure_bazel.py

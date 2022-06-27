@@ -44,7 +44,7 @@ $ python3 -m pip install numpy
 Clone the repository, initialize its submodules and configure:
 
 ```shell
-$ git clone https://github.com/google/iree.git
+$ git clone https://github.com/iree-org/iree.git
 $ cd iree
 $ git submodule update --init
 $ python3 configure_bazel.py
