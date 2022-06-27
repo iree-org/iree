@@ -217,6 +217,9 @@ typedef struct iree_hal_vulkan_driver_options_t {
   // the instance and its devices are created.
   iree_hal_vulkan_features_t requested_features;
 
+  // Cutoff for debug output: 0=none, 1=errors, 2=warnings, 3=info, 4=debug.
+  int32_t debug_verbosity;
+
   // TODO(benvanik): remove this single setting - it would be nice instead to
   // pass a list to force device enumeration/matrix expansion or omit entirely
   // to have auto-discovered options based on capabilities. Right now this

@@ -24,6 +24,9 @@ IREE_FLAG(bool, vulkan_validation_layers, IREE_HAL_VULKAN_DEBUG_FLAG_DEFAULT,
           "Enables standard Vulkan validation layers.");
 IREE_FLAG(bool, vulkan_debug_utils, IREE_HAL_VULKAN_DEBUG_FLAG_DEFAULT,
           "Enables VK_EXT_debug_utils, records markers, and logs errors.");
+IREE_FLAG(int32_t, vulkan_debug_verbosity, 2,
+          "Cutoff for debug output; "
+          "0=none, 1=errors, 2=warnings, 3=info, 4=debug.");
 
 IREE_FLAG(bool, vulkan_tracing, true,
           "Enables Vulkan tracing (if IREE tracing is enabled).");
@@ -55,6 +58,7 @@ static iree_status_t iree_hal_vulkan_create_driver_with_flags(
   if (FLAG_vulkan_debug_utils) {
     driver_options.requested_features |=
         IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS;
+    driver_options.debug_verbosity = FLAG_vulkan_debug_verbosity;
   }
   if (FLAG_vulkan_tracing) {
     driver_options.requested_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING;

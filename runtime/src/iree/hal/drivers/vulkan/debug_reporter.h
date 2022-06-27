@@ -26,7 +26,7 @@ typedef struct iree_hal_vulkan_debug_reporter_t
 
 iree_status_t iree_hal_vulkan_debug_reporter_allocate(
     VkInstance instance, iree::hal::vulkan::DynamicSymbols* syms,
-    const VkAllocationCallbacks* allocation_callbacks,
+    int32_t min_verbosity, const VkAllocationCallbacks* allocation_callbacks,
     iree_allocator_t host_allocator,
     iree_hal_vulkan_debug_reporter_t** out_reporter);
 

@@ -16,6 +16,7 @@ struct iree_hal_vulkan_debug_reporter_t {
   iree_allocator_t host_allocator;
   VkInstance instance;
   iree::hal::vulkan::DynamicSymbols* syms;
+  int32_t min_verbosity;
   const VkAllocationCallbacks* allocation_callbacks;
   VkDebugUtilsMessengerEXT messenger;
 };
@@ -33,11 +34,31 @@ iree_hal_vulkan_debug_utils_message_callback(
     VkDebugUtilsMessageTypeFlagsEXT message_type,
     const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
     void* user_data) {
+  iree_hal_vulkan_debug_reporter_t* reporter =
+      (iree_hal_vulkan_debug_reporter_t*)user_data;
+
+  // Filter messages based on the verbosity setting.
+  // 0=none, 1=errors, 2=warnings, 3=info, 4=debug
+  char severity_char = '?';
+  int32_t message_verbosity = 0;
   if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-    fprintf(stderr, "[VULKAN] ! %s\n", callback_data->pMessage);
+    severity_char = '!';
+    message_verbosity = 1;
+  } else if (message_severity &
+             VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+    severity_char = 'w';
+    message_verbosity = 2;
+  } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
+    severity_char = 'i';
+    message_verbosity = 3;
   } else {
-    fprintf(stderr, "[VULKAN] w %s\n", callback_data->pMessage);
+    severity_char = 'v';
+    message_verbosity = 4;
   }
+  if (message_verbosity < reporter->min_verbosity) {
+    fprintf(stderr, "[VULKAN] %c %s\n", severity_char, callback_data->pMessage);
+  }
+
   return VK_FALSE;  // VK_TRUE is reserved for future use.
 }
 
@@ -73,7 +94,7 @@ static void iree_hal_vulkan_debug_reporter_populate_create_info(
 
 iree_status_t iree_hal_vulkan_debug_reporter_allocate(
     VkInstance instance, iree::hal::vulkan::DynamicSymbols* syms,
-    const VkAllocationCallbacks* allocation_callbacks,
+    int32_t min_verbosity, const VkAllocationCallbacks* allocation_callbacks,
     iree_allocator_t host_allocator,
     iree_hal_vulkan_debug_reporter_t** out_reporter) {
   IREE_ASSERT_ARGUMENT(instance);
@@ -90,6 +111,7 @@ iree_status_t iree_hal_vulkan_debug_reporter_allocate(
   reporter->host_allocator = host_allocator;
   reporter->instance = instance;
   reporter->syms = syms;
+  reporter->min_verbosity = min_verbosity;
   reporter->allocation_callbacks = allocation_callbacks;
 
   VkDebugUtilsMessengerCreateInfoEXT create_info;
