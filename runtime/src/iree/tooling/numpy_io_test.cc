@@ -297,6 +297,16 @@ TEST_F(NumpyIOTest, ArrayTypes) {
       stream, device_allocator_, {2}, IREE_HAL_ELEMENT_TYPE_FLOAT_64,
       IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, {-1.1, 1.1});
 
+  // np.array([1 + 5j, 2 + 6j], dtype=np.complex64)
+  LoadArrayAndAssertContents<float>(
+      stream, device_allocator_, {2}, IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64,
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, {1.0f, 5.0f, 2.0f, 6.0f});
+
+  // np.array([-1.1, 1.1], dtype=np.float64)
+  LoadArrayAndAssertContents<double>(
+      stream, device_allocator_, {2}, IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128,
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, {1.0, 5.0, 2.0, 6.0});
+
   // Should have hit EOF.
   ASSERT_TRUE(IsEOF(stream));
   fclose(stream);
