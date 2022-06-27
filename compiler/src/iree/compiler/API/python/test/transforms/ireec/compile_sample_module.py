@@ -29,8 +29,6 @@ from iree.compiler.dialects import vector
 
 # Test the compiler API.
 with ir.Context() as ctx:
-  ireec.register_all_dialects(ctx)
-
   input_module = ir.Module.parse(r"""
     builtin.module  {
       func.func @fabs(%arg0: tensor<1x4xf32>, %arg1: tensor<4x1xf32>) -> tensor<4x4xf32> {

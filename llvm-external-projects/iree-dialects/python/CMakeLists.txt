@@ -85,15 +85,12 @@ declare_mlir_python_extension(IREEDialectsPythonExtensions.Main
 ################################################################################
 
 set(_source_components
-  # TODO: Core is now implicitly building/registering all dialects, increasing
-  # build burden by ~5x. Make it stop.
   MLIRPythonSources.Core
   MLIRPythonSources.Dialects.builtin
   MLIRPythonSources.Dialects.cf
   MLIRPythonSources.Dialects.func
   MLIRPythonSources.Dialects.pdl
   MLIRPythonSources.Dialects.transform
-  MLIRPythonSources.Passes
   IREEDialectsPythonSources
   IREEDialectsPythonExtensions
 )
