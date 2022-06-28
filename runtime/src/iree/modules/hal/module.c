@@ -1407,8 +1407,8 @@ static const iree_vm_native_export_descriptor_t iree_hal_module_exports_[] = {
       .local_name = iree_string_view_literal(name),                \
       .calling_convention =                                        \
           iree_string_view_literal("0" #arg_types "_" #ret_types), \
-      .reflection_attr_count = 0,                                  \
-      .reflection_attrs = NULL,                                    \
+      .attr_count = 0,                                             \
+      .attrs = NULL,                                               \
   },
 #include "iree/modules/hal/exports.inl"  // IWYU pragma: keep
 #undef EXPORT_FN
@@ -1419,14 +1419,14 @@ static_assert(IREE_ARRAYSIZE(iree_hal_module_funcs_) ==
 
 static const iree_vm_native_module_descriptor_t iree_hal_module_descriptor_ = {
     .module_name = iree_string_view_literal("hal"),
+    .module_attr_count = 0,
+    .module_attrs = NULL,
     .import_count = 0,  // workaround for 0-length C struct
     .imports = iree_hal_module_imports_,
     .export_count = IREE_ARRAYSIZE(iree_hal_module_exports_),
     .exports = iree_hal_module_exports_,
     .function_count = IREE_ARRAYSIZE(iree_hal_module_funcs_),
     .functions = iree_hal_module_funcs_,
-    .reflection_attr_count = 0,
-    .reflection_attrs = NULL,
 };
 
 IREE_API_EXPORT iree_status_t
