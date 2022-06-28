@@ -843,6 +843,7 @@ cc_binary(
         "@llvm-project//mlir:PDLInterpDialect",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SCFTransformOps",
+        "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TransformDialect",
