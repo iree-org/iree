@@ -41,11 +41,11 @@ LLVMTargetOptions getDefaultLLVMTargetOptions() {
 
     // LLVM loop optimization options.
     targetOptions.pipelineTuningOptions.LoopInterleaving = true;
-    targetOptions.pipelineTuningOptions.LoopVectorization = true;
-    targetOptions.pipelineTuningOptions.LoopUnrolling = true;
+    targetOptions.pipelineTuningOptions.LoopVectorization = false;
+    targetOptions.pipelineTuningOptions.LoopUnrolling = false;
 
     // LLVM SLP Auto vectorizer.
-    targetOptions.pipelineTuningOptions.SLPVectorization = true;
+    targetOptions.pipelineTuningOptions.SLPVectorization = false;
 
     // LLVM -O3.
     // TODO(benvanik): add an option for this.
@@ -81,10 +81,10 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
       "iree-llvm-loop-interleaving", llvm::cl::init(false),
       llvm::cl::desc("Enable LLVM loop interleaving opt"));
   static llvm::cl::opt<bool> llvmLoopVectorization(
-      "iree-llvm-loop-vectorization", llvm::cl::init(true),
+      "iree-llvm-loop-vectorization", llvm::cl::init(false),
       llvm::cl::desc("Enable LLVM loop vectorization opt"));
   static llvm::cl::opt<bool> llvmLoopUnrolling(
-      "iree-llvm-loop-unrolling", llvm::cl::init(true),
+      "iree-llvm-loop-unrolling", llvm::cl::init(false),
       llvm::cl::desc("Enable LLVM loop unrolling opt"));
   static llvm::cl::opt<bool> llvmSLPVectorization(
       "iree-llvm-slp-vectorization", llvm::cl::init(false),
