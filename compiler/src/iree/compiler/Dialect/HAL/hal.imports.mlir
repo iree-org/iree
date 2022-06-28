@@ -15,6 +15,7 @@ vm.import @ex.submit_and_wait(
   %device : !vm.ref<!hal.device>,
   %command_buffer : !vm.ref<!hal.command_buffer>
 )
+attributes {vm.yield}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_allocator_t
@@ -378,6 +379,6 @@ vm.import @semaphore.await(
   %semaphore : !vm.ref<!hal.semaphore>,
   %min_value : i64
 ) -> i32
-// TODO(benvanik): yield point trait.
+attributes {vm.yield}
 
 }  // module
