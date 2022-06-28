@@ -49,12 +49,12 @@ static const iree_vm_native_module_descriptor_t
         iree_make_cstring_view("native_import_module"),
         0,
         NULL,
+        0,
+        NULL,
         IREE_ARRAYSIZE(native_import_module_exports_),
         native_import_module_exports_,
         IREE_ARRAYSIZE(native_import_module_funcs_),
         native_import_module_funcs_,
-        0,
-        NULL,
 };
 
 static iree_status_t native_import_module_create(

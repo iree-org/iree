@@ -236,19 +236,18 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
 // the argument objects/attrs.
 static iree_vm_FunctionSignatureDef_ref_t createFunctionSignatureDef(
     FunctionType functionType, llvm::DenseMap<Type, int> &typeTable,
-    StringRef callingConvention,
-    iree_vm_ReflectionAttrDef_vec_ref_t reflectionAttrsRef,
+    StringRef callingConvention, iree_vm_AttrDef_vec_ref_t attrsRef,
     FlatbufferBuilder &fbb) {
   // If the signature would be empty then let's avoid writing the empty table.
   auto callingConventionRef = fbb.createString(callingConvention);
-  if (!callingConventionRef && !reflectionAttrsRef) {
+  if (!callingConventionRef && !attrsRef) {
     return 0;
   }
 
   iree_vm_FunctionSignatureDef_start(fbb);
   iree_vm_FunctionSignatureDef_calling_convention_add(fbb,
                                                       callingConventionRef);
-  iree_vm_FunctionSignatureDef_reflection_attrs_add(fbb, reflectionAttrsRef);
+  iree_vm_FunctionSignatureDef_attrs_add(fbb, attrsRef);
   return iree_vm_FunctionSignatureDef_end(fbb);
 }
 
@@ -260,8 +259,7 @@ static iree_vm_FunctionSignatureDef_ref_t makeImportFunctionSignatureDef(
   auto cconv = makeImportCallingConventionString(importOp);
   if (!cconv.hasValue()) return {};
   return createFunctionSignatureDef(importOp.getFunctionType(), typeTable,
-                                    cconv.getValue(), /*reflectionAttrsRef=*/0,
-                                    fbb);
+                                    cconv.getValue(), /*attrsRef=*/0, fbb);
 }
 
 // Returns a serialized function signature.
@@ -273,27 +271,25 @@ static iree_vm_FunctionSignatureDef_ref_t makeExportFunctionSignatureDef(
   if (!cconv.hasValue()) return {};
 
   // Reflection attributes.
-  iree_vm_ReflectionAttrDef_vec_ref_t reflectionAttrsRef = 0;
-  if (auto reflectionAttrs =
-          funcOp->getAttrOfType<DictionaryAttr>("iree.reflection")) {
-    SmallVector<iree_vm_ReflectionAttrDef_ref_t, 4> reflectionAttrRefs;
-    for (auto reflectionAttr : reflectionAttrs) {
-      auto key = reflectionAttr.getName().strref();
-      auto value = reflectionAttr.getValue().dyn_cast<StringAttr>();
+  iree_vm_AttrDef_vec_ref_t attrsRef = 0;
+  if (auto attrs = funcOp->getAttrOfType<DictionaryAttr>("iree.reflection")) {
+    SmallVector<iree_vm_AttrDef_ref_t, 4> attrRefs;
+    for (auto attr : attrs) {
+      auto key = attr.getName().strref();
+      auto value = attr.getValue().dyn_cast<StringAttr>();
       if (!value || key.empty()) continue;
       // NOTE: if we actually want to keep these we should dedupe them (as the
       // keys and likely several of the values are shared across all functions).
       auto valueRef = fbb.createString(value.getValue());
       auto keyRef = fbb.createString(key);
-      reflectionAttrRefs.push_back(
-          iree_vm_ReflectionAttrDef_create(fbb, keyRef, valueRef));
+      attrRefs.push_back(iree_vm_AttrDef_create(fbb, keyRef, valueRef));
     }
-    reflectionAttrsRef = iree_vm_ReflectionAttrDef_vec_create(
-        fbb, reflectionAttrRefs.data(), reflectionAttrRefs.size());
+    attrsRef =
+        iree_vm_AttrDef_vec_create(fbb, attrRefs.data(), attrRefs.size());
   }
 
   return createFunctionSignatureDef(funcOp.getFunctionType(), typeTable,
-                                    cconv.getValue(), reflectionAttrsRef, fbb);
+                                    cconv.getValue(), attrsRef, fbb);
 }
 
 // Returns a serialized function signature.
@@ -304,8 +300,7 @@ static iree_vm_FunctionSignatureDef_ref_t makeInternalFunctionSignatureDef(
   auto cconv = makeCallingConventionString(funcOp);
   if (!cconv.hasValue()) return {};
   return createFunctionSignatureDef(funcOp.getFunctionType(), typeTable,
-                                    cconv.getValue(), /*reflectionAttrsRef=*/0,
-                                    fbb);
+                                    cconv.getValue(), /*attrsRef=*/0, fbb);
 }
 
 // Builds a complete BytecodeModuleDef FlatBuffer object in |fbb|.

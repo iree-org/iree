@@ -103,6 +103,19 @@ iree_vm_native_module_signature(void* self) {
   return signature;
 }
 
+static iree_status_t IREE_API_PTR iree_vm_native_module_get_module_attr(
+    void* self, iree_host_size_t index, iree_string_pair_t* out_attr) {
+  iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
+  if (module->user_interface.get_module_attr) {
+    return module->user_interface.get_module_attr(module->self, index,
+                                                  out_attr);
+  } else if (index >= module->descriptor->module_attr_count) {
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
+  }
+  *out_attr = module->descriptor->module_attrs[index];
+  return iree_ok_status();
+}
+
 static iree_status_t IREE_API_PTR iree_vm_native_module_get_import_function(
     iree_vm_native_module_t* module, iree_host_size_t ordinal,
     iree_vm_function_t* out_function, iree_string_view_t* out_name,
@@ -125,7 +138,6 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_get_import_function(
   if (out_name) {
     *out_name = import_descriptor->full_name;
   }
-  // TODO(#1979): signature queries when info is useful.
   return iree_ok_status();
 }
 
@@ -181,15 +193,13 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_get_function(
   }
 }
 
-static iree_status_t IREE_API_PTR
-iree_vm_native_module_get_function_reflection_attr(
+static iree_status_t IREE_API_PTR iree_vm_native_module_get_function_attr(
     void* self, iree_vm_function_linkage_t linkage, iree_host_size_t ordinal,
-    iree_host_size_t index, iree_string_view_t* key,
-    iree_string_view_t* value) {
+    iree_host_size_t index, iree_string_pair_t* out_attr) {
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
-  if (module->user_interface.get_function_reflection_attr) {
-    return module->user_interface.get_function_reflection_attr(
-        module->self, linkage, ordinal, index, key, value);
+  if (module->user_interface.get_function_attr) {
+    return module->user_interface.get_function_attr(module->self, linkage,
+                                                    ordinal, index, out_attr);
   }
   // TODO(benvanik): implement native module reflection.
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -465,11 +475,13 @@ IREE_API_EXPORT iree_status_t iree_vm_native_module_initialize(
   module->base_interface.destroy = iree_vm_native_module_destroy;
   module->base_interface.name = iree_vm_native_module_name;
   module->base_interface.signature = iree_vm_native_module_signature;
-  module->base_interface.get_function = iree_vm_native_module_get_function;
-  module->base_interface.get_function_reflection_attr =
-      iree_vm_native_module_get_function_reflection_attr;
+  module->base_interface.get_module_attr =
+      iree_vm_native_module_get_module_attr;
   module->base_interface.lookup_function =
       iree_vm_native_module_lookup_function;
+  module->base_interface.get_function = iree_vm_native_module_get_function;
+  module->base_interface.get_function_attr =
+      iree_vm_native_module_get_function_attr;
   module->base_interface.alloc_state = iree_vm_native_module_alloc_state;
   module->base_interface.free_state = iree_vm_native_module_free_state;
   module->base_interface.resolve_import = iree_vm_native_module_resolve_import;

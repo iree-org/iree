@@ -21,7 +21,7 @@ iree_cc_library(
     LLVMSupport
     MLIRGPUOps
     MLIRIR
-    MLIRSPIRV
+    MLIRSPIRVDialect
     MLIRSPIRVSerialization
     SPIRV-Tools
     iree::compiler::Codegen::Dialect::IREECodegenDialect

@@ -216,8 +216,9 @@ static iree_status_t iree_hal_vmvx_executable_create(
           .linkage = IREE_VM_FUNCTION_LINKAGE_EXPORT,
           .ordinal = executable->entry_fn_ordinals[i],
       };
-      iree_string_view_t local_memory_str = iree_vm_function_reflection_attr(
-          &entry_fn, iree_make_cstring_view("local_memory"));
+      iree_string_view_t local_memory_str =
+          iree_vm_function_lookup_attr_by_name(
+              &entry_fn, iree_make_cstring_view("local_memory"));
       uint32_t local_memory_size = 0;
       if (!iree_string_view_is_empty(local_memory_str)) {
         iree_string_view_atoi_uint32(local_memory_str, &local_memory_size);
