@@ -46,6 +46,7 @@ iree_compiler_cc_library(
     name = "Common",
     srcs = [
         "IREEImportPublic.cpp",
+        "ImportMLProgram.cpp",
         "Passes.cpp",
         "QuantizedMatmulToMatmul.cpp",
         "SanitizeModuleNames.cpp",
@@ -67,6 +68,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:LinalgUtils",
+        "@llvm-project//mlir:MLProgramDialect",
         "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",

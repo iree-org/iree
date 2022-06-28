@@ -6,10 +6,10 @@
 
 #include "TransformDialectFlowExtensions.h"
 
-#include "iree-dialects/Transforms/Functional.h"
+#include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
-#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/Transforms/RegionUtils.h"
@@ -117,7 +117,7 @@ static void rewriteExtractSlices(PatternRewriter &rewriter,
                                  ValueRange tensorDynamicDims,
                                  BlockAndValueMapping tensorToFlowBvm) {
   dispatchOp->walk([&](tensor::ExtractSliceOp extractSliceOp) {
-    Value source = extractSliceOp.source();
+    Value source = extractSliceOp.getSource();
     auto it = llvm::find(tensorOperands, source);
     if (it == tensorOperands.end()) return;
     int64_t index = std::distance(tensorOperands.begin(), it);
@@ -142,7 +142,7 @@ static void rewriteExtractSlices(PatternRewriter &rewriter,
   });
 }
 
-/// Pattern to rewrite a ForeachThreadOp into a Flow::DispatchWorkGroupsOp.
+/// Rewrite a ForeachThreadOp into a Flow::DispatchWorkGroupsOp.
 /// This rewrite proceeds in a few steps:
 ///   - Step 1: Compute the result types and their result dynamic dim operands.
 ///     This first step takes advantage of the ops contained in the
@@ -164,22 +164,12 @@ static void rewriteExtractSlices(PatternRewriter &rewriter,
 ///   - Step 10: Perform RAUWIf.
 ///   - Step 11: Drop the terminator and replace foreachThreadOp.
 // TODO: n-D ForeachThreadOp
-struct ForeachThreadToFlowDispatchWorkgroupsRewriter
-    : public OpRewritePattern<scf::ForeachThreadOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  FailureOr<Flow::DispatchWorkgroupsOp> returningMatchAndRewrite(
-      scf::ForeachThreadOp foreachThreadOp, PatternRewriter &rewriter) const;
-
-  LogicalResult matchAndRewrite(scf::ForeachThreadOp foreachThreadOp,
-                                PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(foreachThreadOp, rewriter);
-  }
-};
-
 FailureOr<Flow::DispatchWorkgroupsOp>
-ForeachThreadToFlowDispatchWorkgroupsRewriter::returningMatchAndRewrite(
-    scf::ForeachThreadOp foreachThreadOp, PatternRewriter &rewriter) const {
+rewriteForeachThreadToFlowDispatchWorkgroups(
+    scf::ForeachThreadOp foreachThreadOp, PatternRewriter &rewriter) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(foreachThreadOp);
+
   // Entry point start just before the foreachThreadOp.
   Location loc = foreachThreadOp.getLoc();
   scf::PerformConcurrentlyOp performConcurrentlyOp =
@@ -379,9 +369,9 @@ transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::apply(
     transform::TransformResults &results, transform::TransformState &state) {
   if (state.getTopLevel()
           ->walk<WalkOrder::PostOrder>([&](scf::ForeachThreadOp op) {
-            if (failed(functional::applyReturningPatternAt(
-                    ForeachThreadToFlowDispatchWorkgroupsRewriter(getContext()),
-                    op)))
+            SimplePatternRewriter rewriter(op);
+            if (failed(
+                    rewriteForeachThreadToFlowDispatchWorkgroups(op, rewriter)))
               return WalkResult::interrupt();
             return WalkResult::advance();
           })

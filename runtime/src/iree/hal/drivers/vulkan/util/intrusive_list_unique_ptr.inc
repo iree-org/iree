@@ -12,7 +12,7 @@
 #include <cstddef>
 #include <memory>
 
-#include "iree/base/logging.h"
+#include "iree/base/assert.h"
 #include "iree/hal/drivers/vulkan/util/intrusive_list.h"
 
 namespace iree {
@@ -90,17 +90,17 @@ class IntrusiveListUniquePtrBase
     }
     auto* link = impl::TToLink<T, kOffset>(value);
     if (link->prev) {
-      IREE_DCHECK_NE(link, head_);
+      IREE_ASSERT_NE(link, head_);
       link->prev->next = link->next;
     } else {
-      IREE_DCHECK_EQ(link, head_);
+      IREE_ASSERT_EQ(link, head_);
       head_ = link->next;
     }
     if (link->next) {
-      IREE_DCHECK_NE(link, tail_);
+      IREE_ASSERT_NE(link, tail_);
       link->next->prev = link->prev;
     } else {
-      IREE_DCHECK_EQ(link, tail_);
+      IREE_ASSERT_EQ(link, tail_);
       tail_ = link->prev;
     }
     link->next = link->prev = nullptr;

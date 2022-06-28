@@ -102,6 +102,7 @@ iree_cc_library(
     MLIRLinalgToLLVM
     MLIRLinalgToSPIRV
     MLIRLinalgTransforms
+    MLIRMLProgramDialect
     MLIRQuantDialect
     MLIRQuantTransforms
     MLIRSCFDialect

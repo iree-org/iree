@@ -15,6 +15,7 @@
 typedef struct iree_hal_cuda_semaphore_t {
   iree_hal_semaphore_t base;
   iree_hal_cuda_context_wrapper_t* context;
+  iree_atomic_int64_t value;
 } iree_hal_cuda_semaphore_t;
 
 static const iree_hal_semaphore_vtable_t iree_hal_cuda_semaphore_vtable;
@@ -39,6 +40,8 @@ iree_status_t iree_hal_cuda_semaphore_create(
     iree_hal_semaphore_initialize(&iree_hal_cuda_semaphore_vtable,
                                   &semaphore->base);
     semaphore->context = context;
+    iree_atomic_store_int64(&semaphore->value, initial_value,
+                            iree_memory_order_release);
     *out_semaphore = &semaphore->base;
   }
 
@@ -61,9 +64,12 @@ static void iree_hal_cuda_semaphore_destroy(
 
 static iree_status_t iree_hal_cuda_semaphore_query(
     iree_hal_semaphore_t* base_semaphore, uint64_t* out_value) {
+  iree_hal_cuda_semaphore_t* semaphore =
+      iree_hal_cuda_semaphore_cast(base_semaphore);
   // TODO: Support semaphores completely.
-  *out_value = 0;
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "Not impemented on CUDA");
+  *out_value =
+      iree_atomic_load_int64(&semaphore->value, iree_memory_order_acquire);
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda_semaphore_signal(
@@ -72,6 +78,8 @@ static iree_status_t iree_hal_cuda_semaphore_signal(
       iree_hal_cuda_semaphore_cast(base_semaphore);
   // TODO: Support semaphores completely. Return OK currently as everything is
   // synchronized for each submit to allow things to run.
+  iree_atomic_store_int64(&semaphore->value, new_value,
+                          iree_memory_order_release);
   iree_hal_semaphore_poll(&semaphore->base);
   return iree_ok_status();
 }

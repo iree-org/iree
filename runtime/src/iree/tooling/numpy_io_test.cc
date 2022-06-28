@@ -26,8 +26,7 @@ class NumpyIOTest : public ::testing::Test {
         iree_hal_available_driver_registry(), IREE_SV("local-sync"),
         iree_allocator_system(), &device_);
     if (iree_status_is_not_found(status)) {
-      IREE_LOG(WARNING)
-          << "Skipping test as 'local-sync' driver was not found:";
+      fprintf(stderr, "Skipping test as 'local-sync' driver was not found:\n");
       iree_status_fprint(stderr, status);
       iree_status_free(status);
       GTEST_SKIP();
@@ -46,7 +45,10 @@ class NumpyIOTest : public ::testing::Test {
     if (!test_tmpdir) {
       test_tmpdir = getenv("TEMP");
     }
-    IREE_CHECK(test_tmpdir) << "TEST_TMPDIR/TMPDIR/TEMP not defined";
+    if (!test_tmpdir) {
+      std::cerr << "TEST_TMPDIR/TMPDIR/TEMP not defined\n";
+      exit(1);
+    }
     return test_tmpdir + std::string("/iree_test_") +
            std::to_string(unique_id++) + '_' + suffix;
   }
@@ -294,6 +296,16 @@ TEST_F(NumpyIOTest, ArrayTypes) {
   LoadArrayAndAssertContents<double>(
       stream, device_allocator_, {2}, IREE_HAL_ELEMENT_TYPE_FLOAT_64,
       IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, {-1.1, 1.1});
+
+  // np.array([1 + 5j, 2 + 6j], dtype=np.complex64)
+  LoadArrayAndAssertContents<float>(
+      stream, device_allocator_, {2}, IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64,
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, {1.0f, 5.0f, 2.0f, 6.0f});
+
+  // np.array([-1.1, 1.1], dtype=np.float64)
+  LoadArrayAndAssertContents<double>(
+      stream, device_allocator_, {2}, IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128,
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, {1.0, 5.0, 2.0, 6.0});
 
   // Should have hit EOF.
   ASSERT_TRUE(IsEOF(stream));

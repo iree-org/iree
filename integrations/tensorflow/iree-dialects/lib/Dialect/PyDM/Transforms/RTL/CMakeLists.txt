@@ -11,7 +11,7 @@ add_mlir_library(IREEPyDMRTLPasses
   IREEPyDMDialect
   MLIRIR
   MLIRParser
-  MLIRFunc
+  MLIRFuncDialect
   MLIRTransformUtils
 )
 

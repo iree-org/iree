@@ -15,7 +15,6 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
-#include "iree/base/logging.h"
 #include "iree/base/status_cc.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
@@ -185,7 +184,7 @@ extern "C" int main(int argc, char** argv) {
   IREE_FORCE_BINARY_STDIN();
 
   if (argc < 2) {
-    IREE_LOG(ERROR)
+    std::cerr
         << "A binary module file path to run (or - for stdin) must be passed";
     return -1;
   }

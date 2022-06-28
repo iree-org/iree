@@ -24,6 +24,7 @@ struct BytecodeLocation {
 };
 
 struct FunctionSourceMap {
+  std::string localName;
   SmallVector<BytecodeLocation> locations;
 };
 

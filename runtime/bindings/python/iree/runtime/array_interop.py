@@ -241,6 +241,8 @@ _DTYPE_TO_HAL_ELEMENT_TYPE = (
     (np.uint16, HalElementType.UINT_16),
     (np.uint8, HalElementType.UINT_8),
     (np.bool_, HalElementType.BOOL_8),
+    (np.complex64, HalElementType.COMPLEX_64),
+    (np.complex128, HalElementType.COMPLEX_128),
 )
 
 

@@ -28,12 +28,10 @@ vm.import @allocator.allocate(
   %allocation_size : i64
 ) -> !vm.ref<!hal.buffer>
 
-// Maps a host byte buffer into a device buffer.
-// If try!=0 then returns null if the given memory type cannot be mapped.
-// Host-local+constant requests will always succeed.
-vm.import @allocator.map.byte_buffer(
+// Allocates a buffer from the allocator with an initial value provided by a
+// VM byte buffer.
+vm.import @allocator.allocate.initialized(
   %allocator : !vm.ref<!hal.allocator>,
-  %try : i32,
   %memory_types : i32,
   %buffer_usage : i32,
   %source : !vm.buffer,
@@ -41,11 +39,12 @@ vm.import @allocator.map.byte_buffer(
   %length : i64
 ) -> !vm.ref<!hal.buffer>
 
-// TODO(benvanik): remove wrap.
-// Wraps a subrange of a read-only host memory buffer.
-// Host mapping must be supported by the allocator.
-vm.import @allocator.wrap.byte_buffer(
+// Maps a host byte buffer into a device buffer.
+// If try!=0 then returns null if the given memory type cannot be mapped.
+// Host-local+constant requests will always succeed.
+vm.import @allocator.map.byte_buffer(
   %allocator : !vm.ref<!hal.allocator>,
+  %try : i32,
   %memory_types : i32,
   %buffer_usage : i32,
   %source : !vm.buffer,

@@ -155,10 +155,10 @@ def ConvertLinalgMatmulToMmt4D :
   ];
 }
 
-def PadTensorToSubTensorInsert :
-    Pass<"iree-flow-pad-tensor-to-subtensor-insert", ""> {
-  let summary = "Convert linalg.pad_tensor into linalg.fill + subtensor_insert";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createPadTensorToSubTensorInsertPass()";
+def PadTensorToTensorInsertSlice :
+    Pass<"iree-flow-pad-tensor-to-tensor-insert-slice", ""> {
+  let summary = "Convert linalg.pad_tensor into linalg.fill + tensor.insert_slice";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createPadTensorToTensorInsertSlicePass()";
 }
 
 def DumpDispatchGraph : Pass<"iree-flow-dump-dispatch-graph-pass"> {

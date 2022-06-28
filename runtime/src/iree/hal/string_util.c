@@ -127,6 +127,8 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_element_type(
     numerical_type = IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE;
   } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("bf"))) {
     numerical_type = IREE_HAL_NUMERICAL_TYPE_FLOAT_BRAIN;
+  } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("cf"))) {
+    numerical_type = IREE_HAL_NUMERICAL_TYPE_FLOAT_COMPLEX;
   } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("x")) ||
              iree_string_view_consume_prefix(&str_value, IREE_SV("*"))) {
     numerical_type = IREE_HAL_NUMERICAL_TYPE_UNKNOWN;
@@ -175,6 +177,9 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element_type(
       break;
     case IREE_HAL_NUMERICAL_TYPE_FLOAT_BRAIN:
       prefix = "bf";
+      break;
+    case IREE_HAL_NUMERICAL_TYPE_FLOAT_COMPLEX:
+      prefix = "cf";
       break;
     default:
       prefix = "*";

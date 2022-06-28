@@ -201,13 +201,6 @@ $ ../iree-build/tools/iree-dump-module /tmp/simple_abs_vmvx.vmfb
 
 There are a few useful generic flags when working with IREE tools:
 
-#### `--iree_minloglevel` and `--iree_v`
-
-These flags can control IREE tool output verbosity. `--iree_minloglevel` and
-`--iree_v` set the minimal and maximal verbosity levels respectively. They both
-accept a number where 0, 1, 2, 3 stands for info, warning, error, and fatal
-error respectively.
-
 #### Read inputs from a file
 
 All the IREE tools support reading input values from a file. This is quite

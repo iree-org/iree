@@ -136,11 +136,11 @@ typedef struct iree_vm_stack_frame_header_t {
   // in the frame storage. May be NULL.
   struct iree_vm_stack_frame_header_t* parent;
 
-  // Stack frame type used to determine which fields are valid.
-  iree_vm_stack_frame_type_t type;
-
   // Size, in bytes, of the additional stack frame data that follows the frame.
   iree_host_size_t data_size;
+
+  // Opened trace zone ID or 0 if none assigned.
+  IREE_TRACE(iree_zone_id_t trace_zone;)
 
   // Function called when the stack frame is left.
   iree_vm_stack_frame_cleanup_fn_t frame_cleanup_fn;
@@ -181,11 +181,6 @@ struct iree_vm_stack_t {
   // may transition to owning it on dynamic growth.
   bool owns_frame_storage;
 
-  // An opaque ID unique for the entire process lifetime.
-  // If tracing then this points at a NUL-terminated string with process
-  // lifetime.
-  iree_vm_context_id_t context_id;
-
   // Resolves a module to a module state within a context.
   // This will be called on function entry whenever module transitions occur.
   iree_vm_state_resolver_t state_resolver;
@@ -201,8 +196,8 @@ struct iree_vm_stack_t {
 
 IREE_API_EXPORT iree_status_t iree_vm_stack_initialize(
     iree_byte_span_t storage, iree_vm_invocation_flags_t flags,
-    iree_vm_context_id_t context_id, iree_vm_state_resolver_t state_resolver,
-    iree_allocator_t allocator, iree_vm_stack_t** out_stack) {
+    iree_vm_state_resolver_t state_resolver, iree_allocator_t allocator,
+    iree_vm_stack_t** out_stack) {
   IREE_ASSERT_ARGUMENT(out_stack);
   *out_stack = NULL;
   if (storage.data_length < IREE_VM_STACK_MIN_SIZE) {
@@ -218,7 +213,6 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_initialize(
   memset(stack, 0, sizeof(iree_vm_stack_t));
   stack->owns_frame_storage = false;
   stack->flags = flags;
-  stack->context_id = context_id;
   stack->state_resolver = state_resolver;
   stack->allocator = allocator;
 
@@ -251,9 +245,8 @@ IREE_API_EXPORT void iree_vm_stack_deinitialize(iree_vm_stack_t* stack) {
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_stack_allocate(
-    iree_vm_invocation_flags_t flags, iree_vm_context_id_t context_id,
-    iree_vm_state_resolver_t state_resolver, iree_allocator_t allocator,
-    iree_vm_stack_t** out_stack) {
+    iree_vm_invocation_flags_t flags, iree_vm_state_resolver_t state_resolver,
+    iree_allocator_t allocator, iree_vm_stack_t** out_stack) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   *out_stack = NULL;
@@ -265,8 +258,8 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_allocate(
   iree_vm_stack_t* stack = NULL;
   if (iree_status_is_ok(status)) {
     iree_byte_span_t storage_span = iree_make_byte_span(storage, storage_size);
-    status = iree_vm_stack_initialize(storage_span, flags, context_id,
-                                      state_resolver, allocator, &stack);
+    status = iree_vm_stack_initialize(storage_span, flags, state_resolver,
+                                      allocator, &stack);
   }
 
   *out_stack = stack;
@@ -290,9 +283,21 @@ iree_vm_stack_invocation_flags(const iree_vm_stack_t* stack) {
   return stack->flags;
 }
 
-IREE_API_EXPORT iree_vm_context_id_t
-iree_vm_stack_context_id(const iree_vm_stack_t* stack) {
-  return stack->context_id;
+IREE_API_EXPORT iree_vm_stack_frame_t* iree_vm_stack_top(
+    iree_vm_stack_t* stack) {
+  if (!stack->top) {
+    // Stack empty.
+    return NULL;
+  } else if (stack->top->frame.type != IREE_VM_STACK_FRAME_WAIT) {
+    // Non-wait frame; return current.
+    return &stack->top->frame;
+  } else {
+    // Wait frame; return parent frame.
+    // Only one wait frame can be active so we know that the parent isn't one.
+    // We technically also know that the parent can't be NULL, but check for it
+    // to be safe.
+    return stack->top->parent ? &stack->top->parent->frame : NULL;
+  }
 }
 
 IREE_API_EXPORT iree_vm_stack_frame_t* iree_vm_stack_current_frame(
@@ -387,6 +392,142 @@ static iree_status_t iree_vm_stack_grow(iree_vm_stack_t* stack,
   return iree_ok_status();
 }
 
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+static iree_zone_id_t iree_vm_stack_trace_wait_zone_begin(
+    iree_vm_wait_type_t wait_type, iree_host_size_t wait_count) {
+  switch (wait_type) {
+    default:
+    case IREE_VM_WAIT_UNTIL: {
+      IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_vm_stack_wait_until");
+      return z0;
+    }
+    case IREE_VM_WAIT_ANY: {
+      IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_vm_stack_wait_any");
+      IREE_TRACE_ZONE_APPEND_VALUE(z0, wait_count);
+      return z0;
+    }
+    case IREE_VM_WAIT_ALL: {
+      IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_vm_stack_wait_all");
+      IREE_TRACE_ZONE_APPEND_VALUE(z0, wait_count);
+      return z0;
+    }
+  }
+}
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+
+IREE_API_EXPORT iree_status_t iree_vm_stack_wait_enter(
+    iree_vm_stack_t* stack, iree_vm_wait_type_t wait_type,
+    iree_host_size_t wait_count, iree_timeout_t timeout,
+    iree_zone_id_t trace_zone, iree_vm_wait_frame_t** out_wait_frame) {
+  IREE_ASSERT_ARGUMENT(out_wait_frame);
+  *out_wait_frame = NULL;
+
+  iree_host_size_t frame_size = iree_host_align(
+      sizeof(iree_vm_wait_frame_t) + wait_count * sizeof(iree_wait_source_t),
+      16);
+
+  // Allocate stack space and grow stack, if required.
+  iree_host_size_t header_size = sizeof(iree_vm_stack_frame_header_t);
+  iree_host_size_t new_top =
+      stack->frame_storage_size + header_size + frame_size;
+  if (IREE_UNLIKELY(new_top > stack->frame_storage_capacity)) {
+    IREE_RETURN_IF_ERROR(iree_vm_stack_grow(stack, new_top));
+  }
+
+  // Try to reuse the same module state if the caller and callee are from the
+  // same module. Otherwise, query the state from the registered handler.
+  iree_vm_stack_frame_header_t* caller_frame_header = stack->top;
+  iree_vm_stack_frame_t* caller_frame =
+      caller_frame_header ? &caller_frame_header->frame : NULL;
+
+  // Bump pointer and get real stack pointer offsets.
+  iree_vm_stack_frame_header_t* frame_header =
+      (iree_vm_stack_frame_header_t*)((uintptr_t)stack->frame_storage +
+                                      stack->frame_storage_size);
+  memset(frame_header, 0, header_size + frame_size);
+
+  frame_header->frame_size = header_size + frame_size;
+  frame_header->parent = stack->top;
+  frame_header->data_size = frame_size;
+  // TODO(benvanik): allow a custom cleanup function so callers can be notified
+  // of aborted waits on the stack? Today normal stack cleanup will take care of
+  // things but we may want to support cancellation.
+  frame_header->frame_cleanup_fn = NULL;
+
+  iree_vm_stack_frame_t* callee_frame = &frame_header->frame;
+  callee_frame->type = IREE_VM_STACK_FRAME_WAIT;
+  callee_frame->depth = caller_frame ? caller_frame->depth + 1 : 0;
+
+  stack->frame_storage_size = new_top;
+  stack->top = frame_header;
+
+  IREE_TRACE({
+    frame_header->trace_zone =
+        iree_vm_stack_trace_wait_zone_begin(wait_type, wait_count);
+  });
+
+  iree_vm_wait_frame_t* wait_frame =
+      (iree_vm_wait_frame_t*)iree_vm_stack_frame_storage(callee_frame);
+  wait_frame->wait_type = wait_type;
+  wait_frame->deadline_ns = iree_timeout_as_deadline_ns(timeout);
+  IREE_TRACE(wait_frame->trace_zone = trace_zone);
+  wait_frame->count = wait_count;
+  *out_wait_frame = wait_frame;
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_stack_wait_leave(
+    iree_vm_stack_t* stack, iree_vm_wait_result_t* out_wait_result) {
+  IREE_ASSERT_ARGUMENT(out_wait_result);
+  memset(out_wait_result, 0, sizeof(*out_wait_result));
+
+  if (IREE_UNLIKELY(!stack->top)) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "unbalanced stack leave");
+  } else if (stack->top->frame.type != IREE_VM_STACK_FRAME_WAIT) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "unbalanced wait leave");
+  }
+
+  // Fetch wait status from the wait storage.
+  iree_vm_wait_frame_t* wait_frame =
+      iree_vm_stack_frame_storage(&stack->top->frame);
+  out_wait_result->status = wait_frame->wait_status;
+
+  // Call (optional) frame storage cleanup function.
+  if (stack->top->frame_cleanup_fn) {
+    stack->top->frame_cleanup_fn(&stack->top->frame);
+  }
+
+  IREE_TRACE({
+    if (stack->top->trace_zone) {
+      IREE_TRACE_ZONE_END(stack->top->trace_zone);
+    }
+    out_wait_result->trace_zone = wait_frame->trace_zone;
+  });
+
+  // Restore the frame pointer to the caller.
+  stack->frame_storage_size -= stack->top->frame_size;
+  stack->top = stack->top->parent;
+
+  return iree_ok_status();
+}
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+static iree_zone_id_t iree_vm_stack_trace_function_zone_begin(
+    iree_vm_stack_frame_type_t frame_type, const iree_vm_function_t* function) {
+  if (frame_type != IREE_VM_STACK_FRAME_NATIVE) {
+    // TODO(benvanik): cache source location and query from module.
+    iree_string_view_t function_name = iree_vm_function_name(function);
+    IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, function_name.data,
+                                        function_name.size);
+    return z0;
+  } else {
+    return 0;
+  }
+}
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+
 IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
     iree_vm_stack_t* stack, const iree_vm_function_t* function,
     iree_vm_stack_frame_type_t frame_type, iree_host_size_t frame_size,
@@ -423,11 +564,11 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
 
   frame_header->frame_size = header_size + frame_size;
   frame_header->parent = stack->top;
-  frame_header->type = frame_type;
   frame_header->data_size = frame_size;
   frame_header->frame_cleanup_fn = frame_cleanup_fn;
 
   iree_vm_stack_frame_t* callee_frame = &frame_header->frame;
+  callee_frame->type = frame_type;
   callee_frame->function = *function;
   callee_frame->module_state = module_state;
   callee_frame->pc = 0;
@@ -437,15 +578,10 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
   stack->top = frame_header;
 
   IREE_TRACE({
-    if (frame_type != IREE_VM_STACK_FRAME_NATIVE) {
-      // TODO(benvanik): cache source location and query from module.
-      iree_string_view_t function_name = iree_vm_function_name(function);
-      IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, function_name.data,
-                                          function_name.size);
-      callee_frame->trace_zone = z0;
-      if (frame_size) {
-        IREE_TRACE_ZONE_APPEND_VALUE(z0, frame_size);
-      }
+    frame_header->trace_zone =
+        iree_vm_stack_trace_function_zone_begin(frame_type, function);
+    if (frame_header->trace_zone) {
+      IREE_TRACE_ZONE_APPEND_VALUE(frame_header->trace_zone, (uint64_t)stack);
     }
   });
 
@@ -466,8 +602,8 @@ iree_vm_stack_function_leave(iree_vm_stack_t* stack) {
   }
 
   IREE_TRACE({
-    if (stack->top->frame.trace_zone) {
-      IREE_TRACE_ZONE_END(stack->top->frame.trace_zone);
+    if (stack->top->trace_zone) {
+      IREE_TRACE_ZONE_END(stack->top->trace_zone);
     }
   });
 
@@ -484,7 +620,7 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_format_backtrace(
        frame = frame->parent) {
     // Stack frame prefix.
     const char* type_str;
-    switch (frame->type) {
+    switch (frame->frame.type) {
       default:
         type_str = "??";
         break;
@@ -497,13 +633,18 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_format_backtrace(
       case IREE_VM_STACK_FRAME_BYTECODE:
         type_str = "bytecode";
         break;
+      case IREE_VM_STACK_FRAME_WAIT:
+        type_str = "wait";
+        break;
     }
     IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
         builder, "\n[%*" PRId32 "] %*s ", 2, frame->frame.depth, 8, type_str));
 
+    iree_vm_module_t* module = frame->frame.function.module;
+    if (!module) continue;
+
     // Common module/function name and PC.
-    iree_string_view_t module_name =
-        iree_vm_module_name(frame->frame.function.module);
+    iree_string_view_t module_name = iree_vm_module_name(module);
     iree_string_view_t function_name =
         iree_vm_function_name(&frame->frame.function);
     if (iree_string_view_is_empty(function_name)) {
@@ -518,7 +659,6 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_format_backtrace(
     IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
         builder, ":%" PRIu64 " ", (uint64_t)frame->frame.pc));
 
-    iree_vm_module_t* module = frame->frame.function.module;
     iree_vm_source_location_t source_location;
     iree_status_t status = iree_vm_module_resolve_source_location(
         module, &frame->frame, &source_location);
@@ -538,6 +678,7 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_format_backtrace(
 
 IREE_API_EXPORT iree_status_t iree_vm_stack_annotate_backtrace(
     iree_vm_stack_t* stack, iree_status_t base_status) {
+  if (IREE_LIKELY(iree_status_is_ok(base_status))) return base_status;
   iree_string_builder_t builder;
   iree_string_builder_initialize(stack->allocator, &builder);
   iree_status_t status = iree_vm_stack_format_backtrace(stack, &builder);
@@ -551,3 +692,74 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_annotate_backtrace(
   iree_string_builder_deinitialize(&builder);
   return status;
 }
+
+#if (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION) && \
+    !(IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FIBERS)
+
+// These helpers perform manual fiber-like stack suspend/resume when not
+// natively supported by the tracing library. See
+// iree_vm_stack_suspend_trace_zones for more information.
+
+IREE_API_EXPORT void iree_vm_stack_suspend_trace_zones(iree_vm_stack_t* stack) {
+  // Walk top->bottom to unwind the trace zones.
+  iree_vm_stack_frame_header_t* frame_header = stack->top;
+  while (frame_header) {
+    if (frame_header->trace_zone) {
+      IREE_TRACE_ZONE_END(frame_header->trace_zone);
+      frame_header->trace_zone = 0;
+    }
+    if (frame_header->frame.type == IREE_VM_STACK_FRAME_WAIT) {
+      iree_vm_wait_frame_t* wait_frame =
+          (iree_vm_wait_frame_t*)iree_vm_stack_frame_storage(
+              &frame_header->frame);
+      if (wait_frame->trace_zone) {
+        IREE_TRACE_ZONE_END(wait_frame->trace_zone);
+        wait_frame->trace_zone = 0;
+      }
+    }
+    frame_header = frame_header->parent;
+  }
+}
+
+static void iree_vm_stack_resume_trace_zones_recursive(
+    iree_vm_stack_t* stack, iree_vm_stack_frame_header_t* frame_header) {
+  if (frame_header->parent) {
+    // To get bottom->top ordering we recurse into parent frames first.
+    iree_vm_stack_resume_trace_zones_recursive(stack, frame_header->parent);
+  }
+
+  IREE_ASSERT_EQ(frame_header->trace_zone, 0);
+  if (frame_header->frame.type == IREE_VM_STACK_FRAME_WAIT) {
+    iree_vm_wait_frame_t* wait_frame =
+        (iree_vm_wait_frame_t*)iree_vm_stack_frame_storage(
+            &frame_header->frame);
+    // TODO(benvanik): find a good way to recover the wait zone; for now we just
+    // mark it as "?".
+    IREE_ASSERT_EQ(wait_frame->trace_zone, 0);
+    IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_vm_stack_wait_recover_?");
+    wait_frame->trace_zone = z0;
+    frame_header->trace_zone = iree_vm_stack_trace_wait_zone_begin(
+        wait_frame->wait_type, wait_frame->count);
+  } else {
+    frame_header->trace_zone = iree_vm_stack_trace_function_zone_begin(
+        frame_header->frame.type, &frame_header->frame.function);
+    if (frame_header->trace_zone) {
+      IREE_TRACE_ZONE_APPEND_VALUE(frame_header->trace_zone, (uint64_t)stack);
+    }
+  }
+}
+IREE_API_EXPORT void iree_vm_stack_resume_trace_zones(iree_vm_stack_t* stack) {
+  // Walking the stack bottom->top only happens in this case and it's not worth
+  // storing additional metadata in order to make it efficient.
+  if (stack->top) {
+    iree_vm_stack_resume_trace_zones_recursive(stack, stack->top);
+  }
+}
+
+#else
+
+IREE_API_EXPORT void iree_vm_stack_resume_trace_zones(iree_vm_stack_t* stack) {}
+IREE_API_EXPORT void iree_vm_stack_suspend_trace_zones(iree_vm_stack_t* stack) {
+}
+
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION

@@ -2,7 +2,6 @@ set(LIBS
   # Local dialects.
   IREEInputDialect
   IREELinalgExtDialect
-  IREELinalgExtOpInterfaceImpl
   IREELinalgExtPasses
   IREELinalgExtTransformOps
   IREELinalgExtTransforms
@@ -13,21 +12,22 @@ set(LIBS
   IREEPyDMDialect
   IREEPyDMPasses
   # Core dialects.
-  MLIRAffine
-  MLIRArithmetic
-  MLIRAsync
-  MLIRControlFlow
+  MLIRAffineDialect
+  MLIRArithmeticDialect
+  MLIRAsyncDialect
+  MLIRControlFlowDialect
   MLIRDialect
-  MLIRFunc
-  MLIRLinalg
+  MLIRFuncDialect
+  MLIRLinalgDialect
   MLIRLinalgTransformOps
-  MLIRMemRef
+  MLIRMemRefDialect
   MLIROptLib
-  MLIRPDL
-  MLIRPDLInterp
-  MLIRSCF
+  MLIRPDLDialect
+  MLIRPDLInterpDialect
+  MLIRSCFDialect
+  MLIRSCFTransformOps
   MLIRSCFTransforms
-  MLIRTensor
+  MLIRTensorDialect
   MLIRTransforms
 )
 

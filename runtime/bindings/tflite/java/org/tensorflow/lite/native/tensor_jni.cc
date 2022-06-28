@@ -6,7 +6,7 @@
 
 #include <jni.h>
 
-#include "iree/base/logging.h"
+#include "iree/base/assert.h"
 
 // NOTE: we pull in our own copy here in case the tflite API changes upstream.
 #define TFL_COMPILE_LIBRARY 1
@@ -21,10 +21,10 @@ namespace {
 // object.
 static TfLiteTensor* GetTensor(JNIEnv* env, jobject obj) {
   jclass clazz = env->GetObjectClass(obj);
-  IREE_DCHECK(clazz);
+  IREE_ASSERT(clazz);
 
   jfieldID field = env->GetFieldID(clazz, "nativeAddress", "J");
-  IREE_DCHECK(field);
+  IREE_ASSERT(field);
 
   if (env->ExceptionCheck()) {
     return nullptr;  // Failed to get field, returning null.

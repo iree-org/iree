@@ -318,17 +318,21 @@ Value AllocatorAllocateOp::getOperandSize(unsigned idx) { return {}; }
 Value AllocatorAllocateOp::getResultSize(unsigned idx) { return result_size(); }
 
 //===----------------------------------------------------------------------===//
-// hal.allocator.map
+// hal.allocator.allocate.initialized
 //===----------------------------------------------------------------------===//
 
-void AllocatorMapOp::getAsmResultNames(
+void AllocatorAllocateInitializedOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "mapped");
 }
 
-Value AllocatorMapOp::getOperandSize(unsigned idx) { return {}; }
+Value AllocatorAllocateInitializedOp::getOperandSize(unsigned idx) {
+  return {};
+}
 
-Value AllocatorMapOp::getResultSize(unsigned idx) { return length(); }
+Value AllocatorAllocateInitializedOp::getResultSize(unsigned idx) {
+  return length();
+}
 
 //===----------------------------------------------------------------------===//
 // hal.allocator.try_map

@@ -16,6 +16,7 @@ transform.with_pdl_patterns {
   transform.structured.canonicalized_sequence %arg0 {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg1
-    transform.structured.vectorize %0 {vectorize_padding = true}
+    %1 = get_closest_isolated_parent %0
+    transform.structured.vectorize %1 {vectorize_padding = true}
   }
 }

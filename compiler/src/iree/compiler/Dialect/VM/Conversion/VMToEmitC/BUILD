@@ -25,11 +25,13 @@ iree_compiler_cc_library(
     srcs = [
         "ConvertVMToEmitC.cpp",
         "DropExcludedExports.cpp",
+        "EmitCBuilders.cpp",
         "EmitCTypeConverter.cpp",
     ],
     hdrs = [
         "ConvertVMToEmitC.h",
         "DropExcludedExports.h",
+        "EmitCBuilders.h",
         "EmitCTypeConverter.h",
         "VMAnalysis.h",
     ],

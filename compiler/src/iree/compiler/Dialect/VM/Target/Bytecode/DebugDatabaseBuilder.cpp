@@ -120,8 +120,9 @@ iree_vm_DebugDatabaseDef_ref_t DebugDatabaseBuilder::build(
     }
     auto locationsRef = iree_vm_BytecodeLocationDef_vec_create(
         fbb, locationDefs.data(), locationDefs.size());
+    auto localNameRef = fbb.createString(sourceMap.localName);
     functionRefs.push_back(
-        iree_vm_FunctionSourceMapDef_create(fbb, locationsRef));
+        iree_vm_FunctionSourceMapDef_create(fbb, localNameRef, locationsRef));
   }
   auto functionsRef = iree_vm_FunctionSourceMapDef_vec_create(
       fbb, functionRefs.data(), functionRefs.size());

@@ -74,7 +74,6 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base:logging",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:arena",

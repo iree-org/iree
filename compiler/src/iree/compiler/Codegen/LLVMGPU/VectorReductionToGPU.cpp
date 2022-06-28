@@ -23,7 +23,6 @@ namespace iree_compiler {
 static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
                                         vector::WarpExecuteOnLane0Op warpOp,
                                         Type type) {
-  builder.setInsertionPoint(warpOp);
   MemRefType memrefType;
   if (auto vectorType = type.dyn_cast<VectorType>()) {
     memrefType =
@@ -95,6 +94,9 @@ class InsertElementToBroadcast final
 
 struct LLVMGPUReduceToGPUPass
     : public LLVMGPUReduceToGPUBase<LLVMGPUReduceToGPUPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<scf::SCFDialect>();
+  }
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
     MLIRContext *ctx = &getContext();

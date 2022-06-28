@@ -15,7 +15,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/file_io.h"
-#include "iree/base/logging.h"
 #include "iree/base/testing/dynamic_library_test_library_embed.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -38,7 +37,10 @@ class DynamicLibraryTest : public ::testing::Test {
     if (!test_tmpdir) {
       test_tmpdir = getenv("TEMP");
     }
-    IREE_CHECK(test_tmpdir) << "TEST_TMPDIR/TMPDIR/TEMP not defined";
+    if (!test_tmpdir) {
+      std::cerr << "TEST_TMPDIR/TMPDIR/TEMP not defined\n";
+      exit(1);
+    }
     return test_tmpdir + std::string("/iree_test_") +
            std::to_string(unique_id++) + suffix;
   }

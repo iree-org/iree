@@ -50,6 +50,8 @@ enum iree_vm_context_flag_bits_t {
 };
 typedef uint32_t iree_vm_context_flags_t;
 
+typedef intptr_t iree_vm_context_id_t;
+
 // Creates a new context that uses the given |instance| for device management.
 // |out_context| must be released by the caller.
 IREE_API_EXPORT iree_status_t iree_vm_context_create(

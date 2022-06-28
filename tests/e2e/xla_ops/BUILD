@@ -82,7 +82,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "fft.mlir",
+            "fft.mlir",  # TODO(#9583)
         ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],
@@ -163,7 +163,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "fft.mlir",
+            "fft.mlir",  # TODO(#9583)
         ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],
@@ -205,6 +205,7 @@ iree_check_single_backend_test_suite(
             "dynamic_slice.mlir",
             "dynamic_update_slice.mlir",
             "exponential.mlir",
+            "exponential_fp16.mlir",
             "exponential_minus_one.mlir",
             "fft.mlir",
             "finite.mlir",
@@ -242,10 +243,6 @@ iree_check_single_backend_test_suite(
             "while.mlir",
         ],
         include = ["*.mlir"],
-        exclude = [
-            # Excluded due to LLVM bug #56156
-            "exponential_fp16.mlir",
-        ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],
     driver = "local-task",
@@ -367,7 +364,6 @@ iree_check_single_backend_test_suite(
             "reverse.mlir",
             "rng_normal.mlir",
             "rng_uniform.mlir",
-            "round.mlir",
             "rsqrt.mlir",
             "scatter.mlir",
             "scatter_dynamic.mlir",
@@ -386,7 +382,8 @@ iree_check_single_backend_test_suite(
         exclude = [
             "bitcast_convert.mlir",
             "exponential_fp16.mlir",
-            "fft.mlir",
+            "fft.mlir",  # TODO(#9583)
+            "round.mlir",  # TODO(#9617)
         ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],

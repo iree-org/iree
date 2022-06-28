@@ -634,26 +634,6 @@ gentbl_cc_library(
 )
 
 gentbl_cc_library(
-    name = "IREELinalgTransformInterfacesIncGen",
-    strip_include_prefix = "include",
-    tbl_outs = [
-        (
-            ["--gen-op-interface-decls"],
-            "include/iree-dialects/Dialect/LinalgTransform/TransformOpInterface.h.inc",
-        ),
-        (
-            ["--gen-op-interface-defs"],
-            "include/iree-dialects/Dialect/LinalgTransform/TransformOpInterface.cpp.inc",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "include/iree-dialects/Dialect/LinalgTransform/TransformOpInterface.td",
-    deps = [
-        ":TdFiles",
-    ],
-)
-
-gentbl_cc_library(
     name = "IREELinalgTransformStructuredIncGen",
     strip_include_prefix = "include",
     tbl_outs = [
@@ -688,7 +668,6 @@ cc_library(
         ":IREELinalgExtDialect",
         ":IREELinalgExtTransforms",
         ":IREELinalgTransformIncGen",
-        ":IREELinalgTransformInterfacesIncGen",
         ":IREELinalgTransformStructuredIncGen",
         "@llvm-project//llvm:Support",
         # Dialects
@@ -742,10 +721,6 @@ cc_library(
     srcs = glob([
         "lib/Dialect/LinalgTransform/Passes/*.cpp",
     ]),
-    hdrs = [
-        "include/iree-dialects/Dialect/LinalgTransform/TrackingListener.h",
-        "include/iree-dialects/Dialect/LinalgTransform/TrackingRewriteDriver.h",
-    ],
     deps = [
         ":IREEDialectsTransforms",
         ":IREELinalgExtDialect",
@@ -868,6 +843,7 @@ cc_binary(
         "@llvm-project//mlir:PDLInterpDialect",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SCFTransformOps",
+        "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TransformDialect",

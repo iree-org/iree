@@ -146,7 +146,6 @@ iree_cc_test(
     ::file_io
     iree::base::cc
     iree::base::core_headers
-    iree::base::logging
     iree::testing::gtest
     iree::testing::gtest_main
 )

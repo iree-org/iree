@@ -69,7 +69,6 @@ cc_library(
         ":numpy_io",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:cc",
-        "//runtime/src/iree/base:logging",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:span",
         "//runtime/src/iree/hal",

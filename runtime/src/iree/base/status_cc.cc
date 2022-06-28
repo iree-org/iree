@@ -11,7 +11,6 @@
 #include <ostream>
 
 #include "iree/base/attributes.h"
-#include "iree/base/logging.h"
 
 namespace iree {
 
@@ -47,16 +46,15 @@ std::ostream& operator<<(std::ostream& os, const Status& x) {
 namespace status_impl {
 
 void Helper::HandleInvalidStatusCtorArg(Status* status) {
-  const char* kMessage =
-      "An OK status is not a valid constructor argument to StatusOr<T>";
-  IREE_LOG(ERROR) << kMessage;
-  *status = Status(StatusCode::kInternal, kMessage);
+  fprintf(stderr,
+          "An OK status is not a valid constructor argument to StatusOr<T>\n");
   abort();
 }
 
 void Helper::Crash(const Status& status) {
-  IREE_LOG(FATAL) << "Attempting to fetch value instead of handling error "
-                  << status;
+  std::string message = status.ToString();
+  fprintf(stderr, "Attempting to fetch value instead of handling error:\n%s\n",
+          message.c_str());
   abort();
 }
 

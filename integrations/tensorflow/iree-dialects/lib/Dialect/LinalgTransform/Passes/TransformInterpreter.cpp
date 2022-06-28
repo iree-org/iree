@@ -7,6 +7,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
+#include "iree-dialects/Dialect/LinalgTransform/TransformInterpreterUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Arithmetic/Transforms/BufferizableOpInterfaceImpl.h"
@@ -18,8 +19,8 @@
 #include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
-#include "mlir/Dialect/SCF/BufferizableOpInterfaceImpl.h"
-#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
@@ -27,25 +28,87 @@
 #include "mlir/Dialect/Vector/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassRegistry.h"
 #include "mlir/Support/FileUtilities.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/SourceMgr.h"
-#include <mlir/Pass/PassRegistry.h>
 
 #define DEBUG_TYPE "transform-dialect-interpreter"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 
 using namespace mlir;
 
-static llvm::cl::opt<std::string> clTransformFileName(
-    "linalg-transform-file-name",
-    llvm::cl::desc("mlir file containing a top-level module that specifies "
-                   "the transformations to apply."),
-    llvm::cl::init(""));
+LogicalResult mlir::transform::parseTransformModuleFromFile(
+    MLIRContext *context, llvm::StringRef transformFileName,
+    OwningOpRef<ModuleOp> &transformModule) {
+  if (transformFileName.empty()) {
+    llvm::errs() << "no transform file name specified, assuming the transform "
+                    "module is embedded in the IR next to the top-level";
+    return success();
+  }
+  // Parse transformFileName content into a ModuleOp.
+  std::string errorMessage;
+  auto memoryBuffer = mlir::openInputFile(transformFileName, &errorMessage);
+  if (!memoryBuffer) {
+    llvm::errs() << "failed to parse transform file: " << transformFileName;
+    return failure();
+  }
+  // Tell sourceMgr about this buffer, the parser will pick it up.
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(std::move(memoryBuffer), llvm::SMLoc());
+  transformModule =
+      OwningOpRef<ModuleOp>(parseSourceFile<ModuleOp>(sourceMgr, context));
+  return success();
+}
+
+LogicalResult mlir::transform::applyTransformsInRegion(Region &transformRegion,
+                                                       Operation *target) {
+  SmallVector<transform::TransformOpInterface> transforms;
+  if (failed(
+          transform::extractTopLevelTransformOps(transformRegion, transforms)))
+    return failure();
+
+  for (transform::TransformOpInterface transform : transforms) {
+    // TransformState::applyTransform requires that the parent region is a
+    // proper ancestor of the transform op to perform SSA liveness assertions.
+    // In multithreaded state hwever, we cannot clone into `transformRegion` so
+    // we build a new single-block region and clone the transform op into it.
+    Region r;
+    OpBuilder b(target->getContext());
+    b.createBlock(&r);
+    transform::TransformState state(r, target);
+    auto xform = cast<transform::TransformOpInterface>(b.clone(*transform));
+    auto g = llvm::make_scope_exit([&]() { xform->erase(); });
+    if (failed(state.applyTransform(xform).checkAndReport()))
+      return failure();
+  }
+  return success();
+}
+
+LogicalResult mlir::transform::extractTopLevelTransformOps(
+    Region &r, SmallVectorImpl<TransformOpInterface> &res) {
+  assert(r.getBlocks().size() == 1 &&
+         "Expected single-block region to extract transform ops from");
+  r.walk<WalkOrder::PreOrder>([&](transform::TransformOpInterface transform) {
+    if (transform->hasTrait<transform::PossibleTopLevelTransformOpTrait>()) {
+      assert(llvm::none_of(res, [&](transform::TransformOpInterface seen) {
+        return seen->isAncestor(transform);
+      }));
+      res.push_back(transform);
+      return WalkResult::skip();
+    }
+    return WalkResult::advance();
+  });
+  return success();
+}
 
 namespace {
-/// Simple pass that applies transform dialect ops directly contained in a
-/// module.
+
+/// Pass declaration.
+/// Interpreter pass that applies transform dialect ops for codegen.
+/// This needs to be its own pass because the registration mechanism and ops
+/// available are different than for other interpreters.
 class TransformDialectInterpreter
     : public PassWrapper<TransformDialectInterpreter, Pass> {
 public:
@@ -84,7 +147,9 @@ public:
     vector::registerBufferizableOpInterfaceExternalModels(registry);
   }
 
-  StringRef getArgument() const override { return "linalg-transform-interp"; }
+  StringRef getArgument() const override {
+    return "transform-dialect-interpreter";
+  }
 
   StringRef getDescription() const override {
     return "apply transform dialect operations one by one";
@@ -94,50 +159,72 @@ public:
     return true;
   }
 
-  void runOnOperation() override {
-    Operation *topLevel = getOperation();
-    if (topLevel->getNumRegions() != 1 ||
-        !llvm::hasSingleElement(topLevel->getRegion(0))) {
-      topLevel->emitError() << "can only run '" << getArgument()
-                            << "' on single-region single-block operations";
-      return signalPassFailure();
-    }
-
-    transform::TransformState state(topLevel->getRegion(0), topLevel);
-
-    if (clTransformFileName.empty()) {
-      Block &body = topLevel->getRegion(0).front();
-      for (auto op : body.getOps<transform::TransformOpInterface>()) {
-        if (failed(state.applyTransform(op)))
-          return signalPassFailure();
-      }
-      return;
-    }
-
-    // If a transform file is specified, parse its content into a ModuleOp.
-    std::string errorMessage;
-    auto memoryBuffer = openInputFile(clTransformFileName, &errorMessage);
-    if (!memoryBuffer) {
-      llvm::errs() << errorMessage << "\n";
-      return signalPassFailure();
-    }
-    // Tell sourceMgr about this buffer, the parser will pick it up.
-    llvm::SourceMgr sourceMgr;
-    sourceMgr.AddNewSourceBuffer(std::move(memoryBuffer), llvm::SMLoc());
-    OwningOpRef<ModuleOp> transformModule(
-        parseSourceFile<ModuleOp>(sourceMgr, &getContext()));
-    for (auto op : transformModule->getBody()
-                       ->getOps<transform::TransformOpInterface>()) {
-      if (failed(state.applyTransform(op)))
-        return signalPassFailure();
-    }
+  TransformDialectInterpreter(StringRef transformFileName = StringRef()) {
+    this->transformFileName = transformFileName.str();
   }
+  TransformDialectInterpreter(const TransformDialectInterpreter &pass) {
+    this->transformFileName = pass.transformFileName;
+    // TODO: if we really don't like shared_ptr, we could also clone the
+    // transformModule here.
+    sharedTransformModule = pass.sharedTransformModule;
+  }
+
+  LogicalResult initialize(MLIRContext *context) override {
+    OwningOpRef<ModuleOp> module;
+    if (failed(transform::parseTransformModuleFromFile(
+            context, transformFileName, module)))
+      return failure();
+    sharedTransformModule =
+        std::make_shared<OwningOpRef<ModuleOp>>(std::move(module));
+    return success();
+  }
+
+  void runOnOperation() override {
+    Operation *target = getOperation();
+    bool parsedTransform = (sharedTransformModule && *sharedTransformModule);
+    assert(parsedTransform || (target->getNumRegions() == 1 &&
+                               target->getRegion(0).getBlocks().size() == 1) &&
+                                  "Cannot extract transform from op");
+    Region &transformRegion = parsedTransform
+                                  ? (*sharedTransformModule)->getRegion()
+                                  : target->getRegion(0);
+    if (failed(transform::applyTransformsInRegion(transformRegion, target)))
+      return signalPassFailure();
+  }
+
+protected:
+  Pass::Option<std::string> transformFileName{
+      *this, "transform-file-name",
+      ::llvm::cl::desc(
+          "File name containing a transform dialect specification to apply.")};
+
+private:
+  // The parsed transform module to be used for scheduling.
+  // TODO: Figure a better way to build a transform module and transport it in
+  // the proper places in the IR as it is transformed by IREE so that it is
+  // available with better ownership semantics.
+  // Note: we wrap the OwningOpRef to get the desired destruction mechanism.
+  // Note: shared_ptr is not great but we know the sharedTransformModule is
+  // readonly.
+  // Alternatives comprise:
+  //   1. no shared_ptr but copying the module with every pass clone that the
+  //      OpPassManager decides to perform.
+  //   2. lifting ownership of the parsed transform module higher up in the
+  //      IREE stack. This may be only shift the problem as we have passes
+  //      building pass managers in IREE.
+  //   3. build better support to embed the transformation module in the
+  //      input IR and transport it to the place of use in IREE. This is deemed
+  //      too intrusive atm.
+  //   4. (future) config/resources mechanism that is being proposed in core?
+  std::shared_ptr<OwningOpRef<ModuleOp>> sharedTransformModule;
 };
 
 struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(DropSchedulePass)
 
-  StringRef getArgument() const final { return "linalg-drop-schedule"; }
+  StringRef getArgument() const final {
+    return "transform-dialect-drop-schedule";
+  }
 
   StringRef getDescription() const final {
     return "Drop the schedule from the operation";
@@ -160,8 +247,9 @@ struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {
 } // namespace
 
 /// Create a Transform dialect interpreter pass.
-std::unique_ptr<Pass> mlir::createTransformDialectInterpreterPass() {
-  return std::make_unique<TransformDialectInterpreter>();
+std::unique_ptr<Pass>
+mlir::createTransformDialectInterpreterPass(llvm::StringRef transformFileName) {
+  return std::make_unique<TransformDialectInterpreter>(transformFileName);
 }
 
 /// Create a Linalg pass to drop the schedule from the module.
