@@ -16,38 +16,6 @@
 #include "iree/vm/api.h"
 
 //===----------------------------------------------------------------------===//
-// Type registration
-//===----------------------------------------------------------------------===//
-
-// NOTE: we aren't exporting any types yet; this is just the empty boilerplate.
-
-// static iree_vm_ref_type_descriptor_t iree_vmvx_interface_descriptor = {0};
-
-#define IREE_VM_REGISTER_VMVX_C_TYPE(type, name, destroy_fn, descriptor) \
-  descriptor.type_name = iree_make_cstring_view(name);                   \
-  descriptor.offsetof_counter = offsetof(type, ref_object);              \
-  descriptor.destroy = (iree_vm_ref_destroy_t)destroy_fn;                \
-  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor));
-
-IREE_API_EXPORT iree_status_t iree_vmvx_module_register_types() {
-  static bool has_registered = false;
-  if (has_registered) return iree_ok_status();
-
-  // IREE_VM_REGISTER_VMVX_C_TYPE(iree_vmvx_interface_t, "vmvx.interface",
-  //                              iree_vmvx_interface_destroy,
-  //                              iree_vmvx_interface_descriptor);
-
-  has_registered = true;
-  return iree_ok_status();
-}
-
-//===----------------------------------------------------------------------===//
-// Type wrappers
-//===----------------------------------------------------------------------===//
-
-// IREE_VM_DEFINE_TYPE_ADAPTERS(iree_vmvx_interface, iree_vmvx_interface_t);
-
-//===----------------------------------------------------------------------===//
 // Module type definitions
 //===----------------------------------------------------------------------===//
 
@@ -65,7 +33,9 @@ typedef struct iree_vmvx_module_state_t {
   // If we have any external libraries we want to interact with that are
   // stateful we could store their state here. Note that VMVX invocations may
   // happen from any thread and concurrently and if the state is not thread-safe
-  // we'll have to perform the synchronization ourselves here.
+  // we'll have to perform the synchronization ourselves here. That'd be bad,
+  // of course, and an indication that whatever is being called is not suited
+  // for this use.
 } iree_vmvx_module_state_t;
 
 static void IREE_API_PTR iree_vmvx_module_destroy(void* base_module) {
@@ -149,7 +119,7 @@ static const iree_vm_native_module_descriptor_t iree_vmvx_module_descriptor_ = {
 };
 
 IREE_API_EXPORT iree_status_t iree_vmvx_module_create(
-    iree_allocator_t allocator, iree_vm_module_t** out_module) {
+    iree_allocator_t host_allocator, iree_vm_module_t** out_module) {
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
 
@@ -166,17 +136,17 @@ IREE_API_EXPORT iree_status_t iree_vmvx_module_create(
       iree_vm_native_module_size() + sizeof(iree_vmvx_module_t);
   iree_vm_module_t* base_module = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(allocator, total_size, (void**)&base_module));
+      iree_allocator_malloc(host_allocator, total_size, (void**)&base_module));
   memset(base_module, 0, total_size);
   iree_status_t status = iree_vm_native_module_initialize(
-      &interface, &iree_vmvx_module_descriptor_, allocator, base_module);
+      &interface, &iree_vmvx_module_descriptor_, host_allocator, base_module);
   if (!iree_status_is_ok(status)) {
-    iree_allocator_free(allocator, base_module);
+    iree_allocator_free(host_allocator, base_module);
     return status;
   }
 
   iree_vmvx_module_t* module = IREE_VMVX_MODULE_CAST(base_module);
-  module->host_allocator = allocator;
+  module->host_allocator = host_allocator;
 
   *out_module = base_module;
   return iree_ok_status();

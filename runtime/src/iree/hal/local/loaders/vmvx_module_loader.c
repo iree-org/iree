@@ -29,11 +29,14 @@ typedef struct iree_hal_vmvx_executable_t {
   iree_hal_local_executable_t base;
 
   // Context containing both the VMVX module and the loaded executable.
+  // This context may also contain custom user modules available for the
+  // generated VMVX modules to use.
   iree_vm_context_t* context;
 
-  // Resolved entry functions from the module.
+  // Resolved entry function export ordinals from the bytecode module.
+  iree_vm_module_t* bytecode_module;
   iree_host_size_t entry_fn_count;
-  iree_vm_function_t entry_fns[];
+  uint16_t entry_fn_ordinals[];
 } iree_hal_vmvx_executable_t;
 
 static const iree_hal_local_executable_vtable_t iree_hal_vmvx_executable_vtable;
@@ -163,7 +166,8 @@ static iree_status_t iree_hal_vmvx_executable_create(
 
   iree_hal_vmvx_executable_t* executable = NULL;
   iree_host_size_t total_size =
-      sizeof(*executable) + entry_count * sizeof(*executable->entry_fns) +
+      sizeof(*executable) +
+      entry_count * sizeof(*executable->entry_fn_ordinals) +
       entry_count * sizeof(*executable->base.dispatch_attrs) +
       executable_params->executable_layout_count *
           sizeof(iree_hal_local_executable_layout_t);
@@ -172,7 +176,7 @@ static iree_status_t iree_hal_vmvx_executable_create(
   iree_hal_executable_dispatch_attrs_v0_t* dispatch_attrs = NULL;
   if (iree_status_is_ok(status)) {
     uint8_t* ptr = (uint8_t*)executable + sizeof(*executable) +
-                   entry_count * sizeof(*executable->entry_fns);
+                   entry_count * sizeof(*executable->entry_fn_ordinals);
     dispatch_attrs = (iree_hal_executable_dispatch_attrs_v0_t*)ptr;
     ptr += entry_count * sizeof(*executable->base.dispatch_attrs);
     iree_hal_local_executable_layout_t** executable_layouts_ptr =
@@ -186,15 +190,18 @@ static iree_status_t iree_hal_vmvx_executable_create(
     executable->base.dispatch_attrs = dispatch_attrs;
     iree_vm_context_retain(executable->context);
 
+    executable->bytecode_module = bytecode_module;
     executable->entry_fn_count = entry_count;
     for (iree_host_size_t i = 0; i < executable->entry_fn_count; ++i) {
+      iree_vm_function_t entry_fn;
       status = iree_vm_module_lookup_function_by_ordinal(
-          bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i,
-          &executable->entry_fns[i]);
+          bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &entry_fn);
       if (!iree_status_is_ok(status)) break;
-      status = iree_hal_vmvx_executable_verify_entry_point(
-          &executable->entry_fns[i]);
+      status = iree_hal_vmvx_executable_verify_entry_point(&entry_fn);
       if (!iree_status_is_ok(status)) break;
+      IREE_ASSERT_EQ(entry_fn.module, bytecode_module);
+      IREE_ASSERT_EQ(entry_fn.linkage, IREE_VM_FUNCTION_LINKAGE_EXPORT);
+      executable->entry_fn_ordinals[i] = entry_fn.ordinal;
     }
   }
 
@@ -204,8 +211,13 @@ static iree_status_t iree_hal_vmvx_executable_create(
     // queries and instead could be a single packed table we can directly
     // reference from the module. Module-level reflection attrs would help.
     for (iree_host_size_t i = 0; i < executable->entry_fn_count; ++i) {
+      iree_vm_function_t entry_fn = {
+          .module = executable->bytecode_module,
+          .linkage = IREE_VM_FUNCTION_LINKAGE_EXPORT,
+          .ordinal = executable->entry_fn_ordinals[i],
+      };
       iree_string_view_t local_memory_str = iree_vm_function_reflection_attr(
-          &executable->entry_fns[i], iree_make_cstring_view("local_memory"));
+          &entry_fn, iree_make_cstring_view("local_memory"));
       uint32_t local_memory_size = 0;
       if (!iree_string_view_is_empty(local_memory_str)) {
         iree_string_view_atoi_uint32(local_memory_str, &local_memory_size);
@@ -257,7 +269,11 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "entry point ordinal out of bounds");
   }
-  iree_vm_function_t entry_fn = executable->entry_fns[ordinal];
+  iree_vm_function_t entry_fn = {
+      .module = executable->bytecode_module,
+      .linkage = IREE_VM_FUNCTION_LINKAGE_EXPORT,
+      .ordinal = executable->entry_fn_ordinals[ordinal],
+  };
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   iree_string_view_t entry_point_name = iree_vm_function_name(&entry_fn);
@@ -440,28 +456,34 @@ typedef struct iree_hal_vmvx_module_loader_t {
   iree_hal_executable_loader_t base;
   iree_allocator_t host_allocator;
   iree_vm_instance_t* instance;
-  iree_vm_module_t* vmvx_module;
+  iree_host_size_t common_module_count;
+  iree_vm_module_t* common_modules[];
 } iree_hal_vmvx_module_loader_t;
 
 static const iree_hal_executable_loader_vtable_t
     iree_hal_vmvx_module_loader_vtable;
 
 iree_status_t iree_hal_vmvx_module_loader_create(
-    iree_vm_instance_t* instance, iree_allocator_t host_allocator,
+    iree_vm_instance_t* instance, iree_host_size_t user_module_count,
+    iree_vm_module_t** user_modules, iree_allocator_t host_allocator,
     iree_hal_executable_loader_t** out_executable_loader) {
   IREE_ASSERT_ARGUMENT(instance);
+  IREE_ASSERT_ARGUMENT(!user_module_count || user_modules);
   IREE_ASSERT_ARGUMENT(out_executable_loader);
   *out_executable_loader = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // A single VMVX module is shared across all loaded executables.
-  IREE_RETURN_IF_ERROR(iree_vmvx_module_register_types());
   iree_vm_module_t* vmvx_module = NULL;
   IREE_RETURN_IF_ERROR(iree_vmvx_module_create(host_allocator, &vmvx_module));
 
+  iree_host_size_t common_module_count = 1 + user_module_count;
   iree_hal_vmvx_module_loader_t* executable_loader = NULL;
   iree_status_t status = iree_allocator_malloc(
-      host_allocator, sizeof(*executable_loader), (void**)&executable_loader);
+      host_allocator,
+      sizeof(*executable_loader) +
+          common_module_count * sizeof(executable_loader->common_modules[0]),
+      (void**)&executable_loader);
   if (iree_status_is_ok(status)) {
     iree_hal_executable_loader_initialize(
         &iree_hal_vmvx_module_loader_vtable,
@@ -469,8 +491,18 @@ iree_status_t iree_hal_vmvx_module_loader_create(
     executable_loader->host_allocator = host_allocator;
     executable_loader->instance = instance;
     iree_vm_instance_retain(executable_loader->instance);
-    executable_loader->vmvx_module = vmvx_module;
-    iree_vm_module_retain(executable_loader->vmvx_module);
+
+    // We prepend the vmvx_module to any user-provided modules.
+    // This yields a single ordered list of modules to pass into contexts with
+    // the generated module coming last so it can resolve imports from all.
+    executable_loader->common_module_count = common_module_count;
+    executable_loader->common_modules[0] = vmvx_module;
+    iree_vm_module_retain(vmvx_module);
+    for (iree_host_size_t i = 0; i < user_module_count; ++i) {
+      executable_loader->common_modules[1 + i] = user_modules[i];
+      iree_vm_module_retain(user_modules[i]);
+    }
+
     *out_executable_loader = (iree_hal_executable_loader_t*)executable_loader;
   }
 
@@ -480,6 +512,7 @@ iree_status_t iree_hal_vmvx_module_loader_create(
 }
 
 iree_status_t iree_hal_vmvx_module_loader_create_isolated(
+    iree_host_size_t user_module_count, iree_vm_module_t** user_modules,
     iree_allocator_t host_allocator,
     iree_hal_executable_loader_t** out_executable_loader) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -489,7 +522,8 @@ iree_status_t iree_hal_vmvx_module_loader_create_isolated(
       z0, iree_vm_instance_create(host_allocator, &instance));
 
   iree_status_t status = iree_hal_vmvx_module_loader_create(
-      instance, host_allocator, out_executable_loader);
+      instance, user_module_count, user_modules, host_allocator,
+      out_executable_loader);
 
   iree_vm_instance_release(instance);
 
@@ -504,7 +538,10 @@ static void iree_hal_vmvx_module_loader_destroy(
   iree_allocator_t host_allocator = executable_loader->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_vm_module_release(executable_loader->vmvx_module);
+  for (iree_host_size_t i = 0; i < executable_loader->common_module_count;
+       ++i) {
+    iree_vm_module_release(executable_loader->common_modules[i]);
+  }
   iree_vm_instance_release(executable_loader->instance);
   iree_allocator_free(host_allocator, executable_loader);
 
@@ -555,18 +592,23 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
       executable_loader->host_allocator, &bytecode_module);
 
   // Create the context tying together the shared VMVX module and the
-  // user-provided module that references it. If we wanted to allow custom
-  // modules here for user-provided functions we'd mix them in here.
+  // user-provided module that references it. We always link the compiled module
+  // in last so that it can use the VMVX module as well as any user-provided
+  // modules.
   iree_vm_context_t* context = NULL;
   if (iree_status_is_ok(status)) {
-    iree_vm_module_t* modules[2] = {
-        executable_loader->vmvx_module,
-        bytecode_module,
-    };
+    iree_host_size_t context_module_count =
+        executable_loader->common_module_count + 1;
+    iree_vm_module_t** context_modules = (iree_vm_module_t**)iree_alloca(
+        context_module_count * sizeof(iree_vm_module_t*));
+    memcpy(context_modules, executable_loader->common_modules,
+           executable_loader->common_module_count *
+               sizeof(executable_loader->common_modules[0]));
+    context_modules[context_module_count - 1] = bytecode_module;
     status = iree_vm_context_create_with_modules(
         executable_loader->instance, IREE_VM_CONTEXT_FLAG_CONCURRENT,
-        IREE_ARRAYSIZE(modules), modules, executable_loader->host_allocator,
-        &context);
+        context_module_count, context_modules,
+        executable_loader->host_allocator, &context);
   }
 
   // Executable takes ownership of the entire context (including the bytecode
