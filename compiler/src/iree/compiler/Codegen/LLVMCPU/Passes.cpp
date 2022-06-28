@@ -332,8 +332,8 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
   }
 }
 
-void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
-                                       bool enablePeeling, bool lowerToAVX2) {
+void addHighLevelDoubleTilingExpertPassPipeline(OpPassManager &passManager,
+                                                bool enablePeeling) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -368,8 +368,14 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
   // Run IREE specific passes before vector lowering expert.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
+}
+
+void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
+                                       bool enablePeeling, bool lowerToAVX2) {
+  addHighLevelDoubleTilingExpertPassPipeline(passManager, enablePeeling);
 
   // Add the vector lowering expert.
+  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   {
     OpPassManager &nestedFuncPassManager = nestedModulePM.nest<func::FuncOp>();
     LinalgVectorLoweringPassOptions options;

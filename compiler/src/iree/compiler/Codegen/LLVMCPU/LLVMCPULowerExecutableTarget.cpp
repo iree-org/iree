@@ -178,9 +178,15 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
         return signalPassFailure();
       }
 
-      bool lowerToVectors = !isVMVXBackend(variantOp);
+      // TODO: This is unfortunate coupling on VMVX.
+      bool isVMVX = isVMVXBackend(variantOp);
+      bool lowerToVectors = isVMVX;
       bool lowerToAVX2 = hasAVX2Feature(variantOp);
-      if (!testLoweringConfiguration) {
+      if (isVMVX) {
+        addHighLevelDoubleTilingExpertPassPipeline(executableLoweringPipeline,
+                                                   /*enablePeeling=*/false);
+
+      } else if (!testLoweringConfiguration) {
         switch (translationInfo.getValue().getDispatchLoweringPassPipeline()) {
           case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
           case IREE::Codegen::DispatchLoweringPassPipeline::None:
