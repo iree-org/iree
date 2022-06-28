@@ -527,36 +527,6 @@ def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
   let hasCanonicalizer = 1;
 }
 
-def HAL_BufferViewByteLengthOp : HAL_PureOp<"buffer_view.byte_length", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
-  let summary = [{buffer view buffer byte length accessor}];
-  let description = [{
-    Returns the allocated size of a shaped buffer view in bytes.
-    This may exceed the logical size of the buffer view; for example sparse
-    tensors will have an allocation size that may be for the maximum possible
-    size of the tensor when fully dense.
-  }];
-
-  let arguments = (ins
-    HAL_BufferView:$buffer_view
-  );
-  let results = (outs
-    HAL_DeviceSize:$result
-  );
-
-  let assemblyFormat = [{
-    `<` $buffer_view `:` type($buffer_view) `>`
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins "Value":$bufferView)>,
-  ];
-}
-
 def HAL_BufferViewElementTypeOp : HAL_PureOp<"buffer_view.element_type"> {
   let summary = [{buffer view element type query}];
   let description = [{

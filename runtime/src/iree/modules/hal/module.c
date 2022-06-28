@@ -776,16 +776,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_buffer,  //
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_byte_length,  //
-                   iree_hal_module_state_t,                  //
-                   r, I) {
-  iree_hal_buffer_view_t* buffer_view = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_view_check_deref(args->r0, &buffer_view));
-  rets->i0 = (int64_t)iree_hal_buffer_view_byte_length(buffer_view);
-  return iree_ok_status();
-}
-
 IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_element_type,  //
                    iree_hal_module_state_t,                   //
                    r, i) {

@@ -128,12 +128,6 @@ vm.import @buffer_view.buffer(
 ) -> !vm.ref<!hal.buffer>
 attributes {nosideeffects}
 
-// Returns the allocated size of a shaped buffer view in bytes.
-vm.import @buffer_view.byte_length(
-  %buffer_view : !vm.ref<!hal.buffer_view>
-) -> i64
-attributes {nosideeffects}
-
 // Returns the element type of the buffer view.
 vm.import @buffer_view.element_type(
   %buffer_view : !vm.ref<!hal.buffer_view>,
