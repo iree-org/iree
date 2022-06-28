@@ -300,11 +300,11 @@ vm.import @device.allocator(
 attributes {nosideeffects}
 
 // Returns a tuple of (ok, value) for the given configuration key.
-vm.import @device.query.i32(
+vm.import @device.query.i64(
   %device : !vm.ref<!hal.device>,
   %category : !vm.buffer,
   %key : !vm.buffer
-) -> (i32, i32)
+) -> (i32, i64)
 attributes {nosideeffects}
 
 //===----------------------------------------------------------------------===//
