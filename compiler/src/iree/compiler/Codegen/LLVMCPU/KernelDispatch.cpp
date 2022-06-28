@@ -394,7 +394,8 @@ static bool isPaddingBeneficial(linalg::LinalgOp op) {
   }
 
   if (isFullyDynamicOp(op)) {
-    return false;
+    llvm_unreachable("This shouldn't happen in CI");
+    //return false;
   }
 
   return true;
@@ -404,7 +405,8 @@ static bool isPaddingBeneficial(linalg::LinalgOp op) {
 /// false if peeling should not be enabled for this operation.
 static bool isPeelingBeneficial(linalg::LinalgOp op) {
   if (isFullyDynamicOp(op)) {
-    return true;
+    llvm_unreachable("This shouldn't happen in CI");
+    //return true;
   }
 
   return false;
