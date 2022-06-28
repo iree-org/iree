@@ -41,11 +41,11 @@ LLVMTargetOptions getDefaultLLVMTargetOptions() {
 
     // LLVM loop optimization options.
     targetOptions.pipelineTuningOptions.LoopInterleaving = true;
-    targetOptions.pipelineTuningOptions.LoopVectorization = true;
+    targetOptions.pipelineTuningOptions.LoopVectorization = false;
     targetOptions.pipelineTuningOptions.LoopUnrolling = true;
 
     // LLVM SLP Auto vectorizer.
-    targetOptions.pipelineTuningOptions.SLPVectorization = true;
+    targetOptions.pipelineTuningOptions.SLPVectorization = false;
 
     // LLVM -O3.
     // TODO(benvanik): add an option for this.
