@@ -891,22 +891,18 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_create,  //
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_create(
       device, modes, command_categories, IREE_HAL_QUEUE_AFFINITY_ANY,
       &command_buffer));
-  rets->r0 = iree_hal_command_buffer_move_ref(command_buffer);
-  return iree_ok_status();
+
+  iree_status_t status = iree_hal_command_buffer_begin(command_buffer);
+  if (iree_status_is_ok(status)) {
+    rets->r0 = iree_hal_command_buffer_move_ref(command_buffer);
+  } else {
+    iree_hal_command_buffer_release(command_buffer);
+  }
+  return status;
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_begin,  //
-                   iree_hal_module_state_t,               //
-                   r, v) {
-  iree_hal_command_buffer_t* command_buffer = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
-
-  return iree_hal_command_buffer_begin(command_buffer);
-}
-
-IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_end,  //
-                   iree_hal_module_state_t,             //
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_finalize,  //
+                   iree_hal_module_state_t,                  //
                    r, v) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(

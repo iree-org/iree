@@ -176,14 +176,9 @@ vm.import @command_buffer.create(
   %command_categories : i32
 ) -> !vm.ref<!hal.command_buffer>
 
-// Resets and begins recording into the command buffer, clearing all previously
-// recorded contents.
-vm.import @command_buffer.begin(
-  %command_buffer : !vm.ref<!hal.command_buffer>
-)
-
-// Ends recording into the command buffer.
-vm.import @command_buffer.end(
+// Finalizes recording into the command buffer and prepares it for submission.
+// No more commands can be recorded afterward.
+vm.import @command_buffer.finalize(
   %command_buffer : !vm.ref<!hal.command_buffer>
 )
 

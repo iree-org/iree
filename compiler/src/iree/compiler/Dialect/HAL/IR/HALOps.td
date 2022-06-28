@@ -710,27 +710,11 @@ def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
   }];
 }
 
-def HAL_CommandBufferBeginOp : HAL_Op<"command_buffer.begin"> {
-  let summary = [{command buffer recording begin operation}];
+def HAL_CommandBufferFinalizeOp : HAL_Op<"command_buffer.finalize"> {
+  let summary = [{finalizes command buffer recording}];
   let description = [{
-    Resets and begins recording into the command buffer, clearing all previously
-    recorded contents.
-  }];
-
-  let arguments = (ins
-    HAL_CommandBuffer:$command_buffer
-  );
-
-  let assemblyFormat = [{
-    `<` $command_buffer `:` type($command_buffer) `>`
-    attr-dict-with-keyword
-  }];
-}
-
-def HAL_CommandBufferEndOp : HAL_Op<"command_buffer.end"> {
-  let summary = [{command buffer recording end operation}];
-  let description = [{
-    Ends recording into the command buffer.
+    Ends recording into the command buffer and prepares it for submission.
+    No more commands may be recorded into the command buffer.
   }];
 
   let arguments = (ins
