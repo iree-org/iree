@@ -34,7 +34,7 @@ theme:
       primary: indigo
       accent: indigo
       toggle:
-        icon: material/toggle-switch-off-outline
+        icon: material/brightness-7
         name: Switch to dark mode
     # Dark mode
     - media: "(prefers-color-scheme: dark)"
@@ -42,7 +42,7 @@ theme:
       primary: blue
       accent: blue
       toggle:
-        icon: material/toggle-switch
+        icon: material/brightness-4
         name: Switch to light mode
 
 repo_url: https://github.com/iree-org/iree
