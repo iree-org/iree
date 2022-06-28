@@ -13,5 +13,5 @@ steps:
       Manual authorization required
     prompt: >
       Is it safe to run presubmits on
-      https://github.com/google/iree/commit/${BUILDKITE_COMMIT} from
-      https://github.com/google/iree/pull/${BUILDKITE_PULL_REQUEST}?
+      https://github.com/iree-org/iree/commit/${BUILDKITE_COMMIT} from
+      https://github.com/iree-org/iree/pull/${BUILDKITE_PULL_REQUEST}?

@@ -226,7 +226,7 @@ option(IREE_BYTECODE_MODULE_ENABLE_TSAN "Enable thread sanitizer in IREE modules
 
 # STREQUAL feels wrong here - we don't care about the exact true-value used,
 # ON or TRUE or something else. But we haven't been able to think of a less bad
-# alternative. https://github.com/google/iree/pull/8474#discussion_r840790062
+# alternative. https://github.com/iree-org/iree/pull/8474#discussion_r840790062
 if(NOT IREE_ENABLE_TSAN STREQUAL IREE_BYTECODE_MODULE_ENABLE_TSAN)
   message(SEND_ERROR
       "IREE_ENABLE_TSAN and IREE_BYTECODE_MODULE_ENABLE_TSAN must be "

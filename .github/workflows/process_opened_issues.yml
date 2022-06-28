@@ -13,5 +13,5 @@ jobs:
     steps:
       - uses: actions/add-to-project@7a0820f97673dfefc999713a9a6d6b7ee128bba5  # v0.0.3
         with:
-          project-url: https://github.com/orgs/google/projects/20
+          project-url: https://github.com/orgs/iree-org/projects/1
           github-token: ${{ secrets.ADD_TO_PROJECT_TOKEN }}
