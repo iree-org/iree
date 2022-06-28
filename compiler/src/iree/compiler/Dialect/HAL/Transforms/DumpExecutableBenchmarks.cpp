@@ -226,7 +226,6 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
               loc, funcBuilder.getType<IREE::HAL::CommandBufferType>(), device,
               commandBufferModes, IREE::HAL::CommandCategoryBitfield::Dispatch)
           .result();
-  funcBuilder.create<IREE::HAL::CommandBufferBeginOp>(loc, commandBuffer);
 
   // Get the layout required to set up the dispatches.
   auto layoutAttr = exportOp.layoutAttr();
@@ -314,7 +313,7 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
       });
 
   // Submit command buffer.
-  funcBuilder.create<IREE::HAL::CommandBufferEndOp>(loc, commandBuffer);
+  funcBuilder.create<IREE::HAL::CommandBufferFinalizeOp>(loc, commandBuffer);
   funcBuilder.create<IREE::HAL::ExSubmitAndWaitOp>(loc, device, commandBuffer);
 
   funcBuilder.create<mlir::func::ReturnOp>(loc);

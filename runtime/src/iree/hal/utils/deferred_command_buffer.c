@@ -79,6 +79,11 @@ static void iree_hal_cmd_list_initialize(iree_arena_block_pool_t* block_pool,
   out_cmd_list->tail = NULL;
 }
 
+// Returns true if the |cmd_list| is empty.
+static bool iree_hal_cmd_list_is_empty(const iree_hal_cmd_list_t* cmd_list) {
+  return cmd_list->head != NULL;
+}
+
 // Resets the command list and returns all arena blocks back to the block pool.
 // Upon return the command list is ready for recording.
 static void iree_hal_cmd_list_reset(iree_hal_cmd_list_t* cmd_list) {
@@ -213,8 +218,10 @@ static iree_status_t iree_hal_deferred_command_buffer_begin(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_deferred_command_buffer_t* command_buffer =
       iree_hal_deferred_command_buffer_cast(base_command_buffer);
-  iree_hal_cmd_list_reset(&command_buffer->cmd_list);
-  iree_hal_resource_set_reset(command_buffer->resource_set);
+  if (!iree_hal_cmd_list_is_empty(&command_buffer->cmd_list)) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "command buffer cannot be re-recorded");
+  }
   return iree_ok_status();
 }
 

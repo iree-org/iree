@@ -148,7 +148,10 @@ Value BufferType::inferSizeFromValue(Location loc, Value value,
 
 Value BufferViewType::inferSizeFromValue(Location loc, Value value,
                                          OpBuilder &builder) const {
-  return builder.createOrFold<BufferViewByteLengthOp>(loc, value);
+  return builder.createOrFold<BufferLengthOp>(
+      loc, builder.getIndexType(),
+      builder.createOrFold<BufferViewBufferOp>(
+          loc, builder.getType<IREE::HAL::BufferType>(), value));
 }
 
 //===----------------------------------------------------------------------===//

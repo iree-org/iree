@@ -834,9 +834,8 @@ struct CmdExecuteOpPattern
                                 OpBuilder::atBlockBegin(&bodyBlock));
 
     // Begin/end recording and inline the execution region between them.
-    rewriter.create<IREE::HAL::CommandBufferBeginOp>(loc, commandBuffer);
     auto endOp =
-        rewriter.create<IREE::HAL::CommandBufferEndOp>(loc, commandBuffer);
+        rewriter.create<IREE::HAL::CommandBufferFinalizeOp>(loc, commandBuffer);
     rewriter.mergeBlockBefore(&executeOp.body().front(), endOp,
                               adaptor.operands());
 

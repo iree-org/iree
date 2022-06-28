@@ -158,15 +158,6 @@ iree_status_t iree_hal_task_command_buffer_create(
   return status;
 }
 
-static void iree_hal_task_command_buffer_reset(
-    iree_hal_task_command_buffer_t* command_buffer) {
-  memset(&command_buffer->state, 0, sizeof(command_buffer->state));
-  iree_task_list_discard(&command_buffer->leaf_tasks);
-  iree_task_list_discard(&command_buffer->root_tasks);
-  iree_hal_resource_set_reset(command_buffer->resource_set);
-  iree_arena_reset(&command_buffer->arena);
-}
-
 static void iree_hal_task_command_buffer_destroy(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_task_command_buffer_t* command_buffer =
@@ -174,7 +165,9 @@ static void iree_hal_task_command_buffer_destroy(
   iree_allocator_t host_allocator = command_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_task_command_buffer_reset(command_buffer);
+  memset(&command_buffer->state, 0, sizeof(command_buffer->state));
+  iree_task_list_discard(&command_buffer->leaf_tasks);
+  iree_task_list_discard(&command_buffer->root_tasks);
   iree_arena_deinitialize(&command_buffer->arena);
   iree_hal_resource_set_free(command_buffer->resource_set);
   iree_allocator_free(host_allocator, command_buffer);
@@ -208,7 +201,10 @@ static iree_status_t iree_hal_task_command_buffer_begin(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_task_command_buffer_t* command_buffer =
       iree_hal_task_command_buffer_cast(base_command_buffer);
-  iree_hal_task_command_buffer_reset(command_buffer);
+  if (!iree_task_list_is_empty(&command_buffer->root_tasks)) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "command buffer cannot be re-recorded");
+  }
   return iree_ok_status();
 }
 
