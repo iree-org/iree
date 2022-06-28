@@ -6,6 +6,6 @@ enum_tools==0.6.4
 sphinx_toolbox==2.15.0
 
 # IREE Python API
--f https://github.com/google/iree/releases
+-f https://github.com/iree-org/iree/releases
 iree-compiler
 iree-runtime

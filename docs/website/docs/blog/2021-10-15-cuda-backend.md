@@ -7,7 +7,7 @@
 IREE is being designed with re-targetability as a core goal: it should be
 possible to use IREE to target a broad spectrum of power regimes, from embedded
 systems to distributed clusters; and it should be possible to extend IREE to
-target new back-ends without having to reinvent the wheel each time. 
+target new back-ends without having to reinvent the wheel each time.
 
 To explore this, we recently branched out from our initial focus on low-latency
 mobile deployments with a goal of using IREE to target data center workloads on
@@ -19,7 +19,7 @@ then shares some metrics and next steps.
 
 ### HAL support
 
-IREE has a [HAL API](https://github.com/google/iree/blob/main/docs/developers/design_roadmap.md#hal-hardware-abstraction-layer-and-multi-architecture-executables)
+IREE has a [HAL API](https://github.com/iree-org/iree/blob/main/docs/developers/design_roadmap.md#hal-hardware-abstraction-layer-and-multi-architecture-executables)
 that abstract all the targets behind a common interface. The first step to
 supporting a CUDA target was to map the HAL API onto CUDA. We use the CUDA
 driver API to reduce dependencies and be closer to the hardware. The HAL API is
@@ -32,7 +32,7 @@ using CUDA streams for comparison.
 
 HAL exposes an API that can be tested independently, even if we are not able to
 create CUDA kernels yet we can test a large portion of the CUDA driver using
-[CTS tests](https://github.com/google/iree/blob/main/iree/hal/cts/README.md).
+[CTS tests](https://github.com/iree-org/iree/blob/main/iree/hal/cts/README.md).
 Those can be run to make sure a system has the required CUDA support.
 
  ![Compilation flow](./2021-10-15-cuda-compiler-flow.png){ align=left }
@@ -86,7 +86,7 @@ can now successfully compile full models.
 ![Compilation diagram](./2021-10-15-cuda-bring_up.png)
 
 The steps to reproduce running a simple op end to end through CUDA backend are
-described [here](https://github.com/google/iree/blob/main/docs/developers/design_docs/cuda_backend.md#example).
+described [here](https://github.com/iree-org/iree/blob/main/docs/developers/design_docs/cuda_backend.md#example).
 
 ## Performance
 
@@ -104,7 +104,7 @@ distribute the work into a set of workgroups that are mapped to CUDA blocks.
 
 At the beginning of the code generation we look at the dispatch region and
 decide on the tile size for a workgroup. For CUDA we also decide the number of
-threads per block. 
+threads per block.
 We will then have a pass tiling the ops in the dispatch region a second time to
 distribute the work onto threads within the block.
 
@@ -119,8 +119,8 @@ At this stage the IR looks like the following:
         indexing_maps = [affine_map<(d0) -> (d0)>,
                          affine_map<(d0) -> (d0)>,
                          affine_map<(d0) -> (d0)>],
-        iterator_types = ["parallel"]} 
-      ins(%10, %11 : 
+        iterator_types = ["parallel"]}
+      ins(%10, %11 :
           memref<4xf32, affine_map<(d0)[s0] -> (d0 + s0)>>,
           memref<4xf32, affine_map<(d0)[s0] -> (d0 + s0)>>)
       outs(%12 : memref<4xf32, affine_map<(d0)[s0] -> (d0 + s0)>>) {
@@ -158,7 +158,7 @@ Nvidia GPUs have a fast shared memory that needs to be leveraged to optimize
 cases where we may be memory bound and have the potential to re-use memory
 reads.
 
-For operations like GEMM using shared memory gives us a significant speed up. 
+For operations like GEMM using shared memory gives us a significant speed up.
 We leverage memory promotion, vector distribution and software pipelining
 transformations from MLIR to generate efficient copies from global to shared
 memory that can be interleaved with the compute work.
@@ -176,7 +176,7 @@ The full dump step by step of a linalg.matmul operation can be found [here](http
 ### GEMM
 
 We compare the performance of a single GEMM operation to highly optimized
-library cuBLAS using [mmperf framework](https://github.com/mmperf/mmperf). 
+library cuBLAS using [mmperf framework](https://github.com/mmperf/mmperf).
 
 ![Compilation diagram](./2021-10-15-cuda-memperf.png)
 

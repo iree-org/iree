@@ -160,7 +160,7 @@ modules opaque.
 
 For tracing the compiler, additionally set `IREE_ENABLE_COMPILER_TRACING` to
 `ON`. Compiler tracing is less stable, particularly on Linux with MLIR threading
-enabled (https://github.com/google/iree/issues/6404).
+enabled (https://github.com/iree-org/iree/issues/6404).
 
 Once done configuring CMake, proceed to rebuild, e.g.
 
@@ -374,6 +374,6 @@ source view pointing to the `.mlir` file.
 ## Configuring Tracy instrumentation
 
 Set IREE's `IREE_TRACING_MODE` value (defined in
-[iree/base/tracing.h](https://github.com/google/iree/blob/main/iree/base/tracing.h))
+[iree/base/tracing.h](https://github.com/iree-org/iree/blob/main/iree/base/tracing.h))
 to adjust which tracing features, such as allocation tracking and callstacks,
 are enabled.

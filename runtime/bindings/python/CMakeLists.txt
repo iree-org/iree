@@ -155,7 +155,7 @@ iree_py_test(
 )
 
 # TODO: Enable this once the CI bots are updated to install the python3-venv
-# apt package. https://github.com/google/iree/issues/9080
+# apt package. https://github.com/iree-org/iree/issues/9080
 # iree_py_test(
 #   NAME
 #     package_test

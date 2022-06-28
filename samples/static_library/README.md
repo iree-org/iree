@@ -35,7 +35,7 @@ _Note: run the following commands from IREE's github repo root._
 1. Configure CMake for building the static library then demo. You'll need to set
 the flags building samples, the compiler, and the `dylib-llvm-aot`
 driver/backend. See
-[here](https://google.github.io/iree/building-from-source/getting-started/)
+[here](https://iree-org.github.io/iree/building-from-source/getting-started/)
 for general instructions on building using CMake):
 
   ```shell
@@ -75,7 +75,7 @@ If you wish to target a different deployment other than the host, you'll need to
 compile the library and demo with different options.
 
 For example, see
-[documentation](https://google.github.io/iree/building-from-source/android/)
+[documentation](https://iree-org.github.io/iree/building-from-source/android/)
 on cross compiling on Android.
 
 Note: separating the target from the host will require modifying dependencies in

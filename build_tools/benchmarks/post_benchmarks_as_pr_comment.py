@@ -47,8 +47,8 @@ from common.benchmark_presentation import *
 
 ABBR_PR_COMMENT_TITLE = "Abbreviated Benchmark Summary"
 GITHUB_GIST_API_PREFIX = "https://api.github.com/gists"
-GITHUB_IREE_API_PREFIX = "https://api.github.com/repos/google/iree"
-GITHUB_IREE_REPO_PREFIX = "https://github.com/google/iree"
+GITHUB_IREE_API_PREFIX = "https://api.github.com/repos/iree-org/iree"
+GITHUB_IREE_REPO_PREFIX = "https://github.com/iree-org/iree"
 GITHUB_USER = "iree-github-actions-bot"
 IREE_PROJECT_ID = 'IREE'
 # The maximal numbers of trials when querying base commit benchmark results.
