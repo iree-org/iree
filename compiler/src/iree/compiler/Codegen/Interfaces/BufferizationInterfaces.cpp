@@ -60,19 +60,27 @@ static Value findOrCreateSubspanBuffer(
                         .dyn_cast<IREE::Flow::DispatchTensorType>();
   assert(shapedType && shapedType.hasRank());
 
+  auto memRefType = getMemrefTypeForTensor(shapedType);
+
   // Look for an existing op.
   Block *block = subspanOp->getBlock();
   for (Operation &op : *block) {
     if (&op == subspanOp.getOperation()) break;
     auto bufferSubspanOp = dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(&op);
     if (!bufferSubspanOp) continue;
+
+    auto bufferMemrefType =
+        bufferSubspanOp.getResult().getType().dyn_cast<MemRefType>();
+    if (!bufferMemrefType) continue;
+
     if (bufferSubspanOp.set() != subspanOp.set() ||
         bufferSubspanOp.binding() != subspanOp.binding() ||
         bufferSubspanOp.type() != subspanOp.type() ||
         bufferSubspanOp.byte_offset() != subspanOp.byte_offset() ||
         !llvm::equal(bufferSubspanOp.dynamic_dims(),
                      subspanOp.dynamic_dims()) ||
-        bufferSubspanOp.alignment() != subspanOp.alignment())
+        bufferSubspanOp.alignment() != subspanOp.alignment() ||
+        memRefType != bufferMemrefType)
       continue;
     return bufferSubspanOp.getResult();
   }
@@ -81,7 +89,6 @@ static Value findOrCreateSubspanBuffer(
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(subspanOp);
   // Just change the result type of the InterfaceBindingSubspanOp.
-  auto memRefType = getMemrefTypeForTensor(shapedType);
   Value buffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
       subspanOp->getLoc(), memRefType, subspanOp.set(), subspanOp.binding(),
       subspanOp.type(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
