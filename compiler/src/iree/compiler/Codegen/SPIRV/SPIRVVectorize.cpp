@@ -151,7 +151,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       RewritePatternSet patterns(context);
       populateVectorizationPatterns(patterns);
       // Pull in additional vectorization patterns in IREE.
-      populateLinalgToVectorVectorizeConvPatterns(context, patterns);
+      linalg::populateConvolutionVectorizationPatterns(patterns);
       populateVectorizePadPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();

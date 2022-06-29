@@ -338,6 +338,22 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
         llvm::dbgs() << "\n\n";
       });
     }
+    {  // Decompose High level N-D to 1-D for later vectorization.
+      RewritePatternSet decompositionPattern(&getContext());
+      linalg::LinalgTransformationFilter filter;
+      linalg::populateDecomposeConvolutionPatterns(decompositionPattern,
+                                                   filter);
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(decompositionPattern)))) {
+        return signalPassFailure();
+      }
+
+      LLVM_DEBUG({
+        llvm::dbgs() << "--- After Decomposing High N-D to 1-D  ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
+    }
   }
 };
 }  // namespace

@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-create-fast-slow-path,iree-spirv-tile,iree-spirv-vectorize))))' %s | FileCheck %s
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 4, 1, 4], [0, 1, 1, 0, 1, 1, 4]]>
 #translation = #iree_codegen.translation_info<SPIRVVectorize workload_per_wg = [16, 4, 4]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -69,22 +69,21 @@ hal.executable private @conv_static_shape_f32 {
 // CHECK-LABEL: func.func @conv_static_shape_f32()
 
 // No vector transfer write ops generated for the linalg.fill op: it's cancelled with read ops.
-// CHECK-NOT: vector.transfer
-
-// Check tiling loop along filter height/width and input channel
-//      CHECK: scf.for %{{.*}} = %c0 to %c3 step %c1
-// CHECK-SAME:     -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
-//      CHECK:   scf.for %{{.*}} = %c0 to %c3 step %c1
-// CHECK-SAME:       -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
-//      CHECK:     scf.for %{{.*}} = %c0 to %c8 step %c4
-// CHECK-SAME:         -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
-
-// CHECK-COUNT-16: vector.fma
-
-// CHECK-COUNT-3: scf.yield
 
 // For linalg.conv_2d_nhwc_hwcf
 // CHECK-COUNT-4: vector.transfer_write
+
+// Check tiling loop along filter height/width and input channel
+//      CHECK: scf.for %{{.*}} = %c0 to %c3 step %c1
+// CHECK-SAME:     -> (tensor<1x4x1x4xf32>)
+//      CHECK:   scf.for %{{.*}} = %c0 to %c3 step %c1
+// CHECK-SAME:       -> (tensor<1x4x1x4xf32>)
+//      CHECK:     scf.for %{{.*}} = %c0 to %c8 step %c4
+// CHECK-SAME:         -> (tensor<1x4x1x4xf32>)
+
+// CHECK-COUNT-4: vector.fma
+
+// CHECK-COUNT-3: scf.yield
 
 // -----
 
@@ -156,21 +155,18 @@ hal.executable private @depthwise_conv_static_shape_f32 {
 
 // CHECK-LABEL: func.func @depthwise_conv_static_shape_f32()
 
-// No vector transfer write ops generated for the linalg.fill op: it's cancelled with read ops.
-// CHECK-NOT: vector.transfer
+// For linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK: vector.transfer_write
 
 // check tiling loop along filter height/width and input channel
 //      CHECK:    scf.for %{{.+}} = %c0 to %c3 step %c1
-// CHECK-SAME:        -> (vector<4xf32>)
+// CHECK-SAME:        -> (tensor<1x1x1x4xf32>)
 //      CHECK:      scf.for %{{.+}} = %c0 to %c3 step %c1
-// CHECK-SAME:          -> (vector<4xf32>)
+// CHECK-SAME:          -> (tensor<1x1x1x4xf32>)
 
 // CHECK: vector.fma
 
 // CHECK-COUNT-2: scf.yield
-
-// For linalg.depthwise_conv_2d_nhwc_hwc
-// CHECK: vector.transfer_write
 
 // -----
 
@@ -395,7 +391,6 @@ hal.executable private @low_high_padded_depthwise_conv {
 // CHECK-COUNT-2: vector.transfer_read
 //         CHECK: vector.fma
 //         CHECK: vector.transfer_read
-//         CHECK: vector.fma
 
 //         CHECK: } else {
 

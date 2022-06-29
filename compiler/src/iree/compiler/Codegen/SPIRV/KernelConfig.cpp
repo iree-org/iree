@@ -148,9 +148,9 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   tileSizes.push_back(invocationTileSizes);
   // Tiling along reduction dimensions
   if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
-    tileSizes.push_back({0, 0, 0, 0, 1, 1, 4});
+    tileSizes.push_back({0, 1, 1, 0, 1, 1, 4});
   } else if (isa<linalg::DepthwiseConv2DNhwcHwcOp>(linalgOp)) {
-    tileSizes.push_back({0, 0, 0, 0, 1, 1});
+    tileSizes.push_back({0, 1, 1, 0, 1, 1});
   } else {
     return success();
   }
