@@ -25,7 +25,7 @@ import subprocess
 import time
 
 from typing import Any, Dict, Optional
-
+from common.benchmark_presentation import COMPILATION_METRICS_TO_TABLE_MAPPERS, collect_all_compilation_metrics
 from common.benchmark_definition import (BenchmarkInfo, BenchmarkResults,
                                          execute_cmd_and_get_output)
 from common.benchmark_thresholds import BENCHMARK_THRESHOLDS
@@ -66,16 +66,15 @@ IREE_TFLITE_MODEL_SOURCE_URL = {
 }
 
 
-def get_model_description(benchmark_info: BenchmarkInfo) -> Optional[str]:
+def get_model_description(model_name: str, model_source: str) -> Optional[str]:
   """Gets the model description for the given benchmark."""
   url = None
-  name = benchmark_info.model_name
-  if benchmark_info.model_source == "TensorFlow":
-    url = IREE_TF_MODEL_SOURCE_URL.get(name)
-  elif benchmark_info.model_source == "TFLite":
-    url = IREE_TFLITE_MODEL_SOURCE_URL.get(name)
+  if model_source == "TensorFlow":
+    url = IREE_TF_MODEL_SOURCE_URL.get(model_name)
+  elif model_source == "TFLite":
+    url = IREE_TFLITE_MODEL_SOURCE_URL.get(model_name)
   if url is not None:
-    description = f'{name} from <a href="{url}">{url}</a>.'
+    description = f'{model_name} from <a href="{url}">{url}</a>.'
     return description
   return None
 
@@ -273,11 +272,20 @@ def parse_arguments():
       raise ValueError(path)
 
   parser = argparse.ArgumentParser()
-  parser.add_argument('benchmark_files',
-                      metavar='<benchmark-json-file>',
-                      type=check_file_path,
-                      nargs='+',
-                      help='Path to the JSON file containing benchmark results')
+  parser.add_argument(
+      '--benchmark_files',
+      metavar='<benchmark-json-files>',
+      type=check_file_path,
+      required=True,
+      nargs='+',
+      help='Paths to the JSON files containing benchmark results')
+  parser.add_argument(
+      "--compile_stats_files",
+      metavar="<compile-stats-json-files>",
+      type=check_file_path,
+      default=[],
+      nargs="+",
+      help="Paths to the JSON files containing compilation statistics")
   parser.add_argument("--dry-run",
                       action="store_true",
                       help="Print the comment instead of posting to dashboard")
@@ -328,7 +336,8 @@ def main(args):
 
   # Upload benchmark results to the dashboard.
   for series_id, (sample_value, benchmark_info) in aggregate_results.items():
-    description = get_model_description(benchmark_info)
+    description = get_model_description(benchmark_info.model_name,
+                                        benchmark_info.model_source)
     if description is None:
       description = ""
     description += COMMON_DESCRIIPTION
@@ -344,6 +353,32 @@ def main(args):
                    sample_value,
                    dry_run=args.dry_run,
                    verbose=args.verbose)
+
+  all_compilation_metrics = collect_all_compilation_metrics(
+      compile_stats_files=args.compile_stats_files,
+      expected_pr_commit=commit_hash)
+  for name, compile_metrics in all_compilation_metrics.items():
+    description = get_model_description(
+        compile_metrics.compilation_info.model_name,
+        compile_metrics.compilation_info.model_source)
+    if description is None:
+      description = ""
+    description += COMMON_DESCRIIPTION
+
+    for mapper in COMPILATION_METRICS_TO_TABLE_MAPPERS:
+      sample_value, _ = mapper.get_current_and_base_value(compile_metrics)
+      series_id = mapper.get_series_name(name)
+      # Override by default to allow updates to the series.
+      add_new_iree_series(series_id,
+                          description,
+                          override=True,
+                          dry_run=args.dry_run,
+                          verbose=args.verbose)
+      add_new_sample(series_id,
+                     commit_count,
+                     sample_value,
+                     dry_run=args.dry_run,
+                     verbose=args.verbose)
 
 
 if __name__ == "__main__":
