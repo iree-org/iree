@@ -503,7 +503,7 @@ class CompilationStatistics(object):
             json_object["compilation_info"]),
         module_component_sizes=ModuleComponentSizes.from_json_object(
             json_object["module_component_sizes"]),
-        compilation_time=json_object["compilation_info"])
+        compilation_time=json_object["compilation_time"])
 
 
 @dataclass(frozen=True)

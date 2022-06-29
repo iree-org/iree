@@ -107,33 +107,24 @@ iree_status_t iree_hal_cuda_graph_command_buffer_create(
   return status;
 }
 
-static void iree_hal_cuda_graph_command_buffer_reset(
-    iree_hal_cuda_graph_command_buffer_t* command_buffer) {
-  if (command_buffer->graph != NULL) {
-    CUDA_IGNORE_ERROR(command_buffer->context->syms,
-                      cuGraphDestroy(command_buffer->graph));
-    command_buffer->graph = NULL;
-  }
-
-  if (command_buffer->exec != NULL) {
-    CUDA_IGNORE_ERROR(command_buffer->context->syms,
-                      cuGraphExecDestroy(command_buffer->exec));
-    command_buffer->exec = NULL;
-  }
-
-  command_buffer->last_node = NULL;
-
-  iree_hal_resource_set_reset(command_buffer->resource_set);
-  iree_arena_reset(&command_buffer->arena);
-}
-
 static void iree_hal_cuda_graph_command_buffer_destroy(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_cuda_graph_command_buffer_reset(command_buffer);
+  if (command_buffer->graph != NULL) {
+    CUDA_IGNORE_ERROR(command_buffer->context->syms,
+                      cuGraphDestroy(command_buffer->graph));
+    command_buffer->graph = NULL;
+  }
+  if (command_buffer->exec != NULL) {
+    CUDA_IGNORE_ERROR(command_buffer->context->syms,
+                      cuGraphExecDestroy(command_buffer->exec));
+    command_buffer->exec = NULL;
+  }
+  command_buffer->last_node = NULL;
+
   iree_hal_resource_set_free(command_buffer->resource_set);
   iree_arena_deinitialize(&command_buffer->arena);
   iree_allocator_free(command_buffer->context->host_allocator, command_buffer);
@@ -168,8 +159,11 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_begin(
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
 
-  // Reset any prior recorded commands.
-  iree_hal_cuda_graph_command_buffer_reset(command_buffer);
+  // Fail if re-recording.
+  if (command_buffer->graph != NULL) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "command buffer cannot be re-recorded");
+  }
 
   // Create a new empty graph to record into.
   CUDA_RETURN_IF_ERROR(command_buffer->context->syms,

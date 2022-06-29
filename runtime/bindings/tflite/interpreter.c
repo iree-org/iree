@@ -292,11 +292,11 @@ static iree_status_t _TfLiteInterpreterAllocate(
 static iree_status_t _TfLiteInterpreterPopulateIO(
     TfLiteInterpreter* interpreter) {
   iree_vm_function_t main_fn = interpreter->model->exports._main;
-  iree_string_view_t io_names_attr = iree_vm_function_reflection_attr(
+  iree_string_view_t io_names_attr = iree_vm_function_lookup_attr_by_name(
       &main_fn, iree_make_cstring_view("tfl.io.names"));
-  iree_string_view_t io_types_attr = iree_vm_function_reflection_attr(
+  iree_string_view_t io_types_attr = iree_vm_function_lookup_attr_by_name(
       &main_fn, iree_make_cstring_view("tfl.io.types"));
-  iree_string_view_t io_quant_attr = iree_vm_function_reflection_attr(
+  iree_string_view_t io_quant_attr = iree_vm_function_lookup_attr_by_name(
       &main_fn, iree_make_cstring_view("tfl.io.quant"));
 
   // Setup static tensor metadata.

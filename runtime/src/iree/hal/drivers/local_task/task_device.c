@@ -187,9 +187,9 @@ static iree_status_t iree_hal_task_device_trim(iree_hal_device_t* base_device) {
   return iree_hal_allocator_trim(device->device_allocator);
 }
 
-static iree_status_t iree_hal_task_device_query_i32(
+static iree_status_t iree_hal_task_device_query_i64(
     iree_hal_device_t* base_device, iree_string_view_t category,
-    iree_string_view_t key, int32_t* out_value) {
+    iree_string_view_t key, int64_t* out_value) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   *out_value = 0;
 
@@ -204,13 +204,13 @@ static iree_status_t iree_hal_task_device_query_i32(
   } else if (iree_string_view_equal(category,
                                     iree_make_cstring_view("hal.device"))) {
     if (iree_string_view_equal(key, iree_make_cstring_view("concurrency"))) {
-      *out_value = (int32_t)device->queue_count;
+      *out_value = (int64_t)device->queue_count;
       return iree_ok_status();
     }
   } else if (iree_string_view_equal(category,
                                     iree_make_cstring_view("hal.dispatch"))) {
     if (iree_string_view_equal(key, iree_make_cstring_view("concurrency"))) {
-      *out_value = (int32_t)iree_task_executor_worker_count(device->executor);
+      *out_value = (int64_t)iree_task_executor_worker_count(device->executor);
       return iree_ok_status();
     }
   }
@@ -375,7 +375,7 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .host_allocator = iree_hal_task_device_host_allocator,
     .device_allocator = iree_hal_task_device_allocator,
     .trim = iree_hal_task_device_trim,
-    .query_i32 = iree_hal_task_device_query_i32,
+    .query_i64 = iree_hal_task_device_query_i64,
     .create_command_buffer = iree_hal_task_device_create_command_buffer,
     .create_descriptor_set = iree_hal_task_device_create_descriptor_set,
     .create_descriptor_set_layout =

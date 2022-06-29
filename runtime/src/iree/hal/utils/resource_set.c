@@ -107,19 +107,6 @@ IREE_API_EXPORT void iree_hal_resource_set_free(iree_hal_resource_set_t* set) {
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT void iree_hal_resource_set_reset(iree_hal_resource_set_t* set) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Release all resources and the blocks besides the base set.
-  iree_hal_resource_set_release_blocks(set, /*preserve_set=*/true);
-
-  // Reset the set state.
-  memset(set->mru, 0, sizeof(set->mru));
-  iree_hal_resource_set_setup_inline_chunk(set);
-
-  IREE_TRACE_ZONE_END(z0);
-}
-
 // Retains |resource| and adds it to the main |set| list.
 static iree_status_t iree_hal_resource_set_insert_retain(
     iree_hal_resource_set_t* set, iree_hal_resource_t* resource) {

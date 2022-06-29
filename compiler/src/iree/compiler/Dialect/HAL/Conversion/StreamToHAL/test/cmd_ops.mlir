@@ -8,7 +8,6 @@ func.func @cmdMemoryControl(%arg0: !stream.resource<transient>, %arg1: index) ->
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
-  // CHECK-NEXT: hal.command_buffer.begin<%[[CMD]]
   %0 = stream.cmd.execute with(%arg0 as %arg2: !stream.resource<transient>{%arg1}) {
     // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
     stream.cmd.flush %arg2[%c0 for %c128] : !stream.resource<transient>{%arg1}
@@ -17,7 +16,7 @@ func.func @cmdMemoryControl(%arg0: !stream.resource<transient>, %arg1: index) ->
     // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
     stream.cmd.discard %arg2[%c0 for %c128] : !stream.resource<transient>{%arg1}
   } => !stream.timepoint
-  // CHECK-NEXT: hal.command_buffer.end<%[[CMD]]
+  // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
   // CHECK-NEXT: hal.ex.submit_and_wait
   return %0 : !stream.timepoint
 }
@@ -30,7 +29,6 @@ func.func @cmdFill(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.
   %c128 = arith.constant 128 : index
   %c255_i32 = arith.constant 255 : i32
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
-  // CHECK-NEXT: hal.command_buffer.begin<%[[CMD]]
   %0 = stream.cmd.execute with(%arg0 as %arg2: !stream.resource<transient>{%arg1}) {
     // CHECK-NEXT: hal.command_buffer.fill_buffer<%[[CMD]] : !hal.command_buffer>
     // CHECK-SAME: target(%arg0 : !hal.buffer)[%c0, %c128]
@@ -38,7 +36,7 @@ func.func @cmdFill(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.
     stream.cmd.fill %c255_i32, %arg2[%c0 for %c128] : i32 -> !stream.resource<transient>{%arg1}
     // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
   } => !stream.timepoint
-  // CHECK-NEXT: hal.command_buffer.end<%[[CMD]]
+  // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
   // CHECK-NEXT: hal.ex.submit_and_wait
   return %0 : !stream.timepoint
 }
@@ -50,7 +48,6 @@ func.func @cmdCopy(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !str
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
-  // CHECK-NEXT: hal.command_buffer.begin<%[[CMD]]
   %0 = stream.cmd.execute with(%arg0 as %arg4: !stream.resource<transient>{%arg1}, %arg2 as %arg5: !stream.resource<staging>{%arg3}) {
     // CHECK-NEXT: hal.command_buffer.copy_buffer<%[[CMD]] : !hal.command_buffer>
     // CHECK-SAME: source(%arg0 : !hal.buffer)[%c0]
@@ -59,7 +56,7 @@ func.func @cmdCopy(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !str
     stream.cmd.copy %arg4[%c0], %arg5[%c0], %c128 : !stream.resource<transient>{%arg1} -> !stream.resource<staging>{%arg3}
     // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
   } => !stream.timepoint
-  // CHECK-NEXT: hal.command_buffer.end<%[[CMD]]
+  // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
   // CHECK-NEXT: hal.ex.submit_and_wait
   return %0 : !stream.timepoint
 }
@@ -76,7 +73,6 @@ func.func @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
-  // CHECK-NEXT: hal.command_buffer.begin<%[[CMD]]
   %0 = stream.cmd.execute await(%arg4) => with(%arg0 as %arg5: !stream.resource<transient>{%arg1}, %arg2 as %arg6: !stream.resource<staging>{%arg3}) {
     stream.cmd.concurrent {
       // CHECK-NEXT: hal.command_buffer.copy_buffer<%[[CMD]]
@@ -96,7 +92,7 @@ func.func @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !
       // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
     }
   } => !stream.timepoint
-  // CHECK-NEXT: hal.command_buffer.end<%[[CMD]]
+  // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
   // CHECK-NEXT: hal.ex.submit_and_wait
   return %0 : !stream.timepoint
 }
@@ -141,7 +137,6 @@ func.func @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, %arg2: 
   %c5_i32 = arith.constant 5 : i32
   %c128 = arith.constant 128 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
-  // CHECK-NEXT: hal.command_buffer.begin<%[[CMD]]
   %0 = stream.cmd.execute with(%arg0 as %arg4: !stream.resource<transient>{%arg1}, %arg2 as %arg5: !stream.resource<external>{%arg3}) {
     // Switch for each executable variant:
     // CHECK: hal.device.switch
@@ -183,7 +178,7 @@ func.func @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, %arg2: 
     }
     // CHECK: hal.command_buffer.execution_barrier<%[[CMD]]
   } => !stream.timepoint
-  // CHECK-NEXT: hal.command_buffer.end<%[[CMD]]
+  // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
   // CHECK-NEXT: hal.ex.submit_and_wait
   return %0 : !stream.timepoint
 }

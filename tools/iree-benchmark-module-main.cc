@@ -80,7 +80,7 @@ IREE_FLAG(string, module_file, "-",
           "function. Defaults to stdin.");
 
 // TODO(hanchung): Extract the batch size using
-// iree_vm_function_reflection_attr.
+// iree_vm_function_lookup_attr_by_name.
 IREE_FLAG(
     int32_t, batch_size, 1,
     "The number of batch size, which is expected to match "
@@ -366,7 +366,7 @@ class IREEBenchmark {
 
       // We run anything with the 'benchmark' attribute.
       // If the attribute is not present we'll run anything that looks runnable.
-      iree_string_view_t benchmark_type = iree_vm_function_reflection_attr(
+      iree_string_view_t benchmark_type = iree_vm_function_lookup_attr_by_name(
           &function, IREE_SV("iree.benchmark"));
       if (iree_string_view_equal(benchmark_type, IREE_SV("dispatch"))) {
         iree::RegisterDispatchBenchmark(

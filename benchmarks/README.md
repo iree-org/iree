@@ -63,7 +63,7 @@ These steps help reproduce the failures in TFLite models.
 
 1. Install `iree-import-tflite`.
    ```
-   $ python -m pip install iree-tools-tflite -f https://github.com/google/iree/releases
+   $ python -m pip install iree-tools-tflite -f https://github.com/iree-org/iree/releases
    ```
 
 2. Expose and confirm the binary `iree-import-tflite` is in your path by running
@@ -85,7 +85,7 @@ These steps help reproduce the failures in TFLite models.
 
 ### Running benchmark suites locally
 
-First you need to have [`iree-import-tflite`](https://google.github.io/iree/getting-started/tflite/)
+First you need to have [`iree-import-tflite`](https://iree-org.github.io/iree/getting-started/tflite/)
 and `requests` in your python environment. Then you can build the target
 `iree-benchmark-suites` to generate the required files:
 

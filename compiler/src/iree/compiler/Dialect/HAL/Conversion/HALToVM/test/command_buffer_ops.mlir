@@ -9,12 +9,10 @@ func.func @command_buffer_create(%arg0: !hal.device) {
 
 // -----
 
-// CHECK-LABEL: @command_buffer_begin_end
-func.func @command_buffer_begin_end(%arg0: !hal.command_buffer) {
-  // CHECK: vm.call @hal.command_buffer.begin(%arg0) : (!vm.ref<!hal.command_buffer>) -> ()
-  hal.command_buffer.begin<%arg0 : !hal.command_buffer>
-  // CHECK: vm.call @hal.command_buffer.end(%arg0) : (!vm.ref<!hal.command_buffer>) -> ()
-  hal.command_buffer.end<%arg0 : !hal.command_buffer>
+// CHECK-LABEL: @command_buffer_finalize
+func.func @command_buffer_finalize(%arg0: !hal.command_buffer) {
+  // CHECK: vm.call @hal.command_buffer.finalize(%arg0) : (!vm.ref<!hal.command_buffer>) -> ()
+  hal.command_buffer.finalize<%arg0 : !hal.command_buffer>
   return
 }
 

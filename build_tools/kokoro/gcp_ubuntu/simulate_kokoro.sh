@@ -25,7 +25,7 @@ set -e
 set -o pipefail
 
 RELATIVE_KOKORO_BUILD_SCRIPT="${1?}"
-REPO_TO_CLONE="${2:-git@github.com:google/iree.git}"
+REPO_TO_CLONE="${2:-git@github.com:iree-org/iree.git}"
 
 # Set up the temporary Kokoro directories
 export KOKORO_ROOT="$(mktemp --directory --tmpdir kokoro-root-XXXXXX)"

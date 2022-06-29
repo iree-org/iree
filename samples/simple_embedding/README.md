@@ -8,7 +8,7 @@ supports.
 # Background
 
 The main bytecode testing tool
-[iree-run-module](https://github.com/google/iree/tree/main/tools/iree-run-module-main.cc)
+[iree-run-module](https://github.com/iree-org/iree/tree/main/tools/iree-run-module-main.cc)
 requires a proper operating system support to set up the runtime environment to
 execute an IREE bytecode module. For embedded systems, the support such as file
 system or multi-thread asynchronous control may not be available. This sample
@@ -58,7 +58,7 @@ The main function of the sample has the following steps:
 
 The HAL device for different target backends. The device is a `module_loader` +
 `executor` combination. For example,
-[device_embedded_sync.c](https://github.com/google/iree/blob/main/iree/samples/simple_embedding/device_embedded_sync.c)
+[device_embedded_sync.c](https://github.com/iree-org/iree/blob/main/iree/samples/simple_embedding/device_embedded_sync.c)
 uses the embedded library loader and the synchronous executor:
 ```c
 iree_hal_sync_device_params_t params;
@@ -76,7 +76,7 @@ iree_status_t status =
 ```
 
 Whereas for
-[device_dylib.c](https://github.com/google/iree/blob/main/iree/samples/simple_embedding/device_dylib.c),
+[device_dylib.c](https://github.com/iree-org/iree/blob/main/iree/samples/simple_embedding/device_dylib.c),
 the executor is replaced with the multi-thread ready asynchronous task executor:
 ```c
 ...
@@ -92,7 +92,7 @@ if (iree_status_is_ok(status)) {
                                         iree_allocator_system(), device);
 ```
 An example that utilizes a higher-level driver registry is in
-[device_vulkan.c](https://github.com/google/iree/blob/main/iree/samples/simple_embedding/device_vulkan.c)
+[device_vulkan.c](https://github.com/iree-org/iree/blob/main/iree/samples/simple_embedding/device_vulkan.c)
 
 ### Load device-specific bytecode module
 To avoid the file IO, the bytecode module is converted into a data stream
@@ -105,4 +105,4 @@ machine mode without an operating system). For example, `device_vmvx_sync`
 should support any architecture that IREE supports, and `device_embedded_sync`
 should support any architecture that supports `dylib-llvm-aot` codegen target
 backend (may need to add the bytecode module data if it is not already in
-[device_embedded_sync.c](https://github.com/google/iree/blob/main/iree/samples/simple_embedding/device_embedded_sync.c)).
+[device_embedded_sync.c](https://github.com/iree-org/iree/blob/main/iree/samples/simple_embedding/device_embedded_sync.c)).

@@ -24,7 +24,7 @@ steps:
   # A host tools install is required for the WebAssembly build.
   # We _could_ instead download from the latest GitHub release, but all of our
   # releases are marked as "draft"s, so the convenient
-  # https://github.com/google/iree/releases/latest does not actually work :/
+  # https://github.com/iree-org/iree/releases/latest does not actually work :/
   - label: ":linux: Build host install"
     key: "build-host-install"
     commands:

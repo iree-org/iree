@@ -75,7 +75,6 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
     // CHECK-SAME: device(%[[DEVICE]] : !hal.device)
     // CHECK-SAME: mode("OneShot|AllowInlineExecution")
     // CHECK-SAME: categories("Transfer|Dispatch") : !hal.command_buffer
-    // CHECK: hal.command_buffer.begin<%[[CMD]] : !hal.command_buffer>
     %timepoint = stream.cmd.execute
         with(%arg0_resource as %arg0_capture: !stream.resource<external>{%c16},
              %arg1_resource as %arg1_capture: !stream.resource<external>{%c16},
@@ -113,7 +112,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
     // CHECK: hal.command_buffer.execution_barrier<%[[CMD]] : !hal.command_buffer>
     // CHECK-SAME: source("Dispatch|Transfer|CommandRetire")
     // CHECK-SAME: target("CommandIssue|Dispatch|Transfer")
-    // CHECK: hal.command_buffer.end<%[[CMD]] : !hal.command_buffer>
+    // CHECK: hal.command_buffer.finalize<%[[CMD]] : !hal.command_buffer>
     } => !stream.timepoint
 
     // CHECK: hal.ex.submit_and_wait %[[DEVICE]], %[[CMD]]

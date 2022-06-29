@@ -25,6 +25,14 @@ else()
   enable_language(ASM)
 endif()
 
+# Set the default CMake build type so some of the build type dependent setting
+# in the submodules and functions (IREE assertion) can be set properly.
+set(DEFAULT_CMAKE_BUILD_TYPE "Release")
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "No build type selected, default to ${DEFAULT_CMAKE_BUILD_TYPE}")
+  set(CMAKE_BUILD_TYPE "${DEFAULT_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
+endif()
+
 include(CMakeDependentOption)
 
 #-------------------------------------------------------------------------------
@@ -218,7 +226,7 @@ option(IREE_BYTECODE_MODULE_ENABLE_TSAN "Enable thread sanitizer in IREE modules
 
 # STREQUAL feels wrong here - we don't care about the exact true-value used,
 # ON or TRUE or something else. But we haven't been able to think of a less bad
-# alternative. https://github.com/google/iree/pull/8474#discussion_r840790062
+# alternative. https://github.com/iree-org/iree/pull/8474#discussion_r840790062
 if(NOT IREE_ENABLE_TSAN STREQUAL IREE_BYTECODE_MODULE_ENABLE_TSAN)
   message(SEND_ERROR
       "IREE_ENABLE_TSAN and IREE_BYTECODE_MODULE_ENABLE_TSAN must be "
@@ -325,12 +333,6 @@ include(iree_cc_binary_benchmark)
 include(iree_benchmark_suite)
 include(iree_microbenchmark_suite)
 include(iree_hal_cts_test_suite)
-
-set(DEFAULT_CMAKE_BUILD_TYPE "Release")
-if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-  message(STATUS "No build type selected, default to ${DEFAULT_CMAKE_BUILD_TYPE}")
-  set(CMAKE_BUILD_TYPE "${DEFAULT_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
-endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 

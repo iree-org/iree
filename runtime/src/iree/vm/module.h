@@ -28,12 +28,6 @@ typedef struct iree_vm_stack_frame_t iree_vm_stack_frame_t;
 // Module / function reflection
 //===----------------------------------------------------------------------===//
 
-// A key-value pair of module/function reflection information.
-typedef struct iree_vm_reflection_attr_t {
-  iree_string_view_t key;
-  iree_string_view_t value;
-} iree_vm_reflection_attr_t;
-
 // Describes the type of a function reference.
 typedef enum iree_vm_function_linkage_e {
   // Function is internal to the module and may not be reflectable.
@@ -44,7 +38,6 @@ typedef enum iree_vm_function_linkage_e {
   IREE_VM_FUNCTION_LINKAGE_EXPORT = 2,
   // Function is an import from another module that may be unavailable.
   IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL = 3,
-  // TODO(#1979): add linkage types for well-known functions like __init.
 } iree_vm_function_linkage_t;
 
 // A function reference that can be used with the iree_vm_function_* methods.
@@ -345,6 +338,20 @@ typedef struct iree_vm_module_t {
   // Returns the reflected signature of the module.
   iree_vm_module_signature_t(IREE_API_PTR* signature)(void* self);
 
+  // Gets a reflection attribute for the module by attribute index.
+  // The returned key and value strings are guaranteed valid for the life
+  // of the module. Note that not all modules have reflection attributes.
+  // Returns IREE_STATUS_OUT_OF_RANGE if index >= the number of attributes.
+  iree_status_t(IREE_API_PTR* get_module_attr)(void* self,
+                                               iree_host_size_t index,
+                                               iree_string_pair_t* out_attr);
+
+  // Looks up a function with the given name and linkage in the module.
+  // This may perform a linear scan and results should be cached.
+  iree_status_t(IREE_API_PTR* lookup_function)(
+      void* self, iree_vm_function_linkage_t linkage, iree_string_view_t name,
+      iree_vm_function_t* out_function);
+
   // Gets one or more pieces of function information:
   // - |out_function| set to the function reference.
   // - |out_name| set to the function name.
@@ -354,11 +361,15 @@ typedef struct iree_vm_module_t {
       iree_vm_function_t* out_function, iree_string_view_t* out_name,
       iree_vm_function_signature_t* out_signature);
 
-  // Looks up a function with the given name and linkage in the module.
-  // This may perform a linear scan and results should be cached.
-  iree_status_t(IREE_API_PTR* lookup_function)(
-      void* self, iree_vm_function_linkage_t linkage, iree_string_view_t name,
-      iree_vm_function_t* out_function);
+  // Gets a reflection attribute for a function by attribute index.
+  // The returned key and value strings are guaranteed valid for the life
+  // of the module. Note that not all modules and functions have reflection
+  // attributes.
+  // Returns IREE_STATUS_OUT_OF_RANGE if index >= the number of attributes for
+  // the function.
+  iree_status_t(IREE_API_PTR* get_function_attr)(
+      void* self, iree_vm_function_linkage_t linkage, iree_host_size_t ordinal,
+      iree_host_size_t index, iree_string_pair_t* out_attr);
 
   // Resolves a stack |frame| from the module to a |out_source_location|, if
   // debug information is available.
@@ -413,19 +424,6 @@ typedef struct iree_vm_module_t {
   iree_status_t(IREE_API_PTR* resume_call)(
       void* self, iree_vm_stack_t* stack, iree_byte_span_t call_results,
       iree_vm_execution_result_t* out_result);
-
-  // TODO(benvanik): move this/refactor.
-  // Gets a reflection attribute for a function by index.
-  // The returned key and value strings are guaranteed valid for the life
-  // of the module. Note that not all modules and functions have reflection
-  // attributes.
-  // Returns IREE_STATUS_NOT_FOUND if index >= the number of attributes for
-  // the function.
-  // See: docs/developers/design_docs/function_abi.md
-  iree_status_t(IREE_API_PTR* get_function_reflection_attr)(
-      void* self, iree_vm_function_linkage_t linkage, iree_host_size_t ordinal,
-      iree_host_size_t index, iree_string_view_t* key,
-      iree_string_view_t* value);
 } iree_vm_module_t;
 
 // Initializes the interface of a module handle.
@@ -450,6 +448,22 @@ iree_vm_module_name(const iree_vm_module_t* module);
 // Returns the signature of the module describing the contents.
 IREE_API_EXPORT iree_vm_module_signature_t
 iree_vm_module_signature(const iree_vm_module_t* module);
+
+// Returns a value for the given reflection attribute |key|, if found.
+// Returns the empty string if the reflection data in general or the specific
+// key is not found.
+IREE_API_EXPORT iree_string_view_t iree_vm_module_lookup_attr_by_name(
+    const iree_vm_module_t* module, iree_string_view_t key);
+
+// Gets a reflection attribute for a module by index into the attribute list.
+// The returned key and value strings are guaranteed valid for the life
+// of the module. Note that not all modules have reflection attributes.
+//
+// Returns IREE_STATUS_OUT_OF_RANGE if index >= the number of attributes for
+// the function.
+IREE_API_EXPORT iree_status_t
+iree_vm_module_get_attr(const iree_vm_module_t* module, iree_host_size_t index,
+                        iree_string_pair_t* out_attr);
 
 // Looks up a function with the given name and linkage in the |module|.
 // This may perform a linear scan and results should be cached.
@@ -479,23 +493,25 @@ iree_vm_function_signature(const iree_vm_function_t* function);
 // Returns a value for the given reflection attribute |key|, if found.
 // Returns the empty string if the reflection data in general or the specific
 // key is not found.
-//
-// See: docs/developers/design_docs/function_abi.md for documentation on the
-// ABI.
-IREE_API_EXPORT iree_string_view_t iree_vm_function_reflection_attr(
+IREE_API_EXPORT iree_string_view_t iree_vm_function_lookup_attr_by_name(
     const iree_vm_function_t* function, iree_string_view_t key);
 
-// TODO(#1979): remove this and use iree_vm_function_reflection_attr.
-// Gets a reflection attribute for a function by index.
+// Gets a reflection attribute for a function by index into the attribute list.
 // The returned key and value strings are guaranteed valid for the life
-// of the module. Note that not all modules and functions have reflection
-// attributes.
-// Returns IREE_STATUS_NOT_FOUND if index >= the number of attributes for
+// of the module. Note that not all functions have reflection attributes.
+//
+// For more information on the function ABI and its reflection metadata see:
+// docs/developers/design_docs/function_abi.md
+//
+// Returns IREE_STATUS_OUT_OF_RANGE if index >= the number of attributes for
 // the function.
-// See: docs/developers/design_docs/function_abi.md
-IREE_API_EXPORT iree_status_t iree_vm_get_function_reflection_attr(
-    iree_vm_function_t function, iree_host_size_t index,
-    iree_string_view_t* key, iree_string_view_t* value);
+//
+// NOTE: always prefer to use iree_vm_function_lookup_attr_by_name; this should
+// only be used when exporting attributes into a generic data structure (JSON
+// or python dicts, etc).
+IREE_API_EXPORT iree_status_t
+iree_vm_function_get_attr(iree_vm_function_t function, iree_host_size_t index,
+                          iree_string_pair_t* out_attr);
 
 #ifdef __cplusplus
 }  // extern "C"

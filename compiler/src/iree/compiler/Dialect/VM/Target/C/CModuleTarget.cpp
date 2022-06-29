@@ -242,14 +242,14 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   output << "static const iree_vm_native_module_descriptor_t " << descriptorName
          << " = {\n"
          << printStringView(moduleName) << ",\n"
+         << "0,\n"
+         << "NULL,\n"
          << importOps.size() << ",\n"
          << importName << ",\n"
          << exportOps.size() << ",\n"
          << exportName << ",\n"
          << exportOps.size() << ",\n"
          << functionName << ",\n"
-         << "0,\n"
-         << "NULL,\n"
          << "};\n";
 
   output << "\n";

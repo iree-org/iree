@@ -15,6 +15,7 @@ vm.import @ex.submit_and_wait(
   %device : !vm.ref<!hal.device>,
   %command_buffer : !vm.ref<!hal.command_buffer>
 )
+attributes {vm.yield}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_allocator_t
@@ -128,12 +129,6 @@ vm.import @buffer_view.buffer(
 ) -> !vm.ref<!hal.buffer>
 attributes {nosideeffects}
 
-// Returns the allocated size of a shaped buffer view in bytes.
-vm.import @buffer_view.byte_length(
-  %buffer_view : !vm.ref<!hal.buffer_view>
-) -> i64
-attributes {nosideeffects}
-
 // Returns the element type of the buffer view.
 vm.import @buffer_view.element_type(
   %buffer_view : !vm.ref<!hal.buffer_view>,
@@ -176,14 +171,9 @@ vm.import @command_buffer.create(
   %command_categories : i32
 ) -> !vm.ref<!hal.command_buffer>
 
-// Resets and begins recording into the command buffer, clearing all previously
-// recorded contents.
-vm.import @command_buffer.begin(
-  %command_buffer : !vm.ref<!hal.command_buffer>
-)
-
-// Ends recording into the command buffer.
-vm.import @command_buffer.end(
+// Finalizes recording into the command buffer and prepares it for submission.
+// No more commands can be recorded afterward.
+vm.import @command_buffer.finalize(
   %command_buffer : !vm.ref<!hal.command_buffer>
 )
 
@@ -311,11 +301,11 @@ vm.import @device.allocator(
 attributes {nosideeffects}
 
 // Returns a tuple of (ok, value) for the given configuration key.
-vm.import @device.query.i32(
+vm.import @device.query.i64(
   %device : !vm.ref<!hal.device>,
   %category : !vm.buffer,
   %key : !vm.buffer
-) -> (i32, i32)
+) -> (i32, i64)
 attributes {nosideeffects}
 
 //===----------------------------------------------------------------------===//
@@ -389,6 +379,6 @@ vm.import @semaphore.await(
   %semaphore : !vm.ref<!hal.semaphore>,
   %min_value : i64
 ) -> i32
-// TODO(benvanik): yield point trait.
+attributes {vm.yield}
 
 }  // module

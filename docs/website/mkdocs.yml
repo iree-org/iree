@@ -1,5 +1,5 @@
 site_name: IREE
-site_url: https://google.github.io/iree/
+site_url: https://iree-org.github.io/iree/
 
 theme:
   name: material
@@ -34,7 +34,7 @@ theme:
       primary: indigo
       accent: indigo
       toggle:
-        icon: material/toggle-switch-off-outline
+        icon: material/brightness-7
         name: Switch to dark mode
     # Dark mode
     - media: "(prefers-color-scheme: dark)"
@@ -42,17 +42,17 @@ theme:
       primary: blue
       accent: blue
       toggle:
-        icon: material/toggle-switch
+        icon: material/brightness-4
         name: Switch to light mode
 
-repo_url: https://github.com/google/iree
-repo_name: google/iree
+repo_url: https://github.com/iree-org/iree
+repo_name: iree-org/iree
 edit_uri: ""  # Omit edit button (linking to GitHub) from each document
 
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/google/iree
+      link: https://github.com/iree-org/iree
       name: IREE on GitHub
     - icon: fontawesome/brands/discord
       link: https://discord.gg/26P4xW4

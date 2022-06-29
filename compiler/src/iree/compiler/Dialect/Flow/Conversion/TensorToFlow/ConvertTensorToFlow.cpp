@@ -292,7 +292,7 @@ struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
     }
 
     // TODO: Decide if this needs to be replaced with a flow.tensor.cast
-    // See https://github.com/google/iree/issues/6418
+    // See https://github.com/iree-org/iree/issues/6418
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
         op, resultType, input, sourceDynamicDims, targetDynamicDims);
 
@@ -306,8 +306,8 @@ struct ConvertTensorFromElementsPattern
   LogicalResult matchAndRewrite(tensor::FromElementsOp op,
                                 PatternRewriter &rewriter) const override {
     // TODO: This pattern was mainly added to iron out some kinks specific to
-    // detensoring (see: https://github.com/google/iree/issues/1159). Do we need
-    // to expand this check for other uses?
+    // detensoring (see: https://github.com/iree-org/iree/issues/1159). Do we
+    // need to expand this check for other uses?
     if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }

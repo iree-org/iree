@@ -229,11 +229,11 @@ IREE_API_EXPORT iree_hal_allocator_t* iree_hal_device_allocator(
 IREE_API_EXPORT
 iree_status_t iree_hal_device_trim(iree_hal_device_t* device);
 
-// Queries a configuration value as an int32_t.
+// Queries a configuration value as an int64_t.
 // The |category| and |key| will be provided to the device driver to interpret
 // in a device-specific way and if recognized the value will be converted to an
-// int32_t and returned in |out_value|. Fails if the value represented by the
-// key is not convertable (overflows a 32-bit integer, not a number, etc).
+// int64_t and returned in |out_value|. Fails if the value represented by the
+// key is not convertable.
 //
 // This is roughly equivalent to the `sysconf` linux syscall
 // (https://man7.org/linux/man-pages/man3/sysconf.3.html) in that the exact
@@ -248,9 +248,9 @@ iree_status_t iree_hal_device_trim(iree_hal_device_t* device);
 //
 // Returned values must remain the same for the lifetime of the device as
 // callers may cache them to avoid redundant calls.
-IREE_API_EXPORT iree_status_t iree_hal_device_query_i32(
+IREE_API_EXPORT iree_status_t iree_hal_device_query_i64(
     iree_hal_device_t* device, iree_string_view_t category,
-    iree_string_view_t key, int32_t* out_value);
+    iree_string_view_t key, int64_t* out_value);
 
 // Queries in what ways the given |semaphore| may be used with |device|.
 IREE_API_EXPORT iree_hal_semaphore_compatibility_t
@@ -413,10 +413,10 @@ typedef struct iree_hal_device_vtable_t {
 
   iree_status_t(IREE_API_PTR* trim)(iree_hal_device_t* device);
 
-  iree_status_t(IREE_API_PTR* query_i32)(iree_hal_device_t* device,
+  iree_status_t(IREE_API_PTR* query_i64)(iree_hal_device_t* device,
                                          iree_string_view_t category,
                                          iree_string_view_t key,
-                                         int32_t* out_value);
+                                         int64_t* out_value);
 
   iree_status_t(IREE_API_PTR* create_command_buffer)(
       iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,

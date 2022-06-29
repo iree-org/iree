@@ -327,7 +327,7 @@ static SmallVector<NamedAttribute> PruneAttributeList(linalg::GenericOp op) {
 namespace {
 /// Adapts Linalg ops input operand to output operand. This is required for not
 /// creating extra alloca ops. For more details, see
-/// https://github.com/google/iree/issues/8303
+/// https://github.com/iree-org/iree/issues/8303
 struct AdaptLinalgInputOperandToOutputOperand
     : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;

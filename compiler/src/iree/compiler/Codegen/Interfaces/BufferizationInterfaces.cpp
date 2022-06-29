@@ -197,8 +197,10 @@ struct DispatchTensorStoreOpInterface
           storeOp.getMixedStrides());
     }  // else: Writing the entire tensor, no subview required.
 
-    Value srcMemref =
+    auto maybeBuffer =
         getBuffer(rewriter, storeOp->getOpOperand(0).get(), options);
+    if (failed(maybeBuffer)) return failure();
+    Value srcMemref = *maybeBuffer;
 
     // If everything bufferized inplace, no copy is needed. We wrote to the
     // target buffer already. The copy folds away in that case.
@@ -236,8 +238,10 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
       newInputBuffers.push_back(opOperand->get());
       continue;
     }
+    auto maybeBuffer = getBuffer(rewriter, opOperand->get(), options);
+    if (failed(maybeBuffer)) return failure();
     // Input operands are never written to.
-    newInputBuffers.push_back(getBuffer(rewriter, opOperand->get(), options));
+    newInputBuffers.push_back(*maybeBuffer);
   }
 
   // New output operands for the cloned op.

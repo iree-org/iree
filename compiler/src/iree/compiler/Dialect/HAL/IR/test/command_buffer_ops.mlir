@@ -15,13 +15,11 @@ func.func @command_buffer_create(%device: !hal.device) {
 
 // -----
 
-// CHECK-LABEL: @command_buffer_begin_end
+// CHECK-LABEL: @command_buffer_finalize
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer)
-func.func @command_buffer_begin_end(%cmd: !hal.command_buffer) {
-  // CHECK: hal.command_buffer.begin<%[[CMD]] : !hal.command_buffer>
-  hal.command_buffer.begin<%cmd : !hal.command_buffer>
-  // CHECK: hal.command_buffer.end<%[[CMD]] : !hal.command_buffer>
-  hal.command_buffer.end<%cmd : !hal.command_buffer>
+func.func @command_buffer_finalize(%cmd: !hal.command_buffer) {
+  // CHECK: hal.command_buffer.finalize<%[[CMD]] : !hal.command_buffer>
+  hal.command_buffer.finalize<%cmd : !hal.command_buffer>
   return
 }
 
