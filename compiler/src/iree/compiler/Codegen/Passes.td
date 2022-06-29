@@ -27,17 +27,6 @@ def ConvertToDestinationPassingStyle :
   let constructor = "mlir::iree_compiler::createConvertToDestinationPassingStylePass()";
 }
 
-def DistributeToWorkgroups :
-  Pass<"iree-codegen-distribute-to-workgroups", "IREE::HAL::ExecutableVariantOp"> {
-  let summary = "Distribute a computation to workgroups";
-  let constructor = "mlir::iree_compiler::createDistributeToWorkgroupsPass()";
-  let options = [
-    ListOption<"tileSizes", "tile-sizes", "int64_t",
-               "List of tile sizes to use for distributing the computation",
-               "llvm::cl::ZeroOrMore">
-  ];
-}
-
 def FlattenMemRefSubspan :
   Pass<"iree-codegen-flatten-memref-subspan", "ModuleOp"> {
   let summary =
@@ -92,14 +81,15 @@ def OptimizeVectorTransfer :
   let constructor = "mlir::iree_compiler::createOptimizeVectorTransferPass()";
 }
 
-def InsertDistributionInfo :
-    Pass<"iree-codegen-insert-distribution-info", "IREE::HAL::ExecutableVariantOp"> {
-  let summary = "Insert the workgroup count region and translation info";
-  let constructor = "mlir::iree_compiler::createInsertDistributionInfoPass()";
+
+def TestPartitionableLoopsInterface :
+    Pass<"iree-codegen-test-partitionable-loops-interface", ""> {
+  let summary = "Test the PartitionableLoopsInterface";
+  let constructor = "mlir::iree_compiler::createTestPartitionableLoopsInterfacePass()";
 }
 
 def TileAndDistributeToWorkgroups :
-    Pass<"iree-codegen-tile-and-distribute-to-workgroups", "func::FuncOp"> {
+    Pass<"iree-codegen-tile-and-distribute-to-workgroups", "IREE::HAL::ExecutableVariantOp"> {
   let summary = "Tile and distribute operations to workgroups";
   let constructor = "mlir::iree_compiler::createTileAndDistributeToWorkgroupsPass()";
 }
@@ -119,16 +109,6 @@ def RemoveSingleIterationLoop :
     Pass<"iree-codegen-remove-single-iteration-loop", "func::FuncOp"> {
   let summary = "Remove distributed loop with single iteration.";
   let constructor = "mlir::iree_compiler::createRemoveSingleIterationLoopPass()";
-}
-
-// TODO: Consider removing or moving to HAL/Transforms in order to avoid
-// polluting common pass declarations with HAL specific ops.
-def SetNumWorkgroups :
-    Pass<"iree-set-num-workgroups",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
-  let summary =
-      "Set the number of workgroups for entry point functions";
-  let constructor = "mlir::iree_compiler::createSetNumWorkgroupsPass()";
 }
 
 // TODO: Rename argument to be fully qualified.
@@ -241,11 +221,11 @@ def LLVMCPUSynchronizeSymbolVisibility :
   let constructor = "mlir::iree_compiler::createLLVMCPUSynchronizeSymbolVisibilityPass()";
 }
 
-def LLVMCPUTileFuseAndVectorize
-    : Pass<"iree-llvmcpu-tile-fuse-and-vectorize", "func::FuncOp"> {
-  let summary = "Tile, fuse and vectorize Linalg ops";
+def LLVMCPUAArch64VectorLowering
+    : Pass<"iree-llvmcpu-aarch64-vector-lowering", "func::FuncOp"> {
+  let summary = "Apply vector lowering logic to vector ops";
   let constructor =
-      "mlir::iree_compiler::createLLVMCPUTileFuseAndVectorizePass()";
+      "mlir::iree_compiler::createLLVMCPUAArch64VectorLoweringPass()";
 }
 
 def LLVMCPUUnfuseFMAOps :
@@ -338,6 +318,12 @@ def LLVMGPUVectorToGPU :
     Pass<"iree-llvmgpu-vector-to-gpu", "func::FuncOp"> {
   let summary = "Pass to convert vector to gpu.";
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorToGPU()";
+}
+
+def LLVMGPUReduceToGPU :
+    Pass<"iree-llvmgpu-reduction-to-gpu", "func::FuncOp"> {
+  let summary = "Convert vector reduction to gpu ops.";
+  let constructor = "mlir::iree_compiler::createConvertVectorReductionToGPUPass()";
 }
 
 //------------------------------------------------------------------------------

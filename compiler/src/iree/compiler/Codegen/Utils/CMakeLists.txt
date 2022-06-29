@@ -24,18 +24,19 @@ iree_cc_library(
   DEPS
     IREELinalgExtDialect
     LLVMSupport
-    MLIRAffine
-    MLIRArithmetic
+    MLIRAffineDialect
+    MLIRArithmeticDialect
     MLIRGPUOps
     MLIRIR
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgTransforms
-    MLIRMemRef
+    MLIRLinalgUtils
+    MLIRMemRefDialect
     MLIRSupport
-    MLIRTensor
+    MLIRTensorDialect
+    iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Interfaces::ProcessorOpInterfaces
     iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::IR::PartitionableLoopsInterface
     iree::compiler::Dialect::HAL::IR
   PUBLIC
 )

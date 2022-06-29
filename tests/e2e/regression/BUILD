@@ -37,6 +37,7 @@ iree_lit_test_suite(
         [
             "fill_i64.mlir",
             "globals.mlir",
+            "globals_ml_program.mlir",
             "libm_linking.mlir",
             "scalar.mlir",
             "trace_dispatch_tensors.mlir",
@@ -52,6 +53,7 @@ iree_lit_test_suite(
             "dynamic_linalg_matmul_on_tensors_fuse_0.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_1.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_2.mlir",
+            "large_reduction.mlir",
             "linalg_quantized_matmul_vs_linalg_matmul.mlir",
             "lowering_config.mlir",
         ] + BACKEND_TESTS,
@@ -107,7 +109,9 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_regression_cuda",
-    srcs = BACKEND_TESTS,
+    srcs = [
+        "large_reduction.mlir",
+    ] + BACKEND_TESTS,
     compiler_flags = ["--iree-input-type=mhlo"],
     driver = "cuda",
     tags = [

@@ -7,9 +7,9 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "mlir/Dialect/GPU/GPUDialect.h"
-#include "mlir/Dialect/NVGPU/NVGPUDialect.h"
-#include "mlir/Dialect/SCF/Transforms.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
+#include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -65,7 +65,7 @@ static void setAsyncAnnotations(Operation* op,
                                 scf::PipeliningOption::PipelinerPart part,
                                 unsigned iteration, unsigned depth) {
   auto waitOp = dyn_cast<nvgpu::DeviceAsyncWaitOp>(op);
-  if (!waitOp || waitOp.numGroups()) return;
+  if (!waitOp || waitOp.getNumGroups()) return;
   int numGroupInFlight = 0;
   if (part == scf::PipeliningOption::PipelinerPart::Kernel) {
     numGroupInFlight = depth - 1;
@@ -78,7 +78,7 @@ static void setAsyncAnnotations(Operation* op,
     numGroupInFlight = depth - 1 - iteration;
   }
   OpBuilder b(op);
-  waitOp->setAttr(waitOp.numGroupsAttrName(),
+  waitOp->setAttr(waitOp.getNumGroupsAttrName(),
                   b.getI32IntegerAttr(numGroupInFlight));
 }
 

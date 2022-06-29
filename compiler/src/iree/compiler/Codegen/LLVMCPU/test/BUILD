@@ -20,6 +20,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         # keep sorted
         [
+            "aarch64_vector_lowering.mlir",
             "apply_scale_lowering.mlir",
             "check_ir_before_llvm_conversion.mlir",
             "convert_to_llvm.mlir",
@@ -33,10 +34,10 @@ iree_lit_test_suite(
             "materialize_riscv_launch_configuration.mlir",
             "materialize_vmvx_launch_configuration.mlir",
             "materialize_x86_64_launch_configuration.mlir",
+            "peel_and_vectorize.mlir",
             "pipeline_tests.mlir",
             "synchronize_symbol_visibility.mlir",
             "test_config_mmt4d.mlir",
-            "tile_fuse_and_vectorize.mlir",
             "transpose_avx2_lowering.mlir",
             "unfused_fma.mlir",
             "vector_contract_to_arm_asm.mlir",
@@ -44,12 +45,12 @@ iree_lit_test_suite(
             "verify_linalg_transform_legality.mlir",
         ],
         include = ["*.mlir"],
-        # linalg_transform_spec is a an MLIR file that specifies a
+        # transform_dialect_*_spec is a an MLIR file that specifies a
         # transformation, it needs to be included as data.
-        exclude = ["linalg_transform_spec.mlir"],
+        exclude = ["transform_dialect_codegen_bufferize_spec.mlir"],
     ),
     cfg = "//compiler:lit.cfg.py",
-    data = ["linalg_transform_spec.mlir"],
+    data = ["transform_dialect_codegen_bufferize_spec.mlir"],
     tools = [
         "//tools:iree-compile",
         "//tools:iree-opt",

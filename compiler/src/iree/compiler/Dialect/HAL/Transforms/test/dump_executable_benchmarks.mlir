@@ -72,7 +72,6 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
 
   // Create command buffer:
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
-  // CHECK: hal.command_buffer.begin<%[[CMD]] : !hal.command_buffer>
 
   // Setup dispatch constants and bindings:
   // CHECK: hal.command_buffer.push_constants<%[[CMD]] : !hal.command_buffer> layout(%{{.+}} : !hal.executable_layout) offset(0) values([%c0_i32, %c0_i32]) : i32, i32
@@ -90,7 +89,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   // CHECK-NEXT: }
 
   // Submit and wait for dispatches to complete:
-  // CHECK: hal.command_buffer.end<%[[CMD]] : !hal.command_buffer>
+  // CHECK: hal.command_buffer.finalize<%[[CMD]] : !hal.command_buffer>
   // CHECK: hal.ex.submit_and_wait %{{.+}}, %[[CMD]]
 
   // ===========================================================================

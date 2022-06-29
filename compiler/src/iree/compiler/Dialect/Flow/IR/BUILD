@@ -24,15 +24,14 @@ td_library(
             "FlowOps.td",
         ],
         include = ["*.td"],
-        exclude = ["PartitionableLoopsInterface.td"],
     ),
     deps = [
         "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
+        "@llvm-project//mlir:FuncTdFiles",
         "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:SideEffectTdFiles",
-        "@llvm-project//mlir:StdOpsTdFiles",
+        "@llvm-project//mlir:SideEffectInterfacesTdFiles",
         "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
     ],
 )
@@ -67,7 +66,7 @@ iree_compiler_cc_library(
         ":FlowTypesGen",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ArithmeticUtils",
@@ -77,7 +76,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:InferTypeOpInterface",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Parser",
-        "@llvm-project//mlir:SideEffects",
+        "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TransformUtils",
@@ -182,45 +181,4 @@ iree_tablegen_doc(
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "FlowOps.td",
     deps = [":td_files"],
-)
-
-iree_compiler_cc_library(
-    name = "PartitionableLoopsInterface",
-    srcs = [
-        "PartitionableLoopsInterface.cpp",
-    ],
-    hdrs = [
-        "PartitionableLoopsInterface.h",
-    ],
-    textual_hdrs = [
-        "PartitionableLoopsInterface.cpp.inc",
-        "PartitionableLoopsInterface.h.inc",
-    ],
-    deps = [
-        ":PartitionableLoopsInterfaceGen",
-        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
-        "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LinalgInterfaces",
-        "@llvm-project//mlir:LinalgOps",
-        "@llvm-project//mlir:LinalgStructuredOpsIncGen",
-        "@llvm-project//mlir:TensorDialect",
-    ],
-)
-
-iree_gentbl_cc_library(
-    name = "PartitionableLoopsInterfaceGen",
-    tbl_outs = [
-        (
-            ["--gen-op-interface-decls"],
-            "PartitionableLoopsInterface.h.inc",
-        ),
-        (
-            ["--gen-op-interface-defs"],
-            "PartitionableLoopsInterface.cpp.inc",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "PartitionableLoopsInterface.td",
-    deps = ["@llvm-project//mlir:OpBaseTdFiles"],
 )

@@ -30,18 +30,22 @@ iree_cc_library(
     "LLVMGPUVectorToGPU.cpp"
     "LLVMGPUVectorization.cpp"
     "Passes.cpp"
+    "VectorReductionToGPU.cpp"
     "Verifiers.cpp"
   DEPS
     IREELinalgExtDialect
     IREELinalgExtPasses
+    IREELinalgTransformDialect
+    IREELinalgTransformDialectPasses
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAffineToStandard
-    MLIRArithmetic
+    MLIRAnalysis
+    MLIRArithmeticDialect
     MLIRArithmeticToLLVM
     MLIRArithmeticTransforms
     MLIRControlFlowToLLVM
-    MLIRFunc
+    MLIRFuncDialect
     MLIRFuncToLLVM
     MLIRFuncTransforms
     MLIRGPUOps
@@ -50,24 +54,27 @@ iree_cc_library(
     MLIRGPUTransforms
     MLIRIR
     MLIRLLVMCommonConversion
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgTransforms
-    MLIRMath
+    MLIRMathDialect
     MLIRMathToLLVM
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
-    MLIRNVGPU
+    MLIRNVGPUDialect
     MLIRNVGPUToNVVM
-    MLIRNVVMIR
+    MLIRNVVMDialect
+    MLIRPDLDialect
+    MLIRPDLInterpDialect
     MLIRPass
-    MLIRROCDLIR
-    MLIRSCF
+    MLIRROCDLDialect
+    MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRSupport
+    MLIRTransformDialect
     MLIRTransforms
-    MLIRVector
+    MLIRVectorDialect
     MLIRVectorToGPU
     MLIRVectorToLLVM
     MLIRVectorToSCF

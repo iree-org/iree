@@ -25,6 +25,12 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
+#if defined(IREE_ARCH_RISCV_32) && defined(__NR_futex_time64) && \
+    !defined(__NR_futex)
+// RV32 uses 64-bit times by default (unlike other 32-bit archs).
+#define __NR_futex __NR_futex_time64
+#endif  // IREE_ARCH_RISCV_32
+
 // Oh Android...
 #ifndef SYS_futex
 #define SYS_futex __NR_futex

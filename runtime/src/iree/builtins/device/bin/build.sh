@@ -58,7 +58,7 @@ function make_arch_bc {
   # Generate a binary bitcode file embedded into the compiler binary.
   # NOTE: we do this from stdin so that the filename on the user's system is not
   # embedded in the bitcode file (making it non-deterministic).
-  cat "${FILE_BASENAME}.ll" | ${LLVM_AS} -o="${FILE_BASENAME}.bc"
+  cat "${FILE_BASENAME}.ll" | ${LLVM_AS} -opaque-pointers=0 -o="${FILE_BASENAME}.bc"
 }
 
 make_arch_bc "wasm32" "generic" "device_generic.c" \

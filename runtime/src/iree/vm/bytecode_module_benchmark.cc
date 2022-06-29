@@ -9,7 +9,6 @@
 
 #include "benchmark/benchmark.h"
 #include "iree/base/api.h"
-#include "iree/base/logging.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/bytecode_module_benchmark_module_c.h"
@@ -23,13 +22,14 @@ typedef struct native_import_module_state_t native_import_module_state_t;
 
 // vm.import @native_import_module.add_1(%arg0 : i32) -> i32
 static iree_status_t native_import_module_add_1(
-    iree_vm_stack_t* stack, const iree_vm_function_call_t* call,
+    iree_vm_stack_t* stack, iree_vm_native_function_flags_t flags,
+    iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
     iree_vm_native_function_target_t target_fn, void* module,
     void* module_state, iree_vm_execution_result_t* out_result) {
   // Add 1 to arg0 and return.
-  int32_t arg0 = *reinterpret_cast<int32_t*>(call->arguments.data);
+  int32_t arg0 = *reinterpret_cast<int32_t*>(args_storage.data);
   int32_t ret0 = arg0 + 1;
-  *reinterpret_cast<int32_t*>(call->results.data) = ret0;
+  *reinterpret_cast<int32_t*>(rets_storage.data) = ret0;
   return iree_ok_status();
 }
 
@@ -49,12 +49,12 @@ static const iree_vm_native_module_descriptor_t
         iree_make_cstring_view("native_import_module"),
         0,
         NULL,
+        0,
+        NULL,
         IREE_ARRAYSIZE(native_import_module_exports_),
         native_import_module_exports_,
         IREE_ARRAYSIZE(native_import_module_funcs_),
         native_import_module_funcs_,
-        0,
-        NULL,
 };
 
 static iree_status_t native_import_module_create(

@@ -25,6 +25,14 @@ else()
   enable_language(ASM)
 endif()
 
+# Set the default CMake build type so some of the build type dependent setting
+# in the submodules and functions (IREE assertion) can be set properly.
+set(DEFAULT_CMAKE_BUILD_TYPE "Release")
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "No build type selected, default to ${DEFAULT_CMAKE_BUILD_TYPE}")
+  set(CMAKE_BUILD_TYPE "${DEFAULT_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
+endif()
+
 include(CMakeDependentOption)
 
 #-------------------------------------------------------------------------------
@@ -218,7 +226,7 @@ option(IREE_BYTECODE_MODULE_ENABLE_TSAN "Enable thread sanitizer in IREE modules
 
 # STREQUAL feels wrong here - we don't care about the exact true-value used,
 # ON or TRUE or something else. But we haven't been able to think of a less bad
-# alternative. https://github.com/google/iree/pull/8474#discussion_r840790062
+# alternative. https://github.com/iree-org/iree/pull/8474#discussion_r840790062
 if(NOT IREE_ENABLE_TSAN STREQUAL IREE_BYTECODE_MODULE_ENABLE_TSAN)
   message(SEND_ERROR
       "IREE_ENABLE_TSAN and IREE_BYTECODE_MODULE_ENABLE_TSAN must be "
@@ -326,12 +334,6 @@ include(iree_benchmark_suite)
 include(iree_microbenchmark_suite)
 include(iree_hal_cts_test_suite)
 
-set(DEFAULT_CMAKE_BUILD_TYPE "Release")
-if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-  message(STATUS "No build type selected, default to ${DEFAULT_CMAKE_BUILD_TYPE}")
-  set(CMAKE_BUILD_TYPE "${DEFAULT_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
-endif()
-
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
 #-------------------------------------------------------------------------------
@@ -433,13 +435,21 @@ set(IREE_CUDA_LIBDEVICE_PATH "" CACHE STRING "Absolute path to an appropriate li
 if(IREE_TARGET_BACKEND_CUDA OR IREE_HAL_DRIVER_CUDA)
   find_package(CUDAToolkit)
 
-  # We define the magic IREE_CUDA_DEPS_DIR env var in our CI docker images if we
-  # have a stripped down CUDA toolkit suitable for compiling available. We
-  # trigger on this below as a fallback for locating headers and libdevice
-  # files.
-  if(NOT CUDAToolkit_FOUND AND DEFINED ENV{IREE_CUDA_DEPS_DIR})
-    set(CUDAToolkit_ROOT "$ENV{IREE_CUDA_DEPS_DIR}")
-    message(STATUS "CUDA SDK not found by CMake but using IREE_CUDA_DEPS = ${CUDAToolkit_ROOT}")
+  if(NOT CUDAToolkit_FOUND)
+    if(DEFINED ENV{IREE_CUDA_DEPS_DIR})
+      # We define the magic IREE_CUDA_DEPS_DIR env var in our CI docker images if we
+      # have a stripped down CUDA toolkit suitable for compiling available. We
+      # trigger on this below as a fallback for locating headers and libdevice
+      # files.
+      set(CUDAToolkit_ROOT "$ENV{IREE_CUDA_DEPS_DIR}")
+      message(STATUS "CUDA SDK not found by CMake but using IREE_CUDA_DEPS = ${CUDAToolkit_ROOT}")
+    else()
+      # If we haven't found CUDA deps, download at least enough to build for CUDA.
+      # This will define IREE_CUDA_DOWNLOAD_LIBDEVICE_PATH & IREE_CUDA_DOWNLOAD_INCLUDE_PATH
+      # vars with the target deps.
+      message(STATUS "CUDA SDK not found by CMake but downloading dependencies")
+      add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
+    endif()
   endif()
 endif()
 
@@ -461,6 +471,9 @@ if(IREE_TARGET_BACKEND_CUDA)
     # are hard and such. In this case, if the user went to the trouble to
     # tell us where it is, we have enough information.
     set(IREE_CUDA_LIBDEVICE_PATH "${CUDAToolkit_ROOT}/nvvm/libdevice/libdevice.10.bc")
+  elseif(IREE_CUDA_DOWNLOAD_LIBDEVICE_PATH)
+    message(STATUS "Using downloaded CUDA libdevice")
+    set(IREE_CUDA_LIBDEVICE_PATH "${IREE_CUDA_DOWNLOAD_LIBDEVICE_PATH}")
   else()
     message(FATAL_ERROR "Building with IREE_TARGET_BACKEND_CUDA requires either a CUDA SDK (consult CMake docs for your version: https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html) or an explicit path to libdevice (set with -DIREE_CUDA_LIBDEVICE_PATH=/path/to/libdevice.10.bc)")
   endif()
@@ -485,6 +498,9 @@ if(IREE_HAL_DRIVER_CUDA)
     else()
       message(SEND_ERROR "Using explicitly specified CUDAToolkit_ROOT, could not find cuda.h at: ${CUDAToolkit_INCLUDE_DIRS}")
     endif()
+  elseif(IREE_CUDA_DOWNLOAD_INCLUDE_PATH)
+    message(STATUS "Using downloaded CUDA includes")
+    set(CUDAToolkit_INCLUDE_DIRS "${IREE_CUDA_DOWNLOAD_INCLUDE_PATH}")
   else()
     message(SEND_ERROR "Cannot build IREE runtime CUDA components (-DIREE_HAL_DRIVER_CUDA=ON) because a CUDA SDK was not found. Consult CMake docs for your version: https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html")
   endif()
@@ -693,6 +709,12 @@ if(IREE_BUILD_BENCHMARKS)
     message(STATUS "Found ${IREE_IMPORT_TFLITE_PATH} to generate benchmark artifacts")
   else()
     message(STATUS "iree-import-tflite not found. Some benchmarks may not configure")
+  endif()
+  find_program(IREE_IMPORT_TF_PATH iree-import-tf)
+  if(IREE_IMPORT_TF_PATH)
+    message(STATUS "Found ${IREE_IMPORT_TF_PATH} to generate benchmark artifacts")
+  else()
+    message(STATUS "iree-import-tf not found. Some benchmarks may not configure")
   endif()
   add_subdirectory(benchmarks)
 endif()

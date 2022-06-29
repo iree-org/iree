@@ -17,7 +17,6 @@
 #include <type_traits>
 #include <utility>
 
-#include "iree/base/logging.h"
 #include "iree/base/status_cc.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -36,7 +35,10 @@ std::string GetUniquePath(const char* unique_name) {
   if (!test_tmpdir) {
     test_tmpdir = getenv("TEMP");
   }
-  IREE_CHECK(test_tmpdir) << "TEST_TMPDIR/TMPDIR/TEMP not defined";
+  if (!test_tmpdir) {
+    std::cerr << "TEST_TMPDIR/TMPDIR/TEMP not defined\n";
+    exit(1);
+  }
   return test_tmpdir + std::string("/iree_test_") + unique_name;
 }
 

@@ -39,7 +39,7 @@ LogicalResult verifyGPUMatmulSimtPassPipeline(
     // Inspect first tile dimensions separately for batched. It should be 1 for
     // parallelizable loops and 0 for non-parallelizable. Continue with other
     // dimensions for remaining comparisons.
-    if (cast<IREE::Flow::PartitionableLoopsInterface>(op).getPartitionableLoops(
+    if (cast<PartitionableLoopsInterface>(op).getPartitionableLoops(
             kNumMaxParallelDims)[0] == 0) {  // The first dimension is
       if (firstLevelTileSizes[0] > 1) {
         return op->emitError("Received first tile dimension of ")
@@ -123,7 +123,7 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
     // Inspect first tile dimensions separately for batched. It should be 1 for
     // parallelizable loops and 0 for non-parallelizable. Continue with other
     // dimensions for remaining comparisons.
-    if (cast<IREE::Flow::PartitionableLoopsInterface>(op).getPartitionableLoops(
+    if (cast<PartitionableLoopsInterface>(op).getPartitionableLoops(
             kNumMaxParallelDims)[0] == 0) {  // The first dimension is
       if (firstLevelTileSizes[0] > 1) {
         return op->emitError("Received first tile dimension of ")

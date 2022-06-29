@@ -10,14 +10,42 @@ func.func @device_allocator(%device: !hal.device) -> !hal.allocator {
 
 // -----
 
+// CHECK-LABEL: @device_query_i64
+// CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>)
+func.func @device_query_i64(%device: !hal.device) -> (i1, i64) {
+  // CHECK-DAG: %[[NS:.+]] = vm.rodata.inline "_utf8_sys_
+  // CHECK-DAG: %[[KEY:.+]] = vm.rodata.inline "_utf8_foo_
+  // CHECK: %[[RET:.+]]:2 = vm.call @hal.device.query.i64(%[[DEVICE]], %[[NS]], %[[KEY]]) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer) -> (i32, i64)
+  %ok, %value = hal.device.query<%device : !hal.device> key("sys" :: "foo") : i1, i64
+  // CHECK: return %[[RET]]#0, %[[RET]]#1
+  return %ok, %value : i1, i64
+}
+
+// -----
+
+// CHECK-LABEL: @device_query_i64_default
+// CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>)
+func.func @device_query_i64_default(%device: !hal.device) -> i64 {
+  // CHECK-DAG: %[[NS:.+]] = vm.rodata.inline "_utf8_sys_
+  // CHECK-DAG: %[[KEY:.+]] = vm.rodata.inline "_utf8_foo_
+  // CHECK: %[[RET:.+]]:2 = vm.call @hal.device.query.i64(%[[DEVICE]], %[[NS]], %[[KEY]]) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer) -> (i32, i64)
+  %ok, %value = hal.device.query<%device : !hal.device> key("sys" :: "foo") : i1, i64 = 123 : i64
+  // CHECK: %[[OUT:.+]] = vm.select.i64 %[[RET]]#0, %[[RET]]#1, %c123 : i64
+  // CHECK: return %[[OUT]]
+  return %value : i64
+}
+
+// -----
+
 // CHECK-LABEL: @device_query_i32
 // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>)
 func.func @device_query_i32(%device: !hal.device) -> (i1, i32) {
   // CHECK-DAG: %[[NS:.+]] = vm.rodata.inline "_utf8_sys_
   // CHECK-DAG: %[[KEY:.+]] = vm.rodata.inline "_utf8_foo_
-  // CHECK: %[[RET:.+]]:2 = vm.call @hal.device.query.i32(%[[DEVICE]], %[[NS]], %[[KEY]]) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer) -> (i32, i32)
+  // CHECK: %[[RET:.+]]:2 = vm.call @hal.device.query.i64(%[[DEVICE]], %[[NS]], %[[KEY]]) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer) -> (i32, i64)
+  // CHECK: %[[RET_I32:.+]] = vm.trunc.i64.i32 %[[RET]]#1 : i64 -> i32
   %ok, %value = hal.device.query<%device : !hal.device> key("sys" :: "foo") : i1, i32
-  // CHECK: return %[[RET]]#0, %[[RET]]#1
+  // CHECK: return %[[RET]]#0, %[[RET_I32]]
   return %ok, %value : i1, i32
 }
 
@@ -28,9 +56,10 @@ func.func @device_query_i32(%device: !hal.device) -> (i1, i32) {
 func.func @device_query_i32_default(%device: !hal.device) -> i32 {
   // CHECK-DAG: %[[NS:.+]] = vm.rodata.inline "_utf8_sys_
   // CHECK-DAG: %[[KEY:.+]] = vm.rodata.inline "_utf8_foo_
-  // CHECK: %[[RET:.+]]:2 = vm.call @hal.device.query.i32(%[[DEVICE]], %[[NS]], %[[KEY]]) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer) -> (i32, i32)
+  // CHECK: %[[RET:.+]]:2 = vm.call @hal.device.query.i64(%[[DEVICE]], %[[NS]], %[[KEY]]) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer) -> (i32, i64)
+  // CHECK: %[[RET_I32:.+]] = vm.trunc.i64.i32 %[[RET]]#1 : i64 -> i32
   %ok, %value = hal.device.query<%device : !hal.device> key("sys" :: "foo") : i1, i32 = 123 : i32
-  // CHECK: %[[OUT:.+]] = vm.select.i32 %[[RET]]#0, %[[RET]]#1, %c123 : i32
+  // CHECK: %[[OUT:.+]] = vm.select.i32 %[[RET]]#0, %[[RET_I32]], %c123 : i32
   // CHECK: return %[[OUT]]
   return %value : i32
 }
@@ -42,9 +71,10 @@ func.func @device_query_i32_default(%device: !hal.device) -> i32 {
 func.func @device_query_i1(%device: !hal.device) -> (i1, i1) {
   // CHECK-DAG: %[[NS:.+]] = vm.rodata.inline "_utf8_sys_
   // CHECK-DAG: %[[KEY:.+]] = vm.rodata.inline "_utf8_foo_
-  // CHECK: %[[RET:.+]]:2 = vm.call @hal.device.query.i32(%[[DEVICE]], %[[NS]], %[[KEY]]) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer) -> (i32, i32)
+  // CHECK: %[[RET:.+]]:2 = vm.call @hal.device.query.i64(%[[DEVICE]], %[[NS]], %[[KEY]]) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer) -> (i32, i64)
+  // CHECK: %[[RET_I32:.+]] = vm.trunc.i64.i32 %[[RET]]#1 : i64 -> i32
   %ok, %value = hal.device.query<%device : !hal.device> key("sys" :: "foo") : i1, i1
-  // CHECK: %[[I1:.+]] = vm.and.i32 %[[RET]]#1, %c1 : i32
+  // CHECK: %[[I1:.+]] = vm.and.i32 %[[RET_I32]], %c1 : i32
   // CHECK: return %[[RET]]#0, %[[I1]]
   return %ok, %value : i1, i1
 }
@@ -56,9 +86,10 @@ func.func @device_query_i1(%device: !hal.device) -> (i1, i1) {
 func.func @device_query_i1_default(%device: !hal.device) -> i1 {
   // CHECK-DAG: %[[NS:.+]] = vm.rodata.inline "_utf8_sys_
   // CHECK-DAG: %[[KEY:.+]] = vm.rodata.inline "_utf8_foo_
-  // CHECK: %[[RET:.+]]:2 = vm.call @hal.device.query.i32(%[[DEVICE]], %[[NS]], %[[KEY]]) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer) -> (i32, i32)
+  // CHECK: %[[RET:.+]]:2 = vm.call @hal.device.query.i64(%[[DEVICE]], %[[NS]], %[[KEY]]) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer) -> (i32, i64)
+  // CHECK: %[[RET_I32:.+]] = vm.trunc.i64.i32 %[[RET]]#1 : i64 -> i32
   %ok, %value = hal.device.query<%device : !hal.device> key("sys" :: "foo") : i1, i1 = 1 : i1
-  // CHECK: %[[I1:.+]] = vm.and.i32 %[[RET]]#1, %c1 : i32
+  // CHECK: %[[I1:.+]] = vm.and.i32 %[[RET_I32]], %c1 : i32
   // CHECK: %[[OUT:.+]] = vm.select.i32 %[[RET]]#0, %[[I1]], %c1
   // CHECK: return %[[OUT]]
   return %value : i1

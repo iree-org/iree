@@ -24,9 +24,8 @@ func.func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 //  CHECK-NEXT:         %{{.+}} = arith.subf %{{.+}}, %{{.+}} : f32
 //  CHECK-NEXT:         %{{.+}} = arith.mulf %{{.+}}, %{{.+}} : f32
 //       CHECK: func.func @hloElementwiseOps(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
-//  CHECK-NEXT:   %0 = flow.dispatch @hloElementwiseOps_dispatch_0::@hloElementwiseOps_dispatch_0[%[[C4]], %[[C1]], %[[C1]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+//  CHECK-NEXT:   %0 = flow.dispatch @hloElementwiseOps_dispatch_0::@hloElementwiseOps_dispatch_0[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
 //  CHECK-NEXT:   return %0 : tensor<4xf32>
 //  CHECK-NEXT: }
 
@@ -54,10 +53,9 @@ func.func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 //       CHECK:         %{{.+}} = arith.mulf %{{.+}}, %{{.+}} : f32
 //       CHECK: func.func @interleavedDot(
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<4x4xf32>) -> tensor<4x4xf32> {
-//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
-//  CHECK-NEXT:   %[[DISPATCH1:.+]] = flow.dispatch @interleavedDot_dispatch_0::@interleavedDot_dispatch_0[%[[C4]], %[[C4]], %[[C1]]](%[[ARG0]]) : (tensor<4x4xf32>) -> tensor<4x4xf32>
-//  CHECK-NEXT:   %1 = flow.dispatch @interleavedDot_dispatch_1::@interleavedDot_dispatch_1[%[[C4]], %[[C4]], %[[C1]]](%[[DISPATCH1:.+]], %[[ARG0]]) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+//  CHECK-NEXT:   %[[DISPATCH1:.+]] = flow.dispatch @interleavedDot_dispatch_0::@interleavedDot_dispatch_0[%[[C4]], %[[C4]]](%[[ARG0]]) : (tensor<4x4xf32>) -> tensor<4x4xf32>
+//  CHECK-NEXT:   %1 = flow.dispatch @interleavedDot_dispatch_1::@interleavedDot_dispatch_1[%[[C4]], %[[C4]]](%[[DISPATCH1:.+]], %[[ARG0]]) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
 //  CHECK-NEXT:   return %1 : tensor<4x4xf32>
 //  CHECK-NEXT: }
 
@@ -82,6 +80,6 @@ func.func @reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
 //       CHECK: func.func @reduction(%arg0: tensor<4x8xf32>) -> tensor<4xf32> {
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
-//  CHECK-NEXT:   %0 = flow.dispatch @reduction_dispatch_0::@reduction_dispatch_0[%[[C4]], %[[C1]], %[[C1]]](%arg0) : (tensor<4x8xf32>) -> tensor<4xf32>
+//  CHECK-NEXT:   %0 = flow.dispatch @reduction_dispatch_0::@reduction_dispatch_0[%[[C4]], %[[C1]]](%arg0) : (tensor<4x8xf32>) -> tensor<4xf32>
 //  CHECK-NEXT:   return %0 : tensor<4xf32>
 //  CHECK-NEXT: }

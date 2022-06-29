@@ -50,6 +50,12 @@ def DeduplicateExecutables :
   let constructor = "mlir::iree_compiler::IREE::Flow::createDeduplicateExecutablesPass()";
 }
 
+def DetachElementwiseFromNamedOps :
+    Pass<"iree-flow-detach-elementwise-from-named-ops", ""> {
+  let summary = "Detaches elementwise ops from named Linalg ops";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createDetachElementwiseFromNamedOpsPass()";
+}
+
 def DispatchLinalgOnTensors :
     InterfacePass<"iree-flow-dispatch-linalg-on-tensors-pass", "mlir::FunctionOpInterface"> {
   let summary = "Dispatch Linalg operations on tensors by using tile and distribute";
@@ -149,10 +155,10 @@ def ConvertLinalgMatmulToMmt4D :
   ];
 }
 
-def PadTensorToSubTensorInsert :
-    Pass<"iree-flow-pad-tensor-to-subtensor-insert", ""> {
-  let summary = "Convert linalg.pad_tensor into linalg.fill + subtensor_insert";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createPadTensorToSubTensorInsertPass()";
+def PadTensorToTensorInsertSlice :
+    Pass<"iree-flow-pad-tensor-to-tensor-insert-slice", ""> {
+  let summary = "Convert linalg.pad_tensor into linalg.fill + tensor.insert_slice";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createPadTensorToTensorInsertSlicePass()";
 }
 
 def DumpDispatchGraph : Pass<"iree-flow-dump-dispatch-graph-pass"> {

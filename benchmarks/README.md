@@ -25,12 +25,13 @@ posting results compared against their base commit as comments.
    model can optionally include trained weights if those are important for
    benchmarking.
 
-2. If this is a TFLite Flatbuffer, the benchmark flow can automatically import
-   it into the corresponding MLIR file. Otherwise, manually import the model
-   into an MLIR file that IREE can compile using the corresponding import tool.
-   For example, `iree-import-tf` for TensorFlow SavedModels. Take notes for where
-   the model came from and how it was imported in case the MLIR file needs to
-   be regenerated in the future.
+2. If this is a TFLite Flatbuffer or a TensorFlow SavedModel, the benchmark flow
+   can automatically import it into the corresponding MLIR file. Make sure the
+   TFLite Flatbuffer ends with `.tflite` and TensorFlow SavedModel ends with
+   `tf-model`. Otherwise, manually import the model into an MLIR file that IREE
+   can compile using the corresponding import tool. Take notes for where the
+   model came from and how it was imported in case the MLIR file needs to be
+   regenerated in the future.
 
 3. Package the source model or imported MLIR file file(s) for storage (see
    [iree_mlir_benchmark_suite.cmake](../build_tools/cmake/iree_mlir_benchmark_suite.cmake)
@@ -62,7 +63,7 @@ These steps help reproduce the failures in TFLite models.
 
 1. Install `iree-import-tflite`.
    ```
-   $ python -m pip install iree-tools-tflite -f https://github.com/google/iree/releases
+   $ python -m pip install iree-tools-tflite -f https://github.com/iree-org/iree/releases
    ```
 
 2. Expose and confirm the binary `iree-import-tflite` is in your path by running
@@ -84,7 +85,7 @@ These steps help reproduce the failures in TFLite models.
 
 ### Running benchmark suites locally
 
-First you need to have [`iree-import-tflite`](https://google.github.io/iree/getting-started/tflite/)
+First you need to have [`iree-import-tflite`](https://iree-org.github.io/iree/getting-started/tflite/)
 and `requests` in your python environment. Then you can build the target
 `iree-benchmark-suites` to generate the required files:
 

@@ -5,17 +5,25 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Downloads a file from the web and decompresses it if necessary."""
+"""Downloads a file from the web and decompresses it if necessary. NEVER Use
+  this tool to download from untrusted sources, it doesn't unpack the file
+  safely.
+"""
 
 import argparse
 import gzip
 import os
-import requests
+import shutil
+import tarfile
+import urllib.request
 
 
 def parse_arguments():
   """Parses command line arguments."""
-  parser = argparse.ArgumentParser()
+  parser = argparse.ArgumentParser(
+      description="Downloads a file from the web "
+      "and decompresses it if necessary. NEVER Use this tool to download from "
+      "untrusted sources, it doesn't unpack the file safely.")
   parser.add_argument("source_url",
                       type=str,
                       metavar="<source-url>",
@@ -35,17 +43,31 @@ def main(args):
   if not os.path.isdir(output_dir):
     os.makedirs(output_dir)
 
-  response = requests.get(args.source_url)
-  if response.status_code != 200:
-    raise requests.RequestException(
-        f"Failed to download file with status code {response.status_code}")
+  # Open the URL and get the file-like streaming object.
+  with urllib.request.urlopen(args.source_url) as response:
+    if response.status != 200:
+      raise RuntimeError(
+          f"Failed to download file with status {response.status} {response.msg}"
+      )
 
-  data = response.content
-  if args.source_url.endswith(".gz"):
-    data = gzip.decompress(data)
+    if args.source_url.endswith(".tar.gz"):
+      # Open tar.gz in the streaming mode.
+      with tarfile.open(fileobj=response, mode="r|*") as tar_file:
+        if os.path.exists(args.output):
+          shutil.rmtree(args.output)
+        os.makedirs(args.output)
+        tar_file.extractall(args.output)
 
-  with open(args.output, "wb") as f:
-    f.write(data)
+    elif args.source_url.endswith(".gz"):
+      # Open gzip from a file-like object, which will be in the streaming mode.
+      with gzip.open(filename=response, mode="rb") as input_file:
+        with open(args.output, "wb") as output_file:
+          shutil.copyfileobj(input_file, output_file)
+
+    else:
+      with open(args.output, "wb") as output_file:
+        # Streaming copy.
+        shutil.copyfileobj(response, output_file)
 
 
 if __name__ == "__main__":

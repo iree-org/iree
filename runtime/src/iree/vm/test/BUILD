@@ -271,3 +271,22 @@ iree_bytecode_module(
         "--compile-mode=vm",
     ],
 )
+
+c_embed_data(
+    name = "async_bytecode_modules_c",
+    srcs = [
+        ":async_ops.vmfb",
+    ],
+    c_file_output = "async_bytecode_modules.c",
+    flatten = True,
+    h_file_output = "async_bytecode_modules.h",
+)
+
+iree_bytecode_module(
+    name = "async_ops",
+    src = "async_ops.mlir",
+    compile_tool = "//tools:iree-compile",
+    flags = [
+        "--compile-mode=vm",
+    ],
+)

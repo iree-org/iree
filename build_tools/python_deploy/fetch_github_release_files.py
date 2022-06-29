@@ -38,7 +38,7 @@ def main(args):
     print("No github user set. Recommend setting GITHUB_USER=user:token")
   print("Fetching release from tag:", tag)
   release_resp = requests.get(
-      f"https://api.github.com/repos/google/iree/releases/tags/{tag}",
+      f"https://api.github.com/repos/iree-org/iree/releases/tags/{tag}",
       headers={"Accept": "application/vnd.github.v3+json"},
       auth=github_auth)
   release_resp.raise_for_status()

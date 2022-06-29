@@ -72,7 +72,6 @@ iree_cc_library(
     iree::base::internal::arena
     iree::base::internal::flatcc::parsing
     iree::base::internal::synchronization
-    iree::base::logging
     iree::base::tracing
     iree::hal
     iree::hal::drivers::vulkan::builtin

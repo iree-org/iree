@@ -19,8 +19,8 @@
 #include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
-#include "mlir/Dialect/SCF/BufferizableOpInterfaceImpl.h"
-#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
@@ -80,7 +80,7 @@ LogicalResult mlir::transform::applyTransformsInRegion(Region &transformRegion,
     transform::TransformState state(r, target);
     auto xform = cast<transform::TransformOpInterface>(b.clone(*transform));
     auto g = llvm::make_scope_exit([&]() { xform->erase(); });
-    if (failed(state.applyTransform(xform)))
+    if (failed(state.applyTransform(xform).checkAndReport()))
       return failure();
   }
   return success();

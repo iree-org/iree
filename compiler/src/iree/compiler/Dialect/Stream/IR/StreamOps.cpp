@@ -1506,8 +1506,9 @@ std::pair<unsigned, unsigned> AsyncExecuteOp::getTiedResultsIndexAndLength() {
   return {0, results().size()};
 }
 
-OperandRange AsyncExecuteOp::getSuccessorEntryOperands(unsigned index) {
-  assert(index == 0 && "invalid region index");
+OperandRange AsyncExecuteOp::getSuccessorEntryOperands(
+    Optional<unsigned> index) {
+  assert(index && index.getValue() == 0 && "invalid region index");
   return operands();
 }
 
@@ -1617,8 +1618,9 @@ LogicalResult AsyncConcurrentOp::verify() {
   return success();
 }
 
-OperandRange AsyncConcurrentOp::getSuccessorEntryOperands(unsigned index) {
-  assert(index == 0 && "invalid region index");
+OperandRange AsyncConcurrentOp::getSuccessorEntryOperands(
+    Optional<unsigned> index) {
+  assert(index && index.getValue() == 0 && "invalid region index");
   return operands();
 }
 
@@ -1970,8 +1972,8 @@ LogicalResult CmdExecuteOp::verify() {
   return success();
 }
 
-OperandRange CmdExecuteOp::getSuccessorEntryOperands(unsigned index) {
-  assert(index == 0 && "invalid region index");
+OperandRange CmdExecuteOp::getSuccessorEntryOperands(Optional<unsigned> index) {
+  assert(index && index.getValue() == 0 && "invalid region index");
   return operands();
 }
 

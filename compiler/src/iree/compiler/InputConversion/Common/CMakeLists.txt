@@ -40,6 +40,7 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "IREEImportPublic.cpp"
+    "ImportMLProgram.cpp"
     "Passes.cpp"
     "QuantizedMatmulToMatmul.cpp"
     "SanitizeModuleNames.cpp"
@@ -48,16 +49,18 @@ iree_cc_library(
     ::PassHeaders
     ::PassesIncGen
     IREEInputDialect
-    MLIRArithmetic
-    MLIRFunc
+    MLIRArithmeticDialect
+    MLIRFuncDialect
     MLIRIR
-    MLIRLinalg
+    MLIRLinalgDialect
     MLIRLinalgTransforms
+    MLIRLinalgUtils
+    MLIRMLProgramDialect
     MLIRMemRefTransforms
     MLIRPass
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSCFToControlFlow
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR

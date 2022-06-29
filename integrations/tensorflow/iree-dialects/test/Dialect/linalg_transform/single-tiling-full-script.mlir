@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt --linalg-transform-interp %s | FileCheck %s
+// RUN: iree-dialects-opt --transform-dialect-interpreter %s | FileCheck %s
 
 // CHECK-LABEL: func @matmul_tensors
 // CHECK-NOT: linalg
@@ -30,7 +30,8 @@ transform.with_pdl_patterns {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg1
     %1, %loops:3 = transform.structured.tile %0 {sizes = [4, 4, 4]}
-    %2 = transform.structured.vectorize %1 {vectorize_padding = true}
+    %2 = get_closest_isolated_parent %1
+    transform.structured.vectorize %2 {vectorize_padding = true}
     bufferize
     lower_vectors { multireduction_lowering = "innerreduce"}
     lower_to_llvm

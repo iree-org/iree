@@ -22,7 +22,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
-    MLIRSPIRV
+    MLIRSPIRVDialect
     MLIRSupport
     iree::compiler::Dialect::Vulkan::IR
   PUBLIC

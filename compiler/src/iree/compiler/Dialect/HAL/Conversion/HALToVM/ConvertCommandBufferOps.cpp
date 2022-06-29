@@ -128,10 +128,8 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
                                           RewritePatternSet &patterns) {
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferCreateOp>>(
       context, importSymbols, typeConverter, "hal.command_buffer.create");
-  patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferBeginOp>>(
-      context, importSymbols, typeConverter, "hal.command_buffer.begin");
-  patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferEndOp>>(
-      context, importSymbols, typeConverter, "hal.command_buffer.end");
+  patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferFinalizeOp>>(
+      context, importSymbols, typeConverter, "hal.command_buffer.finalize");
   patterns
       .insert<VMImportOpConversion<IREE::HAL::CommandBufferBeginDebugGroupOp>>(
           context, importSymbols, typeConverter,

@@ -21,6 +21,7 @@ namespace {
 
 void buildCommonInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createIREEImportPublicPass());
+  passManager.addPass(createImportMLProgramPass());
   passManager.addPass(createSanitizeModuleNamesPass());
 }
 

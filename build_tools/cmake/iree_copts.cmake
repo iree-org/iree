@@ -306,7 +306,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
 # compatible solution.
 #
 # See also:
-#   https://github.com/google/iree/issues/4665.
+#   https://github.com/iree-org/iree/issues/4665.
 #   https://discourse.cmake.org/t/how-to-fix-build-warning-d9025-overriding-gr-with-gr/878
 #   https://gitlab.kitware.com/cmake/cmake/-/issues/20610
 if(CMAKE_CXX_FLAGS AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
@@ -429,6 +429,7 @@ endif()
 #-------------------------------------------------------------------------------
 if(IREE_BUILD_COMPILER)
   set(MLIR_TABLEGEN_EXE mlir-tblgen)
+  set(MLIR_PDLL_TABLEGEN_EXE mlir-pdll)
   # iree-tblgen is not defined using the add_tablegen mechanism as other TableGen
   # tools in LLVM.
   iree_get_executable_path(IREE_TABLEGEN_EXE iree-tblgen)

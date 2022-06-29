@@ -29,7 +29,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",

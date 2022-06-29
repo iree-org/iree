@@ -171,38 +171,16 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_compute_cconv_fragment_size(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT void iree_vm_function_call_release(
-    iree_vm_function_call_t* call,
-    const iree_vm_function_signature_t* signature) {
-  if (!call->arguments.data_length || !call->results.data_length) {
-    return;
+IREE_API_EXPORT iree_status_t
+iree_vm_source_location_format(iree_vm_source_location_t* source_location,
+                               iree_vm_source_location_format_flags_t flags,
+                               iree_string_builder_t* builder) {
+  IREE_ASSERT_ARGUMENT(builder);
+  if (!source_location || !source_location->format) {
+    return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
   }
-  iree_string_view_t cconv = signature->calling_convention;
-  if (cconv.size == 0 || cconv.data[0] != '0') return;
-  uint8_t* p = call->arguments.data;
-  for (iree_host_size_t i = 1; i < cconv.size; ++i) {
-    char c = cconv.data[i];
-    if (c == '_') {
-      // Switch to results.
-      p = call->results.data;
-    }
-    switch (c) {
-      case IREE_VM_CCONV_TYPE_VOID:
-        break;
-      case IREE_VM_CCONV_TYPE_I32:
-      case IREE_VM_CCONV_TYPE_F32:
-        p += sizeof(int32_t);
-        break;
-      case IREE_VM_CCONV_TYPE_I64:
-      case IREE_VM_CCONV_TYPE_F64:
-        p += sizeof(int64_t);
-        break;
-      case IREE_VM_CCONV_TYPE_REF:
-        iree_vm_ref_release((iree_vm_ref_t*)p);
-        p += sizeof(iree_vm_ref_t);
-        break;
-    }
-  }
+  return source_location->format(source_location->self, source_location->data,
+                                 flags, builder);
 }
 
 IREE_API_EXPORT iree_status_t
@@ -245,6 +223,33 @@ iree_vm_module_signature(const iree_vm_module_t* module) {
   return module->signature(module->self);
 }
 
+IREE_API_EXPORT iree_string_view_t iree_vm_module_lookup_attr_by_name(
+    const iree_vm_module_t* module, iree_string_view_t key) {
+  if (!module->get_module_attr) {
+    return iree_string_view_empty();
+  }
+  for (int index = 0;; ++index) {
+    iree_string_pair_t attr;
+    iree_status_t status = module->get_module_attr(module->self, index, &attr);
+    if (!iree_status_is_ok(status)) {
+      iree_status_ignore(status);
+      break;
+    } else if (iree_string_view_equal(key, attr.key)) {
+      return attr.value;
+    }
+  }
+  return iree_string_view_empty();
+}
+
+IREE_API_EXPORT iree_status_t
+iree_vm_module_get_attr(const iree_vm_module_t* module, iree_host_size_t index,
+                        iree_string_pair_t* out_attr) {
+  if (!module->get_module_attr) {
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
+  }
+  return module->get_module_attr(module->self, index, out_attr);
+}
+
 IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_name(
     const iree_vm_module_t* module, iree_vm_function_linkage_t linkage,
     iree_string_view_t name, iree_vm_function_t* out_function) {
@@ -271,18 +276,6 @@ IREE_API_EXPORT iree_status_t iree_vm_module_resolve_source_location(
                                            out_source_location);
   }
   return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
-}
-
-IREE_API_EXPORT iree_status_t
-iree_vm_source_location_format(iree_vm_source_location_t* source_location,
-                               iree_vm_source_location_format_flags_t flags,
-                               iree_string_builder_t* builder) {
-  IREE_ASSERT_ARGUMENT(builder);
-  if (!source_location || !source_location->format) {
-    return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
-  }
-  return source_location->format(source_location->self, source_location->data,
-                                 flags, builder);
 }
 
 IREE_API_EXPORT iree_string_view_t
@@ -312,36 +305,33 @@ iree_vm_function_signature(const iree_vm_function_t* function) {
   return signature;
 }
 
-IREE_API_EXPORT iree_string_view_t iree_vm_function_reflection_attr(
+IREE_API_EXPORT iree_string_view_t iree_vm_function_lookup_attr_by_name(
     const iree_vm_function_t* function, iree_string_view_t key) {
   iree_vm_module_t* module = function->module;
-  if (!module->get_function_reflection_attr) {
+  if (!module->get_function_attr) {
     return iree_string_view_empty();
   }
   for (int index = 0;; ++index) {
-    iree_string_view_t index_key, index_value;
-    iree_status_t status = module->get_function_reflection_attr(
-        module->self, function->linkage, function->ordinal, index, &index_key,
-        &index_value);
+    iree_string_pair_t attr;
+    iree_status_t status = module->get_function_attr(
+        module->self, function->linkage, function->ordinal, index, &attr);
     if (!iree_status_is_ok(status)) {
       iree_status_ignore(status);
       break;
-    }
-    if (iree_string_view_equal(key, index_key)) {
-      return index_value;
+    } else if (iree_string_view_equal(key, attr.key)) {
+      return attr.value;
     }
   }
   return iree_string_view_empty();
 }
 
-IREE_API_EXPORT iree_status_t iree_vm_get_function_reflection_attr(
-    iree_vm_function_t function, iree_host_size_t index,
-    iree_string_view_t* key, iree_string_view_t* value) {
-  if (!function.module->get_function_reflection_attr) {
-    return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "reflection not available for the given module");
+IREE_API_EXPORT iree_status_t
+iree_vm_function_get_attr(iree_vm_function_t function, iree_host_size_t index,
+                          iree_string_pair_t* out_attr) {
+  if (!function.module->get_function_attr) {
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
   }
-  return function.module->get_function_reflection_attr(
-      function.module->self, function.linkage, function.ordinal, index, key,
-      value);
+  return function.module->get_function_attr(function.module->self,
+                                            function.linkage, function.ordinal,
+                                            index, out_attr);
 }

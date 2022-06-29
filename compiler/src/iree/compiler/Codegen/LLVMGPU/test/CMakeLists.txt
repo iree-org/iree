@@ -20,15 +20,23 @@ iree_lit_test_suite(
     "gpu_set_num_workgroups.mlir"
     "illegal_configuration.mlir"
     "legalize.mlir"
+    "linalg_transform.mlir"
     "nvvm_pipeline_test.mlir"
     "reduce_bank_conflicts.mlir"
     "rocdl_pipeline_test.mlir"
     "tensorcore_vectorization.mlir"
+    "transform_dialect_vector_distribution.mlir"
     "vector_to_gpu.mlir"
     "vectorization.mlir"
+    "warp_reduction.mlir"
   TOOLS
     FileCheck
     iree-opt
+  DATA
+    transform_dialect_codegen_bufferize_spec.mlir
+    transform_dialect_codegen_foreach_to_gpu_spec.mlir
+    transform_dialect_codegen_vector_distribution_spec.mlir
+    transform_dialect_codegen_vector_warp_execute_on_lane_0_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

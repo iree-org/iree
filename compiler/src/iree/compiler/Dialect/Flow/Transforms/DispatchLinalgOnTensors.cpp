@@ -12,7 +12,6 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
-#include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.h"
 #include "iree/compiler/Dialect/Flow/Transforms/FusionUtils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
@@ -26,7 +25,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
-#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -69,8 +68,6 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
-
-static unsigned kNumMaxParallelDims = 3;
 
 //===----------------------------------------------------------------------===//
 // Root and fusion group attribute handling
@@ -204,14 +201,28 @@ template <>
 SmallVector<Range> getLoopRanges<linalg::LinalgOp>(linalg::LinalgOp linalgOp,
                                                    Location loc,
                                                    PatternRewriter &rewriter) {
-  return linalgOp.createLoopRanges(rewriter, loc);
+  SmallVector<Range> loopRanges = linalgOp.createLoopRanges(rewriter, loc);
+  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  SmallVector<unsigned> reductionDims;
+  linalgOp.getReductionDims(reductionDims);
+  for (auto reductionDim : reductionDims) {
+    loopRanges[reductionDim].size = one;
+  }
+  return loopRanges;
 }
 
 template <>
 SmallVector<Range> getLoopRanges<IREE::LinalgExt::TiledOpInterface>(
     IREE::LinalgExt::TiledOpInterface tilableOp, Location loc,
     PatternRewriter &rewriter) {
-  return tilableOp.getIterationDomain(rewriter);
+  SmallVector<Range> loopRanges = tilableOp.getIterationDomain(rewriter);
+  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  for (auto iteratorType : llvm::enumerate(tilableOp.getLoopIteratorTypes())) {
+    if (iteratorType.value() == getReductionIteratorTypeName()) {
+      loopRanges[iteratorType.index()].size = one;
+    }
+  }
+  return loopRanges;
 }
 
 template <>
@@ -220,7 +231,7 @@ SmallVector<Range> getLoopRanges<tensor::InsertSliceOp>(
     PatternRewriter &rewriter) {
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-  Value source = insertSliceOp.source();
+  Value source = insertSliceOp.getSource();
   SmallVector<Range> loopRanges(insertSliceOp.getSourceType().getRank(),
                                 Range{zero, one, one});
   for (auto dim : llvm::seq<unsigned>(0, loopRanges.size())) {
@@ -241,48 +252,21 @@ SmallVector<Range> getLoopRanges<tensor::ExtractSliceOp>(
   }));
 }
 
-/// Given the `shape` of the computation with the first element being the
-/// slowest varying and last element being the fastest warying returns the
-/// workload value with
-/// - fastest varying dimension first, i.e., x, y, z order
-/// - the workload padded to `kNumMaxParallelDims` with ones if needed.
-/// The `shape` is expected to be of size less than or equal to
-/// `kNumMaxParallelDims`.
-static SmallVector<Value> convertToWorkload(OpBuilder &b, Location loc,
-                                            ArrayRef<Value> shape) {
-  assert(shape.size() <= kNumMaxParallelDims &&
-         "workload cannot be more than 3D for now");
-  SmallVector<Value> workload = llvm::to_vector(llvm::reverse(shape));
-  Value one = b.create<arith::ConstantIndexOp>(loc, 1);
-  workload.resize(kNumMaxParallelDims, one);
-  return workload;
-}
-
 /// Compute the workload to use for the workgroup based on the root op.
 template <typename OpTy>
-static FailureOr<SmallVector<Value>> getWorkloadForRootOp(
-    PatternRewriter &rewriter, OpTy rootOp) {
+static SmallVector<Value> getWorkloadForRootOp(PatternRewriter &rewriter,
+                                               OpTy rootOp) {
   // Compute workgroup count to use for the dispatch op. These are the ranges
   // of the outermost parallel loops that can be distributed.
   Location loc = rootOp->getLoc();
   SmallVector<Range> loopRanges = getLoopRanges(rootOp, loc, rewriter);
-
-  // TODO: The use of PartitionableLoopsInterface to get the loop bounds
-  // of the distributed loop is legacy. This can be controlled purely in the
-  // backend.
-  auto partitionableLoopsOp =
-      dyn_cast<PartitionableLoopsInterface>(rootOp.getOperation());
-  if (!partitionableLoopsOp) {
-    return rewriter.notifyMatchFailure(
-        rootOp, "expected op to implement ParitionableLoopsInterface");
-  }
-  SmallVector<unsigned> partitionedLoops =
-      partitionableLoopsOp.getPartitionableLoops(kNumMaxParallelDims);
-  SmallVector<Value> count;
-  for (auto dim : partitionedLoops) {
-    count.push_back(loopRanges[dim].size);
-  }
-  return convertToWorkload(rewriter, loc, count);
+  AffineExpr s0, s1, s2;
+  bindSymbols(rewriter.getContext(), s0, s1, s2);
+  AffineMap workload = AffineMap::get(0, 3, (s1 - s0).ceilDiv(s2));
+  return llvm::to_vector(llvm::map_range(loopRanges, [&](Range r) -> Value {
+    return rewriter.create<AffineApplyOp>(
+        rootOp.getLoc(), workload, ValueRange{r.offset, r.size, r.stride});
+  }));
 }
 
 //===----------------------------------------------------------------------===//
@@ -545,7 +529,7 @@ static bool hasUnfusableUseInDispatch(
 
     // Cannot fuse producer of `dest` with `tensor.insert_slice`.
     if (auto insertSliceUser = dyn_cast<tensor::InsertSliceOp>(user)) {
-      if (insertSliceUser.dest() == v) return true;
+      if (insertSliceUser.getDest() == v) return true;
     }
   }
   return false;
@@ -632,7 +616,7 @@ static BlockArgument getTiedOperandBlockArgument(BlockArgument resultArg) {
           .Case<tensor::InsertSliceOp>([&](tensor::InsertSliceOp insertOp)
                                            -> BlockArgument {
             auto loadOp =
-                insertOp.dest()
+                insertOp.getDest()
                     .template getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
             if (!loadOp) return nullptr;
             return loadOp.source().dyn_cast<BlockArgument>();

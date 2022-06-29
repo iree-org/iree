@@ -388,7 +388,7 @@ struct FoldCastOpIntoDispatchStoreOp
     if (!storeOp.value().getDefiningOp<tensor::CastOp>()) return failure();
     auto parentOp = storeOp.value().getDefiningOp<tensor::CastOp>();
     rewriter.replaceOpWithNewOp<DispatchTensorStoreOp>(
-        storeOp, parentOp.source(), storeOp.target(), storeOp.target_dims(),
+        storeOp, parentOp.getSource(), storeOp.target(), storeOp.target_dims(),
         storeOp.offsets(), storeOp.sizes(), storeOp.strides(),
         storeOp.static_offsets(), storeOp.static_sizes(),
         storeOp.static_strides());
@@ -584,7 +584,7 @@ struct ResolveShapedRank : public OpRewritePattern<tensor::RankOp> {
   using OpRewritePattern<tensor::RankOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::RankOp op,
                                 PatternRewriter &rewriter) const override {
-    auto shapedType = op.tensor().getType().cast<ShapedType>();
+    auto shapedType = op.getTensor().getType().cast<ShapedType>();
     rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(op,
                                                         shapedType.getRank());
     return success();
@@ -601,7 +601,7 @@ struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
     }
     auto idx = op.getConstantIndex().getValue();
 
-    auto shapedType = op.source().getType().cast<ShapedType>();
+    auto shapedType = op.getSource().getType().cast<ShapedType>();
     if (!shapedType.isDynamicDim(idx)) {
       rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(
           op, shapedType.getDimSize(idx));
@@ -609,7 +609,7 @@ struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
     }
 
     auto dynamicDims = IREE::Util::findDynamicDims(
-        op.source(), op->getBlock(), Block::iterator(op.getOperation()));
+        op.getSource(), op->getBlock(), Block::iterator(op.getOperation()));
     if (!dynamicDims.hasValue()) {
       return rewriter.notifyMatchFailure(op, "no dynamic dims found/usable");
     }
@@ -848,8 +848,8 @@ struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
     auto targetCastOp = updateOp.target().getDefiningOp<tensor::CastOp>();
     auto updateCastOp = updateOp.update().getDefiningOp<tensor::CastOp>();
     if (!targetCastOp && !updateCastOp) return failure();
-    auto target = (targetCastOp ? targetCastOp.source() : updateOp.target());
-    auto update = (updateCastOp ? updateCastOp.source() : updateOp.update());
+    auto target = (targetCastOp ? targetCastOp.getSource() : updateOp.target());
+    auto update = (updateCastOp ? updateCastOp.getSource() : updateOp.update());
     auto newOp = rewriter.create<TensorUpdateOp>(
         updateOp.getLoc(), target.getType(), target,
         refreshDimsOnTypeChange(updateOp, updateOp.target().getType(),

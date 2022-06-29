@@ -11,7 +11,6 @@
 #include <cmath>
 using namespace std;
 
-#include "iree/base/logging.h"
 #include "iree/base/status_cc.h"
 #include "iree/testing/gtest.h"
 #include "iree/vm/api.h"

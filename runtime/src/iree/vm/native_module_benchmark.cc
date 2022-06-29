@@ -6,7 +6,6 @@
 
 #include "benchmark/benchmark.h"
 #include "iree/base/api.h"
-#include "iree/base/logging.h"
 #include "iree/vm/module.h"
 #include "iree/vm/native_module.h"
 #include "iree/vm/native_module_test.h"

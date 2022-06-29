@@ -44,7 +44,7 @@ int getComputeVectorSize(int64_t size) {
 int getMemoryVectorSize(Value source, Type scalarType, int64_t size) {
   int bitwidth = scalarType.getIntOrFloatBitWidth();
   while (auto sliceOp = source.getDefiningOp<tensor::ExtractSliceOp>())
-    source = sliceOp.source();
+    source = sliceOp.getSource();
   if (!matchPattern(source, m_Constant())) {
     // If we are not reading from a constant array that is embedded in the
     // kernel, try to use a large vector size matching the bitwidth to read in

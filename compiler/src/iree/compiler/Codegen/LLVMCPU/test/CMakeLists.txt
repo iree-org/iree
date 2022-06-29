@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "aarch64_vector_lowering.mlir"
     "apply_scale_lowering.mlir"
     "check_ir_before_llvm_conversion.mlir"
     "convert_to_llvm.mlir"
@@ -27,10 +28,10 @@ iree_lit_test_suite(
     "materialize_riscv_launch_configuration.mlir"
     "materialize_vmvx_launch_configuration.mlir"
     "materialize_x86_64_launch_configuration.mlir"
+    "peel_and_vectorize.mlir"
     "pipeline_tests.mlir"
     "synchronize_symbol_visibility.mlir"
     "test_config_mmt4d.mlir"
-    "tile_fuse_and_vectorize.mlir"
     "transpose_avx2_lowering.mlir"
     "unfused_fma.mlir"
     "vector_contract_to_arm_asm.mlir"
@@ -41,7 +42,7 @@ iree_lit_test_suite(
     iree-compile
     iree-opt
   DATA
-    linalg_transform_spec.mlir
+    transform_dialect_codegen_bufferize_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

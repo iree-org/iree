@@ -14,8 +14,8 @@
 #include "iree/base/tracing.h"
 
 static iree_status_t iree_hal_rocm_driver_factory_enumerate(
-    void *self, const iree_hal_driver_info_t **out_driver_infos,
-    iree_host_size_t *out_driver_info_count) {
+    void *self, iree_host_size_t *out_driver_info_count,
+    const iree_hal_driver_info_t **out_driver_infos) {
   // NOTE: we could query supported ROCM versions or featuresets here.
   static const iree_hal_driver_info_t driver_infos[1] = {{
       .driver_name = iree_string_view_literal("rocm"),

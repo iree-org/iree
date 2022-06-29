@@ -13,19 +13,20 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
-class AllocatorMapOpConversion
-    : public OpConversionPattern<IREE::HAL::AllocatorMapOp> {
+class AllocatorAllocateInitializedOpConversion
+    : public OpConversionPattern<IREE::HAL::AllocatorAllocateInitializedOp> {
  public:
-  AllocatorMapOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                           SymbolTable &importSymbols)
+  AllocatorAllocateInitializedOpConversion(TypeConverter &typeConverter,
+                                           MLIRContext *context,
+                                           SymbolTable &importSymbols)
       : OpConversionPattern(typeConverter, context) {
     importOp = importSymbols.lookup<IREE::VM::ImportOp>(
-        "hal.allocator.wrap.byte_buffer");
+        "hal.allocator.allocate.initialized");
     assert(importOp);
   }
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::AllocatorMapOp op, OpAdaptor adaptor,
+      IREE::HAL::AllocatorAllocateInitializedOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, importOp.getName(),
@@ -100,8 +101,8 @@ void populateHALAllocatorToVMPatterns(MLIRContext *context,
                                       RewritePatternSet &patterns) {
   patterns.insert<VMImportOpConversion<IREE::HAL::AllocatorAllocateOp>>(
       context, importSymbols, typeConverter, "hal.allocator.allocate");
-  patterns.insert<AllocatorMapOpConversion>(typeConverter, context,
-                                            importSymbols);
+  patterns.insert<AllocatorAllocateInitializedOpConversion>(
+      typeConverter, context, importSymbols);
   patterns.insert<AllocatorTryMapOpConversion>(typeConverter, context,
                                                importSymbols);
 }

@@ -32,7 +32,6 @@ iree_cc_library(
     "CleanupBufferAllocViewPass.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "DestructiveUpdateUtils.cpp"
-    "DistributeToWorkgroupsPass.cpp"
     "FlattenMemRefSubspanPass.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
     "FoldTensorExtractOpPass.cpp"
@@ -40,14 +39,13 @@ iree_cc_library(
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUPipelining.cpp"
     "IREEComprehensiveBufferizePass.cpp"
-    "InsertDistributionInfoPass.cpp"
     "MemrefCopyToLinalg.cpp"
     "OptimizeVectorTransferPass.cpp"
     "PadDynamicAlloc.cpp"
     "PolynomialApproximationPass.cpp"
     "RemoveTrivialLoops.cpp"
     "RewriteLinalgDestructiveUpdatesPass.cpp"
-    "SetNumWorkgroupsPass.cpp"
+    "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TypePropagationPass.cpp"
     "VectorizeConv.cpp"
@@ -58,44 +56,44 @@ iree_cc_library(
     IREELinalgExtPasses
     IREELinalgExtTransforms
     LLVMSupport
-    MLIRAffine
+    MLIRAffineDialect
     MLIRAffineUtils
     MLIRAnalysis
-    MLIRArithmetic
+    MLIRArithmeticDialect
     MLIRArithmeticTransforms
-    MLIRBufferization
+    MLIRBufferizationDialect
     MLIRBufferizationTransforms
-    MLIRFunc
+    MLIRFuncDialect
     MLIRGPUOps
     MLIRIR
     MLIRLLVMCommonConversion
-    MLIRLLVMIR
-    MLIRLinalg
+    MLIRLLVMDialect
+    MLIRLinalgDialect
     MLIRLinalgTransforms
-    MLIRMath
+    MLIRMathDialect
     MLIRMathTransforms
-    MLIRMemRef
+    MLIRMemRefDialect
     MLIRMemRefTransforms
-    MLIRNVGPU
+    MLIRNVGPUDialect
     MLIRPass
-    MLIRSCF
+    MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRSideEffectInterfaces
     MLIRSupport
-    MLIRTensor
+    MLIRTensorDialect
     MLIRTransforms
-    MLIRVector
+    MLIRVectorDialect
     MLIRVectorTransforms
     MLIRViewLikeInterface
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
+    iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::IR::PartitionableLoopsInterface
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
   PUBLIC

@@ -152,7 +152,7 @@ static LogicalResult deriveAllowedResourceBufferBits(
       // Today we assume they are device-local|host-visible just for
       // practical purposes but that does not have to be true. We really
       // want this to be something we analyze and handle on the edges
-      // (transfering devices/etc if needed).
+      // (transferring devices/etc if needed).
       memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal |
                     IREE::HAL::MemoryTypeBitfield::HostVisible;
       // NOTE: we may not map it but users may after they get them back.
@@ -318,7 +318,7 @@ struct ResourceMapOpPattern
     auto bufferUsage = IREE::HAL::BufferUsageBitfield::Mapping |
                        IREE::HAL::BufferUsageBitfield::Transfer;
 
-    rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorMapOp>(
+    rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorAllocateInitializedOp>(
         mapOp, bufferType, allocator, memoryTypes, bufferUsage,
         adaptor.source(), adaptor.source_offset(), adaptor.result_size());
     return success();
@@ -392,10 +392,8 @@ struct ResourceStoreOpPattern
   LogicalResult matchAndRewrite(
       IREE::Stream::ResourceStoreOp storeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.create<IREE::HAL::BufferStoreOp>(storeOp.getLoc(), adaptor.value(),
-                                              adaptor.target(),
-                                              adaptor.target_offset());
-    rewriter.replaceOp(storeOp, adaptor.target());
+    rewriter.replaceOpWithNewOp<IREE::HAL::BufferStoreOp>(
+        storeOp, adaptor.value(), adaptor.target(), adaptor.target_offset());
     return success();
   }
 };
@@ -836,9 +834,8 @@ struct CmdExecuteOpPattern
                                 OpBuilder::atBlockBegin(&bodyBlock));
 
     // Begin/end recording and inline the execution region between them.
-    rewriter.create<IREE::HAL::CommandBufferBeginOp>(loc, commandBuffer);
     auto endOp =
-        rewriter.create<IREE::HAL::CommandBufferEndOp>(loc, commandBuffer);
+        rewriter.create<IREE::HAL::CommandBufferFinalizeOp>(loc, commandBuffer);
     rewriter.mergeBlockBefore(&executeOp.body().front(), endOp,
                               adaptor.operands());
 

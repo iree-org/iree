@@ -18,9 +18,9 @@ iree_cc_library(
   SRCS
     "ConvertMathToVM.cpp"
   DEPS
-    MLIRFunc
+    MLIRFuncDialect
     MLIRIR
-    MLIRMath
+    MLIRMathDialect
     MLIRPass
     MLIRTransformUtils
     MLIRTransforms

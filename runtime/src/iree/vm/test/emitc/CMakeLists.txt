@@ -15,7 +15,6 @@ iree_cc_test(
     "module_test.cc"
   DEPS
     iree::base::cc
-    iree::base::logging
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm

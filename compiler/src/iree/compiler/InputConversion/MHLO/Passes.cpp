@@ -12,7 +12,7 @@
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/ShapeToStandard/ShapeToStandard.h"
-#include "mlir/Dialect/SCF/Passes.h"
+#include "mlir/Dialect/SCF/Transforms/Passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
@@ -52,6 +52,9 @@ void registerMHLOConversionPassPipeline() {
 
 // Prepare HLO for use as an input to the Flow dialect.
 void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
+  passManager.addNestedPass<func::FuncOp>(
+      mhlo::createLegalizeControlFlowPass());
+
   // Currently we don't handle SCF ops well and have to convert them all to CFG.
   // In the future it would be nice if we could have all of flow be both scf
   // and cfg compatible.

@@ -167,9 +167,9 @@ bool isReadOnly(Value v) {
       .Case<arith::ConstantOp>(
           [&](arith::ConstantOp constantOp) { return true; })
       .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
-          [&](auto op) { return isReadOnly(op.src()); })
+          [&](auto op) { return isReadOnly(op.getSrc()); })
       .Case<tensor::CastOp, tensor::ExtractSliceOp>(
-          [&](auto op) { return isReadOnly(op.source()); })
+          [&](auto op) { return isReadOnly(op.getSource()); })
       .Case<IREE::Flow::DispatchTensorLoadOp>(
           [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
             return loadOp.source()

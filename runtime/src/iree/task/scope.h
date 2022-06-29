@@ -20,7 +20,10 @@
 extern "C" {
 #endif  // __cplusplus
 
-// A loose way of grouping tasks within the task system.
+// iree_task_scope_t is an atomic reference-counting helper posting a
+// notification when the reference count is decremended to 0.
+//
+// It is used as a loose way of grouping tasks within the task system.
 // Each scope represents a unique collection of tasks that have some related
 // properties - most often their producer - that need to carry along some
 // tracking information to act on all related tasks at once. They do not
@@ -60,28 +63,16 @@ typedef struct iree_task_scope_t {
   // are undefined in the case of failure and may tear.
   iree_task_dispatch_statistics_t dispatch_statistics;
 
-  // A mutex used to guard the pending_submissions.
-  // We need a mutex here so that we can ensure proper ordering with respect to
-  // the pending_submissions changes and the idle_notification: if we were to
-  // decrement the pending_submissions to 0 ("going idle") there's a race that
-  // can happen where another thread may come in and observe that prior to the
-  // idle_notification being notified. If that thread happens to be destroying
-  // the scope then boom.
-  //
-  // Thankfully we insert fences fairly infrequently, the contention is low,
-  // and iree_slim_mutex_t is a futex so this isn't much more expensive than
-  // just having an atomic variable.
-  iree_slim_mutex_t mutex;
-
   // A count of pending submissions within this scope. 0 indicates idle.
   // Each submission has a fence that references this value and decrements it
   // as it is reached indicating that all memory used by all tasks within that
   // submission is available for reuse.
-  uint32_t pending_submissions;
+  iree_atomic_ref_count_t pending_submissions;
 
   // A notification signaled when the scope transitions to having no pending
   // tasks or completes all pending tasks after a failure.
   iree_notification_t idle_notification;
+  iree_atomic_int32_t pending_idle_notification_posts;
 } iree_task_scope_t;
 
 // Initializes a caller-allocated scope.
@@ -131,15 +122,29 @@ void iree_task_scope_fail(iree_task_scope_t* scope, iree_status_t status);
 // Notifies the scope that a new execution task assigned to the scope has begun.
 // The scope is considered active until it is notified execution has completed
 // with iree_task_scope_end.
+//
+// Memory ordering: this does a iree_atomic_ref_count_inc.
+// That typically means only a 'relaxed' order operation -- no ordering.
 void iree_task_scope_begin(iree_task_scope_t* scope);
 
 // Notifies the scope that a previously begun execution task has completed.
+//
+// Memory ordering: this does a iree_atomic_ref_count_dec.
+// That means a guarantee that all writes made before calling
+// iree_task_scope_end on one thread are visible to any other thread that has
+// observed the reference count falling to zero (e.g. iree_task_scope_is_idle
+// returned true).
 void iree_task_scope_end(iree_task_scope_t* scope);
 
 // Returns true if the scope has no pending or in-flight tasks.
 //
-// May race with other threads enqueuing work and be out of date immediately
-// upon return; callers are expected to use this only when it is safe.
+// Memory ordering: this does iree_atomic_ref_count_load.
+// That means a guarantee that subsequent memory read accesses can't be
+// reordered before a call to iree_task_scope_is_idle, and that when
+// iree_task_scope_is_idle returns true as a result of another thread
+// having just called iree_task_scope_end, all memory writes made on that thread
+// before calling iree_task_scope_end are visible on this thread after
+// iree_task_scope_is_idle has returned.
 bool iree_task_scope_is_idle(iree_task_scope_t* scope);
 
 // Waits for the scope to become idle indicating that all pending and in-flight
@@ -147,9 +152,7 @@ bool iree_task_scope_is_idle(iree_task_scope_t* scope);
 // then the wait will only return after it is guaranteed no more tasks will ever
 // be issued by the task system.
 //
-// May race with other threads enqueuing work and be out of date immediately
-// upon return; callers must ensure this is used for command and control
-// decisions only when no other threads may be enqueuing more work.
+// Memory ordering: see iree_task_scope_is_idle.
 iree_status_t iree_task_scope_wait_idle(iree_task_scope_t* scope,
                                         iree_time_t deadline_ns);
 

@@ -13,14 +13,8 @@ include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
-
-def FunctionalStyleMultiOperandMultiResultTransformOpTrait
-    : NativeOpTrait<"FunctionalStyleMultiOperandMultiResultTransformOpTrait"> {
-  let cppNamespace = "::mlir::transform";
-}
-
 def FuseProducersOp : Op<Transform_Dialect, "fuse_producers",
-    [FunctionalStyleMultiOperandMultiResultTransformOpTrait, 
+    [FunctionalStyleTransformOpTrait, 
      MemoryEffectsOpInterface,
      DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{Fuses the producers for the operands to fuse.}];
@@ -37,9 +31,10 @@ def FuseProducersOp : Op<Transform_Dialect, "fuse_producers",
 
 def TileToForeachOp :
     Op<Transform_Dialect, "tile_to_foreach_thread_op",
-      [DeclareOpInterfaceMethods<TransformOpInterface>,
-       FunctionalStyleMultiOperandMultiResultTransformOpTrait,
-       MemoryEffectsOpInterface]> {
+      [FunctionalStyleTransformOpTrait,
+       MemoryEffectsOpInterface,
+       TransformEachOpTrait,
+       TransformOpInterface]> {
   let description = [{Tile a linalg op to `scf.foreach_thread`.}];
 
   let summary = [{
@@ -54,11 +49,16 @@ def TileToForeachOp :
 
   let assemblyFormat = "$target attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
+
+  let extraClassDeclaration = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::Operation *>> applyToOne(
+      ::mlir::linalg::LinalgOp target, transform::TransformState &state);
+  }];
 }
 
 def FuseIntoContainingOp :
     Op<Transform_Dialect, "fuse_into_containing_op",
-      [FunctionalStyleMultiOperandMultiResultTransformOpTrait,
+      [FunctionalStyleTransformOpTrait,
        MemoryEffectsOpInterface,
        DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{Fuse a producer into a containing operation.}];
@@ -93,7 +93,7 @@ def RewriteForeachThreadToAsyncOp :
 
   let extraClassDeclaration = [{
     ::mlir::FailureOr<::mlir::Operation *> applyToOne(
-      ::mlir::scf::ForeachThreadOp target);
+      ::mlir::scf::ForeachThreadOp target, transform::TransformState &state);
   }];
 }
 
@@ -115,7 +115,7 @@ def RewriteForeachThreadToScfForOp :
 
   let extraClassDeclaration = [{
     ::mlir::FailureOr<::mlir::scf::ForOp> applyToOne(
-        ::mlir::scf::ForeachThreadOp target);
+        ::mlir::scf::ForeachThreadOp target, transform::TransformState &state);
   }];
 }
 

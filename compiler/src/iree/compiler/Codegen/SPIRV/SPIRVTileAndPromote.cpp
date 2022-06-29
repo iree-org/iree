@@ -17,10 +17,10 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/SCF/Transforms.h"
+#include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
@@ -183,7 +183,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   int64_t flatWorkgroupSize =
       workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
   int subgroupSize =
-      getSPIRVTargetEnvAttr(funcOp).getResourceLimits().getSubgroup_size();
+      getSPIRVTargetEnvAttr(funcOp).getResourceLimits().getSubgroupSize();
 
   funcOp.walk([&](Operation *op) {
     if (isa<linalg::FillOp, linalg::GenericOp>(op)) {

@@ -38,6 +38,32 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
+    name = "check_cuda-topk-split-reduction",
+    srcs = enforce_glob(
+        [
+            "top-k.mlir",
+        ],
+        include = ["*.mlir"],
+        exclude = [
+            "reverse.mlir",
+            "scan.mlir",
+            "sort.mlir",
+        ],
+    ),
+    compiler_flags = ["--iree-flow-topk-split-reduction=2"],
+    driver = "cuda",
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backend = "cuda",
+)
+
+iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",
     srcs = enforce_glob(
         # keep sorted

@@ -20,20 +20,22 @@ iree_cc_library(
   HDRS
     "ConvertVMToEmitC.h"
     "DropExcludedExports.h"
+    "EmitCBuilders.h"
     "EmitCTypeConverter.h"
     "VMAnalysis.h"
   SRCS
     "ConvertVMToEmitC.cpp"
     "DropExcludedExports.cpp"
+    "EmitCBuilders.cpp"
     "EmitCTypeConverter.cpp"
   DEPS
     LLVMSupport
-    MLIRArithmetic
-    MLIRControlFlow
-    MLIREmitC
-    MLIRFunc
+    MLIRArithmeticDialect
+    MLIRControlFlowDialect
+    MLIREmitCDialect
+    MLIRFuncDialect
     MLIRIR
-    MLIRMath
+    MLIRMathDialect
     MLIRPass
     MLIRTransforms
     iree::compiler::Dialect::Util::Conversion

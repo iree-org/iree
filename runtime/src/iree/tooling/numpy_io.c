@@ -231,11 +231,13 @@ static iree_status_t iree_numpy_descr_to_element_type(
     case 'f':  // floating-point
       numerical_type = IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE;
       break;
+    case 'c':  // complex-floating point
+      numerical_type = IREE_HAL_NUMERICAL_TYPE_FLOAT_COMPLEX;
+      break;
     case 'V':  // raw data
       numerical_type = IREE_HAL_NUMERICAL_TYPE_UNKNOWN;
       break;
     default:
-    case 'c':  // complex-floating point
     case 'm':  // timedelta
     case 'M':  // datetime
     case 'O':  // python objects
@@ -421,6 +423,10 @@ static iree_status_t iree_numpy_npy_build_dtype(
     }
     case IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE: {
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "f"));
+      break;
+    }
+    case IREE_HAL_NUMERICAL_TYPE_FLOAT_COMPLEX: {
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "c"));
       break;
     }
     default:

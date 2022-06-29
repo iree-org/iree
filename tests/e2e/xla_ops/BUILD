@@ -8,7 +8,7 @@
 # Each test file should have a name matching the corresponding XLA HLO op and test only the
 # functionality of that op (though may make use of other ops where necessary). Tests should be
 # written using the IREE Check framework and should always pass on the reference VMVX backend.
-# See https://github.com/google/iree/blob/main/docs/developers/developing_iree/testing_guide.md#iree-core-end-to-end-tests.
+# See https://github.com/iree-org/iree/blob/main/docs/developers/developing_iree/testing_guide.md#iree-core-end-to-end-tests.
 
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
@@ -46,7 +46,6 @@ iree_check_single_backend_test_suite(
             "exponential.mlir",
             "exponential_fp16.mlir",
             "exponential_minus_one.mlir",
-            "fft.mlir",
             "finite.mlir",
             "floor.mlir",
             "gather.mlir",
@@ -82,6 +81,9 @@ iree_check_single_backend_test_suite(
             "while.mlir",
         ],
         include = ["*.mlir"],
+        exclude = [
+            "fft.mlir",  # TODO(#9583)
+        ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],
     driver = "cuda",
@@ -125,7 +127,6 @@ iree_check_single_backend_test_suite(
             "exponential.mlir",
             "exponential_fp16.mlir",
             "exponential_minus_one.mlir",
-            "fft.mlir",
             "finite.mlir",
             "floor.mlir",
             "gather.mlir",
@@ -161,6 +162,9 @@ iree_check_single_backend_test_suite(
             "while.mlir",
         ],
         include = ["*.mlir"],
+        exclude = [
+            "fft.mlir",  # TODO(#9583)
+        ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],
     driver = "cuda",
@@ -341,7 +345,6 @@ iree_check_single_backend_test_suite(
             "dynamic_update_slice.mlir",
             "exponential.mlir",
             "exponential_minus_one.mlir",
-            "fft.mlir",
             "finite.mlir",
             "floor.mlir",
             "gather.mlir",
@@ -361,7 +364,6 @@ iree_check_single_backend_test_suite(
             "reverse.mlir",
             "rng_normal.mlir",
             "rng_uniform.mlir",
-            "round.mlir",
             "rsqrt.mlir",
             "scatter.mlir",
             "scatter_dynamic.mlir",
@@ -380,6 +382,8 @@ iree_check_single_backend_test_suite(
         exclude = [
             "bitcast_convert.mlir",
             "exponential_fp16.mlir",
+            "fft.mlir",  # TODO(#9583)
+            "round.mlir",  # TODO(#9617)
         ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],

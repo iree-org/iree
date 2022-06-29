@@ -7,7 +7,6 @@
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
-#include "iree-dialects/Dialect/LinalgExt/LinalgExtBufferization.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
@@ -25,8 +24,9 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
-#include "mlir/Dialect/SCF/Passes.h"
-#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/TransformOps/SCFTransformOps.h"
+#include "mlir/Dialect/SCF/Transforms/Passes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/IR/AsmState.h"
@@ -60,13 +60,13 @@ int main(int argc, char **argv) {
       // Upstream dialects
       mlir::async::AsyncDialect,
       mlir::arith::ArithmeticDialect,
-      mlir::AffineDialect, 
+      mlir::AffineDialect,
       mlir::cf::ControlFlowDialect,
-      mlir::func::FuncDialect, 
-      mlir::linalg::LinalgDialect, 
+      mlir::func::FuncDialect,
+      mlir::linalg::LinalgDialect,
       mlir::memref::MemRefDialect,
-      mlir::pdl::PDLDialect, 
-      mlir::pdl_interp::PDLInterpDialect, 
+      mlir::pdl::PDLDialect,
+      mlir::pdl_interp::PDLInterpDialect,
       mlir::scf::SCFDialect,
       mlir::tensor::TensorDialect,
       mlir::transform::TransformDialect
@@ -89,11 +89,11 @@ int main(int argc, char **argv) {
   // External models.
   IREE::LinalgExt::registerTiledOpInterfaceExternalModels(registry);
   IREE::LinalgExt::registerTilingInterfaceExternalModels(registry);
-  IREE::LinalgExt::registerBufferizableOpInterfaceExternalModels(registry);
 
   registry.addExtensions<IREE::LinalgExt::LinalgExtTransformOpsExtension,
                          transform_ext::StructuredTransformOpsExtension>();
   mlir::linalg::registerTransformDialectExtension(registry);
+  mlir::scf::registerTransformDialectExtension(registry);
 
   return mlir::asMainReturnCode(
       mlir::MlirOptMain(argc, argv, "MLIR modular optimizer driver\n", registry,

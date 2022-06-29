@@ -45,3 +45,5 @@ with open('array_types.npy', 'wb') as f:
   np.save(f, np.array([-1.1, 1.1], dtype=np.float16))
   np.save(f, np.array([-1.1, 1.1], dtype=np.float32))
   np.save(f, np.array([-1.1, 1.1], dtype=np.float64))
+  np.save(f, np.array([1 + 5j, 2 + 6j], dtype=np.complex64))
+  np.save(f, np.array([1 + 5j, 2 + 6j], dtype=np.complex128))

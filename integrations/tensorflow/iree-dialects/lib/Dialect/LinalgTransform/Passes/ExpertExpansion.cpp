@@ -22,7 +22,6 @@
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]")
 
 using namespace mlir;
-using namespace mlir::linalg;
 
 /// Expands the linalg::transform::ExpertOp instances in the `module` into lists
 /// of transformations as described by the `expansions` module that contains
@@ -35,9 +34,8 @@ static void expandStrategyOps(ModuleOp module, ModuleOp expansions) {
   PatternApplicator applicator(frozen);
   applicator.applyDefaultCostModel();
 
-  SimplePatternRewriter rewriter(module.getContext());
-  module.walk([&](transform::ExpertOp expertOp) {
-    rewriter.setInsertionPoint(expertOp);
+  module.walk([&](linalg::transform::ExpertOp expertOp) {
+    SimplePatternRewriter rewriter(expertOp);
     if (failed(applicator.matchAndRewrite(expertOp, rewriter))) {
       LLVM_DEBUG(DBGS() << "failed to rewrite strategy \""
                         << expertOp.expertName() << "\"\n");

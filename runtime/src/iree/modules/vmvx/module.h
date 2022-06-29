@@ -16,13 +16,9 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Registers the custom types used by the HAL module.
-// WARNING: not thread-safe; call at startup before using.
-IREE_API_EXPORT iree_status_t iree_vmvx_module_register_types();
-
 // Creates the VMVX module with a default configuration.
 IREE_API_EXPORT iree_status_t iree_vmvx_module_create(
-    iree_allocator_t allocator, iree_vm_module_t** out_module);
+    iree_allocator_t host_allocator, iree_vm_module_t** out_module);
 
 #ifdef __cplusplus
 }  // extern "C"

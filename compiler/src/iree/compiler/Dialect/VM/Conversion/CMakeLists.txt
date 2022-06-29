@@ -26,8 +26,8 @@ iree_cc_library(
     "TypeConverter.cpp"
   DEPS
     LLVMSupport
-    MLIRArithmetic
-    MLIRFunc
+    MLIRArithmeticDialect
+    MLIRFuncDialect
     MLIRIR
     MLIRParser
     MLIRTransforms

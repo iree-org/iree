@@ -318,17 +318,21 @@ Value AllocatorAllocateOp::getOperandSize(unsigned idx) { return {}; }
 Value AllocatorAllocateOp::getResultSize(unsigned idx) { return result_size(); }
 
 //===----------------------------------------------------------------------===//
-// hal.allocator.map
+// hal.allocator.allocate.initialized
 //===----------------------------------------------------------------------===//
 
-void AllocatorMapOp::getAsmResultNames(
+void AllocatorAllocateInitializedOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "mapped");
 }
 
-Value AllocatorMapOp::getOperandSize(unsigned idx) { return {}; }
+Value AllocatorAllocateInitializedOp::getOperandSize(unsigned idx) {
+  return {};
+}
 
-Value AllocatorMapOp::getResultSize(unsigned idx) { return length(); }
+Value AllocatorAllocateInitializedOp::getResultSize(unsigned idx) {
+  return length();
+}
 
 //===----------------------------------------------------------------------===//
 // hal.allocator.try_map
@@ -401,21 +405,6 @@ void BufferViewCreateOp::getAsmResultNames(
 void BufferViewBufferOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "buffer");
-}
-
-//===----------------------------------------------------------------------===//
-// hal.buffer_view.byte_length
-//===----------------------------------------------------------------------===//
-
-void BufferViewByteLengthOp::build(OpBuilder &builder, OperationState &state,
-                                   Value bufferView) {
-  state.addOperands({bufferView});
-  state.addTypes({builder.getIndexType()});
-}
-
-void BufferViewByteLengthOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "len");
 }
 
 //===----------------------------------------------------------------------===//
@@ -817,8 +806,14 @@ static std::array<Value, 3> calculateWorkgroupCountFromRegion(
   // TODO(benvanik): replace with region inlining util.
   BlockAndValueMapping bvm;
   bvm.map(body->getArgument(0), device);
-  for (auto args : llvm::enumerate(workload)) {
-    bvm.map(body->getArgument(/*device*/ 1 + args.index()), args.value());
+  // For now use the number of args to minimum of number of args used by
+  // the body, and number of workload entries. When there is a more explicit
+  // propagation of number of workload entries to the `hal.executable.variant`
+  // this will be the same by construction.
+  unsigned numArgs =
+      std::min<unsigned>(body->getNumArguments() - 1, workload.size());
+  for (unsigned argNum : llvm::seq<unsigned>(0, numArgs)) {
+    bvm.map(body->getArgument(/*device*/ 1 + argNum), workload[argNum]);
   }
   for (Operation &op : body->without_terminator()) {
     builder.clone(op, bvm);

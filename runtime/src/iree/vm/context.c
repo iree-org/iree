@@ -22,7 +22,7 @@ struct iree_vm_context_t {
   // An opaque ID unique for the entire process lifetime.
   // If tracing then this points at a NUL-terminated string with process
   // lifetime.
-  intptr_t context_id;
+  iree_vm_context_id_t context_id;
 
   // Context has been frozen and can no longer be modified.
   uint32_t is_frozen : 1;
@@ -43,7 +43,7 @@ struct iree_vm_context_t {
 static void iree_vm_context_destroy(iree_vm_context_t* context);
 
 // Allocates a process-unique ID for a context to use.
-static intptr_t iree_vm_context_allocate_id(void) {
+static iree_vm_context_id_t iree_vm_context_allocate_id(void) {
   static iree_atomic_int32_t next_context_id = IREE_ATOMIC_VAR_INIT(1);
   uint32_t context_id = iree_atomic_fetch_add_int32(&next_context_id, 1,
                                                     iree_memory_order_seq_cst);
@@ -54,9 +54,9 @@ static intptr_t iree_vm_context_allocate_id(void) {
   char* name = (char*)malloc(32);
   snprintf(name, 32, "ctx-%04d", context_id - 1);
   IREE_LEAK_CHECK_DISABLE_POP();
-  return (intptr_t)name;
+  return (iree_vm_context_id_t)name;
 #else
-  return context_id;
+  return (iree_vm_context_id_t)context_id;
 #endif  // IREE_TRACING_FEATURE_FIBERS
 }
 
@@ -80,7 +80,7 @@ static iree_status_t iree_vm_context_run_function(
     return status;
   }
 
-  IREE_TRACE_FIBER_ENTER((char*)iree_vm_context_id(context));
+  IREE_TRACE_FIBER_ENTER(context->context_id);
   iree_vm_execution_result_t result;
   status = module->begin_call(module->self, stack, &call, &result);
   IREE_TRACE_FIBER_LEAVE();
@@ -335,7 +335,8 @@ IREE_API_EXPORT void iree_vm_context_release(iree_vm_context_t* context) {
   }
 }
 
-IREE_API_EXPORT intptr_t iree_vm_context_id(const iree_vm_context_t* context) {
+IREE_API_EXPORT iree_vm_context_id_t
+iree_vm_context_id(const iree_vm_context_t* context) {
   if (!context) {
     return -1;
   }
@@ -494,7 +495,7 @@ IREE_API_EXPORT iree_status_t iree_vm_context_resolve_module_state(
 IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(
     const iree_vm_context_t* context, iree_string_view_t full_name,
     iree_vm_function_t* out_function) {
-  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_ASSERT_ARGUMENT(context);
   IREE_ASSERT_ARGUMENT(out_function);
   memset(out_function, 0, sizeof(iree_vm_function_t));
 
@@ -502,7 +503,6 @@ IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(
   iree_string_view_t function_name;
   if (iree_string_view_split(full_name, '.', &module_name, &function_name) ==
       -1) {
-    IREE_TRACE_ZONE_END(z0);
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "import name not fully-qualified (module.func): '%.*s'",
@@ -512,14 +512,11 @@ IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(
   for (int i = (int)context->list.count - 1; i >= 0; --i) {
     iree_vm_module_t* module = context->list.modules[i];
     if (iree_string_view_equal(module_name, iree_vm_module_name(module))) {
-      iree_status_t status = iree_vm_module_lookup_function_by_name(
+      return iree_vm_module_lookup_function_by_name(
           module, IREE_VM_FUNCTION_LINKAGE_EXPORT, function_name, out_function);
-      IREE_TRACE_ZONE_END(z0);
-      return status;
     }
   }
 
-  IREE_TRACE_ZONE_END(z0);
   return iree_make_status(IREE_STATUS_NOT_FOUND,
                           "module '%.*s' required for import '%.*s' not "
                           "registered with the context",

@@ -338,4 +338,29 @@ iree_bytecode_module(
   PUBLIC
 )
 
+iree_c_embed_data(
+  NAME
+    async_bytecode_modules_c
+  GENERATED_SRCS
+    "async_ops.vmfb"
+  C_FILE_OUTPUT
+    "async_bytecode_modules.c"
+  H_FILE_OUTPUT
+    "async_bytecode_modules.h"
+  FLATTEN
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    async_ops
+  SRC
+    "async_ops.mlir"
+  COMPILE_TOOL
+    iree-compile
+  FLAGS
+    "--compile-mode=vm"
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

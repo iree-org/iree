@@ -762,6 +762,11 @@ iree_status_t iree_hal_vulkan_device_create(
   dispatch_queue_priorities.resize(dispatch_queue_info.queueCount);
   dispatch_queue_info.pQueuePriorities = dispatch_queue_priorities.data();
 
+  // Collect supported physical device features.
+  VkPhysicalDeviceFeatures physical_device_features;
+  instance_syms->vkGetPhysicalDeviceFeatures(physical_device,
+                                             &physical_device_features);
+
   // Create device and its queues.
   VkDeviceCreateInfo device_create_info;
   memset(&device_create_info, 0, sizeof(device_create_info));
@@ -778,6 +783,9 @@ iree_status_t iree_hal_vulkan_device_create(
   memset(&features2, 0, sizeof(features2));
   features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
   device_create_info.pNext = &features2;
+  if (physical_device_features.shaderInt64) {
+    features2.features.shaderInt64 = VK_TRUE;
+  }
 
   VkPhysicalDeviceTimelineSemaphoreFeatures semaphore_features;
   memset(&semaphore_features, 0, sizeof(semaphore_features));
@@ -911,9 +919,9 @@ static iree_status_t iree_hal_vulkan_device_trim(
   return iree_hal_allocator_trim(device->device_allocator);
 }
 
-static iree_status_t iree_hal_vulkan_device_query_i32(
+static iree_status_t iree_hal_vulkan_device_query_i64(
     iree_hal_device_t* base_device, iree_string_view_t category,
-    iree_string_view_t key, int32_t* out_value) {
+    iree_string_view_t key, int64_t* out_value) {
   // iree_hal_vulkan_device_t* device =
   //     iree_hal_vulkan_device_cast(base_device);
   *out_value = 0;
@@ -1122,7 +1130,7 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.host_allocator=*/iree_hal_vulkan_device_host_allocator,
     /*.device_allocator=*/iree_hal_vulkan_device_allocator,
     /*.trim=*/iree_hal_vulkan_device_trim,
-    /*.query_i32=*/iree_hal_vulkan_device_query_i32,
+    /*.query_i64=*/iree_hal_vulkan_device_query_i64,
     /*.create_command_buffer=*/iree_hal_vulkan_device_create_command_buffer,
     /*.create_descriptor_set=*/iree_hal_vulkan_device_create_descriptor_set,
     /*.create_descriptor_set_layout=*/

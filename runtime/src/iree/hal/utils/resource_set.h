@@ -113,6 +113,10 @@ typedef struct iree_hal_resource_set_t {
   iree_hal_resource_set_chunk_t* chunk_head;
 } iree_hal_resource_set_t;
 
+// TODO(benvanik): add an allocation method that allows for placement; in many
+// command buffer implementations we could allocate the command buffer from the
+// same resource set block to avoid a double block pool allocation.
+
 // Allocates a new resource from the given |block_pool|.
 // Resources can be inserted and are retained until the set is freed.
 IREE_API_EXPORT iree_status_t iree_hal_resource_set_allocate(
@@ -122,9 +126,6 @@ IREE_API_EXPORT iree_status_t iree_hal_resource_set_allocate(
 // The |set| itself will be returned back to the block pool it was allocated
 // from.
 IREE_API_EXPORT void iree_hal_resource_set_free(iree_hal_resource_set_t* set);
-
-// Resets the set to its initial empty state by releasing all owned resources.
-IREE_API_EXPORT void iree_hal_resource_set_reset(iree_hal_resource_set_t* set);
 
 // Inserts zero or more resources into the set.
 // Each resource will be retained for at least the lifetime of the set.

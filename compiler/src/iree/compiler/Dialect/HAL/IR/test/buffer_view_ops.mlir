@@ -27,15 +27,6 @@ func.func @buffer_view_buffer(%arg0: !hal.buffer_view) -> !hal.buffer {
 
 // -----
 
-// CHECK-LABEL: @buffer_view_byte_length
-func.func @buffer_view_byte_length(%arg0: !hal.buffer_view) -> index {
-  // CHECK: %len = hal.buffer_view.byte_length<%arg0 : !hal.buffer_view> : index
-  %len = hal.buffer_view.byte_length<%arg0 : !hal.buffer_view> : index
-  return %len : index
-}
-
-// -----
-
 // CHECK-LABEL: @buffer_view_shape_queries
 func.func @buffer_view_shape_queries(%arg0: !hal.buffer_view) -> (index, index, index, index) {
   // CHECK: %{{.+}} = hal.buffer_view.rank<%arg0 : !hal.buffer_view> : index

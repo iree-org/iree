@@ -8,7 +8,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 
 /// Include the generated interface definitions.
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.cpp.inc"
@@ -57,7 +57,7 @@ struct WorkgroupIdOpInterface
 
 struct WorkgroupCountOpInterface
     : public ProcessorCountInterface::ExternalModel<
-          WorkgroupCountOpInterface, IREE::HAL::InterfaceWorkgroupIDOp> {
+          WorkgroupCountOpInterface, IREE::HAL::InterfaceWorkgroupCountOp> {
   unsigned getDimIndex(Operation *op) const {
     return cast<IREE::HAL::InterfaceWorkgroupCountOp>(op)
         .dimension()
@@ -67,7 +67,7 @@ struct WorkgroupCountOpInterface
 
 struct WorkgroupTileSizeOpInterface
     : public ProcessorTileSizeInterface::ExternalModel<
-          WorkgroupTileSizeOpInterface, IREE::HAL::InterfaceWorkgroupIDOp> {
+          WorkgroupTileSizeOpInterface, IREE::HAL::InterfaceWorkgroupSizeOp> {
   unsigned getDimIndex(Operation *op) const {
     return cast<IREE::HAL::InterfaceWorkgroupSizeOp>(op)
         .dimension()

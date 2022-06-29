@@ -81,7 +81,7 @@ std::unique_ptr<Pass> createConvertConv2DToImg2ColPass();
 
 // Pass to convert a linalg.pad_tensor operation into a linalg.fill +
 // subtensor_insert. This allows lowering the operation into a single kernel.
-std::unique_ptr<Pass> createPadTensorToSubTensorInsertPass();
+std::unique_ptr<Pass> createPadTensorToTensorInsertSlicePass();
 
 // Pass to convert a linalg.matmul into linalg.mmt4d given some target ISA
 // information currently passed as pass options.
@@ -89,6 +89,9 @@ std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass();
 std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass(
     CustomKernelsTargetInfo targetInfo);
 std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass(StringRef options);
+
+// Create a pass to detach elementwise ops from named Linalg ops.
+std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass();
 
 // Creates a pass to fuse Linalg operations on tensors.
 std::unique_ptr<Pass> createFusionOfTensorOpsPass();

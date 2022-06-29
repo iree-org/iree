@@ -208,7 +208,9 @@ IREE_API_EXPORT iree_string_view_t iree_hal_command_category_format(
 // Designed to be embedded in concrete implementations that want validation.
 typedef struct iree_hal_command_buffer_validation_state_t {
   iree_hal_device_t* device;
-  bool is_recording;
+  // 1 when in a begin/end recording sequence.
+  uint32_t is_recording : 1;
+  // Debug group depth for tracking proper begin/end pairing.
   int32_t debug_group_depth;
   // TODO(benvanik): current executable layout/descriptor set layout info.
   // TODO(benvanik): valid push constant bit ranges.
@@ -287,9 +289,9 @@ IREE_API_EXPORT iree_hal_command_category_t
 iree_hal_command_buffer_allowed_categories(
     const iree_hal_command_buffer_t* command_buffer);
 
-// Resets and begins recording into the command buffer, clearing all
-// previously recorded contents.
-// The command buffer must not be in-flight.
+// Begins recording into the command buffer.
+// The command buffer must not have been recorded already; this is only valid to
+// call once after creation and must be paired with iree_hal_command_buffer_end.
 IREE_API_EXPORT iree_status_t
 iree_hal_command_buffer_begin(iree_hal_command_buffer_t* command_buffer);
 
@@ -542,26 +544,6 @@ IREE_API_EXPORT iree_status_t iree_hal_create_transfer_command_buffer(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t transfer_count,
     const iree_hal_transfer_command_t* transfer_commands,
-    iree_hal_command_buffer_t** out_command_buffer);
-
-//===----------------------------------------------------------------------===//
-// iree_hal_command_buffer_t validation wrapper
-//===----------------------------------------------------------------------===//
-
-// Wraps |target_command_buffer| with a validation layer that checks the
-// parameters to each call in an attempt to return errors where usage may result
-// in failed or incorrect execution. This layer adds many additional checks to
-// each call but must be used when dealing with untrusted incoming commands.
-//
-// The validation is strictly input argument and permission-based and not a full
-// verification of the correctness of any barriers or memory dependencies. A
-// command buffer recording that has passed validation does not indicate that it
-// is guaranteed to make forward progress or properly observe memory visibility
-// or availability rules. Instead, validation ensures that no command references
-// memory outside of the allowed ranges or accesses memory in violation of the
-// allowed usage or access rights.
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_wrap_validation(
-    iree_hal_device_t* device, iree_hal_command_buffer_t* target_command_buffer,
     iree_hal_command_buffer_t** out_command_buffer);
 
 //===----------------------------------------------------------------------===//

@@ -11,7 +11,9 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Matchers.h"
@@ -22,6 +24,16 @@ using namespace mlir;
 using namespace mlir::iree_compiler;
 
 static constexpr unsigned cudaWarpSize = 32;
+static constexpr StringLiteral kCudaTarget = "cuda";
+namespace mlir {
+namespace iree_compiler {
+llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
+    "iree-codegen-llvmgpu-use-transform-dialect",
+    llvm::cl::desc(
+        "MLIR file containing a transform dialect specification to apply"),
+    llvm::cl::init(""));
+}
+}  // namespace mlir
 
 namespace {
 struct TileWorkgroupSizePair {
@@ -78,6 +90,17 @@ static std::string getTargetArch(func::FuncOp entryPoint) {
   return "";
 }
 
+bool isCudaTarget(func::FuncOp entryPoint) {
+  if (auto variantOp =
+          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
+    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
+    if (auto backend = targetAttr.getBackend()) {
+      return backend.getValue().str() == kCudaTarget;
+    }
+  }
+  return false;
+}
+
 static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op) {
   // Limit tensor core pipeline to matmul as not all combinations of transpose
   // are supported upstream.
@@ -132,7 +155,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
         workgroupTileSizes.append(op.getNumReductionLoops(), tileK);
 
         SmallVector<unsigned> partitionedLoops =
-            cast<IREE::Flow::PartitionableLoopsInterface>(op.getOperation())
+            cast<PartitionableLoopsInterface>(op.getOperation())
                 .getPartitionableLoops(kNumMaxParallelDims);
         llvm::SmallDenseSet<unsigned, 4> partitionedLoopsSet;
         partitionedLoopsSet.insert(partitionedLoops.begin(),
@@ -245,7 +268,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
 
 static LogicalResult setFftConfig(func::FuncOp entryPoint,
                                   IREE::LinalgExt::FftOp op) {
-  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   unsigned loopDepth = partitionedLoops.back() + 1;
@@ -275,7 +298,7 @@ static LogicalResult setFftConfig(func::FuncOp entryPoint,
 
 static LogicalResult setSortConfig(func::FuncOp entryPoint, Operation *op) {
   TileSizesListType tileSizes;
-  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   if (partitionedLoops.empty()) {
@@ -318,7 +341,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
   IREE::Codegen::DispatchLoweringPassPipeline passPipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute;
   TileSizesListType tileSizes;
-  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   if (partitionedLoops.empty()) {
@@ -416,6 +439,93 @@ static LogicalResult setUserConfig(
   return success();
 }
 
+/// Return the size of the given dimension in the linalg op.
+// TODO: this should be part of LinalgOp interface, the equivalent member
+// function currently only support the case where all the dimensions are static
+// while we want to support dynamic shapes.
+static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
+  for (auto map : llvm::enumerate(op.getIndexingMaps())) {
+    for (auto dim : llvm::enumerate(map.value().getResults())) {
+      auto expr = dim.value().dyn_cast<AffineDimExpr>();
+      if (expr && expr.getPosition() == d) {
+        auto type = op->getOperand(map.index()).getType().cast<ShapedType>();
+        if (type.isDynamicDim(dim.index())) return llvm::None;
+        return type.getDimSize(dim.index());
+      }
+    }
+  }
+  return llvm::None;
+}
+
+/// Set the configuration for reductions that can be mapped to warp reductions.
+static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
+                                            linalg::LinalgOp op) {
+  if (!isCudaTarget(entryPoint)) return failure();
+  if (!isa<linalg::GenericOp>(op)) return failure();
+  // TODO(thomasraoux): Enable dynamic shape.
+  if (op.hasDynamicShape()) return failure();
+  SmallVector<unsigned> reductionDims;
+  op.getReductionDims(reductionDims);
+  if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
+    return failure();
+  if (op.getRegionOutputArgs().size() != 1) return failure();
+
+  // Disallow transposition for now, to be enabled.
+  if (llvm::any_of(op.getInputOperands(), [&](OpOperand *input) {
+        return !op.getTiedIndexingMap(input).isMinorIdentity();
+      }))
+    return failure();
+
+  // Only single combiner operations are supported for now.
+  SmallVector<Operation *, 4> combinerOps;
+  if (!matchReduction(op.getRegionOutputArgs(), 0, combinerOps) ||
+      combinerOps.size() != 1)
+    return failure();
+  Optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
+  if (!dimSize || *dimSize % cudaWarpSize != 0) return failure();
+  SmallVector<unsigned> parallelDims;
+  op.getParallelDims(parallelDims);
+  unsigned *innerParallelDim =
+      std::max_element(parallelDims.begin(), parallelDims.end());
+  Optional<int64_t> innerParallelDimSize =
+      getLinalgDimSize(op, *innerParallelDim);
+
+  int64_t numWarps =
+      (innerParallelDimSize && (*innerParallelDimSize % 2 == 0)) ? 2 : 1;
+
+  std::array<int64_t, 3> workgroupSize = {numWarps * cudaWarpSize, 1, 1};
+
+  SmallVector<unsigned> partitionedLoops =
+      cast<PartitionableLoopsInterface>(op.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
+  llvm::SmallDenseSet<unsigned, 4> partitionedLoopsSet;
+  partitionedLoopsSet.insert(partitionedLoops.begin(), partitionedLoops.end());
+  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
+  SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
+  // Don't try to vectorize the store op right now.
+  unsigned vectorSize = 1;
+  // Set the inner most parallel loop to `lowerTs`.
+  for (int64_t depth = numLoops; depth > 0; depth--) {
+    if (partitionedLoopsSet.count(depth - 1)) {
+      workgroupTileSizes[depth - 1] =
+          (workgroupSize[0] * vectorSize) / cudaWarpSize;
+      break;
+    }
+  }
+  // Tile the reduction size to the size of a warp so that we can distribute the
+  // load from the reduced dimension on the whole warp. Once we support
+  // unrolling multi-reduce op we can try to tile to 4 * warpSize to vectorize
+  // load.
+  workgroupTileSizes.append(reductionDims.size(), cudaWarpSize);
+  TileSizesListType tileSizes;
+  tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, tileSizes,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction,
+      workgroupSize);
+  return success();
+}
+
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    Operation *computeOp) {
   if (IREE::Codegen::CompilationInfoAttr compilationInfo =
@@ -429,6 +539,8 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
         linalgOp.getNumParallelLoops() >= 2) {
       return setContractConfig(entryPointFn, linalgOp);
     }
+    if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp)))
+      return success();
   }
   if (auto fftOp = dyn_cast<IREE::LinalgExt::FftOp>(computeOp)) {
     return setFftConfig(entryPointFn, fftOp);
@@ -454,6 +566,16 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
     if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
       return funcOp.emitOpError("failed to get compute ops");
+    }
+
+    // If using sandbox passes, currently set the workload_per_wg to be
+    // empty for single-threaded execution.
+    if (clGPUCodegenTransformDialectFileName.size() > 0) {
+      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
+                                     TransformDialectInterpreterCodegen);
+      setTranslationInfo(funcOp, translationInfo);
+      continue;
     }
 
     Operation *rootOperation = nullptr;

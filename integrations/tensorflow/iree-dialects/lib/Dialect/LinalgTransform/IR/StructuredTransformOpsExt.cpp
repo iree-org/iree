@@ -5,11 +5,12 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
+
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/ScopedTransform.h"
-#include "iree-dialects/Dialect/LinalgTransform/TrackingRewriteDriver.h"
 #include "iree-dialects/Transforms/Listener.h"
 #include "iree-dialects/Transforms/ListenerCSE.h"
+#include "iree-dialects/Transforms/ListenerGreedyPatternRewriteDriver.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/AsyncToLLVM/AsyncToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"
@@ -34,7 +35,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
-#include "mlir/Dialect/SCF/Transforms.h"
+#include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -519,9 +520,8 @@ static LogicalResult performEnablerTransformations(
   return failure(res.wasInterrupted());
 }
 
-LogicalResult transform_ext::CanonicalizedSequenceOp::apply(
-    transform::TransformResults &transformResults,
-    transform::TransformState &state) {
+DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
+    transform::TransformResults &results, transform::TransformState &state) {
 
   MLIRContext *ctx = getContext();
   RewritePatternSet patternList(ctx);
@@ -537,14 +537,14 @@ LogicalResult transform_ext::CanonicalizedSequenceOp::apply(
   auto detachListener = llvm::make_scope_exit(
       [&] { state.removeExtension<::detail::TrackingListener>(); });
   if (failed(mapBlockArguments(state)))
-    return failure();
+    return DiagnosedSilenceableFailure::definiteFailure();
 
   auto checkedListenerTransform =
       [&](function_ref<LogicalResult(Operation *, RewriteListener &)>
               transform) {
         SmallVector<Operation *> roots;
-        if (Value target = getTarget())
-          llvm::append_range(roots, state.getPayloadOps(target));
+        if (Value root = getRoot())
+          llvm::append_range(roots, state.getPayloadOps(root));
         else
           roots.push_back(state.getTopLevel());
 
@@ -586,46 +586,197 @@ LogicalResult transform_ext::CanonicalizedSequenceOp::apply(
 
   LLVM_DEBUG(DBGS() << "begin canonicalizing sequence\n");
   if (failed(checkedListenerTransform(performCSE)))
-    return failure();
+    return DiagnosedSilenceableFailure::definiteFailure();
   if (failed(checkedListenerTransform(performCanonicalization)))
-    return failure();
+    return DiagnosedSilenceableFailure::definiteFailure();
 
+  // Apply the sequenced ops one by one.
   for (Operation &transform : getBodyBlock()->without_terminator()) {
-    if (failed(state.applyTransform(
-            cast<transform::TransformOpInterface>(transform)))) {
+    DiagnosedSilenceableFailure result =
+        state.applyTransform(cast<transform::TransformOpInterface>(transform));
+    if (!result.succeeded()) {
       LLVM_DEBUG(DBGS() << "failed: " << transform << "\n");
-      return failure();
+      return result;
     }
     LLVM_DEBUG(DBGS() << "successfully performed: " << transform << "\n");
 
     if (failed(checkedListenerTransform(performCSE)))
-      return failure();
+      return DiagnosedSilenceableFailure::definiteFailure();
     if (failed(checkedListenerTransform(performEnabler)))
-      return failure();
+      return DiagnosedSilenceableFailure::definiteFailure();
     if (failed(checkedListenerTransform(performCanonicalization)))
-      return failure();
+      return DiagnosedSilenceableFailure::definiteFailure();
+  }
+
+  // Forward the operation mapping for values yielded from the sequence to the
+  // values produced by the sequence op.
+  for (const auto &pair :
+       llvm::zip(getBodyBlock()->getTerminator()->getOperands(),
+                 getOperation()->getOpResults())) {
+    Value terminatorOperand = std::get<0>(pair);
+    OpResult result = std::get<1>(pair);
+    results.set(result, state.getPayloadOps(terminatorOperand));
   }
 
   LLVM_DEBUG(DBGS() << "end canonicalizing sequence\n");
+  return DiagnosedSilenceableFailure::success();
+}
+
+/// Returns `true` if the given op operand may be consuming the handle value in
+/// the Transform IR. That is, if it may have a Free effect on it.
+static bool isValueUsePotentialConsumer(OpOperand &use) {
+  // Conservatively assume the effect being present in absence of the interface.
+  auto memEffectInterface = dyn_cast<MemoryEffectOpInterface>(use.getOwner());
+  if (!memEffectInterface)
+    return true;
+
+  SmallVector<MemoryEffects::EffectInstance, 2> effects;
+  memEffectInterface.getEffectsOnValue(use.get(), effects);
+  return llvm::any_of(effects, [](const MemoryEffects::EffectInstance &effect) {
+    return isa<transform::TransformMappingResource>(effect.getResource()) &&
+           isa<MemoryEffects::Free>(effect.getEffect());
+  });
+}
+
+// TODO: Add declaration to TransformOps.h, then we do not have to duplicate
+// this function.
+static LogicalResult
+checkDoubleConsume(Value value,
+                   function_ref<InFlightDiagnostic()> reportError) {
+  OpOperand *potentialConsumer = nullptr;
+  for (OpOperand &use : value.getUses()) {
+    if (!isValueUsePotentialConsumer(use))
+      continue;
+
+    if (!potentialConsumer) {
+      potentialConsumer = &use;
+      continue;
+    }
+
+    InFlightDiagnostic diag = reportError()
+                              << " has more than one potential consumer";
+    diag.attachNote(potentialConsumer->getOwner()->getLoc())
+        << "used here as operand #" << potentialConsumer->getOperandNumber();
+    diag.attachNote(use.getOwner()->getLoc())
+        << "used here as operand #" << use.getOperandNumber();
+    return diag;
+  }
+
+  return success();
+}
+
+LogicalResult transform_ext::CanonicalizedSequenceOp::verify() {
+  // Check if the block argument has more than one consuming use.
+  for (BlockArgument argument : getBodyBlock()->getArguments()) {
+    auto report = [&]() {
+      return (emitOpError() << "block argument #" << argument.getArgNumber());
+    };
+    if (failed(checkDoubleConsume(argument, report)))
+      return failure();
+  }
+
+  // Check properties of the nested operations they cannot check themselves.
+  for (Operation &child : *getBodyBlock()) {
+    if (!isa<transform::TransformOpInterface>(child) &&
+        &child != &getBodyBlock()->back()) {
+      InFlightDiagnostic diag =
+          emitOpError()
+          << "expected children ops to implement TransformOpInterface";
+      diag.attachNote(child.getLoc()) << "op without interface";
+      return diag;
+    }
+
+    for (OpResult result : child.getResults()) {
+      auto report = [&]() {
+        return (child.emitError() << "result #" << result.getResultNumber());
+      };
+      if (failed(checkDoubleConsume(result, report)))
+        return failure();
+    }
+  }
+
+  if (getBodyBlock()->getTerminator()->getOperandTypes() !=
+      getOperation()->getResultTypes()) {
+    InFlightDiagnostic diag = emitOpError()
+                              << "expects the types of the terminator operands "
+                                 "to match the types of the result";
+    diag.attachNote(getBodyBlock()->getTerminator()->getLoc()) << "terminator";
+    return diag;
+  }
   return success();
 }
 
 void transform_ext::CanonicalizedSequenceOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  SmallVector<MemoryEffects::EffectInstance> childEffects;
-  walk([&](Operation *child) {
-    // Skip self to avoid infinite recursion.
-    if (child == getOperation())
-      return;
+  auto *mappingResource = transform::TransformMappingResource::get();
+  effects.emplace_back(MemoryEffects::Read::get(), getRoot(), mappingResource);
 
-    auto iface = dyn_cast<MemoryEffectOpInterface>(child);
-    if (!iface)
-      return;
+  for (Value result : getResults()) {
+    effects.emplace_back(MemoryEffects::Allocate::get(), result,
+                         mappingResource);
+    effects.emplace_back(MemoryEffects::Write::get(), result, mappingResource);
+  }
 
-    childEffects.clear();
-    iface.getEffects(childEffects);
-    llvm::append_range(effects, childEffects);
-  });
+  if (!getRoot()) {
+    for (Operation &op : *getBodyBlock()) {
+      auto iface = dyn_cast<MemoryEffectOpInterface>(&op);
+      if (!iface) {
+        // TODO: fill all possible effects; or require ops to actually implement
+        // the memory effect interface always
+        assert(false);
+      }
+
+      SmallVector<MemoryEffects::EffectInstance, 2> nestedEffects;
+      iface.getEffects(effects);
+    }
+    return;
+  }
+
+  // Carry over all effects on the argument of the entry block as those on the
+  // operand, this is the same value just remapped.
+  for (Operation &op : *getBodyBlock()) {
+    auto iface = dyn_cast<MemoryEffectOpInterface>(&op);
+    if (!iface) {
+      // TODO: fill all possible effects; or require ops to actually implement
+      // the memory effect interface always
+      assert(false);
+    }
+
+    SmallVector<MemoryEffects::EffectInstance, 2> nestedEffects;
+    iface.getEffectsOnValue(getBodyBlock()->getArgument(0), nestedEffects);
+    for (const auto &effect : nestedEffects)
+      effects.emplace_back(effect.getEffect(), getRoot(), effect.getResource());
+  }
+}
+
+OperandRange transform_ext::CanonicalizedSequenceOp::getSuccessorEntryOperands(
+    Optional<unsigned> index) {
+  assert(index && index.getValue() == 0 && "unexpected region index");
+  if (getOperation()->getNumOperands() == 1)
+    return getOperation()->getOperands();
+  return OperandRange(getOperation()->operand_end(),
+                      getOperation()->operand_end());
+}
+
+void transform_ext::CanonicalizedSequenceOp::getSuccessorRegions(
+    Optional<unsigned> index, ArrayRef<Attribute> operands,
+    SmallVectorImpl<RegionSuccessor> &regions) {
+  if (!index.hasValue()) {
+    Region *bodyRegion = &getBody();
+    regions.emplace_back(bodyRegion, !operands.empty()
+                                         ? bodyRegion->getArguments()
+                                         : Block::BlockArgListType());
+    return;
+  }
+
+  assert(*index == 0 && "unexpected region index");
+  regions.emplace_back(getOperation()->getResults());
+}
+
+void transform_ext::CanonicalizedSequenceOp::getRegionInvocationBounds(
+    ArrayRef<Attribute> operands, SmallVectorImpl<InvocationBounds> &bounds) {
+  (void)operands;
+  bounds.emplace_back(1, 1);
 }
 
 //===----------------------------------------------------------------------===//
@@ -633,328 +784,6 @@ void transform_ext::CanonicalizedSequenceOp::getEffects(
 //===----------------------------------------------------------------------===//
 
 using namespace mlir::linalg;
-
-/// Extracts a vector of int64_t from an array attribute. Asserts if the
-/// attribute contains values other than integers.
-static SmallVector<int64_t> extractI64Array(ArrayAttr attr) {
-  SmallVector<int64_t> result;
-  result.reserve(attr.size());
-  for (APInt value : attr.getAsValueRange<IntegerAttr>())
-    result.push_back(value.getSExtValue());
-  return result;
-}
-
-/// Extracts a vector of unsigned from an array attribute. Asserts if the
-/// attribute contains values other than intergers. May truncate.
-static SmallVector<unsigned> extractUIntArray(ArrayAttr attr) {
-  SmallVector<unsigned> result;
-  result.reserve(attr.size());
-  for (APInt value : attr.getAsValueRange<IntegerAttr>())
-    result.push_back(value.getZExtValue());
-  return result;
-}
-
-/// Apply a tiling transformation to all payload ops and store both the
-/// tiled operation as well as the created tile loops.
-static LogicalResult
-applyTilingToAll(Operation *transformOp, Value target,
-                 ArrayRef<int64_t> tileSizes,
-                 mlir::transform::TransformResults &transformResults,
-                 mlir::transform::TransformState &state,
-                 std::function<FailureOr<TiledLinalgOp>(LinalgOp)> applyFn) {
-  size_t numLoops = tileSizes.size() - llvm::count(tileSizes, 0);
-
-  SmallVector<Operation *> tiledLinalgOps;
-  SmallVector<SmallVector<Operation *>> loopOps(numLoops);
-
-  for (Operation *target : state.getPayloadOps(target)) {
-    auto linalgOp = cast<linalg::LinalgOp>(target);
-    FailureOr<TiledLinalgOp> tiled = applyFn(linalgOp);
-    if (failed(tiled))
-      return failure();
-
-    tiledLinalgOps.push_back(tiled->op);
-    if (tiled->loops.size() != numLoops)
-      // Not enough loops were generated. This usually means that the input size
-      // was smaller than the tiling size.
-      // TODO: LinalgTilingPattern should return failure().
-      return failure();
-    for (unsigned int i = 0; i < numLoops; ++i) {
-      loopOps[i].push_back(tiled->loops[i]);
-    }
-  }
-
-  transformResults.set(transformOp->getOpResult(0), tiledLinalgOps);
-  for (unsigned int i = 0; i < numLoops; ++i) {
-    transformResults.set(transformOp->getOpResult(i + 1), loopOps[i]);
-  }
-  return success();
-}
-
-/// Parse a tiling operation that returns the tiled op as well as the created
-/// tile loops. The function counts the non-zero tile sizes to compute the
-/// number of results.
-static ParseResult parseTileOp(OpAsmParser &parser, OperationState &result,
-                               StringRef sizesAttrName) {
-  OpAsmParser::UnresolvedOperand targetOperand;
-  SMLoc opLoc;
-  if (parser.getCurrentLocation(&opLoc))
-    return failure();
-  if (parser.parseOperand(targetOperand))
-    return parser.emitError(opLoc, "expected `target` operand");
-  if (parser.parseOptionalAttrDict(result.attributes))
-    return failure();
-  Attribute sizesAttr = result.attributes.get(sizesAttrName);
-  if (!sizesAttr) {
-    return parser.emitError(
-        opLoc, llvm::formatv("expected `{0}` attribute", sizesAttrName));
-  }
-  auto sizesArrayAttr = sizesAttr.dyn_cast<ArrayAttr>();
-  if (!sizesArrayAttr) {
-    return parser.emitError(
-        opLoc,
-        llvm::formatv("`{0}` attribute must be an array", sizesAttrName));
-  }
-  Type pdlOpType = parser.getBuilder().getType<pdl::OperationType>();
-  size_t numExpectedLoops =
-      sizesArrayAttr.size() - llvm::count(extractI64Array(sizesArrayAttr), 0);
-  result.addTypes(SmallVector<Type>(numExpectedLoops + 1, pdlOpType));
-  if (parser.resolveOperand(targetOperand, pdlOpType, result.operands))
-    return failure();
-  return success();
-}
-
-namespace {
-class SimpleRewriter : public PatternRewriter {
-public:
-  explicit SimpleRewriter(MLIRContext *context) : PatternRewriter(context) {}
-};
-} // namespace
-
-//===----------------------------------------------------------------------===//
-// ScalarizeOp
-//===----------------------------------------------------------------------===//
-
-FailureOr<LinalgOp> transform_ext::ScalarizeOp::applyToOne(LinalgOp target) {
-  LinalgTilingOptions tilingOptions;
-  tilingOptions.scalarizeDynamicDims();
-  // Tiling with "scalarize_dyn_dims" actually sets the same lambda as the tile
-  // sizes and asserts that it is not already set.
-  SmallVector<int64_t> emptyTileSizes;
-  LinalgTilingPattern pattern(getContext(), tilingOptions);
-  SimpleRewriter rewriter(getContext());
-  rewriter.setInsertionPoint(target);
-  FailureOr<TiledLinalgOp> result =
-      pattern.returningMatchAndRewrite(target, rewriter);
-  if (failed(result))
-    return failure();
-  return result->op;
-}
-
-//===---------------------------------------------------------------------===//
-// FuseOp
-//===---------------------------------------------------------------------===//
-
-LogicalResult transform_ext::FuseOp::apply(
-    mlir::transform::TransformResults &transformResults,
-    mlir::transform::TransformState &state) {
-  LinalgTilingAndFusionOptions fusionOptions;
-  fusionOptions.tileSizes = extractI64Array(getTileSizes());
-  fusionOptions.tileInterchange = extractI64Array(getTileInterchange());
-
-  return applyTilingToAll(
-      getOperation(), getTarget(), fusionOptions.tileSizes, transformResults,
-      state, [&](LinalgOp linalgOp) -> FailureOr<TiledLinalgOp> {
-        LinalgTileAndFuseTensorOpsPattern pattern(getContext(), fusionOptions);
-        SimpleRewriter rewriter(getContext());
-        rewriter.setInsertionPoint(linalgOp);
-        FailureOr<TileLoopNest> tileLoopNest =
-            pattern.returningMatchAndRewrite(linalgOp, rewriter);
-        if (failed(tileLoopNest))
-          return failure();
-
-        TiledLinalgOp tiledLinalgOp;
-        tiledLinalgOp.op = tileLoopNest->getRootOp();
-        tiledLinalgOp.loops = {tileLoopNest->getLoopOps().begin(),
-                               tileLoopNest->getLoopOps().end()};
-        return tiledLinalgOp;
-      });
-}
-
-LogicalResult transform_ext::FuseOp::verify() {
-  SmallVector<int64_t> permutation = extractI64Array(getTileInterchange());
-  auto sequence = llvm::to_vector(llvm::seq<int64_t>(0, permutation.size()));
-  if (!std::is_permutation(sequence.begin(), sequence.end(),
-                           permutation.begin(), permutation.end())) {
-    return emitOpError() << "expects interchange to be a permutation, found "
-                         << getTileInterchange();
-  }
-  return success();
-}
-
-ParseResult transform_ext::FuseOp::parse(OpAsmParser &parser,
-                                         OperationState &result) {
-  return parseTileOp(parser, result, "tile_sizes");
-}
-
-void transform_ext::FuseOp::print(OpAsmPrinter &p) {
-  p << ' ';
-  p << getTarget();
-  p.printOptionalAttrDict((*this)->getAttrs());
-}
-
-//===---------------------------------------------------------------------===//
-// GeneralizeOp
-//===---------------------------------------------------------------------===//
-
-FailureOr<LinalgOp> transform_ext::GeneralizeOp::applyToOne(LinalgOp target) {
-  // Exit early if no transformation is needed.
-  if (isa<GenericOp>(target))
-    return target;
-
-  LinalgGeneralizationPattern pattern(getContext());
-  SimpleRewriter rewriter(getContext());
-  rewriter.setInsertionPoint(target);
-  FailureOr<GenericOp> result =
-      pattern.returningMatchAndRewrite(target, rewriter);
-  if (failed(result))
-    return failure();
-  return cast<LinalgOp>(result->getOperation());
-}
-
-//===---------------------------------------------------------------------===//
-// InterchangeOp
-//===---------------------------------------------------------------------===//
-
-FailureOr<LinalgOp> transform_ext::InterchangeOp::applyToOne(LinalgOp target) {
-  SmallVector<unsigned> interchangeVector =
-      extractUIntArray(getIteratorInterchange());
-  // Exit early if no transformation is needed.
-  if (interchangeVector.empty())
-    return target;
-
-  auto genericTarget = dyn_cast<GenericOp>(target.getOperation());
-  if (!genericTarget) {
-    InFlightDiagnostic diag = emitOpError()
-                              << "applies to " << GenericOp::getOperationName()
-                              << " ops";
-    diag.attachNote(target.getLoc()) << "attempted to apply to this op";
-    return diag;
-  }
-
-  GenericOpInterchangePattern pattern(getContext(), interchangeVector);
-  SimpleRewriter rewriter(getContext());
-  rewriter.setInsertionPoint(target);
-  FailureOr<GenericOp> result =
-      pattern.returningMatchAndRewrite(genericTarget, rewriter);
-  if (failed(result))
-    return failure();
-  return cast<LinalgOp>(result->getOperation());
-}
-
-LogicalResult transform_ext::InterchangeOp::verify() {
-  SmallVector<unsigned> permutation =
-      extractUIntArray(getIteratorInterchange());
-  auto sequence = llvm::to_vector(llvm::seq<unsigned>(0, permutation.size()));
-  if (!std::is_permutation(sequence.begin(), sequence.end(),
-                           permutation.begin(), permutation.end())) {
-    return emitOpError()
-           << "expects iterator_interchange to be a permutation, found "
-           << getIteratorInterchange();
-  }
-  return success();
-}
-
-//===---------------------------------------------------------------------===//
-// PadOp
-//===---------------------------------------------------------------------===//
-
-FailureOr<LinalgOp> transform_ext::PadOp::applyToOne(LinalgOp target) {
-  // Convert the integer packing flags to booleans.
-  SmallVector<bool> packPaddings;
-  for (int64_t packPadding : extractI64Array(getPackPaddings()))
-    packPaddings.push_back(static_cast<bool>(packPadding));
-
-  // Convert the padding values to attributes.
-  SmallVector<Attribute> paddingValues;
-  for (auto const &it :
-       llvm::zip(getPaddingValues(), target->getOperandTypes())) {
-    Attribute attr = std::get<0>(it);
-    Type elementType = getElementTypeOrSelf(std::get<1>(it));
-    // Try to parse string attributes to obtain an attribute of element type.
-    if (auto stringAttr = attr.dyn_cast<StringAttr>()) {
-      paddingValues.push_back(
-          parseAttribute(attr.cast<StringAttr>(), elementType));
-      if (!paddingValues.back()) {
-        return target->emitOpError("expects a padding value ")
-               << std::get<0>(it) << " that parses to " << elementType;
-      }
-      continue;
-    }
-    // Otherwise, add the attribute directly.
-    if (attr.getType() != elementType) {
-      return target->emitOpError("expects a padding value ")
-             << attr << " of type " << elementType;
-    }
-    paddingValues.push_back(attr);
-  }
-
-  // Extract the transpose vectors.
-  SmallVector<SmallVector<int64_t>> transposePaddings;
-  for (Attribute transposeVector : getTransposePaddings().cast<ArrayAttr>())
-    transposePaddings.push_back(
-        extractI64Array(transposeVector.cast<ArrayAttr>()));
-
-  LinalgPaddingOptions paddingOptions;
-  paddingOptions.setPaddingValues(paddingValues);
-  paddingOptions.setPaddingDimensions(extractI64Array(getPaddingDimensions()));
-  paddingOptions.setPackPaddings(packPaddings);
-  paddingOptions.setHoistPaddings(extractI64Array(getHoistPaddings()));
-  paddingOptions.setTransposePaddings(transposePaddings);
-
-  LinalgPaddingPattern pattern(getContext(), paddingOptions);
-  SimpleRewriter rewriter(getContext());
-  rewriter.setInsertionPoint(target);
-  return pattern.returningMatchAndRewrite(target, rewriter);
-}
-
-LogicalResult transform_ext::PadOp::verify() {
-  SmallVector<int64_t> packPaddings = extractI64Array(getPackPaddings());
-  if (any_of(packPaddings, [](int64_t packPadding) {
-        return packPadding != 0 && packPadding != 1;
-      })) {
-    return emitOpError()
-           << "expects pack_paddings to contain booleans (0/1), found "
-           << getPackPaddings();
-  }
-  SmallVector<int64_t> paddingDimensions =
-      extractI64Array(getPaddingDimensions());
-  if (any_of(paddingDimensions,
-             [](int64_t paddingDimension) { return paddingDimension < 0; })) {
-    return emitOpError()
-           << "expects padding_dimensions to contain positive integers, found "
-           << getPaddingDimensions();
-  }
-  SmallVector<int64_t> hoistPaddings = extractI64Array(getHoistPaddings());
-  if (any_of(hoistPaddings,
-             [](int64_t hoistPadding) { return hoistPadding < 0; })) {
-    return emitOpError()
-           << "expects hoist_paddings to contain positive integers, found "
-           << getHoistPaddings();
-  }
-  ArrayAttr transposes = getTransposePaddings();
-  for (Attribute attr : transposes) {
-    SmallVector<int64_t> transpose = extractFromI64ArrayAttr(attr);
-    auto sequence = llvm::to_vector(llvm::seq<int64_t>(0, transpose.size()));
-    if (!std::is_permutation(sequence.begin(), sequence.end(),
-                             transpose.begin(), transpose.end())) {
-      return emitOpError()
-             << "expects transpose_paddings to be a permutation, found "
-             << attr;
-    }
-  }
-  return success();
-}
 
 //===---------------------------------------------------------------------===//
 // BufferizeOp
@@ -966,7 +795,7 @@ static void applyBufferizationEnablingTransformations(ModuleOp moduleOp) {
   (void)applyPatternsAndFoldGreedily(moduleOp, std::move(patterns));
 }
 
-LogicalResult
+DiagnosedSilenceableFailure
 transform_ext::BufferizeOp::apply(mlir::transform::TransformResults &result,
                                   mlir::transform::TransformState &state) {
   bufferization::OneShotBufferizationOptions options;
@@ -979,19 +808,19 @@ transform_ext::BufferizeOp::apply(mlir::transform::TransformResults &result,
   auto moduleOp = cast<ModuleOp>(state.getTopLevel());
   applyBufferizationEnablingTransformations(moduleOp);
   if (failed(runOneShotModuleBufferize(moduleOp, options)))
-    return failure();
+    return DiagnosedSilenceableFailure::definiteFailure();
 
   // Perform buffer-level hoistings.
   state.getTopLevel()->walk(
       [&](func::FuncOp funcOp) { hoistRedundantVectorTransfers(funcOp); });
-  return success();
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
 // LowerToLLVMOp
 //===---------------------------------------------------------------------===//
 
-LogicalResult
+DiagnosedSilenceableFailure
 transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
                                     mlir::transform::TransformState &state) {
   // TODO: it is feasible to scope lowering at arbitrary level and introduce
@@ -1027,7 +856,7 @@ transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
   pm.addPass(createConvertFuncToLLVMPass());
   pm.addPass(createReconcileUnrealizedCastsPass());
   if (failed(pm.run(state.getTopLevel())))
-    return failure();
+    return DiagnosedSilenceableFailure::definiteFailure();
 
   // Make all arguments noalias for now.
   // FIXME: this is a terrible hack!
@@ -1040,137 +869,7 @@ transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
       funcOp.setArgAttr(i, "llvm.noalias", UnitAttr::get(funcOp.getContext()));
     }
   });
-  return success();
-}
-
-//===---------------------------------------------------------------------===//
-// DecomposeOp
-//===---------------------------------------------------------------------===//
-
-LogicalResult
-transform_ext::DecomposeOp::apply(mlir::transform::TransformResults &results,
-                                  mlir::transform::TransformState &state) {
-  RewritePatternSet patterns(getContext());
-  // TODO: make this targetable.
-  populateDecomposeConvolutionPatterns(patterns, LinalgTransformationFilter());
-  if (failed(applyPatternsAndFoldGreedily(state.getTopLevel(),
-                                          std::move(patterns))))
-    return failure();
-
-  // TODO: make this chainable, it isn't in the original codegenstrategy.
-  return success();
-}
-
-//===---------------------------------------------------------------------===//
-// VectorizeOp
-//===---------------------------------------------------------------------===//
-
-static void
-configureVectorizationPatterns(transform_ext::VectorizeOp vectorizeOp,
-                               RewritePatternSet &patterns) {
-  MLIRContext *ctx = vectorizeOp->getContext();
-  vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
-  vector::populateVectorReductionToContractPatterns(patterns);
-  patterns.add<linalg::LinalgCopyVTRForwardingPattern,
-               linalg::LinalgCopyVTWForwardingPattern>(ctx,
-                                                       /*benefit=*/2);
-  vector::TransferReadOp::getCanonicalizationPatterns(patterns, ctx);
-  vector::TransferWriteOp::getCanonicalizationPatterns(patterns, ctx);
-  if (vectorizeOp.getVectorizePadding())
-    linalg::populatePadOpVectorizationPatterns(patterns);
-}
-
-/// Applies the transformation specified by the given vectorize operation to the
-/// given target operation AND some related operations.Populates `results` with
-/// transformation operations for further transformations if the pattern applied
-/// successfully (currently, the main "contraction" op after vectorization).
-static FailureOr<LinalgOp>
-executeTargetedVectorizeOp(LinalgOp target,
-                           transform_ext::VectorizeOp vectorizeOp) {
-  // TODO: this is copy-pasta from LinalgStrategyVectorizePass, it shouldn't be.
-  MLIRContext *ctx = target->getContext();
-  RewritePatternSet patterns(ctx);
-  configureVectorizationPatterns(vectorizeOp, patterns);
-  LinalgVectorizationPattern pattern(target.getContext());
-  auto functionalVectorize = [&](LinalgOp op, PatternRewriter &rewriter) {
-    return pattern.matchAndRewrite(op, rewriter);
-  };
-
-  /// Apply the transformations in a scope.
-  return linalg::transform::scoped(
-      target,
-      [&](linalg::transform::ScopeOp scope,
-          Operation *op) -> FailureOr<LinalgOp> {
-        if (failed(functional::applyAt(op, functionalVectorize)) ||
-            failed(applyPatternsAndFoldGreedily(scope, std::move(patterns))))
-          return failure();
-        // FIXME: Vectorization doesn't return anything.
-        return LinalgOp();
-      });
-
-  // TODO: vectorization may fail because the op is not vectorizable, unclear
-  // what to do here. We should probably report it somehow, but we may also
-  // want to go on and keep the original for continuation. Should we have
-  // some notion of transformation optionality vs. mandatory (like lowering)?
-  // How to find ops that were not replaced?
-}
-
-LogicalResult
-transform_ext::VectorizeOp::apply(mlir::transform::TransformResults &results,
-                                  mlir::transform::TransformState &state) {
-  if (getTarget()) {
-    SmallVector<Operation *> resultVector;
-    LogicalResult res = mlir::transform::detail::applyTransformToEach(
-        state.getPayloadOps(getTarget()), resultVector, [&](LinalgOp target) {
-          return executeTargetedVectorizeOp(target, *this);
-        });
-
-    if (failed(res))
-      return emitError() << "failed to apply";
-
-    results.set(getResult(0).cast<OpResult>(), resultVector);
-    return success();
-  }
-
-  MLIRContext *ctx = getContext();
-  RewritePatternSet patterns(ctx);
-  patterns.add<LinalgVectorizationPattern>(ctx);
-  configureVectorizationPatterns(*this, patterns);
-  auto *listener = state.getExtension<::detail::TrackingListener>();
-  if (!listener)
-    return emitError() << "expected TrackingListener extension to be available";
-  LogicalResult applicationResult = applyPatternsTrackAndFoldGreedily(
-      state.getTopLevel(), *listener, std::move(patterns));
-  LogicalResult listenerResult = listener->checkErrorState();
-  if (failed(applicationResult) || failed(listenerResult))
-    return emitError() << "failed to apply";
-  return success();
-}
-
-ParseResult transform_ext::VectorizeOp::parse(OpAsmParser &parser,
-                                              OperationState &result) {
-  auto operationType = pdl::OperationType::get(parser.getContext());
-  OpAsmParser::UnresolvedOperand target;
-  OptionalParseResult parseResult = parser.parseOptionalOperand(target);
-  if (parseResult.hasValue()) {
-    if (parseResult.getValue().failed() ||
-        parser.parseOptionalAttrDict(result.attributes) ||
-        parser.resolveOperand(target, operationType, result.operands) ||
-        parser.addTypeToList(operationType, result.types)) {
-      return failure();
-    }
-  } else {
-    if (parser.parseOptionalAttrDict(result.attributes)) {
-      return failure();
-    }
-  }
-  return success();
-}
-
-void transform_ext::VectorizeOp::print(OpAsmPrinter &printer) {
-  if (getTarget())
-    printer << " " << getTarget() << " ";
-  printer.printOptionalAttrDict(getOperation()->getAttrs());
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
@@ -1190,7 +889,7 @@ static bool stageIncluded(int stage,
 
 // Applies the transformation specified by the given lower vectors operation
 /// to the given function.
-LogicalResult
+DiagnosedSilenceableFailure
 transform_ext::LowerVectorsOp::apply(mlir::transform::TransformResults &results,
                                      mlir::transform::TransformState &state) {
   MLIRContext *ctx = getContext();
@@ -1282,212 +981,29 @@ transform_ext::LowerVectorsOp::apply(mlir::transform::TransformResults &results,
   // LinalgTransformationFilter filter = makeTransformationFilter(target);
   if (failed(applyPatternsAndFoldGreedily(state.getTopLevel(),
                                           std::move(patterns))))
-    return failure();
+    return DiagnosedSilenceableFailure::definiteFailure();
 
   // TODO: make composable...
-  return success();
-}
-
-//===---------------------------------------------------------------------===//
-// GetParentLoopOp
-//===---------------------------------------------------------------------===//
-
-FailureOr<scf::ForOp>
-transform_ext::GetParentLoopOp::applyToOne(Operation *source) {
-  int64_t nLoops = getNumLoops();
-  for (int64_t i = 0; i < nLoops; ++i) {
-    source = source->getParentOfType<scf::ForOp>();
-    if (!source) {
-      emitError() << "the transformed op is enclosed by " << i << " loops, but "
-                  << nLoops << " expected";
-      return failure();
-    }
-  }
-  return cast<scf::ForOp>(source);
-}
-
-void transform_ext::GetParentLoopOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  effects.emplace_back(MemoryEffects::Read::get(), getTarget(),
-                       mlir::transform::TransformMappingResource::get());
-  effects.emplace_back(MemoryEffects::Allocate::get(), getTransformed(),
-                       mlir::transform::TransformMappingResource::get());
-  effects.emplace_back(MemoryEffects::Write::get(), getTransformed(),
-                       mlir::transform::TransformMappingResource::get());
-  effects.emplace_back(MemoryEffects::Read::get(),
-                       mlir::transform::PayloadIRResource::get());
-}
-
-//===---------------------------------------------------------------------===//
-// UnrollLoopOp
-//===---------------------------------------------------------------------===//
-
-LogicalResult transform_ext::UnrollLoopOp::applyToOne(scf::ForOp loop) {
-  return loopUnrollByFactor(loop, getFactor());
-}
-
-//===---------------------------------------------------------------------===//
-// PeelLoopOp
-//===---------------------------------------------------------------------===//
-
-FailureOr<scf::ForOp> transform_ext::PeelLoopOp::applyToOne(scf::ForOp loop) {
-  scf::ForOp result;
-  IRRewriter rewriter(loop->getContext());
-  LogicalResult status =
-      scf::peelAndCanonicalizeForLoop(rewriter, loop, result);
-  if (failed(status))
-    return loop;
-  return result;
-}
-
-//===---------------------------------------------------------------------===//
-// PipelineLoopOp
-//===---------------------------------------------------------------------===//
-
-static void
-loopScheduling(scf::ForOp forOp,
-               std::vector<std::pair<Operation *, unsigned>> &schedule,
-               unsigned iterationInterval, unsigned readLatency) {
-  auto getLatency = [&](Operation *op) {
-    if (isa<vector::TransferReadOp>(op))
-      return readLatency;
-    return unsigned(1);
-  };
-
-  DenseMap<Operation *, unsigned> opCycles;
-  std::map<unsigned, std::vector<Operation *>> wrappedSchedule;
-  for (Operation &op : forOp.getBody()->getOperations()) {
-    if (isa<scf::YieldOp>(op))
-      continue;
-    unsigned earlyCycle = 0;
-    for (Value operand : op.getOperands()) {
-      Operation *def = operand.getDefiningOp();
-      if (!def)
-        continue;
-      earlyCycle = std::max(earlyCycle, opCycles[def] + getLatency(def));
-    }
-    opCycles[&op] = earlyCycle;
-    wrappedSchedule[earlyCycle % iterationInterval].push_back(&op);
-  }
-  for (auto it : wrappedSchedule) {
-    for (Operation *op : it.second) {
-      unsigned cycle = opCycles[op];
-      schedule.push_back(std::make_pair(op, cycle / iterationInterval));
-    }
-  }
-}
-
-FailureOr<scf::ForOp>
-transform_ext::PipelineLoopOp::applyToOne(scf::ForOp loop) {
-  // TODO: make the pipelining pattern return the transformed loop.
-  if (!getOperation()->getUses().empty()) {
-    InFlightDiagnostic diag = emitError()
-                              << "NYI: cannot target the result of pipelining";
-    diag.attachNote(getOperation()->use_begin()->getOwner()->getLoc())
-        << "use here";
-    return failure();
-  }
-
-  scf::PipeliningOption schedule;
-  schedule.getScheduleFn =
-      [this](scf::ForOp forOp,
-             std::vector<std::pair<Operation *, unsigned>> &schedule) mutable {
-        loopScheduling(forOp, schedule, getIterationInterval(),
-                       getReadLatency());
-      };
-
-  RewritePatternSet patterns(loop->getContext());
-  scf::populateSCFLoopPipeliningPatterns(patterns, schedule);
-  assert(patterns.getNativePatterns().size() == 1 &&
-         "expected one pipelining pattern");
-
-  SimpleRewriter rewriter(getContext());
-  rewriter.setInsertionPoint(loop);
-  RewritePattern *pattern = patterns.getNativePatterns().front().get();
-  if (failed(pattern->matchAndRewrite(loop, rewriter)))
-    return failure();
-
-  return scf::ForOp();
-}
-
-//===---------------------------------------------------------------------===//
-// OutlineLoopOp
-//===---------------------------------------------------------------------===//
-
-static scf::ExecuteRegionOp outlineInExecuteRegion(RewriterBase &b,
-                                                   Operation *op) {
-  if (op->getNumRegions() != 1)
-    return nullptr;
-  OpBuilder::InsertionGuard g(b);
-  b.setInsertionPoint(op);
-  scf::ExecuteRegionOp executeRegionOp =
-      b.create<scf::ExecuteRegionOp>(op->getLoc(), op->getResultTypes());
-  {
-    OpBuilder::InsertionGuard g(b);
-    b.setInsertionPointToStart(&executeRegionOp.getRegion().emplaceBlock());
-    Operation *clonedOp = b.cloneWithoutRegions(*op);
-    Region &clonedRegion = clonedOp->getRegions().front();
-    assert(clonedRegion.empty() && "expected empty region");
-    b.inlineRegionBefore(op->getRegions().front(), clonedRegion,
-                         clonedRegion.end());
-    b.create<scf::YieldOp>(op->getLoc(), clonedOp->getResults());
-  }
-  b.replaceOp(op, executeRegionOp.getResults());
-  return executeRegionOp;
-}
-
-static FailureOr<func::FuncOp>
-outlineLoop(scf::ForOp loop, StringRef funcName,
-            mlir::transform::TransformState &state, Location errorLoc) {
-  PatternRewriterListener rewriter(loop->getContext());
-  auto *listener = state.getExtension<::detail::TrackingListener>();
-  if (!listener) {
-    return emitError(errorLoc)
-           << "expected TrackingListener extension to be present";
-  }
-  rewriter.addListener(listener);
-  Location loc = loop.getLoc();
-  scf::ExecuteRegionOp exec = outlineInExecuteRegion(rewriter, loop);
-  assert(exec && "failed to produce execute_region");
-  FailureOr<func::FuncOp> outlined =
-      outlineSingleBlockRegion(rewriter, loc, exec.getRegion(), funcName);
-  if (failed(listener->checkErrorState()))
-    return failure();
-  return outlined;
-}
-
-LogicalResult
-transform_ext::OutlineLoopOp::apply(mlir::transform::TransformResults &results,
-                                    mlir::transform::TransformState &state) {
-  SmallVector<Operation *> resultVector;
-  auto res = mlir::transform::detail::applyTransformToEach(
-      state.getPayloadOps(getTarget()), resultVector,
-      [&](scf::ForOp loop) -> FailureOr<func::FuncOp> {
-        return outlineLoop(loop, getFuncName(), state, getLoc());
-      });
-  if (failed(res))
-    return emitError() << "failed to apply";
-  results.set(getResult().cast<OpResult>(), resultVector);
-  return success();
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
 // PrintOp
 //===---------------------------------------------------------------------===//
 
-LogicalResult
+DiagnosedSilenceableFailure
 transform_ext::PrintOp::apply(mlir::transform::TransformResults &results,
                               mlir::transform::TransformState &state) {
   if (!getTarget()) {
     llvm::outs() << "[[[ IR printer: " << getName() << " top-level ]]]\n";
     state.getTopLevel()->dump();
-    return success();
+    return DiagnosedSilenceableFailure::success();
   }
 
   llvm::outs() << "[[[ IR printer: " << getName() << " single op ]]]\n";
   ArrayRef<Operation *> targets = state.getPayloadOps(getTarget());
   targets.front()->dump();
-  return success();
+  return DiagnosedSilenceableFailure::success();
 }
 
 void transform_ext::PrintOp::getEffects(

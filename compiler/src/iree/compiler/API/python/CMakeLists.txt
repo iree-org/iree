@@ -85,6 +85,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.arith
   MLIRPythonSources.Dialects.builtin
   MLIRPythonSources.Dialects.cf
+  MLIRPythonSources.Dialects.complex
   MLIRPythonSources.Dialects.func
   MLIRPythonSources.Dialects.linalg
   MLIRPythonSources.Dialects.math

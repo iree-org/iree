@@ -30,7 +30,9 @@ cd "${ROOT_DIR}"
 cd "${ROOT_DIR}/integrations/tensorflow"
 BAZEL_CMD=(bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree-tf.bazelrc)
 BAZEL_BINDIR="$(${BAZEL_CMD[@]} info bazel-bin)"
-"${BAZEL_CMD[@]}" build //iree_tf_compiler:iree-import-tflite \
+"${BAZEL_CMD[@]}" build \
+      //iree_tf_compiler:iree-import-tflite \
+      //iree_tf_compiler:iree-import-tf \
       --config=generic_clang \
       --config=remote_cache_bazel_ci
 # So the benchmark build below can find the importer binaries that were built.
@@ -56,6 +58,7 @@ cd build-host
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_BENCHMARKS=ON \
+  -DIREE_ENABLE_COMPILATION_BENCHMARKS=ON \
   -DIREE_BUILD_MICROBENCHMARKS=ON \
   -DIREE_BUILD_SAMPLES=OFF
 

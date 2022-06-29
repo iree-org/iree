@@ -23,6 +23,7 @@ td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
+            "PartitionableLoopsInterface.td",
             "ProcessorOpInterfaces.td",
         ],
         include = ["*.td"],
@@ -42,12 +43,15 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":BufferizationInterfaces",
+        ":PartitionableLoopsInterface",
         ":ProcessorOpInterfaces",
-        # TODO: Remove this dependency once the transform dialect extensions
-        # have a better registration mechanism.
-        "//compiler/src/iree/compiler/Codegen/TransformDialectExtensions",
+        "//compiler/src/iree/compiler/Codegen/Common/TransformDialectExtensions:TransformDialectCommonExtensions",
+        "//compiler/src/iree/compiler/Codegen/LLVMCPU/TransformDialectExtensions:TransformDialectLLVMCPUExtensions",
+        "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformDialectExtensions:TransformDialectLLVMGPUExtensions",
+        "//compiler/src/iree/compiler/Dialect/Flow/TransformDialectExtensions:TransformDialectFlowExtensions",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
+        "@llvm-project//mlir:LinalgTransformOps",
     ],
 )
 
@@ -74,6 +78,46 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:VectorTransforms",
     ],
+)
+
+iree_compiler_cc_library(
+    name = "PartitionableLoopsInterface",
+    srcs = [
+        "PartitionableLoopsInterface.cpp",
+    ],
+    hdrs = [
+        "PartitionableLoopsInterface.h",
+    ],
+    textual_hdrs = [
+        "PartitionableLoopsInterface.cpp.inc",
+        "PartitionableLoopsInterface.h.inc",
+    ],
+    deps = [
+        ":PartitionableLoopsInterfaceGen",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:LinalgStructuredOpsIncGen",
+        "@llvm-project//mlir:TensorDialect",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "PartitionableLoopsInterfaceGen",
+    tbl_outs = [
+        (
+            ["--gen-op-interface-decls"],
+            "PartitionableLoopsInterface.h.inc",
+        ),
+        (
+            ["--gen-op-interface-defs"],
+            "PartitionableLoopsInterface.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "PartitionableLoopsInterface.td",
+    deps = ["@llvm-project//mlir:OpBaseTdFiles"],
 )
 
 iree_compiler_cc_library(

@@ -13,12 +13,12 @@ add_mlir_library(TorchMLIRTMTensorDialect
   LINK_LIBS PUBLIC
   MLIRDialectUtils
   MLIRIR
-  MLIRLinalg
-  MLIRMemRef
+  MLIRLinalgDialect
+  MLIRMemRefDialect
   MLIRSideEffectInterfaces
   MLIRSupport
-  MLIRSCF
-  MLIRTensor
+  MLIRSCFDialect
+  MLIRTensorDialect
 )
 
 torch_mlir_dialects_target_includes(TorchMLIRTMTensorDialect)
