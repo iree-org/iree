@@ -398,27 +398,15 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
 
   auto ptr = valueTypeMap.find((elementType));
   if (ptr != valueTypeMap.end()) {
-    rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER_ASSIGN"),
-        /*args=*/
-        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "value_type"),
-                             emitc::OpaqueAttr::get(ctx, ptr->second.first)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{elementTypeOp.getResult()});
+    emitc_builders::structMemberAssign(rewriter, loc,
+                                       /*memberName=*/"value_type",
+                                       /*operand=*/elementTypeOp.getResult(),
+                                       /*value=*/ptr->second.first);
 
-    rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER_ASSIGN"),
-        /*args=*/
-        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "ref_type"),
-                             emitc::OpaqueAttr::get(ctx, ptr->second.second)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{elementTypeOp.getResult()});
+    emitc_builders::structMemberAssign(rewriter, loc,
+                                       /*memberName=*/"ref_type",
+                                       /*operand=*/elementTypeOp.getResult(),
+                                       /*value=*/ptr->second.second);
   } else {
     if (!elementType.isa<IREE::VM::RefType>()) {
       return None;
@@ -463,17 +451,10 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
         /*memberName=*/"type",
         /*operand=*/typeDescriptor.getResult(0));
 
-    rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER_ASSIGN"),
-        /*args=*/
-        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "ref_type"),
-                             rewriter.getIndexAttr(1)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/
-        ArrayRef<Value>{elementTypeOp.getResult(), typeDescriptorType});
+    emitc_builders::structMemberAssign(rewriter, loc,
+                                       /*memberName=*/"ref_type",
+                                       /*operand=*/elementTypeOp.getResult(),
+                                       /*value=*/typeDescriptorType);
   }
 
   auto elementTypePtrOp = rewriter.create<emitc::ApplyOp>(
@@ -1283,18 +1264,10 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     // Set function pointers
     for (std::string funcName :
          {"destroy", "alloc_state", "free_state", "resolve_import"}) {
-      builder.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/TypeRange{},
-          /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER_ASSIGN"),
-          /*args=*/
-          ArrayAttr::get(
-              ctx,
-              {builder.getIndexAttr(0), emitc::OpaqueAttr::get(ctx, funcName),
-               emitc::OpaqueAttr::get(ctx, moduleName + "_" + funcName)}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/
-          ArrayRef<Value>{vmModule.getResult()});
+      emitc_builders::structMemberAssign(builder, loc,
+                                         /*memberName=*/funcName,
+                                         /*operand=*/vmModule.getResult(),
+                                         /*value=*/moduleName + "_" + funcName);
     }
 
     std::string descriptoPtr = "&" + moduleName + "_descriptor_";
@@ -2219,16 +2192,10 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
             .getResult();
 
     // call.function = *import;
-    rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER_ASSIGN"),
-        /*args=*/
-        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "function"),
-                             rewriter.getIndexAttr(1)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{call, importValue});
+    emitc_builders::structMemberAssign(rewriter, loc,
+                                       /*memberName=*/"function",
+                                       /*operand=*/call,
+                                       /*value=*/importValue);
 
     allocateByteSpan(call, argumentSize, "arguments", rewriter, loc);
     allocateByteSpan(call, resultSize, "results", rewriter, loc);

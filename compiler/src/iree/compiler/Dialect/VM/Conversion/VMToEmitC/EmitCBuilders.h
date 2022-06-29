@@ -20,6 +20,12 @@ namespace emitc_builders {
 Value structMember(OpBuilder builder, Location location, Type type,
                    StringRef memberName, Value operand);
 
+void structMemberAssign(OpBuilder builder, Location location,
+                        StringRef memberName, Value operand, Value data);
+
+void structMemberAssign(OpBuilder builder, Location location,
+                        StringRef memberName, Value operand, StringRef data);
+
 Value structPtrMember(OpBuilder builder, Location location, Type type,
                       StringRef memberName, Value operand);
 

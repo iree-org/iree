@@ -30,6 +30,36 @@ Value structMember(OpBuilder builder, Location location, Type type,
       .getResult(0);
 }
 
+void structMemberAssign(OpBuilder builder, Location location,
+                        StringRef memberName, Value operand, Value data) {
+  auto ctx = builder.getContext();
+  builder.create<emitc::CallOp>(
+      /*location=*/location,
+      /*type=*/TypeRange{},
+      /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER_ASSIGN"),
+      /*args=*/
+      ArrayAttr::get(ctx, {builder.getIndexAttr(0),
+                           emitc::OpaqueAttr::get(ctx, memberName),
+                           builder.getIndexAttr(1)}),
+      /*templateArgs=*/ArrayAttr{},
+      /*operands=*/ArrayRef<Value>{operand, data});
+}
+
+void structMemberAssign(OpBuilder builder, Location location,
+                        StringRef memberName, Value operand, StringRef data) {
+  auto ctx = builder.getContext();
+  builder.create<emitc::CallOp>(
+      /*location=*/location,
+      /*type=*/TypeRange{},
+      /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER_ASSIGN"),
+      /*args=*/
+      ArrayAttr::get(ctx, {builder.getIndexAttr(0),
+                           emitc::OpaqueAttr::get(ctx, memberName),
+                           emitc::OpaqueAttr::get(ctx, data)}),
+      /*templateArgs=*/ArrayAttr{},
+      /*operands=*/ArrayRef<Value>{operand});
+}
+
 Value structPtrMember(OpBuilder builder, Location location, Type type,
                       StringRef memberName, Value operand) {
   auto ctx = builder.getContext();
