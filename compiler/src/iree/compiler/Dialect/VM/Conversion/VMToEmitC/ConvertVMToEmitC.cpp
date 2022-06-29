@@ -824,17 +824,10 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*operands=*/
         ArrayRef<Value>{stateOp.getResult(), stateSize});
 
-    builder.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER_ASSIGN"),
-        /*args=*/
-        ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "allocator"),
-                             builder.getIndexAttr(1)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/
-        ArrayRef<Value>{stateOp.getResult(), funcOp.getArgument(1)});
+    emitc_builders::structPtrMemberAssign(builder, loc,
+                                          /*memberName=*/"allocator",
+                                          /*operand=*/stateOp.getResult(),
+                                          /*value=*/funcOp.getArgument(1));
 
     // Initialize buffers
     for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
@@ -1216,17 +1209,10 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*operands=*/
         ArrayRef<Value>{module.getResult(), moduleSize});
 
-    builder.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER_ASSIGN"),
-        /*args=*/
-        ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "allocator"),
-                             builder.getIndexAttr(1)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/
-        ArrayRef<Value>{module.getResult(), funcOp.getArgument(0)});
+    emitc_builders::structPtrMemberAssign(builder, loc,
+                                          /*memberName=*/"allocator",
+                                          /*operand=*/module.getResult(),
+                                          /*value=*/funcOp.getArgument(0));
 
     auto vmModule = builder.create<emitc::VariableOp>(
         /*location=*/loc,
@@ -2294,28 +2280,16 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
                             .getResult();
 
     // byteSpan.data_length = SIZE;
-    rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER_ASSIGN"),
-        /*args=*/
-        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "data_length"),
-                             rewriter.getIndexAttr(1)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{byteSpan, size});
+    emitc_builders::structPtrMemberAssign(rewriter, loc,
+                                          /*memberName=*/"data_length",
+                                          /*operand=*/byteSpan,
+                                          /*value=*/size);
 
     // byteSpan.data = byteSpan_data
-    rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER_ASSIGN"),
-        /*args=*/
-        ArrayAttr::get(
-            ctx, {rewriter.getIndexAttr(0), emitc::OpaqueAttr::get(ctx, "data"),
-                  rewriter.getIndexAttr(1)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{byteSpan, byteSpanData});
+    emitc_builders::structPtrMemberAssign(rewriter, loc,
+                                          /*memberName=*/"data",
+                                          /*operand=*/byteSpan,
+                                          /*value=*/byteSpanData);
 
     // memset(byteSpanData, 0, SIZE);
     rewriter.create<emitc::CallOp>(

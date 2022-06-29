@@ -23,6 +23,9 @@ Value structMember(OpBuilder builder, Location location, Type type,
 Value structPtrMember(OpBuilder builder, Location location, Type type,
                       StringRef memberName, Value operand);
 
+void structPtrMemberAssign(OpBuilder builder, Location location,
+                           StringRef memberName, Value operand, Value data);
+
 }  // namespace emitc_builders
 }  // namespace iree_compiler
 }  // namespace mlir
