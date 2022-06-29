@@ -24,6 +24,7 @@ using namespace mlir;
 using namespace mlir::iree_compiler;
 
 static constexpr unsigned cudaWarpSize = 32;
+static constexpr StringLiteral kCudaTarget = "cuda";
 namespace mlir {
 namespace iree_compiler {
 llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
@@ -87,6 +88,17 @@ static std::string getTargetArch(func::FuncOp entryPoint) {
     }
   }
   return "";
+}
+
+bool isCudaTarget(func::FuncOp entryPoint) {
+  if (auto variantOp =
+          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
+    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
+    if (auto backend = targetAttr.getBackend()) {
+      return backend.getValue().str() == kCudaTarget;
+    }
+  }
+  return false;
 }
 
 static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op) {
@@ -448,6 +460,7 @@ static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                             linalg::LinalgOp op) {
+  if (!isCudaTarget(entryPoint)) return failure();
   if (!isa<linalg::GenericOp>(op)) return failure();
   // TODO(thomasraoux): Enable dynamic shape.
   if (op.hasDynamicShape()) return failure();
