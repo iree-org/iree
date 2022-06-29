@@ -81,7 +81,7 @@ static void iree_hal_cmd_list_initialize(iree_arena_block_pool_t* block_pool,
 
 // Returns true if the |cmd_list| is empty.
 static bool iree_hal_cmd_list_is_empty(const iree_hal_cmd_list_t* cmd_list) {
-  return cmd_list->head != NULL;
+  return cmd_list->head == NULL;
 }
 
 // Resets the command list and returns all arena blocks back to the block pool.
