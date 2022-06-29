@@ -51,3 +51,27 @@ module {
     return %1 : f32
   }
 }
+
+// -----
+
+module {
+  // CHECK-LABEL: @assume_alignment
+  func.func @assume_alignment(%buffer: memref<?xf32>) {
+    // CHECK-NOT: assume_alignment
+    memref.assume_alignment %buffer, 64 : memref<?xf32>
+    // CHECK: return
+    func.return
+  }
+}
+
+// -----
+
+module {
+  // CHECK-LABEL: @cast
+  func.func @cast(%buffer: memref<?xf32>) {
+    // CHECK-NOT: memref.cast
+    memref.cast %buffer : memref<?xf32> to memref<5xf32>
+    // CHECK: return
+    func.return
+  }
+}

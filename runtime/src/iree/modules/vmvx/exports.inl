@@ -23,6 +23,9 @@
 
 // clang-format off
 
-EXPORT_FN("_placeholder", iree_vmvx_module_placeholder, v, v)
+EXPORT_FN("add.2d.f32", iree_vmvx_add2d_f32, rIIIrIIIrIIIII, v)
+EXPORT_FN("copy.2d.x32", iree_vmvx_copy2d_x32, rIIIrIIIII, v)
+EXPORT_FN("fill.2d.x32", iree_vmvx_fill2d_x32, irIIII, v)
+EXPORT_FN("matmul.f32f32f32", iree_vmvx_matmul_f32f32f32, rIIrIIrIIIIIffi, v)
 
 // clang-format on

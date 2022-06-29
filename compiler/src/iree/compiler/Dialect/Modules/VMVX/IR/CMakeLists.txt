@@ -99,7 +99,7 @@ iree_tablegen_doc(
   TD_FILE
     "VMVXOps.td"
   OUTS
-    --gen-dialect-doc VMVXDialect.md
+    --dialect=vmvx --gen-dialect-doc VMVXDialect.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -262,8 +262,18 @@ void populateMemRefToVMPatterns(MLIRContext *context,
     return llvm::None;
   });
 
-  patterns.insert<FoldAsNoOp<bufferization::ToMemrefOp>>(typeConverter,
-                                                         context);
+  // Unranked memrefs are emitted for library call integration when we just
+  // need void* semantics. An unranked memref is basically just a (pointer,
+  // memory-space, element-type).
+  typeConverter.addConversion(
+      [&](UnrankedMemRefType type) -> llvm::Optional<Type> {
+        return IREE::VM::RefType::get(
+            IREE::VM::BufferType::get(type.getContext()));
+      });
+
+  patterns.insert<FoldAsNoOp<bufferization::ToMemrefOp>,
+                  FoldAsNoOp<memref::AssumeAlignmentOp>,
+                  FoldAsNoOp<memref::CastOp>>(typeConverter, context);
   patterns
       .insert<ConvertMemRefGlobalOp, ConvertMemRefGetGlobalOp,
               ConvertMemRefAllocaOp, ConvertMemRefLoadOp, ConvertMemRefStoreOp>(

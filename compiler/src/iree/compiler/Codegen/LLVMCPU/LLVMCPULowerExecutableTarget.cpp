@@ -219,6 +219,9 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             addCPUAArchDoubleTilingExpertPassPipeline(
                 executableLoweringPipeline);
             break;
+          case IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault:
+            addVMVXDefaultPassPipeline(executableLoweringPipeline);
+            break;
           default:
             variantOp.emitOpError("Unsupported pipeline on CPU target.");
             return signalPassFailure();

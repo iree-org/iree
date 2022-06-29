@@ -29,4 +29,59 @@ vm.module @vmvx {
 // VMVX Ops: TODO
 //===----------------------------------------------------------------------===//
 
+// Note that we are thinking of specializing 1 and 2D variants and then
+// having a generic ND.
+vm.import @add.2d.f32(
+  %lhs_buffer : !vm.buffer,
+  %lhs_offset : i64,
+  %lhs_strides : tuple<i64, i64>,
+
+  %rhs_buffer : !vm.buffer,
+  %rhs_offset : i64,
+  %rhs_strides : tuple<i64, i64>,
+
+  %out_buffer : !vm.buffer,
+  %out_offset : i64,
+  %out_strides : tuple<i64, i64>,
+
+  %sizes : tuple<i64, i64>
+)
+
+vm.import @copy.2d.x32(
+  %in_buffer : !vm.buffer,
+  %in_offset : i64,
+  %in_strides : tuple<i64, i64>,
+  %out_buffer : !vm.buffer,
+  %out_offset : i64,
+  %out_strides : tuple<i64, i64>,
+  %sizes : tuple<i64, i64>
+)
+
+vm.import @fill.2d.x32(
+  %fill_value : i32,
+  %out_buffer : !vm.buffer,
+  %out_offset : i64,
+  %out_row_stride : i64,
+  %size_m : i64,
+  %size_n : i64
+)
+
+vm.import @matmul.f32f32f32(
+  %lhs_buffer : !vm.buffer,
+  %lhs_offset : i64,
+  %lhs_row_stride : i64,
+  %rhs_buffer : !vm.buffer,
+  %rhs_offset : i64,
+  %rhs_row_stride : i64,
+  %out_buffer : !vm.buffer,
+  %out_offset : i64,
+  %out_row_stride : i64,
+  %m : i64,
+  %n : i64,
+  %k : i64,
+  %alpha : f32,
+  %beta : f32,
+  %flags : i32
+)
+
 }  // module

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Modules/VMVX/Conversion/VMVXToVM/ConvertVMVXToVM.h"
 
+#include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXOps.h"
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -13,6 +14,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -44,20 +46,21 @@ class EraseNonVMOp : public ConversionPattern {
 
 // VMVX -> VM import conversion base for generic ops.
 // Handles signatures with integers, VM types, or simple buffers.
-template <typename T, typename Adaptor = typename T::Adaptor>
+// TODO: This is a big mess and doesn't support the generality we need. Redo
+// it.
+template <typename T>
 class VMVXImportOpConversion : public OpConversionPattern<T> {
  public:
   VMVXImportOpConversion(MLIRContext *context, SymbolTable &importSymbols,
-                         TypeConverter &typeConverter, StringRef importName)
+                         TypeConverter &typeConverter)
       : OpConversionPattern<T>(context),
         importSymbols(importSymbols),
-        typeConverter(typeConverter),
-        importName(importName) {}
+        typeConverter(typeConverter) {}
 
   LogicalResult matchAndRewrite(
-      T op, llvm::ArrayRef<Value> operands,
+      T op, typename T::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    std::string importFqName = importName + getImportSuffix(op);
+    std::string importFqName = getImportFqName(op);
     auto importOp =
         importSymbols.template lookup<IREE::VM::ImportOp>(importFqName);
     if (!importOp) {
@@ -65,15 +68,19 @@ class VMVXImportOpConversion : public OpConversionPattern<T> {
                      << importFqName;
       return failure();
     }
-    auto results =
-        rewriteToCall(op, Adaptor{operands}, importOp, typeConverter, rewriter);
+    auto results = emitCall(op, adaptor, importOp, rewriter);
     if (!results.hasValue()) return failure();
     rewriter.replaceOp(op, results.getValue());
     return success();
   }
 
  protected:
-  virtual std::string getImportSuffix(T op) const { return ""; }
+  virtual std::string getImportFqName(T op) const = 0;
+  virtual Optional<SmallVector<Value>> emitCall(
+      T op, typename T::Adaptor adaptor, IREE::VM::ImportOp importOp,
+      ConversionPatternRewriter &rewriter) const {
+    return rewriteToCall(op, adaptor, importOp, typeConverter, rewriter);
+  }
 
   std::string getSizedTypeStr(Type elementType) const {
     int bitWidth = elementType.getIntOrFloatBitWidth();
@@ -109,11 +116,76 @@ class VMVXImportOpConversion : public OpConversionPattern<T> {
  private:
   SymbolTable &importSymbols;
   TypeConverter &typeConverter;
-  std::string importName;
 };
-#define VMVX_IMPORT_OP(op_type, op_mnemonic)        \
-  patterns.insert<VMVXImportOpConversion<op_type>>( \
-      context, importSymbols, typeConverter, op_mnemonic);
+
+// Converts the vmvx.add op to an appropriate typed import.
+// TODO: This should be an interface pattern on binary ops.
+class AddOpConversion : public VMVXImportOpConversion<IREE::VMVX::AddOp> {
+ public:
+  using VMVXImportOpConversion::VMVXImportOpConversion;
+
+  std::string getImportFqName(IREE::VMVX::AddOp op) const override {
+    int rank = op.getLhsStrides().size();
+    auto getElementType = [&](Value v) {
+      auto t = v.getType().cast<BaseMemRefType>();
+      return t.getElementType();
+    };
+    std::string name("vmvx.add.");
+    name.append(std::to_string(rank));
+    name.append("d.");
+    name.append(getTypedTypeStr(getElementType(op.getLhsBuffer())));
+    return name;
+  }
+};
+
+// Converts the vmvx.copy op to an appropriate typed import.
+class CopyOpConversion : public VMVXImportOpConversion<IREE::VMVX::CopyOp> {
+ public:
+  using VMVXImportOpConversion::VMVXImportOpConversion;
+
+  std::string getImportFqName(IREE::VMVX::CopyOp op) const override {
+    int rank = op.getInStrides().size();
+    auto getElementType = [&](Value v) {
+      auto t = v.getType().cast<BaseMemRefType>();
+      return t.getElementType();
+    };
+    std::string name("vmvx.copy.");
+    name.append(std::to_string(rank));
+    name.append("d.");
+    name.append(getSizedTypeStr(getElementType(op.getInBuffer())));
+    return name;
+  }
+};
+
+// Converts the vmvx.fill2d op to an appropriate typed import.
+class Fill2DOpConversion : public VMVXImportOpConversion<IREE::VMVX::Fill2DOp> {
+ public:
+  using VMVXImportOpConversion::VMVXImportOpConversion;
+
+  std::string getImportFqName(IREE::VMVX::Fill2DOp op) const override {
+    std::string name("vmvx.fill.2d.");
+    name.append(getSizedTypeStr(op.getScalar().getType()));
+    return name;
+  }
+};
+
+// Converts the vmvx.matmul op to an appropriate typed import.
+class MatmulOpConversion : public VMVXImportOpConversion<IREE::VMVX::MatmulOp> {
+ public:
+  using VMVXImportOpConversion::VMVXImportOpConversion;
+
+  std::string getImportFqName(IREE::VMVX::MatmulOp op) const override {
+    auto getElementType = [&](Value v) {
+      auto t = v.getType().cast<BaseMemRefType>();
+      return t.getElementType();
+    };
+    std::string name("vmvx.matmul.");
+    name.append(getTypedTypeStr(getElementType(op.getLhsBuffer())));
+    name.append(getTypedTypeStr(getElementType(op.getRhsBuffer())));
+    name.append(getTypedTypeStr(getElementType(op.getOutBuffer())));
+    return name;
+  }
+};
 
 }  // namespace
 
@@ -121,7 +193,11 @@ void populateVMVXToVMPatterns(MLIRContext *context,
                               ConversionTarget &conversionTarget,
                               TypeConverter &typeConverter,
                               SymbolTable &importSymbols,
-                              RewritePatternSet &patterns) {}
+                              RewritePatternSet &patterns) {
+  conversionTarget.addIllegalDialect<IREE::VMVX::VMVXDialect>();
+  patterns.insert<AddOpConversion, CopyOpConversion, Fill2DOpConversion,
+                  MatmulOpConversion>(context, importSymbols, typeConverter);
+}
 
 }  // namespace iree_compiler
 }  // namespace mlir

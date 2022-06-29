@@ -19,11 +19,7 @@
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
-namespace VMVX {
-
-// (ops go here)
-
-}  // namespace VMVX
+namespace VMVX {}  // namespace VMVX
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

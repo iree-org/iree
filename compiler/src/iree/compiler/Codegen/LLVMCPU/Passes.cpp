@@ -332,6 +332,13 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
   }
 }
 
+void addVMVXDefaultPassPipeline(OpPassManager &passManager) {
+  addTileAndDistributePasses(passManager);
+
+  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+  addBufferizePasses(nestedModulePM);
+}
+
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
                                        bool enablePeeling, bool lowerToAVX2) {
   addTileAndDistributePasses(passManager);

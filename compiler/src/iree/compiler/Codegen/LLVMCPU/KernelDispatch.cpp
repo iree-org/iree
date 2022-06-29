@@ -424,9 +424,10 @@ static LogicalResult setDefaultRootConfig(
       partitionableLoops, lbs, ubs, minTileSizes, maxTileSizes);
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(flowTileSizes));
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, partitionableLoopsInterfaceOp, tileSizes,
-      DispatchLoweringPassPipeline::CPUDefault);
+  auto loweringConfig = IREE::Codegen::LoweringConfigAttr::get(
+      entryPointFn.getContext(), tileSizes);
+  setLoweringConfig(partitionableLoopsInterfaceOp, loweringConfig);
+  return success();
 }
 
 static LogicalResult setMatmulPadRootConfig(
@@ -972,13 +973,18 @@ static LogicalResult setRootConfig(
 /// Set default configuration for Linalg ops.
 static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::LinalgOp linalgOp,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops,
+    DispatchLoweringPassPipeline pipeline =
+        DispatchLoweringPassPipeline::CPUDefault) {
   if (getLoweringConfig(linalgOp)) return success();
 
   auto partitionableLoopOp =
       cast<PartitionableLoopsInterface>(linalgOp.getOperation());
   SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
   SmallVector<int64_t> ubs = linalgOp.getStaticLoopRanges();
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPointFn->getContext(), pipeline);
+  setTranslationInfo(entryPointFn, translationInfo);
   return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
 }
 
@@ -987,7 +993,9 @@ static LogicalResult setRootConfig(
 static LogicalResult setRootConfig(
     func::FuncOp entryPointFn,
     IREE::LinalgExt::TiledOpInterface tiledOpInterfaceOp,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops,
+    DispatchLoweringPassPipeline pipeline =
+        DispatchLoweringPassPipeline::CPUDefault) {
   if (getLoweringConfig(tiledOpInterfaceOp)) return success();
 
   auto partitionableLoopOp =
@@ -1007,6 +1015,9 @@ static LogicalResult setRootConfig(
       iterationDomain, [&](Range r) { return getStaticValue(r.offset); }));
   auto ubs = llvm::to_vector(llvm::map_range(
       iterationDomain, [&](Range r) { return getStaticValue(r.size); }));
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPointFn->getContext(), pipeline);
+  setTranslationInfo(entryPointFn, translationInfo);
   return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
 }
 
@@ -1049,7 +1060,8 @@ static LogicalResult setVMVXRootConfigImpl(
     return TypeSwitch<Operation *, LogicalResult>(op)
         .Case<linalg::LinalgOp, IREE::LinalgExt::TiledOpInterface>(
             [&](auto op) {
-              return setRootConfig(entryPointFn, op, tiledLoops);
+              return setRootConfig(entryPointFn, op, tiledLoops,
+                                   DispatchLoweringPassPipeline::VMVXDefault);
             })
         .Default([&](Operation *op) { return success(); });
   };

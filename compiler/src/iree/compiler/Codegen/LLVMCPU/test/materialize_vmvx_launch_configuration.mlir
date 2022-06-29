@@ -33,7 +33,7 @@ hal.executable private @matmul_static  {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<VMVXDefault>
 //      CHECK: hal.executable.export public @matmul_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matmul
@@ -74,7 +74,7 @@ hal.executable @copy_op_dynamic {
   }
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<VMVXDefault>
 //      CHECK: hal.executable.export public @copy_op_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
@@ -111,7 +111,7 @@ hal.executable private @static_1d_fft_stage2  {
 }
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64]{{\]}}>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<VMVXDefault>
 //       CHECK: hal.executable.export public @static_1d_fft_stage2
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: func.func @static_1d_fft_stage2()

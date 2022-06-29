@@ -93,9 +93,21 @@ Optional<SmallVector<Value>> rewriteToCall(
       auto newOperands =
           llvm::to_vector<4>(adaptor.getODSOperands(inputSetIndex));
       ++inputSetIndex;
-
-      for (auto &operand : newOperands) {
-        state.addOperands(castToImportType(operand, inputType, rewriter));
+      if (auto inputTupleType = inputType.dyn_cast<TupleType>()) {
+        // Unpack a tuple<...> from the variadic.
+        // This only supports a single level of unpacking.
+        if (inputTupleType.size() != newOperands.size()) {
+          assert(false && "arity mismatch between tuple and variadic");
+          return None;
+        }
+        for (auto it : llvm::zip(newOperands, inputTupleType.getTypes())) {
+          state.addOperands(
+              castToImportType(std::get<0>(it), std::get<1>(it), rewriter));
+        }
+      } else {
+        for (auto &operand : newOperands) {
+          state.addOperands(castToImportType(operand, inputType, rewriter));
+        }
       }
 
       if (importOp.isFuncArgumentVariadic(input.index())) {
