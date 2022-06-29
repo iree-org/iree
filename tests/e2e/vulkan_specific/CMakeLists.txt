@@ -12,25 +12,6 @@ iree_add_all_subdirs()
 
 iree_check_single_backend_test_suite(
   NAME
-    check_vulkan-spirv_vulkan
-  SRCS
-    "compare.mlir"
-    "conv.mlir"
-    "dot_general.mlir"
-    "log_plus_one.mlir"
-    "pw_add_multiwg.mlir"
-    "reduce.mlir"
-    "vectorized_conv.mlir"
-  TARGET_BACKEND
-    "vulkan-spirv"
-  DRIVER
-    "vulkan"
-  COMPILER_FLAGS
-    "--iree-input-type=mhlo"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
     check_vulkan-spirv_vulkan_f16
   SRCS
     "add_f16.mlir"
@@ -50,9 +31,9 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_vulkan-spirv_vulkan_vectorized_conv
+    check_vulkan-spirv_vulkan_conv
   SRCS
-    "vectorized_conv.mlir"
+    "conv.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER
