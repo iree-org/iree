@@ -30,6 +30,19 @@ func.func @negative_num() {
   return
 }
 
+func.func @positive_self() {
+  %input = util.unfoldable_constant dense<[1., 2., 3., 32., 33., 34., 40., 41., 42., 46., 47., 48., 108., 109., 110., 111.]> : tensor<16xf32>
+  %result = "mhlo.remainder"(%input, %input) : (tensor<16xf32>, tensor<16xf32>) -> tensor<16xf32>
+  check.expect_almost_eq_const(%result, dense<0.0> : tensor<16xf32>) : tensor<16xf32>
+  return
+}
+func.func @negative_self() {
+  %input = util.unfoldable_constant dense<[-1., -2., -3., -32., -33., -34., -40., -41., -42., -46., -47., -48., -108., -109., -110., -111.]> : tensor<16xf32>
+  %result = "mhlo.remainder"(%input, %input) : (tensor<16xf32>, tensor<16xf32>) -> tensor<16xf32>
+  check.expect_almost_eq_const(%result, dense<0.0> : tensor<16xf32>) : tensor<16xf32>
+  return
+}
+
 func.func @scalar_int() {
   %input1 = util.unfoldable_constant dense<16> : tensor<i32>
   %input2 = util.unfoldable_constant dense<7> : tensor<i32>
