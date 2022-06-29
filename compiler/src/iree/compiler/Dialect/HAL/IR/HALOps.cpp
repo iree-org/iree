@@ -705,7 +705,7 @@ ParseResult ExecutableExportOp::parse(OpAsmParser &parser,
   if (failed(parser.parseKeyword("layout")) || failed(parser.parseLParen()) ||
       failed(parser.parseAttribute(layoutAttr)) ||
       failed(parser.parseRParen()) ||
-      failed(parser.parseOptionalAttrDict(result.attributes))) {
+      failed(parser.parseOptionalAttrDictWithKeyword(result.attributes))) {
     return failure();
   }
   result.addAttribute("layout", layoutAttr);
@@ -733,8 +733,9 @@ void ExecutableExportOp::print(OpAsmPrinter &p) {
   p << " layout(";
   p.printAttribute(layout());
   p << ")";
-  p.printOptionalAttrDict(op->getAttrs(),
-                          /*elidedAttrs=*/{"sym_name", "layout", "ordinal"});
+  p.printOptionalAttrDictWithKeyword(
+      op->getAttrs(),
+      /*elidedAttrs=*/{"sym_name", "layout", "ordinal"});
   if (workgroup_count().empty()) return;
   p << " ";
   p.printRegion(workgroup_count());

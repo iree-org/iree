@@ -15,7 +15,11 @@
 ]>
 hal.executable private @preset_config_matmul  {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.export @no_peel_static_matmul layout(#executable_layout)
+    hal.executable.export @no_peel_static_matmul layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
     builtin.module {
       func.func @no_peel_static_matmul() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -67,7 +71,11 @@ hal.executable private @preset_config_matmul  {
 ]>
 hal.executable private @preset_config_matmul  {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.export @peel_static_matmul layout(#executable_layout)
+    hal.executable.export @peel_static_matmul layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
     builtin.module {
       func.func @peel_static_matmul() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -131,7 +139,11 @@ hal.executable private @preset_config_matmul  {
 ]>
 hal.executable private @preset_config_matmul  {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.export @peel_dynamic_matmul layout(#executable_layout)
+    hal.executable.export @peel_dynamic_matmul layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
     builtin.module {
       func.func @peel_dynamic_matmul() {
         %cst = arith.constant 0.000000e+00 : f32

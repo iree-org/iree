@@ -28,41 +28,34 @@
 module @e2e {
 // CHECK: vm.rodata private @executable_0_vmvx_bytecode_fb
 stream.executable private @executable_0 {
-  stream.executable.export public @dispatch
+  stream.executable.export public @dispatch workgroups(%arg0: index) -> (index, index, index) {
+    %x, %y, %z = flow.default_workgroup_count %arg0
+    stream.return %x, %y, %z : index, index, index
+  }
   builtin.module {
     func.func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding, %ret0: !stream.binding) {
       %c0 = arith.constant 0 : index
       %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:4xf32>
       %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:4xf32>
       %2 = stream.binding.subspan %ret0[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:4xf32>
-      %c4 = arith.constant 4 : index
-      %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
-      %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
-      %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
-      %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_0, %workgroup_size_0]
-      %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_0, %workgroup_size_0]
-      scf.for %arg3 = %3 to %c4 step %4 {
-        %5 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4)>(%arg3)[%workgroup_size_0]
-        %6 = flow.dispatch.tensor.load %0, offsets = [%arg3], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<?xf32>
-        %7 = flow.dispatch.tensor.load %1, offsets = [%arg3], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<?xf32>
-        %8 = linalg.init_tensor [%5] : tensor<?xf32>
-        %9 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6, %7 : tensor<?xf32>, tensor<?xf32>) outs(%8 : tensor<?xf32>) attrs =  {name = "mul.1"} {
+      %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<4xf32>
+      %4 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<4xf32>
+      %5 = linalg.init_tensor [4] : tensor<4xf32>
+      %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%3, %4 : tensor<4xf32>, tensor<4xf32>) outs(%5 : tensor<4xf32>) attrs =  {name = "mul.1"} {
         ^bb0(%arg4: f32, %arg5: f32, %arg6: f32):
           %10 = arith.mulf %arg4, %arg5 : f32
           linalg.yield %10 : f32
-        } -> tensor<?xf32>
-        flow.dispatch.tensor.store %9, %2, offsets = [%arg3], sizes = [%5], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:4xf32>
-      }
+        } -> tensor<4xf32>
+      flow.dispatch.tensor.store %6, %2, offsets = [0], sizes = [4], strides = [1] : tensor<4xf32> -> !flow.dispatch.tensor<writeonly:4xf32>
       return
     }
   }
 }
 // CHECK: vm.func private @simple_mul
 func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
-  %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
   // CHECK: vm.call @hal.command_buffer.dispatch
-  %ret0 = flow.dispatch @executable_0::@dispatch[%c4, %c1, %c1](%arg0, %arg1) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
+  %ret0 = flow.dispatch @executable_0::@dispatch[%c4](%arg0, %arg1) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
   return %ret0 : tensor<4xf32>
 }
 }  // module
@@ -83,40 +76,33 @@ func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf3
 module @inplace {
 // CHECK: vm.rodata private @executable_1_vmvx_bytecode_fb
 stream.executable private @executable_1 {
-  stream.executable.export public @dispatch
+  stream.executable.export public @dispatch workgroups(%arg0: index) -> (index, index, index) {
+    %x, %y, %z = flow.default_workgroup_count %arg0
+    stream.return %x, %y, %z : index, index, index
+  }
   builtin.module {
     func.func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding) {
       %c0 = arith.constant 0 : index
       %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readwrite:4xf32>
       %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:4xf32>
-      %c4 = arith.constant 4 : index
-      %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
-      %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
-      %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
-      %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_0, %workgroup_size_0]
-      %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_0, %workgroup_size_0]
-      scf.for %arg3 = %3 to %c4 step %4 {
-        %5 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4)>(%arg3)[%workgroup_size_0]
-        %6 = flow.dispatch.tensor.load %0, offsets = [%arg3], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readwrite:4xf32> -> tensor<?xf32>
-        %7 = flow.dispatch.tensor.load %1, offsets = [%arg3], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<?xf32>
-        %8 = linalg.init_tensor [%5] : tensor<?xf32>
-        %9 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6, %7 : tensor<?xf32>, tensor<?xf32>) outs(%8 : tensor<?xf32>) attrs =  {name = "mul.1"} {
+      %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readwrite:4xf32> -> tensor<4xf32>
+      %4 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<4xf32>
+      %5 = linalg.init_tensor [4] : tensor<4xf32>
+      %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%3, %4 : tensor<4xf32>, tensor<4xf32>) outs(%5 : tensor<4xf32>) attrs =  {name = "mul.1"} {
         ^bb0(%arg4: f32, %arg5: f32, %arg6: f32):
           %10 = arith.mulf %arg4, %arg5 : f32
           linalg.yield %10 : f32
-        } -> tensor<?xf32>
-        flow.dispatch.tensor.store %9, %0, offsets = [%arg3], sizes = [%5], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<readwrite:4xf32>
-      }
+        } -> tensor<4xf32>
+      flow.dispatch.tensor.store %6, %0, offsets = [0], sizes = [4], strides = [1] : tensor<4xf32> -> !flow.dispatch.tensor<readwrite:4xf32>
       return
     }
   }
 }
 // CHECK: vm.func private @simple_mul_inplace
 func.func @simple_mul_inplace(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
-  %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
   // CHECK: vm.call @hal.command_buffer.dispatch
-  %ret0 = flow.dispatch @executable_1::@dispatch[%c4, %c1, %c1](%arg0, %arg1) : (tensor<4xf32>, tensor<4xf32>) -> %arg0
+  %ret0 = flow.dispatch @executable_1::@dispatch[%c4](%arg0, %arg1) : (tensor<4xf32>, tensor<4xf32>) -> %arg0
   return %ret0 : tensor<4xf32>
 }
 }  // module
@@ -139,30 +125,25 @@ func.func @simple_mul_inplace(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> ten
 module @dynamic {
 // CHECK: vm.rodata private @executable_2_vmvx_bytecode_fb
 stream.executable private @executable_2 {
-  stream.executable.export public @dispatch
+  stream.executable.export public @dispatch workgroups(%arg0: index) -> (index, index, index) {
+    %x, %y, %z = flow.default_workgroup_count %arg0
+    stream.return %x, %y, %z : index, index, index
+  }
   builtin.module {
     func.func @dispatch(%arg0: !stream.binding, %arg0_dim0: index, %arg1: !stream.binding, %arg1_dim0: index, %ret0: !stream.binding) {
       %c0 = arith.constant 0 : index
       %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:?xf32>{%arg0_dim0}
       %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:?xf32>{%arg1_dim0}
       %2 = stream.binding.subspan %ret0[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:?xf32>{%arg0_dim0}
-      %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
-      %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
-      %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
-      %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_0, %workgroup_size_0]
-      %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_0, %workgroup_size_0]
-      scf.for %arg5 = %3 to %arg0_dim0 step %4 {
-        %5 = affine.min affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>(%arg5)[%arg0_dim0, %workgroup_size_0]
-        %6 = flow.dispatch.tensor.load %0, offsets = [%arg5], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:?xf32>{%arg0_dim0} -> tensor<?xf32>
-        %7 = flow.dispatch.tensor.load %1, offsets = [%arg5], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:?xf32>{%arg1_dim0} -> tensor<?xf32>
-        %8 = linalg.init_tensor [%5] : tensor<?xf32>
-        %9 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6, %7 : tensor<?xf32>, tensor<?xf32>) outs(%8 : tensor<?xf32>) attrs =  {name = "mul.1"} {
+      %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [%arg0_dim0], strides = [1] : !flow.dispatch.tensor<readonly:?xf32>{%arg0_dim0} -> tensor<?xf32>
+      %4 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [%arg1_dim0], strides = [1] : !flow.dispatch.tensor<readonly:?xf32>{%arg1_dim0} -> tensor<?xf32>
+      %5 = linalg.init_tensor [%arg0_dim0] : tensor<?xf32>
+      %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%3, %4 : tensor<?xf32>, tensor<?xf32>) outs(%5 : tensor<?xf32>) attrs =  {name = "mul.1"} {
         ^bb0(%arg6: f32, %arg7: f32, %arg8: f32):
           %10 = arith.mulf %arg6, %arg7 : f32
           linalg.yield %10 : f32
         } -> tensor<?xf32>
-        flow.dispatch.tensor.store %9, %2, offsets = [%arg5], sizes = [%5], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:?xf32>{%arg0_dim0}
-      }
+      flow.dispatch.tensor.store %6, %2, offsets = [0], sizes = [%arg0_dim0], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:?xf32>{%arg0_dim0}
       return
     }
   }
@@ -170,13 +151,12 @@ stream.executable private @executable_2 {
 // CHECK: vm.func private @simple_mul_dynamic
 func.func @simple_mul_dynamic(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) -> tensor<?xf32> {
   %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
   // CHECK: vm.call @hal.buffer_view.dim
   %arg0_dim0 = tensor.dim %arg0, %c0 : tensor<?xf32>
   // CHECK: vm.call @hal.buffer_view.dim
   %arg1_dim0 = tensor.dim %arg1, %c0 : tensor<?xf32>
   // CHECK: vm.call @hal.command_buffer.dispatch
-  %ret0 = flow.dispatch @executable_2::@dispatch[%arg0_dim0, %c1, %c1](%arg0, %arg0_dim0, %arg1, %arg1_dim0) : (tensor<?xf32>{%arg0_dim0}, index, tensor<?xf32>{%arg1_dim0}, index) -> tensor<?xf32>{%arg0_dim0}
+  %ret0 = flow.dispatch @executable_2::@dispatch[%arg0_dim0](%arg0, %arg0_dim0, %arg1, %arg1_dim0) : (tensor<?xf32>{%arg0_dim0}, index, tensor<?xf32>{%arg1_dim0}, index) -> tensor<?xf32>{%arg0_dim0}
   return %ret0 : tensor<?xf32>
 }
 }  // module
@@ -191,7 +171,10 @@ func.func @simple_mul_dynamic(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) -> ten
 module @untiled {
 // CHECK: vm.rodata private @executable_3_vmvx_bytecode_fb
 stream.executable private @executable_3 {
-  stream.executable.export public @dispatch
+  stream.executable.export public @dispatch workgroups(%arg0: index) -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
   builtin.module {
     func.func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding, %ret0: !stream.binding) {
       %c0 = arith.constant 0 : index
@@ -214,7 +197,7 @@ stream.executable private @executable_3 {
 // CHECK: vm.func private @simple_mul_untiled
 func.func @simple_mul_untiled(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
   %c1 = arith.constant 1 : index
-  %ret0 = flow.dispatch @executable_3::@dispatch[%c1, %c1, %c1](%arg0, %arg1) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
+  %ret0 = flow.dispatch @executable_3::@dispatch[%c1](%arg0, %arg1) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
   return %ret0 : tensor<4xf32>
 }
 }  // module

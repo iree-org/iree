@@ -8,7 +8,10 @@
 // Writes the i64 %value %count times at byte %offset of %out_binding.
 
 stream.executable private @__builtin_fill_i64 {
-  stream.executable.export public @__builtin_fill_i64
+  stream.executable.export public @__builtin_fill_i64 workgroups(%arg0: index) -> (index, index, index) {
+    %x, %y, %z = flow.default_workgroup_count %arg0
+    stream.return %x, %y, %z : index, index, index
+  }
   builtin.module {
     func.func @__builtin_fill_i64(%value: i64, %offset: index, %count: index, %out_binding: !stream.binding) {
       %out = stream.binding.subspan %out_binding[%offset] : !stream.binding -> !flow.dispatch.tensor<writeonly:?xi64>{%count}

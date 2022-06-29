@@ -17,8 +17,12 @@
 ]>
 hal.executable private @shared_mem_cpy  {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @shared_mem_cpy layout(#executable_layout) {
+    hal.executable.export @shared_mem_cpy layout(#executable_layout) attributes {
       workgroup_size = [32: index, 4: index, 1:index]
+    } {
+    ^bb0(%arg0: !hal.device, %arg1 : index, %arg2 : index):
+      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
       memref.global "private" @__shared_memory___1 : memref<3x512xf32, 3>

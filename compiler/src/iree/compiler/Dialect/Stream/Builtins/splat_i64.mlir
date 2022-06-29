@@ -8,7 +8,10 @@
 // Writes the i64 %value %count times at offset 0 of %out_binding.
 
 stream.executable private @__builtin_splat_i64 {
-  stream.executable.export public @__builtin_splat_i64
+  stream.executable.export public @__builtin_splat_i64 workgroups(%arg0: index) -> (index, index, index) {
+    %x, %y, %z = flow.default_workgroup_count %arg0
+    stream.return %x, %y, %z : index, index, index
+  }
   builtin.module {
     func.func @__builtin_splat_i64(%value: i64, %count: index, %out_binding: !stream.binding) {
       %c0 = arith.constant 0 : index

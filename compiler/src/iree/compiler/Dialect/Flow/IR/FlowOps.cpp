@@ -852,6 +852,13 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
 
+  // Copy the workgroup_count region.
+  auto &workgroupCountRegion = workgroup_count();
+  if (!workgroupCountRegion.empty()) {
+    auto &newWorkgroupCountRegion = newOp.workgroup_count();
+    newWorkgroupCountRegion.takeBody(workgroupCountRegion);
+  }
+
   // For dropped results, erase all the store-op uses. It is a pre-requisite
   // that the result can be dropped only if it is written within the dispatch
   // region op.
