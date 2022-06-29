@@ -460,6 +460,15 @@ static LogicalResult buildFlatBufferModule(
         return iree_vm_ImportFunctionDef_end(fbb);
       }));
 
+  // Check that all export ops point to valid functions.
+  for (auto &exportFuncOp : exportFuncOps) {
+    if (!symbolTable.lookup<IREE::VM::FuncOp>(exportFuncOp.function_ref())) {
+      return moduleOp.emitError()
+             << "vm.func op named '" << exportFuncOp.function_ref()
+             << "' not found for export";
+    }
+  }
+
   auto exportFuncRefs =
       llvm::to_vector<8>(llvm::map_range(exportFuncOps, [&](auto exportOp) {
         auto localNameRef = fbb.createString(exportOp.export_name());
