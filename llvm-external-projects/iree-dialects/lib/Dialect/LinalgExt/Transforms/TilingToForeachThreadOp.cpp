@@ -40,6 +40,7 @@ static FailureOr<TilingResult> tileToForeachOp(PatternRewriter &rewriter,
   Operation *tiledOp = nullptr;
   Operation *tileOp = rewriter.create<scf::ForeachThreadOp>(
       loc, llvm::to_vector<4>(nonZeroNumThreads),
+      /*threadDimMapping=*/ArrayRef<int64_t>{},
       [&](OpBuilder &b, Location loc, ValueRange threadIds) {
         // TODO: support `getTiledImplementation` with >1 produced tiled ops.
         int64_t nLoops = loopRanges.size();
