@@ -34,6 +34,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_regression_dylib-llvm-aot
   SRCS
+    "associative_reordering.mlir"
     "dynamic_abs.mlir"
     "dynamic_add.mlir"
     "dynamic_dot.mlir"
