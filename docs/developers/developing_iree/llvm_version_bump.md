@@ -5,7 +5,7 @@ dependencies. In the recent past, we did this in a different system and this
 is just to get us by until we get it better scripted/automated.
 
 Note that scripts referenced in this guide are temporarily hosted in the
-[iree-samples repository](https://github.com/google/iree-samples/tree/main/scripts/integrate).
+[iree-samples repository](https://github.com/iree-org/iree-samples/tree/main/scripts/integrate).
 This is because it is very non-user friendly to have branch and submodule
 management scripts in the repository being managed, and we don't have an
 immediately better place. In this guide, we reference this location as
@@ -16,14 +16,14 @@ immediately better place. In this guide, we reference this location as
 The IREE team maintains fork repositories for both llvm-project and mlir-hlo,
 allowing them to be patched out of band. These repositories are:
 
-* https://github.com/google/iree-llvm-fork (`main` branch)
-* https://github.com/google/iree-mhlo-fork (`master` branch)
-* https://github.com/google/iree-tf-fork (`master` branch)
+* https://github.com/iree-org/iree-llvm-fork (`main` branch)
+* https://github.com/iree-org/iree-mhlo-fork (`master` branch)
+* https://github.com/iree-org/iree-tf-fork (`master` branch)
 
 By the time you read this, they may be on a cron to advance automatically, but
 even so, it is a good idea to advance them prior to any integrate activities
 so that you have freshest commits available. Iree repository has an
-action named [Advance Upstream Forks](https://github.com/google/iree/actions/workflows/advance_upstream_forks.yml)
+action named [Advance Upstream Forks](https://github.com/iree-org/iree/actions/workflows/advance_upstream_forks.yml)
 to update the forks. Just select `Run Workflow` on that action and give it a
 minute. You should see the fork repository mainline branch move forward.
 
@@ -110,8 +110,8 @@ the main-project version should be copied over the integrations version.
 
 ```
 cd ~/src
-git clone --branch master https://github.com/google/iree-tf-fork.git
-git clone --branch master https://github.com/google/iree-mhlo-fork.git
+git clone --branch master https://github.com/iree-org/iree-tf-fork.git
+git clone --branch master https://github.com/iree-org/iree-mhlo-fork.git
 ```
 
 Get MHLO's published version:
@@ -208,7 +208,7 @@ git push origin HEAD:llvm-bump
 Either fix any issues or get people to do so and land patches until the
 PR is green.
 
-A script from [iree-samples](https://github.com/google/iree-samples/blob/main/scripts/integrate/bump_llvm.py)
+A script from [iree-samples](https://github.com/iree-org/iree-samples/blob/main/scripts/integrate/bump_llvm.py)
 repository can help with bumping the LLVM version and creating a PR.
 To use the script the steps are
 
@@ -280,8 +280,8 @@ under docker, we can find the hash from CI log.
 An example from a log:
 
 ```
-[18:30:23 UTC] docker run --volume=/tmpfs/src/github/iree:/tmpfs/src/github/iree --workdir=/tmpfs/src/github/iree --rm --user=1003:1004 --volume=/tmpfs/fake_etc/group:/etc/group:ro --volume=/tmpfs/fake_etc/passwd:/etc/passwd:ro --volume=/tmpfs/fake_home:/home/kbuilder --volume=/home/kbuilder/.config/gcloud:/home/kbuilder/.config/gcloud:ro gcr.io/iree-oss/frontends-swiftshader@sha256:738b357dae363037e86b37aa594c4eecbd0a8ef233b30bedb44dc44a1fae9101 build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build.sh
-Unable to find image 'gcr.io/iree-oss/frontends-swiftshader@sha256:738b357dae363037e86b37aa594c4eecbd0a8ef233b30bedb44dc44a1fae9101' locally
+[18:30:23 UTC] docker run --volume=/tmpfs/src/github/iree:/tmpfs/src/github/iree --workdir=/tmpfs/src/github/iree --rm --user=1003:1004 --volume=/tmpfs/fake_etc/group:/etc/group:ro --volume=/tmpfs/fake_etc/passwd:/etc/passwd:ro --volume=/tmpfs/fake_home:/home/kbuilder --volume=/home/kbuilder/.config/gcloud:/home/kbuilder/.config/gcloud:ro gcr.io/iree-oss/frontends-swiftshader@sha256:41e516b8c1b432e3c02896c4bf4b7f06df6a67371aa167b88767b8d4d2018ea6 build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build.sh
+Unable to find image 'gcr.io/iree-oss/frontends-swiftshader@sha256:41e516b8c1b432e3c02896c4bf4b7f06df6a67371aa167b88767b8d4d2018ea6' locally
 sha256:aeb8de9fb7af3913d385ec6b274320197d61aa7bc51a6e8bc0deba644da3e405: Pulling from iree-oss/frontends-swiftshader
 ```
 
@@ -289,7 +289,7 @@ You can find the hash tag from log and run the below command. It makes sure that
 you have the enviroment as same as CI bot and requires less local setup.
 
 ```
-docker run --interactive --tty --rm --volume=$PWD:/src/iree --workdir=/src/iree gcr.io/iree-oss/frontends-swiftshader@sha256:738b357dae363037e86b37aa594c4eecbd0a8ef233b30bedb44dc44a1fae9101
+docker run --interactive --tty --rm --volume=$PWD:/src/iree --workdir=/src/iree gcr.io/iree-oss/frontends-swiftshader@sha256:41e516b8c1b432e3c02896c4bf4b7f06df6a67371aa167b88767b8d4d2018ea6
 ```
 
 To repro failures in `iree/e2e/`:
@@ -324,7 +324,7 @@ cmake -G Ninja \
   ..
 ```
 
-To repro failures in CI `bazel_linux_x86-swiftshader_core`, we can follow the [doc](https://github.com/google/iree/blob/main/docs/developers/get_started/building_with_bazel_linux.md) to build IREE using bazel. E.g.,
+To repro failures in CI `bazel_linux_x86-swiftshader_core`, we can follow the [doc](https://github.com/iree-org/iree/blob/main/docs/developers/get_started/building_with_bazel_linux.md) to build IREE using bazel. E.g.,
 
 ```bash
 export CC=clang

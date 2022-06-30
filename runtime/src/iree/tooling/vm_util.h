@@ -41,7 +41,7 @@ Status ParseToVariantList(iree_hal_allocator_t* device_allocator,
 // Prints buffers in the IREE standard shaped buffer format:
 //   [shape]xtype=[value]
 // described in
-// https://github.com/google/iree/tree/main/iree/hal/api.h
+// https://github.com/iree-org/iree/tree/main/iree/hal/api.h
 Status PrintVariantList(iree_vm_list_t* variant_list, size_t max_element_count,
                         std::ostream* os);
 inline Status PrintVariantList(iree_vm_list_t* variant_list, std::ostream* os) {

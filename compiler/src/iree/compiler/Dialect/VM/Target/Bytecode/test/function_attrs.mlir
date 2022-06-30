@@ -5,7 +5,7 @@
 vm.module @simple_module {
   vm.export @func
   // CHECK: "exported_functions":
-  // CHECK: "reflection_attrs":
+  // CHECK: "attrs":
   // CHECK:   "key": "f"
   // CHECK:   "value": "FOOBAR"
   // CHECK:   "key": "fv"

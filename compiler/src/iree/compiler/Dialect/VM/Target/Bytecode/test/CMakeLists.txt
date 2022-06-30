@@ -15,8 +15,8 @@ iree_lit_test_suite(
     lit
   SRCS
     "constant_encoding.mlir"
+    "function_attrs.mlir"
     "module_encoding_smoke.mlir"
-    "reflection_attrs.mlir"
   TOOLS
     FileCheck
     iree-compile

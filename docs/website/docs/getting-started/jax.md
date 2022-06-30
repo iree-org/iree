@@ -1,7 +1,7 @@
 # JAX Integration
 
 !!! todo
-    [Issue#5454](https://github.com/google/iree/issues/5454): write this documentation
+    [Issue#5454](https://github.com/iree-org/iree/issues/5454): write this documentation
 
 <!-- TODO(??): overview (mention XLA? numpy?) -->
 

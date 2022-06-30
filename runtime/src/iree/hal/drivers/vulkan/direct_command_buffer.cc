@@ -140,14 +140,6 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
   return status;
 }
 
-static void iree_hal_vulkan_direct_command_buffer_reset(
-    iree_hal_vulkan_direct_command_buffer_t* command_buffer) {
-  // NOTE: we require that command buffers not be recorded while they are
-  // in-flight so this is safe.
-  IREE_IGNORE_ERROR(command_buffer->descriptor_set_group.Reset());
-  iree_hal_resource_set_reset(command_buffer->resource_set);
-}
-
 bool iree_hal_vulkan_direct_command_buffer_isa(
     iree_hal_command_buffer_t* command_buffer) {
   return iree_hal_command_buffer_dyn_cast(
@@ -171,9 +163,9 @@ static void iree_hal_vulkan_direct_command_buffer_destroy(
       command_buffer->logical_device->host_allocator();
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_vulkan_direct_command_buffer_reset(command_buffer);
   command_buffer->command_pool->Free(command_buffer->handle);
 
+  IREE_IGNORE_ERROR(command_buffer->descriptor_set_group.Reset());
   command_buffer->descriptor_set_group.~DescriptorSetGroup();
   command_buffer->descriptor_set_arena.~DescriptorSetArena();
 
@@ -197,8 +189,6 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_begin(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
-
-  iree_hal_vulkan_direct_command_buffer_reset(command_buffer);
 
   VkCommandBufferBeginInfo begin_info;
   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;

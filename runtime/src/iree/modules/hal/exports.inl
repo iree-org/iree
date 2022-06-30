@@ -36,7 +36,6 @@ EXPORT_FN("buffer.subspan", iree_hal_module_buffer_subspan, rII, r)
 
 EXPORT_FN("buffer_view.assert", iree_hal_module_buffer_view_assert, rriiCID, v)
 EXPORT_FN("buffer_view.buffer", iree_hal_module_buffer_view_buffer, r, r)
-EXPORT_FN("buffer_view.byte_length", iree_hal_module_buffer_view_byte_length, r, I)
 EXPORT_FN("buffer_view.create", iree_hal_module_buffer_view_create, riiCID, r)
 EXPORT_FN("buffer_view.dim", iree_hal_module_buffer_view_dim, ri, I)
 EXPORT_FN("buffer_view.element_type", iree_hal_module_buffer_view_element_type, r, i)
@@ -44,17 +43,16 @@ EXPORT_FN("buffer_view.encoding_type", iree_hal_module_buffer_view_encoding_type
 EXPORT_FN("buffer_view.rank", iree_hal_module_buffer_view_rank, r, i)
 EXPORT_FN("buffer_view.trace", iree_hal_module_buffer_view_trace, rCrD, v)
 
-EXPORT_FN("command_buffer.begin", iree_hal_module_command_buffer_begin, r, v)
 EXPORT_FN("command_buffer.begin_debug_group", iree_hal_module_command_buffer_begin_debug_group, rr, v)
 EXPORT_FN("command_buffer.bind_descriptor_set", iree_hal_module_command_buffer_bind_descriptor_set, rrirCID, v)
 EXPORT_FN("command_buffer.copy_buffer", iree_hal_module_command_buffer_copy_buffer, rrIrII, v)
 EXPORT_FN("command_buffer.create", iree_hal_module_command_buffer_create, rii, r)
 EXPORT_FN("command_buffer.dispatch", iree_hal_module_command_buffer_dispatch, rriiii, v)
 EXPORT_FN("command_buffer.dispatch.indirect", iree_hal_module_command_buffer_dispatch_indirect, rrirI, v)
-EXPORT_FN("command_buffer.end", iree_hal_module_command_buffer_end, r, v)
 EXPORT_FN("command_buffer.end_debug_group", iree_hal_module_command_buffer_end_debug_group, r, v)
 EXPORT_FN("command_buffer.execution_barrier", iree_hal_module_command_buffer_execution_barrier, riii, v)
 EXPORT_FN("command_buffer.fill_buffer", iree_hal_module_command_buffer_fill_buffer, rrIIii, v)
+EXPORT_FN("command_buffer.finalize", iree_hal_module_command_buffer_finalize, r, v)
 EXPORT_FN("command_buffer.push_constants", iree_hal_module_command_buffer_push_constants, rriCiD, v)
 EXPORT_FN("command_buffer.push_descriptor_set", iree_hal_module_command_buffer_push_descriptor_set, rriCirIID, v)
 
@@ -63,7 +61,7 @@ EXPORT_FN("descriptor_set.create", iree_hal_module_descriptor_set_create, rrCirI
 EXPORT_FN("descriptor_set_layout.create", iree_hal_module_descriptor_set_layout_create, riCiiD, r)
 
 EXPORT_FN("device.allocator", iree_hal_module_device_allocator, r, r)
-EXPORT_FN("device.query.i32", iree_hal_module_device_query_i32, rrr, ii)
+EXPORT_FN("device.query.i64", iree_hal_module_device_query_i64, rrr, iI)
 
 EXPORT_FN("ex.shared_device", iree_hal_module_ex_shared_device, v, r)
 EXPORT_FN("ex.submit_and_wait", iree_hal_module_ex_submit_and_wait, rr, v)

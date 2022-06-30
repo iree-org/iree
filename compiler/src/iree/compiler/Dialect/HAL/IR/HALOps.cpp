@@ -408,21 +408,6 @@ void BufferViewBufferOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.buffer_view.byte_length
-//===----------------------------------------------------------------------===//
-
-void BufferViewByteLengthOp::build(OpBuilder &builder, OperationState &state,
-                                   Value bufferView) {
-  state.addOperands({bufferView});
-  state.addTypes({builder.getIndexType()});
-}
-
-void BufferViewByteLengthOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "len");
-}
-
-//===----------------------------------------------------------------------===//
 // hal.command_buffer.create
 //===----------------------------------------------------------------------===//
 

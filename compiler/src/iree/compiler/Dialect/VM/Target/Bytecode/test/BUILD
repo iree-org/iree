@@ -18,8 +18,8 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "constant_encoding.mlir",
+            "function_attrs.mlir",
             "module_encoding_smoke.mlir",
-            "reflection_attrs.mlir",
         ],
         include = ["*.mlir"],
     ),
