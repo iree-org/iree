@@ -288,6 +288,14 @@ def LLVMGPUVectorization :
     Pass<"iree-llvmgpu-vectorization", "func::FuncOp"> {
   let summary = "Pass to convert linalg into Vector.";
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorizationPass()";
+  let options = [
+    Option<"nativeVector", "native-vector", "int64_t",
+            /*default=*/"4",
+           "Pick the native size being targeted.">,
+    Option<"generateContract", "generate-contract", "bool",
+            /*default=*/"true",
+           "Try to convert reduction to vector.contract.">,
+  ];
 }
 
 def LLVMGPUTensorCoreVectorization :

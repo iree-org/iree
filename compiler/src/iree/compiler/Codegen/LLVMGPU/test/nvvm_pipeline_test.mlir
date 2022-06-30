@@ -370,8 +370,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 
 //   CHECK-LABEL: hal.executable public @vector_reduction_dispatch
 //         CHECK:   hal.executable.variant public @cuda
-//         CHECK:   llvm.fadd %{{.*}}, %{{.*}} : vector<4xf32>
-//         CHECK:   llvm.store %{{.*}} : !llvm.ptr<vector<4xf32>>
+// CHECK-COUNT-5:     nvvm.shfl.sync  bfly
 
 // -----
 
