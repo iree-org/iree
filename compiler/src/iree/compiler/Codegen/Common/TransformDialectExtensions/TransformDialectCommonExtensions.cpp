@@ -6,6 +6,8 @@
 
 #include "TransformDialectCommonExtensions.h"
 
+#include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
+#include "iree-dialects/Transforms/ListenerGreedyPatternRewriteDriver.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "mlir/Pass/PassManager.h"
@@ -25,6 +27,37 @@ iree_compiler::IREE::transform_dialect::TransformDialectCommonExtensions::
 void mlir::iree_compiler::registerTransformDialectCommonExtension(
     DialectRegistry &registry) {
   registry.addExtensions<transform_dialect::TransformDialectCommonExtensions>();
+}
+
+//===---------------------------------------------------------------------===//
+// ApplyPatternsOp
+//===---------------------------------------------------------------------===//
+
+static void addAllRegisteredCanonicalizationPatterns(
+    RewritePatternSet &patterns) {
+  MLIRContext *ctx = patterns.getContext();
+  for (Dialect *dialect : ctx->getLoadedDialects())
+    dialect->getCanonicalizationPatterns(patterns);
+  for (RegisteredOperationName op : ctx->getRegisteredOperations())
+    op.getCanonicalizationPatterns(patterns, ctx);
+}
+
+FailureOr<Operation *> transform_dialect::ApplyPatternsOp::applyToOne(
+    Operation *target, transform::TransformState &state) {
+  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>())
+    return emitOpError() << "applies only to isolated-from-above targets "
+                            "because it needs to apply patterns greedily";
+  MLIRContext *ctx = target->getContext();
+  RewritePatternSet patterns(ctx);
+  if (getCanonicalization()) addAllRegisteredCanonicalizationPatterns(patterns);
+
+  TrackingListener listener(state);
+  GreedyRewriteConfig config;
+  LogicalResult result = applyPatternsAndFoldGreedily(
+      target, std::move(patterns), config, &listener);
+  LogicalResult listenerResult = listener.checkErrorState();
+  if (failed(result) || failed(listenerResult)) return failure();
+  return target;
 }
 
 //===---------------------------------------------------------------------===//
