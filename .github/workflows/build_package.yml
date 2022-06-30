@@ -27,37 +27,37 @@ on:
 
 jobs:
   build_core:
-    name: "${{ matrix.os }} :: Build ${{ matrix.build_package }} Package"
-    runs-on: ${{ matrix.os }}
+    name: "${{ matrix.build_family }} :: Build ${{ matrix.build_package }} Package"
+    runs-on: ${{ matrix.runner }}
     continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
       matrix:
         include:
           # Ubuntu packages.
-          - os: ubuntu-20.04
+          - runner: [self-hosted, cpu, trust=high, releaser, Linux, X64]
             build_family: linux
             build_package: main-dist-linux
             experimental: false
-          - os: ubuntu-20.04
+          - runner: [self-hosted, cpu, trust=high, releaser, Linux, X64]
             build_family: linux
             build_package: py-compiler-pkg
             experimental: false
-          - os: ubuntu-20.04
+          - runner: [self-hosted, cpu, trust=high, releaser, Linux, X64]
             build_family: linux
             build_package: py-runtime-pkg
             experimental: false
-          - os: ubuntu-20.04
+          - runner: [self-hosted, cpu, trust=high, releaser, Linux, X64]
             build_family: linux
             build_package: py-tf-compiler-tools-pkg
             experimental: false
 
           # Macos packages.
-          - os: macos-latest
+          - runner: macos-11
             build_family: macos
             build_package: py-compiler-pkg
             experimental: true
-          - os: macos-latest
+          - runner: macos-11
             build_family: macos
             build_package: py-runtime-pkg
             experimental: true
@@ -200,6 +200,7 @@ jobs:
     name: "Invoke workflow to validate and publish release"
     needs: build_core
     runs-on: ubuntu-20.04
+    if: github.event.inputs.release_id != ''
     steps:
       - name: "Invoke workflow :: Validate and Publish Release"
         uses: benc-uk/workflow-dispatch@4c044c1613fabbe5250deadc65452d54c4ad4fc7  # v1
