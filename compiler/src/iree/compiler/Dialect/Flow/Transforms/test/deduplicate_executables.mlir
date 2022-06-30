@@ -5,7 +5,7 @@ flow.executable @single_executable_ex_0 {
   flow.executable.export @single_executable_entry_0
   builtin.module {
     func.func @single_executable_entry_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
+      %0 = arith.addf %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
     }
   }
@@ -25,7 +25,7 @@ flow.executable @duplicate_executables_ex_0 {
   flow.executable.export @duplicate_executables_entry_0
   builtin.module {
     func.func @duplicate_executables_entry_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
+      %0 = arith.addf %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
     }
   }
@@ -35,7 +35,7 @@ flow.executable @duplicate_executables_ex_1 {
   flow.executable.export @duplicate_executables_entry_1
   builtin.module {
     func.func @duplicate_executables_entry_1(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
+      %0 = arith.addf %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
     }
   }
@@ -45,7 +45,7 @@ flow.executable @duplicate_executables_ex_2 {
   flow.executable.export @duplicate_executables_entry_2
   builtin.module {
     func.func @duplicate_executables_entry_2(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = mhlo.subtract %arg0, %arg0 : tensor<4xf32>
+      %0 = arith.subf %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
     }
   }
@@ -69,7 +69,7 @@ flow.executable @same_ops_diff_operands_ex_0 {
   flow.executable.export @entry_0
   builtin.module {
     func.func @entry_0(%arg0: tensor<2xi32>, %arg1: tensor<2xi32>) -> tensor<2xi32> {
-      %0 = mhlo.multiply %arg0, %arg1 : tensor<2xi32>
+      %0 = arith.muli %arg0, %arg1 : tensor<2xi32>
       return %0 : tensor<2xi32>
     }
   }
@@ -79,7 +79,7 @@ flow.executable @same_ops_diff_operands_ex_1 {
   flow.executable.export @entry_1
   builtin.module {
     func.func @entry_1(%arg0: tensor<2xi32>) -> tensor<2xi32> {
-      %0 = mhlo.multiply %arg0, %arg0 : tensor<2xi32>
+      %0 = arith.muli %arg0, %arg0 : tensor<2xi32>
       return %0 : tensor<2xi32>
     }
   }
@@ -102,11 +102,11 @@ flow.executable @multiple_entry_points_ex_0 {
   flow.executable.export @multiple_entry_points_0_entry_1
   builtin.module {
     func.func @multiple_entry_points_0_entry_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
+      %0 = arith.addf %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
     }
     func.func @multiple_entry_points_0_entry_1(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = mhlo.subtract %arg0, %arg0 : tensor<4xf32>
+      %0 = arith.subf %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
     }
   }
@@ -117,11 +117,11 @@ flow.executable @multiple_entry_points_ex_1 {
   flow.executable.export @multiple_entry_points_1_entry_1
   builtin.module {
     func.func @multiple_entry_points_1_entry_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
+      %0 = arith.addf %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
     }
     func.func @multiple_entry_points_1_entry_1(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = mhlo.subtract %arg0, %arg0 : tensor<4xf32>
+      %0 = arith.subf %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
     }
   }
@@ -162,7 +162,7 @@ flow.executable @different_types_float_ex {
   flow.executable.export @different_types_float_entry
   builtin.module {
     func.func @different_types_float_entry(%arg0: tensor<4xf32>) -> tensor<4xi1> {
-      %0 = "mhlo.compare"(%arg0, %arg0) {comparison_direction = #mhlo<"comparison_direction EQ">} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xi1>
+      %0 = arith.cmpf ueq, %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xi1>
     }
   }
@@ -172,7 +172,7 @@ flow.executable @different_types_int_ex {
   flow.executable.export @different_types_int_entry
   builtin.module {
     func.func @different_types_int_entry(%arg0: tensor<4xi32>) -> tensor<4xi1> {
-      %0 = "mhlo.compare"(%arg0, %arg0) {comparison_direction = #mhlo<"comparison_direction EQ">} : (tensor<4xi32>, tensor<4xi32>) -> tensor<4xi1>
+      %0 = arith.cmpi eq, %arg0, %arg0 : tensor<4xi32>
       return %0 : tensor<4xi1>
     }
   }
@@ -190,17 +190,18 @@ func.func @different_types(%arg0: tensor<4xf32>) -> tensor<4xi1> {
 // -----
 
 // CHECK-LABEL: flow.executable public @nested_ops_ex_0
+#map0 = affine_map<(d0, d1) -> (d0, d1)>
 flow.executable @nested_ops_ex_0 {
   flow.executable.export @nested_ops_entry_0
   builtin.module {
-    func.func @nested_ops_entry_0(%input: tensor<1x4xi32>) -> tensor<1xi32> {
-      %0 = arith.constant dense<0> : tensor<i32>
-      %1 = "mhlo.reduce"(%input, %0) ( {
-      ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):   // no predecessors
-        %3 = "mhlo.add"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
-        "mhlo.return"(%3) : (tensor<i32>) -> ()
-      }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x4xi32>, tensor<i32>) -> tensor<1xi32>
-      return %1 : tensor<1xi32>
+    func.func @nested_ops_entry_0(%input0: tensor<5x6xf32>, %input1: tensor<5x6xf32>) -> tensor<5x6xf32> {
+      %init = linalg.init_tensor [5, 6] : tensor<5x6xf32>
+      %max = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
+      ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
+        %27 = arith.maxf %arg1, %arg2 : f32
+        linalg.yield %27 : f32
+      } -> tensor<5x6xf32>
+      return %max : tensor<5x6xf32>
     }
   }
 }
@@ -208,14 +209,14 @@ flow.executable @nested_ops_ex_0 {
 flow.executable @nested_ops_ex_1 {
   flow.executable.export @nested_ops_entry_1
   builtin.module {
-    func.func @nested_ops_entry_1(%input: tensor<1x4xi32>) -> tensor<1xi32> {
-      %0 = arith.constant dense<0> : tensor<i32>
-      %1 = "mhlo.reduce"(%input, %0) ( {
-      ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):   // no predecessors
-        %3 = "mhlo.add"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
-        "mhlo.return"(%3) : (tensor<i32>) -> ()
-      }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x4xi32>, tensor<i32>) -> tensor<1xi32>
-      return %1 : tensor<1xi32>
+    func.func @nested_ops_entry_1(%input0: tensor<5x6xf32>, %input1: tensor<5x6xf32>) -> tensor<5x6xf32> {
+      %init = linalg.init_tensor [5, 6] : tensor<5x6xf32>
+      %max = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
+      ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
+        %27 = arith.maxf %arg1, %arg2 : f32
+        linalg.yield %27 : f32
+      } -> tensor<5x6xf32>
+      return %max : tensor<5x6xf32>
     }
   }
 }
@@ -223,43 +224,46 @@ flow.executable @nested_ops_ex_1 {
 flow.executable @nested_ops_ex_2 {
   flow.executable.export @nested_ops_entry_2
   builtin.module {
-    func.func @nested_ops_entry_2(%input: tensor<1x4xi32>) -> tensor<1xi32> {
-      %0 = arith.constant dense<0> : tensor<i32>
-      %1 = "mhlo.reduce"(%input, %0) ( {
-      ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):   // no predecessors
-        %3 = "mhlo.maximum"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
-        "mhlo.return"(%3) : (tensor<i32>) -> ()
-      }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x4xi32>, tensor<i32>) -> tensor<1xi32>
-      return %1 : tensor<1xi32>
+    func.func @nested_ops_entry_2(%input0: tensor<5x6xf32>, %input1: tensor<5x6xf32>) -> tensor<5x6xf32> {
+      %init = linalg.init_tensor [5, 6] : tensor<5x6xf32>
+      %min = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
+      ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
+        %27 = arith.minf %arg1, %arg2 : f32
+        linalg.yield %27 : f32
+      } -> tensor<5x6xf32>
+      return %min : tensor<5x6xf32>
     }
   }
 }
 // CHECK-LABEL: func.func @nested_ops
-func.func @nested_ops(%arg0: tensor<1x4xi32>) -> tensor<1xi32> {
+func.func @nested_ops(%arg0: tensor<5x6xf32>, %arg1: tensor<5x6xf32>) -> tensor<5x6xf32> {
   %c4 = arith.constant 4 : index
-  // CHECK: %0 = flow.dispatch @nested_ops_ex_0::@nested_ops_entry_0[%c4](%arg0) : (tensor<1x4xi32>) -> tensor<1xi32>
-  %0 = flow.dispatch @nested_ops_ex_0::@nested_ops_entry_0[%c4] (%arg0) : (tensor<1x4xi32>) -> tensor<1xi32>
-  // CHECK: %1 = flow.dispatch @nested_ops_ex_0::@nested_ops_entry_0[%c4](%arg0) : (tensor<1x4xi32>) -> tensor<1xi32>
-  %1 = flow.dispatch @nested_ops_ex_0::@nested_ops_entry_0[%c4] (%arg0) : (tensor<1x4xi32>) -> tensor<1xi32>
-  // CHECK: %2 = flow.dispatch @nested_ops_ex_2::@nested_ops_entry_2[%c4](%arg0) : (tensor<1x4xi32>) -> tensor<1xi32>
-  %2 = flow.dispatch @nested_ops_ex_2::@nested_ops_entry_2[%c4] (%arg0) : (tensor<1x4xi32>) -> tensor<1xi32>
-  return %0 : tensor<1xi32>
+  // CHECK: %0 = flow.dispatch @nested_ops_ex_0::@nested_ops_entry_0[%c4](%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
+  %0 = flow.dispatch @nested_ops_ex_0::@nested_ops_entry_0[%c4] (%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
+  // CHECK: %1 = flow.dispatch @nested_ops_ex_0::@nested_ops_entry_0[%c4](%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
+  %1 = flow.dispatch @nested_ops_ex_0::@nested_ops_entry_0[%c4] (%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
+  // CHECK: %2 = flow.dispatch @nested_ops_ex_2::@nested_ops_entry_2[%c4](%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
+  %2 = flow.dispatch @nested_ops_ex_2::@nested_ops_entry_2[%c4] (%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
+  return %0 : tensor<5x6xf32>
 }
 
 // -----
 
+
 // CHECK-LABEL: flow.executable public @attributes_ex_0
+#map0 = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1, d0)>
 flow.executable @attributes_ex_0 {
   flow.executable.export @attributes_entry_0
   builtin.module {
-    func.func @attributes_entry_0(%input: tensor<1x4xi32>) -> tensor<1xi32> {
-      %0 = arith.constant dense<0> : tensor<i32>
-      %1 = "mhlo.reduce"(%input, %0) ( {
-      ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):   // no predecessors
-        %3 = "mhlo.maximum"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
-        "mhlo.return"(%3) : (tensor<i32>) -> ()
-      }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x4xi32>, tensor<i32>) -> tensor<1xi32>
-      return %1 : tensor<1xi32>
+    func.func @attributes_entry_0(%input0: tensor<5x6xf32>, %input1: tensor<5x6xf32>) -> tensor<5x6xf32> {
+      %init = linalg.init_tensor [5, 6] : tensor<5x6xf32>
+      %max = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
+      ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
+        %27 = arith.maxf %arg1, %arg2 : f32
+        linalg.yield %27 : f32
+      } -> tensor<5x6xf32>
+      return %max : tensor<5x6xf32>
     }
   }
 }
@@ -267,15 +271,15 @@ flow.executable @attributes_ex_0 {
 flow.executable @attributes_ex_1 {
   flow.executable.export @attributes_entry_1
   builtin.module {
-    func.func @attributes_entry_1(%input: tensor<1x4xi32>) -> tensor<4xi32> {
-      %0 = arith.constant dense<0> : tensor<i32>
-      %1 = "mhlo.reduce"(%input, %0) ( {
-      ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):   // no predecessors
-        %3 = "mhlo.maximum"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
-        "mhlo.return"(%3) : (tensor<i32>) -> ()
-        // @attributes_ex_0 but with a different attribute.
-      }) {dimensions = dense<0> : tensor<1xi64>} : (tensor<1x4xi32>, tensor<i32>) -> tensor<4xi32>
-      return %1 : tensor<4xi32>
+    func.func @attributes_entry_1(%input0: tensor<5x6xf32>, %input1: tensor<5x6xf32>) -> tensor<5x6xf32> {
+      %init = linalg.init_tensor [5, 6] : tensor<5x6xf32>
+      // map1 instead of map0
+      %max = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
+      ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
+        %27 = arith.maxf %arg1, %arg2 : f32
+        linalg.yield %27 : f32
+      } -> tensor<5x6xf32>
+      return %max : tensor<5x6xf32>
     }
   }
 }
@@ -284,14 +288,14 @@ flow.executable @attributes_ex_1 {
 flow.executable @attributes_ex_2 {
   flow.executable.export @attributes_entry_2
   builtin.module {
-    func.func @attributes_entry_2(%input: tensor<1x4xi32>) -> tensor<1xi32> {
-      %0 = arith.constant dense<0> : tensor<i32>
-      %1 = "mhlo.reduce"(%input, %0) ( {
-      ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):   // no predecessors
-        %3 = "mhlo.maximum"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
-        "mhlo.return"(%3) : (tensor<i32>) -> ()
-      }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x4xi32>, tensor<i32>) -> tensor<1xi32>
-      return %1 : tensor<1xi32>
+    func.func @attributes_entry_2(%input0: tensor<5x6xf32>, %input1: tensor<5x6xf32>) -> tensor<5x6xf32> {
+      %init = linalg.init_tensor [5, 6] : tensor<5x6xf32>
+      %max = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
+      ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
+        %27 = arith.maxf %arg1, %arg2 : f32
+        linalg.yield %27 : f32
+      } -> tensor<5x6xf32>
+      return %max : tensor<5x6xf32>
     }
   }
 }
