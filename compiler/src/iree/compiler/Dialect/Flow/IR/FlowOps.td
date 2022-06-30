@@ -1137,7 +1137,8 @@ def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", []> {
 // Parameterization Ops
 //===---------------------------------------------------------------------===//
 
-def Flow_DefaultWorkgroupCountOp : FLOW_PureOp<"default_workgroup_count"> {
+def Flow_DispatchDefaultWorkgroupCountOp :
+    FLOW_PureOp<"dispatch.default_workgroup_count"> {
   let summary = [{represents computation that returns workgroup count}];
   let description = [{
     During dispatch region formation, the `workload` captured is used

@@ -17,7 +17,7 @@ hal.executable private @fuse_and_vectorize_fill_matmul {
     }> {
     hal.executable.export @fuse_and_vectorize_fill_matmul layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -68,7 +68,7 @@ hal.executable private @fuse_and_vectorize_matmul_add {
     }> {
     hal.executable.export @fuse_and_vectorize_matmul_add layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

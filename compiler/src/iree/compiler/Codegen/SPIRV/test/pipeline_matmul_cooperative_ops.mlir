@@ -35,7 +35,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
        >}> {
     hal.executable.export public @matmul_256x1024x128_div_sub layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module  {

@@ -9,7 +9,7 @@
 
 stream.executable private @__builtin_fill_i64 {
   stream.executable.export public @__builtin_fill_i64 workgroups(%arg0: index) -> (index, index, index) {
-    %x, %y, %z = flow.default_workgroup_count %arg0
+    %x, %y, %z = flow.dispatch.default_workgroup_count %arg0
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module {

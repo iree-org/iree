@@ -20,7 +20,7 @@ hal.executable private @transpose_10_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export @transpose_10_8x8_pattern layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -78,7 +78,7 @@ hal.executable private @transpose_021_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export @transpose_021_8x8_pattern layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -136,7 +136,7 @@ hal.executable private @transpose_201_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export @transpose_201_8x8_pattern layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -194,7 +194,7 @@ hal.executable private @transpose_210_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export @transpose_210_8x8_pattern layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -252,7 +252,7 @@ hal.executable private @transpose_120_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export @transpose_120_8x8_pattern layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -310,7 +310,7 @@ hal.executable private @transpose_102 {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export @transpose_102 layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -360,7 +360,7 @@ hal.executable private @test_no_avx2_feature {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export @test_no_avx2_feature layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

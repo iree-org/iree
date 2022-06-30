@@ -14,7 +14,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
   hal.executable.variant @rocm, target = <"rocm", "rocm-hsaco-fb"> {
   hal.executable.export @add_dispatch_0 layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index):
-      %x, %y, %z = flow.default_workgroup_count %arg1
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -58,7 +58,7 @@ hal.executable @dot_dispatch_0 {
   hal.executable.variant @rocm, target = <"rocm", "rocm-hsaco-fb"> {
     hal.executable.export @dot_dispatch_0 layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

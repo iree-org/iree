@@ -14,7 +14,7 @@ module attributes {
 
 stream.executable public @reduce_dispatch {
   stream.executable.export @reduce_dispatch workgroups(%arg0 : index) -> (index, index, index) {
-    %x, %y, %z = flow.default_workgroup_count %arg0
+    %x, %y, %z = flow.dispatch.default_workgroup_count %arg0
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module {

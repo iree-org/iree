@@ -66,10 +66,10 @@ static FailureOr<unsigned> getNumWorkloadValues(
   return tilingRoot.getNumLoops();
 }
 
-/// Method to lower the `flow.default_workgroup_count` op into the actual
-/// computation that returns the number of workgroups.
-static LogicalResult lowerDefaultWorkgroupCountOp(
-    IREE::Flow::DefaultWorkgroupCountOp workgroupCountOp,
+/// Method to lower the `flow.dispatch.default_workgroup_count` op into the
+/// actual computation that returns the number of workgroups.
+static LogicalResult lowerDispatchDefaultWorkgroupCountOp(
+    IREE::Flow::DispatchDefaultWorkgroupCountOp workgroupCountOp,
     ArrayRef<Operation *> computeOps, SmallVectorImpl<int64_t> &tileSizes,
     SmallVector<int64_t> &interchange,
     SmallVectorImpl<int64_t> &workloadPerWorkgroup) {
@@ -299,7 +299,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       continue;
     }
 
-    // Find the `flow.default_workgroup_count` operation in the
+    // Find the `flow.dispatch.default_workgroup_count` operation in the
     // `workgroup_count` region of `hal.executable.export`. Lower this to the
     // actual computation that returns the `workgroup_count`.
     // TODO(ravishankarm): Ideally this should be done using a pattern, but the
@@ -312,19 +312,20 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       return signalPassFailure();
     }
     Block &workgroupCountBody = workgroupCountRegion.front();
-    auto ops = workgroupCountBody.getOps<IREE::Flow::DefaultWorkgroupCountOp>();
+    auto ops = workgroupCountBody
+                   .getOps<IREE::Flow::DispatchDefaultWorkgroupCountOp>();
     if (!llvm::hasSingleElement(ops)) {
       // Do not modify the region since the default path expects only a single
-      // `flow.default_workgroup_count` op.
+      // `flow.dispatch.default_workgroup_count` op.
       continue;
     }
-    IREE::Flow::DefaultWorkgroupCountOp defaultWorkgroupCountOp =
+    IREE::Flow::DispatchDefaultWorkgroupCountOp defaultWorkgroupCountOp =
         *(ops.begin());
 
     SmallVector<int64_t> tileSizes, interchange, workloadPerWorkgroup;
-    if (failed(lowerDefaultWorkgroupCountOp(defaultWorkgroupCountOp, computeOps,
-                                            tileSizes, interchange,
-                                            workloadPerWorkgroup))) {
+    if (failed(lowerDispatchDefaultWorkgroupCountOp(
+            defaultWorkgroupCountOp, computeOps, tileSizes, interchange,
+            workloadPerWorkgroup))) {
       return signalPassFailure();
     }
     if (failed(updateTranslationInfoAttr(exportOp, workloadPerWorkgroup))) {

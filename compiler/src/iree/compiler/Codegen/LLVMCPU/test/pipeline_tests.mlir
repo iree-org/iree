@@ -24,7 +24,7 @@ hal.executable private @check_no_cse {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @check_no_cse ordinal(0) layout(#executable_layout5) {
     ^bb0(%arg0: !hal.device, %arg1: index):
-      %x, %y, %z = flow.default_workgroup_count %arg1
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -83,7 +83,7 @@ hal.executable private @preset_config_matmul  {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
     hal.executable.export @preset_config_matmul layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -134,7 +134,7 @@ hal.executable private @batch_matmul_dynamic {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @batch_matmul_dynamic ordinal(0) layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -186,7 +186,7 @@ hal.executable private @check_buffer_ops_vectorization {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @check_buffer_ops_vectorization ordinal(0) layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -232,7 +232,7 @@ hal.executable private @vectorize_fill_conv2d_generic {
         >]>
       ) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

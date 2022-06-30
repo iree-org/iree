@@ -21,7 +21,7 @@ hal.executable private @shared_mem_cpy  {
       workgroup_size = [32: index, 4: index, 1:index]
     } {
     ^bb0(%arg0: !hal.device, %arg1 : index, %arg2 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

@@ -13,7 +13,7 @@ module attributes {
 
 stream.executable public @add_dispatch_0 {
   stream.executable.export @add_dispatch_0 workgroups(%arg0 : index) -> (index, index, index) {
-    %x, %y, %z = flow.default_workgroup_count %arg0
+    %x, %y, %z = flow.dispatch.default_workgroup_count %arg0
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module  {

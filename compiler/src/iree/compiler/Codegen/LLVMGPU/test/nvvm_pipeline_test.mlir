@@ -15,7 +15,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.export @add_dispatch_0 layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index):
-      %x, %y, %z = flow.default_workgroup_count %arg1
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -59,7 +59,7 @@ hal.executable @dot_dispatch_0 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.export @dot_dispatch_0 layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -130,7 +130,7 @@ hal.executable @dot_dispatch_0 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.export @dot_dispatch_0 layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -183,7 +183,7 @@ hal.executable @conv2d_dispatch_0 {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.export @conv2d_dispatch_0 layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index, %arg6 : index, %arg7 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -231,7 +231,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.export @add_dispatch_0 layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index):
-      %x, %y, %z = flow.default_workgroup_count %arg1
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -271,7 +271,7 @@ hal.executable @reduction_dispatch {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.export @reduction layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -318,7 +318,7 @@ hal.executable @vector_add_dispatch {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.export @vector_add_dispatch layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index):
-      %x, %y, %z = flow.default_workgroup_count %arg1
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -371,7 +371,7 @@ hal.executable @vector_reduction_dispatch {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.export @vector_reduction_dispatch layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -418,7 +418,7 @@ hal.executable @mma_fused {
   hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
   hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-    %x, %y, %z = flow.default_workgroup_count %arg1, %arg2
+    %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
@@ -547,7 +547,7 @@ hal.executable @mma_fused_fp16 {
   hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
   hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-    %x, %y, %z = flow.default_workgroup_count %arg1, %arg2
+    %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
@@ -676,7 +676,7 @@ hal.executable @mma_fused_fp16 {
     hal.executable.variant public @cuda, target = #executable_target_cuda_nvptx_fb {
       hal.executable.export @large_dot_general_dispatch_0 layout(#executable_layout) {
       ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 :index):
-        %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3, %arg4
+        %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4
         hal.return %x, %y, %z : index, index, index
       }
       builtin.module {
@@ -762,7 +762,7 @@ hal.executable @mma_fused_fp16 {
     hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
       hal.executable.export public @split_k_gemm ordinal(0) layout(#executable_layout) {
       ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index):
-        %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3, %arg4
+        %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4
         hal.return %x, %y, %z : index, index, index
       }
       builtin.module {
@@ -825,7 +825,7 @@ hal.executable @mma_fused_fp16 {
     hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
       hal.executable.export public @pooling_dynamic ordinal(0) layout(#executable_layout) {
       ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 :index, %arg4 : index, %arg5 : index, %arg6 : index):
-        %x, %y, %z = flow.default_workgroup_count %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
+        %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
         hal.return %x, %y, %z : index, index, index
       }
       builtin.module {
@@ -870,7 +870,7 @@ hal.executable @warp_reduction_dispatch {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.export @warp_reduction_dispatch layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-      %x, %y, %z = flow.default_workgroup_count %arg1, %arg2
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
