@@ -32,8 +32,8 @@
 //  CHECK-NEXT:   %[[IN1:.+]] = hal.tensor.import %[[NULL]] : !hal.buffer -> tensor<?x8x8x3xf32>{%[[IN1_DIM0]]}
 
 // The actual model code used to (eventually) compute shapes.
-//  CHECK-NEXT:   %[[OUT0:.+]] = mhlo.add %[[IN0]], %[[IN1]]
-//  CHECK-NEXT:   %[[OUT1:.+]] = mhlo.add %[[OUT0]], %[[IN0]]
+//  CHECK-NEXT:   %[[OUT0:.+]] = arith.addf %[[IN0]], %[[IN1]]
+//  CHECK-NEXT:   %[[OUT1:.+]] = arith.addf %[[OUT0]], %[[IN0]]
 
 // Store back the new dynamic dimensions of out0/out1.
 //       CHECK:   %[[OUT0_DIM0:.+]] = tensor.dim %[[OUT0]], %c0
@@ -200,10 +200,10 @@ func.func @dynamicEntry(
   tensor<?x8x8x3xf32> {iree.identifier = "output0"},
   tensor<?x8x8x3xf32> {iree.identifier = "output1"}
 ) {
-  // CHECK: = mhlo.add
-  %0 = mhlo.add %arg0, %arg1 : tensor<?x8x8x3xf32>
-  // CHECK: = mhlo.add
-  %1 = mhlo.add %0, %arg0 : tensor<?x8x8x3xf32>
+  // CHECK: = arith.addf
+  %0 = arith.addf %arg0, %arg1 : tensor<?x8x8x3xf32>
+  // CHECK: = arith.addf
+  %1 = arith.addf %0, %arg0 : tensor<?x8x8x3xf32>
   // CHECK: return
   return %0, %1 : tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>
 }
@@ -230,10 +230,10 @@ func.func @dynamicEntryWithoutIdentifiers(
   tensor<?x8x8x3xf32>,
   tensor<?x8x8x3xf32>
 ) {
-  // CHECK: = mhlo.add
-  %0 = mhlo.add %arg0, %arg1 : tensor<?x8x8x3xf32>
-  // CHECK: = mhlo.add
-  %1 = mhlo.add %0, %arg0 : tensor<?x8x8x3xf32>
+  // CHECK: = arith.addf
+  %0 = arith.addf %arg0, %arg1 : tensor<?x8x8x3xf32>
+  // CHECK: = arith.addf
+  %1 = arith.addf %0, %arg0 : tensor<?x8x8x3xf32>
   // CHECK: return
   return %0, %1 : tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>
 }
