@@ -470,9 +470,10 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
     return failure();
   if (op.getRegionOutputArgs().size() != 1) return failure();
 
-  // Disallow transposition for now, to be enabled.
+  // Only support projected permutation, this could be extended to projected
+  // permutated with broadcast.
   if (llvm::any_of(op.getInputOperands(), [&](OpOperand *input) {
-        return !op.getTiedIndexingMap(input).isMinorIdentity();
+        return !op.getTiedIndexingMap(input).isProjectedPermutation();
       }))
     return failure();
 
