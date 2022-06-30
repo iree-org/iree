@@ -36,7 +36,6 @@ import argparse
 import json
 import os
 import requests
-
 import markdown_strings as md
 
 from typing import Any, Dict, Optional, Sequence, Tuple
@@ -169,13 +168,13 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
         all_benchmarks[bench].base_mean_time = base_benchmarks[bench]
 
       # Update the compilation metrics with base numbers.
-      for target_name, compilation_metric in all_compilation_metrics.items():
-        updated_metric = compilation_metric
+      for target_name, metrics in all_compilation_metrics.items():
+        updated_metrics = metrics
         for mapper in COMPILATION_METRICS_TO_TABLE_MAPPERS:
           metric_key = mapper.get_series_name(target_name)
-          updated_metric = mapper.update_base_value(updated_metric,
-                                                    base_benchmarks[metric_key])
-        all_compilation_metrics[target_name] = updated_metric
+          updated_metrics = mapper.update_base_value(
+              updated_metrics, base_benchmarks[metric_key])
+        all_compilation_metrics[target_name] = updated_metrics
 
       commit_info = f"@ commit {pr_commit} (vs. base {base_commit})"
       break
