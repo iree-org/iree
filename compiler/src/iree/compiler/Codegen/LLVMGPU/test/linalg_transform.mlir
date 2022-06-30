@@ -31,38 +31,44 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
           // CHECK-NEXT: linalg.matmul{{.*}}ins(%{{.*}} : memref<250x500xf32>, memref<500x1020xf32>) outs(%{{.*}} : memref<250x1020xf32>)
           // CHECK-NEXT: return
 
-
-          // Fill is tiled by 5x1 matmul is tiled by 7x9, the joined workgroup_size is 7x9.
-          // FOREACH-TO-GPU-DAG: hal.executable.export {{.*}}{translation_info = #translation, workgroup_size = [7 : index, 9 : index, 1 : index]}
+          // workgroup_size is explicitly set to [10, 11].
+          // FOREACH-TO-GPU-DAG: hal.executable.export {{.*}}{translation_info = #translation, workgroup_size = [10 : index, 11 : index, 1 : index]}
           // FOREACH-TO-GPU-DAG: %[[C0:.*]] = arith.constant 0 : index
           // FOREACH-TO-GPU-DAG: %[[C1:.*]] = arith.constant 1 : index
           // FOREACH-TO-GPU-DAG: %[[C5:.*]] = arith.constant 5 : index
+          // FOREACH-TO-GPU-DAG: %[[C7:.*]] = arith.constant 7 : index
+          // FOREACH-TO-GPU-DAG: %[[C9:.*]] = arith.constant 9 : index
           // FOREACH-TO-GPU-DAG: %[[CF0:.*]] = arith.constant 0.000000e+00 : f32
           // FOREACH-TO-GPU: %[[TIDX:.*]] = gpu.thread_id  x
           // FOREACH-TO-GPU: %[[TIDY:.*]] = gpu.thread_id  y
           //
-          // Fill is tiled by 5x1 in a 7x9 workgroup_size, predicate appropriately.
-          // FOREACH-TO-GPU: %[[LT5:.*]]  = arith.cmpi ult, %[[TIDX]], %[[C5]] : index
-          // FOREACH-TO-GPU: %[[LT1:.*]]  = arith.cmpi ult, %[[TIDY]], %[[C1]] : index
-          // FOREACH-TO-GPU: %[[COND:.*]]  = arith.andi %[[LT5]], %[[LT1]] : i1
+          // Fill is tiled by 5x1 with thread_dim_mapping = [1, 0, 2], predicate appropriately.
+          // FOREACH-TO-GPU: %[[LT1:.*]]  = arith.cmpi ult, %[[TIDX]], %[[C1]] : index
+          // FOREACH-TO-GPU: %[[LT5:.*]]  = arith.cmpi ult, %[[TIDY]], %[[C5]] : index
+          // FOREACH-TO-GPU: %[[COND:.*]]  = arith.andi %[[LT1]], %[[LT5]] : i1
           // FOREACH-TO-GPU: scf.if %[[COND]] {
-          // FOREACH-TO-GPU:   affine.apply #{{.*}}()[%[[TIDX]]]
           // FOREACH-TO-GPU:   affine.apply #{{.*}}()[%[[TIDY]]]
+          // FOREACH-TO-GPU:   affine.apply #{{.*}}()[%[[TIDX]]]
           // FOREACH-TO-GPU:   linalg.fill
           // FOREACH-TO-GPU: }
           // FOREACH-TO-GPU: gpu.barrier
           //
-          // Matmul does not need to be predicated.
-          // FOREACH-TO-GPU: affine.min #{{.*}}()[%[[TIDX]]]
-          // FOREACH-TO-GPU: affine.min #{{.*}}()[%[[TIDY]]]
-          // FOREACH-TO-GPU: affine.apply #{{.*}}()[%[[TIDX]]]
-          // FOREACH-TO-GPU: %[[svA:.*]] = memref.subview {{.*}} : memref<250x500xf32> to memref<?x500xf32
-          // FOREACH-TO-GPU: affine.apply #{{.*}}()[%[[TIDY]]]
-          // FOREACH-TO-GPU: %[[svB:.*]] = memref.subview {{.*}} : memref<500x1020xf32> to memref<500x?xf32
-          // FOREACH-TO-GPU: %[[svC:.*]] = memref.subview {{.*}} : memref<250x1020xf32> to memref<?x?xf32
-          // FOREACH-TO-GPU: linalg.matmul ins(%[[svA]], %[[svB]] : memref<?x500xf32{{.*}}>, memref<500x?xf32{{.*}}>) outs(%[[svC]] : memref<?x?xf32{{.*}}>)
+          // Matmul is tiled by 7x9 with identity (omitted) thread_dim_mapping, predicate appropriately.
+          // FOREACH-TO-GPU: %[[LT7:.*]]  = arith.cmpi ult, %[[TIDX]], %[[C7]] : index
+          // FOREACH-TO-GPU: %[[LT9:.*]]  = arith.cmpi ult, %[[TIDY]], %[[C9]] : index
+          // FOREACH-TO-GPU: %[[COND2:.*]]  = arith.andi %[[LT7]], %[[LT9]] : i1
+          // FOREACH-TO-GPU: scf.if %[[COND2]] {
+          // FOREACH-TO-GPU:   affine.min #{{.*}}()[%[[TIDX]]]
+          // FOREACH-TO-GPU:   affine.min #{{.*}}()[%[[TIDY]]]
+          // FOREACH-TO-GPU:   affine.apply #{{.*}}()[%[[TIDX]]]
+          // FOREACH-TO-GPU:   %[[svA:.*]] = memref.subview {{.*}} : memref<250x500xf32> to memref<?x500xf32
+          // FOREACH-TO-GPU:   affine.apply #{{.*}}()[%[[TIDY]]]
+          // FOREACH-TO-GPU:   %[[svB:.*]] = memref.subview {{.*}} : memref<500x1020xf32> to memref<500x?xf32
+          // FOREACH-TO-GPU:   %[[svC:.*]] = memref.subview {{.*}} : memref<250x1020xf32> to memref<?x?xf32
+          // FOREACH-TO-GPU:   linalg.matmul ins(%[[svA]], %[[svB]] : memref<?x500xf32{{.*}}>, memref<500x?xf32{{.*}}>) outs(%[[svC]] : memref<?x?xf32{{.*}}>)
+          // FOREACH-TO-GPU: }
           // FOREACH-TO-GPU: gpu.barrier
-
+          //
           %6 = linalg.matmul ins(%3, %4 : tensor<250x500xf32>, tensor<500x1020xf32>) outs(%5 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
           flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [250, 1020], strides = [1, 1] : tensor<250x1020xf32> -> !flow.dispatch.tensor<readwrite:250x1020xf32>
           return
