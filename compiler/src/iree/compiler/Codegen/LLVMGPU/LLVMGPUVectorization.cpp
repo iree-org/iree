@@ -83,8 +83,10 @@ static void populateVectorUnrollPatterns(RewritePatternSet &patterns,
 namespace {
 struct LLVMGPUVectorizationPass
     : public LLVMGPUVectorizationBase<LLVMGPUVectorizationPass> {
-  LLVMGPUVectorizationPass(int64_t nativeVector, bool generateContract)
-      : nativeVector(nativeVector), generateContract(generateContract) {}
+  LLVMGPUVectorizationPass(int64_t nativeVector, bool generateContract) {
+    this->nativeVector = nativeVector;
+    this->generateContract = generateContract;
+  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -163,11 +165,6 @@ struct LLVMGPUVectorizationPass
       });
     }
   }
-
- private:
-  int64_t nativeVector;
-  // Try to convert reduction to contraction op.
-  bool generateContract;
 };
 }  // namespace
 
