@@ -118,6 +118,7 @@ class VMVXImportOpConversion : public OpConversionPattern<T> {
 }  // namespace
 
 void populateVMVXToVMPatterns(MLIRContext *context,
+                              ConversionTarget &conversionTarget,
                               TypeConverter &typeConverter,
                               SymbolTable &importSymbols,
                               RewritePatternSet &patterns) {}

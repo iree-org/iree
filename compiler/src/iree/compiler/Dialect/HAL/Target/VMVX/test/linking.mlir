@@ -130,13 +130,15 @@ hal.executable private @dispatch_0 {
         vm.rodata public @rodata_c dense<[0]> : tensor<1xi32>
         vm.rodata private @rodata_d dense<[0]> : tensor<1xi32>
         vm.rodata private @rodata_e dense<[0]> : tensor<1xi32>
-
-        %buf_a = vm.const.ref.rodata @rodata_a : !vm.buffer
-        %buf_b = vm.const.ref.rodata @rodata_b : !vm.buffer
-        %buf_b_0 = vm.const.ref.rodata @rodata_b_0 : !vm.buffer
-        %buf_c = vm.const.ref.rodata @rodata_c : !vm.buffer
-        %buf_d = vm.const.ref.rodata @rodata_d : !vm.buffer
-        %buf_e = vm.const.ref.rodata @rodata_e : !vm.buffer
+        vm.func public @dispatch_0() {
+          %buf_a = vm.const.ref.rodata @rodata_a : !vm.buffer
+          %buf_b = vm.const.ref.rodata @rodata_b : !vm.buffer
+          %buf_b_0 = vm.const.ref.rodata @rodata_b_0 : !vm.buffer
+          %buf_c = vm.const.ref.rodata @rodata_c : !vm.buffer
+          %buf_d = vm.const.ref.rodata @rodata_d : !vm.buffer
+          %buf_e = vm.const.ref.rodata @rodata_e : !vm.buffer
+          vm.return
+        }
       }
     }
   }
@@ -156,12 +158,14 @@ hal.executable private @dispatch_1 {
         vm.rodata public @rodata_e dense<[1]> : tensor<1xi32>
         // No conflict.
         vm.rodata public @rodata_f dense<[1]> : tensor<1xi32>
-
-        %buf_b = vm.const.ref.rodata @rodata_b : !vm.buffer
-        %buf_b_0 = vm.const.ref.rodata @rodata_b_0 : !vm.buffer
-        %buf_d = vm.const.ref.rodata @rodata_d : !vm.buffer
-        %buf_e = vm.const.ref.rodata @rodata_e : !vm.buffer
-        %buf_f = vm.const.ref.rodata @rodata_f : !vm.buffer
+        vm.func public @dispatch_1() {
+          %buf_b = vm.const.ref.rodata @rodata_b : !vm.buffer
+          %buf_b_0 = vm.const.ref.rodata @rodata_b_0 : !vm.buffer
+          %buf_d = vm.const.ref.rodata @rodata_d : !vm.buffer
+          %buf_e = vm.const.ref.rodata @rodata_e : !vm.buffer
+          %buf_f = vm.const.ref.rodata @rodata_f : !vm.buffer
+          vm.return
+        }
       }
     }
   }
@@ -183,19 +187,25 @@ hal.executable private @dispatch_1 {
 // CHECK-NEXT:          vm.rodata public @rodata_c dense<0> : tensor<1xi32>
 // CHECK-NEXT:          vm.rodata private @rodata_d dense<0> : tensor<1xi32>
 // CHECK-NEXT:          vm.rodata private @rodata_e_0 dense<0> : tensor<1xi32>
-// CHECK-NEXT:          %[[BUF_rodata_a:.+]] = vm.const.ref.rodata @rodata_a : !vm.buffer
-// CHECK-NEXT:          %[[BUF_rodata_b:.+]] = vm.const.ref.rodata @rodata_b : !vm.buffer
-// CHECK-NEXT:          %[[BUF_rodata_b_0:.+]] = vm.const.ref.rodata @rodata_b_0 : !vm.buffer
-// CHECK-NEXT:          %[[BUF_rodata_c:.+]] = vm.const.ref.rodata @rodata_c : !vm.buffer
-// CHECK-NEXT:          %[[BUF_rodata_d:.+]] = vm.const.ref.rodata @rodata_d : !vm.buffer
-// CHECK-NEXT:          %[[BUF_rodata_e_0:.+]] = vm.const.ref.rodata @rodata_e_0 : !vm.buffer
+// CHECK-NEXT:          vm.func public @dispatch_0() {
+// CHECK-NEXT:            = vm.const.ref.rodata @rodata_a : !vm.buffer
+// CHECK-NEXT:            = vm.const.ref.rodata @rodata_b : !vm.buffer
+// CHECK-NEXT:            = vm.const.ref.rodata @rodata_b_0 : !vm.buffer
+// CHECK-NEXT:            = vm.const.ref.rodata @rodata_c : !vm.buffer
+// CHECK-NEXT:            = vm.const.ref.rodata @rodata_d : !vm.buffer
+// CHECK-NEXT:            = vm.const.ref.rodata @rodata_e_0 : !vm.buffer
+// CHECK-NEXT:            vm.return
+// CHECK-NEXT:          }
 // CHECK-NEXT:          vm.rodata private @rodata_b_1 dense<1> : tensor<1xi32>
 // CHECK-NEXT:          vm.rodata private @rodata_b_0_0 dense<1> : tensor<1xi32>
 // CHECK-NEXT:          vm.rodata private @rodata_d_0 dense<1> : tensor<1xi32>
 // CHECK-NEXT:          vm.rodata public @rodata_e dense<1> : tensor<1xi32>
 // CHECK-NEXT:          vm.rodata public @rodata_f dense<1> : tensor<1xi32>
-// CHECK-NEXT:          %[[BUF_rodata_b_1:.+]] = vm.const.ref.rodata @rodata_b_1 : !vm.buffer
-// CHECK-NEXT:          %[[BUF_rodata_b_0_0:.+]] = vm.const.ref.rodata @rodata_b_0_0 : !vm.buffer
-// CHECK-NEXT:          %[[BUF_rodata_d_0:.+]] = vm.const.ref.rodata @rodata_d_0 : !vm.buffer
-// CHECK-NEXT:          %[[BUF_rodata_e:.+]] = vm.const.ref.rodata @rodata_e : !vm.buffer
-// CHECK-NEXT:          %[[BUF_rodata_f:.+]] = vm.const.ref.rodata @rodata_f : !vm.buffer
+// CHECK-NEXT:          vm.func public @dispatch_1() {
+// CHECK-NEXT:            = vm.const.ref.rodata @rodata_b_1 : !vm.buffer
+// CHECK-NEXT:            = vm.const.ref.rodata @rodata_b_0_0 : !vm.buffer
+// CHECK-NEXT:            = vm.const.ref.rodata @rodata_d_0 : !vm.buffer
+// CHECK-NEXT:            = vm.const.ref.rodata @rodata_e : !vm.buffer
+// CHECK-NEXT:            = vm.const.ref.rodata @rodata_f : !vm.buffer
+// CHECK-NEXT:            vm.return
+// CHECK-NEXT:          }

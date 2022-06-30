@@ -87,6 +87,7 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
 
   void populateVMConversionPatterns(
       SymbolTable &importSymbols, RewritePatternSet &patterns,
+      ConversionTarget &conversionTarget,
       TypeConverter &typeConverter) const override {
     populateHALToVMPatterns(getDialect()->getContext(), importSymbols, patterns,
                             typeConverter);
