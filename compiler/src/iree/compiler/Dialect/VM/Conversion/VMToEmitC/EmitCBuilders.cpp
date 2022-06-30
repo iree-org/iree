@@ -91,6 +91,19 @@ void structPtrMemberAssign(OpBuilder builder, Location location,
       /*operands=*/ArrayRef<Value>{operand, data});
 }
 
+Value ireeOkStatus(OpBuilder builder, Location location) {
+  auto ctx = builder.getContext();
+  return builder
+      .create<emitc::CallOp>(
+          /*location=*/location,
+          /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
+          /*callee=*/StringAttr::get(ctx, "iree_ok_status"),
+          /*args=*/ArrayAttr{},
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>{})
+      .getResult(0);
+}
+
 void ireeVmRefRelease(OpBuilder builder, Location location, Value operand) {
   auto ctx = builder.getContext();
   builder.create<emitc::CallOp>(

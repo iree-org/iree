@@ -925,15 +925,9 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*operands=*/
         ArrayRef<Value>{funcOp.getArgument(2), baseStateOp.getResult()});
 
-    auto status = builder.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
-        /*callee=*/StringAttr::get(ctx, "iree_ok_status"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{});
+    auto status = emitc_builders::ireeOkStatus(builder, loc);
 
-    builder.create<mlir::func::ReturnOp>(loc, status.getResult(0));
+    builder.create<mlir::func::ReturnOp>(loc, status);
   }
 
   // free_state
@@ -1088,15 +1082,9 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*operands=*/
         ArrayRef<Value>{import.getResult(0), funcOp.getArgument(3)});
 
-    auto status = builder.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
-        /*callee=*/StringAttr::get(ctx, "iree_ok_status"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{});
+    auto status = emitc_builders::ireeOkStatus(builder, loc);
 
-    builder.create<mlir::func::ReturnOp>(loc, status.getResult(0));
+    builder.create<mlir::func::ReturnOp>(loc, status);
   }
 
   // create
@@ -1531,15 +1519,9 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
 
       returnIfError(rewriter, loc, funcOp, operands, *typeConverter);
 
-      auto status = rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
-          /*callee=*/StringAttr::get(ctx, "iree_ok_status"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{});
+      auto status = emitc_builders::ireeOkStatus(rewriter, loc);
 
-      rewriter.create<mlir::func::ReturnOp>(loc, status.getResult(0));
+      rewriter.create<mlir::func::ReturnOp>(loc, status);
     }
 
     rewriter.eraseOp(exportOp);
@@ -2048,15 +2030,9 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
         return importOp.emitError() << "failed to unpack result struct";
       }
 
-      auto status = rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
-          /*callee=*/StringAttr::get(ctx, "iree_ok_status"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{});
+      auto status = emitc_builders::ireeOkStatus(rewriter, loc);
 
-      rewriter.create<mlir::func::ReturnOp>(loc, status.getResult(0));
+      rewriter.create<mlir::func::ReturnOp>(loc, status);
     }
 
     return success();
@@ -3494,15 +3470,9 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
 
     releaseRefs(rewriter, loc, funcOp, *typeConverter);
 
-    auto status = rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
-        /*callee=*/StringAttr::get(ctx, "iree_ok_status"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{});
+    auto status = emitc_builders::ireeOkStatus(rewriter, loc);
 
-    rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(op, status.getResult(0));
+    rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(op, status);
 
     return success();
   }
@@ -3618,15 +3588,9 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
 
       releaseRefs(rewriter, loc, funcOp, *typeConverter);
 
-      auto status = rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
-          /*callee=*/StringAttr::get(ctx, "iree_ok_status"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{});
+      auto status = emitc_builders::ireeOkStatus(rewriter, loc);
 
-      rewriter.create<mlir::func::ReturnOp>(loc, status.getResult(0));
+      rewriter.create<mlir::func::ReturnOp>(loc, status);
     }
     Block *failureBlock;
     {

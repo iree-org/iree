@@ -32,6 +32,8 @@ Value structPtrMember(OpBuilder builder, Location location, Type type,
 void structPtrMemberAssign(OpBuilder builder, Location location,
                            StringRef memberName, Value operand, Value data);
 
+Value ireeOkStatus(OpBuilder builder, Location location);
+
 void ireeVmRefRelease(OpBuilder builder, Location location, Value operand);
 
 }  // namespace emitc_builders
