@@ -485,13 +485,7 @@ void releaseRefs(OpBuilder &builder, Location location,
 
     Value localRef = cast<emitc::ApplyOp>(op).getResult();
 
-    builder.create<emitc::CallOp>(
-        /*location=*/location,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{localRef});
+    emitc_builders::ireeVmRefRelease(builder, location, localRef);
   }
 
   // We only release the original arguments not the results which were appended
@@ -504,13 +498,7 @@ void releaseRefs(OpBuilder &builder, Location location,
           refArgumentsReleased++) {
         break;
       }
-      builder.create<emitc::CallOp>(
-          /*location=*/location,
-          /*type=*/TypeRange{},
-          /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{arg});
+      emitc_builders::ireeVmRefRelease(builder, location, arg);
     }
   }
 }
@@ -1011,13 +999,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
             /*templateArgs=*/ArrayAttr{},
             /*operands=*/ArrayRef<Value>{refs});
 
-        builder.create<emitc::CallOp>(
-            /*location=*/loc,
-            /*type=*/TypeRange{},
-            /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-            /*args=*/ArrayAttr{},
-            /*templateArgs=*/ArrayAttr{},
-            /*operands=*/ArrayRef<Value>{refPtrOp.getResult(0)});
+        emitc_builders::ireeVmRefRelease(builder, loc, refPtrOp.getResult(0));
       }
     }
 
@@ -2945,25 +2927,13 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
         /*operands=*/ArrayRef<Value>{refLhs.getValue(), refRhs.getValue()});
 
     if (moveLhs) {
-      rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/TypeRange{},
-          /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{refLhs.getValue()});
+      emitc_builders::ireeVmRefRelease(rewriter, loc, refLhs.getValue());
     }
 
     // NOTE: If lhs and rhs alias we call release twice on the same
     // argument.
     if (moveRhs) {
-      rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/TypeRange{},
-          /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{refRhs.getValue()});
+      emitc_builders::ireeVmRefRelease(rewriter, loc, refRhs.getValue());
     }
 
     return success();
@@ -3012,13 +2982,7 @@ class CompareRefNotZeroOpConversion
         /*operands=*/ArrayRef<Value>{ref.getValue()});
 
     if (move) {
-      rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/TypeRange{},
-          /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{ref.getValue()});
+      emitc_builders::ireeVmRefRelease(rewriter, loc, ref.getValue());
     }
 
     return success();
@@ -3086,13 +3050,7 @@ class ConstRefZeroOpConversion
       return constRefZeroOp.emitError() << "local ref not found";
     }
 
-    rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{ref.getValue()});
+    emitc_builders::ireeVmRefRelease(rewriter, loc, ref.getValue());
 
     rewriter.replaceOp(constRefZeroOp, ref.getValue());
 
@@ -4391,13 +4349,7 @@ class ListGetRefOpConversion
       Region *parentRegion = condBlock->getParent();
       failureBlock = rewriter.createBlock(parentRegion, parentRegion->end());
 
-      rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/TypeRange{},
-          /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{ref.getValue()});
+      emitc_builders::ireeVmRefRelease(rewriter, loc, ref.getValue());
 
       rewriter.create<mlir::cf::BranchOp>(loc, continuationBlock);
     }

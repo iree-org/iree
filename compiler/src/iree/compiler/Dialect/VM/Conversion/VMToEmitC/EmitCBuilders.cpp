@@ -91,6 +91,17 @@ void structPtrMemberAssign(OpBuilder builder, Location location,
       /*operands=*/ArrayRef<Value>{operand, data});
 }
 
+void ireeVmRefRelease(OpBuilder builder, Location location, Value operand) {
+  auto ctx = builder.getContext();
+  builder.create<emitc::CallOp>(
+      /*location=*/location,
+      /*type=*/TypeRange{},
+      /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
+      /*args=*/ArrayAttr{},
+      /*templateArgs=*/ArrayAttr{},
+      /*operands=*/ArrayRef<Value>{operand});
+}
+
 }  // namespace emitc_builders
 }  // namespace iree_compiler
 }  // namespace mlir
