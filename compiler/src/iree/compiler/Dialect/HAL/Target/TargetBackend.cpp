@@ -188,7 +188,7 @@ LogicalResult TargetBackend::linkExecutablesInto(
     OpBuilder &builder) {
   int nextEntryPointOrdinal = 0;
   DenseMap<StringRef, Operation *> targetSymbolMap;
-  DenseMap<Attribute, Attribute> entryPointRefReplacements;
+  DenseMap<Attribute, Attribute> exportRefReplacements;
 
   auto linkedTargetBuilder = OpBuilder::atBlockBegin(linkedTargetOp.getBody());
   auto linkedModuleOp = getInnerModuleFn(linkedTargetOp.getInnerModule());
@@ -201,25 +201,26 @@ LogicalResult TargetBackend::linkExecutablesInto(
       // Only process targets matching our pattern.
       if (variantOp.target().getBackend().getValue() != name()) continue;
 
-      // Clone entry point ops and queue remapping ordinals and updating
+      // Clone export ops and queue remapping ordinals and updating
       // symbol refs.
       for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
-        auto newEntryPointOp =
+        auto newExportOp =
             linkedTargetBuilder.create<IREE::HAL::ExecutableExportOp>(
                 exportOp.getLoc(), exportOp.sym_nameAttr(),
                 builder.getIndexAttr(nextEntryPointOrdinal++),
                 exportOp.layout(), ArrayAttr{}, IntegerAttr{});
+        newExportOp->setDialectAttrs(exportOp->getDialectAttrs());
 
         // Add to replacement table for fixing up dispatch calls referencing
-        // this entry point.
+        // this export.
         auto oldSymbolRefAttr = SymbolRefAttr::get(
             builder.getContext(), sourceExecutableOp.getName(),
             {SymbolRefAttr::get(variantOp), SymbolRefAttr::get(exportOp)});
         auto newSymbolRefAttr = SymbolRefAttr::get(
             builder.getContext(), linkedExecutableOp.getName(),
             {SymbolRefAttr::get(linkedTargetOp),
-             SymbolRefAttr::get(newEntryPointOp)});
-        entryPointRefReplacements[oldSymbolRefAttr] = newSymbolRefAttr;
+             SymbolRefAttr::get(newExportOp)});
+        exportRefReplacements[oldSymbolRefAttr] = newSymbolRefAttr;
       }
 
       // Merge the existing module into the new linked module op.
@@ -238,7 +239,7 @@ LogicalResult TargetBackend::linkExecutablesInto(
   }
 
   // Update references to @executable::@target::@entry symbols.
-  replaceEntryPointUses(moduleOp, entryPointRefReplacements);
+  replaceEntryPointUses(moduleOp, exportRefReplacements);
 
   // Remove if we didn't add anything.
   if (linkedTargetOp.getOps<IREE::HAL::ExecutableExportOp>().empty()) {

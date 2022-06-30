@@ -95,10 +95,6 @@ static iree_status_t iree_hal_vmvx_executable_set_constants(
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // TODO(benvanik): maybe just take the cost of an alloc + clone here so that
-  // we can more gracefully handle the module doing weird things with the inputs
-  // and constants.
-
   // Wrap the constant memory in an on-stack buffer.
   iree_vm_buffer_t buffer = {{0}};
   iree_vm_buffer_initialize(

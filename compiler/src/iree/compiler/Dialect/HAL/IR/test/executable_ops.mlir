@@ -1,6 +1,5 @@
 // RUN: iree-opt --split-input-file %s | FileCheck %s
 
-
 #executable_target_format = #hal.executable.target<"backend", "format">
 // CHECK-LABEL: @ex
 hal.executable @ex {
