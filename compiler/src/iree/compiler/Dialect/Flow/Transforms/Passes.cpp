@@ -214,7 +214,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   FunctionLikeNest(passManager)
       // Pad tensors.
       .addPredicatedPass((!clEnableFusePaddingIntoConsumerOps),
-                         IREE::Flow::createPadTensorToSubTensorInsertPass)
+                         IREE::Flow::createPadTensorToTensorInsertSlicePass)
 
       // Preprocess the input to a form more amenable for fusion
       // - Convert all elementwise ops to Linalg

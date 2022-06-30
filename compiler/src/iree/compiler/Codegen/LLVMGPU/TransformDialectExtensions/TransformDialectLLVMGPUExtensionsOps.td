@@ -74,12 +74,14 @@ def ForeachThreadToGpuAndTranslationInfo :
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
-def VectorDistributionOp : Op<Transform_Dialect, "iree.vector_distribution",
-    [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
-     TransformEachOpTrait, TransformOpInterface]> {
+def VectorWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.warp_execute_on_lane_0",
+    [FunctionalStyleTransformOpTrait, 
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait, 
+     TransformOpInterface]> {
   let description = [{
-    Given a target that is isolated from above, rewrite ops predicated by 
-    `if (threadIdx.x == 0)` to distributed form running **on a single warp**.
+    Given an scf.if target predicated by `if (threadIdx.x == 0)`, rewrite its 
+    body to vector.execute_on_lane_0 running ***on a single warp***.
 
     The warp size is determined by the `warp_size` attribute (it is generally 
     32 but we do not want to hardcode it).
@@ -89,6 +91,9 @@ def VectorDistributionOp : Op<Transform_Dialect, "iree.vector_distribution",
     along the warp dimension is a multiple of the warp size. The transformation
     bails on non-perfect multiples of the warp size that would not properly 
     distribute.
+
+    This is the first of two step towards apply vector distribution to a single
+    warp.
 
     Example:
 
@@ -104,6 +109,83 @@ def VectorDistributionOp : Op<Transform_Dialect, "iree.vector_distribution",
         scf.if %2 {
           %3 = arith.constant dense<1.0> : vector<128xf32>
           vector.transfer_write %3, %0[%c0] : vector<128xf32>, memref<128xf32>
+        }
+      }
+    }
+    ```
+
+    rewrites to:
+
+    ```
+    hal.executable.export public @foo ... { workgroup_size = [64: index, 1: index, 1: index] }
+    builtin.module {
+      func.func @foo() {
+        %c0 = arith.constant 0 : index
+        %c4 = arith.constant 4 : index
+        %c32 = arith.constant 32 : index
+        %cst = arith.constant dense<1.000000e+00> : vector<128xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<128xf32>
+        %1 = gpu.thread_id  x
+        %2 = arith.cmpi ult, %1, %c32 : index
+        // Single-warp guard filters out threads 32-63.
+        scf.if %2 {
+          vector.warp_execute_on_lane_0(%1)[32] {
+            %cst = arith.constant dense<1.000000e+00> : vector<128xf32>
+            vector.transfer_write %cst, %0[%c0] : vector<128xf32>, memref<128xf32>
+          }
+        }
+      }
+    }
+    ```
+  }];
+
+  let arguments = (ins PDL_Operation:$target,
+                   DefaultValuedAttr<I64Attr, "{}">:$warp_size);
+  let results = (outs PDL_Operation:$result);
+
+  let assemblyFormat = "$target attr-dict";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::FailureOr<::mlir::vector::WarpExecuteOnLane0Op> applyToOne(
+      ::mlir::scf::IfOp ifOp, ::mlir::transform::TransformState &state);
+  }];
+}
+
+def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribute",
+    [FunctionalStyleTransformOpTrait, 
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait, 
+     TransformOpInterface]> {
+  let description = [{
+    Given a vector.warp_execute_on_lane_0, apply the patterns to rewrite into
+    distributed form with warp synchronization. This produces IR that runs 
+    ***on a single warp***.
+
+    IR that cannot be distributed will be predicated by `if (threadIdx.x == 0)`.
+
+    This is the second step of two for applying vector distribution to a single
+    warp.
+
+    Example:
+
+    ```
+    hal.executable.export public @foo ... { workgroup_size = [64: index, 1: index, 1: index] }
+    builtin.module {
+      func.func @foo() {
+        %c0 = arith.constant 0 : index
+        %c4 = arith.constant 4 : index
+        %c32 = arith.constant 32 : index
+        %cst = arith.constant dense<1.000000e+00> : vector<128xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<128xf32>
+        %1 = gpu.thread_id  x
+        %2 = arith.cmpi ult, %1, %c32 : index
+        // Single-warp guard filters out threads 32-63.
+        scf.if %2 {
+          vector.warp_execute_on_lane_0(%1)[32] {
+            %cst = arith.constant dense<1.000000e+00> : vector<128xf32>
+            vector.transfer_write %cst, %0[%c0] : vector<128xf32>, memref<128xf32>
+          }
         }
       }
     }
@@ -140,16 +222,15 @@ def VectorDistributionOp : Op<Transform_Dialect, "iree.vector_distribution",
     ```
   }];
 
-  let arguments = (ins PDL_Operation:$target,
-                   DefaultValuedAttr<I64Attr, "{}">:$warp_size);
+  let arguments = (ins PDL_Operation:$target);
   let results = (outs);
 
   let assemblyFormat = "$target attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let extraClassDeclaration = [{
-    ::mlir::LogicalResult applyToOne(::mlir::Operation *target, 
-      ::mlir::transform::TransformState &state);
+    ::mlir::LogicalResult applyToOne(
+      ::mlir::Operation *target, ::mlir::transform::TransformState &state);
   }];
 }
 

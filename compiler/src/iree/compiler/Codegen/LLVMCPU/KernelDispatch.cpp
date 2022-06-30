@@ -552,37 +552,31 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
                                           ArrayRef<int64_t> workgroupTileSizes,
                                           int vectorSize) {
   assert(flowTileSizes.size() == workgroupTileSizes.size());
-  int64_t numLoops = workgroupTileSizes.size();
-  SmallVector<int64_t> l1TileSizes;
+  SmallVector<int64_t> parallelTileSizes;
   auto shape = cast<linalg::LinalgOp>(op.getOperation()).getStaticLoopRanges();
   for (auto en : llvm::enumerate(flowTileSizes.drop_back())) {
-    l1TileSizes.push_back(
+    parallelTileSizes.push_back(
         getMaxTileSize(0, en.value() ? en.value() : shape[en.index()],
                        workgroupTileSizes[en.index()], vectorSize));
   }
 
-  // L1 tile size for k dimensions.
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
   int64_t K = lhsShapedType.getShape().back();
-  l1TileSizes.push_back(
+  parallelTileSizes.push_back(
       getMaxTileSize(0, K, workgroupTileSizes.back(), vectorSize));
 
-  SmallVector<int64_t> vectorTileSizes;
-  if (numLoops >= 3) {
-    vectorTileSizes.append(numLoops - 3, 1);
-    vectorTileSizes.append(3, vectorSize);
-  } else {
-    vectorTileSizes.append(numLoops, vectorSize);
-  }
+  SmallVector<int64_t> reductionTileSizes;
+  splitParallelAndReductionTiles(op.getOperation(), parallelTileSizes,
+                                 reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
-  tileSizes.push_back(l1TileSizes);
-  tileSizes.push_back(vectorTileSizes);
+  tileSizes.push_back(parallelTileSizes);
+  tileSizes.push_back(reductionTileSizes);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
-      DispatchLoweringPassPipeline::CPUTileFuseAndVectorize);
+      DispatchLoweringPassPipeline::CPUAArchDoubleTilingExpert);
 }
 
 static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,
@@ -731,27 +725,17 @@ static LogicalResult setRootConfig(
     return {1, 1, 1, M0, N0, K0};
   };
 
-  auto getVectorSizes = [&]() -> SmallVector<int64_t> {
-    auto lhsShape = mmt4dOp.inputs()[0].getType().cast<ShapedType>().getShape();
-    auto rhsShape = mmt4dOp.inputs()[1].getType().cast<ShapedType>().getShape();
-    int M0 = lhsShape[2];
-    int N0 = rhsShape[2];
-    int K0 = lhsShape[3];
-    if (!mmt4dVectorSizes.empty()) {
-      return SmallVector<int64_t>(mmt4dVectorSizes.begin(),
-                                  mmt4dVectorSizes.end());
-    }
-    return {1, 1, 1, M0, N0, K0};
-  };
+  SmallVector<int64_t> parallelTileSizes = getL1TileSizes();
+  SmallVector<int64_t> reductionTileSizes;
+  splitParallelAndReductionTiles(mmt4dOp.getOperation(), parallelTileSizes,
+                                 reductionTileSizes);
 
-  SmallVector<int64_t> nativeVectorSize = getVectorSizes();
-
-  TileSizesListType tileSizes = {getWorkgroupTileSizes(), getL1TileSizes(),
-                                 nativeVectorSize};
+  TileSizesListType tileSizes = {getWorkgroupTileSizes(), parallelTileSizes,
+                                 reductionTileSizes};
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, mmt4dOp, tileSizes,
-      DispatchLoweringPassPipeline::CPUTileFuseAndVectorize);
+      DispatchLoweringPassPipeline::CPUAArchDoubleTilingExpert);
 }
 
 /// Sets the lowering configuration for dispatch region for linalg_ext.fft

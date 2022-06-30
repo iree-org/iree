@@ -2,9 +2,6 @@ add_mlir_library(IREELinalgTransformDialect
   LinalgTransformOps.cpp
   ScopedTransform.cpp
   StructuredTransformOpsExt.cpp
-  TransformOpInterface.cpp
-  TrackingListener.cpp
-  TrackingRewriteDriver.cpp
 
   DEPENDS
   mlir-headers
@@ -17,10 +14,10 @@ add_mlir_library(IREELinalgTransformDialect
   IREELinalgExtDialect
   IREELinalgExtTransforms
 
-  MLIRAsync
+  MLIRAsyncDialect
   MLIRControlFlowInterfaces
-  MLIRLinalg
-  MLIRPDL
+  MLIRLinalgDialect
+  MLIRPDLDialect
   MLIRRewrite
   MLIRTransformDialect
 

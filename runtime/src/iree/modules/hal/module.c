@@ -285,6 +285,46 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_allocate,  //
   return iree_ok_status();
 }
 
+IREE_VM_ABI_EXPORT(iree_hal_module_allocator_allocate_initialized,  //
+                   iree_hal_module_state_t,                         //
+                   riirII, r) {
+  iree_hal_allocator_t* allocator = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_check_deref(args->r0, &allocator));
+  iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i1;
+  iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i2;
+  iree_vm_buffer_t* source = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r3, &source));
+  iree_device_size_t offset = iree_hal_cast_device_size(args->i4);
+  iree_device_size_t length = iree_hal_cast_device_size(args->i5);
+
+  iree_host_size_t buffer_length = source->data.data_length;
+  if (length == -1) {
+    length = buffer_length;
+  }
+  if (length < 0 || offset < 0 || offset > buffer_length ||
+      offset + length > buffer_length) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "byte range out of bounds (requested %" PRIdsz
+                            "-%" PRIdsz " of available %" PRIhsz ")",
+                            offset, (offset + length - 1), buffer_length);
+  }
+
+  const iree_hal_buffer_params_t params = {
+      .type = memory_types,
+      .usage = buffer_usage,
+  };
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_allocator_allocate_buffer(
+          allocator, params, length,
+          iree_make_const_byte_span(source->data.data + offset, length),
+          &buffer),
+      "failed to allocate buffer of length %" PRIdsz, length);
+
+  rets->r0 = iree_hal_buffer_move_ref(buffer);
+  return iree_ok_status();
+}
+
 static void iree_hal_module_mapped_buffer_release(void* user_data,
                                                   iree_hal_buffer_t* buffer) {
   iree_vm_buffer_t* backing_buffer = (iree_vm_buffer_t*)user_data;
@@ -375,47 +415,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_map_byte_buffer,  //
     return iree_ok_status();
   }
   return status;
-}
-
-// TODO(#7277): drop this method (use map instead) with streams.
-IREE_VM_ABI_EXPORT(iree_hal_module_allocator_wrap_byte_buffer,  //
-                   iree_hal_module_state_t,                     //
-                   riirII, r) {
-  iree_hal_allocator_t* allocator = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_check_deref(args->r0, &allocator));
-  iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i1;
-  iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i2;
-  iree_vm_buffer_t* source = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r3, &source));
-  iree_device_size_t offset = iree_hal_cast_device_size(args->i4);
-  iree_device_size_t length = iree_hal_cast_device_size(args->i5);
-
-  iree_host_size_t buffer_length = source->data.data_length;
-  if (length == -1) {
-    length = buffer_length;
-  }
-  if (length < 0 || offset < 0 || offset > buffer_length ||
-      offset + length > buffer_length) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "byte range out of bounds (requested %" PRIdsz
-                            "-%" PRIdsz " of available %" PRIhsz ")",
-                            offset, (offset + length - 1), buffer_length);
-  }
-
-  const iree_hal_buffer_params_t params = {
-      .type = memory_types,
-      .usage = buffer_usage,
-  };
-  iree_hal_buffer_t* buffer = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_allocator_allocate_buffer(
-          allocator, params, length,
-          iree_make_const_byte_span(source->data.data + offset, length),
-          &buffer),
-      "failed to allocate buffer of length %" PRIdsz, length);
-
-  rets->r0 = iree_hal_buffer_move_ref(buffer);
-  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -777,16 +776,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_buffer,  //
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_byte_length,  //
-                   iree_hal_module_state_t,                  //
-                   r, I) {
-  iree_hal_buffer_view_t* buffer_view = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_view_check_deref(args->r0, &buffer_view));
-  rets->i0 = (int64_t)iree_hal_buffer_view_byte_length(buffer_view);
-  return iree_ok_status();
-}
-
 IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_element_type,  //
                    iree_hal_module_state_t,                   //
                    r, i) {
@@ -892,22 +881,18 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_create,  //
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_create(
       device, modes, command_categories, IREE_HAL_QUEUE_AFFINITY_ANY,
       &command_buffer));
-  rets->r0 = iree_hal_command_buffer_move_ref(command_buffer);
-  return iree_ok_status();
+
+  iree_status_t status = iree_hal_command_buffer_begin(command_buffer);
+  if (iree_status_is_ok(status)) {
+    rets->r0 = iree_hal_command_buffer_move_ref(command_buffer);
+  } else {
+    iree_hal_command_buffer_release(command_buffer);
+  }
+  return status;
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_begin,  //
-                   iree_hal_module_state_t,               //
-                   r, v) {
-  iree_hal_command_buffer_t* command_buffer = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
-
-  return iree_hal_command_buffer_begin(command_buffer);
-}
-
-IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_end,  //
-                   iree_hal_module_state_t,             //
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_finalize,  //
+                   iree_hal_module_state_t,                  //
                    r, v) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(
@@ -1199,9 +1184,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_allocator,  //
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_device_query_i32,  //
+IREE_VM_ABI_EXPORT(iree_hal_module_device_query_i64,  //
                    iree_hal_module_state_t,           //
-                   rrr, ii) {
+                   rrr, iI) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_vm_buffer_t* category = NULL;
@@ -1211,11 +1196,11 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_query_i32,  //
   IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r2, &key));
   iree_string_view_t key_str = iree_vm_buffer_as_string(key);
 
-  int32_t value = 0;
+  int64_t value = 0;
   iree_status_t query_status =
-      iree_hal_device_query_i32(device, category_str, key_str, &value);
+      iree_hal_device_query_i64(device, category_str, key_str, &value);
   rets->i0 = iree_status_consume_code(query_status) == IREE_STATUS_OK ? 1 : 0;
-  rets->i1 = (int32_t)value;
+  rets->i1 = value;
   return iree_ok_status();
 }
 
@@ -1408,8 +1393,8 @@ static const iree_vm_native_export_descriptor_t iree_hal_module_exports_[] = {
       .local_name = iree_string_view_literal(name),                \
       .calling_convention =                                        \
           iree_string_view_literal("0" #arg_types "_" #ret_types), \
-      .reflection_attr_count = 0,                                  \
-      .reflection_attrs = NULL,                                    \
+      .attr_count = 0,                                             \
+      .attrs = NULL,                                               \
   },
 #include "iree/modules/hal/exports.inl"  // IWYU pragma: keep
 #undef EXPORT_FN
@@ -1420,14 +1405,14 @@ static_assert(IREE_ARRAYSIZE(iree_hal_module_funcs_) ==
 
 static const iree_vm_native_module_descriptor_t iree_hal_module_descriptor_ = {
     .module_name = iree_string_view_literal("hal"),
+    .module_attr_count = 0,
+    .module_attrs = NULL,
     .import_count = 0,  // workaround for 0-length C struct
     .imports = iree_hal_module_imports_,
     .export_count = IREE_ARRAYSIZE(iree_hal_module_exports_),
     .exports = iree_hal_module_exports_,
     .function_count = IREE_ARRAYSIZE(iree_hal_module_funcs_),
     .functions = iree_hal_module_funcs_,
-    .reflection_attr_count = 0,
-    .reflection_attrs = NULL,
 };
 
 IREE_API_EXPORT iree_status_t

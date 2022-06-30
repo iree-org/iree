@@ -27,8 +27,7 @@ import os
 from common.benchmark_runner import *
 from common.utils import *
 from mobilebert_fp32_commands import *
-from mobilenetv2_fp32_commands import *
-from mobilenetv2_uint8_commands import *
+from simple_commands import *
 
 
 def benchmark_desktop_cpu(device_name: str,
@@ -110,8 +109,12 @@ def main(args):
   # Create factories for all models to be benchmarked.
   command_factory = []
   command_factory.append(MobilebertFP32CommandFactory(args.base_dir))
-  command_factory.append(MobilenetV2FP32CommandFactory(args.base_dir))
-  command_factory.append(MobilenetV2UINT8CommandFactory(args.base_dir))
+  command_factory.append(
+      SimpleCommandFactory(args.base_dir, "mobilenet_v2_1.0_224",
+                           "1x224x224x3xf32"))
+  command_factory.append(
+      SimpleCommandFactory(args.base_dir, "mobilenet_v2_224_1.0_uint8",
+                           "1x224x224x3xui8", "input", "1,224,224,3"))
 
   if args.mode == "desktop":
     results_path = os.path.join(args.output_dir, "results.csv")

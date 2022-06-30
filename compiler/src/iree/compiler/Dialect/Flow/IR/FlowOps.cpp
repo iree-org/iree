@@ -1259,7 +1259,7 @@ struct FoldTensorLoadWithExtractSlice
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
                                 PatternRewriter &rewriter) const override {
     auto dispatchTensorLoadOp =
-        extractSliceOp.source()
+        extractSliceOp.getSource()
             .getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
     if (!dispatchTensorLoadOp) return failure();
 
@@ -1298,7 +1298,7 @@ struct FoldInsertSliceWithTensorStoreOp
     // Check that the `dest` of the `tensor.insert_slice` and target of the
     // `flow.dispatch.tensor.store` are the same interface binding.
     Optional<BlockArgument> destBinding =
-        getBindingArgument(insertSliceOp.dest());
+        getBindingArgument(insertSliceOp.getDest());
     Optional<BlockArgument> targetBinding =
         getBindingArgument(dispatchTensorStoreOp.target());
     if (!destBinding || !targetBinding ||
@@ -1317,7 +1317,7 @@ struct FoldInsertSliceWithTensorStoreOp
     }
 
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
-        dispatchTensorStoreOp, insertSliceOp.source(),
+        dispatchTensorStoreOp, insertSliceOp.getSource(),
         dispatchTensorStoreOp.target(), dispatchTensorStoreOp.target_dims(),
         offsets, sizes, strides);
     return success();

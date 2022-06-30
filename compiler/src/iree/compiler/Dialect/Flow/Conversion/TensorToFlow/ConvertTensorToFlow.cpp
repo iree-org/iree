@@ -144,7 +144,7 @@ struct ConvertTensorInsertSlicePattern
 
     Location loc = insertOp.getLoc();
     auto sourceDynamicDims = getDynamicValues(sizes);
-    Value source = insertOp.source();
+    Value source = insertOp.getSource();
     ShapedType sourceType = insertOp.getSourceType();
     ShapedType destType = insertOp.getType();
 
@@ -159,7 +159,7 @@ struct ConvertTensorInsertSlicePattern
     }
 
     auto offsetVals = getAsValues(rewriter, loc, insertOp.getMixedOffsets());
-    Value dest = insertOp.dest();
+    Value dest = insertOp.getDest();
     auto destDynamicDims = getDynamicDimValues(rewriter, loc, dest);
     rewriter.replaceOpWithNewOp<TensorUpdateOp>(
         insertOp, insertOp.getType(), dest, destDynamicDims, offsetVals, source,
@@ -203,10 +203,10 @@ struct ConvertTensorExtractSlicePattern
     auto offsetVals = getAsValues(rewriter, loc, offsets);
     auto sizeVals = getAsValues(rewriter, loc, sizes);
     auto sourceDynamicDims =
-        getDynamicDimValues(rewriter, loc, sliceOp.source());
+        getDynamicDimValues(rewriter, loc, sliceOp.getSource());
     auto resultDynamicDims = getDynamicValues(sizes);
     Value replacement = rewriter.create<TensorSliceOp>(
-        loc, resultType, sliceOp.source(), sourceDynamicDims, offsetVals,
+        loc, resultType, sliceOp.getSource(), sourceDynamicDims, offsetVals,
         sizeVals, resultDynamicDims);
     if (resultType.getRank() > sliceOp.getType().getRank()) {
       replacement = rewriter.create<IREE::Flow::TensorReshapeOp>(
@@ -229,7 +229,7 @@ struct ConvertTensorExtractPattern
     }
 
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorLoadOp>(
-        op, op.getResult().getType(), op.tensor(), op.indices());
+        op, op.getResult().getType(), op.getTensor(), op.getIndices());
     return success();
   }
 };
@@ -292,7 +292,7 @@ struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
     }
 
     // TODO: Decide if this needs to be replaced with a flow.tensor.cast
-    // See https://github.com/google/iree/issues/6418
+    // See https://github.com/iree-org/iree/issues/6418
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
         op, resultType, input, sourceDynamicDims, targetDynamicDims);
 
@@ -306,8 +306,8 @@ struct ConvertTensorFromElementsPattern
   LogicalResult matchAndRewrite(tensor::FromElementsOp op,
                                 PatternRewriter &rewriter) const override {
     // TODO: This pattern was mainly added to iron out some kinks specific to
-    // detensoring (see: https://github.com/google/iree/issues/1159). Do we need
-    // to expand this check for other uses?
+    // detensoring (see: https://github.com/iree-org/iree/issues/1159). Do we
+    // need to expand this check for other uses?
     if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
@@ -353,7 +353,7 @@ struct ConvertTensorReshapePattern : public OpRewritePattern<TensorReshapeOp> {
       outputDynamicShapes.push_back(std::get<1>(shape));
     }
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
-        reshapeOp, reshapeOp.getResultType(), reshapeOp.src(),
+        reshapeOp, reshapeOp.getResultType(), reshapeOp.getSrc(),
         outputDynamicShapes);
     return success();
   }

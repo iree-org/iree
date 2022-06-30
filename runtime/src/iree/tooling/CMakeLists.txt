@@ -80,7 +80,6 @@ iree_cc_library(
     iree::base
     iree::base::cc
     iree::base::internal::span
-    iree::base::logging
     iree::base::tracing
     iree::hal
     iree::modules::hal

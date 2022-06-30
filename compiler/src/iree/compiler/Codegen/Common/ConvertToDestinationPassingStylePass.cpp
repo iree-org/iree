@@ -32,7 +32,7 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
-#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -128,14 +128,14 @@ static Value getReverseOfReshapeOp(OpBuilder &b, TensorReshapeOpTy reshapeOp,
       tensor::ExpandShapeOp, tensor::CollapseShapeOp>::type;
   return b.create<ReverseReshapeOpTy>(reshapeOp.getLoc(),
                                       reshapeOp.getSrcType(), resultBuffer,
-                                      reshapeOp.reassociation());
+                                      reshapeOp.getReassociation());
 }
 
 /// Gets the reverse of a `tensor.cast` op to get a memref type that
 /// can be used for in-place computation of the result of a disaptch region.
 static Value getReverseOfCastOp(OpBuilder &b, tensor::CastOp castOp,
                                 Value resultBuffer) {
-  return b.create<tensor::CastOp>(castOp.getLoc(), castOp.source().getType(),
+  return b.create<tensor::CastOp>(castOp.getLoc(), castOp.getSource().getType(),
                                   resultBuffer);
 }
 
@@ -245,7 +245,7 @@ static LogicalResult modifyResultToUseStoreBuffer(
                   vector::TransferWriteOp>(
                 [&](auto caseOp) { return resultBuffer; })
             .Case<tensor::InsertSliceOp>([&](auto insertSliceOp) -> Value {
-              if (it->get() == insertSliceOp.dest()) {
+              if (it->get() == insertSliceOp.getDest()) {
                 return resultBuffer;
               }
               return nullptr;
@@ -327,7 +327,7 @@ static SmallVector<NamedAttribute> PruneAttributeList(linalg::GenericOp op) {
 namespace {
 /// Adapts Linalg ops input operand to output operand. This is required for not
 /// creating extra alloca ops. For more details, see
-/// https://github.com/google/iree/issues/8303
+/// https://github.com/iree-org/iree/issues/8303
 struct AdaptLinalgInputOperandToOutputOperand
     : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;

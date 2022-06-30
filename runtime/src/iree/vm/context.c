@@ -80,8 +80,10 @@ static iree_status_t iree_vm_context_run_function(
     return status;
   }
 
+  IREE_TRACE_FIBER_ENTER(context->context_id);
   iree_vm_execution_result_t result;
   status = module->begin_call(module->self, stack, &call, &result);
+  IREE_TRACE_FIBER_LEAVE();
   if (!iree_status_is_ok(status)) {
     status = IREE_VM_STACK_ANNOTATE_BACKTRACE_IF_ENABLED(stack, status);
   }
@@ -205,8 +207,7 @@ static void iree_vm_context_release_modules(iree_vm_context_t* context,
       context->flags & IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
           ? IREE_VM_INVOCATION_FLAG_TRACE_EXECUTION
           : IREE_VM_INVOCATION_FLAG_NONE,
-      iree_vm_context_id(context), iree_vm_context_state_resolver(context),
-      context->allocator);
+      iree_vm_context_state_resolver(context), context->allocator);
   for (int i = (int)end; i >= (int)start; --i) {
     iree_vm_module_t* module = context->list.modules[i];
     iree_vm_module_state_t* module_state = context->list.module_states[i];
@@ -410,8 +411,7 @@ IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
       context->flags & IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
           ? IREE_VM_INVOCATION_FLAG_TRACE_EXECUTION
           : IREE_VM_INVOCATION_FLAG_NONE,
-      iree_vm_context_id(context), iree_vm_context_state_resolver(context),
-      context->allocator);
+      iree_vm_context_state_resolver(context), context->allocator);
 
   // Retain all modules and allocate their state.
   assert(context->list.capacity >= context->list.count + module_count);
@@ -495,7 +495,7 @@ IREE_API_EXPORT iree_status_t iree_vm_context_resolve_module_state(
 IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(
     const iree_vm_context_t* context, iree_string_view_t full_name,
     iree_vm_function_t* out_function) {
-  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_ASSERT_ARGUMENT(context);
   IREE_ASSERT_ARGUMENT(out_function);
   memset(out_function, 0, sizeof(iree_vm_function_t));
 
@@ -503,7 +503,6 @@ IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(
   iree_string_view_t function_name;
   if (iree_string_view_split(full_name, '.', &module_name, &function_name) ==
       -1) {
-    IREE_TRACE_ZONE_END(z0);
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "import name not fully-qualified (module.func): '%.*s'",
@@ -513,14 +512,11 @@ IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(
   for (int i = (int)context->list.count - 1; i >= 0; --i) {
     iree_vm_module_t* module = context->list.modules[i];
     if (iree_string_view_equal(module_name, iree_vm_module_name(module))) {
-      iree_status_t status = iree_vm_module_lookup_function_by_name(
+      return iree_vm_module_lookup_function_by_name(
           module, IREE_VM_FUNCTION_LINKAGE_EXPORT, function_name, out_function);
-      IREE_TRACE_ZONE_END(z0);
-      return status;
     }
   }
 
-  IREE_TRACE_ZONE_END(z0);
   return iree_make_status(IREE_STATUS_NOT_FOUND,
                           "module '%.*s' required for import '%.*s' not "
                           "registered with the context",
@@ -629,8 +625,7 @@ IREE_API_EXPORT iree_status_t iree_vm_context_notify(iree_vm_context_t* context,
       context->flags & IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
           ? IREE_VM_INVOCATION_FLAG_TRACE_EXECUTION
           : IREE_VM_INVOCATION_FLAG_NONE,
-      iree_vm_context_id(context), iree_vm_context_state_resolver(context),
-      context->allocator);
+      iree_vm_context_state_resolver(context), context->allocator);
 
   // Resumes are walked forward while suspends are walked backward.
   // This follows the expected construction/destruction pattern where for

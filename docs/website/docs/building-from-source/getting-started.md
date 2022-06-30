@@ -51,7 +51,7 @@ Use [Git](https://git-scm.com/) to clone the IREE repository and initialize its
 submodules:
 
 ``` shell
-git clone https://github.com/google/iree.git
+git clone https://github.com/iree-org/iree.git
 cd iree
 git submodule update --init
 ```

@@ -208,10 +208,6 @@ createLLVMCPULowerExecutableTargetPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMCPUSynchronizeSymbolVisibilityPass();
 
-/// Multi-level tiling, fusing and vectorization of linalg ops on tensors.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUTileFuseAndVectorizePass(bool lowerToVectors = true);
-
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUAArch64VectorLoweringPass();
 
@@ -279,8 +275,7 @@ void addTransformDialectInterpreterPasses(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize lowering
 /// of linalg ops on tensors to vectors operations.
-void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
-                                         bool lowerToVectors = true);
+void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Pass Pipelines for lowering to LLVM dialect.

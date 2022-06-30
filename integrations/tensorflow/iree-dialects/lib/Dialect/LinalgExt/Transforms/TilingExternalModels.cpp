@@ -50,7 +50,7 @@ makeTiledInputShapes(OpBuilder &b, Location loc, LinalgOp linalgOp,
   // that define tile subshapes.
   SmallVector<Value> lbs = computeTileOffsets(b, loc, ivsRef, tileSizes);
   SmallVector<Value> subShapeSizes =
-      computeTileSizes(b, loc, ivsRef, tileSizes, sizeBounds);
+      computeTileSizes(b, loc, tileSizes, sizeBounds);
 
   SmallVector<Value, 4> tiledShapes;
   tiledShapes.reserve(valuesToTile.size());

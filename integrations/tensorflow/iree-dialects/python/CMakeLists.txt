@@ -53,14 +53,15 @@ declare_mlir_dialect_python_bindings(
   DIALECT_NAME iree_pydm
 )
 
-declare_mlir_python_sources(TmpTransformDialect
+declare_mlir_dialect_extension_python_bindings(
   ADD_TO_PARENT IREEDialectsPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
+  TD_FILE dialects/IreeStructuredTransformOps.td
   SOURCES
-    dialects/transform.py
-    dialects/_transform_ops_ext.py
-    dialects/_transform_ops_gen.py
-)
+    dialects/transform/iree_structured.py
+    dialects/_iree_structured_transform_ops_ext.py
+  DIALECT_NAME transform
+  EXTENSION_NAME iree_structured_transform)
 
 ################################################################################
 # Extensions
@@ -91,6 +92,7 @@ set(_source_components
   MLIRPythonSources.Dialects.cf
   MLIRPythonSources.Dialects.func
   MLIRPythonSources.Dialects.pdl
+  MLIRPythonSources.Dialects.transform
   MLIRPythonSources.Passes
   IREEDialectsPythonSources
   IREEDialectsPythonExtensions

@@ -6,7 +6,7 @@
 
 # Run commands below on the workstation that the phone is attached to.
 # Prerequisites:
-#   Manual installations of the Android NDK and ADB are needed. See https://google.github.io/iree/building-from-source/android/#install-android-ndk-and-adb for instructions.
+#   Manual installations of the Android NDK and ADB are needed. See https://iree-org.github.io/iree/building-from-source/android/#install-android-ndk-and-adb for instructions.
 #   Manual installations of the Termux App and python are needed on the Android device. See README.md for instructions.
 
 #!/bin/bash
@@ -27,7 +27,7 @@ mkdir "${ROOT_DIR}/setup"
 mkdir "${ROOT_DIR}/test_data"
 mkdir "${ROOT_DIR}/output"
 # Touch result file as adb doesn't push empty dirs.
-touch "${ROOT_DIR}/output/result.csv"
+touch "${ROOT_DIR}/output/results.csv"
 
 wget https://storage.googleapis.com/iree-model-artifacts/tflite_squad_test_data.zip -O /tmp/tflite_squad_test_data.zip
 unzip /tmp/tflite_squad_test_data.zip -d "${ROOT_DIR}/test_data/"
@@ -41,7 +41,7 @@ rm -rf "${SOURCE_DIR}"
 mkdir "${SOURCE_DIR}"
 cd "${SOURCE_DIR}"
 
-git clone https://github.com/google/iree.git
+git clone https://github.com/iree-org/iree.git
 
 cd iree
 cp "${SOURCE_DIR}/iree/build_tools/benchmarks/set_adreno_gpu_scaling_policy.sh" "${ROOT_DIR}/setup/"
@@ -185,4 +185,4 @@ fi
 echo Running benchmark.
 adb push "${SOURCE_DIR}/iree/build_tools/benchmarks/comparisons" /data/local/tmp/
 adb shell "su root /data/data/com.termux/files/usr/bin/python /data/local/tmp/comparisons/run_benchmarks.py --device_name=Pixel6  --mode=mobile --base_dir=${DEVICE_ROOT_DIR} --output_dir=${DEVICE_ROOT_DIR}/output"
-adb shell cat "${DEVICE_ROOT_DIR}/output/result.csv" | tee ${ROOT_DIR}/output/result.csv
+adb shell cat "${DEVICE_ROOT_DIR}/output/results.csv" | tee ${ROOT_DIR}/output/results.csv

@@ -77,3 +77,13 @@ BENCHMARK_THRESHOLDS = [
     # Default threshold for all benchmarks: 5%.
     BenchmarkThreshold(re.compile(r".*"), 5, ThresholdUnit.PERCENTAGE),
 ]
+
+COMPILATION_TIME_THRESHOLDS = [
+    # Default threshold: 5%.
+    BenchmarkThreshold(re.compile(r".*"), 5, ThresholdUnit.PERCENTAGE),
+]
+
+TOTAL_DISPATCH_SIZE_THRESHOLDS = [
+    # Default threshold: 5%.
+    BenchmarkThreshold(re.compile(r".*"), 5, ThresholdUnit.PERCENTAGE),
+]

@@ -12,8 +12,8 @@
 namespace mlir {
 namespace iree_compiler {
 
-// Rewrites a hal.device.query of an i1 value to a hal.device.query of i32 with
-// a truncation on the result.
+// Rewrites a hal.device.query of an i1/i16/i32 value to a hal.device.query of
+// i64 with a truncation on the result.
 class DeviceQueryIntCastOpConversion
     : public OpConversionPattern<IREE::HAL::DeviceQueryOp> {
  public:
@@ -26,34 +26,34 @@ class DeviceQueryIntCastOpConversion
       ConversionPatternRewriter &rewriter) const override {
     // We only deal with in-dialect conversions to i32 in this pattern.
     auto targetType = op.value().getType();
-    if (targetType.isInteger(32)) return failure();
+    if (targetType.isInteger(64)) return failure();
     if (!targetType.isIntOrIndex()) return failure();
 
-    // Query as I32.
+    // Query as I64.
     // Note that due to type conversion we need to handle the default logic
-    // ourselves instead of allowing the i32 do the same. We could let it handle
+    // ourselves instead of allowing the i64 do the same. We could let it handle
     // things but then we are generating more IR that may prevent other
     // canonicalizations (a select of i1 to i1 is easier to handle).
     auto queryOp = rewriter.create<IREE::HAL::DeviceQueryOp>(
-        op.getLoc(), rewriter.getI1Type(), rewriter.getI32Type(),
+        op.getLoc(), rewriter.getI1Type(), rewriter.getI64Type(),
         adaptor.device(), op.categoryAttr(), op.keyAttr(), Attribute{});
     auto ok = queryOp.ok();
     auto value = queryOp.value();
 
     // Truncate or extend based on the target type.
     if (targetType.isIndex()) {
-      // i32 -> index cast.
+      // i64 -> index cast.
       value = rewriter.createOrFold<arith::IndexCastOp>(op.getLoc(), targetType,
                                                         value);
     } else if (targetType.isa<IntegerType>()) {
-      // i32 -> {integer} cast.
+      // i64 -> {integer} cast.
       if (targetType.getIntOrFloatBitWidth() <
           value.getType().getIntOrFloatBitWidth()) {
-        // i32 -> narrowing cast.
+        // i64 -> narrowing cast.
         value = rewriter.createOrFold<arith::TruncIOp>(op.getLoc(), targetType,
                                                        value);
       } else {
-        // i32 -> widening cast.
+        // i64 -> widening cast.
         value = rewriter.createOrFold<arith::ExtUIOp>(op.getLoc(), targetType,
                                                       value);
       }
@@ -75,10 +75,10 @@ class DeviceQueryIntCastOpConversion
   }
 };
 
-class DeviceQueryI32OpConversion
+class DeviceQueryI64OpConversion
     : public OpConversionPattern<IREE::HAL::DeviceQueryOp> {
  public:
-  DeviceQueryI32OpConversion(MLIRContext *context, SymbolTable &importSymbols,
+  DeviceQueryI64OpConversion(MLIRContext *context, SymbolTable &importSymbols,
                              TypeConverter &typeConverter, StringRef importName)
       : OpConversionPattern(typeConverter, context) {
     importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
@@ -88,7 +88,7 @@ class DeviceQueryI32OpConversion
   LogicalResult matchAndRewrite(
       IREE::HAL::DeviceQueryOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!op.value().getType().isInteger(32)) return failure();
+    if (!op.value().getType().isInteger(64)) return failure();
     auto results =
         rewriteToCall(op, adaptor, importOp, *getTypeConverter(), rewriter);
     if (!results.hasValue()) return failure();
@@ -97,9 +97,9 @@ class DeviceQueryI32OpConversion
     if (op.default_value().hasValue()) {
       value = rewriter.createOrFold<arith::SelectOp>(
           op.getLoc(), ok, value,
-          rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(),
+          rewriter.createOrFold<IREE::VM::ConstI64Op>(op.getLoc(),
                                                       op.default_valueAttr()));
-      ok = rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), 1);
+      ok = rewriter.createOrFold<IREE::VM::ConstI64Op>(op.getLoc(), 1);
     }
     rewriter.replaceOp(op, {ok, value});
     return success();
@@ -117,8 +117,8 @@ void populateHALDeviceToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.device.allocator");
 
   patterns.insert<DeviceQueryIntCastOpConversion>(context, typeConverter);
-  patterns.insert<DeviceQueryI32OpConversion>(
-      context, importSymbols, typeConverter, "hal.device.query.i32");
+  patterns.insert<DeviceQueryI64OpConversion>(
+      context, importSymbols, typeConverter, "hal.device.query.i64");
 }
 
 }  // namespace iree_compiler

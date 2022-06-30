@@ -49,10 +49,12 @@ enum iree_vm_invocation_flag_bits_t {
   // functionality is available; specifically:
   //   -DIREE_VM_EXECUTION_TRACING_ENABLE=1
   IREE_VM_INVOCATION_FLAG_TRACE_EXECUTION = 1u << 0,
+
+  // Attributes invocation timings to the caller instead of a context or
+  // invocation-specific fiber.
+  IREE_VM_INVOCATION_FLAG_TRACE_INLINE = 1u << 1,
 };
 typedef uint32_t iree_vm_invocation_flags_t;
-
-typedef intptr_t iree_vm_context_id_t;
 
 typedef enum iree_vm_stack_frame_type_e {
   // Represents an `[external]` frame that needs to marshal args/results.
@@ -65,6 +67,9 @@ typedef enum iree_vm_stack_frame_type_e {
   IREE_VM_STACK_FRAME_NATIVE = 1,
   // VM stack frame in bytecode using internal register storage.
   IREE_VM_STACK_FRAME_BYTECODE = 2,
+  // Wait frame used to retain resources during a yield-and-wait.
+  // Execution cannot continue until the wait conditions are met.
+  IREE_VM_STACK_FRAME_WAIT = 3,
 } iree_vm_stack_frame_type_t;
 
 // A single stack frame within the VM.
@@ -74,6 +79,9 @@ typedef enum iree_vm_stack_frame_type_e {
 // immediately follows this struct in memory and is highly likely to be touched
 // by the callee immediately and repeatedly.
 typedef struct iree_vm_stack_frame_t {
+  // Stack frame type used to determine which fields are valid.
+  iree_vm_stack_frame_type_t type;
+
   // Function that the stack frame is within.
   iree_vm_function_t function;
 
@@ -92,13 +100,55 @@ typedef struct iree_vm_stack_frame_t {
   // As stack frame pointers are not stable this can be used instead to detect
   // stack enter/leave balance issues.
   int32_t depth;
-
-  IREE_TRACE(iree_zone_id_t trace_zone;)
 } iree_vm_stack_frame_t;
+
+// Defines the type of wait operation in a IREE_VM_STACK_FRAME_WAIT frame.
+enum iree_vm_wait_type_e {
+  // Sleeps until the timeout is reached then resumes execution.
+  // Immediate timeouts may be used to perform a deferred call.
+  IREE_VM_WAIT_UNTIL,
+  // Waits until one or more wait sources have resolved then resumes execution.
+  IREE_VM_WAIT_ANY,
+  // Waits until all of the wait sources have resolved then resumes execution.
+  IREE_VM_WAIT_ALL,
+};
+typedef uint8_t iree_vm_wait_type_t;
+
+// Stack frame storage for wait frames.
+// These keep track of the wait parameters on the top of the stack until the
+// wait condition has been satisfied.
+typedef struct iree_vm_wait_frame_t {
+  // Type of wait being performed.
+  iree_vm_wait_type_t wait_type;
+  // Status of the wait operation set by the scheduler.
+  iree_status_t wait_status;
+  // Maximum time to wait before failing the wait with
+  // IREE_STATUS_DEADLINE_EXCEEDED.
+  iree_time_t deadline_ns;
+  // Optional tracing zone that marks the beginning of the wait operation.
+  // Waiters are expected to end this zone after leaving the wait frame.
+  IREE_TRACE(iree_zone_id_t trace_zone;)
+  // Total number of wait sources.
+  iree_host_size_t count;
+  // List of wait source to wait on.
+  iree_wait_source_t wait_sources[];
+} iree_vm_wait_frame_t;
+
+// Result of a wait operation.
+typedef struct iree_vm_wait_result_t {
+  // Final status of the wait operation; OK if successful and DEADLINE_EXCEEDED
+  // if the deadline was reached before all conditions were met. Other failures
+  // may occur if for example the context is aborted.
+  iree_status_t status;
+  // Optional tracing zone provided by the waiter when entering the frame.
+  // The caller performing the wait frame leave must end it.
+  IREE_TRACE(iree_zone_id_t trace_zone;)
+} iree_vm_wait_result_t;
 
 // Returns the implementation-defined frame storage associated with |frame|.
 // The pointer will contain at least as many bytes as requested by frame_size.
 static inline void* iree_vm_stack_frame_storage(iree_vm_stack_frame_t* frame) {
+  IREE_ASSERT(frame);
   return (void*)((uintptr_t)frame + sizeof(iree_vm_stack_frame_t));
 }
 
@@ -128,20 +178,18 @@ typedef struct iree_vm_stack_t iree_vm_stack_t;
 //  IREE_VM_INLINE_STACK_INITIALIZE(
 //      stack,
 //      IREE_VM_INVOCATION_FLAG_NONE,
-//      iree_vm_context_id(context),
 //      iree_vm_context_state_resolver(context),
 //      iree_allocator_system());
 //  ...
 //  iree_vm_stack_deinitialize(stack);
-#define IREE_VM_INLINE_STACK_INITIALIZE(stack, flags, context_id,            \
-                                        state_resolver, allocator)           \
-  uint8_t __stack_storage[IREE_VM_STACK_DEFAULT_SIZE];                       \
-  iree_byte_span_t __stack_storage_span =                                    \
-      iree_make_byte_span(__stack_storage, sizeof(__stack_storage));         \
-  iree_vm_stack_t* stack = NULL;                                             \
-  IREE_IGNORE_ERROR(iree_vm_stack_initialize(__stack_storage_span, (flags),  \
-                                             (context_id), (state_resolver), \
-                                             (allocator), &stack));
+#define IREE_VM_INLINE_STACK_INITIALIZE(stack, flags, state_resolver, \
+                                        allocator)                    \
+  uint8_t __stack_storage[IREE_VM_STACK_DEFAULT_SIZE];                \
+  iree_byte_span_t __stack_storage_span =                             \
+      iree_make_byte_span(__stack_storage, sizeof(__stack_storage));  \
+  iree_vm_stack_t* stack = NULL;                                      \
+  IREE_IGNORE_ERROR(iree_vm_stack_initialize(                         \
+      __stack_storage_span, (flags), (state_resolver), (allocator), &stack));
 
 // Initializes a statically-allocated stack in |storage|.
 // The contents of the |storage| can be anything upon initialization and the
@@ -164,8 +212,8 @@ typedef struct iree_vm_stack_t iree_vm_stack_t;
 //  // stack_storage can now be reused/freed/etc
 IREE_API_EXPORT iree_status_t iree_vm_stack_initialize(
     iree_byte_span_t storage, iree_vm_invocation_flags_t flags,
-    iree_vm_context_id_t context_id, iree_vm_state_resolver_t state_resolver,
-    iree_allocator_t allocator, iree_vm_stack_t** out_stack);
+    iree_vm_state_resolver_t state_resolver, iree_allocator_t allocator,
+    iree_vm_stack_t** out_stack);
 
 // Deinitializes a statically-allocated |stack| previously initialized with
 // iree_vm_stack_initialize.
@@ -186,9 +234,8 @@ IREE_API_EXPORT void iree_vm_stack_deinitialize(iree_vm_stack_t* stack);
 //  ...
 //  iree_vm_stack_free(stack);
 IREE_API_EXPORT iree_status_t iree_vm_stack_allocate(
-    iree_vm_invocation_flags_t flags, iree_vm_context_id_t context_id,
-    iree_vm_state_resolver_t state_resolver, iree_allocator_t allocator,
-    iree_vm_stack_t** out_stack);
+    iree_vm_invocation_flags_t flags, iree_vm_state_resolver_t state_resolver,
+    iree_allocator_t allocator, iree_vm_stack_t** out_stack);
 
 // Frees a dynamically-allocated |stack| from iree_vm_stack_allocate.
 IREE_API_EXPORT void iree_vm_stack_free(iree_vm_stack_t* stack);
@@ -197,9 +244,9 @@ IREE_API_EXPORT void iree_vm_stack_free(iree_vm_stack_t* stack);
 IREE_API_EXPORT iree_vm_invocation_flags_t
 iree_vm_stack_invocation_flags(const iree_vm_stack_t* stack);
 
-// Returns the process-unique context ID.
-IREE_API_EXPORT iree_vm_context_id_t
-iree_vm_stack_context_id(const iree_vm_stack_t* stack);
+// Returns the top stack execution frame, ignore wait frames.
+IREE_API_EXPORT iree_vm_stack_frame_t* iree_vm_stack_top(
+    iree_vm_stack_t* stack);
 
 // Returns the current stack frame or nullptr if the stack is empty.
 IREE_API_EXPORT iree_vm_stack_frame_t* iree_vm_stack_current_frame(
@@ -213,6 +260,33 @@ IREE_API_EXPORT iree_vm_stack_frame_t* iree_vm_stack_parent_frame(
 IREE_API_EXPORT iree_status_t iree_vm_stack_query_module_state(
     iree_vm_stack_t* stack, iree_vm_module_t* module,
     iree_vm_module_state_t** out_module_state);
+
+// Enters into the given |wait_type| operation with a capacity of |wait_count|.
+// May invalidate any pointers to stack frames and the only pointer that can
+// be assumed valid after return is the one in |out_wait_frame|.
+//
+// The resulting |out_wait_frame| storage must have all wait sources populated
+// by the caller upon return. Callers should then return to the scheduling loop
+// by propagating an IREE_STATUS_DEFERRED result to ancestors.
+//
+// If the caller has an open trace zone it can provide it here to then retrieve
+// it from iree_vm_stack_wait_leave in order to leave it.
+//
+// After the wait has completed (successfully or otherwise) the scheduler must
+// call iree_vm_stack_wait_leave to pop the wait from the stack and resume
+// execution.
+IREE_API_EXPORT iree_status_t iree_vm_stack_wait_enter(
+    iree_vm_stack_t* stack, iree_vm_wait_type_t wait_type,
+    iree_host_size_t wait_count, iree_timeout_t timeout,
+    iree_zone_id_t trace_zone, iree_vm_wait_frame_t** out_wait_frame);
+
+// Leaves the current wait frame on the top of the stack.
+// |out_wait_result| will be populated with the results of the wait, such as
+// IREE_STATUS_DEADLINE_EXCEEDED or IREE_STATUS_ABORTED if it failed.
+// If a trace zone was passed to the iree_vm_stack_wait_enter it will be
+// available for the caller to leave.
+IREE_API_EXPORT iree_status_t iree_vm_stack_wait_leave(
+    iree_vm_stack_t* stack, iree_vm_wait_result_t* out_wait_result);
 
 // Enters into the given |function| and returns the callee stack frame.
 // May invalidate any pointers to stack frames and the only pointer that can be
@@ -249,6 +323,33 @@ iree_vm_stack_annotate_backtrace(iree_vm_stack_t* stack,
 #define IREE_VM_STACK_ANNOTATE_BACKTRACE_IF_ENABLED(stack, base_status) \
   (base_status)
 #endif  // IREE_VM_BACKTRACE_ENABLE && IREE_STATUS_FEATURE_ANNOTATIONS
+
+// Suspends active trace zones for all stack frames.
+// This returns the zone stack to a state before entering the stack. To restore
+// the zone stack use iree_vm_stack_resume_trace_zones.
+//
+// Trace zone suspend/resume is only required if the tracing library doesn't
+// natively support fibers. By doing this manual zone suspend/resume we can
+// leave the zone stack empty and avoid out-of-order zone events.
+//
+// At a yield point:
+//   z0 = [invoke]
+//    fiber:
+//     z1 = [function]
+//     z2 = [wait]
+// After suspend:
+//   z0 = [invoke]
+// After resume:
+//   z0 = [invoke]
+//    fiber:
+//     z1 = [function]
+//     z2 = [wait]
+IREE_API_EXPORT void iree_vm_stack_suspend_trace_zones(iree_vm_stack_t* stack);
+
+// Resumes trace zones for all stack frames.
+// This recovers the zone stack from a prior iree_vm_stack_suspend_trace_zones.
+// This is a no-op if the tracing library natively supports fibers.
+IREE_API_EXPORT void iree_vm_stack_resume_trace_zones(iree_vm_stack_t* stack);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -136,7 +136,7 @@ IREE offers a low level C API, as well as several specialized sets of
 ## Communication channels
 
 *   :fontawesome-brands-github:
-    [GitHub issues](https://github.com/google/iree/issues): Feature requests,
+    [GitHub issues](https://github.com/iree-org/iree/issues): Feature requests,
     bugs, and other work tracking
 *   :fontawesome-brands-discord:
     [IREE Discord server](https://discord.gg/26P4xW4): Daily development
@@ -148,17 +148,17 @@ IREE offers a low level C API, as well as several specialized sets of
 
 IREE is in the early stages of development and is not yet ready for broad
 adoption. Check out the
-[long-term design roadmap](https://github.com/google/iree/blob/main/docs/developers/design_roadmap.md)
+[long-term design roadmap](https://github.com/iree-org/iree/blob/main/docs/developers/design_roadmap.md)
 to get a sense of where we're headed.
 
 We plan on a quarterly basis using [OKRs](https://en.wikipedia.org/wiki/OKR).
 Review our latest
-[objectives](https://github.com/google/iree/blob/main/docs/developers/objectives.md) to
+[objectives](https://github.com/iree-org/iree/blob/main/docs/developers/objectives.md) to
 see what we're up to.
 
-We use [GitHub Projects](https://github.com/google/iree/projects) to track
+We use [GitHub Projects](https://github.com/iree-org/iree/projects) to track
 progress on IREE components and specific efforts and
-[GitHub Milestones](https://github.com/google/iree/milestones) to track the
+[GitHub Milestones](https://github.com/iree-org/iree/milestones) to track the
 work associated with plans for each quarter.
 
 [^1]:

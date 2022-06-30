@@ -20,7 +20,7 @@ defaults:
 jobs:
   publish_website:
     # Don't run this in everyone's forks.
-    if: github.repository == 'google/iree'
+    if: github.repository == 'iree-org/iree'
     runs-on: ubuntu-18.04
     steps:
       - name: Checkout out repository

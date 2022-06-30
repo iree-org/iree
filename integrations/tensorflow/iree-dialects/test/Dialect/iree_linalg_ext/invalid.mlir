@@ -406,49 +406,6 @@ func.func @reverse_dup_dims(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
 
 // -----
 
-func.func @not_enough_results() -> () {
-  %num_threads = arith.constant 100 : index
-  // expected-error@+1 {{'iree_linalg_ext.in_parallel' op produces 1 results, but its terminator yields 0 values}}
-  %result = iree_linalg_ext.in_parallel %num_threads -> tensor<100xf32> {
-    ^bb0(%thread_idx : index):
-      iree_linalg_ext.perform_concurrently {}
-  }
-}
-
-// -----
-
-func.func @too_many_results(%1 : tensor<1xf32>, %out : tensor<100xf32>) -> () {
-  %num_threads = arith.constant 100 : index
-  // expected-error@+1 {{'iree_linalg_ext.in_parallel' op produces 1 results, but its terminator yields 2 values}}
-  %result = iree_linalg_ext.in_parallel %num_threads -> tensor<100xf32> {
-    ^bb0(%thread_idx : index):
-      %0 = arith.constant 1 : index
-      iree_linalg_ext.perform_concurrently {
-        iree_linalg_ext.parallel_insert_slice %1 into %out[%thread_idx][%0][%0] :
-          tensor<1xf32> into tensor<100xf32>
-        iree_linalg_ext.parallel_insert_slice %1 into %out[%thread_idx][%0][%0] :
-          tensor<1xf32> into tensor<100xf32>
-      }
-  }
-}
-
-// -----
-
-func.func @type_mismatch(%1 : tensor<1xf32>, %out : tensor<200xf32>) -> () {
-  %num_threads = arith.constant 100 : index
-  // expected-error@+1 {{'iree_linalg_ext.in_parallel' op type mismatch between 0th result of in_parallel ('tensor<200xf32>') and 0th result yielded by its terminator ('tensor<100xf32>')}}
-  %result = iree_linalg_ext.in_parallel %num_threads -> tensor<100xf32> {
-    ^bb0(%thread_idx : index):
-      %0 = arith.constant 1 : index
-      iree_linalg_ext.perform_concurrently {
-        iree_linalg_ext.parallel_insert_slice %1 into %out[%thread_idx][%0][%0] :
-          tensor<1xf32> into tensor<200xf32>
-      }
-  }
-}
-
-// -----
-
 func.func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
   // expected-error@+1 {{expected one or two input operands}}
   %0:2 = iree_linalg_ext.topk

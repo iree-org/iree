@@ -12,5 +12,5 @@ add_mlir_library(IREELinalgExtTransformOps
   IREELinalgExtDialect
   IREELinalgExtTransforms
 
-  MLIRPDL
+  MLIRPDLDialect
 )

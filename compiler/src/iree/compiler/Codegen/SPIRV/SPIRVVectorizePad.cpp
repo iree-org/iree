@@ -10,7 +10,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
@@ -123,7 +123,7 @@ struct VectorizePadWithConditions final
 
       paddedDimIndices.push_back(i);
       auto srcDimSize =
-          rewriter.createOrFold<tensor::DimOp>(loc, padOp.source(), i);
+          rewriter.createOrFold<tensor::DimOp>(loc, padOp.getSource(), i);
       auto lb = getAsIndexValue(lowPads[i], rewriter, loc);
       auto ub = rewriter.create<AffineApplyOp>(loc, addMap,
                                                ValueRange{lb, srcDimSize});
@@ -195,8 +195,8 @@ struct VectorizePadWithConditions final
           loc, sliceVectorType, condition,
           [&](OpBuilder builder, Location Loc) {
             Value read = builder.create<vector::TransferReadOp>(
-                loc, sliceVectorType, padOp.source(), readIndices, paddingValue,
-                llvm::makeArrayRef(inBounds));
+                loc, sliceVectorType, padOp.getSource(), readIndices,
+                paddingValue, llvm::makeArrayRef(inBounds));
             builder.create<scf::YieldOp>(loc, read);
           },
           [&](OpBuilder builder, Location Loc) {

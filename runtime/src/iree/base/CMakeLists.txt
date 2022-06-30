@@ -59,7 +59,6 @@ iree_cc_library(
   DEPS
     ::base
     ::core_headers
-    ::logging
   PUBLIC
 )
 
@@ -142,20 +141,6 @@ iree_cc_library(
     target_platform
   HDRS
     "target_platform.h"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    logging
-  HDRS
-    "logging.h"
-  SRCS
-    "logging.cc"
-  DEPS
-    ::core_headers
-    ::tracing
-    iree::base::internal::flags
   PUBLIC
 )
 

@@ -74,9 +74,10 @@ iree_task_t* iree_task_queue_try_steal(iree_task_queue_t* source_queue,
   // First attempt to steal up to max_tasks from the source queue.
   iree_task_list_t stolen_tasks;
   iree_task_list_initialize(&stolen_tasks);
-  iree_slim_mutex_lock(&source_queue->mutex);
-  iree_task_list_split(&source_queue->list, max_tasks, &stolen_tasks);
-  iree_slim_mutex_unlock(&source_queue->mutex);
+  if (iree_slim_mutex_try_lock(&source_queue->mutex)) {
+    iree_task_list_split(&source_queue->list, max_tasks, &stolen_tasks);
+    iree_slim_mutex_unlock(&source_queue->mutex);
+  }
 
   // Add any stolen tasks to the target queue and pop off the head for return.
   iree_task_t* next_task = NULL;

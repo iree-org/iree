@@ -32,6 +32,16 @@ namespace iree_compiler {
 
 namespace {
 
+enum {
+  SHIM_ARGUMENT_STACK = 0,
+  SHIM_ARGUMENT_FLAGS,
+  SHIM_ARGUMENT_ARGS_STORAGE,
+  SHIM_ARGUMENT_RETS_STORAGE,
+  SHIM_ARGUMENT_MODULE,
+  SHIM_ARGUMENT_MODULE_STATE,
+  SHIM_ARGUMENT_EXECUTION_RESULT,
+};
+
 // TODO(simon-camp/marbre): Use this function throughout the conversions.
 Optional<std::string> getCType(Type type) {
   if (auto iType = type.dyn_cast<IntegerType>()) {
@@ -1468,8 +1478,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
 
     Type stackType =
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_stack_t"));
-    Type callType = emitc::PointerType::get(
-        emitc::OpaqueType::get(ctx, "iree_vm_function_call_t"));
+    Type flagsType = emitc::OpaqueType::get(ctx, "uint32_t");
+    Type spanType = emitc::OpaqueType::get(ctx, "iree_byte_span_t");
     Type moduleType =
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"));
     Type moduleStateType =
@@ -1477,8 +1487,15 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
     Type executionResultType = emitc::PointerType::get(
         emitc::OpaqueType::get(ctx, "iree_vm_execution_result_t"));
 
-    SmallVector<Type, 5> inputTypes = {stackType, callType, moduleType,
-                                       moduleStateType, executionResultType};
+    SmallVector<Type> inputTypes = {
+        stackType,            // SHIM_ARGUMENT_STACK
+        flagsType,            // SHIM_ARGUMENT_FLAGS
+        spanType,             // SHIM_ARGUMENT_ARGS_STORAGE
+        spanType,             // SHIM_ARGUMENT_RETS_STORAGE
+        moduleType,           // SHIM_ARGUMENT_MODULE
+        moduleStateType,      // SHIM_ARGUMENT_MODULE_STATE
+        executionResultType,  // SHIM_ARGUMENT_EXECUTION_RESULT
+    };
 
     auto newFuncType = mlir::FunctionType::get(
         ctx, {inputTypes}, {emitc::OpaqueType::get(ctx, "iree_status_t")});
@@ -1504,11 +1521,14 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
           rewriter.createBlock(&newFuncOp.getBody(), newFuncOp.getBody().end());
 
       // Insert arguments into block.
-      block->addArgument(stackType, loc);
-      block->addArgument(callType, loc);
-      block->addArgument(moduleType, loc);
-      block->addArgument(moduleStateType, loc);
-      block->addArgument(executionResultType, loc);
+      block->addArgument(stackType, loc);        // SHIM_ARGUMENT_STACK
+      block->addArgument(flagsType, loc);        // SHIM_ARGUMENT_FLAGS
+      block->addArgument(spanType, loc);         // SHIM_ARGUMENT_ARGS_STORAGE
+      block->addArgument(spanType, loc);         // SHIM_ARGUMENT_RETS_STORAGE
+      block->addArgument(moduleType, loc);       // SHIM_ARGUMENT_MODULE
+      block->addArgument(moduleStateType, loc);  // SHIM_ARGUMENT_MODULE_STATE
+      block->addArgument(executionResultType,
+                         loc);  // SHIM_ARGUMENT_EXECUTION_RESULT
 
       rewriter.setInsertionPointToStart(block);
 
@@ -1557,8 +1577,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
       }
 
       // Call internal function and return on error.
-      SmallVector<Value> operands{block->getArgument(0), moduleStruct,
-                                  moduleStateStruct};
+      SmallVector<Value> operands{block->getArgument(SHIM_ARGUMENT_STACK),
+                                  moduleStruct, moduleStateStruct};
 
       for (auto &argument : argumentStruct.callArguments) {
         operands.push_back(argument);
@@ -1593,8 +1613,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
     auto ctx = exportOp.getContext();
     auto loc = exportOp.getLoc();
 
-    auto module = newFuncOp.getArgument(2);
-    auto moduleState = newFuncOp.getArgument(3);
+    auto module = newFuncOp.getArgument(SHIM_ARGUMENT_MODULE);
+    auto moduleState = newFuncOp.getArgument(SHIM_ARGUMENT_MODULE_STATE);
 
     auto moduleOp =
         newFuncOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
@@ -1728,12 +1748,6 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
 
     if (haveArgumentStruct) {
       // args_t* args = (args_t*)call->arguments.data;
-      // call->arguments
-      auto callArguments = emitc_builders::structPtrMember(
-          rewriter, loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_byte_span_t"),
-          /*memberName=*/"arguments",
-          /*operand=*/newFuncOp.getArgument(1));
 
       // arguments.data
       auto argumentsData = rewriter.create<emitc::CallOp>(
@@ -1744,7 +1758,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
           ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
                                emitc::OpaqueAttr::get(ctx, "data")}),
           /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{callArguments});
+          /*operands=*/
+          ArrayRef<Value>{newFuncOp.getArgument(SHIM_ARGUMENT_ARGS_STORAGE)});
 
       // cast
       std::string argumentsType = argumentStruct.name.getValue();
@@ -1760,12 +1775,6 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
     const bool haveResultStruct = resultStruct.name.hasValue();
     if (haveResultStruct) {
       // results_t* results = (results_t*)call->results.data;
-      // call->results
-      auto callResults = emitc_builders::structPtrMember(
-          rewriter, loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_byte_span_t"),
-          /*memberName=*/"results",
-          /*operand=*/newFuncOp.getArgument(1));
 
       // results.data
       auto resultsData = rewriter.create<emitc::CallOp>(
@@ -1776,7 +1785,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
           ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
                                emitc::OpaqueAttr::get(ctx, "data")}),
           /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{callResults});
+          /*operands=*/
+          ArrayRef<Value>{newFuncOp.getArgument(SHIM_ARGUMENT_RETS_STORAGE)});
 
       // cast
       std::string resultType = resultStruct.name.getValue();

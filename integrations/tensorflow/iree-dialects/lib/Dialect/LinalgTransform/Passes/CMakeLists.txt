@@ -8,17 +8,17 @@ add_mlir_library(IREELinalgTransformDialectPasses
   LINK_LIBS PUBLIC
   IREELinalgTransformDialect
 
-  MLIRBufferization
+  MLIRBufferizationDialect
   MLIRIR
-  MLIRLinalg
-  MLIRLLVMIR
-  MLIRMath
+  MLIRLinalgDialect
+  MLIRLLVMDialect
+  MLIRMathDialect
   MLIRMathToLLVM
-  MLIRMemRef
+  MLIRMemRefDialect
   MLIRMemRefToLLVM
   MLIRPass
-  MLIRTensor
+  MLIRTensorDialect
   MLIRTransforms
-  MLIRVector
+  MLIRVectorDialect
   MLIRVectorToLLVM
 )

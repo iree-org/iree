@@ -19,7 +19,6 @@ target_sources(${_NAME}
 target_link_libraries(${_NAME}
   PUBLIC
     iree::base
-    iree::base::logging
     iree::runtime::bindings::tflite::shim
 )
 

@@ -10,7 +10,7 @@
 export BUILDKITE_ORGANIZATION_SLUG="iree"
 export BUILDKITE_PIPELINE_SLUG="local-test"
 export BUILDKITE_BUILD_NUMBER=1
-export BUILDKITE_REPO="https://github.com/google/iree"
+export BUILDKITE_REPO="https://github.com/iree-org/iree"
 export BUILDKITE_COMMIT="$(git rev-parse HEAD)"
 export BUILDKITE_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 export BUILDKITE_BUILD_AUTHOR="$(git log -n 1 --pretty="format:%aN" HEAD)"

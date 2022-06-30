@@ -14,7 +14,8 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "smoketest.mlir"
+    "smoketest_embedded.mlir"
+    "smoketest_system.mlir"
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck

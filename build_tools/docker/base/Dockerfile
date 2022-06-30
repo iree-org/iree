@@ -115,9 +115,16 @@ RUN apt-get update \
     python3.7-venv \
   && python3 -m pip install --upgrade pip>=21.3 \
   && python3 -m pip install --upgrade setuptools \
+  # Versions for things required to build IREE should match the minimum versions
+  # in runtime/bindings/python/iree/runtime/build_requirements.txt
   && python3 -m pip install --ignore-installed \
-    numpy==1.19.4 absl-py==0.12.0 requests PyYAML==5.4.1 wheel==0.36.2 \
-    pybind11==2.9.0
+    # For building
+    numpy==1.19.4 \
+    PyYAML==5.4.1 \
+    wheel==0.36.2 \
+    pybind11==2.8.0 \
+    # For scripting only
+    requests
 
 ENV PYTHON_BIN /usr/bin/python3
 

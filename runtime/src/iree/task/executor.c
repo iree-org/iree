@@ -405,8 +405,8 @@ void iree_task_executor_flush(iree_task_executor_t* executor) {
 // posted to it.
 void iree_task_executor_coordinate(iree_task_executor_t* executor,
                                    iree_task_worker_t* current_worker) {
-  iree_slim_mutex_lock(&executor->coordinator_mutex);
   IREE_TRACE_ZONE_BEGIN(z0);
+  iree_slim_mutex_lock(&executor->coordinator_mutex);
 
   // We may be adding tasks/waiting/etc on each pass through coordination - to
   // ensure we completely drain the incoming queues and satisfied waits we loop

@@ -9,7 +9,7 @@
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
-#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/Transforms/RegionUtils.h"
@@ -117,7 +117,7 @@ static void rewriteExtractSlices(PatternRewriter &rewriter,
                                  ValueRange tensorDynamicDims,
                                  BlockAndValueMapping tensorToFlowBvm) {
   dispatchOp->walk([&](tensor::ExtractSliceOp extractSliceOp) {
-    Value source = extractSliceOp.source();
+    Value source = extractSliceOp.getSource();
     auto it = llvm::find(tensorOperands, source);
     if (it == tensorOperands.end()) return;
     int64_t index = std::distance(tensorOperands.begin(), it);
