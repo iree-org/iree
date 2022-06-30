@@ -24,24 +24,17 @@ LogicalResult applyPatternsAndFoldGreedily(
     MutableArrayRef<Region> regions, const FrozenRewritePatternSet &patterns,
     const GreedyRewriteConfig &config, RewriteListener *listener);
 
-static inline LogicalResult applyPatternsAndFoldGreedily(
-    Operation *op, const FrozenRewritePatternSet &patterns,
-    const GreedyRewriteConfig &config, RewriteListener *listener) {
-  return applyPatternsAndFoldGreedily(op->getRegions(), patterns, config,
-                                      listener);
-}
-
 /// Apply the given list of transformations to the regions of the
 /// isolated-from-above operation `root` greedily until convergence. Update
 /// Linalg operations in values of `trackedOperations` if they are replaced by
 /// other Linalg operations during the rewriting process. Tracked operations
 /// must be replaced with Linalg operations and must not be erased in the
 /// patterns.
-static inline LogicalResult applyPatternsTrackAndFoldGreedily(
-    Operation *root, RewriteListener &listener,
-    const FrozenRewritePatternSet &patterns,
-    GreedyRewriteConfig config = GreedyRewriteConfig()) {
-  return applyPatternsAndFoldGreedily(root, patterns, config, &listener);
+static inline LogicalResult applyPatternsAndFoldGreedily(
+    Operation *op, const FrozenRewritePatternSet &patterns,
+    const GreedyRewriteConfig &config, RewriteListener *listener) {
+  return applyPatternsAndFoldGreedily(op->getRegions(), patterns, config,
+                                      listener);
 }
 
 } // namespace mlir

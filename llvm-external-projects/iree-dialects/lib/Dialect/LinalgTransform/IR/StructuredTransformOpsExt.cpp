@@ -439,8 +439,9 @@ static LogicalResult performEnablerTransformations(
   RewritePatternSet patterns(ctx);
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
-  if (failed(applyPatternsTrackAndFoldGreedily(func, listener,
-                                               std::move(patterns))))
+  GreedyRewriteConfig config;
+  if (failed(applyPatternsAndFoldGreedily(func, std::move(patterns), config,
+                                          listener)))
     return failure();
 
   // This assumes LICM never removes operations so we don't need tracking.
@@ -533,8 +534,9 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
   };
   auto performCanonicalization = [&patterns](Operation *root,
                                              RewriteListener &listener) {
+    GreedyRewriteConfig config;
     LogicalResult result =
-        applyPatternsTrackAndFoldGreedily(root, listener, patterns);
+        applyPatternsAndFoldGreedily(root, patterns, config, listener);
     LLVM_DEBUG(
         DBGS() << (succeeded(result) ? "successfully performed" : "failed")
                << " canonicalization\n");
