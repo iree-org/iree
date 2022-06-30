@@ -13,6 +13,10 @@
 namespace mlir {
 class DialectRegistry;
 
+namespace func {
+class FuncOp;
+}
+
 namespace scf {
 class IfOp;
 }  // namespace scf

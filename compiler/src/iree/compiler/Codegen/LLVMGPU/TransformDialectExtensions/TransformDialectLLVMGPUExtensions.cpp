@@ -41,32 +41,71 @@ void mlir::iree_compiler::registerTransformDialectLLVMGPUExtension(
 // TODO: Maybe we need both a transform.iree.cpu.bufferize and a
 // transform.iree.gpu.bufferize rather than a single common bufferize op?
 
-static FailureOr<SmallVector<int64_t>> joinStaticRanges(
-    ArrayRef<scf::ForeachThreadOp> ops) {
-  SmallVector<int64_t> joinedStaticRange = {1, 1, 1};
-  for (auto op : ops) {
-    for (auto en : llvm::enumerate(op.getNumThreads())) {
-      auto maybeInt = getConstantIntValue(en.value());
-      if (!maybeInt) {
-        op->emitError(
-            "scf.foreach_thread with non-constant workgroup size cannot be "
-            "lowered into the translation_info attr");
-        return failure();
-      }
-      joinedStaticRange[en.index()] =
-          std::max(joinedStaticRange[en.index()], *maybeInt);
-    }
+/// Apply the permutation `perm` to `vals.
+/// Return failure if perm is not a permutation.
+// TODO: upstream as extraClassDeclaration once stabilized.
+template <typename T>
+static FailureOr<SmallVector<T>> permute(const SmallVector<T> &vals,
+                                         ArrayRef<int64_t> perm) {
+  if (vals.size() != perm.size()) return failure();
+  SmallVector<T> result(vals.size());
+  SmallVector<bool> seen(vals.size());
+  for (const auto &it : llvm::zip(perm, vals)) {
+    // Already seen, invalid thread_dim_mapping.
+    if (seen[std::get<0>(it)]) return failure();
+    result[std::get<0>(it)] = std::get<1>(it);
+    seen[std::get<0>(it)] = true;
   }
-  return joinedStaticRange;
+  // Some not seen, invalid thread_dim_mapping.
+  if (!llvm::all_of(seen, [](bool b) { return b; })) return failure();
+  return result;
+}
+
+/// Helper to get apply the `thread_dim_mapping` permutation of a
+/// `foreachThreadOp` to `values`.
+// TODO: upstream as extraClassDeclaration once stabilized.
+template <typename T>
+static FailureOr<SmallVector<T>> getPermuted(
+    scf::ForeachThreadOp foreachThreadOp, const SmallVector<T> &values) {
+  // Apply mapping permutation if specified.
+  auto mapping = foreachThreadOp.getThreadDimMapping();
+  if (mapping && !mapping.empty()) {
+    auto maybePermuted = permute(values, extractFromI64ArrayAttr(mapping));
+    if (failed(maybePermuted))
+      return foreachThreadOp->emitError("invalid permutation");
+    return *maybePermuted;
+  }
+  return values;
+}
+
+/// Helper to get the `num_threads` of a `foreachThreadOp` after applying the
+/// `thread_dim_mapping` permutation.
+// TODO: upstream as extraClassDeclaration once stabilized.
+static FailureOr<SmallVector<OpFoldResult>> getNumThreads(
+    OpBuilder &b, scf::ForeachThreadOp foreachThreadOp) {
+  SmallVector<OpFoldResult> threadCount = foreachThreadOp.getNumThreads();
+  threadCount.resize(3, b.getIndexAttr(1));
+  return getPermuted(foreachThreadOp, threadCount);
+}
+
+/// Helper to get the thread indices of a `foreachThreadOp` after applying the
+/// `thread_dim_mapping` permutation.
+// TODO: upstream as extraClassDeclaration once stabilized.
+static FailureOr<SmallVector<Value>> getThreadIndices(
+    OpBuilder &b, scf::ForeachThreadOp foreachThreadOp) {
+  SmallVector<Value> threadCount = foreachThreadOp.getThreadIndices();
+  threadCount.resize(3, Value());
+  return getPermuted(foreachThreadOp, threadCount);
 }
 
 //===---------------------------------------------------------------------===//
 // Patterns for ForeachThreadToGpu rewrite.
 //===---------------------------------------------------------------------===//
 
-FailureOr<SmallVector<Value>> rewriteForeachThreadToGpu(
+FailureOr<SmallVector<OpFoldResult>> rewriteForeachThreadToGpu(
     scf::ForeachThreadOp foreachThreadOp,
-    SmallVector<int64_t> &globalWorkgroupSizes, PatternRewriter &rewriter) {
+    const SmallVector<int64_t> &globalWorkgroupSizes,
+    PatternRewriter &rewriter) {
   if (foreachThreadOp.getNumResults() > 0)
     return foreachThreadOp->emitError(
         "only bufferized scf.foreach_thread lowers to gpu.thread");
@@ -74,20 +113,25 @@ FailureOr<SmallVector<Value>> rewriteForeachThreadToGpu(
     return foreachThreadOp->emitError(
         "scf.foreach_thread with rank > 3 does not lower to gpu.thread");
 
-  auto maybeWorkgroupSizes = joinStaticRanges({foreachThreadOp});
-  assert(succeeded(maybeWorkgroupSizes) && "unexpected dynamic workgroup size");
+  auto maybeWorkgroupSizes = getNumThreads(rewriter, foreachThreadOp);
+  if (failed(maybeWorkgroupSizes) ||
+      llvm::any_of(*maybeWorkgroupSizes, [](OpFoldResult ofr) {
+        return !getConstantIntValue(ofr).hasValue();
+      }))
+    return foreachThreadOp->emitError("unsupported dynamic workgroup size");
 
-  auto workgroupSizes = *maybeWorkgroupSizes;
+  SmallVector<int64_t> workgroupSizes;
+  for (OpFoldResult ofr : *maybeWorkgroupSizes)
+    workgroupSizes.push_back(getConstantIntValue(ofr).getValue());
 
   // Step 1. Create the gpu.thread ops
   Location loc = foreachThreadOp.getLoc();
   IndexType indexType = rewriter.getIndexType();
-  SmallVector<Value> threadCount = foreachThreadOp.getNumThreads();
+
   SmallVector<gpu::Dimension, 3> gpuDims{gpu::Dimension::x, gpu::Dimension::y,
                                          gpu::Dimension::z};
   SmallVector<Value, 3> threadOps;
-  threadCount.resize(3, rewriter.create<arith::ConstantIndexOp>(loc, 1));
-  for (int64_t idx : llvm::seq<int64_t>(0, threadCount.size())) {
+  for (int64_t idx : llvm::seq<int64_t>(0, workgroupSizes.size())) {
     threadOps.push_back(
         rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpuDims[idx]));
   }
@@ -129,8 +173,12 @@ FailureOr<SmallVector<Value>> rewriteForeachThreadToGpu(
                                       sourceBlock.getOperations());
 
   // Step 4. RAUW thread indices to thread ops.
-  for (auto it : llvm::zip(foreachThreadOp.getThreadIndices(), threadOps))
+  SmallVector<Value> threadIndices =
+      *getThreadIndices(rewriter, foreachThreadOp);
+  for (auto it : llvm::zip(threadIndices, threadOps)) {
+    if (!std::get<0>(it)) continue;
     std::get<0>(it).replaceAllUsesWith(std::get<1>(it));
+  }
 
   // Step 5. syncthreads.
   rewriter.create<gpu::BarrierOp>(loc);
@@ -138,7 +186,7 @@ FailureOr<SmallVector<Value>> rewriteForeachThreadToGpu(
   // Step 6. Erase old op.
   rewriter.eraseOp(foreachThreadOp);
 
-  return threadCount;
+  return *maybeWorkgroupSizes;
 }
 
 //===---------------------------------------------------------------------===//
@@ -148,60 +196,41 @@ FailureOr<SmallVector<Value>> rewriteForeachThreadToGpu(
 // TODO: if the number of threads was wired like the workgroup_count, we could
 // reuse most of the code and not require a static number of threads.
 // TODO: synchronizations for imperfectly nested stuff.
-DiagnosedSilenceableFailure
-transform_dialect::ForeachThreadToGpuAndTranslationInfo::apply(
-    transform::TransformResults &results, transform::TransformState &state) {
+FailureOr<func::FuncOp>
+transform_dialect::ForeachThreadToGpuAndTranslationInfo::applyToOne(
+    func::FuncOp funcOp, transform::TransformState &state) {
   if (!isa<HAL::ExecutableVariantOp>(state.getTopLevel())) {
-    emitOpError() << "applies only to HAL::ExecutableVariantOp targets";
-    return DiagnosedSilenceableFailure::definiteFailure();
+    return state.getTopLevel()->emitError(
+        "requires HAL::ExecutableVariantOp toplevel");
   }
 
-  DenseMap<func::FuncOp, SmallVector<scf::ForeachThreadOp>>
-      foreachThreadsPerFunc;
-  DenseMap<scf::ForeachThreadOp, func::FuncOp> foreachThreadToFunc;
-  WalkResult walkResult = state.getTopLevel()->walk<WalkOrder::PostOrder>(
-      [&](scf::ForeachThreadOp op) {
-        if (op->getParentOfType<scf::ForeachThreadOp>())
-          return WalkResult::interrupt();
+  IREE::HAL::ExecutableExportOp exportOp;
+  state.getTopLevel()->walk([&](IREE::HAL::ExecutableExportOp op) {
+    if (op.sym_name() == funcOp.getName()) exportOp = op;
+  });
+  if (!exportOp) {
+    state.getTopLevel()->emitWarning("no export found for " + funcOp.getName());
+    return funcOp;
+  }
 
-        auto funcOp = op->getParentOfType<func::FuncOp>();
-        foreachThreadToFunc.insert(std::make_pair(op, funcOp));
-        auto it = foreachThreadsPerFunc.find(funcOp);
-        if (it == foreachThreadsPerFunc.end())
-          foreachThreadsPerFunc.insert(
-              std::make_pair(funcOp, SmallVector<scf::ForeachThreadOp>{op}));
-        else
-          it->second.push_back(op);
-        return WalkResult::advance();
-      });
-  if (walkResult.wasInterrupted())
-    return DiagnosedSilenceableFailure::definiteFailure();
+  SmallVector<int64_t> workgroupSize =
+      extractFromI64ArrayAttr(getWorkgroupSize());
+  workgroupSize.resize(/*size=*/3, /*value=*/1);
+  SimplePatternRewriter rewriter(funcOp);
+  auto walkResult = funcOp->walk([&](scf::ForeachThreadOp foreachThreadOp) {
+    rewriter.setInsertionPoint(foreachThreadOp);
+    if (failed(rewriteForeachThreadToGpu(foreachThreadOp, workgroupSize,
+                                         rewriter)))
+      return WalkResult::interrupt();
+    return WalkResult::advance();
+  });
 
-  llvm::StringMap<HAL::ExecutableExportOp> exportOps;
-  state.getTopLevel()->walk(
-      [&](HAL::ExecutableExportOp op) { exportOps[op.sym_name()] = op; });
+  if (walkResult.wasInterrupted()) return failure();
+  auto newAttr = rewriter.getIndexArrayAttr(workgroupSize);
+  // TODO: should really be: exportOp.setWorkgroupSizeAttr(newAttr);
+  exportOp->setAttr(exportOp.workgroup_sizeAttrName(), newAttr);
 
-  walkResult =
-      state.getTopLevel()->walk<WalkOrder::PostOrder>([&](func::FuncOp funcOp) {
-        SimplePatternRewriter rewriter(funcOp);
-        auto maybeJoinedRanges =
-            joinStaticRanges(foreachThreadsPerFunc.lookup(funcOp));
-        if (failed(maybeJoinedRanges)) return WalkResult::interrupt();
-        for (auto foreachOp : foreachThreadsPerFunc.lookup(funcOp)) {
-          rewriter.setInsertionPoint(foreachOp);
-          if (failed(rewriteForeachThreadToGpu(foreachOp, *maybeJoinedRanges,
-                                               rewriter)))
-            return WalkResult::interrupt();
-        }
-        auto exportOp = exportOps.lookup(funcOp.getName());
-        auto newAttr = rewriter.getIndexArrayAttr(*maybeJoinedRanges);
-        exportOp->setAttr(exportOp.workgroup_sizeAttrName(), newAttr);
-        return WalkResult::advance();
-      });
-
-  return walkResult.wasInterrupted()
-             ? DiagnosedSilenceableFailure::definiteFailure()
-             : DiagnosedSilenceableFailure::success();
+  return funcOp;
 }
 
 //===---------------------------------------------------------------------===//
@@ -346,8 +375,9 @@ transform_dialect::VectorWarpExecuteOnLane0Op::applyToOne(
         << "vector distribution requires workgroup size for x to be a "
         << "multiple of the warp size: " << workgroupSizeX << " vs " << warpSize
         << " --- the transform is not applied";
-    // Explicitly return a null WarpExecuteOnLane0Op. This is not a failure but
-    // the transformation is not applied and the null result is propagated.
+    // Explicitly return a null WarpExecuteOnLane0Op. This is not a failure
+    // but the transformation is not applied and the null result is
+    // propagated.
     return vector::WarpExecuteOnLane0Op();
   }
 

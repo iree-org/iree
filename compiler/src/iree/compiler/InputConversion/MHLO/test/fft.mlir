@@ -27,7 +27,12 @@ func.func @rfft_1d(%input: tensor<32xf32>) -> (tensor<17xf32>, tensor<17xf32>) {
 // CHECK:        %[[ImagRes:.+]] = linalg.vecmat
 // CHECK-SAME:     ins(%[[Arg0]], %[[ImagMatrix]] : tensor<32xf32>, tensor<32x17xf32>)
 // CHECK-SAME:     outs(%[[ImagFill]] : tensor<17xf32>) -> tensor<17xf32>
-// CHECK:        return %[[RealRes]], %[[ImagRes]] : tensor<17xf32>, tensor<17xf32>
+// CHECK:        %[[ComplexRes:.*]] = linalg.generic
+// CHECK:        %[[ReRes:.*]] = linalg.generic
+// CHECK-SAME:     ins(%[[ComplexRes]]
+// CHECK:        %[[ImRes:.*]] = linalg.generic
+// CHECK-SAME:     ins(%[[ComplexRes]]
+// CHECK:        return %[[ReRes]], %[[ImRes]] : tensor<17xf32>, tensor<17xf32>
 
 // -----
 
@@ -58,4 +63,9 @@ func.func @rfft_2d(%input: tensor<1x32xf32>) -> (tensor<1x17xf32>, tensor<1x17xf
 // CHECK:        %[[ImagRes:.+]] = linalg.matmul
 // CHECK-SAME:     ins(%[[Arg0]], %[[ImagMatrix]] : tensor<1x32xf32>, tensor<32x17xf32>)
 // CHECK-SAME:     outs(%[[ImagFill]] : tensor<1x17xf32>) -> tensor<1x17xf32>
-// CHECK:        return %[[RealRes]], %[[ImagRes]] : tensor<1x17xf32>, tensor<1x17xf32>
+// CHECK:        %[[ComplexRes:.*]] = linalg.generic
+// CHECK:        %[[ReRes:.*]] = linalg.generic
+// CHECK-SAME:     ins(%[[ComplexRes]]
+// CHECK:        %[[ImRes:.*]] = linalg.generic
+// CHECK-SAME:     ins(%[[ComplexRes]]
+// CHECK:        return %[[ReRes]], %[[ImRes]] : tensor<1x17xf32>, tensor<1x17xf32>

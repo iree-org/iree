@@ -151,34 +151,38 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   };
 
   // exports
-  SmallVector<IREE::VM::ExportOp, 4> exportOps(
-      moduleOp.getOps<IREE::VM::ExportOp>());
+  SmallVector<func::FuncOp, 4> exportedFunctions;
+  for (auto func : moduleOp.getOps<func::FuncOp>()) {
+    if (func.getOperation()->hasAttr("vm.export_name")) {
+      exportedFunctions.push_back(func);
+    }
+  }
+  auto extractExportName = [](func::FuncOp funcOp) {
+    return funcOp.getOperation()->getAttr("vm.export_name").cast<StringAttr>();
+  };
+
   std::string exportName = moduleName + "_exports_";
   output << "static const iree_vm_native_export_descriptor_t " << exportName
          << "[] = {\n";
-  if (exportOps.empty()) {
+  if (exportedFunctions.empty()) {
     // Empty list placeholder.
     output << "    {{0}},\n";
   } else {
     // sort export ops
-    llvm::sort(exportOps, [](auto &lhs, auto &rhs) {
-      return lhs.export_name().compare(rhs.export_name()) < 0;
+    llvm::sort(exportedFunctions, [&extractExportName](auto &lhs, auto &rhs) {
+      return extractExportName(lhs).compare(extractExportName(rhs)) < 0;
     });
-    for (auto exportOp : exportOps) {
-      StringRef funcName = exportOp.function_ref();
-      auto funcOp = symbolTable.lookup<mlir::func::FuncOp>(funcName);
-      if (!funcOp) {
-        return exportOp.emitError("Couldn't find referenced FuncOp");
-      }
+    for (auto funcOp : exportedFunctions) {
+      StringAttr exportName = extractExportName(funcOp);
       StringAttr callingConvention = funcOp.getOperation()
                                          ->getAttr("vm.calling_convention")
                                          .cast<StringAttr>();
       if (!callingConvention) {
-        return exportOp.emitError("Couldn't find calling convention attribute");
+        return funcOp.emitError("Couldn't find calling convention attribute");
       }
 
       // TODO(simon-camp): support function-level reflection attributes
-      output << "{" << printStringView(exportOp.export_name()) << ", "
+      output << "{" << printStringView(exportName) << ", "
              << printStringView(callingConvention.getValue())
              << ", 0, NULL},\n";
     }
@@ -215,19 +219,15 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   std::string functionName = moduleName + "_funcs_";
   output << "static const iree_vm_native_function_ptr_t " << functionName
          << "[] = {\n";
-  if (exportOps.empty()) {
+  if (exportedFunctions.empty()) {
     // Empty list placeholder.
     output << "    {0},\n";
   } else {
     // We only add exported functions to the table, as calls to internal
     // functions are directly mapped to C function calls of the generated
     // implementation.
-    for (auto exportOp : exportOps) {
-      StringRef funcName = exportOp.function_ref();
-      auto funcOp = symbolTable.lookup<mlir::func::FuncOp>(funcName);
-      if (!funcOp) {
-        return exportOp.emitError("Couldn't find referenced FuncOp");
-      }
+    for (auto funcOp : exportedFunctions) {
+      auto funcName = funcOp.getName();
       output << "{"
              << "(iree_vm_native_function_shim_t)iree_emitc_shim, "
              << "(iree_vm_native_function_target_t)" << funcName << "},\n";
@@ -246,9 +246,9 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
          << "NULL,\n"
          << importOps.size() << ",\n"
          << importName << ",\n"
-         << exportOps.size() << ",\n"
+         << exportedFunctions.size() << ",\n"
          << exportName << ",\n"
-         << exportOps.size() << ",\n"
+         << exportedFunctions.size() << ",\n"
          << functionName << ",\n"
          << "};\n";
 
