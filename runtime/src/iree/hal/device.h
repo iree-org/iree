@@ -346,23 +346,6 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_submit(
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
     const iree_hal_submission_batch_t* batches);
 
-// Submits batches of work and waits until |wait_semaphore| reaches or exceeds
-// |wait_value|.
-//
-// This is equivalent to following iree_hal_device_queue_submit with a
-// iree_hal_semaphore_wait on |wait_timeout|/|wait_value| but
-// may help to reduce overhead by preventing thread wakeups, kernel calls, and
-// internal tracking.
-//
-// See iree_hal_device_queue_submit for more information about the queuing
-// behavior and iree_hal_semaphore_wait for the waiting  behavior.
-IREE_API_EXPORT iree_status_t iree_hal_device_submit_and_wait(
-    iree_hal_device_t* device, iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
-    const iree_hal_submission_batch_t* batches,
-    iree_hal_semaphore_t* wait_semaphore, uint64_t wait_value,
-    iree_timeout_t timeout);
-
 // Blocks the caller until the semaphores reach or exceed the specified payload
 // values or the |timeout| elapses. All semaphores in |semaphore_list| must be
 // created from this device (or be imported into it).
@@ -468,13 +451,6 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_device_t* device, iree_hal_command_category_t command_categories,
       iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
       const iree_hal_submission_batch_t* batches);
-
-  iree_status_t(IREE_API_PTR* submit_and_wait)(
-      iree_hal_device_t* device, iree_hal_command_category_t command_categories,
-      iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
-      const iree_hal_submission_batch_t* batches,
-      iree_hal_semaphore_t* wait_semaphore, uint64_t wait_value,
-      iree_timeout_t timeout);
 
   iree_status_t(IREE_API_PTR* wait_semaphores)(
       iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
