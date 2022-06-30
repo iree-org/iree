@@ -42,6 +42,15 @@ enum {
   SHIM_ARGUMENT_EXECUTION_RESULT,
 };
 
+/// The EmitC dialect is currently missing operations to cleanly represent some
+/// constructs we need for the C target. This includes storage class specifiers
+/// on functions, forward declarations of functions, globals and arrays.
+/// As a workaround the conversion currently adds bits of information via
+/// attributes that later get used by the CModuleTarget.
+void attachAttribute(Operation *op, StringRef name, Attribute value) {
+  op->setAttr(name, value);
+}
+
 // TODO(simon-camp/marbre): Use this function throughout the conversions.
 Optional<std::string> getCType(Type type) {
   if (auto iType = type.dyn_cast<IntegerType>()) {
@@ -201,15 +210,14 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
 
   auto newFuncOp = builder.create<mlir::func::FuncOp>(loc, name, newFuncType);
 
-  newFuncOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
+  attachAttribute(newFuncOp, "emitc.static", UnitAttr::get(ctx));
 
   Optional<std::string> callingConvention = makeCallingConventionString(funcOp);
 
   // Annotate new function with calling convention string which gets used in
   // the CModuleTarget.
-  newFuncOp.getOperation()->setAttr(
-      "vm.calling_convention",
-      StringAttr::get(ctx, callingConvention.getValue()));
+  attachAttribute(newFuncOp, "vm.calling_convention",
+                  StringAttr::get(ctx, callingConvention.getValue()));
 
   // This call shold be equivalent to rewriter.inlineRegionBefore()
   newFuncOp.getBody().getBlocks().splice(newFuncOp.end(),
@@ -717,7 +725,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     typeConverter.analysisCache.insert(
         std::make_pair(funcOp.getOperation(), VMAnalysis()));
 
-    funcOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
+    attachAttribute(funcOp, "emitc.static", UnitAttr::get(ctx));
 
     Block *entryBlock = funcOp.addEntryBlock();
 
@@ -766,7 +774,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     typeConverter.analysisCache.insert(
         std::make_pair(funcOp.getOperation(), VMAnalysis()));
 
-    funcOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
+    attachAttribute(funcOp, "emitc.static", UnitAttr::get(ctx));
 
     Block *entryBlock = funcOp.addEntryBlock();
 
@@ -983,7 +991,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     typeConverter.analysisCache.insert(
         std::make_pair(funcOp.getOperation(), VMAnalysis()));
 
-    funcOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
+    attachAttribute(funcOp, "emitc.static", UnitAttr::get(ctx));
 
     Block *entryBlock = funcOp.addEntryBlock();
 
@@ -1081,7 +1089,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     typeConverter.analysisCache.insert(
         std::make_pair(funcOp.getOperation(), VMAnalysis()));
 
-    funcOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
+    attachAttribute(funcOp, "emitc.static", UnitAttr::get(ctx));
 
     Block *entryBlock = funcOp.addEntryBlock();
 
@@ -1155,11 +1163,11 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     // This function needs an iree_vm_native_module_descriptor_t that is emitted
     // by the CModuleTarget at the moment. So we add a marker to this function
     // and delay the printing of it.
-    funcOp.getOperation()->setAttr("vm.emit_at_end", UnitAttr::get(ctx));
+    attachAttribute(funcOp, "vm.emit_at_end", UnitAttr::get(ctx));
 
     // This functions is the only one users need and it is therefore declared
     // separatly from all other functions.
-    funcOp.getOperation()->setAttr("vm.module.constructor", UnitAttr::get(ctx));
+    attachAttribute(funcOp, "vm.module.constructor", UnitAttr::get(ctx));
 
     Block *entryBlock = funcOp.addEntryBlock();
 
@@ -1437,11 +1445,6 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
  public:
   using OpConversionPattern<IREE::VM::ExportOp>::OpConversionPattern;
 
-  ExportOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                     SmallVector<Operation *> &visitedExports)
-      : OpConversionPattern<IREE::VM::ExportOp>(typeConverter, context),
-        visitedExports(visitedExports) {}
-
  private:
   typedef struct GeneratedStruct {
     Optional<Value> value = None;
@@ -1457,8 +1460,6 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
 
     IREE::VM::EmitCTypeConverter *typeConverter =
         this->getTypeConverter<IREE::VM::EmitCTypeConverter>();
-
-    rewriter.startRootUpdate(exportOp.getOperation());
 
     mlir::func::FuncOp funcOp = lookupSymbolRef<mlir::func::FuncOp>(
         exportOp.getOperation(), "function_ref");
@@ -1509,10 +1510,10 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
     typeConverter->analysisCache.insert(
         std::make_pair(newFuncOp.getOperation(), std::move(newVmAnalysis)));
 
-    newFuncOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
-    newFuncOp.getOperation()->setAttr(
-        "vm.calling_convention",
-        funcOp.getOperation()->getAttr("vm.calling_convention"));
+    attachAttribute(newFuncOp, "emitc.static", UnitAttr::get(ctx));
+    attachAttribute(newFuncOp, "vm.calling_convention",
+                    funcOp.getOperation()->getAttr("vm.calling_convention"));
+    attachAttribute(newFuncOp, "vm.export_name", exportOp.export_nameAttr());
 
     // Populate newly generated function.
     {
@@ -1600,10 +1601,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
       rewriter.create<mlir::func::ReturnOp>(loc, status.getResult(0));
     }
 
-    exportOp.function_refAttr(FlatSymbolRefAttr::get(newFuncOp.getOperation()));
-    rewriter.finalizeRootUpdate(exportOp.getOperation());
+    rewriter.eraseOp(exportOp);
 
-    visitedExports.push_back(exportOp.getOperation());
     return success();
   }
 
@@ -1905,8 +1904,6 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
 
     return success();
   }
-
-  SmallVector<Operation *> &visitedExports;
 };
 
 class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
@@ -2067,7 +2064,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
     getTypeConverter<IREE::VM::EmitCTypeConverter>()->analysisCache.insert(
         std::make_pair(newFuncOp.getOperation(), VMAnalysis{}));
 
-    newFuncOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
+    attachAttribute(newFuncOp, "emitc.static", UnitAttr::get(ctx));
 
     // Populate newly generated function.
     {
@@ -4661,7 +4658,6 @@ class ListSetRefOpConversion
 void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                IREE::VM::EmitCTypeConverter &typeConverter,
                                RewritePatternSet &patterns,
-                               SmallVector<Operation *> &visitedExports,
                                SmallVector<std::string> &importShims) {
   auto context = patterns.getContext();
   populateUtilConversionPatterns(context, conversionTarget, typeConverter,
@@ -4675,7 +4671,7 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
   patterns.add<CondBranchOpConversion>(typeConverter, context);
   patterns.add<FailOpConversion>(typeConverter, context);
   patterns.add<FuncOpConversion>(typeConverter, context);
-  patterns.add<ExportOpConversion>(typeConverter, context, visitedExports);
+  patterns.add<ExportOpConversion>(typeConverter, context);
   patterns.add<ImportOpConversion>(typeConverter, context, importShims);
   patterns.add<ReturnOpConversion>(typeConverter, context);
   patterns.add<ImportResolvedOpConversion>(typeConverter, context);
@@ -5060,11 +5056,9 @@ class ConvertVMToEmitCPass
       return signalPassFailure();
     }
 
-    SmallVector<Operation *> visitedExports;
     SmallVector<std::string> importShims;
     RewritePatternSet patterns(&getContext());
-    populateVMToEmitCPatterns(target, typeConverter, patterns, visitedExports,
-                              importShims);
+    populateVMToEmitCPatterns(target, typeConverter, patterns, importShims);
 
     target.addLegalDialect<
         emitc::EmitCDialect, mlir::BuiltinDialect, mlir::cf::ControlFlowDialect,
@@ -5080,14 +5074,9 @@ class ConvertVMToEmitCPass
     target.addLegalOp<IREE::VM::ModuleOp>();
     target.addLegalOp<IREE::VM::ModuleTerminatorOp>();
 
-    // These ops are needed to build arrays for the module descriptor. There is
-    // no way to generate this directly with the EmitC dialect at the moment.
-    // We nonetheless visit each export once to create a shim.
-    target.addDynamicallyLegalOp<IREE::VM::ExportOp>(
-        [&visitedExports](IREE::VM::ExportOp op) {
-          return llvm::find(visitedExports, op.getOperation()) !=
-                 std::end(visitedExports);
-        });
+    // The import ops are currently needed to build the import array for the
+    // module descriptor. There is no way to generate this directly with the
+    // EmitC dialect at the moment.
     target.addDynamicallyLegalOp<IREE::VM::ImportOp>(
         [&importShims](IREE::VM::ImportOp op) {
           auto key = makeImportCallingConventionString(op);
