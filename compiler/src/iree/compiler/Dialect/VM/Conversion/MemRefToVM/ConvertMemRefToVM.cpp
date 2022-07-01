@@ -139,7 +139,7 @@ class ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
     auto oldType = allocaOp.getType();
     auto newType = getTypeConverter()->convertType(oldType);
     Value size =
-        rewriter.create<IREE::VM::ConstI32Op>(allocaOp.getLoc(), length);
+        rewriter.create<IREE::VM::ConstI64Op>(allocaOp.getLoc(), length);
     rewriter.replaceOpWithNewOp<IREE::VM::BufferAllocOp>(allocaOp, newType,
                                                          size);
     return success();

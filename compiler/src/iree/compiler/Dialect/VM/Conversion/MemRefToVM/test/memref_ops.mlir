@@ -3,8 +3,8 @@
 module {
   // CHECK-LABEL: vm.func private @alloca() -> !vm.buffer
   func.func @alloca() -> memref<16xi32> {
-    // CHECK: %[[LEN:.+]] = vm.const.i32 64
-    // CHECK: %[[BUF:.+]] = vm.buffer.alloc %[[LEN]] : !vm.buffer
+    // CHECK: %[[LEN_64:.+]] = vm.const.i64 64
+    // CHECK: %[[BUF:.+]] = vm.buffer.alloc %[[LEN_64]] : !vm.buffer
     // return %[[BUF]]
     %0 = memref.alloca() : memref<16xi32>
     return %0 : memref<16xi32>
