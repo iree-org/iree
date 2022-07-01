@@ -179,9 +179,11 @@ static bool GenerateImpl(const std::string& identifier,
   }
   f << "  {NULL, NULL, 0},\n";
   f << "};\n";
+  GenerateExternCOpen(f);
   f << "const struct iree_file_toc_t* " << identifier << "_create() {\n";
   f << "  return &toc[0];\n";
   f << "}\n";
+  GenerateExternCClose(f);
   f.close();
   return f.good();
 }
