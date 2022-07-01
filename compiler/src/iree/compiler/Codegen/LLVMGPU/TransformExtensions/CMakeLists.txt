@@ -12,25 +12,25 @@ iree_add_all_subdirs()
 
 iree_tablegen_library(
   NAME
-    TransformDialectLLVMGPUExtensionsOpGen
+    LLVMGPUExtensionsOpGen
   TD_FILE
-    "TransformDialectLLVMGPUExtensionsOps.td"
+    "LLVMGPUExtensionsOps.td"
   OUTS
-    --gen-op-decls TransformDialectLLVMGPUExtensionsOps.h.inc
-    --gen-op-defs TransformDialectLLVMGPUExtensionsOps.cpp.inc
+    --gen-op-decls LLVMGPUExtensionsOps.h.inc
+    --gen-op-defs LLVMGPUExtensionsOps.cpp.inc
 )
 
 iree_cc_library(
   NAME
-    TransformDialectLLVMGPUExtensions
+    LLVMGPUExtensions
   HDRS
-    "TransformDialectLLVMGPUExtensions.h"
-    "TransformDialectLLVMGPUExtensionsOps.h.inc"
+    "LLVMGPUExtensions.h"
+    "LLVMGPUExtensionsOps.h.inc"
   SRCS
-    "TransformDialectLLVMGPUExtensions.cpp"
-    "TransformDialectLLVMGPUExtensionsOps.cpp.inc"
+    "LLVMGPUExtensions.cpp"
+    "LLVMGPUExtensionsOps.cpp.inc"
   DEPS
-    ::TransformDialectLLVMGPUExtensionsOpGen
+    ::LLVMGPUExtensionsOpGen
     IREEDialectsTransforms
     IREELinalgTransformDialect
     MLIRArithmeticDialect

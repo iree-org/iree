@@ -47,7 +47,7 @@ iree_compiler_cc_library(
         ":ProcessorOpInterfaces",
         "//compiler/src/iree/compiler/Codegen/Common/TransformExtensions:CommonExtensions",
         "//compiler/src/iree/compiler/Codegen/LLVMCPU/TransformExtensions:LLVMCPUExtensions",
-        "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformExtensions:TransformDialectLLVMGPUExtensions",
+        "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformExtensions:LLVMGPUExtensions",
         "//compiler/src/iree/compiler/Dialect/Flow/TransformExtensions:FlowExtensions",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",

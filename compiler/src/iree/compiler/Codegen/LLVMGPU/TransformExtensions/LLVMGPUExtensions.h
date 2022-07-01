@@ -35,11 +35,11 @@ void registerTransformDialectLLVMGPUExtension(DialectRegistry &registry);
 namespace IREE {
 namespace transform_dialect {
 // Hook to register LLVMGPU transformations to the transform dialect.
-class TransformDialectLLVMGPUExtensions
+class LLVMGPUExtensions
     : public transform::TransformDialectExtension<
-          TransformDialectLLVMGPUExtensions> {
+          LLVMGPUExtensions> {
  public:
-  TransformDialectLLVMGPUExtensions();
+  LLVMGPUExtensions();
 };
 }  // namespace transform_dialect
 }  // namespace IREE
@@ -47,6 +47,6 @@ class TransformDialectLLVMGPUExtensions
 }  // namespace mlir
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/TransformDialectLLVMGPUExtensionsOps.h.inc"
+#include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensionsOps.h.inc"
 
 #endif  // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMDIALECTEXTENSIONS_TRANSFORMDIALECTLLVMGPUEXTENSIONS_H_

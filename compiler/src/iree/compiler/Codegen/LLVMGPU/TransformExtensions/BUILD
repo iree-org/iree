@@ -19,7 +19,7 @@ td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
-            "TransformDialectLLVMGPUExtensionsOps.td",
+            "LLVMGPUExtensionsOps.td",
         ],
         include = ["*.td"],
     ),
@@ -31,34 +31,34 @@ td_library(
 )
 
 iree_gentbl_cc_library(
-    name = "TransformDialectLLVMGPUExtensionsOpGen",
+    name = "LLVMGPUExtensionsOpGen",
     tbl_outs = [
         (
             ["--gen-op-decls"],
-            "TransformDialectLLVMGPUExtensionsOps.h.inc",
+            "LLVMGPUExtensionsOps.h.inc",
         ),
         (
             ["--gen-op-defs"],
-            "TransformDialectLLVMGPUExtensionsOps.cpp.inc",
+            "LLVMGPUExtensionsOps.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "TransformDialectLLVMGPUExtensionsOps.td",
+    td_file = "LLVMGPUExtensionsOps.td",
     deps = [":td_files"],
 )
 
 iree_compiler_cc_library(
-    name = "TransformDialectLLVMGPUExtensions",
+    name = "LLVMGPUExtensions",
     srcs = [
-        "TransformDialectLLVMGPUExtensions.cpp",
-        "TransformDialectLLVMGPUExtensionsOps.cpp.inc",
+        "LLVMGPUExtensions.cpp",
+        "LLVMGPUExtensionsOps.cpp.inc",
     ],
     hdrs = [
-        "TransformDialectLLVMGPUExtensions.h",
-        "TransformDialectLLVMGPUExtensionsOps.h.inc",
+        "LLVMGPUExtensions.h",
+        "LLVMGPUExtensionsOps.h.inc",
     ],
     deps = [
-        ":TransformDialectLLVMGPUExtensionsOpGen",
+        ":LLVMGPUExtensionsOpGen",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",

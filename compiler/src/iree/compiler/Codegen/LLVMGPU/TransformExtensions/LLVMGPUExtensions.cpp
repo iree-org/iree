@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "TransformDialectLLVMGPUExtensions.h"
+#include "LLVMGPUExtensions.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -24,18 +24,18 @@
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE;
 
-iree_compiler::IREE::transform_dialect::TransformDialectLLVMGPUExtensions::
-    TransformDialectLLVMGPUExtensions() {
+iree_compiler::IREE::transform_dialect::LLVMGPUExtensions::
+    LLVMGPUExtensions() {
   registerTransformOps<
 #define GET_OP_LIST
-#include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/TransformDialectLLVMGPUExtensionsOps.cpp.inc"
+#include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensionsOps.cpp.inc"
       >();
 }
 
 void mlir::iree_compiler::registerTransformDialectLLVMGPUExtension(
     DialectRegistry &registry) {
   registry
-      .addExtensions<transform_dialect::TransformDialectLLVMGPUExtensions>();
+      .addExtensions<transform_dialect::LLVMGPUExtensions>();
 }
 
 // TODO: Maybe we need both a transform.iree.cpu.bufferize and a
@@ -524,4 +524,4 @@ LogicalResult transform_dialect::VectorWarpDistributionOp::applyToOne(
 }
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/TransformDialectLLVMGPUExtensionsOps.cpp.inc"
+#include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensionsOps.cpp.inc"
