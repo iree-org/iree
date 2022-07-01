@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Support/LLVM.h"
@@ -601,7 +602,8 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm);
 /// GPU processor ID ops into SPIR-V global variables, loop/standard ops into
 /// corresponding SPIR-V ops.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass(
-    bool enableFastMath = false, unsigned indexWidth = 32);
+    bool enableFastMath = false, unsigned indexWidth = 32,
+    spirv::AddressingModel addressingModel = spirv::AddressingModel::Logical);
 
 /// Creates a pass to fold processor ID uses where possible.
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -689,7 +691,8 @@ createSPIRVAnnotateWinogradLoopsPass();
 /// Populates passes needed to lower linalg/arith/math ops to SPIR-V ops via
 /// the structured ops path. The pass manager `pm` here operate on the module
 /// within the IREE::HAL::ExecutableOp.
-void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath);
+void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath,
+                                   spirv::AddressingModel addressingModel);
 
 //------------------------------------------------------------------------------
 // VMVX passes
