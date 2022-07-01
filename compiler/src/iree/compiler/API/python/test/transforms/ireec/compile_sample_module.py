@@ -41,10 +41,9 @@ with ir.Context() as ctx:
     }
   """)
 
-  options = ireec.CompilerOptions("--iree-hal-target-backends=cpu")
+  options = ireec.CompilerOptions("--iree-hal-target-backends=cpu --iree-input-type=mhlo")
   print(options)
   pm = passmanager.PassManager()
-  ireec.build_mhlo_import_pass_pipeline(pm)
   ireec.build_iree_vm_pass_pipeline(options, pm)
   pm.run(input_module)
 

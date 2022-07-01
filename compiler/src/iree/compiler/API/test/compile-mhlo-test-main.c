@@ -70,9 +70,11 @@ static bool iree_compile_mlir_to_bytecode(iree_string_view_t mlir_source,
 
   // Create compiler options.
   IreeCompilerOptions options = ireeCompilerOptionsCreate();
-  const char* compiler_flags[] = {iree_string_builder_buffer(&target_builder)};
+  const char* compiler_flags[] = {iree_string_builder_buffer(&target_builder),
+                                  "--iree-input-type=mhlo"};
   MlirLogicalResult status =
-      ireeCompilerOptionsSetFlags(options, 1, compiler_flags, NULL, NULL);
+      ireeCompilerOptionsSetFlags(options, 2, compiler_flags, /*onError=*/NULL,
+                                  /*userData=*/NULL);
   if (mlirLogicalResultIsFailure(status)) {
     ireeCompilerOptionsDestroy(options);
     mlirModuleDestroy(module);
@@ -80,13 +82,9 @@ static bool iree_compile_mlir_to_bytecode(iree_string_view_t mlir_source,
     return false;
   }
 
-  // Run MLIR pass pipeline to lower the high level MLIR code down to IREE VM
-  // MLIR code.
+  // Run MLIR pass pipeline to lower the input IR down to the IREE VM dialect.
   MlirPassManager pass = mlirPassManagerCreate(context);
   MlirOpPassManager op_pass = mlirPassManagerGetAsOpPassManager(pass);
-
-  // Enable use of MHLO dialect.
-  ireeCompilerBuildMHLOImportPassPipeline(op_pass);
   ireeCompilerBuildIREEVMPassPipeline(options, op_pass);
   status = mlirPassManagerRun(pass, module);
   if (mlirLogicalResultIsFailure(status)) {
@@ -130,7 +128,7 @@ int main(int argc, char** argv) {
       mlir_code, iree_make_cstring_view("vmvx"), &bytecode_builder);
   if (!status) {
     iree_string_builder_deinitialize(&bytecode_builder);
-    fprintf(stderr, "failed to compiler MLIR code\n");
+    fprintf(stderr, "failed to compile MLIR code\n");
     return -1;
   }
 
