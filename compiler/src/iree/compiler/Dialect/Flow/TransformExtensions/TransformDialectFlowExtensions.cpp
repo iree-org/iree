@@ -22,7 +22,7 @@ iree_compiler::IREE::transform_dialect::TransformDialectFlowExtensions::
     TransformDialectFlowExtensions() {
   registerTransformOps<
 #define GET_OP_LIST
-#include "iree/compiler/Dialect/Flow/TransformDialectExtensions/TransformDialectFlowExtensionsOps.cpp.inc"
+#include "iree/compiler/Dialect/Flow/TransformExtensions/TransformDialectFlowExtensionsOps.cpp.inc"
       >();
 }
 
@@ -381,4 +381,4 @@ transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::apply(
 }
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/Flow/TransformDialectExtensions/TransformDialectFlowExtensionsOps.cpp.inc"
+#include "iree/compiler/Dialect/Flow/TransformExtensions/TransformDialectFlowExtensionsOps.cpp.inc"

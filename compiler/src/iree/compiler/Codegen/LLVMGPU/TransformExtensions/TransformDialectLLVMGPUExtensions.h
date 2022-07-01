@@ -47,6 +47,6 @@ class TransformDialectLLVMGPUExtensions
 }  // namespace mlir
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Codegen/LLVMGPU/TransformDialectExtensions/TransformDialectLLVMGPUExtensionsOps.h.inc"
+#include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/TransformDialectLLVMGPUExtensionsOps.h.inc"
 
 #endif  // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMDIALECTEXTENSIONS_TRANSFORMDIALECTLLVMGPUEXTENSIONS_H_

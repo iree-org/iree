@@ -28,7 +28,7 @@ iree_compiler::IREE::transform_dialect::TransformDialectLLVMGPUExtensions::
     TransformDialectLLVMGPUExtensions() {
   registerTransformOps<
 #define GET_OP_LIST
-#include "iree/compiler/Codegen/LLVMGPU/TransformDialectExtensions/TransformDialectLLVMGPUExtensionsOps.cpp.inc"
+#include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/TransformDialectLLVMGPUExtensionsOps.cpp.inc"
       >();
 }
 
@@ -524,4 +524,4 @@ LogicalResult transform_dialect::VectorWarpDistributionOp::applyToOne(
 }
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Codegen/LLVMGPU/TransformDialectExtensions/TransformDialectLLVMGPUExtensionsOps.cpp.inc"
+#include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/TransformDialectLLVMGPUExtensionsOps.cpp.inc"

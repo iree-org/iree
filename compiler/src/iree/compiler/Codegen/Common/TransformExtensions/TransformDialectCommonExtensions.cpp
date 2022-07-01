@@ -20,7 +20,7 @@ iree_compiler::IREE::transform_dialect::TransformDialectCommonExtensions::
     TransformDialectCommonExtensions() {
   registerTransformOps<
 #define GET_OP_LIST
-#include "iree/compiler/Codegen/Common/TransformDialectExtensions/TransformDialectCommonExtensionsOps.cpp.inc"
+#include "iree/compiler/Codegen/Common/TransformExtensions/TransformDialectCommonExtensionsOps.cpp.inc"
       >();
 }
 
@@ -134,4 +134,4 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
 }
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Codegen/Common/TransformDialectExtensions/TransformDialectCommonExtensionsOps.cpp.inc"
+#include "iree/compiler/Codegen/Common/TransformExtensions/TransformDialectCommonExtensionsOps.cpp.inc"

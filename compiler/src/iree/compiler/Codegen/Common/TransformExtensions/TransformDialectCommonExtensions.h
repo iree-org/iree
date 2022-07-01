@@ -11,7 +11,7 @@
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Codegen/Common/TransformDialectExtensions/TransformDialectCommonExtensionsOps.h.inc"
+#include "iree/compiler/Codegen/Common/TransformExtensions/TransformDialectCommonExtensionsOps.h.inc"
 
 namespace mlir {
 class DialectRegistry;

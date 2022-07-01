@@ -14,7 +14,7 @@ iree_compiler::IREE::transform_dialect::TransformDialectLLVMCPUExtensions::
     TransformDialectLLVMCPUExtensions() {
   registerTransformOps<
 #define GET_OP_LIST
-#include "iree/compiler/Codegen/LLVMCPU/TransformDialectExtensions/TransformDialectLLVMCPUExtensionsOps.cpp.inc"
+#include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/TransformDialectLLVMCPUExtensionsOps.cpp.inc"
       >();
 }
 
@@ -28,4 +28,4 @@ void mlir::iree_compiler::registerTransformDialectLLVMCPUExtension(
 // transform.iree.gpu.bufferize rather than a single common bufferize op?
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Codegen/LLVMCPU/TransformDialectExtensions/TransformDialectLLVMCPUExtensionsOps.cpp.inc"
+#include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/TransformDialectLLVMCPUExtensionsOps.cpp.inc"
