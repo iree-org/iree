@@ -2048,7 +2048,7 @@ static OpFoldResult foldCmpNEFOp(T op, ArrayRef<Attribute> operands) {
         if (ordering == ORDERED) {
           return result != APFloat::cmpEqual;
         } else {
-          return result != APFloat::cmpEqual || result == APFloat::cmpUnordered;
+          return result != APFloat::cmpEqual && result != APFloat::cmpUnordered;
         }
       });
 }
