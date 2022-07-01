@@ -18,7 +18,11 @@
 
 hal.executable private @transpose_10_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export @transpose_10_8x8_pattern layout(#executable_layout)
+    hal.executable.export @transpose_10_8x8_pattern layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
     builtin.module {
       func.func @transpose_10_8x8_pattern() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -72,7 +76,11 @@ hal.executable private @transpose_10_8x8_pattern {
 
 hal.executable private @transpose_021_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export @transpose_021_8x8_pattern layout(#executable_layout)
+    hal.executable.export @transpose_021_8x8_pattern layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
     builtin.module {
       func.func @transpose_021_8x8_pattern() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -126,7 +134,11 @@ hal.executable private @transpose_021_8x8_pattern {
 
 hal.executable private @transpose_201_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export @transpose_201_8x8_pattern layout(#executable_layout)
+    hal.executable.export @transpose_201_8x8_pattern layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
     builtin.module {
       func.func @transpose_201_8x8_pattern() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -180,7 +192,11 @@ hal.executable private @transpose_201_8x8_pattern {
 
 hal.executable private @transpose_210_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export @transpose_210_8x8_pattern layout(#executable_layout)
+    hal.executable.export @transpose_210_8x8_pattern layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
     builtin.module {
       func.func @transpose_210_8x8_pattern() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -234,7 +250,11 @@ hal.executable private @transpose_210_8x8_pattern {
 
 hal.executable private @transpose_120_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export @transpose_120_8x8_pattern layout(#executable_layout)
+    hal.executable.export @transpose_120_8x8_pattern layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
     builtin.module {
       func.func @transpose_120_8x8_pattern() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -288,7 +308,11 @@ hal.executable private @transpose_120_8x8_pattern {
 
 hal.executable private @transpose_102 {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export @transpose_102 layout(#executable_layout)
+    hal.executable.export @transpose_102 layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
     builtin.module {
       func.func @transpose_102() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -334,7 +358,11 @@ hal.executable private @transpose_102 {
 
 hal.executable private @test_no_avx2_feature {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export @test_no_avx2_feature layout(#executable_layout)
+    hal.executable.export @test_no_avx2_feature layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
     builtin.module {
       func.func @test_no_avx2_feature() {
         %cst = arith.constant 0.000000e+00 : f32

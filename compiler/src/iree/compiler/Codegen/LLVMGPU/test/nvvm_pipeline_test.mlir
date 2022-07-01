@@ -13,7 +13,11 @@
 ]>
 hal.executable @simpleMath_ex_dispatch_0 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-  hal.executable.export @add_dispatch_0 layout(#executable_layout)
+  hal.executable.export @add_dispatch_0 layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
+      hal.return %x, %y, %z : index, index, index
+    }
   builtin.module {
     func.func @add_dispatch_0() {
       %c0 = arith.constant 0 : index
@@ -53,7 +57,11 @@ hal.executable @simpleMath_ex_dispatch_0 {
 ]>
 hal.executable @dot_dispatch_0 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @dot_dispatch_0 layout(#executable_layout)
+    hal.executable.export @dot_dispatch_0 layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
     builtin.module {
       func.func @dot_dispatch_0() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -120,7 +128,11 @@ hal.executable @dot_dispatch_0 {
 ]>
 hal.executable @dot_dispatch_0 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @dot_dispatch_0 layout(#executable_layout)
+    hal.executable.export @dot_dispatch_0 layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
     builtin.module {
       func.func @dot_dispatch_0() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -169,7 +181,11 @@ hal.executable @dot_dispatch_0 {
 ]>
 hal.executable @conv2d_dispatch_0 {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-  hal.executable.export @conv2d_dispatch_0 layout(#executable_layout)
+  hal.executable.export @conv2d_dispatch_0 layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index, %arg6 : index, %arg7 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7
+      hal.return %x, %y, %z : index, index, index
+    }
   builtin.module {
     func.func @conv2d_dispatch_0() {
       %c0 = arith.constant 0 : index
@@ -213,7 +229,11 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 ]>
 hal.executable @simpleMath_ex_dispatch_0 {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-  hal.executable.export @add_dispatch_0 layout(#executable_layout)
+  hal.executable.export @add_dispatch_0 layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
+      hal.return %x, %y, %z : index, index, index
+    }
   builtin.module {
     func.func @add_dispatch_0() {
       %c0 = arith.constant 0 : index
@@ -249,7 +269,11 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 ]>
 hal.executable @reduction_dispatch {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-  hal.executable.export @reduction layout(#executable_layout)
+  hal.executable.export @reduction layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
   builtin.module {
     func.func @reduction() {
       %c0 = arith.constant 0 : index
@@ -292,7 +316,11 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 ]>
 hal.executable @vector_add_dispatch {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-  hal.executable.export @vector_add_dispatch layout(#executable_layout)
+  hal.executable.export @vector_add_dispatch layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
+      hal.return %x, %y, %z : index, index, index
+    }
   builtin.module {
     func.func @vector_add_dispatch() {
       %c0 = arith.constant 0 : index
@@ -341,7 +369,11 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 ]>
 hal.executable @vector_reduction_dispatch {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-  hal.executable.export @vector_reduction_dispatch layout(#executable_layout)
+  hal.executable.export @vector_reduction_dispatch layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
   builtin.module {
     func.func @vector_reduction_dispatch() {
       %c0 = arith.constant 0 : index
@@ -383,7 +415,11 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 ]>
 hal.executable @mma_fused {
   hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
-  hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>)
+  hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>) {
+  ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+    %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+    hal.return %x, %y, %z : index, index, index
+  }
   builtin.module {
     func.func @_large_aligned_dispatch_0() {
       %c0 = arith.constant 0 : index
@@ -508,7 +544,11 @@ hal.executable @mma_fused {
 ]>
 hal.executable @mma_fused_fp16 {
   hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
-  hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>)
+  hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>) {
+  ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+    %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+    hal.return %x, %y, %z : index, index, index
+  }
   builtin.module {
     func.func @_large_aligned_dispatch_0() {
       %c0 = arith.constant 0 : index
@@ -633,7 +673,11 @@ hal.executable @mma_fused_fp16 {
 #map6 = affine_map<(d0)[s0] -> (-d0 + 64, s0)>
   hal.executable @large_dot_general_dispatch_0 {
     hal.executable.variant public @cuda, target = #executable_target_cuda_nvptx_fb {
-      hal.executable.export @large_dot_general_dispatch_0 layout(#executable_layout)
+      hal.executable.export @large_dot_general_dispatch_0 layout(#executable_layout) {
+      ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 :index):
+        %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4
+        hal.return %x, %y, %z : index, index, index
+      }
       builtin.module {
         func.func @large_dot_general_dispatch_0() {
           %c64 = arith.constant 64 : index
@@ -715,7 +759,11 @@ hal.executable @mma_fused_fp16 {
 #map6 = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
   hal.executable public @split_k_gemm {
     hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
-      hal.executable.export public @split_k_gemm ordinal(0) layout(#executable_layout)
+      hal.executable.export public @split_k_gemm ordinal(0) layout(#executable_layout) {
+      ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index):
+        %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4
+        hal.return %x, %y, %z : index, index, index
+      }
       builtin.module {
         func.func @split_k_gemm() {
           %cst = arith.constant 0.000000e+00 : f32
@@ -774,7 +822,11 @@ hal.executable @mma_fused_fp16 {
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
   hal.executable public @pooling_dynamic {
     hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
-      hal.executable.export public @pooling_dynamic ordinal(0) layout(#executable_layout)
+      hal.executable.export public @pooling_dynamic ordinal(0) layout(#executable_layout) {
+      ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 :index, %arg4 : index, %arg5 : index, %arg6 : index):
+        %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
+        hal.return %x, %y, %z : index, index, index
+      }
       builtin.module {
         func.func @pooling_dynamic() {
           %c1_i64 = arith.constant 1 : i64
@@ -815,7 +867,11 @@ hal.executable @mma_fused_fp16 {
 ]>
 hal.executable @warp_reduction_dispatch {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-  hal.executable.export @warp_reduction_dispatch layout(#executable_layout)
+  hal.executable.export @warp_reduction_dispatch layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
   builtin.module {
     func.func @warp_reduction_dispatch() {
       %c0 = arith.constant 0 : index

@@ -10,7 +10,11 @@
 
 hal.executable private @dispatch_0 {
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.export @dispatch_0 ordinal(0) layout(#executable_layout)
+    hal.executable.export @dispatch_0 ordinal(0) layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device) :
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
     builtin.module {
       vm.module @module {
         vm.func @dispatch_0() {
@@ -23,7 +27,11 @@ hal.executable private @dispatch_0 {
 }
 hal.executable private @dispatch_1 {
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.export @dispatch_1 ordinal(0) layout(#executable_layout)
+    hal.executable.export @dispatch_1 ordinal(0) layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device) :
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
     builtin.module {
       vm.module @module {
         vm.func @dispatch_1() {
@@ -36,7 +44,11 @@ hal.executable private @dispatch_1 {
 }
 hal.executable private @dispatch_2 {
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.export @dispatch_2 ordinal(0) layout(#executable_layout)
+    hal.executable.export @dispatch_2 ordinal(0) layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device) :
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
     builtin.module {
       vm.module @module {
         vm.func @dispatch_2() {
@@ -121,7 +133,11 @@ util.initializer {
 
 hal.executable private @dispatch_0 {
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.export @dispatch_0 ordinal(0) layout(#executable_layout)
+    hal.executable.export @dispatch_0 ordinal(0) layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device) :
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
     builtin.module {
       vm.module @module {
         vm.rodata public @rodata_a dense<[0]> : tensor<1xi32>
@@ -145,7 +161,11 @@ hal.executable private @dispatch_0 {
 }
 hal.executable private @dispatch_1 {
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.export @dispatch_1 ordinal(0) layout(#executable_layout)
+    hal.executable.export @dispatch_1 ordinal(0) layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device) :
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
     builtin.module {
       vm.module @module {
         // Conflict with a public symbol, this should be renamed when linked.
