@@ -25,8 +25,7 @@ namespace IREE {
 namespace transform_dialect {
 // Hook to register Flow transformations to the transform dialect.
 class FlowExtensions
-    : public transform::TransformDialectExtension<
-          FlowExtensions> {
+    : public transform::TransformDialectExtension<FlowExtensions> {
  public:
   FlowExtensions();
 };

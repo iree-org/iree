@@ -26,8 +26,7 @@ namespace IREE {
 namespace transform_dialect {
 // Hook to register common transformations to the transform dialect.
 class CommonExtensions
-    : public transform::TransformDialectExtension<
-          CommonExtensions> {
+    : public transform::TransformDialectExtension<CommonExtensions> {
  public:
   CommonExtensions();
 };

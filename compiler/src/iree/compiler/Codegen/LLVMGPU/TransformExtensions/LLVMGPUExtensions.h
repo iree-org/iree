@@ -36,8 +36,7 @@ namespace IREE {
 namespace transform_dialect {
 // Hook to register LLVMGPU transformations to the transform dialect.
 class LLVMGPUExtensions
-    : public transform::TransformDialectExtension<
-          LLVMGPUExtensions> {
+    : public transform::TransformDialectExtension<LLVMGPUExtensions> {
  public:
   LLVMGPUExtensions();
 };

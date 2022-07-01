@@ -16,8 +16,7 @@ using namespace mlir;
 using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::IREE;
 
-iree_compiler::IREE::transform_dialect::CommonExtensions::
-    CommonExtensions() {
+iree_compiler::IREE::transform_dialect::CommonExtensions::CommonExtensions() {
   registerTransformOps<
 #define GET_OP_LIST
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensionsOps.cpp.inc"

@@ -18,8 +18,7 @@ using namespace mlir;
 using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::IREE;
 
-iree_compiler::IREE::transform_dialect::FlowExtensions::
-    FlowExtensions() {
+iree_compiler::IREE::transform_dialect::FlowExtensions::FlowExtensions() {
   registerTransformOps<
 #define GET_OP_LIST
 #include "iree/compiler/Dialect/Flow/TransformExtensions/FlowExtensionsOps.cpp.inc"

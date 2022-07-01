@@ -10,8 +10,7 @@ using namespace mlir;
 using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::IREE;
 
-iree_compiler::IREE::transform_dialect::LLVMCPUExtensions::
-    LLVMCPUExtensions() {
+iree_compiler::IREE::transform_dialect::LLVMCPUExtensions::LLVMCPUExtensions() {
   registerTransformOps<
 #define GET_OP_LIST
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensionsOps.cpp.inc"
@@ -20,8 +19,7 @@ iree_compiler::IREE::transform_dialect::LLVMCPUExtensions::
 
 void mlir::iree_compiler::registerTransformDialectLLVMCPUExtension(
     DialectRegistry &registry) {
-  registry
-      .addExtensions<transform_dialect::LLVMCPUExtensions>();
+  registry.addExtensions<transform_dialect::LLVMCPUExtensions>();
 }
 
 // TODO: Maybe we need both a transform.iree.cpu.bufferize and a

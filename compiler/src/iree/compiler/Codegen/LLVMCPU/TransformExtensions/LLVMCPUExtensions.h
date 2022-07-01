@@ -25,8 +25,7 @@ namespace IREE {
 namespace transform_dialect {
 // Hook to register LLVMCPU transformations to the transform dialect.
 class LLVMCPUExtensions
-    : public transform::TransformDialectExtension<
-          LLVMCPUExtensions> {
+    : public transform::TransformDialectExtension<LLVMCPUExtensions> {
  public:
   LLVMCPUExtensions();
 };

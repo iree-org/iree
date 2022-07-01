@@ -24,8 +24,7 @@
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE;
 
-iree_compiler::IREE::transform_dialect::LLVMGPUExtensions::
-    LLVMGPUExtensions() {
+iree_compiler::IREE::transform_dialect::LLVMGPUExtensions::LLVMGPUExtensions() {
   registerTransformOps<
 #define GET_OP_LIST
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensionsOps.cpp.inc"
@@ -34,8 +33,7 @@ iree_compiler::IREE::transform_dialect::LLVMGPUExtensions::
 
 void mlir::iree_compiler::registerTransformDialectLLVMGPUExtension(
     DialectRegistry &registry) {
-  registry
-      .addExtensions<transform_dialect::LLVMGPUExtensions>();
+  registry.addExtensions<transform_dialect::LLVMGPUExtensions>();
 }
 
 // TODO: Maybe we need both a transform.iree.cpu.bufferize and a
