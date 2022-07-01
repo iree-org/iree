@@ -10,7 +10,7 @@
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/TransformDialectLLVMCPUExtensionsOps.h.inc"
+#include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensionsOps.h.inc"
 
 namespace mlir {
 class DialectRegistry;
@@ -24,11 +24,11 @@ void registerTransformDialectLLVMCPUExtension(DialectRegistry &registry);
 namespace IREE {
 namespace transform_dialect {
 // Hook to register LLVMCPU transformations to the transform dialect.
-class TransformDialectLLVMCPUExtensions
+class LLVMCPUExtensions
     : public transform::TransformDialectExtension<
-          TransformDialectLLVMCPUExtensions> {
+          LLVMCPUExtensions> {
  public:
-  TransformDialectLLVMCPUExtensions();
+  LLVMCPUExtensions();
 };
 }  // namespace transform_dialect
 }  // namespace IREE
