@@ -100,7 +100,7 @@ IREE_API_EXPORT void iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore,
 // exceeded the required payload value.
 //
 // Returns IREE_STATUS_DEADLINE_EXCEEDED if the |timeout| elapses without the
-// semaphore reaching the required value. If an asynchronous failure occured
+// semaphore reaching the required value. If an asynchronous failure occurred
 // this will return the failure status that was set immediately.
 //
 // Returns IREE_STATUS_ABORTED if one or more semaphores has failed. Callers can

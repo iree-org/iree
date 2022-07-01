@@ -18,6 +18,7 @@
 #include "iree/hal/event.h"
 #include "iree/hal/executable_cache.h"
 #include "iree/hal/executable_layout.h"
+#include "iree/hal/fence.h"
 #include "iree/hal/resource.h"
 #include "iree/hal/semaphore.h"
 
@@ -152,15 +153,6 @@ enum iree_hal_semaphore_compatibility_bits_t {
       IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_SIGNAL,
 };
 typedef uint32_t iree_hal_semaphore_compatibility_t;
-
-// A list of semaphores and their corresponding payloads.
-// When signaling each semaphore will be set to the new payload value provided.
-// When waiting each semaphore must reach or exceed the payload value.
-typedef struct iree_hal_semaphore_list_t {
-  iree_host_size_t count;
-  iree_hal_semaphore_t** semaphores;
-  uint64_t* payload_values;
-} iree_hal_semaphore_list_t;
 
 // A single batch of command buffers submitted to a device queue.
 // All of the wait semaphores must reach or exceed the given payload value prior
