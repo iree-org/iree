@@ -17,6 +17,9 @@
 #ifdef IREE_HAVE_METALSPIRV_TARGET
 #include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/MetalSPIRVTarget.h"
 #endif  // IREE_HAVE_METALSPIRV_TARGET
+#ifdef IREE_HAVE_OPENCLSPIRV_TARGET
+#include "iree/compiler/Dialect/HAL/Target/OpenCLSPIRV/OpenCLSPIRVTarget.h"
+#endif  // IREE_HAVE_OPENCLSPIRV_TARGET
 #ifdef IREE_HAVE_ROCM_TARGET
 #include "iree/compiler/Dialect/HAL/Target/ROCM/ROCMTarget.h"
 #endif  // IREE_HAVE_ROCM_TARGET
@@ -50,6 +53,10 @@ void registerHALTargetBackends() {
 #ifdef IREE_HAVE_METALSPIRV_TARGET
     IREE::HAL::registerMetalSPIRVTargetBackends();
 #endif  // IREE_HAVE_METALSPIRV_TARGET
+#ifdef IREE_HAVE_OPENCLSPIRV_TARGET
+    IREE::HAL::registerOpenCLSPIRVTargetBackends(
+        []() { return IREE::HAL::getOpenCLSPIRVTargetOptionsFromFlags(); });
+#endif  // IREE_HAVE_OPENCLSPIRV_TARGET
 #ifdef IREE_HAVE_ROCM_TARGET
     IREE::HAL::registerROCMTargetBackends();
 #endif  // IREE_HAVE_ROCM_TARGET

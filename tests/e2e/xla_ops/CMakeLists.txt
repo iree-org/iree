@@ -500,4 +500,68 @@ iree_check_single_backend_test_suite(
     "local"
 )
 
+iree_check_single_backend_test_suite(
+  NAME
+    check_level_zero-spirv_opencl
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    "clamp.mlir"
+    "compare.mlir"
+    "concatenate.mlir"
+    "constant.mlir"
+    "convert.mlir"
+    "convolution.mlir"
+    "cosine.mlir"
+    "divide.mlir"
+    "dot.mlir"
+    "dot_general.mlir"
+    "dynamic_slice.mlir"
+    "dynamic_update_slice.mlir"
+    "exponential.mlir"
+    "exponential_minus_one.mlir"
+    "finite.mlir"
+    "floor.mlir"
+    "gather.mlir"
+    "iota.mlir"
+    "log.mlir"
+    "log_plus_one.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "pow.mlir"
+    "reduce.mlir"
+    "reduce_window.mlir"
+    "remainder.mlir"
+    "reshape.mlir"
+    "reverse.mlir"
+    "rng_normal.mlir"
+    "rng_uniform.mlir"
+    "rsqrt.mlir"
+    "scatter.mlir"
+    "scatter_dynamic.mlir"
+    "select.mlir"
+    "sine.mlir"
+    "slice.mlir"
+    "sort.mlir"
+    "sqrt.mlir"
+    "subtract.mlir"
+    "tanh.mlir"
+    "torch_index_select.mlir"
+    "transpose.mlir"
+    "while.mlir"
+  TARGET_BACKEND
+    "opencl-spirv"
+  DRIVER
+    "level_zero"
+  COMPILER_FLAGS
+    "--iree-input-type=mhlo"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

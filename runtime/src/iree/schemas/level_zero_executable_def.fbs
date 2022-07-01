@@ -1,0 +1,33 @@
+// Copyright 2021 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+namespace iree;
+
+// 'LEVEL_ZERO Executable'.
+file_identifier "ZERO";
+file_extension "zero";
+
+// A struct for the kernel block size along each dimensions.
+struct LEVEL_ZEROBlockSizeDef {
+  x:uint32;
+  y:uint32;
+  z:uint32;
+}
+
+table LEVEL_ZEROExecutableDef {
+  // A map of entry point ordinals to string names as used in the shader
+  // library.
+  entry_points:[string];
+
+  // Block sizes for each entry point.
+  //
+  block_sizes:[LEVEL_ZEROBlockSizeDef];
+
+  // HSACO string of the module.
+  level_zero_image:[uint32];
+}
+
+root_type LEVEL_ZEROExecutableDef;

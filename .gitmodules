@@ -47,3 +47,6 @@
 [submodule "third_party/musl"]
 	path = third_party/musl
 	url = https://github.com/powderluv/musl.git
+[submodule "third_party/level-zero"]
+	path = third_party/level-zero
+	url = https://github.com/oneapi-src/level-zero

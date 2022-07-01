@@ -235,6 +235,7 @@ def prepare_installation():
         "-DCMAKE_BUILD_TYPE={}".format(cfg),
         get_env_cmake_option("IREE_TARGET_BACKEND_CUDA"),
         get_env_cmake_option("IREE_TARGET_BACKEND_ROCM"),
+        get_env_cmake_option("IREE_TARGET_BACKEND_OPENCL_SPIRV"),
         get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
     ]
 

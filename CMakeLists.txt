@@ -196,6 +196,15 @@ set(IREE_EXTERNAL_ROCM_HAL_DRIVER_TARGET "iree::experimental::rocm::registration
 set(IREE_EXTERNAL_ROCM_HAL_DRIVER_REGISTER "iree_hal_rocm_driver_module_register")
 
 #-------------------------------------------------------------------------------
+# Experimental Intel Level Zero HAL driver
+#-------------------------------------------------------------------------------
+
+set(IREE_EXTERNAL_LEVEL_ZERO_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/level_zero")
+set(IREE_EXTERNAL_LEVEL_ZERO_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experimental/level_zero")
+set(IREE_EXTERNAL_LEVEL_ZERO_HAL_DRIVER_TARGET "iree::experimental::level_zero::registration")
+set(IREE_EXTERNAL_LEVEL_ZERO_HAL_DRIVER_REGISTER "iree_hal_level_zero_driver_module_register")
+
+#-------------------------------------------------------------------------------
 # Compiler Target Options
 # By default, all compiler targets supported by the current platform which do
 # not require external deps are enabled by default. This can be changed with:
@@ -217,6 +226,7 @@ cmake_dependent_option(IREE_TARGET_BACKEND_VULKAN_SPIRV "Enables the 'vulkan-spi
 # experimental/niche in some fashion.
 cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
 cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_OPENCL_SPIRV "Enables the 'OpenCL-SPIRV' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
 # Disable WebGPU by default - it has complex deps and is under development.
 cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
 
