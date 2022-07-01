@@ -8,11 +8,25 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
-#include "mlir/IR/BuiltinAttributes.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace emitc_builders {
+
+Value arrayElementAddress(OpBuilder builder, Location location, Type type,
+                          IntegerAttr index, Value operand) {
+  auto ctx = builder.getContext();
+  return builder
+      .create<emitc::CallOp>(
+          /*location=*/location,
+          /*type=*/type,
+          /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
+          /*args=*/
+          ArrayAttr::get(ctx, {builder.getIndexAttr(0), index}),
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>{operand})
+      .getResult(0);
+}
 
 Value structMember(OpBuilder builder, Location location, Type type,
                    StringRef memberName, Value operand) {
