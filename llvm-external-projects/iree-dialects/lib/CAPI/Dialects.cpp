@@ -63,7 +63,7 @@ void mlirIREELinalgTransformRegisterPasses() {
 MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(Transform, transform,
                                       mlir::transform::TransformDialect)
 
-void ireeRegisterTransformDialectExtensions(MlirContext context) {
+void ireeRegisterTransformExtensions(MlirContext context) {
   MLIRContext *ctx = unwrap(context);
   DialectRegistry registry;
   registry.addExtensions<

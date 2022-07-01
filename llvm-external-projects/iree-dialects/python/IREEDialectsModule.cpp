@@ -134,7 +134,7 @@ PYBIND11_MODULE(_ireeDialects, m) {
       [](MlirContext context, bool load) {
         MlirDialectHandle handle = mlirGetDialectHandle__transform__();
         mlirDialectHandleRegisterDialect(handle, context);
-        ireeRegisterTransformDialectExtensions(context);
+        ireeRegisterTransformExtensions(context);
         if (load) {
           mlirDialectHandleLoadDialect(handle, context);
         }
