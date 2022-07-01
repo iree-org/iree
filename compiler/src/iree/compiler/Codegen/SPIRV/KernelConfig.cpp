@@ -985,6 +985,11 @@ static LogicalResult setWinogradOpConfig(spirv::ResourceLimitsAttr limits,
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
                                         linalg::GenericOp op) {
+
+  // TODO: Fix/support Warp Reduction for LevelZero.
+  if (targetEnv.allows(spirv::Capability::Kernel))
+    return failure();
+
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as reduction...\n");
   if (op.hasDynamicShape()) return failure();
   // This pipeline eventually generates non-uniform group shuffle ops, which

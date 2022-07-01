@@ -238,7 +238,7 @@ def prepare_installation():
         "-DCMAKE_BUILD_TYPE={}".format(cfg),
         get_env_cmake_option("IREE_HAL_DRIVER_CUDA"),
         get_env_cmake_option("IREE_EXTERNAL_HAL_DRIVERS",
-                             "" if platform.system() == "Darwin" else "rocm"),
+                             "" if platform.system() == "Darwin" else "rocm;level_zero"),
         get_env_cmake_option("IREE_HAL_DRIVER_VULKAN",
                              "OFF" if platform.system() == "Darwin" else "ON"),
         get_env_cmake_option("IREE_ENABLE_RUNTIME_TRACING"),
