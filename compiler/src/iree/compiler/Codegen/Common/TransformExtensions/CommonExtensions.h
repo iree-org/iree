@@ -11,7 +11,7 @@
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Codegen/Common/TransformExtensions/TransformDialectCommonExtensionsOps.h.inc"
+#include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensionsOps.h.inc"
 
 namespace mlir {
 class DialectRegistry;
@@ -25,11 +25,11 @@ void registerTransformDialectCommonExtension(DialectRegistry &registry);
 namespace IREE {
 namespace transform_dialect {
 // Hook to register common transformations to the transform dialect.
-class TransformDialectCommonExtensions
+class CommonExtensions
     : public transform::TransformDialectExtension<
-          TransformDialectCommonExtensions> {
+          CommonExtensions> {
  public:
-  TransformDialectCommonExtensions();
+  CommonExtensions();
 };
 }  // namespace transform_dialect
 }  // namespace IREE

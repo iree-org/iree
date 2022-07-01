@@ -24,7 +24,7 @@ iree_cc_library(
     IREELinalgExtTransformOps
     IREELinalgTransformDialect
     MLIRLinalgTransformOps
-    iree::compiler::Codegen::Common::TransformExtensions::TransformDialectCommonExtensions
+    iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::TransformDialectLLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::TransformDialectLLVMGPUExtensions
     iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions

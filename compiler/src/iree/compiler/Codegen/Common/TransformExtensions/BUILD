@@ -19,7 +19,7 @@ td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
-            "TransformDialectCommonExtensionsOps.td",
+            "CommonExtensionsOps.td",
         ],
         include = ["*.td"],
     ),
@@ -31,34 +31,34 @@ td_library(
 )
 
 iree_gentbl_cc_library(
-    name = "TransformDialectCommonExtensionsOpGen",
+    name = "CommonExtensionsOpGen",
     tbl_outs = [
         (
             ["--gen-op-decls"],
-            "TransformDialectCommonExtensionsOps.h.inc",
+            "CommonExtensionsOps.h.inc",
         ),
         (
             ["--gen-op-defs"],
-            "TransformDialectCommonExtensionsOps.cpp.inc",
+            "CommonExtensionsOps.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "TransformDialectCommonExtensionsOps.td",
+    td_file = "CommonExtensionsOps.td",
     deps = [":td_files"],
 )
 
 iree_compiler_cc_library(
-    name = "TransformDialectCommonExtensions",
+    name = "CommonExtensions",
     srcs = [
-        "TransformDialectCommonExtensions.cpp",
-        "TransformDialectCommonExtensionsOps.cpp.inc",
+        "CommonExtensions.cpp",
+        "CommonExtensionsOps.cpp.inc",
     ],
     hdrs = [
-        "TransformDialectCommonExtensions.h",
-        "TransformDialectCommonExtensionsOps.h.inc",
+        "CommonExtensions.h",
+        "CommonExtensionsOps.h.inc",
     ],
     deps = [
-        ":TransformDialectCommonExtensionsOpGen",
+        ":CommonExtensionsOpGen",
         "//compiler/src/iree/compiler/Codegen:PassHeaders",
         "//compiler/src/iree/compiler/Codegen/Interfaces:BufferizationInterfaces",
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",

@@ -45,7 +45,7 @@ iree_compiler_cc_library(
         ":BufferizationInterfaces",
         ":PartitionableLoopsInterface",
         ":ProcessorOpInterfaces",
-        "//compiler/src/iree/compiler/Codegen/Common/TransformExtensions:TransformDialectCommonExtensions",
+        "//compiler/src/iree/compiler/Codegen/Common/TransformExtensions:CommonExtensions",
         "//compiler/src/iree/compiler/Codegen/LLVMCPU/TransformExtensions:TransformDialectLLVMCPUExtensions",
         "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformExtensions:TransformDialectLLVMGPUExtensions",
         "//compiler/src/iree/compiler/Dialect/Flow/TransformExtensions:FlowExtensions",

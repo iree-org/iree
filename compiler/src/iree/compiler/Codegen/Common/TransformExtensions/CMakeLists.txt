@@ -12,25 +12,25 @@ iree_add_all_subdirs()
 
 iree_tablegen_library(
   NAME
-    TransformDialectCommonExtensionsOpGen
+    CommonExtensionsOpGen
   TD_FILE
-    "TransformDialectCommonExtensionsOps.td"
+    "CommonExtensionsOps.td"
   OUTS
-    --gen-op-decls TransformDialectCommonExtensionsOps.h.inc
-    --gen-op-defs TransformDialectCommonExtensionsOps.cpp.inc
+    --gen-op-decls CommonExtensionsOps.h.inc
+    --gen-op-defs CommonExtensionsOps.cpp.inc
 )
 
 iree_cc_library(
   NAME
-    TransformDialectCommonExtensions
+    CommonExtensions
   HDRS
-    "TransformDialectCommonExtensions.h"
-    "TransformDialectCommonExtensionsOps.h.inc"
+    "CommonExtensions.h"
+    "CommonExtensionsOps.h.inc"
   SRCS
-    "TransformDialectCommonExtensions.cpp"
-    "TransformDialectCommonExtensionsOps.cpp.inc"
+    "CommonExtensions.cpp"
+    "CommonExtensionsOps.cpp.inc"
   DEPS
-    ::TransformDialectCommonExtensionsOpGen
+    ::CommonExtensionsOpGen
     IREEDialectsTransforms
     IREELinalgTransformDialect
     MLIRBufferizationDialect
