@@ -108,7 +108,9 @@ class WebGPUTargetBackend : public TargetBackend {
     // ways to check whether a floating point number is NaN or infinity.
     // Therefore, just let the SPIR-V CodeGen to avoid generating guards w.r.t.
     // NaN and infinity.
-    buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/true);
+    buildSPIRVCodegenPassPipeline(
+        passManager, /*enableFastMath=*/true,
+        /*addressingModel=*/spirv::AddressingModel::Logical);
 
     // WGSL does not support extended multiplication:
     // https://github.com/gpuweb/gpuweb/issues/1565. Make sure to lower it to

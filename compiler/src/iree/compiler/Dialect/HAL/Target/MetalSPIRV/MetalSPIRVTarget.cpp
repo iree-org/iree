@@ -116,7 +116,9 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     // archives, etc).
     if (variantOp.isExternal()) return;
 
-    buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/false);
+    buildSPIRVCodegenPassPipeline(
+        passManager, /*enableFastMath=*/false,
+        /*addressingModel=*/spirv::AddressingModel::Logical);
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &options,
