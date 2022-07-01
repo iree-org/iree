@@ -112,9 +112,8 @@ class LowerGlobalTensorsPass
 
       // TODO(suderman): Determine the global type based on all store
       // operations.
-      std::string symName = "__global_" + name.str();
       auto global = builder.create<mlir::ml_program::GlobalOp>(
-          loc, symName, attribute.getType(), /*is_mutable=*/true, attribute,
+          loc, name, attribute.getType(), /*is_mutable=*/true, attribute,
           nullptr);
       global.setPrivate();
 
@@ -129,7 +128,10 @@ class LowerGlobalTensorsPass
 
       Value value = assign.value();
       auto globalOpIt = symbolRefMap.find(handle.shared_name());
-      if (globalOpIt == symbolRefMap.end()) continue;
+      if (globalOpIt == symbolRefMap.end()) {
+        assign->emitError("Unable to find corresponding GlobalOp for op's VarHandle");
+        continue;
+      }
       auto globalOp = std::get<1>(*globalOpIt);
 
       builder.setInsertionPoint(assign);
