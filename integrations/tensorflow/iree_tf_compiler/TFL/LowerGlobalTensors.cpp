@@ -129,7 +129,8 @@ class LowerGlobalTensorsPass
       Value value = assign.value();
       auto globalOpIt = symbolRefMap.find(handle.shared_name());
       if (globalOpIt == symbolRefMap.end()) {
-        assign->emitError("Unable to find corresponding GlobalOp for op's VarHandle");
+        assign->emitError(
+            "Unable to find corresponding GlobalOp for op's VarHandle");
         continue;
       }
       auto globalOp = std::get<1>(*globalOpIt);
