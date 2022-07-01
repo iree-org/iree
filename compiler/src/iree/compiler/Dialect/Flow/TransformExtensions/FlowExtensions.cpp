@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "TransformDialectFlowExtensions.h"
+#include "FlowExtensions.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -18,17 +18,17 @@ using namespace mlir;
 using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::IREE;
 
-iree_compiler::IREE::transform_dialect::TransformDialectFlowExtensions::
-    TransformDialectFlowExtensions() {
+iree_compiler::IREE::transform_dialect::FlowExtensions::
+    FlowExtensions() {
   registerTransformOps<
 #define GET_OP_LIST
-#include "iree/compiler/Dialect/Flow/TransformExtensions/TransformDialectFlowExtensionsOps.cpp.inc"
+#include "iree/compiler/Dialect/Flow/TransformExtensions/FlowExtensionsOps.cpp.inc"
       >();
 }
 
 void mlir::iree_compiler::registerTransformDialectFlowExtension(
     DialectRegistry &registry) {
-  registry.addExtensions<transform_dialect::TransformDialectFlowExtensions>();
+  registry.addExtensions<transform_dialect::FlowExtensions>();
 }
 
 // TODO: Upstream to ShapeType and reuse.
@@ -381,4 +381,4 @@ transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::apply(
 }
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/Flow/TransformExtensions/TransformDialectFlowExtensionsOps.cpp.inc"
+#include "iree/compiler/Dialect/Flow/TransformExtensions/FlowExtensionsOps.cpp.inc"

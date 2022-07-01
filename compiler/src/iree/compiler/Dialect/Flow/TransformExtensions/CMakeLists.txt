@@ -12,25 +12,25 @@ iree_add_all_subdirs()
 
 iree_tablegen_library(
   NAME
-    TransformDialectFlowExtensionsOpGen
+    FlowExtensionsOpGen
   TD_FILE
-    "TransformDialectFlowExtensionsOps.td"
+    "FlowExtensionsOps.td"
   OUTS
-    --gen-op-decls TransformDialectFlowExtensionsOps.h.inc
-    --gen-op-defs TransformDialectFlowExtensionsOps.cpp.inc
+    --gen-op-decls FlowExtensionsOps.h.inc
+    --gen-op-defs FlowExtensionsOps.cpp.inc
 )
 
 iree_cc_library(
   NAME
-    TransformDialectFlowExtensions
+    FlowExtensions
   HDRS
-    "TransformDialectFlowExtensions.h"
-    "TransformDialectFlowExtensionsOps.h.inc"
+    "FlowExtensions.h"
+    "FlowExtensionsOps.h.inc"
   SRCS
-    "TransformDialectFlowExtensions.cpp"
-    "TransformDialectFlowExtensionsOps.cpp.inc"
+    "FlowExtensions.cpp"
+    "FlowExtensionsOps.cpp.inc"
   DEPS
-    ::TransformDialectFlowExtensionsOpGen
+    ::FlowExtensionsOpGen
     IREEDialectsTransforms
     IREELinalgTransformDialect
     MLIRArithmeticDialect

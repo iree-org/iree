@@ -10,7 +10,7 @@
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/Flow/TransformExtensions/TransformDialectFlowExtensionsOps.h.inc"
+#include "iree/compiler/Dialect/Flow/TransformExtensions/FlowExtensionsOps.h.inc"
 
 namespace mlir {
 class DialectRegistry;
@@ -24,11 +24,11 @@ void registerTransformDialectFlowExtension(DialectRegistry &registry);
 namespace IREE {
 namespace transform_dialect {
 // Hook to register Flow transformations to the transform dialect.
-class TransformDialectFlowExtensions
+class FlowExtensions
     : public transform::TransformDialectExtension<
-          TransformDialectFlowExtensions> {
+          FlowExtensions> {
  public:
-  TransformDialectFlowExtensions();
+  FlowExtensions();
 };
 }  // namespace transform_dialect
 }  // namespace IREE

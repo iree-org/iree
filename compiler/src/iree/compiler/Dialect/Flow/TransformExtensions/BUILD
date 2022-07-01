@@ -19,7 +19,7 @@ td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
-            "TransformDialectFlowExtensionsOps.td",
+            "FlowExtensionsOps.td",
         ],
         include = ["*.td"],
     ),
@@ -31,34 +31,34 @@ td_library(
 )
 
 iree_gentbl_cc_library(
-    name = "TransformDialectFlowExtensionsOpGen",
+    name = "FlowExtensionsOpGen",
     tbl_outs = [
         (
             ["--gen-op-decls"],
-            "TransformDialectFlowExtensionsOps.h.inc",
+            "FlowExtensionsOps.h.inc",
         ),
         (
             ["--gen-op-defs"],
-            "TransformDialectFlowExtensionsOps.cpp.inc",
+            "FlowExtensionsOps.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "TransformDialectFlowExtensionsOps.td",
+    td_file = "FlowExtensionsOps.td",
     deps = [":td_files"],
 )
 
 iree_compiler_cc_library(
-    name = "TransformDialectFlowExtensions",
+    name = "FlowExtensions",
     srcs = [
-        "TransformDialectFlowExtensions.cpp",
-        "TransformDialectFlowExtensionsOps.cpp.inc",
+        "FlowExtensions.cpp",
+        "FlowExtensionsOps.cpp.inc",
     ],
     hdrs = [
-        "TransformDialectFlowExtensions.h",
-        "TransformDialectFlowExtensionsOps.h.inc",
+        "FlowExtensions.h",
+        "FlowExtensionsOps.h.inc",
     ],
     deps = [
-        ":TransformDialectFlowExtensionsOpGen",
+        ":FlowExtensionsOpGen",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",

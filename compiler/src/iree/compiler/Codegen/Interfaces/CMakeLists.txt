@@ -27,7 +27,7 @@ iree_cc_library(
     iree::compiler::Codegen::Common::TransformExtensions::TransformDialectCommonExtensions
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::TransformDialectLLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::TransformDialectLLVMGPUExtensions
-    iree::compiler::Dialect::Flow::TransformExtensions::TransformDialectFlowExtensions
+    iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
   PUBLIC
 )
 

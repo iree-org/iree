@@ -16,7 +16,7 @@
 #include "iree/compiler/Codegen/Common/TransformExtensions/TransformDialectCommonExtensions.h"
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/TransformDialectLLVMCPUExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/TransformDialectLLVMGPUExtensions.h"
-#include "iree/compiler/Dialect/Flow/TransformExtensions/TransformDialectFlowExtensions.h"
+#include "iree/compiler/Dialect/Flow/TransformExtensions/FlowExtensions.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 
 namespace mlir {

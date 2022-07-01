@@ -48,7 +48,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Common/TransformExtensions:TransformDialectCommonExtensions",
         "//compiler/src/iree/compiler/Codegen/LLVMCPU/TransformExtensions:TransformDialectLLVMCPUExtensions",
         "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformExtensions:TransformDialectLLVMGPUExtensions",
-        "//compiler/src/iree/compiler/Dialect/Flow/TransformExtensions:TransformDialectFlowExtensions",
+        "//compiler/src/iree/compiler/Dialect/Flow/TransformExtensions:FlowExtensions",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "@llvm-project//mlir:LinalgTransformOps",
