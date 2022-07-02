@@ -386,6 +386,9 @@ static bool isFullyDynamicOp(linalg::LinalgOp op) {
 /// Returns true if peeling might be beneficial for this operation. Returns
 /// false if peeling should not be enabled for this operation.
 static bool isPeelingBeneficial(linalg::LinalgOp op) {
+  if (op.hasBufferSemantics()) {
+    return false;
+  }
   if (isFullyDynamicOp(op)) {
     return true;
   }
@@ -396,6 +399,10 @@ static bool isPeelingBeneficial(linalg::LinalgOp op) {
 /// Returns true if padding might be beneficial for this operation. Returns
 /// false if padding should not be enabled for this operation.
 static bool isPaddingBeneficial(linalg::LinalgOp op) {
+  if (op.hasBufferSemantics()) {
+    return false;
+  }
+
   auto variantOp = getExecutableVariantOp(op);
   assert(succeeded(variantOp) && "ExecutableVariantOp not found");
 
@@ -433,18 +440,34 @@ static void setVectorSizesForDynamicShapes(
   setAlwaysVectorizeSizes(op, parallelSizes, reductionSizes);
 
   // If peeling is enabled and the 'op' is fully dynamic, we only vectorize the
-  // lowest parallel order dimension for now to avoid peeling higher level
-  // dimensions.
+  // lowest order parallel dimension for now to avoid peeling higher level
+  // dimensions. If no parallel dimension is found to be vectorized, we try to
+  // vectorize the lowest order reduction dimension.
   if (isFullyDynamicOp(op) && isPeelingBeneficial(op)) {
+    bool isParallelDimVectorized = false;
     for (int i = origParallelSizes.size() - 1; i >= 0; --i) {
       if (origParallelSizes[i] > 1) {
         assert(parallelSizes[i] == 1 &&
                "This tile size should have been set to one");
         parallelSizes[i] = origParallelSizes[i];
+        isParallelDimVectorized = true;
         break;
       }
     }
+
+    if (!isParallelDimVectorized) {
+      for (int i = origReductionSizes.size() - 1; i >= 0; --i) {
+        if (origReductionSizes[i] > 1) {
+          assert(reductionSizes[i] == 1 &&
+                 "This tile size should have been set to one");
+          reductionSizes[i] = origReductionSizes[i];
+          break;
+        }
+      }
+    }
   }
+
+  return;
 }
 
 /// Sets the default configuration to use for an operation that implements the
