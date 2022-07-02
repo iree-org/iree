@@ -18,11 +18,11 @@ func.func @fence_create_empty() -> !hal.fence {
 // deduplicated to the max of the timepoints.
 
 // CHECK-LABEL: @fence_create_duplicate_semaphores
-// CHECK-SAME: %[[SEMAPHORE0:.+]]: !hal.semaphore, %[[TIME0:.+]]: index, %[[SEMAPHORE1:.+]]: !hal.semaphore, %[[TIME1:.+]]: index, %[[TIME2:.+]]: index
+// CHECK-SAME: %[[SEMAPHORE0:.+]]: !hal.semaphore, %[[TIME0:.+]]: i64, %[[SEMAPHORE1:.+]]: !hal.semaphore, %[[TIME1:.+]]: i64, %[[TIME2:.+]]: i64
 func.func @fence_create_duplicate_semaphores(
-    %semaphore0: !hal.semaphore, %time0: index,
-    %semaphore1: !hal.semaphore, %time1: index, %time2: index) -> !hal.fence {
-  // CHECK: %[[TIMEMAX:.+]] = arith.maxui %[[TIME1]], %[[TIME2]] : index
+    %semaphore0: !hal.semaphore, %time0: i64,
+    %semaphore1: !hal.semaphore, %time1: i64, %time2: i64) -> !hal.fence {
+  // CHECK: %[[TIMEMAX:.+]] = arith.maxui %[[TIME1]], %[[TIME2]] : i64
   // CHECK: %[[FENCE:.+]] = hal.fence.create
   // CHECK-SAME: at<%[[SEMAPHORE0]] : !hal.semaphore>(%[[TIME0]])
   // CHECK-SAME: at<%[[SEMAPHORE1]] : !hal.semaphore>(%[[TIMEMAX]])
@@ -42,10 +42,10 @@ func.func @fence_create_duplicate_semaphores(
 // avoids emitting additional IR and is effectively free.
 
 // CHECK-LABEL: @fence_create_duplicate_values
-// CHECK-SAME: %[[SEMAPHORE0:.+]]: !hal.semaphore, %[[TIME0:.+]]: index, %[[SEMAPHORE1:.+]]: !hal.semaphore, %[[TIME1:.+]]: index
+// CHECK-SAME: %[[SEMAPHORE0:.+]]: !hal.semaphore, %[[TIME0:.+]]: i64, %[[SEMAPHORE1:.+]]: !hal.semaphore, %[[TIME1:.+]]: i64
 func.func @fence_create_duplicate_values(
-    %semaphore0: !hal.semaphore, %time0: index,
-    %semaphore1: !hal.semaphore, %time1: index) -> !hal.fence {
+    %semaphore0: !hal.semaphore, %time0: i64,
+    %semaphore1: !hal.semaphore, %time1: i64) -> !hal.fence {
   // CHECK: %[[FENCE:.+]] = hal.fence.create
   %fence = hal.fence.create
       // CHECK-SAME: at<%[[SEMAPHORE0]] : !hal.semaphore>(%[[TIME0]])

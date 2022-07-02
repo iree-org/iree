@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @fence_create
-func.func @fence_create(%arg0: !hal.semaphore, %arg1: index, %arg2: index) -> !hal.fence {
+func.func @fence_create(%arg0: !hal.semaphore, %arg1: i64, %arg2: i64) -> !hal.fence {
   // CHECK: = hal.fence.create
   // CHECK-SAME: at<%arg0 : !hal.semaphore>(%arg1)
   // CHECK-SAME: at<%arg0 : !hal.semaphore>(%arg2)

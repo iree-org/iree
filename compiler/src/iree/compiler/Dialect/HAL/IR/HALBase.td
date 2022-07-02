@@ -391,7 +391,7 @@ def HAL_DeviceSizes : Variadic<HAL_DeviceSize>;
 def HAL_HostSize : TypeAlias<Index>;
 def HAL_HostSizeAttr : Util_IndexAttrBase<"size_t">;
 
-def HAL_TimelineValue : TypeAlias<Index>;
+def HAL_TimelineValue : TypeAlias<I64>;
 
 def HAL_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
 def HAL_FillPatternType : AnyTypeOf<[I8, I16, I32]>;
