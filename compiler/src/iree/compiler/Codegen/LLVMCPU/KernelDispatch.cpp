@@ -383,6 +383,16 @@ static bool isFullyDynamicOp(linalg::LinalgOp op) {
                       [](int64_t size) { return ShapedType::isDynamic(size); });
 }
 
+/// Returns true if peeling might be beneficial for this operation. Returns
+/// false if peeling should not be enabled for this operation.
+static bool isPeelingBeneficial(linalg::LinalgOp op) {
+  if (isFullyDynamicOp(op)) {
+    return true;
+  }
+
+  return false;
+}
+
 /// Returns true if padding might be beneficial for this operation. Returns
 /// false if padding should not be enabled for this operation.
 static bool isPaddingBeneficial(linalg::LinalgOp op) {
@@ -393,21 +403,7 @@ static bool isPaddingBeneficial(linalg::LinalgOp op) {
     return false;
   }
 
-  if (isFullyDynamicOp(op)) {
-    return false;
-  }
-
-  return true;
-}
-
-/// Returns true if peeling might be beneficial for this operation. Returns
-/// false if peeling should not be enabled for this operation.
-static bool isPeelingBeneficial(linalg::LinalgOp op) {
-  if (isFullyDynamicOp(op)) {
-    return true;
-  }
-
-  return false;
+  return !isPeelingBeneficial(op);
 }
 
 static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
@@ -436,11 +432,18 @@ static void setVectorSizesForDynamicShapes(
                                           reductionSizes.end());
   setAlwaysVectorizeSizes(op, parallelSizes, reductionSizes);
 
-  // If peeling is enabled and the 'op' is fully dynamic, we vectorize the
-  // lowest order dimension only for now to avoid too much peeling.
+  // If peeling is enabled and the 'op' is fully dynamic, we only vectorize the
+  // lowest parallel order dimension for now to avoid peeling higher level
+  // dimensions.
   if (isFullyDynamicOp(op) && isPeelingBeneficial(op)) {
-    parallelSizes.back() = origParallelSizes.back();
-    reductionSizes.back() = origReductionSizes.back();
+    for (int i = origParallelSizes.size() - 1; i >= 0; --i) {
+      if (origParallelSizes[i] > 1) {
+        assert(parallelSizes[i] == 1 &&
+               "This tile size should have been set to one");
+        parallelSizes[i] = origParallelSizes[i];
+        break;
+      }
+    }
   }
 }
 
