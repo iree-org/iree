@@ -13,10 +13,10 @@
 // have a better registration mechanism.
 #include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
-#include "iree/compiler/Codegen/Common/TransformDialectExtensions/TransformDialectCommonExtensions.h"
-#include "iree/compiler/Codegen/LLVMCPU/TransformDialectExtensions/TransformDialectLLVMCPUExtensions.h"
-#include "iree/compiler/Codegen/LLVMGPU/TransformDialectExtensions/TransformDialectLLVMGPUExtensions.h"
-#include "iree/compiler/Dialect/Flow/TransformDialectExtensions/TransformDialectFlowExtensions.h"
+#include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
+#include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
+#include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
+#include "iree/compiler/Dialect/Flow/TransformExtensions/FlowExtensions.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 
 namespace mlir {

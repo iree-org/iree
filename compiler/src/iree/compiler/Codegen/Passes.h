@@ -341,7 +341,7 @@ createLLVMGPULowerExecutableTargetPass();
 
 /// Convert Linalg ops to Vector.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorizationPass(
-    int64_t nativeVector = 4);
+    int64_t nativeVector = 4, bool generateContract = true);
 
 /// Convert Linalg ops to Vector and prepare converstion to GPU MMA ops.
 std::unique_ptr<OperationPass<func::FuncOp>>

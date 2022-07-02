@@ -4,8 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "TransformDialectCommonExtensions.h"
+#include "CommonExtensions.h"
 
+#include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
+#include "iree-dialects/Transforms/ListenerGreedyPatternRewriteDriver.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "mlir/Pass/PassManager.h"
@@ -14,17 +16,47 @@ using namespace mlir;
 using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::IREE;
 
-iree_compiler::IREE::transform_dialect::TransformDialectCommonExtensions::
-    TransformDialectCommonExtensions() {
+iree_compiler::IREE::transform_dialect::CommonExtensions::CommonExtensions() {
   registerTransformOps<
 #define GET_OP_LIST
-#include "iree/compiler/Codegen/Common/TransformDialectExtensions/TransformDialectCommonExtensionsOps.cpp.inc"
+#include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensionsOps.cpp.inc"
       >();
 }
 
 void mlir::iree_compiler::registerTransformDialectCommonExtension(
     DialectRegistry &registry) {
-  registry.addExtensions<transform_dialect::TransformDialectCommonExtensions>();
+  registry.addExtensions<transform_dialect::CommonExtensions>();
+}
+
+//===---------------------------------------------------------------------===//
+// ApplyPatternsOp
+//===---------------------------------------------------------------------===//
+
+static void addAllRegisteredCanonicalizationPatterns(
+    RewritePatternSet &patterns) {
+  MLIRContext *ctx = patterns.getContext();
+  for (Dialect *dialect : ctx->getLoadedDialects())
+    dialect->getCanonicalizationPatterns(patterns);
+  for (RegisteredOperationName op : ctx->getRegisteredOperations())
+    op.getCanonicalizationPatterns(patterns, ctx);
+}
+
+FailureOr<Operation *> transform_dialect::ApplyPatternsOp::applyToOne(
+    Operation *target, transform::TransformState &state) {
+  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>())
+    return emitOpError() << "applies only to isolated-from-above targets "
+                            "because it needs to apply patterns greedily";
+  MLIRContext *ctx = target->getContext();
+  RewritePatternSet patterns(ctx);
+  if (getCanonicalization()) addAllRegisteredCanonicalizationPatterns(patterns);
+
+  TrackingListener listener(state);
+  GreedyRewriteConfig config;
+  LogicalResult result = applyPatternsAndFoldGreedily(
+      target, std::move(patterns), config, &listener);
+  LogicalResult listenerResult = listener.checkErrorState();
+  if (failed(result) || failed(listenerResult)) return failure();
+  return target;
 }
 
 //===---------------------------------------------------------------------===//
@@ -101,4 +133,4 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
 }
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Codegen/Common/TransformDialectExtensions/TransformDialectCommonExtensionsOps.cpp.inc"
+#include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensionsOps.cpp.inc"

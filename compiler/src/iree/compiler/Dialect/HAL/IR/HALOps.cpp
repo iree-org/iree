@@ -182,6 +182,36 @@ void ExSharedDeviceOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
+// hal.return
+//===----------------------------------------------------------------------===//
+
+LogicalResult ReturnOp::verify() {
+  ReturnOp op = *this;
+
+  auto parentFuncOp = dyn_cast_or_null<FunctionOpInterface>(op->getParentOp());
+  if (parentFuncOp) {
+    auto expectedTypes = parentFuncOp.getResultTypes();
+    if (op.getNumOperands() != expectedTypes.size()) {
+      return op.emitOpError() << "return must have the same number of operands "
+                                 "as the parent result signature (have "
+                              << op.getNumOperands() << ", expected "
+                              << expectedTypes.size() << ")";
+    }
+    for (auto pair : llvm::enumerate(llvm::zip(op.operands(), expectedTypes))) {
+      auto operand = std::get<0>(pair.value());
+      auto expectedType = std::get<1>(pair.value());
+      if (operand.getType() != expectedType) {
+        return op.emitOpError()
+               << "parent expected result " << pair.index() << " to be "
+               << expectedType << " but returning " << operand.getType();
+      }
+    }
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // hal.tensor.import/export
 //===----------------------------------------------------------------------===//
 
@@ -675,7 +705,7 @@ ParseResult ExecutableExportOp::parse(OpAsmParser &parser,
   if (failed(parser.parseKeyword("layout")) || failed(parser.parseLParen()) ||
       failed(parser.parseAttribute(layoutAttr)) ||
       failed(parser.parseRParen()) ||
-      failed(parser.parseOptionalAttrDict(result.attributes))) {
+      failed(parser.parseOptionalAttrDictWithKeyword(result.attributes))) {
     return failure();
   }
   result.addAttribute("layout", layoutAttr);
@@ -703,8 +733,9 @@ void ExecutableExportOp::print(OpAsmPrinter &p) {
   p << " layout(";
   p.printAttribute(layout());
   p << ")";
-  p.printOptionalAttrDict(op->getAttrs(),
-                          /*elidedAttrs=*/{"sym_name", "layout", "ordinal"});
+  p.printOptionalAttrDictWithKeyword(
+      op->getAttrs(),
+      /*elidedAttrs=*/{"sym_name", "layout", "ordinal"});
   if (workgroup_count().empty()) return;
   p << " ";
   p.printRegion(workgroup_count());

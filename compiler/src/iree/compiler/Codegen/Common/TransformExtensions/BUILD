@@ -19,7 +19,7 @@ td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
-            "TransformDialectFlowExtensionsOps.td",
+            "CommonExtensionsOps.td",
         ],
         include = ["*.td"],
     ),
@@ -31,42 +31,41 @@ td_library(
 )
 
 iree_gentbl_cc_library(
-    name = "TransformDialectFlowExtensionsOpGen",
+    name = "CommonExtensionsOpGen",
     tbl_outs = [
         (
             ["--gen-op-decls"],
-            "TransformDialectFlowExtensionsOps.h.inc",
+            "CommonExtensionsOps.h.inc",
         ),
         (
             ["--gen-op-defs"],
-            "TransformDialectFlowExtensionsOps.cpp.inc",
+            "CommonExtensionsOps.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "TransformDialectFlowExtensionsOps.td",
+    td_file = "CommonExtensionsOps.td",
     deps = [":td_files"],
 )
 
 iree_compiler_cc_library(
-    name = "TransformDialectFlowExtensions",
+    name = "CommonExtensions",
     srcs = [
-        "TransformDialectFlowExtensions.cpp",
-        "TransformDialectFlowExtensionsOps.cpp.inc",
+        "CommonExtensions.cpp",
+        "CommonExtensionsOps.cpp.inc",
     ],
     hdrs = [
-        "TransformDialectFlowExtensions.h",
-        "TransformDialectFlowExtensionsOps.h.inc",
+        "CommonExtensions.h",
+        "CommonExtensionsOps.h.inc",
     ],
     deps = [
-        ":TransformDialectFlowExtensionsOpGen",
-        "//compiler/src/iree/compiler/Dialect/Flow/IR",
+        ":CommonExtensionsOpGen",
+        "//compiler/src/iree/compiler/Codegen:PassHeaders",
+        "//compiler/src/iree/compiler/Codegen/Interfaces:BufferizationInterfaces",
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
-        "@llvm-project//mlir:ArithmeticDialect",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:SCFDialect",
-        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:BufferizationDialect",
+        "@llvm-project//mlir:BufferizationTransforms",
+        "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:TransformDialect",
-        "@llvm-project//mlir:TransformUtils",
     ],
 )

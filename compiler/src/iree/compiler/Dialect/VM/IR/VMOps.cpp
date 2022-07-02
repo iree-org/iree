@@ -201,6 +201,16 @@ void ExportOp::build(OpBuilder &builder, OperationState &result,
   result.attributes.append(attrs.begin(), attrs.end());
 }
 
+LogicalResult ExportOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+  Operation *op = getOperation();
+  if (!symbolTable.lookupNearestSymbolFrom<IREE::VM::FuncOp>(
+          op, function_refAttr())) {
+    return op->emitError() << "vm.func op named '" << function_ref()
+                           << "' not found for export";
+  }
+  return success();
+}
+
 ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
   auto builder = parser.getBuilder();
   if (succeeded(parser.parseOptionalKeyword("optional"))) {

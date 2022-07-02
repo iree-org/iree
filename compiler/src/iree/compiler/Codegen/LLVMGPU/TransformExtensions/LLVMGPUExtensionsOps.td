@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMDIALECTEXTENSIONS_TRANSFORMDIALECTLLVMGPUEXTENSIONS
-#define IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMDIALECTEXTENSIONS_TRANSFORMDIALECTLLVMGPUEXTENSIONS
+#ifndef IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS
+#define IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS
 
 include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
@@ -17,7 +17,8 @@ def ForeachThreadToGpuAndTranslationInfo :
   Op<Transform_Dialect, "iree.foreach_thread_to_gpu_and_translation_info",
     [FunctionalStyleTransformOpTrait, 
      MemoryEffectsOpInterface,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
+     TransformEachOpTrait,
+     TransformOpInterface]> {
   let description = [{
     Target the whole hal.executable_variant op and rewrite all scf.foreach_thread
     to distributed gpu.thread_id and translation_info attribute.
@@ -67,11 +68,18 @@ def ForeachThreadToGpuAndTranslationInfo :
     ```
   }];
 
-  let arguments = (ins);
-  let results = (outs);
+  let arguments = (ins PDL_Operation:$target,
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$workgroup_size);
+  let results = (outs PDL_Operation:$result);
 
-  let assemblyFormat = "attr-dict";
+  let assemblyFormat = "$target attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::FailureOr<::mlir::func::FuncOp> applyToOne(
+      ::mlir::func::FuncOp target,
+      ::mlir::transform::TransformState &state);
+  }];
 }
 
 def VectorWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.warp_execute_on_lane_0",
@@ -234,4 +242,4 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
   }];
 }
 
-#endif // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMDIALECTEXTENSIONS_TRANSFORMDIALECTLLVMGPUEXTENSIONS
+#endif // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS

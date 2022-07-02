@@ -36,9 +36,10 @@ class VMVXToVMConversionInterface : public VMConversionDialectInterface {
 
   void populateVMConversionPatterns(
       SymbolTable &importSymbols, RewritePatternSet &patterns,
+      ConversionTarget &conversionTarget,
       TypeConverter &typeConverter) const override {
-    populateVMVXToVMPatterns(getDialect()->getContext(), typeConverter,
-                             importSymbols, patterns);
+    populateVMVXToVMPatterns(getDialect()->getContext(), conversionTarget,
+                             typeConverter, importSymbols, patterns);
   }
 };
 

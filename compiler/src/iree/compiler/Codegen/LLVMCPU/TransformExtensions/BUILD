@@ -1,4 +1,4 @@
-# Copyright 2022 The IREE Authors
+# Copyright 2019 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -19,7 +19,7 @@ td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
-            "TransformDialectLLVMGPUExtensionsOps.td",
+            "LLVMCPUExtensionsOps.td",
         ],
         include = ["*.td"],
     ),
@@ -31,48 +31,37 @@ td_library(
 )
 
 iree_gentbl_cc_library(
-    name = "TransformDialectLLVMGPUExtensionsOpGen",
+    name = "LLVMCPUExtensionsOpGen",
     tbl_outs = [
         (
             ["--gen-op-decls"],
-            "TransformDialectLLVMGPUExtensionsOps.h.inc",
+            "LLVMCPUExtensionsOps.h.inc",
         ),
         (
             ["--gen-op-defs"],
-            "TransformDialectLLVMGPUExtensionsOps.cpp.inc",
+            "LLVMCPUExtensionsOps.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "TransformDialectLLVMGPUExtensionsOps.td",
+    td_file = "LLVMCPUExtensionsOps.td",
     deps = [":td_files"],
 )
 
 iree_compiler_cc_library(
-    name = "TransformDialectLLVMGPUExtensions",
+    name = "LLVMCPUExtensions",
     srcs = [
-        "TransformDialectLLVMGPUExtensions.cpp",
-        "TransformDialectLLVMGPUExtensionsOps.cpp.inc",
+        "LLVMCPUExtensions.cpp",
+        "LLVMCPUExtensionsOps.cpp.inc",
     ],
     hdrs = [
-        "TransformDialectLLVMGPUExtensions.h",
-        "TransformDialectLLVMGPUExtensionsOps.h.inc",
+        "LLVMCPUExtensions.h",
+        "LLVMCPUExtensionsOps.h.inc",
     ],
     deps = [
-        ":TransformDialectLLVMGPUExtensionsOpGen",
-        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        ":LLVMCPUExtensionsOpGen",
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
-        "@llvm-project//mlir:ArithmeticDialect",
-        "@llvm-project//mlir:FuncDialect",
-        "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:MemRefDialect",
-        "@llvm-project//mlir:PDLDialect",
-        "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:TransformDialect",
-        "@llvm-project//mlir:Transforms",
-        "@llvm-project//mlir:VectorDialect",
-        "@llvm-project//mlir:VectorTransforms",
     ],
 )

@@ -1314,6 +1314,8 @@ def HAL_ReturnOp : HAL_Op<"return", [Terminator]> {
       build($_builder, $_state, llvm::None);
     }]>,
   ];
+
+  let hasVerifier = 1;
 }
 
 def HAL_DeviceQueryOp :

@@ -34,6 +34,7 @@ class CheckToVmConversionInterface : public VMConversionDialectInterface {
 
   void populateVMConversionPatterns(
       SymbolTable &importSymbols, RewritePatternSet &patterns,
+      ConversionTarget &conversionTarget,
       TypeConverter &typeConverter) const override {
     populateCheckToVMPatterns(getDialect()->getContext(), importSymbols,
                               patterns, typeConverter);

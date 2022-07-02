@@ -1,4 +1,4 @@
-# Copyright 2019 The IREE Authors
+# Copyright 2022 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -19,7 +19,7 @@ td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
-            "TransformDialectLLVMCPUExtensionsOps.td",
+            "FlowExtensionsOps.td",
         ],
         include = ["*.td"],
     ),
@@ -31,37 +31,42 @@ td_library(
 )
 
 iree_gentbl_cc_library(
-    name = "TransformDialectLLVMCPUExtensionsOpGen",
+    name = "FlowExtensionsOpGen",
     tbl_outs = [
         (
             ["--gen-op-decls"],
-            "TransformDialectLLVMCPUExtensionsOps.h.inc",
+            "FlowExtensionsOps.h.inc",
         ),
         (
             ["--gen-op-defs"],
-            "TransformDialectLLVMCPUExtensionsOps.cpp.inc",
+            "FlowExtensionsOps.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "TransformDialectLLVMCPUExtensionsOps.td",
+    td_file = "FlowExtensionsOps.td",
     deps = [":td_files"],
 )
 
 iree_compiler_cc_library(
-    name = "TransformDialectLLVMCPUExtensions",
+    name = "FlowExtensions",
     srcs = [
-        "TransformDialectLLVMCPUExtensions.cpp",
-        "TransformDialectLLVMCPUExtensionsOps.cpp.inc",
+        "FlowExtensions.cpp",
+        "FlowExtensionsOps.cpp.inc",
     ],
     hdrs = [
-        "TransformDialectLLVMCPUExtensions.h",
-        "TransformDialectLLVMCPUExtensionsOps.h.inc",
+        "FlowExtensions.h",
+        "FlowExtensionsOps.h.inc",
     ],
     deps = [
-        ":TransformDialectLLVMCPUExtensionsOpGen",
+        ":FlowExtensionsOpGen",
+        "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TransformDialect",
+        "@llvm-project//mlir:TransformUtils",
     ],
 )

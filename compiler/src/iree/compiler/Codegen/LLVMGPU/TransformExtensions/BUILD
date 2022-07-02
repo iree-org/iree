@@ -19,7 +19,7 @@ td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
-            "TransformDialectCommonExtensionsOps.td",
+            "LLVMGPUExtensionsOps.td",
         ],
         include = ["*.td"],
     ),
@@ -31,41 +31,48 @@ td_library(
 )
 
 iree_gentbl_cc_library(
-    name = "TransformDialectCommonExtensionsOpGen",
+    name = "LLVMGPUExtensionsOpGen",
     tbl_outs = [
         (
             ["--gen-op-decls"],
-            "TransformDialectCommonExtensionsOps.h.inc",
+            "LLVMGPUExtensionsOps.h.inc",
         ),
         (
             ["--gen-op-defs"],
-            "TransformDialectCommonExtensionsOps.cpp.inc",
+            "LLVMGPUExtensionsOps.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "TransformDialectCommonExtensionsOps.td",
+    td_file = "LLVMGPUExtensionsOps.td",
     deps = [":td_files"],
 )
 
 iree_compiler_cc_library(
-    name = "TransformDialectCommonExtensions",
+    name = "LLVMGPUExtensions",
     srcs = [
-        "TransformDialectCommonExtensions.cpp",
-        "TransformDialectCommonExtensionsOps.cpp.inc",
+        "LLVMGPUExtensions.cpp",
+        "LLVMGPUExtensionsOps.cpp.inc",
     ],
     hdrs = [
-        "TransformDialectCommonExtensions.h",
-        "TransformDialectCommonExtensionsOps.h.inc",
+        "LLVMGPUExtensions.h",
+        "LLVMGPUExtensionsOps.h.inc",
     ],
     deps = [
-        ":TransformDialectCommonExtensionsOpGen",
-        "//compiler/src/iree/compiler/Codegen:PassHeaders",
-        "//compiler/src/iree/compiler/Codegen/Interfaces:BufferizationInterfaces",
+        ":LLVMGPUExtensionsOpGen",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
-        "@llvm-project//mlir:BufferizationDialect",
-        "@llvm-project//mlir:BufferizationTransforms",
+        "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:TransformDialect",
+        "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:VectorDialect",
+        "@llvm-project//mlir:VectorTransforms",
     ],
 )

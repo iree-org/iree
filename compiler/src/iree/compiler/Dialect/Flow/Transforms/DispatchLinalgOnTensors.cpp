@@ -398,6 +398,27 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
       resultPos++;
     }
   }
+
+  LLVM_DEBUG(llvm::dbgs() << "After workgroup_body creation \n"
+                          << *dispatchOp << "\n");
+
+  // 4. Add a region for workgroup_count computation.
+  Region &workgroupCountRegion = dispatchOp.workgroup_count();
+  Block *body = rewriter.createBlock(&workgroupCountRegion);
+  // Assuming that there is an insertion guard in place already, change the
+  // insertion point to the body.
+  rewriter.setInsertionPointToStart(body);
+  SmallVector<Value> workloadArgs;
+  for (auto workload : llvm::enumerate(workload)) {
+    workloadArgs.push_back(body->addArgument(workload.value().getType(), loc));
+  }
+  auto numWorkgroupsOp =
+      rewriter.create<DispatchDefaultWorkgroupCountOp>(loc, workloadArgs);
+  rewriter.create<ReturnOp>(loc, numWorkgroupsOp.getResults());
+
+  LLVM_DEBUG(llvm::dbgs() << "After workgroup_count creation \n"
+                          << *dispatchOp << "\n");
+
   LLVM_DEBUG(llvm::dbgs() << "Created dispatchOp shell \n"
                           << *dispatchOp << "\n");
   return clonedOps;

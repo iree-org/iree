@@ -138,7 +138,7 @@ class ConversionPass
     SymbolTable importSymbols(innerModuleOp);
     for (auto *dialectInterface : usedDialects) {
       dialectInterface->populateVMConversionPatterns(
-          importSymbols, conversionPatterns, typeConverter);
+          importSymbols, conversionPatterns, conversionTarget, typeConverter);
     }
 
     if (failed(applyPartialConversion(outerModuleOp, conversionTarget,

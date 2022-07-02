@@ -4,14 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMDIALECTEXTENSIONS_TRANSFORMDIALECTLLVMGPUEXTENSIONS_H_
-#define IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMDIALECTEXTENSIONS_TRANSFORMDIALECTLLVMGPUEXTENSIONS_H_
+#ifndef IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS_H_
+#define IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS_H_
 
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 
 namespace mlir {
 class DialectRegistry;
+
+namespace func {
+class FuncOp;
+}
 
 namespace scf {
 class IfOp;
@@ -31,11 +35,10 @@ void registerTransformDialectLLVMGPUExtension(DialectRegistry &registry);
 namespace IREE {
 namespace transform_dialect {
 // Hook to register LLVMGPU transformations to the transform dialect.
-class TransformDialectLLVMGPUExtensions
-    : public transform::TransformDialectExtension<
-          TransformDialectLLVMGPUExtensions> {
+class LLVMGPUExtensions
+    : public transform::TransformDialectExtension<LLVMGPUExtensions> {
  public:
-  TransformDialectLLVMGPUExtensions();
+  LLVMGPUExtensions();
 };
 }  // namespace transform_dialect
 }  // namespace IREE
@@ -43,6 +46,6 @@ class TransformDialectLLVMGPUExtensions
 }  // namespace mlir
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Codegen/LLVMGPU/TransformDialectExtensions/TransformDialectLLVMGPUExtensionsOps.h.inc"
+#include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensionsOps.h.inc"
 
-#endif  // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMDIALECTEXTENSIONS_TRANSFORMDIALECTLLVMGPUEXTENSIONS_H_
+#endif  // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS_H_

@@ -4,11 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/Input/InputDialect.h"
-#include "iree-dialects/Dialect/Input/InputOps.h"
 #include "iree_tf_compiler/TFL/PassDetail.h"
 #include "iree_tf_compiler/TFL/Passes.h"
-#include "mlir/Dialect/Tosa/IR/TosaOps.h"
+#include "mlir/Dialect/MLProgram/IR/MLProgram.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -25,8 +23,8 @@ class LowerGlobalTensorsPass
     : public LowerGlobalTensorsBase<LowerGlobalTensorsPass> {
  public:
   void getDependentDialects(DialectRegistry& registry) const override {
-    registry.insert<mlir::TFL::TensorFlowLiteDialect, tosa::TosaDialect,
-                    iree_compiler::IREE::Input::IREEInputDialect>();
+    registry.insert<mlir::TFL::TensorFlowLiteDialect,
+                    mlir::ml_program::MLProgramDialect>();
   }
 
   // Converts TFLite state operations to the IREE equivalent.
@@ -102,7 +100,7 @@ class LowerGlobalTensorsPass
     for (auto op : callOnceOps) op.erase();
 
     // Create the Util::GlobalOps to store our new global variables.
-    DenseMap<StringRef, std::string> sharedNameToFlowName;
+    DenseMap<StringRef, mlir::ml_program::GlobalOp> symbolRefMap;
     for (auto it : sharedNameToConstant) {
       auto name = std::get<0>(it);
       auto attribute = std::get<1>(it);
@@ -112,84 +110,74 @@ class LowerGlobalTensorsPass
         loc = std::get<1>(*locIt);
       }
 
-      std::string flowSymName = "__iree_flow_" + name.str();
-
       // TODO(suderman): Determine the global type based on all store
       // operations.
-      auto global = builder.create<iree_compiler::IREE::Input::GlobalOp>(
-          loc, flowSymName, /*is_mutable=*/true, attribute.getType(),
-          attribute);
+      auto global = builder.create<mlir::ml_program::GlobalOp>(
+          loc, name, attribute.getType(), /*is_mutable=*/true, attribute,
+          nullptr);
       global.setPrivate();
-      sharedNameToFlowName[name] = std::move(flowSymName);
-    }
 
-    // Replace handles with global addresses.
-    for (auto handle : handleOps) {
-      auto name = handle.shared_name();
-      auto flowName = sharedNameToFlowName[name];
-      auto constIt = sharedNameToConstant.find(name);
-      if (constIt == sharedNameToConstant.end()) continue;
-
-      auto attribute = std::get<1>(*constIt);
-
-      builder.setInsertionPoint(handle);
-      auto address =
-          builder.create<iree_compiler::IREE::Input::GlobalAddressOp>(
-              handle.getLoc(),
-              iree_compiler::IREE::Input::PtrType::get(context,
-                                                       attribute.getType()),
-              SymbolRefAttr::get(builder.getContext(), flowName));
-      handle.getResult().replaceAllUsesWith(address.getResult());
-      handle.erase();
+      symbolRefMap[name] = global;
     }
 
     // Replace the assign ops with a global store operation.
     for (auto assign : assignOps) {
-      auto address = dyn_cast<iree_compiler::IREE::Input::GlobalAddressOp>(
+      auto handle = dyn_cast<mlir::TFL::VarHandleOp>(
           assign.resource_id().getDefiningOp());
-      if (!address) continue;
+      if (!handle) continue;
+
+      Value value = assign.value();
+      auto globalOpIt = symbolRefMap.find(handle.shared_name());
+      if (globalOpIt == symbolRefMap.end()) {
+        assign->emitError(
+            "Unable to find corresponding GlobalOp for op's VarHandle");
+        continue;
+      }
+      auto globalOp = std::get<1>(*globalOpIt);
 
       builder.setInsertionPoint(assign);
-      Value value = assign.value();
-      Type storageType = address.getType()
-                             .cast<iree_compiler::IREE::Input::PtrType>()
-                             .getTargetType();
-      if (storageType != value.getType()) {
+      if (globalOp.getType() != value.getType()) {
         value = builder
-                    .create<UnrealizedConversionCastOp>(assign.getLoc(),
-                                                        storageType, value)
+                    .create<UnrealizedConversionCastOp>(
+                        assign.getLoc(), globalOp.getType(), value)
                     .getResult(0);
       }
 
-      builder.create<iree_compiler::IREE::Input::GlobalStoreIndirectOp>(
-          assign.getLoc(), value, assign.resource_id());
+      auto globalSymbolRef = SymbolRefAttr::get(context, globalOp.getSymName());
+      builder.create<mlir::ml_program::GlobalStoreOp>(assign.getLoc(),
+                                                      globalSymbolRef, value);
       assign.erase();
     }
 
-    // Replace the read ops with a global load operation.
     for (auto read : readOps) {
-      auto address = dyn_cast<iree_compiler::IREE::Input::GlobalAddressOp>(
-          read.resource_id().getDefiningOp());
-      if (!address) continue;
+      auto handle =
+          dyn_cast<mlir::TFL::VarHandleOp>(read.resource_id().getDefiningOp());
+      if (!handle) continue;
 
-      auto ptrType =
-          address.getType().dyn_cast<iree_compiler::IREE::Input::PtrType>();
-      if (!ptrType) continue;
-
-      auto type = ptrType.getTargetType();
+      auto globalOpIt = symbolRefMap.find(handle.shared_name());
+      if (globalOpIt == symbolRefMap.end()) continue;
+      auto globalOp = std::get<1>(*globalOpIt);
 
       builder.setInsertionPoint(read);
-      Value load =
-          builder.create<iree_compiler::IREE::Input::GlobalLoadIndirectOp>(
-              read.getLoc(), type, read.resource_id());
-      if (type != read.getResult().getType()) {
+
+      auto globalSymbolRef = SymbolRefAttr::get(context, globalOp.getSymName());
+      Value load = builder.create<mlir::ml_program::GlobalLoadOp>(
+          read.getLoc(), globalOp.getType(), globalSymbolRef);
+
+      if (read.getType() != load.getType()) {
         load = builder
-                   .create<UnrealizedConversionCastOp>(
-                       read.getLoc(), read.getResult().getType(), load)
+                   .create<UnrealizedConversionCastOp>(read.getLoc(),
+                                                       read.getType(), load)
                    .getResult(0);
       }
       read.getResult().replaceAllUsesWith(load);
       read.erase();
+    }
+
+    for (auto handle : handleOps) {
+      if (handle.getResult().use_empty()) {
+        handle.erase();
+      }
     }
   }
 };
