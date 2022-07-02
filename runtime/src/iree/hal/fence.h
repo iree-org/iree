@@ -124,6 +124,8 @@ IREE_API_EXPORT iree_status_t iree_hal_fence_wait(iree_hal_fence_t* fence,
 IREE_API_EXPORT iree_wait_source_t
 iree_hal_fence_await(iree_hal_fence_t* fence);
 
+IREE_API_EXPORT void iree_hal_fence_destroy(iree_hal_fence_t* fence);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

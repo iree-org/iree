@@ -29,6 +29,7 @@ IREE_VM_DECLARE_TYPE_ADAPTERS(iree_hal_executable_cache,
                               iree_hal_executable_cache_t);
 IREE_VM_DECLARE_TYPE_ADAPTERS(iree_hal_executable_layout,
                               iree_hal_executable_layout_t);
+IREE_VM_DECLARE_TYPE_ADAPTERS(iree_hal_fence, iree_hal_fence_t);
 IREE_VM_DECLARE_TYPE_ADAPTERS(iree_hal_semaphore, iree_hal_semaphore_t);
 
 #ifdef __cplusplus

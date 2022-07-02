@@ -38,6 +38,7 @@ static iree_vm_ref_type_descriptor_t iree_hal_event_descriptor = {0};
 static iree_vm_ref_type_descriptor_t iree_hal_executable_descriptor = {0};
 static iree_vm_ref_type_descriptor_t iree_hal_executable_layout_descriptor = {
     0};
+static iree_vm_ref_type_descriptor_t iree_hal_fence_descriptor = {0};
 static iree_vm_ref_type_descriptor_t iree_hal_semaphore_descriptor = {0};
 
 #define IREE_VM_REGISTER_HAL_C_TYPE(type, name, destroy_fn, descriptor)   \
@@ -82,6 +83,9 @@ IREE_API_EXPORT iree_status_t iree_hal_module_register_types(void) {
                               "hal.executable_layout",
                               iree_hal_executable_layout_destroy,
                               iree_hal_executable_layout_descriptor);
+  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_fence_t, "hal.fence",
+                              iree_hal_fence_destroy,
+                              iree_hal_fence_descriptor);
   IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_semaphore_t, "hal.semaphore",
                               iree_hal_semaphore_destroy,
                               iree_hal_semaphore_descriptor);
@@ -108,6 +112,7 @@ IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_event, iree_hal_event_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_executable, iree_hal_executable_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_executable_layout,
                              iree_hal_executable_layout_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_fence, iree_hal_fence_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_semaphore, iree_hal_semaphore_t);
 
 //===----------------------------------------------------------------------===//
@@ -1297,6 +1302,117 @@ IREE_VM_ABI_EXPORT(iree_hal_module_executable_layout_create,  //
 }
 
 //===----------------------------------------------------------------------===//
+// iree_hal_fence_t
+//===----------------------------------------------------------------------===//
+
+IREE_VM_ABI_EXPORT(iree_hal_module_fence_create,  //
+                   iree_hal_module_state_t,       //
+                   CrID, r) {
+  // Create fence with enough capacity to store all the timepoints.
+  // The count may end up lower if some are deduplicated.
+  iree_hal_fence_t* fence = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_fence_create(args->a0_count, state->host_allocator, &fence));
+
+  // Insert each timepoint into the fence.
+  // This will deduplicate the semaphores and max their values.
+  // The compiler already does this but we want to ensure that invariant is met
+  // and don't trust the user code - at the point we'd have to verify
+  // correctness it's easier just to use the same code path as insertion.
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < args->a0_count; ++i) {
+    iree_hal_semaphore_t* semaphore = NULL;
+    status = iree_hal_semaphore_check_deref(args->a0[i].r0, &semaphore);
+    if (!iree_status_is_ok(status)) break;
+    uint64_t min_value = args->a0[i].i1;
+    status = iree_hal_fence_insert(fence, semaphore, min_value);
+    if (!iree_status_is_ok(status)) break;
+  }
+
+  if (iree_status_is_ok(status)) {
+    rets->r0 = iree_hal_fence_move_ref(fence);
+  } else {
+    iree_hal_fence_release(fence);
+  }
+  return status;
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_fence_join,  //
+                   iree_hal_module_state_t,     //
+                   CrD, r) {
+  iree_host_size_t fence_count = 0;
+  iree_hal_fence_t** fences = NULL;
+  IREE_VM_ABI_VLA_STACK_DEREF(args, a0_count, a0, iree_hal_fence, 32,
+                              &fence_count, &fences);
+
+  iree_hal_fence_t* fence = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_fence_join(fence_count, fences, state->host_allocator, &fence));
+
+  rets->r0 = iree_hal_fence_move_ref(fence);
+  return iree_ok_status();
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_fence_signal,  //
+                   iree_hal_module_state_t,       //
+                   r, v) {
+  iree_hal_fence_t* fence = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_fence_check_deref(args->r0, &fence));
+  return iree_hal_fence_signal(fence);
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_fence_fail,  //
+                   iree_hal_module_state_t,     //
+                   ri, v) {
+  iree_hal_fence_t* fence = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_fence_check_deref(args->r0, &fence));
+  iree_status_code_t status_code =
+      (iree_status_code_t)(args->i1 & IREE_STATUS_CODE_MASK);
+  iree_hal_fence_fail(fence, iree_make_status(status_code));
+  return iree_ok_status();
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_fence_await,  //
+                   iree_hal_module_state_t,      //
+                   iCrD, i) {
+  uint32_t timeout_millis = (uint32_t)args->i0;
+  iree_host_size_t fence_count = 0;
+  iree_hal_fence_t** fences = NULL;
+  IREE_VM_ABI_VLA_STACK_DEREF(args, a1_count, a1, iree_hal_fence, 32,
+                              &fence_count, &fences);
+
+  // Capture absolute timeout so that regardless of how long it takes us to wait
+  // the user-perceived wait time remains the same.
+  iree_timeout_t timeout = iree_make_timeout_ms(timeout_millis);
+  iree_convert_timeout_to_absolute(&timeout);
+
+  // Wait on each fence in-turn.
+  // TODO(benvanik): use a stack wait frame and expand all fences into their
+  // individual timepoint wait sources. This will allow the loop to perform a
+  // multi-wait without needing to materialize intermediate wait primitives
+  // which may not be possible across devices.
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < fence_count; ++i) {
+    status = iree_hal_fence_wait(fences[i], timeout);
+    if (!iree_status_is_ok(status)) break;
+  }
+
+  if (iree_status_is_ok(status)) {
+    // Successful wait.
+    rets->i0 = 0;
+    return iree_ok_status();
+  } else if (iree_status_is_deadline_exceeded(status)) {
+    // Propagate deadline exceeded back to the VM.
+    rets->i0 = (int32_t)iree_status_consume_code(status);
+    iree_status_ignore(status);
+    return iree_ok_status();
+  }
+
+  // Fail the invocation.
+  return status;
+}
+
+//===----------------------------------------------------------------------===//
 // iree_hal_semaphore_t
 //===----------------------------------------------------------------------===//
 
@@ -1359,12 +1475,19 @@ IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_await,  //
   // TODO(benvanik): coroutine magic.
   iree_status_t status =
       iree_hal_semaphore_wait(semaphore, new_value, iree_infinite_timeout());
+
   if (iree_status_is_ok(status)) {
+    // Successful wait.
     rets->i0 = 0;
+    return iree_ok_status();
   } else if (iree_status_is_deadline_exceeded(status)) {
     // Propagate deadline exceeded back to the VM.
     rets->i0 = (int32_t)iree_status_consume_code(status);
+    iree_status_ignore(status);
+    return iree_ok_status();
   }
+
+  // Fail the invocation.
   return status;
 }
 

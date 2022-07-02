@@ -70,6 +70,12 @@ EXPORT_FN("executable.create", iree_hal_module_executable_create, rrrrCrD, r)
 
 EXPORT_FN("executable_layout.create", iree_hal_module_executable_layout_create, riCrD, r)
 
+EXPORT_FN("fence.await", iree_hal_module_fence_await, iCrD, i)
+EXPORT_FN("fence.create", iree_hal_module_fence_create, CrID, r)
+EXPORT_FN("fence.fail", iree_hal_module_fence_signal, ri, v)
+EXPORT_FN("fence.join", iree_hal_module_fence_join, CrD, r)
+EXPORT_FN("fence.signal", iree_hal_module_fence_signal, r, v)
+
 EXPORT_FN("semaphore.await", iree_hal_module_semaphore_await, rI, i)
 EXPORT_FN("semaphore.create", iree_hal_module_semaphore_create, rI, r)
 EXPORT_FN("semaphore.fail", iree_hal_module_semaphore_fail, r, i)

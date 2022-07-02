@@ -92,7 +92,7 @@ IREE_API_EXPORT iree_status_t iree_hal_fence_join(
   return status;
 }
 
-static void iree_hal_fence_destroy(iree_hal_fence_t* fence) {
+IREE_API_EXPORT void iree_hal_fence_destroy(iree_hal_fence_t* fence) {
   IREE_ASSERT_ARGUMENT(fence);
   IREE_ASSERT_REF_COUNT_ZERO(&fence->ref_count);
   IREE_TRACE_ZONE_BEGIN(z0);
