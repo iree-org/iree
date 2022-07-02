@@ -92,9 +92,6 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
             llvm::AddressSanitizerOptions Opts;
             bool moduleUseAfterScope = false;
             bool useOdrIndicator = false;
-            modulePassManager.addPass(
-                llvm::RequireAnalysisPass<llvm::ASanGlobalsMetadataAnalysis,
-                                          llvm::Module>());
             modulePassManager.addPass(llvm::ModuleAddressSanitizerPass(
                 Opts, moduleUseAfterScope, useOdrIndicator));
           });
