@@ -23,6 +23,57 @@ What follows are some rambly notes on how to do an LLVM integrate.
 
 TODO: Refactor these based on the common procedure we actually use.
 
+## Cookbook
+
+### Making an immediate fix to LLVM
+
+Generally, we only cherry-pick committed changes to LLVM into IREE. This is
+great when someone else has been nice enough to have already landed such a
+change. However, when something in LLVM is breaking IREE, it can be helpful
+to develop the change within IREE's third_party/llvm-project submodule and
+land it from there. Because this is often done as part of an integrate, you
+will typically be on the integrate branch for this procedure.
+
+General procedure:
+
+* Make changes in third_party/llvm-project as needed and get IREE build/test
+  passing locally.
+* Rebase the change onto LLVM head, get reviewed and land.
+* Cherry-pick the landed change into IREE's llvm fork.
+
+This should not be common. Reserve it for NFC, reverts and obvious bug fixes to
+LLVM. Most LLVM changes will take time and should not be rushed or be done
+outside of the bounds of the Development Policy. If you don't know if what you
+are doing is appropriate, ask on discord or ask an experienced committer for
+a second opinion.
+
+Roughly (note that this is a development procedure, not a copy-paste exercise:
+know what you are doing and adapt):
+
+```
+(iree)$ ... Make changes ...
+(iree/third_party/llvm-project)$ cd third_party/llvm-project
+# May need to delete the 'land' branch if re-using: git branch -D land
+(iree/third_party/llvm-project)$ git checkout -b land
+# Make sure you have an upstream COMMIT remote (or equiv)
+(iree/third_party/llvm-project)$ git remote add COMMIT git@github.com:llvm/llvm-project.git
+# Rebase your 'land' branch to upstream main
+(iree/third_party/llvm-project)$ git fetch COMMIT && git pull --rebase COMMIT main
+
+# To request a code-review.
+(iree/third_party/llvm-project)$ arc diff
+# To land the change (double check, etc -- follow upstream policies).
+(iree/third_party/llvm-project)$ git push COMMIT HEAD:main
+# Run "git log" and note that commit hash you will be cherry-picking.
+# Assume this is $COMMIT_HASH below
+
+# Move back to IREE's concept of LLVM head and cherry-pick as normal.
+(iree/third_party/llvm-project)$ (cd ../.. && git submodule update third_party/llvm-project)
+(iree/third_party/llvm-project)$ git cherry-pick $COMMIT_HASH
+(iree/third_party/llvm-project)$ cd ../..
+(iree)$ ./build_tools/scripts/integrate/patch_module.py --module=llvm-project
+```
+
 ## Notes on integrating LLVM from the OSS side
 
 This is a work in progress guide on how to bump versions of LLVM and related
