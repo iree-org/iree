@@ -1,17 +1,37 @@
-# Notes on integrating LLVM from the OSS side
+# Scripts for Integrating Changes from Third Party Dependencies
+
+This directory contains scripts for managing some of our more storied third
+party dependencies (which are submodules in the project):
+
+* llvm-project
+* mlir-hlo
+
+Depending on your activity, please refer to the appropriate script,
+which has comments at the top on how to use it:
+
+* `bump_llvm.py` : Bumping LLVM and related sub-projects to a new commit
+* `patch_module.py` : Push local patches (cherry-picks) from a submodule to
+  a mirror for use by others.
+
+NOTE: If needing to make changes to these scripts, DO NOT make changes while
+using them to perform one of the above tasks (i.e. your changes will just
+get bundled into an unrelated patch unless if very careful). In this rare
+case, just copy the contents of this directory to a temporary location and
+edit/run from there. When done, submit the changes to main.
+
+What follows are some rambly notes on how to do an LLVM integrate.
+
+TODO: Refactor these based on the common procedure we actually use.
+
+## Notes on integrating LLVM from the OSS side
 
 This is a work in progress guide on how to bump versions of LLVM and related
 dependencies. In the recent past, we did this in a different system and this
 is just to get us by until we get it better scripted/automated.
 
-Note that scripts referenced in this guide are temporarily hosted in the
-[iree-samples repository](https://github.com/iree-org/iree-samples/tree/main/scripts/integrate).
-This is because it is very non-user friendly to have branch and submodule
-management scripts in the repository being managed, and we don't have an
-immediately better place. In this guide, we reference this location as
-`$SCRIPTS`.
+In this guide, we reference this directory as `$SCRIPTS`.
 
-## Advancing the mainline branch in forks
+### Advancing the mainline branch in forks
 
 The IREE team maintains fork repositories for both llvm-project and mlir-hlo,
 allowing them to be patched out of band. These repositories are:
@@ -20,16 +40,16 @@ allowing them to be patched out of band. These repositories are:
 * https://github.com/iree-org/iree-mhlo-fork (`master` branch)
 * https://github.com/iree-org/iree-tf-fork (`master` branch)
 
-By the time you read this, they may be on a cron to advance automatically, but
-even so, it is a good idea to advance them prior to any integrate activities
-so that you have freshest commits available. Iree repository has an
+Iree repository has an
 action named [Advance Upstream Forks](https://github.com/iree-org/iree/actions/workflows/advance_upstream_forks.yml)
 to update the forks. Just select `Run Workflow` on that action and give it a
-minute. You should see the fork repository mainline branch move forward.
+minute. You should see the fork repository mainline branch move forward. This
+action runs hourly. If needing up to the minute changes, you may need to trigger
+it manually.
 
-## Bumping LLVM and Dependent Projects
+### Bumping LLVM and Dependent Projects
 
-### Strategy 1: Bump third_party/llvm-project in isolation
+#### Strategy 1: Bump third_party/llvm-project in isolation
 
 It is very common to only bump llvm-project and not sync to new versions of
 mlir-hlo and tensorflow. However, as we need to periodically integrate those
@@ -102,7 +122,7 @@ details.
 
 Good luck!
 
-### Strategy 2: Sync everything to a Google/TensorFlow commit
+#### Strategy 2: Sync everything to a Google/TensorFlow commit
 
 TODO: Add a script for this. Also note that there is a forked copy of
 `iree-dialects` in integrations/tensorflow. When bumping that dependency,
@@ -228,7 +248,7 @@ git commit ...
 git push UPSTREAM_AUTOMATION bump-llvm-...
 ```
 
-## Cherry-picking
+### Cherry-picking
 
 We support cherry-picking specific commits in to both llvm-project and mlir-hlo.
 This should only ever be done to incorporate patches that enable further
@@ -333,3 +353,4 @@ python configure_bazel.py
 cd integrations/tensorflow
 bazel test ...
 ```
+
