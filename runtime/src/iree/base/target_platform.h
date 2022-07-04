@@ -31,6 +31,7 @@
 // IREE_ENDIANNESS_BIG
 //
 // IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED (0/1)
+// IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_64 (0/1)
 //
 // IREE_COMPILER_CLANG
 // IREE_COMPILER_GCC
@@ -155,6 +156,10 @@ static_assert(sizeof(void*) == sizeof(uintptr_t),
 #define IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED 0
 #endif  // !__ARM_FEATURE_UNALIGNED
 
+// Unaligned support is only available for singles on Armv7-M.
+// Therefore, aligned memory access is enforced for 64-bit data types.
+#define IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_64 1
+
 #elif defined(IREE_ARCH_RISCV_32) || defined(IREE_ARCH_RISCV_64)
 
 // Though unaligned access is part of the base spec it is allowed to be
@@ -168,6 +173,13 @@ static_assert(sizeof(void*) == sizeof(uintptr_t),
 #else
 #define IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED 0
 #endif  // !IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED
+
+// Set IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_64 to the value of
+// IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED if the former was not set before.
+#if !defined(IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_64)
+#define IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_64 \
+  IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED
+#endif  // !IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_64
 
 //==============================================================================
 // IREE_COMPILER_*
