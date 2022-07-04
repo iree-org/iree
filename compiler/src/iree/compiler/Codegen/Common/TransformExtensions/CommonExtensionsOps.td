@@ -53,9 +53,15 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
     [FunctionalStyleTransformOpTrait, 
      MemoryEffectsOpInterface,
      DeclareOpInterfaceMethods<TransformOpInterface>]> {
-  let description = [{Calls upstream comprehensive bufferize with extra IREE hooks.}];
+  let description = [{
+    Call upstream comprehensive bufferize with extra IREE hooks.
 
-  let arguments = (ins);
+    By default, CPU allocations are emitted. This behavior can be modified by 
+    using the following attributes:
+      - target_gpu: if set, GPU allocations are emitted.
+  }];
+
+  let arguments = (ins UnitAttr:$target_gpu);
   let results = (outs);
 
   let assemblyFormat = "attr-dict";
