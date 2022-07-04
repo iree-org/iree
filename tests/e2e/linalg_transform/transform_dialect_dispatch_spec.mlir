@@ -11,7 +11,7 @@ transform.with_pdl_patterns {
   transform.structured.canonicalized_sequence %arg0 {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_matmul_target in %arg1
-    %tiling_1_result:2 = tile_to_foreach_thread_op %0 {num_threads = [13, 33]}
-    transform.iree.foreach_thread_to_flow
+    %foreach_op, %tiled_op = tile_to_foreach_thread_op %0 {num_threads = [13, 33]}
+    %dispatch_op = transform.iree.foreach_thread_to_flow %foreach_op
   }
 }
