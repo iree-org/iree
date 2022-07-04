@@ -383,8 +383,13 @@ transform_dialect::VectorWarpExecuteOnLane0Op::applyToOne(
   FailureOr<VectorDistributionResult> vectorDistributionResult =
       vectorDistribution(rewriter, ifOp->getLoc(), ifOp, workgroupSizeX,
                          warpSize);
-  if (failed(vectorDistributionResult))
-    return ifOp->emitError("error when trying to apply");
+  if (failed(vectorDistributionResult)) {
+    // Explicitly return a null WarpExecuteOnLane0Op. This is not a failure
+    // but the transformation is not applied and the null result is
+    // propagated.
+    // TODO: Do not encode this behavior with null upstream.
+    return vector::WarpExecuteOnLane0Op();
+  }
   return vectorDistributionResult->warpOp;
 }
 
