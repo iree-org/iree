@@ -14,7 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "load_store_ops.mlir"
+    "memref_ops.mlir"
   TOOLS
     FileCheck
     iree-opt

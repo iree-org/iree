@@ -1,6 +1,19 @@
 // RUN: iree-opt --split-input-file --iree-vm-conversion %s | FileCheck %s
 
 module {
+  // CHECK-LABEL: vm.func private @alloca() -> !vm.buffer
+  func.func @alloca() -> memref<16xi32> {
+    // CHECK: %[[LEN_64:.+]] = vm.const.i64 64
+    // CHECK: %[[BUF:.+]] = vm.buffer.alloc %[[LEN_64]] : !vm.buffer
+    // return %[[BUF]]
+    %0 = memref.alloca() : memref<16xi32>
+    return %0 : memref<16xi32>
+  }
+}
+
+// -----
+
+module {
   // CHECK-LABEL: vm.func private @load_store
   // CHECK-SAME: (%[[BUFFER:.+]]: !vm.buffer, %[[IDX0:.+]]: i32, %[[IDX1:.+]]: i32) -> f32 {
   func.func @load_store(%buffer: memref<?xf32>, %idx0: index, %idx1: index) -> f32 {
