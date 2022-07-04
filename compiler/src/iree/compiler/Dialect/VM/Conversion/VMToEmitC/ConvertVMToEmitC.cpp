@@ -2341,11 +2341,10 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
 
     Type bytePtrType =
         emitc::PointerType::get(rewriter.getIntegerType(8, false));
-    Value uint8Ptr = emitc_builders::structMember(
-                rewriter, loc,
-                /*type=*/bytePtrType,
-                /*memberName=*/"data",
-                /*operand=*/results);
+    Value uint8Ptr = emitc_builders::structMember(rewriter, loc,
+                                                  /*type=*/bytePtrType,
+                                                  /*memberName=*/"data",
+                                                  /*operand=*/results);
 
     for (size_t i = 0; i < resultTypes.size(); i++) {
       Type resultType = resultTypes[i];
@@ -3081,8 +3080,7 @@ class ConstRefRodataOpConversion
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{byteBufferPtrOp, typeIdOp.getResult(0),
-                        ref.getValue()},
+        ArrayRef<Value>{byteBufferPtrOp, typeIdOp.getResult(0), ref.getValue()},
         /*typeConverter=*/*typeConverter);
 
     rewriter.replaceOp(constRefRodataOp, ref.getValue());
@@ -3623,8 +3621,7 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
                rewriter.getIndexAttr(0), rewriter.getIndexAttr(1)}),
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/
-          ArrayRef<Value>{messageSizeIntOp.getResult(),
-                          messageDataOp});
+          ArrayRef<Value>{messageSizeIntOp.getResult(), messageDataOp});
 
       rewriter.create<mlir::func::ReturnOp>(loc, status.getResult(0));
     }
