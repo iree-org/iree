@@ -121,6 +121,7 @@ IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_semaphore, iree_hal_semaphore_t);
 
 typedef struct iree_hal_module_t {
   iree_allocator_t host_allocator;
+  iree_hal_module_flags_t flags;
   iree_hal_device_t* shared_device;
   // TODO(benvanik): types.
 } iree_hal_module_t;
@@ -130,6 +131,7 @@ typedef struct iree_hal_module_t {
 
 typedef struct iree_hal_module_state_t {
   iree_allocator_t host_allocator;
+  iree_hal_module_flags_t flags;
   iree_hal_device_t* shared_device;
   iree_status_t loop_status;
   iree_hal_executable_cache_t* executable_cache;
@@ -155,6 +157,7 @@ iree_hal_module_alloc_state(void* self, iree_allocator_t host_allocator,
       iree_allocator_malloc(host_allocator, sizeof(*state), (void**)&state));
   memset(state, 0, sizeof(*state));
   state->host_allocator = host_allocator;
+  state->flags = module->flags;
   state->shared_device = module->shared_device;
   iree_hal_device_retain(state->shared_device);
 
@@ -1538,9 +1541,9 @@ static const iree_vm_native_module_descriptor_t iree_hal_module_descriptor_ = {
     .functions = iree_hal_module_funcs_,
 };
 
-IREE_API_EXPORT iree_status_t
-iree_hal_module_create(iree_hal_device_t* device, iree_allocator_t allocator,
-                       iree_vm_module_t** out_module) {
+IREE_API_EXPORT iree_status_t iree_hal_module_create(
+    iree_hal_device_t* device, iree_hal_module_flags_t flags,
+    iree_allocator_t host_allocator, iree_vm_module_t** out_module) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
@@ -1559,17 +1562,18 @@ iree_hal_module_create(iree_hal_device_t* device, iree_allocator_t allocator,
       iree_vm_native_module_size() + sizeof(iree_hal_module_t);
   iree_vm_module_t* base_module = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(allocator, total_size, (void**)&base_module));
+      iree_allocator_malloc(host_allocator, total_size, (void**)&base_module));
   memset(base_module, 0, total_size);
   iree_status_t status = iree_vm_native_module_initialize(
-      &interface, &iree_hal_module_descriptor_, allocator, base_module);
+      &interface, &iree_hal_module_descriptor_, host_allocator, base_module);
   if (!iree_status_is_ok(status)) {
-    iree_allocator_free(allocator, base_module);
+    iree_allocator_free(host_allocator, base_module);
     return status;
   }
 
   iree_hal_module_t* module = IREE_HAL_MODULE_CAST(base_module);
-  module->host_allocator = allocator;
+  module->host_allocator = host_allocator;
+  module->flags = flags;
   module->shared_device = device;
   iree_hal_device_retain(module->shared_device);
 

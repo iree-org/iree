@@ -272,8 +272,8 @@ void CompiledBinary::initialize(void* data, size_t length) {
   iree_hal_driver_release(driver);
 
   // Create hal module.
-  IREE_CHECK_OK(
-      iree_hal_module_create(device, iree_allocator_system(), &hal_module));
+  IREE_CHECK_OK(iree_hal_module_create(device, IREE_HAL_MODULE_FLAG_NONE,
+                                       iree_allocator_system(), &hal_module));
 
   // Bytecode module.
   IREE_CHECK_OK(iree_vm_bytecode_module_create(

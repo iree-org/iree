@@ -109,8 +109,9 @@ static iree_status_t iree_trace_replay_load_builtin_module(
         document, module_node, iree_make_cstring_view("driver"), &driver_node));
     IREE_RETURN_IF_ERROR(iree_trace_replay_create_device(
         replay, driver_node, replay->host_allocator, &replay->device));
-    IREE_RETURN_IF_ERROR(iree_hal_module_create(
-        replay->device, replay->host_allocator, &module));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_module_create(replay->device, IREE_HAL_MODULE_FLAG_NONE,
+                               replay->host_allocator, &module));
   }
   if (!module) {
     return iree_make_status(

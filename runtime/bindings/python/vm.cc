@@ -22,9 +22,10 @@ namespace {
 
 VmModule CreateHalModule(HalDevice* device) {
   iree_vm_module_t* module;
-  CheckApiStatus(iree_hal_module_create(device->raw_ptr(),
-                                        iree_allocator_system(), &module),
-                 "Error creating hal module");
+  CheckApiStatus(
+      iree_hal_module_create(device->raw_ptr(), IREE_HAL_MODULE_FLAG_NONE,
+                             iree_allocator_system(), &module),
+      "Error creating hal module");
   return VmModule::StealFromRawPtr(module);
 }
 
