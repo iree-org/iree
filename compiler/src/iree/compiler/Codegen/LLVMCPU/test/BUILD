@@ -29,7 +29,6 @@ iree_lit_test_suite(
             "hal_interface_constants.mlir",
             "hal_interface_workgroup_info.mlir",
             "illegal_configuration.mlir",
-            "linalg_transform.mlir",
             "materialize_aarch64_launch_configuration.mlir",
             "materialize_riscv_launch_configuration.mlir",
             "materialize_vmvx_launch_configuration.mlir",
@@ -38,6 +37,7 @@ iree_lit_test_suite(
             "pipeline_tests.mlir",
             "synchronize_symbol_visibility.mlir",
             "test_config_mmt4d.mlir",
+            "transform_dialect_bufferize.mlir",
             "transpose_avx2_lowering.mlir",
             "unfused_fma.mlir",
             "vector_contract_to_arm_asm.mlir",
@@ -45,12 +45,8 @@ iree_lit_test_suite(
             "verify_linalg_transform_legality.mlir",
         ],
         include = ["*.mlir"],
-        # transform_dialect_*_spec is a an MLIR file that specifies a
-        # transformation, it needs to be included as data.
-        exclude = ["transform_dialect_codegen_bufferize_spec.mlir"],
     ),
     cfg = "//compiler:lit.cfg.py",
-    data = ["transform_dialect_codegen_bufferize_spec.mlir"],
     tools = [
         "//tools:iree-compile",
         "//tools:iree-opt",
