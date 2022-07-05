@@ -26,10 +26,18 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 
     Returns the IsolatedFromAbove op whose content it has modified for better
     chaining APIs.
+
+    The following additive attributes can be set, they add patterns in an 
+    unspecified order:
+      - canonicalization: adds all the canonicalization pattenrs of all 
+      registered dialects and ops.
+      - rank_reducing: adds patterns that results in rank-reducing behavior on
+      subset-based operations.
   }];
 
   let arguments = (ins PDL_Operation:$target,
-                       UnitAttr:$canonicalization);
+                       UnitAttr:$canonicalization,
+                       UnitAttr:$rank_reducing);
   let results = (outs PDL_Operation:$result);
 
   let assemblyFormat = "$target attr-dict";

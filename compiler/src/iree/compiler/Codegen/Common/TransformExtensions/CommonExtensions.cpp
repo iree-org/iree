@@ -32,6 +32,11 @@ void mlir::iree_compiler::registerTransformDialectCommonExtension(
 // ApplyPatternsOp
 //===---------------------------------------------------------------------===//
 
+static void addRankReducingPatterns(RewritePatternSet &patterns) {
+  vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
+  linalg::populateFoldUnitExtentDimsPatterns(patterns);
+}
+
 static void addAllRegisteredCanonicalizationPatterns(
     RewritePatternSet &patterns) {
   MLIRContext *ctx = patterns.getContext();
@@ -49,6 +54,7 @@ FailureOr<Operation *> transform_dialect::ApplyPatternsOp::applyToOne(
   MLIRContext *ctx = target->getContext();
   RewritePatternSet patterns(ctx);
   if (getCanonicalization()) addAllRegisteredCanonicalizationPatterns(patterns);
+  if (getRankReducing()) addRankReducingPatterns(patterns);
 
   TrackingListener listener(state);
   GreedyRewriteConfig config;
