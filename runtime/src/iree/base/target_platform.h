@@ -171,10 +171,9 @@ static_assert(sizeof(void*) == sizeof(uintptr_t),
 // every load/store.
 #define IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED 1
 
-#endif  // IREE_ARCH_*
-
 #else
 #define IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED 0
+#endif  // IREE_ARCH_*
 #endif  // !IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED
 
 // Set IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_* to the value of
