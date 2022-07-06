@@ -493,7 +493,7 @@ static iree_task_t* iree_task_executor_try_steal_task_from_affinity_set(
     mask = iree_shr(mask, offset + 1);
     iree_task_worker_t* victim_worker = &executor->workers[victim_index];
     if (iree_atomic_load_int32(&victim_worker->state,
-                               iree_memory_order_seq_cst) !=
+                               iree_memory_order_acquire) !=
         IREE_TASK_WORKER_STATE_RUNNING) {
       return NULL;
     }
