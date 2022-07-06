@@ -283,6 +283,173 @@ void CommandBufferPushDescriptorSetOp::getCanonicalizationPatterns(
 
 // TODO(benvanik): fold matches that are known true based on device config.
 
+//===----------------------------------------------------------------------===//
+// hal.fence.create
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Replaces a fence with no timepoints with a null value.
+struct ElideEmptyFenceCreate : public OpRewritePattern<FenceCreateOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(FenceCreateOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op.getNumOperands() != 0) return failure();
+    rewriter.replaceOpWithNewOp<IREE::Util::NullOp>(op, op.result().getType());
+    return success();
+  }
+};
+
+/// Deduplicates timepoints by taking the maximum payload value of any that
+/// share the same semaphore.
+struct DeduplicateFenceCreateTimepoints
+    : public OpRewritePattern<FenceCreateOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(FenceCreateOp op,
+                                PatternRewriter &rewriter) const override {
+    // Check to see if the fence is over a single (semaphore, value) timepoint.
+    if (op.semaphores().size() <= 1) return failure();  // just 0 or 1 timepoint
+
+    // Build a map of all timepoints keyed on semaphore.
+    // This will implicitly deduplicate the semaphores and the values for each.
+    llvm::MapVector<Value, SetVector<Value>> timepoints;
+    for (auto it : llvm::zip(op.semaphores(), op.min_values())) {
+      auto semaphore = std::get<0>(it);
+      auto minValue = std::get<1>(it);
+      timepoints[semaphore].insert(minValue);
+    }
+
+    // Check for no-op when we don't deduplicate anything.
+    if (timepoints.size() == op.semaphores().size()) return failure();
+
+    // Build the timepoints.
+    // A single semaphore may have multiple values and we need to take the max.
+    SmallVector<Value> semaphores;
+    SmallVector<Value> minValues;
+    semaphores.reserve(timepoints.size());
+    minValues.reserve(timepoints.size());
+    for (auto it : timepoints) {
+      semaphores.push_back(it.first);
+      if (it.second.size() == 1) {
+        // Single timepoint.
+        minValues.push_back(it.second.front());
+      } else {
+        // Join timepoints. This will fold if constant.
+        minValues.push_back(rewriter.createOrFold<IREE::Util::RangeMaxOp>(
+            op.getLoc(), it.second.takeVector()));
+      }
+    }
+
+    // Build new op. The map/set vectors we used will ensure the relative order
+    // of the timepoints matches the original.
+    rewriter.replaceOpWithNewOp<FenceCreateOp>(op, op.result().getType(),
+                                               semaphores, minValues);
+    return success();
+  }
+};
+
+}  // namespace
+
+void FenceCreateOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
+  results.insert<ElideEmptyFenceCreate>(context);
+  results.insert<DeduplicateFenceCreateTimepoints>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// hal.fence.join
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Replaces a fence join with no operands with a null value.
+struct ElideEmptyFenceJoin : public OpRewritePattern<FenceJoinOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(FenceJoinOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op.getNumOperands() != 0) return failure();
+    rewriter.replaceOpWithNewOp<IREE::Util::NullOp>(op, op.result().getType());
+    return success();
+  }
+};
+
+// Produces a deduplicated and null-elided operand list.
+// Returns None if nothing changed.
+static Optional<std::vector<Value>> deduplicateFenceOperands(
+    ValueRange operands) {
+  SetVector<Value> newOperands;
+  for (auto operand : operands) {
+    if (isa_and_nonnull<IREE::Util::NullOp>(operand.getDefiningOp())) {
+      // Drop null values as they don't mean anything. Ideally we'd reach back
+      // a little further here but that's best done in an IPO pass.
+      continue;
+    }
+    newOperands.insert(operand);
+  }
+
+  if (newOperands.size() == operands.size()) return None;
+  return newOperands.takeVector();
+}
+
+/// Deduplicates fence join operands and drops nulls.
+struct DeduplicateFenceJoinFences : public OpRewritePattern<FenceJoinOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(FenceJoinOp op,
+                                PatternRewriter &rewriter) const override {
+    auto newOperands = deduplicateFenceOperands(op.fences());
+    if (!newOperands) return failure();
+    rewriter.replaceOpWithNewOp<FenceJoinOp>(op, op.result().getType(),
+                                             newOperands.value());
+    return success();
+  }
+};
+
+}  // namespace
+
+void FenceJoinOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                              MLIRContext *context) {
+  results.insert<ElideEmptyFenceJoin>(context);
+  results.insert<DeduplicateFenceJoinFences>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// hal.fence.await
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Elides a fence await with no fences.
+struct ElideEmptyFenceAwait : public OpRewritePattern<FenceAwaitOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(FenceAwaitOp op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.fences().empty()) return failure();
+    rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(op, /*ok=*/0, 32);
+    return success();
+  }
+};
+
+/// Deduplicates fence await operands and drops nulls.
+struct DeduplicateFenceAwaitFences : public OpRewritePattern<FenceAwaitOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(FenceAwaitOp op,
+                                PatternRewriter &rewriter) const override {
+    auto newOperands = deduplicateFenceOperands(op.fences());
+    if (newOperands == None) return failure();
+    rewriter.replaceOpWithNewOp<FenceAwaitOp>(
+        op, op.status().getType(), op.timeout_millis(), newOperands.value());
+    return success();
+  }
+};
+
+}  // namespace
+
+void FenceAwaitOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
+  results.insert<ElideEmptyFenceAwait>(context);
+  results.insert<DeduplicateFenceAwaitFences>(context);
+}
+
 }  // namespace HAL
 }  // namespace IREE
 }  // namespace iree_compiler

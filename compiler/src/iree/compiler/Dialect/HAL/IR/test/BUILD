@@ -29,6 +29,8 @@ iree_lit_test_suite(
             "executable_ops.mlir",
             "executable_targets.mlir",
             "experimental_ops.mlir",
+            "fence_folding.mlir",
+            "fence_ops.mlir",
             "interface_ops.mlir",
             "invalid.mlir",
             "semaphore_ops.mlir",

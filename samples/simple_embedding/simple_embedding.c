@@ -43,7 +43,8 @@ iree_status_t Run() {
                        "create device");
   iree_vm_module_t* hal_module = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_hal_module_create(device, iree_allocator_system(), &hal_module));
+      iree_hal_module_create(device, IREE_HAL_MODULE_FLAG_SYNCHRONOUS,
+                             iree_allocator_system(), &hal_module));
 
   // Load bytecode module from the embedded data.
   const iree_const_byte_span_t module_data = load_bytecode_module_data();

@@ -317,6 +317,17 @@ def HAL_ExecutableLayout : DialectType<
   let builderCall = "$_builder.getType<IREE::HAL::ExecutableLayoutType>()";
 }
 
+def HAL_Fence : DialectType<
+    HAL_Dialect,
+    CPred<"$_self.isa<IREE::HAL::FenceType>()">,
+    "fence"> {
+  let description = [{
+    A set of semaphore timepoints defining a common point in time across
+    multiple timelines.
+  }];
+  let builderCall = "$_builder.getType<IREE::HAL::FenceType>()";
+}
+
 def HAL_RingBuffer : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::RingBufferType>()">,
@@ -380,7 +391,7 @@ def HAL_DeviceSizes : Variadic<HAL_DeviceSize>;
 def HAL_HostSize : TypeAlias<Index>;
 def HAL_HostSizeAttr : Util_IndexAttrBase<"size_t">;
 
-def HAL_TimelineValue : TypeAlias<Index>;
+def HAL_TimelineValue : TypeAlias<I64>;
 
 def HAL_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
 def HAL_FillPatternType : AnyTypeOf<[I8, I16, I32]>;
