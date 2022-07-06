@@ -38,8 +38,6 @@ void populateTopkSplitReductionPattern(
 
 std::unique_ptr<OperationPass<func::FuncOp>> createTopkSplitReductionPass();
 
-void registerTilingInterfaceExternalModels(DialectRegistry &registry);
-
 void registerPasses();
 
 } // namespace LinalgExt
