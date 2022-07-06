@@ -86,20 +86,33 @@ struct iree_task_executor_t {
   // existing computation on the workers to finish).
   iree_task_poller_t poller;
 
-  // A bitset indicating which workers are live and usable; all attempts to
-  // push work onto a particular worker should check first with this mask. This
-  // may change over time either automatically or by user request ("don't use
-  // these cores for awhile I'm going to be using them" etc).
+  // A bitset indicating which workers are likely to be live and usable; all
+  // attempts to push work onto a particular worker should check first with this
+  // mask. This may change over time either automatically or by user request
+  // ("don't use these cores for awhile I'm going to be using them" etc).
+  //
+  // This mask is just a hint, accessed with memory_order_relaxed. Readers must
+  // be OK with getting slightly out-of-date information. The only way to get
+  // an authoritative answer to the question "is this worker live" is to
+  // atomically query worker->state. This mask is for usage patterns where one
+  // needs a cheap (single relaxed atomic op) approximation of all N workers'
+  // live state without having to perform N expensive atomic ops.
   iree_atomic_task_affinity_set_t worker_live_mask;
 
   // A bitset indicating which workers may be suspended and need to be resumed
   // via iree_thread_resume prior to them being able to execute work.
+  //
+  // This mask is just a hint, accessed with memory_order_relaxed. See the
+  // comment on worker_live_mask.
   iree_atomic_task_affinity_set_t worker_suspend_mask;
 
   // A bitset indicating which workers are currently idle. Used to bias incoming
   // tasks to workers that aren't doing much else. This is a balance of latency
   // to wake the idle workers vs. latency to wait for existing work to complete
   // on already woken workers.
+  //
+  // This mask is just a hint, accessed with memory_order_relaxed. See the
+  // comment on worker_live_mask.
   iree_atomic_task_affinity_set_t worker_idle_mask;
 
   // Specifies how many workers threads there are.

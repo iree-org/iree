@@ -40,6 +40,11 @@ iree_status_t iree_task_worker_initialize(
   out_worker->processor_id = 0;
   out_worker->processor_tag = 0;
 
+  iree_notification_initialize(&out_worker->wake_notification);
+  iree_notification_initialize(&out_worker->state_notification);
+  iree_atomic_task_slist_initialize(&out_worker->mailbox_slist);
+  iree_task_queue_initialize(&out_worker->local_task_queue);
+
   iree_task_worker_state_t initial_state = IREE_TASK_WORKER_STATE_RUNNING;
   if (executor->scheduling_mode &
       IREE_TASK_SCHEDULING_MODE_DEFER_WORKER_STARTUP) {
@@ -51,11 +56,6 @@ iree_status_t iree_task_worker_initialize(
   }
   iree_atomic_store_int32(&out_worker->state, initial_state,
                           iree_memory_order_seq_cst);
-
-  iree_notification_initialize(&out_worker->wake_notification);
-  iree_notification_initialize(&out_worker->state_notification);
-  iree_atomic_task_slist_initialize(&out_worker->mailbox_slist);
-  iree_task_queue_initialize(&out_worker->local_task_queue);
 
   iree_thread_create_params_t thread_params;
   memset(&thread_params, 0, sizeof(thread_params));
@@ -284,7 +284,7 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
         iree_notification_prepare_wait(&worker->wake_notification);
     iree_atomic_task_affinity_set_fetch_and(&worker->executor->worker_idle_mask,
                                             ~worker->worker_bit,
-                                            iree_memory_order_seq_cst);
+                                            iree_memory_order_relaxed);
 
     // Check state to see if we've been asked to exit.
     if (iree_atomic_load_int32(&worker->state, iree_memory_order_seq_cst) ==
@@ -317,7 +317,7 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
     // work we will properly coordinate/wake below.
     iree_atomic_task_affinity_set_fetch_or(&worker->executor->worker_idle_mask,
                                            worker->worker_bit,
-                                           iree_memory_order_seq_cst);
+                                           iree_memory_order_relaxed);
 
     // When we encounter a complete lack of work we can self-nominate to check
     // the global work queue and distribute work to other threads. Only one
