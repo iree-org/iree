@@ -418,13 +418,13 @@ static void iree_task_poller_wake_task(iree_task_poller_t* poller,
 // wait handles were resolved.
 static void iree_task_poller_commit_wait(iree_task_poller_t* poller,
                                          iree_time_t deadline_ns) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
   if (iree_atomic_load_int32(&poller->state, iree_memory_order_seq_cst) ==
       IREE_TASK_POLLER_STATE_EXITING) {
     // Thread exit requested - don't block shutdown.
     return;
   }
+
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   // Enter the system wait API.
   iree_wait_handle_t wake_handle = iree_wait_handle_immediate();
