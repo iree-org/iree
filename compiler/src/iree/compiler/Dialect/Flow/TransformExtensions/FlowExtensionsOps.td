@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_FLOW_TRANSFORMEXTENSIONS_FLOWEXTENSIONS
 #define IREE_COMPILER_DIALECT_FLOW_TRANSFORMEXTENSIONS_FLOWEXTENSIONS
 
+include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -15,14 +16,20 @@ include "mlir/IR/OpBase.td"
 def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.foreach_thread_to_flow",
     [FunctionalStyleTransformOpTrait, 
      MemoryEffectsOpInterface,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
+     TransformOpInterface,
+     TransformEachOpTrait]> {
   let description = [{Rewrite an scf.foreach_thread to Flow::DispatchWorkgroups.}];
 
-  let arguments = (ins);
-  let results = (outs);
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs PDL_Operation:$transformed);
 
-  let assemblyFormat = "attr-dict";
+  let assemblyFormat = "$target attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::FailureOr<::mlir::iree_compiler::IREE::Flow::DispatchWorkgroupsOp> applyToOne(
+      ::mlir::scf::ForeachThreadOp foreachThreadOp, ::mlir::transform::TransformState &state);
+  }];
 }
  
 #endif // IREE_COMPILER_DIALECT_FLOW_TRANSFORMEXTENSIONS_FLOWEXTENSIONS
