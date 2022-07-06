@@ -180,6 +180,34 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
   let hasFolder = 1;
 }
 
+// NOTE: this has side-effects as it is mutating the global timeline.
+// Eventually we'll probably want a dedicated hal.timeline type instead.
+def HAL_TimelineAdvanceOp : HAL_Op<"timeline.advance"> {
+  let summary = [{advances a program timeline by one step}];
+  let description = [{
+    Returns a fence indicating when the timeline has been advanced one step.
+    This fence can be used to wait until the timeline reaches or exceeds the
+    timepoint or used to signal the that it has.
+
+    This is a pseudo-op that is expanded into a semaphore and target value
+    pair during timeline materialization. The op represents when the advancement
+    should occur in program order but not what the actual live timepoint would
+    be.
+  }];
+
+  // TODO(benvanik): discriminator when multiple devices or timelines are
+  // present. Today we only have a single timeline.
+  let arguments = (ins);
+  let results = (outs
+    HAL_Fence:$fence
+  );
+
+  let assemblyFormat = [{
+    `:` type($fence)
+    attr-dict-with-keyword
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // !hal.allocator / iree_hal_allocator_t
 //===----------------------------------------------------------------------===//

@@ -1,5 +1,14 @@
 // RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
+// CHECK-LABEL: @timeline_advance
+func.func @timeline_advance() -> !hal.fence {
+  // CHECK: = hal.timeline.advance : !hal.fence
+  %fence = hal.timeline.advance : !hal.fence
+  return %fence : !hal.fence
+}
+
+// -----
+
 // CHECK-LABEL: @fence_create
 func.func @fence_create(%arg0: !hal.semaphore, %arg1: i64, %arg2: i64) -> !hal.fence {
   // CHECK: = hal.fence.create
