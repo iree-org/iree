@@ -331,21 +331,6 @@ static iree_status_t iree_hal_task_device_queue_submit(
                                     batches);
 }
 
-static iree_status_t iree_hal_task_device_submit_and_wait(
-    iree_hal_device_t* base_device,
-    iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
-    const iree_hal_submission_batch_t* batches,
-    iree_hal_semaphore_t* wait_semaphore, uint64_t wait_value,
-    iree_timeout_t timeout) {
-  // Submit...
-  IREE_RETURN_IF_ERROR(iree_hal_task_device_queue_submit(
-      base_device, command_categories, queue_affinity, batch_count, batches));
-
-  // ...and wait.
-  return iree_hal_semaphore_wait(wait_semaphore, wait_value, timeout);
-}
-
 static iree_status_t iree_hal_task_device_wait_semaphores(
     iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout) {
@@ -388,7 +373,6 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
         iree_hal_task_device_query_semaphore_compatibility,
     .transfer_range = iree_hal_device_transfer_mappable_range,
     .queue_submit = iree_hal_task_device_queue_submit,
-    .submit_and_wait = iree_hal_task_device_submit_and_wait,
     .wait_semaphores = iree_hal_task_device_wait_semaphores,
     .wait_idle = iree_hal_task_device_wait_idle,
 };

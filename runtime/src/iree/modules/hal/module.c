@@ -232,14 +232,14 @@ IREE_VM_ABI_EXPORT(iree_hal_module_ex_submit_and_wait,  //
   batch.signal_semaphores.semaphores = signal_semaphore_ptrs;
   batch.signal_semaphores.payload_values = signal_semaphore_values;
 
-  iree_status_t status = iree_hal_device_submit_and_wait(
-      device, IREE_HAL_COMMAND_CATEGORY_ANY, 0, 1, &batch,
-      state->submit_semaphore, next_semaphore_value, iree_infinite_timeout());
-  if (!iree_status_is_ok(status)) {
-    return status;
+  iree_status_t status = iree_hal_device_queue_submit(
+      device, IREE_HAL_COMMAND_CATEGORY_ANY, 0, 1, &batch);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_wait(
+        state->submit_semaphore, next_semaphore_value, iree_infinite_timeout());
   }
 
-  return iree_ok_status();
+  return status;
 }
 
 //===----------------------------------------------------------------------===//
