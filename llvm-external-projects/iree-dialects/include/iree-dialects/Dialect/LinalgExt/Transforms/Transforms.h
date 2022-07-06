@@ -95,19 +95,19 @@ struct ForeachThreadOpToScfForRewriter
   }
 };
 
-/// Pattern to fuse a LinalgOp into a containing op.
+/// Pattern to fuse a tileable op into a containing op.
 struct LinalgExtFusionInContainingOpPattern
-    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+    : public OpInterfaceRewritePattern<TilingInterface> {
   LinalgExtFusionInContainingOpPattern(MLIRContext *context,
                                        Operation *containingOp)
-      : OpInterfaceRewritePattern<linalg::LinalgOp>(context),
+      : OpInterfaceRewritePattern<TilingInterface>(context),
         containingOp(containingOp) {}
 
-  FailureOr<SmallVector<linalg::LinalgOp>>
-  returningMatchAndRewrite(linalg::LinalgOp producerOp,
+  FailureOr<SmallVector<TilingInterface>>
+  returningMatchAndRewrite(TilingInterface producerOp,
                            PatternRewriter &rewriter) const;
 
-  LogicalResult matchAndRewrite(linalg::LinalgOp producerOp,
+  LogicalResult matchAndRewrite(TilingInterface producerOp,
                                 PatternRewriter &rewriter) const override {
     return returningMatchAndRewrite(producerOp, rewriter);
   }
@@ -117,22 +117,22 @@ private:
 };
 
 struct FusionResult {
-  linalg::LinalgOp consumerOp;
-  SmallVector<linalg::LinalgOp> fusedOps;
+  TilingInterface consumerOp;
+  SmallVector<TilingInterface> fusedOps;
 };
 
-/// Pattern to fuse the producers of a LinalgOp.
+/// Pattern to fuse the producers of a tileable op.
 struct LinalgExtFusionPattern
-    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+    : public OpInterfaceRewritePattern<TilingInterface> {
   LinalgExtFusionPattern(MLIRContext *context, ArrayRef<int64_t> operandsToFuse)
-      : OpInterfaceRewritePattern<linalg::LinalgOp>(context),
+      : OpInterfaceRewritePattern<TilingInterface>(context),
         operandsToFuse(operandsToFuse.begin(), operandsToFuse.end()) {}
 
   FailureOr<FusionResult>
-  returningMatchAndRewrite(linalg::LinalgOp consumerOp,
+  returningMatchAndRewrite(TilingInterface consumerOp,
                            PatternRewriter &rewriter) const;
 
-  LogicalResult matchAndRewrite(linalg::LinalgOp consumerOp,
+  LogicalResult matchAndRewrite(TilingInterface consumerOp,
                                 PatternRewriter &rewriter) const override {
     return returningMatchAndRewrite(consumerOp, rewriter);
   }
