@@ -32,10 +32,10 @@ struct TilingResult {
 /// Pattern to tile a TilingInterface op using a scf::ForeachThreadOp.
 struct ForeachThreadTilingPattern
     : public OpInterfaceRewritePattern<TilingInterface> {
-  ForeachThreadTilingPattern(MLIRContext *context,
-                             linalg::LinalgTilingOptions opt,
+  ForeachThreadTilingPattern(MLIRContext *context, ArrayRef<int64_t> tileSizes,
                              ArrayRef<int64_t> threadDimMapping)
-      : OpInterfaceRewritePattern<TilingInterface>(context), options(opt),
+      : OpInterfaceRewritePattern<TilingInterface>(context),
+        tileSizes(tileSizes.begin(), tileSizes.end()),
         threadDimMapping(threadDimMapping.begin(), threadDimMapping.end()) {}
 
   FailureOr<TilingResult>
@@ -47,7 +47,7 @@ struct ForeachThreadTilingPattern
   }
 
 private:
-  linalg::LinalgTilingOptions options;
+  SmallVector<int64_t> tileSizes;
   SmallVector<int64_t> threadDimMapping;
 };
 
