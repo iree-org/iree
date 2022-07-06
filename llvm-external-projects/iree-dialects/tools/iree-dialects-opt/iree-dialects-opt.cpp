@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
 
   // External models.
   IREE::LinalgExt::registerTiledOpInterfaceExternalModels(registry);
-  IREE::LinalgExt::registerTilingInterfaceExternalModels(registry);
+  mlir::linalg::registerTilingInterfaceExternalModels(registry);
 
   registry.addExtensions<IREE::LinalgExt::LinalgExtTransformOpsExtension,
                          transform_ext::StructuredTransformOpsExtension>();

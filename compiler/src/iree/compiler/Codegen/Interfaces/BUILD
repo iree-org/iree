@@ -52,6 +52,7 @@ iree_compiler_cc_library(
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "@llvm-project//mlir:LinalgTransformOps",
+        "@llvm-project//mlir:LinalgTransforms",
     ],
 )
 

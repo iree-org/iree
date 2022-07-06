@@ -2,7 +2,6 @@ add_mlir_library(IREELinalgExtTransforms
   ForeachThreadToAsync.cpp
   ForeachThreadToSequentialFor.cpp
   Fusion.cpp
-  TilingExternalModels.cpp
   Tiling.cpp
   TilingToForeachThreadOp.cpp
   Utils.cpp
