@@ -151,10 +151,10 @@ LinalgExt::FuseIntoContainingOp::apply(transform::TransformResults &results,
   ArrayRef<Operation *> producerOps = state.getPayloadOps(getProducerOp());
   ArrayRef<Operation *> containingOps = state.getPayloadOps(getContainingOp());
   for (auto it : llvm::zip(producerOps, containingOps)) {
-    auto producerOp = dyn_cast<linalg::LinalgOp>(std::get<0>(it));
+    auto producerOp = dyn_cast<TilingInterface>(std::get<0>(it));
     Operation *containingOp = std::get<1>(it);
     if (!producerOp) {
-      std::get<0>(it)->emitError("Cannot fuse op: Not a LinalgOp");
+      std::get<0>(it)->emitError("Cannot fuse op: Not a tileable op");
       return DiagnosedSilenceableFailure::definiteFailure();
     }
     LinalgExt::LinalgExtFusionInContainingOpPattern pattern(this->getContext(),
