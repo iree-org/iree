@@ -129,11 +129,15 @@ mlir::iree_compiler::IREE::LinalgExt::ForeachThreadTilingPattern::
   if (loopIteratorTypes.empty())
     return rewriter.notifyMatchFailure(op, "Scalar op, no tiling possible");
 
-  // Get rank and tile sizes.
+  // Get tile sizes.
+  SmallVector<Value> numThreads =
+      llvm::to_vector<4>(map_range(tileSizes, [&](int64_t s) {
+        Value v = rewriter.create<arith::ConstantIndexOp>(op->getLoc(), s);
+        return v;
+      }));
+
   // TODO: consider moving these checks to a common place that the TransformOp
   // verifier can also use.
-  SmallVector<Value> numThreads =
-      options.tileSizeComputationFunction(rewriter, op);
   for (auto it : llvm::zip(numThreads, loopIteratorTypes)) {
     Optional<int64_t> maybeTileSize = getConstantIntValue(std::get<0>(it));
     if (maybeTileSize && *maybeTileSize == 0)

@@ -35,7 +35,7 @@ def TileToForeachOp :
        MemoryEffectsOpInterface,
        TransformEachOpTrait,
        TransformOpInterface]> {
-  let description = [{Tile a linalg op to `scf.foreach_thread`.}];
+  let description = [{Tile a tileable op to `scf.foreach_thread`.}];
 
   let summary = [{
     0 should be used as a tile size to skip tiling a particular dimension.
@@ -53,7 +53,7 @@ def TileToForeachOp :
 
   let extraClassDeclaration = [{
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::Operation *>> applyToOne(
-      ::mlir::linalg::LinalgOp target, transform::TransformState &state);
+      ::mlir::TilingInterface target, transform::TransformState &state);
   }];
 }
 

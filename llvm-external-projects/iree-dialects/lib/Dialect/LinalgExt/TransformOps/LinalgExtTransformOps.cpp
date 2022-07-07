@@ -123,15 +123,14 @@ void LinalgExt::FuseProducersOp::print(OpAsmPrinter &p) {
 }
 
 FailureOr<SmallVector<Operation *>>
-LinalgExt::TileToForeachOp::applyToOne(::mlir::linalg::LinalgOp target,
+LinalgExt::TileToForeachOp::applyToOne(TilingInterface target,
                                        transform::TransformState &state) {
   linalg::LinalgTilingOptions tilingOptions;
   SmallVector<int64_t> numThreads = extractI64Array(getNumThreads());
-  if (!numThreads.empty())
-    tilingOptions.setTileSizes(numThreads);
 
+  // TODO: Pass options object when the number of parameters increases.
   LinalgExt::ForeachThreadTilingPattern pattern(
-      this->getContext(), tilingOptions,
+      this->getContext(), numThreads,
       extractFromI64ArrayAttr(getThreadDimMapping()));
   // Apply the pattern.
   SimplePatternRewriter rewriter(target);
@@ -142,6 +141,7 @@ LinalgExt::TileToForeachOp::applyToOne(::mlir::linalg::LinalgOp target,
     target->emitError("Failed to tile op to scf.foreach_thread:\n") << target;
     return failure();
   }
+
   return SmallVector<Operation *>{result->tileOp, result->tiledOp};
 }
 
