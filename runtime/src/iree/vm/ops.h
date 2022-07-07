@@ -314,7 +314,7 @@ static inline float vm_sqrt_f32(float operand) { return sqrtf(operand); }
 static inline float vm_tanh_f32(float operand) { return tanhf(operand); }
 static inline float vm_erf_f32(float operand) { return erff(operand); }
 
-static inline float vm_round_f32(float operand) { return round(operand); }
+static inline float vm_round_f32(float operand) { return roundf(operand); }
 
 //===------------------------------------------------------------------===//
 // ExtF32: Casting and type conversion/emulation
