@@ -4624,6 +4624,8 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                                          "vm_tanh_f32");
   patterns.add<GenericOpConversion<IREE::VM::ErfF32Op>>(typeConverter, context,
                                                         "vm_erf_f32");
+  patterns.add<GenericOpConversion<IREE::VM::RoundF32Op>>(typeConverter, context,
+                                                        "vm_round_f32");
 
   // ExtF32: Casting and type conversion/emulation
   patterns.add<GenericOpConversion<IREE::VM::CastSI32F32Op>>(

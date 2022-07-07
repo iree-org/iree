@@ -63,20 +63,21 @@ def VM_OPC_RsqrtF32              : VM_OPC<0x26, "RsqrtF32">;
 def VM_OPC_SqrtF32               : VM_OPC<0x27, "SqrtF32">;
 def VM_OPC_TanhF32               : VM_OPC<0x28, "TanhF32">;
 def VM_OPC_ErfF32                : VM_OPC<0x29, "ErfF32">;
+def VM_OPC_RoundF32              : VM_OPC<0x2A, "RoundF32">;
 
-def VM_OPC_CmpEQF32O             : VM_OPC<0x2A, "CmpEQF32O">;
-def VM_OPC_CmpEQF32U             : VM_OPC<0x2B, "CmpEQF32U">;
-def VM_OPC_CmpNEF32O             : VM_OPC<0x2C, "CmpNEF32O">;
-def VM_OPC_CmpNEF32U             : VM_OPC<0x2D, "CmpNEF32U">;
-def VM_OPC_CmpLTF32O             : VM_OPC<0x2E, "CmpLTF32O">;
-def VM_OPC_CmpLTF32U             : VM_OPC<0x2F, "CmpLTF32U">;
-def VM_OPC_CmpLTEF32O            : VM_OPC<0x30, "CmpLTEF32O">;
-def VM_OPC_CmpLTEF32U            : VM_OPC<0x31, "CmpLTEF32U">;
-def VM_OPC_CmpNaNF32             : VM_OPC<0x32, "CmpNaNF32">;
+def VM_OPC_CmpEQF32O             : VM_OPC<0x2B, "CmpEQF32O">;
+def VM_OPC_CmpEQF32U             : VM_OPC<0x2C, "CmpEQF32U">;
+def VM_OPC_CmpNEF32O             : VM_OPC<0x2D, "CmpNEF32O">;
+def VM_OPC_CmpNEF32U             : VM_OPC<0x2E, "CmpNEF32U">;
+def VM_OPC_CmpLTF32O             : VM_OPC<0x2F, "CmpLTF32O">;
+def VM_OPC_CmpLTF32U             : VM_OPC<0x30, "CmpLTF32U">;
+def VM_OPC_CmpLTEF32O            : VM_OPC<0x31, "CmpLTEF32O">;
+def VM_OPC_CmpLTEF32U            : VM_OPC<0x32, "CmpLTEF32U">;
+def VM_OPC_CmpNaNF32             : VM_OPC<0x33, "CmpNaNF32">;
 
-def VM_OPC_BufferLoadF32         : VM_OPC<0x33, "BufferLoadF32">;
-def VM_OPC_BufferStoreF32        : VM_OPC<0x34, "BufferStoreF32">;
-def VM_OPC_BufferFillF32         : VM_OPC<0x35, "BufferFillF32">;
+def VM_OPC_BufferLoadF32         : VM_OPC<0x34, "BufferLoadF32">;
+def VM_OPC_BufferStoreF32        : VM_OPC<0x35, "BufferStoreF32">;
+def VM_OPC_BufferFillF32         : VM_OPC<0x36, "BufferFillF32">;
 
 // Runtime enum iree_vm_ext_f32_op_t:
 def VM_ExtF32OpcodeAttr :
@@ -133,6 +134,7 @@ def VM_ExtF32OpcodeAttr :
     VM_OPC_SqrtF32,
     VM_OPC_TanhF32,
     VM_OPC_ErfF32,
+    VM_OPC_RoundF32,
 
     VM_OPC_CmpEQF32O,
     VM_OPC_CmpEQF32U,

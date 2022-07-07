@@ -2029,6 +2029,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP_EXT_F32_UNARY_F32(SqrtF32, vm_sqrt_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(TanhF32, vm_tanh_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(ErfF32, vm_erf_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(RoundF32, vm_round_f32);
 
       //===----------------------------------------------------------------===//
       // ExtF32: Casting and type conversion/emulation

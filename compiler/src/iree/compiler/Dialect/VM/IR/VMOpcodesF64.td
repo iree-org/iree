@@ -69,21 +69,22 @@ def VM_OPC_RsqrtF64              : VM_OPC<0x2C, "RsqrtF64">;
 def VM_OPC_SqrtF64               : VM_OPC<0x2D, "SqrtF64">;
 def VM_OPC_TanhF64               : VM_OPC<0x2E, "TanhF64">;
 def VM_OPC_ErfF64                : VM_OPC<0x2F, "ErfF64">;
+def VM_OPC_RoundF64              : VM_OPC<0x30, "RoundF64">;
 
-def VM_OPC_CmpEQF64O             : VM_OPC<0x30, "CmpEQF64O">;
-def VM_OPC_CmpEQF64U             : VM_OPC<0x31, "CmpEQF64U">;
-def VM_OPC_CmpNEF64O             : VM_OPC<0x32, "CmpNEF64O">;
-def VM_OPC_CmpNEF64U             : VM_OPC<0x33, "CmpNEF64U">;
-def VM_OPC_CmpLTF64O             : VM_OPC<0x34, "CmpLTF64O">;
-def VM_OPC_CmpLTF64U             : VM_OPC<0x35, "CmpLTF64U">;
-def VM_OPC_CmpLTEF64O            : VM_OPC<0x36, "CmpLTEF64O">;
-def VM_OPC_CmpLTEF64U            : VM_OPC<0x37, "CmpLTEF64U">;
-def VM_OPC_CmpNaNF64             : VM_OPC<0x38, "CmpNaNF64">;
+def VM_OPC_CmpEQF64O             : VM_OPC<0x31, "CmpEQF64O">;
+def VM_OPC_CmpEQF64U             : VM_OPC<0x32, "CmpEQF64U">;
+def VM_OPC_CmpNEF64O             : VM_OPC<0x33, "CmpNEF64O">;
+def VM_OPC_CmpNEF64U             : VM_OPC<0x34, "CmpNEF64U">;
+def VM_OPC_CmpLTF64O             : VM_OPC<0x35, "CmpLTF64O">;
+def VM_OPC_CmpLTF64U             : VM_OPC<0x36, "CmpLTF64U">;
+def VM_OPC_CmpLTEF64O            : VM_OPC<0x37, "CmpLTEF64O">;
+def VM_OPC_CmpLTEF64U            : VM_OPC<0x38, "CmpLTEF64U">;
+def VM_OPC_CmpNaNF64             : VM_OPC<0x39, "CmpNaNF64">;
 
 // Buffer load/store:
-def VM_OPC_BufferLoadF64         : VM_OPC<0x39, "BufferLoadF64">;
-def VM_OPC_BufferStoreF64        : VM_OPC<0x3A, "BufferStoreF64">;
-def VM_OPC_BufferFillF64         : VM_OPC<0x3B, "BufferFillF64">;
+def VM_OPC_BufferLoadF64         : VM_OPC<0x3A, "BufferLoadF64">;
+def VM_OPC_BufferStoreF64        : VM_OPC<0x3B, "BufferStoreF64">;
+def VM_OPC_BufferFillF64         : VM_OPC<0x3C, "BufferFillF64">;
 
 // Runtime enum iree_vm_ext_f64_op_t:
 def VM_ExtF64OpcodeAttr :
@@ -145,6 +146,8 @@ def VM_ExtF64OpcodeAttr :
     VM_OPC_RsqrtF64,
     VM_OPC_SqrtF64,
     VM_OPC_TanhF64,
+    VM_OPC_ErfF64,
+    VM_OPC_RoundF64,
 
     VM_OPC_CmpEQF64O,
     VM_OPC_CmpEQF64U,

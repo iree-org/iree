@@ -2382,6 +2382,13 @@ def VM_ErfF64Op : VM_UnaryArithmeticOp<F64, "erf.f64", VM_OPC_ErfF64, [VM_ExtF64
   let summary = [{computes the error function of the specified value}];
 }
 
+def VM_RoundF32Op : VM_UnaryArithmeticOp<F32, "round.f32", VM_OPC_RoundF32, [VM_ExtF32]> {
+  let summary = [{rounds the value to the nearest integer away from zero}];
+}
+def VM_RoundF64Op : VM_UnaryArithmeticOp<F64, "round.f64", VM_OPC_RoundF64, [VM_ExtF64]> {
+  let summary = [{rounds the value to the nearest integer away from zero}];
+}
+
 //===----------------------------------------------------------------------===//
 // Integer bit manipulation
 //===----------------------------------------------------------------------===//

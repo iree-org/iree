@@ -119,7 +119,9 @@ void populateMathToVMPatterns(MLIRContext *context,
       UnaryArithmeticOpConversion<math::TanhOp, IREE::VM::TanhF32Op,
                                   IREE::VM::TanhF64Op>,
       UnaryArithmeticOpConversion<math::ErfOp, IREE::VM::ErfF32Op,
-                                  IREE::VM::ErfF64Op>>(typeConverter, context);
+                                  IREE::VM::ErfF64Op>,
+      UnaryArithmeticOpConversion<math::RoundOp, IREE::VM::RoundF32Op,
+                                  IREE::VM::RoundF64Op>>(typeConverter, context);
 }
 
 }  // namespace iree_compiler

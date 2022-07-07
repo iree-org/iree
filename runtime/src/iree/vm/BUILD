@@ -7,7 +7,7 @@
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
 load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
-# load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library")
+# load("//build_tools/bazel:iree_tablegen.bzl", "iree_gentbl_cc_library", "iree_tablegen_doc")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -204,21 +204,21 @@ iree_runtime_cc_library(
 )
 
 # TODO(#357): Add a script to update bytecode_op_table.h.
-# gentbl_cc_library(
+# iree_gentbl_cc_library(
 #     name = "bytecode_op_table_gen",
 #     tbl_outs = [
 #         (["--gen-iree-vm-op-table-defs"], "bytecode_op_table.h"),
 #     ],
 #     tblgen = "//tools:iree-tblgen",
-#     td_file = "//iree/compiler/Dialect/VM/IR:VMOps.td",
-#     td_srcs = [
-#         "//iree/compiler/Dialect/Util/IR:td_files",
-#         "//iree/compiler/Dialect/VM/IR:td_files",
+#     td_file = "//compiler/src/iree/compiler/Dialect/VM/IR:VMOps.td",
+#     deps = [
+#         "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
+#         "//compiler/src/iree/compiler/Dialect/VM/IR:td_files",
+#         "@llvm-project//mlir:CallInterfacesTdFiles",
+#         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
+#         "@llvm-project//mlir:FunctionInterfacesTdFiles",
 #         "@llvm-project//mlir:OpBaseTdFiles",
-#         "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",
-#         "@llvm-project//mlir:include/mlir/Interfaces/CallInterfaces.td",
-#         "@llvm-project//mlir:include/mlir/Interfaces/ControlFlowInterfaces.td",
-#         "@llvm-project//mlir:SideEffectTdFiles",
+#         "@llvm-project//mlir:SideEffectInterfacesTdFiles",
 #     ],
 # )
 
