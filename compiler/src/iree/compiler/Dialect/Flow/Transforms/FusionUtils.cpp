@@ -65,7 +65,7 @@ static bool canInsOperandTieWithOutsOperand(OpOperand *insOperand) {
 
 /// Checks if a linalg op is a simple reduction of the innermost dimensions
 /// with identity map for the input.
-static bool isSimpleReduction(linalg::LinalgOp linalgOp) {
+static bool isReductionOnInnermostDims(linalg::LinalgOp linalgOp) {
   SmallVector<Operation *, 4> combinerOps;
 
   if (linalgOp.getNumOutputs() != 1) return false;
@@ -91,14 +91,33 @@ static bool isSimpleReduction(linalg::LinalgOp linalgOp) {
   return true;
 }
 
+/// Check if the op is elementwise and the output indexing map is identity.
+static bool isSimpleElementwise(linalg::LinalgOp op) {
+  if (op.getNumLoops() != op.getNumParallelLoops()) return false;
+
+  if (!allIndexingsAreProjectedPermutation(op)) return false;
+
+  for (OpOperand *opOperand : op.getOutputOperands()) {
+    if (!op.getTiedIndexingMap(opOperand).isIdentity()) return false;
+  }
+  return linalg::hasOnlyScalarElementwiseOp(op->getRegion(0));
+}
+
 /// Check if the use of operand is a reduction -> broadcast -> elementwise.
+/// An example:
+///   s = sum(a: <16x32xf32>) -> <16xf32>
+///   d = div(a: <16x32xf32>, broadcast(s to <16x32xf32>)) -> <16x32xf32>
 static bool isReductionBroadcastElementwise(OpOperand *operand) {
   auto producer = operand->get().getDefiningOp<linalg::LinalgOp>();
   auto consumer = dyn_cast<linalg::LinalgOp>(operand->getOwner());
   if (!producer || !consumer) return false;
 
+  // TODO: might be able to support dynamic shape if the shape is the same for
+  // reduction and broadcast.
+  if (producer.hasDynamicShape() || consumer.hasDynamicShape()) return false;
+
   // Check if the producer is a simple reduction.
-  if (!isSimpleReduction(producer)) return false;
+  if (!isReductionOnInnermostDims(producer)) return false;
 
   // Check if the reduction is broadcasted back for the elementwise op.
   auto output = producer.getOutputOperand(0);
@@ -106,15 +125,25 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
   auto inputIndexingMap = consumer.getTiedIndexingMap(operand);
   if (outputIndexingMap != inputIndexingMap) return false;
 
-  // Check if the consumer is an elementwise op.
-  if (!isElementwise(consumer)) return false;
+  // Check if the consumer is an elementwise with identity output indexing map.
+  if (!isSimpleElementwise(consumer)) return false;
 
-  // Check if there is no output transpose.
-  // TODO(okwan): The output transpose might affect the tiling and perf.
-  // Need more evaluation.
-  auto ewResult = consumer.getOutputOperand(0);
-  auto ewResultIndexingMap = consumer.getTiedIndexingMap(ewResult);
-  if (!ewResultIndexingMap.isIdentity()) return false;
+  // Check if the reduction has at least one input with identity indexing map.
+  OpOperand *reductionInput = nullptr;
+  for (OpOperand *operand : producer.getInputOperands()) {
+    auto map = producer.getTiedIndexingMap(operand);
+    if (map.isIdentity()) {
+      reductionInput = operand;
+      break;
+    }
+  }
+  if (!reductionInput) return false;
+
+  // Check the reduction input type is the same as the type of the elementwise
+  // output.
+  if (reductionInput->get().getType() !=
+      consumer.getOutputOperand(0)->get().getType())
+    return false;
 
   return true;
 }
