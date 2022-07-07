@@ -86,7 +86,7 @@ static void rewriteParallelInsertSlices(
   Location loc = performConcurrentlyOp.getLoc();
   int64_t resultIndex = 0;
   for (const Operation &yieldingOp :
-       llvm::make_early_inc_range(performConcurrentlyOp.getYieldingOps())) {
+       llvm::make_early_inc_range(performConcurrentlyOp.yieldingOps())) {
     auto parallelInsertOp = cast<scf::ParallelInsertSliceOp>(&yieldingOp);
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(block.getTerminator());
@@ -179,7 +179,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
   // over to the Flow::DispatchWorkgroupsOp.
   // Use a SetVector to ensure tensor operand uniqueness.
   llvm::SetVector<Value> resultTensorOperands, resultTensorsDynamicDims;
-  for (const Operation &yieldingOp : performConcurrentlyOp.getYieldingOps()) {
+  for (const Operation &yieldingOp : performConcurrentlyOp.yieldingOps()) {
     auto parallelInsertOp = cast<scf::ParallelInsertSliceOp>(&yieldingOp);
     Value dest = parallelInsertOp.getDest();
     bool inserted = resultTensorOperands.insert(dest);
