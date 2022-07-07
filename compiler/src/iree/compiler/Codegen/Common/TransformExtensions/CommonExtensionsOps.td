@@ -33,6 +33,18 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       registered dialects and ops.
       - rank_reducing: adds patterns that results in rank-reducing behavior on
       subset-based operations.
+
+    Return modes:
+    =============
+    This operation applies a number of patterns to rewrite vector IR into 
+    distributed warp form. To apply these patterns, this operation must target 
+    an operation that is isolated from above, otherwise the transform definitely
+    fails.
+  
+    If the pattern application fails, or if the underlying listener fails to 
+    capture op handles, the transformation definitely fails.
+
+    Otherwise the transformation is successful and no result is returned.
   }];
 
   let arguments = (ins PDL_Operation:$target,
@@ -44,8 +56,10 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let extraClassDeclaration = [{
-    ::mlir::FailureOr<::mlir::Operation *> applyToOne(
-      ::mlir::Operation *target, ::mlir::transform::TransformState &state);
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results, 
+        ::mlir::transform::TransformState &state);
   }];
 }
 

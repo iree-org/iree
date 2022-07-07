@@ -148,7 +148,7 @@ struct DispatchTensorLoadOpInterface
 
     // Bufferize to subview.
     auto subviewMemRefType = memref::SubViewOp::inferRankReducedResultType(
-        loadOp.getType().getRank(), source.getType().cast<MemRefType>(),
+        loadOp.getType().getShape(), source.getType().cast<MemRefType>(),
         loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
         loadOp.getMixedStrides());
     replaceOpWithNewBufferizedOp<memref::SubViewOp>(
@@ -193,7 +193,7 @@ struct DispatchTensorStoreOpInterface
       // Writing to a part of the tensor.
       auto subviewMemRefType =
           memref::SubViewOp::inferRankReducedResultType(
-              storeOp.value().getType().cast<ShapedType>().getRank(),
+              storeOp.value().getType().cast<ShapedType>().getShape(),
               target.getType().cast<MemRefType>(), storeOp.getMixedOffsets(),
               storeOp.getMixedSizes(), storeOp.getMixedStrides())
               .cast<MemRefType>();

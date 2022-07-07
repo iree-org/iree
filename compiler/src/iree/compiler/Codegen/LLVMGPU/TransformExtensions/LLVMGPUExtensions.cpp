@@ -194,28 +194,30 @@ FailureOr<SmallVector<OpFoldResult>> rewriteForeachThreadToGpu(
 // TODO: if the number of threads was wired like the workgroup_count, we could
 // reuse most of the code and not require a static number of threads.
 // TODO: synchronizations for imperfectly nested stuff.
-FailureOr<func::FuncOp>
+DiagnosedSilenceableFailure
 transform_dialect::ForeachThreadToGpuAndTranslationInfo::applyToOne(
-    func::FuncOp funcOp, transform::TransformState &state) {
+    func::FuncOp target, SmallVectorImpl<Operation *> &results,
+    transform::TransformState &state) {
   if (!isa<HAL::ExecutableVariantOp>(state.getTopLevel())) {
-    return state.getTopLevel()->emitError(
+    state.getTopLevel()->emitOpError(
         "requires HAL::ExecutableVariantOp toplevel");
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
   }
 
   IREE::HAL::ExecutableExportOp exportOp;
   state.getTopLevel()->walk([&](IREE::HAL::ExecutableExportOp op) {
-    if (op.sym_name() == funcOp.getName()) exportOp = op;
+    if (op.sym_name() == target.getName()) exportOp = op;
   });
   if (!exportOp) {
-    state.getTopLevel()->emitWarning("no export found for " + funcOp.getName());
-    return funcOp;
+    state.getTopLevel()->emitOpError("no IREE::HAL::ExecutableExportOp found");
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
   }
 
   SmallVector<int64_t> workgroupSize =
       extractFromI64ArrayAttr(getWorkgroupSize());
   workgroupSize.resize(/*size=*/3, /*value=*/1);
-  SimplePatternRewriter rewriter(funcOp);
-  auto walkResult = funcOp->walk([&](scf::ForeachThreadOp foreachThreadOp) {
+  SimplePatternRewriter rewriter(target);
+  auto walkResult = target->walk([&](scf::ForeachThreadOp foreachThreadOp) {
     rewriter.setInsertionPoint(foreachThreadOp);
     if (failed(rewriteForeachThreadToGpu(foreachThreadOp, workgroupSize,
                                          rewriter)))
@@ -223,12 +225,15 @@ transform_dialect::ForeachThreadToGpuAndTranslationInfo::applyToOne(
     return WalkResult::advance();
   });
 
-  if (walkResult.wasInterrupted()) return failure();
+  if (walkResult.wasInterrupted())
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+
   auto newAttr = rewriter.getIndexArrayAttr(workgroupSize);
   // TODO: should really be: exportOp.setWorkgroupSizeAttr(newAttr);
   exportOp->setAttr(exportOp.workgroup_sizeAttrName(), newAttr);
 
-  return funcOp;
+  results.assign({target});
+  return DiagnosedSilenceableFailure(success());
 }
 
 //===---------------------------------------------------------------------===//
@@ -289,8 +294,7 @@ static FailureOr<VectorDistributionResult> vectorDistribution(
     PatternRewriter &rewriter, Location loc, scf::IfOp ifOp,
     int64_t workgroupSizeX, int64_t warpSize) {
   // Bail if cond is not `if (threadIdx.x == 0)`.
-  if (failed(isThreadIdxxZeroPredicate(ifOp)))
-    return ifOp->emitError("unmet prerequisite: isThreadIdxxZeroPredicate");
+  if (failed(isThreadIdxxZeroPredicate(ifOp))) return failure();
 
   // All the code below will be executed on a single warp given a fixed
   // (threadIdxy, threadIdxz).
@@ -345,52 +349,64 @@ static HAL::ExecutableExportOp getExecutableExportOpForFunc(
   return exportOp;
 }
 
-FailureOr<vector::WarpExecuteOnLane0Op>
+DiagnosedSilenceableFailure
 transform_dialect::VectorWarpExecuteOnLane0Op::applyToOne(
-    scf::IfOp ifOp, transform::TransformState &state) {
-  assert(isa<HAL::ExecutableVariantOp>(state.getTopLevel()) &&
-         "requires HAL::ExecutableVariantOp toplevel so that IR is properly "
-         "isolated. This is required so we can safely inspect the "
-         "HAL::ExecutableExportOp under multi-threaded pass assumptions.");
+    scf::IfOp target, SmallVectorImpl<Operation *> &results,
+    transform::TransformState &state) {
+  if (!isa<HAL::ExecutableVariantOp>(state.getTopLevel())) {
+    state.getTopLevel()->emitOpError(
+        "requires HAL::ExecutableVariantOp toplevel so that IR is properly "
+        "isolated. This is required so we can safely inspect the "
+        "HAL::ExecutableExportOp under multi-threaded pass assumptions.");
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+  }
 
   auto halExecutableVariantOp =
-      ifOp->getParentOfType<HAL::ExecutableVariantOp>();
-  auto funcOp = ifOp->getParentOfType<func::FuncOp>();
+      target->getParentOfType<HAL::ExecutableVariantOp>();
+  auto funcOp = target->getParentOfType<func::FuncOp>();
   HAL::ExecutableExportOp exportOp =
       getExecutableExportOpForFunc(halExecutableVariantOp, funcOp);
-  assert(halExecutableVariantOp && funcOp && exportOp && "missing export op");
+  if (!halExecutableVariantOp || !funcOp || !exportOp) {
+    // Return a silenceable failure and set the expected 1 result to nullptr.
+    results.assign(1, nullptr);
+    return emitDefaultSilenceableFailure(target)
+           << "export op is missing --- the transform is not applied";
+  }
 
   Optional<ArrayAttr> maybeAttr = exportOp.workgroup_size();
   // TODO: Pervasive 3 constant in IREE.
-  if (!maybeAttr || maybeAttr->size() != 3)
-    return exportOp->emitError(
-        "export op must have workgroup_size attribute set with 3 entries");
+  if (!maybeAttr || maybeAttr->size() != 3) {
+    // Return a silenceable failure and set the expected 1 result to nullptr.
+    results.assign(1, nullptr);
+    return emitDefaultSilenceableFailure(target)
+           << "export op must have workgroup_size attribute set with 3 entries "
+              "--- the transform is not applied";
+  }
 
   int64_t workgroupSizeX = (*maybeAttr)[0].cast<IntegerAttr>().getInt();
   int64_t warpSize = getWarpSize();
   if (workgroupSizeX % warpSize != 0) {
-    exportOp->emitWarning()
-        << "vector distribution requires workgroup size for x to be a "
-        << "multiple of the warp size: " << workgroupSizeX << " vs " << warpSize
-        << " --- the transform is not applied";
-    // Explicitly return a null WarpExecuteOnLane0Op. This is not a failure
-    // but the transformation is not applied and the null result is
-    // propagated.
-    return vector::WarpExecuteOnLane0Op();
+    // Return a silenceable failure and set the expected 1 result to nullptr.
+    results.assign(1, nullptr);
+    return emitDefaultSilenceableFailure(target)
+           << "vector distribution requires workgroup size for x to be a "
+           << "multiple of the warp size: " << workgroupSizeX << " vs "
+           << warpSize << " --- the transform is not applied";
   }
 
-  SimplePatternRewriter rewriter(ifOp);
+  SimplePatternRewriter rewriter(target);
   FailureOr<VectorDistributionResult> vectorDistributionResult =
-      vectorDistribution(rewriter, ifOp->getLoc(), ifOp, workgroupSizeX,
+      vectorDistribution(rewriter, target->getLoc(), target, workgroupSizeX,
                          warpSize);
   if (failed(vectorDistributionResult)) {
-    // Explicitly return a null WarpExecuteOnLane0Op. This is not a failure
-    // but the transformation is not applied and the null result is
-    // propagated.
-    // TODO: Do not encode this behavior with null upstream.
-    return vector::WarpExecuteOnLane0Op();
+    // Return a silenceable failure and set the expected 1 result to nullptr.
+    results.assign(1, nullptr);
+    return emitDefaultSilenceableFailure(target)
+           << "scf::ifOp needs to be predicated on threadIdx.x == 0 --- the "
+              "transform is not applied";
   }
-  return vectorDistributionResult->warpOp;
+  results.assign({vectorDistributionResult->warpOp});
+  return DiagnosedSilenceableFailure(success());
 }
 
 //===---------------------------------------------------------------------===//
@@ -503,27 +519,42 @@ static LogicalResult applyWarpExecuteOnLane0ToScf(Operation *target) {
   return applyPatternsAndFoldGreedily(target, std::move(patterns));
 }
 
-LogicalResult transform_dialect::VectorWarpDistributionOp::applyToOne(
-    Operation *target, transform::TransformState &state) {
-  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>())
-    return emitOpError() << "applies only to isolated-from-above targets "
-                            "because it needs to apply patterns greedily";
+DiagnosedSilenceableFailure
+transform_dialect::VectorWarpDistributionOp::applyToOne(
+    Operation *target, SmallVectorImpl<Operation *> &results,
+    transform::TransformState &state) {
+  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
+    target->emitOpError(
+        "applies only to isolated-from-above targets because it needs to apply "
+        "patterns greedily");
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+  }
 
-  // TODO: Attach and use Listener.
-  // auto &listener = state.addExtension<::detail::TrackingListener>();
-  // auto detachListener = llvm::make_scope_exit(
-  //   [&] { state.removeExtension<::detail::TrackingListener>(); });
-  // if (failed(mapBlockArguments(state)))
-  //   return DiagnosedSilenceableFailure::definiteFailure();
+  // TODO: Hook up into the ApplyPatternOp in CommonExtensions.cpp to
+  // automatically get listening capabilities.
 
   // MultiReduction lowering is necessary until we have explicit support for
   // distributing that op.
-  if (failed(applyMultiReductionLoweringPatterns(target))) return failure();
-  if (failed(applyVectorTransferWriteDistribution(target))) return failure();
-  if (failed(applyPropagateVectorDistribution(target))) return failure();
-  if (failed(applyWarpExecuteOnLane0ToScf(target))) return failure();
+  if (failed(applyMultiReductionLoweringPatterns(target))) {
+    target->emitOpError("multi-reduction lowering patterns failed to apply");
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+  }
+  if (failed(applyVectorTransferWriteDistribution(target))) {
+    target->emitOpError("transfer write distribution patterns failed to apply");
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+  }
+  if (failed(applyPropagateVectorDistribution(target))) {
+    target->emitOpError(
+        "propagate vector distribution patterns failed to apply");
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+  }
+  if (failed(applyWarpExecuteOnLane0ToScf(target))) {
+    target->emitOpError(
+        "warp execute on lane 0 to scf patterns failed to apply");
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+  }
 
-  return success();
+  return DiagnosedSilenceableFailure(success());
 }
 
 #define GET_OP_CLASSES
