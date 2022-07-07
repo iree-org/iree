@@ -196,8 +196,8 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
       subViewStrides.push_back(rewriter.getIndexAttr(1));
     }
     MemRefType resultType = memref::SubViewOp::inferRankReducedResultType(
-                                rankOfCollapsedVector, sourceType,
-                                subViewOffsets, subViewSizes, subViewStrides)
+                                vectorShapeCollapse, sourceType, subViewOffsets,
+                                subViewSizes, subViewStrides)
                                 .cast<MemRefType>();
     Value subView = rewriter.create<memref::SubViewOp>(
         loc, resultType, source, subViewOffsets, subViewSizes, subViewStrides);
