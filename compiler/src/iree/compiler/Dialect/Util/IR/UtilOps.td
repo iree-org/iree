@@ -592,6 +592,14 @@ def Util_GlobalStoreOp : Util_Op<"global.store", [
     $value `,` $global attr-dict `:` type($value)
   }];
 
+  let builders = [
+    OpBuilder<(ins
+      "Value":$value,
+      "IREE::Util::GlobalOp":$globalOp,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
+    )>,
+  ];
+
   let extraClassDeclaration = [{
     IREE::Util::GlobalOp getGlobalOp(SymbolTableCollection &symbolTable);
   }];

@@ -906,6 +906,14 @@ LogicalResult GlobalLoadIndirectOp::verify() {
   return success();
 }
 
+void GlobalStoreOp::build(OpBuilder &builder, OperationState &state,
+                          Value value, GlobalOp globalOp,
+                          ArrayRef<NamedAttribute> attrs) {
+  state.addOperands({value});
+  state.addAttribute("global", SymbolRefAttr::get(globalOp));
+  state.attributes.append(attrs.begin(), attrs.end());
+}
+
 IREE::Util::GlobalOp GlobalStoreOp::getGlobalOp(
     SymbolTableCollection &symbolTable) {
   return symbolTable.lookupNearestSymbolFrom<IREE::Util::GlobalOp>(

@@ -147,6 +147,10 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   // Convert supported input dialects (std, stream, etc) into the HAL dialect.
   passManager.addPass(createConvertToHALPass());
+
+  // Materialize timelines for device queues.
+  passManager.addPass(createMaterializeTimelinesPass());
+
   addCleanupPatterns(passManager);
 
   //----------------------------------------------------------------------------
