@@ -46,11 +46,15 @@ static void addAllRegisteredCanonicalizationPatterns(
     op.getCanonicalizationPatterns(patterns, ctx);
 }
 
-FailureOr<Operation *> transform_dialect::ApplyPatternsOp::applyToOne(
-    Operation *target, transform::TransformState &state) {
-  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>())
-    return emitOpError() << "applies only to isolated-from-above targets "
-                            "because it needs to apply patterns greedily";
+DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
+    Operation *target, SmallVectorImpl<Operation *> &results,
+    transform::TransformState &state) {
+  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
+    target->emitOpError(
+        "applies only to isolated-from-above targets because it needs to apply "
+        "patterns greedily");
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+  }
   MLIRContext *ctx = target->getContext();
   RewritePatternSet patterns(ctx);
   if (getCanonicalization()) addAllRegisteredCanonicalizationPatterns(patterns);
@@ -61,8 +65,10 @@ FailureOr<Operation *> transform_dialect::ApplyPatternsOp::applyToOne(
   LogicalResult result = applyPatternsAndFoldGreedily(
       target, std::move(patterns), config, &listener);
   LogicalResult listenerResult = listener.checkErrorState();
-  if (failed(result) || failed(listenerResult)) return failure();
-  return target;
+  if (failed(result) || failed(listenerResult))
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+  results.assign({target});
+  return DiagnosedSilenceableFailure(success());
 }
 
 //===---------------------------------------------------------------------===//

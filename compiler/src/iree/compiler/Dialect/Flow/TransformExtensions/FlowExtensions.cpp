@@ -250,7 +250,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
   // operands.
   if (failed(populateWorkgroupCountComputingRegion(rewriter, foreachThreadOp,
                                                    dispatchOp)))
-    return foreachThreadOp.emitError(
+    return foreachThreadOp->emitOpError(
                "failed to populate workload region for dispatchOp: ")
            << dispatchOp;
 
@@ -363,12 +363,17 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
 // IREE-specific transformations defined outside of iree_linalg_transform.
 //===---------------------------------------------------------------------===//
 
-FailureOr<Flow::DispatchWorkgroupsOp>
+DiagnosedSilenceableFailure
 transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::applyToOne(
-    scf::ForeachThreadOp foreachThreadOp, transform::TransformState &state) {
-  SimplePatternRewriter rewriter(foreachThreadOp->getContext());
-  return rewriteForeachThreadToFlowDispatchWorkgroups(foreachThreadOp,
-                                                      rewriter);
+    scf::ForeachThreadOp target, SmallVectorImpl<Operation *> &results,
+    transform::TransformState &state) {
+  SimplePatternRewriter rewriter(target->getContext());
+  FailureOr<Flow::DispatchWorkgroupsOp> result =
+      rewriteForeachThreadToFlowDispatchWorkgroups(target, rewriter);
+  if (failed(result))
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+  results.push_back(*result);
+  return DiagnosedSilenceableFailure(success());
 }
 
 #define GET_OP_CLASSES

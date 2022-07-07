@@ -35,12 +35,25 @@ def TileToForeachOp :
        MemoryEffectsOpInterface,
        TransformEachOpTrait,
        TransformOpInterface]> {
-  let description = [{Tile a tileable op to `scf.foreach_thread`.}];
-
-  let summary = [{
+  let description = [{
+    Tile a linalg op to `scf.foreach_thread`.
+    
     0 should be used as a tile size to skip tiling a particular dimension.
     This is a commonly used convention in Linalg.
-    }];
+    
+    Return modes:
+    =============
+    This operation ignores non-Linalg ops and drops them in the return.
+
+    If all the operations referred to by the `target` PDLOperation tile
+    properly, the transform succeeds. Otherwise the transform silently fails.
+    
+    The 2 returned handles points to only the subset of successfully produced 
+    tiled operations, which can all be empty.
+    This 2 returned handles point to:
+      - the new scf.foreach_thread op,
+      - the tiled linalg op used.
+  }];
 
   let arguments = (ins PDL_Operation:$target,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$num_threads,
@@ -52,8 +65,10 @@ def TileToForeachOp :
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
 
   let extraClassDeclaration = [{
-    ::mlir::FailureOr<::llvm::SmallVector<::mlir::Operation *>> applyToOne(
-      ::mlir::TilingInterface target, transform::TransformState &state);
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::linalg::LinalgOp target, 
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results, 
+        ::mlir::transform::TransformState &state);
   }];
 }
 
@@ -85,6 +100,18 @@ def RewriteForeachThreadToAsyncOp :
 
   let description = [{
     Rewrite a bufferized scf.foreach_thread op to the async dialect.
+        
+    Return modes:
+    =============
+    This operation ignores non-Linalg ops and drops them in the return.
+    This transform is currently only implemented for 1-D scf.foreach_thread that
+    have been bufferized and definitely fail for the rest.
+
+    If all the operations referred to by the `target` PDLOperation lower
+    properly, the transform succeeds. Otherwise the transform silently fails.
+    
+    The returned handle points to only the subset of successfully produced 
+    async operations, which can all be empty.
   }];
   let arguments = (ins PDL_Operation:$target);
   let results = (outs PDL_Operation:$transformed);
@@ -93,8 +120,10 @@ def RewriteForeachThreadToAsyncOp :
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
 
   let extraClassDeclaration = [{
-    ::mlir::FailureOr<::mlir::Operation *> applyToOne(
-      ::mlir::scf::ForeachThreadOp target, transform::TransformState &state);
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::scf::ForeachThreadOp target, 
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results, 
+        ::mlir::transform::TransformState &state);
   }];
 }
 
@@ -107,6 +136,18 @@ def RewriteForeachThreadToScfForOp :
 
   let description = [{
     Rewrite a bufferized scf.foreach_thread to a sequential scf.for.
+            
+    Return modes:
+    =============
+    This operation ignores non-Linalg ops and drops them in the return.
+    This transform is currently only implemented for 1-D scf.foreach_thread that
+    have been bufferized and definitely fail for the rest.
+
+    If all the operations referred to by the `target` PDLOperation lower
+    properly, the transform succeeds. Otherwise the transform silently fails.
+    
+    The returned handle points to only the subset of successfully produced 
+    scf.for operations, which can all be empty.
   }];
   let arguments = (ins PDL_Operation:$target);
   let results = (outs PDL_Operation:$transformed);
@@ -115,8 +156,10 @@ def RewriteForeachThreadToScfForOp :
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
 
   let extraClassDeclaration = [{
-    ::mlir::FailureOr<::mlir::scf::ForOp> applyToOne(
-        ::mlir::scf::ForeachThreadOp target, transform::TransformState &state);
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::scf::ForeachThreadOp target, 
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results, 
+        ::mlir::transform::TransformState &state);
   }];
 }
 
