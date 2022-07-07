@@ -52,7 +52,6 @@ inline void registerIreeDialects(DialectRegistry &registry) {
 
   // External models.
   IREE::LinalgExt::registerTiledOpInterfaceExternalModels(registry);
-  IREE::LinalgExt::registerTilingInterfaceExternalModels(registry);
   IREE::Util::registerUtilExternalModels(registry);
   registerCodegenInterfaces(registry);
 }
