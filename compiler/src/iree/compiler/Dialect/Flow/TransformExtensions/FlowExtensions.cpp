@@ -363,20 +363,12 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
 // IREE-specific transformations defined outside of iree_linalg_transform.
 //===---------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure
-transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::apply(
-    transform::TransformResults &results, transform::TransformState &state) {
-  if (state.getTopLevel()
-          ->walk<WalkOrder::PostOrder>([&](scf::ForeachThreadOp op) {
-            SimplePatternRewriter rewriter(op);
-            if (failed(
-                    rewriteForeachThreadToFlowDispatchWorkgroups(op, rewriter)))
-              return WalkResult::interrupt();
-            return WalkResult::advance();
-          })
-          .wasInterrupted())
-    return DiagnosedSilenceableFailure::definiteFailure();
-  return DiagnosedSilenceableFailure::success();
+FailureOr<Flow::DispatchWorkgroupsOp>
+transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::applyToOne(
+    scf::ForeachThreadOp foreachThreadOp, transform::TransformState &state) {
+  SimplePatternRewriter rewriter(foreachThreadOp->getContext());
+  return rewriteForeachThreadToFlowDispatchWorkgroups(foreachThreadOp,
+                                                      rewriter);
 }
 
 #define GET_OP_CLASSES

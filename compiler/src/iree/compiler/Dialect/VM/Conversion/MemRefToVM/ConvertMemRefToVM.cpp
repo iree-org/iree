@@ -118,6 +118,34 @@ class ConvertMemRefGetGlobalOp
   }
 };
 
+// TODO(#9165): Support alignment for vm.buffer.alloc. So far we ignore the
+// alignment attribute when lowering the op to VM dialect.
+class ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
+ public:
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      memref::AllocaOp allocaOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto type = allocaOp.getType().cast<ShapedType>();
+    if (!type.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(
+          allocaOp, "unable to create buffers for dynamic shapes");
+    }
+
+    int64_t length = type.getSizeInBits();
+    length = llvm::divideCeil(length, 8);
+
+    auto oldType = allocaOp.getType();
+    auto newType = getTypeConverter()->convertType(oldType);
+    Value size =
+        rewriter.create<IREE::VM::ConstI64Op>(allocaOp.getLoc(), length);
+    rewriter.replaceOpWithNewOp<IREE::VM::BufferAllocOp>(allocaOp, newType,
+                                                         size);
+    return success();
+  }
+};
+
 class ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
@@ -236,9 +264,10 @@ void populateMemRefToVMPatterns(MLIRContext *context,
 
   patterns.insert<FoldAsNoOp<bufferization::ToMemrefOp>>(typeConverter,
                                                          context);
-  patterns.insert<ConvertMemRefGlobalOp, ConvertMemRefGetGlobalOp,
-                  ConvertMemRefLoadOp, ConvertMemRefStoreOp>(typeConverter,
-                                                             context);
+  patterns
+      .insert<ConvertMemRefGlobalOp, ConvertMemRefGetGlobalOp,
+              ConvertMemRefAllocaOp, ConvertMemRefLoadOp, ConvertMemRefStoreOp>(
+          typeConverter, context);
 }
 
 }  // namespace iree_compiler

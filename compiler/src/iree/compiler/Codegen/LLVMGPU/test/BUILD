@@ -31,6 +31,7 @@ iree_lit_test_suite(
             "legalize.mlir",
             "tensorcore_vectorization.mlir",
             "transform_dialect_vector_distribution.mlir",
+            "transform_dialect_bufferize.mlir",
             "vector_to_gpu.mlir",
             "vectorization.mlir",
             "warp_reduction.mlir",

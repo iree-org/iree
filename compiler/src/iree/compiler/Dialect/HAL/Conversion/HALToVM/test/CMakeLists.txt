@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "command_buffer_ops.mlir"
     "device_ops.mlir"
     "executable_ops.mlir"
+    "fence_ops.mlir"
   TOOLS
     FileCheck
     iree-opt

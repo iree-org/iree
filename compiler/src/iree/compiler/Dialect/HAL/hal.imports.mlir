@@ -336,6 +336,42 @@ vm.import @executable_layout.create(
 attributes {nosideeffects}
 
 //===----------------------------------------------------------------------===//
+// iree_hal_fence_t
+//===----------------------------------------------------------------------===//
+
+// Returns a fence that defines a point in time across one or more timelines.
+vm.import @fence.create(
+  // <semaphore, min_value>
+  %timepoints : tuple<!vm.ref<!hal.fence>, i64>...
+) -> !vm.ref<!hal.fence>
+attributes {nosideeffects}
+
+// Returns a fence that joins the input fences as a wait-all operation.
+vm.import @fence.join(
+  %fences : !vm.ref<!hal.fence> ...
+) -> !vm.ref<!hal.fence>
+attributes {nosideeffects}
+
+// Signals the fence.
+vm.import @fence.signal(
+  %fence : !vm.ref<!hal.fence>
+)
+
+// Signals the fence with a failure. The |status| will be returned from the
+// `hal.semaphore.query` and `hal.semaphore.signal` of each timepoint semaphore.
+vm.import @fence.fail(
+  %fence : !vm.ref<!hal.fence>,
+  %status : i32
+)
+
+// Yields the caller until all fences is reached.
+vm.import @fence.await(
+  %timeout_millis : i32,
+  %fences : !vm.ref<!hal.fence> ...
+) -> i32
+attributes {vm.yield}
+
+//===----------------------------------------------------------------------===//
 // iree_hal_semaphore_t
 //===----------------------------------------------------------------------===//
 

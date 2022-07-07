@@ -22,6 +22,7 @@ iree_compiler_cc_library(
         "ConvertDeviceOps.cpp",
         "ConvertExecutableOps.cpp",
         "ConvertExperimentalOps.cpp",
+        "ConvertFenceOps.cpp",
         "ConvertHALToVM.cpp",
         "ConvertSemaphoreOps.cpp",
     ],
