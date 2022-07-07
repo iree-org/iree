@@ -129,13 +129,13 @@ func.func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%
   %98 = "mhlo.reshape"(%42) : (tensor<i64>) -> tensor<1xi64>
   %99 = "mhlo.convert"(%98) : (tensor<1xi64>) -> tensor<1xi32>
   %100 = "mhlo.reshape"(%99) : (tensor<1xi32>) -> tensor<i32>
-  %101 = "mhlo.dynamic-update-slice"(%53, %97, %100) : (tensor<5xi64>, tensor<1xi64>, tensor<i32>) -> tensor<5xi64>
+  %101 = "mhlo.dynamic_update_slice"(%53, %97, %100) : (tensor<5xi64>, tensor<1xi64>, tensor<i32>) -> tensor<5xi64>
   %102 = "mhlo.reshape"(%84) : (tensor<1x10xf32>) -> tensor<1x1x10xf32>
   %103 = "mhlo.reshape"(%99) : (tensor<1xi32>) -> tensor<i32>
-  %104 = "mhlo.dynamic-update-slice"(%54, %102, %103, %cst_6, %cst_6) : (tensor<5x1x10xf32>, tensor<1x1x10xf32>, tensor<i32>, tensor<i32>, tensor<i32>) -> tensor<5x1x10xf32>
+  %104 = "mhlo.dynamic_update_slice"(%54, %102, %103, %cst_6, %cst_6) : (tensor<5x1x10xf32>, tensor<1x1x10xf32>, tensor<i32>, tensor<i32>, tensor<i32>) -> tensor<5x1x10xf32>
   %105 = "mhlo.reshape"(%96) : (tensor<1x10xf32>) -> tensor<1x1x10xf32>
   %106 = "mhlo.reshape"(%99) : (tensor<1xi32>) -> tensor<i32>
-  %107 = "mhlo.dynamic-update-slice"(%55, %105, %106, %cst_6, %cst_6) : (tensor<5x1x10xf32>, tensor<1x1x10xf32>, tensor<i32>, tensor<i32>, tensor<i32>) -> tensor<5x1x10xf32>
+  %107 = "mhlo.dynamic_update_slice"(%55, %105, %106, %cst_6, %cst_6) : (tensor<5x1x10xf32>, tensor<1x1x10xf32>, tensor<i32>, tensor<i32>, tensor<i32>) -> tensor<5x1x10xf32>
   cf.br ^bb1(%56, %43, %44, %45, %46, %47, %84, %96, %50, %51, %52, %101, %104, %107 : tensor<i64>, tensor<i64>, tensor<40xf32>, tensor<i64>, tensor<74x40xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>, tensor<5x1x64xf32>, tensor<5x1x1xf32>, tensor<5x1x1xf32>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>)
 ^bb3(%108: tensor<i64>, %109: tensor<i64>, %110: tensor<1x10xf32>, %111: tensor<1x10xf32>, %112: tensor<5xi64>, %113: tensor<5x1x10xf32>, %114: tensor<5x1x10xf32>):  // pred: ^bb1
   return %108, %112, %113, %114, %109, %110, %111 : tensor<i64>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>
