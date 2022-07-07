@@ -275,6 +275,7 @@ iree_check_single_backend_test_suite(
             "dynamic_update_slice.mlir",
             "exponential.mlir",
             "exponential_minus_one.mlir",
+            "fft.mlir",
             "finite.mlir",
             "floor.mlir",
             "gather.mlir",
@@ -309,7 +310,6 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [
             "exponential_fp16.mlir",
-            "fft.mlir",  # TODO(#6601): Eanble the test.
             "rng_uniform.mlir",  # TODO(#6995): Enable the test.
             "rng_normal.mlir",  # TODO(#6995): Enable the test.
             "round.mlir",  # TODO(#7618): Fix and enable (math.copysign -> VM)
