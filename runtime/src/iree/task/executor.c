@@ -494,8 +494,9 @@ static iree_task_t* iree_task_executor_try_steal_task_from_affinity_set(
     iree_task_worker_t* victim_worker = &executor->workers[victim_index];
     if (iree_atomic_load_int32(&victim_worker->state,
                                iree_memory_order_seq_cst) !=
-        IREE_TASK_WORKER_STATE_RUNNING)
+        IREE_TASK_WORKER_STATE_RUNNING) {
       return NULL;
+    }
 
     // Policy: steal a chunk of tasks at the tail of the victim queue.
     // This will steal multiple tasks from the victim up to the specified max
