@@ -32,7 +32,7 @@ module {
       // CHECK:    %[[T4:.*]] = linalg.elemwise_unary ins(%[[T1]] {{.*}} outs(%[[T3]]
       %8 = linalg.elemwise_unary ins(%6 : tensor<?xf32>) outs(%7 : tensor<?xf32>) -> tensor<?xf32>
       scf.foreach_thread.perform_concurrently {
-        scf.foreach_thread.parallel_insert_slice %8 into %arg2[%4] [%5] [1] : tensor<?xf32> into tensor<64xf32>
+        tensor.parallel_insert_slice %8 into %arg2[%4] [%5] [1] : tensor<?xf32> into tensor<64xf32>
       }
     }
     func.return %3 : tensor<64xf32>
@@ -93,7 +93,7 @@ module {
       // CHECK:    %[[T2:.*]] = linalg.elemwise_unary ins(%[[T1]]
       %7 = linalg.elemwise_unary ins(%6 : tensor<?xf32>) outs(%5 : tensor<?xf32>) -> tensor<?xf32>
       scf.foreach_thread.perform_concurrently {
-        scf.foreach_thread.parallel_insert_slice %7 into %arg2[%3] [%4] [1] : tensor<?xf32> into tensor<?xf32>
+        tensor.parallel_insert_slice %7 into %arg2[%3] [%4] [1] : tensor<?xf32> into tensor<?xf32>
       }
     }
     func.return %2 : tensor<?xf32>
