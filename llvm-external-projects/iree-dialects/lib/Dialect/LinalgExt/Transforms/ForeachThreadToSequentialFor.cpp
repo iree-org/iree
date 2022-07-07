@@ -25,10 +25,9 @@ using namespace mlir::iree_compiler::IREE::LinalgExt;
 namespace {
 
 SmallVector<Value> getValuesToYield(scf::PerformConcurrentlyOp op) {
-  return llvm::to_vector(
-      llvm::map_range(op.yieldingOps(), [](Operation &op) {
-        return cast<scf::ParallelInsertSliceOp>(&op).getDest();
-      }));
+  return llvm::to_vector(llvm::map_range(op.yieldingOps(), [](Operation &op) {
+    return cast<scf::ParallelInsertSliceOp>(&op).getDest();
+  }));
 }
 
 } // namespace
