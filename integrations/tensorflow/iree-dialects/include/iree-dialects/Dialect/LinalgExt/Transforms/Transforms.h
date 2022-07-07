@@ -33,8 +33,10 @@ struct TilingResult {
 struct ForeachThreadTilingPattern
     : public OpInterfaceRewritePattern<TilingInterface> {
   ForeachThreadTilingPattern(MLIRContext *context,
-                             linalg::LinalgTilingOptions opt)
-      : OpInterfaceRewritePattern<TilingInterface>(context), options(opt) {}
+                             linalg::LinalgTilingOptions opt,
+                             ArrayRef<int64_t> threadDimMapping)
+      : OpInterfaceRewritePattern<TilingInterface>(context), options(opt),
+        threadDimMapping(threadDimMapping.begin(), threadDimMapping.end()) {}
 
   FailureOr<TilingResult>
   returningMatchAndRewrite(TilingInterface op, PatternRewriter &rewriter) const;
@@ -46,6 +48,7 @@ struct ForeachThreadTilingPattern
 
 private:
   linalg::LinalgTilingOptions options;
+  SmallVector<int64_t> threadDimMapping;
 };
 
 /// Pattern to swap a `TilingInterface` op -> `tensor::ExtractSliceOp`.

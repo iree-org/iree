@@ -43,7 +43,8 @@ def TileToForeachOp :
     }];
 
   let arguments = (ins PDL_Operation:$target,
-                   DefaultValuedAttr<I64ArrayAttr, "{}">:$num_threads);
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$num_threads,
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$thread_dim_mapping);
   let results = (outs PDL_Operation:$tiled_op,
                       PDL_Operation:$tile_op);
 
