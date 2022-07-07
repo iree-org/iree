@@ -2012,6 +2012,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP_EXT_F32_UNARY_F32(NegF32, vm_neg_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(CeilF32, vm_ceil_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(FloorF32, vm_floor_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(RoundF32, vm_round_f32);
 
       DISPATCH_OP_EXT_F32_UNARY_F32(AtanF32, vm_atan_f32);
       DISPATCH_OP_EXT_F32_BINARY_F32(Atan2F32, vm_atan2_f32);
@@ -2029,7 +2030,6 @@ static iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP_EXT_F32_UNARY_F32(SqrtF32, vm_sqrt_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(TanhF32, vm_tanh_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(ErfF32, vm_erf_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(RoundF32, vm_round_f32);
 
       //===----------------------------------------------------------------===//
       // ExtF32: Casting and type conversion/emulation

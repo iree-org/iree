@@ -294,6 +294,7 @@ static inline float vm_abs_f32(float operand) { return fabsf(operand); }
 static inline float vm_neg_f32(float operand) { return -operand; }
 static inline float vm_ceil_f32(float operand) { return ceilf(operand); }
 static inline float vm_floor_f32(float operand) { return floorf(operand); }
+static inline float vm_round_f32(float operand) { return roundf(operand); }
 
 static inline float vm_atan_f32(float operand) { return atanf(operand); }
 static inline float vm_atan2_f32(float y, float x) { return atan2f(y, x); }
@@ -313,8 +314,6 @@ static inline float vm_rsqrt_f32(float operand) {
 static inline float vm_sqrt_f32(float operand) { return sqrtf(operand); }
 static inline float vm_tanh_f32(float operand) { return tanhf(operand); }
 static inline float vm_erf_f32(float operand) { return erff(operand); }
-
-static inline float vm_round_f32(float operand) { return roundf(operand); }
 
 //===------------------------------------------------------------------===//
 // ExtF32: Casting and type conversion/emulation
