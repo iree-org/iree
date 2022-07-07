@@ -18,8 +18,16 @@ namespace mlir {
 namespace iree_compiler {
 namespace emitc_builders {
 
+typedef struct StructField {
+  std::string type;
+  std::string name;
+} StructField;
+
 Value arrayElementAddress(OpBuilder builder, Location location, Type type,
                           IntegerAttr index, Value operand);
+
+void structDefinition(OpBuilder builder, Location location,
+                      StringRef structName, SmallVector<StructField> fields);
 
 Value structMember(OpBuilder builder, Location location, Type type,
                    StringRef memberName, Value operand);

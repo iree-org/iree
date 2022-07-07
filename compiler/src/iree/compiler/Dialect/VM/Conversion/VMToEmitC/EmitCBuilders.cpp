@@ -28,6 +28,24 @@ Value arrayElementAddress(OpBuilder builder, Location location, Type type,
       .getResult(0);
 }
 
+void structDefinition(OpBuilder builder, Location location,
+                      StringRef structName, SmallVector<StructField> fields) {
+  std::string structBody;
+
+  for (auto &field : fields) {
+    structBody += field.type + " " + field.name + ";";
+  }
+
+  auto ctx = builder.getContext();
+
+  builder.create<emitc::CallOp>(
+      /*location=*/location, /*type=*/TypeRange{},
+      /*callee=*/StringAttr::get(ctx, "EMITC_TYPEDEF_STRUCT"), /*args=*/
+      ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, structName),
+                           emitc::OpaqueAttr::get(ctx, structBody)}),
+      /*templateArgs=*/ArrayAttr{}, /*operands=*/ArrayRef<Value>{});
+}
+
 Value structMember(OpBuilder builder, Location location, Type type,
                    StringRef memberName, Value operand) {
   auto ctx = builder.getContext();
