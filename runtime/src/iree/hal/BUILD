@@ -57,6 +57,8 @@ iree_runtime_cc_library(
         "executable_cache.h",
         "executable_layout.c",
         "executable_layout.h",
+        "fence.c",
+        "fence.h",
         "resource.h",
         "semaphore.c",
         "semaphore.h",

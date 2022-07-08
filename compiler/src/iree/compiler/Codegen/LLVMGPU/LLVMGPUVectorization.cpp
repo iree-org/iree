@@ -36,8 +36,6 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   patterns.add<linalg::CopyVectorizationPattern>(ctx);
   patterns.add<linalg::LinalgVectorizationPattern>(
       ctx, f.addOpFilter<linalg::ContractionOpInterface>(), opt);
-  vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
-  vector::populateVectorReductionToContractPatterns(patterns);
 }
 
 static Optional<SmallVector<int64_t, 4>> getGPUNativeVectorSize(
@@ -85,7 +83,10 @@ static void populateVectorUnrollPatterns(RewritePatternSet &patterns,
 namespace {
 struct LLVMGPUVectorizationPass
     : public LLVMGPUVectorizationBase<LLVMGPUVectorizationPass> {
-  LLVMGPUVectorizationPass(int64_t nativeVector) : nativeVector(nativeVector) {}
+  LLVMGPUVectorizationPass(int64_t nativeVector, bool generateContract) {
+    this->nativeVector = nativeVector;
+    this->generateContract = generateContract;
+  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -97,6 +98,12 @@ struct LLVMGPUVectorizationPass
       // Step 1. Vectorize
       RewritePatternSet vectorizationPatterns(context);
       populateVectorizationPatterns(vectorizationPatterns);
+      if (generateContract) {
+        vector::populateVectorTransferPermutationMapLoweringPatterns(
+            vectorizationPatterns);
+        vector::populateVectorReductionToContractPatterns(
+            vectorizationPatterns);
+      }
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(vectorizationPatterns)))) {
         return signalPassFailure();
@@ -128,8 +135,6 @@ struct LLVMGPUVectorizationPass
       RewritePatternSet lowerTransferOpPatterns(funcOp.getContext());
       vector::populateVectorToVectorCanonicalizationPatterns(
           lowerTransferOpPatterns);
-      vector::populateVectorTransferPermutationMapLoweringPatterns(
-          lowerTransferOpPatterns);
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(lowerTransferOpPatterns)))) {
         return signalPassFailure();
@@ -160,15 +165,13 @@ struct LLVMGPUVectorizationPass
       });
     }
   }
-
- private:
-  int64_t nativeVector;
 };
 }  // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorizationPass(
-    int64_t nativeVector) {
-  return std::make_unique<LLVMGPUVectorizationPass>(nativeVector);
+    int64_t nativeVector, bool generateContract) {
+  return std::make_unique<LLVMGPUVectorizationPass>(nativeVector,
+                                                    generateContract);
 }
 
 }  // namespace iree_compiler

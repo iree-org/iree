@@ -34,7 +34,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
        >}> {
-    hal.executable.export public @matmul_256x1024x128_div_sub layout(#executable_layout) {
+    hal.executable.export public @matmul_256x1024x128_div_sub layout(#executable_layout) attributes {
       translation_info = #translation,
       workgroup_size = [32 : index, 1 : index, 1 : index]
     } {

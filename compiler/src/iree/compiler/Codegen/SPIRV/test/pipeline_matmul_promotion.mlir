@@ -17,7 +17,11 @@ hal.executable @matmul_128x256x64 {
       max_compute_workgroup_invocations = 1024,
       max_compute_workgroup_size = [65535, 65535, 65535],
       subgroup_size = 32>>}> {
-    hal.executable.export public @matmul_128x256x64 ordinal(0) layout(#executable_layout)
+    hal.executable.export public @matmul_128x256x64 ordinal(0) layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
     builtin.module {
       func.func @matmul_128x256x64() {
         %cst = arith.constant 0.000000e+00 : f32

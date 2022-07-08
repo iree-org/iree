@@ -24,6 +24,16 @@ int main(int argc, char **argv) {
   mlir::iree_compiler::registerAllPasses();
   mlir::iree_compiler::registerHALTargetBackends();
 
+  // Also register the transform interpreter pass so that iree-opt can run
+  // transform dialect IR without resorting to a separate file.
+  // Resorting to separate files is a convenience for iree-compile to be able to
+  // use the transform dialect without requiring special plumbing.
+  // Still the preferred mode of execution should be to transport the relevant
+  // piece of transform IR in the right location, for each piece of code we
+  // want to transform for.
+  mlir::linalg::transform::registerTransformDialectInterpreterPass();
+  mlir::linalg::transform::registerDropSchedulePass();
+
   if (failed(MlirOptMain(argc, argv, "IREE modular optimizer driver\n",
                          registry,
                          /*preloadDialectsInContext=*/false))) {

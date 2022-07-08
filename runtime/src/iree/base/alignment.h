@@ -101,15 +101,63 @@ static inline bool iree_device_size_has_alignment(
 #define IREE_LE_IDX_8(i) (7 - (i))
 #endif  // IREE_ENDIANNESS_*
 
-#if IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED
+#if IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_8
 
 static inline uint8_t iree_unaligned_load_le_u8(const uint8_t* ptr) {
   return *ptr;
 }
+
+static inline void iree_unaligned_store_le_u8(uint8_t* ptr, uint8_t value) {
+  *ptr = value;
+}
+
+#else
+
+#if defined(IREE_ENDIANNESS_LITTLE)
+
+#define iree_unaligned_load_le_u8(ptr) *(ptr)
+
+#define iree_unaligned_store_le_u8(ptr, value) *(ptr) = (value)
+
+#else
+
+#error "TODO(benvanik): little-endian load/store for big-endian archs"
+
+#endif  // IREE_ENDIANNESS_*
+
+#endif  // IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_8
+
+#if IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_16
+
 static inline uint16_t iree_unaligned_load_le_u16(const uint16_t* ptr) {
   const uint8_t* p = (const uint8_t*)ptr;
   return ((uint16_t)p[IREE_LE_IDX_2(0)]) | ((uint16_t)p[IREE_LE_IDX_2(1)] << 8);
 }
+
+static inline void iree_unaligned_store_le_u16(uint16_t* ptr, uint16_t value) {
+  uint8_t* p = (uint8_t*)ptr;
+  p[IREE_LE_IDX_2(0)] = value;
+  p[IREE_LE_IDX_2(1)] = value >> 8;
+}
+
+#else
+
+#if defined(IREE_ENDIANNESS_LITTLE)
+
+#define iree_unaligned_load_le_u16(ptr) *(ptr)
+
+#define iree_unaligned_store_le_u16(ptr, value) *(ptr) = (value)
+
+#else
+
+#error "TODO(benvanik): little-endian load/store for big-endian archs"
+
+#endif  // IREE_ENDIANNESS_*
+
+#endif  // IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_16
+
+#if IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_32
+
 static inline uint32_t iree_unaligned_load_le_u32(const uint32_t* ptr) {
   const uint8_t* p = (const uint8_t*)ptr;
   return ((uint32_t)p[IREE_LE_IDX_4(0)]) |
@@ -117,6 +165,46 @@ static inline uint32_t iree_unaligned_load_le_u32(const uint32_t* ptr) {
          ((uint32_t)p[IREE_LE_IDX_4(2)] << 16) |
          ((uint32_t)p[IREE_LE_IDX_4(3)] << 24);
 }
+static inline float iree_unaligned_load_le_f32(const float* ptr) {
+  uint32_t uint_value = iree_unaligned_load_le_u32((const uint32_t*)ptr);
+  float value;
+  memcpy(&value, &uint_value, sizeof(value));
+  return value;
+}
+
+static inline void iree_unaligned_store_le_u32(uint32_t* ptr, uint32_t value) {
+  uint8_t* p = (uint8_t*)ptr;
+  p[IREE_LE_IDX_4(0)] = value;
+  p[IREE_LE_IDX_4(1)] = value >> 8;
+  p[IREE_LE_IDX_4(2)] = value >> 16;
+  p[IREE_LE_IDX_4(3)] = value >> 24;
+}
+static inline void iree_unaligned_store_le_f32(float* ptr, float value) {
+  uint32_t uint_value;
+  memcpy(&uint_value, &value, sizeof(value));
+  iree_unaligned_store_le_u32((uint32_t*)ptr, uint_value);
+}
+
+#else
+
+#if defined(IREE_ENDIANNESS_LITTLE)
+
+#define iree_unaligned_load_le_u32(ptr) *(ptr)
+#define iree_unaligned_load_le_f32(ptr) *(ptr)
+
+#define iree_unaligned_store_le_u32(ptr, value) *(ptr) = (value)
+#define iree_unaligned_store_le_f32(ptr, value) *(ptr) = (value)
+
+#else
+
+#error "TODO(benvanik): little-endian load/store for big-endian archs"
+
+#endif  // IREE_ENDIANNESS_*
+
+#endif  // IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_32
+
+#if IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_64
+
 static inline uint64_t iree_unaligned_load_le_u64(const uint64_t* ptr) {
   const uint8_t* p = (const uint8_t*)ptr;
   return ((uint64_t)p[IREE_LE_IDX_8(0)]) |
@@ -128,12 +216,6 @@ static inline uint64_t iree_unaligned_load_le_u64(const uint64_t* ptr) {
          ((uint64_t)p[IREE_LE_IDX_8(6)] << 48) |
          ((uint64_t)p[IREE_LE_IDX_8(7)] << 56);
 }
-static inline float iree_unaligned_load_le_f32(const float* ptr) {
-  uint32_t uint_value = iree_unaligned_load_le_u32((const uint32_t*)ptr);
-  float value;
-  memcpy(&value, &uint_value, sizeof(value));
-  return value;
-}
 static inline double iree_unaligned_load_le_f64(const double* ptr) {
   uint64_t uint_value = iree_unaligned_load_le_u64((const uint64_t*)ptr);
   double value;
@@ -141,21 +223,6 @@ static inline double iree_unaligned_load_le_f64(const double* ptr) {
   return value;
 }
 
-static inline void iree_unaligned_store_le_u8(uint8_t* ptr, uint8_t value) {
-  *ptr = value;
-}
-static inline void iree_unaligned_store_le_u16(uint16_t* ptr, uint16_t value) {
-  uint8_t* p = (uint8_t*)ptr;
-  p[IREE_LE_IDX_2(0)] = value;
-  p[IREE_LE_IDX_2(1)] = value >> 8;
-}
-static inline void iree_unaligned_store_le_u32(uint32_t* ptr, uint32_t value) {
-  uint8_t* p = (uint8_t*)ptr;
-  p[IREE_LE_IDX_4(0)] = value;
-  p[IREE_LE_IDX_4(1)] = value >> 8;
-  p[IREE_LE_IDX_4(2)] = value >> 16;
-  p[IREE_LE_IDX_4(3)] = value >> 24;
-}
 static inline void iree_unaligned_store_le_u64(uint64_t* ptr, uint64_t value) {
   uint8_t* p = (uint8_t*)ptr;
   p[IREE_LE_IDX_8(0)] = value;
@@ -167,11 +234,6 @@ static inline void iree_unaligned_store_le_u64(uint64_t* ptr, uint64_t value) {
   p[IREE_LE_IDX_8(6)] = value >> 48;
   p[IREE_LE_IDX_8(7)] = value >> 56;
 }
-static inline void iree_unaligned_store_le_f32(float* ptr, float value) {
-  uint32_t uint_value;
-  memcpy(&uint_value, &value, sizeof(value));
-  iree_unaligned_store_le_u32((uint32_t*)ptr, uint_value);
-}
 static inline void iree_unaligned_store_le_f64(double* ptr, double value) {
   uint64_t uint_value;
   memcpy(&uint_value, &value, sizeof(value));
@@ -182,18 +244,10 @@ static inline void iree_unaligned_store_le_f64(double* ptr, double value) {
 
 #if defined(IREE_ENDIANNESS_LITTLE)
 
-#define iree_unaligned_load_le_u8(ptr) *(ptr)
-#define iree_unaligned_load_le_u16(ptr) *(ptr)
-#define iree_unaligned_load_le_u32(ptr) *(ptr)
 #define iree_unaligned_load_le_u64(ptr) *(ptr)
-#define iree_unaligned_load_le_f32(ptr) *(ptr)
 #define iree_unaligned_load_le_f64(ptr) *(ptr)
 
-#define iree_unaligned_store_le_u8(ptr, value) *(ptr) = (value)
-#define iree_unaligned_store_le_u16(ptr, value) *(ptr) = (value)
-#define iree_unaligned_store_le_u32(ptr, value) *(ptr) = (value)
 #define iree_unaligned_store_le_u64(ptr, value) *(ptr) = (value)
-#define iree_unaligned_store_le_f32(ptr, value) *(ptr) = (value)
 #define iree_unaligned_store_le_f64(ptr, value) *(ptr) = (value)
 
 #else
@@ -202,7 +256,7 @@ static inline void iree_unaligned_store_le_f64(double* ptr, double value) {
 
 #endif  // IREE_ENDIANNESS_*
 
-#endif  // IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED
+#endif  // IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_64
 
 // clang-format off
 

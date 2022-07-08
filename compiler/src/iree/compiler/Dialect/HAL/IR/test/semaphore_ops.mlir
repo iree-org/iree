@@ -2,8 +2,9 @@
 
 // CHECK-LABEL: @semaphore_create
 func.func @semaphore_create(%arg0 : !hal.device) -> !hal.semaphore {
-  %c0 = arith.constant 0 : index
-  // CHECK: %semaphore = hal.semaphore.create device(%arg0 : !hal.device) initial(%c0) : !hal.semaphore
+  // CHECK: %[[C0:.+]] = arith.constant 0
+  %c0 = arith.constant 0 : i64
+  // CHECK: %semaphore = hal.semaphore.create device(%arg0 : !hal.device) initial(%[[C0]]) : !hal.semaphore
   %semaphore = hal.semaphore.create device(%arg0 : !hal.device) initial(%c0) : !hal.semaphore
   return %semaphore : !hal.semaphore
 }
@@ -12,8 +13,8 @@ func.func @semaphore_create(%arg0 : !hal.device) -> !hal.semaphore {
 
 // CHECK-LABEL: @semaphore_query
 func.func @semaphore_query(%arg0 : !hal.semaphore) {
-  // CHECK: = hal.semaphore.query<%arg0 : !hal.semaphore> : i32, index
-  %status, %value = hal.semaphore.query<%arg0 : !hal.semaphore> : i32, index
+  // CHECK: = hal.semaphore.query<%arg0 : !hal.semaphore> : i32, i64
+  %status, %value = hal.semaphore.query<%arg0 : !hal.semaphore> : i32, i64
   return
 }
 
@@ -21,8 +22,9 @@ func.func @semaphore_query(%arg0 : !hal.semaphore) {
 
 // CHECK-LABEL: @semaphore_signal
 func.func @semaphore_signal(%arg0 : !hal.semaphore) {
-  %c0 = arith.constant 0 : index
-  // CHECK: hal.semaphore.signal<%arg0 : !hal.semaphore> value(%c0)
+  // CHECK: %[[C0:.+]] = arith.constant 0
+  %c0 = arith.constant 0 : i64
+  // CHECK: hal.semaphore.signal<%arg0 : !hal.semaphore> value(%[[C0]])
   hal.semaphore.signal<%arg0 : !hal.semaphore> value(%c0)
   return
 }
@@ -43,7 +45,7 @@ func.func @semaphore_fail(%arg0 : !hal.semaphore) {
 // CHECK-LABEL: @semaphore_await
 func.func @semaphore_await(%arg0 : !hal.semaphore) {
   // CHECK: %[[C0:.+]] = arith.constant 0
-  %c0 = arith.constant 0 : index
+  %c0 = arith.constant 0 : i64
   // CHECK: = hal.semaphore.await<%arg0 : !hal.semaphore> until(%[[C0]]) : i32
   %0 = hal.semaphore.await<%arg0 : !hal.semaphore> until(%c0) : i32
   return

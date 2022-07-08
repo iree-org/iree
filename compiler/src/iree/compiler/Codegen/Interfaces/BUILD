@@ -45,13 +45,14 @@ iree_compiler_cc_library(
         ":BufferizationInterfaces",
         ":PartitionableLoopsInterface",
         ":ProcessorOpInterfaces",
-        "//compiler/src/iree/compiler/Codegen/Common/TransformDialectExtensions:TransformDialectCommonExtensions",
-        "//compiler/src/iree/compiler/Codegen/LLVMCPU/TransformDialectExtensions:TransformDialectLLVMCPUExtensions",
-        "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformDialectExtensions:TransformDialectLLVMGPUExtensions",
-        "//compiler/src/iree/compiler/Dialect/Flow/TransformDialectExtensions:TransformDialectFlowExtensions",
+        "//compiler/src/iree/compiler/Codegen/Common/TransformExtensions:CommonExtensions",
+        "//compiler/src/iree/compiler/Codegen/LLVMCPU/TransformExtensions:LLVMCPUExtensions",
+        "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformExtensions:LLVMGPUExtensions",
+        "//compiler/src/iree/compiler/Dialect/Flow/TransformExtensions:FlowExtensions",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "@llvm-project//mlir:LinalgTransformOps",
+        "@llvm-project//mlir:LinalgTransforms",
     ],
 )
 

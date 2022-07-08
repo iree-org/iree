@@ -1968,6 +1968,125 @@ def HAL_ExecutableLayoutLookupOp : HAL_PureOp<"executable_layout.lookup", [
 }
 
 //===----------------------------------------------------------------------===//
+// !hal.fence / iree_hal_fence_t
+//===----------------------------------------------------------------------===//
+
+def HAL_FenceCreateOp : HAL_Op<"fence.create", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+    SameVariadicOperandSize,
+  ]> {
+  let summary = [{creates a fence from the given timepoints}];
+  let description = [{
+    Returns a fence that defines a point in time across one or more timelines.
+  }];
+
+  let arguments = (ins
+    Variadic<HAL_Semaphore>:$semaphores,
+    Variadic<HAL_TimelineValue>:$min_values
+  );
+  let results = (outs
+    HAL_Fence:$result
+  );
+
+  let assemblyFormat = [{
+    custom<TimepointList>($semaphores, type($semaphores), $min_values)
+    `->` type($result)
+    attr-dict-with-keyword
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+def HAL_FenceJoinOp : HAL_Op<"fence.join", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  ]> {
+  let summary = [{creates a fence from the given timepoints}];
+  let description = [{
+    Returns a fence that joins the input fences as a wait-all operation.
+  }];
+
+  let arguments = (ins
+    Variadic<HAL_Fence>:$fences
+  );
+  let results = (outs
+    HAL_Fence:$result
+  );
+
+  let assemblyFormat = [{
+    `at` `(` `[` $fences `]` `)`
+    `->` type($result)
+    attr-dict-with-keyword
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+def HAL_FenceSignalOp : HAL_Op<"fence.signal"> {
+  let summary = [{fence signal operation}];
+  let description = [{
+    Signals the fence to indicate that the timepoints contained have been
+    reached. Waiting work may begin immediately.
+  }];
+
+  let arguments = (ins
+    HAL_Fence:$fence
+  );
+
+  let assemblyFormat = [{
+    `<` $fence `:` type($fence) `>`
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_FenceFailOp : HAL_Op<"fence.fail"> {
+  let summary = [{fence failure operation}];
+  let description = [{
+    Signals the fence with a failure. The `status` will be returned from
+    each timepoint semaphores `hal.semaphore.query` and `hal.semaphore.signal`
+    for the lifetime of each semaphore.
+  }];
+
+  let arguments = (ins
+    HAL_Fence:$fence,
+    Util_Status:$status
+  );
+
+  let assemblyFormat = [{
+    `<` $fence `:` type($fence) `>`
+    `status` `(` $status `)`
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_FenceAwaitOp : HAL_Op<"fence.await", [
+    YieldPoint,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  ]> {
+  let summary = [{asynchronous fence wait operation}];
+  let description = [{
+    Yields the caller until all fences is reached. Returns the `status` of the
+    fence after the wait, with a non-zero value indicating failure.
+  }];
+
+  let arguments = (ins
+    I32:$timeout_millis,
+    Variadic<HAL_Fence>:$fences
+  );
+  let results = (outs
+    Util_Status:$status
+  );
+
+  let assemblyFormat = [{
+    `until` `(` `[` $fences `]` `)`
+    `timeout_millis` `(` $timeout_millis `)`
+    `:` type($status)
+    attr-dict-with-keyword
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // !hal.semaphore / iree_hal_semaphore_t
 //===----------------------------------------------------------------------===//
 
@@ -1995,7 +2114,9 @@ def HAL_SemaphoreCreateOp : HAL_Op<"semaphore.create", [
   }];
 }
 
-def HAL_SemaphoreQueryOp : HAL_Op<"semaphore.query"> {
+def HAL_SemaphoreQueryOp : HAL_Op<"semaphore.query", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  ]> {
   let summary = [{semaphore payload value query}];
   let description = [{
     Queries the current payload and returns a tuple of `(status, value)`.
@@ -2059,7 +2180,10 @@ def HAL_SemaphoreFailOp : HAL_Op<"semaphore.fail"> {
   }];
 }
 
-def HAL_SemaphoreAwaitOp : HAL_Op<"semaphore.await", [YieldPoint]> {
+def HAL_SemaphoreAwaitOp : HAL_Op<"semaphore.await", [
+    YieldPoint,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  ]> {
   let summary = [{asynchronous semaphore wait operation}];
   let description = [{
     Yields the caller until the semaphore reaches or exceeds the specified

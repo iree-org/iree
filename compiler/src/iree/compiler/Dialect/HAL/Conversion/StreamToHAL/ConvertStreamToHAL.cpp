@@ -267,7 +267,7 @@ struct ResourceAllocaOpPattern
 
     // TODO(benvanik): stream ordered allocations.
     auto resolvedTimepoint =
-        rewriter.create<arith::ConstantIndexOp>(allocaOp.getLoc(), 0)
+        rewriter.create<arith::ConstantIntOp>(allocaOp.getLoc(), 0, 64)
             .getResult();
 
     rewriter.replaceOp(allocaOp, {allocateOp.result(), resolvedTimepoint});
@@ -283,7 +283,7 @@ struct ResourceDeallocaOpPattern
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): stream ordered allocations.
     auto resolvedTimepoint =
-        rewriter.create<arith::ConstantIndexOp>(deallocaOp.getLoc(), 0)
+        rewriter.create<arith::ConstantIntOp>(deallocaOp.getLoc(), 0, 64)
             .getResult();
     rewriter.replaceOp(deallocaOp, {resolvedTimepoint});
     return success();
@@ -844,7 +844,7 @@ struct CmdExecuteOpPattern
 
     // TODO(benvanik): propagate semaphore information.
     auto resolvedTimepoint =
-        rewriter.create<arith::ConstantIndexOp>(loc, 0).getResult();
+        rewriter.create<arith::ConstantIntOp>(loc, 0, 64).getResult();
 
     rewriter.replaceOp(executeOp, resolvedTimepoint);
     return success();
@@ -893,7 +893,7 @@ struct TimepointImmediateOpPattern
       IREE::Stream::TimepointImmediateOp immediateOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): model timepoints as semaphores.
-    rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(immediateOp, 0);
+    rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(immediateOp, 0, 64);
     return success();
   }
 };
@@ -921,7 +921,7 @@ struct TimepointImportOpPattern
     rewriter.create<IREE::Util::StatusCheckOkOp>(
         importOp.getLoc(), awaitOp.status(),
         "failed to wait on imported semaphore");
-    rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(importOp, 0);
+    rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(importOp, 0, 64);
     return success();
   }
 };
@@ -946,7 +946,7 @@ struct TimepointExportOpPattern
 
     // TODO(benvanik): model timepoints as semaphores.
     // For now we just create a signaled semaphore.
-    auto exportValue = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    auto exportValue = rewriter.create<arith::ConstantIntOp>(loc, 0, 64);
     auto exportSemaphore = rewriter.create<IREE::HAL::SemaphoreCreateOp>(
         loc, rewriter.getType<IREE::HAL::SemaphoreType>(), device, exportValue);
     rewriter.replaceOp(exportOp, {exportSemaphore, exportValue});
@@ -964,7 +964,7 @@ struct TimepointJoinOpPattern
     // This should be a max() of the operand timepoints. Could be done with
     // affine expressions, but since everything is always 0 we just max(0,0)=0
     // here :)
-    rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(joinOp, 0);
+    rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(joinOp, 0, 64);
     return success();
   }
 };
@@ -1004,7 +1004,7 @@ struct GlobalTimepointConversionPattern
     if (!initialValue.hasValue()) return failure();
     if (!initialValue->isa<IREE::Stream::TimepointAttr>()) return failure();
     rewriter.updateRootInPlace(
-        op, [&]() { op.initial_valueAttr(rewriter.getIndexAttr(0)); });
+        op, [&]() { op.initial_valueAttr(rewriter.getI64IntegerAttr(0)); });
     return success();
   }
 };
@@ -1030,7 +1030,7 @@ void populateStreamToHALPatterns(MLIRContext *context,
         // This may become a !hal.semaphore + index, or some !hal.timepoint that
         // we then do more analysis on once we know what devices are in use
         // where.
-        results.push_back(IndexType::get(context));
+        results.push_back(IntegerType::get(context, 64));
         return success();
       });
 

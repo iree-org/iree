@@ -318,7 +318,8 @@ class IREEBenchmark {
     IREE_RETURN_IF_ERROR(iree_hal_create_device_from_flags(
         iree_hal_default_device_uri(), iree_allocator_system(), &device_));
     IREE_RETURN_IF_ERROR(
-        iree_hal_module_create(device_, iree_allocator_system(), &hal_module_));
+        iree_hal_module_create(device_, IREE_HAL_MODULE_FLAG_NONE,
+                               iree_allocator_system(), &hal_module_));
     IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
         flatbuffer_contents->const_buffer,
         iree_file_contents_deallocator(flatbuffer_contents),

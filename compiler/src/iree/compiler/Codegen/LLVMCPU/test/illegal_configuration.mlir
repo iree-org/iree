@@ -11,9 +11,7 @@
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
-    hal.executable.export @illegal layout(#executable_layout)  {
-      translation_info = #translation
-    }
+    hal.executable.export @illegal layout(#executable_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -42,9 +40,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
-    hal.executable.export @illegal layout(#executable_layout)  {
-      translation_info = #translation
-    }
+    hal.executable.export @illegal layout(#executable_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -73,9 +69,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
-    hal.executable.export @illegal layout(#executable_layout)  {
-      translation_info = #translation
-    }
+    hal.executable.export @illegal layout(#executable_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -104,9 +98,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
-    hal.executable.export @illegal layout(#executable_layout)  {
-      translation_info = #translation
-    }
+    hal.executable.export @illegal layout(#executable_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -135,9 +127,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
-    hal.executable.export @illegal layout(#executable_layout)  {
-      translation_info = #translation
-    }
+    hal.executable.export @illegal layout(#executable_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -168,9 +158,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
-    hal.executable.export @illegal layout(#executable_layout)  {
-      translation_info = #translation
-    }
+    hal.executable.export @illegal layout(#executable_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index

@@ -25,9 +25,10 @@ using namespace mlir::iree_compiler::IREE::LinalgExt;
 namespace {
 
 SmallVector<Value> getValuesToYield(scf::PerformConcurrentlyOp op) {
-  return llvm::to_vector(llvm::map_range(op.yieldingOps(), [](Operation &op) {
-    return cast<scf::ParallelInsertSliceOp>(&op).getDest();
-  }));
+  return llvm::to_vector(
+      llvm::map_range(op.getYieldingOps(), [](Operation &op) {
+        return cast<tensor::ParallelInsertSliceOp>(&op).getDest();
+      }));
 }
 
 } // namespace
@@ -79,9 +80,9 @@ FailureOr<scf::ForOp> ForeachThreadOpToScfForRewriter::returningMatchAndRewrite(
   // Create sequential insertSlice ops.
   SmallVector<Value> toYield;
   rewriter.setInsertionPoint(performConcurrentlyOp);
-  for (Operation &operation : performConcurrentlyOp.yieldingOps()) {
-    scf::ParallelInsertSliceOp op =
-        cast<scf::ParallelInsertSliceOp>(&operation);
+  for (Operation &operation : performConcurrentlyOp.getYieldingOps()) {
+    tensor::ParallelInsertSliceOp op =
+        cast<tensor::ParallelInsertSliceOp>(&operation);
     toYield.push_back(rewriter.createOrFold<tensor::InsertSliceOp>(
         loc, op.getSource(), bvm.lookup(op.getDest()), op.getMixedOffsets(),
         op.getMixedSizes(), op.getMixedStrides()));

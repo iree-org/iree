@@ -376,6 +376,7 @@ cc_library(
         ":IREELinalgExtTransforms",
         ":IREELinalgTransformDialect",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:TransformDialect",
     ],

@@ -26,7 +26,7 @@ func.func @resourceAlloca(%arg0: index, %await_timepoint: !stream.timepoint) -> 
   // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
   // CHECK-SAME: : !hal.buffer{%arg0}
   %0:2 = stream.resource.alloca uninitialized : !stream.resource<staging>{%arg0} => !stream.timepoint
-  // CHECK: %[[IMMEDIATE:.+]] = arith.constant 0 : index
+  // CHECK: %[[IMMEDIATE:.+]] = arith.constant 0 : i64
   // CHECK: return %[[RET0]], %[[IMMEDIATE]]
   return %0#0, %0#1 : !stream.resource<staging>, !stream.timepoint
 }
@@ -42,7 +42,7 @@ func.func @resourceAllocaAwait(%arg0: index, %await_timepoint: !stream.timepoint
   // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
   // CHECK-SAME: : !hal.buffer{%arg0}
   %0:2 = stream.resource.alloca uninitialized await(%await_timepoint) => !stream.resource<staging>{%arg0} => !stream.timepoint
-  // CHECK: %[[IMMEDIATE:.+]] = arith.constant 0 : index
+  // CHECK: %[[IMMEDIATE:.+]] = arith.constant 0 : i64
   // CHECK: return %[[RET0]], %[[IMMEDIATE]]
   return %0#0, %0#1 : !stream.resource<staging>, !stream.timepoint
 }
@@ -54,7 +54,7 @@ func.func @resourceAllocaAwait(%arg0: index, %await_timepoint: !stream.timepoint
 // CHECK-LABEL: @resourceDealloca
 func.func @resourceDealloca(%arg0: index, %arg1: !stream.resource<staging>, %arg2: !stream.timepoint) -> !stream.timepoint {
   %0 = stream.resource.dealloca %arg1 : !stream.resource<staging>{%arg0} => !stream.timepoint
-  // CHECK: %[[IMMEDIATE:.+]] = arith.constant 0 : index
+  // CHECK: %[[IMMEDIATE:.+]] = arith.constant 0 : i64
   // CHECK: return %[[IMMEDIATE]]
   return %0 : !stream.timepoint
 }
@@ -66,7 +66,7 @@ func.func @resourceDealloca(%arg0: index, %arg1: !stream.resource<staging>, %arg
 // CHECK-LABEL: @resourceDeallocaAwait
 func.func @resourceDeallocaAwait(%arg0: index, %arg1: !stream.resource<staging>, %arg2: !stream.timepoint) -> !stream.timepoint {
   %0 = stream.resource.dealloca await(%arg2) => %arg1 : !stream.resource<staging>{%arg0} => !stream.timepoint
-  // CHECK: %[[IMMEDIATE:.+]] = arith.constant 0 : index
+  // CHECK: %[[IMMEDIATE:.+]] = arith.constant 0 : i64
   // CHECK: return %[[IMMEDIATE]]
   return %0 : !stream.timepoint
 }
