@@ -113,6 +113,8 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
 static FailureOr<Value> gpuComprehensiveBufferizeAllocationFn(
     OpBuilder &builder, Location loc, MemRefType memRefType,
     ValueRange dynamicSizes, unsigned alignment) {
+  // TODO: use gpu::GPUDialect::getWorkgroupAddressSpace() but this requires
+  // moving out of CommonExtensions.
   MemRefType allocType = MemRefType::get(memRefType.getShape(),
                                          memRefType.getElementType(), {}, 3);
   return builder
