@@ -41,8 +41,8 @@ with ir.Context() as ctx:
     }
   """)
 
-  options = ireec.CompilerOptions(
-      "--iree-hal-target-backends=cpu", "--iree-input-type=mhlo")
+  options = ireec.CompilerOptions("--iree-hal-target-backends=cpu",
+                                  "--iree-input-type=mhlo")
   print(options)
   pm = passmanager.PassManager()
   ireec.build_iree_vm_pass_pipeline(options, pm)

@@ -45,11 +45,12 @@ class CompilerTest(unittest.TestCase):
     print(options)
 
   def testMultipleOptions(self):
-    options = ireec.CompilerOptions(
-        "--iree-input-type=mhlo", "--iree-tflite-bindings-support=true")
+    options = ireec.CompilerOptions("--iree-input-type=mhlo",
+                                    "--iree-tflite-bindings-support=true")
     self.assertEqual(
         repr(options),
-        "<CompilerOptions:['--iree-input-type=mhlo', '--iree-tflite-bindings-support=true']>")
+        "<CompilerOptions:['--iree-input-type=mhlo', '--iree-tflite-bindings-support=true']>"
+    )
 
 
 if __name__ == "__main__":
