@@ -198,9 +198,10 @@ DiagnosedSilenceableFailure
 transform_dialect::ForeachThreadToGpuAndTranslationInfo::applyToOne(
     func::FuncOp target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
-  if (!isa<HAL::ExecutableVariantOp>(state.getTopLevel())) {
+  if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
     state.getTopLevel()->emitOpError(
-        "requires HAL::ExecutableVariantOp toplevel");
+        "requires HAL::ExecutableOp or HAL::ExecutableVariantOp toplevel to "
+        "attach the workgroup size information to a nested ExecutableExportOp");
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
   }
 
@@ -353,11 +354,12 @@ DiagnosedSilenceableFailure
 transform_dialect::VectorWarpExecuteOnLane0Op::applyToOne(
     scf::IfOp target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
-  if (!isa<HAL::ExecutableVariantOp>(state.getTopLevel())) {
+  if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
     state.getTopLevel()->emitOpError(
-        "requires HAL::ExecutableVariantOp toplevel so that IR is properly "
-        "isolated. This is required so we can safely inspect the "
-        "HAL::ExecutableExportOp under multi-threaded pass assumptions.");
+        "requires HAL::ExecutableOp or HAL::ExecutableVariantOp toplevel so "
+        "that "
+        "IR is properly isolated. This is required so we can safely inspect "
+        "the HAL::ExecutableExportOp under multi-threaded pass assumptions.");
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
   }
 

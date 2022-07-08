@@ -290,8 +290,9 @@ extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName;
 
 void addGPUTransformDialectInterpreterPasses(OpPassManager &passManager) {
   // Give control to the transform dialect.
-  passManager.addPass(createTransformDialectInterpreterPass(
-      clGPUCodegenTransformDialectFileName));
+  passManager.addPass(
+      mlir::iree_compiler::createTransformDialectInterpreterPass(
+          clGPUCodegenTransformDialectFileName));
 
   // Dropping the schedule is only needed if we want to embed the transform in
   // the module: we should drop the schedule once applied.
