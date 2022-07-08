@@ -229,3 +229,28 @@ hal.executable @shared_memory_lowering {
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(4096 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
 //  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<1 x array<8 x array<16 x f32>>>, 3>
+
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>
+  ]>
+]>
+hal.executable @shared_memory_dealloc_elision {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+    hal.executable.export @shared_memory_dealloc_elision layout(#executable_layout)
+    builtin.module {
+      func.func @shared_memory_dealloc_elision() {
+        %f0 = arith.constant 0.0 : f32
+        %c0 = arith.constant 0 : index
+        //     CHECK: llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+        %0 = memref.alloc() : memref<1xf32, 3>
+        memref.store %f0, %0[%c0] : memref<1xf32, 3>
+        // CHECK-NOT: free
+        memref.dealloc %0 : memref<1xf32, 3>
+        return
+      }
+    }
+  }
+}
