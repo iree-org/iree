@@ -156,17 +156,25 @@ def Stream_TimelineOp : OpInterface<"TimelineOpInterface"> {
   }];
 
   let methods = [
-    // TODO(benvanik): implement interface methods:
-    //   getWaitTimepoints
-    //   setWaitTimepoints
-    //   getWaitResources
-    //   getSignalTimepoint
-    //   setSignalTimepoint
-    //   getSignalResources
-    //   + maybe mutable resource accessors? (MutableOperandRange)
-    // This would let us rework code relying on AsyncExecuteOp/CmdExecuteOp to
-    // work with both, and wait elision canonicalization patterns to be shared
-    // across the async resource ops and execution ops.
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns zero or more timepoints consumed by this timeline operation
+        indicating the asynchronous operations that must complete before it can
+        perform its operation.
+      }],
+      /*retTy=*/"SmallVector<Value>",
+      /*methodName=*/"getAwaitTimepoints",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the timepoint produced by this timeline operation indicating the
+        asynchronous completion of the operation.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getResultTimepoint",
+      /*args=*/(ins)
+    >,
   ];
 }
 

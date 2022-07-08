@@ -122,6 +122,9 @@ def Stream_ResourceAllocaOp : Stream_PureOp<"resource.alloca", [
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return {}; }
     Value getResultSize(unsigned idx) { return getStorageSize(); }
+    SmallVector<Value> getAwaitTimepoints() {
+      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
+    }
   }];
 
   let hasCanonicalizer = 1;
@@ -170,6 +173,9 @@ def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return getOperandSize(); }
     Value getResultSize(unsigned idx) { return {}; }
+    SmallVector<Value> getAwaitTimepoints() {
+      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
+    }
   }];
 
   let hasCanonicalizer = 1;
@@ -531,6 +537,7 @@ def Stream_ResourceConstantsOp : Stream_PureOp<"resource.constants", [
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return {}; }
     Value getResultSize(unsigned idx) { return getResultSizes()[idx]; }
+    SmallVector<Value> getAwaitTimepoints() { return {}; }
   }];
 }
 
@@ -1975,6 +1982,9 @@ def Stream_AsyncExecuteOp : Stream_Op<"async.execute", [
     Value getResultSize(unsigned idx) {
       return findValueSizeInList(idx, getResults(), getResultSizes());
     }
+    SmallVector<Value> getAwaitTimepoints() {
+      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
+    }
   }];
 
   let hasVerifier = 1;
@@ -2417,6 +2427,9 @@ def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
     Value getResultSize(unsigned idx) {
       return {};
     }
+    SmallVector<Value> getAwaitTimepoints() {
+      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
+    }
   }];
 
   let hasVerifier = 1;
@@ -2579,6 +2592,10 @@ def Stream_TimepointImmediateOp : Stream_PureOp<"timepoint.immediate", [
     `=` `` `>` type($result_timepoint)
   }];
 
+  let extraClassDeclaration = [{
+    SmallVector<Value> getAwaitTimepoints() { return {}; }
+  }];
+
   let hasFolder = 1;
 }
 
@@ -2727,6 +2744,10 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
     Value getResultSize(unsigned idx) {
       return getResourceOperandSizes()[idx];
     }
+    SmallVector<Value> getAwaitTimepoints() {
+      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
+    }
+    Value getResultTimepoint() { return {}; }
   }];
 
   let hasVerifier = 1;
