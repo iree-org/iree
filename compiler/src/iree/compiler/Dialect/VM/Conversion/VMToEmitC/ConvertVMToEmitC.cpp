@@ -1591,7 +1591,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
     // function name.
     auto typedefStruct = [&rewriter, &newFuncOp, &loc](
                              std::string structName,
-                             SmallVector<emitc_builders::StructField> fields) {
+                             ArrayRef<emitc_builders::StructField> fields) {
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPoint(newFuncOp.getOperation());
 

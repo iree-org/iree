@@ -29,7 +29,7 @@ Value arrayElementAddress(OpBuilder builder, Location location, Type type,
 }
 
 void structDefinition(OpBuilder builder, Location location,
-                      StringRef structName, SmallVector<StructField> fields) {
+                      StringRef structName, ArrayRef<StructField> fields) {
   std::string structBody;
 
   for (auto &field : fields) {
