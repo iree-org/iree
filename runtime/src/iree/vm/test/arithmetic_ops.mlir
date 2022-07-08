@@ -98,6 +98,16 @@ vm.module @arithmetic_ops {
     vm.return
   }
 
+  vm.export @test_abs_i32
+  vm.func @test_abs_i32() {
+    %c1 = vm.const.i32 -1
+    %c1dno = util.do_not_optimize(%c1) : i32
+    %v = vm.abs.i32 %c1dno : i32
+    %c2 = vm.const.i32 1
+    vm.check.eq %v, %c2, "abs(-1)=1" : i32
+    vm.return
+  }
+
   vm.export @test_not_i32
   vm.func @test_not_i32() {
     %c1 = vm.const.i32 0

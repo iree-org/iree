@@ -77,6 +77,28 @@ vm.module @my_module {
 
 // -----
 
+// CHECK-LABEL: @fma_i32
+vm.module @my_module {
+  vm.func @fma_i32(%arg0 : i32, %arg1 : i32, %arg2 : i32) -> i32 {
+    // CHECK: %0 = vm.fma.i32 %arg0, %arg1, %arg2 : i32
+    %0 = vm.fma.i32 %arg0, %arg1, %arg2 : i32
+    vm.return %0 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @abs_i32
+vm.module @my_module {
+  vm.func @abs_i32(%arg0 : i32) -> i32 {
+    // CHECK: %0 = vm.abs.i32 %arg0 : i32
+    %0 = vm.abs.i32 %arg0 : i32
+    vm.return %0 : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @not_i32
 vm.module @my_module {
   vm.func @not_i32(%arg0 : i32) -> i32 {

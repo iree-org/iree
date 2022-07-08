@@ -941,6 +941,16 @@ void FMAI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<CanonicalizeFMA<FMAI64Op, MulI64Op, AddI64Op>>(context);
 }
 
+OpFoldResult AbsI32Op::fold(ArrayRef<Attribute> operands) {
+  return constFoldUnaryOp<IntegerAttr>(operands,
+                                       [](const APInt &a) { return a.abs(); });
+}
+
+OpFoldResult AbsI64Op::fold(ArrayRef<Attribute> operands) {
+  return constFoldUnaryOp<IntegerAttr>(operands,
+                                       [](const APInt &a) { return a.abs(); });
+}
+
 //===----------------------------------------------------------------------===//
 // Floating-point arithmetic
 //===----------------------------------------------------------------------===//
