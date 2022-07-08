@@ -36,7 +36,6 @@ import argparse
 import json
 import os
 import requests
-
 import markdown_strings as md
 
 from typing import Any, Dict, Optional, Sequence, Tuple
@@ -142,6 +141,12 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
 
   commit_info = f"@ commit {pr_commit}"
   if query_base:
+    # Collect the metric keys for each compilation target.
+    compilation_metric_keys = set()
+    for target_name in all_compilation_metrics:
+      for mapper in COMPILATION_METRICS_TO_TABLE_MAPPERS:
+        compilation_metric_keys.add(mapper.get_series_name(target_name))
+
     # Try to query some base benchmark to diff against, from the top of the
     # tree. Bail out if the maximal trial number is exceeded.
     for i in range(MAX_BASE_COMMIT_QUERY_COUNT):
@@ -150,17 +155,26 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
       base_commit = md.link(base_commit,
                             f"{GITHUB_IREE_REPO_PREFIX}/commit/{base_commit}")
 
-      # TODO(#9167): Searching with keys from compilation metrics.
       # Skip if the base doesn't contain all benchmarks to be compared.
-      if not (set(all_benchmarks.keys()) <= set(base_benchmarks.keys())):
+      base_keys = set(base_benchmarks.keys())
+      if (not (set(all_benchmarks.keys()) <= base_keys) or
+          not (compilation_metric_keys <= base_keys)):
         commit_info = (f"@ commit {pr_commit} (no previous benchmark results to"
                        f" compare against since {base_commit})")
         continue
 
-      # TODO(#9167): Update bases of compilation metrics.
       # Update the aggregate benchmarks with base numbers.
       for bench in all_benchmarks:
         all_benchmarks[bench].base_mean_time = base_benchmarks[bench]
+
+      # Update the compilation metrics with base numbers.
+      for target_name, metrics in all_compilation_metrics.items():
+        updated_metrics = metrics
+        for mapper in COMPILATION_METRICS_TO_TABLE_MAPPERS:
+          metric_key = mapper.get_series_name(target_name)
+          updated_metrics = mapper.update_base_value(
+              updated_metrics, base_benchmarks[metric_key])
+        all_compilation_metrics[target_name] = updated_metrics
 
       commit_info = f"@ commit {pr_commit} (vs. base {base_commit})"
       break
