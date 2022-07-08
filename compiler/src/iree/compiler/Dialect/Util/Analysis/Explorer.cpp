@@ -389,6 +389,11 @@ TraversalResult Explorer::walkIncomingCalls(
 TraversalResult Explorer::walkReturnOps(Operation *parentOp,
                                         OperationWalkFn fn) {
   LLVM_DEBUG(llvm::dbgs() << "[[ Explorer::walkReturnOps ]]\n");
+  if (getTraversalAction(parentOp) != TraversalAction::RECURSE) {
+    LLVM_DEBUG(llvm::dbgs() << "  -- ignoring region op "
+                            << parentOp->getName().getStringRef() << "\n");
+    return TraversalResult::COMPLETE;
+  }
   TraversalResult result = TraversalResult::COMPLETE;
   if (auto regionOp = dyn_cast<RegionBranchOpInterface>(parentOp)) {
     auto enumerateTerminatorOps = [&](Region &region) {
@@ -505,6 +510,16 @@ TraversalResult Explorer::walkIncomingBranchOperands(
   }
 
   return result;
+}
+
+TraversalResult Explorer::walkIncomingBlockArgument(
+    BlockArgument blockArg,
+    std::function<WalkResult(Block *sourceBlock, Value operand)> fn) {
+  return walkIncomingBranchOperands(
+      blockArg.getParentBlock(),
+      [&](Block *sourceBlock, OperandRange operands) {
+        return fn(sourceBlock, operands[blockArg.getArgNumber()]);
+      });
 }
 
 TraversalResult Explorer::walkOutgoingBranchArguments(

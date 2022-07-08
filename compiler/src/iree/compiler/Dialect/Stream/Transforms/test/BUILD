@@ -21,6 +21,8 @@ iree_lit_test_suite(
             "convert_to_stream.mlir",
             "dump_statistics.mlir",
             "elide_async_copies.mlir",
+            "elide_timepoints_coverage.mlir",
+            "elide_timepoints_immediate.mlir",
             "encode_device_tensors.mlir",
             "encode_host_tensors.mlir",
             "fold_globals.mlir",

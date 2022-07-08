@@ -20,6 +20,7 @@ iree_compiler_cc_library(
         "ConvertToStream.cpp",
         "DumpStatistics.cpp",
         "ElideAsyncCopies.cpp",
+        "ElideTimepoints.cpp",
         "EncodeTensors.cpp",
         "FoldUniformOperands.cpp",
         "FuseDispatchBindings.cpp",

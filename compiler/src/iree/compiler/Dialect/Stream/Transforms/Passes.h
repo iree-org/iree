@@ -124,6 +124,7 @@ std::unique_ptr<InterfacePass<CallableOpInterface>>
 createScheduleConcurrencyPass();
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateTimepointsPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createElideTimepointsPass();
 
 //===----------------------------------------------------------------------===//
 // Allocation and command issuing

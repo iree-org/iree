@@ -133,6 +133,26 @@ class Explorer {
     bool isIndirect = false;
     // All loads and stores of the global across the program.
     SmallVector<Operation *> uses;
+
+    // Returns a range of all direct loads of the global.
+    auto getLoads() const {
+      assert(!isIndirect && "indirect loads not yet tracked");
+      return llvm::map_range(
+          llvm::make_filter_range(
+              uses,
+              [](Operation *op) { return isa<IREE::Util::GlobalLoadOp>(op); }),
+          [](Operation *op) { return cast<IREE::Util::GlobalLoadOp>(op); });
+    }
+
+    // Returns a range of all direct stores to the global.
+    auto getStores() const {
+      assert(!isIndirect && "indirect stores not yet tracked");
+      return llvm::map_range(
+          llvm::make_filter_range(
+              uses,
+              [](Operation *op) { return isa<IREE::Util::GlobalStoreOp>(op); }),
+          [](Operation *op) { return cast<IREE::Util::GlobalStoreOp>(op); });
+    }
   };
 
   // Gets analyzed global information for the given global operation.
@@ -207,6 +227,11 @@ class Explorer {
   TraversalResult walkIncomingBranchOperands(
       Block *targetBlock,
       std::function<WalkResult(Block *sourceBlock, OperandRange operands)> fn);
+
+  // Walks all predecessor blocks providing values for |blockArg|.
+  TraversalResult walkIncomingBlockArgument(
+      BlockArgument blockArg,
+      std::function<WalkResult(Block *sourceBlock, Value operand)> fn);
 
   // Walks all successor blocks of |sourceBlock| and provides their arguments.
   // Note that |sourceBlock| may be enumerated if there is recursion.
