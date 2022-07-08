@@ -4521,6 +4521,8 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                                          "vm_rem_i32u");
   patterns.add<GenericOpConversion<IREE::VM::FMAI32Op>>(typeConverter, context,
                                                         "vm_fma_i32");
+  patterns.add<GenericOpConversion<IREE::VM::AbsI32Op>>(typeConverter, context,
+                                                        "vm_abs_i32");
   patterns.add<GenericOpConversion<IREE::VM::NotI32Op>>(typeConverter, context,
                                                         "vm_not_i32");
   patterns.add<GenericOpConversion<IREE::VM::AndI32Op>>(typeConverter, context,
@@ -4716,6 +4718,8 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                                          "vm_rem_i64u");
   patterns.add<GenericOpConversion<IREE::VM::FMAI64Op>>(typeConverter, context,
                                                         "vm_fma_i64");
+  patterns.add<GenericOpConversion<IREE::VM::AbsI64Op>>(typeConverter, context,
+                                                        "vm_abs_i64");
   patterns.add<GenericOpConversion<IREE::VM::NotI64Op>>(typeConverter, context,
                                                         "vm_not_i64");
   patterns.add<GenericOpConversion<IREE::VM::AndI64Op>>(typeConverter, context,
