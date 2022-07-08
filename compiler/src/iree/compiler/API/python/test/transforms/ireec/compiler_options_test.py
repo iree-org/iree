@@ -49,7 +49,7 @@ class CompilerTest(unittest.TestCase):
                                     "--iree-tflite-bindings-support=true")
     self.assertEqual(
         repr(options),
-        "<CompilerOptions:['--iree-input-type=mhlo', '--iree-tflite-bindings-support=true']>"
+        "<CompilerOptions:['--iree-tflite-bindings-support=true', '--iree-input-type=mhlo']>"
     )
 
 
