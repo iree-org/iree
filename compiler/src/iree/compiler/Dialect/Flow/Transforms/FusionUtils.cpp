@@ -68,6 +68,9 @@ static bool canInsOperandTieWithOutsOperand(OpOperand *insOperand) {
 static bool isReductionOnInnermostDims(linalg::LinalgOp linalgOp) {
   SmallVector<Operation *, 4> combinerOps;
 
+  auto numInputs = linalgOp.getNumInputs();
+  if (numInputs != 1 && numInputs != 2) return false;
+
   if (linalgOp.getNumOutputs() != 1) return false;
 
   // Check if the result dims are d0, d1, ..., which means the reduction is done
@@ -128,22 +131,46 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
   // Check if the consumer is an elementwise with identity output indexing map.
   if (!isSimpleElementwise(consumer)) return false;
 
-  // Check if the reduction has at least one input with identity indexing map.
-  OpOperand *reductionInput = nullptr;
-  for (OpOperand *operand : producer.getInputOperands()) {
-    auto map = producer.getTiedIndexingMap(operand);
-    if (map.isIdentity()) {
-      reductionInput = operand;
-      break;
+  // Check the input and output shapes are compatible. They are compatible when
+  //   1. the shapes are identical, or
+  //   2. the broadcasted input shape is the same as the output shape.
+  auto numInputs = producer.getNumInputs();
+  auto ewOutputType = consumer.getOutputOperand(0)->get().getType();
+  if (numInputs == 1) {
+    if (producer.getInputOperand(0)->get().getType() != ewOutputType)
+      return false;
+  } else {
+    assert(numInputs == 2 && "Expected two inputs to reduction");
+
+    // For a binary reduction, at least one of them should be in a full
+    // dimension. Here we put another restriction that the full input does not
+    // have a transpose, which may be relaxed later. For the other operand, we
+    // expect it to be broadcasted to the output shape.
+    OpOperand *fullInput = nullptr;
+    OpOperand *otherInput = nullptr;
+    for (unsigned i = 0; i < 2; ++i) {
+      auto input = producer.getInputOperand(i);
+      auto indexingMap = producer.getTiedIndexingMap(input);
+      if (indexingMap.isIdentity()) {
+        fullInput = input;
+        otherInput = producer.getInputOperand(i == 0 ? 1 : 0);
+        break;
+      }
+    }
+    if (!fullInput) return false;
+
+    if (fullInput->get().getType() != ewOutputType) return false;
+
+    auto otherIndexingMap = producer.getTiedIndexingMap(otherInput);
+    if (!otherIndexingMap.isProjectedPermutation()) return false;
+
+    if (!otherIndexingMap.isIdentity()) {
+      // We do not support transpose for the input yet.
+      if (otherIndexingMap.isPermutation()) return false;
+
+      // Otherwise, it is a broadcasting supported.
     }
   }
-  if (!reductionInput) return false;
-
-  // Check the reduction input type is the same as the type of the elementwise
-  // output.
-  if (reductionInput->get().getType() !=
-      consumer.getOutputOperand(0)->get().getType())
-    return false;
 
   return true;
 }
