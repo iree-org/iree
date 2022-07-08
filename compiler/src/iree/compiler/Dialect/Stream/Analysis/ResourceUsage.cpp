@@ -129,7 +129,7 @@ class AbstractResourceUsage
     return convertBitsToResourceUsage(this->getAssumed());
   }
 
-  const std::string getAsStr() const override {
+  const std::string getAsStr(AsmState &asmState) const override {
     std::string str;
     auto append = [&](const char *part) {
       if (!str.empty()) str += '|';

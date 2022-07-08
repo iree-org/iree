@@ -57,7 +57,7 @@ void AbstractElement::print(llvm::raw_ostream &os, AsmState &asmState) const {
     os << "<<null>>";
   }
 
-  os << " with state " << getAsStr();
+  os << " with state " << getAsStr(asmState);
 }
 
 void AbstractElement::printWithDeps(llvm::raw_ostream &os,
