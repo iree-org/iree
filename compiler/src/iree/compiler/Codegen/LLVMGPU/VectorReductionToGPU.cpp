@@ -51,6 +51,34 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
   return laneVal;
 }
 
+/// Emit reduction across a group for a given input.
+static Value groupReduction(Location loc, OpBuilder &builder, Value input,
+                            vector::CombiningKind kind, uint32_t size) {
+  const int warpSize = 32;
+  Value laneVal = warpReduction(loc, builder, input, kind, warpSize);
+  // if we have more than one warp, reduce across warps.
+  if (size > warpSize) {
+    uint32_t numWarp = size / warpSize;
+    MemRefType memrefType =
+        MemRefType::get(numWarp, input.getType(), {},
+                        gpu::GPUDialect::getWorkgroupAddressSpace());
+    Value alloc = builder.create<memref::AllocOp>(loc, memrefType);
+    Value threadX = builder.create<gpu::ThreadIdOp>(loc, builder.getIndexType(),
+                                                    gpu::Dimension::x);
+    Value cstWarpSize = builder.create<arith::ConstantIndexOp>(loc, warpSize);
+    Value warpId = builder.create<arith::DivUIOp>(loc, threadX, cstWarpSize);
+    // Store the reduction for each warp.
+    SmallVector<Value> indices = {warpId};
+    builder.create<memref::StoreOp>(loc, laneVal, alloc, indices);
+    builder.create<gpu::BarrierOp>(loc);
+    VectorType vecType = VectorType::get(numWarp, input.getType());
+    Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+    Value vec = builder.create<vector::LoadOp>(loc, vecType, alloc, zero);
+    laneVal = builder.create<vector::ReductionOp>(loc, kind, vec);
+  }
+  return laneVal;
+}
+
 /// Special case to hoist hal operations that have side effect but are safe to
 /// move out of the warp single lane region.
 static void hoistHalBindingOps(vector::WarpExecuteOnLane0Op warpOp) {
@@ -95,7 +123,7 @@ class InsertElementToBroadcast final
 struct LLVMGPUReduceToGPUPass
     : public LLVMGPUReduceToGPUBase<LLVMGPUReduceToGPUPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<scf::SCFDialect>();
+    registry.insert<scf::SCFDialect, memref::MemRefDialect>();
   }
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
@@ -111,22 +139,23 @@ struct LLVMGPUReduceToGPUPass
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
+    auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
+        getEntryPoint(funcOp)->workgroup_size().getValue(),
+        [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
+    assert(workgroupSize[1] == 1 && workgroupSize[2] == 1);
     // 2. Create the warp op and move the function body into it.
-    const int warpSize = 32;
+    const int groupSize = workgroupSize[0];
     Location loc = funcOp.getLoc();
     OpBuilder builder(funcOp);
     auto threadX = builder.create<gpu::ThreadIdOp>(loc, builder.getIndexType(),
                                                    gpu::Dimension::x);
-    auto cstWarpSize = builder.create<arith::ConstantIndexOp>(loc, warpSize);
-    auto laneId =
-        builder.create<arith::RemUIOp>(loc, threadX.getResult(), cstWarpSize);
+    auto cstGroupSize = builder.create<arith::ConstantIndexOp>(loc, groupSize);
     auto warpOp = builder.create<vector::WarpExecuteOnLane0Op>(
-        loc, TypeRange(), laneId, warpSize);
+        loc, TypeRange(), threadX.getResult(), groupSize);
     warpOp.getWarpRegion().takeBody(funcOp.getBody());
     Block &newBlock = funcOp.getBody().emplaceBlock();
     threadX->moveBefore(&newBlock, newBlock.end());
-    cstWarpSize->moveBefore(&newBlock, newBlock.end());
-    laneId->moveBefore(&newBlock, newBlock.end());
+    cstGroupSize->moveBefore(&newBlock, newBlock.end());
     warpOp->moveBefore(&newBlock, newBlock.end());
     warpOp.getWarpRegion().getBlocks().back().back().moveBefore(&newBlock,
                                                                 newBlock.end());
@@ -160,7 +189,7 @@ struct LLVMGPUReduceToGPUPass
     {
       RewritePatternSet patterns(ctx);
       vector::populatePropagateWarpVectorDistributionPatterns(patterns);
-      vector::populateDistributeReduction(patterns, warpReduction);
+      vector::populateDistributeReduction(patterns, groupReduction);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
@@ -170,7 +199,9 @@ struct LLVMGPUReduceToGPUPass
       vector::WarpExecuteOnLane0LoweringOptions options;
       options.warpAllocationFn = allocateGlobalSharedMemory;
       options.warpSyncronizationFn = [](Location loc, OpBuilder &builder,
-                                        vector::WarpExecuteOnLane0Op warpOp) {};
+                                        vector::WarpExecuteOnLane0Op warpOp) {
+        builder.create<gpu::BarrierOp>(loc);
+      };
       vector::populateWarpExecuteOnLane0OpToScfForPattern(patterns, options);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }

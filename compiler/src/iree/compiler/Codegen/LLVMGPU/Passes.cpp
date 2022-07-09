@@ -186,21 +186,18 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
 void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   tileAndBufferize(pm);
 
-  auto &nestedModulePM = pm.nest<ModuleOp>();
-  // Distribute linalg onto warps within the workgroup.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMGPUTileAndDistribute(/*distributeToWarp=*/true));
+  // Don't tile to warp or thread and use vector distribution instead.
 
+  auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
 
-  const int64_t nativeVector = 32;
   // Linalg -> vector
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMGPUVectorizationPass(nativeVector, /*generateContract=*/false));
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorizationPass(
+      /*nativeVector=*/0, /*generateContract=*/false));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLoopInvariantCodeMotionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());

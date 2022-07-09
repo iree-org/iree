@@ -484,17 +484,14 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
     return failure();
   Optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
   if (!dimSize || *dimSize % cudaWarpSize != 0) return failure();
+  // TODO: Add reduction tiling to handle larger reductions.
+  if (*dimSize > 1024) return failure();
   SmallVector<unsigned> parallelDims;
   op.getParallelDims(parallelDims);
-  unsigned *innerParallelDim =
-      std::max_element(parallelDims.begin(), parallelDims.end());
-  Optional<int64_t> innerParallelDimSize =
-      getLinalgDimSize(op, *innerParallelDim);
+  unsigned vectorSize = 4;
+  while ((*dimSize / vectorSize) % cudaWarpSize != 0) vectorSize /= 2;
 
-  int64_t numWarps =
-      (innerParallelDimSize && (*innerParallelDimSize % 2 == 0)) ? 2 : 1;
-
-  std::array<int64_t, 3> workgroupSize = {numWarps * cudaWarpSize, 1, 1};
+  std::array<int64_t, 3> workgroupSize = {*dimSize / vectorSize, 1, 1};
 
   SmallVector<unsigned> partitionedLoops =
       cast<PartitionableLoopsInterface>(op.getOperation())
@@ -502,22 +499,8 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   llvm::SmallDenseSet<unsigned, 4> partitionedLoopsSet;
   partitionedLoopsSet.insert(partitionedLoops.begin(), partitionedLoops.end());
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
+  // Tile all the parallel dimension to 1.
   SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
-  // Don't try to vectorize the store op right now.
-  unsigned vectorSize = 1;
-  // Set the inner most parallel loop to `lowerTs`.
-  for (int64_t depth = numLoops; depth > 0; depth--) {
-    if (partitionedLoopsSet.count(depth - 1)) {
-      workgroupTileSizes[depth - 1] =
-          (workgroupSize[0] * vectorSize) / cudaWarpSize;
-      break;
-    }
-  }
-  // Tile the reduction size to the size of a warp so that we can distribute the
-  // load from the reduced dimension on the whole warp. Once we support
-  // unrolling multi-reduce op we can try to tile to 4 * warpSize to vectorize
-  // load.
-  workgroupTileSizes.append(reductionDims.size(), cudaWarpSize);
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
   return setOpConfigAndEntryPointFnTranslation(
