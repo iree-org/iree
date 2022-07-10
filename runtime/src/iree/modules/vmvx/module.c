@@ -324,8 +324,8 @@ IREE_VM_ABI_EXPORT(iree_vmvx_add2d_f32, iree_vmvx_module_state_t,
                    /*size1=*/
                    args->binary2d.size1);
 
-  for (iree_device_size_t i = 0; i < out_size0; ++i) {
-    for (iree_device_size_t j = 0; j < out_size1; ++j) {
+  for (iree_host_size_t i = 0; i < out_size0; ++i) {
+    for (iree_host_size_t j = 0; j < out_size1; ++j) {
       out[i * out_stride0 + j * out_stride1] =
           lhs[i * lhs_stride0 + j * lhs_stride1] +
           rhs[i * rhs_stride0 + j * rhs_stride1];
@@ -338,6 +338,7 @@ IREE_VM_ABI_EXPORT(iree_vmvx_add2d_f32, iree_vmvx_module_state_t,
 
 IREE_VM_ABI_EXPORT(iree_vmvx_copy2d_x32, iree_vmvx_module_state_t, rIIIrIIIII,
                    v) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   MAP_BUFFER_2D_RO(in, int32_t,
                    /*buffer_ref=*/
                    args->unary2d.in_ref,
@@ -365,9 +366,8 @@ IREE_VM_ABI_EXPORT(iree_vmvx_copy2d_x32, iree_vmvx_module_state_t, rIIIrIIIII,
                    /*size1=*/
                    args->unary2d.size1);
 
-  IREE_TRACE_ZONE_BEGIN(z0);
-  for (iree_device_size_t j = 0; j < out_size0; ++j) {
-    for (iree_device_size_t i = 0; i < out_size1; ++i) {
+  for (iree_host_size_t j = 0; j < out_size0; ++j) {
+    for (iree_host_size_t i = 0; i < out_size1; ++i) {
       out[j * out_stride0 + i * out_stride1] =
           in[j * in_stride0 + i * in_stride1];
     }
@@ -393,8 +393,8 @@ IREE_VM_ABI_EXPORT(iree_vmvx_fill2d_x32, iree_vmvx_module_state_t, irIIII, v) {
                    /*size1=*/
                    args->fill2d_x32.size1);
 
-  for (iree_device_size_t i = 0; i < out_size0; ++i) {
-    for (iree_device_size_t j = 0; j < out_size1; ++j) {
+  for (iree_host_size_t i = 0; i < out_size0; ++i) {
+    for (iree_host_size_t j = 0; j < out_size1; ++j) {
       out[i * out_stride0 + j] = args->fill2d_x32.fill_value;
     }
   }
@@ -455,10 +455,10 @@ IREE_VM_ABI_EXPORT(iree_vmvx_matmul_f32f32f32, iree_vmvx_module_state_t,
   // robustly.
   if (args->matmul_f32.flags == 0) {
     // Row major.
-    for (iree_device_size_t i = 0; i < M; ++i) {
-      for (iree_device_size_t k = 0; k < K; ++k) {
+    for (iree_host_size_t i = 0; i < M; ++i) {
+      for (iree_host_size_t k = 0; k < K; ++k) {
         float apart = args->matmul_f32.alpha * lhs[i * lhs_stride0 + k];
-        for (iree_device_size_t j = 0; j < N; ++j) {
+        for (iree_host_size_t j = 0; j < N; ++j) {
           out[i * out_stride0 + j] +=
               args->matmul_f32.beta * apart * rhs[k * rhs_stride0 + j];
         }
@@ -517,11 +517,7 @@ static const iree_vm_native_export_descriptor_t iree_vmvx_module_exports_[] = {
 };
 static_assert(IREE_ARRAYSIZE(iree_vmvx_module_funcs_) ==
                   IREE_ARRAYSIZE(iree_vmvx_module_exports_),
-              "function "
-              "pointer "
-              "table must "
-              "be 1:1 with "
-              "exports");
+              "function pointer table must be 1:1 with exports");
 
 static const iree_vm_native_module_descriptor_t iree_vmvx_module_descriptor_ = {
     .module_name = iree_string_view_literal("vmv"
