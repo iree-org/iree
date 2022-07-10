@@ -476,16 +476,10 @@ IREE_VM_ABI_EXPORT(iree_vmvx_matmul_f32f32f32, iree_vmvx_module_state_t,
 }
 
 //===----------------------------------------------------------------------===//
-// VM module
-// interface
-// implementation
+// VM module interface implementation
 //===----------------------------------------------------------------------===//
 
-// NOTE: this must
-// match the
-// ordering of the
-// iree_vmvx_module_exports_
-// table.
+// NOTE: this must match the ordering of the iree_vmvx_module_exports_table.
 static const iree_vm_native_function_ptr_t iree_vmvx_module_funcs_[] = {
 #define EXPORT_FN(name, target_fn, arg_types, ret_types)       \
   {                                                            \
