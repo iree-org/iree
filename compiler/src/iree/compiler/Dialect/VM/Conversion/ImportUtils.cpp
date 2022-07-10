@@ -64,7 +64,17 @@ Value castToImportType(Value value, Type targetType,
                        ConversionPatternRewriter &rewriter) {
   auto sourceType = value.getType();
   if (sourceType == targetType) return value;
-  if (targetType.isSignedInteger() || targetType.isSignlessInteger()) {
+  bool sourceIsInteger = sourceType.isa<IntegerType>();
+
+  // Allow bitcast between same width float/int types. This is used for
+  // marshalling to "untyped" VM interfaces, which will have an integer type.
+  if (sourceType.isa<FloatType>() && targetType.isa<IntegerType>() &&
+      sourceType.getIntOrFloatBitWidth() ==
+          targetType.getIntOrFloatBitWidth()) {
+    return rewriter.create<mlir::arith::BitcastOp>(value.getLoc(), targetType,
+                                                   value);
+  } else if (sourceIsInteger &&
+             (targetType.isSignedInteger() || targetType.isSignlessInteger())) {
     if (targetType.getIntOrFloatBitWidth() >
         sourceType.getIntOrFloatBitWidth()) {
       return rewriter.create<mlir::arith::ExtSIOp>(value.getLoc(), targetType,
@@ -73,7 +83,7 @@ Value castToImportType(Value value, Type targetType,
       return rewriter.create<mlir::arith::TruncIOp>(value.getLoc(), targetType,
                                                     value);
     }
-  } else if (targetType.isUnsignedInteger()) {
+  } else if (sourceIsInteger && targetType.isUnsignedInteger()) {
     if (targetType.getIntOrFloatBitWidth() >
         sourceType.getIntOrFloatBitWidth()) {
       return rewriter.create<mlir::arith::ExtUIOp>(value.getLoc(), targetType,

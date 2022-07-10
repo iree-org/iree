@@ -454,12 +454,32 @@ struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
   LogicalResult matchAndRewrite(
       ReshapeOpTy op, typename ReshapeOpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
+    auto typeConverter = OpConversionPattern<ReshapeOpTy>::typeConverter;
     if (!isRankOneMemRef(adaptor.src().getType())) {
       return rewriter.notifyMatchFailure(
           op, "expected converted memref of rank == 1");
     }
-    rewriter.replaceOp(op, adaptor.src());
-    return success();
+
+    // If the types are the same, just elide. Otherwise, introduce a cast
+    // so long as both are 1D. This is most often the result of needing
+    // to become more static (i.e. memref<?xf32> -> memref<5xf32>).
+    // Refuse to match if the cast would be illegal.
+    Type newSourceType = adaptor.src().getType();
+    Type neededResultType =
+        typeConverter->convertType(op.getResult().getType());
+    if (!neededResultType) return failure();
+    if (newSourceType == neededResultType) {
+      rewriter.replaceOp(op, adaptor.src());
+      return success();
+    } else if (isRankOneMemRef(neededResultType)) {
+      rewriter.replaceOpWithNewOp<memref::CastOp>(op, op.getResult().getType(),
+                                                  adaptor.src());
+      return success();
+    }
+    return rewriter.notifyMatchFailure(op, [&](Diagnostic &d) {
+      d << "replacement type incompatible (" << newSourceType << " vs "
+        << neededResultType << ")";
+    });
   };
 };
 
@@ -615,10 +635,15 @@ struct FlattenMemRefSubspanPass
     ConversionTarget target(context);
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
     target.addDynamicallyLegalOp<memref::AllocaOp, memref::AllocOp,
-                                 memref::CollapseShapeOp, memref::ExpandShapeOp,
                                  memref::GetGlobalOp>([](Operation *op) {
       return isRankOneMemRef(op->getResultTypes().front());
     });
+    target
+        .addDynamicallyLegalOp<memref::CollapseShapeOp, memref::ExpandShapeOp>(
+            [](Operation *op) {
+              return isRankOneMemRef(op->getResultTypes().front()) &&
+                     isRankOneMemRef(op->getOperandTypes().front());
+            });
     target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
         [](IREE::HAL::InterfaceBindingSubspanOp op) {
           return isRankOneMemRef(op.getType()) &&

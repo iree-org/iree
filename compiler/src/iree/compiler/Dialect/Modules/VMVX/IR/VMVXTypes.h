@@ -23,18 +23,7 @@
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXEnums.h.inc"  // IWYU pragma: export
-// clang-format on
-
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VMVX {
-
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXOpInterface.h.inc"  // IWYU pragma: export
-
-}  // namespace VMVX
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+// clang-format on
 
 #endif  // IREE_COMPILER_DIALECT_MODULES_VMVX_IR_VMVXTYPES_H_

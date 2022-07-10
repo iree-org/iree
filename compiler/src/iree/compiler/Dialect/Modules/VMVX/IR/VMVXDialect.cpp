@@ -38,6 +38,7 @@ class VMVXToVMConversionInterface : public VMConversionDialectInterface {
       SymbolTable &importSymbols, RewritePatternSet &patterns,
       ConversionTarget &conversionTarget,
       TypeConverter &typeConverter) const override {
+    conversionTarget.addIllegalDialect<IREE::VMVX::VMVXDialect>();
     populateVMVXToVMPatterns(getDialect()->getContext(), conversionTarget,
                              typeConverter, importSymbols, patterns);
   }

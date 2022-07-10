@@ -3518,13 +3518,13 @@ def VM_CallOp : VM_CallBaseOp<"call"> {
       $_state.addTypes(callee.getFunctionType().getResults());
     }]>,
     OpBuilder<(ins "FlatSymbolRefAttr":$callee,
-      "ArrayRef<Type>":$resultTypes, CArg<"ValueRange", "{}">:$operands),
+      "mlir::TypeRange":$resultTypes, CArg<"ValueRange", "{}">:$operands),
     [{
       $_state.addOperands(operands);
       $_state.addAttribute("callee", callee);
       $_state.addTypes(resultTypes);
     }]>,
-    OpBuilder<(ins "StringRef":$callee, "ArrayRef<Type>":$resultTypes,
+    OpBuilder<(ins "StringRef":$callee, "mlir::TypeRange":$resultTypes,
       CArg<"ValueRange", "{}">:$operands),
     [{
       build($_builder, $_state, mlir::SymbolRefAttr::get($_builder.getContext(), callee),
