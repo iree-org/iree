@@ -1313,11 +1313,11 @@ IREE_VM_ABI_EXPORT(iree_hal_module_fence_await,  //
           if (!iree_status_is_ok(wait_status)) break;
         }
       } else {
+        current_frame->pc = IREE_HAL_MODULE_FENCE_AWAIT_PC_RESUME;
         IREE_RETURN_AND_END_ZONE_IF_ERROR(
             zone_id,
             iree_hal_module_fence_await_begin(stack, fence_count, fences,
                                               timeout, zone_id, &wait_status));
-        current_frame->pc = IREE_HAL_MODULE_FENCE_AWAIT_PC_RESUME;
         if (iree_status_is_deferred(wait_status)) {
           zone_id = 0;  // ownership transferred to wait frame
         }
@@ -1579,7 +1579,8 @@ IREE_API_EXPORT iree_status_t iree_hal_module_create(
 
   iree_hal_module_t* module = IREE_HAL_MODULE_CAST(base_module);
   module->host_allocator = host_allocator;
-  module->flags = flags;
+  // TODO(benvanik): fix vm yield with result storage.
+  module->flags = flags | IREE_HAL_MODULE_FLAG_SYNCHRONOUS;
   module->shared_device = device;
   iree_hal_device_retain(module->shared_device);
 
