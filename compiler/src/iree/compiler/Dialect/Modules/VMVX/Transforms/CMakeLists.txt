@@ -36,6 +36,8 @@ iree_cc_library(
 iree_cc_library(
   NAME
     Transforms
+  HDRS
+    "Passes.h"
   SRCS
     "Conversion.cpp"
     "LowerLinalgMicrokernels.cpp"
@@ -47,7 +49,9 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRAffineToStandard
     MLIRAffineTransforms
+    MLIRArithmeticDialect
     MLIRArithmeticTransforms
+    MLIRBufferizationDialect
     MLIRFuncDialect
     MLIRFuncTransforms
     MLIRIR

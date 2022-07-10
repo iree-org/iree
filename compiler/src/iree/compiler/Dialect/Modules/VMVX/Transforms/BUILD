@@ -47,6 +47,7 @@ iree_compiler_cc_library(
         "LowerLinalgMicrokernels.cpp",
         "Passes.cpp",
     ],
+    hdrs = ["Passes.h"],
     deps = [
         ":PassHeaders",
         "//compiler/src/iree/compiler/Codegen:PassHeaders",
@@ -66,7 +67,9 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineToStandard",
         "@llvm-project//mlir:AffineTransforms",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ArithmeticTransforms",
+        "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:FuncTransforms",
         "@llvm-project//mlir:IR",
