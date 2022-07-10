@@ -246,6 +246,18 @@ class ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
   }
 };
 
+class ElideMemRefAssumeAlignmentOp
+    : public OpConversionPattern<memref::AssumeAlignmentOp> {
+ public:
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      memref::AssumeAlignmentOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 }  // namespace
 
 void populateMemRefToVMPatterns(MLIRContext *context,
@@ -274,10 +286,10 @@ void populateMemRefToVMPatterns(MLIRContext *context,
   patterns.insert<FoldAsNoOp<bufferization::ToMemrefOp>,
                   FoldAsNoOp<memref::AssumeAlignmentOp>,
                   FoldAsNoOp<memref::CastOp>>(typeConverter, context);
-  patterns
-      .insert<ConvertMemRefGlobalOp, ConvertMemRefGetGlobalOp,
-              ConvertMemRefAllocaOp, ConvertMemRefLoadOp, ConvertMemRefStoreOp>(
-          typeConverter, context);
+  patterns.insert<ConvertMemRefGlobalOp, ConvertMemRefGetGlobalOp,
+                  ConvertMemRefAllocaOp, ConvertMemRefLoadOp,
+                  ConvertMemRefStoreOp, ElideMemRefAssumeAlignmentOp>(
+      typeConverter, context);
 }
 
 }  // namespace iree_compiler
