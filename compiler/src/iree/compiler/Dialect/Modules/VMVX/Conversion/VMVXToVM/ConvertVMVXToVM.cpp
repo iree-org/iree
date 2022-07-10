@@ -194,7 +194,6 @@ void populateVMVXToVMPatterns(MLIRContext *context,
                               TypeConverter &typeConverter,
                               SymbolTable &importSymbols,
                               RewritePatternSet &patterns) {
-  conversionTarget.addIllegalDialect<IREE::VMVX::VMVXDialect>();
   patterns.insert<AddOpConversion, CopyOpConversion, Fill2DOpConversion,
                   MatmulOpConversion>(context, importSymbols, typeConverter);
 }
