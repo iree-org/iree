@@ -27,9 +27,6 @@ from common.linux_device_utils import get_linux_device_info
 class LinuxBenchmarkDriver(BenchmarkDriver):
   """Linux benchmark driver."""
 
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-
   def run_benchmark_case(self, benchmark_case: BenchmarkCase,
                          benchmark_results_filename: Optional[str],
                          capture_filename: Optional[str]) -> None:
@@ -39,45 +36,42 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
     taskset = "0xFF"
 
     if benchmark_results_filename:
-      self.__run_benchmark(case_dir=benchmark_case.benchmark_case_dir,
-                           tool_name=benchmark_case.benchmark_tool_name,
+      self.__run_benchmark(benchmark_case=benchmark_case,
                            results_filename=benchmark_results_filename,
-                           config=benchmark_case.config,
                            taskset=taskset)
 
     if capture_filename:
-      self.__run_capture(case_dir=benchmark_case.benchmark_case_dir,
-                         tool_name=benchmark_case.benchmark_tool_name,
+      self.__run_capture(benchmark_case=benchmark_case,
                          capture_filename=capture_filename,
                          taskset=taskset)
 
-  def __run_benchmark(self, case_dir, tool_name: str, results_filename: str,
-                      config: str, taskset: str):
+  def __run_benchmark(self, benchmark_case: BenchmarkCase,
+                      results_filename: str, taskset: str):
+    tool_name = benchmark_case.benchmark_tool_name
     tool_path = os.path.join(self.config.normal_benchmark_tool_dir, tool_name)
     cmd = ["taskset", taskset, tool_path, f"--flagfile={MODEL_FLAGFILE_NAME}"]
     if tool_name == "iree-benchmark-module":
       cmd.extend(
           get_iree_benchmark_module_arguments(
               results_filename=results_filename,
-              config=config,
+              driver_info=benchmark_case.driver_info,
               benchmark_min_time=self.config.benchmark_min_time))
 
-    result_json = execute_cmd_and_get_output(cmd,
-                                             cwd=case_dir,
-                                             verbose=self.verbose)
+    result_json = execute_cmd_and_get_output(
+        cmd, cwd=benchmark_case.benchmark_case_dir, verbose=self.verbose)
     if self.verbose:
       print(result_json)
 
-  def __run_capture(self, case_dir, tool_name: str, capture_filename: str,
+  def __run_capture(self, benchmark_case: BenchmarkCase, capture_filename: str,
                     taskset: str):
     capture_config = self.config.trace_capture_config
 
     tool_path = os.path.join(capture_config.traced_benchmark_tool_dir,
-                             tool_name)
+                             benchmark_case.benchmark_tool_name)
     cmd = ["taskset", taskset, tool_path, f"--flagfile={MODEL_FLAGFILE_NAME}"]
     process = subprocess.Popen(cmd,
                                env={"TRACY_NO_EXIT": "1"},
-                               cwd=case_dir,
+                               cwd=benchmark_case.benchmark_case_dir,
                                stdout=subprocess.PIPE,
                                text=True)
 

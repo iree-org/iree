@@ -35,7 +35,7 @@ import re
 
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
-from common.benchmark_definition import IREE_DRIVERS_INFOS
+from common.benchmark_definition import IREE_DRIVERS_INFOS, DriverInfo
 
 # All benchmarks' relative path against root build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
@@ -52,7 +52,7 @@ class BenchmarkCase:
     model_tags: the source model tags, e.g., ['f32'].
     bench_mode: the benchmark mode, e.g., '1-thread,big-core'.
     target_arch: the target CPU/GPU architature, e.g., 'GPU-Adreno'.
-    config: the IREE runtime configuration, e.g., 'dylib'.
+    driver_info: the IREE driver configuration.
     benchmark_case_dir: the path to benchmark case directory.
     benchmark_tool_name: the benchmark tool, e.g., 'iree-benchmark-module'.
   """
@@ -61,7 +61,7 @@ class BenchmarkCase:
   model_tags: Sequence[str]
   bench_mode: Sequence[str]
   target_arch: str
-  config: str
+  driver_info: DriverInfo
   benchmark_case_dir: str
   benchmark_tool_name: str
 
@@ -122,17 +122,17 @@ class BenchmarkSuite(object):
 
     chosen_cases = []
     for benchmark_case in self.suite_map[category_dir]:
-      config_info = IREE_DRIVERS_INFOS[benchmark_case.config.lower()]
+      driver_info = benchmark_case.driver_info
 
-      driver_name = config_info.driver_name
+      driver_name = driver_info.driver_name
       matched_available_driver = (available_drivers is None or
                                   driver_name in available_drivers)
       matched_drivler_filter = driver_filter is None or re.match(
           driver_filter, driver_name) is not None
       matched_driver = matched_available_driver and matched_drivler_filter
 
-      matched_loader = not config_info.loader_name or available_loaders is None or (
-          config_info.loader_name in available_loaders)
+      matched_loader = not driver_info.loader_name or available_loaders is None or (
+          driver_info.loader_name in available_loaders)
 
       target_arch = benchmark_case.target_arch.lower()
       matched_cpu_arch = (cpu_target_arch_filter is not None and re.match(
@@ -197,7 +197,7 @@ class BenchmarkSuite(object):
                         model_tags=model_tags,
                         bench_mode=bench_mode,
                         target_arch=target_arch,
-                        config=config,
+                        driver_info=IREE_DRIVERS_INFOS[config.lower()],
                         benchmark_case_dir=benchmark_case_dir,
                         benchmark_tool_name=tool_name))
 

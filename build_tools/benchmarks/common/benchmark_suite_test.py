@@ -9,6 +9,7 @@ import os
 import tempfile
 import unittest
 from typing import Sequence
+from common.benchmark_definition import IREE_DRIVERS_INFOS
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 
 
@@ -28,21 +29,21 @@ class BenchmarkSuiteTest(unittest.TestCase):
                           model_tags=[],
                           bench_mode=["1-thread", "full-inference"],
                           target_arch="CPU-ARMv8",
-                          config="iree-dylib",
+                          driver_info=IREE_DRIVERS_INFOS["iree-dylib"],
                           benchmark_case_dir="case1",
                           benchmark_tool_name="tool")
     case2 = BenchmarkCase(model_name="deepnetv2",
                           model_tags=["f32"],
                           bench_mode=["full-inference"],
                           target_arch="GPU-Mali",
-                          config="iree-vulkan",
+                          driver_info=IREE_DRIVERS_INFOS["iree-vulkan"],
                           benchmark_case_dir="case2",
                           benchmark_tool_name="tool")
     case3 = BenchmarkCase(model_name="deepnetv3",
                           model_tags=["f32"],
                           bench_mode=["full-inference"],
                           target_arch="CPU-x86_64",
-                          config="iree-dylib-sync",
+                          driver_info=IREE_DRIVERS_INFOS["iree-dylib-sync"],
                           benchmark_case_dir="case3",
                           benchmark_tool_name="tool")
     suite = BenchmarkSuite({
@@ -142,7 +143,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
                          model_tags=model_tags,
                          bench_mode=bench_mode,
                          target_arch=target_arch,
-                         config=config,
+                         driver_info=IREE_DRIVERS_INFOS[config],
                          benchmark_case_dir=bench_path,
                          benchmark_tool_name=tool)
 
