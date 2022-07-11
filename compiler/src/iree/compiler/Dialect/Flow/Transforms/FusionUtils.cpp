@@ -74,7 +74,7 @@ static bool isReductionOnInnermostDims(linalg::LinalgOp linalgOp) {
   if (linalgOp.getNumOutputs() != 1) return false;
 
   // Check if the result dims are d0, d1, ..., which means the reduction is done
-  // in the innermost dimensions.
+  // in the innermost dimensions without an output transpose.
   auto output = linalgOp.getOutputOperand(0);
   auto outputIndexingMap = linalgOp.getTiedIndexingMap(output);
   for (const auto &en : llvm::enumerate(outputIndexingMap.getResults())) {
@@ -123,8 +123,8 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
   if (!isReductionOnInnermostDims(producer)) return false;
 
   // Check if the reduction is broadcasted back for the elementwise op.
-  auto output = producer.getOutputOperand(0);
-  auto outputIndexingMap = producer.getTiedIndexingMap(output);
+  auto producerResult = operand->get().cast<OpResult>();
+  auto outputIndexingMap = producer.getTiedIndexingMapForResult(producerResult);
   auto inputIndexingMap = consumer.getTiedIndexingMap(operand);
   if (outputIndexingMap != inputIndexingMap) return false;
 
