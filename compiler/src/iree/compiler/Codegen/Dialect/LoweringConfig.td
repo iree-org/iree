@@ -115,7 +115,7 @@ def IREECodegen_TranslationInfoAttr :
   let parameters = (ins
     AttrParameter<"IREE::Codegen::DispatchLoweringPassPipelineAttr",
         "Name of the pipeline to be invoked on the translation unit.">:$passPipeline,
-    DefaultValuedParameter<"ArrayAttr", "nullptr",
+    DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctxt, {})",
         "The workload mapped to a single workgroup">:$workloadPerWorkgroup,
     DefaultValuedParameter<"unsigned", "1",
         "The software pipeline depth to be used">:$softwarePipelineDepth
@@ -163,9 +163,9 @@ def IREECodegen_LoweringConfigAttr :
   let parameters = (ins
     AttrParameter<"ArrayAttr",
         "The tile sizes to use for different levels of tiling">:$tileSizes,
-    DefaultValuedParameter<"ArrayAttr", "nullptr",
+    DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctxt, {})",
         "The tile interchange to use for different levels of tiling">:$tileInterchange,
-    DefaultValuedParameter<"ArrayAttr", "nullptr",
+    DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctxt, {})",
         "The native vector size to use for the given operation">:$nativeVectorSize
   );
   let builders = [
@@ -214,7 +214,7 @@ def IREECodegen_CompilationInfoAttr :
   let parameters = (ins
     AttrParameter<"LoweringConfigAttr", "">:$loweringConfig,
     AttrParameter<"TranslationInfoAttr", "">:$translationInfo,
-    DefaultValuedParameter<"ArrayAttr", "nullptr",
+    DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctxt, {})",
         "The workgroup size to use during translation.">:$workgroupSize
   );
 
