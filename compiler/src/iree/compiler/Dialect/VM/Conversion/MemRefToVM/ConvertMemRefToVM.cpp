@@ -28,6 +28,7 @@ namespace iree_compiler {
 namespace {
 
 /// Pattern to lower operations that become a no-ops at this level.
+/// Passes through operands to results.
 template <typename OpTy>
 struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
@@ -35,6 +36,19 @@ struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
       OpTy op, typename OpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOp(op, adaptor.getOperands());
+    return success();
+  }
+};
+
+/// Pattern to lower operations that become a no-ops at this level.
+/// Erases the op entirely.
+template <typename OpTy>
+struct ElideNoOp final : public OpConversionPattern<OpTy> {
+  using OpConversionPattern<OpTy>::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      OpTy op, typename OpTy::Adaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.eraseOp(op);
     return success();
   }
 };
@@ -72,10 +86,8 @@ static Value getBufferOffset(Location loc, Value memrefValue,
   return rewriter.create<arith::IndexCastOp>(loc, indexType, offset);
 }
 
-class ConvertMemRefGlobalOp : public OpConversionPattern<memref::GlobalOp> {
- public:
+struct ConvertMemRefGlobalOp : public OpConversionPattern<memref::GlobalOp> {
   using OpConversionPattern::OpConversionPattern;
-
   LogicalResult matchAndRewrite(
       memref::GlobalOp globalOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -100,11 +112,9 @@ class ConvertMemRefGlobalOp : public OpConversionPattern<memref::GlobalOp> {
   }
 };
 
-class ConvertMemRefGetGlobalOp
+struct ConvertMemRefGetGlobalOp
     : public OpConversionPattern<memref::GetGlobalOp> {
- public:
   using OpConversionPattern::OpConversionPattern;
-
   LogicalResult matchAndRewrite(
       memref::GetGlobalOp getOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -120,10 +130,8 @@ class ConvertMemRefGetGlobalOp
 
 // TODO(#9165): Support alignment for vm.buffer.alloc. So far we ignore the
 // alignment attribute when lowering the op to VM dialect.
-class ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
- public:
+struct ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
   using OpConversionPattern::OpConversionPattern;
-
   LogicalResult matchAndRewrite(
       memref::AllocaOp allocaOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -146,10 +154,8 @@ class ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
   }
 };
 
-class ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
- public:
+struct ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
   using OpConversionPattern::OpConversionPattern;
-
   LogicalResult matchAndRewrite(
       memref::LoadOp loadOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -204,10 +210,8 @@ class ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
   }
 };
 
-class ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
- public:
+struct ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
   using OpConversionPattern::OpConversionPattern;
-
   LogicalResult matchAndRewrite(
       memref::StoreOp storeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -246,18 +250,6 @@ class ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
   }
 };
 
-class ElideMemRefAssumeAlignmentOp
-    : public OpConversionPattern<memref::AssumeAlignmentOp> {
- public:
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      memref::AssumeAlignmentOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
-
 }  // namespace
 
 void populateMemRefToVMPatterns(MLIRContext *context,
@@ -283,13 +275,14 @@ void populateMemRefToVMPatterns(MLIRContext *context,
             IREE::VM::BufferType::get(type.getContext()));
       });
 
-  patterns.insert<FoldAsNoOp<bufferization::ToMemrefOp>,
-                  FoldAsNoOp<memref::AssumeAlignmentOp>,
-                  FoldAsNoOp<memref::CastOp>>(typeConverter, context);
-  patterns.insert<ConvertMemRefGlobalOp, ConvertMemRefGetGlobalOp,
-                  ConvertMemRefAllocaOp, ConvertMemRefLoadOp,
-                  ConvertMemRefStoreOp, ElideMemRefAssumeAlignmentOp>(
-      typeConverter, context);
+  patterns
+      .insert<FoldAsNoOp<bufferization::ToMemrefOp>,
+              ElideNoOp<memref::AssumeAlignmentOp>, FoldAsNoOp<memref::CastOp>>(
+          typeConverter, context);
+  patterns
+      .insert<ConvertMemRefGlobalOp, ConvertMemRefGetGlobalOp,
+              ConvertMemRefAllocaOp, ConvertMemRefLoadOp, ConvertMemRefStoreOp>(
+          typeConverter, context);
 }
 
 }  // namespace iree_compiler
