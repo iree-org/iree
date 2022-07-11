@@ -142,7 +142,8 @@ Optional<BufferDescriptor> computeBufferDescriptor(Location loc, Value buffer,
   builder.setInsertionPoint(subViewOp);
 
   // Recursively resolve the descriptor of the subview's base.
-  auto sourceDesc = computeBufferDescriptor(loc, subViewOp.source(), builder);
+  auto sourceDesc =
+      computeBufferDescriptor(loc, subViewOp.getSource(), builder);
   if (!sourceDesc) return None;
 
   // TODO: For the moment, don't deal with the rank reducing subview case.
