@@ -45,6 +45,58 @@ vm.module @cmp_eq_i32_folds {
 
 // -----
 
+
+// CHECK-LABEL: @cmp_eq_f32_near_folds
+vm.module @cmp_eq_f32_near_folds {
+  // CHECK-LABEL: @eq_near_f32
+  vm.func @eq_near_f32(%arg0 : f32, %arg1 : f32) -> i32 {
+    // CHECK-NEXT:   %zero = vm.const.f32.zero
+    // CHECK-NEXT:   %c1 = vm.const.i32 1
+    // CHECK-NEXT:   [[THRESHOLD:%.+]] = vm.const.i32
+    // CHECK-NEXT:   %0 = vm.cmp.lt.f32.o %arg0, %zero : f32
+    // CHECK-NEXT:   %1 = vm.xor.i32 %0, %c1 : i32
+    // CHECK-NEXT:   %2 = vm.cmp.lt.f32.o %arg1, %zero : f32
+    // CHECK-NEXT:   %3 = vm.xor.i32 %2, %c1 : i32
+    // CHECK-NEXT:   %ne = vm.cmp.ne.i32 %1, %3 : i32
+    // CHECK-NEXT:   vm.cond_br %ne, ^bb1, ^bb2
+    // CHECK-NEXT: ^bb1:  // pred: ^bb0
+    // CHECK-NEXT:   %4 = vm.cmp.eq.f32.o %arg0, %arg1 : f32
+    // CHECK-NEXT:   vm.br ^bb3(%4 : i32)
+    // CHECK-NEXT: ^bb2:  // pred: ^bb0
+    // CHECK-NEXT:   %5 = vm.bitcast.f32.i32 %arg0 : f32 -> i32
+    // CHECK-NEXT:   %6 = vm.bitcast.f32.i32 %arg1 : f32 -> i32
+    // CHECK-NEXT:   %7 = vm.sub.i32 %5, %6 : i32
+    // CHECK-NEXT:   %8 = vm.abs.i32 %7 : i32
+    // CHECK-NEXT:   %slt = vm.cmp.lt.i32.s %8, [[THRESHOLD]] : i32
+    // CHECK-NEXT:   vm.br ^bb3(%slt : i32)
+    // CHECK-NEXT: ^bb3(%9: i32):  // 2 preds: ^bb1, ^bb2
+    // CHECK-NEXT:   vm.return %9 : i32
+    %cmp = vm.cmp.eq.f32.near %arg0, %arg1 : f32
+    vm.return %cmp : i32
+  }
+
+  // CHECK-LABEL: @const_eq_near_f32
+  vm.func @const_eq_near_f32() -> i32 {
+    // CHECK: %c1 = vm.const.i32 1
+    // CHECK-NEXT: vm.return %c1 : i32
+    %a = vm.const.f32 1.9999999
+    %b = vm.const.f32 2.0
+    %cmp = vm.cmp.eq.f32.near %a, %b : f32
+    vm.return %cmp : i32
+  }
+
+  vm.func @const_flipped_signs_eq_near_f32() -> i32 {
+    // CHECK: %zero = vm.const.i32.zero
+    // CHECK-NEXT: vm.return %zero
+    %a = vm.const.f32 -2.0
+    %b = vm.const.f32 2.0
+    %cmp = vm.cmp.eq.f32.near %a, %b : f32
+    vm.return %cmp : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @cmp_ne_i32_folds
 vm.module @cmp_ne_i32_folds {
   // CHECK-LABEL: @always_eq

@@ -11,6 +11,17 @@ vm.module @my_module {
 
 // -----
 
+// CHECK-LABEL: @cmp_eq_f32_near
+vm.module @my_module {
+  vm.func @cmp_eq_f32_near(%arg0 : f32, %arg1 : f32) -> i32 {
+    // CHECK: = vm.cmp.eq.f32.near %arg0, %arg1 : f32
+    %eq = vm.cmp.eq.f32.near %arg0, %arg1 : f32
+    vm.return %eq : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @cmp_ne_i32
 vm.module @my_module {
   vm.func @cmp_ne_i32(%arg0 : i32, %arg1 : i32) -> i32 {
