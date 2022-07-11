@@ -816,11 +816,15 @@ struct CmdExecuteOpPattern
     auto loc = executeOp.getLoc();
     auto device = lookupDeviceFor(executeOp, rewriter);
 
-    // TODO(benvanik): disable inline execution once we have semaphores.
-    // We can look ahead to see if there's an await immediately to trigger the
-    // inline execution.
-    auto modes = IREE::HAL::CommandBufferModeBitfield::OneShot |
-                 IREE::HAL::CommandBufferModeBitfield::AllowInlineExecution;
+    // If there are any wait timepoints it means there's prior queued execution
+    // that we may need to wait behind and we can't execute inline. HAL
+    // implementations may be able to flush eagerly if they are able to tell
+    // that all conditions are met during recording but we leave that to them.
+    auto modes = IREE::HAL::CommandBufferModeBitfield::OneShot;
+    if (!executeOp.getAwaitTimepoint()) {
+      modes =
+          modes | IREE::HAL::CommandBufferModeBitfield::AllowInlineExecution;
+    }
 
     // Derive the command buffer type based on the kind of operations present.
     // This can help the submission get routed to appropriate hardware queues
