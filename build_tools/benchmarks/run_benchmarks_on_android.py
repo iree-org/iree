@@ -40,7 +40,7 @@ import sys
 from typing import Optional, Sequence
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_driver import BenchmarkDriver
-from common.benchmark_definition import (execute_cmd,
+from common.benchmark_definition import (DriverInfo, execute_cmd,
                                          execute_cmd_and_get_output,
                                          get_git_commit_hash,
                                          get_iree_benchmark_module_arguments,
@@ -204,7 +204,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     if benchmark_results_filename is not None:
       self.__run_benchmark(android_case_dir=android_case_dir,
                            tool_name=benchmark_case.benchmark_tool_name,
-                           config=benchmark_case.config,
+                           driver_info=benchmark_case.driver_info,
                            results_filename=benchmark_results_filename,
                            taskset=taskset)
 
@@ -214,8 +214,9 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
                          capture_filename=capture_filename,
                          taskset=taskset)
 
-  def __run_benchmark(self, android_case_dir: str, tool_name: str, config: str,
-                      results_filename: str, taskset: str):
+  def __run_benchmark(self, android_case_dir: str, tool_name: str,
+                      driver_info: DriverInfo, results_filename: str,
+                      taskset: str):
     host_tool_path = os.path.join(self.config.normal_benchmark_tool_dir,
                                   tool_name)
     android_tool = self.__check_and_push_file(host_tool_path,
@@ -227,7 +228,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
       cmd.extend(
           get_iree_benchmark_module_arguments(
               results_filename=f"'{os.path.basename(results_filename)}'",
-              config=config,
+              driver_info=driver_info,
               benchmark_min_time=self.config.benchmark_min_time))
 
     result_json = adb_execute_and_get_output(cmd,

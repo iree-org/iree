@@ -73,7 +73,7 @@ IREE_DRIVERS_INFOS = {
         DriverInfo("IREE-Vulkan", "GPU", "vulkan", ""),
 }
 
-IREE_PRETTY_NAMES_TO_DRIVERS = {
+IREE_PRETTY_NAME_TO_DRIVER_NAME = {
     v.pretty_name: k for k, v in IREE_DRIVERS_INFOS.items()
 }
 
@@ -123,11 +123,11 @@ def get_git_commit_hash(commit: str) -> str:
 
 def get_iree_benchmark_module_arguments(
     results_filename: str,
-    config: str,
+    driver_info: DriverInfo,
     benchmark_min_time: Optional[float] = None):
   """Returns the common arguments to run iree-benchmark-module."""
 
-  if config == "iree-vmvx" or config == "iree-vmvx-sync":
+  if driver_info.loader_name == "vmvx-module":
     # VMVX is very unoptimized for now and can take a long time to run.
     # Decrease the repetition for it until it's reasonably fast.
     repetitions = 3
@@ -299,24 +299,19 @@ class BenchmarkInfo:
   model_tags: Sequence[str]
   model_source: str
   bench_mode: Sequence[str]
-  runner: str
+  driver_info: DriverInfo
   device_info: DeviceInfo
 
   def __str__(self):
     # Get the target architecture and better driver name depending on the runner.
-    driver_info = IREE_DRIVERS_INFOS.get(self.runner)
-    if not driver_info:
-      raise ValueError(
-          f"Unrecognized runner '{self.runner}'; need to update the list")
-
     target_arch = None
-    if driver_info.device_type == 'GPU':
+    if self.driver_info.device_type == 'GPU':
       target_arch = "GPU-" + self.device_info.gpu_name
-    elif driver_info.device_type == 'CPU':
+    elif self.driver_info.device_type == 'CPU':
       target_arch = "CPU-" + self.device_info.get_detailed_cpu_arch_name()
     else:
       raise ValueError(
-          f"Unrecognized device type '{driver_info.device_type}' of the runner '{self.runner}'"
+          f"Unrecognized device type '{self.driver_info.device_type}' of the driver '{self.driver_info.pretty_name}'"
       )
 
     if self.model_tags:
@@ -327,7 +322,7 @@ class BenchmarkInfo:
     device_part = f"{self.device_info.model} ({target_arch})"
     mode = ",".join(self.bench_mode)
 
-    return f"{model_part} {mode} with {driver_info.pretty_name} @ {device_part}"
+    return f"{model_part} {mode} with {self.driver_info.pretty_name} @ {device_part}"
 
   @staticmethod
   def from_device_info_and_name(device_info: DeviceInfo, name: str):
@@ -345,9 +340,17 @@ class BenchmarkInfo:
     model_source = model_source.strip("()")
     model_tags = model_tags.strip("[]").split(",")
     bench_mode = bench_mode.split(",")
-    runner = IREE_PRETTY_NAMES_TO_DRIVERS.get(runner)
-    return BenchmarkInfo(model_name, model_tags, model_source, bench_mode,
-                         runner, device_info)
+
+    driver = IREE_PRETTY_NAME_TO_DRIVER_NAME.get(runner)
+    if not driver:
+      raise ValueError(f"Unrecognized runner: {runner}")
+
+    return BenchmarkInfo(model_name=model_name,
+                         model_tags=model_tags,
+                         model_source=model_source,
+                         bench_mode=bench_mode,
+                         driver_info=IREE_DRIVERS_INFOS[driver],
+                         device_info=device_info)
 
   def to_json_object(self) -> Dict[str, Any]:
     return {
@@ -355,17 +358,22 @@ class BenchmarkInfo:
         "model_tags": self.model_tags,
         "model_source": self.model_source,
         "bench_mode": self.bench_mode,
-        "runner": self.runner,
+        # Get the "iree-*" driver name from the DriverInfo.
+        "runner": IREE_PRETTY_NAME_TO_DRIVER_NAME[self.driver_info.pretty_name],
         "device_info": self.device_info.to_json_object(),
     }
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
+    driver_info = IREE_DRIVERS_INFOS.get(json_object["runner"])
+    if not driver_info:
+      raise ValueError(f"Unrecognized runner: {json_object['runner']}")
+
     return BenchmarkInfo(model_name=json_object["model_name"],
                          model_tags=json_object["model_tags"],
                          model_source=json_object["model_source"],
                          bench_mode=json_object["bench_mode"],
-                         runner=json_object["runner"],
+                         driver_info=driver_info,
                          device_info=DeviceInfo.from_json_object(
                              json_object["device_info"]))
 
