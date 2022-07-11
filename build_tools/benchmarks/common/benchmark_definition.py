@@ -341,15 +341,15 @@ class BenchmarkInfo:
     model_tags = model_tags.strip("[]").split(",")
     bench_mode = bench_mode.split(",")
 
-    runner = IREE_PRETTY_NAME_TO_DRIVER_NAME.get(runner)
-    if not runner:
+    driver = IREE_PRETTY_NAME_TO_DRIVER_NAME.get(runner)
+    if not driver:
       raise ValueError(f"Unrecognized runner: {runner}")
 
     return BenchmarkInfo(model_name=model_name,
                          model_tags=model_tags,
                          model_source=model_source,
                          bench_mode=bench_mode,
-                         driver_info=IREE_DRIVERS_INFOS[runner],
+                         driver_info=IREE_DRIVERS_INFOS[driver],
                          device_info=device_info)
 
   def to_json_object(self) -> Dict[str, Any]:
