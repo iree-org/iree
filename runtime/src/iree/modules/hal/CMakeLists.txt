@@ -20,8 +20,23 @@ iree_cc_library(
   SRCS
     "module.c"
   DEPS
+    ::types
     iree::base
     iree::base::tracing
+    iree::hal
+    iree::vm
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    types
+  HDRS
+    "types.h"
+  SRCS
+    "types.c"
+  DEPS
+    iree::base
     iree::hal
     iree::vm
   PUBLIC

@@ -483,7 +483,7 @@ std::string VmVariantList::DebugString() const {
 
 void SetupVmBindings(pybind11::module m) {
   IREE_CHECK_OK(iree_vm_register_builtin_types());
-  IREE_CHECK_OK(iree_hal_module_register_types());
+  IREE_CHECK_OK(iree_hal_module_register_all_types());
 
   // Built-in module creation.
   m.def("create_hal_module", &CreateHalModule);

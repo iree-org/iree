@@ -21,7 +21,7 @@ namespace {
 class VmUtilTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    IREE_ASSERT_OK(iree_hal_module_register_types());
+    IREE_ASSERT_OK(iree_hal_module_register_all_types());
     iree_status_t status = iree_hal_create_device(
         iree_hal_available_driver_registry(), IREE_SV("local-sync"),
         iree_allocator_system(), &device_);

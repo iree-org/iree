@@ -306,7 +306,7 @@ Runtime::Runtime() {
   IREE_CHECK_OK(
       iree_hal_driver_registry_allocate(iree_allocator_system(), &registry));
   IREE_CHECK_OK(iree_hal_local_task_driver_module_register(registry));
-  IREE_CHECK_OK(iree_hal_module_register_types());
+  IREE_CHECK_OK(iree_hal_module_register_all_types());
   IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
 }
 

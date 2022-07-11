@@ -30,7 +30,7 @@ class CheckTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
     // TODO(benvanik): move to instance-based registration.
-    IREE_ASSERT_OK(iree_hal_module_register_types());
+    IREE_ASSERT_OK(iree_hal_module_register_all_types());
 
     iree_hal_driver_t* hal_driver = nullptr;
     iree_status_t status = iree_hal_driver_registry_try_create(

@@ -32,7 +32,7 @@ extern const iree_const_byte_span_t load_bytecode_module_data();
 
 iree_status_t Run() {
   // TODO(benvanik): move to instance-based registration.
-  IREE_RETURN_IF_ERROR(iree_hal_module_register_types());
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types());
 
   iree_vm_instance_t* instance = NULL;
   IREE_RETURN_IF_ERROR(
