@@ -506,30 +506,6 @@ iree_status_t iree_hal_task_queue_submit(
   return status;
 }
 
-iree_status_t iree_hal_task_queue_submit_and_wait(
-    iree_hal_task_queue_t* queue, iree_host_size_t batch_count,
-    const iree_hal_submission_batch_t* batches,
-    iree_hal_semaphore_t* wait_semaphore, uint64_t wait_value,
-    iree_timeout_t timeout) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_convert_timeout_to_absolute(&timeout);
-
-  // Queue all of the batches.
-  iree_status_t status =
-      iree_hal_task_queue_submit_batches(queue, batch_count, batches);
-  if (iree_status_is_ok(status)) {
-    // Flush the pending submissions and begin processing, then wait until idle.
-    // TODO(benvanik): get a wait_handle we can pass to
-    // iree_task_executor_donate_caller - it'll flush + do work.
-    iree_task_executor_flush(queue->executor);
-    status = iree_hal_semaphore_wait(wait_semaphore, wait_value, timeout);
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
 iree_status_t iree_hal_task_queue_wait_idle(iree_hal_task_queue_t* queue,
                                             iree_timeout_t timeout) {
   IREE_TRACE_ZONE_BEGIN(z0);

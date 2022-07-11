@@ -155,7 +155,7 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
     symbolTable.insert(global);
 
     rewriter.setInsertionPointToStart(&(*funcOp.getBody().begin()));
-    rewriter.replaceOpWithNewOp<memref::GetGlobalOp>(allocOp, global.type(),
+    rewriter.replaceOpWithNewOp<memref::GetGlobalOp>(allocOp, global.getType(),
                                                      global.getName());
     return success();
   }

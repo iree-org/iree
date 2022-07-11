@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- PadTensorToInsertSlice.cpp - Pass to legalize linalg.pad_tensor-===//
+//===- PadTensorToInsertSlice.cpp ----- Pass to legalize linalg.pad_tensor-===//
 //
 // Pass to convert linalg.pad_tensor to linalg.fill + tensor.insert_slice
 // operations which is the only way Vulkan backend can lower it to a single

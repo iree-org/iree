@@ -4,9 +4,9 @@
 // For now all timepoints turn into ints and are mostly ignored.
 
 // CHECK-LABEL: @rwTimepoint
-// CHECK-SAME: = 0 : index
+// CHECK-SAME: = 0 : i64
 util.global private mutable @rwTimepoint = #stream.timepoint<immediate>
-// CHECK: func.func @globalTimepoint(%arg0: index) -> index
+// CHECK: func.func @globalTimepoint(%arg0: i64) -> i64
 func.func @globalTimepoint(%arg0: !stream.timepoint) -> !stream.timepoint {
   // CHECK: util.global.store %arg0, @rwTimepoint
   util.global.store %arg0, @rwTimepoint : !stream.timepoint
@@ -29,11 +29,11 @@ func.func @timepointImmediate() -> !stream.timepoint {
 // -----
 
 // CHECK-LABEL: @timepointImport
-func.func @timepointImport(%arg0: !hal.semaphore, %arg1: index) -> !stream.timepoint {
+func.func @timepointImport(%arg0: !hal.semaphore, %arg1: i64) -> !stream.timepoint {
   // CHECK: %[[WAIT_OK:.+]] = hal.semaphore.await<%arg0 : !hal.semaphore> until(%arg1) : i32
   // CHECK: util.status.check_ok %[[WAIT_OK]]
   // CHECK: %[[TIMEPOINT:.+]] = arith.constant 0
-  %0 = stream.timepoint.import %arg0, %arg1 : (!hal.semaphore, index) => !stream.timepoint
+  %0 = stream.timepoint.import %arg0, %arg1 : (!hal.semaphore, i64) => !stream.timepoint
   // CHECK: return %[[TIMEPOINT]]
   return %0 : !stream.timepoint
 }
@@ -41,12 +41,12 @@ func.func @timepointImport(%arg0: !hal.semaphore, %arg1: index) -> !stream.timep
 // -----
 
 // CHECK-LABEL: @timepointExport
-func.func @timepointExport(%arg0: !stream.timepoint) -> (!hal.semaphore, index) {
+func.func @timepointExport(%arg0: !stream.timepoint) -> (!hal.semaphore, i64) {
   // CHECK: %[[TIMEPOINT:.+]] = arith.constant 0
-  // CHECK: %[[SEMAPHORE:.+]] = hal.semaphore.create device(%device : !hal.device) initial(%c0) : !hal.semaphore
-  %0:2 = stream.timepoint.export %arg0 => (!hal.semaphore, index)
+  // CHECK: %[[SEMAPHORE:.+]] = hal.semaphore.create device(%device : !hal.device) initial(%[[TIMEPOINT]]) : !hal.semaphore
+  %0:2 = stream.timepoint.export %arg0 => (!hal.semaphore, i64)
   // CHECK: return %[[SEMAPHORE]], %[[TIMEPOINT]]
-  return %0#0, %0#1 : !hal.semaphore, index
+  return %0#0, %0#1 : !hal.semaphore, i64
 }
 
 // -----

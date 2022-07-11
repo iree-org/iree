@@ -405,7 +405,7 @@ void iree_slim_mutex_initialize(iree_slim_mutex_t* out_mutex) {
 void iree_slim_mutex_deinitialize(iree_slim_mutex_t* mutex) {
   // Assert unlocked (callers must ensure the mutex is no longer in use).
   SYNC_ASSERT(
-      iree_atomic_load_int32(&mutex->value, iree_memory_order_seq_cst) == 0);
+      iree_atomic_load_int32(&mutex->value, iree_memory_order_acquire) == 0);
 }
 
 void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
@@ -683,7 +683,7 @@ void iree_notification_initialize(iree_notification_t* out_notification) {
 void iree_notification_deinitialize(iree_notification_t* notification) {
   // Assert no more waiters (callers must tear down waiters first).
   SYNC_ASSERT(
-      (iree_atomic_load_int64(&notification->value, iree_memory_order_seq_cst) &
+      (iree_atomic_load_int64(&notification->value, iree_memory_order_acquire) &
        IREE_NOTIFICATION_WAITER_MASK) == 0);
 }
 
@@ -732,7 +732,7 @@ bool iree_notification_commit_wait(iree_notification_t* notification,
   // the waiter count gets to 0 the less likely we'll wake on the futex.
   uint64_t previous_value = iree_atomic_fetch_add_int64(
       &notification->value, IREE_NOTIFICATION_WAITER_DEC,
-      iree_memory_order_seq_cst);
+      iree_memory_order_acq_rel);
   SYNC_ASSERT((previous_value & IREE_NOTIFICATION_WAITER_MASK) != 0);
 
   return result;
@@ -744,7 +744,7 @@ void iree_notification_cancel_wait(iree_notification_t* notification) {
   // the waiter count gets to 0 the less likely we'll wake on the futex.
   uint64_t previous_value = iree_atomic_fetch_add_int64(
       &notification->value, IREE_NOTIFICATION_WAITER_DEC,
-      iree_memory_order_seq_cst);
+      iree_memory_order_acq_rel);
   SYNC_ASSERT((previous_value & IREE_NOTIFICATION_WAITER_MASK) != 0);
 }
 

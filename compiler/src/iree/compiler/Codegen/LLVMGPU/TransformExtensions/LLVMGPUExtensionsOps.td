@@ -35,7 +35,20 @@ def ForeachThreadToGpuAndTranslationInfo :
    
     Barriers are inserted after each scf.foreach_thread op for now.
 
+    Return modes:
+    =============
+    This operation ignores non-Func ops and drops them in the return.
+
+    If all the scf::ForeachThread operations contained within the FuncOp 
+    referred to by the `target` PDLOperation lower to GPU properly, the 
+    transform succeeds. Otherwise the transform definitely fails.
+    
+    The returned handle points to the same FuncOp operand, consuming it and
+    producing a new SSA value to satisfy chaining and linearity of the IR 
+    properties.
+
     Example:
+    ========
 
     ```
     hal.executable {
@@ -76,9 +89,10 @@ def ForeachThreadToGpuAndTranslationInfo :
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let extraClassDeclaration = [{
-    ::mlir::FailureOr<::mlir::func::FuncOp> applyToOne(
-      ::mlir::func::FuncOp target,
-      ::mlir::transform::TransformState &state);
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::func::FuncOp target,
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results, 
+        ::mlir::transform::TransformState &state);
   }];
 }
 
@@ -103,7 +117,29 @@ def VectorWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.warp_execute
     This is the first of two step towards apply vector distribution to a single
     warp.
 
+
+    Return modes:
+    =============
+    This operation ignores non-scf::IfOp ops and drops them in the return.
+
+    If all the operations referred to by the `target` PDLOperation are properly
+    properly, the transform succeeds. Otherwise the transform silently fails.
+    
+    If the transform is anchored at a top-level that is not isolated from above,
+    the transform definitely fails.
+
+    If the transform cannot find a proper HAL::ExecutableExportOp with a 
+    well-formed workgroup_size 3-entry attribute such that the threadIdx.x 
+    component is a multiple of warp_size, the transform silently fails.
+    If the scf::ForOp predicate does not predicate on threadIdx.x == 0, the 
+    transform silently fails.
+
+    Otherwise the transformation succeeds and the returned handle points to the
+    produced vector::WarpExecuteOnThread0Op.
+
+
     Example:
+    ========
 
     ```
     hal.executable.export public @foo ... { workgroup_size = [64: index, 1: index, 1: index] }
@@ -155,8 +191,10 @@ def VectorWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.warp_execute
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let extraClassDeclaration = [{
-    ::mlir::FailureOr<::mlir::vector::WarpExecuteOnLane0Op> applyToOne(
-      ::mlir::scf::IfOp ifOp, ::mlir::transform::TransformState &state);
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::scf::IfOp target,
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results, 
+        ::mlir::transform::TransformState &state);
   }];
 }
 
@@ -175,7 +213,28 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
     This is the second step of two for applying vector distribution to a single
     warp.
 
+            
+    Return modes:
+    =============
+    This operation applies a number of patterns to rewrite vector IR into 
+    distributed warp form. To apply these patterns, this operation must target 
+    an operation that is isolated from above, otherwise the transform definitely
+    fails.
+  
+    Patterns sets are applied in the following order:
+      - applyMultiReductionLoweringPatterns
+      - applyVectorTransferWriteDistribution
+      - applyPropagateVectorDistribution
+      - applyWarpExecuteOnLane0ToScf
+
+    If any of the pattern sets fail to apply, the transformation definitely
+    fails.
+
+    Otherwise the transformation is successful and no result is returned.
+
+
     Example:
+    ========
 
     ```
     hal.executable.export public @foo ... { workgroup_size = [64: index, 1: index, 1: index] }
@@ -237,8 +296,10 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let extraClassDeclaration = [{
-    ::mlir::LogicalResult applyToOne(
-      ::mlir::Operation *target, ::mlir::transform::TransformState &state);
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results, 
+        ::mlir::transform::TransformState &state);
   }];
 }
 

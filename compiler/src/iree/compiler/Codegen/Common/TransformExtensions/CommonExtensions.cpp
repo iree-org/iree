@@ -32,6 +32,11 @@ void mlir::iree_compiler::registerTransformDialectCommonExtension(
 // ApplyPatternsOp
 //===---------------------------------------------------------------------===//
 
+static void addRankReducingPatterns(RewritePatternSet &patterns) {
+  vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
+  linalg::populateFoldUnitExtentDimsPatterns(patterns);
+}
+
 static void addAllRegisteredCanonicalizationPatterns(
     RewritePatternSet &patterns) {
   MLIRContext *ctx = patterns.getContext();
@@ -41,23 +46,34 @@ static void addAllRegisteredCanonicalizationPatterns(
     op.getCanonicalizationPatterns(patterns, ctx);
 }
 
-FailureOr<Operation *> transform_dialect::ApplyPatternsOp::applyToOne(
-    Operation *target, transform::TransformState &state) {
-  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>())
-    return emitOpError() << "applies only to isolated-from-above targets "
-                            "because it needs to apply patterns greedily";
+DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
+    Operation *target, SmallVectorImpl<Operation *> &results,
+    transform::TransformState &state) {
+  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
+    target->emitOpError(
+        "applies only to isolated-from-above targets because it needs to apply "
+        "patterns greedily");
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+  }
   MLIRContext *ctx = target->getContext();
   RewritePatternSet patterns(ctx);
   if (getCanonicalization()) addAllRegisteredCanonicalizationPatterns(patterns);
+  if (getRankReducing()) addRankReducingPatterns(patterns);
 
   TrackingListener listener(state);
   GreedyRewriteConfig config;
   LogicalResult result = applyPatternsAndFoldGreedily(
       target, std::move(patterns), config, &listener);
   LogicalResult listenerResult = listener.checkErrorState();
-  if (failed(result) || failed(listenerResult)) return failure();
-  return target;
+  if (failed(result) || failed(listenerResult))
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+  results.assign({target});
+  return DiagnosedSilenceableFailure(success());
 }
+
+//===---------------------------------------------------------------------===//
+// IREEBufferizeOp
+//===---------------------------------------------------------------------===//
 
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
@@ -65,15 +81,6 @@ FailureOr<Operation *> transform_dialect::ApplyPatternsOp::applyToOne(
 // TODO: Maybe bufferize should have a separate cpu and a gpu version. This is
 // unclear though: what happens on heterogeneous HW ?
 //===---------------------------------------------------------------------===//
-
-// Default allocation function to use with IREEs bufferization.
-static Value cpuAllocationFunction(OpBuilder &builder, Location loc,
-                                   ArrayRef<int64_t> staticShape,
-                                   Type elementType,
-                                   ArrayRef<Value> dynamicSizes) {
-  MemRefType allocType = MemRefType::get(staticShape, elementType);
-  return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes);
-}
 
 // Allocation callbacks to use with upstream comprehensive bufferization
 static FailureOr<Value> cpuComprehensiveBufferizeAllocationFn(
@@ -103,9 +110,37 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
   return success();
 }
 
-//===---------------------------------------------------------------------===//
-// IREE-specific transformations defined outside of iree_linalg_transform.
-//===---------------------------------------------------------------------===//
+static FailureOr<Value> gpuComprehensiveBufferizeAllocationFn(
+    OpBuilder &builder, Location loc, MemRefType memRefType,
+    ValueRange dynamicSizes, unsigned alignment) {
+  // TODO: use gpu::GPUDialect::getWorkgroupAddressSpace() but this requires
+  // moving out of CommonExtensions.
+  MemRefType allocType = MemRefType::get(memRefType.getShape(),
+                                         memRefType.getElementType(), {}, 3);
+  return builder
+      .create<memref::AllocOp>(loc, allocType, dynamicSizes,
+                               builder.getI64IntegerAttr(alignment))
+      .getResult();
+}
+
+static LogicalResult gpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
+                                                             Location loc,
+                                                             Value allocation) {
+  builder.create<memref::DeallocOp>(loc, allocation);
+  return success();
+}
+
+static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
+                                                     Location loc, Value from,
+                                                     Value to) {
+  // TODO: ideally we should use linalg.copy which was recently reintroduced
+  // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
+  // post-bufferization copies do not trigger properly.
+  // So we keep using `createLinalgCopyOp` which builds a GenericOp.
+  // builder.create<linalg::CopyOp>(loc, from, to);
+  mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
+  return success();
+}
 
 DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     transform::TransformResults &results, transform::TransformState &state) {
@@ -117,6 +152,11 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   BufferizationOptions::DeallocationFn deallocationFn =
       cpuComprehensiveBufferizeDeallocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
+  if (getTargetGpu()) {
+    allocationFn = gpuComprehensiveBufferizeAllocationFn;
+    deallocationFn = gpuComprehensiveBufferizeDeallocationFn;
+    memcpyFn = gpuComprehensiveBufferizeCopyFn;
+  }
   mlir::iree_compiler::addIREEComprehensiveBufferizePasses(
       pm, allocationFn, deallocationFn, memcpyFn);
   WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {

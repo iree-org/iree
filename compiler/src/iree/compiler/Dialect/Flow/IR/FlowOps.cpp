@@ -354,36 +354,6 @@ static void getDefaultOffsetSizeAndStrides(
   return;
 }
 
-RankedTensorType DispatchTensorLoadOp::inferRankReducedResultType(
-    unsigned resultRank, IREE::Flow::DispatchTensorType sourceType,
-    ArrayRef<OpFoldResult> mixedSizes) {
-  // This is using logic from
-  // `tensor::ExtractSliceOp::inferRankReducedResultType`. Eventually just use
-  // that.
-  auto shape = llvm::to_vector<4>(
-      llvm::map_range(mixedSizes, [&](OpFoldResult valueOrAttr) -> int64_t {
-        if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-          return attr.cast<IntegerAttr>().getInt();
-        }
-        return DispatchTensorType::kDynamicSize;
-      }));
-  auto inferredType = RankedTensorType::get(shape, sourceType.getElementType());
-  int rankDiff = sourceType.getRank() - resultRank;
-  if (rankDiff > 0) {
-    llvm::SmallBitVector dimsToProject =
-        mlir::getPositionsOfShapeOne(rankDiff, shape);
-    SmallVector<int64_t> projectedShape;
-    for (unsigned pos = 0, e = shape.size(); pos < e; ++pos) {
-      if (!dimsToProject.test(pos)) {
-        projectedShape.push_back(shape[pos]);
-      }
-    }
-    inferredType =
-        RankedTensorType::get(projectedShape, inferredType.getElementType());
-  }
-  return inferredType;
-}
-
 RankedTensorType DispatchTensorLoadOp::inferResultType(
     IREE::Flow::DispatchTensorType sourceType,
     ArrayRef<OpFoldResult> mixedSizes) {

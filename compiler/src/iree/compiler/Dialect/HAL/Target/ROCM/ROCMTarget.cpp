@@ -249,6 +249,12 @@ class ROCMTargetBackend final : public TargetBackend {
       MLIRContext *context) const {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
+    // Add some configurations to the `hal.executable.target` attribute.
+    auto addConfig = [&](StringRef name, Attribute value) {
+      configItems.emplace_back(StringAttr::get(context, name), value);
+    };
+    // Set target arch
+    addConfig("target_arch", StringAttr::get(context, clROCMTargetChip));
 
     auto configAttr = b.getDictionaryAttr(configItems);
     return IREE::HAL::ExecutableTargetAttr::get(

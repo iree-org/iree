@@ -646,7 +646,7 @@ class UIToFPOpConversion : public OpConversionPattern<arith::UIToFPOp> {
       ConversionPatternRewriter &rewriter) const override {
     auto srcType = adaptor.getOperands()[0].getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
-    if (srcType.isUnsignedInteger(32)) {
+    if (srcType.isSignlessInteger(32) || srcType.isUnsignedInteger(32)) {
       if (dstType.isF32()) {
         rewriter.replaceOpWithNewOp<IREE::VM::CastUI32F32Op>(
             srcOp, dstType, adaptor.getOperands()[0]);

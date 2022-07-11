@@ -5,12 +5,12 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, Tuple, TypeVar
+import dataclasses
 import json
 import urllib.parse
 import markdown_strings as md
-
-from dataclasses import dataclass
-from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, Tuple, TypeVar
 
 from common.benchmark_definition import BenchmarkResults, CompilationInfo, CompilationResults
 from common.benchmark_thresholds import BENCHMARK_THRESHOLDS, COMPILATION_TIME_THRESHOLDS, TOTAL_DISPATCH_SIZE_THRESHOLDS, BenchmarkThreshold, ThresholdUnit
@@ -39,7 +39,7 @@ class AggregateBenchmarkLatency:
   base_mean_time: Optional[int] = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class CompilationMetrics:
   """An object for describing the summary of statistics and the reference."""
   compilation_info: CompilationInfo
@@ -59,6 +59,11 @@ class MetricsToTableMapper(ABC, Generic[T]):
     information for a metric. For example, extract the current and base metric
     value, the metric thresholds, the table header of the metrics, ...
   """
+
+  @abstractmethod
+  def update_base_value(self, obj: T, base_value: Any) -> T:
+    """Sets the base value and returns the updated metric object."""
+    raise NotImplementedError()
 
   @abstractmethod
   def get_current_and_base_value(self, obj: T) -> Tuple[int, Optional[int]]:
@@ -89,6 +94,11 @@ class MetricsToTableMapper(ABC, Generic[T]):
 class CompilationTimeToTable(MetricsToTableMapper[CompilationMetrics]):
   """Helper to map CompilationMetrics to compilation time column."""
 
+  def update_base_value(self, compile_metrics: CompilationMetrics,
+                        base_value: Any) -> CompilationMetrics:
+    return dataclasses.replace(compile_metrics,
+                               base_compilation_time=base_value)
+
   def get_current_and_base_value(
       self, compile_metrics: CompilationMetrics) -> Tuple[int, Optional[int]]:
     return (compile_metrics.compilation_time,
@@ -112,6 +122,11 @@ class CompilationTimeToTable(MetricsToTableMapper[CompilationMetrics]):
 
 class TotalDispatchSizeToTable(MetricsToTableMapper[CompilationMetrics]):
   """Helper to map CompilationMetrics to total dispatch size column."""
+
+  def update_base_value(self, compile_metrics: CompilationMetrics,
+                        base_value: Any) -> CompilationMetrics:
+    return dataclasses.replace(compile_metrics,
+                               base_total_dispatch_component_size=base_value)
 
   def get_current_and_base_value(
       self, compile_metrics: CompilationMetrics) -> Tuple[int, Optional[int]]:

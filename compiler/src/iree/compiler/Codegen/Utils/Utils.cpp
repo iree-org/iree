@@ -663,10 +663,10 @@ void replaceMemrefUsesAndPropagateType(Operation *oldOp, Value val,
     }
     builder.setInsertionPoint(subviewUse);
     Type newType = memref::SubViewOp::inferRankReducedResultType(
-        subviewUse.getType().getRank(), val.getType().cast<MemRefType>(),
-        extractFromI64ArrayAttr(subviewUse.static_offsets()),
-        extractFromI64ArrayAttr(subviewUse.static_sizes()),
-        extractFromI64ArrayAttr(subviewUse.static_strides()));
+        subviewUse.getType().getShape(), val.getType().cast<MemRefType>(),
+        extractFromI64ArrayAttr(subviewUse.getStaticOffsets()),
+        extractFromI64ArrayAttr(subviewUse.getStaticSizes()),
+        extractFromI64ArrayAttr(subviewUse.getStaticStrides()));
     Value newSubview = builder.create<memref::SubViewOp>(
         subviewUse->getLoc(), newType.cast<MemRefType>(), val,
         subviewUse.getMixedOffsets(), subviewUse.getMixedSizes(),

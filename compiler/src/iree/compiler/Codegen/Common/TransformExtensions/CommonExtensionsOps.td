@@ -26,18 +26,40 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 
     Returns the IsolatedFromAbove op whose content it has modified for better
     chaining APIs.
+
+    The following additive attributes can be set, they add patterns in an 
+    unspecified order:
+      - canonicalization: adds all the canonicalization pattenrs of all 
+      registered dialects and ops.
+      - rank_reducing: adds patterns that results in rank-reducing behavior on
+      subset-based operations.
+
+    Return modes:
+    =============
+    This operation applies a number of patterns to rewrite vector IR into 
+    distributed warp form. To apply these patterns, this operation must target 
+    an operation that is isolated from above, otherwise the transform definitely
+    fails.
+  
+    If the pattern application fails, or if the underlying listener fails to 
+    capture op handles, the transformation definitely fails.
+
+    Otherwise the transformation is successful and no result is returned.
   }];
 
   let arguments = (ins PDL_Operation:$target,
-                       UnitAttr:$canonicalization);
+                       UnitAttr:$canonicalization,
+                       UnitAttr:$rank_reducing);
   let results = (outs PDL_Operation:$result);
 
   let assemblyFormat = "$target attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let extraClassDeclaration = [{
-    ::mlir::FailureOr<::mlir::Operation *> applyToOne(
-      ::mlir::Operation *target, ::mlir::transform::TransformState &state);
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results, 
+        ::mlir::transform::TransformState &state);
   }];
 }
 
@@ -45,9 +67,15 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
     [FunctionalStyleTransformOpTrait, 
      MemoryEffectsOpInterface,
      DeclareOpInterfaceMethods<TransformOpInterface>]> {
-  let description = [{Calls upstream comprehensive bufferize with extra IREE hooks.}];
+  let description = [{
+    Call upstream comprehensive bufferize with extra IREE hooks.
 
-  let arguments = (ins);
+    By default, CPU allocations are emitted. This behavior can be modified by 
+    using the following attributes:
+      - target_gpu: if set, GPU allocations are emitted.
+  }];
+
+  let arguments = (ins UnitAttr:$target_gpu);
   let results = (outs);
 
   let assemblyFormat = "attr-dict";

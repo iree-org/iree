@@ -210,7 +210,7 @@ class BenchmarkDriver(object):
                          model_tags=benchmark_case.model_tags,
                          model_source=category,
                          bench_mode=benchmark_case.bench_mode,
-                         runner=benchmark_case.config,
+                         driver_info=benchmark_case.driver_info,
                          device_info=self.device_info)
 
   def __get_available_drivers_and_loaders(

@@ -86,8 +86,8 @@ static void rewriteParallelInsertSlices(
   Location loc = performConcurrentlyOp.getLoc();
   int64_t resultIndex = 0;
   for (const Operation &yieldingOp :
-       llvm::make_early_inc_range(performConcurrentlyOp.yieldingOps())) {
-    auto parallelInsertOp = cast<scf::ParallelInsertSliceOp>(&yieldingOp);
+       llvm::make_early_inc_range(performConcurrentlyOp.getYieldingOps())) {
+    auto parallelInsertOp = cast<tensor::ParallelInsertSliceOp>(&yieldingOp);
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(block.getTerminator());
     auto dynamicDims = Util::findVariadicDynamicDims(
@@ -179,8 +179,8 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
   // over to the Flow::DispatchWorkgroupsOp.
   // Use a SetVector to ensure tensor operand uniqueness.
   llvm::SetVector<Value> resultTensorOperands, resultTensorsDynamicDims;
-  for (const Operation &yieldingOp : performConcurrentlyOp.yieldingOps()) {
-    auto parallelInsertOp = cast<scf::ParallelInsertSliceOp>(&yieldingOp);
+  for (const Operation &yieldingOp : performConcurrentlyOp.getYieldingOps()) {
+    auto parallelInsertOp = cast<tensor::ParallelInsertSliceOp>(&yieldingOp);
     Value dest = parallelInsertOp.getDest();
     bool inserted = resultTensorOperands.insert(dest);
     if (!inserted) continue;
@@ -250,7 +250,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
   // operands.
   if (failed(populateWorkgroupCountComputingRegion(rewriter, foreachThreadOp,
                                                    dispatchOp)))
-    return foreachThreadOp.emitError(
+    return foreachThreadOp->emitOpError(
                "failed to populate workload region for dispatchOp: ")
            << dispatchOp;
 
@@ -364,19 +364,16 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
 //===---------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
-transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::apply(
-    transform::TransformResults &results, transform::TransformState &state) {
-  if (state.getTopLevel()
-          ->walk<WalkOrder::PostOrder>([&](scf::ForeachThreadOp op) {
-            SimplePatternRewriter rewriter(op);
-            if (failed(
-                    rewriteForeachThreadToFlowDispatchWorkgroups(op, rewriter)))
-              return WalkResult::interrupt();
-            return WalkResult::advance();
-          })
-          .wasInterrupted())
-    return DiagnosedSilenceableFailure::definiteFailure();
-  return DiagnosedSilenceableFailure::success();
+transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::applyToOne(
+    scf::ForeachThreadOp target, SmallVectorImpl<Operation *> &results,
+    transform::TransformState &state) {
+  SimplePatternRewriter rewriter(target->getContext());
+  FailureOr<Flow::DispatchWorkgroupsOp> result =
+      rewriteForeachThreadToFlowDispatchWorkgroups(target, rewriter);
+  if (failed(result))
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+  results.push_back(*result);
+  return DiagnosedSilenceableFailure(success());
 }
 
 #define GET_OP_CLASSES

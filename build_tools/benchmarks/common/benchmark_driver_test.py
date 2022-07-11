@@ -13,7 +13,7 @@ from typing import Optional
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_config import BENCHMARK_RESULTS_REL_PATH, CAPTURES_REL_PATH, BenchmarkConfig, TraceCaptureConfig
-from common.benchmark_definition import DeviceInfo, PlatformType
+from common.benchmark_definition import IREE_DRIVERS_INFOS, DeviceInfo, PlatformType
 
 
 class FakeBenchmarkDriver(BenchmarkDriver):
@@ -77,14 +77,14 @@ class BenchmarkDriverTest(unittest.TestCase):
                           model_tags=[],
                           bench_mode=["1-thread", "full-inference"],
                           target_arch="CPU-ARM64-v8A",
-                          config="iree-dylib",
+                          driver_info=IREE_DRIVERS_INFOS["iree-dylib"],
                           benchmark_case_dir="case1",
                           benchmark_tool_name="tool")
     case2 = BenchmarkCase(model_name="DeepNetv2",
                           model_tags=["f32"],
                           bench_mode=["full-inference"],
                           target_arch="CPU-ARM64-v8A",
-                          config="iree-dylib-sync",
+                          driver_info=IREE_DRIVERS_INFOS["iree-dylib-sync"],
                           benchmark_case_dir="case2",
                           benchmark_tool_name="tool")
     self.benchmark_suite = BenchmarkSuite({

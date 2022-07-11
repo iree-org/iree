@@ -7,14 +7,29 @@
 #ifndef IREE_COMPILER_CODEGEN_FLOW_TRANSFORMEXTENSIONS_FLOWEXTENSIONS_H_
 #define IREE_COMPILER_CODEGEN_FLOW_TRANSFORMEXTENSIONS_FLOWEXTENSIONS_H_
 
+#include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
+
+namespace mlir {
+class DialectRegistry;
+
+namespace scf {
+class ForeachThreadOp;
+}  // namespace scf
+
+namespace iree_compiler {
+namespace IREE {
+namespace Flow {
+class DispatchWorkgroupsOp;
+}  // namespace Flow
+}  // namespace IREE
+}  // namespace iree_compiler
+}  // namespace mlir
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Flow/TransformExtensions/FlowExtensionsOps.h.inc"
 
 namespace mlir {
-class DialectRegistry;
-
 namespace iree_compiler {
 
 /// Registers Flow transformations that require IREE-specific information into

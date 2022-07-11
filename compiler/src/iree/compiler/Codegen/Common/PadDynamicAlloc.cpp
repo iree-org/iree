@@ -22,7 +22,7 @@ static LogicalResult padAlloc(memref::AllocOp allocOp) {
       sizes.push_back(builder.getIndexAttr(dimSize));
       continue;
     }
-    Value dim = allocOp.dynamicSizes()[dynamicDimIdx++];
+    Value dim = allocOp.getDynamicSizes()[dynamicDimIdx++];
     auto ub = linalg::getConstantUpperBoundForIndex(dim);
     if (failed(ub)) {
       return allocOp.emitOpError(

@@ -27,6 +27,7 @@ def VMVX_Dialect : Dialect {
 
     See `vmvx.imports.mlir` for the full list of exported functions.
   }];
+  let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 }
 
 //===----------------------------------------------------------------------===//
@@ -50,7 +51,18 @@ def VMVX_HostBuffer : AnyTypeOf<[
   MutableByteBufferType,
 ]>;
 
-def VMVX_Buffer : MemRefRankOf<[I8, I16, I32, I64, F32, F64], [0, 1]>;
+def VMVX_ElementType : AnyTypeOf<[I8, I16, I32, I64, F32, F64]>;
+
+// A potentially non-contiguous buffer of unknown providence.
+def VMVX_NonContiguousBuffer : RankedOrUnrankedMemRefOf<
+    [I8, I16, I32, I64, F32, F64]>;
+
+// An assumed contiguous buffer.
+def VMVX_HasIdentityLayout : CPred<
+    [{ $_self.cast<::mlir::MemRefType>().getLayout().isIdentity() }]>;
+def VMVX_Buffer : Type<And<[
+  MemRefRankOf<[I8, I16, I32, I64, F32, F64], [1]>.predicate,
+  VMVX_HasIdentityLayout]>>;
 
 //===----------------------------------------------------------------------===//
 // VMVX op traits
@@ -61,6 +73,8 @@ def VMVX_Buffer : MemRefRankOf<[I8, I16, I32, I64, F32, F64], [0, 1]>;
 //===----------------------------------------------------------------------===//
 
 def VMVX_OpInterface : OpInterface<"VMVXOp"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::VMVX";
+
   let description = [{
     Interface for VMVX ops that can be used to customize the lowering.
     This is required as there is not a way to get reflection information about

@@ -1,17 +1,88 @@
-# Notes on integrating LLVM from the OSS side
+# Scripts for Integrating Changes from Third Party Dependencies
+
+This directory contains scripts for managing some of our more storied third
+party dependencies (which are submodules in the project):
+
+* llvm-project
+* mlir-hlo
+
+Depending on your activity, please refer to the appropriate script,
+which has comments at the top on how to use it:
+
+* `bump_llvm.py` : Bumping LLVM and related sub-projects to a new commit
+* `patch_module.py` : Push local patches (cherry-picks) from a submodule to
+  a mirror for use by others.
+
+NOTE: If needing to make changes to these scripts, DO NOT make changes while
+using them to perform one of the above tasks (i.e. your changes will just
+get bundled into an unrelated patch unless if very careful). In this rare
+case, just copy the contents of this directory to a temporary location and
+edit/run from there. When done, submit the changes to main.
+
+What follows are some rambly notes on how to do an LLVM integrate.
+
+TODO: Refactor these based on the common procedure we actually use.
+
+## Cookbook
+
+### Making an immediate fix to LLVM
+
+Generally, we only cherry-pick committed changes to LLVM into IREE. This is
+great when someone else has been nice enough to have already landed such a
+change. However, when something in LLVM is breaking IREE, it can be helpful
+to develop the change within IREE's third_party/llvm-project submodule and
+land it from there. Because this is often done as part of an integrate, you
+will typically be on the integrate branch for this procedure.
+
+General procedure:
+
+* Make changes in third_party/llvm-project as needed and get IREE build/test
+  passing locally.
+* Rebase the change onto LLVM head, get reviewed and land.
+* Cherry-pick the landed change into IREE's llvm fork.
+
+This should not be common. Reserve it for NFC, reverts and obvious bug fixes to
+LLVM. Most LLVM changes will take time and should not be rushed or be done
+outside of the bounds of the Development Policy. If you don't know if what you
+are doing is appropriate, ask on discord or ask an experienced committer for
+a second opinion.
+
+Roughly (note that this is a development procedure, not a copy-paste exercise:
+know what you are doing and adapt):
+
+```
+(iree)$ ... Make changes ...
+(iree/third_party/llvm-project)$ cd third_party/llvm-project
+# May need to delete the 'land' branch if re-using: git branch -D land
+(iree/third_party/llvm-project)$ git checkout -b land
+# Make sure you have an upstream COMMIT remote (or equiv)
+(iree/third_party/llvm-project)$ git remote add COMMIT git@github.com:llvm/llvm-project.git
+# Rebase your 'land' branch to upstream main
+(iree/third_party/llvm-project)$ git fetch COMMIT && git pull --rebase COMMIT main
+
+# To request a code-review.
+(iree/third_party/llvm-project)$ arc diff
+# To land the change (double check, etc -- follow upstream policies).
+(iree/third_party/llvm-project)$ git push COMMIT HEAD:main
+# Run "git log" and note that commit hash you will be cherry-picking.
+# Assume this is $COMMIT_HASH below
+
+# Move back to IREE's concept of LLVM head and cherry-pick as normal.
+(iree/third_party/llvm-project)$ (cd ../.. && git submodule update third_party/llvm-project)
+(iree/third_party/llvm-project)$ git cherry-pick $COMMIT_HASH
+(iree/third_party/llvm-project)$ cd ../..
+(iree)$ ./build_tools/scripts/integrate/patch_module.py --module=llvm-project
+```
+
+## Notes on integrating LLVM from the OSS side
 
 This is a work in progress guide on how to bump versions of LLVM and related
 dependencies. In the recent past, we did this in a different system and this
 is just to get us by until we get it better scripted/automated.
 
-Note that scripts referenced in this guide are temporarily hosted in the
-[iree-samples repository](https://github.com/iree-org/iree-samples/tree/main/scripts/integrate).
-This is because it is very non-user friendly to have branch and submodule
-management scripts in the repository being managed, and we don't have an
-immediately better place. In this guide, we reference this location as
-`$SCRIPTS`.
+In this guide, we reference this directory as `$SCRIPTS`.
 
-## Advancing the mainline branch in forks
+### Advancing the mainline branch in forks
 
 The IREE team maintains fork repositories for both llvm-project and mlir-hlo,
 allowing them to be patched out of band. These repositories are:
@@ -20,16 +91,16 @@ allowing them to be patched out of band. These repositories are:
 * https://github.com/iree-org/iree-mhlo-fork (`master` branch)
 * https://github.com/iree-org/iree-tf-fork (`master` branch)
 
-By the time you read this, they may be on a cron to advance automatically, but
-even so, it is a good idea to advance them prior to any integrate activities
-so that you have freshest commits available. Iree repository has an
+Iree repository has an
 action named [Advance Upstream Forks](https://github.com/iree-org/iree/actions/workflows/advance_upstream_forks.yml)
 to update the forks. Just select `Run Workflow` on that action and give it a
-minute. You should see the fork repository mainline branch move forward.
+minute. You should see the fork repository mainline branch move forward. This
+action runs hourly. If needing up to the minute changes, you may need to trigger
+it manually.
 
-## Bumping LLVM and Dependent Projects
+### Bumping LLVM and Dependent Projects
 
-### Strategy 1: Bump third_party/llvm-project in isolation
+#### Strategy 1: Bump third_party/llvm-project in isolation
 
 It is very common to only bump llvm-project and not sync to new versions of
 mlir-hlo and tensorflow. However, as we need to periodically integrate those
@@ -102,7 +173,7 @@ details.
 
 Good luck!
 
-### Strategy 2: Sync everything to a Google/TensorFlow commit
+#### Strategy 2: Sync everything to a Google/TensorFlow commit
 
 TODO: Add a script for this. Also note that there is a forked copy of
 `iree-dialects` in integrations/tensorflow. When bumping that dependency,
@@ -228,7 +299,7 @@ git commit ...
 git push UPSTREAM_AUTOMATION bump-llvm-...
 ```
 
-## Cherry-picking
+### Cherry-picking
 
 We support cherry-picking specific commits in to both llvm-project and mlir-hlo.
 This should only ever be done to incorporate patches that enable further
@@ -333,3 +404,4 @@ python configure_bazel.py
 cd integrations/tensorflow
 bazel test ...
 ```
+

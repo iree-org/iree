@@ -537,7 +537,7 @@ void HALDialect::registerAttributes() {
 void HALDialect::registerTypes() {
   addTypes<AllocatorType, BufferType, BufferViewType, CommandBufferType,
            DescriptorSetType, DescriptorSetLayoutType, DeviceType, EventType,
-           ExecutableType, ExecutableLayoutType, RingBufferType,
+           ExecutableType, ExecutableLayoutType, FenceType, RingBufferType,
            SemaphoreType>();
 }
 
@@ -586,6 +586,7 @@ Type HALDialect::parseType(DialectAsmParser &parser) const {
           .Case("event", EventType::get(getContext()))
           .Case("executable", ExecutableType::get(getContext()))
           .Case("executable_layout", ExecutableLayoutType::get(getContext()))
+          .Case("fence", FenceType::get(getContext()))
           .Case("ring_buffer", RingBufferType::get(getContext()))
           .Case("semaphore", SemaphoreType::get(getContext()))
           .Default(nullptr);
@@ -617,6 +618,8 @@ void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
     p << "executable";
   } else if (type.isa<ExecutableLayoutType>()) {
     p << "executable_layout";
+  } else if (type.isa<FenceType>()) {
+    p << "fence";
   } else if (type.isa<RingBufferType>()) {
     p << "ring_buffer";
   } else if (type.isa<SemaphoreType>()) {
