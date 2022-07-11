@@ -583,12 +583,15 @@ class MulCastOfBool : public OpRewritePattern<mhlo::MulOp> {
 
 // Generates Gaussian noise with uniform random generator based on Box-Muller
 // transform.
-class ExpandRngNormal : public OpRewritePattern<mhlo::RngNormalOp> {
+class ExpandRngNormal : public OpRewritePattern<mhlo::RngOp> {
  public:
-  using OpRewritePattern<mhlo::RngNormalOp>::OpRewritePattern;
+  using OpRewritePattern<mhlo::RngOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(mhlo::RngNormalOp op,
+  LogicalResult matchAndRewrite(mhlo::RngOp op,
                                 PatternRewriter &rewriter) const override {
+    if (op.rng_distribution() != mhlo::RngDistribution::NORMAL)
+      return failure();
+
     auto resTy = op.getType().dyn_cast<RankedTensorType>();
     // We can support static shapes, but it's easier to implement Box-Muller
     // transform if we know the number of elements.
@@ -624,12 +627,12 @@ class ExpandRngNormal : public OpRewritePattern<mhlo::RngNormalOp> {
     // mag = sigma * sqrt(-2.0 * log(u1));
     Value mag = getF32Const(b, /*shapes=*/{halfNumElems}, sqrtValues);
     Value sigma = b.create<mhlo::BroadcastOp>(
-        mag.getType(), op.sigma(), make1DElementsAttr(b, halfNumElems));
+        mag.getType(), op.b(), make1DElementsAttr(b, halfNumElems));
     mag = b.create<mhlo::MulOp>(sigma, b.create<mhlo::SqrtOp>(mag));
 
     // z0 = mag * cos(two_pi * u2) + mu;
     // z1 = mag * sin(two_pi * u2) + mu;
-    Value mu = b.create<mhlo::BroadcastOp>(mag.getType(), op.mu(),
+    Value mu = b.create<mhlo::BroadcastOp>(mag.getType(), op.a(),
                                            make1DElementsAttr(b, halfNumElems));
     Value z0 = getF32Const(b, /*shapes=*/{halfNumElems}, cosValues);
     z0 = b.create<mhlo::MulOp>(mag, z0);
