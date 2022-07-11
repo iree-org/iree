@@ -27,13 +27,13 @@
 #define IREE_VM_ABI_TYPE_NAME(types) iree_vm_abi_##types##_t
 
 #define IREE_VM_ABI_FIXED_STRUCT(types, body) \
-  IREE_VM_ABI_FIXED_STRUCT_IMPL(types, IREE_VM_ABI_TYPE_NAME(types), body)
+  IREE_VM_ABI_FIXED_STRUCT_IMPL(IREE_VM_ABI_TYPE_NAME(types), types, body)
 
 #define IREE_VM_ABI_VLA_STRUCT(types, vla_count, vla_field, body) \
   IREE_VM_ABI_VLA_STRUCT_IMPL(types, vla_count, vla_field,        \
                               IREE_VM_ABI_TYPE_NAME(types), body)
 
-#define IREE_VM_ABI_FIXED_STRUCT_IMPL(types, struct_type, body)        \
+#define IREE_VM_ABI_FIXED_STRUCT_IMPL(struct_type, types, body)        \
   typedef struct iree_vm_abi_##types##_t body IREE_ATTRIBUTE_PACKED    \
       struct_type;                                                     \
   static inline struct_type* iree_vm_abi_##types##_checked_deref(      \
