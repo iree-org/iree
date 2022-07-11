@@ -52,9 +52,6 @@
 // to never need it. This removes our dependency on pthreads.
 #if !IREE_SYNCHRONIZATION_DISABLE_UNSAFE
 
-// NOTE: we only support futex when not using tsan as we need to add annotations
-// for tsan to understand what we are doing.
-// https://github.com/llvm-mirror/compiler-rt/blob/master/include/sanitizer/tsan_interface.h
 #if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_EMSCRIPTEN) || \
     defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_WINDOWS)
 #define IREE_PLATFORM_HAS_FUTEX 1
