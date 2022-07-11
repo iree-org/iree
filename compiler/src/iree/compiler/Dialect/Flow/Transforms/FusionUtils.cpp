@@ -136,6 +136,10 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
   auto numInputs = producer.getNumInputs();
   auto ewOutputType = consumer.getOutputOperand(0)->get().getType();
   if (numInputs == 1) {
+    auto input = producer.getInputOperand(0);
+    auto indexingMap = producer.getTiedIndexingMap(input);
+    if (!indexingMap.isIdentity()) return false;
+
     if (producer.getInputOperand(0)->get().getType() != ewOutputType)
       return false;
   } else {
@@ -145,8 +149,8 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
     // dimension. Here we put another restriction that the full input does not
     // have a transpose, which may be relaxed later. For the other operand, we
     // expect it to be broadcasted to the output shape.
-    OpOperand *fullInput = nullptr;
-    OpOperand *otherInput = nullptr;
+    Optional<OpOperand *> fullInput;
+    Optional<OpOperand *> otherInput;
     for (unsigned i = 0; i < 2; ++i) {
       auto input = producer.getInputOperand(i);
       auto indexingMap = producer.getTiedIndexingMap(input);
@@ -158,9 +162,11 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
     }
     if (!fullInput) return false;
 
-    if (fullInput->get().getType() != ewOutputType) return false;
+    assert(otherInput);
 
-    auto otherIndexingMap = producer.getTiedIndexingMap(otherInput);
+    if ((*fullInput)->get().getType() != ewOutputType) return false;
+
+    auto otherIndexingMap = producer.getTiedIndexingMap(*otherInput);
     if (!otherIndexingMap.isProjectedPermutation()) return false;
 
     if (!otherIndexingMap.isIdentity()) {
