@@ -1,4 +1,4 @@
-# Copyright 2019 The IREE Authors
+# Copyright 2022 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -13,33 +13,14 @@ package(
 )
 
 iree_runtime_cc_library(
-    name = "hal",
-    srcs = [
-        "module.c",
-    ],
-    hdrs = [
-        "module.h",
-    ],
-    textual_hdrs = [
-        "exports.inl",
-    ],
+    name = "buffer_diagnostics",
+    srcs = ["buffer_diagnostics.c"],
+    hdrs = ["buffer_diagnostics.h"],
     deps = [
-        ":types",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/hal",
-        "//runtime/src/iree/modules/hal/utils:buffer_diagnostics",
-        "//runtime/src/iree/vm",
-    ],
-)
-
-iree_runtime_cc_library(
-    name = "types",
-    srcs = ["types.c"],
-    hdrs = ["types.h"],
-    deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/hal",
+        "//runtime/src/iree/modules/hal:types",
         "//runtime/src/iree/vm",
     ],
 )
