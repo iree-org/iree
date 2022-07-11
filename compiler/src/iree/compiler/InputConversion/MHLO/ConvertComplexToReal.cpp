@@ -214,9 +214,9 @@ struct ConvertExpOp : public OpConversionPattern<mhlo::ExpOp> {
     Value result = rewriter.createOrFold<mhlo::ComplexOp>(
         loc,
         rewriter.create<mhlo::MulOp>(
-            loc, rewriter.create<mhlo::CosOp>(loc, operandImag), expReal),
+            loc, rewriter.create<mhlo::CosineOp>(loc, operandImag), expReal),
         rewriter.create<mhlo::MulOp>(
-            loc, rewriter.create<mhlo::SinOp>(loc, operandImag), expReal));
+            loc, rewriter.create<mhlo::SineOp>(loc, operandImag), expReal));
     rewriter.replaceOp(op, result);
     return success();
   }
