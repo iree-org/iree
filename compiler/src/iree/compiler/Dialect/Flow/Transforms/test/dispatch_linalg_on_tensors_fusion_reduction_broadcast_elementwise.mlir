@@ -158,11 +158,12 @@ func.func @reduction_broadcast_elementwise_dynamic(%a: tensor<12x16x?xf32>, %b: 
   return %42 : tensor<12x16x?xf32>
 }
 
-// Check that two generic ops are NOT dispatched together since the ops have a
-// dynamic shape. We should see two flow.dispatch.workgroups.
+// When a same indexing map is used for reduction and broadcast with dynamic
+// shape,  their dimension size is guarateed to be the same at runtime, so the
+// case should be supported.
 
 // CHECK-LABEL: func.func @reduction_broadcast_elementwise_dynamic
 //      CHECK: flow.dispatch.workgroups
-//      CHECK: flow.dispatch.workgroups
-
-
+//      CHECK:   %[[RED:.+]] = linalg.generic
+//      CHECK:   linalg.generic
+//      CHECK-SAME: %[[RED]]

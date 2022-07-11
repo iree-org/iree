@@ -68,13 +68,19 @@ static bool canInsOperandTieWithOutsOperand(OpOperand *insOperand) {
 static bool isReductionOnInnermostDims(linalg::LinalgOp linalgOp) {
   SmallVector<Operation *, 4> combinerOps;
 
+  // TODO: We may relax this condition to support a really generic op with
+  // a reduction.
   auto numInputs = linalgOp.getNumInputs();
   if (numInputs != 1 && numInputs != 2) return false;
 
   if (linalgOp.getNumOutputs() != 1) return false;
 
+  if (linalgOp.getNumReductionLoops() == 0) return false;
+
   // Check if the result dims are d0, d1, ..., which means the reduction is done
   // in the innermost dimensions without an output transpose.
+  // TODO: the condition may be relaxed to support transpose or reduction on an
+  // arbirary dimension.
   auto output = linalgOp.getOutputOperand(0);
   auto outputIndexingMap = linalgOp.getTiedIndexingMap(output);
   for (const auto &en : llvm::enumerate(outputIndexingMap.getResults())) {
@@ -84,11 +90,6 @@ static bool isReductionOnInnermostDims(linalg::LinalgOp linalgOp) {
     } else {
       return false;
     }
-  }
-
-  if (!matchReduction(linalgOp.getRegionOutputArgs(), 0, combinerOps) ||
-      combinerOps.size() != 1) {
-    return false;
   }
 
   return true;
@@ -103,7 +104,7 @@ static bool isSimpleElementwise(linalg::LinalgOp op) {
   for (OpOperand *opOperand : op.getOutputOperands()) {
     if (!op.getTiedIndexingMap(opOperand).isIdentity()) return false;
   }
-  return linalg::hasOnlyScalarElementwiseOp(op->getRegion(0));
+  return true;
 }
 
 /// Check if the use of operand is a reduction -> broadcast -> elementwise.
@@ -115,14 +116,12 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
   auto consumer = dyn_cast<linalg::LinalgOp>(operand->getOwner());
   if (!producer || !consumer) return false;
 
-  // TODO: might be able to support dynamic shape if the shape is the same for
-  // reduction and broadcast.
-  if (producer.hasDynamicShape() || consumer.hasDynamicShape()) return false;
-
   // Check if the producer is a simple reduction.
   if (!isReductionOnInnermostDims(producer)) return false;
 
   // Check if the reduction is broadcasted back for the elementwise op.
+  // TODO: We may need to relax the condition to support some broadcast with
+  // a unit dimension, e.g., <16x8xf32> -> <16xf32> -> <16x1x8xf32>.
   auto producerResult = operand->get().cast<OpResult>();
   auto outputIndexingMap = producer.getTiedIndexingMapForResult(producerResult);
   auto inputIndexingMap = consumer.getTiedIndexingMap(operand);
@@ -165,7 +164,8 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
     if (!otherIndexingMap.isProjectedPermutation()) return false;
 
     if (!otherIndexingMap.isIdentity()) {
-      // We do not support transpose for the input yet.
+      // We do not support transpose for the input for now, but we may relax it
+      // later.
       if (otherIndexingMap.isPermutation()) return false;
 
       // Otherwise, it is a broadcasting supported.
