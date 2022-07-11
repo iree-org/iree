@@ -81,8 +81,6 @@ steps:
       build.pull_request.id == null ||
       build.pull_request.labels includes 'buildkite:benchmark-x86_64'
 
-  - wait
-
   - label: ":recycle: Collect compilation statistics"
     key: "collect-compilation-statistics"
     commands: |
