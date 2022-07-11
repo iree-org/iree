@@ -10,39 +10,25 @@ import unittest
 from unittest import mock
 
 from common.benchmark_definition import DeviceInfo, PlatformType
-from common.linux_device_utils import get_linux_cpu_arch, get_linux_cpu_features, get_linux_device_info
+from common.linux_device_utils import canonicalize_gpu_name, get_linux_cpu_arch, get_linux_cpu_features
+
+LSCPU_OUTPUT = ("Architecture:                    x86_64\n"
+                "Vendor ID:                       AuthenticAMD\n"
+                "Flags:                           fpu vme de pse tsc\n")
 
 
 class LinuxDeviceUtilsTest(unittest.TestCase):
 
-  def setUp(self):
-    self.execute_cmd_patch = mock.patch(
-        "common.linux_device_utils.execute_cmd_and_get_output")
-    self.execute_cmd_mock = self.execute_cmd_patch.start()
-    self.execute_cmd_mock.return_value = (
-        "Architecture:                    x86_64\n"
-        "Vendor ID:                       AuthenticAMD\n"
-        "Flags:                           fpu vme de pse tsc\n")
-
-  def tearDown(self):
-    self.execute_cmd_patch.stop()
-
   def test_get_linux_cpu_arch(self):
-    self.assertEqual(get_linux_cpu_arch(), "x86_64")
+    self.assertEqual(get_linux_cpu_arch(LSCPU_OUTPUT), "x86_64")
 
   def test_get_linux_cpu_features(self):
-    self.assertEqual(get_linux_cpu_features(),
+    self.assertEqual(get_linux_cpu_features(LSCPU_OUTPUT),
                      ["fpu", "vme", "de", "pse", "tsc"])
 
-  def test_get_linux_device_info(self):
-    self.assertEqual(
-        get_linux_device_info("Dummy", "Zen2"),
-        DeviceInfo(platform_type=PlatformType.LINUX,
-                   model="Dummy",
-                   cpu_abi="x86_64",
-                   cpu_uarch="Zen2",
-                   cpu_features=["fpu", "vme", "de", "pse", "tsc"],
-                   gpu_name="Unknown"))
+  def test_canonicalize_gpu_name(self):
+    self.assertEqual(canonicalize_gpu_name("Tesla  V100-SXM2-16GB"),
+                     "Tesla-V100-SXM2-16GB")
 
 
 if __name__ == "__main__":
