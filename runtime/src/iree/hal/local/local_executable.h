@@ -10,7 +10,6 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/local/executable_library.h"
-#include "iree/hal/local/local_executable_layout.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -20,7 +19,7 @@ typedef struct iree_hal_local_executable_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   iree_host_size_t executable_layout_count;
-  iree_hal_local_executable_layout_t** executable_layouts;
+  iree_hal_executable_layout_t** executable_layouts;
 
   // Defines per-entry point how much workgroup local memory is required.
   // Contains entries with 0 to indicate no local memory is required or >0 in
@@ -49,7 +48,7 @@ void iree_hal_local_executable_initialize(
     const iree_hal_local_executable_vtable_t* vtable,
     iree_host_size_t executable_layout_count,
     iree_hal_executable_layout_t* const* source_executable_layouts,
-    iree_hal_local_executable_layout_t** target_executable_layouts,
+    iree_hal_executable_layout_t** target_executable_layouts,
     iree_allocator_t host_allocator,
     iree_hal_local_executable_t* out_base_executable);
 

@@ -31,8 +31,8 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/local",
         "//runtime/src/iree/hal/local:executable_library",
+        "//runtime/src/iree/hal/local:executable_loader",
         "//runtime/src/iree/hal/local/elf:elf_module",
     ],
 )
@@ -55,9 +55,9 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/local",
         "//runtime/src/iree/hal/local:executable_environment",
         "//runtime/src/iree/hal/local:executable_library",
+        "//runtime/src/iree/hal/local:executable_loader",
     ],
 )
 
@@ -81,8 +81,8 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:dynamic_library",
         "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/local",
         "//runtime/src/iree/hal/local:executable_library",
+        "//runtime/src/iree/hal/local:executable_loader",
     ],
 )
 
@@ -111,8 +111,8 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/local",
         "//runtime/src/iree/hal/local:executable_library",
+        "//runtime/src/iree/hal/local:executable_loader",
         "//runtime/src/iree/modules/vmvx",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm:bytecode_module",

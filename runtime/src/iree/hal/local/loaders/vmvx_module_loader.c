@@ -15,7 +15,6 @@
 #include "iree/hal/api.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
-#include "iree/hal/local/local_executable_layout.h"
 #include "iree/modules/vmvx/module.h"
 #include "iree/vm/bytecode_module.h"
 
@@ -166,7 +165,7 @@ static iree_status_t iree_hal_vmvx_executable_create(
       entry_count * sizeof(*executable->entry_fn_ordinals) +
       entry_count * sizeof(*executable->base.dispatch_attrs) +
       executable_params->executable_layout_count *
-          sizeof(iree_hal_local_executable_layout_t);
+          sizeof(iree_hal_executable_layout_t*);
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
   iree_hal_executable_dispatch_attrs_v0_t* dispatch_attrs = NULL;
@@ -175,8 +174,8 @@ static iree_status_t iree_hal_vmvx_executable_create(
                    entry_count * sizeof(*executable->entry_fn_ordinals);
     dispatch_attrs = (iree_hal_executable_dispatch_attrs_v0_t*)ptr;
     ptr += entry_count * sizeof(*executable->base.dispatch_attrs);
-    iree_hal_local_executable_layout_t** executable_layouts_ptr =
-        (iree_hal_local_executable_layout_t**)ptr;
+    iree_hal_executable_layout_t** executable_layouts_ptr =
+        (iree_hal_executable_layout_t**)ptr;
     iree_hal_local_executable_initialize(
         &iree_hal_vmvx_executable_vtable,
         executable_params->executable_layout_count,
@@ -406,6 +405,7 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
 
   // On-stack stack. We really do abuse the stack too much here.
   // TODO(benvanik): pass in an iree_arena_t that can be used for this.
+  // TODO(benvanik): invocation flag that prevents global stores.
   IREE_VM_INLINE_STACK_INITIALIZE(
       stack, IREE_VM_INVOCATION_FLAG_TRACE_INLINE,
       iree_vm_context_state_resolver(executable->context),
