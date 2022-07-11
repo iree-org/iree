@@ -88,6 +88,10 @@ struct SchedulingOptions {
     // Full HAL using asynchronous host/device execution both internally and
     // externally.
     AsyncExternal = 2,
+    // Inline host-local in-process execution with executable code statically
+    // linked into the host program.
+    // (Currently) only supports the `vmvx-inline` HAL target backend.
+    InlineStatic = 3,
   };
   // Program execution model specifying scheduling behavior.
   ExecutionModel executionModel = ExecutionModel::AsyncInternal;

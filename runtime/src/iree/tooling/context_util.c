@@ -13,9 +13,14 @@
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/tracing.h"
+#include "iree/modules/hal/inline/module.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
 #include "iree/vm/bytecode_module.h"
+
+#if defined(IREE_HAVE_VMVX_MODULE)
+#include "iree/modules/vmvx/module.h"
+#endif  // IREE_HAVE_VMVX_MODULE
 
 //===----------------------------------------------------------------------===//
 // Module loading
@@ -142,6 +147,50 @@ static iree_status_t iree_tooling_create_inline_device_allocator_from_flags(
   return status;
 }
 
+static iree_status_t iree_tooling_load_hal_inline_module(
+    iree_vm_instance_t* instance, iree_allocator_t host_allocator,
+    iree_vm_module_t** out_module,
+    iree_hal_allocator_t** out_device_allocator) {
+  IREE_ASSERT_ARGUMENT(instance);
+  IREE_ASSERT_ARGUMENT(out_module);
+  IREE_ASSERT_ARGUMENT(out_device_allocator);
+  if (*out_device_allocator) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "inline HAL module cannot be used with other "
+                            "primary HAL module types");
+  }
+  *out_module = NULL;
+  *out_device_allocator = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Register required types before creating the module.
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_module_register_inline_types(instance));
+
+  // Create default heap device allocator.
+  iree_hal_allocator_t* device_allocator = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_tooling_create_inline_device_allocator_from_flags(
+              host_allocator, &device_allocator));
+
+  // Create the module; it's immutable and can be reused but we don't do that in
+  // this tooling.
+  iree_hal_inline_module_flags_t flags = IREE_HAL_INLINE_MODULE_FLAG_NONE;
+  iree_vm_module_t* module = NULL;
+  iree_status_t status = iree_hal_inline_module_create(
+      instance, flags, device_allocator, host_allocator, &module);
+
+  if (iree_status_is_ok(status)) {
+    *out_module = module;
+    *out_device_allocator = device_allocator;
+  } else {
+    iree_hal_allocator_release(device_allocator);
+    iree_vm_module_release(module);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 //===----------------------------------------------------------------------===//
 // Module management
 //===----------------------------------------------------------------------===//
@@ -222,6 +271,13 @@ static iree_status_t iree_tooling_resolve_module_dependency(
     IREE_RETURN_IF_ERROR(iree_tooling_load_hal_async_module(
         state->instance, state->default_device_uri, state->host_allocator,
         &module, &state->device, &state->device_allocator));
+  } else if (iree_string_view_equal(dependency->name, IREE_SV("hal_inline"))) {
+    IREE_RETURN_IF_ERROR(iree_tooling_load_hal_inline_module(
+        state->instance, state->host_allocator, &module,
+        &state->device_allocator));
+  } else if (iree_string_view_equal(dependency->name, IREE_SV("vmvx"))) {
+    IREE_RETURN_IF_ERROR(iree_vmvx_module_create(
+        state->instance, state->host_allocator, &module));
   } else if (iree_all_bits_set(dependency->flags,
                                IREE_VM_MODULE_DEPENDENCY_FLAG_REQUIRED)) {
     // Required but not found; fail.

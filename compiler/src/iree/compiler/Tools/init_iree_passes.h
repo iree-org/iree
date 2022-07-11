@@ -20,6 +20,7 @@
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Modules/HAL/Inline/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Analysis/TestPasses.h"
@@ -46,6 +47,7 @@ inline void registerAllIreePasses() {
   ConstEval::registerConstEvalPasses();
   IREE::Flow::registerFlowPasses();
   IREE::HAL::registerHALPasses();
+  IREE::HAL::Inline::registerHALInlinePasses();
   IREE::LinalgExt::registerPasses();
   IREE::Stream::registerStreamPasses();
   IREE::Util::registerTransformPasses();

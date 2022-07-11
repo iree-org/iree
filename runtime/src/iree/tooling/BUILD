@@ -24,6 +24,7 @@ cc_library(
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",
+        "//runtime/src/iree/modules/hal/inline",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm:bytecode_module",
     ],

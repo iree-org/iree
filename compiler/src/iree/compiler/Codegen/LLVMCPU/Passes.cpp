@@ -362,6 +362,10 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager) {
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addBufferizePasses(nestedModulePM);
 
+  // Cleanup the IR that may now have unused loops.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+
   // Convert buffer-level microkernels.
   if (clEnableMicrokernels) {
     nestedModulePM.addNestedPass<func::FuncOp>(

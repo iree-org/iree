@@ -20,6 +20,9 @@ iree_runtime_cc_library(
     hdrs = [
         "module.h",
     ],
+    defines = [
+        "IREE_HAVE_VMVX_MODULE",
+    ],
     textual_hdrs = [
         "exports.inl",
     ],
