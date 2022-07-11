@@ -76,7 +76,7 @@ steps:
   - label: ":arrow_forward: Execute linux-x86_64 benchmark pipeline"
     commands: |
       buildkite-agent pipeline upload \
-        build_tools/buildkite/cmake/linux/x86_64/benchmark.yml
+        build_tools/buildkite/cmake/linux/x86_64/benchmark2.yml
     if: >
       build.pull_request.id == null ||
       build.pull_request.labels includes 'buildkite:benchmark-x86_64'
