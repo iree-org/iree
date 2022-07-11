@@ -36,7 +36,7 @@ void LLVMCPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
       if (dimSize == ShapedType::kDynamicSize) continue;
       size *= dimSize;
     }
-    for (auto operand : allocaOp.dynamicSizes()) {
+    for (auto operand : allocaOp.getDynamicSizes()) {
       auto ub = linalg::getConstantUpperBoundForIndex(operand);
       if (failed(ub)) {
         return allocaOp.emitOpError(
@@ -45,8 +45,8 @@ void LLVMCPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
       size *= *ub;
     }
     size *= type.getElementType().getIntOrFloatBitWidth();
-    if (allocaOp.alignment()) {
-      int64_t alignmentInBits = *allocaOp.alignment() * 8;
+    if (allocaOp.getAlignment()) {
+      int64_t alignmentInBits = *allocaOp.getAlignment() * 8;
       size = llvm::divideCeil(size, alignmentInBits) * alignmentInBits;
     }
     totalBits += size;

@@ -107,7 +107,7 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
   LogicalResult matchAndRewrite(DimOp op,
                                 PatternRewriter &rewriter) const override {
     auto shapeAwareOp =
-        dyn_cast_or_null<ShapeAwareOpInterface>(op.source().getDefiningOp());
+        dyn_cast_or_null<ShapeAwareOpInterface>(op.getSource().getDefiningOp());
     if (!shapeAwareOp) return failure();
 
     // We only support static dimension indices today (as in general we only
@@ -115,13 +115,13 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
     // need to do something much more complex - or prevent them from sneaking
     // in.
     APInt index;
-    if (!matchPattern(op.index(), m_ConstantInt(&index))) {
+    if (!matchPattern(op.getIndex(), m_ConstantInt(&index))) {
       return rewriter.notifyMatchFailure(op,
                                          "non-constant dim index unsupported");
     }
 
     // If it's a static dim then just fold to that.
-    auto type = op.source().getType().template cast<ShapedType>();
+    auto type = op.getSource().getType().template cast<ShapedType>();
     int64_t staticDim = type.getDimSize(index.getZExtValue());
     if (staticDim != ShapedType::kDynamicSize) {
       rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(op, staticDim);
@@ -131,7 +131,8 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
     // Otherwise try to get the dynamic dimension cheaply without the need to
     // insert new IR.
     unsigned dynamicIdx = type.getDynamicDimIndex(index.getZExtValue());
-    auto dynamicDims = shapeAwareOp.getResultDynamicDimsFromValue(op.source());
+    auto dynamicDims =
+        shapeAwareOp.getResultDynamicDimsFromValue(op.getSource());
     rewriter.replaceOp(op, dynamicDims[dynamicIdx]);
 
     return success();
