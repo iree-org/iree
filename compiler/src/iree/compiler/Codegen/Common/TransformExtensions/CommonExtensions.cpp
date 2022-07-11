@@ -10,6 +10,7 @@
 #include "iree-dialects/Transforms/ListenerGreedyPatternRewriteDriver.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "llvm/ADT/StringSet.h"
 #include "mlir/Pass/PassManager.h"
 
 using namespace mlir;
@@ -171,6 +172,55 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   });
   return DiagnosedSilenceableFailure(failure(res.wasInterrupted()));
 }
+
+//===---------------------------------------------------------------------===//
+// MatchOp
+//===---------------------------------------------------------------------===//
+
+LogicalResult transform_dialect::MatchOp::verify() {
+  bool opXorIface = getMatchOp().hasValue() ^ getMatchInterface().hasValue();
+  if (!opXorIface)
+    return this->emitOpError(
+        "requires a either a match_op or a match_interface attribute (but not "
+        "both)");
+  return success();
+}
+
+DiagnosedSilenceableFailure transform_dialect::MatchOp::apply(
+    transform::TransformResults &results, transform::TransformState &state) {
+  llvm::StringSet<> strs;
+  if (getMatchOp().hasValue())
+    strs.insert(getMatchOp()->getAsValueRange<StringAttr>().begin(),
+                getMatchOp()->getAsValueRange<StringAttr>().end());
+
+  ArrayRef<Operation *> payloadOps = state.getPayloadOps(getTarget());
+  if (payloadOps.size() != 1)
+    return DiagnosedSilenceableFailure(
+        this->emitOpError("requires exactly one target handle"));
+
+  SmallVector<Operation *> res;
+
+  auto matchFun = [&](Operation *op) {
+    if (strs.contains(op->getName().getStringRef())) res.push_back(op);
+    // Interfaces cannot be matched by name, just by ID.
+    // So we specifically encode the interfaces we care about for this op.
+    if (getMatchInterface().hasValue()) {
+      auto iface = getMatchInterface().getValue();
+      if (iface == transform_dialect::MatchInterfaceEnum::LinalgOp &&
+          isa<linalg::LinalgOp>(op))
+        res.push_back(op);
+      if (iface == transform_dialect::MatchInterfaceEnum::TilingInterface &&
+          isa<TilingInterface>(op))
+        res.push_back(op);
+    }
+  };
+
+  payloadOps.front()->walk(matchFun);
+  results.set(getResult().cast<OpResult>(), res);
+  return DiagnosedSilenceableFailure(success());
+}
+
+#include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensionsAttrs.cpp.inc"
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensionsOps.cpp.inc"

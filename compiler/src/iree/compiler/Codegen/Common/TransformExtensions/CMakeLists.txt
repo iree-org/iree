@@ -18,6 +18,8 @@ iree_tablegen_library(
   OUTS
     --gen-op-decls CommonExtensionsOps.h.inc
     --gen-op-defs CommonExtensionsOps.cpp.inc
+    --gen-enum-decls CommonExtensionsAttrs.h.inc
+    --gen-enum-defs CommonExtensionsAttrs.cpp.inc
 )
 
 iree_cc_library(
@@ -25,14 +27,17 @@ iree_cc_library(
     CommonExtensions
   HDRS
     "CommonExtensions.h"
+    "CommonExtensionsAttrs.h.inc"
     "CommonExtensionsOps.h.inc"
   SRCS
     "CommonExtensions.cpp"
+    "CommonExtensionsAttrs.cpp.inc"
     "CommonExtensionsOps.cpp.inc"
   DEPS
     ::CommonExtensionsOpGen
     IREEDialectsTransforms
     IREELinalgTransformDialect
+    LLVMSupport
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRPass
