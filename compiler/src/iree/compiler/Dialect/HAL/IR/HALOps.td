@@ -45,15 +45,6 @@ def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
   ];
 }
 
-def HAL_ExSubmitAndWaitOp : HAL_Op<"ex.submit_and_wait", [Util_YieldPoint]> {
-  let arguments = (ins
-    HAL_Device:$device,
-    HAL_CommandBuffer:$command_buffer
-  );
-
-  let assemblyFormat = "$device `,` $command_buffer attr-dict";
-}
-
 //===----------------------------------------------------------------------===//
 // Pseudo ops for conversion support
 //===----------------------------------------------------------------------===//

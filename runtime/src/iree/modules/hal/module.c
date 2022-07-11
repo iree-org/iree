@@ -58,10 +58,6 @@ typedef struct iree_hal_module_state_t {
   // executables like ones for training vs inference in the same model, or just
   // always use this.
   iree_hal_executable_cache_t* executable_cache;
-
-  // TODO(benvanik): remove with submit_and_wait.
-  iree_hal_semaphore_t* submit_semaphore;
-  uint64_t submit_value;
 } iree_hal_module_state_t;
 
 static void IREE_API_PTR iree_hal_module_destroy(void* base_module) {
@@ -91,11 +87,6 @@ iree_hal_module_alloc_state(void* self, iree_allocator_t host_allocator,
               state->shared_device, iree_string_view_empty(),
               iree_loop_inline(&state->loop_status), &state->executable_cache));
 
-  state->submit_value = 0ull;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_semaphore_create(state->shared_device, state->submit_value,
-                                    &state->submit_semaphore));
-
   *out_module_state = (iree_vm_module_state_t*)state;
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -106,7 +97,6 @@ iree_hal_module_free_state(void* self, iree_vm_module_state_t* module_state) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_module_state_t* state = (iree_hal_module_state_t*)module_state;
-  iree_hal_semaphore_release(state->submit_semaphore);
   iree_hal_executable_cache_release(state->executable_cache);
   iree_status_ignore(state->loop_status);
   iree_hal_device_release(state->shared_device);
@@ -138,40 +128,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_ex_shared_device,  //
                    v, r) {
   rets->r0 = iree_hal_device_retain_ref(state->shared_device);
   return iree_ok_status();
-}
-
-IREE_VM_ABI_EXPORT(iree_hal_module_ex_submit_and_wait,  //
-                   iree_hal_module_state_t,             //
-                   rr, v) {
-  iree_hal_device_t* device = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
-  iree_hal_command_buffer_t* command_buffer = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_command_buffer_check_deref(args->r1, &command_buffer));
-
-  // Batch with our single command buffer.
-  iree_hal_submission_batch_t batch;
-  memset(&batch, 0, sizeof(batch));
-
-  iree_hal_command_buffer_t* command_buffer_ptrs[] = {command_buffer};
-  batch.command_buffer_count = IREE_ARRAYSIZE(command_buffer_ptrs);
-  batch.command_buffers = command_buffer_ptrs;
-
-  uint64_t next_semaphore_value = ++state->submit_value;
-  iree_hal_semaphore_t* signal_semaphore_ptrs[] = {state->submit_semaphore};
-  uint64_t signal_semaphore_values[] = {next_semaphore_value};
-  batch.signal_semaphores.count = IREE_ARRAYSIZE(signal_semaphore_ptrs);
-  batch.signal_semaphores.semaphores = signal_semaphore_ptrs;
-  batch.signal_semaphores.payload_values = signal_semaphore_values;
-
-  iree_status_t status = iree_hal_device_queue_submit(
-      device, IREE_HAL_COMMAND_CATEGORY_ANY, 0, 1, &batch);
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_wait(
-        state->submit_semaphore, next_semaphore_value, iree_infinite_timeout());
-  }
-
-  return status;
 }
 
 //===----------------------------------------------------------------------===//
