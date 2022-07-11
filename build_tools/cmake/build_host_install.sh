@@ -16,6 +16,10 @@ CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
 "${CMAKE_BIN?}" --version
 ninja --version
 
+echo "Initializing submodules"
+git submodule sync
+git submodule update --init --jobs 8 --depth 1
+
 ROOT_DIR=$(git rev-parse --show-toplevel)
 cd ${ROOT_DIR?}
 
