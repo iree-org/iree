@@ -8,7 +8,6 @@
 name: Build Native Release Packages
 
 on:
-  pull_request:
   workflow_dispatch:
     inputs:
       package_suffix:
@@ -29,7 +28,7 @@ on:
 jobs:
   build_core:
     name: "${{ matrix.os }} :: Build ${{ matrix.build_package }} Package"
-    runs-on: [self-hosted, runner-group=releaser]
+    runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
