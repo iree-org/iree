@@ -33,6 +33,7 @@ GPU_NAME_TO_TARGET_ARCH_MAP = {
     "adreno-730": "gpu-adreno",
     "mali-g77": "gpu-mali-valhall",
     "mali-g78": "gpu-mali-valhall",
+    "tesla-v100-sxm2-16gb": "gpu-cuda-sm_70",
     "unknown": "gpu-unknown",
 }
 
@@ -71,6 +72,8 @@ IREE_DRIVERS_INFOS = {
         DriverInfo("IREE-VMVX-Sync", "CPU", "local-sync", "vmvx-module"),
     "iree-vulkan":
         DriverInfo("IREE-Vulkan", "GPU", "vulkan", ""),
+    "iree-cuda":
+        DriverInfo("IREE-CUDA", "GPU", "cuda", ""),
 }
 
 IREE_PRETTY_NAME_TO_DRIVER_NAME = {
