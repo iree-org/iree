@@ -8,7 +8,7 @@ func.func @dot_general_to_dot(%arg0: tensor<1x32x128x4xf32>, %arg1: tensor<128x4
       rhs_batching_dimensions = [],
       rhs_contracting_dimensions = [0, 1],
     >,
-    precision_config = [#mhlo<"precision DEFAULT">, #mhlo<"precision DEFAULT">]
+    precision_config = [#mhlo<precision DEFAULT>, #mhlo<precision DEFAULT>]
   } : (tensor<1x32x128x4xf32>, tensor<128x4x8x64xf32>) -> tensor<1x32x8x64xf32>
   return %0 : tensor<1x32x8x64xf32>
 }
@@ -30,7 +30,7 @@ func.func @dot_general_to_dot_general_rank_reduced(%arg0: tensor<1x8x32x64xf32>,
       rhs_batching_dimensions = [0, 1],
       rhs_contracting_dimensions = [2],
     >,
-    precision_config = [#mhlo<"precision DEFAULT">, #mhlo<"precision DEFAULT">]
+    precision_config = [#mhlo<precision DEFAULT>, #mhlo<precision DEFAULT>]
   } : (tensor<1x8x32x64xf32>, tensor<1x8x64x32xf32>) -> tensor<1x8x32x32xf32>
   return %0 : tensor<1x8x32x32xf32>
 }
@@ -52,7 +52,7 @@ func.func @dot_general_to_dot_general_rank_reduced_attribute(%arg0: tensor<1x8x3
       rhs_batching_dimensions = [0, 1],
       rhs_contracting_dimensions = [2],
     >,
-    precision_config = [#mhlo<"precision DEFAULT">, #mhlo<"precision DEFAULT">]
+    precision_config = [#mhlo<precision DEFAULT>, #mhlo<precision DEFAULT>]
   } : (tensor<1x8x32x64xf32>, tensor<1x8x64x32xf32>) -> tensor<1x8x32x32xf32>
   return %0 : tensor<1x8x32x32xf32>
 }
@@ -73,7 +73,7 @@ func.func @dot_general_to_dot_general_rank_reduced_a_transposed(%arg0: tensor<1x
       rhs_batching_dimensions = [0, 1],
       rhs_contracting_dimensions = [2],
     >,
-    precision_config = [#mhlo<"precision DEFAULT">, #mhlo<"precision DEFAULT">]
+    precision_config = [#mhlo<precision DEFAULT>, #mhlo<precision DEFAULT>]
   } : (tensor<1x8x64x32xf32>, tensor<1x8x64x32xf32>) -> tensor<1x8x32x32xf32>
   return %0 : tensor<1x8x32x32xf32>
 }
@@ -94,7 +94,7 @@ func.func @dot_general_to_dot_general_rank_reduced_b_transposed(%arg0: tensor<1x
       rhs_batching_dimensions = [0, 1],
       rhs_contracting_dimensions = [3],
     >,
-    precision_config = [#mhlo<"precision DEFAULT">, #mhlo<"precision DEFAULT">]
+    precision_config = [#mhlo<precision DEFAULT>, #mhlo<precision DEFAULT>]
   } : (tensor<1x8x32x64xf32>, tensor<1x8x32x64xf32>) -> tensor<1x8x32x32xf32>
   return %0 : tensor<1x8x32x32xf32>
 }
@@ -117,7 +117,7 @@ func.func @dot_general_to_dot_general_rank_reduced_ab_transposed(%arg0: tensor<1
       rhs_batching_dimensions = [0, 1],
       rhs_contracting_dimensions = [3],
     >,
-    precision_config = [#mhlo<"precision DEFAULT">, #mhlo<"precision DEFAULT">]
+    precision_config = [#mhlo<precision DEFAULT>, #mhlo<precision DEFAULT>]
   } : (tensor<1x8x64x32xf32>, tensor<1x8x32x64xf32>) -> tensor<1x8x32x32xf32>
   return %0 : tensor<1x8x32x32xf32>
 }
@@ -140,7 +140,7 @@ func.func @dot_general_4d_transposed(%arg0: tensor<1x1x8x64xf32>, %arg1: tensor<
       rhs_batching_dimensions = [0, 2],
       rhs_contracting_dimensions = [3],
     >,
-    precision_config = [#mhlo<"precision DEFAULT">, #mhlo<"precision DEFAULT">]
+    precision_config = [#mhlo<precision DEFAULT>, #mhlo<precision DEFAULT>]
   } : (tensor<1x1x8x64xf32>, tensor<1x512x8x64xf32>) -> tensor<1x8x1x512xf32>
   return %0 : tensor<1x8x1x512xf32>
 }
