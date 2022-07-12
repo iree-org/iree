@@ -21,6 +21,6 @@ jobs:
 
   test_runtime:
     needs: build_runtime
-    uses: ./.github/workflows/test_runtime.yml
+    uses: ./.github/workflows/test_runtime_cmake.yml
     with:
       build-dir: build-runtime
