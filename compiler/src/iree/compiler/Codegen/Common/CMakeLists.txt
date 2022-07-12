@@ -21,6 +21,53 @@ iree_tablegen_library(
 
 iree_cc_library(
   NAME
+    TransformDialectInterpreterPass
+  SRCS
+    "TransformDialectInterpreterPass.cpp"
+  DEPS
+    IREELinalgExtDialect
+    IREELinalgExtTransformOps
+    IREELinalgTransformDialect
+    LLVMSupport
+    MLIRAffineDialect
+    MLIRAffineUtils
+    MLIRArithmeticDialect
+    MLIRArithmeticTransforms
+    MLIRAsyncDialect
+    MLIRBufferizationDialect
+    MLIRBufferizationTransforms
+    MLIRFuncDialect
+    MLIRGPUOps
+    MLIRIR
+    MLIRLLVMDialect
+    MLIRLinalgDialect
+    MLIRLinalgTransformOps
+    MLIRLinalgTransforms
+    MLIRPDLDialect
+    MLIRPDLInterpDialect
+    MLIRParser
+    MLIRPass
+    MLIRRewrite
+    MLIRSCFDialect
+    MLIRSCFTransforms
+    MLIRSCFUtils
+    MLIRSupport
+    MLIRTensorDialect
+    MLIRTensorTransforms
+    MLIRTransformDialect
+    MLIRVectorDialect
+    MLIRVectorTransforms
+    iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
+    iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
+    iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
+    iree::compiler::Codegen::PassHeaders
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     Common
   HDRS
     "BufferizationAnalysis.h"
@@ -52,6 +99,7 @@ iree_cc_library(
     "VectorizeMMT4d.cpp"
     "WorkGroupSwizzle.cpp"
   DEPS
+    ::TransformDialectInterpreterPass
     IREELinalgExtDialect
     IREELinalgExtPasses
     IREELinalgExtTransforms
