@@ -9,9 +9,9 @@ name: Postsubmit
 on:
   push:
     branches:
-     - main
+      - main
   workflow_dispatch:
-  pull_request: # TODO: remove this
+  pull_request:  # TODO: DO NOT SUBMIT. remove this
 
 jobs:
   build_runtime:
@@ -20,6 +20,6 @@ jobs:
       build-dir: build-runtime
 
   test_runtime:
-    uses:  ./.github/workflows/test_runtime.yml
+    uses: ./.github/workflows/test_runtime.yml
     with:
       build-dir: build-runtime
