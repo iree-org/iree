@@ -20,6 +20,7 @@ jobs:
       build-dir: build-runtime
 
   test_runtime:
+    needs: build_runtime
     uses: ./.github/workflows/test_runtime.yml
     with:
       build-dir: build-runtime
