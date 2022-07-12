@@ -55,6 +55,9 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
 static Value groupReduction(Location loc, OpBuilder &builder, Value input,
                             vector::CombiningKind kind, uint32_t size) {
   const int warpSize = 32;
+  assert(
+      size % warpSize == 0 &&
+      "Group reduction only support for sizes aligned on warp size for now.");
   Value laneVal = warpReduction(loc, builder, input, kind, warpSize);
   // if we have more than one warp, reduce across warps.
   if (size > warpSize) {
