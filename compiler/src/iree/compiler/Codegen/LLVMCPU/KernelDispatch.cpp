@@ -443,27 +443,31 @@ static void setVectorSizesForDynamicShapes(
   // lowest order parallel dimension for now to avoid peeling higher level
   // dimensions. If no parallel dimension is found to be vectorized, we try to
   // vectorize the lowest order reduction dimension.
-  if (isFullyDynamicOp(op) && isPeelingBeneficial(op)) {
-    bool isParallelDimVectorized = false;
-    for (int i = origParallelSizes.size() - 1; i >= 0; --i) {
-      if (origParallelSizes[i] > 1) {
-        assert(parallelSizes[i] == 1 &&
-               "This tile size should have been set to one");
-        parallelSizes[i] = origParallelSizes[i];
-        isParallelDimVectorized = true;
-        break;
-      }
-    }
+  if (!isFullyDynamicOp(op) || !isPeelingBeneficial(op)) {
+    return;
+  }
 
-    if (!isParallelDimVectorized) {
-      for (int i = origReductionSizes.size() - 1; i >= 0; --i) {
-        if (origReductionSizes[i] > 1) {
-          assert(reductionSizes[i] == 1 &&
-                 "This tile size should have been set to one");
-          reductionSizes[i] = origReductionSizes[i];
-          break;
-        }
-      }
+  bool isParallelDimVectorized = false;
+  for (int i = origParallelSizes.size() - 1; i >= 0; --i) {
+    if (origParallelSizes[i] > 1) {
+      assert(parallelSizes[i] == 1 &&
+             "This tile size should have been set to one");
+      parallelSizes[i] = origParallelSizes[i];
+      isParallelDimVectorized = true;
+      break;
+    }
+  }
+
+  if (isParallelDimVectorized) {
+    return;
+  }
+
+  for (int i = origReductionSizes.size() - 1; i >= 0; --i) {
+    if (origReductionSizes[i] > 1) {
+      assert(reductionSizes[i] == 1 &&
+             "This tile size should have been set to one");
+      reductionSizes[i] = origReductionSizes[i];
+      break;
     }
   }
 
