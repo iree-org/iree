@@ -73,7 +73,7 @@ static OwningOpRef<mlir::ModuleOp> importSavedModelV2(
     return nullptr;
   }
 
-  return loadedModule.ConsumeValueOrDie();
+  return std::move(loadedModule).ValueOrDie();
 }
 
 static OwningOpRef<mlir::ModuleOp> importSavedModelV1(
@@ -117,7 +117,7 @@ static OwningOpRef<mlir::ModuleOp> importSavedModelV1(
     return nullptr;
   }
 
-  return loadedModule.ConsumeValueOrDie();
+  return std::move(loadedModule).ValueOrDie();
 }
 
 int main(int argc, char **argv) {
