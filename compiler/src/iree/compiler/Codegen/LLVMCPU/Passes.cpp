@@ -223,8 +223,6 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
     options.vectorize = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
   // Run IREE specific passes before vector lowering expert.
@@ -249,8 +247,6 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
     nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
   auto pad = [&](std::string anchorOpName, bool setAnchorOpToRootOp = false,
@@ -277,8 +273,6 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
         static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
   if (!clEnableHoistPadding) {
@@ -293,6 +287,8 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
       options.setAnchorOpToRootOp = true;
       options.packPaddings = {1, 1, 0};
       nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
+      nestedModulePM.addPass(createCanonicalizerPass());
+      nestedModulePM.addPass(createCSEPass());
     }
 
     LinalgFusePassOptions options;
@@ -300,8 +296,6 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
     options.setAnchorOpToRootOp = true;
     options.hoistPaddings = SmallVector<int64_t>{2, 3, 0};
     nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
   // Fold dim(pad) away before vectorization.
@@ -313,8 +307,6 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
     options.vectorizePadding = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
   addBufferizePasses(nestedModulePM);
@@ -353,8 +345,6 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
     nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
   // Add the sandbox single tiling expert to tile and vectorize.
@@ -366,8 +356,6 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
         static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
   addBufferizePasses(nestedModulePM);
@@ -399,8 +387,6 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
     nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
   // Add the sandbox single tiling expert to tile.
@@ -411,8 +397,6 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
         static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
   // Add the sandbox single tiling expert to vectorize.
@@ -425,13 +409,9 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
     options.vectorizePadding = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
   addBufferizePasses(nestedModulePM);
-  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
 
