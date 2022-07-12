@@ -130,6 +130,12 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
   // Check if the consumer is an elementwise with identity output indexing map.
   if (!isSimpleElementwise(consumer)) return false;
 
+  // When we have static shapes, we do extra checks for the type. For dynamic
+  // shape cases, we do not check the shape and do aggressive fusion with high
+  // optimism, which is the default approach we are pursuing now.
+  bool hasStaticShape =
+      !producer.hasDynamicShape() && !consumer.hasDynamicShape();
+
   // Check the input and output shapes are compatible. They are compatible when
   //   1. the shapes are identical, or
   //   2. the broadcasted input shape is the same as the output shape.
@@ -140,7 +146,8 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
     auto indexingMap = producer.getTiedIndexingMap(input);
     if (!indexingMap.isIdentity()) return false;
 
-    if (producer.getInputOperand(0)->get().getType() != ewOutputType)
+    if (hasStaticShape &&
+        producer.getInputOperand(0)->get().getType() != ewOutputType)
       return false;
   } else {
     assert(numInputs == 2 && "Expected two inputs to reduction");
@@ -164,7 +171,8 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
 
     assert(otherInput);
 
-    if ((*fullInput)->get().getType() != ewOutputType) return false;
+    if (hasStaticShape && (*fullInput)->get().getType() != ewOutputType)
+      return false;
 
     auto otherIndexingMap = producer.getTiedIndexingMap(*otherInput);
     if (!otherIndexingMap.isProjectedPermutation()) return false;
