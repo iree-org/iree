@@ -8,7 +8,9 @@
 
 set -euo pipefail
 
-source is_contained.sh
+SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
+
+source "${SCRIPT_DIR}/functions.sh"
 
 ALLOWED_EVENTS=(
   "push"
@@ -19,7 +21,7 @@ ALLOWED_EVENTS=(
   "schedule"
 )
 
-if ! isContained "${GITHUB_EVENT_NAME}" "${ALLOWED_EVENTS[@]}"; then
+if ! is_contained "${GITHUB_EVENT_NAME}" "${ALLOWED_EVENTS[@]}"; then
   echo "Event type '${GITHUB_EVENT_NAME}' is not allowed on this runner. Aborting workflow."
   # clean up any nefarious stuff we may have fetched in job setup
   cd /home/runner/actions-runner/_work
