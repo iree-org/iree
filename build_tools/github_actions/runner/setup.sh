@@ -17,27 +17,9 @@ set -euo pipefail
 
 token="$1"
 
+source "${SCRIPT_DIR}/functions.sh"
+
 cd actions-runner
-
-get_metadata() {
-  local url="http://metadata.google.internal/computeMetadata/v1/${1}"
-  ret=0
-  curl "${url}" \
-    --silent --fail --show-error \
-    --header "Metadata-Flavor: Google" || ret=$?
-  if [[ $ret != 0 ]]; then
-    echo "Failed fetching ${url}" >&2
-    return ${ret}
-  fi
-}
-
-get_os_info() {
-  get_metadata "instance/guest-attributes/guestInventory/${1}"
-}
-
-get_attribute() {
-  get_metadata "instance/attributes/${1}"
-}
 
 OS_ID="$(get_os_info ShortName)"
 OS_VERSION="$(get_os_info Version)"
