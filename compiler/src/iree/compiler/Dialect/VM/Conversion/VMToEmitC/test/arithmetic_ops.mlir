@@ -88,6 +88,17 @@ vm.module @my_module {
 
 // -----
 
+// CHECK-LABEL: @my_module_abs_i32
+vm.module @my_module {
+  vm.func @abs_i32(%arg0 : i32) -> i32 {
+    // CHECK: %0 = emitc.call "vm_abs_i32"(%arg3) : (i32) -> i32
+    %0 = vm.abs.i32 %arg0 : i32
+    vm.return %0 : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @my_module_not_i32
 vm.module @my_module {
   vm.func @not_i32(%arg0 : i32) -> i32 {

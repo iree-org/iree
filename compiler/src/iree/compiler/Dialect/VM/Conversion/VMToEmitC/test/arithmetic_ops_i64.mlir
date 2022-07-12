@@ -88,6 +88,17 @@ vm.module @my_module {
 
 // -----
 
+// CHECK-LABEL: @my_module_abs_i64
+vm.module @my_module {
+  vm.func @abs_i64(%arg0 : i64) -> i64 {
+    // CHECK: %0 = emitc.call "vm_abs_i64"(%arg3) : (i64) -> i64
+    %0 = vm.abs.i64 %arg0 : i64
+    vm.return %0 : i64
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @my_module_not_i64
 vm.module @my_module {
   vm.func @not_i64(%arg0 : i64) -> i64 {
