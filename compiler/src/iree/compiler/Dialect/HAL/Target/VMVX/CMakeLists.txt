@@ -30,12 +30,12 @@ iree_cc_library(
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
-    iree::compiler::Dialect::Modules::VMVX::IR::VMVXDialect
-    iree::compiler::Dialect::Modules::VMVX::Transforms
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::IR
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Transforms
+    iree::compiler::Dialect::VMVX::IR::VMVXDialect
+    iree::compiler::Dialect::VMVX::Transforms
     iree::compiler::Utils
   PUBLIC
 )

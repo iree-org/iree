@@ -24,7 +24,10 @@
 // clang-format off
 
 EXPORT_FN("add.2d.f32", iree_vmvx_add2d_f32, binary2d, rIIIrIIIrIIIII, v)
+EXPORT_FN("copy.2d.x16", iree_vmvx_copy2d_x16, unary2d, rIIIrIIIII, v)
 EXPORT_FN("copy.2d.x32", iree_vmvx_copy2d_x32, unary2d, rIIIrIIIII, v)
+EXPORT_FN("copy.2d.x64", iree_vmvx_copy2d_x64, unary2d, rIIIrIIIII, v)
+EXPORT_FN("copy.2d.x8", iree_vmvx_copy2d_x8, unary2d, rIIIrIIIII, v)
 EXPORT_FN("fill.2d.x32", iree_vmvx_fill2d_x32, fill2d_x32, irIIII, v)
 EXPORT_FN("matmul.f32f32f32", iree_vmvx_matmul_f32f32f32, matmul_f32, rIIrIIrIIIIIffi, v)
 
