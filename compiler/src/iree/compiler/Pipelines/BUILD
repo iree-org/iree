@@ -40,6 +40,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion/HALToVM",
         "//compiler/src/iree/compiler/Dialect/HAL/Transforms",
         "//compiler/src/iree/compiler/Dialect/Modules/HAL/Inline/Transforms",
+        "//compiler/src/iree/compiler/Dialect/Modules/HAL/Loader/Transforms",
         "//compiler/src/iree/compiler/Dialect/Stream/Transforms",
         "//compiler/src/iree/compiler/Dialect/Util/Transforms",
         "//compiler/src/iree/compiler/Dialect/VM/Conversion",

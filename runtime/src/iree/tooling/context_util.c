@@ -13,7 +13,9 @@
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/local/loaders/registration/init.h"
 #include "iree/modules/hal/inline/module.h"
+#include "iree/modules/hal/loader/module.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
 #include "iree/vm/bytecode_module.h"
@@ -191,6 +193,47 @@ static iree_status_t iree_tooling_load_hal_inline_module(
   return status;
 }
 
+static iree_status_t iree_tooling_load_hal_loader_module(
+    iree_vm_instance_t* instance, iree_allocator_t host_allocator,
+    iree_vm_module_t** out_module) {
+  IREE_ASSERT_ARGUMENT(instance);
+  IREE_ASSERT_ARGUMENT(out_module);
+  *out_module = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Register required types before creating the module.
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_module_register_loader_types(instance));
+
+  // Create all executable loaders built into the binary.
+  // We could allow users to choose the set with a flag.
+  iree_host_size_t loader_count = 0;
+  iree_hal_executable_loader_t* loaders[16];
+  iree_status_t status = iree_hal_create_all_available_executable_loaders(
+      IREE_ARRAYSIZE(loaders), &loader_count, loaders, host_allocator);
+
+  // Create the module; it retains the loaders for its lifetime.
+  iree_vm_module_t* module = NULL;
+  if (iree_status_is_ok(status)) {
+    iree_hal_loader_module_flags_t flags = IREE_HAL_LOADER_MODULE_FLAG_NONE;
+    status = iree_hal_loader_module_create(instance, flags, loader_count,
+                                           loaders, host_allocator, &module);
+  }
+
+  // Always release loaders; loader module has retained them.
+  for (iree_host_size_t i = 0; i < loader_count; ++i) {
+    iree_hal_executable_loader_release(loaders[i]);
+  }
+
+  if (iree_status_is_ok(status)) {
+    *out_module = module;
+  } else {
+    iree_vm_module_release(module);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 //===----------------------------------------------------------------------===//
 // Module management
 //===----------------------------------------------------------------------===//
@@ -275,6 +318,9 @@ static iree_status_t iree_tooling_resolve_module_dependency(
     IREE_RETURN_IF_ERROR(iree_tooling_load_hal_inline_module(
         state->instance, state->host_allocator, &module,
         &state->device_allocator));
+  } else if (iree_string_view_equal(dependency->name, IREE_SV("hal_loader"))) {
+    IREE_RETURN_IF_ERROR(iree_tooling_load_hal_loader_module(
+        state->instance, state->host_allocator, &module));
   } else if (iree_string_view_equal(dependency->name, IREE_SV("vmvx"))) {
     IREE_RETURN_IF_ERROR(iree_vmvx_module_create(
         state->instance, state->host_allocator, &module));

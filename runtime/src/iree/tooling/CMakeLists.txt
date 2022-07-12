@@ -24,8 +24,11 @@ iree_cc_library(
     iree::base::internal::flags
     iree::base::tracing
     iree::hal
+    iree::hal::local::loaders::registration
     iree::modules::hal
     iree::modules::hal::inline
+    iree::modules::hal::loader
+    iree::modules::vmvx
     iree::vm
     iree::vm::bytecode_module
   PUBLIC

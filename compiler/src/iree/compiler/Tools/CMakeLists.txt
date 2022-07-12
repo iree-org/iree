@@ -95,6 +95,8 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Transforms
     iree::compiler::Dialect::Modules::HAL::Inline::IR::HALInlineDialect
     iree::compiler::Dialect::Modules::HAL::Inline::Transforms
+    iree::compiler::Dialect::Modules::HAL::Loader::IR::HALLoaderDialect
+    iree::compiler::Dialect::Modules::HAL::Loader::Transforms
     iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Stream::Transforms
     iree::compiler::Dialect::Util::IR

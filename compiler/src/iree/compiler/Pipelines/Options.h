@@ -92,6 +92,9 @@ struct SchedulingOptions {
     // linked into the host program.
     // (Currently) only supports the `vmvx-inline` HAL target backend.
     InlineStatic = 3,
+    // Inline host-local in-process execution using dynamic executables.
+    // Only supports CPU HAL target backends that produce executable libraries.
+    InlineDynamic = 4,
   };
   // Program execution model specifying scheduling behavior.
   ExecutionModel executionModel = ExecutionModel::AsyncInternal;

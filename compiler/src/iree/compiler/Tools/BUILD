@@ -52,6 +52,8 @@ cc_library(
         "//compiler/src/iree/compiler/Dialect/HAL/Transforms",
         "//compiler/src/iree/compiler/Dialect/Modules/HAL/Inline/IR:HALInlineDialect",
         "//compiler/src/iree/compiler/Dialect/Modules/HAL/Inline/Transforms",
+        "//compiler/src/iree/compiler/Dialect/Modules/HAL/Loader/IR:HALLoaderDialect",
+        "//compiler/src/iree/compiler/Dialect/Modules/HAL/Loader/Transforms",
         "//compiler/src/iree/compiler/Dialect/Stream/IR",
         "//compiler/src/iree/compiler/Dialect/Stream/Transforms",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
