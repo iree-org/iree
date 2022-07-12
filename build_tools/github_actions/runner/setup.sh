@@ -17,6 +17,8 @@ set -euo pipefail
 
 token="$1"
 
+SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
+
 source "${SCRIPT_DIR}/functions.sh"
 
 cd actions-runner
