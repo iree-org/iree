@@ -8,7 +8,7 @@ on:
 
 jobs:
   build_android_with_docker:
-    runs-on: [self-hosted, postsubmit]
+    runs-on: [self-hosted, runner-group=postsubmit]
     env:
       ANDROID_CONTAINER: "gcr.io/iree-oss/gradle-android@sha256:5da3d6281618ac840a00e667afd97b4484d97d676c0a0d75fa74c84e392084a9"
     steps:
