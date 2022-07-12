@@ -29,7 +29,7 @@ on:
 jobs:
   build_core:
     name: "${{ matrix.os }} :: Build ${{ matrix.build_package }} Package"
-    runs-on: [self-hosted, releaser]
+    runs-on: [self-hosted, runner-group=releaser]
     continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
