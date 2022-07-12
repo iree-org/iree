@@ -11,6 +11,7 @@ include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
 def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
@@ -73,6 +74,19 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
     By default, CPU allocations are emitted. This behavior can be modified by 
     using the following attributes:
       - target_gpu: if set, GPU allocations are emitted.
+
+    Return modes:
+    =============
+    This operation calls the upstream one-shot bufferization pass with extra
+    registered patterns for IREE.
+  
+    The pass is ran on all the ModuleOp nested under the top-level op on which
+    the transform dialect interpreter pass is applied.
+
+    If any of the pass on any of the ModuleOp fails, the transformation 
+    definitely fails. Otherwise the transformation succeeds.
+
+    No handles are consumed or produced.
   }];
 
   let arguments = (ins UnitAttr:$target_gpu);
@@ -80,6 +94,55 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
 
   let assemblyFormat = "attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
+def MatchInterfaceEnum : I32EnumAttr<"MatchInterfaceEnum", "An interface to match",
+    [
+      I32EnumAttrCase<"LinalgOp", 0>,
+      I32EnumAttrCase<"TilingInterface", 1>
+    ]>{
+  let cppNamespace = "::mlir::iree_compiler::IREE::transform_dialect";
+}
+
+def MatchOp : Op<Transform_Dialect, "iree.match",
+    [MemoryEffectsOpInterface,
+     NavigationTransformOpTrait,
+     DeclareOpInterfaceMethods<TransformOpInterface>]> {
+  let description = [{
+    Match op with the specified constraints, within the target op.
+
+    The following constraints are supported:
+      - interface: an optional MatchInterfaceEnum specifying an enum
+      representation for an interface to target.
+      - ops: an optional StrArrayAttr specifying the concrete name of an op. 
+      
+      Note: either `ops` or `interface` must be specified.
+
+    Return modes:
+    =============
+    This op traverses the ops nested under `target` and returns the handles to
+    all the operations that match the requirements.
+
+    This op fails if the target is not a handle to exactly one operation. 
+    Otherwise it succeeds.
+  
+    This operation does not consume the target handle and produces new handles:
+    it is a navigation op.
+  }];
+
+  let arguments = (ins PDL_Operation:$target,
+                       OptionalAttr<StrArrayAttr>:$match_op,
+                       OptionalAttr<MatchInterfaceEnum>:$match_interface);
+  // TODO: veriadic results when needed.
+  let results = (outs PDL_Operation:$results);
+
+  let assemblyFormat = [{
+    (`ops` `{` $match_op^ `}`)? 
+    (`interface` `{` $match_interface^ `}`)? 
+    `in` $target attr-dict
+  }];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let hasVerifier = 1;
 }
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS
