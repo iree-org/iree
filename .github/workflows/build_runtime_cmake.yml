@@ -13,7 +13,6 @@ on:
 
 
 env:
-  BUILD_DIR: ${{ inputs.build-dir }}
   IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
 
 jobs:
@@ -31,8 +30,8 @@ jobs:
             --rm \
             gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
             ./build_tools/cmake/build_runtime.sh \
-            "${BUILD_DIR}"
+            "${{ inputs.build-dir }}"
       - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8  # v3.1.0
         with:
-          name: ${{ env.BUILD_DIR }}
-          path: ${{ env.BUILD_DIR }}
+          name: ${{ inputs.build-dir }}
+          path: ${{ inputs.build-dir }}
