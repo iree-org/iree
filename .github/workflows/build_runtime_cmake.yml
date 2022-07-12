@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        with:
+          submodules: true
       - name: "Building runtime"
         run: |
           docker run --user="$(id -u):$(id -g)" \
