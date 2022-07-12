@@ -6,12 +6,12 @@
 
 name: Postsubmit
 
-on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
-  pull_request:  # TODO: DO NOT SUBMIT. remove this
+on: [pull_request]
+  # push:
+  #   branches:
+  #     - main
+  # workflow_dispatch:
+  # pull_request:  # TODO: DO NOT SUBMIT. remove this
 
 jobs:
   build_runtime:
