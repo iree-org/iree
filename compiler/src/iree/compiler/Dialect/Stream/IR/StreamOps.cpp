@@ -1107,12 +1107,7 @@ LogicalResult BuiltinSplatI64Op::convertBuiltinOp(OpBuilder &builder) {
   auto c8 = builder.createOrFold<arith::ConstantIndexOp>(getLoc(), 8);
   auto count =
       builder.createOrFold<arith::DivUIOp>(getLoc(), result_size(), c8);
-  auto one = builder.create<arith::ConstantIndexOp>(getLoc(), 1);
-  Value workload[3] = {
-      count,
-      one,
-      one,
-  };
+  Value workload[] = {count};
   SmallVector<Value> operands = {
       value(),
       count,
@@ -1173,12 +1168,7 @@ LogicalResult BuiltinFillI64Op::convertBuiltinOp(OpBuilder &builder) {
   auto c8 = builder.createOrFold<arith::ConstantIndexOp>(getLoc(), 8);
   auto count =
       builder.createOrFold<arith::DivUIOp>(getLoc(), target_length(), c8);
-  auto one = builder.create<arith::ConstantIndexOp>(getLoc(), 1);
-  Value workload[3] = {
-      count,
-      one,
-      one,
-  };
+  Value workload[] = {count};
   SmallVector<Value> operands = {
       target(),
       value(),

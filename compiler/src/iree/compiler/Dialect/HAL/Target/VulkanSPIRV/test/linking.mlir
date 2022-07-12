@@ -22,7 +22,11 @@
 
 hal.executable private @call_dispatch_0  {
   hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
-    hal.executable.export @call_dispatch_0 ordinal(0) layout(#executable_layout_0)
+    hal.executable.export @call_dispatch_0 ordinal(0) layout(#executable_layout_0) {
+    ^bb0(%arg0: !hal.device) :
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
     builtin.module {
       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
         spv.func @call_dispatch_0() "None" {
@@ -36,7 +40,11 @@ hal.executable private @call_dispatch_0  {
 }
 hal.executable private @call_dispatch_1  {
   hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
-    hal.executable.export @call_dispatch_1 ordinal(0) layout(#executable_layout_1)
+    hal.executable.export @call_dispatch_1 ordinal(0) layout(#executable_layout_1) {
+    ^bb0(%arg0: !hal.device) :
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
     builtin.module {
       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
         spv.func @call_dispatch_1() "None" {
@@ -50,7 +58,11 @@ hal.executable private @call_dispatch_1  {
 }
 hal.executable private @call_dispatch_2  {
   hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
-    hal.executable.export @call_dispatch_2 ordinal(0) layout(#executable_layout_0)
+    hal.executable.export @call_dispatch_2 ordinal(0) layout(#executable_layout_0) {
+    ^bb0(%arg0: !hal.device) :
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
     builtin.module {
       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
         spv.func @call_dispatch_2() "None" {
@@ -64,7 +76,11 @@ hal.executable private @call_dispatch_2  {
 }
 hal.executable private @call_dispatch_3  {
   hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
-    hal.executable.export @call_dispatch_3 ordinal(0) layout(#executable_layout_1)
+    hal.executable.export @call_dispatch_3 ordinal(0) layout(#executable_layout_1) {
+    ^bb0(%arg0: !hal.device) :
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
     builtin.module {
       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
         spv.func @call_dispatch_3() "None" {
@@ -78,7 +94,11 @@ hal.executable private @call_dispatch_3  {
 }
 hal.executable private @call_dispatch_4  {
   hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
-    hal.executable.export @call_dispatch_4 ordinal(0) layout(#executable_layout_1)
+    hal.executable.export @call_dispatch_4 ordinal(0) layout(#executable_layout_1) {
+    ^bb0(%arg0: !hal.device) :
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
     builtin.module {
       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
         spv.func @call_dispatch_4() "None" {

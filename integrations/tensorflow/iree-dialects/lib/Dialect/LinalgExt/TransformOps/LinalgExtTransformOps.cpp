@@ -8,6 +8,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/OpImplementation.h"
 #include "llvm/Support/FormatVariadic.h"
 
@@ -129,8 +130,9 @@ LinalgExt::TileToForeachOp::applyToOne(::mlir::linalg::LinalgOp target,
   if (!numThreads.empty())
     tilingOptions.setTileSizes(numThreads);
 
-  LinalgExt::ForeachThreadTilingPattern pattern(this->getContext(),
-                                                tilingOptions);
+  LinalgExt::ForeachThreadTilingPattern pattern(
+      this->getContext(), tilingOptions,
+      extractFromI64ArrayAttr(getThreadDimMapping()));
   // Apply the pattern.
   SimplePatternRewriter rewriter(target);
   FailureOr<iree_compiler::IREE::LinalgExt::TilingResult> result =
@@ -140,7 +142,7 @@ LinalgExt::TileToForeachOp::applyToOne(::mlir::linalg::LinalgOp target,
     target->emitError("Failed to tile op to scf.foreach_thread:\n") << target;
     return failure();
   }
-  return SmallVector<Operation *>{result->tiledOp, result->tileOp};
+  return SmallVector<Operation *>{result->tileOp, result->tiledOp};
 }
 
 DiagnosedSilenceableFailure

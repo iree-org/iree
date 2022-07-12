@@ -1,4 +1,4 @@
-// RUN: iree-compile --split-input-file --iree-input-type=mhlo \
+// RUN: iree-compile --split-input-file \
 // RUN:   --iree-hal-target-backends=vmvx \
 // RUN:   --iree-vm-bytecode-module-output-format=flatbuffer-text %s | FileCheck %s
 
@@ -51,9 +51,9 @@ module @hal_usage {
 // CHECK: "local_name": "hloElementwiseOps"
 // CHECK: "local_name": "__init"
 func.func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
-  %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
-  %1 = mhlo.subtract %0, %arg0 : tensor<4xf32>
-  %2 = mhlo.multiply %1, %arg0 : tensor<4xf32>
+  %0 = arith.addf %arg0, %arg0 : tensor<4xf32>
+  %1 = arith.subf %0, %arg0 : tensor<4xf32>
+  %2 = arith.mulf %1, %arg0 : tensor<4xf32>
   return %2 : tensor<4xf32>
 }
 }

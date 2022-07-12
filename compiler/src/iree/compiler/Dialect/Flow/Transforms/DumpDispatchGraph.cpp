@@ -138,12 +138,14 @@ class DumpDispatchGraphPass
     auto modOp = dyn_cast<ModuleOp>(getOperation());
     if (!modOp) return;
 
-    for (auto funcOp : modOp.getOps<func::FuncOp>()) {
-      emitGraph([&]() {
-        processOperation(funcOp);
-        emitAllEdgeStmts();
-      });
-    }
+    auto funcOps = modOp.getOps<func::FuncOp>();
+
+    if (funcOps.empty()) return;
+
+    emitGraph([&]() {
+      for (auto funcOp : funcOps) processOperation(funcOp);
+      emitAllEdgeStmts();
+    });
   }
 
   /// Create a CFG graph for a region. Used in `Region::viewGraph`.

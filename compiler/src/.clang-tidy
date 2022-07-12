@@ -9,7 +9,5 @@ Checks: >
         -misc-unused-using-decls,
         -llvm-else-after-return,
         -llvm-include-order,
-        -llvm-qualified-auto,
-        -misc-redundant-expression,
-        -llvm-namespace-comment
+        -llvm-qualified-auto
 

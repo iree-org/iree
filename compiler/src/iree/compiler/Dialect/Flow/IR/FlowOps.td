@@ -367,11 +367,6 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
         (IREE::Flow::DispatchTensorType sourceType,
          ArrayRef<OpFoldResult> mixedSizes);
 
-    /// Returns the type of the result based on the sizes.
-    static RankedTensorType inferRankReducedResultType
-        (unsigned resultRank, IREE::Flow::DispatchTensorType sourceType,
-         ArrayRef<OpFoldResult> mixedSizes);
-
     /// Returns the list of dimensions that are dropped if the
     /// !flow.dispatch.tensor.load is rank-reducing.
     llvm::SmallBitVector getDroppedDims();
@@ -1132,3 +1127,27 @@ def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", []> {
 }
 
 #endif  // IREE_DIALECT_FLOW_OPS
+
+//===---------------------------------------------------------------------===//
+// Parameterization Ops
+//===---------------------------------------------------------------------===//
+
+def Flow_DispatchDefaultWorkgroupCountOp :
+    FLOW_PureOp<"dispatch.default_workgroup_count"> {
+  let summary = [{represents computation that returns workgroup count}];
+  let description = [{
+    During dispatch region formation, the `workload` captured is used
+    by the backends to compute the number of workgroups. This operation
+    is a placeholder that represents the computation that takes the `workload`
+    as operands and returns the workgroup count as results.
+    The backends are expected to lower this operation into the actual computation
+    that returns the number of workgroups.
+  }];
+
+  let arguments = (ins Variadic<Index>:$operands);
+  let results = (outs Index:$x, Index:$y, Index:$z);
+
+  let assemblyFormat = [{
+    attr-dict $operands
+  }];
+}

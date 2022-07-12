@@ -59,32 +59,39 @@ endfunction()
 #   tests/e2e/CMakeLists.txt -> iree::tests::e2e
 function(iree_package_ns PACKAGE_NS)
   # Get the relative path of the current dir (i.e. runtime/src/iree/vm).
-  string(REPLACE ${IREE_ROOT_DIR} "" _RELATIVE_PATH ${CMAKE_CURRENT_LIST_DIR})
-  string(SUBSTRING ${_RELATIVE_PATH} 1 -1 _RELATIVE_PATH)
+  string(REPLACE ${IREE_ROOT_DIR} "" _IREE_RELATIVE_PATH ${CMAKE_CURRENT_LIST_DIR})
+  string(SUBSTRING ${_IREE_RELATIVE_PATH} 1 -1 _IREE_RELATIVE_PATH)
+
+  if(NOT ${CMAKE_CURRENT_LIST_DIR} MATCHES "^${IREE_ROOT_DIR}/.*")
+    # Function is being called from outside IREE. Use the source-relative path.
+    # Please check the README.md to see the potential risk.
+    string(REPLACE ${PROJECT_SOURCE_DIR} "" _SOURCE_RELATIVE_PATH ${CMAKE_CURRENT_LIST_DIR})
+    string(SUBSTRING ${_SOURCE_RELATIVE_PATH} 1 -1 _SOURCE_RELATIVE_PATH)
+    set(_PACKAGE "${_SOURCE_RELATIVE_PATH}")
 
   # If changing the directory/package mapping rules, please also implement
   # the corresponding rule in:
   #   build_tools/bazel_to_cmake/bazel_to_cmake_targets.py
   # Some sub-trees form their own roots for package purposes. Rewrite them.
-  if(_RELATIVE_PATH MATCHES "^compiler/src/(.*)")
+  elseif(_IREE_RELATIVE_PATH MATCHES "^compiler/src/(.*)")
     # compiler/src/iree/compiler -> iree/compiler
     set(_PACKAGE "${CMAKE_MATCH_1}")
-  elseif(_RELATIVE_PATH MATCHES "^runtime/src/(.*)")
+  elseif(_IREE_RELATIVE_PATH MATCHES "^runtime/src/(.*)")
     # runtime/src/iree/base -> iree/base
     set(_PACKAGE "${CMAKE_MATCH_1}")
-  elseif(_RELATIVE_PATH MATCHES "^tools$")
+  elseif(_IREE_RELATIVE_PATH MATCHES "^tools$")
     # Special case for tools/ -> "" (empty string)
     # For example, tools/iree-compile -> iree-compile (no namespace)
     set(_PACKAGE "")
   else()
     # Default to prefixing with iree/
-    set(_PACKAGE "iree/${_RELATIVE_PATH}")
+    set(_PACKAGE "iree/${_IREE_RELATIVE_PATH}")
   endif()
 
   string(REPLACE "/" "::" _PACKAGE_NS "${_PACKAGE}")
 
   if(_DEBUG_IREE_PACKAGE_NAME)
-    message(STATUS "iree_package_ns(): map ${_RELATIVE_PATH} -> ${_PACKAGE_NS}")
+    message(STATUS "iree_package_ns(): map ${_IREE_RELATIVE_PATH} -> ${_PACKAGE_NS}")
   endif()
 
   set(${PACKAGE_NS} ${_PACKAGE_NS} PARENT_SCOPE)

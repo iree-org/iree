@@ -63,7 +63,7 @@ static std::string getPVSAsStr(
 
 static llvm::MaybeAlign commonAlignment(llvm::MaybeAlign A,
                                         llvm::MaybeAlign B) {
-  return A && B ? llvm::commonAlignment(*A, *B) : A ? A : B;
+  return A && B ? std::min(*A, *B) : A ? A : B;
 }
 
 class GlobalPVS : public DFX::StateWrapper<

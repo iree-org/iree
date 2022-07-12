@@ -105,11 +105,9 @@ namespace {
 
 /// Rewrites hal.interface.workgroup.id to use the arguments injected onto the
 /// function.
-class ConvertHALInterfaceWorkgroupIDOp
+struct ConvertHALInterfaceWorkgroupIDOp
     : public OpConversionPattern<IREE::HAL::InterfaceWorkgroupIDOp> {
- public:
   using OpConversionPattern::OpConversionPattern;
-
   LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceWorkgroupIDOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -128,11 +126,9 @@ class ConvertHALInterfaceWorkgroupIDOp
 
 /// Rewrites hal.interface.workgroup.size to use the arguments injected onto the
 /// function.
-class ConvertHALInterfaceWorkgroupSizeOp
+struct ConvertHALInterfaceWorkgroupSizeOp
     : public OpConversionPattern<IREE::HAL::InterfaceWorkgroupSizeOp> {
- public:
   using OpConversionPattern::OpConversionPattern;
-
   LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceWorkgroupSizeOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -151,11 +147,9 @@ class ConvertHALInterfaceWorkgroupSizeOp
 
 /// Rewrites hal.interface.workgroup.count to use the arguments injected onto
 /// the function.
-class ConvertHALInterfaceWorkgroupCountOp
+struct ConvertHALInterfaceWorkgroupCountOp
     : public OpConversionPattern<IREE::HAL::InterfaceWorkgroupCountOp> {
- public:
   using OpConversionPattern::OpConversionPattern;
-
   LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceWorkgroupCountOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -173,11 +167,9 @@ class ConvertHALInterfaceWorkgroupCountOp
 };
 
 /// Rewrites hal.interface.constant.load to ops loading from the ABI structs.
-class ConvertHALInterfaceConstantLoadOp
+struct ConvertHALInterfaceConstantLoadOp
     : public OpConversionPattern<IREE::HAL::InterfaceConstantLoadOp> {
- public:
   using OpConversionPattern::OpConversionPattern;
-
   LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceConstantLoadOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
@@ -201,11 +193,9 @@ class ConvertHALInterfaceConstantLoadOp
 };
 
 /// Rewrites hal.interface.binding.subspan to ops loading from the ABI structs.
-class ConvertHALInterfaceBindingSubspanOp
+struct ConvertHALInterfaceBindingSubspanOp
     : public OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
- public:
   using OpConversionPattern::OpConversionPattern;
-
   LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {

@@ -8,6 +8,7 @@ func.func @fn(%arg0: !hal.buffer_view) {
 }
 
 // -----
+
 util.global mutable @var : !hal.buffer
 func.func @fn(%arg0: !hal.buffer_view) {
   %0 = util.global.address @var : !util.ptr<!hal.buffer>

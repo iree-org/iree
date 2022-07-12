@@ -291,8 +291,6 @@ struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
       }
     }
 
-    // TODO: Decide if this needs to be replaced with a flow.tensor.cast
-    // See https://github.com/iree-org/iree/issues/6418
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
         op, resultType, input, sourceDynamicDims, targetDynamicDims);
 

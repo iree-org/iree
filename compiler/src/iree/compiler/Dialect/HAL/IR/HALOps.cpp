@@ -173,12 +173,90 @@ static void printPackSliceRanges(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<TimepointList>($semaphores, $values)
+//===----------------------------------------------------------------------===//
+// at<%semaphore : !hal.semaphore>(%value) ...
+
+static ParseResult parseTimepointList(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &semaphores,
+    SmallVectorImpl<Type> &semaphoreTypes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &values) {
+  while (succeeded(parser.parseOptionalKeyword("at"))) {
+    OpAsmParser::UnresolvedOperand semaphore;
+    Type semaphoreType;
+    OpAsmParser::UnresolvedOperand value;
+    if (failed(parser.parseLess()) || failed(parser.parseOperand(semaphore)) ||
+        failed(parser.parseColonType(semaphoreType)) ||
+        failed(parser.parseGreater()) || failed(parser.parseLParen()) ||
+        failed(parser.parseOperand(value)) || failed(parser.parseRParen())) {
+      return failure();
+    }
+    semaphores.push_back(semaphore);
+    semaphoreTypes.push_back(semaphoreType);
+    values.push_back(value);
+  }
+  return success();
+}
+
+static void printTimepointList(OpAsmPrinter &p, Operation *op,
+                               ValueRange semaphores, TypeRange semaphoreTypes,
+                               ValueRange values) {
+  if (semaphores.empty()) return;
+  llvm::interleave(
+      llvm::zip(semaphores, semaphoreTypes, values), p,
+      [&](std::tuple<Value, Type, Value> it) {
+        auto semaphore = std::get<0>(it);
+        auto semaphoreType = std::get<1>(it);
+        auto value = std::get<2>(it);
+        p << "at<";
+        p.printOperand(semaphore);
+        p << " : ";
+        p.printType(semaphoreType);
+        p << ">(";
+        p.printOperand(value);
+        p << ")";
+      },
+      " ");
+}
+
+//===----------------------------------------------------------------------===//
 // hal.ex.shared_device
 //===----------------------------------------------------------------------===//
 
 void ExSharedDeviceOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "device");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.return
+//===----------------------------------------------------------------------===//
+
+LogicalResult ReturnOp::verify() {
+  ReturnOp op = *this;
+
+  auto parentFuncOp = dyn_cast_or_null<FunctionOpInterface>(op->getParentOp());
+  if (parentFuncOp) {
+    auto expectedTypes = parentFuncOp.getResultTypes();
+    if (op.getNumOperands() != expectedTypes.size()) {
+      return op.emitOpError() << "return must have the same number of operands "
+                                 "as the parent result signature (have "
+                              << op.getNumOperands() << ", expected "
+                              << expectedTypes.size() << ")";
+    }
+    for (auto pair : llvm::enumerate(llvm::zip(op.operands(), expectedTypes))) {
+      auto operand = std::get<0>(pair.value());
+      auto expectedType = std::get<1>(pair.value());
+      if (operand.getType() != expectedType) {
+        return op.emitOpError()
+               << "parent expected result " << pair.index() << " to be "
+               << expectedType << " but returning " << operand.getType();
+      }
+    }
+  }
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -675,7 +753,7 @@ ParseResult ExecutableExportOp::parse(OpAsmParser &parser,
   if (failed(parser.parseKeyword("layout")) || failed(parser.parseLParen()) ||
       failed(parser.parseAttribute(layoutAttr)) ||
       failed(parser.parseRParen()) ||
-      failed(parser.parseOptionalAttrDict(result.attributes))) {
+      failed(parser.parseOptionalAttrDictWithKeyword(result.attributes))) {
     return failure();
   }
   result.addAttribute("layout", layoutAttr);
@@ -703,8 +781,9 @@ void ExecutableExportOp::print(OpAsmPrinter &p) {
   p << " layout(";
   p.printAttribute(layout());
   p << ")";
-  p.printOptionalAttrDict(op->getAttrs(),
-                          /*elidedAttrs=*/{"sym_name", "layout", "ordinal"});
+  p.printOptionalAttrDictWithKeyword(
+      op->getAttrs(),
+      /*elidedAttrs=*/{"sym_name", "layout", "ordinal"});
   if (workgroup_count().empty()) return;
   p << " ";
   p.printRegion(workgroup_count());
@@ -1047,12 +1126,41 @@ void ExecutableLayoutLookupOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.semaphore.create
+// hal.fence.*
+//===----------------------------------------------------------------------===//
+
+void FenceCreateOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), "fence");
+}
+
+void FenceJoinOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), "fence");
+}
+
+void FenceAwaitOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(status(), "status");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.semaphore.*
 //===----------------------------------------------------------------------===//
 
 void SemaphoreCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "semaphore");
+}
+
+void SemaphoreQueryOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(status(), "status");
+}
+
+void SemaphoreAwaitOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(status(), "status");
 }
 
 }  // namespace HAL

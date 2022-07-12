@@ -213,6 +213,20 @@ vm.module @rem_i32_folds {
 
 // -----
 
+// CHECK-LABEL: @abs_i32_folds
+vm.module @abs_i32_folds {
+  // CHECK-LABEL: @abs_i32_const
+  vm.func @abs_i32_const() -> i32 {
+    // CHECK: %c2 = vm.const.i32 2
+    // CHECK-NEXT: vm.return %c2 : i32
+    %cn2 = vm.const.i32 -2
+    %0 = vm.abs.i32 %cn2 : i32
+    vm.return %0 : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @not_i32_folds
 vm.module @not_i32_folds {
   // CHECK-LABEL: @not_i32_const

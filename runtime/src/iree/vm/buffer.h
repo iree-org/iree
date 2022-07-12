@@ -155,6 +155,22 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_fill_elements(
     iree_host_size_t element_count, iree_host_size_t element_length,
     const void* value);
 
+// Maps a subrange to a span of bytes within the |buffer| for read-only access.
+// |offset| and |length| must match the provided |alignment| (1, 2, 4, 8) and
+// will be rounded toward zero if they do not.
+IREE_API_EXPORT iree_status_t
+iree_vm_buffer_map_ro(const iree_vm_buffer_t* buffer, iree_host_size_t offset,
+                      iree_host_size_t length, iree_host_size_t alignment,
+                      iree_const_byte_span_t* out_span);
+
+// Maps a subrange to a span of bytes within the |buffer| for read/write access.
+// |offset| and |length| must match the provided |alignment| (1, 2, 4, 8) and
+// will be rounded toward zero if they do not.
+IREE_API_EXPORT iree_status_t
+iree_vm_buffer_map_rw(const iree_vm_buffer_t* buffer, iree_host_size_t offset,
+                      iree_host_size_t length, iree_host_size_t alignment,
+                      iree_byte_span_t* out_span);
+
 // Reads |element_count| elements each of |element_length| bytes from the
 // |source_buffer| into |out_target_ptr|. The |source_offset|, in bytes, must be
 // aligned to at least the |element_length|.

@@ -128,7 +128,8 @@ IREE_CHECK_OK(iree_hal_driver_create_default_device(
 // We'll load this module into a VM context later.
 iree_vm_module_t* hal_module = NULL;
 IREE_CHECK_OK(
-    iree_hal_module_create(device, iree_allocator_system(), &hal_module));
+    iree_hal_module_create(device, IREE_HAL_MODULE_FLAG_NONE,
+                           iree_allocator_system(), &hal_module));
 // The reference to the driver can be released now.
 iree_hal_driver_release(driver);
 ```

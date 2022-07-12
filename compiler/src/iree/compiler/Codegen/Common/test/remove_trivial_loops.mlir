@@ -10,8 +10,12 @@
 // CHECK-LABEL: func.func @dispatch_0()
 hal.executable private @dispatch_0  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @dispatch_0 layout(#executable_layout) {
+    hal.executable.export @dispatch_0 layout(#executable_layout) attributes {
       workgroup_size = [64: index, 1: index, 1:index]
+    } {
+    ^bb0(%arg0: !hal.device) :
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
     }
     builtin.module {
       func.func @dispatch_0() {
@@ -57,8 +61,13 @@ hal.executable private @dispatch_0  {
 #translation = #iree_codegen.translation_info<LLVMGPUDistribute workload_per_wg = [32]>
 hal.executable private @workgroup_tile_loop  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @workgroup_tile_loop layout(#executable_layout) {
+    hal.executable.export @workgroup_tile_loop layout(#executable_layout) attributes {
       translation_info = #translation
+    } {
+    ^bb0(%arg0 : !hal.device, %arg1 : index):
+      %c1 = arith.constant 1 : index
+      %0 = affine.apply affine_map<(d0) -> (d0 ceildiv 32)>(%arg1)
+      hal.return %0, %c1, %c1 : index, index, index
     }
     builtin.module {
       func.func @workgroup_tile_loop() {
@@ -91,8 +100,13 @@ hal.executable private @workgroup_tile_loop  {
 #translation = #iree_codegen.translation_info<LLVMGPUDistribute workload_per_wg = [16]>
 hal.executable private @workgroup_tile_loop_negative  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @workgroup_tile_loop_negative layout(#executable_layout)  {
+    hal.executable.export @workgroup_tile_loop_negative layout(#executable_layout) attributes {
       translation_info = #translation
+    } {
+    ^bb0(%arg0: !hal.device, %arg1 : index):
+      %c1 = arith.constant 1 : index
+      %0 = affine.apply affine_map<(d0) -> (d0 ceildiv 16)>(%arg1)
+      hal.return %0, %c1, %c1 : index, index, index
     }
     builtin.module {
       func.func @workgroup_tile_loop_negative() {
@@ -127,9 +141,14 @@ hal.executable private @workgroup_tile_loop_negative  {
 #translation = #iree_codegen.translation_info<LLVMGPUDistribute workload_per_wg = [32, 8, 1]>
 hal.executable private @both_workgroup_and_workitem  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @both_workgroup_and_workitem layout(#executable_layout)  {
+    hal.executable.export @both_workgroup_and_workitem layout(#executable_layout) attributes {
       translation_info = #translation,
       workgroup_size = [8: index, 2: index, 1: index]
+    } {
+    ^bb0(%arg0 : !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+      %0 = affine.apply affine_map<(d0) -> (d0 ceildiv 8)>(%arg2)
+      %1 = affine.apply affine_map<(d0) -> (d0 ceildiv 32)>(%arg3)
+      hal.return %1, %0, %arg1 : index, index, index
     }
     builtin.module {
       func.func @both_workgroup_and_workitem() {
@@ -189,7 +208,7 @@ hal.executable private @both_workgroup_and_workitem  {
 module attributes {hal.device.targets = [#device_target_cpu]} {
   hal.executable private @simple_mul {
     hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-      hal.executable.export public @simple_mul ordinal(0) layout(#executable_layout) {translation_info = #translation} {
+      hal.executable.export public @simple_mul ordinal(0) layout(#executable_layout) attributes {translation_info = #translation} {
       ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
         %c1 = arith.constant 1 : index
         %0 = affine.apply #map0()[%arg1]

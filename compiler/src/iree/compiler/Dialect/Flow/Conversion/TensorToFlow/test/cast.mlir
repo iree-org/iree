@@ -9,6 +9,7 @@ func.func @static_tensor_cast_to_dynamic(%arg0: tensor<4x4xf32>) -> tensor<?x?xf
 }
 
 // -----
+
 func.func @dynamic_tensor_cast_to_static(%arg0: tensor<?xf32>) -> tensor<4xf32> {
   // CHECK: %[[C4:.*]] = arith.constant 4 : index
   // CHECK: %[[RESULT:.*]] = flow.tensor.reshape %arg0 : tensor<?xf32>{%[[C4]]} -> tensor<4xf32>
@@ -18,6 +19,7 @@ func.func @dynamic_tensor_cast_to_static(%arg0: tensor<?xf32>) -> tensor<4xf32> 
 }
 
 // -----
+
 func.func @dynamic_tensor_cast_to_dynamic(%arg0: tensor<?x?xf32>) -> tensor<?x3xf32> {
   // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   // CHECK-DAG: %[[D0:.*]] = tensor.dim %arg0, %[[C0]] : tensor<?x?xf32>
@@ -29,6 +31,7 @@ func.func @dynamic_tensor_cast_to_dynamic(%arg0: tensor<?x?xf32>) -> tensor<?x3x
 }
 
 // -----
+
 func.func @tensor_cast_within_dispatch_workgroups_not_converted() -> tensor<f32> {
   %x = arith.constant 100 : index
   %0 = flow.dispatch.workgroups[%x]() : () -> (tensor<f32>) = () {

@@ -18,6 +18,7 @@ iree_cc_library(
   SRCS
     "ConvertVMVXToVM.cpp"
   DEPS
+    MLIRArithmeticDialect
     MLIRFuncDialect
     MLIRIR
     MLIRPass

@@ -61,79 +61,71 @@ inline bool allEnumBitsSet(T value, T required) {
 // Object types
 //===----------------------------------------------------------------------===//
 
-class AllocatorType : public Type::TypeBase<AllocatorType, Type, TypeStorage> {
- public:
+struct AllocatorType : public Type::TypeBase<AllocatorType, Type, TypeStorage> {
   using Base::Base;
 };
 
-class BufferType
+struct BufferType
     : public Type::TypeBase<BufferType, Type, TypeStorage,
                             IREE::Util::InferTypeSizeInterface::Trait,
                             IREE::Util::ReferenceTypeInterface::Trait> {
- public:
   using Base::Base;
 
   Value inferSizeFromValue(Location loc, Value value, OpBuilder &builder) const;
 };
 
-class BufferViewType
+struct BufferViewType
     : public Type::TypeBase<BufferViewType, Type, TypeStorage,
                             IREE::Util::InferTypeSizeInterface::Trait,
                             IREE::Util::ReferenceTypeInterface::Trait> {
- public:
   using Base::Base;
 
   Value inferSizeFromValue(Location loc, Value value, OpBuilder &builder) const;
 };
 
-class CommandBufferType
+struct CommandBufferType
     : public Type::TypeBase<CommandBufferType, Type, TypeStorage> {
- public:
   using Base::Base;
 };
 
-class DescriptorSetType
+struct DescriptorSetType
     : public Type::TypeBase<DescriptorSetType, Type, TypeStorage> {
- public:
   using Base::Base;
 };
 
-class DescriptorSetLayoutType
+struct DescriptorSetLayoutType
     : public Type::TypeBase<DescriptorSetLayoutType, Type, TypeStorage> {
- public:
   using Base::Base;
 };
 
-class DeviceType : public Type::TypeBase<DeviceType, Type, TypeStorage> {
- public:
+struct DeviceType : public Type::TypeBase<DeviceType, Type, TypeStorage> {
   using Base::Base;
 };
 
-class EventType : public Type::TypeBase<EventType, Type, TypeStorage> {
- public:
+struct EventType : public Type::TypeBase<EventType, Type, TypeStorage> {
   using Base::Base;
 };
 
-class ExecutableType
+struct ExecutableType
     : public Type::TypeBase<ExecutableType, Type, TypeStorage> {
- public:
   using Base::Base;
 };
 
-class ExecutableLayoutType
+struct ExecutableLayoutType
     : public Type::TypeBase<ExecutableLayoutType, Type, TypeStorage> {
- public:
   using Base::Base;
 };
 
-class RingBufferType
+struct FenceType : public Type::TypeBase<FenceType, Type, TypeStorage> {
+  using Base::Base;
+};
+
+struct RingBufferType
     : public Type::TypeBase<RingBufferType, Type, TypeStorage> {
- public:
   using Base::Base;
 };
 
-class SemaphoreType : public Type::TypeBase<SemaphoreType, Type, TypeStorage> {
- public:
+struct SemaphoreType : public Type::TypeBase<SemaphoreType, Type, TypeStorage> {
   using Base::Base;
 };
 

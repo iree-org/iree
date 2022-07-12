@@ -22,8 +22,8 @@
 // CHECK-LABEL: func.func private @_dynamicEntry(
 func.func @dynamicEntry(%arg0: tensor<?x8x8x3xf32>, %arg1: tensor<?x8x8x3xf32>) ->
     (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) {
-  %0 = "mhlo.add"(%arg0, %arg1) : (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) -> tensor<?x8x8x3xf32>
-  %1 = "mhlo.add"(%0, %arg0) : (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) -> tensor<?x8x8x3xf32>
+  %0 = arith.addf %arg0, %arg1 : tensor<?x8x8x3xf32>
+  %1 = arith.addf %0, %arg0 : tensor<?x8x8x3xf32>
   return %0, %1 : tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>
 }
 
@@ -50,8 +50,8 @@ func.func @dynamicEntry(%arg0: tensor<?x8x8x3xf32>, %arg1: tensor<?x8x8x3xf32>) 
 // CHECK-LABEL: func.func private @_outputStorage(
 func.func @outputStorage(%arg0: tensor<?x8x8x3xf32>, %ret1: !hal.buffer {iree.abi.output = 1 : index}) ->
     (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) {
-  %0 = "mhlo.add"(%arg0, %arg0) : (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) -> tensor<?x8x8x3xf32>
-  %1 = "mhlo.add"(%0, %arg0) : (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) -> tensor<?x8x8x3xf32>
+  %0 = arith.addf %arg0, %arg0 : tensor<?x8x8x3xf32>
+  %1 = arith.addf %0, %arg0 : tensor<?x8x8x3xf32>
   return %0, %1 : tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>
 }
 

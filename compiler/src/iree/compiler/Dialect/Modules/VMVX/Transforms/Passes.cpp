@@ -22,6 +22,11 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
+static llvm::cl::opt<bool> clEnableMicrokernels(
+    "iree-vmvx-enable-microkernels",
+    llvm::cl::desc("Enables microkernel lowering for vmvx (experimental)"),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -34,6 +39,14 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+
+  // ---------------------------------------------------------------------------
+  // Linalg -> Microkernel library calls
+  // ---------------------------------------------------------------------------
+  if (clEnableMicrokernels) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLowerLinalgMicrokernelsPass());
+  }
 
   // ---------------------------------------------------------------------------
   // Linalg -> Vectors
@@ -91,6 +104,7 @@ void buildVMVXTransformPassPipeline(OpPassManager &passManager) {
   // ---------------------------------------------------------------------------
 
   buildVectorVMVXTransformPassPipeline(passManager);
+
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
@@ -113,8 +127,16 @@ void buildVMVXTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createCSEPass());
 }
 
-void createVMVXTransformPassPipeline() {
-  PassPipelineRegistration<> transformPassPipeline(
+namespace {
+#define GEN_PASS_REGISTRATION
+#include "iree/compiler/Dialect/Modules/VMVX/Transforms/Passes.h.inc"
+}  // namespace
+
+void registerVMVXPasses() {
+  // Generated.
+  registerPasses();
+
+  static PassPipelineRegistration<> transformPassPipeline(
       "iree-vmvx-transformation-pipeline",
       "Runs the full IREE VMVX dialect transformation pipeline",
       [](OpPassManager &passManager) {

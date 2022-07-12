@@ -3,6 +3,6 @@ func.func @main(
   ) -> (
     tensor<?xf32> {iree.identifier = "output"}
   ) {
-  %result = mhlo.add %input, %input : tensor<?xf32>
+  %result = arith.addf %input, %input : tensor<?xf32>
   return %result : tensor<?xf32>
 }

@@ -367,8 +367,8 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
       iree_allocator_system(), &device));
 
   iree_vm_module_t* hal_module = nullptr;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_module_create(device, iree_allocator_system(), &hal_module));
+  IREE_RETURN_IF_ERROR(iree_hal_module_create(
+      device, IREE_HAL_MODULE_FLAG_NONE, iree_allocator_system(), &hal_module));
 
   // Evaluate all exported functions.
   auto run_function = [&](int ordinal) -> Status {

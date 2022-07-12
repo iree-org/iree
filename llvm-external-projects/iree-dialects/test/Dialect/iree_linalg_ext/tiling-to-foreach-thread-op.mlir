@@ -23,9 +23,10 @@ module {
   // CHECK-SAME:      ins(%[[tA]], %[[tB]] : tensor<?x?xf32>, tensor<?x?xf32>)
   // CHECK-SAME:     outs(%[[tC]] : tensor<?x?xf32>) -> tensor<?x?xf32>
   // CHECK-NEXT:   scf.foreach_thread.perform_concurrently {
-  // CHECK-NEXT:     scf.foreach_thread.parallel_insert_slice %[[RES]] into %[[C]]{{.*}} :
+  // CHECK-NEXT:     tensor.parallel_insert_slice %[[RES]] into %[[C]]{{.*}} :
   // CHECK-SAME:       tensor<?x?xf32> into tensor<?x?xf32>
   // CHECK-NEXT:   }
+  // CHECK-NEXT: } {thread_dim_mapping = [1, 0]}
     %0 = linalg.matmul ins(%A, %B : tensor<?x?xf32>, tensor<?x?xf32>)
                       outs(%C : tensor<?x?xf32>) -> (tensor<?x?xf32>)
     return %0 : tensor<?x?xf32>
@@ -42,7 +43,7 @@ module {
     transform.structured.canonicalized_sequence %arg0 {
     ^bb1(%arg1: !pdl.operation):
       %0 = pdl_match @match_linalg_matmul in %arg1
-      %1:2 = tile_to_foreach_thread_op %0 {num_threads = [10, 20]}
+      %1:2 = tile_to_foreach_thread_op %0 {num_threads = [10, 20], thread_dim_mapping = [1, 0]}
     }
   }
 }

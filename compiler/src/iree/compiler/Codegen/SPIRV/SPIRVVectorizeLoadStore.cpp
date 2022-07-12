@@ -360,7 +360,7 @@ class ProcessAlloc final : public MemRefConversionPattern<memref::AllocOp> {
     auto memrefType = getVectorizedMemRefType(rewriter, alloc.getResult());
     if (!memrefType) return failure();
     rewriter.replaceOpWithNewOp<memref::AllocOp>(alloc, *memrefType,
-                                                 alloc.dynamicSizes());
+                                                 alloc.getDynamicSizes());
     return success();
   }
 };
@@ -554,9 +554,9 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
     if (isa<vector::TransferWriteOp, vector::TransferReadOp>(op))
       return !memrefUsageAnalysis->shouldConvertTransfer(op);
     if (auto dealloc = dyn_cast<memref::DeallocOp>(op))
-      return !memrefUsageAnalysis->shouldVectorizeMemRef(dealloc.memref());
+      return !memrefUsageAnalysis->shouldVectorizeMemRef(dealloc.getMemref());
     if (auto assumeOp = dyn_cast<memref::AssumeAlignmentOp>(op))
-      return !memrefUsageAnalysis->shouldVectorizeMemRef(assumeOp.memref());
+      return !memrefUsageAnalysis->shouldVectorizeMemRef(assumeOp.getMemref());
     return true;
   });
   if (failed(applyPartialConversion(module, target,

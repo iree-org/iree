@@ -49,6 +49,9 @@ def SPIRV_VectorizeToCooperativeOps
 def SPIRV_VectorizeWithWorkgroupMemory
     : I32EnumAttrCase<"SPIRVVectorizeWithWorkgroupMemory", 16>;
 
+def VMVX_Default
+    : I32EnumAttrCase<"VMVXDefault", 17>;
+
 def None
     : I32EnumAttrCase<"None", 0xff>;
 
@@ -66,7 +69,7 @@ def DispatchLoweringPassPipelineEnum
                     LLVMGPU_MatmulTensorCore, LLVMGPU_WarpReduction, 
                     SPIRV_Distribute, SPIRV_Vectorize,
                     SPIRV_VectorizeToCooperativeOps,
-                    SPIRV_VectorizeWithWorkgroupMemory, None
+                    SPIRV_VectorizeWithWorkgroupMemory, VMVX_Default, None
                   ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   // Don't generate a C++ class! We want to use the AttrDef

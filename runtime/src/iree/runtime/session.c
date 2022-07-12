@@ -94,7 +94,8 @@ IREE_API_EXPORT iree_status_t iree_runtime_session_create_with_device(
   // Lower-level usage of the VM can avoid the HAL if it's not required.
   iree_vm_module_t* hal_module = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_hal_module_create(device, host_allocator, &hal_module);
+    status = iree_hal_module_create(device, IREE_HAL_MODULE_FLAG_NONE,
+                                    host_allocator, &hal_module);
   }
   if (iree_status_is_ok(status)) {
     status = iree_vm_context_register_modules(

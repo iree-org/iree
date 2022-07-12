@@ -42,6 +42,7 @@ class VMConversionDialectInterface
   // used dialects, not just this dialect.
   virtual void populateVMConversionPatterns(
       SymbolTable &importSymbols, RewritePatternSet &patterns,
+      ConversionTarget &conversionTarget,
       TypeConverter &typeConverter) const = 0;
 
   // Walks all child attributes defined within a custom dialect attribute.

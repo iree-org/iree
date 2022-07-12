@@ -113,8 +113,8 @@ iree_status_t Run(std::string module_file_path, int* out_exit_code) {
   IREE_RETURN_IF_ERROR(iree_hal_create_device_from_flags(
       iree_hal_default_device_uri(), iree_allocator_system(), &device));
   iree_vm_module_t* hal_module = nullptr;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_module_create(device, iree_allocator_system(), &hal_module));
+  IREE_RETURN_IF_ERROR(iree_hal_module_create(
+      device, IREE_HAL_MODULE_FLAG_NONE, iree_allocator_system(), &hal_module));
   iree_vm_module_t* check_module = nullptr;
   IREE_RETURN_IF_ERROR(
       iree_check_module_create(iree_allocator_system(), &check_module));

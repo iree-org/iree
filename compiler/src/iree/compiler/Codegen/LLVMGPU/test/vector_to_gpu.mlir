@@ -143,7 +143,7 @@ func.func @ksplitmatmul_4D_allone(%a: memref<128x16x32x256xf32>) -> vector<1x1x1
   return %0 : vector<1x1x1x1xf32>
 }
 
-//   CHECK-DAG:#[[$MAP:.*]] = affine_map<(d0, d1) -> (d0 * 256 + d1 + 287749)>
+//   CHECK-DAG:#[[$MAP:.*]] = affine_map<(d0, d1) -> (d0 * 131072 + d1 * 8192 + 287749)>
 // CHECK-LABEL: func.func @ksplitmatmul_4D_allone
 //   CHECK-DAG: %[[ID:.*]] = arith.constant 0 : index
 //   CHECK-DAG: %[[CST:.*]] = arith.constant 0.000000e+00 : f32

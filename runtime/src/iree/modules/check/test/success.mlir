@@ -54,7 +54,7 @@ func.func @expect_almost_eq_const() {
 
 func.func @add() {
   %c5 = util.unfoldable_constant dense<5> : tensor<i32>
-  %result = "mhlo.add"(%c5, %c5) : (tensor<i32>, tensor<i32>) -> tensor<i32>
+  %result = arith.addi %c5, %c5 : tensor<i32>
   %c10 = util.unfoldable_constant dense<10> : tensor<i32>
   check.expect_eq(%result, %c10) : tensor<i32>
   return
@@ -63,15 +63,15 @@ func.func @add() {
 func.func @floats() {
   %cp1 = util.unfoldable_constant dense<0.1> : tensor<f32>
   %c1 = util.unfoldable_constant dense<1.0> : tensor<f32>
-  %p2 = "mhlo.add"(%cp1, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  %p3 = "mhlo.add"(%p2, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  %p4 = "mhlo.add"(%p3, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  %p5 = "mhlo.add"(%p4, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  %p6 = "mhlo.add"(%p5, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  %p7 = "mhlo.add"(%p6, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  %p8 = "mhlo.add"(%p7, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  %p9 = "mhlo.add"(%p8, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  %approximately_1 = "mhlo.add"(%p9, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  %p2 = arith.addf %cp1, %cp1 : tensor<f32>
+  %p3 = arith.addf %p2, %cp1 : tensor<f32>
+  %p4 = arith.addf %p3, %cp1 : tensor<f32>
+  %p5 = arith.addf %p4, %cp1 : tensor<f32>
+  %p6 = arith.addf %p5, %cp1 : tensor<f32>
+  %p7 = arith.addf %p6, %cp1 : tensor<f32>
+  %p8 = arith.addf %p7, %cp1 : tensor<f32>
+  %p9 = arith.addf %p8, %cp1 : tensor<f32>
+  %approximately_1 = arith.addf %p9, %cp1 : tensor<f32>
 
   check.expect_almost_eq(%approximately_1, %c1) : tensor<f32>
   return

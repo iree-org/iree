@@ -1,0 +1,141 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+env:
+  DOCKER_IMAGE: "gcr.io/iree-oss/frontends@sha256:908d7e0ba3e3a6d448b3c07b39cc0f786a120dd2ced8653993f62fa933e882f7"
+  IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
+
+steps:
+  - label: ":hammer_and_wrench: Build host tools"
+    key: "build-host-tools"
+    commands: |
+      docker run --user=$(id -u):$(id -g) \
+        --volume="$${HOME?}:$${HOME?}" \
+        --volume="/etc/passwd:/etc/passwd:ro" \
+        --volume="/etc/group:/etc/group:ro" \
+        --volume="$$PWD:$$IREE_DOCKER_WORKDIR" \
+        --workdir="$$IREE_DOCKER_WORKDIR" \
+        --rm \
+        $${DOCKER_IMAGE} \
+        build_tools/cmake/build_host_install.sh
+      tar -czvf iree-host-tools-$${BUILDKITE_BUILD_NUMBER}.tgz build-host/install
+    if: >
+      build.pull_request.id == null ||
+      build.pull_request.labels includes 'buildkite:benchmark-x86_64' ||
+      build.pull_request.labels includes 'buildkite:benchmark-riscv'
+    agents:
+      - "queue=build"
+    artifact_paths:
+      - "iree-host-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
+
+  - wait
+
+  - label: ":hammer_and_wrench: Build benchmark suites"
+    key: "build-benchmark-suites"
+    commands: |
+      buildkite-agent artifact download \
+        "iree-host-tools-$${BUILDKITE_BUILD_NUMBER}.tgz" ./
+      tar -xzvf "iree-host-tools-$${BUILDKITE_BUILD_NUMBER}.tgz"
+      docker run --user=$(id -u):$(id -g) \
+        --volume="$${HOME?}:$${HOME?}" \
+        --volume="/etc/passwd:/etc/passwd:ro" \
+        --volume="/etc/group:/etc/group:ro" \
+        --volume="$$PWD:$$IREE_DOCKER_WORKDIR" \
+        --workdir="$$IREE_DOCKER_WORKDIR" \
+        --rm \
+        $${DOCKER_IMAGE} \
+        build_tools/cmake/build_linux_benchmark_modules.sh
+      # Scan all target builds and pack the benchmark suites.
+      ls build-targets | xargs -I "{target}" -- \
+        tar --exclude="*.tar.gz" \
+          --exclude="*.tgz" \
+          --exclude="*.mlir" \
+          --exclude="*.tflite" \
+          --exclude="*-tf-model" \
+          -czvf "benchmark-suites-{target}-$${BUILDKITE_BUILD_NUMBER}.tgz" \
+          "build-targets/{target}/benchmark_suites" \
+          "build-targets/{target}/.ninja_log"
+      # Pack imported models.
+      find build-targets/linux-x86_64/benchmark_suites -name "*.mlir" | \
+        tar -czvf "source-mlir-models-$${BUILDKITE_BUILD_NUMBER}.tgz" -T -
+    if: >
+      build.pull_request.id == null ||
+      build.pull_request.labels includes 'buildkite:benchmark-x86_64' ||
+      build.pull_request.labels includes 'buildkite:benchmark-riscv'
+    agents:
+      - "queue=build"
+    artifact_paths:
+      - "benchmark-suites-*-${BUILDKITE_BUILD_NUMBER}.tgz"
+      - "source-mlir-models-${BUILDKITE_BUILD_NUMBER}.tgz"
+
+  - wait
+
+  - label: ":arrow_forward: Execute linux-x86_64 benchmark pipeline"
+    commands: |
+      buildkite-agent pipeline upload \
+        build_tools/buildkite/cmake/linux/x86_64/benchmark2.yml
+    if: >
+      build.pull_request.id == null ||
+      build.pull_request.labels includes 'buildkite:benchmark-x86_64'
+
+  - label: ":recycle: Collect compilation statistics"
+    key: "collect-compilation-statistics"
+    commands: |
+      git clean -fdx
+      buildkite-agent artifact download \
+        "benchmark-suites-*-$${BUILDKITE_BUILD_NUMBER}.tgz" ./
+      ls benchmark-suites-*-$${BUILDKITE_BUILD_NUMBER}.tgz | xargs -I "{}" -- \
+        tar -xzvf "{}"
+      ls build-targets | xargs -I "{target}" -- \
+        python3 build_tools/benchmarks/collect_compilation_statistics.py \
+          --verbose \
+          --output "compile-stats-results-{target}-$${BUILDKITE_BUILD_NUMBER}.json" \
+          "build-targets/{target}"
+    if: >
+      build.pull_request.id == null ||
+      build.pull_request.labels includes 'buildkite:benchmark-x86_64' ||
+      build.pull_request.labels includes 'buildkite:benchmark-riscv'
+    agents:
+      - "queue=build"
+    artifact_paths:
+      - "compile-stats-results-*.json"
+    timeout_in_minutes: "10"
+
+  - wait
+
+  - label: ":lower_left_crayon: Comment benchmark results on pull request"
+    key: "post-on-pr"
+    commands: |
+      git clean -fdx
+      buildkite-agent artifact download "benchmark-results-*.json" ./
+      buildkite-agent artifact download "compile-stats-results-*.json" ./
+      python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py \
+        --verbose \
+        --query-base \
+        --comment-title="Abbreviated Linux Benchmark Summary" \
+        --benchmark_files benchmark-results-*.json \
+        --compile_stats_files compile-stats-results-*.json
+    if: >
+      build.pull_request.id != null && (
+        build.pull_request.labels includes 'buildkite:benchmark-x86_64' ||
+        build.pull_request.labels includes 'buildkite:benchmark-riscv'
+      )
+    agents:
+      - "queue=report"
+
+  - label: ":lower_left_crayon: Push benchmark results to dashboard"
+    key: "upload-to-dashboard"
+    commands: |
+      git clean -fdx
+      buildkite-agent artifact download "benchmark-results-*.json" ./
+      buildkite-agent artifact download "compile-stats-results-*.json" ./
+      python3 build_tools/benchmarks/upload_benchmarks_to_dashboard.py \
+        --verbose \
+        --benchmark_files benchmark-results-*.json \
+        --compile_stats_files compile-stats-results-*.json
+    branches: "main"
+    agents:
+      - "queue=report"

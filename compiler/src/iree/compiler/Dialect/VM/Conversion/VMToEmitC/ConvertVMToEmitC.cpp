@@ -42,6 +42,15 @@ enum {
   SHIM_ARGUMENT_EXECUTION_RESULT,
 };
 
+/// The EmitC dialect is currently missing operations to cleanly represent some
+/// constructs we need for the C target. This includes storage class specifiers
+/// on functions, forward declarations of functions, globals and arrays.
+/// As a workaround the conversion currently adds bits of information via
+/// attributes that later get used by the CModuleTarget.
+void attachAttribute(Operation *op, StringRef name, Attribute value) {
+  op->setAttr(name, value);
+}
+
 // TODO(simon-camp/marbre): Use this function throughout the conversions.
 Optional<std::string> getCType(Type type) {
   if (auto iType = type.dyn_cast<IntegerType>()) {
@@ -201,15 +210,14 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
 
   auto newFuncOp = builder.create<mlir::func::FuncOp>(loc, name, newFuncType);
 
-  newFuncOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
+  attachAttribute(newFuncOp, "emitc.static", UnitAttr::get(ctx));
 
   Optional<std::string> callingConvention = makeCallingConventionString(funcOp);
 
   // Annotate new function with calling convention string which gets used in
   // the CModuleTarget.
-  newFuncOp.getOperation()->setAttr(
-      "vm.calling_convention",
-      StringAttr::get(ctx, callingConvention.getValue()));
+  attachAttribute(newFuncOp, "vm.calling_convention",
+                  StringAttr::get(ctx, callingConvention.getValue()));
 
   // This call shold be equivalent to rewriter.inlineRegionBefore()
   newFuncOp.getBody().getBlocks().splice(newFuncOp.end(),
@@ -390,27 +398,15 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
 
   auto ptr = valueTypeMap.find((elementType));
   if (ptr != valueTypeMap.end()) {
-    rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER_ASSIGN"),
-        /*args=*/
-        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "value_type"),
-                             emitc::OpaqueAttr::get(ctx, ptr->second.first)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{elementTypeOp.getResult()});
+    emitc_builders::structMemberAssign(rewriter, loc,
+                                       /*memberName=*/"value_type",
+                                       /*operand=*/elementTypeOp.getResult(),
+                                       /*value=*/ptr->second.first);
 
-    rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER_ASSIGN"),
-        /*args=*/
-        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "ref_type"),
-                             emitc::OpaqueAttr::get(ctx, ptr->second.second)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{elementTypeOp.getResult()});
+    emitc_builders::structMemberAssign(rewriter, loc,
+                                       /*memberName=*/"ref_type",
+                                       /*operand=*/elementTypeOp.getResult(),
+                                       /*value=*/ptr->second.second);
   } else {
     if (!elementType.isa<IREE::VM::RefType>()) {
       return None;
@@ -455,17 +451,10 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
         /*memberName=*/"type",
         /*operand=*/typeDescriptor.getResult(0));
 
-    rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER_ASSIGN"),
-        /*args=*/
-        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "ref_type"),
-                             rewriter.getIndexAttr(1)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/
-        ArrayRef<Value>{elementTypeOp.getResult(), typeDescriptorType});
+    emitc_builders::structMemberAssign(rewriter, loc,
+                                       /*memberName=*/"ref_type",
+                                       /*operand=*/elementTypeOp.getResult(),
+                                       /*value=*/typeDescriptorType);
   }
 
   auto elementTypePtrOp = rewriter.create<emitc::ApplyOp>(
@@ -496,13 +485,7 @@ void releaseRefs(OpBuilder &builder, Location location,
 
     Value localRef = cast<emitc::ApplyOp>(op).getResult();
 
-    builder.create<emitc::CallOp>(
-        /*location=*/location,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{localRef});
+    emitc_builders::ireeVmRefRelease(builder, location, localRef);
   }
 
   // We only release the original arguments not the results which were appended
@@ -515,13 +498,7 @@ void releaseRefs(OpBuilder &builder, Location location,
           refArgumentsReleased++) {
         break;
       }
-      builder.create<emitc::CallOp>(
-          /*location=*/location,
-          /*type=*/TypeRange{},
-          /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{arg});
+      emitc_builders::ireeVmRefRelease(builder, location, arg);
     }
   }
 }
@@ -717,7 +694,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     typeConverter.analysisCache.insert(
         std::make_pair(funcOp.getOperation(), VMAnalysis()));
 
-    funcOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
+    attachAttribute(funcOp, "emitc.static", UnitAttr::get(ctx));
 
     Block *entryBlock = funcOp.addEntryBlock();
 
@@ -766,7 +743,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     typeConverter.analysisCache.insert(
         std::make_pair(funcOp.getOperation(), VMAnalysis()));
 
-    funcOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
+    attachAttribute(funcOp, "emitc.static", UnitAttr::get(ctx));
 
     Block *entryBlock = funcOp.addEntryBlock();
 
@@ -816,17 +793,10 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*operands=*/
         ArrayRef<Value>{stateOp.getResult(), stateSize});
 
-    builder.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER_ASSIGN"),
-        /*args=*/
-        ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "allocator"),
-                             builder.getIndexAttr(1)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/
-        ArrayRef<Value>{stateOp.getResult(), funcOp.getArgument(1)});
+    emitc_builders::structPtrMemberAssign(builder, loc,
+                                          /*memberName=*/"allocator",
+                                          /*operand=*/stateOp.getResult(),
+                                          /*value=*/funcOp.getArgument(1));
 
     // Initialize buffers
     for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
@@ -874,17 +844,13 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
           /*memberName=*/"rodata_buffers",
           /*operand=*/stateOp.getResult());
 
-      auto buffer = builder.create<emitc::CallOp>(
-          /*location=*/loc,
+      auto buffer = emitc_builders::arrayElementAddress(
+          builder, loc,
           /*type=*/
           emitc::PointerType::get(
               emitc::OpaqueType::get(ctx, "iree_vm_buffer_t")),
-          /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
-          /*args=*/
-          ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                               builder.getUI32IntegerAttr(ordinal)}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{buffers});
+          /*index=*/builder.getUI32IntegerAttr(ordinal),
+          /*operand=*/buffers);
 
       builder.create<emitc::CallOp>(
           /*location=*/loc,
@@ -898,7 +864,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/
           ArrayRef<Value>{byteSpan.getResult(0), allocator.getResult(0),
-                          buffer.getResult(0)});
+                          buffer});
     }
 
     // Zero out refs from state struct.
@@ -921,19 +887,15 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
           /*operand=*/stateOp.getResult());
 
       for (int i = 0; i < numGlobalRefs; i++) {
-        auto refPtrOp = builder.create<emitc::CallOp>(
-            /*location=*/loc,
+        auto refPtrOp = emitc_builders::arrayElementAddress(
+            builder, loc,
             /*type=*/
             emitc::PointerType::get(
                 emitc::OpaqueType::get(ctx, "iree_vm_ref_t")),
-            /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
-            /*args=*/
-            ArrayAttr::get(
-                ctx, {builder.getIndexAttr(0), builder.getUI32IntegerAttr(i)}),
-            /*templateArgs=*/ArrayAttr{},
-            /*operands=*/ArrayRef<Value>{refs});
+            /*index=*/builder.getUI32IntegerAttr(i),
+            /*operand=*/refs);
 
-        if (failed(clearStruct(builder, refPtrOp.getResult(0)))) {
+        if (failed(clearStruct(builder, refPtrOp))) {
           return failure();
         }
       }
@@ -955,15 +917,9 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*operands=*/
         ArrayRef<Value>{funcOp.getArgument(2), baseStateOp.getResult()});
 
-    auto status = builder.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
-        /*callee=*/StringAttr::get(ctx, "iree_ok_status"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{});
+    auto status = emitc_builders::ireeOkStatus(builder, loc);
 
-    builder.create<mlir::func::ReturnOp>(loc, status.getResult(0));
+    builder.create<mlir::func::ReturnOp>(loc, status);
   }
 
   // free_state
@@ -983,7 +939,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     typeConverter.analysisCache.insert(
         std::make_pair(funcOp.getOperation(), VMAnalysis()));
 
-    funcOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
+    attachAttribute(funcOp, "emitc.static", UnitAttr::get(ctx));
 
     Block *entryBlock = funcOp.addEntryBlock();
 
@@ -1017,25 +973,15 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
           /*operand=*/stateOp.getResult());
 
       for (int i = 0; i < numGlobalRefs; i++) {
-        auto refPtrOp = builder.create<emitc::CallOp>(
-            /*location=*/loc,
+        auto refPtrOp = emitc_builders::arrayElementAddress(
+            builder, loc,
             /*type=*/
             emitc::PointerType::get(
                 emitc::OpaqueType::get(ctx, "iree_vm_ref_t")),
-            /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
-            /*args=*/
-            ArrayAttr::get(
-                ctx, {builder.getIndexAttr(0), builder.getUI32IntegerAttr(i)}),
-            /*templateArgs=*/ArrayAttr{},
-            /*operands=*/ArrayRef<Value>{refs});
+            /*index=*/builder.getUI32IntegerAttr(i),
+            /*operand=*/refs);
 
-        builder.create<emitc::CallOp>(
-            /*location=*/loc,
-            /*type=*/TypeRange{},
-            /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-            /*args=*/ArrayAttr{},
-            /*templateArgs=*/ArrayAttr{},
-            /*operands=*/ArrayRef<Value>{refPtrOp.getResult(0)});
+        emitc_builders::ireeVmRefRelease(builder, loc, refPtrOp);
       }
     }
 
@@ -1081,7 +1027,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     typeConverter.analysisCache.insert(
         std::make_pair(funcOp.getOperation(), VMAnalysis()));
 
-    funcOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
+    attachAttribute(funcOp, "emitc.static", UnitAttr::get(ctx));
 
     Block *entryBlock = funcOp.addEntryBlock();
 
@@ -1124,15 +1070,9 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*operands=*/
         ArrayRef<Value>{import.getResult(0), funcOp.getArgument(3)});
 
-    auto status = builder.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
-        /*callee=*/StringAttr::get(ctx, "iree_ok_status"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{});
+    auto status = emitc_builders::ireeOkStatus(builder, loc);
 
-    builder.create<mlir::func::ReturnOp>(loc, status.getResult(0));
+    builder.create<mlir::func::ReturnOp>(loc, status);
   }
 
   // create
@@ -1155,11 +1095,11 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     // This function needs an iree_vm_native_module_descriptor_t that is emitted
     // by the CModuleTarget at the moment. So we add a marker to this function
     // and delay the printing of it.
-    funcOp.getOperation()->setAttr("vm.emit_at_end", UnitAttr::get(ctx));
+    attachAttribute(funcOp, "vm.emit_at_end", UnitAttr::get(ctx));
 
     // This functions is the only one users need and it is therefore declared
     // separatly from all other functions.
-    funcOp.getOperation()->setAttr("vm.module.constructor", UnitAttr::get(ctx));
+    attachAttribute(funcOp, "vm.module.constructor", UnitAttr::get(ctx));
 
     Block *entryBlock = funcOp.addEntryBlock();
 
@@ -1208,17 +1148,10 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*operands=*/
         ArrayRef<Value>{module.getResult(), moduleSize});
 
-    builder.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER_ASSIGN"),
-        /*args=*/
-        ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "allocator"),
-                             builder.getIndexAttr(1)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/
-        ArrayRef<Value>{module.getResult(), funcOp.getArgument(0)});
+    emitc_builders::structPtrMemberAssign(builder, loc,
+                                          /*memberName=*/"allocator",
+                                          /*operand=*/module.getResult(),
+                                          /*value=*/funcOp.getArgument(0));
 
     auto vmModule = builder.create<emitc::VariableOp>(
         /*location=*/loc,
@@ -1289,18 +1222,10 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     // Set function pointers
     for (std::string funcName :
          {"destroy", "alloc_state", "free_state", "resolve_import"}) {
-      builder.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/TypeRange{},
-          /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER_ASSIGN"),
-          /*args=*/
-          ArrayAttr::get(
-              ctx,
-              {builder.getIndexAttr(0), emitc::OpaqueAttr::get(ctx, funcName),
-               emitc::OpaqueAttr::get(ctx, moduleName + "_" + funcName)}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/
-          ArrayRef<Value>{vmModule.getResult()});
+      emitc_builders::structMemberAssign(builder, loc,
+                                         /*memberName=*/funcName,
+                                         /*operand=*/vmModule.getResult(),
+                                         /*value=*/moduleName + "_" + funcName);
     }
 
     std::string descriptoPtr = "&" + moduleName + "_descriptor_";
@@ -1437,11 +1362,6 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
  public:
   using OpConversionPattern<IREE::VM::ExportOp>::OpConversionPattern;
 
-  ExportOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                     SmallVector<Operation *> &visitedExports)
-      : OpConversionPattern<IREE::VM::ExportOp>(typeConverter, context),
-        visitedExports(visitedExports) {}
-
  private:
   typedef struct GeneratedStruct {
     Optional<Value> value = None;
@@ -1457,8 +1377,6 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
 
     IREE::VM::EmitCTypeConverter *typeConverter =
         this->getTypeConverter<IREE::VM::EmitCTypeConverter>();
-
-    rewriter.startRootUpdate(exportOp.getOperation());
 
     mlir::func::FuncOp funcOp = lookupSymbolRef<mlir::func::FuncOp>(
         exportOp.getOperation(), "function_ref");
@@ -1509,10 +1427,10 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
     typeConverter->analysisCache.insert(
         std::make_pair(newFuncOp.getOperation(), std::move(newVmAnalysis)));
 
-    newFuncOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
-    newFuncOp.getOperation()->setAttr(
-        "vm.calling_convention",
-        funcOp.getOperation()->getAttr("vm.calling_convention"));
+    attachAttribute(newFuncOp, "emitc.static", UnitAttr::get(ctx));
+    attachAttribute(newFuncOp, "vm.calling_convention",
+                    funcOp.getOperation()->getAttr("vm.calling_convention"));
+    attachAttribute(newFuncOp, "vm.export_name", exportOp.export_nameAttr());
 
     // Populate newly generated function.
     {
@@ -1589,21 +1507,13 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
 
       returnIfError(rewriter, loc, funcOp, operands, *typeConverter);
 
-      auto status = rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
-          /*callee=*/StringAttr::get(ctx, "iree_ok_status"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{});
+      auto status = emitc_builders::ireeOkStatus(rewriter, loc);
 
-      rewriter.create<mlir::func::ReturnOp>(loc, status.getResult(0));
+      rewriter.create<mlir::func::ReturnOp>(loc, status);
     }
 
-    exportOp.function_refAttr(FlatSymbolRefAttr::get(newFuncOp.getOperation()));
-    rewriter.finalizeRootUpdate(exportOp.getOperation());
+    rewriter.eraseOp(exportOp);
 
-    visitedExports.push_back(exportOp.getOperation());
     return success();
   }
 
@@ -1750,16 +1660,11 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
       // args_t* args = (args_t*)call->arguments.data;
 
       // arguments.data
-      auto argumentsData = rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
+      auto argumentsData = emitc_builders::structMember(
+          rewriter, loc,
           /*type=*/emitc::PointerType::get(rewriter.getIntegerType(8, false)),
-          /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER"),
-          /*args=*/
-          ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                               emitc::OpaqueAttr::get(ctx, "data")}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/
-          ArrayRef<Value>{newFuncOp.getArgument(SHIM_ARGUMENT_ARGS_STORAGE)});
+          /*memberName=*/"data",
+          /*operand=*/newFuncOp.getArgument(SHIM_ARGUMENT_ARGS_STORAGE));
 
       // cast
       std::string argumentsType = argumentStruct.name.getValue();
@@ -1767,7 +1672,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
           /*location=*/loc,
           /*type=*/
           emitc::PointerType::get(emitc::OpaqueType::get(ctx, argumentsType)),
-          /*operand=*/argumentsData.getResult(0));
+          /*operand=*/argumentsData);
 
       argumentStruct.value = arguments.getResult();
     }
@@ -1777,16 +1682,11 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
       // results_t* results = (results_t*)call->results.data;
 
       // results.data
-      auto resultsData = rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
+      auto resultsData = emitc_builders::structMember(
+          rewriter, loc,
           /*type=*/emitc::PointerType::get(rewriter.getIntegerType(8, false)),
-          /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER"),
-          /*args=*/
-          ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                               emitc::OpaqueAttr::get(ctx, "data")}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/
-          ArrayRef<Value>{newFuncOp.getArgument(SHIM_ARGUMENT_RETS_STORAGE)});
+          /*memberName=*/"data",
+          /*operand=*/newFuncOp.getArgument(SHIM_ARGUMENT_RETS_STORAGE));
 
       // cast
       std::string resultType = resultStruct.name.getValue();
@@ -1794,7 +1694,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
           /*location=*/loc,
           /*type=*/
           emitc::PointerType::get(emitc::OpaqueType::get(ctx, resultType)),
-          /*operand=*/resultsData.getResult(0));
+          /*operand=*/resultsData);
 
       resultStruct.value = results.getResult();
     }
@@ -1905,8 +1805,6 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
 
     return success();
   }
-
-  SmallVector<Operation *> &visitedExports;
 };
 
 class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
@@ -2067,7 +1965,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
     getTypeConverter<IREE::VM::EmitCTypeConverter>()->analysisCache.insert(
         std::make_pair(newFuncOp.getOperation(), VMAnalysis{}));
 
-    newFuncOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
+    attachAttribute(newFuncOp, "emitc.static", UnitAttr::get(ctx));
 
     // Populate newly generated function.
     {
@@ -2120,15 +2018,9 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
         return importOp.emitError() << "failed to unpack result struct";
       }
 
-      auto status = rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
-          /*callee=*/StringAttr::get(ctx, "iree_ok_status"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{});
+      auto status = emitc_builders::ireeOkStatus(rewriter, loc);
 
-      rewriter.create<mlir::func::ReturnOp>(loc, status.getResult(0));
+      rewriter.create<mlir::func::ReturnOp>(loc, status);
     }
 
     return success();
@@ -2246,16 +2138,10 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
             .getResult();
 
     // call.function = *import;
-    rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER_ASSIGN"),
-        /*args=*/
-        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "function"),
-                             rewriter.getIndexAttr(1)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{call, importValue});
+    emitc_builders::structMemberAssign(rewriter, loc,
+                                       /*memberName=*/"function",
+                                       /*operand=*/call,
+                                       /*value=*/importValue);
 
     allocateByteSpan(call, argumentSize, "arguments", rewriter, loc);
     allocateByteSpan(call, resultSize, "results", rewriter, loc);
@@ -2307,28 +2193,16 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
                             .getResult();
 
     // byteSpan.data_length = SIZE;
-    rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER_ASSIGN"),
-        /*args=*/
-        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "data_length"),
-                             rewriter.getIndexAttr(1)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{byteSpan, size});
+    emitc_builders::structPtrMemberAssign(rewriter, loc,
+                                          /*memberName=*/"data_length",
+                                          /*operand=*/byteSpan,
+                                          /*value=*/size);
 
     // byteSpan.data = byteSpan_data
-    rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER_ASSIGN"),
-        /*args=*/
-        ArrayAttr::get(
-            ctx, {rewriter.getIndexAttr(0), emitc::OpaqueAttr::get(ctx, "data"),
-                  rewriter.getIndexAttr(1)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{byteSpan, byteSpanData});
+    emitc_builders::structPtrMemberAssign(rewriter, loc,
+                                          /*memberName=*/"data",
+                                          /*operand=*/byteSpan,
+                                          /*value=*/byteSpanData);
 
     // memset(byteSpanData, 0, SIZE);
     rewriter.create<emitc::CallOp>(
@@ -2357,33 +2231,18 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
 
     size_t inputOffset = 2;
 
-    Value arguments =
-        rewriter
-            .create<emitc::CallOp>(
-                /*location=*/loc,
-                /*type=*/emitc::OpaqueType::get(ctx, "iree_byte_span_t"),
-                /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER"),
-                /*args=*/
-                ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                                     emitc::OpaqueAttr::get(ctx, "arguments")}),
-                /*templateArgs=*/ArrayAttr{},
-                /*operands=*/ArrayRef<Value>{call})
-            .getResult(0);
+    Value arguments = emitc_builders::structMember(
+        rewriter, loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_byte_span_t"),
+        /*memberName=*/"arguments",
+        /*operand=*/call);
 
     Type bytePtrType =
         emitc::PointerType::get(rewriter.getIntegerType(8, false));
-    Value uint8Ptr =
-        rewriter
-            .create<emitc::CallOp>(
-                /*location=*/loc,
-                /*type=*/bytePtrType,
-                /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER"),
-                /*args=*/
-                ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                                     emitc::OpaqueAttr::get(ctx, "data")}),
-                /*templateArgs=*/ArrayAttr{},
-                /*operands=*/ArrayRef<Value>{arguments})
-            .getResult(0);
+    Value uint8Ptr = emitc_builders::structMember(rewriter, loc,
+                                                  /*type=*/bytePtrType,
+                                                  /*memberName=*/"data",
+                                                  /*operand=*/arguments);
 
     for (size_t i = 0; i < inputTypes.size(); i++) {
       Type inputType = inputTypes[i];
@@ -2474,33 +2333,18 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
     // The last N arguments are the results.
     size_t resultOffset = funcOp.getNumArguments() - resultTypes.size();
 
-    Value results =
-        rewriter
-            .create<emitc::CallOp>(
-                /*location=*/loc,
-                /*type=*/emitc::OpaqueType::get(ctx, "iree_byte_span_t"),
-                /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER"),
-                /*args=*/
-                ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                                     emitc::OpaqueAttr::get(ctx, "results")}),
-                /*templateArgs=*/ArrayAttr{},
-                /*operands=*/ArrayRef<Value>{call})
-            .getResult(0);
+    Value results = emitc_builders::structMember(
+        rewriter, loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_byte_span_t"),
+        /*memberName=*/"results",
+        /*operand=*/call);
 
     Type bytePtrType =
         emitc::PointerType::get(rewriter.getIntegerType(8, false));
-    Value uint8Ptr =
-        rewriter
-            .create<emitc::CallOp>(
-                /*location=*/loc,
-                /*type=*/bytePtrType,
-                /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER"),
-                /*args=*/
-                ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                                     emitc::OpaqueAttr::get(ctx, "data")}),
-                /*templateArgs=*/ArrayAttr{},
-                /*operands=*/ArrayRef<Value>{results})
-            .getResult(0);
+    Value uint8Ptr = emitc_builders::structMember(rewriter, loc,
+                                                  /*type=*/bytePtrType,
+                                                  /*memberName=*/"data",
+                                                  /*operand=*/results);
 
     for (size_t i = 0; i < resultTypes.size(); i++) {
       Type resultType = resultTypes[i];
@@ -2792,19 +2636,15 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
         /*memberName=*/"imports",
         /*operand=*/stateArg);
 
-    auto import = rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
+    auto import = emitc_builders::arrayElementAddress(
+        rewriter, loc,
         /*type=*/
         emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, "iree_vm_function_t")),
-        /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
-        /*args=*/
-        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             rewriter.getUI32IntegerAttr(importOrdinal)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{imports});
+        /*index=*/rewriter.getUI32IntegerAttr(importOrdinal),
+        /*operand=*/imports);
 
-    updatedOperands = {stackArg, import.getResult(0)};
+    updatedOperands = {stackArg, import};
 
     Optional<std::string> funcName;
     if (auto variadicOp = dyn_cast<IREE::VM::CallVariadicOp>(op)) {
@@ -3046,25 +2886,13 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
         /*operands=*/ArrayRef<Value>{refLhs.getValue(), refRhs.getValue()});
 
     if (moveLhs) {
-      rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/TypeRange{},
-          /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{refLhs.getValue()});
+      emitc_builders::ireeVmRefRelease(rewriter, loc, refLhs.getValue());
     }
 
     // NOTE: If lhs and rhs alias we call release twice on the same
     // argument.
     if (moveRhs) {
-      rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/TypeRange{},
-          /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{refRhs.getValue()});
+      emitc_builders::ireeVmRefRelease(rewriter, loc, refRhs.getValue());
     }
 
     return success();
@@ -3113,13 +2941,7 @@ class CompareRefNotZeroOpConversion
         /*operands=*/ArrayRef<Value>{ref.getValue()});
 
     if (move) {
-      rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/TypeRange{},
-          /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{ref.getValue()});
+      emitc_builders::ireeVmRefRelease(rewriter, loc, ref.getValue());
     }
 
     return success();
@@ -3174,7 +2996,6 @@ class ConstRefZeroOpConversion
   LogicalResult matchAndRewrite(
       IREE::VM::ConstRefZeroOp constRefZeroOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
-    auto ctx = constRefZeroOp.getContext();
     auto loc = constRefZeroOp.getLoc();
 
     IREE::VM::EmitCTypeConverter *typeConverter =
@@ -3187,13 +3008,7 @@ class ConstRefZeroOpConversion
       return constRefZeroOp.emitError() << "local ref not found";
     }
 
-    rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{ref.getValue()});
+    emitc_builders::ireeVmRefRelease(rewriter, loc, ref.getValue());
 
     rewriter.replaceOp(constRefZeroOp, ref.getValue());
 
@@ -3230,19 +3045,15 @@ class ConstRefRodataOpConversion
         /*memberName=*/"rodata_buffers",
         /*operand=*/stateArg);
 
-    auto byteBufferPtrOp = rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
+    auto byteBufferPtrOp = emitc_builders::arrayElementAddress(
+        rewriter, loc,
         /*type=*/
         emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, "iree_vm_buffer_t")),
-        /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
-        /*args=*/
-        ArrayAttr::get(ctx,
-                       {rewriter.getIndexAttr(0),
-                        rewriter.getUI32IntegerAttr(static_cast<uint32_t>(
-                            rodataOp.ordinal().getValue().getZExtValue()))}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{rodataBuffersPtr});
+        /*index=*/
+        rewriter.getUI32IntegerAttr(static_cast<uint32_t>(
+            rodataOp.ordinal().getValue().getZExtValue())),
+        /*operand=*/rodataBuffersPtr);
 
     auto typeIdOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -3269,8 +3080,7 @@ class ConstRefRodataOpConversion
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{byteBufferPtrOp.getResult(0), typeIdOp.getResult(0),
-                        ref.getValue()},
+        ArrayRef<Value>{byteBufferPtrOp, typeIdOp.getResult(0), ref.getValue()},
         /*typeConverter=*/*typeConverter);
 
     rewriter.replaceOp(constRefRodataOp, ref.getValue());
@@ -3637,15 +3447,9 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
 
     releaseRefs(rewriter, loc, funcOp, *typeConverter);
 
-    auto status = rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
-        /*callee=*/StringAttr::get(ctx, "iree_ok_status"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{});
+    auto status = emitc_builders::ireeOkStatus(rewriter, loc);
 
-    rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(op, status.getResult(0));
+    rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(op, status);
 
     return success();
   }
@@ -3681,17 +3485,13 @@ class ImportResolvedOpConversion
         /*memberName=*/"imports",
         /*operand=*/stateArg);
 
-    auto import = rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
+    auto import = emitc_builders::arrayElementAddress(
+        rewriter, loc,
         /*type=*/
         emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, "iree_vm_function_t")),
-        /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
-        /*args=*/
-        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             rewriter.getUI32IntegerAttr(importOrdinal)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{imports});
+        /*index=*/rewriter.getUI32IntegerAttr(importOrdinal),
+        /*operand=*/imports);
 
     // (iree_vm_function_t*)->module
     auto importModule = emitc_builders::structPtrMember(
@@ -3700,7 +3500,7 @@ class ImportResolvedOpConversion
         emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, "iree_vm_module_t")),
         /*memberName=*/"module",
-        /*operand=*/import.getResult(0));
+        /*operand=*/import);
 
     Type boolType = rewriter.getIntegerType(1);
     auto conditionI1 = rewriter
@@ -3761,15 +3561,9 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
 
       releaseRefs(rewriter, loc, funcOp, *typeConverter);
 
-      auto status = rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
-          /*callee=*/StringAttr::get(ctx, "iree_ok_status"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{});
+      auto status = emitc_builders::ireeOkStatus(rewriter, loc);
 
-      rewriter.create<mlir::func::ReturnOp>(loc, status.getResult(0));
+      rewriter.create<mlir::func::ReturnOp>(loc, status);
     }
     Block *failureBlock;
     {
@@ -3795,31 +3589,23 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{});
 
-      auto messageSizeOp = rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
+      auto messageSizeOp = emitc_builders::structMember(
+          rewriter, loc,
           /*type=*/emitc::OpaqueType::get(ctx, "iree_host_size_t"),
-          /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER"),
-          /*args=*/
-          ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                               emitc::OpaqueAttr::get(ctx, "size")}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{messageOp.getResult(0)});
+          /*memberName=*/"size",
+          /*operand=*/messageOp.getResult(0));
 
       auto messageSizeIntOp = rewriter.create<emitc::CastOp>(
           /*location=*/loc,
           /*type=*/rewriter.getIntegerType(32),
-          /*operand=*/messageSizeOp.getResult(0));
+          /*operand=*/messageSizeOp);
 
-      auto messageDataOp = rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
+      auto messageDataOp = emitc_builders::structMember(
+          rewriter, loc,
           /*type=*/
           emitc::PointerType::get(emitc::OpaqueType::get(ctx, "const char")),
-          /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER"),
-          /*args=*/
-          ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                               emitc::OpaqueAttr::get(ctx, "data")}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{messageOp.getResult(0)});
+          /*memberName=*/"data",
+          /*operand=*/messageOp.getResult(0));
 
       auto status = rewriter.create<emitc::CallOp>(
           /*location=*/loc,
@@ -3835,8 +3621,7 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
                rewriter.getIndexAttr(0), rewriter.getIndexAttr(1)}),
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/
-          ArrayRef<Value>{messageSizeIntOp.getResult(),
-                          messageDataOp.getResult(0)});
+          ArrayRef<Value>{messageSizeIntOp.getResult(), messageDataOp});
 
       rewriter.create<mlir::func::ReturnOp>(loc, status.getResult(0));
     }
@@ -3966,16 +3751,12 @@ class GlobalLoadStoreRefOpConversion
         /*memberName=*/"refs",
         /*operand=*/stateArg);
 
-    auto stateRef = rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
+    auto stateRef = emitc_builders::arrayElementAddress(
+        rewriter, loc,
         /*type=*/
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_ref_t")),
-        /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
-        /*args=*/
-        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             rewriter.getUI32IntegerAttr(globalOrdinal)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{refs});
+        /*index=*/rewriter.getUI32IntegerAttr(globalOrdinal),
+        /*operand=*/refs);
 
     Type elementType = localValue.getType();
 
@@ -3991,8 +3772,8 @@ class GlobalLoadStoreRefOpConversion
         /*memberName=*/"ref_type",
         /*operand=*/elementTypePtrOp.getValue().getResult());
 
-    Value srcRef = isLoad ? stateRef.getResult(0) : localRef.getValue();
-    Value destRef = isLoad ? localRef.getValue() : stateRef.getResult(0);
+    Value srcRef = isLoad ? stateRef : localRef.getValue();
+    Value destRef = isLoad ? localRef.getValue() : stateRef;
 
     bool move =
         vmAnalysis.getValue().get().isLastValueUse(localValue, op) && false;
@@ -4500,13 +4281,7 @@ class ListGetRefOpConversion
       Region *parentRegion = condBlock->getParent();
       failureBlock = rewriter.createBlock(parentRegion, parentRegion->end());
 
-      rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/TypeRange{},
-          /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{ref.getValue()});
+      emitc_builders::ireeVmRefRelease(rewriter, loc, ref.getValue());
 
       rewriter.create<mlir::cf::BranchOp>(loc, continuationBlock);
     }
@@ -4661,7 +4436,6 @@ class ListSetRefOpConversion
 void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                IREE::VM::EmitCTypeConverter &typeConverter,
                                RewritePatternSet &patterns,
-                               SmallVector<Operation *> &visitedExports,
                                SmallVector<std::string> &importShims) {
   auto context = patterns.getContext();
   populateUtilConversionPatterns(context, conversionTarget, typeConverter,
@@ -4675,7 +4449,7 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
   patterns.add<CondBranchOpConversion>(typeConverter, context);
   patterns.add<FailOpConversion>(typeConverter, context);
   patterns.add<FuncOpConversion>(typeConverter, context);
-  patterns.add<ExportOpConversion>(typeConverter, context, visitedExports);
+  patterns.add<ExportOpConversion>(typeConverter, context);
   patterns.add<ImportOpConversion>(typeConverter, context, importShims);
   patterns.add<ReturnOpConversion>(typeConverter, context);
   patterns.add<ImportResolvedOpConversion>(typeConverter, context);
@@ -4747,6 +4521,8 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                                          "vm_rem_i32u");
   patterns.add<GenericOpConversion<IREE::VM::FMAI32Op>>(typeConverter, context,
                                                         "vm_fma_i32");
+  patterns.add<GenericOpConversion<IREE::VM::AbsI32Op>>(typeConverter, context,
+                                                        "vm_abs_i32");
   patterns.add<GenericOpConversion<IREE::VM::NotI32Op>>(typeConverter, context,
                                                         "vm_not_i32");
   patterns.add<GenericOpConversion<IREE::VM::AndI32Op>>(typeConverter, context,
@@ -4942,6 +4718,8 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                                          "vm_rem_i64u");
   patterns.add<GenericOpConversion<IREE::VM::FMAI64Op>>(typeConverter, context,
                                                         "vm_fma_i64");
+  patterns.add<GenericOpConversion<IREE::VM::AbsI64Op>>(typeConverter, context,
+                                                        "vm_abs_i64");
   patterns.add<GenericOpConversion<IREE::VM::NotI64Op>>(typeConverter, context,
                                                         "vm_not_i64");
   patterns.add<GenericOpConversion<IREE::VM::AndI64Op>>(typeConverter, context,
@@ -5060,11 +4838,9 @@ class ConvertVMToEmitCPass
       return signalPassFailure();
     }
 
-    SmallVector<Operation *> visitedExports;
     SmallVector<std::string> importShims;
     RewritePatternSet patterns(&getContext());
-    populateVMToEmitCPatterns(target, typeConverter, patterns, visitedExports,
-                              importShims);
+    populateVMToEmitCPatterns(target, typeConverter, patterns, importShims);
 
     target.addLegalDialect<
         emitc::EmitCDialect, mlir::BuiltinDialect, mlir::cf::ControlFlowDialect,
@@ -5080,14 +4856,9 @@ class ConvertVMToEmitCPass
     target.addLegalOp<IREE::VM::ModuleOp>();
     target.addLegalOp<IREE::VM::ModuleTerminatorOp>();
 
-    // These ops are needed to build arrays for the module descriptor. There is
-    // no way to generate this directly with the EmitC dialect at the moment.
-    // We nonetheless visit each export once to create a shim.
-    target.addDynamicallyLegalOp<IREE::VM::ExportOp>(
-        [&visitedExports](IREE::VM::ExportOp op) {
-          return llvm::find(visitedExports, op.getOperation()) !=
-                 std::end(visitedExports);
-        });
+    // The import ops are currently needed to build the import array for the
+    // module descriptor. There is no way to generate this directly with the
+    // EmitC dialect at the moment.
     target.addDynamicallyLegalOp<IREE::VM::ImportOp>(
         [&importShims](IREE::VM::ImportOp op) {
           auto key = makeImportCallingConventionString(op);

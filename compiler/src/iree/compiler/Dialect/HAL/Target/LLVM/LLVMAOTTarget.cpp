@@ -277,6 +277,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
                               : LibraryBuilder::Mode::NONE;
     LibraryBuilder libraryBuilder(llvmModule.get(), libraryBuilderMode,
                                   LibraryBuilder::Version::LATEST);
+
     switch (options_.sanitizerKind) {
       case SanitizerKind::kNone: {
         libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::NONE);
