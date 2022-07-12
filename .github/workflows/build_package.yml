@@ -8,6 +8,7 @@
 name: Build Native Release Packages
 
 on:
+  pull_request:
   workflow_dispatch:
     inputs:
       package_suffix:
