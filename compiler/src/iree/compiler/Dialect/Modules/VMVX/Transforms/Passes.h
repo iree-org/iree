@@ -37,6 +37,10 @@ void buildVMVXTransformPassPipeline(OpPassManager &passManager);
 
 void createVMVXTransformPassPipeline();
 
+// Lowers high level library calls from named ops and generics. This operates
+// at the bufferized linalg level.
+std::unique_ptr<Pass> createLowerLinalgMicrokernelsPass();
+
 //===----------------------------------------------------------------------===//
 // Dialect conversion
 //===----------------------------------------------------------------------===//
@@ -48,7 +52,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass();
 // Register all Passes
 //===----------------------------------------------------------------------===//
 
-inline void registerVMVXPasses() { createVMVXTransformPassPipeline(); }
+void registerVMVXPasses();
 
 }  // namespace VMVX
 }  // namespace IREE

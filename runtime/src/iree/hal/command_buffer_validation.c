@@ -22,16 +22,10 @@
 #include "iree/hal/executable_layout.h"
 #include "iree/hal/resource.h"
 
-#if IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
-#define VALIDATION_STATE(command_buffer) (&(command_buffer)->validation)
-#else
-#define VALIDATION_STATE(command_buffer) \
-  ((iree_hal_command_buffer_validation_state_t*)NULL)
-#endif  // IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
-
 // Returns success iff the queue supports the given command categories.
 static iree_status_t iree_hal_command_buffer_validate_categories(
     const iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_command_category_t required_categories) {
   if (!iree_all_bits_set(command_buffer->allowed_categories,
                          required_categories)) {
@@ -57,12 +51,14 @@ static iree_status_t iree_hal_command_buffer_validate_categories(
 
 // Returns success iff the buffer is compatible with the device.
 static iree_status_t iree_hal_command_buffer_validate_buffer_compatibility(
-    const iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* buffer,
+    const iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_hal_buffer_t* buffer,
     iree_hal_buffer_compatibility_t required_compatibility,
     iree_hal_buffer_usage_t intended_usage) {
   iree_hal_buffer_compatibility_t allowed_compatibility =
       iree_hal_allocator_query_compatibility(
-          iree_hal_device_allocator(VALIDATION_STATE(command_buffer)->device),
+          iree_hal_device_allocator(validation_state->device),
           (iree_hal_buffer_params_t){
               .type = iree_hal_buffer_memory_type(buffer),
               .usage = iree_hal_buffer_allowed_usage(buffer) & intended_usage,
@@ -94,6 +90,7 @@ static iree_status_t iree_hal_command_buffer_validate_buffer_compatibility(
 // given executable entry point.
 static iree_status_t iree_hal_command_buffer_validate_dispatch_bindings(
     iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_executable_t* executable, int32_t entry_point) {
   // TODO(benvanik): validate buffers referenced have compatible memory types
   // and access rights.
@@ -102,51 +99,55 @@ static iree_status_t iree_hal_command_buffer_validate_dispatch_bindings(
 }
 
 void iree_hal_command_buffer_initialize_validation(
-    iree_hal_device_t* device, iree_hal_command_buffer_t* command_buffer) {
-  VALIDATION_STATE(command_buffer)->device = device;
-  VALIDATION_STATE(command_buffer)->is_recording = false;
+    iree_hal_device_t* device, iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* out_validation_state) {
+  out_validation_state->device = device;
+  out_validation_state->is_recording = false;
 }
 
 iree_status_t iree_hal_command_buffer_begin_validation(
-    iree_hal_command_buffer_t* command_buffer) {
-  if (VALIDATION_STATE(command_buffer)->is_recording) {
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state) {
+  if (validation_state->is_recording) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "command buffer is already in a recording state");
   }
-  VALIDATION_STATE(command_buffer)->is_recording = true;
+  validation_state->is_recording = true;
   return iree_ok_status();
 }
 
 iree_status_t iree_hal_command_buffer_end_validation(
-    iree_hal_command_buffer_t* command_buffer) {
-  if (VALIDATION_STATE(command_buffer)->debug_group_depth != 0) {
-    return iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "unbalanced debug group depth (expected 0, is %d)",
-        VALIDATION_STATE(command_buffer)->debug_group_depth);
-  }
-  if (!VALIDATION_STATE(command_buffer)->is_recording) {
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state) {
+  if (validation_state->debug_group_depth != 0) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "unbalanced debug group depth (expected 0, is %d)",
+                            validation_state->debug_group_depth);
+  } else if (!validation_state->is_recording) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "command buffer is not in a recording state");
   }
-  VALIDATION_STATE(command_buffer)->is_recording = false;
+  validation_state->is_recording = false;
   return iree_ok_status();
 }
 
 void iree_hal_command_buffer_begin_debug_group_validation(
-    iree_hal_command_buffer_t* command_buffer, iree_string_view_t label,
-    iree_hal_label_color_t label_color,
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_string_view_t label, iree_hal_label_color_t label_color,
     const iree_hal_label_location_t* location) {
-  ++VALIDATION_STATE(command_buffer)->debug_group_depth;
+  ++validation_state->debug_group_depth;
 }
 
 void iree_hal_command_buffer_end_debug_group_validation(
-    iree_hal_command_buffer_t* command_buffer) {
-  --VALIDATION_STATE(command_buffer)->debug_group_depth;
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state) {
+  --validation_state->debug_group_depth;
 }
 
 iree_status_t iree_hal_command_buffer_execution_barrier_validation(
     iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_execution_stage_t source_stage_mask,
     iree_hal_execution_stage_t target_stage_mask,
     iree_hal_execution_barrier_flags_t flags,
@@ -162,10 +163,11 @@ iree_status_t iree_hal_command_buffer_execution_barrier_validation(
 }
 
 iree_status_t iree_hal_command_buffer_signal_event_validation(
-    iree_hal_command_buffer_t* command_buffer, iree_hal_event_t* event,
-    iree_hal_execution_stage_t source_stage_mask) {
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_hal_event_t* event, iree_hal_execution_stage_t source_stage_mask) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
+      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
   // TODO(benvanik): additional synchronization validation.
 
@@ -173,10 +175,11 @@ iree_status_t iree_hal_command_buffer_signal_event_validation(
 }
 
 iree_status_t iree_hal_command_buffer_reset_event_validation(
-    iree_hal_command_buffer_t* command_buffer, iree_hal_event_t* event,
-    iree_hal_execution_stage_t source_stage_mask) {
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_hal_event_t* event, iree_hal_execution_stage_t source_stage_mask) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
+      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
   // TODO(benvanik): additional synchronization validation.
 
@@ -184,8 +187,9 @@ iree_status_t iree_hal_command_buffer_reset_event_validation(
 }
 
 iree_status_t iree_hal_command_buffer_wait_events_validation(
-    iree_hal_command_buffer_t* command_buffer, iree_host_size_t event_count,
-    const iree_hal_event_t** events,
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_host_size_t event_count, const iree_hal_event_t** events,
     iree_hal_execution_stage_t source_stage_mask,
     iree_hal_execution_stage_t target_stage_mask,
     iree_host_size_t memory_barrier_count,
@@ -193,7 +197,7 @@ iree_status_t iree_hal_command_buffer_wait_events_validation(
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
+      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
   // TODO(benvanik): additional synchronization validation.
 
@@ -201,9 +205,11 @@ iree_status_t iree_hal_command_buffer_wait_events_validation(
 }
 
 iree_status_t iree_hal_command_buffer_discard_buffer_validation(
-    iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* buffer) {
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_hal_buffer_t* buffer) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
+      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
 
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
       iree_hal_buffer_memory_type(buffer),
@@ -213,13 +219,15 @@ iree_status_t iree_hal_command_buffer_discard_buffer_validation(
 }
 
 iree_status_t iree_hal_command_buffer_fill_buffer_validation(
-    iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* target_buffer,
-    iree_device_size_t target_offset, iree_device_size_t length,
-    const void* pattern, iree_host_size_t pattern_length) {
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, const void* pattern,
+    iree_host_size_t pattern_length) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
+      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_compatibility(
-      command_buffer, target_buffer,
+      command_buffer, validation_state, target_buffer,
       IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER,
       IREE_HAL_BUFFER_USAGE_TRANSFER));
 
@@ -257,13 +265,15 @@ iree_status_t iree_hal_command_buffer_fill_buffer_validation(
 }
 
 iree_status_t iree_hal_command_buffer_update_buffer_validation(
-    iree_hal_command_buffer_t* command_buffer, const void* source_buffer,
-    iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
-    iree_device_size_t target_offset, iree_device_size_t length) {
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    const void* source_buffer, iree_host_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
+      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_compatibility(
-      command_buffer, target_buffer,
+      command_buffer, validation_state, target_buffer,
       IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER,
       IREE_HAL_BUFFER_USAGE_TRANSFER));
 
@@ -283,17 +293,19 @@ iree_status_t iree_hal_command_buffer_update_buffer_validation(
 }
 
 iree_status_t iree_hal_command_buffer_copy_buffer_validation(
-    iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* source_buffer,
-    iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
-    iree_device_size_t target_offset, iree_device_size_t length) {
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
+      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_compatibility(
-      command_buffer, source_buffer,
+      command_buffer, validation_state, source_buffer,
       IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER,
       IREE_HAL_BUFFER_USAGE_TRANSFER));
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_compatibility(
-      command_buffer, target_buffer,
+      command_buffer, validation_state, target_buffer,
       IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER,
       IREE_HAL_BUFFER_USAGE_TRANSFER));
 
@@ -353,10 +365,11 @@ iree_status_t iree_hal_command_buffer_copy_buffer_validation(
 
 iree_status_t iree_hal_command_buffer_push_constants_validation(
     iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
+      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
   if (IREE_UNLIKELY((values_length % 4) != 0)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -371,11 +384,12 @@ iree_status_t iree_hal_command_buffer_push_constants_validation(
 
 iree_status_t iree_hal_command_buffer_push_descriptor_set_validation(
     iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_executable_layout_t* executable_layout, uint32_t set,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
+      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
   // TODO(benvanik): validate set index.
   // TODO(benvanik): validate binding_offset.
@@ -386,12 +400,13 @@ iree_status_t iree_hal_command_buffer_push_descriptor_set_validation(
 
 iree_status_t iree_hal_command_buffer_bind_descriptor_set_validation(
     iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_executable_layout_t* executable_layout, uint32_t set,
     iree_hal_descriptor_set_t* descriptor_set,
     iree_host_size_t dynamic_offset_count,
     const iree_device_size_t* dynamic_offsets) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
+      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
   // TODO(benvanik): validate set index.
   // TODO(benvanik): validate dynamic offsets (both count and offsets).
@@ -401,24 +416,26 @@ iree_status_t iree_hal_command_buffer_bind_descriptor_set_validation(
 
 iree_status_t iree_hal_command_buffer_dispatch_validation(
     iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_executable_t* executable, int32_t entry_point,
     uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
+      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_dispatch_bindings(
-      command_buffer, executable, entry_point));
+      command_buffer, validation_state, executable, entry_point));
   return iree_ok_status();
 }
 
 iree_status_t iree_hal_command_buffer_dispatch_indirect_validation(
     iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_executable_t* executable, int32_t entry_point,
     iree_hal_buffer_t* workgroups_buffer,
     iree_device_size_t workgroups_offset) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
+      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_compatibility(
-      command_buffer, workgroups_buffer,
+      command_buffer, validation_state, workgroups_buffer,
       IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
       IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS));
 
@@ -435,7 +452,7 @@ iree_status_t iree_hal_command_buffer_dispatch_indirect_validation(
       workgroups_buffer, workgroups_offset, sizeof(uint32_t) * 3));
 
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_dispatch_bindings(
-      command_buffer, executable, entry_point));
+      command_buffer, validation_state, executable, entry_point));
 
   return iree_ok_status();
 }

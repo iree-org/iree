@@ -280,9 +280,11 @@ static void markTensorInputsIllegal(Verifier &verifier) {
   verifier.addIllegalDialect("tensor");
   verifier.addIllegalDialect("linalg");
 
-  // We don't allow the flow dialect except for inside of executables for which
-  // we don't yet have a full mapping to in the stream dialect.
-  // TODO(#7277): remove this carveout once we switch over to streams fully.
+  // We don't allow the flow dialect except for inside of executables where
+  // we don't yet have a full mapping to in the stream dialect (and may never).
+  // Ideally we'd not be using the flow ops inside at all at this point but
+  // that'd require some upstream ops (or something in codegen) for the tensor
+  // load and store behaviors as well as the workgroup info.
   verifier.addIllegalDialect("flow");
   verifier.addRecursivelyLegalOp<IREE::Stream::ExecutableOp>();
 }

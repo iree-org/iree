@@ -425,6 +425,8 @@ void SetupHalBindings(pybind11::module m) {
       .value("FLOAT_32", IREE_HAL_ELEMENT_TYPE_FLOAT_32)
       .value("FLOAT_64", IREE_HAL_ELEMENT_TYPE_FLOAT_64)
       .value("BFLOAT_16", IREE_HAL_ELEMENT_TYPE_BFLOAT_16)
+      .value("COMPLEX_64", IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64)
+      .value("COMPLEX_128", IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128)
       .export_values()
       .def_static("map_to_dtype", &MapElementTypeToDType);
 

@@ -12,8 +12,8 @@ import unittest
 class FlagsTest(unittest.TestCase):
 
   def testParse(self):
-    # We always have the logging verbose level available so use it.
-    rt.flags.parse_flags("--iree_v=1")
+    # --help is always available if flags are.
+    rt.flags.parse_flags("--help")
 
   def testParseError(self):
     with self.assertRaisesRegex(ValueError, "flag 'barbar' not recognized"):

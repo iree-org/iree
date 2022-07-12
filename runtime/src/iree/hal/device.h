@@ -18,6 +18,7 @@
 #include "iree/hal/event.h"
 #include "iree/hal/executable_cache.h"
 #include "iree/hal/executable_layout.h"
+#include "iree/hal/fence.h"
 #include "iree/hal/resource.h"
 #include "iree/hal/semaphore.h"
 
@@ -153,15 +154,6 @@ enum iree_hal_semaphore_compatibility_bits_t {
 };
 typedef uint32_t iree_hal_semaphore_compatibility_t;
 
-// A list of semaphores and their corresponding payloads.
-// When signaling each semaphore will be set to the new payload value provided.
-// When waiting each semaphore must reach or exceed the payload value.
-typedef struct iree_hal_semaphore_list_t {
-  iree_host_size_t count;
-  iree_hal_semaphore_t** semaphores;
-  uint64_t* payload_values;
-} iree_hal_semaphore_list_t;
-
 // A single batch of command buffers submitted to a device queue.
 // All of the wait semaphores must reach or exceed the given payload value prior
 // to the batch beginning execution. Each command buffer begins execution in the
@@ -229,11 +221,11 @@ IREE_API_EXPORT iree_hal_allocator_t* iree_hal_device_allocator(
 IREE_API_EXPORT
 iree_status_t iree_hal_device_trim(iree_hal_device_t* device);
 
-// Queries a configuration value as an int32_t.
+// Queries a configuration value as an int64_t.
 // The |category| and |key| will be provided to the device driver to interpret
 // in a device-specific way and if recognized the value will be converted to an
-// int32_t and returned in |out_value|. Fails if the value represented by the
-// key is not convertable (overflows a 32-bit integer, not a number, etc).
+// int64_t and returned in |out_value|. Fails if the value represented by the
+// key is not convertable.
 //
 // This is roughly equivalent to the `sysconf` linux syscall
 // (https://man7.org/linux/man-pages/man3/sysconf.3.html) in that the exact
@@ -248,9 +240,9 @@ iree_status_t iree_hal_device_trim(iree_hal_device_t* device);
 //
 // Returned values must remain the same for the lifetime of the device as
 // callers may cache them to avoid redundant calls.
-IREE_API_EXPORT iree_status_t iree_hal_device_query_i32(
+IREE_API_EXPORT iree_status_t iree_hal_device_query_i64(
     iree_hal_device_t* device, iree_string_view_t category,
-    iree_string_view_t key, int32_t* out_value);
+    iree_string_view_t key, int64_t* out_value);
 
 // Queries in what ways the given |semaphore| may be used with |device|.
 IREE_API_EXPORT iree_hal_semaphore_compatibility_t
@@ -302,30 +294,6 @@ IREE_API_EXPORT iree_status_t iree_hal_device_transfer_d2d(
     iree_device_size_t target_offset, iree_device_size_t data_length,
     iree_hal_transfer_buffer_flags_t flags, iree_timeout_t timeout);
 
-// Synchronously executes one or more transfer operations against a queue.
-// All buffers must be compatible with |device| and ranges must not overlap
-// (same as with memcpy).
-//
-// This is a blocking operation and may incur significant overheads as
-// internally it issues a command buffer with the transfer operations and waits
-// for it to complete. Users should do that themselves so that the work can be
-// issued concurrently and batched effectively. This is only useful as a
-// fallback for implementations that require it or tools where things like I/O
-// are transferred without worrying about performance. When submitting other
-// work it's preferable to use iree_hal_create_transfer_command_buffer and a
-// normal queue submission that allows for more fine-grained sequencing and
-// amortizes the submission cost by batching other work.
-//
-// The transfer will begin after the optional |wait_semaphore| reaches
-// |wait_value|. Behavior is undefined if no semaphore is provided and there are
-// in-flight operations concurrently using the buffer ranges.
-// Returns only after all transfers have completed and been flushed.
-IREE_API_EXPORT iree_status_t iree_hal_device_transfer_and_wait(
-    iree_hal_device_t* device, iree_hal_semaphore_t* wait_semaphore,
-    uint64_t wait_value, iree_host_size_t transfer_count,
-    const iree_hal_transfer_command_t* transfer_commands,
-    iree_timeout_t timeout);
-
 // Submits one or more batches of work to a device queue.
 //
 // The queue is selected based on the flags set in |command_categories| and the
@@ -345,23 +313,6 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_submit(
     iree_hal_device_t* device, iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
     const iree_hal_submission_batch_t* batches);
-
-// Submits batches of work and waits until |wait_semaphore| reaches or exceeds
-// |wait_value|.
-//
-// This is equivalent to following iree_hal_device_queue_submit with a
-// iree_hal_semaphore_wait on |wait_timeout|/|wait_value| but
-// may help to reduce overhead by preventing thread wakeups, kernel calls, and
-// internal tracking.
-//
-// See iree_hal_device_queue_submit for more information about the queuing
-// behavior and iree_hal_semaphore_wait for the waiting  behavior.
-IREE_API_EXPORT iree_status_t iree_hal_device_submit_and_wait(
-    iree_hal_device_t* device, iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
-    const iree_hal_submission_batch_t* batches,
-    iree_hal_semaphore_t* wait_semaphore, uint64_t wait_value,
-    iree_timeout_t timeout);
 
 // Blocks the caller until the semaphores reach or exceed the specified payload
 // values or the |timeout| elapses. All semaphores in |semaphore_list| must be
@@ -413,10 +364,10 @@ typedef struct iree_hal_device_vtable_t {
 
   iree_status_t(IREE_API_PTR* trim)(iree_hal_device_t* device);
 
-  iree_status_t(IREE_API_PTR* query_i32)(iree_hal_device_t* device,
+  iree_status_t(IREE_API_PTR* query_i64)(iree_hal_device_t* device,
                                          iree_string_view_t category,
                                          iree_string_view_t key,
-                                         int32_t* out_value);
+                                         int64_t* out_value);
 
   iree_status_t(IREE_API_PTR* create_command_buffer)(
       iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
@@ -468,13 +419,6 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_device_t* device, iree_hal_command_category_t command_categories,
       iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
       const iree_hal_submission_batch_t* batches);
-
-  iree_status_t(IREE_API_PTR* submit_and_wait)(
-      iree_hal_device_t* device, iree_hal_command_category_t command_categories,
-      iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
-      const iree_hal_submission_batch_t* batches,
-      iree_hal_semaphore_t* wait_semaphore, uint64_t wait_value,
-      iree_timeout_t timeout);
 
   iree_status_t(IREE_API_PTR* wait_semaphores)(
       iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,

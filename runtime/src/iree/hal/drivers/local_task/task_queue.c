@@ -219,8 +219,9 @@ static iree_status_t iree_hal_task_queue_issue_cmd(
   return status;
 }
 
-// Cleanup for iree_hal_task_queue_issue_cmd_t that resets the queue state
-// tracking the last in-flight issue.
+// Cleanup for iree_hal_task_queue_issue_cmd_t to drop all resources.
+// Any that need to remain live during execution are retained by the tasks
+// performing that execution.
 static void iree_hal_task_queue_issue_cmd_cleanup(
     iree_task_t* task, iree_status_code_t status_code) {
   iree_hal_task_queue_issue_cmd_t* cmd = (iree_hal_task_queue_issue_cmd_t*)task;
@@ -230,13 +231,6 @@ static void iree_hal_task_queue_issue_cmd_cleanup(
   for (iree_host_size_t i = 0; i < cmd->command_buffer_count; ++i) {
     iree_hal_command_buffer_release(cmd->command_buffers[i]);
   }
-
-  // Reset queue tail issue task if it was us.
-  iree_slim_mutex_lock(&cmd->queue->mutex);
-  if (cmd->queue->tail_issue_task == task) {
-    cmd->queue->tail_issue_task = NULL;
-  }
-  iree_slim_mutex_unlock(&cmd->queue->mutex);
 }
 
 // Allocates and initializes a iree_hal_task_queue_issue_cmd_t task.
@@ -400,9 +394,7 @@ void iree_hal_task_queue_initialize(iree_string_view_t identifier,
 
   iree_task_scope_initialize(identifier, &out_queue->scope);
 
-  iree_slim_mutex_initialize(&out_queue->mutex);
   iree_hal_task_queue_state_initialize(&out_queue->state);
-  out_queue->tail_issue_task = NULL;
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -413,12 +405,7 @@ void iree_hal_task_queue_deinitialize(iree_hal_task_queue_t* queue) {
   iree_status_ignore(
       iree_task_scope_wait_idle(&queue->scope, IREE_TIME_INFINITE_FUTURE));
 
-  iree_slim_mutex_lock(&queue->mutex);
-  IREE_ASSERT(!queue->tail_issue_task);
-  iree_slim_mutex_unlock(&queue->mutex);
-
   iree_hal_task_queue_state_deinitialize(&queue->state);
-  iree_slim_mutex_deinitialize(&queue->mutex);
   iree_task_scope_deinitialize(&queue->scope);
   iree_task_executor_release(queue->executor);
 
@@ -485,20 +472,6 @@ static iree_status_t iree_hal_task_queue_submit_batch(
     iree_task_submission_enqueue(&submission, &issue_cmd->task.header);
   }
 
-  iree_slim_mutex_lock(&queue->mutex);
-
-  // If there is an in-flight issue pending then we need to chain onto that
-  // so that we ensure FIFO submission order is preserved. Note that we are only
-  // waiting for the issue to complete and *not* all of the commands that are
-  // issued.
-  if (queue->tail_issue_task != NULL) {
-    iree_task_set_completion_task(queue->tail_issue_task,
-                                  &issue_cmd->task.header);
-  }
-  queue->tail_issue_task = &issue_cmd->task.header;
-
-  iree_slim_mutex_unlock(&queue->mutex);
-
   // Submit the tasks immediately. The executor may queue them up until we
   // force the flush after all batches have been processed.
   iree_task_executor_submit(queue->executor, &submission);
@@ -527,30 +500,6 @@ iree_status_t iree_hal_task_queue_submit(
       iree_hal_task_queue_submit_batches(queue, batch_count, batches);
   if (iree_status_is_ok(status)) {
     iree_task_executor_flush(queue->executor);
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
-iree_status_t iree_hal_task_queue_submit_and_wait(
-    iree_hal_task_queue_t* queue, iree_host_size_t batch_count,
-    const iree_hal_submission_batch_t* batches,
-    iree_hal_semaphore_t* wait_semaphore, uint64_t wait_value,
-    iree_timeout_t timeout) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_convert_timeout_to_absolute(&timeout);
-
-  // Queue all of the batches.
-  iree_status_t status =
-      iree_hal_task_queue_submit_batches(queue, batch_count, batches);
-  if (iree_status_is_ok(status)) {
-    // Flush the pending submissions and begin processing, then wait until idle.
-    // TODO(benvanik): get a wait_handle we can pass to
-    // iree_task_executor_donate_caller - it'll flush + do work.
-    iree_task_executor_flush(queue->executor);
-    status = iree_hal_semaphore_wait(wait_semaphore, wait_value, timeout);
   }
 
   IREE_TRACE_ZONE_END(z0);

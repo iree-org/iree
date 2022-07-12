@@ -42,13 +42,15 @@ iree_lit_test_suite(
             "pad_tensor_to_tensor.mlir",
             "strip_and_splat_constant_variables.mlir",
             "strip_signedness.mlir",
-            "transformation.mlir",
+            "transformation_pipeline.mlir",
             "verify_input_ir.mlir",
         ],
         include = ["*.mlir"],
-        # linalg_transform_spec is a an MLIR file that specifies a
+        # transform_dialect_dispatch_spec is a an MLIR file that specifies a
         # transformation, it needs to be included as data.
-        exclude = ["transform_dialect_dispatch_spec.mlir"],
+        exclude = [
+            "transform_dialect_dispatch_spec.mlir",
+        ],
     ),
     cfg = "//compiler:lit.cfg.py",
     data = ["transform_dialect_dispatch_spec.mlir"],

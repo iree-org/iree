@@ -252,10 +252,7 @@ class ElideRedundantCommandsPass
         for (auto &op : llvm::make_early_inc_range(block.getOperations())) {
           if (!op.getDialect()) continue;
           TypeSwitch<Operation *>(&op)
-              .Case([&](IREE::HAL::CommandBufferBeginOp op) {
-                invalidateState(op.command_buffer());
-              })
-              .Case([&](IREE::HAL::CommandBufferEndOp op) {
+              .Case([&](IREE::HAL::CommandBufferFinalizeOp op) {
                 invalidateState(op.command_buffer());
               })
               .Case([&](IREE::HAL::CommandBufferExecutionBarrierOp op) {

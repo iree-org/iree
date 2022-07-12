@@ -28,7 +28,7 @@ func.func @while(%start: tensor<i32>, %bound: tensor<i32>) -> tensor<i32> {
   %2 = tensor.extract %1[] : tensor<i1>
   cf.cond_br %2, ^bb2(%0 : tensor<i32>), ^bb3(%0 : tensor<i32>)
 ^bb2(%3: tensor<i32>):
-  %4 = mhlo.add %3, %3 : tensor<i32>
+  %4 = arith.addi %3, %3 : tensor<i32>
   cf.br ^bb1(%4 : tensor<i32>)
 ^bb3(%5: tensor<i32>):
   return %5 : tensor<i32>
@@ -52,7 +52,7 @@ func.func @while(%start: tensor<i32>, %bound: tensor<i32>) -> tensor<i32> {
 func.func @simpleMul(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub, iree.module.export} {
   %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<4xf32>
   %1 = hal.tensor.import %arg1 : !hal.buffer_view -> tensor<4xf32>
-  %2 = mhlo.multiply %0, %1 {name = "mul.1"} : tensor<4xf32>
+  %2 = arith.mulf %0, %1 : tensor<4xf32>
   %3 = hal.tensor.export %2 : tensor<4xf32> -> !hal.buffer_view
   return %3 : !hal.buffer_view
 }
@@ -74,7 +74,7 @@ func.func @simpleMul(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.b
 // CHECK-LABEL: func private @importBufferViewBitcasting
 func.func @importBufferViewBitcasting(%view: !hal.buffer_view) -> !hal.buffer_view {
   %0 = hal.tensor.import %view : !hal.buffer_view -> tensor<2xui32> as tensor<4xi32>
-  %1 = mhlo.multiply %0, %0 {name = "mul.3"} : tensor<4xi32>
+  %1 = arith.muli %0, %0 : tensor<4xi32>
   %2 = hal.tensor.export %1 : tensor<4xi32> -> !hal.buffer_view
   return %2 : !hal.buffer_view
 }
@@ -102,7 +102,7 @@ func.func @importDynamicBufferView(%view: !hal.buffer_view) -> !hal.buffer_view 
   %dim0 = hal.buffer_view.dim<%view : !hal.buffer_view>[0] : index
   %dim1 = hal.buffer_view.dim<%view : !hal.buffer_view>[1] : index
   %0 = hal.tensor.import %view : !hal.buffer_view -> tensor<?x?x4xf32>{%dim0, %dim1}
-  %1 = mhlo.multiply %0, %0 {name = "mul.2"} : tensor<?x?x4xf32>
+  %1 = arith.mulf %0, %0 : tensor<?x?x4xf32>
   %2 = hal.tensor.export %1 : tensor<?x?x4xf32>{%dim0, %dim1} -> !hal.buffer_view
   return %2 : !hal.buffer_view
 }
@@ -114,7 +114,7 @@ func.func @importDynamicBufferView(%view: !hal.buffer_view) -> !hal.buffer_view 
 // CHECK-LABEL: func private @exportBufferViewInPlace
 func.func @exportBufferViewInPlace(%view: !hal.buffer_view, %storage: !hal.buffer) -> !hal.buffer_view {
   %0 = hal.tensor.import %view : !hal.buffer_view -> tensor<4xi32>
-  %1 = mhlo.multiply %0, %0 {name = "mul.4"} : tensor<4xi32>
+  %1 = arith.muli %0, %0 : tensor<4xi32>
   %2 = hal.tensor.export %1 into %storage : tensor<4xi32> -> !hal.buffer_view
   return %2 : !hal.buffer_view
 }

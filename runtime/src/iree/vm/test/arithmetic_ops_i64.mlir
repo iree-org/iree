@@ -98,6 +98,16 @@ vm.module @arithmetic_ops_i64 {
     vm.return
   }
 
+  vm.export @test_abs_i64
+  vm.func @test_abs_i64() {
+    %c1 = vm.const.i64 -1
+    %c1dno = util.do_not_optimize(%c1) : i64
+    %v = vm.abs.i64 %c1dno : i64
+    %c2 = vm.const.i64 1
+    vm.check.eq %v, %c2, "abs(-1)=1" : i64
+    vm.return
+  }
+
   vm.export @test_not_i64
   vm.func @test_not_i64() {
     %c1 = vm.const.i64 0

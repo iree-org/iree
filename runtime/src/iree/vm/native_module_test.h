@@ -45,7 +45,9 @@ typedef iree_status_t (*call_i32_i32_t)(iree_vm_stack_t* stack,
 // non-VM code or may be internally referenced using a target-specific ABI.
 // TODO(benvanik): generate/export these shims/call functions in stack.h.
 static iree_status_t call_shim_i32_i32(iree_vm_stack_t* stack,
-                                       const iree_vm_function_call_t* call,
+                                       iree_vm_native_function_flags_t flags,
+                                       iree_byte_span_t args_storage,
+                                       iree_byte_span_t rets_storage,
                                        call_i32_i32_t target_fn, void* module,
                                        void* module_state,
                                        iree_vm_execution_result_t* out_result) {
@@ -59,8 +61,8 @@ static iree_status_t call_shim_i32_i32(iree_vm_stack_t* stack,
     int32_t ret0;
   } results_t;
 
-  const args_t* args = (const args_t*)call->arguments.data;
-  results_t* results = (results_t*)call->results.data;
+  const args_t* args = (const args_t*)args_storage.data;
+  results_t* results = (results_t*)rets_storage.data;
 
   // For simple cases like this (zero or 1 result) we can tail-call.
   return target_fn(stack, module, module_state, args->arg0, &results->ret0);
@@ -114,12 +116,12 @@ static const iree_vm_native_module_descriptor_t module_a_descriptor_ = {
     iree_make_cstring_view("module_a"),
     0,
     NULL,
+    0,
+    NULL,
     IREE_ARRAYSIZE(module_a_exports_),
     module_a_exports_,
     IREE_ARRAYSIZE(module_a_funcs_),
     module_a_funcs_,
-    0,
-    NULL,
 };
 
 static iree_status_t module_a_create(iree_allocator_t allocator,
@@ -248,7 +250,7 @@ static const iree_vm_native_import_descriptor_t module_b_imports_[] = {
 static_assert(IREE_ARRAYSIZE(module_b_state_t::imports) ==
                   IREE_ARRAYSIZE(module_b_imports_),
               "import storage must be able to hold all imports");
-static const iree_vm_reflection_attr_t module_b_entry_attrs_[] = {
+static const iree_string_pair_t module_b_entry_attrs_[] = {
     {iree_make_cstring_view("key1"), iree_make_cstring_view("value1")},
 };
 static const iree_vm_native_export_descriptor_t module_b_exports_[] = {
@@ -260,14 +262,14 @@ static_assert(IREE_ARRAYSIZE(module_b_funcs_) ==
               "function pointer table must be 1:1 with exports");
 static const iree_vm_native_module_descriptor_t module_b_descriptor_ = {
     iree_make_cstring_view("module_b"),
+    0,
+    NULL,
     IREE_ARRAYSIZE(module_b_imports_),
     module_b_imports_,
     IREE_ARRAYSIZE(module_b_exports_),
     module_b_exports_,
     IREE_ARRAYSIZE(module_b_funcs_),
     module_b_funcs_,
-    0,
-    NULL,
 };
 
 static iree_status_t module_b_create(iree_allocator_t allocator,

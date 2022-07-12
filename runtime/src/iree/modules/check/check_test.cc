@@ -38,16 +38,16 @@ class CheckTest : public ::testing::Test {
         iree_make_cstring_view("local-task"), iree_allocator_system(),
         &hal_driver);
     if (iree_status_is_not_found(status)) {
-      IREE_LOG(WARNING)
-          << "Skipping tests as 'local-task' driver was not found:";
+      fprintf(stderr, "Skipping test as 'local-task' driver was not found:\n");
       iree_status_fprint(stderr, status);
       iree_status_free(status);
       return;
     }
     IREE_ASSERT_OK(iree_hal_driver_create_default_device(
         hal_driver, iree_allocator_system(), &device_));
-    IREE_ASSERT_OK(
-        iree_hal_module_create(device_, iree_allocator_system(), &hal_module_));
+    IREE_ASSERT_OK(iree_hal_module_create(device_, IREE_HAL_MODULE_FLAG_NONE,
+                                          iree_allocator_system(),
+                                          &hal_module_));
     iree_hal_driver_release(hal_driver);
 
     IREE_ASSERT_OK(

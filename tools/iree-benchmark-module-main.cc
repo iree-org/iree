@@ -80,7 +80,7 @@ IREE_FLAG(string, module_file, "-",
           "function. Defaults to stdin.");
 
 // TODO(hanchung): Extract the batch size using
-// iree_vm_function_reflection_attr.
+// iree_vm_function_lookup_attr_by_name.
 IREE_FLAG(
     int32_t, batch_size, 1,
     "The number of batch size, which is expected to match "
@@ -318,7 +318,8 @@ class IREEBenchmark {
     IREE_RETURN_IF_ERROR(iree_hal_create_device_from_flags(
         iree_hal_default_device_uri(), iree_allocator_system(), &device_));
     IREE_RETURN_IF_ERROR(
-        iree_hal_module_create(device_, iree_allocator_system(), &hal_module_));
+        iree_hal_module_create(device_, IREE_HAL_MODULE_FLAG_NONE,
+                               iree_allocator_system(), &hal_module_));
     IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
         flatbuffer_contents->const_buffer,
         iree_file_contents_deallocator(flatbuffer_contents),
@@ -366,7 +367,7 @@ class IREEBenchmark {
 
       // We run anything with the 'benchmark' attribute.
       // If the attribute is not present we'll run anything that looks runnable.
-      iree_string_view_t benchmark_type = iree_vm_function_reflection_attr(
+      iree_string_view_t benchmark_type = iree_vm_function_lookup_attr_by_name(
           &function, IREE_SV("iree.benchmark"));
       if (iree_string_view_equal(benchmark_type, IREE_SV("dispatch"))) {
         iree::RegisterDispatchBenchmark(

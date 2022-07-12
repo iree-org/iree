@@ -103,6 +103,19 @@ iree_vm_native_module_signature(void* self) {
   return signature;
 }
 
+static iree_status_t IREE_API_PTR iree_vm_native_module_get_module_attr(
+    void* self, iree_host_size_t index, iree_string_pair_t* out_attr) {
+  iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
+  if (module->user_interface.get_module_attr) {
+    return module->user_interface.get_module_attr(module->self, index,
+                                                  out_attr);
+  } else if (index >= module->descriptor->module_attr_count) {
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
+  }
+  *out_attr = module->descriptor->module_attrs[index];
+  return iree_ok_status();
+}
+
 static iree_status_t IREE_API_PTR iree_vm_native_module_get_import_function(
     iree_vm_native_module_t* module, iree_host_size_t ordinal,
     iree_vm_function_t* out_function, iree_string_view_t* out_name,
@@ -125,7 +138,6 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_get_import_function(
   if (out_name) {
     *out_name = import_descriptor->full_name;
   }
-  // TODO(#1979): signature queries when info is useful.
   return iree_ok_status();
 }
 
@@ -181,15 +193,13 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_get_function(
   }
 }
 
-static iree_status_t IREE_API_PTR
-iree_vm_native_module_get_function_reflection_attr(
+static iree_status_t IREE_API_PTR iree_vm_native_module_get_function_attr(
     void* self, iree_vm_function_linkage_t linkage, iree_host_size_t ordinal,
-    iree_host_size_t index, iree_string_view_t* key,
-    iree_string_view_t* value) {
+    iree_host_size_t index, iree_string_pair_t* out_attr) {
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
-  if (module->user_interface.get_function_reflection_attr) {
-    return module->user_interface.get_function_reflection_attr(
-        module->self, linkage, ordinal, index, key, value);
+  if (module->user_interface.get_function_attr) {
+    return module->user_interface.get_function_attr(module->self, linkage,
+                                                    ordinal, index, out_attr);
   }
   // TODO(benvanik): implement native module reflection.
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -257,8 +267,7 @@ static void IREE_API_PTR iree_vm_native_module_free_state(
     return;
   }
   // No-op in the default implementation.
-  // TODO(#2843): IREE_DCHECK_EQ(NULL, module_state);
-  assert(!module_state);
+  IREE_ASSERT_EQ(module_state, NULL);
 }
 
 static iree_status_t IREE_API_PTR iree_vm_native_module_resolve_import(
@@ -281,6 +290,50 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_notify(
     return module->user_interface.notify(module->self, module_state, signal);
   }
   return iree_ok_status();
+}
+
+static iree_status_t iree_vm_native_module_issue_call(
+    iree_vm_native_module_t* module, iree_vm_stack_t* stack,
+    iree_vm_stack_frame_t* callee_frame, iree_vm_native_function_flags_t flags,
+    iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
+    iree_vm_execution_result_t* out_result) {
+  iree_vm_module_state_t* module_state = callee_frame->module_state;
+
+  IREE_ASSERT_ARGUMENT(out_result);
+  memset(out_result, 0, sizeof(iree_vm_execution_result_t));
+
+  // Call the target function using the shim.
+  const uint16_t function_ordinal = callee_frame->function.ordinal;
+  const iree_vm_native_function_ptr_t* function_ptr =
+      &module->descriptor->functions[function_ordinal];
+  iree_status_t status = function_ptr->shim(stack, flags, args_storage,
+                                            rets_storage, function_ptr->target,
+                                            module, module_state, out_result);
+  if (iree_status_is_deferred(status)) {
+    // Call deferred; bail and return to the scheduler.
+    // Note that we preserve the stack.
+    return status;
+  }
+
+  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+#if IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS
+    iree_string_view_t module_name IREE_ATTRIBUTE_UNUSED =
+        iree_vm_native_module_name(module);
+    iree_string_view_t function_name IREE_ATTRIBUTE_UNUSED =
+        iree_string_view_empty();
+    iree_status_ignore(iree_vm_native_module_get_export_function(
+        module, function_ordinal, NULL, &function_name, NULL));
+    return iree_status_annotate_f(status,
+                                  "while invoking native function %.*s.%.*s",
+                                  (int)module_name.size, module_name.data,
+                                  (int)function_name.size, function_name.data);
+#else
+    return status;
+#endif  // IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS
+  }
+
+  // Call completed successfully; pop the stack and return to caller.
+  return iree_vm_stack_function_leave(stack);
 }
 
 static iree_status_t IREE_API_PTR iree_vm_native_module_begin_call(
@@ -310,30 +363,10 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_begin_call(
       stack, &call->function, IREE_VM_STACK_FRAME_NATIVE, frame_size,
       /*frame_cleanup_fn=*/NULL, &callee_frame));
 
-  // Call the target function using the shim.
-  const iree_vm_native_function_ptr_t* function_ptr =
-      &module->descriptor->functions[call->function.ordinal];
-  iree_vm_module_state_t* module_state = callee_frame->module_state;
-  iree_status_t status = function_ptr->shim(stack, call, function_ptr->target,
-                                            module, module_state, out_result);
-  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-#if IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS
-    iree_string_view_t module_name IREE_ATTRIBUTE_UNUSED =
-        iree_vm_native_module_name(module);
-    iree_string_view_t function_name IREE_ATTRIBUTE_UNUSED =
-        iree_string_view_empty();
-    iree_status_ignore(iree_vm_native_module_get_export_function(
-        module, call->function.ordinal, NULL, &function_name, NULL));
-    return iree_status_annotate_f(status,
-                                  "while invoking native function %.*s.%.*s",
-                                  (int)module_name.size, module_name.data,
-                                  (int)function_name.size, function_name.data);
-#else
-    return status;
-#endif  // IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS
-  }
-
-  return iree_vm_stack_function_leave(stack);
+  // Begin call with fresh callee frame.
+  return iree_vm_native_module_issue_call(
+      module, stack, callee_frame, IREE_VM_NATIVE_FUNCTION_CALL_BEGIN,
+      call->arguments, call->results, out_result);  // tail
 }
 
 static iree_status_t IREE_API_PTR iree_vm_native_module_resume_call(
@@ -344,8 +377,16 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_resume_call(
     return module->user_interface.resume_call(module->self, stack, call_results,
                                               out_result);
   }
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "native module does not support resume");
+
+  // Resume call using existing top frame.
+  iree_vm_stack_frame_t* callee_frame = iree_vm_stack_top(stack);
+  if (IREE_UNLIKELY(!callee_frame)) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "no frame at top of stack to resume");
+  }
+  return iree_vm_native_module_issue_call(
+      module, stack, callee_frame, IREE_VM_NATIVE_FUNCTION_CALL_RESUME,
+      iree_byte_span_empty(), call_results, out_result);  // tail
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_native_module_create(
@@ -434,11 +475,13 @@ IREE_API_EXPORT iree_status_t iree_vm_native_module_initialize(
   module->base_interface.destroy = iree_vm_native_module_destroy;
   module->base_interface.name = iree_vm_native_module_name;
   module->base_interface.signature = iree_vm_native_module_signature;
-  module->base_interface.get_function = iree_vm_native_module_get_function;
-  module->base_interface.get_function_reflection_attr =
-      iree_vm_native_module_get_function_reflection_attr;
+  module->base_interface.get_module_attr =
+      iree_vm_native_module_get_module_attr;
   module->base_interface.lookup_function =
       iree_vm_native_module_lookup_function;
+  module->base_interface.get_function = iree_vm_native_module_get_function;
+  module->base_interface.get_function_attr =
+      iree_vm_native_module_get_function_attr;
   module->base_interface.alloc_state = iree_vm_native_module_alloc_state;
   module->base_interface.free_state = iree_vm_native_module_free_state;
   module->base_interface.resolve_import = iree_vm_native_module_resolve_import;

@@ -235,11 +235,11 @@ happen before passing the input into the IREE compiler.
 
 The runtime portion requires that the code be exported to the VM system by way
 of an `iree_vm_module_t` interface. A low-level native interface exists with
-minimal overhead and is used for example [by the IREE HAL itself](https://github.com/google/iree/tree/main/iree/modules/hal).
+minimal overhead and is used for example [by the IREE HAL itself](https://github.com/iree-org/iree/tree/main/iree/modules/hal).
 There is also a C++ wrapper that is significantly easier to work with however it
 needs some performance improvements.
 
-A full end-to-end example can be found under [`samples/custom_modules/`](https://github.com/google/iree/tree/main/samples/custom_modules),
+A full end-to-end example can be found under [`samples/custom_modules/`](https://github.com/iree-org/iree/tree/main/samples/custom_modules),
 though it should not currently be considered representative of best practices.
 
 ## 3. Extend target-specific device conversion patterns
@@ -483,6 +483,6 @@ provider to resolve named symbols in the import table to C functions that
 marshal arguments and results.
 
 The compiler-side needs some additional work but an example is included here:
-[Issue 7504](https://github.com/google/iree/issues/7504).
+[Issue 7504](https://github.com/iree-org/iree/issues/7504).
 The runtime-side is complete and resolution is performed by a user-supplied
 `iree_hal_executable_import_provider_t`.

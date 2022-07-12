@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-codegen-flatten-memref-subspan --canonicalize %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-codegen-flatten-memref-subspan --canonicalize --allow-unregistered-dialect %s | FileCheck %s
 
 func.func @load_subspan_with_offset(%offset : index, %i0: index, %i1: index, %i2: index) -> f32 {
   %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<6x7x8xf32>
@@ -325,22 +325,16 @@ func.func @expand_shape(%offset : index, %i0: index, %i1: index, %i2: index, %i3
 
 // -----
 
-func.func @load_store_rank_one_static_size_subspan_with_offset(%offset : index, %i: index) {
-  %subspan0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<32xf32>
-  %subspan1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%offset) : memref<32xf32>
-  %val = memref.load %subspan0[%i] : memref<32xf32>
-  memref.store %val, %subspan1[%i] : memref<32xf32>
-  return
+// An opaque consumer that already takes a collapsed, static 1d memref should
+// be able to do so (a memref cast is inserted to move between unknown and
+// known dim).
+func.func @static_collapse_shape_to_1d_static(%offset : index, %i: index) {
+  %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<6x7x8xf32>
+  %collapse = memref.collapse_shape %subspan [[0, 1, 2]] : memref<6x7x8xf32> into memref<336xf32>
+  "unregistered.opaque"(%collapse) : (memref<336xf32>) -> ()
 }
 
-//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1] -> (s0 + s1 floordiv 4)>
-//      CHECK: func.func @load_store_rank_one_static_size_subspan_with_offset
-// CHECK-SAME: %[[OFFSET:.+]]: index, %[[I:.+]]: index
-//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//  CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index
-//      CHECK:   %[[SPAN0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%[[C0]]) : memref<?xf32>{%[[C32]]}
-//      CHECK:   %[[SPAN1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%[[C0]]) : memref<?xf32>{%[[C32]]}
-//      CHECK:   %[[I0:.+]] = affine.apply #[[MAP]]()[%[[I]], %[[OFFSET]]]
-//      CHECK:   %[[V:.+]] = memref.load %[[SPAN0]][%[[I0]]] : memref<?xf32>
-//      CHECK:   %[[I1:.+]] = affine.apply #[[MAP]]()[%[[I]], %[[OFFSET]]]
-//      CHECK:   memref.store %[[V]], %[[SPAN1]][%[[I1]]] : memref<?xf32>
+//      CHECK:   %[[SIZE:.+]] = arith.constant 336 : index
+//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%arg0) : memref<?xf32>{%[[SIZE]]}
+//      CHECK:   %[[STATIC_CAST:.+]] = memref.cast %0 : memref<?xf32> to memref<336xf32>
+//      CHECK:   "unregistered.opaque"(%[[STATIC_CAST]])

@@ -82,6 +82,7 @@ enum class NumericalType : uint32_t {
   kFloat = 0x20,
   kFloatIEEE = kFloat | 0x01,
   kFloatBrain = kFloat | 0x02,
+  kFloatComplex = kFloat | 0x03,
 };
 constexpr inline int32_t makeElementTypeValue(NumericalType numericalType,
                                               int32_t bitCount) {
@@ -120,6 +121,10 @@ llvm::Optional<int32_t> getElementTypeValue(Type type) {
       default:
         return llvm::None;
     }
+  } else if (auto complexType = type.dyn_cast_or_null<ComplexType>()) {
+    return makeElementTypeValue(
+        NumericalType::kFloatComplex,
+        complexType.getElementType().getIntOrFloatBitWidth() * 2);
   }
   return llvm::None;
 }
@@ -143,7 +148,10 @@ Value BufferType::inferSizeFromValue(Location loc, Value value,
 
 Value BufferViewType::inferSizeFromValue(Location loc, Value value,
                                          OpBuilder &builder) const {
-  return builder.createOrFold<BufferViewByteLengthOp>(loc, value);
+  return builder.createOrFold<BufferLengthOp>(
+      loc, builder.getIndexType(),
+      builder.createOrFold<BufferViewBufferOp>(
+          loc, builder.getType<IREE::HAL::BufferType>(), value));
 }
 
 //===----------------------------------------------------------------------===//
@@ -529,7 +537,7 @@ void HALDialect::registerAttributes() {
 void HALDialect::registerTypes() {
   addTypes<AllocatorType, BufferType, BufferViewType, CommandBufferType,
            DescriptorSetType, DescriptorSetLayoutType, DeviceType, EventType,
-           ExecutableType, ExecutableLayoutType, RingBufferType,
+           ExecutableType, ExecutableLayoutType, FenceType, RingBufferType,
            SemaphoreType>();
 }
 
@@ -578,6 +586,7 @@ Type HALDialect::parseType(DialectAsmParser &parser) const {
           .Case("event", EventType::get(getContext()))
           .Case("executable", ExecutableType::get(getContext()))
           .Case("executable_layout", ExecutableLayoutType::get(getContext()))
+          .Case("fence", FenceType::get(getContext()))
           .Case("ring_buffer", RingBufferType::get(getContext()))
           .Case("semaphore", SemaphoreType::get(getContext()))
           .Default(nullptr);
@@ -609,6 +618,8 @@ void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
     p << "executable";
   } else if (type.isa<ExecutableLayoutType>()) {
     p << "executable_layout";
+  } else if (type.isa<FenceType>()) {
+    p << "fence";
   } else if (type.isa<RingBufferType>()) {
     p << "ring_buffer";
   } else if (type.isa<SemaphoreType>()) {

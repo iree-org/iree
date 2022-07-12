@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -17,6 +18,8 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Stream {
+
+using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
 
 //===----------------------------------------------------------------------===//
 // Utilities
@@ -29,10 +32,8 @@ static void addCleanupPatterns(OpPassManager &passManager) {
 
   // Simplify util.global accesses; this can help with data flow tracking as
   // redundant store-loads are removed.
-  passManager.addNestedPass<IREE::Util::InitializerOp>(
-      IREE::Util::createSimplifyGlobalAccessesPass());
-  passManager.addNestedPass<mlir::func::FuncOp>(
-      IREE::Util::createSimplifyGlobalAccessesPass());
+  FunctionLikeNest(passManager)
+      .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
 
   // Cleanup and canonicalization of util.global (and other util ops).
   passManager.addPass(IREE::Util::createApplyPatternsPass());
@@ -107,10 +108,8 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
 
   // Lower stream.tensor.* ops to stream.async.* ops based on
   // affinity/configuration assigned during placement.
-  passManager.addNestedPass<IREE::Util::InitializerOp>(
-      IREE::Stream::createEncodeHostTensorsPass());
-  passManager.addNestedPass<mlir::func::FuncOp>(
-      IREE::Stream::createEncodeHostTensorsPass());
+  FunctionLikeNest(passManager)
+      .addPass(IREE::Stream::createEncodeHostTensorsPass);
   passManager.addNestedPass<IREE::Stream::ExecutableOp>(
       IREE::Stream::createEncodeDeviceTensorsPass());
 
@@ -125,10 +124,8 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // pass attempting to do both. Note that copy-on-write materialization is
   // required for correct execution while copy elision is for performance only
   // (though it's critical enough that it is not optional).
-  passManager.addNestedPass<IREE::Util::InitializerOp>(
-      IREE::Stream::createMaterializeCopyOnWritePass());
-  passManager.addNestedPass<mlir::func::FuncOp>(
-      IREE::Stream::createMaterializeCopyOnWritePass());
+  FunctionLikeNest(passManager)
+      .addPass(IREE::Stream::createMaterializeCopyOnWritePass);
   passManager.addPass(IREE::Stream::createElideAsyncCopiesPass());
 
   // Refine lifetime of all resources across the module.
@@ -141,17 +138,11 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // Stream formation and scheduling
   //----------------------------------------------------------------------------
 
-  // Combine async work into execution regions.
-  passManager.addNestedPass<IREE::Util::InitializerOp>(
-      IREE::Stream::createScheduleExecutionPass());
-  passManager.addNestedPass<mlir::func::FuncOp>(
-      IREE::Stream::createScheduleExecutionPass());
-
-  // Group concurrently executable work into waves.
-  passManager.addNestedPass<IREE::Util::InitializerOp>(
-      IREE::Stream::createScheduleConcurrencyPass());
-  passManager.addNestedPass<mlir::func::FuncOp>(
-      IREE::Stream::createScheduleConcurrencyPass());
+  FunctionLikeNest(passManager)
+      // Combine async work into execution regions.
+      .addPass(IREE::Stream::createScheduleExecutionPass)
+      // Group concurrently executable work into waves.
+      .addPass(IREE::Stream::createScheduleConcurrencyPass);
 
   // Materialize timepoints across the entire module. This simplifies scheduling
   // of the timeline as we can shake the IR and see what timepoints we still
@@ -173,36 +164,25 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
                                 const TransformOptions &transformOptions) {
   // Schedule fine-grained allocations and insert placeholders for larger/longer
   // lifetime allocations.
-  passManager.addNestedPass<IREE::Util::InitializerOp>(
-      IREE::Stream::createScheduleAllocationPass());
-  passManager.addNestedPass<mlir::func::FuncOp>(
-      IREE::Stream::createScheduleAllocationPass());
+  FunctionLikeNest(passManager)
+      .addPass(IREE::Stream::createScheduleAllocationPass)
 
-  // TODO(benvanik): passes to convert alloc to alloca and thread through
-  // streams. Ideally all transient allocs become stream-ordered allocas.
-  // createPropagateTransientsPass()
+      // TODO(benvanik): passes to convert alloc to alloca and thread through
+      // streams. Ideally all transient allocs become stream-ordered allocas.
+      // createPropagateTransientsPass()
 
-  // Allocate backing storage for fused constant resources.
-  // This expands packed constants into explicit forms with partitioned storage
-  // buffers and upload logic.
-  passManager.addNestedPass<IREE::Util::InitializerOp>(
-      IREE::Stream::createPackConstantsPass());
-  passManager.addNestedPass<mlir::func::FuncOp>(
-      IREE::Stream::createPackConstantsPass());
+      // Allocate backing storage for fused constant resources.
+      // This expands packed constants into explicit forms with partitioned
+      // storage buffers and upload logic.
+      .addPass(IREE::Stream::createPackConstantsPass)
 
-  // Pack fused allocations based on lifetime.
-  passManager.addNestedPass<IREE::Util::InitializerOp>(
-      IREE::Stream::createPackAllocationsPass());
-  passManager.addNestedPass<mlir::func::FuncOp>(
-      IREE::Stream::createPackAllocationsPass());
+      // Pack fused allocations based on lifetime.
+      .addPass(IREE::Stream::createPackAllocationsPass)
 
-  // Layout packed slices to emit the arithmetic required for all resource
-  // offsets. This enables us to propagate the subviews across the program
-  // below.
-  passManager.addNestedPass<IREE::Util::InitializerOp>(
-      IREE::Stream::createLayoutSlicesPass());
-  passManager.addNestedPass<mlir::func::FuncOp>(
-      IREE::Stream::createLayoutSlicesPass());
+      // Layout packed slices to emit the arithmetic required for all resource
+      // offsets. This enables us to propagate the subviews across the program
+      // below.
+      .addPass(IREE::Stream::createLayoutSlicesPass);
 
   // Propagate subviews throughout the program to unify resource storage access.
   // After propagation many resource SSA values can be deduped or folded by the

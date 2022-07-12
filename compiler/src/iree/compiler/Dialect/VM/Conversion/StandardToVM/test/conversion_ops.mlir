@@ -27,3 +27,17 @@ module @my_module {
   }
 }
 }
+
+// -----
+
+module @t003_uitofp_i32_f32 {
+module @my_module {
+  // CHECK: vm.func private @my_fn
+  // CHECK-SAME: %[[ARG0:.+]]: i32
+  func.func @my_fn(%arg0 : i32) -> (f32) {
+    // CHECK: vm.cast.ui32.f32 %[[ARG0]] : i32 -> f32
+    %1 = arith.uitofp %arg0 : i32 to f32
+    return %1 : f32
+  }
+}
+}

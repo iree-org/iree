@@ -9,7 +9,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Utils.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -21,9 +21,9 @@
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::LinalgExt;
 
-static FailureOr<TilingResult> tileToForeachOp(PatternRewriter &rewriter,
-                                               TilingInterface op,
-                                               ValueRange numThreads) {
+static FailureOr<TilingResult>
+tileToForeachOp(PatternRewriter &rewriter, TilingInterface op,
+                ValueRange numThreads, ArrayRef<int64_t> threadDimMapping) {
   Location loc = op->getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   SmallVector<Range> loopRanges = op.getIterationDomain(rewriter);
@@ -38,8 +38,8 @@ static FailureOr<TilingResult> tileToForeachOp(PatternRewriter &rewriter,
 
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   Operation *tiledOp = nullptr;
-  Operation *tileOp = rewriter.create<scf::ForeachThreadOp>(
-      loc, llvm::to_vector<4>(nonZeroNumThreads),
+  scf::ForeachThreadOp foreachThreadOp = rewriter.create<scf::ForeachThreadOp>(
+      loc, llvm::to_vector<4>(nonZeroNumThreads), threadDimMapping,
       [&](OpBuilder &b, Location loc, ValueRange threadIds) {
         // TODO: support `getTiledImplementation` with >1 produced tiled ops.
         int64_t nLoops = loopRanges.size();
@@ -112,7 +112,7 @@ static FailureOr<TilingResult> tileToForeachOp(PatternRewriter &rewriter,
               std::get<1>(it), std::get<2>(it));
         }
       });
-  return TilingResult{tileOp, tiledOp};
+  return TilingResult{foreachThreadOp, tiledOp};
 }
 
 FailureOr<TilingResult>
@@ -129,11 +129,15 @@ mlir::iree_compiler::IREE::LinalgExt::ForeachThreadTilingPattern::
   if (loopIteratorTypes.empty())
     return rewriter.notifyMatchFailure(op, "Scalar op, no tiling possible");
 
-  // Get rank and tile sizes.
+  // Get tile sizes.
+  SmallVector<Value> numThreads =
+      llvm::to_vector<4>(map_range(tileSizes, [&](int64_t s) {
+        Value v = rewriter.create<arith::ConstantIndexOp>(op->getLoc(), s);
+        return v;
+      }));
+
   // TODO: consider moving these checks to a common place that the TransformOp
   // verifier can also use.
-  SmallVector<Value> numThreads =
-      options.tileSizeComputationFunction(rewriter, op);
   for (auto it : llvm::zip(numThreads, loopIteratorTypes)) {
     Optional<int64_t> maybeTileSize = getConstantIntValue(std::get<0>(it));
     if (maybeTileSize && *maybeTileSize == 0)
@@ -146,7 +150,7 @@ mlir::iree_compiler::IREE::LinalgExt::ForeachThreadTilingPattern::
   }
 
   FailureOr<TilingResult> tilingResult =
-      tileToForeachOp(rewriter, op, numThreads);
+      tileToForeachOp(rewriter, op, numThreads, threadDimMapping);
   if (failed(tilingResult))
     return failure();
 

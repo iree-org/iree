@@ -28,7 +28,7 @@ Also see [instructions for installing pre-built binaries](../bindings/python.md)
 * A relatively recent Python3 installation >=3.7 (we aim to support
   [non-eol Python versions](https://endoflife.date/python)).
 * Installation of python dependencies as specified in
-  [`runtime/bindings/python/iree/runtime/build_requirements.txt`](https://github.com/google/iree/blob/main/runtime/bindings/python/iree/runtime/build_requirements.txt).
+  [`runtime/bindings/python/iree/runtime/build_requirements.txt`](https://github.com/iree-org/iree/blob/main/runtime/bindings/python/iree/runtime/build_requirements.txt).
 
 **CMake Variables:**
 
@@ -158,7 +158,7 @@ APIs under `import iree.compiler.tf`, `import iree.compiler.tflite`,
 !!! Warning
 
     This section is under construction. Refer to the
-    [source documentation](https://github.com/google/iree/tree/main/integrations/tensorflow#readme)
+    [source documentation](https://github.com/iree-org/iree/tree/main/integrations/tensorflow#readme)
     for the latest building from source instructions.
 
 ???+ Note

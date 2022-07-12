@@ -22,7 +22,11 @@
   >]>
 hal.executable private @check_no_cse {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export public @check_no_cse ordinal(0) layout(#executable_layout5)
+    hal.executable.export public @check_no_cse ordinal(0) layout(#executable_layout5) {
+    ^bb0(%arg0: !hal.device, %arg1: index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
+      hal.return %x, %y, %z : index, index, index
+    }
     builtin.module {
       func.func @check_no_cse() {
         %cst = arith.constant 3.840000e+02 : f32
@@ -77,7 +81,11 @@ hal.executable private @check_no_cse {
 ]>
 hal.executable private @preset_config_matmul  {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.export @preset_config_matmul layout(#executable_layout)
+    hal.executable.export @preset_config_matmul layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
     builtin.module {
       func.func @preset_config_matmul() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -124,7 +132,11 @@ hal.executable private @preset_config_matmul  {
   >]>
 hal.executable private @batch_matmul_dynamic {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export public @batch_matmul_dynamic ordinal(0) layout(#executable_layout)
+    hal.executable.export public @batch_matmul_dynamic ordinal(0) layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4
+      hal.return %x, %y, %z : index, index, index
+    }
     builtin.module {
       func.func @batch_matmul_dynamic() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -172,7 +184,11 @@ hal.executable private @batch_matmul_dynamic {
   >]>
 hal.executable private @check_buffer_ops_vectorization {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export public @check_buffer_ops_vectorization ordinal(0) layout(#executable_layout)
+    hal.executable.export public @check_buffer_ops_vectorization ordinal(0) layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
     builtin.module {
       func.func @check_buffer_ops_vectorization() {
         %c0 = arith.constant 0 : index
@@ -214,7 +230,11 @@ hal.executable private @vectorize_fill_conv2d_generic {
           #hal.descriptor_set.binding<1, storage_buffer>,
           #hal.descriptor_set.binding<2, storage_buffer>]
         >]>
-      )
+      ) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4
+      hal.return %x, %y, %z : index, index, index
+    }
     builtin.module {
       func.func @vectorize_fill_conv2d_generic() {
         %cst = arith.constant 0.000000e+00 : f32

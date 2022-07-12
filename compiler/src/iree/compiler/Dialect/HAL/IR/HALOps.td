@@ -215,7 +215,7 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
   }];
 }
 
-def HAL_AllocatorMapOp : HAL_Op<"allocator.map", [
+def HAL_AllocatorAllocateInitializedOp : HAL_Op<"allocator.allocate.initialized", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     DeclareOpInterfaceMethods<Util_SizeAwareOp>,
   ]> {
@@ -527,36 +527,6 @@ def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
   let hasCanonicalizer = 1;
 }
 
-def HAL_BufferViewByteLengthOp : HAL_PureOp<"buffer_view.byte_length", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
-  let summary = [{buffer view buffer byte length accessor}];
-  let description = [{
-    Returns the allocated size of a shaped buffer view in bytes.
-    This may exceed the logical size of the buffer view; for example sparse
-    tensors will have an allocation size that may be for the maximum possible
-    size of the tensor when fully dense.
-  }];
-
-  let arguments = (ins
-    HAL_BufferView:$buffer_view
-  );
-  let results = (outs
-    HAL_DeviceSize:$result
-  );
-
-  let assemblyFormat = [{
-    `<` $buffer_view `:` type($buffer_view) `>`
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins "Value":$bufferView)>,
-  ];
-}
-
 def HAL_BufferViewElementTypeOp : HAL_PureOp<"buffer_view.element_type"> {
   let summary = [{buffer view element type query}];
   let description = [{
@@ -710,27 +680,11 @@ def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
   }];
 }
 
-def HAL_CommandBufferBeginOp : HAL_Op<"command_buffer.begin"> {
-  let summary = [{command buffer recording begin operation}];
+def HAL_CommandBufferFinalizeOp : HAL_Op<"command_buffer.finalize"> {
+  let summary = [{finalizes command buffer recording}];
   let description = [{
-    Resets and begins recording into the command buffer, clearing all previously
-    recorded contents.
-  }];
-
-  let arguments = (ins
-    HAL_CommandBuffer:$command_buffer
-  );
-
-  let assemblyFormat = [{
-    `<` $command_buffer `:` type($command_buffer) `>`
-    attr-dict-with-keyword
-  }];
-}
-
-def HAL_CommandBufferEndOp : HAL_Op<"command_buffer.end"> {
-  let summary = [{command buffer recording end operation}];
-  let description = [{
-    Ends recording into the command buffer.
+    Ends recording into the command buffer and prepares it for submission.
+    No more commands may be recorded into the command buffer.
   }];
 
   let arguments = (ins
@@ -1360,6 +1314,8 @@ def HAL_ReturnOp : HAL_Op<"return", [Terminator]> {
       build($_builder, $_state, llvm::None);
     }]>,
   ];
+
+  let hasVerifier = 1;
 }
 
 def HAL_DeviceQueryOp :
@@ -2012,6 +1968,125 @@ def HAL_ExecutableLayoutLookupOp : HAL_PureOp<"executable_layout.lookup", [
 }
 
 //===----------------------------------------------------------------------===//
+// !hal.fence / iree_hal_fence_t
+//===----------------------------------------------------------------------===//
+
+def HAL_FenceCreateOp : HAL_Op<"fence.create", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+    SameVariadicOperandSize,
+  ]> {
+  let summary = [{creates a fence from the given timepoints}];
+  let description = [{
+    Returns a fence that defines a point in time across one or more timelines.
+  }];
+
+  let arguments = (ins
+    Variadic<HAL_Semaphore>:$semaphores,
+    Variadic<HAL_TimelineValue>:$min_values
+  );
+  let results = (outs
+    HAL_Fence:$result
+  );
+
+  let assemblyFormat = [{
+    custom<TimepointList>($semaphores, type($semaphores), $min_values)
+    `->` type($result)
+    attr-dict-with-keyword
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+def HAL_FenceJoinOp : HAL_Op<"fence.join", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  ]> {
+  let summary = [{creates a fence from the given timepoints}];
+  let description = [{
+    Returns a fence that joins the input fences as a wait-all operation.
+  }];
+
+  let arguments = (ins
+    Variadic<HAL_Fence>:$fences
+  );
+  let results = (outs
+    HAL_Fence:$result
+  );
+
+  let assemblyFormat = [{
+    `at` `(` `[` $fences `]` `)`
+    `->` type($result)
+    attr-dict-with-keyword
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+def HAL_FenceSignalOp : HAL_Op<"fence.signal"> {
+  let summary = [{fence signal operation}];
+  let description = [{
+    Signals the fence to indicate that the timepoints contained have been
+    reached. Waiting work may begin immediately.
+  }];
+
+  let arguments = (ins
+    HAL_Fence:$fence
+  );
+
+  let assemblyFormat = [{
+    `<` $fence `:` type($fence) `>`
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_FenceFailOp : HAL_Op<"fence.fail"> {
+  let summary = [{fence failure operation}];
+  let description = [{
+    Signals the fence with a failure. The `status` will be returned from
+    each timepoint semaphores `hal.semaphore.query` and `hal.semaphore.signal`
+    for the lifetime of each semaphore.
+  }];
+
+  let arguments = (ins
+    HAL_Fence:$fence,
+    Util_Status:$status
+  );
+
+  let assemblyFormat = [{
+    `<` $fence `:` type($fence) `>`
+    `status` `(` $status `)`
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_FenceAwaitOp : HAL_Op<"fence.await", [
+    YieldPoint,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  ]> {
+  let summary = [{asynchronous fence wait operation}];
+  let description = [{
+    Yields the caller until all fences is reached. Returns the `status` of the
+    fence after the wait, with a non-zero value indicating failure.
+  }];
+
+  let arguments = (ins
+    I32:$timeout_millis,
+    Variadic<HAL_Fence>:$fences
+  );
+  let results = (outs
+    Util_Status:$status
+  );
+
+  let assemblyFormat = [{
+    `until` `(` `[` $fences `]` `)`
+    `timeout_millis` `(` $timeout_millis `)`
+    `:` type($status)
+    attr-dict-with-keyword
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // !hal.semaphore / iree_hal_semaphore_t
 //===----------------------------------------------------------------------===//
 
@@ -2039,7 +2114,9 @@ def HAL_SemaphoreCreateOp : HAL_Op<"semaphore.create", [
   }];
 }
 
-def HAL_SemaphoreQueryOp : HAL_Op<"semaphore.query"> {
+def HAL_SemaphoreQueryOp : HAL_Op<"semaphore.query", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  ]> {
   let summary = [{semaphore payload value query}];
   let description = [{
     Queries the current payload and returns a tuple of `(status, value)`.
@@ -2103,7 +2180,10 @@ def HAL_SemaphoreFailOp : HAL_Op<"semaphore.fail"> {
   }];
 }
 
-def HAL_SemaphoreAwaitOp : HAL_Op<"semaphore.await", [YieldPoint]> {
+def HAL_SemaphoreAwaitOp : HAL_Op<"semaphore.await", [
+    YieldPoint,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  ]> {
   let summary = [{asynchronous semaphore wait operation}];
   let description = [{
     Yields the caller until the semaphore reaches or exceeds the specified

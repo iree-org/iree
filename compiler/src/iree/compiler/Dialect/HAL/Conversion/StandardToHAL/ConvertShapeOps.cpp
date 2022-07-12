@@ -22,13 +22,13 @@ struct BufferViewDimPattern : public OpConversionPattern<tensor::DimOp> {
   LogicalResult matchAndRewrite(
       tensor::DimOp dimOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!adaptor.source().getType().isa<IREE::HAL::BufferViewType>()) {
+    if (!adaptor.getSource().getType().isa<IREE::HAL::BufferViewType>()) {
       return failure();
     }
     Optional<int64_t> index = dimOp.getConstantIndex();
     assert(index.hasValue() && "expect constant index in `std.dim` operation");
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewDimOp>(
-        dimOp, dimOp.getResult().getType(), adaptor.source(),
+        dimOp, dimOp.getResult().getType(), adaptor.getSource(),
         rewriter.getIndexAttr(index.getValue()));
     return success();
   }
@@ -39,11 +39,11 @@ struct BufferViewRankPattern : public OpConversionPattern<tensor::RankOp> {
   LogicalResult matchAndRewrite(
       tensor::RankOp rankOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!adaptor.tensor().getType().isa<IREE::HAL::BufferViewType>()) {
+    if (!adaptor.getTensor().getType().isa<IREE::HAL::BufferViewType>()) {
       return failure();
     }
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewRankOp>(
-        rankOp, rankOp.getResult().getType(), adaptor.tensor());
+        rankOp, rankOp.getResult().getType(), adaptor.getTensor());
     return success();
   }
 };

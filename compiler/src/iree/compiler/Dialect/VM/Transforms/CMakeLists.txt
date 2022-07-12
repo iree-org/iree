@@ -37,6 +37,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRPass
     MLIRSCFToControlFlow
+    MLIRSCFTransforms
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTransformUtils
@@ -49,6 +50,7 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::Conversion::UtilToVM
     iree::compiler::Dialect::VM::IR
+    iree::compiler::Utils
   PUBLIC
 )
 

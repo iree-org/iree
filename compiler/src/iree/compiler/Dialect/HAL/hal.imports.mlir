@@ -15,6 +15,7 @@ vm.import @ex.submit_and_wait(
   %device : !vm.ref<!hal.device>,
   %command_buffer : !vm.ref<!hal.command_buffer>
 )
+attributes {vm.yield}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_allocator_t
@@ -28,12 +29,10 @@ vm.import @allocator.allocate(
   %allocation_size : i64
 ) -> !vm.ref<!hal.buffer>
 
-// Maps a host byte buffer into a device buffer.
-// If try!=0 then returns null if the given memory type cannot be mapped.
-// Host-local+constant requests will always succeed.
-vm.import @allocator.map.byte_buffer(
+// Allocates a buffer from the allocator with an initial value provided by a
+// VM byte buffer.
+vm.import @allocator.allocate.initialized(
   %allocator : !vm.ref<!hal.allocator>,
-  %try : i32,
   %memory_types : i32,
   %buffer_usage : i32,
   %source : !vm.buffer,
@@ -41,11 +40,12 @@ vm.import @allocator.map.byte_buffer(
   %length : i64
 ) -> !vm.ref<!hal.buffer>
 
-// TODO(benvanik): remove wrap.
-// Wraps a subrange of a read-only host memory buffer.
-// Host mapping must be supported by the allocator.
-vm.import @allocator.wrap.byte_buffer(
+// Maps a host byte buffer into a device buffer.
+// If try!=0 then returns null if the given memory type cannot be mapped.
+// Host-local+constant requests will always succeed.
+vm.import @allocator.map.byte_buffer(
   %allocator : !vm.ref<!hal.allocator>,
+  %try : i32,
   %memory_types : i32,
   %buffer_usage : i32,
   %source : !vm.buffer,
@@ -129,12 +129,6 @@ vm.import @buffer_view.buffer(
 ) -> !vm.ref<!hal.buffer>
 attributes {nosideeffects}
 
-// Returns the allocated size of a shaped buffer view in bytes.
-vm.import @buffer_view.byte_length(
-  %buffer_view : !vm.ref<!hal.buffer_view>
-) -> i64
-attributes {nosideeffects}
-
 // Returns the element type of the buffer view.
 vm.import @buffer_view.element_type(
   %buffer_view : !vm.ref<!hal.buffer_view>,
@@ -177,14 +171,9 @@ vm.import @command_buffer.create(
   %command_categories : i32
 ) -> !vm.ref<!hal.command_buffer>
 
-// Resets and begins recording into the command buffer, clearing all previously
-// recorded contents.
-vm.import @command_buffer.begin(
-  %command_buffer : !vm.ref<!hal.command_buffer>
-)
-
-// Ends recording into the command buffer.
-vm.import @command_buffer.end(
+// Finalizes recording into the command buffer and prepares it for submission.
+// No more commands can be recorded afterward.
+vm.import @command_buffer.finalize(
   %command_buffer : !vm.ref<!hal.command_buffer>
 )
 
@@ -312,11 +301,11 @@ vm.import @device.allocator(
 attributes {nosideeffects}
 
 // Returns a tuple of (ok, value) for the given configuration key.
-vm.import @device.query.i32(
+vm.import @device.query.i64(
   %device : !vm.ref<!hal.device>,
   %category : !vm.buffer,
   %key : !vm.buffer
-) -> (i32, i32)
+) -> (i32, i64)
 attributes {nosideeffects}
 
 //===----------------------------------------------------------------------===//
@@ -345,6 +334,42 @@ vm.import @executable_layout.create(
   %set_layouts : !vm.ref<!hal.descriptor_set_layout>...
 ) -> !vm.ref<!hal.executable_layout>
 attributes {nosideeffects}
+
+//===----------------------------------------------------------------------===//
+// iree_hal_fence_t
+//===----------------------------------------------------------------------===//
+
+// Returns a fence that defines a point in time across one or more timelines.
+vm.import @fence.create(
+  // <semaphore, min_value>
+  %timepoints : tuple<!vm.ref<!hal.fence>, i64>...
+) -> !vm.ref<!hal.fence>
+attributes {nosideeffects}
+
+// Returns a fence that joins the input fences as a wait-all operation.
+vm.import @fence.join(
+  %fences : !vm.ref<!hal.fence> ...
+) -> !vm.ref<!hal.fence>
+attributes {nosideeffects}
+
+// Signals the fence.
+vm.import @fence.signal(
+  %fence : !vm.ref<!hal.fence>
+)
+
+// Signals the fence with a failure. The |status| will be returned from the
+// `hal.semaphore.query` and `hal.semaphore.signal` of each timepoint semaphore.
+vm.import @fence.fail(
+  %fence : !vm.ref<!hal.fence>,
+  %status : i32
+)
+
+// Yields the caller until all fences is reached.
+vm.import @fence.await(
+  %timeout_millis : i32,
+  %fences : !vm.ref<!hal.fence> ...
+) -> i32
+attributes {vm.yield}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_semaphore_t
@@ -390,6 +415,6 @@ vm.import @semaphore.await(
   %semaphore : !vm.ref<!hal.semaphore>,
   %min_value : i64
 ) -> i32
-// TODO(benvanik): yield point trait.
+attributes {vm.yield}
 
 }  // module

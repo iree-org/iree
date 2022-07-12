@@ -208,10 +208,6 @@ createLLVMCPULowerExecutableTargetPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMCPUSynchronizeSymbolVisibilityPass();
 
-/// Multi-level tiling, fusing and vectorization of linalg ops on tensors.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUTileFuseAndVectorizePass(bool lowerToVectors = true);
-
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUAArch64VectorLoweringPass();
 
@@ -242,6 +238,10 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 /// code-generation. This pipeline does not vectorize, but instead just converts
 /// to memrefs
 void addCPUDefaultPassPipeline(OpPassManager &passManager);
+
+/// Populates the passes to lower to tiled/distributed/bufferized ops, suitable
+/// for library call dispatch and lowering to loops.
+void addVMVXDefaultPassPipeline(OpPassManager &passManager);
 
 /// Populates the passes to lower linalg ops on buffers. Currenly this pipeline
 /// is only used for dispatches that just copy data from input interfaces to
@@ -279,8 +279,7 @@ void addTransformDialectInterpreterPasses(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize lowering
 /// of linalg ops on tensors to vectors operations.
-void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
-                                         bool lowerToVectors = true);
+void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Pass Pipelines for lowering to LLVM dialect.
@@ -346,7 +345,7 @@ createLLVMGPULowerExecutableTargetPass();
 
 /// Convert Linalg ops to Vector.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorizationPass(
-    int64_t nativeVector = 4);
+    int64_t nativeVector = 4, bool generateContract = true);
 
 /// Convert Linalg ops to Vector and prepare converstion to GPU MMA ops.
 std::unique_ptr<OperationPass<func::FuncOp>>

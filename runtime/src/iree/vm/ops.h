@@ -60,6 +60,7 @@ static inline int32_t vm_rem_i32u(int32_t lhs, int32_t rhs) {
 static inline int32_t vm_fma_i32(int32_t a, int32_t b, int32_t c) {
   return a * b + c;
 }
+static inline int32_t vm_abs_i32(int32_t operand) { return abs(operand); }
 static inline int32_t vm_not_i32(int32_t operand) {
   return (int32_t)(~((uint32_t)operand));
 }
@@ -185,6 +186,7 @@ static inline int64_t vm_rem_i64u(int64_t lhs, int64_t rhs) {
 static inline int64_t vm_fma_i64(int64_t a, int64_t b, int64_t c) {
   return a * b + c;
 }
+static inline int64_t vm_abs_i64(int64_t operand) { return labs(operand); }
 static inline int64_t vm_not_i64(int64_t operand) {
   return (int64_t)(~((uint64_t)operand));
 }
@@ -324,7 +326,7 @@ static inline int32_t vm_cast_f32si32(float operand) {
   return (int32_t)lroundf(operand);
 }
 static inline int32_t vm_cast_f32ui32(float operand) {
-  return (uint32_t)lroundf(operand);
+  return (uint32_t)llroundf(operand);
 }
 static inline float vm_bitcast_i32f32(int32_t operand) {
   float result;

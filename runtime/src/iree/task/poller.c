@@ -95,7 +95,7 @@ void iree_task_poller_request_exit(iree_task_poller_t* poller) {
     case IREE_TASK_POLLER_STATE_ZOMBIE:
       // Poller already exited; reset state to ZOMBIE.
       iree_atomic_store_int32(&poller->state, IREE_TASK_POLLER_STATE_ZOMBIE,
-                              iree_memory_order_seq_cst);
+                              iree_memory_order_release);
       break;
     default:
       // Poller now set to EXITING and should exit soon.
@@ -112,7 +112,7 @@ void iree_task_poller_request_exit(iree_task_poller_t* poller) {
 // Returns true if the wait thread is in the zombie state (exited and awaiting
 // teardown).
 static bool iree_task_poller_is_zombie(iree_task_poller_t* poller) {
-  return iree_atomic_load_int32(&poller->state, iree_memory_order_seq_cst) ==
+  return iree_atomic_load_int32(&poller->state, iree_memory_order_acquire) ==
          IREE_TASK_POLLER_STATE_ZOMBIE;
 }
 
@@ -418,6 +418,12 @@ static void iree_task_poller_wake_task(iree_task_poller_t* poller,
 // wait handles were resolved.
 static void iree_task_poller_commit_wait(iree_task_poller_t* poller,
                                          iree_time_t deadline_ns) {
+  if (iree_atomic_load_int32(&poller->state, iree_memory_order_acquire) ==
+      IREE_TASK_POLLER_STATE_EXITING) {
+    // Thread exit requested - don't block shutdown.
+    return;
+  }
+
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Enter the system wait API.
@@ -469,7 +475,7 @@ static void iree_task_poller_commit_wait(iree_task_poller_t* poller,
 static void iree_task_poller_pump_until_exit(iree_task_poller_t* poller) {
   while (true) {
     // Check state to see if we've been asked to exit.
-    if (iree_atomic_load_int32(&poller->state, iree_memory_order_seq_cst) ==
+    if (iree_atomic_load_int32(&poller->state, iree_memory_order_acquire) ==
         IREE_TASK_POLLER_STATE_EXITING) {
       // Thread exit requested - cancel pumping.
       break;
@@ -520,7 +526,7 @@ static int iree_task_poller_main(iree_task_poller_t* poller) {
   // mess with any data structures.
   const bool should_run =
       iree_atomic_exchange_int32(&poller->state, IREE_TASK_POLLER_STATE_RUNNING,
-                                 iree_memory_order_seq_cst) !=
+                                 iree_memory_order_acq_rel) !=
       IREE_TASK_POLLER_STATE_EXITING;
   if (IREE_LIKELY(should_run)) {
     // << work happens here >>
@@ -529,7 +535,7 @@ static int iree_task_poller_main(iree_task_poller_t* poller) {
 
   IREE_TRACE_ZONE_END(thread_zone);
   iree_atomic_store_int32(&poller->state, IREE_TASK_POLLER_STATE_ZOMBIE,
-                          iree_memory_order_seq_cst);
+                          iree_memory_order_release);
   iree_notification_post(&poller->state_notification, IREE_ALL_WAITERS);
   return 0;
 }

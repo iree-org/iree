@@ -117,8 +117,6 @@ class LibraryBuilder {
     exports.push_back({name.str(), tag.str(), attrs, func});
   }
 
-  // TODO(benvanik): addConstant for registering constant values.
-
   // Builds a `iree_hal_executable_library_query_fn_t` with the given
   // |queryFuncName| that will return the current library metadata.
   //

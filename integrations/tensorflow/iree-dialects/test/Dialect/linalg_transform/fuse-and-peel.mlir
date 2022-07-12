@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt --linalg-transform-interp %s | FileCheck %s
+// RUN: iree-dialects-opt --transform-dialect-interpreter %s | FileCheck %s
 
 // CHECK-LABEL: func.func @fuse_unary
 func.func @fuse_unary(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> {
@@ -35,6 +35,6 @@ transform.with_pdl_patterns {
     %0 = pdl_match @pdl_target in %arg1
     %1, %loops:2 = transform.structured.fuse %0 {tile_sizes = [32, 32], tile_interchange = [0, 1]}
 
-    peel_loop %loops#0
+    transform.loop.peel %loops#0
   }
 }

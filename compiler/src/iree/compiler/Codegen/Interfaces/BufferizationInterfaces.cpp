@@ -20,7 +20,7 @@
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/BufferizableOpInterfaceImpl.h"
+#include "mlir/Dialect/SCF/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Vector/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Support/LLVM.h"
@@ -60,19 +60,27 @@ static Value findOrCreateSubspanBuffer(
                         .dyn_cast<IREE::Flow::DispatchTensorType>();
   assert(shapedType && shapedType.hasRank());
 
+  auto memRefType = getMemrefTypeForTensor(shapedType);
+
   // Look for an existing op.
   Block *block = subspanOp->getBlock();
   for (Operation &op : *block) {
     if (&op == subspanOp.getOperation()) break;
     auto bufferSubspanOp = dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(&op);
     if (!bufferSubspanOp) continue;
+
+    auto bufferMemrefType =
+        bufferSubspanOp.getResult().getType().dyn_cast<MemRefType>();
+    if (!bufferMemrefType) continue;
+
     if (bufferSubspanOp.set() != subspanOp.set() ||
         bufferSubspanOp.binding() != subspanOp.binding() ||
         bufferSubspanOp.type() != subspanOp.type() ||
         bufferSubspanOp.byte_offset() != subspanOp.byte_offset() ||
         !llvm::equal(bufferSubspanOp.dynamic_dims(),
                      subspanOp.dynamic_dims()) ||
-        bufferSubspanOp.alignment() != subspanOp.alignment())
+        bufferSubspanOp.alignment() != subspanOp.alignment() ||
+        memRefType != bufferMemrefType)
       continue;
     return bufferSubspanOp.getResult();
   }
@@ -81,7 +89,6 @@ static Value findOrCreateSubspanBuffer(
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(subspanOp);
   // Just change the result type of the InterfaceBindingSubspanOp.
-  auto memRefType = getMemrefTypeForTensor(shapedType);
   Value buffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
       subspanOp->getLoc(), memRefType, subspanOp.set(), subspanOp.binding(),
       subspanOp.type(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
@@ -141,7 +148,7 @@ struct DispatchTensorLoadOpInterface
 
     // Bufferize to subview.
     auto subviewMemRefType = memref::SubViewOp::inferRankReducedResultType(
-        loadOp.getType().getRank(), source.getType().cast<MemRefType>(),
+        loadOp.getType().getShape(), source.getType().cast<MemRefType>(),
         loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
         loadOp.getMixedStrides());
     replaceOpWithNewBufferizedOp<memref::SubViewOp>(
@@ -186,7 +193,7 @@ struct DispatchTensorStoreOpInterface
       // Writing to a part of the tensor.
       auto subviewMemRefType =
           memref::SubViewOp::inferRankReducedResultType(
-              storeOp.value().getType().cast<ShapedType>().getRank(),
+              storeOp.value().getType().cast<ShapedType>().getShape(),
               target.getType().cast<MemRefType>(), storeOp.getMixedOffsets(),
               storeOp.getMixedSizes(), storeOp.getMixedStrides())
               .cast<MemRefType>();
@@ -197,8 +204,10 @@ struct DispatchTensorStoreOpInterface
           storeOp.getMixedStrides());
     }  // else: Writing the entire tensor, no subview required.
 
-    Value srcMemref =
+    auto maybeBuffer =
         getBuffer(rewriter, storeOp->getOpOperand(0).get(), options);
+    if (failed(maybeBuffer)) return failure();
+    Value srcMemref = *maybeBuffer;
 
     // If everything bufferized inplace, no copy is needed. We wrote to the
     // target buffer already. The copy folds away in that case.
@@ -236,8 +245,10 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
       newInputBuffers.push_back(opOperand->get());
       continue;
     }
+    auto maybeBuffer = getBuffer(rewriter, opOperand->get(), options);
+    if (failed(maybeBuffer)) return failure();
     // Input operands are never written to.
-    newInputBuffers.push_back(getBuffer(rewriter, opOperand->get(), options));
+    newInputBuffers.push_back(*maybeBuffer);
   }
 
   // New output operands for the cloned op.

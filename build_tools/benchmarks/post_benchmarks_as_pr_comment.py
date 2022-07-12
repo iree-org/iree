@@ -36,19 +36,17 @@ import argparse
 import json
 import os
 import requests
-
 import markdown_strings as md
 
-from dataclasses import dataclass
-from typing import Any, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Optional, Sequence, Tuple
 
 from common.benchmark_definition import execute_cmd_and_get_output
 from common.benchmark_presentation import *
 
 ABBR_PR_COMMENT_TITLE = "Abbreviated Benchmark Summary"
 GITHUB_GIST_API_PREFIX = "https://api.github.com/gists"
-GITHUB_IREE_API_PREFIX = "https://api.github.com/repos/google/iree"
-GITHUB_IREE_REPO_PREFIX = "https://github.com/google/iree"
+GITHUB_IREE_API_PREFIX = "https://api.github.com/repos/iree-org/iree"
+GITHUB_IREE_REPO_PREFIX = "https://github.com/iree-org/iree"
 GITHUB_USER = "iree-github-actions-bot"
 IREE_PROJECT_ID = 'IREE'
 # The maximal numbers of trials when querying base commit benchmark results.
@@ -124,6 +122,7 @@ def query_base_benchmark_results(commit,
 
 
 def get_benchmark_result_markdown(benchmark_files: Sequence[str],
+                                  compile_stats_files: Sequence[str],
                                   query_base: bool,
                                   comment_title: str,
                                   verbose: bool = False) -> Tuple[str, str]:
@@ -132,6 +131,8 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
   all_benchmarks = aggregate_all_benchmarks(benchmark_files,
                                             pr_commit,
                                             verbose=verbose)
+  all_compilation_metrics = collect_all_compilation_metrics(
+      compile_stats_files, pr_commit)
 
   build_url = get_required_env_var("BUILDKITE_BUILD_URL")
   pr_number = get_required_env_var("BUILDKITE_PULL_REQUEST")
@@ -140,6 +141,12 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
 
   commit_info = f"@ commit {pr_commit}"
   if query_base:
+    # Collect the metric keys for each compilation target.
+    compilation_metric_keys = set()
+    for target_name in all_compilation_metrics:
+      for mapper in COMPILATION_METRICS_TO_TABLE_MAPPERS:
+        compilation_metric_keys.add(mapper.get_series_name(target_name))
+
     # Try to query some base benchmark to diff against, from the top of the
     # tree. Bail out if the maximal trial number is exceeded.
     for i in range(MAX_BASE_COMMIT_QUERY_COUNT):
@@ -149,7 +156,9 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
                             f"{GITHUB_IREE_REPO_PREFIX}/commit/{base_commit}")
 
       # Skip if the base doesn't contain all benchmarks to be compared.
-      if not (set(all_benchmarks.keys()) <= set(base_benchmarks.keys())):
+      base_keys = set(base_benchmarks.keys())
+      if (not (set(all_benchmarks.keys()) <= base_keys) or
+          not (compilation_metric_keys <= base_keys)):
         commit_info = (f"@ commit {pr_commit} (no previous benchmark results to"
                        f" compare against since {base_commit})")
         continue
@@ -157,6 +166,15 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
       # Update the aggregate benchmarks with base numbers.
       for bench in all_benchmarks:
         all_benchmarks[bench].base_mean_time = base_benchmarks[bench]
+
+      # Update the compilation metrics with base numbers.
+      for target_name, metrics in all_compilation_metrics.items():
+        updated_metrics = metrics
+        for mapper in COMPILATION_METRICS_TO_TABLE_MAPPERS:
+          metric_key = mapper.get_series_name(target_name)
+          updated_metrics = mapper.update_base_value(
+              updated_metrics, base_benchmarks[metric_key])
+        all_compilation_metrics[target_name] = updated_metrics
 
       commit_info = f"@ commit {pr_commit} (vs. base {base_commit})"
       break
@@ -170,14 +188,28 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
   full_table.append(md.unordered_list([commit_info, pr_info, buildkite_info]))
   full_table.append(categorize_benchmarks_into_tables(all_benchmarks))
 
+  # Compose the full compilation metrics tables.
+  full_table.append(
+      categorize_compilation_metrics_into_tables(all_compilation_metrics))
+
   # Compose the abbreviated benchmark tables.
   abbr_table = [md.header(comment_title, 2)]
   abbr_table.append(commit_info)
-  tables = categorize_benchmarks_into_tables(all_benchmarks, TABLE_SIZE_CUT)
-  if len(tables) == 0:
+
+  abbr_benchmarks_tables = categorize_benchmarks_into_tables(
+      all_benchmarks, TABLE_SIZE_CUT)
+  if len(abbr_benchmarks_tables) == 0:
     abbr_table.append("No improved or regressed benchmarks 🏖️")
   else:
-    abbr_table.append(tables)
+    abbr_table.append(abbr_benchmarks_tables)
+
+  abbr_compilation_metrics_tables = categorize_compilation_metrics_into_tables(
+      all_compilation_metrics, TABLE_SIZE_CUT)
+  if len(abbr_compilation_metrics_tables) == 0:
+    abbr_table.append("No improved or regressed compilation metrics 🏖️")
+  else:
+    abbr_table.append(abbr_compilation_metrics_tables)
+
   abbr_table.append("For more information:")
   # We don't know until a Gist is really created. Use a placeholder for now
   # and replace later.
@@ -296,11 +328,20 @@ def parse_arguments():
       raise ValueError(path)
 
   parser = argparse.ArgumentParser()
-  parser.add_argument("benchmark_files",
-                      metavar="<benchmark-json-file>",
-                      type=check_file_path,
-                      nargs="+",
-                      help="Path to the JSON file containing benchmark results")
+  parser.add_argument(
+      "--benchmark_files",
+      metavar="<benchmark-json-files>",
+      type=check_file_path,
+      default=[],
+      nargs="+",
+      help="Paths to the JSON files containing benchmark results")
+  parser.add_argument(
+      "--compile_stats_files",
+      metavar="<compile-stats-json-files>",
+      type=check_file_path,
+      default=[],
+      nargs="+",
+      help="Paths to the JSON files containing compilation statistics")
   parser.add_argument("--dry-run",
                       action="store_true",
                       help="Print the comment instead of posting to GitHub")
@@ -324,6 +365,7 @@ def parse_arguments():
 def main(args):
   full_md, abbr_md = get_benchmark_result_markdown(
       args.benchmark_files,
+      args.compile_stats_files,
       query_base=args.query_base,
       comment_title=args.comment_title,
       verbose=args.verbose)

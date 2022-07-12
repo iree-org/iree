@@ -21,8 +21,8 @@ def CPU_DoubleTilingPeelingExpert
     : I32EnumAttrCase<"CPUDoubleTilingPeelingExpert", 3>;
 def CPU_ConvTileAndDecomposeExpert
     : I32EnumAttrCase<"CPUConvTileAndDecomposeExpert", 4>;
-def CPU_TileFuseAndVectorize
-    : I32EnumAttrCase<"CPUTileFuseAndVectorize", 5>;
+def CPU_CPUAArchDoubleTilingExpert
+    : I32EnumAttrCase<"CPUAArchDoubleTilingExpert", 5>;
 def CPU_BufferOpsTileAndVectorize
     : I32EnumAttrCase<"CPUBufferOpsTileAndVectorize", 6>;
 
@@ -49,6 +49,9 @@ def SPIRV_VectorizeToCooperativeOps
 def SPIRV_VectorizeWithWorkgroupMemory
     : I32EnumAttrCase<"SPIRVVectorizeWithWorkgroupMemory", 16>;
 
+def VMVX_Default
+    : I32EnumAttrCase<"VMVXDefault", 17>;
+
 def None
     : I32EnumAttrCase<"None", 0xff>;
 
@@ -59,14 +62,14 @@ def DispatchLoweringPassPipelineEnum
                   "identifier for pass pipeline use to lower dispatch region", [
                     CPU_Default, CPU_DoubleTilingExpert,
                     CPU_DoubleTilingPadExpert, CPU_DoubleTilingPeelingExpert,
-                    CPU_ConvTileAndDecomposeExpert, CPU_TileFuseAndVectorize,
+                    CPU_ConvTileAndDecomposeExpert, CPU_CPUAArchDoubleTilingExpert,
                     CPU_BufferOpsTileAndVectorize,
                     Linalg_TransformInterpCodegen, LLVMGPU_SimpleDistribute,
                     LLVMGPU_Vectorize, LLVMGPU_MatmulSimt,
                     LLVMGPU_MatmulTensorCore, LLVMGPU_WarpReduction, 
                     SPIRV_Distribute, SPIRV_Vectorize,
                     SPIRV_VectorizeToCooperativeOps,
-                    SPIRV_VectorizeWithWorkgroupMemory, None
+                    SPIRV_VectorizeWithWorkgroupMemory, VMVX_Default, None
                   ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   // Don't generate a C++ class! We want to use the AttrDef

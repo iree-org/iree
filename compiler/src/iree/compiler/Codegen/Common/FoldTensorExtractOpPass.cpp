@@ -18,7 +18,7 @@ namespace iree_compiler {
 
 namespace {
 #include "iree/compiler/Codegen/Common/FoldTensorExtractOp.cpp.inc"
-}
+}  // namespace
 
 namespace {
 /// Upstream canonicalization passes fold

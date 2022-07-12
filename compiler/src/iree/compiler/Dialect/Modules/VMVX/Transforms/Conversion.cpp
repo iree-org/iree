@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Modules/VMVX/Conversion/StandardToVMVX/ConvertStandardToVMVX.h"
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXTypes.h"
+#include "iree/compiler/Dialect/Modules/VMVX/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Modules/VMVX/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
@@ -18,7 +19,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
@@ -32,19 +33,12 @@ namespace IREE {
 namespace VMVX {
 
 // Runs conversion with registered input dialects.
-class ConversionPass
-    : public PassWrapper<ConversionPass, OperationPass<mlir::ModuleOp>> {
+class ConversionPass : public ConversionBase<ConversionPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                     IREE::VM::VMDialect, IREE::VMVX::VMVXDialect,
                     memref::MemRefDialect>();
-  }
-
-  StringRef getArgument() const override { return "iree-vmvx-conversion"; }
-
-  StringRef getDescription() const override {
-    return "Converts from various dialects to the VMVX dialect";
   }
 
   void runOnOperation() override {
@@ -101,8 +95,6 @@ class ConversionPass
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass() {
   return std::make_unique<ConversionPass>();
 }
-
-static PassRegistration<ConversionPass> pass;
 
 }  // namespace VMVX
 }  // namespace IREE

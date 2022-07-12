@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-flow-pad-tensor-to-subtensor-insert --canonicalize %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-flow-pad-tensor-to-tensor-insert-slice --canonicalize %s | FileCheck %s
 
 module  {
   func.func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : tensor<f32>, %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {
@@ -7,7 +7,7 @@ module  {
     %c3 = arith.constant 3 : index
     %0 = tensor.extract %arg1[] : tensor<f32>
     %1 = tensor.pad %arg0 low[%c4, %arg2] high[%arg3, %c3]  {
-    ^bb0(%arg4: index, %arg5: index):  // no predecessors
+    ^bb0(%arg4: index, %arg5: index):
       tensor.yield %0 : f32
     } : tensor<?x?xf32> to tensor<?x?xf32>
     return %1 : tensor<?x?xf32>
@@ -44,7 +44,7 @@ module  {
     %c3 = arith.constant 3 : index
     %0 = tensor.extract %arg1[] : tensor<f32>
     %1 = tensor.pad %arg0 low[%c4, %c5] high[%c2, %c3]  {
-    ^bb0(%arg2: index, %arg3: index):  // no predecessors
+    ^bb0(%arg2: index, %arg3: index):
       tensor.yield %0 : f32
     } : tensor<12x4xf32> to tensor<18x12xf32>
     return %1 : tensor<18x12xf32>

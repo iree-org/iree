@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt --linalg-transform-interp --linalg-transform-file-name=%p/vectorize-transforms.mlir %s | FileCheck %s
+// RUN: iree-dialects-opt --transform-dialect-interpreter=transform-file-name=%p/vectorize-transforms.mlir %s | FileCheck %s
 
 // CHECK-LABEL: func.func @matmul_tensors(
 // CHECK-SAME:    %[[TA:[0-9a-z]+]]: tensor<128x128xf32>
@@ -18,4 +18,26 @@ func.func @matmul_tensors(
     -> tensor<128x128xf32>
 
   return %0 : tensor<128x128xf32>
+}
+
+// Some dummy functions to exercise TSAN under parallelism.
+func.func @foo1() -> index {
+  %0 = arith.constant 1 : index
+  return %0 : index
+}
+func.func @foo2() -> index {
+  %0 = arith.constant 2 : index
+  return %0 : index
+}
+func.func @foo3() -> index {
+  %0 = arith.constant 3 : index
+  return %0 : index
+}
+func.func @foo4() -> index {
+  %0 = arith.constant 4 : index
+  return %0 : index
+}
+func.func @foo5() -> index {
+  %0 = arith.constant 5 : index
+  return %0 : index
 }

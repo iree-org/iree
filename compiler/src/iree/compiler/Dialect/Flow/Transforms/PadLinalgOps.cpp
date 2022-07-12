@@ -18,7 +18,7 @@ namespace IREE {
 namespace Flow {
 
 namespace {
-/// A pattern to pad staticly shaped matmul operands to the next integer
+/// A pattern to pad statically shaped matmul operands to the next integer
 /// multiple of padSize.
 class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
  public:
@@ -39,9 +39,8 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
 
     if (!lhsType || !rhsType) return failure();
 
-    if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape()) {
+    if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape())
       return failure();
-    }
 
     auto lhsShape = lhsType.getShape();
     auto rhsShape = rhsType.getShape();
@@ -56,9 +55,8 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
     int paddingForN = newNSize - N;
     int paddingForK = newKSize - K;
 
-    if (paddingForM == 0 && paddingForN == 0 && paddingForK == 0) {
+    if (paddingForM == 0 && paddingForN == 0 && paddingForK == 0)
       return failure();
-    }
 
     auto lhsPaddedType =
         RankedTensorType::get({newMSize, newKSize}, lhsType.getElementType());
@@ -88,7 +86,7 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
                   loc, rewriter)
             : lhs;
 
-    auto paddedrhs =
+    Value paddedRhs =
         (paddingForK > 0 || paddingForN > 0)
             ? tensor::createPadScalarOp(
                   rhsPaddedType, rhs, rhsPaddingValue, createPadding({0, 0}),
@@ -96,12 +94,12 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
                   loc, rewriter)
             : rhs;
 
-    // Padding for K-dim only result doesn't change result size.
+    // Padding for K-dim doesn't change result size.
     if (paddingForM == 0 && paddingForN == 0) {
       auto paddedMatmulOp =
           cast<linalg::LinalgOp>(matmulOp.getOperation())
               .clone(rewriter, loc, {resultType},
-                     ArrayRef<Value>{paddedLhs, paddedrhs, result});
+                     ArrayRef<Value>{paddedLhs, paddedRhs, result});
       rewriter.replaceOp(matmulOp, paddedMatmulOp->getResults());
     } else {
       auto newResultType = RankedTensorType::get({newMSize, newNSize},
@@ -115,7 +113,7 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
       auto paddedMatmulOp =
           cast<linalg::LinalgOp>(matmulOp.getOperation())
               .clone(rewriter, loc, {newResultType},
-                     ArrayRef<Value>{paddedLhs, paddedrhs, paddedResult});
+                     ArrayRef<Value>{paddedLhs, paddedRhs, paddedResult});
 
       SmallVector<OpFoldResult> offsets(2, rewriter.getI64IntegerAttr(0));
       SmallVector<OpFoldResult> strides(2, rewriter.getI64IntegerAttr(1));
@@ -151,6 +149,7 @@ class PadLinalgOpsPass : public PadLinalgOpsBase<PadLinalgOpsPass> {
  private:
   int paddingSize;
 };
+
 }  // namespace
 
 std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass(int paddingSize) {

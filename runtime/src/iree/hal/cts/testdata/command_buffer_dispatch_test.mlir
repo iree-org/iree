@@ -13,8 +13,11 @@
 ]>
 
 hal.executable.source public @executable {
-  hal.executable.export public @abs layout(#executable_layout)
-
+  hal.executable.export public @abs layout(#executable_layout) {
+  ^bb0(%arg0: !hal.device):
+    %x, %y, %z = flow.dispatch.default_workgroup_count
+    hal.return %x, %y, %z : index, index, index
+  }
   builtin.module {
     func.func @abs() {
       %c0 = arith.constant 0 : index

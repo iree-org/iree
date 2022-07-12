@@ -155,7 +155,7 @@ iree_status_t iree_task_executor_create(
                                         iree_memory_order_relaxed);
     iree_atomic_task_affinity_set_store(&executor->worker_live_mask,
                                         worker_live_mask,
-                                        iree_memory_order_release);
+                                        iree_memory_order_relaxed);
   }
 
   if (!iree_status_is_ok(status)) {
@@ -405,8 +405,8 @@ void iree_task_executor_flush(iree_task_executor_t* executor) {
 // posted to it.
 void iree_task_executor_coordinate(iree_task_executor_t* executor,
                                    iree_task_worker_t* current_worker) {
-  iree_slim_mutex_lock(&executor->coordinator_mutex);
   IREE_TRACE_ZONE_BEGIN(z0);
+  iree_slim_mutex_lock(&executor->coordinator_mutex);
 
   // We may be adding tasks/waiting/etc on each pass through coordination - to
   // ensure we completely drain the incoming queues and satisfied waits we loop
@@ -492,6 +492,11 @@ static iree_task_t* iree_task_executor_try_steal_task_from_affinity_set(
     worker_index += offset + 1;
     mask = iree_shr(mask, offset + 1);
     iree_task_worker_t* victim_worker = &executor->workers[victim_index];
+    if (iree_atomic_load_int32(&victim_worker->state,
+                               iree_memory_order_acquire) !=
+        IREE_TASK_WORKER_STATE_RUNNING) {
+      return NULL;
+    }
 
     // Policy: steal a chunk of tasks at the tail of the victim queue.
     // This will steal multiple tasks from the victim up to the specified max
@@ -532,7 +537,7 @@ iree_task_t* iree_task_executor_try_steal_task(
 
   iree_task_affinity_set_t worker_live_mask =
       iree_atomic_task_affinity_set_load(&executor->worker_live_mask,
-                                         iree_memory_order_acquire);
+                                         iree_memory_order_relaxed);
   iree_task_affinity_set_t worker_idle_mask =
       iree_atomic_task_affinity_set_load(&executor->worker_idle_mask,
                                          iree_memory_order_relaxed);

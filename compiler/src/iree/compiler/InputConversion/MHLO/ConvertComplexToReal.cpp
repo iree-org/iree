@@ -348,7 +348,7 @@ void populateMHLOComplexToRealPatterns(MLIRContext *context,
   // ElideComplexPattern.
   // Doing it this way makes error messages nice because a failure will report
   // which remaining live op is keeping it from being erased.
-  patterns.insert<ElideComplexPattern>(typeConverter, context);
+  patterns.insert<ElideComplexPattern>(typeConverter, context, 0);
   patterns.insert<ElideRealPattern>(typeConverter, context);
   patterns.insert<ElideImagPattern>(typeConverter, context);
 }

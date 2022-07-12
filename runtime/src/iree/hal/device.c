@@ -45,9 +45,9 @@ iree_status_t iree_hal_device_trim(iree_hal_device_t* device) {
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_device_query_i32(
+IREE_API_EXPORT iree_status_t iree_hal_device_query_i64(
     iree_hal_device_t* device, iree_string_view_t category,
-    iree_string_view_t key, int32_t* out_value) {
+    iree_string_view_t key, int64_t* out_value) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_value);
 
@@ -58,7 +58,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_query_i32(
     return iree_ok_status();
   }
 
-  return _VTABLE_DISPATCH(device, query_i32)(device, category, key, out_value);
+  return _VTABLE_DISPATCH(device, query_i64)(device, category, key, out_value);
 }
 
 IREE_API_EXPORT iree_hal_semaphore_compatibility_t
@@ -152,72 +152,6 @@ IREE_API_EXPORT iree_status_t iree_hal_device_transfer_d2d(
       flags, timeout);
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_device_transfer_and_wait(
-    iree_hal_device_t* device, iree_hal_semaphore_t* wait_semaphore,
-    uint64_t wait_value, iree_host_size_t transfer_count,
-    const iree_hal_transfer_command_t* transfer_commands,
-    iree_timeout_t timeout) {
-  IREE_ASSERT_ARGUMENT(device);
-  IREE_ASSERT_ARGUMENT(!transfer_count || transfer_commands);
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // We only want to allow inline execution if we have not been instructed to
-  // wait on a semaphore and it hasn't yet been signaled.
-  iree_hal_command_buffer_mode_t mode = IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT;
-  if (wait_semaphore) {
-    uint64_t current_value = 0ull;
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_hal_semaphore_query(wait_semaphore, &current_value));
-    if (current_value >= wait_value) {
-      mode |= IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION;
-    }
-  } else {
-    mode |= IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION;
-  }
-
-  // Create a command buffer performing all of the transfer operations.
-  iree_hal_command_buffer_t* command_buffer = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_create_transfer_command_buffer(
-              device, mode, IREE_HAL_QUEUE_AFFINITY_ANY, transfer_count,
-              transfer_commands, &command_buffer));
-
-  // Perform a full submit-and-wait. On devices with multiple queues this can
-  // run out-of-order/overlapped with other work and return earlier than device
-  // idle.
-  iree_hal_semaphore_t* fence_semaphore = NULL;
-  iree_status_t status =
-      iree_hal_semaphore_create(device, 0ull, &fence_semaphore);
-  uint64_t signal_value = 1ull;
-  if (iree_status_is_ok(status)) {
-    iree_hal_submission_batch_t batch = {
-        .wait_semaphores =
-            {
-                .count = wait_semaphore != NULL ? 1 : 0,
-                .semaphores = &wait_semaphore,
-                .payload_values = &wait_value,
-            },
-        .command_buffer_count = 1,
-        .command_buffers = &command_buffer,
-        .signal_semaphores =
-            {
-                .count = 1,
-                .semaphores = &fence_semaphore,
-                .payload_values = &signal_value,
-            },
-    };
-    status = iree_hal_device_submit_and_wait(
-        device, IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
-        1, &batch, fence_semaphore, signal_value, timeout);
-  }
-
-  iree_hal_command_buffer_release(command_buffer);
-  iree_hal_semaphore_release(fence_semaphore);
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
 // Validates that the submission is well-formed.
 static iree_status_t iree_hal_device_validate_submission(
     iree_host_size_t batch_count, const iree_hal_submission_batch_t* batches) {
@@ -252,24 +186,6 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_submit(
       z0, iree_hal_device_validate_submission(batch_count, batches));
   iree_status_t status = _VTABLE_DISPATCH(device, queue_submit)(
       device, command_categories, queue_affinity, batch_count, batches);
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
-IREE_API_EXPORT iree_status_t iree_hal_device_submit_and_wait(
-    iree_hal_device_t* device, iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
-    const iree_hal_submission_batch_t* batches,
-    iree_hal_semaphore_t* wait_semaphore, uint64_t wait_value,
-    iree_timeout_t timeout) {
-  IREE_ASSERT_ARGUMENT(device);
-  IREE_ASSERT_ARGUMENT(!batch_count || batches);
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_device_validate_submission(batch_count, batches));
-  iree_status_t status = _VTABLE_DISPATCH(device, submit_and_wait)(
-      device, command_categories, queue_affinity, batch_count, batches,
-      wait_semaphore, wait_value, timeout);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

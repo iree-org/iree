@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "fill_i64.mlir"
     "globals.mlir"
+    "globals_ml_program.mlir"
     "libm_linking.mlir"
     "scalar.mlir"
     "trace_dispatch_tensors.mlir"
@@ -33,6 +34,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_regression_dylib-llvm-aot
   SRCS
+    "associative_reordering.mlir"
     "dynamic_abs.mlir"
     "dynamic_add.mlir"
     "dynamic_dot.mlir"

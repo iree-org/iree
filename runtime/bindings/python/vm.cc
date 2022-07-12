@@ -22,9 +22,10 @@ namespace {
 
 VmModule CreateHalModule(HalDevice* device) {
   iree_vm_module_t* module;
-  CheckApiStatus(iree_hal_module_create(device->raw_ptr(),
-                                        iree_allocator_system(), &module),
-                 "Error creating hal module");
+  CheckApiStatus(
+      iree_hal_module_create(device->raw_ptr(), IREE_HAL_MODULE_FLAG_NONE,
+                             iree_allocator_system(), &module),
+      "Error creating hal module");
   return VmModule::StealFromRawPtr(module);
 }
 
@@ -41,17 +42,16 @@ class PyBufferReleaser {
 
 py::dict GetFunctionReflectionDict(iree_vm_function_t& f) {
   py::dict attrs;
-  for (int i = 0;; ++i) {
-    iree_string_view_t key;
-    iree_string_view_t value;
-    auto status = iree_vm_get_function_reflection_attr(f, i, &key, &value);
-    if (iree_status_is_not_found(status)) {
+  for (iree_host_size_t i = 0;; ++i) {
+    iree_string_pair_t attr;
+    auto status = iree_vm_function_get_attr(f, i, &attr);
+    if (iree_status_is_out_of_range(status)) {
       iree_status_ignore(status);
       break;
     }
     CheckApiStatus(status, "Error getting reflection attr");
-    py::str key_str(key.data, key.size);
-    py::str value_str(value.data, value.size);
+    py::str key_str(attr.key.data, attr.key.size);
+    py::str value_str(attr.value.data, attr.value.size);
     attrs[std::move(key_str)] = std::move(value_str);
   }
   return attrs;
@@ -98,7 +98,7 @@ VmContext VmContext::Create(VmInstance* instance,
     CheckApiStatus(status, "Error creating vm context with modules");
   }
 
-  IREE_CHECK(context);
+  IREE_ASSERT(context);
   return VmContext::StealFromRawPtr(context);
 }
 

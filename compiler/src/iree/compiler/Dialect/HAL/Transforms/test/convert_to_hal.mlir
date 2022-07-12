@@ -20,7 +20,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   // CHECK: hal.executable private @ex
   hal.executable private @ex {
     hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-      hal.executable.export public @dispatch ordinal(0) layout(#executable_layout) {
+      hal.executable.export public @dispatch ordinal(0) layout(#executable_layout) attributes {
         translation_info = #iree_codegen.translation_info<CPUDefault workload_per_wg = [4]>
       } {
       ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
@@ -75,7 +75,6 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
     // CHECK-SAME: device(%[[DEVICE]] : !hal.device)
     // CHECK-SAME: mode("OneShot|AllowInlineExecution")
     // CHECK-SAME: categories("Transfer|Dispatch") : !hal.command_buffer
-    // CHECK: hal.command_buffer.begin<%[[CMD]] : !hal.command_buffer>
     %timepoint = stream.cmd.execute
         with(%arg0_resource as %arg0_capture: !stream.resource<external>{%c16},
              %arg1_resource as %arg1_capture: !stream.resource<external>{%c16},
@@ -113,7 +112,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
     // CHECK: hal.command_buffer.execution_barrier<%[[CMD]] : !hal.command_buffer>
     // CHECK-SAME: source("Dispatch|Transfer|CommandRetire")
     // CHECK-SAME: target("CommandIssue|Dispatch|Transfer")
-    // CHECK: hal.command_buffer.end<%[[CMD]] : !hal.command_buffer>
+    // CHECK: hal.command_buffer.finalize<%[[CMD]] : !hal.command_buffer>
     } => !stream.timepoint
 
     // CHECK: hal.ex.submit_and_wait %[[DEVICE]], %[[CMD]]

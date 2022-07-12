@@ -8,7 +8,7 @@
 # Each test file should have a name matching the corresponding XLA HLO op and test only the
 # functionality of that op (though may make use of other ops where necessary). Tests should be
 # written using the IREE Check framework and should always pass on the reference VMVX backend.
-# See https://github.com/google/iree/blob/main/docs/developers/developing_iree/testing_guide.md#iree-core-end-to-end-tests.
+# See https://github.com/iree-org/iree/blob/main/docs/developers/developing_iree/testing_guide.md#iree-core-end-to-end-tests.
 
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
@@ -82,7 +82,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "fft.mlir",
+            "fft.mlir",  # TODO(#9583)
         ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],
@@ -163,7 +163,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "fft.mlir",
+            "fft.mlir",  # TODO(#9583)
         ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],
@@ -182,6 +182,75 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",
+    srcs = enforce_glob(
+        # keep sorted
+        [
+            "abs.mlir",
+            "add.mlir",
+            "batch_norm_inference.mlir",
+            "bitcast_convert.mlir",
+            "broadcast.mlir",
+            "broadcast_add.mlir",
+            "broadcast_in_dim.mlir",
+            "clamp.mlir",
+            "compare.mlir",
+            "concatenate.mlir",
+            "constant.mlir",
+            "convert.mlir",
+            "convolution.mlir",
+            "cosine.mlir",
+            "divide.mlir",
+            "dot.mlir",
+            "dot_general.mlir",
+            "dynamic_slice.mlir",
+            "dynamic_update_slice.mlir",
+            "exponential.mlir",
+            "exponential_fp16.mlir",
+            "exponential_minus_one.mlir",
+            "fft.mlir",
+            "finite.mlir",
+            "floor.mlir",
+            "gather.mlir",
+            "iota.mlir",
+            "log.mlir",
+            "log_plus_one.mlir",
+            "maximum.mlir",
+            "minimum.mlir",
+            "multiply.mlir",
+            "negate.mlir",
+            "pad.mlir",
+            "pow.mlir",
+            "reduce.mlir",
+            "reduce_window.mlir",
+            "remainder.mlir",
+            "reshape.mlir",
+            "reverse.mlir",
+            "rng_normal.mlir",
+            "rng_uniform.mlir",
+            "round.mlir",
+            "rsqrt.mlir",
+            "scatter.mlir",
+            "scatter_dynamic.mlir",
+            "select.mlir",
+            "sine.mlir",
+            "slice.mlir",
+            "sort.mlir",
+            "sqrt.mlir",
+            "subtract.mlir",
+            "tanh.mlir",
+            "torch_index_select.mlir",
+            "transpose.mlir",
+            "while.mlir",
+        ],
+        include = ["*.mlir"],
+    ),
+    compiler_flags = ["--iree-input-type=mhlo"],
+    driver = "local-task",
+    target_backend = "dylib-llvm-aot",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_vmvx_vmvx",
     srcs = enforce_glob(
         # keep sorted
         [
@@ -226,75 +295,6 @@ iree_check_single_backend_test_suite(
             "reverse.mlir",
             "rng_normal.mlir",
             "rng_uniform.mlir",
-            "round.mlir",
-            "rsqrt.mlir",
-            "scatter.mlir",
-            "scatter_dynamic.mlir",
-            "select.mlir",
-            "sine.mlir",
-            "slice.mlir",
-            "sort.mlir",
-            "sqrt.mlir",
-            "subtract.mlir",
-            "tanh.mlir",
-            "torch_index_select.mlir",
-            "transpose.mlir",
-            "while.mlir",
-        ],
-        include = ["*.mlir"],
-        exclude = [
-            # Excluded due to LLVM bug #56156
-            "exponential_fp16.mlir",
-        ],
-    ),
-    compiler_flags = ["--iree-input-type=mhlo"],
-    driver = "local-task",
-    target_backend = "dylib-llvm-aot",
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_vmvx_vmvx",
-    srcs = enforce_glob(
-        # keep sorted
-        [
-            "abs.mlir",
-            "add.mlir",
-            "batch_norm_inference.mlir",
-            "bitcast_convert.mlir",
-            "broadcast.mlir",
-            "broadcast_add.mlir",
-            "broadcast_in_dim.mlir",
-            "clamp.mlir",
-            "compare.mlir",
-            "concatenate.mlir",
-            "constant.mlir",
-            "convert.mlir",
-            "convolution.mlir",
-            "cosine.mlir",
-            "divide.mlir",
-            "dot.mlir",
-            "dot_general.mlir",
-            "dynamic_slice.mlir",
-            "dynamic_update_slice.mlir",
-            "exponential.mlir",
-            "exponential_minus_one.mlir",
-            "finite.mlir",
-            "floor.mlir",
-            "gather.mlir",
-            "iota.mlir",
-            "log.mlir",
-            "log_plus_one.mlir",
-            "maximum.mlir",
-            "minimum.mlir",
-            "multiply.mlir",
-            "negate.mlir",
-            "pad.mlir",
-            "pow.mlir",
-            "reduce.mlir",
-            "reduce_window.mlir",
-            "remainder.mlir",
-            "reshape.mlir",
-            "reverse.mlir",
             "rsqrt.mlir",
             "scatter.mlir",
             "scatter_dynamic.mlir",
@@ -312,9 +312,6 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [
             "exponential_fp16.mlir",
-            "fft.mlir",  # TODO(#6601): Eanble the test.
-            "rng_uniform.mlir",  # TODO(#6995): Enable the test.
-            "rng_normal.mlir",  # TODO(#6995): Enable the test.
             "round.mlir",  # TODO(#7618): Fix and enable (math.copysign -> VM)
         ],
     ),
@@ -367,7 +364,6 @@ iree_check_single_backend_test_suite(
             "reverse.mlir",
             "rng_normal.mlir",
             "rng_uniform.mlir",
-            "round.mlir",
             "rsqrt.mlir",
             "scatter.mlir",
             "scatter_dynamic.mlir",
@@ -386,7 +382,8 @@ iree_check_single_backend_test_suite(
         exclude = [
             "bitcast_convert.mlir",
             "exponential_fp16.mlir",
-            "fft.mlir",
+            "fft.mlir",  # TODO(#9583)
+            "round.mlir",  # TODO(#9617)
         ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],

@@ -208,9 +208,9 @@ static iree_status_t iree_hal_cuda_device_trim(iree_hal_device_t* base_device) {
   return iree_hal_allocator_trim(device->device_allocator);
 }
 
-static iree_status_t iree_hal_cuda_device_query_i32(
+static iree_status_t iree_hal_cuda_device_query_i64(
     iree_hal_device_t* base_device, iree_string_view_t category,
-    iree_string_view_t key, int32_t* out_value) {
+    iree_string_view_t key, int64_t* out_value) {
   // iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   *out_value = 0;
 
@@ -357,21 +357,6 @@ static iree_status_t iree_hal_cuda_device_queue_submit(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_device_submit_and_wait(
-    iree_hal_device_t* base_device,
-    iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
-    const iree_hal_submission_batch_t* batches,
-    iree_hal_semaphore_t* wait_semaphore, uint64_t wait_value,
-    iree_timeout_t timeout) {
-  // Submit...
-  IREE_RETURN_IF_ERROR(iree_hal_cuda_device_queue_submit(
-      base_device, command_categories, queue_affinity, batch_count, batches));
-
-  // ...and wait.
-  return iree_hal_semaphore_wait(wait_semaphore, wait_value, timeout);
-}
-
 static iree_status_t iree_hal_cuda_device_wait_semaphores(
     iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout) {
@@ -397,7 +382,7 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .host_allocator = iree_hal_cuda_device_host_allocator,
     .device_allocator = iree_hal_cuda_device_allocator,
     .trim = iree_hal_cuda_device_trim,
-    .query_i32 = iree_hal_cuda_device_query_i32,
+    .query_i64 = iree_hal_cuda_device_query_i64,
     .create_command_buffer = iree_hal_cuda_device_create_command_buffer,
     .create_descriptor_set = iree_hal_cuda_device_create_descriptor_set,
     .create_descriptor_set_layout =
@@ -410,7 +395,6 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
         iree_hal_cuda_device_query_semaphore_compatibility,
     .transfer_range = iree_hal_device_submit_transfer_range_and_wait,
     .queue_submit = iree_hal_cuda_device_queue_submit,
-    .submit_and_wait = iree_hal_cuda_device_submit_and_wait,
     .wait_semaphores = iree_hal_cuda_device_wait_semaphores,
     .wait_idle = iree_hal_cuda_device_wait_idle,
 };

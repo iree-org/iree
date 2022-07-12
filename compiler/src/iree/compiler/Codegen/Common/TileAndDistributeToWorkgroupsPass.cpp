@@ -66,18 +66,19 @@ static FailureOr<unsigned> getNumWorkloadValues(
   return tilingRoot.getNumLoops();
 }
 
-/// Method to find the root op, and based on the tile sizes and loops of the
-/// root op that are distributed, define the region on the
-/// `hal.executable.export` for the number of workgroups. Returns the tile
-/// sizes, interchange, and workloadPerWorkgroup.
-static LogicalResult defineWorkgroupCountRegion(
-    IREE::HAL::ExecutableExportOp exportOp, ArrayRef<Operation *> computeOps,
-    SmallVectorImpl<int64_t> &tileSizes, SmallVector<int64_t> &interchange,
+/// Method to lower the `flow.dispatch.default_workgroup_count` op into the
+/// actual computation that returns the number of workgroups.
+static LogicalResult lowerDispatchDefaultWorkgroupCountOp(
+    IREE::Flow::DispatchDefaultWorkgroupCountOp workgroupCountOp,
+    ArrayRef<Operation *> computeOps, SmallVectorImpl<int64_t> &tileSizes,
+    SmallVector<int64_t> &interchange,
     SmallVectorImpl<int64_t> &workloadPerWorkgroup) {
+  auto workloadValues = workgroupCountOp.operands();
+
   // Find the lowering configuration of the root operation.
   FailureOr<Operation *> rootOp = getRootOp(computeOps);
   if (failed(rootOp)) {
-    return exportOp.emitOpError(
+    return workgroupCountOp.emitOpError(
         "unable to find root op for defining workgroup count "
         "region for export op");
   }
@@ -88,12 +89,6 @@ static LogicalResult defineWorkgroupCountRegion(
     return rootOp.getValue()->emitOpError(
         "expected root op to implement the partitionable loop interface to "
         "help define the workgroup count");
-  }
-
-  FailureOr<unsigned> numWorkloadValues = getNumWorkloadValues(computeOps);
-  if (failed(numWorkloadValues)) {
-    return exportOp.emitOpError(
-        "unable to determined number of workload values");
   }
 
   SmallVector<unsigned> partitionableLoops =
@@ -109,60 +104,56 @@ static LogicalResult defineWorkgroupCountRegion(
   interchange.assign(rootOpConfig.getTileInterchangeVals(0));
 
   // Resize tile sizes to the number of loops setting inner loops to 0.
-  tileSizes.resize(*numWorkloadValues, 0);
+  tileSizes.resize(workloadValues.size(), 0);
   // Check that the interchange vector is also equal to the number of loops
   if (!interchange.empty()) {
-    if (interchange.size() < *numWorkloadValues) {
-      auto seq = llvm::seq<int64_t>(interchange.size(), *numWorkloadValues);
+    if (interchange.size() < workloadValues.size()) {
+      auto seq = llvm::seq<int64_t>(interchange.size(), workloadValues.size());
       interchange.append(seq.begin(), seq.end());
     }
-    interchange.resize(*numWorkloadValues);
+    interchange.resize(workloadValues.size());
   }
   // For now assert that number of partitionable loops are less than the
   // supported max.
   // TODO(ravishankarm): Relax this restriction.
   if (partitionableLoops.size() > kNumMaxParallelDims) {
-    return exportOp.emitOpError(
+    return workgroupCountOp.emitOpError(
                "expected number of partitionable loops to be less than or "
                "equal to ")
            << kNumMaxParallelDims;
   }
 
-  MLIRContext *context = exportOp.getContext();
+  MLIRContext *context = workgroupCountOp.getContext();
   OpBuilder builder(context);
-  Region &region = exportOp.workgroup_count();
-  Block *entryBlock = builder.createBlock(&region);
   // Add as many arguments as the number of loops
-  Location loc = exportOp.getLoc();
-  auto indexType = builder.getIndexType();
-  entryBlock->addArgument(builder.getType<IREE::HAL::DeviceType>(), loc);
+  Location loc = workgroupCountOp.getLoc();
 
   // AffineMap for the number of workgroups = ceilDiv(workload, tileSize)
   SmallVector<Value> numTiles;
-  numTiles.reserve(*numWorkloadValues);
-  builder.setInsertionPointToStart(entryBlock);
+  numTiles.reserve(workloadValues.size());
+  builder.setInsertionPoint(workgroupCountOp);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   llvm::DenseSet<unsigned> partitionableLoopsSet;
   partitionableLoopsSet.insert(partitionableLoops.begin(),
                                partitionableLoops.end());
-  for (auto loopNum : llvm::seq<unsigned>(0, *numWorkloadValues)) {
-    Value workload = entryBlock->addArgument(indexType, loc);
-    if (!partitionableLoopsSet.count(loopNum)) {
-      tileSizes[loopNum] = 0;
+  for (auto workload : llvm::enumerate(workloadValues)) {
+    if (!partitionableLoopsSet.count(workload.index())) {
+      tileSizes[workload.index()] = 0;
     }
-    if (tileSizes[loopNum] == 0) {
+    if (tileSizes[workload.index()] == 0) {
       numTiles.push_back(one);
       continue;
     }
-    if (tileSizes[loopNum] == 1) {
-      numTiles.push_back(workload);
+    if (tileSizes[workload.index()] == 1) {
+      numTiles.push_back(workload.value());
       continue;
     }
     AffineExpr s0;
-    bindSymbols(exportOp.getContext(), s0);
+    bindSymbols(workgroupCountOp.getContext(), s0);
     AffineMap numTilesMap =
-        AffineMap::get(0, 1, s0.ceilDiv(tileSizes[loopNum]));
-    Value nTiles = builder.create<AffineApplyOp>(loc, numTilesMap, workload);
+        AffineMap::get(0, 1, s0.ceilDiv(tileSizes[workload.index()]));
+    Value nTiles =
+        builder.create<AffineApplyOp>(loc, numTilesMap, workload.value());
     numTiles.push_back(nTiles);
   }
 
@@ -187,7 +178,8 @@ static LogicalResult defineWorkgroupCountRegion(
     workloadPerWorkgroup.push_back(tileSizes[partitionedLoop]);
   }
   numWorkgroups.resize(kNumMaxParallelDims, one);
-  builder.create<IREE::HAL::ReturnOp>(loc, numWorkgroups);
+  workgroupCountOp->replaceAllUsesWith(numWorkgroups);
+  workgroupCountOp.erase();
   return success();
 }
 
@@ -293,9 +285,6 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     auto exportOp = entryPoints.lookup(funcOp.getName());
     if (!exportOp) continue;
 
-    // If there is already a region on the `exportOp` do nothing.
-    if (!exportOp.workgroup_count().empty()) continue;
-
     SmallVector<Operation *> computeOps;
     SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
     if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
@@ -310,9 +299,33 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       continue;
     }
 
+    // Find the `flow.dispatch.default_workgroup_count` operation in the
+    // `workgroup_count` region of `hal.executable.export`. Lower this to the
+    // actual computation that returns the `workgroup_count`.
+    // TODO(ravishankarm): Ideally this should be done using a pattern, but the
+    // `workload_per_workgroup` usage here makes it hard. That is to be
+    // deprecated. Rework this logic into a pattern when that is done.
+    Region &workgroupCountRegion = exportOp.workgroup_count();
+    if (!workgroupCountRegion.hasOneBlock()) {
+      exportOp.emitOpError(
+          "expected workgroup_count region to have a single block");
+      return signalPassFailure();
+    }
+    Block &workgroupCountBody = workgroupCountRegion.front();
+    auto ops = workgroupCountBody
+                   .getOps<IREE::Flow::DispatchDefaultWorkgroupCountOp>();
+    if (!llvm::hasSingleElement(ops)) {
+      // Do not modify the region since the default path expects only a single
+      // `flow.dispatch.default_workgroup_count` op.
+      continue;
+    }
+    IREE::Flow::DispatchDefaultWorkgroupCountOp defaultWorkgroupCountOp =
+        *(ops.begin());
+
     SmallVector<int64_t> tileSizes, interchange, workloadPerWorkgroup;
-    if (failed(defineWorkgroupCountRegion(exportOp, computeOps, tileSizes,
-                                          interchange, workloadPerWorkgroup))) {
+    if (failed(lowerDispatchDefaultWorkgroupCountOp(
+            defaultWorkgroupCountOp, computeOps, tileSizes, interchange,
+            workloadPerWorkgroup))) {
       return signalPassFailure();
     }
     if (failed(updateTranslationInfoAttr(exportOp, workloadPerWorkgroup))) {

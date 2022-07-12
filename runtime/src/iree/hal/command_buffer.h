@@ -208,7 +208,9 @@ IREE_API_EXPORT iree_string_view_t iree_hal_command_category_format(
 // Designed to be embedded in concrete implementations that want validation.
 typedef struct iree_hal_command_buffer_validation_state_t {
   iree_hal_device_t* device;
-  bool is_recording;
+  // 1 when in a begin/end recording sequence.
+  uint32_t is_recording : 1;
+  // Debug group depth for tracking proper begin/end pairing.
   int32_t debug_group_depth;
   // TODO(benvanik): current executable layout/descriptor set layout info.
   // TODO(benvanik): valid push constant bit ranges.
@@ -287,9 +289,9 @@ IREE_API_EXPORT iree_hal_command_category_t
 iree_hal_command_buffer_allowed_categories(
     const iree_hal_command_buffer_t* command_buffer);
 
-// Resets and begins recording into the command buffer, clearing all
-// previously recorded contents.
-// The command buffer must not be in-flight.
+// Begins recording into the command buffer.
+// The command buffer must not have been recorded already; this is only valid to
+// call once after creation and must be paired with iree_hal_command_buffer_end.
 IREE_API_EXPORT iree_status_t
 iree_hal_command_buffer_begin(iree_hal_command_buffer_t* command_buffer);
 

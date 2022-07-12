@@ -33,6 +33,24 @@ namespace iree_compiler {
 
 namespace {
 
+// A `dealloc` is converted into a call to `free` on the underlying data buffer.
+// The memref descriptor being an SSA value, there is no need to clean it up
+// in any way.
+struct DropSharedMemoryDeallocOp : public OpRewritePattern<memref::DeallocOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(memref::DeallocOp op,
+                                PatternRewriter &rewriter) const override {
+    unsigned addressSpace =
+        op.getMemref().getType().cast<MemRefType>().getMemorySpaceAsInt();
+    if (addressSpace == gpu::GPUDialect::getWorkgroupAddressSpace()) {
+      rewriter.eraseOp(op);
+      return success();
+    }
+    return failure();
+  }
+};
+
 /// A pass that replaces all occurrences of GPU device operations with their
 /// corresponding NVVM equivalent.
 ///
@@ -63,6 +81,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
     {
       RewritePatternSet patterns(&getContext());
+      patterns.insert<DropSharedMemoryDeallocOp>(&getContext());
       populateScalarizeMathOps(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);

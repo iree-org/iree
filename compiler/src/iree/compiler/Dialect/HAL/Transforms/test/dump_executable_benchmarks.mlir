@@ -27,7 +27,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   // CHECK: hal.executable private @ex0
   hal.executable private @ex0 {
     hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-      hal.executable.export public @dispatch0 ordinal(0) layout(#executable_layout_0) {
+      hal.executable.export public @dispatch0 ordinal(0) layout(#executable_layout_0) attributes {
         translation_info = #iree_codegen.translation_info<CPUDefault workload_per_wg = [4]>
       } {
       ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):
@@ -41,7 +41,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
         }
       }
 
-      hal.executable.export public @dispatch1 ordinal(1) layout(#executable_layout_1) {
+      hal.executable.export public @dispatch1 ordinal(1) layout(#executable_layout_1) attributes {
         translation_info = #iree_codegen.translation_info<CPUDefault workload_per_wg = [4]>
       } {
       ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):
@@ -72,7 +72,6 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
 
   // Create command buffer:
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
-  // CHECK: hal.command_buffer.begin<%[[CMD]] : !hal.command_buffer>
 
   // Setup dispatch constants and bindings:
   // CHECK: hal.command_buffer.push_constants<%[[CMD]] : !hal.command_buffer> layout(%{{.+}} : !hal.executable_layout) offset(0) values([%c0_i32, %c0_i32]) : i32, i32
@@ -90,7 +89,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   // CHECK-NEXT: }
 
   // Submit and wait for dispatches to complete:
-  // CHECK: hal.command_buffer.end<%[[CMD]] : !hal.command_buffer>
+  // CHECK: hal.command_buffer.finalize<%[[CMD]] : !hal.command_buffer>
   // CHECK: hal.ex.submit_and_wait %{{.+}}, %[[CMD]]
 
   // ===========================================================================

@@ -62,7 +62,6 @@ iree_runtime_cc_library(
     deps = [
         ":base",
         ":core_headers",
-        ":logging",
     ],
 )
 
@@ -157,23 +156,6 @@ iree_runtime_cc_library(
 #===------------------------------------------------------------------------===#
 # Internal IREE C++ wrappers and utilities
 #===------------------------------------------------------------------------===#
-
-iree_runtime_cc_library(
-    name = "logging",
-    srcs = ["logging.cc"],
-    hdrs = ["logging.h"],
-    linkopts = select({
-        "//build_tools/bazel:iree_is_android": [
-            "-llog",
-        ],
-        "//conditions:default": [],
-    }),
-    deps = [
-        ":core_headers",
-        ":tracing",
-        "//runtime/src/iree/base/internal:flags",
-    ],
-)
 
 iree_runtime_cc_library(
     name = "loop_sync",

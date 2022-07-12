@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file %s --verify-diagnostics | FileCheck %s
 
 // CHECK-LABEL: @module_empty
 vm.module @module_empty {}
@@ -47,6 +47,16 @@ vm.module @export_funcs {
 
   // CHECK-LABEL: vm.export @fn as("fn_attributed") attributes {a}
   vm.export @fn as("fn_attributed") attributes {a}
+}
+
+// -----
+
+vm.module @export_funcs_invalid {
+  // expected-error@+1 {{vm.func op named 'fn_wrong_name' not found for export}}
+  vm.export @fn_wrong_name
+  vm.func @fn() {
+    vm.return
+  }
 }
 
 // -----

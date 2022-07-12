@@ -46,15 +46,22 @@ typedef struct iree_vm_native_export_descriptor_t {
   iree_string_view_t calling_convention;
 
   // An optional list of function-level reflection attributes.
-  iree_host_size_t reflection_attr_count;
-  const iree_vm_reflection_attr_t* reflection_attrs;
+  iree_host_size_t attr_count;
+  const iree_string_pair_t* attrs;
 } iree_vm_native_export_descriptor_t;
 
 typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_target_t)(
     iree_vm_stack_t* stack, void* module, void* module_state);
 
+enum iree_vm_native_function_flag_bits_t {
+  IREE_VM_NATIVE_FUNCTION_CALL_BEGIN = 1u << 0,
+  IREE_VM_NATIVE_FUNCTION_CALL_RESUME = 1u << 1,
+};
+typedef uint32_t iree_vm_native_function_flags_t;
+
 typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_shim_t)(
-    iree_vm_stack_t* stack, const iree_vm_function_call_t* call,
+    iree_vm_stack_t* stack, iree_vm_native_function_flags_t flags,
+    iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
     iree_vm_native_function_target_t target_fn, void* module,
     void* module_state, iree_vm_execution_result_t* out_result);
 
@@ -79,6 +86,10 @@ typedef struct iree_vm_native_module_descriptor_t {
   // Name of the module prefixed on all exported functions.
   iree_string_view_t module_name;
 
+  // An optional list of module-level reflection attributes.
+  iree_host_size_t module_attr_count;
+  const iree_string_pair_t* module_attrs;
+
   // All imported function descriptors.
   // interface.resolve_import will be called for each import.
   // Imports must be in order sorted by name compatible with
@@ -97,10 +108,6 @@ typedef struct iree_vm_native_module_descriptor_t {
   // implementation and are optional if overriding begin_call.
   iree_host_size_t function_count;
   const iree_vm_native_function_ptr_t* functions;
-
-  // An optional list of module-level reflection attributes.
-  iree_host_size_t reflection_attr_count;
-  const iree_vm_reflection_attr_t* reflection_attrs;
 } iree_vm_native_module_descriptor_t;
 
 // Returns the size, in bytes, of the allocation required for native modules.

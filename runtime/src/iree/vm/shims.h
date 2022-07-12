@@ -15,6 +15,7 @@
 #include "iree/base/attributes.h"
 #include "iree/base/target_platform.h"
 #include "iree/vm/module.h"
+#include "iree/vm/native_module.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
 #include "iree/vm/value.h"
@@ -26,13 +27,13 @@
 #define IREE_VM_ABI_TYPE_NAME(types) iree_vm_abi_##types##_t
 
 #define IREE_VM_ABI_FIXED_STRUCT(types, body) \
-  IREE_VM_ABI_FIXED_STRUCT_IMPL(types, IREE_VM_ABI_TYPE_NAME(types), body)
+  IREE_VM_ABI_FIXED_STRUCT_IMPL(IREE_VM_ABI_TYPE_NAME(types), types, body)
 
 #define IREE_VM_ABI_VLA_STRUCT(types, vla_count, vla_field, body) \
   IREE_VM_ABI_VLA_STRUCT_IMPL(types, vla_count, vla_field,        \
                               IREE_VM_ABI_TYPE_NAME(types), body)
 
-#define IREE_VM_ABI_FIXED_STRUCT_IMPL(types, struct_type, body)        \
+#define IREE_VM_ABI_FIXED_STRUCT_IMPL(struct_type, types, body)        \
   typedef struct iree_vm_abi_##types##_t body IREE_ATTRIBUTE_PACKED    \
       struct_type;                                                     \
   static inline struct_type* iree_vm_abi_##types##_checked_deref(      \
@@ -75,7 +76,8 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_target2_t)(
 #define IREE_VM_ABI_DECLARE_SHIM(arg_types, ret_types)                         \
   iree_status_t iree_vm_shim_##arg_types##_##ret_types(                        \
       iree_vm_stack_t* IREE_RESTRICT stack,                                    \
-      const iree_vm_function_call_t* IREE_RESTRICT call,                       \
+      iree_vm_native_function_flags_t flags, iree_byte_span_t args_storage,    \
+      iree_byte_span_t rets_storage,                                           \
       iree_vm_native_function_target2_t target_fn, void* IREE_RESTRICT module, \
       void* IREE_RESTRICT module_state,                                        \
       iree_vm_execution_result_t* IREE_RESTRICT out_result);
@@ -83,15 +85,18 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_target2_t)(
 #define IREE_VM_ABI_DEFINE_SHIM(arg_types, ret_types)                          \
   iree_status_t iree_vm_shim_##arg_types##_##ret_types(                        \
       iree_vm_stack_t* IREE_RESTRICT stack,                                    \
-      const iree_vm_function_call_t* IREE_RESTRICT call,                       \
+      iree_vm_native_function_flags_t flags, iree_byte_span_t args_storage,    \
+      iree_byte_span_t rets_storage,                                           \
       iree_vm_native_function_target2_t target_fn, void* IREE_RESTRICT module, \
       void* IREE_RESTRICT module_state,                                        \
       iree_vm_execution_result_t* IREE_RESTRICT out_result) {                  \
     const IREE_VM_ABI_TYPE_NAME(arg_types)* args =                             \
-        iree_vm_abi_##arg_types##_checked_deref(call->arguments);              \
+        iree_vm_abi_##arg_types##_checked_deref(args_storage);                 \
     IREE_VM_ABI_TYPE_NAME(ret_types)* rets =                                   \
-        iree_vm_abi_##ret_types##_checked_deref(call->results);                \
-    if (IREE_UNLIKELY(!args || !rets)) {                                       \
+        iree_vm_abi_##ret_types##_checked_deref(rets_storage);                 \
+    if (IREE_UNLIKELY(                                                         \
+            !((flags & IREE_VM_NATIVE_FUNCTION_CALL_RESUME) || args) ||        \
+            !rets)) {                                                          \
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                    \
                               "argument/result signature mismatch");           \
     }                                                                          \
@@ -444,6 +449,22 @@ IREE_VM_ABI_VLA_STRUCT(rriCirIID, a3_count, a3, {
   iree_vm_abi_irII_t a3[0];
 });
 
+IREE_VM_ABI_VLA_STRUCT(CrD, a0_count, a0, {
+  iree_vm_size_t a0_count;
+  iree_vm_abi_r_t a0[0];
+});
+
+IREE_VM_ABI_VLA_STRUCT(CrID, a0_count, a0, {
+  iree_vm_size_t a0_count;
+  iree_vm_abi_rI_t a0[0];
+});
+
+IREE_VM_ABI_VLA_STRUCT(iCrD, a1_count, a1, {
+  int32_t i0;
+  iree_vm_size_t a1_count;
+  iree_vm_abi_r_t a1[0];
+});
+
 #if defined(IREE_COMPILER_MSVC)
 #pragma pack(pop)
 #endif  // IREE_COMPILER_MSVC
@@ -491,7 +512,7 @@ IREE_VM_ABI_DECLARE_SHIM(rr, i);
 IREE_VM_ABI_DECLARE_SHIM(rr, r);
 IREE_VM_ABI_DECLARE_SHIM(rr, v);
 IREE_VM_ABI_DECLARE_SHIM(rr, ii);
-IREE_VM_ABI_DECLARE_SHIM(rrr, ii);
+IREE_VM_ABI_DECLARE_SHIM(rrr, iI);
 IREE_VM_ABI_DECLARE_SHIM(rrCirIID, r);
 IREE_VM_ABI_DECLARE_SHIM(rriCiD, v);
 IREE_VM_ABI_DECLARE_SHIM(rriiCID, v);
@@ -502,6 +523,9 @@ IREE_VM_ABI_DECLARE_SHIM(rrirCID, v);
 IREE_VM_ABI_DECLARE_SHIM(rrirI, v);
 IREE_VM_ABI_DECLARE_SHIM(rrIrII, v);
 IREE_VM_ABI_DECLARE_SHIM(rrrIii, v);
+IREE_VM_ABI_DECLARE_SHIM(CrID, r);
+IREE_VM_ABI_DECLARE_SHIM(CrD, r);
+IREE_VM_ABI_DECLARE_SHIM(iCrD, i);
 IREE_VM_ABI_DECLARE_SHIM(v, i);
 IREE_VM_ABI_DECLARE_SHIM(v, r);
 IREE_VM_ABI_DECLARE_SHIM(v, v);

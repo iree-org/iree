@@ -19,7 +19,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arithmetic/Utils/Utils.h"
-#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -112,7 +112,7 @@ struct CreateFastSlowPath final : public OpRewritePattern<scf::ForOp> {
       for (Operation *op : cloneOps) {
         if (op == padOp.getOperation()) {
           // We can elide the tensor.pad op. Just use its source.
-          bvm.map(padOp.getResult(), bvm.lookupOrDefault(padOp.source()));
+          bvm.map(padOp.getResult(), bvm.lookupOrDefault(padOp.getSource()));
         } else {
           builder.clone(*op, bvm);
         }

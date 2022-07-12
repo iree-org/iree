@@ -221,13 +221,6 @@ def LLVMCPUSynchronizeSymbolVisibility :
   let constructor = "mlir::iree_compiler::createLLVMCPUSynchronizeSymbolVisibilityPass()";
 }
 
-def LLVMCPUTileFuseAndVectorize
-    : Pass<"iree-llvmcpu-tile-fuse-and-vectorize", "func::FuncOp"> {
-  let summary = "Tile, fuse and vectorize Linalg ops";
-  let constructor =
-      "mlir::iree_compiler::createLLVMCPUTileFuseAndVectorizePass()";
-}
-
 def LLVMCPUAArch64VectorLowering
     : Pass<"iree-llvmcpu-aarch64-vector-lowering", "func::FuncOp"> {
   let summary = "Apply vector lowering logic to vector ops";
@@ -295,6 +288,14 @@ def LLVMGPUVectorization :
     Pass<"iree-llvmgpu-vectorization", "func::FuncOp"> {
   let summary = "Pass to convert linalg into Vector.";
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorizationPass()";
+  let options = [
+    Option<"nativeVector", "native-vector", "int64_t",
+            /*default=*/"4",
+           "Pick the native size being targeted.">,
+    Option<"generateContract", "generate-contract", "bool",
+            /*default=*/"true",
+           "Try to convert reduction to vector.contract.">,
+  ];
 }
 
 def LLVMGPUTensorCoreVectorization :

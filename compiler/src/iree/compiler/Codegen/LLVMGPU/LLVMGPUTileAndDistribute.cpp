@@ -233,7 +233,7 @@ static void propagateFillIntoPromotionAlloc(func::FuncOp funcOp) {
 
         auto fillOp = dyn_cast<linalg::FillOp>(prevOp);
         if (!fillOp) break;
-        if (fillOp.output() != copyOp.source()) break;
+        if (fillOp.output() != copyOp.getSource()) break;
         // Move the fillOp and change the destination to the copy destination.
         fillOp->moveBefore(copyOp);
         fillOp.outputsMutable().assign(copyOp.getTarget());

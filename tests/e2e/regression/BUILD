@@ -37,6 +37,7 @@ iree_lit_test_suite(
         [
             "fill_i64.mlir",
             "globals.mlir",
+            "globals_ml_program.mlir",
             "libm_linking.mlir",
             "scalar.mlir",
             "trace_dispatch_tensors.mlir",
@@ -46,6 +47,7 @@ iree_lit_test_suite(
             ["*.mlir"],
         # TODO(#5897): enable these for codegen linalg on tensors/etc.
         exclude = [
+            "associative_reordering.mlir",
             "dynamic_compare_and_select.mlir",
             "dynamic_dot_general.mlir",
             "dynamic_linalg_matmul_on_tensors.mlir",
@@ -70,6 +72,7 @@ iree_lit_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_regression_dylib-llvm-aot",
     srcs = [
+        "associative_reordering.mlir",
         "lowering_config.mlir",
     ] + BACKEND_TESTS,
     compiler_flags = ["--iree-input-type=mhlo"],

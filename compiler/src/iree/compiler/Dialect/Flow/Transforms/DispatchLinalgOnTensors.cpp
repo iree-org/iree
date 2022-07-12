@@ -25,7 +25,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
-#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -231,7 +231,7 @@ SmallVector<Range> getLoopRanges<tensor::InsertSliceOp>(
     PatternRewriter &rewriter) {
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-  Value source = insertSliceOp.source();
+  Value source = insertSliceOp.getSource();
   SmallVector<Range> loopRanges(insertSliceOp.getSourceType().getRank(),
                                 Range{zero, one, one});
   for (auto dim : llvm::seq<unsigned>(0, loopRanges.size())) {
@@ -398,6 +398,27 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
       resultPos++;
     }
   }
+
+  LLVM_DEBUG(llvm::dbgs() << "After workgroup_body creation \n"
+                          << *dispatchOp << "\n");
+
+  // 4. Add a region for workgroup_count computation.
+  Region &workgroupCountRegion = dispatchOp.workgroup_count();
+  Block *body = rewriter.createBlock(&workgroupCountRegion);
+  // Assuming that there is an insertion guard in place already, change the
+  // insertion point to the body.
+  rewriter.setInsertionPointToStart(body);
+  SmallVector<Value> workloadArgs;
+  for (auto workload : llvm::enumerate(workload)) {
+    workloadArgs.push_back(body->addArgument(workload.value().getType(), loc));
+  }
+  auto numWorkgroupsOp =
+      rewriter.create<DispatchDefaultWorkgroupCountOp>(loc, workloadArgs);
+  rewriter.create<ReturnOp>(loc, numWorkgroupsOp.getResults());
+
+  LLVM_DEBUG(llvm::dbgs() << "After workgroup_count creation \n"
+                          << *dispatchOp << "\n");
+
   LLVM_DEBUG(llvm::dbgs() << "Created dispatchOp shell \n"
                           << *dispatchOp << "\n");
   return clonedOps;
@@ -529,7 +550,7 @@ static bool hasUnfusableUseInDispatch(
 
     // Cannot fuse producer of `dest` with `tensor.insert_slice`.
     if (auto insertSliceUser = dyn_cast<tensor::InsertSliceOp>(user)) {
-      if (insertSliceUser.dest() == v) return true;
+      if (insertSliceUser.getDest() == v) return true;
     }
   }
   return false;
@@ -616,7 +637,7 @@ static BlockArgument getTiedOperandBlockArgument(BlockArgument resultArg) {
           .Case<tensor::InsertSliceOp>([&](tensor::InsertSliceOp insertOp)
                                            -> BlockArgument {
             auto loadOp =
-                insertOp.dest()
+                insertOp.getDest()
                     .template getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
             if (!loadOp) return nullptr;
             return loadOp.source().dyn_cast<BlockArgument>();

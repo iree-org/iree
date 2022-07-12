@@ -25,7 +25,7 @@ towards various targets, and executing compiled code on IREE's backends.
 !!! warning
     The TensorFlow, TensorFlow Lite, and XLA packages are currently only
     available on Linux and macOS. They are not available on Windows yet (see
-    [this issue](https://github.com/google/iree/issues/6417)).
+    [this issue](https://github.com/iree-org/iree/issues/6417)).
 
 ## Prerequisites
 
@@ -97,11 +97,11 @@ Stable release packages are published to
 !!! Tip
 
     Nightly packages are also published on
-    [GitHub releases](https://github.com/google/iree/releases). To use these,
+    [GitHub releases](https://github.com/iree-org/iree/releases). To use these,
     run `pip install` with this extra option:
 
     ```
-    --find-links https://github.com/google/iree/releases
+    --find-links https://github.com/iree-org/iree/releases
     ```
 
 ### Building from source
@@ -115,8 +115,8 @@ API reference pages for IREE's runtime and compiler Python APIs are hosted on
 [readthedocs](https://iree-python-api.readthedocs.io/en/latest/).
 
 Check out the samples in IREE's
-[samples/colab/ directory](https://github.com/google/iree/tree/main/samples/colab)
-and the [iree-samples repository](https://github.com/google/iree-samples) for
+[samples/colab/ directory](https://github.com/iree-org/iree/tree/main/samples/colab)
+and the [iree-samples repository](https://github.com/iree-org/iree-samples) for
 examples using the Python APIs.
 
 <!-- ## Troubleshooting -->

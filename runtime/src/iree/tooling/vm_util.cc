@@ -14,7 +14,6 @@
 #include <vector>
 
 #include "iree/base/api.h"
-#include "iree/base/logging.h"
 #include "iree/base/status_cc.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
@@ -106,7 +105,7 @@ static iree_status_t CreateBufferViewFromFile(
         IREE_STATUS_RESOURCE_EXHAUSTED,
         "a shape rank of %zu is just a little bit excessive, eh?", shape_rank);
   }
-  shape_result = iree_status_ignore(shape_result);
+  iree_status_ignore(shape_result);
   iree_hal_dim_t* shape =
       (iree_hal_dim_t*)iree_alloca(shape_rank * sizeof(iree_hal_dim_t));
   IREE_RETURN_IF_ERROR(iree_hal_parse_shape_and_element_type(

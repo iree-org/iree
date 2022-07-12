@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
+
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/ScopedTransform.h"
 #include "iree-dialects/Transforms/Listener.h"
@@ -34,7 +35,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
-#include "mlir/Dialect/SCF/Transforms.h"
+#include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -389,84 +390,41 @@ static Operation *findSingleDefiningOp(Operation *replacedOp,
       .Default([](Operation *) -> Operation * { return nullptr; });
 }
 
-namespace detail {
-class TrackingListener : public RewriteListener,
-                         public transform::TransformState::Extension {
-public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TrackingListener);
+void mlir::TrackingListener::notifyOperationReplaced(Operation *op,
+                                                     ValueRange newValues) {
+  // Bail out if in error state.
+  if (hadErrors)
+    return;
 
-  explicit TrackingListener(transform::TransformState &state)
-      : transform::TransformState::Extension(state) {}
+  // Exit early if the op is not tracked.
+  Value handle = getTransformState().getHandleForPayloadOp(op);
+  if (!handle)
+    return;
 
-  ~TrackingListener() override {
-#ifdef LLVM_ENABLE_ABI_BREAKING_CHECKS
-    assert(errorStateChecked && "must check listener error state");
-#endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
+  Operation *replacement = findSingleDefiningOp(op, newValues);
+  if (!replacement) {
+    emitError(op) << "could not find replacement for tracked op";
+    return;
   }
 
-  void notifyOperationReplaced(Operation *op, ValueRange newValues) override {
-    // Bail out if in error state.
-    if (hadErrors)
-      return;
+  LLVM_DEBUG(DBGS() << "replacing tracked " << *op << " with " << *replacement
+                    << " for " << handle << "\n");
+  mayFail(replacePayloadOp(op, replacement));
+}
 
-    // Exit early if the op is not tracked.
-    Value handle = getTransformState().getHandleForPayloadOp(op);
-    if (!handle)
-      return;
+void mlir::TrackingListener::notifyOperationRemoved(Operation *op) {
+  // Bail out if in error state.
+  if (hadErrors)
+    return;
 
-    Operation *replacement = findSingleDefiningOp(op, newValues);
-    if (!replacement) {
-      emitError(op) << "could not find replacement for tracked op";
-      return;
-    }
+  // Exit early if the op is not tracked.
+  Value handle = getTransformState().getHandleForPayloadOp(op);
+  if (!handle)
+    return;
 
-    LLVM_DEBUG(DBGS() << "replacing tracked " << *op << " with " << *replacement
-                      << " for " << handle << "\n");
-    mayFail(replacePayloadOp(op, replacement));
-  }
-
-  void notifyOperationRemoved(Operation *op) override {
-    // Bail out if in error state.
-    if (hadErrors)
-      return;
-
-    // Exit early if the op is not tracked.
-    Value handle = getTransformState().getHandleForPayloadOp(op);
-    if (!handle)
-      return;
-
-    LLVM_DEBUG(DBGS() << "removing tracked " << *op << " for " << handle
-                      << "\n");
-    mayFail(replacePayloadOp(op, nullptr));
-  }
-
-  LogicalResult checkErrorState() const {
-#ifdef LLVM_ENABLE_ABI_BREAKING_CHECKS
-    errorStateChecked = true;
-#endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
-    return failure(hadErrors);
-  }
-
-private:
-  InFlightDiagnostic emitError(Operation *op, const llvm::Twine &message = {}) {
-    mayFail(failure());
-    return op->emitError(message);
-  }
-
-  void mayFail(LogicalResult result) {
-    hadErrors |= result.failed();
-#ifdef LLVM_ENABLE_ABI_BREAKING_CHECKS
-    errorStateChecked = false;
-#endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
-  }
-
-  bool hadErrors = false;
-
-#ifdef LLVM_ENABLE_ABI_BREAKING_CHECKS
-  mutable bool errorStateChecked = false;
-#endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
-};
-} // namespace detail
+  LLVM_DEBUG(DBGS() << "removing tracked " << *op << " for " << handle << "\n");
+  mayFail(replacePayloadOp(op, nullptr));
+}
 
 //===----------------------------------------------------------------------===//
 // CanonicalizedSequenceOp
@@ -532,9 +490,9 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
 
   transform::TransformState::RegionScope regionScope =
       state.make_region_scope(getBodyRegion());
-  auto &listener = state.addExtension<::detail::TrackingListener>();
+  auto &listener = state.addExtension<::mlir::TrackingListener>();
   auto detachListener = llvm::make_scope_exit(
-      [&] { state.removeExtension<::detail::TrackingListener>(); });
+      [&] { state.removeExtension<::mlir::TrackingListener>(); });
   if (failed(mapBlockArguments(state)))
     return DiagnosedSilenceableFailure::definiteFailure();
 

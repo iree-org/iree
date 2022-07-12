@@ -40,7 +40,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
-#include "iree/base/logging.h"
 #include "iree/base/status_cc.h"
 #include "iree/base/tracing.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
@@ -213,8 +212,7 @@ Status PrepareModule(std::string target_backend,
   }
 
   // Translate from MLIR to IREE bytecode.
-  IREE_LOG(INFO) << "Compiling for target backend '" << target_backend
-                 << "'...";
+  std::cout << "Compiling for target backend '" << target_backend << "'...";
   mlir::PassManager pass_manager(mlir_module->getContext());
   pass_manager.enableVerifier(verify_passes_flag);
   mlir::applyPassManagerCLOptions(pass_manager);
@@ -343,9 +341,9 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
     device_uri = device_uris[0];
   }
 
-  IREE_LOG(INFO) << "Evaluating all functions in module for driver '"
-                 << driver_name << "' using device '"
-                 << std::string(device_uri.data, device_uri.size) << "'...";
+  std::cout << "Evaluating all functions in module for driver '" << driver_name
+            << "' using device '"
+            << std::string(device_uri.data, device_uri.size) << "'...";
 
   // Load the bytecode module from the flatbuffer data.
   // We do this first so that if we fail validation we know prior to dealing
@@ -369,8 +367,8 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
       iree_allocator_system(), &device));
 
   iree_vm_module_t* hal_module = nullptr;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_module_create(device, iree_allocator_system(), &hal_module));
+  IREE_RETURN_IF_ERROR(iree_hal_module_create(
+      device, IREE_HAL_MODULE_FLAG_NONE, iree_allocator_system(), &hal_module));
 
   // Evaluate all exported functions.
   auto run_function = [&](int ordinal) -> Status {
@@ -506,8 +504,8 @@ Status RunFile(const std::string& mlir_filename,
                                llvm::Twine(split_line));
     auto sub_failure = EvaluateFile(std::move(sub_buffer), registry);
     if (!sub_failure.ok()) {
-      IREE_LOG(ERROR) << "Failure for split at line #" << split_line << ": "
-                      << sub_failure;
+      std::cerr << "Failure for split at line #" << split_line << ": "
+                << sub_failure;
       if (any_failure.ok()) {
         any_failure = std::move(sub_failure);
       }

@@ -50,7 +50,7 @@
 #include <limits>
 #include <utility>
 
-#include "iree/base/logging.h"
+#include "iree/base/assert.h"
 
 namespace iree {
 
@@ -382,16 +382,16 @@ void IntrusiveListBase<T, IteratorT, ReverseIteratorT,
   while (link) {
     ++actual_count;
     if (!link->prev) {
-      IREE_DCHECK_EQ(link, head_);
+      IREE_ASSERT_EQ(link, head_);
     }
     if (!link->next) {
-      IREE_DCHECK_EQ(link, tail_);
+      IREE_ASSERT_EQ(link, tail_);
     }
-    IREE_DCHECK_EQ(link->prev, previous);
+    IREE_ASSERT_EQ(link->prev, previous);
     previous = link;
     link = link->next;
   }
-  IREE_DCHECK_EQ(actual_count, count_);
+  IREE_ASSERT_EQ(actual_count, count_);
 #endif  // IREE_PARANOID_INTRUSIVE_LIST
 }
 
@@ -481,10 +481,10 @@ template <typename T, typename IteratorT, typename ReverseIteratorT,
           size_t kOffset>
 void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::push_front(
     T* value) {
-  IREE_DCHECK(value);
+  IREE_ASSERT(value);
   auto* link = impl::TToLink<T, kOffset>(value);
-  IREE_DCHECK(!link->next);
-  IREE_DCHECK(!link->prev);
+  IREE_ASSERT(!link->next);
+  IREE_ASSERT(!link->prev);
   link->next = head_;
   link->prev = nullptr;
   head_ = link;
@@ -502,7 +502,7 @@ void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::push_front(
 template <typename T, typename IteratorT, typename ReverseIteratorT,
           size_t kOffset>
 void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::pop_front() {
-  IREE_DCHECK(head_);
+  IREE_ASSERT(head_);
   auto* link = head_;
   if (link) {
     head_ = head_->next;
@@ -530,10 +530,10 @@ template <typename T, typename IteratorT, typename ReverseIteratorT,
           size_t kOffset>
 void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::push_back(
     T* value) {
-  IREE_DCHECK(value);
+  IREE_ASSERT(value);
   auto* link = impl::TToLink<T, kOffset>(value);
-  IREE_DCHECK(!link->next);
-  IREE_DCHECK(!link->prev);
+  IREE_ASSERT(!link->next);
+  IREE_ASSERT(!link->prev);
   link->prev = tail_;
   link->next = nullptr;
   tail_ = link;
@@ -551,7 +551,7 @@ void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::push_back(
 template <typename T, typename IteratorT, typename ReverseIteratorT,
           size_t kOffset>
 void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::pop_back() {
-  IREE_DCHECK(tail_);
+  IREE_ASSERT(tail_);
   auto* link = tail_;
   if (link) {
     tail_ = tail_->prev;
@@ -572,11 +572,11 @@ template <typename T, typename IteratorT, typename ReverseIteratorT,
           size_t kOffset>
 void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::insert(
     T* position, T* value) {
-  IREE_DCHECK(value);
+  IREE_ASSERT(value);
   auto* link = impl::TToLink<T, kOffset>(value);
   auto* position_link = impl::TToLink<T, kOffset>(position);
-  IREE_DCHECK(!link->next);
-  IREE_DCHECK(!link->prev);
+  IREE_ASSERT(!link->next);
+  IREE_ASSERT(!link->prev);
 
   if (position_link == head_) {
     push_front(value);
@@ -601,17 +601,17 @@ T* IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::erase(T* value) {
   }
   auto* link = impl::TToLink<T, kOffset>(value);
   if (link->prev) {
-    IREE_DCHECK_NE(link, head_);
+    IREE_ASSERT_NE(link, head_);
     link->prev->next = link->next;
   } else {
-    IREE_DCHECK_EQ(link, head_);
+    IREE_ASSERT_EQ(link, head_);
     head_ = link->next;
   }
   if (link->next) {
-    IREE_DCHECK_NE(link, tail_);
+    IREE_ASSERT_NE(link, tail_);
     link->next->prev = link->prev;
   } else {
-    IREE_DCHECK_EQ(link, tail_);
+    IREE_ASSERT_EQ(link, tail_);
     tail_ = link->prev;
   }
   auto* next = link->next;
@@ -640,9 +640,9 @@ template <typename T, typename IteratorT, typename ReverseIteratorT,
           size_t kOffset>
 void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::replace(
     T* old_value, T* new_value) {
-  IREE_DCHECK(old_value);
-  IREE_DCHECK(new_value);
-  IREE_DCHECK_NE(old_value, new_value);
+  IREE_ASSERT(old_value);
+  IREE_ASSERT(new_value);
+  IREE_ASSERT_NE(old_value, new_value);
   auto* old_link = impl::TToLink<T, kOffset>(old_value);
   auto* new_link = impl::TToLink<T, kOffset>(new_value);
   new_link->next = old_link->next;

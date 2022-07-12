@@ -11,7 +11,7 @@ jobs:
     name: "Tag candidate release"
     runs-on: ubuntu-18.04
     # Don't run this in everyone's forks.
-    if: github.repository == 'google/iree'
+    if: github.repository == 'iree-org/iree'
     steps:
       - name: Get the last green commit
         id: last_green_commit

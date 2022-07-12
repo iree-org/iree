@@ -1,13 +1,10 @@
 add_mlir_library(IREELinalgExtTransforms
+  ForeachThreadToAsync.cpp
+  ForeachThreadToSequentialFor.cpp
   Fusion.cpp
-  InParallelToAsync.cpp
-  InParallelToHAL.cpp
-  InParallelToSequentialFor.cpp
   TilingExternalModels.cpp
-  TileToSequentialFor.cpp
-  TileToInParallel.cpp
   Tiling.cpp
-  TilingToTileOp.cpp
+  TilingToForeachThreadOp.cpp
   Utils.cpp
 
   PARTIAL_SOURCES_INTENDED
@@ -19,28 +16,17 @@ add_mlir_library(IREELinalgExtTransforms
   IREELinalgExtDialect
 
   MLIRAffineToStandard
-  MLIRAsync
+  MLIRAsyncDialect
   MLIRSCFToControlFlow
   MLIRLinalgToLLVM
   MLIRVectorToLLVM
   MLIRMathToLLVM
   MLIRMemRefToLLVM
   MLIRIR
-  MLIRMath
-  MLIRLinalg
+  MLIRMathDialect
+  MLIRLinalgDialect
   MLIRLinalgTransforms
   MLIRPass
-  MLIRSCF
+  MLIRSCFDialect
   MLIRTransforms
-)
-
-add_mlir_library(IREELinalgExtOpInterfaceImpl
-  LinalgExtBufferization.cpp
-
-  PARTIAL_SOURCES_INTENDED
-  LINK_LIBS PUBLIC
-  IREELinalgExtDialect
-
-  MLIRBufferization
-  MLIRTensorTransforms
 )

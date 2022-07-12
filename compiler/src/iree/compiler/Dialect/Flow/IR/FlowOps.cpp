@@ -354,36 +354,6 @@ static void getDefaultOffsetSizeAndStrides(
   return;
 }
 
-RankedTensorType DispatchTensorLoadOp::inferRankReducedResultType(
-    unsigned resultRank, IREE::Flow::DispatchTensorType sourceType,
-    ArrayRef<OpFoldResult> mixedSizes) {
-  // This is using logic from
-  // `tensor::ExtractSliceOp::inferRankReducedResultType`. Eventually just use
-  // that.
-  auto shape = llvm::to_vector<4>(
-      llvm::map_range(mixedSizes, [&](OpFoldResult valueOrAttr) -> int64_t {
-        if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-          return attr.cast<IntegerAttr>().getInt();
-        }
-        return DispatchTensorType::kDynamicSize;
-      }));
-  auto inferredType = RankedTensorType::get(shape, sourceType.getElementType());
-  int rankDiff = sourceType.getRank() - resultRank;
-  if (rankDiff > 0) {
-    llvm::SmallBitVector dimsToProject =
-        mlir::getPositionsOfShapeOne(rankDiff, shape);
-    SmallVector<int64_t> projectedShape;
-    for (unsigned pos = 0, e = shape.size(); pos < e; ++pos) {
-      if (!dimsToProject.test(pos)) {
-        projectedShape.push_back(shape[pos]);
-      }
-    }
-    inferredType =
-        RankedTensorType::get(projectedShape, inferredType.getElementType());
-  }
-  return inferredType;
-}
-
 RankedTensorType DispatchTensorLoadOp::inferResultType(
     IREE::Flow::DispatchTensorType sourceType,
     ArrayRef<OpFoldResult> mixedSizes) {
@@ -852,6 +822,13 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
 
+  // Copy the workgroup_count region.
+  auto &workgroupCountRegion = workgroup_count();
+  if (!workgroupCountRegion.empty()) {
+    auto &newWorkgroupCountRegion = newOp.workgroup_count();
+    newWorkgroupCountRegion.takeBody(workgroupCountRegion);
+  }
+
   // For dropped results, erase all the store-op uses. It is a pre-requisite
   // that the result can be dropped only if it is written within the dispatch
   // region op.
@@ -1259,7 +1236,7 @@ struct FoldTensorLoadWithExtractSlice
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
                                 PatternRewriter &rewriter) const override {
     auto dispatchTensorLoadOp =
-        extractSliceOp.source()
+        extractSliceOp.getSource()
             .getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
     if (!dispatchTensorLoadOp) return failure();
 
@@ -1298,7 +1275,7 @@ struct FoldInsertSliceWithTensorStoreOp
     // Check that the `dest` of the `tensor.insert_slice` and target of the
     // `flow.dispatch.tensor.store` are the same interface binding.
     Optional<BlockArgument> destBinding =
-        getBindingArgument(insertSliceOp.dest());
+        getBindingArgument(insertSliceOp.getDest());
     Optional<BlockArgument> targetBinding =
         getBindingArgument(dispatchTensorStoreOp.target());
     if (!destBinding || !targetBinding ||
@@ -1317,7 +1294,7 @@ struct FoldInsertSliceWithTensorStoreOp
     }
 
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
-        dispatchTensorStoreOp, insertSliceOp.source(),
+        dispatchTensorStoreOp, insertSliceOp.getSource(),
         dispatchTensorStoreOp.target(), dispatchTensorStoreOp.target_dims(),
         offsets, sizes, strides);
     return success();

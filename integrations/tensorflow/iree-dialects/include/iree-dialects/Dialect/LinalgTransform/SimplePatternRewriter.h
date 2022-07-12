@@ -7,14 +7,17 @@
 #include "mlir/IR/PatternMatch.h"
 
 namespace mlir {
-
 class MLIRContext;
 
 /// The only purpose of this class is to enable creation of PatternRewriter
 /// instances as the base class doesn't have a public constructor.
+/// The op-based constructor sets the insertion point before the `op`.
 class SimplePatternRewriter : public PatternRewriter {
 public:
-  explicit SimplePatternRewriter(MLIRContext *ctx) : PatternRewriter(ctx) {}
-};
+  SimplePatternRewriter(MLIRContext *context) : PatternRewriter(context) {}
 
+  SimplePatternRewriter(Operation *op) : PatternRewriter(op->getContext()) {
+    setInsertionPoint(op);
+  }
+};
 } // namespace mlir

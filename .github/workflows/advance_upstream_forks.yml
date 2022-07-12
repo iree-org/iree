@@ -16,7 +16,7 @@ on:
 jobs:
   advance_iree-llvm-fork:
     # Don't run this in everyone's forks.
-    if: github.repository == 'google/iree'
+    if: github.repository == 'iree-org/iree'
     name: "Advance iree-llvm-fork"
     runs-on: ubuntu-20.04
     steps:
@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
-          repository: google/iree-llvm-fork
+          repository: iree-org/iree-llvm-fork
           ref: main
 
       - name: Pull from upstream
@@ -36,11 +36,11 @@ jobs:
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: main
-          repository: google/iree-llvm-fork
+          repository: iree-org/iree-llvm-fork
 
   advance_iree-mhlo-fork:
     # Don't run this in everyone's forks.
-    if: github.repository == 'google/iree'
+    if: github.repository == 'iree-org/iree'
     name: "Advance iree-mhlo-fork"
     runs-on: ubuntu-20.04
     steps:
@@ -48,7 +48,7 @@ jobs:
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
-          repository: google/iree-mhlo-fork
+          repository: iree-org/iree-mhlo-fork
           ref: master
 
       - name: Pull from upstream
@@ -60,11 +60,11 @@ jobs:
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: master
-          repository: google/iree-mhlo-fork
+          repository: iree-org/iree-mhlo-fork
 
   advance_iree-tf-fork:
     # Don't run this in everyone's forks.
-    if: github.repository == 'google/iree'
+    if: github.repository == 'iree-org/iree'
     name: "Advance iree-tf-fork"
     runs-on: ubuntu-20.04
     steps:
@@ -72,7 +72,7 @@ jobs:
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
-          repository: google/iree-tf-fork
+          repository: iree-org/iree-tf-fork
           ref: master
 
       - name: Pull from upstream
@@ -84,4 +84,4 @@ jobs:
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: master
-          repository: google/iree-tf-fork
+          repository: iree-org/iree-tf-fork

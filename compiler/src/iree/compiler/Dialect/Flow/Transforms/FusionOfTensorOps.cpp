@@ -145,7 +145,8 @@ struct FusionOfTensorOpsPass
           auto reshapeOp = dyn_cast<tensor::ExpandShapeOp>(producer.getOwner());
           if (!reshapeOp) return true;
 
-          return reshapeOp.src().getDefiningOp<linalg::LinalgOp>() != nullptr;
+          return reshapeOp.getSrc().getDefiningOp<linalg::LinalgOp>() !=
+                 nullptr;
         };
 
     RewritePatternSet collapsingReshapePatterns(&getContext());

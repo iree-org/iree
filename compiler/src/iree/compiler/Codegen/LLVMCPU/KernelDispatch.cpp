@@ -424,9 +424,10 @@ static LogicalResult setDefaultRootConfig(
       partitionableLoops, lbs, ubs, minTileSizes, maxTileSizes);
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(flowTileSizes));
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, partitionableLoopsInterfaceOp, tileSizes,
-      DispatchLoweringPassPipeline::CPUDefault);
+  auto loweringConfig = IREE::Codegen::LoweringConfigAttr::get(
+      entryPointFn.getContext(), tileSizes);
+  setLoweringConfig(partitionableLoopsInterfaceOp, loweringConfig);
+  return success();
 }
 
 static LogicalResult setMatmulPadRootConfig(
@@ -497,37 +498,31 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
                                           ArrayRef<int64_t> workgroupTileSizes,
                                           int vectorSize) {
   assert(flowTileSizes.size() == workgroupTileSizes.size());
-  int64_t numLoops = workgroupTileSizes.size();
-  SmallVector<int64_t> l1TileSizes;
+  SmallVector<int64_t> parallelTileSizes;
   auto shape = cast<linalg::LinalgOp>(op.getOperation()).getStaticLoopRanges();
   for (auto en : llvm::enumerate(flowTileSizes.drop_back())) {
-    l1TileSizes.push_back(
+    parallelTileSizes.push_back(
         getMaxTileSize(0, en.value() ? en.value() : shape[en.index()],
                        workgroupTileSizes[en.index()], vectorSize));
   }
 
-  // L1 tile size for k dimensions.
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
   int64_t K = lhsShapedType.getShape().back();
-  l1TileSizes.push_back(
+  parallelTileSizes.push_back(
       getMaxTileSize(0, K, workgroupTileSizes.back(), vectorSize));
 
-  SmallVector<int64_t> vectorTileSizes;
-  if (numLoops >= 3) {
-    vectorTileSizes.append(numLoops - 3, 1);
-    vectorTileSizes.append(3, vectorSize);
-  } else {
-    vectorTileSizes.append(numLoops, vectorSize);
-  }
+  SmallVector<int64_t> reductionTileSizes;
+  splitParallelAndReductionTiles(op.getOperation(), parallelTileSizes,
+                                 reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
-  tileSizes.push_back(l1TileSizes);
-  tileSizes.push_back(vectorTileSizes);
+  tileSizes.push_back(parallelTileSizes);
+  tileSizes.push_back(reductionTileSizes);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
-      DispatchLoweringPassPipeline::CPUTileFuseAndVectorize);
+      DispatchLoweringPassPipeline::CPUAArchDoubleTilingExpert);
 }
 
 static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,
@@ -675,27 +670,17 @@ static LogicalResult setRootConfig(
     return {1, 1, 1, M0, N0, K0};
   };
 
-  auto getVectorSizes = [&]() -> SmallVector<int64_t> {
-    auto lhsShape = mmt4dOp.inputs()[0].getType().cast<ShapedType>().getShape();
-    auto rhsShape = mmt4dOp.inputs()[1].getType().cast<ShapedType>().getShape();
-    int M0 = lhsShape[2];
-    int N0 = rhsShape[2];
-    int K0 = lhsShape[3];
-    if (!mmt4dVectorSizes.empty()) {
-      return SmallVector<int64_t>(mmt4dVectorSizes.begin(),
-                                  mmt4dVectorSizes.end());
-    }
-    return {1, 1, 1, M0, N0, K0};
-  };
+  SmallVector<int64_t> parallelTileSizes = getL1TileSizes();
+  SmallVector<int64_t> reductionTileSizes;
+  splitParallelAndReductionTiles(mmt4dOp.getOperation(), parallelTileSizes,
+                                 reductionTileSizes);
 
-  SmallVector<int64_t> nativeVectorSize = getVectorSizes();
-
-  TileSizesListType tileSizes = {getWorkgroupTileSizes(), getL1TileSizes(),
-                                 nativeVectorSize};
+  TileSizesListType tileSizes = {getWorkgroupTileSizes(), parallelTileSizes,
+                                 reductionTileSizes};
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, mmt4dOp, tileSizes,
-      DispatchLoweringPassPipeline::CPUTileFuseAndVectorize);
+      DispatchLoweringPassPipeline::CPUAArchDoubleTilingExpert);
 }
 
 /// Sets the lowering configuration for dispatch region for linalg_ext.fft
@@ -988,13 +973,18 @@ static LogicalResult setRootConfig(
 /// Set default configuration for Linalg ops.
 static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::LinalgOp linalgOp,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops,
+    DispatchLoweringPassPipeline pipeline =
+        DispatchLoweringPassPipeline::CPUDefault) {
   if (getLoweringConfig(linalgOp)) return success();
 
   auto partitionableLoopOp =
       cast<PartitionableLoopsInterface>(linalgOp.getOperation());
   SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
   SmallVector<int64_t> ubs = linalgOp.getStaticLoopRanges();
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPointFn->getContext(), pipeline);
+  setTranslationInfo(entryPointFn, translationInfo);
   return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
 }
 
@@ -1003,7 +993,9 @@ static LogicalResult setRootConfig(
 static LogicalResult setRootConfig(
     func::FuncOp entryPointFn,
     IREE::LinalgExt::TiledOpInterface tiledOpInterfaceOp,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops,
+    DispatchLoweringPassPipeline pipeline =
+        DispatchLoweringPassPipeline::CPUDefault) {
   if (getLoweringConfig(tiledOpInterfaceOp)) return success();
 
   auto partitionableLoopOp =
@@ -1023,6 +1015,9 @@ static LogicalResult setRootConfig(
       iterationDomain, [&](Range r) { return getStaticValue(r.offset); }));
   auto ubs = llvm::to_vector(llvm::map_range(
       iterationDomain, [&](Range r) { return getStaticValue(r.size); }));
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPointFn->getContext(), pipeline);
+  setTranslationInfo(entryPointFn, translationInfo);
   return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
 }
 
@@ -1065,7 +1060,8 @@ static LogicalResult setVMVXRootConfigImpl(
     return TypeSwitch<Operation *, LogicalResult>(op)
         .Case<linalg::LinalgOp, IREE::LinalgExt::TiledOpInterface>(
             [&](auto op) {
-              return setRootConfig(entryPointFn, op, tiledLoops);
+              return setRootConfig(entryPointFn, op, tiledLoops,
+                                   DispatchLoweringPassPipeline::VMVXDefault);
             })
         .Default([&](Operation *op) { return success(); });
   };

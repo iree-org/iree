@@ -6,7 +6,7 @@
 
 #include <jni.h>
 
-#include "iree/base/logging.h"
+#include "iree/base/assert.h"
 
 // NOTE: we pull in our own copy here in case the tflite API changes upstream.
 #define TFL_COMPILE_LIBRARY 1
@@ -21,10 +21,10 @@ namespace {
 // object.
 static TfLiteInterpreter* GetInterpreter(JNIEnv* env, jobject obj) {
   jclass clazz = env->GetObjectClass(obj);
-  IREE_DCHECK(clazz);
+  IREE_ASSERT(clazz);
 
   jfieldID field = env->GetFieldID(clazz, "nativeAddress", "J");
-  IREE_DCHECK(field);
+  IREE_ASSERT(field);
 
   if (env->ExceptionCheck()) {
     return nullptr;  // Failed to get field, returning null.
@@ -59,19 +59,19 @@ JNI_FUNC jlong JNI_PREFIX(nativeNew)(JNIEnv* env, jobject thiz,
 
 JNI_FUNC void JNI_PREFIX(nativeFree)(JNIEnv* env, jobject thiz) {
   TfLiteInterpreter* interpreter = GetInterpreter(env, thiz);
-  IREE_DCHECK_NE(interpreter, nullptr);
+  IREE_ASSERT_NE(interpreter, nullptr);
   TfLiteInterpreterDelete(interpreter);
 }
 
 JNI_FUNC jint JNI_PREFIX(nativeInputTensorCount)(JNIEnv* env, jobject thiz) {
   TfLiteInterpreter* interpreter = GetInterpreter(env, thiz);
-  IREE_DCHECK_NE(interpreter, nullptr);
+  IREE_ASSERT_NE(interpreter, nullptr);
   return (jint)TfLiteInterpreterGetInputTensorCount(interpreter);
 }
 
 JNI_FUNC jint JNI_PREFIX(nativeOutputTensorCount)(JNIEnv* env, jobject thiz) {
   TfLiteInterpreter* interpreter = GetInterpreter(env, thiz);
-  IREE_DCHECK_NE(interpreter, nullptr);
+  IREE_ASSERT_NE(interpreter, nullptr);
 
   return (jint)TfLiteInterpreterGetOutputTensorCount(interpreter);
 }
