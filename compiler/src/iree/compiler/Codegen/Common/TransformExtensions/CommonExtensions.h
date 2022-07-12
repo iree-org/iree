@@ -10,6 +10,9 @@
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 
+// Do not hoist this include!
+#include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensionsAttrs.h.inc"
+
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensionsOps.h.inc"
 

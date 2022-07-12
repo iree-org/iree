@@ -176,6 +176,20 @@ def PadDynamicAlloc :
   let constructor = "mlir::iree_compiler::createPadDynamicAlloc()";
 }
 
+def TransformDialectInterpreter :
+    Pass<"iree-transform-dialect-interpreter"> {
+  let summary = "Pass to apply transform dialect operations one by one.";
+  let constructor = 
+    "mlir::iree_compiler::createTransformDialectInterpreterPass()";
+  let options = [
+    Option<"transformFileName", "transform-file-name", "std::string",
+            /*default=*/"\"\"",
+            "Optional filename containing a transform dialect specification to "
+            "apply. If left empty, the IR is assumed to contain a transform "
+            "dialect spec embedded next to the top-level op.">,
+  ];
+}
+
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------

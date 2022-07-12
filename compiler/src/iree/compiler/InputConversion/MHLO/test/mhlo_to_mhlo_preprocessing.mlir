@@ -212,7 +212,7 @@ func.func @reorder_broadcast_in_dim_scalar_unary_diff_type(%arg0: tensor<complex
 
 func.func @rng_normal(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<3x5xf32> {
   %shape = mhlo.constant dense<[3, 5]> : tensor<2xi64>
-  %0 = "mhlo.rng_normal"(%arg0, %arg1, %shape) : (tensor<f32>, tensor<f32>, tensor<2xi64>) -> tensor<3x5xf32>
+  %0 = "mhlo.rng"(%arg0, %arg1, %shape) {rng_distribution = #mhlo.rng_distribution<NORMAL>} : (tensor<f32>, tensor<f32>, tensor<2xi64>) -> tensor<3x5xf32>
   return %0 : tensor<3x5xf32>
 }
 // CHECK-LABEL: func.func @rng_normal

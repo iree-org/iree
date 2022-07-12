@@ -14,7 +14,7 @@ import shutil
 import sys
 import tarfile
 
-from typing import Optional
+from typing import List, Optional
 
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_suite import MODEL_FLAGFILE_NAME, BenchmarkCase, BenchmarkSuite
@@ -27,6 +27,10 @@ from common.linux_device_utils import get_linux_device_info
 class LinuxBenchmarkDriver(BenchmarkDriver):
   """Linux benchmark driver."""
 
+  def __init__(self, gpu_id: str, *args, **kwargs):
+    self.gpu_id = gpu_id
+    super().__init__(*args, **kwargs)
+
   def run_benchmark_case(self, benchmark_case: BenchmarkCase,
                          benchmark_results_filename: Optional[str],
                          capture_filename: Optional[str]) -> None:
@@ -35,21 +39,35 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
     # Only use the low 8 cores.
     taskset = "0xFF"
 
+    run_flags = self.__parse_flagfile(benchmark_case.benchmark_case_dir)
+    # Replace the CUDA device flag with the specified GPU.
+    if benchmark_case.driver_info.driver_name == "cuda":
+      run_flags = list(
+          filter(lambda flag: not flag.startswith("--device"), run_flags))
+      run_flags.append(f"--device=cuda://{self.gpu_id}")
+
     if benchmark_results_filename:
       self.__run_benchmark(benchmark_case=benchmark_case,
                            results_filename=benchmark_results_filename,
-                           taskset=taskset)
+                           taskset=taskset,
+                           run_flags=run_flags)
 
     if capture_filename:
       self.__run_capture(benchmark_case=benchmark_case,
                          capture_filename=capture_filename,
-                         taskset=taskset)
+                         taskset=taskset,
+                         run_flags=run_flags)
+
+  def __parse_flagfile(self, case_dir: str) -> List[str]:
+    with open(os.path.join(case_dir, MODEL_FLAGFILE_NAME)) as flagfile:
+      return [line.strip() for line in flagfile.readlines()]
 
   def __run_benchmark(self, benchmark_case: BenchmarkCase,
-                      results_filename: str, taskset: str):
+                      results_filename: str, taskset: str,
+                      run_flags: List[str]):
     tool_name = benchmark_case.benchmark_tool_name
     tool_path = os.path.join(self.config.normal_benchmark_tool_dir, tool_name)
-    cmd = ["taskset", taskset, tool_path, f"--flagfile={MODEL_FLAGFILE_NAME}"]
+    cmd = ["taskset", taskset, tool_path] + run_flags
     if tool_name == "iree-benchmark-module":
       cmd.extend(
           get_iree_benchmark_module_arguments(
@@ -63,12 +81,12 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
       print(result_json)
 
   def __run_capture(self, benchmark_case: BenchmarkCase, capture_filename: str,
-                    taskset: str):
+                    taskset: str, run_flags: List[str]):
     capture_config = self.config.trace_capture_config
 
     tool_path = os.path.join(capture_config.traced_benchmark_tool_dir,
                              benchmark_case.benchmark_tool_name)
-    cmd = ["taskset", taskset, tool_path, f"--flagfile={MODEL_FLAGFILE_NAME}"]
+    cmd = ["taskset", taskset, tool_path] + run_flags
     process = subprocess.Popen(cmd,
                                env={"TRACY_NO_EXIT": "1"},
                                cwd=benchmark_case.benchmark_case_dir,
@@ -86,7 +104,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
 
 def main(args):
   device_info = get_linux_device_info(args.device_model, args.cpu_uarch,
-                                      args.verbose)
+                                      args.gpu_id, args.verbose)
   if args.verbose:
     print(device_info)
 
@@ -94,7 +112,8 @@ def main(args):
   benchmark_config = BenchmarkConfig.build_from_args(args, commit)
   benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
       benchmark_config.root_benchmark_dir)
-  benchmark_driver = LinuxBenchmarkDriver(device_info=device_info,
+  benchmark_driver = LinuxBenchmarkDriver(gpu_id=args.gpu_id,
+                                          device_info=device_info,
                                           benchmark_config=benchmark_config,
                                           benchmark_suite=benchmark_suite,
                                           benchmark_grace_time=1.0,
@@ -139,6 +158,11 @@ def parse_argument():
   arg_parser.add_argument("--cpu_uarch",
                           default=None,
                           help="CPU microarchitecture, e.g., CascadeLake")
+  arg_parser.add_argument(
+      "--gpu_id",
+      type=str,
+      default="0",
+      help="GPU ID to run the benchmark, e.g., '0' or 'GPU-<UUID>'")
 
   return arg_parser.parse_args()
 

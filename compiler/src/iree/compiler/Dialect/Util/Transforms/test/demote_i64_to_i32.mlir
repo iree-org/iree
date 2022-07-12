@@ -80,14 +80,14 @@ func.func @mhlo_constant_ui64() -> tensor<1xui64> {
 // CHECK-LABEL: func.func @mhlo_compare_i64
 // CHECK-SAME: (%arg0: tensor<i32>, %arg1: tensor<i32>) -> (i1, tensor<i32>)
 func.func @mhlo_compare_i64(%arg0 : tensor<i64>, %arg1 : tensor<i64>) -> (i1, tensor<i64>) {
-  // CHECK-NEXT: %0 = "mhlo.compare"(%arg0, %arg1) {comparison_direction = #mhlo<"comparison_direction LT">} : (tensor<i32>, tensor<i32>) -> tensor<i1>
+  // CHECK-NEXT: %0 = "mhlo.compare"(%arg0, %arg1) {comparison_direction = #mhlo<comparison_direction LT>} : (tensor<i32>, tensor<i32>) -> tensor<i1>
   // CHECK-NEXT: %1 = tensor.extract %0[] : tensor<i1>
   // CHECK-NEXT: cf.cond_br %1, ^bb1(%1, %arg0 : i1, tensor<i32>), ^bb2(%1, %arg1 : i1, tensor<i32>)
   // CHECK-NEXT: ^bb1(%2: i1, %3: tensor<i32>): // pred: ^bb0
   // CHECK-NEXT: return %2, %3 : i1, tensor<i32>
   // CHECK-NEXT: ^bb2(%4: i1, %5: tensor<i32>): // pred: ^bb0
   // CHECK-NEXT: return %4, %5 : i1, tensor<i32>
-  %0 = "mhlo.compare"(%arg0, %arg1) {comparison_direction = #mhlo<"comparison_direction LT">} : (tensor<i64>, tensor<i64>) -> tensor<i1>
+  %0 = "mhlo.compare"(%arg0, %arg1) {comparison_direction = #mhlo<comparison_direction LT>} : (tensor<i64>, tensor<i64>) -> tensor<i1>
   %1 = tensor.extract %0[] : tensor<i1>
   cf.cond_br %1, ^bb1(%1, %arg0 : i1, tensor<i64>), ^bb2(%1, %arg1 : i1, tensor<i64>)
 ^bb1(%2 : i1, %3 : tensor<i64>):

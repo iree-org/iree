@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -transform-dialect-interpreter -transform-dialect-drop-schedule | FileCheck %s
+// RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule | FileCheck %s
 
 func.func @pad_matmul_static_dispatch_0(%arg0: tensor<250x500xf32>, %arg1: tensor<500x1020xf32>) -> tensor<250x1020xf32> {
   %c0 = arith.constant 0 : index

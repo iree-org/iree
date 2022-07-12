@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -transform-dialect-interpreter -transform-dialect-drop-schedule | FileCheck %s
+// RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule | FileCheck %s
 
 // CHECK-LABEL: @select_cmp_eq_select
 //       CHECK:   return %arg1

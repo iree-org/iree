@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassOptions.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -147,6 +148,11 @@ std::unique_ptr<OperationPass<func::FuncOp>> createWorkGroupSwizzle(
 
 /// Pad dynamic alloc op to convert them into static one.
 std::unique_ptr<OperationPass<func::FuncOp>> createPadDynamicAlloc();
+
+/// Create an IREE-specific Transform dialect interpreter pass with all
+/// registrations necessary for IREE.
+std::unique_ptr<Pass> createTransformDialectInterpreterPass(
+    llvm::StringRef transformFileName = llvm::StringRef());
 
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
