@@ -273,6 +273,9 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
 
   *out_driver = NULL;
 
+  iree_string_builder_t driver_list;
+  iree_string_builder_initialize(iree_allocator_system(), &driver_list);
+
   // NOTE: we hold the lock the entire time here so that we can avoid
   // allocations and avoid spurious failures by outside mutation of the
   // registry.
@@ -303,6 +306,9 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
         hit_factory = factory;
         break;
       }
+      iree_string_builder_append_format(&driver_list, "%16.*s\n",
+                                        (int)driver_info->driver_name.size,
+                                        driver_info->driver_name.data);
     }
     // Since we are scanning in reverse we stop searching when we find the first
     // hit (aka the most recently added driver).
@@ -316,11 +322,14 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_try_create(
     status = hit_factory->try_create(hit_factory->self, driver_name,
                                      host_allocator, out_driver);
   } else {
-    status =
-        iree_make_status(IREE_STATUS_NOT_FOUND, "no driver '%.*s' registered",
-                         (int)driver_name.size, driver_name.data);
+    status = iree_make_status(
+        IREE_STATUS_NOT_FOUND,
+        "no driver '%.*s' registered. Available drivers:\n%.*s",
+        (int)driver_name.size, driver_name.data, (int)driver_list.size,
+        driver_list.buffer);
   }
 
+  iree_string_builder_deinitialize(&driver_list);
   iree_slim_mutex_unlock(&registry->mutex);
 
   IREE_TRACE_ZONE_END(z0);
