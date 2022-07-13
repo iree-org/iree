@@ -7,16 +7,17 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # This script is actually part of the VM image and fetches the rest of the
-# configuration. Longer term, we may want to
+# configuration. Longer term, we may want to have an explicit deployment of new
+# scripts instead.
 
 set -euo pipefail
 
-token="${1}"
+runner_registration_token="${1}"
 
 if [[ "$(whoami)" != "runner" ]]; then
   echo "Current user is not 'runner'. Rerunning script as 'runner'."
   SCRIPT="$( readlink -f -- "$0"; )"
-  sudo su runner --shell /bin/bash --command "${SCRIPT} ${token}"
+  sudo su runner --shell /bin/bash --command "${SCRIPT} ${runner_registration_token}"
   exit
 fi
 
@@ -40,4 +41,4 @@ cp -r iree/build_tools/github_actions/runner/* "${HOME}/"
 cd "${HOME}"
 rm -rf /tmp/iree
 
-./setup.sh "${token}"
+./setup.sh "${runner_registration_token}"

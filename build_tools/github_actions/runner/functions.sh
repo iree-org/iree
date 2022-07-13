@@ -37,12 +37,13 @@ get_attribute() {
 
 ############################## Utility functions ###############################
 
-is_contained () {
+# Tests if the first argument is contained in the array in the second argument.
+# Usage `is_contained "element" "${array[@]}"`
+is_contained() {
   local e;
   local match="$1"
   shift
-  # for loop with no paramters iterates over arguments
-  for e; do
+  for e in "$@"; do
     if [[ "$e" == "$match" ]]; then
       return 0
     fi

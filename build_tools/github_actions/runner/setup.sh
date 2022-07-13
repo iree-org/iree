@@ -11,11 +11,11 @@
 # querying host properties (see
 # https://cloud.google.com/compute/docs/instances/os-inventory-management).
 # It also still requires being passed a runner token (which will go away with
-# the introduction
+# the introduction of a proxy service for obtaining registration tokens).
 
 set -euo pipefail
 
-token="$1"
+runner_registration_token="$1"
 
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 
@@ -56,7 +56,6 @@ MACHINE_TYPE="$(get_metadata instance/machine-type | awk -F/ '{print $NF}')"
 
 RUNNER_GROUP="$(get_attribute github-runner-group)"
 RUNNER_TRUST="$(get_attribute github-runner-trust)"
-# Things like "Linux" need to be in here because we don't have
 RUNNER_CUSTOM_LABELS="$(get_attribute github-runner-labels)"
 
 declare -a RUNNER_LABELS_ARRAY=(
@@ -80,12 +79,18 @@ RUNNER_LABELS="$(IFS="," ; echo "${RUNNER_LABELS_ARRAY[*]}")"
 # Append custom labels, taking care to only add a comma if there are any
 RUNNER_LABELS="${RUNNER_LABELS}${RUNNER_CUSTOM_LABELS:+,${RUNNER_CUSTOM_LABELS}}"
 
-set -x
-./config.sh \
-  --url https://github.com/iree-org \
-  --token "${token}" \
-  --labels "${RUNNER_LABELS}" \
-  --unattended \
+declare -a args=(
+  --url https://github.com/iree-org
+  --labels "${RUNNER_LABELS}"
+  --unattended
   --runnergroup "${RUNNER_GROUP}"
+)
+# I would love to discover another way to print an array while preserving quote
+# escaping. We're not just using `set -x` on the command itself because we don't
+# want to leak the token (even if it's immediately invalidated, still best not
+# to).
+(set -x; : Running configuration with additional args: "${args[@]}")
+
+./config.sh --token "${runner_registration_token}" "${args[@]}"
 sudo ./svc.sh install
 sudo ./svc.sh start

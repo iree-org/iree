@@ -8,5 +8,7 @@
 
 set -euo pipefail
 
-# clean up any messes docker has left
+# Docker has a tendency to make things owned by root unless you do a dance with
+# which user you run it as. This can make the workspace unusable.
+# TODO: switch to ephemeral runners and get rid of this.
 sudo chown -R runner:runner /home/runner
