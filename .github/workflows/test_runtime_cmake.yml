@@ -17,7 +17,6 @@ env:
 
 jobs:
   build_runtime:
-    name: "Test runtime"
     runs-on: ubuntu-20.04
     steps:
       - name: "Checking out repository"
