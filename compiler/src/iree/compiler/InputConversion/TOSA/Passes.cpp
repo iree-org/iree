@@ -49,7 +49,7 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
 
   tosa::addTosaToLinalgPasses(passManager);
 
-  // Sometimes we generate more TOSA operaitons post linalg.
+  // Sometimes we generate more TOSA operations during the lowering to linalg.
   passManager.addNestedPass<func::FuncOp>(tosa::createTosaToArith());
   passManager.addNestedPass<func::FuncOp>(tosa::createTosaToTensor());
 
