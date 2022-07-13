@@ -11,7 +11,6 @@ on:
     branches:
       - main
   workflow_dispatch:
-  pull_request:  # TODO: DO NOT SUBMIT. remove this
 
 jobs:
   build_runtime:
