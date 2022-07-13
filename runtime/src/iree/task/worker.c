@@ -241,8 +241,22 @@ static bool iree_task_worker_pump_once(
     // first place (large uneven workloads for various workers, bad distribution
     // in the face of heterogenous multi-core architectures where some workers
     // complete tasks faster than others, etc).
-    task = iree_task_queue_flush_from_lifo_slist(&worker->local_task_queue,
-                                                 &worker->mailbox_slist);
+
+    // First flush into a local `suffix` list. No need for a lock around this:
+    // the source is an atomic slist and the destination `suffix` is still
+    // local to this scope.
+    iree_task_list_t suffix;
+    iree_task_list_initialize(&suffix);
+    iree_task_list_append_from_fifo_slist(&suffix, &worker->mailbox_slist);
+
+    if (!iree_task_list_is_empty(&suffix)) {
+      // Append the tasks and pop off the front to obtain the `task`.
+      iree_task_queue_t* queue = &worker->local_task_queue;
+      iree_slim_mutex_lock(&queue->mutex);
+      iree_task_list_append(&queue->list, &suffix);
+      task = iree_task_list_pop_front(&queue->list);
+      iree_slim_mutex_unlock(&queue->mutex);
+    }
   }
 
   // If we ran out of work assigned to this specific worker try to steal some

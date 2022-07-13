@@ -117,7 +117,7 @@ TEST(QueueTest, FlushSlistEmpty) {
   iree_atomic_task_slist_initialize(&slist);
 
   EXPECT_TRUE(iree_task_queue_is_empty(&queue));
-  EXPECT_FALSE(iree_task_queue_flush_from_lifo_slist(&queue, &slist));
+  iree_task_list_append_from_fifo_slist(&queue.list, &slist);
   EXPECT_TRUE(iree_task_queue_is_empty(&queue));
 
   iree_atomic_task_slist_deinitialize(&slist);
@@ -135,7 +135,8 @@ TEST(QueueTest, FlushSlist1) {
   iree_atomic_task_slist_push(&slist, &task_a);
 
   EXPECT_TRUE(iree_task_queue_is_empty(&queue));
-  EXPECT_EQ(&task_a, iree_task_queue_flush_from_lifo_slist(&queue, &slist));
+  iree_task_list_append_from_fifo_slist(&queue.list, &slist);
+  EXPECT_EQ(&task_a, iree_task_queue_pop_front(&queue));
   EXPECT_TRUE(iree_task_queue_is_empty(&queue));
 
   iree_atomic_task_slist_deinitialize(&slist);
@@ -160,7 +161,8 @@ TEST(QueueTest, FlushSlistOrdered) {
   // Flush the list to the queue; it should swap LIFO->FIFO and return the
   // first task in the queue.
   EXPECT_TRUE(iree_task_queue_is_empty(&queue));
-  EXPECT_EQ(&task_a, iree_task_queue_flush_from_lifo_slist(&queue, &slist));
+  iree_task_list_append_from_fifo_slist(&queue.list, &slist);
+  EXPECT_EQ(&task_a, iree_task_queue_pop_front(&queue));
   EXPECT_FALSE(iree_task_queue_is_empty(&queue));
 
   // Pop list and ensure order: [a->]b->c.
