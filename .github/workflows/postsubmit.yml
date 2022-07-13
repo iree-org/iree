@@ -14,13 +14,35 @@ on: [pull_request]
   # pull_request:  # TODO: DO NOT SUBMIT. remove this
 
 jobs:
-  build_runtime:
-    uses: ./.github/workflows/build_runtime_cmake.yml
-    with:
-      build-dir: build-runtime
+  upload_dir:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: "Create artifacts"
+        run: |
+          mkdir some-dir
+          touch some-dir/foo.txt
+          touch some-dir/bar.txt
+      - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8  # v3.1.0
+        with:
+          name: some-dir
+          path: some-dir
+  download_dir:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: "Downloading runtime build directory"
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
+        with:
+          name: some-dir
+      - name: "Explore"
+        run: ls -R
 
-  test_runtime:
-    needs: build_runtime
-    uses: ./.github/workflows/test_runtime_cmake.yml
-    with:
-      build-dir: build-runtime
+  # build_runtime:
+  #   uses: ./.github/workflows/build_runtime_cmake.yml
+  #   with:
+  #     build-dir: build-runtime
+
+  # test_runtime:
+  #   needs: build_runtime
+  #   uses: ./.github/workflows/test_runtime_cmake.yml
+  #   with:
+  #     build-dir: build-runtime
