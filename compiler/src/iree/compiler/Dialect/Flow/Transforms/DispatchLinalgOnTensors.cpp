@@ -968,14 +968,14 @@ static void fuseRootsWithConsumers(MLIRContext *context,
   }
 }
 
-/// Some heuristic is needed to fuse a dispatchble op with root operations using
-/// tile + fuse. Using some heuristic, each root operation is tagged with an ID
-/// (using an IntegerAttr with name `kRootOpAttr`) and all dispatchable ops to
-/// be fused with it is tagged with the same ID (using a list of IntegerAttr
-/// with name `kFusionGroupsAttr`). Each dispatchable operation can be marked to
-/// fuse with multiple root operations (i.e. replicated). For now a very simple
-/// heuristic is used below, but the mechanism should be general enough to
-/// capture any heuristic.
+/// Some heuristic is needed to fuse a dispatchable op with root operations
+/// using tile + fuse. Using some heuristic, each root operation is tagged with
+/// an ID (using an IntegerAttr with name `kRootOpAttr`) and all dispatchable
+/// ops to be fused with it is tagged with the same ID (using a list of
+/// IntegerAttr with name `kFusionGroupsAttr`). Each dispatchable operation can
+/// be marked to fuse with multiple root operations (i.e. replicated). For now a
+/// very simple heuristic is used below, but the mechanism should be general
+/// enough to capture any heuristic.
 static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
                                        DominanceInfo const &dominanceInfo) {
   unsigned numRootOps = 0;
