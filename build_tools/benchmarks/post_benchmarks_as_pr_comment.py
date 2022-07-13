@@ -40,6 +40,7 @@ import markdown_strings as md
 
 from typing import Any, Dict, Optional, Sequence, Tuple
 
+from common.common_arguments import expand_and_check_file_paths
 from common.benchmark_definition import execute_cmd_and_get_output
 from common.benchmark_presentation import *
 
@@ -321,36 +322,29 @@ def update_comment_on_pr(comment_id: int, content: str, verbose: bool = False):
 def parse_arguments():
   """Parses command-line options."""
 
-  def check_file_path(path):
-    if os.path.isfile(path):
-      return path
-    else:
-      raise ValueError(path)
-
   parser = argparse.ArgumentParser()
   parser.add_argument(
       "--benchmark_files",
       metavar="<benchmark-json-files>",
-      type=check_file_path,
       default=[],
       nargs="+",
-      help="Paths to the JSON files containing benchmark results")
+      help=("Paths to the JSON files containing benchmark results, "
+            "accepts wildcards"))
   parser.add_argument(
       "--compile_stats_files",
       metavar="<compile-stats-json-files>",
-      type=check_file_path,
       default=[],
       nargs="+",
-      help="Paths to the JSON files containing compilation statistics")
+      help=("Paths to the JSON files containing compilation statistics, "
+            "accepts wildcards"))
   parser.add_argument("--dry-run",
                       action="store_true",
                       help="Print the comment instead of posting to GitHub")
   parser.add_argument(
       "--query-base",
       action="store_true",
-      help=
-      "Query the dashboard for the benchmark results of the targeting base branch"
-  )
+      help=("Query the dashboard for the benchmark results of the targeting "
+            "base branch"))
   parser.add_argument("--comment-title",
                       default=ABBR_PR_COMMENT_TITLE,
                       help="Title of the comment")
@@ -363,9 +357,11 @@ def parse_arguments():
 
 
 def main(args):
+  benchmark_files = expand_and_check_file_paths(args.benchmark_files)
+  compile_stats_files = expand_and_check_file_paths(args.compile_stats_files)
   full_md, abbr_md = get_benchmark_result_markdown(
-      args.benchmark_files,
-      args.compile_stats_files,
+      benchmark_files,
+      compile_stats_files,
       query_base=args.query_base,
       comment_title=args.comment_title,
       verbose=args.verbose)
