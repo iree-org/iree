@@ -13,7 +13,6 @@ SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 source "${SCRIPT_DIR}/functions.sh"
 
 ALLOWED_EVENTS=(
-  "push"
   "workflow_dispatch"
   "release"
   "deployment"
