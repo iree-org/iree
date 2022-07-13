@@ -13,7 +13,7 @@ operations, and memory access is tightly restricted.
 ## Adding an Op
 
 As with other VM modules, VMVX ops are declared in
-[vmvx.imports.mlir](/iree/compiler/Dialect/Modules/VMVX/vmvx.imports.mlir).
+[vmvx.imports.mlir](vmvx.imports.mlir).
 These declarations are what enable the compiler and runtime side to talk to each
 other. It's helpful to start here to think about the information you need to
 communicate to the runtime prior to writing conversions. As a general rule try
@@ -28,14 +28,14 @@ reduce binary sizes, get accurate profiles at runtime, etc.
 TLDR:
 
 1.  Add an MLIR op def to
-    [VMVXOps.td](/iree/compiler/Dialect/Modules/VMVX/IR/VMVXOps.td).
+    [VMVXOps.td](IR/VMVXOps.td).
 2.  Add a conversion from the source dialect like
-    [StandardToVMVX](/iree/compiler/Dialect/Modules/VMVX/Conversion/StandardToVMVX/).
+    [StandardToVMVX](Conversion/StandardToVMVX/).
 3.  Add a `vm.import` to
-    [vmvx.imports.mlir](/iree/compiler/Dialect/Modules/VMVX/vmvx.imports.mlir).
+    [vmvx.imports.mlir](vmvx.imports.mlir).
 4.  Add a conversion to the `vm.import` in
-    [VMVXToVM](/iree/compiler/Dialect/Modules/VMVX/Conversion/VMVXToVM/).
+    [VMVXToVM](Conversion/VMVXToVM/).
 5.  Add a definition matching the `vm.import` to the runtime module
-    [exports.inl](/iree/modules/vmvx/exports.inl).
+    [exports.inl](/runtime/src/iree/modules/vmvx/exports.inl).
 6.  Add the runtime method implementing the op to
-    [vmvx_module.c](/iree/modules/vmvx/module.c).
+    [vmvx_module.c](/runtime/src/iree/modules/vmvx/module.c).
