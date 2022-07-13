@@ -33,7 +33,9 @@ jobs:
             gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
             ./build_tools/cmake/build_runtime.sh \
             "${{ inputs.build-dir }}"
+      - name: "Create build dir archive"
+        run: tar -cf ${{ inputs.build-dir }}.tar ${{ inputs.build-dir }}
       - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8  # v3.1.0
         with:
-          name: ${{ inputs.build-dir }}
-          path: ${{ inputs.build-dir }}
+          name: "${{ inputs.build-dir }}.tar"
+          path: "${{ inputs.build-dir }}.tar"

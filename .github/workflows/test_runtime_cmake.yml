@@ -27,8 +27,10 @@ jobs:
       - name: "Downloading runtime build directory"
         uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
         with:
-          name: ${{ inputs.build-dir }}
-          path: ${{ inputs.build-dir }}
+          name: "${{ inputs.build-dir }}.tar"
+          path: "${{ inputs.build-dir }}.tar"
+      - name: "Extract archive"
+        run: tar -xf ${{ inputs.build-dir }}.tar ${{ inputs.build-dir }}
       - name: "Testing runtime"
         run: |
           docker run --user="$(id -u):$(id -g)" \
