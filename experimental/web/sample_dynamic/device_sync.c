@@ -6,19 +6,25 @@
 
 #include "iree/hal/drivers/local_sync/sync_device.h"
 #include "iree/hal/local/loaders/system_library_loader.h"
+#include "iree/hal/local/loaders/vmvx_module_loader.h"
 
-iree_status_t create_device_with_wasm_loader(iree_allocator_t host_allocator,
-                                             iree_hal_device_t** out_device) {
+iree_status_t create_device_with_loaders(iree_allocator_t host_allocator,
+                                         iree_hal_device_t** out_device) {
   iree_hal_sync_device_params_t params;
   iree_hal_sync_device_params_initialize(&params);
 
   iree_status_t status = iree_ok_status();
 
-  iree_hal_executable_loader_t* loaders[1] = {NULL};
+  iree_hal_executable_loader_t* loaders[2] = {NULL, NULL};
   iree_host_size_t loader_count = 0;
   if (iree_status_is_ok(status)) {
     status = iree_hal_system_library_loader_create(
         iree_hal_executable_import_provider_null(), host_allocator,
+        &loaders[loader_count++]);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vmvx_module_loader_create_isolated(
+        /*user_module_count=*/0, /*user_modules=*/NULL, host_allocator,
         &loaders[loader_count++]);
   }
 
