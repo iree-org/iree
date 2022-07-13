@@ -21,3 +21,6 @@ jobs:
     uses: ./.github/workflows/test_runtime_cmake.yml
     with:
       build-dir: build-runtime
+
+  tsan:
+    uses: ./.github/workflows/tsan.yml
