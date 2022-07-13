@@ -109,15 +109,22 @@ steps:
   - label: ":lower_left_crayon: Comment benchmark results on pull request"
     key: "post-on-pr"
     commands: |
-      git clean -fdx
-      buildkite-agent artifact download "benchmark-results-*.json" ./
-      buildkite-agent artifact download "compile-stats-results-*.json" ./
+      set -euo pipefail
+      buildkite-agent artifact download "benchmark-results-*.json" ./ 2>&1 | tee bench-dl.log \
+        || { grep -q "No artifacts found" ./bench-dl.log; NOT_FOUND=1; }
+      if [[ -z "${NOT_FOUND:-}" ]]; then
+        PARAMS+=("--benchmark_files" benchmark-results-*.json)
+      fi
+      buildkite-agent artifact download "compile-stats-results-*.json" ./ 2>&1 | tee stats-dl.log \
+        || { grep -q "No artifacts found" ./stats-dl.log; NOT_FOUND=1; }
+      if [[ -z "${NOT_FOUND:-}" ]]; then
+        PARAMS+=("--compile_stats_files" compile-stats-results-*.json)
+      fi
       python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py \
         --verbose \
         --query-base \
         --comment-title="Abbreviated Linux Benchmark Summary" \
-        --benchmark_files benchmark-results-*.json \
-        --compile_stats_files compile-stats-results-*.json
+        ${PARAMS[@]}
     if: >
       build.pull_request.id != null && (
         build.pull_request.labels includes 'buildkite:benchmark-x86_64' ||
