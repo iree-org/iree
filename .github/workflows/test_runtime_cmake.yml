@@ -16,7 +16,7 @@ env:
   IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
 
 jobs:
-  build_runtime:
+  test_runtime:
     runs-on: ubuntu-20.04
     steps:
       - name: "Checking out repository"
