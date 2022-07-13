@@ -115,18 +115,13 @@ steps:
         || grep -q "No artifacts found" ./bench-dl-log
       buildkite-agent artifact download "compile-stats-results-*.json" ./ 2>&1 | tee stats-dl-log \
         || grep -q "No artifacts found" ./stats-dl-log
-      # Check the downloaded artifacts and build the parameters.
-      if ls benchmark-results-*.json; then
-        PARAMS+=("--benchmark_files" benchmark-results-*.json)
-      fi
-      if ls compile-stats-results-*.json; then
-        PARAMS+=("--compile_stats_files" compile-stats-results-*.json)
-      fi
+      # The script will handle the wildcard patterns.
       python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py \
         --verbose \
         --query-base \
         --comment-title="Abbreviated Linux Benchmark Summary" \
-        $${PARAMS[@]}
+        --benchmark_files "benchmark-results-*.json" \
+        --compile_stats_files "compile-stats-results-*.json"
     if: >
       build.pull_request.id != null && (
         build.pull_request.labels includes 'buildkite:benchmark-x86_64' ||

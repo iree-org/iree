@@ -19,12 +19,11 @@ Example usage:
 import argparse
 import json
 import os
-import re
 import requests
-import subprocess
-import time
 
 from typing import Any, Dict, Optional
+
+from common.common_arguments import expand_and_check_file_paths
 from common.benchmark_presentation import COMPILATION_METRICS_TO_TABLE_MAPPERS, collect_all_compilation_metrics
 from common.benchmark_definition import (BenchmarkInfo, BenchmarkResults,
                                          execute_cmd_and_get_output)
@@ -265,27 +264,21 @@ def add_new_sample(series_id: str,
 def parse_arguments():
   """Parses command-line options."""
 
-  def check_file_path(path):
-    if os.path.isfile(path):
-      return path
-    else:
-      raise ValueError(path)
-
   parser = argparse.ArgumentParser()
   parser.add_argument(
       '--benchmark_files',
       metavar='<benchmark-json-files>',
-      type=check_file_path,
       required=True,
       nargs='+',
-      help='Paths to the JSON files containing benchmark results')
+      help=("Paths to the JSON files containing benchmark results, "
+            "accepts wildcards"))
   parser.add_argument(
       "--compile_stats_files",
       metavar="<compile-stats-json-files>",
-      type=check_file_path,
       default=[],
       nargs="+",
-      help="Paths to the JSON files containing compilation statistics")
+      help=("Paths to the JSON files containing compilation statistics, "
+            "accepts wildcards"))
   parser.add_argument("--dry-run",
                       action="store_true",
                       help="Print the comment instead of posting to dashboard")
@@ -298,9 +291,12 @@ def parse_arguments():
 
 
 def main(args):
+  benchmark_files = expand_and_check_file_paths(args.benchmark_files)
+  compile_stats_files = expand_and_check_file_paths(args.compile_stats_files)
+
   # Collect benchmark results from all files.
   all_results = []
-  for benchmark_file in args.benchmark_files:
+  for benchmark_file in benchmark_files:
     with open(benchmark_file) as f:
       content = f.read()
     all_results.append(BenchmarkResults.from_json_str(content))
@@ -355,8 +351,7 @@ def main(args):
                    verbose=args.verbose)
 
   all_compilation_metrics = collect_all_compilation_metrics(
-      compile_stats_files=args.compile_stats_files,
-      expected_pr_commit=commit_hash)
+      compile_stats_files=compile_stats_files, expected_pr_commit=commit_hash)
   for name, compile_metrics in all_compilation_metrics.items():
     description = get_model_description(
         compile_metrics.compilation_info.model_name,

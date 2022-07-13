@@ -5,8 +5,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import glob
 import os
 import argparse
+from typing import List, Sequence
 
 
 def build_common_argument_parser():
@@ -122,3 +124,20 @@ def build_common_argument_parser():
       "instead.")
 
   return parser
+
+
+def expand_and_check_file_paths(paths: Sequence[str]) -> List[str]:
+  """Expands the wildcards in the paths and check if they are files.
+    Returns:
+      List of expanded paths.
+  """
+
+  expanded_paths = []
+  for path in paths:
+    expanded_paths += glob.glob(path)
+
+  for path in expanded_paths:
+    if not os.path.isfile(path):
+      raise ValueError(f"{path} is not a file.")
+
+  return expanded_paths
