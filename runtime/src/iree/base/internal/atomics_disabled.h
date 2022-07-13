@@ -37,8 +37,8 @@ typedef int64_t iree_atomic_int64_t;
 // typedef __int128 iree_atomic_int128_t;
 typedef intptr_t iree_atomic_intptr_t;
 
-#define iree_atomic_load_int32(object, order) *(object)
-#define iree_atomic_store_int32(object, desired, order) *(object) = (desired)
+#define iree_atomic_load_int32(object, order) (*(object))
+#define iree_atomic_store_int32(object, desired, order) (*(object) = (desired))
 #define iree_atomic_fetch_add_int32(object, operand, order)                 \
   iree_atomic_fetch_add_int32_impl((volatile iree_atomic_int32_t*)(object), \
                                    (int32_t)(operand))
@@ -65,8 +65,8 @@ typedef intptr_t iree_atomic_intptr_t;
 #define iree_atomic_compare_exchange_weak_int32 \
   iree_atomic_compare_exchange_strong_int32
 
-#define iree_atomic_load_int64(object, order) *(object)
-#define iree_atomic_store_int64(object, desired, order) *(object) = (desired)
+#define iree_atomic_load_int64(object, order) (*(object))
+#define iree_atomic_store_int64(object, desired, order) (*(object) = (desired))
 #define iree_atomic_fetch_add_int64(object, operand, order)                 \
   iree_atomic_fetch_add_int64_impl((volatile iree_atomic_int64_t*)(object), \
                                    (int64_t)(operand))
