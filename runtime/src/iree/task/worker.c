@@ -218,7 +218,10 @@ static bool iree_task_worker_pump_once(
   // Check the local work queue for any work we know we should start
   // processing immediately. Other workers may try to steal some of this work
   // if we take too long.
-  iree_task_t* task = iree_task_queue_pop_front(&worker->local_task_queue);
+  iree_task_queue_t* queue = &worker->local_task_queue;
+  iree_slim_mutex_lock(&queue->mutex);
+  iree_task_t* task = iree_task_queue_pop_front(queue);
+  iree_slim_mutex_unlock(&queue->mutex);
 
   // Check the mailbox to see if we have incoming work that has been posted.
   // We try to greedily move it to our local work list so that we can work
@@ -230,8 +233,7 @@ static bool iree_task_worker_pump_once(
     // first place (large uneven workloads for various workers, bad distribution
     // in the face of heterogenous multi-core architectures where some workers
     // complete tasks faster than others, etc).
-    task = iree_task_queue_flush_from_lifo_slist(&worker->local_task_queue,
-                                                 &worker->mailbox_slist);
+    task = iree_task_queue_flush_from_lifo_slist(queue, &worker->mailbox_slist);
   }
 
   // If we ran out of work assigned to this specific worker try to steal some
@@ -241,8 +243,7 @@ static bool iree_task_worker_pump_once(
   if (!task) {
     task = iree_task_executor_try_steal_task(
         worker->executor, worker->constructive_sharing_mask,
-        worker->max_theft_attempts, &worker->theft_prng,
-        &worker->local_task_queue);
+        worker->max_theft_attempts, &worker->theft_prng, queue);
   }
 
   // No tasks to run; let the caller know we want to wait for more.
