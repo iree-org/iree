@@ -110,7 +110,7 @@ steps:
     key: "post-on-pr"
     commands: |
       set -euo pipefail
-      # Try to download the artifacts and not fail if not found.
+      # Try to download the artifacts, continuing with a message if not found.
       buildkite-agent artifact download "benchmark-results-*.json" ./ 2>&1 | tee bench-dl-log \
         || grep -q "No artifacts found" ./bench-dl-log
       buildkite-agent artifact download "compile-stats-results-*.json" ./ 2>&1 | tee stats-dl-log \
