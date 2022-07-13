@@ -33,6 +33,7 @@ jobs:
         uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
         with:
           name: some-dir
+          path: some-dir
       - name: "Explore"
         run: ls -R
 
