@@ -153,6 +153,23 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   options.opFilter.denyOperation<arith::ConstantOp>();
   options.opFilter.denyOperation<bufferization::ToMemrefOp>();
 
+  // This type converter converts tensor types to memref types when no exact
+  // memref type can be inferred from the context.
+  options.unknownTypeConverterFn = [](Value value, unsigned memorySpace,
+                                      const BufferizationOptions &options) {
+    auto tensorType = value.getType().cast<TensorType>();
+
+    // Special rule for ConstantOps: These always lower to some memref with a
+    // static identity layout.
+    if (value.getDefiningOp<arith::ConstantOp>())
+      return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType,
+                                                                  memorySpace);
+
+    // Default case: Fully dynamic layout map for best compatibility.
+    return bufferization::getMemRefTypeWithFullyDynamicLayout(tensorType,
+                                                              memorySpace);
+  };
+
   if (failed(initTensorElimination(moduleOp.getOperation(), options))) {
     return signalPassFailure();
   }
