@@ -136,12 +136,8 @@ def MatchOp : Op<Transform_Dialect, "iree.match",
   // TODO: veriadic results when needed.
   let results = (outs PDL_Operation:$results);
 
-  let assemblyFormat = [{
-    (`ops` `{` $match_op^ `}`)? 
-    (`interface` `{` $match_interface^ `}`)? 
-    `in` $target attr-dict
-  }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 }
 
