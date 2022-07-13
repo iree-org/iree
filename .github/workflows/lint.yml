@@ -8,7 +8,7 @@
 
 name: Lint
 
-# on: [pull_request] DO NOT SUBMIT. Undo this!
+on: [pull_request]
 
 jobs:
   bazel_to_cmake:
