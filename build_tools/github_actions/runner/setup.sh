@@ -88,7 +88,7 @@ declare -a args=(
 # I would love to discover another way to print an array while preserving quote
 # escaping. We're not just using `set -x` on the command itself because we don't
 # want to leak the token (even if it's immediately invalidated, still best not
-# to).
+# to). `:` is the bash noop command that is equivalent to `true`.
 (set -x; : Running configuration with additional args: "${args[@]}")
 
 ./config.sh --token "${runner_registration_token}" "${args[@]}"
