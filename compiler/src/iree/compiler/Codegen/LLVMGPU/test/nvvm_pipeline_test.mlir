@@ -875,17 +875,17 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   builtin.module {
     func.func @warp_reduction_dispatch() {
       %c0 = arith.constant 0 : index
-      %c16384 = arith.constant 16384 : index
+      %c1024 = arith.constant 1024 : index
       %cst = arith.constant 1.000000e+00 : f32
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:512x16384xf32>
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:512x1024xf32>
       %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:512xf32>
-      %5 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [512, 16384], strides = [1, 1]
-          : !flow.dispatch.tensor<readonly:512x16384xf32> -> tensor<512x16384xf32>
+      %5 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [512, 1024], strides = [1, 1]
+          : !flow.dispatch.tensor<readonly:512x1024xf32> -> tensor<512x1024xf32>
       %8 = linalg.init_tensor [512] : tensor<512xf32>
       %9 = linalg.fill ins(%cst : f32) outs(%8 : tensor<512xf32>) -> tensor<512xf32>
       %10 = linalg.generic {
           indexing_maps = [#map3, #map4], iterator_types = ["parallel", "reduction"]}
-          ins(%5 : tensor<512x16384xf32>) outs(%9 : tensor<512xf32>) {
+          ins(%5 : tensor<512x1024xf32>) outs(%9 : tensor<512xf32>) {
         ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
           %11 = arith.addf %arg1, %arg2 : f32
           linalg.yield %11 : f32
@@ -902,3 +902,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //   CHECK-LABEL: hal.executable public @warp_reduction_dispatch
 //         CHECK:   hal.executable.variant public @cuda
 // CHECK-COUNT-5:     nvvm.shfl.sync  bfly
+//         CHECK:     llvm.store %{{.*}}, %{{.*}} : !llvm.ptr<f32, 3>
+//         CHECK:     nvvm.barrier0
+//         CHECK:     llvm.load {{.*}} : !llvm.ptr<vector<8xf32>, 3>
+//         CHECK:     "llvm.intr.vector.reduce.fadd"(%{{.*}}, %{{.*}}) {reassoc = false} : (f32, vector<8xf32>) -> f32

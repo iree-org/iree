@@ -31,6 +31,7 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   linalg::LinalgVectorizationOptions opt;
   linalg::LinalgTransformationFilter f(
       StringAttr::get(ctx, getVectorizeMarker()));
+  f.setMatchByDefault();
   linalg::VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
       patterns, opt, f);
   patterns.add<linalg::CopyVectorizationPattern>(ctx);
@@ -118,11 +119,13 @@ struct LLVMGPUVectorizationPass
         return signalPassFailure();
       }
 
-      RewritePatternSet vectorUnrollPatterns(context);
-      populateVectorUnrollPatterns(vectorUnrollPatterns, nativeVector);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(vectorUnrollPatterns)))) {
-        return signalPassFailure();
+      if (nativeVector > 0) {
+        RewritePatternSet vectorUnrollPatterns(context);
+        populateVectorUnrollPatterns(vectorUnrollPatterns, nativeVector);
+        if (failed(applyPatternsAndFoldGreedily(
+                funcOp, std::move(vectorUnrollPatterns)))) {
+          return signalPassFailure();
+        }
       }
       DEBUG_WITH_TYPE(DEBUG_TYPE, {
         llvm::dbgs() << "\n--- After Step 1: Vectorization ---\n";
