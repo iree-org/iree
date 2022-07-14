@@ -196,9 +196,9 @@ void FlowDialect::registerTypes() {
 
 Type FlowDialect::parseType(DialectAsmParser &parser) const {
   StringRef mnemonic;
-  if (failed(parser.parseKeyword(&mnemonic))) return {};
   Type type;
-  OptionalParseResult parseResult = generatedTypeParser(parser, mnemonic, type);
+  OptionalParseResult parseResult =
+      generatedTypeParser(parser, &mnemonic, type);
   if (parseResult.hasValue()) return type;
   if (mnemonic == "dispatch.tensor") {
     return DispatchTensorType::parse(parser);

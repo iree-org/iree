@@ -38,8 +38,8 @@ transform.with_pdl_patterns {
   transform.structured.canonicalized_sequence %arg0 {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg1
-    %1, %loops1:3 = transform.structured.tile %0 {interchange = [0, 2, 1], sizes = [32, 32, 32]}
-    %2, %loops2:3 = transform.structured.tile %1 {interchange = [0, 1, 2], sizes = [4, 4, 1]}
+    %1, %loops1:3 = transform.structured.tile %0 [32, 32, 32] {interchange = [0, 2, 1]}
+    %2, %loops2:3 = transform.structured.tile %1 [4, 4, 1] {interchange = [0, 1, 2]}
     %3 = transform.structured.pad %2 {padding_values=[0.0 : f32, 0.0 : f32, 0.0 : f32], pack_paddings = [1, 1, 1], hoist_paddings = [6, 6, 0], transpose_paddings = [[1, 0], [0, 1]]}
     %4 = transform.get_closest_isolated_parent %3
     transform.structured.vectorize %4  { vectorize_padding = true }
@@ -82,8 +82,8 @@ transform.with_pdl_patterns {
   transform.structured.canonicalized_sequence %arg0 {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg1
-    %1, %loops1:3 = transform.structured.tile %0 {interchange = [0, 2, 1], sizes = [32, 32, 32]}
-    %2, %loops2:3 = transform.structured.tile %1 {interchange = [0, 1, 2], sizes = [4, 4, 1]}
+    %1, %loops1:3 = transform.structured.tile %0 [32, 32, 32] {interchange = [0, 2, 1]}
+    %2, %loops2:3 = transform.structured.tile %1 [4, 4, 1] {interchange = [0, 1, 2]}
     %3 = transform.structured.pad %2 {padding_values=[0.0 : f32, 0.0 : f32, 0.0 : f32], pack_paddings = [1, 1, 1], hoist_paddings = [6, 6, 0], transpose_paddings = [[1, 0], [0, 1]]}
     %4 = transform.get_closest_isolated_parent %3
     transform.structured.vectorize %4  { vectorize_padding = false }

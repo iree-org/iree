@@ -40,7 +40,7 @@ transform.with_pdl_patterns {
   transform.structured.canonicalized_sequence %arg0 {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg1
-    %linalg_op, %loops:3 = transform.structured.tile %0 {sizes = [4, 4, 4]}
+    %linalg_op, %loops:3 = transform.structured.tile %0 [4, 4, 4]
 
     // Note: The order in which the loops are peeled is important. If %loop#2 is
     // peeled first, the partial iteration of %loop#0 also contains a peeled

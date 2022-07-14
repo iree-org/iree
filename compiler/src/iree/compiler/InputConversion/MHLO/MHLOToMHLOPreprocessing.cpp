@@ -814,7 +814,7 @@ struct MHLOToMHLOPreprocessingPass
         ReorderBroadcastInDimOpAndElementwiseOp<mhlo::ShiftLeftOp>,
         ReorderBroadcastInDimOpAndElementwiseOp<mhlo::ShiftRightArithmeticOp>,
         ReorderBroadcastInDimOpAndElementwiseOp<mhlo::ShiftRightLogicalOp>,
-        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::SubOp>,
+        ReorderBroadcastInDimOpAndElementwiseOp<mhlo::SubtractOp>,
         ReorderBroadcastInDimOpAndElementwiseOp<mhlo::AndOp>,
         ReorderBroadcastInDimOpAndElementwiseOp<mhlo::OrOp>,
         ReorderBroadcastInDimOpAndElementwiseOp<mhlo::XorOp>>(context);

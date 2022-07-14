@@ -23,7 +23,7 @@ transform.with_pdl_patterns {
   transform.structured.canonicalized_sequence %arg0 {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @isa_linalg.matmul in %arg1
-    %tiled_linalg_op, %loops:3 = transform.structured.tile %0 {interchange = [1, 0, 2], sizes = [6, 16, 32]}
+    %tiled_linalg_op, %loops:3 = transform.structured.tile %0 [6, 16, 32] {interchange = [1, 0, 2]}
     %1 = transform.loop.peel %loops#0
 
     %tiled_and_peeled_linalg_op = pdl_match @isa_linalg.matmul in %1
