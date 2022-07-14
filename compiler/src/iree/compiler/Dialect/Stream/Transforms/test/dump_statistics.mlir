@@ -25,7 +25,7 @@ util.initializer {
   %c0 = arith.constant 0 : index
   %c192 = arith.constant 192 : index
   %0 = stream.timepoint.immediate => !stream.timepoint
-  %1 = util.byte_buffer.constant {alignment = 32 : i64} : !util.byte_buffer = #util.composite<192xi8, [
+  %1 = util.buffer.constant {alignment = 32 : i64} : !util.buffer = #util.composite<192xi8, [
       dense<[5, 6, 7, 8]> : tensor<4xi32>,
       dense<0> : vector<16xi8>,
       dense<[5, 6, 3, 8]> : tensor<4xi32>,
@@ -39,11 +39,11 @@ util.initializer {
       dense<[1, 6, 7]> : tensor<3xi32>,
       dense<0> : vector<20xi8>,
   ]>
-  %did_map, %result = stream.resource.try_map %1[%c0] : !util.byte_buffer -> i1, !stream.resource<constant>{%c192}
+  %did_map, %result = stream.resource.try_map %1[%c0] : !util.buffer -> i1, !stream.resource<constant>{%c192}
   %2:2 = scf.if %did_map -> (!stream.resource<constant>, !stream.timepoint) {
     scf.yield %result, %0 : !stream.resource<constant>, !stream.timepoint
   } else {
-    %3 = stream.resource.map %1[%c0] : !util.byte_buffer -> !stream.resource<staging>{%c192}
+    %3 = stream.resource.map %1[%c0] : !util.buffer -> !stream.resource<staging>{%c192}
     %4 = stream.resource.alloc uninitialized : !stream.resource<constant>{%c192}
     %5 = stream.cmd.execute with(%3 as %arg0: !stream.resource<staging>{%c192}, %4 as %arg1: !stream.resource<constant>{%c192}) {
       stream.cmd.copy %arg0[%c0], %arg1[%c0], %c192 : !stream.resource<staging>{%c192} -> !stream.resource<constant>{%c192}

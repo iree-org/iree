@@ -17,7 +17,6 @@ iree_cc_library(
     "ClosureOpUtils.h"
     "UtilDialect.h"
     "UtilOps.h"
-    "UtilOps.h.inc"
     "UtilTraits.h"
     "UtilTypes.h"
   TEXTUAL_HDRS
@@ -27,20 +26,24 @@ iree_cc_library(
     "UtilAttrs.h.inc"
     "UtilOpInterfaces.cpp.inc"
     "UtilOpInterfaces.h.inc"
+    "UtilOps.cpp.inc"
+    "UtilOps.h.inc"
     "UtilTypeInterfaces.cpp.inc"
     "UtilTypeInterfaces.h.inc"
+    "UtilTypes.cpp.inc"
+    "UtilTypes.h.inc"
   SRCS
     "ClosureOpUtils.cpp"
     "UtilAttrs.cpp"
     "UtilDialect.cpp"
     "UtilOpFolders.cpp"
     "UtilOps.cpp"
-    "UtilOps.cpp.inc"
     "UtilTypes.cpp"
   DEPS
     ::UtilAttrsGen
     ::UtilInterfacesGen
     ::UtilOpsGen
+    ::UtilTypesGen
     LLVMSupport
     MLIRArithmeticDialect
     MLIRControlFlowDialect
@@ -88,6 +91,16 @@ iree_tablegen_library(
   OUTS
     --gen-op-decls UtilOps.h.inc
     --gen-op-defs UtilOps.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
+    UtilTypesGen
+  TD_FILE
+    "UtilTypes.td"
+  OUTS
+    --gen-typedef-decls UtilTypes.h.inc
+    --gen-typedef-defs UtilTypes.cpp.inc
 )
 
 iree_tablegen_doc(

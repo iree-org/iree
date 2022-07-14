@@ -22,7 +22,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-#include "iree/compiler/Dialect/VM/IR/VMOpInterface.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/VM/IR/VMOpInterfaces.cpp.inc"  // IWYU pragma: keep
 
 // Fallback asm printer for ops that do not define their own. See op-specific
 // printers in the op implementations.
@@ -166,30 +166,6 @@ void *VMDialect::getRegisteredInterfaceForOp(mlir::TypeID interface,
   }
 
   return nullptr;
-}
-
-//===----------------------------------------------------------------------===//
-// Attribute printing and parsing
-//===----------------------------------------------------------------------===//
-
-Attribute VMDialect::parseAttribute(DialectAsmParser &parser, Type type) const {
-  StringRef attrKind;
-  if (failed(parser.parseKeyword(&attrKind))) return {};
-  if (attrKind == OrdinalCountsAttr::getKindName()) {
-    return OrdinalCountsAttr::parse(parser);
-  }
-  parser.emitError(parser.getNameLoc()) << "unknown VM attribute: " << attrKind;
-  return {};
-}
-
-void VMDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
-  TypeSwitch<Attribute>(attr)
-      .Case<OrdinalCountsAttr>([&](auto typedAttr) {
-        p << typedAttr.getKindName();
-        typedAttr.print(p);
-      })
-      .Default(
-          [](Attribute) { assert(false && "unhandled VM attribute kind"); });
 }
 
 //===----------------------------------------------------------------------===//

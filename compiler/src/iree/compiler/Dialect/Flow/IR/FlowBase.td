@@ -9,6 +9,7 @@
 
 include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
+include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 include "mlir/IR/AttrTypeBase.td"
 
 //===----------------------------------------------------------------------===//
@@ -85,8 +86,8 @@ def FLOW_ShapeDynamicDims : Variadic<FLOW_Dim>;
 
 def FLOW_Tensor : TypeAlias<AnyRankedTensor>;
 
-def FLOW_ExecutableRefAttr : AliasedSymbolRefAttr;
-def FLOW_GlobalRefAttr : AliasedSymbolRefAttr;
+def FLOW_ExecutableRefAttr : Util_AliasedSymbolRefAttr;
+def FLOW_GlobalRefAttr : Util_AliasedSymbolRefAttr;
 def FLOW_GlobalPtr : Util_AnyPtrOf<[FLOW_Tensor, FLOW_PrimitiveType]>;
 
 //===----------------------------------------------------------------------===//

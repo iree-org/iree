@@ -876,7 +876,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
                 "must be run before.";
     }
 
-    const int numGlobalRefs = ordinal_counts.getValue().global_refs();
+    const int numGlobalRefs = ordinal_counts.getValue().getGlobalRefs();
 
     if (numGlobalRefs > 0) {
       auto refs = emitc_builders::structPtrMember(
@@ -962,7 +962,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
              << "ordinal_counts attribute not found. The OrdinalAllocationPass "
                 "must be run before.";
     }
-    const int numGlobalRefs = ordinal_counts.getValue().global_refs();
+    const int numGlobalRefs = ordinal_counts.getValue().getGlobalRefs();
 
     if (numGlobalRefs > 0) {
       auto refs = emitc_builders::structPtrMember(

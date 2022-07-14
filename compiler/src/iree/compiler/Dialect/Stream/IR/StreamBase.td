@@ -10,6 +10,7 @@
 include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
+include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/SubElementInterfaces.td"
@@ -136,8 +137,8 @@ def Stream_IndexArrayAttr : TypedArrayAttrBase<Stream_IndexAttr,
   let constBuilderCall = "$_builder.getIndexArrayAttr($0)";
 }
 
-def Stream_ExecutableRefAttr : AliasedSymbolRefAttr;
-def Stream_GlobalRefAttr : AliasedSymbolRefAttr;
+def Stream_ExecutableRefAttr : Util_AliasedSymbolRefAttr;
+def Stream_GlobalRefAttr : Util_AliasedSymbolRefAttr;
 def Stream_GlobalPtr : Util_AnyPtrOf<[Stream_Tensor, Stream_PrimitiveType]>;
 
 //===----------------------------------------------------------------------===//

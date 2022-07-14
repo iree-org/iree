@@ -495,8 +495,8 @@ class PackConstantsPass : public PackConstantsBase<PackConstantsPass> {
       // them once regardless of how many strategies we emit IR for.
       SmallVector<Value> storageBuffers;
       for (auto &storageResource : storageResources) {
-        auto rodataOp = builder.create<IREE::Util::ByteBufferConstantOp>(
-            storageResource.loc, builder.getType<IREE::Util::ByteBufferType>(),
+        auto rodataOp = builder.create<IREE::Util::BufferConstantOp>(
+            storageResource.loc, builder.getType<IREE::Util::BufferType>(),
             storageResource.data,
             builder.getI64IntegerAttr(
                 resourceConfig.getMinBufferOffsetAlignment()));

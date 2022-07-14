@@ -22,6 +22,7 @@ td_library(
     srcs = enforce_glob(
         [
             "VMVXBase.td",
+            "VMVXInterfaces.td",
             "VMVXOps.td",
         ],
         include = ["*.td"],
@@ -37,23 +38,23 @@ iree_compiler_cc_library(
     name = "IR",
     srcs = [
         "VMVXEnums.cpp.inc",
-        "VMVXOpInterface.cpp.inc",
         "VMVXOps.cpp",
         "VMVXTypes.cpp",
     ],
     hdrs = [
         "VMVXEnums.h.inc",
-        "VMVXOpInterface.h.inc",
         "VMVXOps.h",
-        "VMVXOps.h.inc",
         "VMVXTypes.h",
     ],
     textual_hdrs = [
+        "VMVXOpInterfaces.cpp.inc",
+        "VMVXOpInterfaces.h.inc",
         "VMVXOps.cpp.inc",
+        "VMVXOps.h.inc",
     ],
     deps = [
         ":VMVXEnumsGen",
-        ":VMVXOpInterfaceGen",
+        ":VMVXInterfacesGen",
         ":VMVXOpsGen",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/VM/IR",
@@ -120,24 +121,24 @@ iree_gentbl_cc_library(
 )
 
 iree_gentbl_cc_library(
-    name = "VMVXOpInterfaceGen",
+    name = "VMVXInterfacesGen",
     tbl_outs = [
         (
             ["--gen-op-interface-decls"],
-            "VMVXOpInterface.h.inc",
+            "VMVXOpInterfaces.h.inc",
         ),
         (
             ["--gen-op-interface-defs"],
-            "VMVXOpInterface.cpp.inc",
+            "VMVXOpInterfaces.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "VMVXBase.td",
+    td_file = "VMVXInterfaces.td",
     deps = [":td_files"],
 )
 
 iree_tablegen_doc(
-    name = "VMVXDialecDocGen",
+    name = "VMVXDialectDocGen",
     tbl_outs = [
         (
             [

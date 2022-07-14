@@ -24,7 +24,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-#include "iree/compiler/Dialect/VM/IR/VMOpInterface.h.inc"  // IWYU pragma: export
+#include "iree/compiler/Dialect/VM/IR/VMOpInterfaces.h.inc"  // IWYU pragma: export
 
 class VMDialect : public Dialect {
  public:

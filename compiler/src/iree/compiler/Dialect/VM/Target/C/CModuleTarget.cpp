@@ -117,14 +117,14 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
 
   auto ordinalCounts = moduleOp.ordinal_counts().getValue();
   output << "iree_allocator_t allocator;\n";
-  output << "uint8_t rwdata[" << countOrEmpty(ordinalCounts.global_bytes())
+  output << "uint8_t rwdata[" << countOrEmpty(ordinalCounts.getGlobalBytes())
          << "];\n";
-  output << "iree_vm_ref_t refs[" << countOrEmpty(ordinalCounts.global_refs())
+  output << "iree_vm_ref_t refs[" << countOrEmpty(ordinalCounts.getGlobalRefs())
          << "];\n";
   output << "iree_vm_buffer_t rodata_buffers["
-         << countOrEmpty(ordinalCounts.rodatas()) << "];\n";
+         << countOrEmpty(ordinalCounts.getRodatas()) << "];\n";
   output << "iree_vm_function_t imports["
-         << countOrEmpty(ordinalCounts.import_funcs()) << "];\n";
+         << countOrEmpty(ordinalCounts.getImportFuncs()) << "];\n";
   output << "};\n";
 
   output << "typedef struct " << moduleName << "_t " << moduleName << "_t;\n";

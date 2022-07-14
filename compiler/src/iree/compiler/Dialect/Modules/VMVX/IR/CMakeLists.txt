@@ -15,20 +15,20 @@ iree_cc_library(
     IR
   HDRS
     "VMVXEnums.h.inc"
-    "VMVXOpInterface.h.inc"
     "VMVXOps.h"
-    "VMVXOps.h.inc"
     "VMVXTypes.h"
   TEXTUAL_HDRS
+    "VMVXOpInterfaces.cpp.inc"
+    "VMVXOpInterfaces.h.inc"
     "VMVXOps.cpp.inc"
+    "VMVXOps.h.inc"
   SRCS
     "VMVXEnums.cpp.inc"
-    "VMVXOpInterface.cpp.inc"
     "VMVXOps.cpp"
     "VMVXTypes.cpp"
   DEPS
     ::VMVXEnumsGen
-    ::VMVXOpInterfaceGen
+    ::VMVXInterfacesGen
     ::VMVXOpsGen
     LLVMSupport
     MLIRFuncDialect
@@ -85,17 +85,17 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
-    VMVXOpInterfaceGen
+    VMVXInterfacesGen
   TD_FILE
-    "VMVXBase.td"
+    "VMVXInterfaces.td"
   OUTS
-    --gen-op-interface-decls VMVXOpInterface.h.inc
-    --gen-op-interface-defs VMVXOpInterface.cpp.inc
+    --gen-op-interface-decls VMVXOpInterfaces.h.inc
+    --gen-op-interface-defs VMVXOpInterfaces.cpp.inc
 )
 
 iree_tablegen_doc(
   NAME
-    VMVXDialecDocGen
+    VMVXDialectDocGen
   TD_FILE
     "VMVXOps.td"
   OUTS

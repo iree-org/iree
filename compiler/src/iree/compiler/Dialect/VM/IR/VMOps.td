@@ -13,6 +13,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
+include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 include "iree/compiler/Dialect/VM/IR/VMBase.td"
 
 class VM_PureOp<string mnemonic, list<Trait> traits = []> :
@@ -435,7 +436,7 @@ def VM_GlobalAddressOp : VM_PureOp<"global.address"> {
     VM_GlobalRefAttr:$global
   );
   let results = (outs
-    Util_AnyPtr:$result
+    AnyTypeOf<[VM_Ptr, Util_AnyPtrType]>:$result
   );
 
   let assemblyFormat = "$global attr-dict `:` type($result)";
@@ -3860,7 +3861,7 @@ def VM_YieldOp : VM_Op<"yield", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     HasParent<"IREE::VM::FuncOp">,
     Terminator,
-    YieldPoint,
+    Util_YieldPoint,
   ]> {
   let summary = [{unconditional fiber yield operation}];
   let description = [{
@@ -3975,7 +3976,7 @@ def VM_BreakOp : VM_Op<"break", [
     DeclareOpInterfaceMethods<BranchOpInterface>,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     Terminator,
-    YieldPoint,
+    Util_YieldPoint,
     VM_FullBarrier,
     VM_DebugOnly,
   ]> {
@@ -4026,7 +4027,7 @@ def VM_CondBreakOp : VM_Op<"cond_break", [
     DeclareOpInterfaceMethods<BranchOpInterface>,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     Terminator,
-    YieldPoint,
+    Util_YieldPoint,
     VM_FullBarrier,
     VM_DebugOnly,
   ]> {

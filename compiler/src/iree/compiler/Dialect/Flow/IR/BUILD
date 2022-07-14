@@ -146,19 +146,31 @@ iree_gentbl_cc_library(
     name = "FlowTypesGen",
     tbl_outs = [
         (
-            ["--gen-attrdef-decls"],
+            [
+                "--gen-attrdef-decls",
+                "--attrdefs-dialect=flow",
+            ],
             "FlowAttrs.h.inc",
         ),
         (
-            ["--gen-attrdef-defs"],
+            [
+                "--gen-attrdef-defs",
+                "--attrdefs-dialect=flow",
+            ],
             "FlowAttrs.cpp.inc",
         ),
         (
-            ["--gen-typedef-decls"],
+            [
+                "--gen-typedef-decls",
+                "--typedefs-dialect=flow",
+            ],
             "FlowTypes.h.inc",
         ),
         (
-            ["--gen-typedef-defs"],
+            [
+                "--gen-typedef-defs",
+                "--typedefs-dialect=flow",
+            ],
             "FlowTypes.cpp.inc",
         ),
     ],

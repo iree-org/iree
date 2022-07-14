@@ -94,10 +94,10 @@ iree_tablegen_library(
   TD_FILE
     "StreamBase.td"
   OUTS
-    --gen-attrdef-decls StreamAttrs.h.inc
-    --gen-attrdef-defs StreamAttrs.cpp.inc
-    --gen-typedef-decls StreamTypes.h.inc
-    --gen-typedef-defs StreamTypes.cpp.inc
+    --gen-attrdef-decls --attrdefs-dialect=stream StreamAttrs.h.inc
+    --gen-attrdef-defs --attrdefs-dialect=stream StreamAttrs.cpp.inc
+    --gen-typedef-decls --typedefs-dialect=stream StreamTypes.h.inc
+    --gen-typedef-defs --typedefs-dialect=stream StreamTypes.cpp.inc
 )
 
 iree_tablegen_doc(

@@ -14,8 +14,9 @@
 #include "mlir/IR/TypeSupport.h"
 
 // clang-format off: must be included after all LLVM/MLIR headers.
-#include "iree/compiler/Dialect/VM/IR/VMEnums.cpp.inc"    // IWYU pragma: keep
-#include "iree/compiler/Dialect/VM/IR/VMStructs.cpp.inc"  // IWYU pragma: keep
+#define GET_ATTRDEF_CLASSES
+#include "iree/compiler/Dialect/VM/IR/VMAttrs.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/VM/IR/VMEnums.cpp.inc"  // IWYU pragma: keep
 // clang-format on
 
 namespace mlir {
@@ -131,66 +132,42 @@ RefType RefType::getChecked(function_ref<InFlightDiagnostic()> emitError,
 Type RefType::getObjectType() { return getImpl()->objectType; }
 
 //===----------------------------------------------------------------------===//
-// Attribute printing and parsing
-//===----------------------------------------------------------------------===//
-
-Attribute OrdinalCountsAttr::parse(AsmParser &p) {
-  Type i32 = p.getBuilder().getIntegerType(32);
-  IntegerAttr importFuncsAttr;
-  IntegerAttr exportFuncsAttr;
-  IntegerAttr internalFuncsAttr;
-  IntegerAttr globalBytesAttr;
-  IntegerAttr globalRefsAttr;
-  IntegerAttr rodatasAttr;
-  IntegerAttr rwdatasAttr;
-  if (failed(p.parseLess()) || failed(p.parseKeyword("import_funcs")) ||
-      failed(p.parseEqual()) ||
-      failed(p.parseAttribute(importFuncsAttr, i32)) ||
-      failed(p.parseComma()) || failed(p.parseKeyword("export_funcs")) ||
-      failed(p.parseEqual()) ||
-      failed(p.parseAttribute(exportFuncsAttr, i32)) ||
-      failed(p.parseComma()) || failed(p.parseKeyword("internal_funcs")) ||
-      failed(p.parseEqual()) ||
-      failed(p.parseAttribute(internalFuncsAttr, i32)) ||
-      failed(p.parseComma()) || failed(p.parseKeyword("global_bytes")) ||
-      failed(p.parseEqual()) ||
-      failed(p.parseAttribute(globalBytesAttr, i32)) ||
-      failed(p.parseComma()) || failed(p.parseKeyword("global_refs")) ||
-      failed(p.parseEqual()) || failed(p.parseAttribute(globalRefsAttr, i32)) ||
-      failed(p.parseComma()) || failed(p.parseKeyword("rodatas")) ||
-      failed(p.parseEqual()) || failed(p.parseAttribute(rodatasAttr, i32)) ||
-      failed(p.parseComma()) || failed(p.parseKeyword("rwdatas")) ||
-      failed(p.parseEqual()) || failed(p.parseAttribute(rwdatasAttr, i32)) ||
-      failed(p.parseGreater())) {
-    return {};
-  }
-  return get(importFuncsAttr, exportFuncsAttr, internalFuncsAttr,
-             globalBytesAttr, globalRefsAttr, rodatasAttr, rwdatasAttr);
-}
-
-void OrdinalCountsAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<";
-  os << "import_funcs = " << import_funcs() << ", ";
-  os << "export_funcs = " << export_funcs() << ", ";
-  os << "internal_funcs = " << internal_funcs() << ", ";
-  os << "global_bytes = " << global_bytes() << ", ";
-  os << "global_refs = " << global_refs() << ", ";
-  os << "rodatas = " << rodatas() << ", ";
-  os << "rwdatas = " << rwdatas();
-  os << ">";
-}
-
-//===----------------------------------------------------------------------===//
 // VMDialect
 //===----------------------------------------------------------------------===//
 
 void VMDialect::registerAttributes() {
-  addAttributes<IREE::VM::OrdinalCountsAttr>();
+  addAttributes<
+#define GET_ATTRDEF_LIST
+#include "iree/compiler/Dialect/VM/IR/VMAttrs.cpp.inc"  // IWYU pragma: keep
+      >();
 }
 void VMDialect::registerTypes() {
   addTypes<IREE::VM::BufferType, IREE::VM::ListType, IREE::VM::OpaqueType,
            IREE::VM::RefType>();
+}
+
+//===----------------------------------------------------------------------===//
+// Attribute printing and parsing
+//===----------------------------------------------------------------------===//
+
+Attribute VMDialect::parseAttribute(DialectAsmParser &parser, Type type) const {
+  StringRef mnemonic;
+  if (failed(parser.parseKeyword(&mnemonic))) return {};
+  Attribute genAttr;
+  OptionalParseResult parseResult =
+      generatedAttributeParser(parser, mnemonic, type, genAttr);
+  if (parseResult.hasValue()) return genAttr;
+  parser.emitError(parser.getNameLoc())
+      << "unknown HAL attribute: " << mnemonic;
+  return {};
+}
+
+void VMDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
+  TypeSwitch<Attribute>(attr).Default([&](Attribute) {
+    if (failed(generatedAttributePrinter(attr, p))) {
+      assert(false && "unhandled HAL attribute kind");
+    }
+  });
 }
 
 }  // namespace VM

@@ -17,8 +17,9 @@
 #include "mlir/Support/LLVM.h"
 
 // clang-format off: must be included after all LLVM/MLIR headers.
-#include "iree/compiler/Dialect/VM/IR/VMEnums.h.inc"    // IWYU pragma: keep
-#include "iree/compiler/Dialect/VM/IR/VMStructs.h.inc"  // IWYU pragma: export
+#define GET_ATTRDEF_CLASSES
+#include "iree/compiler/Dialect/VM/IR/VMAttrs.h.inc"  // IWYU pragma: export
+#include "iree/compiler/Dialect/VM/IR/VMEnums.h.inc"  // IWYU pragma: keep
 // clang-format on
 
 namespace mlir {

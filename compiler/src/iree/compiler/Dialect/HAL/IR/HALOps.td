@@ -45,7 +45,7 @@ def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
   ];
 }
 
-def HAL_ExSubmitAndWaitOp : HAL_Op<"ex.submit_and_wait", [YieldPoint]> {
+def HAL_ExSubmitAndWaitOp : HAL_Op<"ex.submit_and_wait", [Util_YieldPoint]> {
   let arguments = (ins
     HAL_Device:$device,
     HAL_CommandBuffer:$command_buffer
@@ -231,7 +231,7 @@ def HAL_AllocatorAllocateInitializedOp : HAL_Op<"allocator.allocate.initialized"
     HAL_MemoryTypeBitfieldAttr:$memory_types,
     HAL_BufferUsageBitfieldAttr:$buffer_usage,
     // TODO(benvanik): support other types (and mutable buffers).
-    ByteBufferType:$source,
+    Util_BufferType:$source,
     HAL_DeviceSize:$offset,
     HAL_DeviceSize:$length
   );
@@ -268,7 +268,7 @@ def HAL_AllocatorTryMapOp : HAL_Op<"allocator.try_map", [
     HAL_MemoryTypeBitfieldAttr:$memory_types,
     HAL_BufferUsageBitfieldAttr:$buffer_usage,
     // TODO(benvanik): support other types (and mutable buffers).
-    ByteBufferType:$source,
+    Util_BufferType:$source,
     HAL_DeviceSize:$offset,
     HAL_DeviceSize:$length
   );
@@ -2059,7 +2059,7 @@ def HAL_FenceFailOp : HAL_Op<"fence.fail"> {
 }
 
 def HAL_FenceAwaitOp : HAL_Op<"fence.await", [
-    YieldPoint,
+    Util_YieldPoint,
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{asynchronous fence wait operation}];
@@ -2181,7 +2181,7 @@ def HAL_SemaphoreFailOp : HAL_Op<"semaphore.fail"> {
 }
 
 def HAL_SemaphoreAwaitOp : HAL_Op<"semaphore.await", [
-    YieldPoint,
+    Util_YieldPoint,
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{asynchronous semaphore wait operation}];
