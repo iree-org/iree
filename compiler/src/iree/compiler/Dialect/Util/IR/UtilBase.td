@@ -34,8 +34,14 @@ def Util_Bool :
 def Util_Element : AnyTypeOf<[AnySignlessInteger, AnyFloat]>;
 def Util_MemRef : MemRefOf<[Util_Element]>;
 def Util_Tensor : TensorOf<[Util_Element]>;
+def Util_Primitive : AnyTypeOf<[Index, AnyInteger, AnyFloat]>;
 
-def Util_Offset : AnyTypeOf<[Index, AnyInteger]>;
+def Util_FillPattern : AnyTypeOf<[AnyInteger, AnyFloat]>;
+
+def Util_Offset : TypeAlias<Index>;
+def Util_Size : TypeAlias<Index>;
+
+def Util_Range : AnyTypeOf<[Index, AnyInteger]>;
 
 class Util_IndexAttrBase<string descr> :
     TypedAttrBase<

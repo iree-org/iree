@@ -186,10 +186,10 @@ def Util_RangeMinOp : Util_PureOp<"range.min", [
   }];
 
   let arguments = (ins
-    Variadic<Util_Offset>:$operands
+    Variadic<Util_Range>:$operands
   );
   let results = (outs
-    Util_Offset:$result
+    Util_Range:$result
   );
 
   let assemblyFormat = [{
@@ -212,10 +212,10 @@ def Util_RangeMaxOp : Util_PureOp<"range.max", [
   }];
 
   let arguments = (ins
-    Variadic<Util_Offset>:$operands
+    Variadic<Util_Range>:$operands
   );
   let results = (outs
-    Util_Offset:$result
+    Util_Range:$result
   );
 
   let assemblyFormat = [{
@@ -238,12 +238,12 @@ def Util_RangeExtentsOp : Util_PureOp<"range.extents", [
   }];
 
   let arguments = (ins
-    Variadic<Util_Offset>:$offsets,
-    Variadic<Util_Offset>:$lengths
+    Variadic<Util_Range>:$offsets,
+    Variadic<Util_Range>:$lengths
   );
   let results = (outs
-    Util_Offset:$min,
-    Util_Offset:$max
+    Util_Range:$min,
+    Util_Range:$max
   );
 
   let assemblyFormat = [{
