@@ -28,9 +28,8 @@ hal.executable private @simple_reduce  {
       %4 = scf.for %arg0 = %c0 to %c384 step %c32 iter_args(%arg1 = %cst) -> (vector<1xf32>) {
         %6 = vector.transfer_read %0[%3, %arg0], %cst_0 {in_bounds = [true]} : memref<128x384xf32>, vector<32xf32>
         %7 = vector.broadcast %6 : vector<32xf32> to vector<1x32xf32>
-        %8 = vector.multi_reduction <add>, %7 [1] : vector<1x32xf32> to vector<1xf32>
-        %9 = arith.addf %8, %arg1 : vector<1xf32>
-        scf.yield %9 : vector<1xf32>
+        %8 = vector.multi_reduction <add>, %7, %arg1 [1] : vector<1x32xf32> to vector<1xf32>
+        scf.yield %8 : vector<1xf32>
       }
       %5 = arith.divf %4, %cst_1 : vector<1xf32>
       vector.transfer_write %5, %1[%3] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
@@ -107,9 +106,8 @@ hal.executable private @simple_reduce_multi_warp  {
       %4 = scf.for %arg0 = %c0 to %c384 step %c64 iter_args(%arg1 = %cst) -> (vector<1xf32>) {
         %6 = vector.transfer_read %0[%3, %arg0], %cst_0 {in_bounds = [true]} : memref<128x384xf32>, vector<64xf32>
         %7 = vector.broadcast %6 : vector<64xf32> to vector<1x64xf32>
-        %8 = vector.multi_reduction <add>, %7 [1] : vector<1x64xf32> to vector<1xf32>
-        %9 = arith.addf %8, %arg1 : vector<1xf32>
-        scf.yield %9 : vector<1xf32>
+        %8 = vector.multi_reduction <add>, %7, %arg1 [1] : vector<1x64xf32> to vector<1xf32>
+        scf.yield %8 : vector<1xf32>
       }
       %5 = arith.divf %4, %cst_1 : vector<1xf32>
       vector.transfer_write %5, %1[%3] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
