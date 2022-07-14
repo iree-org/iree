@@ -5,7 +5,7 @@ transform.structured.canonicalized_sequence {
 ^bb0(%arg0: !pdl.operation):
   // CHECK: %[[OPS:.*]] = pdl_match @match1 in %{{.*}}
   %0 = pdl_match @match1 in %arg0
-  // CHECK: %[[TILED:.*]], %{{.*}}:3 = transform.structured.tile %[[OPS]] [4, 4, 4]
+  // CHECK: %[[TILED:.*]], %{{.*}}:3 = transform.structured.tile %[[OPS]][4, 4, 4]
   %1, %loops1:3 = transform.structured.tile %0 [4, 4, 4]
   // CHECK: %[[TILED2:.*]], %{{.*}}:3 = transform.structured.tile %[[TILED]]
   %2, %loops2:3  = transform.structured.tile %1 [2, 2, 2]
