@@ -16,7 +16,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace VMVX {
 
-#include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXOpInterface.cpp.inc"
+#include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXOpInterfaces.cpp.inc"
 
 }  // namespace VMVX
 }  // namespace IREE

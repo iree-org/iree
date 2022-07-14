@@ -94,10 +94,10 @@ iree_tablegen_library(
   TD_FILE
     "FlowBase.td"
   OUTS
-    --gen-attrdef-decls FlowAttrs.h.inc
-    --gen-attrdef-defs FlowAttrs.cpp.inc
-    --gen-typedef-decls FlowTypes.h.inc
-    --gen-typedef-defs FlowTypes.cpp.inc
+    --gen-attrdef-decls --attrdefs-dialect=flow FlowAttrs.h.inc
+    --gen-attrdef-defs --attrdefs-dialect=flow FlowAttrs.cpp.inc
+    --gen-typedef-decls --typedefs-dialect=flow FlowTypes.h.inc
+    --gen-typedef-defs --typedefs-dialect=flow FlowTypes.cpp.inc
 )
 
 iree_tablegen_doc(

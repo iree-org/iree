@@ -121,8 +121,8 @@ iree_tablegen_library(
   TD_FILE
     "HALBase.td"
   OUTS
-    --gen-attrdef-decls HALAttrs.h.inc
-    --gen-attrdef-defs HALAttrs.cpp.inc
+    --gen-attrdef-decls --attrdefs-dialect=hal HALAttrs.h.inc
+    --gen-attrdef-defs --attrdefs-dialect=hal HALAttrs.cpp.inc
     --gen-enum-decls HALEnums.h.inc
     --gen-enum-defs HALEnums.cpp.inc
 )

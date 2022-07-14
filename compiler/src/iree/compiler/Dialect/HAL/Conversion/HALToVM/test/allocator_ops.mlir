@@ -12,12 +12,12 @@ func.func @allocatorAllocate(%arg0 : !hal.allocator) -> !hal.buffer {
 // -----
 
 // CHECK-LABEL: vm.func private @allocatorMapByteBuffer
-func.func @allocatorMapByteBuffer(%arg0 : !hal.allocator, %arg1 : !util.byte_buffer) -> !hal.buffer {
+func.func @allocatorMapByteBuffer(%arg0 : !hal.allocator, %arg1 : !util.buffer) -> !hal.buffer {
   // CHECK-DAG: %[[OFFSET:.+]] = vm.const.i64 128
   %offset = arith.constant 128 : index
   // CHECK-DAG: %[[LENGTH:.+]] = vm.const.i64 256
   %length = arith.constant 256 : index
   // CHECK: = vm.call @hal.allocator.allocate.initialized(%arg0, %c6, %c3, %arg1, %[[OFFSET]], %[[LENGTH]]) : (!vm.ref<!hal.allocator>, i32, i32, !vm.buffer, i64, i64) -> !vm.ref<!hal.buffer>
-  %buffer = hal.allocator.allocate.initialized<%arg0 : !hal.allocator> source(%arg1 : !util.byte_buffer)[%offset, %length] type("HostVisible|HostCoherent") usage("Transfer") : !hal.buffer
+  %buffer = hal.allocator.allocate.initialized<%arg0 : !hal.allocator> source(%arg1 : !util.buffer)[%offset, %length] type("HostVisible|HostCoherent") usage("Transfer") : !hal.buffer
   return %buffer : !hal.buffer
 }

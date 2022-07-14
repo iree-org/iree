@@ -178,11 +178,14 @@ iree_gentbl_cc_library(
     name = "HALTypesGen",
     tbl_outs = [
         (
-            ["--gen-attrdef-decls"],
+            ["--gen-attrdef-decls", "--attrdefs-dialect=hal"],
             "HALAttrs.h.inc",
         ),
         (
-            ["--gen-attrdef-defs"],
+            [
+                "--gen-attrdef-defs",
+                "--attrdefs-dialect=hal",
+            ],
             "HALAttrs.cpp.inc",
         ),
         (

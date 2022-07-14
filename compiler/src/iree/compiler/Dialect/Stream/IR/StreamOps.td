@@ -224,7 +224,7 @@ def Stream_ResourceMapOp : Stream_Op<"resource.map", [
   }];
 
   let arguments = (ins
-    ByteBufferType:$source,
+    Util_BufferType:$source,
     Stream_Offset:$source_offset,
     Stream_Size:$result_size,
     OptionalAttr<Stream_AffinityAttr>:$affinity
@@ -267,7 +267,7 @@ def Stream_ResourceTryMapOp : Stream_PureOp<"resource.try_map", [
   }];
 
   let arguments = (ins
-    ByteBufferType:$source,
+    Util_BufferType:$source,
     Stream_Offset:$source_offset,
     Stream_Size:$result_size,
     OptionalAttr<Stream_AffinityAttr>:$affinity

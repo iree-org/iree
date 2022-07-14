@@ -243,7 +243,7 @@ static void prettyPrintGlobalInfo(const UsageInfo &usageInfo, bool verbose,
 
   // TODO(benvanik): print global information:
   // - number of resource globals: constants/variables
-  // - util.byte_buffer.constant sizes (fed into stream.resource.try_map/map)
+  // - util.buffer.constant sizes (fed into stream.resource.try_map/map)
   // - variable allocation sizes
   os << "// TODO\n";
 

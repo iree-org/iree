@@ -17,7 +17,7 @@ func.func @resourceConstants() -> (!stream.resource<constant>, !stream.resource<
   %c8 = arith.constant 8 : index
 
   // Fetch the read-only host data containing the constants.
-  // CHECK: %[[RODATA:.+]] = util.byte_buffer.constant {alignment = 64 : i64} : !util.byte_buffer = #composite_of_128b
+  // CHECK: %[[RODATA:.+]] = util.buffer.constant {alignment = 64 : i64} : !util.buffer = #composite_of_128b
   %0:3 = stream.resource.constants :
     !stream.resource<constant>{%c4} = dense<100> : tensor<1xi32>,
     !stream.resource<constant>{%c8} = dense<[101, 102]> : tensor<2xi32>
@@ -26,14 +26,14 @@ func.func @resourceConstants() -> (!stream.resource<constant>, !stream.resource<
   // Try first to map the memory directly into a usable resource. If this
   // succeeds we are done and can avoid allocation/complete immediately.
   // CHECK: %[[DID_MAP:.+]], %[[TRY_MAP:.+]] = stream.resource.try_map %[[RODATA]][%c0] :
-  // CHECK-SAME: !util.byte_buffer -> i1, !stream.resource<constant>{%c128}
+  // CHECK-SAME: !util.buffer -> i1, !stream.resource<constant>{%c128}
   //      CHECK: %[[IF:.+]]:2 = scf.if %[[DID_MAP]] -> (!stream.resource<constant>, !stream.timepoint) {
   // CHECK-NEXT:   %[[IMMEDIATE:.+]] = stream.timepoint.immediate => !stream.timepoint
   // CHECK-NEXT:   scf.yield %[[TRY_MAP]], %[[IMMEDIATE]]
   // CHECK-NEXT: } else {
 
   // If the mapping fails we need to perform an upload via a staging buffer.
-  // CHECK: %[[STAGING:.+]] = stream.resource.map %[[RODATA]][%c0] : !util.byte_buffer -> !stream.resource<staging>{%c128}
+  // CHECK: %[[STAGING:.+]] = stream.resource.map %[[RODATA]][%c0] : !util.buffer -> !stream.resource<staging>{%c128}
   // CHECK: %[[ALLOC:.+]] = stream.resource.alloc uninitialized : !stream.resource<constant>{%c128}
   // CHECK: %[[EXEC_TIMEPOINT:.+]] = stream.cmd.execute
   // CHECK-SAME: with(%[[STAGING]] as %[[STAGING_CAPTURE:.+]]: !stream.resource<staging>{%c128},
@@ -79,8 +79,8 @@ func.func @splitResourceConstants() -> (!stream.resource<constant>, !stream.reso
   %c4 = arith.constant 4 : index
   %c8 = arith.constant 8 : index
 
-  // CHECK: %[[RODATA0:.+]] = util.byte_buffer.constant {alignment = 16 : i64} : !util.byte_buffer = #composite_of_16b0
-  // CHECK: %[[RODATA1:.+]] = util.byte_buffer.constant {alignment = 16 : i64} : !util.byte_buffer = #composite_of_16b1
+  // CHECK: %[[RODATA0:.+]] = util.buffer.constant {alignment = 16 : i64} : !util.buffer = #composite_of_16b0
+  // CHECK: %[[RODATA1:.+]] = util.buffer.constant {alignment = 16 : i64} : !util.buffer = #composite_of_16b1
   %0:3 = stream.resource.constants :
     !stream.resource<constant>{%c4} = dense<100> : tensor<1xi32>,
     !stream.resource<constant>{%c8} = dense<[101, 102]> : tensor<2xi32>
@@ -89,8 +89,8 @@ func.func @splitResourceConstants() -> (!stream.resource<constant>, !stream.reso
   // NOTE: we fall back for all even if only one fails; this is just for
   // simplicity in the pass today but we could only fallback for the ones that
   // failed if we wanted.
-  // CHECK: %[[DID_MAP0:.+]], %[[TRY_MAP0:.+]] = stream.resource.try_map %[[RODATA0]][%c0] : !util.byte_buffer -> i1, !stream.resource<constant>{%c16}
-  // CHECK: %[[DID_MAP1:.+]], %[[TRY_MAP1:.+]] = stream.resource.try_map %[[RODATA1]][%c0] : !util.byte_buffer -> i1, !stream.resource<constant>{%c16}
+  // CHECK: %[[DID_MAP0:.+]], %[[TRY_MAP0:.+]] = stream.resource.try_map %[[RODATA0]][%c0] : !util.buffer -> i1, !stream.resource<constant>{%c16}
+  // CHECK: %[[DID_MAP1:.+]], %[[TRY_MAP1:.+]] = stream.resource.try_map %[[RODATA1]][%c0] : !util.buffer -> i1, !stream.resource<constant>{%c16}
   // CHECK: %[[BOTH_MAPPED:.+]] = arith.andi %[[DID_MAP0]], %[[DID_MAP1]] : i1
   // CHECK: %[[IF:.+]]:3 = scf.if %[[BOTH_MAPPED]]
   // CHECK:    scf.yield %[[TRY_MAP0]], %[[TRY_MAP1]]

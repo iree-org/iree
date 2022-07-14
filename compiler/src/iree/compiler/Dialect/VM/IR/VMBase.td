@@ -329,8 +329,8 @@ class VM_ListOf<Type type> :
 // VM types
 //===----------------------------------------------------------------------===//
 
-def VM_GlobalRefAttr : AliasedSymbolRefAttr;
-def VM_FuncRefAttr : AliasedSymbolRefAttr;
+def VM_GlobalRefAttr : Util_AliasedSymbolRefAttr;
+def VM_FuncRefAttr : Util_AliasedSymbolRefAttr;
 
 def VM_Ordinal : SignlessIntegerAttrBase<I32, "ordinal value">;
 

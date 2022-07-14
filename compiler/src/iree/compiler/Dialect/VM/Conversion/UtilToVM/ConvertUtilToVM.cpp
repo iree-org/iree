@@ -77,11 +77,11 @@ struct CmpEQOpConversion : public OpConversionPattern<IREE::Util::CmpEQOp> {
 // util.byte_buffer.*
 //===----------------------------------------------------------------------===//
 
-struct ByteBufferConstantOpConversion
-    : public OpConversionPattern<IREE::Util::ByteBufferConstantOp> {
+struct BufferConstantOpConversion
+    : public OpConversionPattern<IREE::Util::BufferConstantOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Util::ByteBufferConstantOp op, OpAdaptor adaptor,
+      IREE::Util::BufferConstantOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::RodataInlineOp>(
         op,
@@ -120,11 +120,11 @@ void populateUtilToVMPatterns(MLIRContext *context,
                               RewritePatternSet &patterns) {
   patterns.insert<NullOpConversion>(typeConverter, context);
   patterns.insert<CmpEQOpConversion>(typeConverter, context);
-  patterns.insert<ByteBufferConstantOpConversion>(typeConverter, context);
+  patterns.insert<BufferConstantOpConversion>(typeConverter, context);
   patterns.insert<UnreachableOpConversion>(typeConverter, context);
 
   typeConverter.addConversion(
-      [](IREE::Util::ByteBufferType type) -> Optional<Type> {
+      [](IREE::Util::BufferType type) -> Optional<Type> {
         return IREE::VM::RefType::get(
             IREE::VM::BufferType::get(type.getContext()));
       });

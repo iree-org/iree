@@ -8,6 +8,7 @@
 #define IREE_DIALECT_MODULES_VMVX_BASE
 
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
+include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 
 //===----------------------------------------------------------------------===//
 // IREE VMVX (Virtual Machine-based Linear Algebra) dialect
@@ -47,7 +48,7 @@ def VMVX_HostSizeAttr : Util_IndexAttrBase<"size_t">;
 def VMVX_Index : TypeAlias<Index>;
 
 def VMVX_HostBuffer : AnyTypeOf<[
-  ByteBufferType,
+  Util_BufferType,
 ]>;
 
 def VMVX_ElementType : AnyTypeOf<[I8, I16, I32, I64, F32, F64]>;
@@ -70,27 +71,6 @@ def VMVX_Buffer : Type<And<[
 //===----------------------------------------------------------------------===//
 // Base VMVX op classes
 //===----------------------------------------------------------------------===//
-
-def VMVX_OpInterface : OpInterface<"VMVXOp"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::VMVX";
-
-  let description = [{
-    Interface for VMVX ops that can be used to customize the lowering.
-    This is required as there is not a way to get reflection information about
-    ops.
-  }];
-
-  let methods = [
-    StaticInterfaceMethod<
-      "Extracts type information attributes that may be required by the op.",
-      "void", "extractTypeAttributes", (ins "OperationState &":$state, "ArrayRef<Type>":$operandTypes, "ArrayRef<Type>":$resultTypes), [{
-        ConcreteOp::extractTypeAttributes(state, operandTypes, resultTypes);
-      }], [{
-        return;  // default to no extraction
-      }]
-    >,
-  ];
-}
 
 class VMVX_Op<string mnemonic, list<Trait> traits = []> :
     Op<VMVX_Dialect, mnemonic, !listconcat(traits, [])> {}

@@ -84,14 +84,14 @@ func.func @resourceSize(%arg0: !stream.resource<transient>) -> index {
 // -----
 
 // CHECK-LABEL: @resourceMap
-func.func @resourceMap(%arg0: !util.byte_buffer) -> !stream.resource<staging> {
+func.func @resourceMap(%arg0: !util.buffer) -> !stream.resource<staging> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: %[[MAPPING:.+]] = hal.allocator.allocate.initialized
-  // CHECK-SAME: source(%arg0 : !util.byte_buffer)[%c0, %c128]
+  // CHECK-SAME: source(%arg0 : !util.buffer)[%c0, %c128]
   // CHECK-SAME: type("HostVisible|HostCoherent|HostLocal|DeviceVisible")
   // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Mapping{{.+}}") : !hal.buffer
-  %mapping = stream.resource.map %arg0[%c0] : !util.byte_buffer -> !stream.resource<staging>{%c128}
+  %mapping = stream.resource.map %arg0[%c0] : !util.buffer -> !stream.resource<staging>{%c128}
   // CHECK: return %[[MAPPING]]
   return %mapping : !stream.resource<staging>
 }
@@ -99,14 +99,14 @@ func.func @resourceMap(%arg0: !util.byte_buffer) -> !stream.resource<staging> {
 // -----
 
 // CHECK-LABEL: @resourceTryMap
-func.func @resourceTryMap(%arg0: !util.byte_buffer) -> (i1, !stream.resource<constant>) {
+func.func @resourceTryMap(%arg0: !util.buffer) -> (i1, !stream.resource<constant>) {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: %[[DID_MAP:.+]], %[[MAPPING:.+]] = hal.allocator.try_map
-  // CHECK-SAME: source(%arg0 : !util.byte_buffer)[%c0, %c128]
+  // CHECK-SAME: source(%arg0 : !util.buffer)[%c0, %c128]
   // CHECK-SAME: type("DeviceVisible|DeviceLocal")
   // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}SharingImmutable") : i1, !hal.
-  %did_map, %mapping = stream.resource.try_map %arg0[%c0] : !util.byte_buffer -> i1, !stream.resource<constant>{%c128}
+  %did_map, %mapping = stream.resource.try_map %arg0[%c0] : !util.buffer -> i1, !stream.resource<constant>{%c128}
   // CHECK: return %[[DID_MAP]], %[[MAPPING]]
   return %did_map, %mapping : i1, !stream.resource<constant>
 }

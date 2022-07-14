@@ -33,13 +33,6 @@ class TiedOpInterface;
 // Common types
 //===----------------------------------------------------------------------===//
 
-namespace detail {
-
-struct ListTypeStorage;
-struct PtrTypeStorage;
-
-}  // namespace detail
-
 // Status code table mapping to iree::StatusCode in the runtime.
 enum class StatusCode : int32_t {
   Ok = 0,
@@ -77,74 +70,6 @@ struct ValueAccess {
   static ValueAccess ReadWrite() { return ValueAccess(true, true, false); }
   static ValueAccess WriteOnly() { return ValueAccess(false, true, false); }
   static ValueAccess DiscardWrite() { return ValueAccess(false, true, true); }
-};
-
-/// Placeholder for a variant type (`?`).
-class VariantType : public Type::TypeBase<VariantType, Type, TypeStorage> {
- public:
-  using Base::Base;
-};
-
-/// A list containing an optional element type.
-class ListType
-    : public Type::TypeBase<ListType, Type, detail::ListTypeStorage> {
- public:
-  using Base::Base;
-
-  /// Returns true if the given type can be wrapped in a list.
-  static bool isCompatible(Type type);
-
-  /// Returns true if |from| can be implicitly cast to |to| as part of a list
-  /// access operation. Example: tensor<*xf32> -> tensor<4xf32>.
-  static bool canImplicitlyCast(Type from, Type to);
-
-  /// Gets or creates a ListType with the provided element type.
-  static ListType get(Type elementType);
-
-  /// Gets or creates a ListType with the provided element type.
-  /// This emits an error at the specified location and returns null if the
-  /// element type isn't supported.
-  static ListType getChecked(Type elementType, Location location);
-  static ListType getChecked(function_ref<InFlightDiagnostic()> emitError,
-                             Type elementType);
-
-  /// Verifies construction of a type with the given object.
-  static LogicalResult verify(function_ref<InFlightDiagnostic()> emitError,
-                              Type elementType) {
-    if (!isCompatible(elementType)) {
-      return emitError() << "invalid element type for a list: " << elementType;
-    }
-    return success();
-  }
-
-  Type getElementType();
-};
-
-/// Base for typed pointer-like references.
-class PtrType : public Type::TypeBase<PtrType, Type, detail::PtrTypeStorage,
-                                      mlir::SubElementTypeInterface::Trait> {
- public:
-  static PtrType get(Type targetType);
-  static PtrType getChecked(Type targetType, Location location);
-  static PtrType getChecked(function_ref<InFlightDiagnostic()> emitError,
-                            Type targetType);
-
-  using Base::Base;
-
-  Type getTargetType() const;
-
-  void walkImmediateSubElements(
-      llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
-      llvm::function_ref<void(mlir::Type)> walkTypesFn) const {
-    walkTypesFn(getTargetType());
-  }
-};
-
-/// A buffer of constant mapped memory.
-class ByteBufferType
-    : public Type::TypeBase<ByteBufferType, Type, TypeStorage> {
- public:
-  using Base::Base;
 };
 
 //===----------------------------------------------------------------------===//
