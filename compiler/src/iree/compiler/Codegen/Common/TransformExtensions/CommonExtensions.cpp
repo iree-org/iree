@@ -220,6 +220,64 @@ DiagnosedSilenceableFailure transform_dialect::MatchOp::apply(
   return DiagnosedSilenceableFailure(success());
 }
 
+ParseResult transform_dialect::MatchOp::parse(OpAsmParser &parser,
+                                              OperationState &result) {
+  // Parse 'match_op' or 'interface' clause.
+  if (succeeded(parser.parseOptionalKeyword("ops"))) {
+    ArrayAttr opsAttr;
+    if (parser.parseLBrace() ||
+        parser.parseCustomAttributeWithFallback(
+            opsAttr, parser.getBuilder().getType<NoneType>(), "match_op",
+            result.attributes) ||
+        parser.parseRBrace())
+      return failure();
+  } else if (succeeded(parser.parseOptionalKeyword("interface"))) {
+    if (parser.parseLBrace()) return failure();
+    StringRef attrStr;
+    auto loc = parser.getCurrentLocation();
+    if (parser.parseKeyword(&attrStr)) return failure();
+    auto interfaceEnum =
+        transform_dialect::symbolizeMatchInterfaceEnum(attrStr);
+    if (!interfaceEnum)
+      return parser.emitError(loc, "invalid ")
+             << "match_interface attribute specification: \"" << attrStr << '"';
+    transform_dialect::MatchInterfaceEnumAttr match_interfaceAttr =
+        transform_dialect::MatchInterfaceEnumAttr::get(
+            parser.getBuilder().getContext(), interfaceEnum.value());
+    result.addAttribute("match_interface", match_interfaceAttr);
+    if (parser.parseRBrace()) return failure();
+  } else {
+    auto loc = parser.getCurrentLocation();
+    return parser.emitError(loc, "expected ops or interface");
+  }
+
+  OpAsmParser::UnresolvedOperand targetRawOperands[1];
+  ArrayRef<OpAsmParser::UnresolvedOperand> targetOperands(targetRawOperands);
+  if (parser.parseKeyword("in") || parser.parseOperand(targetRawOperands[0]) ||
+      parser.parseOptionalAttrDict(result.attributes))
+    return failure();
+  Type pdlOpType = parser.getBuilder().getType<pdl::OperationType>();
+  result.addTypes(pdlOpType);
+  if (parser.resolveOperands(targetOperands, pdlOpType, result.operands))
+    return failure();
+  return success();
+}
+
+void transform_dialect::MatchOp::print(OpAsmPrinter &p) {
+  if ((*this)->getAttr("match_op")) {
+    p << " ops{";
+    p.printAttributeWithoutType(getMatchOpAttr());
+    p << "}";
+  }
+  if ((*this)->getAttr("match_interface")) {
+    p << " interface{" << stringifyMatchInterfaceEnum(*getMatchInterface())
+      << "}";
+  }
+  p << " in " << getTarget();
+  p.printOptionalAttrDict((*this)->getAttrs(),
+                          /*elidedAttrs=*/{"match_op", "match_interface"});
+}
+
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensionsAttrs.cpp.inc"
 
 #define GET_OP_CLASSES
