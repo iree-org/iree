@@ -31,6 +31,16 @@ vm.module @cmp_eq_i32_folds {
     %eq = vm.cmp.eq.i32 %c1, %c2 : i32
     vm.return %eq : i32
   }
+
+  // CHECK-LABEL: @const_ne_f32
+  vm.func @const_ne_f32() -> i32 {
+    // CHECK: %zero = vm.const.i32.zero
+    // CHECK-NEXT: vm.return %zero : i32
+    %c1 = vm.const.f32 1.0
+    %c2 = vm.const.f32 2.0
+    %eq = vm.cmp.eq.f32.o %c1, %c2 : f32
+    vm.return %eq : i32
+  }
 }
 
 // -----
@@ -61,6 +71,16 @@ vm.module @cmp_ne_i32_folds {
     %c1 = vm.const.i32 1
     %c2 = vm.const.i32 2
     %ne = vm.cmp.ne.i32 %c1, %c2 : i32
+    vm.return %ne : i32
+  }
+
+  // CHECK-LABEL: @const_ne_f32
+  vm.func @const_ne_f32() -> i32 {
+    // CHECK: %c1 = vm.const.i32 1
+    // CHECK-NEXT: vm.return %c1 : i32
+    %c1 = vm.const.f32 1.0
+    %c2 = vm.const.f32 2.0
+    %ne = vm.cmp.ne.f32.o %c1, %c2 : f32
     vm.return %ne : i32
   }
 
