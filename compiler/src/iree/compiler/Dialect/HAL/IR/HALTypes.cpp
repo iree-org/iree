@@ -548,10 +548,9 @@ void HALDialect::registerTypes() {
 Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
                                      Type type) const {
   StringRef mnemonic;
-  if (failed(parser.parseKeyword(&mnemonic))) return {};
   Attribute genAttr;
   OptionalParseResult parseResult =
-      generatedAttributeParser(parser, mnemonic, type, genAttr);
+      generatedAttributeParser(parser, &mnemonic, type, genAttr);
   if (parseResult.hasValue()) return genAttr;
   parser.emitError(parser.getNameLoc())
       << "unknown HAL attribute: " << mnemonic;

@@ -35,9 +35,6 @@ def IREECodegen_Dialect : Dialect {
   }];
   let extraClassDeclaration = [{
     void initializeCodegenAttrs();
-    OptionalParseResult parseCodegenAttrs(DialectAsmParser &parser,
-        StringRef mnemonic, Type type, Attribute &value) const;
-    LogicalResult printCodegenAttrs(Attribute attr, DialectAsmPrinter &p) const;
   }];
   let useDefaultAttributePrinterParser = 1;
 }

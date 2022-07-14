@@ -248,17 +248,6 @@ void IREECodegenDialect::initializeCodegenAttrs() {
       >();
 }
 
-OptionalParseResult IREECodegenDialect::parseCodegenAttrs(
-    DialectAsmParser &parser, StringRef mnemonic, Type type,
-    Attribute &value) const {
-  return generatedAttributeParser(parser, mnemonic, type, value);
-}
-
-LogicalResult IREECodegenDialect::printCodegenAttrs(
-    Attribute attr, DialectAsmPrinter &p) const {
-  return generatedAttributePrinter(attr, p);
-}
-
 }  // namespace Codegen
 }  // namespace IREE
 
