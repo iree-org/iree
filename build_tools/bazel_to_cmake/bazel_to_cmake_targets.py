@@ -96,6 +96,10 @@ EXPLICIT_TARGET_MAPPING = {
         "tensorflow::external_mhlo_includes",
         "MhloPasses",
     ],
+    "@mlir-hlo//:legalize_shape_computations": [
+        "tensorflow::external_mhlo_includes",
+        "MhloPasses",
+    ],
     "@mlir-hlo//:legalize_to_linalg": [
         "tensorflow::external_mhlo_includes",
         "MhloToLinalg",
