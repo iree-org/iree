@@ -8,6 +8,7 @@
 #define IREE_COMPILER_DIALECT_HAL_CONVERSION_HALTOVM_CONVERTHALTOVM_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -18,6 +19,14 @@ namespace iree_compiler {
 void populateHALToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
                              RewritePatternSet &patterns,
                              TypeConverter &typeConverter);
+
+// Creates a !vm.buffer containing all of the |constantValues|.
+Value createPackedConstantBuffer(Location loc, ValueRange constantValues,
+                                 OpBuilder &builder);
+
+// Creates a vm.rodata containing the contents of a hal.executable.binary.
+IREE::VM::RodataOp createExecutableBinaryRodata(
+    IREE::HAL::ExecutableBinaryOp binaryOp, OpBuilder &builder);
 
 }  // namespace iree_compiler
 }  // namespace mlir

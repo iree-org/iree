@@ -67,9 +67,8 @@ static void addCleanupPatterns(OpPassManager &passManager) {
   passManager.addPass(IREE::Util::createFuseGlobalsPass());
 }
 
-void buildHALTransformPassPipeline(OpPassManager &passManager,
-                                   const TargetOptions &targetOptions,
-                                   const TransformOptions &transformOptions) {
+void buildHALConfigurationPassPipeline(OpPassManager &passManager,
+                                       const TargetOptions &targetOptions) {
   //----------------------------------------------------------------------------
   // Input cleanup and simplification
   //----------------------------------------------------------------------------
@@ -114,6 +113,20 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
     passManager.addPass(createDumpExecutableBenchmarksPass(
         targetOptions.executableBenchmarksPath));
   }
+}
+
+void buildHALTransformPassPipeline(OpPassManager &passManager,
+                                   const TargetOptions &targetOptions,
+                                   const TransformOptions &transformOptions) {
+  //----------------------------------------------------------------------------
+  // Device assignment and interface materialization
+  //----------------------------------------------------------------------------
+
+  buildHALConfigurationPassPipeline(passManager, targetOptions);
+
+  //----------------------------------------------------------------------------
+  // Executable translation
+  //----------------------------------------------------------------------------
 
   // TODO(benvanik): move translation after conversion; today translation
   // inserts the workgroup count logic we need to convert but we could instead
@@ -155,7 +168,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // MaterializeResourceCachesPass.
   passManager.addPass(createResolveExportOrdinalsPass());
 
-  // Gather cachable resources such as executables and descriptor sets and
+  // Gather cacheable resources such as executables and descriptor sets and
   // cache them at initialization-time.
   passManager.addPass(createMaterializeResourceCachesPass(targetOptions));
 

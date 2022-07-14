@@ -1080,9 +1080,8 @@ static LogicalResult mergeBuiltinModuleSource(Location loc, StringRef fileName,
     return mlir::emitError(
         loc, "unable to merge builtin module; file not found " + fileName);
   }
-  SymbolTable targetSymbols(targetOp);
   return mergeSourceModuleInto(loc, StringRef(file->data, file->size), targetOp,
-                               targetSymbols, targetBuilder);
+                               targetBuilder);
 }
 
 //===----------------------------------------------------------------------===//

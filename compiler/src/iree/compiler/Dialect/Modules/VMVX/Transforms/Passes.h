@@ -35,15 +35,13 @@ namespace VMVX {
 //   <serialize VM module>
 void buildVMVXTransformPassPipeline(OpPassManager &passManager);
 
-void createVMVXTransformPassPipeline();
+//===----------------------------------------------------------------------===//
+// Dialect conversion
+//===----------------------------------------------------------------------===//
 
 // Lowers high level library calls from named ops and generics. This operates
 // at the bufferized linalg level.
 std::unique_ptr<Pass> createLowerLinalgMicrokernelsPass();
-
-//===----------------------------------------------------------------------===//
-// Dialect conversion
-//===----------------------------------------------------------------------===//
 
 // Converts from various dialects (HAL, standard, etc) to the VMVX dialect.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass();

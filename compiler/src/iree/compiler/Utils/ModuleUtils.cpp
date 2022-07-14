@@ -15,9 +15,10 @@ namespace mlir {
 namespace iree_compiler {
 
 // Renames |op| within |moduleOp| with a new name that is unique within both
-// |moduleOp| and |optionalSymbolTable| (if one is provided).
+// |moduleOp| and |symbolTable|.
 static void renameWithDisambiguatedName(Operation *op, Operation *moduleOp,
-                                        SymbolTable &symbolTable) {
+                                        SymbolTable &symbolTable0,
+                                        SymbolTable &symbolTable1) {
   StringRef originalName = SymbolTable::getSymbolName(op).getValue();
 
   // This could stand to be rewritten noting that nested symbol refs exist.
@@ -29,8 +30,11 @@ static void renameWithDisambiguatedName(Operation *op, Operation *moduleOp,
   do {
     disambiguatedName =
         llvm::formatv("{0}_{1}", originalName, uniqueingCounter++).str();
-  } while (symbolTable.lookup(disambiguatedName));
+  } while (symbolTable0.lookup(disambiguatedName) ||
+           symbolTable1.lookup(disambiguatedName));
 
+  // HORRENDOUS: this needs to be rewritten; we're walking the entire module
+  // each time to do this!
   SymbolTableCollection symbolTables;
   SymbolUserMap symbolUsers(symbolTables, moduleOp);
   mlir::StringAttr nameAttr =
@@ -39,12 +43,13 @@ static void renameWithDisambiguatedName(Operation *op, Operation *moduleOp,
   SymbolTable::setSymbolName(op, disambiguatedName);
 }
 
-LogicalResult mergeModuleInto(Operation *sourceOp, Operation *targetOp,
-                              SymbolTable &targetSymbolTable,
+LogicalResult mergeModuleInto(Operation *sourceModuleOp,
+                              Operation *targetModuleOp,
                               OpBuilder &targetBuilder) {
   // Capture source information we need prior to destructively merging.
-  SymbolTable sourceSymbolTable(sourceOp);
-  auto &sourceBlock = sourceOp->getRegion(0).front();
+  SymbolTable sourceSymbolTable(sourceModuleOp);
+  SymbolTable targetSymbolTable(targetModuleOp);
+  auto &sourceBlock = sourceModuleOp->getRegion(0).front();
   auto sourceOps = llvm::to_vector<8>(
       llvm::map_range(sourceBlock, [&](Operation &op) { return &op; }));
 
@@ -67,7 +72,8 @@ LogicalResult mergeModuleInto(Operation *sourceOp, Operation *targetOp,
             continue;
           } else {
             // Preserve the op but give it a unique name.
-            renameWithDisambiguatedName(sourceOp, sourceOp, sourceSymbolTable);
+            renameWithDisambiguatedName(sourceOp, sourceModuleOp,
+                                        sourceSymbolTable, targetSymbolTable);
           }
         } else {
           // The source symbol has 'nested' or 'public' visibility.
@@ -80,7 +86,8 @@ LogicalResult mergeModuleInto(Operation *sourceOp, Operation *targetOp,
                    << "multiple public symbols with the name: " << symbolName;
           } else {
             // Keep the original name for our new op, rename the target op.
-            renameWithDisambiguatedName(targetOp, targetOp, targetSymbolTable);
+            renameWithDisambiguatedName(targetOp, targetModuleOp,
+                                        sourceSymbolTable, targetSymbolTable);
           }
         }
       }
@@ -96,7 +103,6 @@ LogicalResult mergeModuleInto(Operation *sourceOp, Operation *targetOp,
 
 LogicalResult mergeSourceModuleInto(Location loc, StringRef source,
                                     Operation *targetOp,
-                                    SymbolTable &targetSymbolTable,
                                     OpBuilder &targetBuilder) {
   // Parse the module. This will only fail if the compiler was built wrong;
   // we're loading the embedded files from the compiler binary.
@@ -108,8 +114,7 @@ LogicalResult mergeSourceModuleInto(Location loc, StringRef source,
   }
 
   // Merge all of the module contents.
-  return mergeModuleInto(*sourceModuleRef, targetOp, targetSymbolTable,
-                         targetBuilder);
+  return mergeModuleInto(*sourceModuleRef, targetOp, targetBuilder);
 }
 
 }  // namespace iree_compiler

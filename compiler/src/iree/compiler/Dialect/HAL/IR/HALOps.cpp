@@ -119,60 +119,6 @@ static void printDescriptorSetBindings(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
-// custom<PackSliceRanges>($lifetime_intervals,
-//                         $dynamic_slice_sizes,
-//                         type($packed_offsets))
-//===----------------------------------------------------------------------===//
-
-static ParseResult parsePackSliceRanges(
-    OpAsmParser &parser, ArrayAttr &lifetimeIntervals,
-    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dynamicSliceSizes,
-    SmallVectorImpl<Type> &packedOffsetTypes) {
-  auto indexType = parser.getBuilder().getIndexType();
-  SmallVector<Attribute> lifetimeRangeValues;
-  do {
-    if (failed(parser.parseOptionalLSquare())) break;
-    IntegerAttr lifetimeStart;
-    IntegerAttr lifetimeEnd;
-    OpAsmParser::UnresolvedOperand dynamicSliceSize;
-    if (failed(parser.parseAttribute(lifetimeStart, indexType)) ||
-        failed(parser.parseComma()) ||
-        failed(parser.parseAttribute(lifetimeEnd, indexType)) ||
-        failed(parser.parseRSquare()) || failed(parser.parseEqual()) ||
-        failed(parser.parseOperand(dynamicSliceSize))) {
-      return failure();
-    }
-    lifetimeRangeValues.push_back(lifetimeStart);
-    lifetimeRangeValues.push_back(lifetimeEnd);
-    dynamicSliceSizes.push_back(dynamicSliceSize);
-    packedOffsetTypes.push_back(indexType);
-  } while (succeeded(parser.parseOptionalComma()));
-  lifetimeIntervals = parser.getBuilder().getArrayAttr(lifetimeRangeValues);
-  return success();
-}
-
-static void printPackSliceRanges(OpAsmPrinter &p, Operation *op,
-                                 ArrayAttr lifetimeIntervals,
-                                 ValueRange dynamicSliceSizes,
-                                 TypeRange packedOffsetTypes) {
-  if (packedOffsetTypes.empty()) return;
-  for (unsigned i = 0; i < packedOffsetTypes.size(); ++i) {
-    auto lifetimeStart = lifetimeIntervals[i * 2];
-    auto lifetimeEnd = lifetimeIntervals[i * 2 + 1];
-    auto sliceSize = dynamicSliceSizes[i];
-    p.printNewline();
-    p << "  [";
-    p.printAttributeWithoutType(lifetimeStart);
-    p << ", ";
-    p.printAttributeWithoutType(lifetimeEnd);
-    p << "] = ";
-    p.printOperand(sliceSize);
-    if (i < packedOffsetTypes.size() - 1) p << ",";
-  }
-  p.printNewline();
-}
-
-//===----------------------------------------------------------------------===//
 // custom<TimepointList>($semaphores, $values)
 //===----------------------------------------------------------------------===//
 // at<%semaphore : !hal.semaphore>(%value) ...
