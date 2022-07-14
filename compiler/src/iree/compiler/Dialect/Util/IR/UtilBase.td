@@ -215,15 +215,6 @@ def ByteBufferType : DialectType<
 }
 def ByteBufferRefAttr : AliasedSymbolRefAttr;
 
-def MutableByteBufferType : DialectType<
-    Util_Dialect,
-    CPred<"$_self.isa<IREE::Util::MutableByteBufferType>()">,
-    "mutable_byte_buffer"> {
-  let description = [{
-    A buffer of read-write host memory.
-  }];
-}
-
 //===----------------------------------------------------------------------===//
 // List types
 //===----------------------------------------------------------------------===//

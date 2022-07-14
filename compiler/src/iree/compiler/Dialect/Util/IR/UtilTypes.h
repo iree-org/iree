@@ -147,13 +147,6 @@ class ByteBufferType
   using Base::Base;
 };
 
-/// A buffer of read-write memory.
-class MutableByteBufferType
-    : public Type::TypeBase<MutableByteBufferType, Type, TypeStorage> {
- public:
-  using Base::Base;
-};
-
 //===----------------------------------------------------------------------===//
 // Tied operand interface utilities
 //===----------------------------------------------------------------------===//
@@ -253,6 +246,11 @@ static inline int32_t getRoundedElementByteWidth(Type type) {
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Dialect/Util/IR/UtilAttrs.h.inc"  // IWYU pragma: keep
+// clang-format on
+
+// clang-format off: must be included after all LLVM/MLIR headers.
+#define GET_TYPEDEF_CLASSES
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h.inc"  // IWYU pragma: keep
 // clang-format on
 
 #endif  // IREE_COMPILER_DIALECT_UTIL_IR_UTILTYPES_H_

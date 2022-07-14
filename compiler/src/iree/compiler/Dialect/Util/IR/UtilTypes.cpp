@@ -555,8 +555,7 @@ SmallVector<Value> buildResultShape(ShapeAwareOpInterface op,
 
 void UtilDialect::registerTypes() {
   addTypes<IREE::Util::ByteBufferType, IREE::Util::ListType,
-           IREE::Util::MutableByteBufferType, IREE::Util::PtrType,
-           IREE::Util::VariantType>();
+           IREE::Util::PtrType, IREE::Util::VariantType>();
 }
 
 //===----------------------------------------------------------------------===//
@@ -584,8 +583,6 @@ Type UtilDialect::parseType(DialectAsmParser &parser) const {
     return IREE::Util::PtrType::getChecked(variableType, loc);
   } else if (spec == "byte_buffer") {
     return IREE::Util::ByteBufferType::get(getContext());
-  } else if (spec == "mutable_byte_buffer") {
-    return IREE::Util::MutableByteBufferType::get(getContext());
   } else if (spec.consume_front("list")) {
     if (!spec.consume_front("<") || !spec.consume_back(">")) {
       parser.emitError(parser.getCurrentLocation())
@@ -617,8 +614,6 @@ void UtilDialect::printType(Type type, DialectAsmPrinter &os) const {
     os << "ptr<" << ptrType.getTargetType() << ">";
   } else if (type.isa<IREE::Util::ByteBufferType>()) {
     os << "byte_buffer";
-  } else if (type.isa<IREE::Util::MutableByteBufferType>()) {
-    os << "mutable_byte_buffer";
   } else if (auto listType = type.dyn_cast<IREE::Util::ListType>()) {
     os << "list<";
     if (listType.getElementType().isa<IREE::Util::VariantType>()) {

@@ -128,11 +128,6 @@ void populateUtilToVMPatterns(MLIRContext *context,
         return IREE::VM::RefType::get(
             IREE::VM::BufferType::get(type.getContext()));
       });
-  typeConverter.addConversion(
-      [](IREE::Util::MutableByteBufferType type) -> Optional<Type> {
-        return IREE::VM::RefType::get(
-            IREE::VM::BufferType::get(type.getContext()));
-      });
 
   populateUtilGlobalToVMPatterns(context, conversionTarget, typeConverter,
                                  patterns);

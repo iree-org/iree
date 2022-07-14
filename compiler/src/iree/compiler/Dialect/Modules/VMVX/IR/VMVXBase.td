@@ -48,7 +48,6 @@ def VMVX_Index : TypeAlias<Index>;
 
 def VMVX_HostBuffer : AnyTypeOf<[
   ByteBufferType,
-  MutableByteBufferType,
 ]>;
 
 def VMVX_ElementType : AnyTypeOf<[I8, I16, I32, I64, F32, F64]>;
