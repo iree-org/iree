@@ -12,12 +12,10 @@
 
 set -euo pipefail
 
-runner_registration_token="${1}"
-
 if [[ "$(whoami)" != "runner" ]]; then
   echo "Current user is not 'runner'. Rerunning script as 'runner'."
   SCRIPT="$( readlink -f -- "$0"; )"
-  sudo su runner --shell /bin/bash --command "${SCRIPT} ${runner_registration_token}"
+  sudo su runner --shell /bin/bash --command "${SCRIPT}
   exit
 fi
 
@@ -32,8 +30,8 @@ rm -rf /tmp/iree
 # git clone https://github.com/iree-org/iree.git
 git clone https://github.com/gmngeoffrey/iree.git
 cd iree
-git fetch origin runner-setup
-git checkout runner-setup
+git fetch origin runner-setup-ephemeral
+git checkout runner-setup-ephemeral
 cd ..
 
 cp -r iree/build_tools/github_actions/runner/* "${HOME}/"
@@ -41,4 +39,4 @@ cp -r iree/build_tools/github_actions/runner/* "${HOME}/"
 cd "${HOME}"
 rm -rf /tmp/iree
 
-./setup.sh "${runner_registration_token}"
+./setup.sh

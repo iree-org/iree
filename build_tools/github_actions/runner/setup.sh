@@ -15,13 +15,21 @@
 
 set -euo pipefail
 
-runner_registration_token="$1"
-
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 
 source "${SCRIPT_DIR}/functions.sh"
 
 cd actions-runner
+
+GITHUB_TOKEN_PROXY_URL="$(get_attribute github-token-proxy-url)"
+GITHUB_RUNNER_SCOPE="$(get_attribute github-runner-scope)"
+
+GOOGLE_CLOUD_RUN_ID_TOKEN=$(get_metadata "instance/service-accounts/default/identity?audience=${GITHUB_TOKEN_PROXY_URL}")
+GITHUB_REGISTRATION_TOKEN="$(curl -sSfL "${GITHUB_TOKEN_PROXY_URL}/register" \
+  --header "Authorization: Bearer ${GOOGLE_CLOUD_RUN_ID_TOKEN}" \
+  --data-binary "{\"scope\": \"${GITHUB_RUNNER_SCOPE}\"}" \
+  | jq -r ".token"
+)"
 
 OS_ID="$(get_os_info ShortName)"
 OS_VERSION="$(get_os_info Version)"
@@ -80,10 +88,17 @@ RUNNER_LABELS="$(IFS="," ; echo "${RUNNER_LABELS_ARRAY[*]}")"
 RUNNER_LABELS="${RUNNER_LABELS}${RUNNER_CUSTOM_LABELS:+,${RUNNER_CUSTOM_LABELS}}"
 
 declare -a args=(
-  --url https://github.com/iree-org
+  --url "https://github.com/${GITHUB_RUNNER_SCOPE}"
   --labels "${RUNNER_LABELS}"
   --unattended
   --runnergroup "${RUNNER_GROUP}"
+  --replace
+  --ephemeral
+  # We have to manage updates ourselves at the moment, since the GitHub runner
+  # is baked into the image and we don't want every runner to start out by
+  # updating itself. GitHub mandates an update within 30 days of release though.
+  # TODO: Switch to fetching the latest runner on VM creation.
+  --disableupdate
 )
 # I would love to discover another way to print an array while preserving quote
 # escaping. We're not just using `set -x` on the command itself because we don't
@@ -91,6 +106,6 @@ declare -a args=(
 # to). `:` is the bash noop command that is equivalent to `true`.
 (set -x; : Running configuration with additional args: "${args[@]}")
 
-./config.sh --token "${runner_registration_token}" "${args[@]}"
+./config.sh --token "${GITHUB_REGISTRATION_TOKEN}" "${args[@]}"
 sudo ./svc.sh install
 sudo ./svc.sh start
