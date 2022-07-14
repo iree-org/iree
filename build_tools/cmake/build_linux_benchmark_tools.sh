@@ -56,3 +56,30 @@ cd build-targets/linux-x86_64
 
 fi
 # --------------------------------------------------------------------------- #
+
+# --------------------------------------------------------------------------- #
+# Build for the target (linux-cuda).
+if [[ "${TARGETS}" == *"linux-cuda"* ]] || [[ "${TARGETS}" == *"all"* ]]
+then
+
+cd "${ROOT_DIR}"
+
+if [ -d "build-targets/linux-cuda" ]
+then
+  echo "linux-cuda directory already exists. Will use cached results there."
+else
+  echo "linux-cuda directory does not already exist. Creating a new one."
+  mkdir -p build-targets/linux-cuda
+fi
+cd build-targets/linux-cuda
+
+"${CMAKE_BIN}" -G Ninja ../.. \
+  -DIREE_BUILD_COMPILER=OFF \
+  -DIREE_BUILD_TESTS=OFF \
+  -DIREE_BUILD_SAMPLES=OFF \
+  -DIREE_HAL_DRIVER_CUDA=ON
+
+"${CMAKE_BIN}" --build . --target iree-benchmark-module -- -k 0
+
+fi
+# --------------------------------------------------------------------------- #

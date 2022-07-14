@@ -34,3 +34,4 @@ set(MINILM_L12_H384_UNCASED_INT32_MODULE
 # Add benchmarks for all platforms.                                            #
 ################################################################################
 include(linux-x86_64.cmake)
+include(linux-cuda.cmake)
