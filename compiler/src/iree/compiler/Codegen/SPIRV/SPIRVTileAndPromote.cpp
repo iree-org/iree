@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
@@ -96,6 +97,9 @@ LogicalResult copyToWorkgroupMemory(OpBuilder &builder, Value src, Value dst) {
   return success();
 }
 
+template <typename T>
+using LinalgPromotionPattern =
+    mlir::iree_compiler::IREE::LinalgExt::LinalgPromotionPattern<T>;
 static void populatePromotionPatterns(RewritePatternSet &patterns,
                                       StringAttr replaceMarker) {
   MLIRContext *context = patterns.getContext();
@@ -116,14 +120,14 @@ static void populatePromotionPatterns(RewritePatternSet &patterns,
   linalg::LinalgTransformationFilter promoteBothFilter(
       {StringAttr::get(context, promoteBothMarker)}, replaceMarker);
 
-  patterns.insert<linalg::LinalgPromotionPattern<linalg::MatmulOp>,
-                  linalg::LinalgPromotionPattern<linalg::BatchMatmulOp>>(
+  patterns.insert<LinalgPromotionPattern<linalg::MatmulOp>,
+                  LinalgPromotionPattern<linalg::BatchMatmulOp>>(
       patterns.getContext(), promoteLHSOptions, promoteLHSFilter);
-  patterns.insert<linalg::LinalgPromotionPattern<linalg::MatmulOp>,
-                  linalg::LinalgPromotionPattern<linalg::BatchMatmulOp>>(
+  patterns.insert<LinalgPromotionPattern<linalg::MatmulOp>,
+                  LinalgPromotionPattern<linalg::BatchMatmulOp>>(
       patterns.getContext(), promoteRHSOptions, promoteRHSFilter);
-  patterns.insert<linalg::LinalgPromotionPattern<linalg::MatmulOp>,
-                  linalg::LinalgPromotionPattern<linalg::BatchMatmulOp>>(
+  patterns.insert<LinalgPromotionPattern<linalg::MatmulOp>,
+                  LinalgPromotionPattern<linalg::BatchMatmulOp>>(
       patterns.getContext(), promoteBothOptions, promoteBothFilter);
 }
 

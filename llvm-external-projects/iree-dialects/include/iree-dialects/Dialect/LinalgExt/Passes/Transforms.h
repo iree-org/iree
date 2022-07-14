@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMS_TRANSFORMS_H_
-#define IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMS_TRANSFORMS_H_
+#ifndef IREE_DIALECTS_DIALECT_LINALGEXT_PASSES_TRANSFORMS_H_
+#define IREE_DIALECTS_DIALECT_LINALGEXT_PASSES_TRANSFORMS_H_
 
 #include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -90,4 +90,4 @@ struct TiledOpInterfaceTilingPattern
 } // namespace iree_compiler
 } // namespace mlir
 
-#endif // IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMS_TRANSFORMS_H_
+#endif // IREE_DIALECTS_DIALECT_LINALGEXT_PASSES_TRANSFORMS_H_

@@ -6,6 +6,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
@@ -186,12 +187,15 @@ static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
   return success();
 }
 
+template <typename T>
+using LinalgPromotionPattern =
+    mlir::iree_compiler::IREE::LinalgExt::LinalgPromotionPattern<T>;
 static void populatePromotionPatterns(MLIRContext *context,
                                       RewritePatternSet &patterns,
                                       ArrayRef<int64_t> operandsToPromote) {
-  patterns.insert<linalg::LinalgPromotionPattern<linalg::MatmulOp>,
-                  linalg::LinalgPromotionPattern<linalg::BatchMatmulOp>,
-                  linalg::LinalgPromotionPattern<linalg::GenericOp>>(
+  patterns.insert<LinalgPromotionPattern<linalg::MatmulOp>,
+                  LinalgPromotionPattern<linalg::BatchMatmulOp>,
+                  LinalgPromotionPattern<linalg::GenericOp>>(
       context,
       linalg::LinalgPromotionOptions()
           .setAllocationDeallocationFns(allocateWorkgroupMemory,
