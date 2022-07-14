@@ -162,8 +162,8 @@ struct EncodeTensorImportOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorImportOp op,
                                 PatternRewriter &rewriter) const override {
-    auto resultType = op.result_encoding().cast<RankedTensorType>();
-    auto resultDims = op.result_encoding_dims();
+    auto resultType = op.getResultEncoding().cast<RankedTensorType>();
+    auto resultDims = op.getResultEncodingDims();
     if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
       return failure();
     }
@@ -185,8 +185,8 @@ struct EncodeTensorExportOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorExportOp op,
                                 PatternRewriter &rewriter) const override {
-    auto sourceType = op.source_encoding().cast<RankedTensorType>();
-    auto sourceDims = op.source_encoding_dims();
+    auto sourceType = op.getSourceEncoding().cast<RankedTensorType>();
+    auto sourceDims = op.getSourceEncodingDims();
     if (failed(checkEncoding(op, sourceType, sourceDims, rewriter))) {
       return failure();
     }
@@ -208,8 +208,8 @@ struct EncodeTensorSizeOfOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorSizeOfOp op,
                                 PatternRewriter &rewriter) const override {
-    auto encodingType = op.encoding().cast<RankedTensorType>();
-    auto encodingDims = op.encoding_dims();
+    auto encodingType = op.getEncoding().cast<RankedTensorType>();
+    auto encodingDims = op.getEncodingDims();
     if (failed(checkEncoding(op, encodingType, encodingDims, rewriter))) {
       return failure();
     }
@@ -234,8 +234,8 @@ struct EncodeTensorEmptyOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorEmptyOp op,
                                 PatternRewriter &rewriter) const override {
-    auto resultType = op.result_encoding().cast<RankedTensorType>();
-    auto resultDims = op.result_encoding_dims();
+    auto resultType = op.getResultEncoding().cast<RankedTensorType>();
+    auto resultDims = op.getResultEncodingDims();
     if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
       return failure();
     }
@@ -244,8 +244,8 @@ struct EncodeTensorEmptyOp
     auto resultSize =
         rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0).getResult();
     rewriter.replaceOpWithNewOp<IREE::Stream::ResourceAllocOp>(
-        op, op.result().getType(), resultSize, /*uninitialized=*/false,
-        op.affinityAttr());
+        op, op.getResult().getType(), resultSize, /*uninitialized=*/false,
+        op.getAffinityAttr());
 
     return success();
   }
@@ -260,8 +260,8 @@ struct EncodeTensorConstantOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorConstantOp op,
                                 PatternRewriter &rewriter) const override {
-    auto resultType = op.result_encoding().cast<RankedTensorType>();
-    auto resultDims = op.result_encoding_dims();
+    auto resultType = op.getResultEncoding().cast<RankedTensorType>();
+    auto resultDims = op.getResultEncodingDims();
     if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
       return failure();
     }
@@ -283,7 +283,7 @@ struct EncodeTensorConstantOp
     // byte-aligned width. This is unfortunate: it's wasted bits in the final
     // binary that we could otherwise use productively.
     auto alignedType = alignTensorType(resultType);
-    ElementsAttr encodedAttr = op.value();
+    ElementsAttr encodedAttr = op.getValue();
     if (alignedType != resultType) {
       if (auto sourceAttr = encodedAttr.dyn_cast<DenseIntElementsAttr>()) {
         auto alignedBitWidth = alignedType.getElementTypeBitWidth();
@@ -303,7 +303,8 @@ struct EncodeTensorConstantOp
         IREE::Util::getRoundedElementByteWidth(alignedType.getElementType()),
         rewriter);
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncConstantOp>(
-        op, op.result().getType(), encodedAttr, resultSize, op.affinityAttr());
+        op, op.getResult().getType(), encodedAttr, resultSize,
+        op.getAffinityAttr());
 
     return success();
   }
@@ -360,8 +361,8 @@ struct EncodeTensorSplatOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorSplatOp op,
                                 PatternRewriter &rewriter) const override {
-    auto resultType = op.result_encoding().cast<RankedTensorType>();
-    auto resultDims = op.result_encoding_dims();
+    auto resultType = op.getResultEncoding().cast<RankedTensorType>();
+    auto resultDims = op.getResultEncodingDims();
     if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
       return failure();
     }
@@ -369,19 +370,19 @@ struct EncodeTensorSplatOp
     // Dense:
 
     // Canonicalize the fill pattern into one of [i8, i16, i32, i64].
-    auto pattern = canonicalizeFillPattern(op.value(), rewriter);
+    auto pattern = canonicalizeFillPattern(op.getValue(), rewriter);
     if (!pattern) {
       return rewriter.notifyMatchFailure(
           op, "unsupported pattern width; encoding policy required");
     } else if (pattern.getType().getIntOrFloatBitWidth() > 32) {
       // We emulate 64-bit support with a stream.builtin.splat.i64.
       rewriter.replaceOpWithNewOp<IREE::Stream::BuiltinSplatI64Op>(
-          op, op.result().getType(), pattern, op.result_size(),
-          op.affinityAttr());
+          op, op.getResult().getType(), pattern, op.getResultSize(),
+          op.getAffinityAttr());
     } else {
       rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(
-          op, op.result().getType(), pattern, op.result_size(),
-          op.affinityAttr());
+          op, op.getResult().getType(), pattern, op.getResultSize(),
+          op.getAffinityAttr());
     }
 
     return success();
@@ -397,21 +398,21 @@ struct EncodeTensorCloneOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorCloneOp op,
                                 PatternRewriter &rewriter) const override {
-    auto sourceType = op.source_encoding().cast<RankedTensorType>();
-    auto sourceDims = op.source_encoding_dims();
+    auto sourceType = op.getSourceEncoding().cast<RankedTensorType>();
+    auto sourceDims = op.getSourceEncodingDims();
     if (failed(checkEncoding(op, sourceType, sourceDims, rewriter))) {
       return failure();
     }
-    auto resultType = op.result_encoding().cast<RankedTensorType>();
-    auto resultDims = op.result_encoding_dims();
+    auto resultType = op.getResultEncoding().cast<RankedTensorType>();
+    auto resultDims = op.getResultEncodingDims();
     if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
       return failure();
     }
 
     // Dense:
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncCloneOp>(
-        op, op.result().getType(), op.source(), op.source_size(),
-        op.result_size(), op.affinityAttr());
+        op, op.getResult().getType(), op.getSource(), op.getSourceSize(),
+        op.getResultSize(), op.getAffinityAttr());
 
     return success();
   }
@@ -426,25 +427,25 @@ struct EncodeTensorSliceOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorSliceOp op,
                                 PatternRewriter &rewriter) const override {
-    auto sourceType = op.source_encoding().cast<RankedTensorType>();
-    auto sourceDims = op.source_encoding_dims();
+    auto sourceType = op.getSourceEncoding().cast<RankedTensorType>();
+    auto sourceDims = op.getSourceEncodingDims();
     if (failed(checkEncoding(op, sourceType, sourceDims, rewriter))) {
       return failure();
     }
-    auto resultType = op.result_encoding().cast<RankedTensorType>();
-    auto resultDims = op.result_encoding_dims();
+    auto resultType = op.getResultEncoding().cast<RankedTensorType>();
+    auto resultDims = op.getResultEncodingDims();
     if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
       return failure();
     }
 
     // Dense:
     auto sourceOffset = calculateElementByteOffset(
-        op.getLoc(), sourceType, sourceDims, op.start_indices(), rewriter);
+        op.getLoc(), sourceType, sourceDims, op.getStartIndices(), rewriter);
     auto sourceEnd = rewriter.createOrFold<arith::AddIOp>(
-        op.getLoc(), sourceOffset, op.result_size());
+        op.getLoc(), sourceOffset, op.getResultSize());
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSliceOp>(
-        op, op.result().getType(), op.source(), op.source_size(), sourceOffset,
-        sourceEnd, op.result_size(), op.affinityAttr());
+        op, op.getResult().getType(), op.getSource(), op.getSourceSize(),
+        sourceOffset, sourceEnd, op.getResultSize(), op.getAffinityAttr());
 
     return success();
   }
@@ -459,33 +460,33 @@ struct EncodeTensorFillOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorFillOp op,
                                 PatternRewriter &rewriter) const override {
-    auto targetType = op.target_encoding().cast<RankedTensorType>();
-    auto targetDims = op.target_encoding_dims();
+    auto targetType = op.getTargetEncoding().cast<RankedTensorType>();
+    auto targetDims = op.getTargetEncodingDims();
     if (failed(checkEncoding(op, targetType, targetDims, rewriter))) {
       return failure();
     }
 
     // Dense:
     auto targetOffset = calculateElementByteOffset(
-        op.getLoc(), targetType, targetDims, op.start_indices(), rewriter);
+        op.getLoc(), targetType, targetDims, op.getStartIndices(), rewriter);
     auto targetLength = calculateElementByteOffset(
-        op.getLoc(), targetType, targetDims, op.lengths(), rewriter);
+        op.getLoc(), targetType, targetDims, op.getLengths(), rewriter);
     auto targetEnd = rewriter.createOrFold<arith::AddIOp>(
         op.getLoc(), targetOffset, targetLength);
 
     // Canonicalize the fill pattern into one of [i8, i16, i32, i64].
-    auto pattern = canonicalizeFillPattern(op.value(), rewriter);
+    auto pattern = canonicalizeFillPattern(op.getValue(), rewriter);
     if (!pattern) {
       return rewriter.notifyMatchFailure(
           op, "unsupported pattern width; encoding policy required");
     } else if (pattern.getType().getIntOrFloatBitWidth() > 32) {
       rewriter.replaceOpWithNewOp<IREE::Stream::BuiltinFillI64Op>(
-          op, op.result().getType(), op.target(), op.target_size(),
-          targetOffset, targetEnd, targetLength, pattern, op.affinityAttr());
+          op, op.getResult().getType(), op.getTarget(), op.getTargetSize(),
+          targetOffset, targetEnd, targetLength, pattern, op.getAffinityAttr());
     } else {
       rewriter.replaceOpWithNewOp<IREE::Stream::AsyncFillOp>(
-          op, op.result().getType(), op.target(), op.target_size(),
-          targetOffset, targetEnd, targetLength, pattern, op.affinityAttr());
+          op, op.getResult().getType(), op.getTarget(), op.getTargetSize(),
+          targetOffset, targetEnd, targetLength, pattern, op.getAffinityAttr());
     }
 
     return success();
@@ -501,25 +502,26 @@ struct EncodeTensorUpdateOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorUpdateOp op,
                                 PatternRewriter &rewriter) const override {
-    auto updateType = op.update_encoding().cast<RankedTensorType>();
-    auto updateDims = op.update_encoding_dims();
+    auto updateType = op.getUpdateEncoding().cast<RankedTensorType>();
+    auto updateDims = op.getUpdateEncodingDims();
     if (failed(checkEncoding(op, updateType, updateDims, rewriter))) {
       return failure();
     }
-    auto targetType = op.target_encoding().cast<RankedTensorType>();
-    auto targetDims = op.target_encoding_dims();
+    auto targetType = op.getTargetEncoding().cast<RankedTensorType>();
+    auto targetDims = op.getTargetEncodingDims();
     if (failed(checkEncoding(op, targetType, targetDims, rewriter))) {
       return failure();
     }
 
     // Dense:
     auto targetOffset = calculateElementByteOffset(
-        op.getLoc(), targetType, targetDims, op.start_indices(), rewriter);
+        op.getLoc(), targetType, targetDims, op.getStartIndices(), rewriter);
     auto targetEnd = rewriter.createOrFold<arith::AddIOp>(
-        op.getLoc(), targetOffset, op.update_size());
+        op.getLoc(), targetOffset, op.getUpdateSize());
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncUpdateOp>(
-        op, op.result().getType(), op.target(), op.target_size(), targetOffset,
-        targetEnd, op.update(), op.update_size(), op.affinityAttr());
+        op, op.getResult().getType(), op.getTarget(), op.getTargetSize(),
+        targetOffset, targetEnd, op.getUpdate(), op.getUpdateSize(),
+        op.getAffinityAttr());
 
     return success();
   }
@@ -534,17 +536,18 @@ struct EncodeTensorLoadOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorLoadOp op,
                                 PatternRewriter &rewriter) const override {
-    auto sourceType = op.source_encoding().cast<RankedTensorType>();
-    auto sourceDims = op.source_encoding_dims();
+    auto sourceType = op.getSourceEncoding().cast<RankedTensorType>();
+    auto sourceDims = op.getSourceEncodingDims();
     if (failed(checkEncoding(op, sourceType, sourceDims, rewriter))) {
       return failure();
     }
 
     // Dense:
     auto sourceOffset = calculateElementByteOffset(
-        op.getLoc(), sourceType, sourceDims, op.indices(), rewriter);
+        op.getLoc(), sourceType, sourceDims, op.getIndices(), rewriter);
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncLoadOp>(
-        op, op.result().getType(), op.source(), op.source_size(), sourceOffset);
+        op, op.getResult().getType(), op.getSource(), op.getSourceSize(),
+        sourceOffset);
 
     return success();
   }
@@ -559,17 +562,17 @@ struct EncodeTensorStoreOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::TensorStoreOp op,
                                 PatternRewriter &rewriter) const override {
-    auto targetType = op.target_encoding().cast<RankedTensorType>();
-    auto targetDims = op.target_encoding_dims();
+    auto targetType = op.getTargetEncoding().cast<RankedTensorType>();
+    auto targetDims = op.getTargetEncodingDims();
     if (failed(checkEncoding(op, targetType, targetDims, rewriter))) {
       return failure();
     }
 
     // Dense:
     auto targetOffset = calculateElementByteOffset(
-        op.getLoc(), targetType, targetDims, op.indices(), rewriter);
+        op.getLoc(), targetType, targetDims, op.getIndices(), rewriter);
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncStoreOp>(
-        op, op.target(), op.target_size(), targetOffset, op.value());
+        op, op.getTarget(), op.getTargetSize(), targetOffset, op.getValue());
 
     return success();
   }
@@ -632,7 +635,7 @@ struct EncodeBindingSubspanOp
   LogicalResult matchAndRewrite(IREE::Stream::BindingSubspanOp op,
                                 PatternRewriter &rewriter) const override {
     auto originalType =
-        op.result().getType().dyn_cast<IREE::Flow::DispatchTensorType>();
+        op.getResult().getType().dyn_cast<IREE::Flow::DispatchTensorType>();
     if (!originalType) {
       return rewriter.notifyMatchFailure(op, "binding type not supported");
     }
@@ -643,7 +646,8 @@ struct EncodeBindingSubspanOp
 
     // Directly swap the type with the one, changing all uses in the IR.
     // This works because
-    rewriter.updateRootInPlace(op, [&]() { op.result().setType(alignedType); });
+    rewriter.updateRootInPlace(op,
+                               [&]() { op.getResult().setType(alignedType); });
 
     return success();
   }
@@ -658,7 +662,7 @@ struct EncodeDispatchTensorLoadOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Flow::DispatchTensorLoadOp op,
                                 PatternRewriter &rewriter) const override {
-    auto targetType = op.result().getType().cast<RankedTensorType>();
+    auto targetType = op.getResult().getType().cast<RankedTensorType>();
 
     // Align the element type, if needed.
     auto alignedType = alignTensorType(targetType);

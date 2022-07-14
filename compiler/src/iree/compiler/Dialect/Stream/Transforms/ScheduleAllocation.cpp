@@ -45,7 +45,7 @@ using ValueAliasingMap = llvm::MapVector<Value, SmallPtrSet<Value, 16>>;
 // Only values that alias will be present in the map.
 static ValueAliasingMap computeExecutionRegionValueAliases(
     IREE::Stream::AsyncExecuteOp executeOp) {
-  auto *streamBlock = &executeOp.body().front();
+  auto *streamBlock = &executeOp.getBody().front();
   ValueAliasingMap valueAliases;
 
   auto propagateAlias = [&](Value streamValue, Value aliasedValue) {
@@ -61,7 +61,8 @@ static ValueAliasingMap computeExecutionRegionValueAliases(
   auto tiedStreamOp =
       cast<IREE::Util::TiedOpInterface>(executeOp.getOperation());
   auto yieldOp = cast<IREE::Stream::YieldOp>(streamBlock->getTerminator());
-  for (auto it : llvm::zip(executeOp.results(), yieldOp.operands())) {
+  for (auto it :
+       llvm::zip(executeOp.getResults(), yieldOp.getResourceOperands())) {
     auto outerResult = std::get<0>(it);
     auto innerResult = std::get<1>(it);
     auto tiedOperandIndex =
@@ -135,8 +136,8 @@ static LivenessIntervalList computeExecutionRegionLivenessIntervals(
   // Perform a liveness analysis on the execution region.
   // Fragments have a single block and as such the live-in/live-out block
   // information derived here applies to the entire stream region.
-  assert(executeOp.body().getBlocks().size() == 1);
-  auto *streamBlock = &executeOp.body().front();
+  assert(executeOp.getBody().getBlocks().size() == 1);
+  auto *streamBlock = &executeOp.getBody().front();
   Liveness streamLiveness(executeOp);
   auto *livenessInfo = streamLiveness.getLiveness(streamBlock);
 
@@ -150,7 +151,7 @@ static LivenessIntervalList computeExecutionRegionLivenessIntervals(
   // Liveness doesn't track return values as live-outs so we do that here.
   SmallPtrSet<Value, 16> liveOuts;
   auto yieldOp = cast<IREE::Stream::YieldOp>(streamBlock->back());
-  for (auto returnValue : yieldOp.operands()) {
+  for (auto returnValue : yieldOp.getResourceOperands()) {
     if (!returnValue.getType().isa<IREE::Stream::ResourceType>()) continue;
     liveOuts.insert(returnValue);
   }
@@ -426,10 +427,10 @@ static LogicalResult applyAsyncConstantOp(IREE::Stream::AsyncConstantOp asyncOp,
 static LogicalResult applyAsyncSplatOp(IREE::Stream::AsyncSplatOp asyncOp,
                                        AllocationScope &scope,
                                        OpBuilder builder) {
-  auto targetRange = scope.lookupResourceRange(asyncOp.result());
+  auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
   builder.create<IREE::Stream::CmdFillOp>(
       asyncOp.getLoc(), targetRange.resource, targetRange.resourceSize,
-      targetRange.offset, targetRange.length, asyncOp.value());
+      targetRange.offset, targetRange.length, asyncOp.getValue());
   asyncOp.erase();
   return success();
 }
@@ -437,8 +438,8 @@ static LogicalResult applyAsyncSplatOp(IREE::Stream::AsyncSplatOp asyncOp,
 static LogicalResult applyAsyncCloneOp(IREE::Stream::AsyncCloneOp asyncOp,
                                        AllocationScope &scope,
                                        OpBuilder builder) {
-  auto sourceRange = scope.lookupResourceRange(asyncOp.source());
-  auto targetRange = scope.lookupResourceRange(asyncOp.result());
+  auto sourceRange = scope.lookupResourceRange(asyncOp.getSource());
+  auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
   builder.create<IREE::Stream::CmdCopyOp>(
       asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
       sourceRange.offset, targetRange.resource, targetRange.resourceSize,
@@ -451,14 +452,14 @@ static LogicalResult applyAsyncSliceOp(IREE::Stream::AsyncSliceOp asyncOp,
                                        AllocationScope &scope,
                                        OpBuilder builder) {
   // TODO(benvanik): place the allocation instead.
-  auto sourceRange = scope.lookupResourceRange(asyncOp.source());
-  auto sourceOffset =
-      scope.add(asyncOp.getLoc(), sourceRange.offset, asyncOp.source_offset());
-  auto targetRange = scope.lookupResourceRange(asyncOp.result());
+  auto sourceRange = scope.lookupResourceRange(asyncOp.getSource());
+  auto sourceOffset = scope.add(asyncOp.getLoc(), sourceRange.offset,
+                                asyncOp.getSourceOffset());
+  auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
   builder.create<IREE::Stream::CmdCopyOp>(
       asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
       sourceOffset, targetRange.resource, targetRange.resourceSize,
-      targetRange.offset, asyncOp.result_size());
+      targetRange.offset, asyncOp.getResultSize());
   asyncOp.erase();
   return success();
 }
@@ -466,12 +467,12 @@ static LogicalResult applyAsyncSliceOp(IREE::Stream::AsyncSliceOp asyncOp,
 static LogicalResult applyAsyncFillOp(IREE::Stream::AsyncFillOp asyncOp,
                                       AllocationScope &scope,
                                       OpBuilder builder) {
-  auto targetRange = scope.lookupResourceRange(asyncOp.result());
-  auto targetOffset =
-      scope.add(asyncOp.getLoc(), targetRange.offset, asyncOp.target_offset());
+  auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
+  auto targetOffset = scope.add(asyncOp.getLoc(), targetRange.offset,
+                                asyncOp.getTargetOffset());
   builder.create<IREE::Stream::CmdFillOp>(
       asyncOp.getLoc(), targetRange.resource, targetRange.resourceSize,
-      targetOffset, asyncOp.target_length(), asyncOp.value());
+      targetOffset, asyncOp.getTargetLength(), asyncOp.getValue());
   asyncOp.erase();
   return success();
 }
@@ -480,15 +481,15 @@ static LogicalResult applyAsyncUpdateOp(IREE::Stream::AsyncUpdateOp asyncOp,
                                         AllocationScope &scope,
                                         OpBuilder builder) {
   // TODO(benvanik): place the allocation instead.
-  auto sourceRange = scope.lookupResourceRange(asyncOp.update());
+  auto sourceRange = scope.lookupResourceRange(asyncOp.getUpdate());
   auto sourceOffset = sourceRange.offset;
-  auto targetRange = scope.lookupResourceRange(asyncOp.result());
-  auto targetOffset =
-      scope.add(asyncOp.getLoc(), targetRange.offset, asyncOp.target_offset());
+  auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
+  auto targetOffset = scope.add(asyncOp.getLoc(), targetRange.offset,
+                                asyncOp.getTargetOffset());
   builder.create<IREE::Stream::CmdCopyOp>(
       asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
       sourceOffset, targetRange.resource, targetRange.resourceSize,
-      targetOffset, asyncOp.update_size());
+      targetOffset, asyncOp.getUpdateSize());
   asyncOp.erase();
   return success();
 }
@@ -496,16 +497,16 @@ static LogicalResult applyAsyncUpdateOp(IREE::Stream::AsyncUpdateOp asyncOp,
 static LogicalResult applyAsyncCopyOp(IREE::Stream::AsyncCopyOp asyncOp,
                                       AllocationScope &scope,
                                       OpBuilder builder) {
-  auto sourceRange = scope.lookupResourceRange(asyncOp.source());
-  auto sourceOffset =
-      scope.add(asyncOp.getLoc(), sourceRange.offset, asyncOp.source_offset());
-  auto targetRange = scope.lookupResourceRange(asyncOp.result());
-  auto targetOffset =
-      scope.add(asyncOp.getLoc(), targetRange.offset, asyncOp.target_offset());
+  auto sourceRange = scope.lookupResourceRange(asyncOp.getSource());
+  auto sourceOffset = scope.add(asyncOp.getLoc(), sourceRange.offset,
+                                asyncOp.getSourceOffset());
+  auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
+  auto targetOffset = scope.add(asyncOp.getLoc(), targetRange.offset,
+                                asyncOp.getTargetOffset());
   builder.create<IREE::Stream::CmdCopyOp>(
       asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
       sourceOffset, targetRange.resource, targetRange.resourceSize,
-      targetOffset, asyncOp.length());
+      targetOffset, asyncOp.getLength());
   asyncOp.erase();
   return success();
 }
@@ -520,19 +521,20 @@ static LogicalResult applyAsyncTransferOp(IREE::Stream::AsyncTransferOp asyncOp,
            IREE::Stream::Lifetime::Staging;
   };
   auto currentAffinityAttr = IREE::Stream::AffinityAttr::lookup(asyncOp);
-  bool transferIn = asyncOp.source_affinityAttr() != currentAffinityAttr ||
-                    isStaging(asyncOp.source());
-  bool transferOut = asyncOp.result_affinityAttr() != currentAffinityAttr ||
-                     isStaging(asyncOp.result());
+  bool transferIn = asyncOp.getSourceAffinityAttr() != currentAffinityAttr ||
+                    isStaging(asyncOp.getSource());
+  bool transferOut = asyncOp.getResultAffinityAttr() != currentAffinityAttr ||
+                     isStaging(asyncOp.getResult());
 
-  auto sourceRange = scope.lookupResourceRange(asyncOp.source());
-  auto targetRange = scope.lookupResourceRange(asyncOp.result());
+  auto sourceRange = scope.lookupResourceRange(asyncOp.getSource());
+  auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
 
   // Incoming transfers need invalidation.
   if (transferIn) {
     builder.create<IREE::Stream::CmdInvalidateOp>(
         asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
-        sourceRange.offset, sourceRange.length, asyncOp.source_affinityAttr());
+        sourceRange.offset, sourceRange.length,
+        asyncOp.getSourceAffinityAttr());
   }
 
   // Perform the copy.
@@ -545,7 +547,8 @@ static LogicalResult applyAsyncTransferOp(IREE::Stream::AsyncTransferOp asyncOp,
   if (transferOut) {
     builder.create<IREE::Stream::CmdFlushOp>(
         asyncOp.getLoc(), targetRange.resource, targetRange.resourceSize,
-        targetRange.offset, targetRange.length, asyncOp.result_affinityAttr());
+        targetRange.offset, targetRange.length,
+        asyncOp.getResultAffinityAttr());
   }
 
   asyncOp.erase();
@@ -562,7 +565,7 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
   SmallVector<Value> newResourceLengths;
   SmallVector<Attribute> newResourceAccesses;
 
-  for (auto it : llvm::enumerate(asyncOp.operands())) {
+  for (auto it : llvm::enumerate(asyncOp.getResourceOperands())) {
     auto operand = it.value();
     if (!operand.getType().isa<IREE::Stream::ResourceType>()) {
       // Primitive operand.
@@ -590,7 +593,7 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
     newResourceAccesses.push_back(resourceAccess);
   }
 
-  for (auto result : asyncOp.results()) {
+  for (auto result : asyncOp.getResults()) {
     auto tiedOperand = asyncOp.getTiedResultOperand(result);
     if (tiedOperand) {
       // All tied results are handled above as read-write.
@@ -609,9 +612,9 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
   }
 
   builder.create<IREE::Stream::CmdDispatchOp>(
-      asyncOp.getLoc(), asyncOp.workload(), asyncOp.entry_point(), newOperands,
-      newResources, newResourceSizes, newResourceOffsets, newResourceLengths,
-      builder.getArrayAttr(newResourceAccesses));
+      asyncOp.getLoc(), asyncOp.getWorkload(), asyncOp.getEntryPoint(),
+      newOperands, newResources, newResourceSizes, newResourceOffsets,
+      newResourceLengths, builder.getArrayAttr(newResourceAccesses));
   asyncOp.erase();
   return success();
 }
@@ -626,24 +629,24 @@ static LogicalResult applyAsyncConcurrentOp(
   // Must do this before we recurse so that the ops we are transforming have no
   // uses.
   auto yieldOp =
-      cast<IREE::Stream::YieldOp>(asyncOp.body().front().getTerminator());
+      cast<IREE::Stream::YieldOp>(asyncOp.getBody().front().getTerminator());
   yieldOp->eraseOperands(0, yieldOp.getNumOperands());
 
   // Recurse into the wave ops to process the async ops within.
   // Resources are captured inside of the region and need to be mapped back to
   // the parent scope where they will be captured after lowering into
   // stream.cmd.execute.
-  if (failed(applyAsyncAllocations(asyncOp.body(), scope))) {
+  if (failed(applyAsyncAllocations(asyncOp.getBody(), scope))) {
     return failure();
   }
 
   // Explicit variant has no args/operands
-  auto &block = asyncOp.body().front();
+  auto &block = asyncOp.getBody().front();
   block.eraseArguments([&](auto arg) { return true; });
 
   // Rewrite wave op to remove results.
   auto newOp = builder.create<IREE::Stream::CmdConcurrentOp>(asyncOp.getLoc());
-  newOp.body().takeBody(asyncOp.body());
+  newOp.getBody().takeBody(asyncOp.getBody());
   asyncOp.erase();
   return success();
 }
@@ -782,27 +785,27 @@ static llvm::Optional<TransientAllocation> allocateLocalTransients(
   auto packOp = externalBuilder.create<IREE::Stream::ResourcePackOp>(
       fusedLoc, indexType, packedOffsetTypes,
       /*offset=*/nullptr, externalBuilder.getIndexArrayAttr(lifetimeIntervals),
-      dynamicSliceSizes, executeOp.affinityAttr());
+      dynamicSliceSizes, executeOp.getAffinityAttr());
 
   // Allocate the transient storage for the entire packed slab.
   auto transientType = externalBuilder.getType<IREE::Stream::ResourceType>(
       IREE::Stream::Lifetime::Transient);
   auto timepointType = externalBuilder.getType<IREE::Stream::TimepointType>();
   auto allocaOp = externalBuilder.create<IREE::Stream::ResourceAllocaOp>(
-      fusedLoc, transientType, timepointType, packOp.total_length(),
-      executeOp.await_timepoint(), executeOp.affinityAttr());
+      fusedLoc, transientType, timepointType, packOp.getTotalLength(),
+      executeOp.getAwaitTimepoint(), executeOp.getAffinityAttr());
   TransientAllocation allocation;
-  allocation.awaitTimepoint = allocaOp.result_timepoint();
-  allocation.reservation = allocaOp.result();
-  allocation.reservationSize = allocaOp.storage_size();
-  allocation.capturedArg = executeOp.body().front().addArgument(
+  allocation.awaitTimepoint = allocaOp.getResultTimepoint();
+  allocation.reservation = allocaOp.getResult();
+  allocation.reservationSize = allocaOp.getStorageSize();
+  allocation.capturedArg = executeOp.getBody().front().addArgument(
       allocation.reservation.getType(), allocation.reservation.getLoc());
 
   // Map values to their ranges within the slab.
   for (size_t i = 0; i < transientValues.size(); ++i) {
     auto value = transientValues[i];
-    auto offset = packOp.packed_offsets()[i];
-    auto length = packOp.dynamic_slice_sizes()[i];
+    auto offset = packOp.getPackedOffsets()[i];
+    auto length = packOp.getDynamicSliceSizes()[i];
     auto resourceRange = ResourceRange(
         allocation.capturedArg, allocation.reservationSize, offset, length);
     scope.mapResourceRange(value, resourceRange);
@@ -853,9 +856,9 @@ static Optional<ConstantAllocation> extractConstants(
   SmallVector<Value> resultSizes;
   for (auto constantOp : constantOps) {
     locs.push_back(constantOp.getLoc());
-    resultTypes.push_back(constantOp.result().getType());
-    initialValues.push_back(constantOp.value());
-    resultSizes.push_back(constantOp.result_size());
+    resultTypes.push_back(constantOp.getResult().getType());
+    initialValues.push_back(constantOp.getValue());
+    resultSizes.push_back(constantOp.getResultSize());
   }
   auto timepointType = externalBuilder.getType<IREE::Stream::TimepointType>();
   ConstantAllocation allocation;
@@ -863,10 +866,10 @@ static Optional<ConstantAllocation> extractConstants(
       externalBuilder.create<IREE::Stream::ResourceConstantsOp>(
           externalBuilder.getFusedLoc(locs), resultTypes, timepointType,
           externalBuilder.getArrayAttr(initialValues), resultSizes,
-          executeOp.affinityAttr());
+          executeOp.getAffinityAttr());
 
   // Remap original constants to reservations.
-  auto &entryBlock = executeOp.body().front();
+  auto &entryBlock = executeOp.getBody().front();
   for (auto it : llvm::enumerate(constantOps)) {
     unsigned idx = static_cast<unsigned>(it.index());
     auto constantOp = it.value();
@@ -875,15 +878,15 @@ static Optional<ConstantAllocation> extractConstants(
 
     // Grab the returned resource from the upload op. This will later likely
     // be subviewed but all we know here is what the subview result will be.
-    reservation.resource = allocation.constantsOp.results()[idx];
-    reservation.resourceSize = allocation.constantsOp.result_sizes()[idx];
+    reservation.resource = allocation.constantsOp.getResults()[idx];
+    reservation.resourceSize = allocation.constantsOp.getResultSizes()[idx];
 
     // Capture the subview resource and switch all uses of the internal op if
     // there are any. Otherwise, if it's just yield, we can avoid the capture
     // and implicit dependency.
-    if (!constantOp.use_empty() && !isOnlyUseYield(constantOp.result())) {
+    if (!constantOp.use_empty() && !isOnlyUseYield(constantOp.getResult())) {
       reservation.capturedArg = entryBlock.addArgument(
-          constantOp.result().getType(), constantOp.getLoc());
+          constantOp.getResult().getType(), constantOp.getLoc());
     }
 
     allocation.reservations.push_back(reservation);
@@ -996,7 +999,7 @@ static LogicalResult allocateExecutionRegion(
 
   OpBuilder externalBuilder(executeOp);
 
-  auto &entryBlock = executeOp.body().front();
+  auto &entryBlock = executeOp.getBody().front();
   auto yieldOp = cast<IREE::Stream::YieldOp>(entryBlock.back());
 
   // We're going to allocate transients - if we do, we need to insert
@@ -1009,11 +1012,11 @@ static LogicalResult allocateExecutionRegion(
   SmallVector<Value> newOperandSizes;
   SmallVector<std::pair<Value, Value>> resultReplacements;
   SetVector<Value> handledResults;
-  if (executeOp.await_timepoint()) {
-    newAwaitTimepoints.push_back(executeOp.await_timepoint());
+  if (executeOp.getAwaitTimepoint()) {
+    newAwaitTimepoints.push_back(executeOp.getAwaitTimepoint());
   }
-  llvm::append_range(newOperands, executeOp.operands());
-  llvm::append_range(newOperandSizes, executeOp.operand_sizes());
+  llvm::append_range(newOperands, executeOp.getResourceOperands());
+  llvm::append_range(newOperandSizes, executeOp.getResourceOperandSizes());
   SmallVector<Value> joinTimepoints;
 
   // First find all constants and pull them out into a dedicated constant upload
@@ -1044,7 +1047,7 @@ static LogicalResult allocateExecutionRegion(
       });
     }
 
-    auto awaitTimepoint = constantAllocation->constantsOp.result_timepoint();
+    auto awaitTimepoint = constantAllocation->constantsOp.getResultTimepoint();
     if (anyCaptured) {
       // The execute region must depend on the constant upload as one or more
       // constants are used. All this code could be much more clever about
@@ -1077,7 +1080,7 @@ static LogicalResult allocateExecutionRegion(
 
     // Replace results of escaping uploads with the upload values.
     for (auto &reservation : constantAllocation->reservations) {
-      auto result = findTiedYieldResult(reservation.constantOp.result());
+      auto result = findTiedYieldResult(reservation.constantOp.getResult());
       if (!result) continue;
       result.replaceAllUsesWith(reservation.resource);
       handledResults.insert(result);
@@ -1097,7 +1100,7 @@ static LogicalResult allocateExecutionRegion(
   // Compute an updated set of operands/results. After allocation all results
   // must be tied to operands; it's possible though that this is already the
   // case by construction.
-  for (auto operand : llvm::enumerate(executeOp.operands())) {
+  for (auto operand : llvm::enumerate(executeOp.getResourceOperands())) {
     unsigned operandIdx =
         executeOp.getTiedOperandsIndexAndLength().first + operand.index();
     auto operandSize = executeOp.getOperandSize(operandIdx);
@@ -1114,7 +1117,8 @@ static LogicalResult allocateExecutionRegion(
     scope.mapResourceRange(arg, resourceRange);
   }
   SmallVector<ResultReservation> resultReservations;
-  for (auto it : llvm::zip(executeOp.results(), executeOp.result_sizes())) {
+  for (auto it :
+       llvm::zip(executeOp.getResults(), executeOp.getResultSizes())) {
     auto result = std::get<0>(it);
     auto resultSize = std::get<1>(it);
     auto resultType = result.getType().cast<IREE::Stream::ResourceType>();
@@ -1124,7 +1128,7 @@ static LogicalResult allocateExecutionRegion(
     }
 
     // Find the internal op that defined the result.
-    auto yieldValue = yieldOp.operands()[result.getResultNumber()];
+    auto yieldValue = yieldOp.getResourceOperands()[result.getResultNumber()];
 
     // Early-exit if we are tied to an operand and have storage already.
     auto tiedOperandIndex =
@@ -1189,7 +1193,7 @@ static LogicalResult allocateExecutionRegion(
         externalBuilder.getFusedLoc(reservationSet.reservationLocs),
         reservationSet.reservationTypes, reservationSet.reservationSizes,
         /*uninitialized=*/externalBuilder.getUnitAttr(),
-        executeOp.affinityAttr());
+        executeOp.getAffinityAttr());
 
     LLVM_DEBUG({
       AsmState asmState(executeOp->getParentOp());
@@ -1198,7 +1202,8 @@ static LogicalResult allocateExecutionRegion(
       llvm::dbgs() << ":\n";
     });
 
-    for (auto it : llvm::zip(reservationSet.reservations, allocOp.results())) {
+    for (auto it :
+         llvm::zip(reservationSet.reservations, allocOp.getResults())) {
       auto &reservation = std::get<0>(it);
       auto allocResult = std::get<1>(it);
 
@@ -1275,12 +1280,12 @@ static LogicalResult allocateExecutionRegion(
   // the results (besides the timepoint) as they are all aliased.
   auto newExecuteOp = executeBuilder.create<IREE::Stream::CmdExecuteOp>(
       executeOp.getLoc(), newAwaitTimepoint, newOperands, newOperandSizes);
-  if (executeOp.affinity().hasValue()) {
-    newExecuteOp.affinityAttr(executeOp.affinityAttr());
+  if (executeOp.getAffinity().hasValue()) {
+    newExecuteOp.setAffinityAttr(executeOp.getAffinityAttr());
   }
-  newExecuteOp.body().takeBody(executeOp.body());
-  executeOp.result_timepoint().replaceAllUsesWith(
-      newExecuteOp.result_timepoint());
+  newExecuteOp.getBody().takeBody(executeOp.getBody());
+  executeOp.getResultTimepoint().replaceAllUsesWith(
+      newExecuteOp.getResultTimepoint());
   for (auto replacement : resultReplacements) {
     if (!replacement.second) continue;  // handled already
     replacement.first.replaceAllUsesWith(replacement.second);
@@ -1295,10 +1300,10 @@ static LogicalResult allocateExecutionRegion(
   // and convert to stream.cmd.concurrent we are removing all wave
   // operands/results and taking whatever we established above as the true
   // ranges.
-  newExecuteOp.body().walk<WalkOrder::PreOrder>(
+  newExecuteOp.getBody().walk<WalkOrder::PreOrder>(
       [&](IREE::Stream::AsyncConcurrentOp concurrentOp) {
-        for (auto it : llvm::zip(concurrentOp.operands(),
-                                 concurrentOp.body().getArguments())) {
+        for (auto it : llvm::zip(concurrentOp.getResourceOperands(),
+                                 concurrentOp.getBody().getArguments())) {
           auto outerValue = std::get<0>(it);
           auto innerValue = std::get<1>(it);
           LLVM_DEBUG({
@@ -1313,8 +1318,9 @@ static LogicalResult allocateExecutionRegion(
                                  scope.lookupResourceRange(outerValue));
         }
         auto yieldOp = cast<IREE::Stream::YieldOp>(
-            concurrentOp.body().front().getTerminator());
-        for (auto it : llvm::zip(yieldOp.operands(), concurrentOp.results())) {
+            concurrentOp.getBody().front().getTerminator());
+        for (auto it : llvm::zip(yieldOp.getResourceOperands(),
+                                 concurrentOp.getResults())) {
           auto innerValue = std::get<0>(it);
           auto outerValue = std::get<1>(it);
           LLVM_DEBUG({
@@ -1331,7 +1337,7 @@ static LogicalResult allocateExecutionRegion(
       });
 
   // Apply the scope to the region and convert ops.
-  if (failed(applyAsyncAllocations(newExecuteOp.body(), scope))) {
+  if (failed(applyAsyncAllocations(newExecuteOp.getBody(), scope))) {
     return newExecuteOp.emitError()
            << "failed to apply allocations/issue commands";
   }
@@ -1352,8 +1358,8 @@ static LogicalResult allocateExecutionRegion(
     auto reservationSize = release.second;
     auto deallocaOp = builder.create<IREE::Stream::ResourceDeallocaOp>(
         reservation.getLoc(), reservation, reservationSize,
-        newExecuteOp.result_timepoint(), newExecuteOp.affinityAttr());
-    joinTimepoints.push_back(deallocaOp.result_timepoint());
+        newExecuteOp.getResultTimepoint(), newExecuteOp.getAffinityAttr());
+    joinTimepoints.push_back(deallocaOp.getResultTimepoint());
     executeTimepointUsers.insert(deallocaOp);
   }
 
@@ -1361,14 +1367,14 @@ static LogicalResult allocateExecutionRegion(
   // that the original timepoint dependency chain is preserved even if we make
   // local changes here.
   if (!joinTimepoints.empty()) {
-    joinTimepoints.push_back(newExecuteOp.result_timepoint());
+    joinTimepoints.push_back(newExecuteOp.getResultTimepoint());
     auto fusedLoc = builder.getFusedLoc(llvm::to_vector<4>(llvm::map_range(
         joinTimepoints, [](auto timepoint) { return timepoint.getLoc(); })));
     auto joinOp = builder.create<IREE::Stream::TimepointJoinOp>(
-        fusedLoc, newExecuteOp.result_timepoint().getType(), joinTimepoints);
+        fusedLoc, newExecuteOp.getResultTimepoint().getType(), joinTimepoints);
     executeTimepointUsers.insert(joinOp);
-    newExecuteOp.result_timepoint().replaceUsesWithIf(
-        joinOp.result_timepoint(), [&](OpOperand &operand) {
+    newExecuteOp.getResultTimepoint().replaceUsesWithIf(
+        joinOp.getResultTimepoint(), [&](OpOperand &operand) {
           return !executeTimepointUsers.contains(operand.getOwner());
         });
   }
@@ -1378,18 +1384,18 @@ static LogicalResult allocateExecutionRegion(
 
 static LogicalResult convertAsyncLoadOp(IREE::Stream::AsyncLoadOp asyncOp) {
   auto newOp = OpBuilder(asyncOp).create<IREE::Stream::ResourceLoadOp>(
-      asyncOp.getLoc(), asyncOp.result().getType(), asyncOp.source(),
-      asyncOp.source_size(), asyncOp.source_offset());
-  asyncOp.replaceAllUsesWith(newOp.result());
+      asyncOp.getLoc(), asyncOp.getResult().getType(), asyncOp.getSource(),
+      asyncOp.getSourceSize(), asyncOp.getSourceOffset());
+  asyncOp.replaceAllUsesWith(newOp.getResult());
   asyncOp.erase();
   return success();
 }
 
 static LogicalResult convertAsyncStoreOp(IREE::Stream::AsyncStoreOp asyncOp) {
   auto newOp = OpBuilder(asyncOp).create<IREE::Stream::ResourceStoreOp>(
-      asyncOp.getLoc(), asyncOp.target(), asyncOp.target_size(),
-      asyncOp.target_offset(), asyncOp.value());
-  asyncOp.replaceAllUsesWith(newOp.target());
+      asyncOp.getLoc(), asyncOp.getTarget(), asyncOp.getTargetSize(),
+      asyncOp.getTargetOffset(), asyncOp.getValue());
+  asyncOp.replaceAllUsesWith(newOp.getTarget());
   asyncOp.erase();
   return success();
 }

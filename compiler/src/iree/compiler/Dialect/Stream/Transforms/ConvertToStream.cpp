@@ -69,14 +69,14 @@ static Value buildTensorImportOp(Location loc, Value sourceTensor,
   consumingOps.insert(importOp);
 
   // If needed insert a transfer to the target lifetime.
-  Value result = importOp.result();
+  Value result = importOp.getResult();
   if (targetType != externalType) {
     result = builder
                  .create<IREE::Stream::AsyncTransferOp>(
                      loc, targetType, result, resultSize, resultSize,
                      /*source_affinity=*/nullptr,
                      /*result_affinity=*/nullptr)
-                 .result();
+                 .getResult();
   }
 
   auto castOp = builder.create<mlir::UnrealizedConversionCastOp>(
@@ -108,7 +108,7 @@ static Value buildTensorExportOp(Location loc, Value sourceValue,
       loc, targetType, source.resource, TypeAttr::get(targetType), dynamicDims,
       source.resourceSize,
       /*affinity=*/nullptr);
-  return newOp.result();
+  return newOp.getResult();
 }
 
 // Returns true if |op| has tensor I/O that is not yet imported/exported using
@@ -196,7 +196,7 @@ class ConvertToStreamPass : public ConvertToStreamBase<ConvertToStreamPass> {
     ConversionTarget conversionTarget(getContext());
     RewritePatternSet patterns(&getContext());
 
-    // Always allow lowerering target dialects and reasonable types.
+    // Always allow lowering target dialects and reasonable types.
     conversionTarget.addLegalDialect<IREE::Stream::StreamDialect>();
     typeConverter.addConversion(
         [](IREE::Stream::ResourceType type) { return type; });
@@ -231,7 +231,7 @@ class ConvertToStreamPass : public ConvertToStreamBase<ConvertToStreamPass> {
                   resourceSize,
                   /*source_affinity=*/nullptr,
                   /*result_affinity=*/nullptr)
-              .result();
+              .getResult();
         });
 
     populateUtilConversionPatterns(context, conversionTarget, typeConverter,

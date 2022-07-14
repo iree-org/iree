@@ -107,7 +107,7 @@ struct WavePartitionBuilder {
         tiedOperands);
 
     // Add entry block and arguments.
-    auto &entryBlock = concurrentOp.body().emplaceBlock();
+    auto &entryBlock = concurrentOp.getBody().emplaceBlock();
     SmallVector<Location> operandLocs(operandTypes.size(),
                                       concurrentOp.getLoc());
     for (auto args : llvm::zip(
@@ -117,7 +117,7 @@ struct WavePartitionBuilder {
     builder = OpBuilder::atBlockBegin(&entryBlock);
 
     // Remap results for escaping outputs.
-    for (auto results : llvm::zip(partition->outs, concurrentOp.results())) {
+    for (auto results : llvm::zip(partition->outs, concurrentOp.getResults())) {
       parentMapping.map(std::get<0>(results), std::get<1>(results));
     }
   }
@@ -188,10 +188,10 @@ class ScheduleConcurrencyPass
   }
 
   LogicalResult runOnRegion(IREE::Stream::AsyncExecuteOp parentOp) {
-    if (parentOp.body().empty()) {
+    if (parentOp.getBody().empty()) {
       return success();
     }
-    auto *block = &parentOp.body().front();
+    auto *block = &parentOp.getBody().front();
 
     // Lookup the optional config used to control partitioning.
     auto configAttr = IREE::Stream::PartitioningConfigAttr::lookup(parentOp);
@@ -237,7 +237,7 @@ class ScheduleConcurrencyPass
     for (auto &partitionBuilder : partitionBuilders) {
       for (auto resultPair :
            llvm::zip(partitionBuilder.partition->outs,
-                     partitionBuilder.concurrentOp.results())) {
+                     partitionBuilder.concurrentOp.getResults())) {
         auto oldResult = std::get<0>(resultPair);
         auto newResult = std::get<1>(resultPair);
         oldResult.replaceAllUsesWith(newResult);

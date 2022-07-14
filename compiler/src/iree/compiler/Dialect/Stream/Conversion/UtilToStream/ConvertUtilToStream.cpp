@@ -122,11 +122,11 @@ struct GlobalOpExpansion
           initialValue.cast<ElementsAttr>(), TypeAttr::get(globalOp.getType()),
           /*result_encoding_dims=*/ValueRange{}, /*affinity=*/nullptr);
       auto constantSizeOp = rewriter.create<IREE::Stream::ResourceSizeOp>(
-          globalOp.getLoc(), indexType, constantOp.result());
+          globalOp.getLoc(), indexType, constantOp.getResult());
       rewriter.create<IREE::Util::GlobalStoreOp>(
-          globalOp.getLoc(), constantOp.result(), resourceOp.getSymName());
+          globalOp.getLoc(), constantOp.getResult(), resourceOp.getSymName());
       rewriter.create<IREE::Util::GlobalStoreOp>(globalOp.getLoc(),
-                                                 constantSizeOp.result(),
+                                                 constantSizeOp.getResult(),
                                                  resourceSizeOp.getSymName());
       rewriter.create<IREE::Util::InitializerReturnOp>(globalOp.getLoc());
     }
@@ -192,7 +192,8 @@ struct GlobalStoreOpExpansion
         value.resourceSize, value.resourceSize, /*source_affinity=*/nullptr,
         /*result_affinity=*/nullptr);
     rewriter.replaceOpWithNewOp<IREE::Util::GlobalStoreOp>(
-        storeOp, transferOp.result(), expandedGlobal.resourceOp.getSymName());
+        storeOp, transferOp.getResult(),
+        expandedGlobal.resourceOp.getSymName());
     rewriter.create<IREE::Util::GlobalStoreOp>(
         storeOp.getLoc(), value.resourceSize,
         expandedGlobal.resourceSizeOp.getSymName());

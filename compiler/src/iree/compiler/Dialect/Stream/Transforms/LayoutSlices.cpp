@@ -288,7 +288,7 @@ class LayoutSlicesPass : public LayoutSlicesBase<LayoutSlicesPass> {
 
       // First pack all static slices as these are entirely knowable here at
       // compile time.
-      auto offset = packOp.offset() ? packOp.offset() : indexSet.get(0);
+      auto offset = packOp.getOffset() ? packOp.getOffset() : indexSet.get(0);
       if (!staticSlices.empty()) {
         offset = packStaticSlicesGreedily(packOp, offset, staticSlices,
                                           resourceConfig, indexSet, builder);
@@ -309,7 +309,7 @@ class LayoutSlicesPass : public LayoutSlicesBase<LayoutSlicesPass> {
 
       // Total packed length is the current offset after all slices are
       // allocated. This should be aligned to the range constraints.
-      packOp.total_length().replaceAllUsesWith(offset);
+      packOp.getTotalLength().replaceAllUsesWith(offset);
 
       packOp.erase();
     });

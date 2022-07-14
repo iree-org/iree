@@ -58,14 +58,14 @@ static ConstantTable buildConstantTable(
     mlir::func::FuncOp funcOp,
     SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
   auto anyDispatchOp = dispatchOps.front();
-  unsigned operandCount = anyDispatchOp.operands().size();
+  unsigned operandCount = anyDispatchOp.getUniformOperands().size();
 
   // Find which operands are uniformly constants across all usages.
   llvm::BitVector constantOperandMap(operandCount, /*t=*/true);
   for (auto dispatchOp : dispatchOps) {
     for (unsigned idx = 0; idx < operandCount; ++idx) {
       if (!constantOperandMap.test(idx)) continue;
-      auto value = dispatchOp.operands()[idx];
+      auto value = dispatchOp.getUniformOperands()[idx];
       Attribute constantValue;
       if (!matchPattern(value, m_Constant(&constantValue))) {
         // Non-constant breaks the operand constant uniformity.
@@ -86,7 +86,7 @@ static ConstantTable buildConstantTable(
   SmallVector<Type> typeOrder;
   for (unsigned idx = 0; idx < operandCount; ++idx) {
     if (!constantOperandMap.test(idx)) continue;
-    auto operandType = anyDispatchOp.operands()[idx].getType();
+    auto operandType = anyDispatchOp.getUniformOperands()[idx].getType();
     auto &set = typeSets[operandType];
     if (!set.type) {
       set.type = operandType;
@@ -94,7 +94,7 @@ static ConstantTable buildConstantTable(
     }
     SmallVector<Attribute> values;
     for (auto dispatchOp : dispatchOps) {
-      auto operand = dispatchOp.operands()[idx];
+      auto operand = dispatchOp.getUniformOperands()[idx];
       Attribute constantValue;
       matchPattern(operand, m_Constant(&constantValue));
       values.push_back(constantValue);
@@ -262,13 +262,13 @@ static void insertDispatchSiteIdentifiers(
     // Remove operands that are covered by the constant table.
     for (int i = constantTable.coveredOperands.size() - 1; i >= 0; --i) {
       if (constantTable.coveredOperands.test(i)) {
-        dispatchOp.operandsMutable().erase(i);
+        dispatchOp.getUniformOperandsMutable().erase(i);
       }
     }
 
     // Add the site-unique identifier.
     auto siteId = memoizedConstants.getIndexForOp(it.index(), dispatchOp);
-    dispatchOp.operandsMutable().append({siteId});
+    dispatchOp.getUniformOperandsMutable().append({siteId});
   }
 }
 
@@ -288,7 +288,7 @@ static void specializeDispatches(
     MemoizedCmdConstants &memoizedConstants) {
   if (dispatchOps.empty()) return;  // no-op if no dispatches
 
-  auto funcOp = exportOp.getFunctionRef();
+  auto funcOp = exportOp.lookupFunctionRef();
 
   // Build a constant table for unique per-dispatch constant values.
   auto constantTable = buildConstantTable(funcOp, dispatchOps);
@@ -296,8 +296,8 @@ static void specializeDispatches(
 
   LLVM_DEBUG({
     AsmState asmState(executableOp->getParentOp());
-    llvm::dbgs() << "---- specializeDispatches(@" << executableOp.sym_name()
-                 << "::" << exportOp.sym_name() << ") ----\n";
+    llvm::dbgs() << "---- specializeDispatches(@" << executableOp.getSymName()
+                 << "::" << exportOp.getSymName() << ") ----\n";
     llvm::dbgs() << "constant table from " << dispatchOps.size()
                  << " dispatches:\n";
     for (auto &set : constantTable.sets) {
@@ -345,7 +345,7 @@ class SpecializeDispatchesPass
         entryDispatchMap;
     getOperation()->walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
       auto exportOp = symbolTable.lookupNearestSymbolFrom(
-          dispatchOp, dispatchOp.entry_point());
+          dispatchOp, dispatchOp.getEntryPoint());
       entryDispatchMap[exportOp].push_back(dispatchOp);
     });
 

@@ -39,9 +39,9 @@ struct ConvertTensorConstantOp : public OpConversionPattern<arith::ConstantOp> {
 
     Type unknownType = IREE::Stream::ResourceType::get(getContext());
     auto constantSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
-        constantOp.getLoc(), rewriter.getIndexType(), newOp.result());
+        constantOp.getLoc(), rewriter.getIndexType(), newOp.getResult());
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncTransferOp>(
-        constantOp, unknownType, newOp.result(), constantSize, constantSize,
+        constantOp, unknownType, newOp.getResult(), constantSize, constantSize,
         /*source_affinity=*/nullptr,
         /*result_affinity=*/nullptr);
     return success();

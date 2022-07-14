@@ -133,11 +133,11 @@ static std::pair<Value, Value> consumeTimepoint(
 
   if (auto awaitOp = dyn_cast_or_null<IREE::Stream::TimepointAwaitOp>(
           value.getDefiningOp())) {
-    return std::make_pair(awaitOp.await_timepoint(),
+    return std::make_pair(awaitOp.getAwaitTimepoint(),
                           awaitOp.getTiedResultOperand(value));
   } else if (auto executeOp = dyn_cast_or_null<IREE::Stream::AsyncExecuteOp>(
                  value.getDefiningOp())) {
-    return std::make_pair(executeOp.result_timepoint(), value);
+    return std::make_pair(executeOp.getResultTimepoint(), value);
   } else {
     return std::make_pair(
         builder.create<IREE::Stream::TimepointImmediateOp>(loc).getResult(),
@@ -251,7 +251,8 @@ static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
       if (auto *sizeOp = resourceSize.getDefiningOp()) {
         excludedUsers.insert(sizeOp);
       }
-      resource.replaceAllUsesExcept(awaitOp.results().front(), excludedUsers);
+      resource.replaceAllUsesExcept(awaitOp.getResults().front(),
+                                    excludedUsers);
     }
   }
 
@@ -317,7 +318,7 @@ static void expandGlobalLoadOp(IREE::Util::GlobalLoadOp op,
       op.getLoc(), op.getResult(), resultSize, timepoint);
   replacementExceptions.insert(awaitOp);
 
-  op.getResult().replaceAllUsesExcept(awaitOp.results().front(),
+  op.getResult().replaceAllUsesExcept(awaitOp.getResults().front(),
                                       replacementExceptions);
 }
 
@@ -416,10 +417,10 @@ static void expandCallOp(mlir::func::CallOp op,
     resourceTimepointMap.map(newResult, newTimepoint);
     auto newResultSize =
         builder.create<IREE::Stream::ResourceSizeOp>(op.getLoc(), newResult)
-            .result();
+            .getResult();
     auto awaitOp = builder.create<IREE::Stream::TimepointAwaitOp>(
         op.getLoc(), newResult, newResultSize, newTimepoint);
-    oldResult.replaceAllUsesWith(awaitOp.results().front());
+    oldResult.replaceAllUsesWith(awaitOp.getResults().front());
   }
 
   op.erase();
@@ -485,9 +486,9 @@ static void expandCondBranchOp(mlir::cf::CondBranchOp op,
 // perform an initial scan to populate the mapping.
 static void expandAwaitOp(IREE::Stream::TimepointAwaitOp op,
                           BlockAndValueMapping &resourceTimepointMap) {
-  for (auto result : op.results()) {
+  for (auto result : op.getResults()) {
     resourceTimepointMap.map(op.getTiedResultOperand(result),
-                             op.await_timepoint());
+                             op.getAwaitTimepoint());
   }
 }
 
@@ -500,10 +501,11 @@ static void expandAsyncExecuteOp(IREE::Stream::AsyncExecuteOp op,
   SetVector<Value> newTimepoints;
   SmallVector<Value> newOperands;
   SmallVector<Value> newOperandSizes;
-  if (op.await_timepoint()) {
-    newTimepoints.insert(op.await_timepoint());
+  if (op.getAwaitTimepoint()) {
+    newTimepoints.insert(op.getAwaitTimepoint());
   }
-  for (auto it : llvm::zip(op.operands(), op.operand_sizes())) {
+  for (auto it :
+       llvm::zip(op.getResourceOperands(), op.getResourceOperandSizes())) {
     auto operand = std::get<0>(it);
     auto operandSize = std::get<1>(it);
     auto timepointOperand =
@@ -520,17 +522,17 @@ static void expandAsyncExecuteOp(IREE::Stream::AsyncExecuteOp op,
     }
   }
   if (newTimepoints.empty()) {
-    op.await_timepointMutable().clear();
+    op.getAwaitTimepointMutable().clear();
   } else {
     auto newTimepoint = builder.createOrFold<IREE::Stream::TimepointJoinOp>(
         op.getLoc(), builder.getType<IREE::Stream::TimepointType>(),
         newTimepoints.takeVector());
-    op.await_timepointMutable().assign(newTimepoint);
+    op.getAwaitTimepointMutable().assign(newTimepoint);
   }
-  op.operandsMutable().assign(newOperands);
-  op.operand_sizesMutable().assign(newOperandSizes);
-  for (auto result : op.results()) {
-    resourceTimepointMap.map(result, op.result_timepoint());
+  op.getResourceOperandsMutable().assign(newOperands);
+  op.getResourceOperandSizesMutable().assign(newOperandSizes);
+  for (auto result : op.getResults()) {
+    resourceTimepointMap.map(result, op.getResultTimepoint());
   }
 }
 
