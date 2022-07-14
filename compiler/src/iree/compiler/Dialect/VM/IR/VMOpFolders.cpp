@@ -579,48 +579,42 @@ static Attribute constFoldFloatUnaryOp(
 
 /// Performs const folding `calculate` with element-wise behavior on the two
 /// attributes in `operands` and returns the result if possible.
-template <class ArgAttrElementT, class RetAttrElementT = ArgAttrElementT,
-          class ArgElementValueT = typename ArgAttrElementT::ValueType,
-          class CalculationT = std::function<
-              ArgElementValueT(ArgElementValueT, ArgElementValueT)>>
-static Attribute constFoldBinaryOp(Operation *op, ArrayRef<Attribute> operands,
+/// Note: return type will match the operand types.
+template <class AttrElementT,
+          class ElementValueT = typename AttrElementT::ValueType,
+          class CalculationT =
+              std::function<ElementValueT(ElementValueT, ElementValueT)>>
+static Attribute constFoldBinaryOp(ArrayRef<Attribute> operands,
                                    const CalculationT &calculate) {
   assert(operands.size() == 2 && "binary op takes two operands");
-
-  assert(op->getNumResults() == 1 && "binary op needs one result");
-  auto returnType = op->getResult(0).getType();
-  // TODO(scotttodd): assert that RetAttrElementT matches returnType
-  //   or create an attribute using the general mlir::Type, without the extra
-  //   RetAttrElementT template type somehow
-
-  if (auto lhs = operands[0].dyn_cast_or_null<ArgAttrElementT>()) {
-    auto rhs = operands[1].dyn_cast_or_null<ArgAttrElementT>();
+  if (auto lhs = operands[0].dyn_cast_or_null<AttrElementT>()) {
+    auto rhs = operands[1].dyn_cast_or_null<AttrElementT>();
     if (!rhs) return {};
-    return RetAttrElementT::get(returnType,
-                                calculate(lhs.getValue(), rhs.getValue()));
+    return AttrElementT::get(lhs.getType(),
+                             calculate(lhs.getValue(), rhs.getValue()));
   } else if (auto lhs = operands[0].dyn_cast_or_null<SplatElementsAttr>()) {
     // TODO(benvanik): handle splat/otherwise.
     auto rhs = operands[1].dyn_cast_or_null<SplatElementsAttr>();
     if (!rhs || lhs.getType() != rhs.getType()) return {};
-    auto elementResult = constFoldBinaryOp<ArgAttrElementT, RetAttrElementT>(
-        op, {lhs.getSplatValue<Attribute>(), rhs.getSplatValue<Attribute>()},
+    auto elementResult = constFoldBinaryOp<AttrElementT>(
+        {lhs.getSplatValue<Attribute>(), rhs.getSplatValue<Attribute>()},
         calculate);
     if (!elementResult) return {};
-    return DenseElementsAttr::get(returnType, elementResult);
+    return DenseElementsAttr::get(lhs.getType(), elementResult);
   } else if (auto lhs = operands[0].dyn_cast_or_null<ElementsAttr>()) {
     auto rhs = operands[1].dyn_cast_or_null<ElementsAttr>();
     if (!rhs || lhs.getType() != rhs.getType()) return {};
-    auto lhsIt = lhs.getValues<ArgAttrElementT>().begin();
-    auto rhsIt = rhs.getValues<ArgAttrElementT>().begin();
+    auto lhsIt = lhs.getValues<AttrElementT>().begin();
+    auto rhsIt = rhs.getValues<AttrElementT>().begin();
     SmallVector<Attribute, 4> resultAttrs(lhs.getNumElements());
     for (int64_t i = 0; i < lhs.getNumElements(); ++i) {
-      resultAttrs[i] = constFoldBinaryOp<ArgAttrElementT, RetAttrElementT>(
-          op, {*lhsIt, *rhsIt}, calculate);
+      resultAttrs[i] =
+          constFoldBinaryOp<AttrElementT>({*lhsIt, *rhsIt}, calculate);
       if (!resultAttrs[i]) return {};
       ++lhsIt;
       ++rhsIt;
     }
-    return DenseElementsAttr::get(returnType, resultAttrs);
+    return DenseElementsAttr::get(lhs.getType(), resultAttrs);
   }
   return {};
 }
@@ -693,7 +687,7 @@ static OpFoldResult foldAddOp(ADD op, ArrayRef<Attribute> operands) {
     if (subOp.rhs() == op.lhs()) return subOp.lhs();
   }
   return constFoldBinaryOp<AttrElementT>(
-      op, operands,
+      operands,
       [](const ElementValueT &a, const ElementValueT &b) { return a + b; });
 }
 
@@ -720,7 +714,7 @@ static OpFoldResult foldSubOp(SUB op, ArrayRef<Attribute> operands) {
     if (addOp.rhs() == op.lhs()) return addOp.lhs();
   }
   return constFoldBinaryOp<AttrElementT>(
-      op, operands,
+      operands,
       [](const ElementValueT &a, const ElementValueT &b) { return a - b; });
 }
 
@@ -743,7 +737,7 @@ static OpFoldResult foldMulOp(T op, ArrayRef<Attribute> operands) {
     return op.lhs();
   }
   return constFoldBinaryOp<AttrElementT>(
-      op, operands,
+      operands,
       [](const ElementValueT &a, const ElementValueT &b) { return a * b; });
 }
 
@@ -761,8 +755,7 @@ struct FoldConstantMulOperand : public OpRewritePattern<T> {
         auto c = rewriter.createOrFold<CONST_OP>(
             rewriter.getFusedLoc({mulOp.getLoc(), op.getLoc()}),
             constFoldBinaryOp<AttrElementT>(
-                op, {c1, c2},
-                [](const ElementValueT &a, const ElementValueT &b) {
+                {c1, c2}, [](const ElementValueT &a, const ElementValueT &b) {
                   return a * b;
                 }));
         rewriter.replaceOpWithNewOp<T>(op, op.getType(), mulOp.lhs(), c);
@@ -807,7 +800,7 @@ static OpFoldResult foldDivSOp(T op, ArrayRef<Attribute> operands) {
     return op.lhs();
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [](const APInt &a, const APInt &b) { return a.sdiv(b); });
+      operands, [](const APInt &a, const APInt &b) { return a.sdiv(b); });
 }
 
 OpFoldResult DivI32SOp::fold(ArrayRef<Attribute> operands) {
@@ -832,7 +825,7 @@ static OpFoldResult foldDivUOp(T op, ArrayRef<Attribute> operands) {
     return op.lhs();
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [](const APInt &a, const APInt &b) { return a.udiv(b); });
+      operands, [](const APInt &a, const APInt &b) { return a.udiv(b); });
 }
 
 OpFoldResult DivI32UOp::fold(ArrayRef<Attribute> operands) {
@@ -856,7 +849,7 @@ static OpFoldResult foldRemSOp(T op, ArrayRef<Attribute> operands) {
     return zeroOfType(op.getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [](const APInt &a, const APInt &b) { return a.srem(b); });
+      operands, [](const APInt &a, const APInt &b) { return a.srem(b); });
 }
 
 OpFoldResult RemI32SOp::fold(ArrayRef<Attribute> operands) {
@@ -880,7 +873,7 @@ static OpFoldResult foldRemUOp(T op, ArrayRef<Attribute> operands) {
     return zeroOfType(op.getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [](const APInt &a, const APInt &b) { return a.urem(b); });
+      operands, [](const APInt &a, const APInt &b) { return a.urem(b); });
 }
 
 OpFoldResult RemI32UOp::fold(ArrayRef<Attribute> operands) {
@@ -1013,7 +1006,7 @@ static OpFoldResult foldDivFOp(T op, ArrayRef<Attribute> operands) {
     return op.lhs();
   }
   return constFoldBinaryOp<FloatAttr>(
-      op, operands, [](const APFloat &a, const APFloat &b) {
+      operands, [](const APFloat &a, const APFloat &b) {
         APFloat c = a;
         c.divide(b, APFloat::rmNearestTiesToAway);
         return c;
@@ -1040,7 +1033,7 @@ static OpFoldResult foldRemFOp(T op, ArrayRef<Attribute> operands) {
     // 0 % y = 0
     return zeroOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr>(op, operands,
+  return constFoldBinaryOp<FloatAttr>(operands,
                                       [](const APFloat &a, const APFloat &b) {
                                         APFloat c = a;
                                         c.remainder(b);
@@ -1198,7 +1191,7 @@ static OpFoldResult foldAndOp(T op, ArrayRef<Attribute> operands) {
     return op.lhs();
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [](const APInt &a, const APInt &b) { return a & b; });
+      operands, [](const APInt &a, const APInt &b) { return a & b; });
 }
 
 OpFoldResult AndI32Op::fold(ArrayRef<Attribute> operands) {
@@ -1219,7 +1212,7 @@ static OpFoldResult foldOrOp(T op, ArrayRef<Attribute> operands) {
     return op.lhs();
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [](const APInt &a, const APInt &b) { return a | b; });
+      operands, [](const APInt &a, const APInt &b) { return a | b; });
 }
 
 OpFoldResult OrI32Op::fold(ArrayRef<Attribute> operands) {
@@ -1240,7 +1233,7 @@ static OpFoldResult foldXorOp(T op, ArrayRef<Attribute> operands) {
     return zeroOfType(op.getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [](const APInt &a, const APInt &b) { return a ^ b; });
+      operands, [](const APInt &a, const APInt &b) { return a ^ b; });
 }
 
 OpFoldResult XorI32Op::fold(ArrayRef<Attribute> operands) {
@@ -1280,7 +1273,7 @@ static OpFoldResult foldShlOp(T op, ArrayRef<Attribute> operands) {
     return op.operand();
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [&](const APInt &a, const APInt &b) { return a.shl(b); });
+      operands, [&](const APInt &a, const APInt &b) { return a.shl(b); });
 }
 
 OpFoldResult ShlI32Op::fold(ArrayRef<Attribute> operands) {
@@ -1301,7 +1294,7 @@ static OpFoldResult foldShrSOp(T op, ArrayRef<Attribute> operands) {
     return op.operand();
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [&](const APInt &a, const APInt &b) { return a.ashr(b); });
+      operands, [&](const APInt &a, const APInt &b) { return a.ashr(b); });
 }
 
 OpFoldResult ShrI32SOp::fold(ArrayRef<Attribute> operands) {
@@ -1322,7 +1315,7 @@ static OpFoldResult foldShrUOp(T op, ArrayRef<Attribute> operands) {
     return op.operand();
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [&](const APInt &a, const APInt &b) { return a.lshr(b); });
+      operands, [&](const APInt &a, const APInt &b) { return a.lshr(b); });
 }
 
 OpFoldResult ShrI32UOp::fold(ArrayRef<Attribute> operands) {
@@ -1629,7 +1622,7 @@ static OpFoldResult foldCmpEQOp(T op, ArrayRef<Attribute> operands) {
     return oneOfType(op.getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [&](const APInt &a, const APInt &b) { return a.eq(b); });
+      operands, [&](const APInt &a, const APInt &b) { return a.eq(b); });
 }
 
 OpFoldResult CmpEQI32Op::fold(ArrayRef<Attribute> operands) {
@@ -1657,7 +1650,7 @@ static OpFoldResult foldCmpNEOp(T op, ArrayRef<Attribute> operands) {
     return zeroOfType(op.getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [&](const APInt &a, const APInt &b) { return a.ne(b); });
+      operands, [&](const APInt &a, const APInt &b) { return a.ne(b); });
 }
 
 OpFoldResult CmpNEI32Op::fold(ArrayRef<Attribute> operands) {
@@ -1705,7 +1698,7 @@ static OpFoldResult foldCmpLTSOp(T op, ArrayRef<Attribute> operands) {
     return zeroOfType(op.getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [&](const APInt &a, const APInt &b) { return a.slt(b); });
+      operands, [&](const APInt &a, const APInt &b) { return a.slt(b); });
 }
 
 OpFoldResult CmpLTI32SOp::fold(ArrayRef<Attribute> operands) {
@@ -1729,7 +1722,7 @@ static OpFoldResult foldCmpLTUOp(T op, ArrayRef<Attribute> operands) {
     return zeroOfType(op.getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [&](const APInt &a, const APInt &b) { return a.ult(b); });
+      operands, [&](const APInt &a, const APInt &b) { return a.ult(b); });
 }
 
 OpFoldResult CmpLTI32UOp::fold(ArrayRef<Attribute> operands) {
@@ -1773,7 +1766,7 @@ static OpFoldResult foldCmpLTESOp(T op, ArrayRef<Attribute> operands) {
     return oneOfType(op.getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [&](const APInt &a, const APInt &b) { return a.sle(b); });
+      operands, [&](const APInt &a, const APInt &b) { return a.sle(b); });
 }
 
 OpFoldResult CmpLTEI32SOp::fold(ArrayRef<Attribute> operands) {
@@ -1803,7 +1796,7 @@ static OpFoldResult foldCmpLTEUOp(T op, ArrayRef<Attribute> operands) {
     return oneOfType(op.getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [&](const APInt &a, const APInt &b) { return a.ule(b); });
+      operands, [&](const APInt &a, const APInt &b) { return a.ule(b); });
 }
 
 OpFoldResult CmpLTEI32UOp::fold(ArrayRef<Attribute> operands) {
@@ -1849,7 +1842,7 @@ static OpFoldResult foldCmpGTSOp(T op, ArrayRef<Attribute> operands) {
     return zeroOfType(op.getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [&](const APInt &a, const APInt &b) { return a.sgt(b); });
+      operands, [&](const APInt &a, const APInt &b) { return a.sgt(b); });
 }
 
 OpFoldResult CmpGTI32SOp::fold(ArrayRef<Attribute> operands) {
@@ -1879,7 +1872,7 @@ static OpFoldResult foldCmpGTUOp(T op, ArrayRef<Attribute> operands) {
     return zeroOfType(op.getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [&](const APInt &a, const APInt &b) { return a.ugt(b); });
+      operands, [&](const APInt &a, const APInt &b) { return a.ugt(b); });
 }
 
 OpFoldResult CmpGTI32UOp::fold(ArrayRef<Attribute> operands) {
@@ -1929,7 +1922,7 @@ static OpFoldResult foldCmpGTESOp(T op, ArrayRef<Attribute> operands) {
     return oneOfType(op.getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [&](const APInt &a, const APInt &b) { return a.sge(b); });
+      operands, [&](const APInt &a, const APInt &b) { return a.sge(b); });
 }
 
 OpFoldResult CmpGTEI32SOp::fold(ArrayRef<Attribute> operands) {
@@ -1959,7 +1952,7 @@ static OpFoldResult foldCmpGTEUOp(T op, ArrayRef<Attribute> operands) {
     return oneOfType(op.getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
-      op, operands, [&](const APInt &a, const APInt &b) { return a.uge(b); });
+      operands, [&](const APInt &a, const APInt &b) { return a.uge(b); });
 }
 
 OpFoldResult CmpGTEI32UOp::fold(ArrayRef<Attribute> operands) {
@@ -1996,6 +1989,51 @@ OpFoldResult CmpNZI64Op::fold(ArrayRef<Attribute> operands) {
 // Floating-point comparison
 //===----------------------------------------------------------------------===//
 
+/// Performs const folding `calculate` with element-wise behavior on the two
+/// attributes in `operands` and returns the integer result of the comparison
+/// if possible.
+template <class AttrElementT,
+          class ElementValueT = typename AttrElementT::ValueType,
+          class CalculationT =
+              std::function<ElementValueT(ElementValueT, ElementValueT)>>
+static Attribute constFoldFloatComparisonOp(ArrayRef<Attribute> operands,
+                                            const CalculationT &calculate) {
+  assert(operands.size() == 2 && "binary op takes two operands");
+
+  auto boolType = IntegerType::get(operands[0].getContext(), 32);
+
+  if (auto lhs = operands[0].dyn_cast_or_null<AttrElementT>()) {
+    auto rhs = operands[1].dyn_cast_or_null<AttrElementT>();
+    if (!rhs) return {};
+    return IntegerAttr::get(boolType,
+                            calculate(lhs.getValue(), rhs.getValue()));
+  } else if (auto lhs = operands[0].dyn_cast_or_null<SplatElementsAttr>()) {
+    // TODO(benvanik): handle splat/otherwise.
+    auto rhs = operands[1].dyn_cast_or_null<SplatElementsAttr>();
+    if (!rhs || lhs.getType() != rhs.getType()) return {};
+    auto elementResult = constFoldFloatComparisonOp<AttrElementT>(
+        {lhs.getSplatValue<Attribute>(), rhs.getSplatValue<Attribute>()},
+        calculate);
+    if (!elementResult) return {};
+    return DenseElementsAttr::get(boolType, elementResult);
+  } else if (auto lhs = operands[0].dyn_cast_or_null<ElementsAttr>()) {
+    auto rhs = operands[1].dyn_cast_or_null<ElementsAttr>();
+    if (!rhs || lhs.getType() != rhs.getType()) return {};
+    auto lhsIt = lhs.getValues<AttrElementT>().begin();
+    auto rhsIt = rhs.getValues<AttrElementT>().begin();
+    SmallVector<Attribute, 4> resultAttrs(lhs.getNumElements());
+    for (int64_t i = 0; i < lhs.getNumElements(); ++i) {
+      resultAttrs[i] =
+          constFoldFloatComparisonOp<AttrElementT>({*lhsIt, *rhsIt}, calculate);
+      if (!resultAttrs[i]) return {};
+      ++lhsIt;
+      ++rhsIt;
+    }
+    return DenseElementsAttr::get(boolType, resultAttrs);
+  }
+  return {};
+}
+
 enum CmpFOrdering {
   ORDERED = 0,
   UNORDERED = 1,
@@ -2007,8 +2045,8 @@ static OpFoldResult foldCmpEQFOp(T op, ArrayRef<Attribute> operands) {
     // x == x = true
     return oneOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr, IntegerAttr>(
-      op, operands, [&](const APFloat &a, const APFloat &b) {
+  return constFoldFloatComparisonOp<FloatAttr>(
+      operands, [&](const APFloat &a, const APFloat &b) {
         auto result = a.compare(b);
         if (ordering == ORDERED) {
           return result == APFloat::cmpEqual;
@@ -2060,8 +2098,8 @@ static OpFoldResult foldCmpNEFOp(T op, ArrayRef<Attribute> operands) {
     // x != x = false
     return zeroOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr, IntegerAttr>(
-      op, operands, [&](const APFloat &a, const APFloat &b) {
+  return constFoldFloatComparisonOp<FloatAttr>(
+      operands, [&](const APFloat &a, const APFloat &b) {
         auto result = a.compare(b);
         if (ordering == ORDERED) {
           return result != APFloat::cmpEqual;
@@ -2113,8 +2151,8 @@ static OpFoldResult foldCmpLTFOp(T op, ArrayRef<Attribute> operands) {
     // x < x = false
     return zeroOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr, IntegerAttr>(
-      op, operands, [&](const APFloat &a, const APFloat &b) {
+  return constFoldFloatComparisonOp<FloatAttr>(
+      operands, [&](const APFloat &a, const APFloat &b) {
         auto result = a.compare(b);
         if (ordering == ORDERED) {
           return result == APFloat::cmpLessThan;
@@ -2159,8 +2197,8 @@ static OpFoldResult foldCmpLTEFOp(T op, ArrayRef<Attribute> operands) {
     // x <= x = true
     return oneOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr, IntegerAttr>(
-      op, operands, [&](const APFloat &a, const APFloat &b) {
+  return constFoldFloatComparisonOp<FloatAttr>(
+      operands, [&](const APFloat &a, const APFloat &b) {
         auto result = a.compare(b);
         if (ordering == ORDERED) {
           return result == APFloat::cmpLessThan || result == APFloat::cmpEqual;
@@ -2193,8 +2231,8 @@ static OpFoldResult foldCmpGTFOp(T op, ArrayRef<Attribute> operands) {
     // x > x = false
     return zeroOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr, IntegerAttr>(
-      op, operands, [&](const APFloat &a, const APFloat &b) {
+  return constFoldFloatComparisonOp<FloatAttr>(
+      operands, [&](const APFloat &a, const APFloat &b) {
         auto result = a.compare(b);
         if (ordering == ORDERED) {
           return result == APFloat::cmpGreaterThan;
@@ -2251,8 +2289,8 @@ static OpFoldResult foldCmpGTEFOp(T op, ArrayRef<Attribute> operands) {
     // x >= x = true
     return oneOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr, IntegerAttr>(
-      op, operands, [&](const APFloat &a, const APFloat &b) {
+  return constFoldFloatComparisonOp<FloatAttr>(
+      operands, [&](const APFloat &a, const APFloat &b) {
         auto result = a.compare(b);
         if (ordering == ORDERED) {
           return result == APFloat::cmpGreaterThan ||
