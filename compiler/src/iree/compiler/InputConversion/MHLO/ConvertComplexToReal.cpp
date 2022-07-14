@@ -50,8 +50,9 @@ struct ConvertAddSubOp : public OpConversionPattern<OpTy> {
   static Value createOp(OpBuilder &b, mhlo::AddOp op, Value lhs, Value rhs) {
     return b.create<mhlo::AddOp>(op.getLoc(), lhs, rhs);
   }
-  static Value createOp(OpBuilder &b, mhlo::SubOp op, Value lhs, Value rhs) {
-    return b.create<mhlo::SubOp>(op.getLoc(), lhs, rhs);
+  static Value createOp(OpBuilder &b, mhlo::SubtractOp op, Value lhs,
+                        Value rhs) {
+    return b.create<mhlo::SubtractOp>(op.getLoc(), lhs, rhs);
   }
   static Value createOp(OpBuilder &b, chlo::BroadcastAddOp op, Value lhs,
                         Value rhs) {
@@ -103,7 +104,7 @@ struct ConvertMulOp : public OpConversionPattern<MulOpTy> {
     auto rhsReal = rewriter.createOrFold<mhlo::RealOp>(loc, adaptor.rhs());
     auto rhsImag = rewriter.createOrFold<mhlo::ImagOp>(loc, adaptor.rhs());
 
-    auto realComponent = rewriter.create<mhlo::SubOp>(
+    auto realComponent = rewriter.create<mhlo::SubtractOp>(
         loc,
         rewriter.create<chlo::BroadcastMulOp>(loc, lhsReal, rhsReal,
                                               /*broadcast_dimensions=*/nullptr),
@@ -313,7 +314,7 @@ void populateMHLOComplexToRealPatterns(MLIRContext *context,
                                        RewritePatternSet &patterns) {
   // Add an subtract patterns.
   patterns.insert<ConvertAddSubOp<mhlo::AddOp>>(typeConverter, context);
-  patterns.insert<ConvertAddSubOp<mhlo::SubOp>>(typeConverter, context);
+  patterns.insert<ConvertAddSubOp<mhlo::SubtractOp>>(typeConverter, context);
   patterns.insert<ConvertAddSubOp<chlo::BroadcastAddOp>>(typeConverter,
                                                          context);
   patterns.insert<ConvertAddSubOp<chlo::BroadcastSubOp>>(typeConverter,
@@ -401,7 +402,7 @@ struct TestMHLOConvertComplexToRealPass
     // Binary elementwise.
     target.addDynamicallyLegalOp<mhlo::AddOp>(hasNoComplexTypes);
     target.addDynamicallyLegalOp<chlo::BroadcastAddOp>(hasNoComplexTypes);
-    target.addDynamicallyLegalOp<mhlo::SubOp>(hasNoComplexTypes);
+    target.addDynamicallyLegalOp<mhlo::SubtractOp>(hasNoComplexTypes);
     target.addDynamicallyLegalOp<chlo::BroadcastSubOp>(hasNoComplexTypes);
     target.addDynamicallyLegalOp<mhlo::MulOp>(hasNoComplexTypes);
     target.addDynamicallyLegalOp<chlo::BroadcastMulOp>(hasNoComplexTypes);

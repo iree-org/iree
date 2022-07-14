@@ -109,39 +109,6 @@ void ireeCompilerOptionsDestroy(IreeCompilerOptions options) {
   delete unwrap(options);
 }
 
-void ireeCompilerOptionsAddTargetBackend(IreeCompilerOptions options,
-                                         const char *targetBackend) {
-  unwrap(options)->halTargetOptions.targets.push_back(
-      std::string(targetBackend));
-}
-
-void ireeCompilerOptionsSetInputDialectMHLO(IreeCompilerOptions options) {
-  unwrap(options)->inputDialectOptions.type = InputDialectOptions::Type::mhlo;
-}
-
-void ireeCompilerOptionsSetInputDialectTOSA(IreeCompilerOptions options) {
-  unwrap(options)->inputDialectOptions.type = InputDialectOptions::Type::tosa;
-}
-
-void ireeCompilerOptionsSetInputDialectXLA(IreeCompilerOptions options) {
-  unwrap(options)->inputDialectOptions.type = InputDialectOptions::Type::xla;
-}
-
-void ireeCompilerBuildXLACleanupPassPipeline(MlirOpPassManager passManager) {
-  auto *passManagerCpp = unwrap(passManager);
-  MHLO::buildXLACleanupPassPipeline(*passManagerCpp);
-}
-
-void ireeCompilerBuildMHLOImportPassPipeline(MlirOpPassManager passManager) {
-  auto *passManagerCpp = unwrap(passManager);
-  MHLO::buildMHLOInputConversionPassPipeline(*passManagerCpp);
-}
-
-void ireeCompilerBuildTOSAImportPassPipeline(MlirOpPassManager passManager) {
-  auto *passManagerCpp = unwrap(passManager);
-  buildTOSAInputConversionPassPipeline(*passManagerCpp);
-}
-
 void ireeCompilerBuildIREEVMPassPipeline(IreeCompilerOptions options,
                                          MlirOpPassManager passManager) {
   auto *optionsCpp = unwrap(options);

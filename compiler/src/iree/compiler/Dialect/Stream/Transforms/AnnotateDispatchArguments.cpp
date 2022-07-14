@@ -146,7 +146,7 @@ class ValuePVS : public DFX::StateWrapper<DFX::PotentialConstantIntValuesState,
           if (auto loadOp =
                   dyn_cast<IREE::Util::GlobalLoadOp>(result.getDefiningOp())) {
             auto *globalInfo = solver.getExplorer().queryGlobalInfoFrom(
-                loadOp.global(), loadOp);
+                loadOp.getGlobal(), loadOp);
             auto global = solver.getElementFor<GlobalPVS>(
                 *this, Position::forOperation(globalInfo->op),
                 DFX::Resolution::REQUIRED);
@@ -202,7 +202,7 @@ void GlobalPVS::initializeOperation(IREE::Util::GlobalOp globalOp,
     indicatePessimisticFixpoint();
   } else if (globalInfo) {
     if (auto initialValue =
-            globalOp.initial_valueAttr().dyn_cast_or_null<IntegerAttr>()) {
+            globalOp.getInitialValueAttr().dyn_cast_or_null<IntegerAttr>()) {
       // Initial value is available for use; stored values from the rest of the
       // program will come during iteration.
       unionAssumed(initialValue.getValue());
@@ -218,7 +218,8 @@ ChangeStatus GlobalPVS::updateOperation(IREE::Util::GlobalOp globalOp,
     auto storeOp = dyn_cast<IREE::Util::GlobalStoreOp>(use);
     if (!storeOp) continue;
     auto value = solver.getElementFor<ValuePVS>(
-        *this, Position::forValue(storeOp.value()), DFX::Resolution::REQUIRED);
+        *this, Position::forValue(storeOp.getValue()),
+        DFX::Resolution::REQUIRED);
     if (value.isValidState()) {
       newState.unionAssumed(value);
     } else {
@@ -307,7 +308,7 @@ class ValueAlignment
             if (auto alignOp =
                     dyn_cast<IREE::Util::AlignOp>(result.getDefiningOp())) {
               auto alignment = solver.getElementFor<ValueAlignment>(
-                  *this, Position::forValue(alignOp.alignment()),
+                  *this, Position::forValue(alignOp.getAlignment()),
                   DFX::Resolution::REQUIRED);
               newState ^= alignment;
             }

@@ -784,7 +784,7 @@ void mlir::iree_compiler::MHLO::populateMHLOBroadcastingToLinalgPatterns(
                         mhlo::ShiftRightArithmeticOp);
   POPULATE_SIMPLE_BCAST(chlo::BroadcastShiftRightLogicalOp,
                         mhlo::ShiftRightLogicalOp);
-  POPULATE_SIMPLE_BCAST(chlo::BroadcastSubOp, mhlo::SubOp);
+  POPULATE_SIMPLE_BCAST(chlo::BroadcastSubOp, mhlo::SubtractOp);
   POPULATE_SIMPLE_BCAST(chlo::BroadcastXorOp, mhlo::XorOp);
   POPULATE_SIMPLE_BCAST(chlo::BroadcastZetaOp, chlo::ZetaOp);
 

@@ -53,7 +53,7 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
   // Populate the constant roots for globals.
   explorer.forEachGlobal([&](const Explorer::GlobalInfo *info) {
     // Rely on globals having been canonicalized to immutable correctly.
-    if (info->op.is_mutable()) return;
+    if (info->op.getIsMutable()) return;
     if (info->isIndirect) return;
     for (auto *use : info->uses) {
       auto loadOp = llvm::dyn_cast<GlobalLoadOp>(use);

@@ -44,6 +44,14 @@ class CompilerTest(unittest.TestCase):
         "<CompilerOptions:['--iree-hal-target-backends=cpu,vmvx']>")
     print(options)
 
+  def testMultipleOptions(self):
+    options = ireec.CompilerOptions("--iree-input-type=mhlo",
+                                    "--iree-tflite-bindings-support=true")
+    self.assertEqual(
+        repr(options),
+        "<CompilerOptions:['--iree-tflite-bindings-support=true', '--iree-input-type=mhlo']>"
+    )
+
 
 if __name__ == "__main__":
   logging.basicConfig(level=logging.DEBUG)

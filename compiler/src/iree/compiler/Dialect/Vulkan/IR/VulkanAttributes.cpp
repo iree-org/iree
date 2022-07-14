@@ -290,11 +290,9 @@ Attribute VulkanDialect::parseAttribute(DialectAsmParser &parser,
 
   // Parse the kind keyword first.
   StringRef attrKind;
-  if (parser.parseKeyword(&attrKind)) return {};
-
   Attribute attr;
   OptionalParseResult result =
-      generatedAttributeParser(parser, attrKind, type, attr);
+      generatedAttributeParser(parser, &attrKind, type, attr);
   if (result.hasValue()) {
     if (failed(result.getValue())) return {};
     return attr;

@@ -633,7 +633,7 @@ struct ConvertMHLOToLinalgExtPass
                 LinalgExtRegionHLOOpConversion<mhlo::SignOp>,
                 LinalgExtRegionHLOOpConversion<mhlo::SineOp>,
                 LinalgExtRegionHLOOpConversion<mhlo::SqrtOp>,
-                LinalgExtRegionHLOOpConversion<mhlo::SubOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::SubtractOp>,
                 LinalgExtRegionHLOOpConversion<mhlo::TanhOp>,
                 LinalgExtRegionHLOOpConversion<mhlo::XorOp>,
                 LinalgExtRegionReturnOpConversion>(typeConverter, context);

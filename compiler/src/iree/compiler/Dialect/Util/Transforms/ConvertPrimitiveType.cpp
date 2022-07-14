@@ -238,7 +238,7 @@ struct ConvertTypesPass : public PassWrapper<T, OperationPass<mlir::ModuleOp>> {
     // Operations are legal if they don't contain any illegal type.
     target.markUnknownOpDynamicallyLegal([&](Operation *op) {
       if (auto globalOp = dyn_cast<IREE::Util::GlobalOp>(op)) {
-        return typeConverter.isLegal(globalOp.type());
+        return typeConverter.isLegal(globalOp.getType());
       } else if (auto funcOp = dyn_cast<func::FuncOp>(op)) {
         for (Type type : funcOp.getFunctionType().getInputs()) {
           if (!typeConverter.isLegal(type)) return false;

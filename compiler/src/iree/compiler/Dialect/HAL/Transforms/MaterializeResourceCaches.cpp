@@ -157,7 +157,7 @@ class MaterializeResourceCachesPass
     for (auto setLayoutGlobalOp : setLayoutGlobalOps) {
       auto setLayoutValue = blockBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
           loc, DescriptorSetLayoutType::get(loc.getContext()),
-          setLayoutGlobalOp.sym_name());
+          setLayoutGlobalOp.getSymName());
       setLayoutValues.push_back(setLayoutValue);
     }
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
@@ -212,7 +212,7 @@ class MaterializeResourceCachesPass
         executableLayoutValues.push_back(
             caseBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
                 loc, ExecutableLayoutType::get(loc.getContext()),
-                executableLayoutGlobalOp.sym_name()));
+                executableLayoutGlobalOp.getSymName()));
       }
 
       // Inline constant initializer from the variant.
@@ -254,7 +254,7 @@ class MaterializeResourceCachesPass
         defineDescriptorSetLayoutOp(lookupOp.getLoc(), lookupOp.bindings());
     auto loadOp = builder.create<IREE::Util::GlobalLoadOp>(
         lookupOp.getLoc(), DescriptorSetLayoutType::get(lookupOp.getContext()),
-        globalOp.sym_name());
+        globalOp.getSymName());
     lookupOp.replaceAllUsesWith(loadOp.getOperation());
     lookupOp.erase();
   }
@@ -265,7 +265,7 @@ class MaterializeResourceCachesPass
         defineExecutableLayoutOp(lookupOp.getLoc(), lookupOp.layout());
     auto loadOp = builder.create<IREE::Util::GlobalLoadOp>(
         lookupOp.getLoc(), ExecutableLayoutType::get(lookupOp.getContext()),
-        globalOp.sym_name());
+        globalOp.getSymName());
     lookupOp.replaceAllUsesWith(loadOp.getOperation());
     lookupOp.erase();
   }
@@ -278,7 +278,7 @@ class MaterializeResourceCachesPass
     auto globalOp = executableIt->second;
     auto loadOp = builder.create<IREE::Util::GlobalLoadOp>(
         lookupOp.getLoc(), ExecutableType::get(lookupOp.getContext()),
-        globalOp.sym_name());
+        globalOp.getSymName());
     lookupOp.replaceAllUsesWith(loadOp.getOperation());
     lookupOp.erase();
   }

@@ -94,41 +94,12 @@ py::list getFlagsFromOptions(IreeCompilerOptions &options,
 
 }  // namespace
 
-static const char BUILD_MHLO_IMPORT_PASS_PIPELINE_DOCSTRING[] =
-    R"(Populates MHLO import passes on a PassManager.
-
-This enables standalone access to the import pipeline that can be run as part
-of main compilation with the `set_input_dialect_mhlo()` option. It is provided
-seprately to facilitate integration with frontend workflows.
-
-This pipeline requires IREE-compatible MHLO input: MHLO control flow must have
-been legalized to SCF or CFG and tuples must not exist. See the
-`build_xla_cleanup_pass_pipeline` for assistance if interoping with such IR.
-)";
-
-static const char BUILD_TOSA_IMPORT_PASS_PIPELINE_DOCSTRING[] =
-    R"(Populates TOSA import passes on a PassManager.
-
-This enables standalone access to the import pipeline that can be run as part
-of main compilation with the `set_input_dialect_tosa()` option. It is provided
-seprately to facilitate integration with frontend workflows.
-)";
-
 static const char BUILD_IREE_VM_PASS_PIPELINE_DOCSTRING[] =
     R"(Populates VM compilation pass on a PassManager.
 
 This is the primary interface to IREE's backend compiler, providing compilation
 from a supported set of input dialects to the `vm` dialect, representing
 IREE's lowest level representation.
-)";
-
-static const char BUILD_XLA_CLEANUP_PASS_PIPELINE_DOCSTRING[] =
-    R"(Populates passes to cleanup XLA-imported MHLO to comply with IREE.
-
-Combining this pipeline with `build_mhlo_import_pass_pipeline()` provides
-standalone access to the import pipeline that can be run as part of main
-compilation with the `set_input_dialect_xla()` option. It is provided
-separately to facilitate integration with frontend workflows.
 )";
 
 static const char TRANSLATE_MODULE_TO_VM_BYTECODE_DOCSTRING[] =
@@ -174,30 +145,6 @@ PYBIND11_MODULE(_ireecTransforms, m) {
             getFlagsFromOptions(self.options, /*nonDefaultOnly=*/true);
         return py::str("<CompilerOptions:") + py::repr(flags) + py::str(">");
       });
-  m.def(
-      "build_mhlo_import_pass_pipeline",
-      [](MlirPassManager passManager) {
-        MlirOpPassManager opPassManager =
-            mlirPassManagerGetAsOpPassManager(passManager);
-        ireeCompilerBuildMHLOImportPassPipeline(opPassManager);
-      },
-      py::arg("pass_manager"), BUILD_MHLO_IMPORT_PASS_PIPELINE_DOCSTRING);
-  m.def(
-      "build_tosa_import_pass_pipeline",
-      [](MlirPassManager passManager) {
-        MlirOpPassManager opPassManager =
-            mlirPassManagerGetAsOpPassManager(passManager);
-        ireeCompilerBuildTOSAImportPassPipeline(opPassManager);
-      },
-      py::arg("pass_manager"), BUILD_TOSA_IMPORT_PASS_PIPELINE_DOCSTRING);
-  m.def(
-      "build_xla_cleanup_pass_pipeline",
-      [](MlirPassManager passManager) {
-        MlirOpPassManager opPassManager =
-            mlirPassManagerGetAsOpPassManager(passManager);
-        ireeCompilerBuildXLACleanupPassPipeline(opPassManager);
-      },
-      py::arg("pass_manager"), BUILD_XLA_CLEANUP_PASS_PIPELINE_DOCSTRING);
   m.def(
       "build_iree_vm_pass_pipeline",
       [](PyCompilerOptions &options, MlirPassManager passManager) {

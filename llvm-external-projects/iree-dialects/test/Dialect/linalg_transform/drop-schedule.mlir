@@ -26,6 +26,6 @@ transform.with_pdl_patterns {
   transform.structured.canonicalized_sequence %arg0 {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg1
-    transform.structured.tile %0 {sizes = [4, 4, 4], pad = false}
+    transform.structured.tile %0 [4, 4, 4] {pad = false}
   }
 }

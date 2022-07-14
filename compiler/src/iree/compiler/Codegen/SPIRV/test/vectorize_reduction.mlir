@@ -28,10 +28,10 @@ func.func @reduce_outmost_dim(%input: tensor<4x1x4xf32>, %init: tensor<1x4xf32>)
 //       CHECK:   %[[V3:.+]] = vector.transfer_read %[[INPUT]][%[[C3]], %[[C0]], %[[C0]]], %[[F0]] {in_bounds = [true]} : tensor<4x1x4xf32>, vector<4xf32>
 //       CHECK:   %[[VI:.+]] = vector.transfer_read %[[INIT]][%[[C0]], %[[C0]]], %[[F0]] {in_bounds = [true]} : tensor<1x4xf32>, vector<4xf32>
 
-//       CHECK:   %[[ADD0:.+]] = arith.addf %[[V1]], %[[V0]] : vector<4xf32>
-//       CHECK:   %[[ADD1:.+]] = arith.addf %[[V2]], %[[ADD0]] : vector<4xf32>
-//       CHECK:   %[[ADD2:.+]] = arith.addf %[[V3]], %[[ADD1]] : vector<4xf32>
-//       CHECK:   %[[ADD3:.+]] = arith.addf %[[ADD2]], %[[VI]] : vector<4xf32>
+//       CHECK:   %[[ADD0:.+]] = arith.addf %[[V0]], %[[VI]] : vector<4xf32>
+//       CHECK:   %[[ADD1:.+]] = arith.addf %[[V1]], %[[ADD0]] : vector<4xf32>
+//       CHECK:   %[[ADD2:.+]] = arith.addf %[[V2]], %[[ADD1]] : vector<4xf32>
+//       CHECK:   %[[ADD3:.+]] = arith.addf %[[V3]], %[[ADD2]] : vector<4xf32>
 //       CHECK:   %[[W:.+]] = vector.transfer_write %[[ADD3]], %[[INIT]][%[[C0]], %[[C0]]] {in_bounds = [true]} : vector<4xf32>, tensor<1x4xf32>
 //       CHECK:   return %[[W]]
 

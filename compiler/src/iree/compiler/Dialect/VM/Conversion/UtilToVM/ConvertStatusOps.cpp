@@ -22,7 +22,7 @@ class StatusCheckOkOpConversion
       ConversionPatternRewriter &rewriter) const override {
     // If status value is non-zero, fail.
     rewriter.replaceOpWithNewOp<IREE::VM::CondFailOp>(
-        op, adaptor.status(), op.message().getValueOr(""));
+        op, adaptor.getStatus(), op.getMessage().getValueOr(""));
     return success();
   }
 };

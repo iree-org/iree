@@ -74,9 +74,9 @@ struct NarrowParams {
             llvm::dyn_cast_or_null<IREE::Util::NumericOptionalNarrowOp>(
                 value.getDefiningOp())) {
       NarrowParams params;
-      params.producer = narrowOp.operand();
+      params.producer = narrowOp.getOperand();
       params.fromType = value.getType();
-      params.toElementType = narrowOp.semantic_type();
+      params.toElementType = narrowOp.getSemanticType();
       params.range = narrowOp.getIntegerRange();
 
       return params;
