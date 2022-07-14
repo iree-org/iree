@@ -93,12 +93,6 @@ declare -a args=(
   --unattended
   --runnergroup "${RUNNER_GROUP}"
   --replace
-  --ephemeral
-  # We have to manage updates ourselves at the moment, since the GitHub runner
-  # is baked into the image and we don't want every runner to start out by
-  # updating itself. GitHub mandates an update within 30 days of release though.
-  # TODO: Switch to fetching the latest runner on VM creation.
-  --disableupdate
 )
 # I would love to discover another way to print an array while preserving quote
 # escaping. We're not just using `set -x` on the command itself because we don't

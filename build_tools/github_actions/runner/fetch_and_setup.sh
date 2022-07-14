@@ -30,8 +30,8 @@ rm -rf /tmp/iree
 # git clone https://github.com/iree-org/iree.git
 git clone https://github.com/gmngeoffrey/iree.git
 cd iree
-git fetch origin runner-setup-ephemeral
-git checkout runner-setup-ephemeral
+git fetch origin runner-setup
+git checkout runner-setup
 cd ..
 
 cp -r iree/build_tools/github_actions/runner/* "${HOME}/"
