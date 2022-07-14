@@ -67,7 +67,7 @@ transform.with_pdl_patterns {
     %1 = pdl_match @pdl_target2 in %arg1
 
     // Add references to handles produced by match so that they are not DCE'd.
-    transform.structured.tile %0 {sizes = [32, 32, 32]}
-    transform.structured.tile %1 {sizes = [32, 32, 32]}
+    transform.structured.tile %0 [32, 32, 32]
+    transform.structured.tile %1 [32, 32, 32]
   }
 }

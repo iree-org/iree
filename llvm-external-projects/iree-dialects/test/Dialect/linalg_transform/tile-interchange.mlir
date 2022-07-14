@@ -33,8 +33,8 @@ transform.with_pdl_patterns {
   transform.structured.canonicalized_sequence %arg0 {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @target_pattern in %arg1
-    %1, %loops1:3 = transform.structured.tile %0 {interchange = [0, 2, 1], sizes = [3, 5, 14]}
-    %2, %loops2:3 = transform.structured.tile %1 {sizes = [3, 5, 2]}
+    %1, %loops1:3 = transform.structured.tile %0 [3, 5, 14] {interchange = [0, 2, 1]}
+    %2, %loops2:3 = transform.structured.tile %1 [3, 5, 2]
     %3 = get_closest_isolated_parent %2
     transform.structured.vectorize %3 {vectorize_padding = true}
   }
@@ -75,8 +75,8 @@ transform.with_pdl_patterns {
   transform.structured.canonicalized_sequence %arg0 {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @target_pattern in %arg1
-    %1, %loops1:3 = transform.structured.tile %0 {interchange = [2, 1, 0], sizes = [3, 5, 14]}
-    %2, %loops2:3 = transform.structured.tile %1 {sizes = [3, 5, 2]}
+    %1, %loops1:3 = transform.structured.tile %0 [3, 5, 14] {interchange = [2, 1, 0]}
+    %2, %loops2:3 = transform.structured.tile %1 [3, 5, 2]
     %3 = get_closest_isolated_parent %2
     transform.structured.vectorize %3 {vectorize_padding = true}
   }
