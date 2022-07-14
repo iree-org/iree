@@ -15,7 +15,7 @@ set -euo pipefail
 if [[ "$(whoami)" != "runner" ]]; then
   echo "Current user is not 'runner'. Rerunning script as 'runner'."
   SCRIPT="$( readlink -f -- "$0"; )"
-  sudo su runner --shell /bin/bash --command "${SCRIPT}
+  sudo su runner --shell /bin/bash --command "${SCRIPT}"
   exit
 fi
 
