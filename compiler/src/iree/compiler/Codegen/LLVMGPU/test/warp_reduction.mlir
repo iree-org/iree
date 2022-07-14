@@ -51,6 +51,7 @@ hal.executable private @simple_reduce  {
 //   CHECK-DAG:   %[[TID:.*]] = gpu.thread_id  x
 //   CHECK-DAG:   %[[VCST:.*]] = arith.constant dense<0.000000e+00> : vector<1xf32>
 //       CHECK:   %[[F:.*]] = scf.for %{{.*}} = %{{.*}} to %{{.*}} step %{{.*}} iter_args(%[[V0:.*]] = %[[VCST]]) -> (vector<1xf32>) {
+//       CHECK:     %[[E:.*]] = vector.extract %[[V0]][0] : vector<1xf32>
 //       CHECK:     %[[ID:.*]] = affine.apply
 //       CHECK:     %[[V1:.*]] = vector.transfer_read %{{.*}}[%{{.*}}, %[[ID]]], %{{.*}} {in_bounds = [true]} : memref<128x384xf32>, vector<1xf32>
 //       CHECK:     %[[S:.*]] = vector.reduction <add>, %[[V1]] : vector<1xf32> into f32
@@ -64,9 +65,9 @@ hal.executable private @simple_reduce  {
 //       CHECK:     %[[S7:.*]] = arith.addf %[[S5]], %[[S6]] : f32
 //       CHECK:     %[[S8:.*]], %{{.*}} = gpu.shuffle  xor %[[S7]], %[[C16]], %[[C32]] : f32
 //       CHECK:     %[[S9:.*]] = arith.addf %[[S7]], %[[S8]] : f32
-//       CHECK:     %[[B:.*]] = vector.broadcast %[[S9]] : f32 to vector<1xf32>
-//       CHECK:     %[[ADD:.*]] = arith.addf %[[B]], %[[V0]] : vector<1xf32>
-//       CHECK:     scf.yield %[[ADD]] : vector<1xf32>
+//       CHECK:     %[[S10:.*]] = arith.addf %[[S9]], %[[E]] : f32
+//       CHECK:     %[[B:.*]] = vector.broadcast %[[S10]] : f32 to vector<1xf32>
+//       CHECK:     scf.yield %[[B]] : vector<1xf32>
 //       CHECK:   }
 //       CHECK:   %[[DIV:.*]] = arith.divf %[[F]], %{{.*}} : vector<1xf32>
 //       CHECK:   %[[CMP:.*]] = arith.cmpi eq, %[[TID]], %[[C0]] : index
@@ -129,6 +130,7 @@ hal.executable private @simple_reduce_multi_warp  {
 //   CHECK-DAG:   %[[TID:.*]] = gpu.thread_id  x
 //   CHECK-DAG:   %[[VCST:.*]] = arith.constant dense<0.000000e+00> : vector<1xf32>
 //       CHECK:   %[[F:.*]] = scf.for %{{.*}} = %{{.*}} to %{{.*}} step %{{.*}} iter_args(%[[V0:.*]] = %[[VCST]]) -> (vector<1xf32>) {
+//       CHECK:     %[[E:.*]] = vector.extract %[[V0]][0] : vector<1xf32>
 //       CHECK:     %[[ID:.*]] = affine.apply
 //       CHECK:     %[[V1:.*]] = vector.transfer_read %{{.*}}[%{{.*}}, %[[ID]]], %{{.*}} {in_bounds = [true]} : memref<128x384xf32>, vector<1xf32>
 //       CHECK:     %[[S:.*]] = vector.reduction <add>, %[[V1]] : vector<1xf32>
@@ -148,9 +150,9 @@ hal.executable private @simple_reduce_multi_warp  {
 //       CHECK:     gpu.barrier
 //       CHECK:     %[[VL:.*]] = vector.load %[[A]][%[[C0]]] : memref<2xf32, 3>, vector<2xf32>
 //       CHECK:     %[[S10:.*]] = vector.reduction <add>, %[[VL]] : vector<2xf32> into f32
-//       CHECK:     %[[B:.*]] = vector.broadcast %[[S10]] : f32 to vector<1xf32>
-//       CHECK:     %[[ADD:.*]] = arith.addf %[[B]], %[[V0]] : vector<1xf32>
-//       CHECK:     scf.yield %[[ADD]] : vector<1xf32>
+//       CHECK:     %[[S11:.*]] = arith.addf %[[S10]], %[[E]] : f32
+//       CHECK:     %[[B:.*]] = vector.broadcast %[[S11]] : f32 to vector<1xf32>
+//       CHECK:     scf.yield %[[B]] : vector<1xf32>
 //       CHECK:   }
 //       CHECK:   %[[DIV:.*]] = arith.divf %[[F]], %{{.*}} : vector<1xf32>
 //       CHECK:   %[[CMP:.*]] = arith.cmpi eq, %[[TID]], %[[C0]] : index

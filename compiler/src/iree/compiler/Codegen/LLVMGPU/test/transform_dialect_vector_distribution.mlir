@@ -1,9 +1,11 @@
 // RUN: iree-opt %s --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass))' \
-// RUN: --iree-codegen-llvmgpu-use-transform-dialect=%p/transform_dialect_codegen_vector_warp_execute_on_lane_0_spec.mlir | \
+// RUN: --iree-codegen-llvmgpu-use-transform-dialect=%p/transform_dialect_codegen_vector_warp_execute_on_lane_0_spec.mlir \
+// RUN: --allow-unregistered-dialect | \
 // RUN: FileCheck %s --check-prefix=WARP-EXECUTE
 
 // RUN: iree-opt %s --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass))' \
-// RUN: --iree-codegen-llvmgpu-use-transform-dialect=%p/transform_dialect_codegen_vector_distribution_spec.mlir | \
+// RUN: --iree-codegen-llvmgpu-use-transform-dialect=%p/transform_dialect_codegen_vector_distribution_spec.mlir \
+// RUN: --allow-unregistered-dialect | \
 // RUN: FileCheck %s
 
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>]>]>
@@ -23,18 +25,17 @@ hal.executable private @reduce_dispatch_0 {
 
         // WARP-EXECUTE-DAG: %[[C0:.*]] = arith.constant 0 : index
         // WARP-EXECUTE-DAG: %[[C32:.*]] = arith.constant 32 : index
-        // WARP-EXECUTE-DAG: %[[V128:.*]] = arith.constant dense<1.000000e+00> : vector<128xf32>
         // WARP-EXECUTE: %[[TIDX:.*]] = gpu.thread_id  x
         // WARP-EXECUTE: %[[COND32:.*]] = arith.cmpi ult, %[[TIDX]], %[[C32]] : index
         // Single-warp guard filters out threads 32-63.
         // WARP-EXECUTE: scf.if %[[COND32]] {
         // WARP-EXECUTE:   vector.warp_execute_on_lane_0(%[[TIDX]])[32] {
-        // WARP-EXECUTE:     vector.transfer_write %[[V128]], %{{.*}} {in_bounds = [true]} : vector<128xf32>, memref<128xf32>
+        // WARP-EXECUTE:     %[[V:.*]] = "some_def"() : () -> vector<128xf32>
+        // WARP-EXECUTE:     vector.transfer_write %[[V]], %{{.*}} {in_bounds = [true]} : vector<128xf32>, memref<128xf32>
 
         // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
         // CHECK-DAG: %[[C4:.*]] = arith.constant 4 : index
         // CHECK-DAG: %[[C32:.*]] = arith.constant 32 : index
-        // CHECK-DAG: %[[V128:.*]] = arith.constant dense<1.000000e+00> : vector<128xf32>
         // CHECK: %[[TIDX:.*]] = gpu.thread_id  x
         // CHECK: %[[COND32:.*]] = arith.cmpi ult, %[[TIDX]], %[[C32]] : index
         // Single-warp guard filters out threads 32-63.
@@ -43,13 +44,14 @@ hal.executable private @reduce_dispatch_0 {
         // CHECK:   %[[ALLOC:.*]] = memref.alloc() : memref<128xf32, 3>
         // Single-thread guard runs on thread 0 only.
         // CHECK:   scf.if %[[COND1]] {
-        // CHECK:     vector.store %{{.*}} : memref<128xf32, 3>, vector<128xf32>
+        // CHECK:     %[[V:.*]] = "some_def"() : () -> vector<128xf32>
+        // CHECK:     vector.store %[[V]], %{{.*}} : memref<128xf32, 3>, vector<128xf32>
         // CHECK:   %[[IDX:.*]] = arith.muli %[[TIDX]], %[[C4]] : index
         // CHECK:   %[[LOADED:.*]] = vector.load %{{.*}}[%[[IDX]]] : memref<128xf32, 3>, vector<4xf32>
         // CHECK:   vector.transfer_write %[[LOADED]], %{{.*}} {in_bounds = [true]} : vector<4xf32>, memref<128xf32>
         scf.if %2 {
-          %3 = arith.constant dense<1.0> : vector<128xf32>
-          vector.transfer_write %3, %0[%c0] : vector<128xf32>, memref<128xf32>
+          %v = "some_def"() : () -> (vector<128xf32>)
+          vector.transfer_write %v, %0[%c0] : vector<128xf32>, memref<128xf32>
         }
         return
       }
