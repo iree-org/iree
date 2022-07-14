@@ -68,7 +68,7 @@ getReassociationIndices(int64_t rank, int64_t splitDimParallel) {
 
 LogicalResult shouldParallelTopk(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
                                  PatternRewriter &rewriter, int64_t kDimOrig,
-                                 int64_t splitReductionRatio) {
+                                 int64_t splitReductionRatio, int64_t splitReductionDepth) {
   // Determine if we should split the reduction. Requires aligned static shapes
   // and no input indicies.
   auto valuesOrigType = topkOp.getInputType();
@@ -76,7 +76,7 @@ LogicalResult shouldParallelTopk(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
     return rewriter.notifyMatchFailure(topkOp,
                                        "cannot split dynamic dimension");
   }
-  if (topkOp.indices()) {
+  if (topkOp.indices() && splitReductionDepth == 0) {
     return rewriter.notifyMatchFailure(topkOp,
                                        "input indices aren't supported");
   }
@@ -120,7 +120,7 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
   if (Optional<Value> inputIndices = topkOp.indices()) {
     // Type inputElementType = inputIndices->getType().cast<ShapedType>();
     Type indicesExpandedType = RankedTensorType::get(expandedShape, indicesElementType);
-    Value indicesExpanded = rewriter.create<tensor::ExpandShapeOp>(
+    indicesExpanded = rewriter.create<tensor::ExpandShapeOp>(
       loc, indicesExpandedType, inputIndices.getValue(), reassociationIndices);
   }
 
@@ -265,24 +265,13 @@ TopkOp computeReductionTopk(Location loc, PatternRewriter &rewriter,
   return reductionTopkOp;
 }
 
-// // Checks for the split reduction depth marker and increments if found or initializes to 0.
-// void updateSplitReductionDepthMarker(TopkOp topkOp, PatternRewriter &rewriter){
-//   auto attr = topkOp->template getAttrOfType<IntegerAttr>(kSplitReductionDepthMarker);
-//   if (!attr) {
-//     topkOp->setAttr(kSplitReductionDepthMarker, rewriter.getZeroAttr(rewriter.getI64Type()));
-//     llvm::errs() << "updateSplitReductionDepthMarker(): " << 0 << "\n";
-//   } else {
-//     topkOp->setAttr(kSplitReductionDepthMarker,
-//                     rewriter.getI64IntegerAttr(attr.getInt() + 1));
-//     llvm::errs() << "updateSplitReductionDepthMarker(): " << attr.getInt() + 1 << "\n";
-//   }
-// }
-
 int64_t getSplitReductionDepth(TopkOp topkOp) {
   auto attr = topkOp->template getAttrOfType<IntegerAttr>(kSplitReductionDepthMarker);
   if (attr) {
+    // llvm::errs() << "getSplitReductionDepth(): " << attr.getInt() << "\n";
     return attr.getInt();
   } else {
+    // llvm::errs() << "getSplitReductionDepth(): " << 0 << "\n";
     return 0;
   }
 }
@@ -290,10 +279,11 @@ int64_t getSplitReductionDepth(TopkOp topkOp) {
 void setSplitReductionDepth(TopkOp topkOp, PatternRewriter &rewriter, int64_t depth){
   topkOp->setAttr(kSplitReductionDepthMarker,
                   rewriter.getI64IntegerAttr(depth));
-  llvm::errs() << "setSplitReductionDepth(): " << depth << "\n";
+  // llvm::errs() << "setSplitReductionDepth(): " << depth << "\n";
 }
 
 void clearSplitReductionDepth(TopkOp topkOp) {
+  // llvm::errs() << "clearSplitReductionDepth(): " << "\n";
   topkOp->removeAttr(kSplitReductionDepthMarker);
 }
 
@@ -332,13 +322,15 @@ struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
     int64_t kSize =
         topkOp.getResult(0).getType().cast<ShapedType>().getDimSize(kDimOrig);
     int64_t splitReductionDepth = getSplitReductionDepth(topkOp);
-    int64_t splitReductionRatio = splitReductionFn(topkOp, splitReductionDepth);
+    int64_t splitReductionRatio = splitReductionFn(splitReductionDepth);
     SmallVector<ReassociationIndices> reassociationIndices =
         getReassociationIndices(topkOp.getInputRank(), splitDimParallel);
 
+    // llvm::errs() << "Working on depth("<< splitReductionDepth << ") with ratio(" << splitReductionRatio << ")\n";
+
     // Determine if should compute parallel topk
     LogicalResult shouldParallelTopkResult =
-        shouldParallelTopk(topkOp, rewriter, kDimOrig, splitReductionRatio);
+        shouldParallelTopk(topkOp, rewriter, kDimOrig, splitReductionRatio, splitReductionDepth);
     if (shouldParallelTopkResult.failed()) {
       return shouldParallelTopkResult;
     }
@@ -348,14 +340,23 @@ struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
         loc, rewriter, topkOp, reassociationIndices, splitReductionRatio,
         splitDimParallel, kDimParallel, kSize);
 
-    // Update parallel indices to correct offsets
+    // Update parallel indices to correct offsets if input indices weren't provided. If input indices were provided, no offsetting is needed (index original positions already recorded).
+    Value updatedParallelIndices = parallelTopkOp.getResult(1);
+    if (!topkOp.indices()) {
+      // llvm::errs() << "Input depth(" << splitReductionDepth <<") has no indices so need to add offsets\n";
+
     Value parallelIndices = parallelTopkOp.getResult(1);
     SmallVector<int64_t> expandedShape = getExpandedShape(
         topkOp.values().getType().cast<ShapedType>().getShape(),
         splitReductionRatio, splitDimParallel);
     int64_t kDimParallelSize = expandedShape[kDimParallel];
-    Value updatedParallelIndices = offsetParallelIndices(
+    updatedParallelIndices = offsetParallelIndices(
         loc, rewriter, parallelIndices, kDimParallelSize, splitDimParallel);
+    }
+    // } else {
+    //   llvm::errs() << "Input depth(" << splitReductionDepth << ") has indices. NO OFFSETS\n";
+
+    // }
 
     // Topk final reduction
     TopkOp reductionTopkOp = computeReductionTopk(
@@ -395,11 +396,11 @@ struct TopkSplitReductionPass
       return;
     }
 
-    llvm::errs() << "runOnOperation() \n";
+    // llvm::errs() << "runOnOperation() \n";
 
     RewritePatternSet patterns(&getContext());
     TopkSplitReductionControlFn splitReductionFn =
-        [&](mlir::iree_compiler::IREE::LinalgExt::TopkOp topkOp, int64_t splitReductionDepth) -> int64_t {
+        [&](int64_t splitReductionDepth) -> int64_t {
         SmallVector<int64_t, 4> reductionRatios(splitRatios.begin(),
                                 splitRatios.end());
             if (splitReductionDepth >= reductionRatios.size()) {
@@ -420,11 +421,12 @@ struct TopkSplitReductionPass
 
     // Remove all the markers at the end.
     auto funcOp = getOperation();
-    funcOp->walk([&](linalg::LinalgOp op) {
-        llvm::errs() << "runOnOperation(): not removing attr \n";
-
-      // op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
-      // op->removeAttr(kSplitReductionDepthMarker);
+    funcOp->walk([&](TopkOp op) {
+      //   llvm::errs() << "runOnOperation(): removing attr ";
+      // op.print(llvm::errs());
+      // llvm::errs() << "\n";
+      op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+      op->removeAttr(kSplitReductionDepthMarker);
     });
   }
 };

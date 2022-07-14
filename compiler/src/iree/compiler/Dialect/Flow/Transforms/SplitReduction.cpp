@@ -102,7 +102,7 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
             ArrayRef<StringAttr>{}, StringAttr::get(&getContext(), "SPLIT")));
 
     LinalgExt::TopkSplitReductionControlFn splitReductionFn =
-        [&](mlir::iree_compiler::IREE::LinalgExt::TopkOp topkOp, int64_t splitReductionDepth) -> int64_t {
+        [&](int64_t splitReductionDepth) -> int64_t {
            SmallVector<int64_t, 4> reductionRatios(topkSplitReductionRatio.begin(),
                                 topkSplitReductionRatio.end());
           if (splitReductionDepth >= reductionRatios.size()) {
@@ -129,6 +129,7 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
     });
     funcOp->walk([&](LinalgExt::LinalgExtOp op) {
       op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+      op->removeAttr(mlir::iree_compiler::IREE::LinalgExt::kSplitReductionDepthMarker);
     });
   }
 };

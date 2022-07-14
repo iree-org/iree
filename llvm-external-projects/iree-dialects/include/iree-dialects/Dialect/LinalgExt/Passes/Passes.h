@@ -27,7 +27,7 @@ std::unique_ptr<OperationPass<>> createPadContractionToBlockSizePass();
 /// reduction ratio used to split the reduction dimension. The ratio is applied
 /// to the reduction dimension of TopK. If the ratio value is less or equal to 1
 /// then nothing will be done.
-using TopkSplitReductionControlFn = std::function<int64_t(TopkOp topkOp, int64_t splitReductionDepth)>;
+using TopkSplitReductionControlFn = std::function<int64_t(int64_t splitReductionDepth)>;
 
 /// Patterns to apply `topk split reduction` pass.
 void populateTopkSplitReductionPattern(
