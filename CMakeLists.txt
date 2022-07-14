@@ -358,7 +358,8 @@ set(IREE_USE_LINKER "" CACHE STRING "")
 # Note that unlike LLVM's LLVM_ENABLE_LLD, this does _not_ build lld. You will
 # need to either install a recent version of lld or build it from source prior
 # to setting this option. See also: https://lld.llvm.org/#using-lld.
-option(IREE_ENABLE_LLD "Override the system's default linker to lld" OFF)
+# This option is disabled on Apple platforms, where lld is not supported.
+cmake_dependent_option(IREE_ENABLE_LLD "Override the system's default linker to lld" OFF "NOT APPLE" OFF)
 
 include(iree_setup_toolchain)
 
