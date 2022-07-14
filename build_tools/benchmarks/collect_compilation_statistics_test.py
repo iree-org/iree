@@ -43,8 +43,10 @@ class CollectCompilationStatistics(unittest.TestCase):
     with zipfile.ZipFile(module_file, "w") as zip:
       zip.writestr(VM_COMPONENT_NAME, b"abcd")
       zip.writestr(CONST_COMPONENT_NAME, b"123")
-      zip.writestr("main_dispatch_0_vulkan_spirv_fb.fb", b"bindata1")
-      zip.writestr("main_dispatch_1_vulkan_spirv_fb.fb", b"bindata2")
+      zip.writestr("main_dispatch_0_vulkan_spirv_fb.fb", b"bindata0")
+      zip.writestr("main_dispatch_1_vulkan_spirv_fb.fb", b"bindata1")
+      zip.writestr("predict_dispatch_2_cuda_nvptx_fb.fb", b"bindata2")
+      zip.writestr("dispatch_3_embedded_elf_x86_64.so", b"bindata3")
     module_file_data = module_file.getvalue()
 
     component_sizes = get_module_component_info(BytesIO(module_file_data),
@@ -55,7 +57,7 @@ class CollectCompilationStatistics(unittest.TestCase):
         ModuleComponentSizes(file_bytes=len(module_file_data),
                              vm_component_bytes=4,
                              const_component_bytes=3,
-                             total_dispatch_component_bytes=16))
+                             total_dispatch_component_bytes=32))
 
   def test_get_module_component_info_unknown_components(self):
     module_file = BytesIO()
