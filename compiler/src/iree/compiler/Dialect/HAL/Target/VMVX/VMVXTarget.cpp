@@ -36,8 +36,8 @@ class VMVXTargetBackend final : public TargetBackend {
   std::string name() const override { return "vmvx"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Codegen::IREECodegenDialect, VM::VMDialect,
-                    VMVX::VMVXDialect>();
+    registry.insert<IREE::Codegen::IREECodegenDialect, IREE::VM::VMDialect,
+                    IREE::VMVX::VMVXDialect>();
   }
 
   IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(

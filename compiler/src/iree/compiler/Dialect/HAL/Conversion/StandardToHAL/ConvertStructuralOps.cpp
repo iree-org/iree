@@ -42,13 +42,15 @@ class FuncOpSignatureConversion
     for (auto argType : llvm::enumerate(originalType.getInputs())) {
       if (failed(typeConverter.convertSignatureArg(
               argType.index(), argType.value(), newSignature))) {
-        return failure();
+        return rewriter.notifyMatchFailure(funcOp,
+                                           "failed to convert arg type");
       }
     }
     SmallVector<Type, 4> newResultTypes;
     if (failed(typeConverter.convertTypes(originalType.getResults(),
                                           newResultTypes))) {
-      return failure();
+      return rewriter.notifyMatchFailure(funcOp,
+                                         "failed to convert result type");
     }
 
     // Replace function.
@@ -192,7 +194,11 @@ void populateStandardStructuralToHALPatterns(MLIRContext *context,
         return typeConverter.isSignatureLegal(op.getFunctionType()) &&
                typeConverter.isLegal(&op.getBody());
       });
-
+  addGenericLegalOp<func::CallOp>(conversionTarget, typeConverter);
+  addGenericLegalOp<func::ReturnOp>(conversionTarget, typeConverter);
+  addGenericLegalOp<cf::BranchOp>(conversionTarget, typeConverter);
+  addGenericLegalOp<cf::CondBranchOp>(conversionTarget, typeConverter);
+  addGenericLegalOp<arith::SelectOp>(conversionTarget, typeConverter);
   patterns
       .insert<FuncOpSignatureConversion, CallOpConversion, ReturnOpConversion,
               BranchOpConversion, CondBranchOpConversion, SelectOpConversion>(

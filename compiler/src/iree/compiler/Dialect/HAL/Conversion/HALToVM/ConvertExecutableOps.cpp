@@ -22,6 +22,78 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+// Creates a !vm.buffer containing all of the |constantValues|.
+// TODO(benvanik): if there are a decent number of actual constant values we
+// should create a rodata buffer that we can clone and then poke in the
+// dynamic values; currently we require a lot of IR in order to store each
+// value and it's very wasteful (think potentially KB of binary size) in order
+// to do this all dynamically.
+Value createPackedConstantBuffer(Location loc, ValueRange constantValues,
+                                 OpBuilder &builder) {
+  auto bufferRefType =
+      IREE::VM::RefType::get(builder.getType<IREE::VM::BufferType>());
+  size_t constantCount = constantValues.size();
+  if (constantValues.empty()) {
+    // No constants; pass a null buffer.
+    return builder.create<IREE::VM::ConstRefZeroOp>(loc, bufferRefType);
+  }
+
+  // Create the constant storage buffer.
+  SmallVector<Location> constantLocs;
+  constantLocs.reserve(constantCount);
+  for (auto constantValue : constantValues) {
+    constantLocs.push_back(constantValue.getLoc());
+  }
+  auto constantBufferLoc = builder.getFusedLoc(constantLocs);
+  auto constantBuffer = builder.create<IREE::VM::BufferAllocOp>(
+      constantBufferLoc, bufferRefType,
+      builder.create<IREE::VM::ConstI64Op>(constantBufferLoc,
+                                           constantCount * sizeof(uint32_t)));
+
+  // Store each constant into it.
+  // TODO(#8477): better ops for this pattern; this creates a lot of
+  // extra IR for the indices. We should batch them up and append in one go.
+  for (auto constantValue : llvm::enumerate(constantValues)) {
+    // Buffer is zero-initialized so we can skip zero values.
+    if (mlir::matchPattern(constantValue.value(), m_Zero())) continue;
+    auto constantLoc = constantValue.value().getLoc();
+    builder.create<IREE::VM::BufferStoreI32Op>(
+        constantLoc, constantBuffer,
+        builder.create<IREE::VM::ConstI64Op>(constantLoc,
+                                             constantValue.index()),
+        constantValue.value());
+  }
+
+  return constantBuffer;
+}
+
+IREE::VM::RodataOp createExecutableBinaryRodata(
+    IREE::HAL::ExecutableBinaryOp binaryOp, OpBuilder &builder) {
+  auto executableOp =
+      binaryOp.getOperation()->getParentOfType<IREE::HAL::ExecutableOp>();
+  auto insertPoint = builder.saveInsertionPoint();
+  builder.setInsertionPoint(builder.getInsertionBlock()->getParentOp());
+
+  std::string rodataName =
+      (executableOp.getName() + "_" + binaryOp.getName()).str();
+  std::replace(rodataName.begin(), rodataName.end(), '-', '_');
+  auto rodataOp = builder.create<IREE::VM::RodataOp>(
+      binaryOp.getLoc(), rodataName, binaryOp.data());
+  rodataOp.setPrivate();
+  if (binaryOp.mime_type().hasValue()) {
+    rodataOp.mime_typeAttr(binaryOp.mime_typeAttr());
+  }
+
+  // TODO(benvanik): should these be page aligned? memcpy fastpath is fine for
+  // now.
+  rodataOp.alignmentAttr(builder.getI64IntegerAttr(16));
+
+  builder.restoreInsertionPoint(insertPoint);
+
+  return rodataOp;
+}
+
 namespace {
 
 class RemoveExecutableOpConversion
@@ -51,41 +123,23 @@ class ExecutableCreateOpConversion
   LogicalResult matchAndRewrite(
       IREE::HAL::ExecutableCreateOp createOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto loc = createOp.getLoc();
-
     // Materialize vm.rodata for the binary.
     auto executableBinaryOp =
         SymbolTable::lookupNearestSymbolFrom<IREE::HAL::ExecutableBinaryOp>(
             createOp, createOp.executable_target());
-    auto executableOp = executableBinaryOp.getOperation()
-                            ->getParentOfType<IREE::HAL::ExecutableOp>();
-    auto insertPoint = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPoint(rewriter.getInsertionBlock()->getParentOp());
-    std::string rodataName =
-        (executableOp.getName() + "_" + executableBinaryOp.getName()).str();
-    std::replace(rodataName.begin(), rodataName.end(), '-', '_');
-    auto rodataOp = rewriter.create<IREE::VM::RodataOp>(
-        executableBinaryOp.getLoc(), rodataName, executableBinaryOp.data());
-    rodataOp.setPrivate();
-    if (executableBinaryOp.mime_type().hasValue()) {
-      rodataOp.mime_typeAttr(executableBinaryOp.mime_typeAttr());
-    }
-    // TODO(benvanik): should these be page aligned? memcpy fastpath is fine for
-    // now.
-    rodataOp.alignmentAttr(rewriter.getI64IntegerAttr(16));
-    rewriter.restoreInsertionPoint(insertPoint);
+    auto rodataOp = createExecutableBinaryRodata(executableBinaryOp, rewriter);
 
     auto executableFormatString = detail::rewriteAttrToOperands(
         createOp.getLoc(), executableBinaryOp.formatAttr(),
         importOp.getFunctionType().getInput(1), rewriter);
     assert(executableFormatString.hasValue() &&
            executableFormatString.getValue().size() == 1);
-    auto executableRodata =
-        rewriter.createOrFold<IREE::VM::ConstRefRodataOp>(loc, rodataOp);
+    auto executableRodata = rewriter.createOrFold<IREE::VM::ConstRefRodataOp>(
+        createOp.getLoc(), rodataOp);
 
     // Pack constants, if any.
-    auto constantBuffer =
-        createConstantBuffer(createOp.getLoc(), adaptor.constants(), rewriter);
+    auto constantBuffer = createPackedConstantBuffer(
+        createOp.getLoc(), adaptor.constants(), rewriter);
 
     SmallVector<int16_t, 5> segmentSizes = {
         /*device=*/-1,
@@ -112,54 +166,9 @@ class ExecutableCreateOpConversion
     return success();
   }
 
-  // Creates a !vm.buffer containing all of the |constantValues|.
-  // TODO(benvanik): if there are a decent number of actual constant values we
-  // should create a rodata buffer that we can clone and then poke in the
-  // dynamic values; currently we require a lot of IR in order to store each
-  // value and it's very wasteful (think potentially KB of binary size) in order
-  // to do this all dynamically.
-  static Value createConstantBuffer(Location loc, ValueRange constantValues,
-                                    PatternRewriter &rewriter) {
-    auto bufferRefType =
-        IREE::VM::RefType::get(rewriter.getType<IREE::VM::BufferType>());
-    size_t constantCount = constantValues.size();
-    if (constantValues.empty()) {
-      // No constants; pass a null buffer.
-      return rewriter.create<IREE::VM::ConstRefZeroOp>(loc, bufferRefType);
-    }
-
-    // Create the constant storage buffer.
-    SmallVector<Location> constantLocs;
-    constantLocs.reserve(constantCount);
-    for (auto constantValue : constantValues) {
-      constantLocs.push_back(constantValue.getLoc());
-    }
-    auto constantBufferLoc = rewriter.getFusedLoc(constantLocs);
-    auto constantBuffer = rewriter.create<IREE::VM::BufferAllocOp>(
-        constantBufferLoc, bufferRefType,
-        rewriter.create<IREE::VM::ConstI64Op>(
-            constantBufferLoc, constantCount * sizeof(uint32_t)));
-
-    // Store each constant into it.
-    // TODO(#8477): better ops for this pattern; this creates a lot of
-    // extra IR for the indices. We should batch them up and append in one go.
-    for (auto constantValue : llvm::enumerate(constantValues)) {
-      // Buffer is zero-initialized so we can skip zero values.
-      if (mlir::matchPattern(constantValue.value(), m_Zero())) continue;
-      auto constantLoc = constantValue.value().getLoc();
-      rewriter.create<IREE::VM::BufferStoreI32Op>(
-          constantLoc, constantBuffer,
-          rewriter.create<IREE::VM::ConstI64Op>(constantLoc,
-                                                constantValue.index()),
-          constantValue.value());
-    }
-
-    return constantBuffer;
-  }
-
  private:
   mutable IREE::VM::ImportOp importOp;
-};  // namespace
+};
 
 }  // namespace
 

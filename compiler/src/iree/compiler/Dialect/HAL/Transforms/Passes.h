@@ -38,6 +38,12 @@ namespace HAL {
 void buildHALTransformPassPipeline(OpPassManager &passManager,
                                    const TargetOptions &targetOptions);
 
+// Adds a set of passes to the given pass manager that run the head of the HAL
+// pipeline to assign devices, materialize interfaces, and translate
+// executables. The host portion of the program is annotated but not modified.
+void buildHALConfigurationPassPipeline(OpPassManager &passManager,
+                                       const TargetOptions &targetOptions);
+
 void registerHALTransformPassPipeline();
 
 //===----------------------------------------------------------------------===//

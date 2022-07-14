@@ -23,24 +23,6 @@ namespace iree_compiler {
 
 namespace {
 
-static Value makeElementType(Location loc, Type elementType,
-                             OpBuilder &builder) {
-  auto i32Value = IREE::HAL::getElementTypeValue(elementType);
-  assert(i32Value.hasValue() && "unhandled element type for allocation");
-  auto constantValue =
-      builder.createOrFold<arith::ConstantIntOp>(loc, i32Value.getValue(), 32);
-  return constantValue;
-}
-
-static Value makeEncodingType(Location loc, Attribute encodingType,
-                              OpBuilder &builder) {
-  auto i32Value = IREE::HAL::getEncodingTypeValue(encodingType);
-  assert(i32Value.hasValue() && "unhandled encoding type for allocation");
-  auto constantValue =
-      builder.createOrFold<arith::ConstantIntOp>(loc, i32Value.getValue(), 32);
-  return constantValue;
-}
-
 static Value lookupDeviceFor(Operation *op, OpBuilder &builder) {
   // TODO(benvanik): make this do multi-device lookup and other fancy things.
   auto lookupOp = builder.create<IREE::HAL::ExSharedDeviceOp>(op->getLoc());
