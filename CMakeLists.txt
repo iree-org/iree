@@ -216,9 +216,6 @@ cmake_dependent_option(IREE_OUTPUT_FORMAT_C "Enables the 'vm-c' output format, u
 # IREE compilation toolchain configuration
 #-------------------------------------------------------------------------------
 
-# Enable using lld as the linker for C/C++ targets. This affects IREE and all
-# dependency projects.
-option(IREE_ENABLE_LLD "Use lld when linking" OFF)
 option(IREE_ENABLE_ASAN "Enable address sanitizer" OFF)
 option(IREE_ENABLE_MSAN "Enable memory sanitizer" OFF)
 option(IREE_ENABLE_TSAN "Enable thread sanitizer" OFF)
@@ -353,6 +350,15 @@ mark_as_advanced(
   CMAKE_EXE_LINKER_FLAGS_FASTBUILD
   CMAKE_SHARED_LINKER_FLAGS_FASTBUILD
 )
+
+# Override the system's default linker.
+# See also: https://llvm.org/docs/CMake.html#llvm-use-linker.
+set(IREE_USE_LINKER "" CACHE STRING "")
+# Equivalent to setting -DIREE_USE_LINKER=lld.
+# Note that unlike LLVM's LLVM_ENABLE_LLD, this does _not_ build lld. You will
+# need to either install a recent version of lld or build it from source prior
+# to setting this option. See also: https://lld.llvm.org/#using-lld.
+option(IREE_ENABLE_LLD "Override the system's default linker to lld" OFF)
 
 include(iree_setup_toolchain)
 
