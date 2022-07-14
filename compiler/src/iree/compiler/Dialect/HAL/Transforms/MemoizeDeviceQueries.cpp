@@ -107,12 +107,12 @@ class MemoizeDeviceQueriesPass
       for (auto queryOp : queryOps) {
         OpBuilder replaceBuilder(queryOp);
         auto okLoadOp = replaceBuilder.create<IREE::Util::GlobalLoadOp>(
-            fusedLoc, okGlobalOp.type(), okGlobalOp.getName());
+            fusedLoc, okGlobalOp.getType(), okGlobalOp.getName());
         auto resultLoadOp = replaceBuilder.create<IREE::Util::GlobalLoadOp>(
-            fusedLoc, valueGlobalOp.type(), valueGlobalOp.getName());
+            fusedLoc, valueGlobalOp.getType(), valueGlobalOp.getName());
         queryOp.replaceAllUsesWith(ValueRange{
-            okLoadOp.result(),
-            resultLoadOp.result(),
+            okLoadOp.getResult(),
+            resultLoadOp.getResult(),
         });
         queryOp.erase();
       }

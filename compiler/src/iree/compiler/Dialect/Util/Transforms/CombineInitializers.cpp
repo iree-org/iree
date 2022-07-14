@@ -70,7 +70,7 @@ class CombineInitializersPass
     InlinerInterface inlinerInterface(&getContext());
     for (auto initializerOp : initializerOps) {
       if (failed(mlir::inlineRegion(
-              inlinerInterface, &initializerOp.body(),
+              inlinerInterface, &initializerOp.getBody(),
               builder.getInsertionBlock(), builder.getInsertionPoint(),
               /*inlinedOperands=*/ValueRange{},
               /*resultsToReplace=*/ValueRange{}, /*inlineLoc=*/llvm::None,

@@ -103,7 +103,7 @@ class WrapEntryPointsPass
           dims.push_back(
               builder
                   .create<IREE::Util::GlobalLoadOp>(globalOp.getLoc(), globalOp)
-                  .result());
+                  .getResult());
         }
       }
       return dims;
@@ -202,7 +202,7 @@ class WrapEntryPointsPass
 
     // Go back and insert a check for the dirty flag.
     auto dirtyValue = entryBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
-        loc, dirtyGlobalOp.type(), dirtyGlobalOp.getName());
+        loc, dirtyGlobalOp.getType(), dirtyGlobalOp.getName());
     auto *recalculateBlock = calcFuncOp.addBlock();
     auto *returnBlock = calcFuncOp.addBlock();
     entryBuilder.create<mlir::cf::CondBranchOp>(loc, dirtyValue,
@@ -256,16 +256,15 @@ class WrapEntryPointsPass
           auto dimValue =
               exitBuilder.createOrFold<tensor::DimOp>(exitLoc, outputValue, i);
           exitBuilder.create<IREE::Util::GlobalStoreOp>(
-              exitLoc, dimValue,
-              outputDynamicDims.globalOps[i].getSymbolName());
+              exitLoc, dimValue, outputDynamicDims.globalOps[i].getSymName());
         }
       }
 
       // Clear the dirty flag now that the shapes have been updated.
       auto falseValue =
           exitBuilder.createOrFold<arith::ConstantIntOp>(exitLoc, 0, 1);
-      exitBuilder.create<IREE::Util::GlobalStoreOp>(
-          exitLoc, falseValue, dirtyGlobalOp.getSymbolName());
+      exitBuilder.create<IREE::Util::GlobalStoreOp>(exitLoc, falseValue,
+                                                    dirtyGlobalOp.getSymName());
       exitBuilder.create<mlir::func::ReturnOp>(exitLoc);
       returnOp.erase();
     }
@@ -350,10 +349,9 @@ class WrapEntryPointsPass
               .create<IREE::Util::ListGetOp>(
                   loc, builder.getIndexType(), listValue,
                   builder.createOrFold<arith::ConstantIndexOp>(loc, i))
-              .result();
+              .getResult();
       builder.create<IREE::Util::GlobalStoreOp>(
-          loc, dimValue,
-          dynamicDims.globalOps[dynamicDimIdx++].getSymbolName());
+          loc, dimValue, dynamicDims.globalOps[dynamicDimIdx++].getSymName());
     }
   }
 
@@ -549,7 +547,7 @@ class WrapEntryPointsPass
         auto dynamicDim = std::get<0>(it);
         auto globalOp = std::get<1>(it);
         entryBuilder.create<IREE::Util::GlobalStoreOp>(
-            result.getLoc(), dynamicDim, globalOp.getSymbolName());
+            result.getLoc(), dynamicDim, globalOp.getSymName());
       }
     }
 
@@ -557,7 +555,7 @@ class WrapEntryPointsPass
     entryBuilder.create<IREE::Util::GlobalStoreOp>(
         entryFuncOp.getLoc(),
         entryBuilder.create<arith::ConstantIntOp>(entryFuncOp.getLoc(), 0, 1),
-        dirtyGlobalOp.getSymbolName());
+        dirtyGlobalOp.getSymName());
 
     entryBuilder.create<mlir::func::ReturnOp>(entryFuncOp.getLoc(),
                                               callResults);

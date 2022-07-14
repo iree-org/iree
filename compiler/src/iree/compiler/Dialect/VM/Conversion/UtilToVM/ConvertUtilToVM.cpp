@@ -63,10 +63,10 @@ struct CmpEQOpConversion : public OpConversionPattern<IREE::Util::CmpEQOp> {
   LogicalResult matchAndRewrite(
       IREE::Util::CmpEQOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto operandType = adaptor.lhs().getType();
+    auto operandType = adaptor.getLhs().getType();
     if (operandType.isa<IREE::VM::RefType>()) {
       rewriter.replaceOpWithNewOp<IREE::VM::CmpEQRefOp>(
-          op, rewriter.getI32Type(), adaptor.lhs(), adaptor.rhs());
+          op, rewriter.getI32Type(), adaptor.getLhs(), adaptor.getRhs());
       return success();
     }
     return failure();  // not used for non-ref types currently
@@ -87,7 +87,7 @@ struct BufferConstantOpConversion
         op,
         IREE::VM::RefType::get(
             IREE::VM::BufferType::get(rewriter.getContext())),
-        /*name=*/nullptr, op.value(), op.alignmentAttr());
+        /*name=*/nullptr, op.getValue(), op.getAlignmentAttr());
     return success();
   }
 };
@@ -107,7 +107,7 @@ struct UnreachableOpConversion
         rewriter.createOrFold<IREE::VM::ConstI32Op>(
             srcOp.getLoc(),
             static_cast<int32_t>(IREE::Util::StatusCode::Unknown)),
-        srcOp.message());
+        srcOp.getMessage());
     return success();
   }
 };

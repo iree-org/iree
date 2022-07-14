@@ -17,6 +17,7 @@ include "mlir/IR/OpBase.td"
 def Util_Dialect : Dialect {
   let name = "util";
   let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+  let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 
   let summary = [{
     A dialect used for types common across IREE subdialects.

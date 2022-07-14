@@ -693,10 +693,10 @@ void UnfoldableConstantOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"value"});
 
   if (op->getAttrs().size() > 1) p << ' ';
-  p << value();
+  p << getValue();
 
   // If the value is a symbol reference, print a trailing type.
-  if (value().isa<SymbolRefAttr>()) p << " : " << getType();
+  if (getValue().isa<SymbolRefAttr>()) p << " : " << getType();
 }
 
 //===----------------------------------------------------------------------===//
@@ -705,15 +705,15 @@ void UnfoldableConstantOp::print(OpAsmPrinter &p) {
 
 Optional<std::pair<int64_t, int64_t>>
 NumericOptionalNarrowOp::getIntegerRange() {
-  if (!min_value() || !max_value()) return {};
+  if (!getMinValue() || !getMaxValue()) return {};
   bool signExtend = isSigned();
   // Note: Cannot sign extend 0 bit values.
-  int64_t minValue = signExtend && min_value()->getBitWidth() > 0
-                         ? min_value()->getSExtValue()
-                         : min_value()->getZExtValue();
-  int64_t maxValue = signExtend && max_value()->getBitWidth() > 0
-                         ? max_value()->getSExtValue()
-                         : max_value()->getZExtValue();
+  int64_t minValue = signExtend && getMinValue()->getBitWidth() > 0
+                         ? getMinValue()->getSExtValue()
+                         : getMinValue()->getZExtValue();
+  int64_t maxValue = signExtend && getMaxValue()->getBitWidth() > 0
+                         ? getMaxValue()->getSExtValue()
+                         : getMaxValue()->getZExtValue();
   return std::make_pair(minValue, maxValue);
 }
 
@@ -747,7 +747,7 @@ void InitializerOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDictWithKeyword(op->getAttrs(),
                                      /*elidedAttrs=*/{"function_type"});
   p << " ";
-  p.printRegion(body());
+  p.printRegion(getBody());
 }
 
 Block *InitializerOp::addEntryBlock() {
@@ -809,13 +809,13 @@ void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 
 LogicalResult GlobalOp::verify() {
   Operation *op = getOperation();
-  if (initial_value().hasValue()) {
+  if (getInitialValue().hasValue()) {
     // Ensure the value is something we can convert to a const.
-    if (!isGlobalTypeCompatible(type(), initial_valueAttr().getType())) {
+    if (!isGlobalTypeCompatible(getType(), getInitialValueAttr().getType())) {
       return op->emitOpError()
-             << "initial value type mismatch; global " << getSymbolName()
-             << " is " << type() << " but initial value provided is "
-             << initial_valueAttr().getType();
+             << "initial value type mismatch; global " << getSymName() << " is "
+             << getType() << " but initial value provided is "
+             << getInitialValueAttr().getType();
     }
   }
   return success();
@@ -824,14 +824,16 @@ LogicalResult GlobalOp::verify() {
 IREE::Util::GlobalOp GlobalAddressOp::getGlobalOp(
     SymbolTableCollection &symbolTable) {
   return symbolTable.lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
-      getOperation()->getParentOp(), globalAttr());
+      getOperation()->getParentOp(), getGlobalAttr());
 }
 
-FlatSymbolRefAttr GlobalAddressOp::getGlobalRefAttr() { return globalAttr(); }
+FlatSymbolRefAttr GlobalAddressOp::getGlobalRefAttr() {
+  return getGlobalAttr();
+}
 
 void GlobalAddressOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), Twine("ptr_" + global()).str());
+  setNameFn(getResult(), Twine("ptr_" + getGlobal()).str());
 }
 
 LogicalResult GlobalAddressOp::verifySymbolUses(
@@ -839,14 +841,14 @@ LogicalResult GlobalAddressOp::verifySymbolUses(
   Operation *op = getOperation();
   auto globalOp = getGlobalOp(symbolTable);
   if (!globalOp) {
-    return op->emitOpError() << "undefined global: " << global();
+    return op->emitOpError() << "undefined global: " << getGlobal();
   }
   return success();
 }
 
 void GlobalLoadOp::build(OpBuilder &builder, OperationState &state,
                          GlobalOp globalOp, ArrayRef<NamedAttribute> attrs) {
-  state.addTypes({globalOp.type()});
+  state.addTypes({globalOp.getType()});
   state.addAttribute("global", SymbolRefAttr::get(globalOp));
   state.attributes.append(attrs.begin(), attrs.end());
 }
@@ -854,14 +856,14 @@ void GlobalLoadOp::build(OpBuilder &builder, OperationState &state,
 IREE::Util::GlobalOp GlobalLoadOp::getGlobalOp(
     SymbolTableCollection &symbolTable) {
   return symbolTable.lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
-      getOperation()->getParentOp(), globalAttr());
+      getOperation()->getParentOp(), getGlobalAttr());
 }
 
-FlatSymbolRefAttr GlobalLoadOp::getGlobalRefAttr() { return globalAttr(); }
+FlatSymbolRefAttr GlobalLoadOp::getGlobalRefAttr() { return getGlobalAttr(); }
 
 void GlobalLoadOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), global());
+  setNameFn(getResult(), getGlobal());
 }
 
 void GlobalLoadOp::getEffects(
@@ -869,9 +871,9 @@ void GlobalLoadOp::getEffects(
   // HACK: works around the lack of symbol side effects in mlir by only saying
   // we have a side-effect if the variable we are loading is mutable.
   auto globalOp =
-      SymbolTable::lookupNearestSymbolFrom<GlobalOp>(*this, globalAttr());
+      SymbolTable::lookupNearestSymbolFrom<GlobalOp>(*this, getGlobalAttr());
   assert(globalOp);
-  if (globalOp.is_mutable()) {
+  if (globalOp.getIsMutable()) {
     effects.emplace_back(MemoryEffects::Read::get());
   }
 }
@@ -881,13 +883,13 @@ LogicalResult GlobalLoadOp::verifySymbolUses(
   Operation *op = getOperation();
   auto globalOp = getGlobalOp(symbolTable);
   if (!globalOp) {
-    return op->emitOpError() << "undefined global: " << global();
+    return op->emitOpError() << "undefined global: " << getGlobal();
   }
   auto loadType = op->getResult(0).getType();
-  if (!isGlobalTypeCompatible(globalOp.type(), loadType)) {
+  if (!isGlobalTypeCompatible(globalOp.getType(), loadType)) {
     return op->emitOpError()
-           << "global type mismatch; global " << global() << " is "
-           << globalOp.type() << " but load is " << loadType;
+           << "global type mismatch; global " << getGlobal() << " is "
+           << globalOp.getType() << " but load is " << loadType;
   }
   return success();
 }
@@ -895,8 +897,8 @@ LogicalResult GlobalLoadOp::verifySymbolUses(
 LogicalResult GlobalLoadIndirectOp::verify() {
   Operation *op = getOperation();
   auto globalType =
-      global().getType().cast<IREE::Util::PtrType>().getTargetType();
-  auto loadType = result().getType();
+      getGlobal().getType().cast<IREE::Util::PtrType>().getTargetType();
+  auto loadType = getResult().getType();
   if (!isGlobalTypeCompatible(globalType, loadType)) {
     return op->emitOpError() << "global type mismatch; global pointer is "
                              << globalType << " but load is " << loadType;
@@ -907,28 +909,28 @@ LogicalResult GlobalLoadIndirectOp::verify() {
 IREE::Util::GlobalOp GlobalStoreOp::getGlobalOp(
     SymbolTableCollection &symbolTable) {
   return symbolTable.lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
-      getOperation()->getParentOp(), globalAttr());
+      getOperation()->getParentOp(), getGlobalAttr());
 }
 
-FlatSymbolRefAttr GlobalStoreOp::getGlobalRefAttr() { return globalAttr(); }
+FlatSymbolRefAttr GlobalStoreOp::getGlobalRefAttr() { return getGlobalAttr(); }
 
 LogicalResult GlobalStoreOp::verifySymbolUses(
     SymbolTableCollection &symbolTable) {
   Operation *op = getOperation();
   auto globalOp = getGlobalOp(symbolTable);
   if (!globalOp) {
-    return op->emitOpError() << "undefined global: " << global();
+    return op->emitOpError() << "undefined global: " << getGlobal();
   }
   auto storeType = op->getOperand(0).getType();
-  if (globalOp.type() != storeType) {
+  if (globalOp.getType() != storeType) {
     return op->emitOpError()
-           << "global type mismatch; global " << global() << " is "
-           << globalOp.type() << " but store is " << storeType;
+           << "global type mismatch; global " << getGlobal() << " is "
+           << globalOp.getType() << " but store is " << storeType;
   }
-  if (!globalOp.isMutable()) {
+  if (!globalOp.getIsMutable()) {
     // Allow stores to immutable globals in initializers.
     if (!op->getParentOfType<IREE::Util::InitializerOp>()) {
-      return op->emitOpError() << "global " << global()
+      return op->emitOpError() << "global " << getGlobal()
                                << " is not mutable and cannot be stored to";
     }
   }
@@ -938,8 +940,8 @@ LogicalResult GlobalStoreOp::verifySymbolUses(
 LogicalResult GlobalStoreIndirectOp::verify() {
   Operation *op = getOperation();
   auto globalType =
-      global().getType().cast<IREE::Util::PtrType>().getTargetType();
-  auto storeType = value().getType();
+      getGlobal().getType().cast<IREE::Util::PtrType>().getTargetType();
+  auto storeType = getValue().getType();
   if (!isGlobalTypeCompatible(globalType, storeType)) {
     return op->emitOpError() << "global type mismatch; global pointer is "
                              << globalType << " but store is " << storeType;
@@ -1024,9 +1026,9 @@ static void printListTypeSet(OpAsmPrinter &printer, Operation *, Type listType,
 
 LogicalResult ListGetOp::verify() {
   Operation *op = getOperation();
-  auto listType = list().getType().cast<IREE::Util::ListType>();
+  auto listType = getList().getType().cast<IREE::Util::ListType>();
   auto elementType = listType.getElementType();
-  auto resultType = result().getType();
+  auto resultType = getResult().getType();
   if (!ListType::canImplicitlyCast(elementType, resultType)) {
     return op->emitError() << "list contains " << elementType
                            << " and cannot be accessed as " << resultType;
@@ -1036,9 +1038,9 @@ LogicalResult ListGetOp::verify() {
 
 LogicalResult ListSetOp::verify() {
   Operation *op = getOperation();
-  auto listType = list().getType().cast<IREE::Util::ListType>();
+  auto listType = getList().getType().cast<IREE::Util::ListType>();
   auto elementType = listType.getElementType();
-  auto valueType = value().getType();
+  auto valueType = getValue().getType();
   if (!ListType::canImplicitlyCast(valueType, elementType)) {
     return op->emitError() << "list contains " << elementType
                            << " and cannot be mutated as " << valueType;

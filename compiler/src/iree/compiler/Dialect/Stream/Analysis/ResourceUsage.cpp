@@ -253,9 +253,9 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
         .Case([&](IREE::Util::GlobalLoadOp op) {
           removeAssumedBits(NOT_GLOBAL_READ);
           auto *globalInfo =
-              solver.getExplorer().queryGlobalInfoFrom(op.global(), op);
-          auto globalType =
-              globalInfo->op.type().template cast<IREE::Stream::ResourceType>();
+              solver.getExplorer().queryGlobalInfoFrom(op.getGlobal(), op);
+          auto globalType = globalInfo->op.getType()
+                                .template cast<IREE::Stream::ResourceType>();
           switch (globalType.getLifetime()) {
             case IREE::Stream::Lifetime::Constant:
               removeAssumedBits(NOT_CONSTANT);
@@ -265,14 +265,14 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
               break;
           }
           auto resultUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.result()),
+              *this, Position::forValue(op.getResult()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Util::GlobalLoadIndirectOp op) {
           removeAssumedBits(NOT_INDIRECT | NOT_GLOBAL_READ);
           auto resultUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.result()),
+              *this, Position::forValue(op.getResult()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })
@@ -447,9 +447,9 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
         .Case([&](IREE::Util::GlobalStoreOp op) {
           removeAssumedBits(NOT_GLOBAL_WRITE);
           auto *globalInfo =
-              solver.getExplorer().queryGlobalInfoFrom(op.global(), op);
-          auto globalType =
-              globalInfo->op.type().template cast<IREE::Stream::ResourceType>();
+              solver.getExplorer().queryGlobalInfoFrom(op.getGlobal(), op);
+          auto globalType = globalInfo->op.getType()
+                                .template cast<IREE::Stream::ResourceType>();
           switch (globalType.getLifetime()) {
             case IREE::Stream::Lifetime::Constant:
               removeAssumedBits(NOT_CONSTANT);

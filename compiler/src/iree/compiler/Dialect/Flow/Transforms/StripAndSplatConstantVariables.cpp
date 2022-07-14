@@ -44,16 +44,16 @@ class StripAndSplatConstantVariablesPass
 
     moduleOp.walk([&](IREE::Util::GlobalOp op) {
       // Only strip constant variables.
-      if (op.is_mutable()) {
+      if (op.getIsMutable()) {
         return;
       }
 
       // Only strip tensor type constants (to replace with dense<>).
-      if (!op.type().isa<TensorType>()) {
+      if (!op.getType().isa<TensorType>()) {
         return;
       }
 
-      auto tensorType = op.type().cast<TensorType>();
+      auto tensorType = op.getType().cast<TensorType>();
       auto elementType = tensorType.getElementType();
       DenseElementsAttr newValue;
       if (elementType.isa<FloatType>()) {
@@ -66,7 +66,8 @@ class StripAndSplatConstantVariablesPass
 
       builder.setInsertionPointAfter(op);
       auto newOp = builder.create<IREE::Util::GlobalOp>(
-          op.getLoc(), op.sym_name(), op.is_mutable(), op.type(), newValue);
+          op.getLoc(), op.getSymName(), op.getIsMutable(), op.getType(),
+          newValue);
       newOp.setVisibility(op.getVisibility());
       newOp->setAttr("noinline", UnitAttr::get(builder.getContext()));
       op.erase();
