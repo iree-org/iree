@@ -2000,12 +2000,10 @@ static Attribute constFoldFloatComparisonOp(ArrayRef<Attribute> operands,
                                             const CalculationT &calculate) {
   assert(operands.size() == 2 && "binary op takes two operands");
 
-  auto boolType = IntegerType::get(operands[0].getContext(), 32);
-
   if (auto lhs = operands[0].dyn_cast_or_null<AttrElementT>()) {
     auto rhs = operands[1].dyn_cast_or_null<AttrElementT>();
     if (!rhs) return {};
-    return IntegerAttr::get(boolType,
+    return IntegerAttr::get(IntegerType::get(lhs.getContext(), 32),
                             calculate(lhs.getValue(), rhs.getValue()));
   } else if (auto lhs = operands[0].dyn_cast_or_null<SplatElementsAttr>()) {
     // TODO(benvanik): handle splat/otherwise.
@@ -2015,7 +2013,8 @@ static Attribute constFoldFloatComparisonOp(ArrayRef<Attribute> operands,
         {lhs.getSplatValue<Attribute>(), rhs.getSplatValue<Attribute>()},
         calculate);
     if (!elementResult) return {};
-    return DenseElementsAttr::get(boolType, elementResult);
+    return DenseElementsAttr::get(IntegerType::get(lhs.getContext(), 32),
+                                  elementResult);
   } else if (auto lhs = operands[0].dyn_cast_or_null<ElementsAttr>()) {
     auto rhs = operands[1].dyn_cast_or_null<ElementsAttr>();
     if (!rhs || lhs.getType() != rhs.getType()) return {};
@@ -2029,7 +2028,8 @@ static Attribute constFoldFloatComparisonOp(ArrayRef<Attribute> operands,
       ++lhsIt;
       ++rhsIt;
     }
-    return DenseElementsAttr::get(boolType, resultAttrs);
+    return DenseElementsAttr::get(IntegerType::get(lhs.getContext(), 32),
+                                  resultAttrs);
   }
   return {};
 }
