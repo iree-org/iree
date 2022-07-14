@@ -34,6 +34,7 @@ GPU_NAME_TO_TARGET_ARCH_MAP = {
     "mali-g77": "gpu-mali-valhall",
     "mali-g78": "gpu-mali-valhall",
     "tesla-v100-sxm2-16gb": "gpu-cuda-sm_70",
+    "nvidia-a100-sxm4-40gb": "gpu-cuda-sm_80",
     "unknown": "gpu-unknown",
 }
 

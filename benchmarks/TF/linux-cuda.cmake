@@ -16,12 +16,12 @@
 #                                                                              #
 ################################################################################
 
-set(LINUX_CUDA_SM_70_GPU_COMPILATION_FLAGS
+set(LINUX_CUDA_SM_80_GPU_COMPILATION_FLAGS
   "--iree-input-type=mhlo"
-  "--iree-hal-cuda-llvm-target-arch=sm_70"
+  "--iree-hal-cuda-llvm-target-arch=sm_80"
 )
 
-# GPU, CUDA, SM_70, full-inference
+# GPU, CUDA, SM_80, full-inference
 iree_benchmark_suite(
   GROUP_NAME
     "linux-cuda"
@@ -34,9 +34,9 @@ iree_benchmark_suite(
   TARGET_BACKEND
     "cuda"
   TARGET_ARCHITECTURE
-    "GPU-CUDA-SM_70"
+    "GPU-CUDA-SM_80"
   COMPILATION_FLAGS
-    ${LINUX_CUDA_SM_70_GPU_COMPILATION_FLAGS}
+    ${LINUX_CUDA_SM_80_GPU_COMPILATION_FLAGS}
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
