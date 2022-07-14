@@ -95,8 +95,8 @@ class OrdinalAllocationPass
 
     // Assign ordinal counts to module op.
     getOperation().ordinal_countsAttr(OrdinalCountsAttr::get(
-        nextImportOrdinal, nextExportOrdinal, nextFuncOrdinal, globalBytes,
-        nextGlobalRefOrdinal, nextRodataOrdinal, 0, &getContext()));
+        &getContext(), nextImportOrdinal, nextExportOrdinal, nextFuncOrdinal,
+        globalBytes, nextGlobalRefOrdinal, nextRodataOrdinal, 0));
 
     SymbolTable symbolTable(getOperation());
 

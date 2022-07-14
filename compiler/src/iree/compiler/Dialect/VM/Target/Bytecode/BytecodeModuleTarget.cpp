@@ -337,9 +337,9 @@ static LogicalResult buildFlatBufferModule(
   std::vector<IREE::VM::ImportOp> importFuncOps;
   std::vector<IREE::VM::ExportOp> exportFuncOps;
   std::vector<IREE::VM::FuncOp> internalFuncOps;
-  importFuncOps.resize(ordinalCounts.import_funcs());
-  exportFuncOps.resize(ordinalCounts.export_funcs());
-  internalFuncOps.resize(ordinalCounts.internal_funcs());
+  importFuncOps.resize(ordinalCounts.getImportFuncs());
+  exportFuncOps.resize(ordinalCounts.getExportFuncs());
+  internalFuncOps.resize(ordinalCounts.getInternalFuncs());
 
   for (auto &op : moduleOp.getBlock().getOperations()) {
     if (auto funcOp = dyn_cast<IREE::VM::FuncOp>(op)) {
@@ -487,8 +487,8 @@ static LogicalResult buildFlatBufferModule(
   auto importFuncsRef = fbb.createOffsetVecDestructive(importFuncRefs);
   auto typesRef = fbb.createOffsetVecDestructive(typeRefs);
 
-  int32_t globalRefs = ordinalCounts.global_refs();
-  int32_t globalBytes = ordinalCounts.global_bytes();
+  int32_t globalRefs = ordinalCounts.getGlobalRefs();
+  int32_t globalBytes = ordinalCounts.getGlobalBytes();
 
   iree_vm_ModuleStateDef_ref_t moduleStateDef = 0;
   if (globalBytes || globalRefs) {
@@ -591,7 +591,7 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
   // it's small (like strings) we can avoid the extra seeks and keep it more
   // local by embedding it in the FlatBuffer.
   std::vector<IREE::VM::RodataOp> rodataOps;
-  rodataOps.resize(moduleOp.ordinal_counts().getValue().rodatas());
+  rodataOps.resize(moduleOp.ordinal_counts().getValue().getRodatas());
   for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
     rodataOps[rodataOp.ordinal().getValue().getLimitedValue()] = rodataOp;
   }

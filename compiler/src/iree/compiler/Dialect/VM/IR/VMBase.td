@@ -386,19 +386,18 @@ class VM_ConstantFloatValueAttr<F type> :
 // VM structs
 //===----------------------------------------------------------------------===//
 
-def VM_OrdinalCountsAttr :
-  Util_StructAttr<"ordinal_counts",
-                  "OrdinalCountsAttr",
-                  VM_Dialect, [
-    Util_StructFieldAttr<"import_funcs", I32Attr>,
-    Util_StructFieldAttr<"export_funcs", I32Attr>,
-    Util_StructFieldAttr<"internal_funcs", I32Attr>,
-    Util_StructFieldAttr<"global_bytes", I32Attr>,
-    Util_StructFieldAttr<"global_refs", I32Attr>,
-    Util_StructFieldAttr<"rodatas", I32Attr>,
-    Util_StructFieldAttr<"rwdatas", I32Attr>,
-  ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::VM";
+def VM_OrdinalCountsAttr : AttrDef<VM_Dialect, "OrdinalCounts"> {
+  let mnemonic = "ordinal_counts";
+  let parameters = (ins
+    AttrParameter<"int32_t", "">:$import_funcs,
+    AttrParameter<"int32_t", "">:$export_funcs,
+    AttrParameter<"int32_t", "">:$internal_funcs,
+    AttrParameter<"int32_t", "">:$global_bytes,
+    AttrParameter<"int32_t", "">:$global_refs,
+    AttrParameter<"int32_t", "">:$rodatas,
+    AttrParameter<"int32_t", "">:$rwdatas
+  );
+  let assemblyFormat = "`<` struct(params) `>`";
 }
 
 #endif  // IREE_DIALECT_VM_BASE

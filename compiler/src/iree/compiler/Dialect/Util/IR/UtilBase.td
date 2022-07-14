@@ -86,33 +86,6 @@ class Util_AliasedSymbolRefAttr : Attr<CPred<"$_self.isa<FlatSymbolRefAttr>()">,
 }
 
 //===----------------------------------------------------------------------===//
-// Util_StructAttr
-//===----------------------------------------------------------------------===//
-// This has a custom tablegen generator in StructAttrGen.cpp to create the
-// attribute and storage types. It differs from the core MLIR StructAttr
-// by more closely matching what handwritten C++ would have (better typing
-// and ergonomics and custom parser/printer).
-
-class Util_StructFieldAttr<string thisName, Attr thisType> {
-  string name = thisName;
-  Attr type = thisType;
-}
-
-class Util_StructAttr<string thisKind, string name, Dialect dialect,
-                      list<Util_StructFieldAttr> attributes>
-    : Attr<CPred<"$_self.isa<" # name # ">()">,
-                 "structured attribute of " # name> {
-  string kind = thisKind;
-  string className = name;
-  string cppNamespace = ?;
-  let storageType = name;
-  let returnType = name;
-  let convertFromStorage = "$_self";
-  Dialect structDialect = dialect;
-  list<Util_StructFieldAttr> fields = attributes;
-}
-
-//===----------------------------------------------------------------------===//
 // Common traits
 //===----------------------------------------------------------------------===//
 

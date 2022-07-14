@@ -29,8 +29,6 @@ iree_cc_library(
     "HALOpInterfaces.h.inc"
     "HALOps.cpp.inc"
     "HALOps.h.inc"
-    "HALStructs.cpp.inc"
-    "HALStructs.h.inc"
     "HALTypeInterfaces.cpp.inc"
     "HALTypeInterfaces.h.inc"
   SRCS
@@ -40,7 +38,6 @@ iree_cc_library(
   DEPS
     ::HALInterfacesGen
     ::HALOpsGen
-    ::HALStructsGen
     ::HALTypesGen
     LLVMSupport
     MLIRArithmeticDialect
@@ -101,18 +98,6 @@ iree_tablegen_library(
   OUTS
     --gen-op-decls HALOps.h.inc
     --gen-op-defs HALOps.cpp.inc
-)
-
-iree_tablegen_library(
-  NAME
-    HALStructsGen
-  TD_FILE
-    "HALBase.td"
-  OUTS
-    --gen-iree-struct-attr-decls HALStructs.h.inc
-    --gen-iree-struct-attr-defs HALStructs.cpp.inc
-  TBLGEN
-    IREE
 )
 
 iree_tablegen_library(

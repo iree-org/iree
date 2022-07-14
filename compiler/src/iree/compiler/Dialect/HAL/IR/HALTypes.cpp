@@ -17,9 +17,8 @@
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Dialect/HAL/IR/HALAttrs.cpp.inc"    // IWYU pragma: keep
-#include "iree/compiler/Dialect/HAL/IR/HALEnums.cpp.inc"    // IWYU pragma: keep
-#include "iree/compiler/Dialect/HAL/IR/HALStructs.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/HAL/IR/HALAttrs.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/HAL/IR/HALEnums.cpp.inc"  // IWYU pragma: keep
 // clang-format on
 
 namespace mlir {
