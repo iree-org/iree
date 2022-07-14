@@ -83,6 +83,9 @@ struct BufferDescriptor {
 /// offset/strides/sizes.
 Optional<BufferDescriptor> computeBufferDescriptor(Location loc, Value buffer,
                                                    OpBuilder &builder) {
+  auto bufferType = buffer.getType().dyn_cast<MemRefType>();
+  if (!bufferType) return None;
+
   auto constant = [&](int64_t idxValue) -> Value {
     return builder.create<arith::ConstantIndexOp>(loc, idxValue);
   };
@@ -115,7 +118,6 @@ Optional<BufferDescriptor> computeBufferDescriptor(Location loc, Value buffer,
   }
 
   // If identity, construct an identity layout.
-  auto bufferType = buffer.getType().cast<MemRefType>();
   if (bufferType.getLayout().isIdentity()) {
     int rank = bufferType.getRank();
     BufferDescriptor desc(buffer, rank);
