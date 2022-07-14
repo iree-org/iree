@@ -18,7 +18,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "alignment_ops.mlir",
-            "byte_buffer_ops.mlir",
+            "buffer_ops.mlir",
             "global_ops.mlir",
             "hint_ops.mlir",
             "list_ops.mlir",

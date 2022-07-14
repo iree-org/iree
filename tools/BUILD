@@ -211,7 +211,6 @@ cc_binary(
 cc_binary(
     name = "iree-tblgen",
     srcs = [
-        "//compiler/src/iree/compiler/Dialect/Util/Tools:GenSrcs",
         "//compiler/src/iree/compiler/Dialect/VM/Tools:GenSrcs",
     ],
     tags = ["hostonly"],

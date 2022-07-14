@@ -63,15 +63,12 @@ iree_compiler_cc_library(
         "HALOpInterfaces.h.inc",
         "HALOps.cpp.inc",
         "HALOps.h.inc",
-        "HALStructs.cpp.inc",
-        "HALStructs.h.inc",
         "HALTypeInterfaces.cpp.inc",
         "HALTypeInterfaces.h.inc",
     ],
     deps = [
         ":HALInterfacesGen",
         ":HALOpsGen",
-        ":HALStructsGen",
         ":HALTypesGen",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
@@ -158,31 +155,20 @@ iree_gentbl_cc_library(
 )
 
 iree_gentbl_cc_library(
-    name = "HALStructsGen",
-    tbl_outs = [
-        (
-            ["--gen-iree-struct-attr-decls"],
-            "HALStructs.h.inc",
-        ),
-        (
-            ["--gen-iree-struct-attr-defs"],
-            "HALStructs.cpp.inc",
-        ),
-    ],
-    tblgen = "//tools:iree-tblgen",
-    td_file = "HALBase.td",
-    deps = [":td_files"],
-)
-
-iree_gentbl_cc_library(
     name = "HALTypesGen",
     tbl_outs = [
         (
-            ["--gen-attrdef-decls"],
+            [
+                "--gen-attrdef-decls",
+                "--attrdefs-dialect=hal",
+            ],
             "HALAttrs.h.inc",
         ),
         (
-            ["--gen-attrdef-defs"],
+            [
+                "--gen-attrdef-defs",
+                "--attrdefs-dialect=hal",
+            ],
             "HALAttrs.cpp.inc",
         ),
         (

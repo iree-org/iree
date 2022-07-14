@@ -32,25 +32,27 @@ namespace Util {
 // ListType
 //===----------------------------------------------------------------------===//
 
-namespace detail {
-
-struct ListTypeStorage : public TypeStorage {
-  ListTypeStorage(Type elementType) : elementType(elementType) {}
-
-  /// The hash key used for uniquing.
-  using KeyTy = Type;
-  bool operator==(const KeyTy &key) const { return key == elementType; }
-
-  static ListTypeStorage *construct(TypeStorageAllocator &allocator,
-                                    const KeyTy &key) {
-    // Initialize the memory using placement new.
-    return new (allocator.allocate<ListTypeStorage>()) ListTypeStorage(key);
+static LogicalResult parseListElementType(AsmParser &parser,
+                                          FailureOr<Type> &elementType) {
+  if (succeeded(parser.parseOptionalQuestion())) {
+    elementType = IREE::Util::VariantType::get(parser.getContext());
+    return success();
   }
+  Type type;
+  if (succeeded(parser.parseType(type))) {
+    elementType = type;
+    return success();
+  }
+  return failure();
+}
 
-  Type elementType;
-};
-
-}  // namespace detail
+static void printListElementType(AsmPrinter &printer, Type elementType) {
+  if (elementType.isa<IREE::Util::VariantType>()) {
+    printer << "?";
+  } else {
+    printer << elementType;
+  }
+}
 
 // static
 bool ListType::isCompatible(Type type) { return true; }
@@ -65,59 +67,30 @@ bool ListType::canImplicitlyCast(Type from, Type to) {
   return from == to;
 }
 
-ListType ListType::get(Type elementType) {
-  return Base::get(elementType.getContext(), elementType);
+// static
+LogicalResult ListType::verify(function_ref<InFlightDiagnostic()> emitError,
+                               Type elementType) {
+  if (!isCompatible(elementType)) {
+    return emitError() << "invalid element type for a list: " << elementType;
+  }
+  return success();
 }
-
-ListType ListType::getChecked(Type elementType, Location location) {
-  return Base::getChecked(location, elementType);
-}
-
-ListType ListType::getChecked(function_ref<InFlightDiagnostic()> emitError,
-                              Type elementType) {
-  return Base::getChecked(emitError, elementType.getContext(), elementType);
-}
-
-Type ListType::getElementType() { return getImpl()->elementType; }
 
 //===----------------------------------------------------------------------===//
 // PtrType
 //===----------------------------------------------------------------------===//
 
-namespace detail {
+// static
+bool PtrType::isCompatible(Type type) { return true; }
 
-struct PtrTypeStorage : public TypeStorage {
-  PtrTypeStorage(Type targetType) : targetType(targetType) {}
-
-  /// The hash key used for uniquing.
-  using KeyTy = Type;
-  bool operator==(const KeyTy &key) const { return key == targetType; }
-
-  static PtrTypeStorage *construct(TypeStorageAllocator &allocator,
-                                   const KeyTy &key) {
-    // Initialize the memory using placement new.
-    return new (allocator.allocate<PtrTypeStorage>()) PtrTypeStorage(key);
+// static
+LogicalResult PtrType::verify(function_ref<InFlightDiagnostic()> emitError,
+                              Type targetType) {
+  if (!isCompatible(targetType)) {
+    return emitError() << "invalid target type for a pointer: " << targetType;
   }
-
-  Type targetType;
-};
-
-}  // namespace detail
-
-PtrType PtrType::get(Type targetType) {
-  return Base::get(targetType.getContext(), targetType);
+  return success();
 }
-
-PtrType PtrType::getChecked(Type targetType, Location location) {
-  return Base::getChecked(location, targetType);
-}
-
-PtrType PtrType::getChecked(function_ref<InFlightDiagnostic()> emitError,
-                            Type targetType) {
-  return Base::getChecked(emitError, targetType.getContext(), targetType);
-}
-
-Type PtrType::getTargetType() const { return getImpl()->targetType; }
 
 //===----------------------------------------------------------------------===//
 // IREE::Util::TiedOpInterface
@@ -545,91 +518,34 @@ SmallVector<Value> buildResultShape(ShapeAwareOpInterface op,
   return buildShape(op.getLoc(), type, dynamicDims, builder);
 }
 
+}  // namespace Util
+}  // namespace IREE
+}  // namespace iree_compiler
+}  // namespace mlir
+
 //===----------------------------------------------------------------------===//
 // IREE::Util::UtilDialect
 //===----------------------------------------------------------------------===//
+
+// clang-format off: must be included after all LLVM/MLIR headers.
+#define GET_TYPEDEF_CLASSES
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.cpp.inc"  // IWYU pragma: keep
+// clang-format on
+
+namespace mlir {
+namespace iree_compiler {
+namespace IREE {
+namespace Util {
 
 // At the end so it can use functions above:
 #include "iree/compiler/Dialect/Util/IR/UtilOpInterfaces.cpp.inc"
 #include "iree/compiler/Dialect/Util/IR/UtilTypeInterfaces.cpp.inc"
 
 void UtilDialect::registerTypes() {
-  addTypes<IREE::Util::ByteBufferType, IREE::Util::ListType,
-           IREE::Util::MutableByteBufferType, IREE::Util::PtrType,
-           IREE::Util::VariantType>();
-}
-
-//===----------------------------------------------------------------------===//
-// Type printing and parsing
-//===----------------------------------------------------------------------===//
-
-Type UtilDialect::parseType(DialectAsmParser &parser) const {
-  Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
-  llvm::StringRef spec = parser.getFullSymbolSpec();
-  if (spec == "variant") {
-    return IREE::Util::VariantType::get(getContext());
-  } else if (spec.consume_front("ptr")) {
-    if (!spec.consume_front("<") || !spec.consume_back(">")) {
-      parser.emitError(parser.getCurrentLocation())
-          << "malformed ptr type '" << parser.getFullSymbolSpec() << "'";
-      return Type();
-    }
-    auto variableType = mlir::parseType(spec, getContext());
-    if (!variableType) {
-      parser.emitError(parser.getCurrentLocation())
-          << "invalid ptr object type specification: '"
-          << parser.getFullSymbolSpec() << "'";
-      return Type();
-    }
-    return IREE::Util::PtrType::getChecked(variableType, loc);
-  } else if (spec == "byte_buffer") {
-    return IREE::Util::ByteBufferType::get(getContext());
-  } else if (spec == "mutable_byte_buffer") {
-    return IREE::Util::MutableByteBufferType::get(getContext());
-  } else if (spec.consume_front("list")) {
-    if (!spec.consume_front("<") || !spec.consume_back(">")) {
-      parser.emitError(parser.getCurrentLocation())
-          << "malformed list type '" << parser.getFullSymbolSpec() << "'";
-      return Type();
-    }
-    Type elementType;
-    if (spec == "?") {
-      elementType = IREE::Util::VariantType::get(getContext());
-    } else {
-      elementType = mlir::parseType(spec, getContext());
-    }
-    if (!elementType) {
-      parser.emitError(parser.getCurrentLocation())
-          << "invalid list element type specification: '"
-          << parser.getFullSymbolSpec() << "'";
-      return Type();
-    }
-    return IREE::Util::ListType::getChecked(elementType, loc);
-  }
-  emitError(loc, "unknown IREE type: ") << spec;
-  return Type();
-}
-
-void UtilDialect::printType(Type type, DialectAsmPrinter &os) const {
-  if (type.isa<IREE::Util::VariantType>()) {
-    os << "variant";
-  } else if (auto ptrType = type.dyn_cast<IREE::Util::PtrType>()) {
-    os << "ptr<" << ptrType.getTargetType() << ">";
-  } else if (type.isa<IREE::Util::ByteBufferType>()) {
-    os << "byte_buffer";
-  } else if (type.isa<IREE::Util::MutableByteBufferType>()) {
-    os << "mutable_byte_buffer";
-  } else if (auto listType = type.dyn_cast<IREE::Util::ListType>()) {
-    os << "list<";
-    if (listType.getElementType().isa<IREE::Util::VariantType>()) {
-      os << "?";
-    } else {
-      os << listType.getElementType();
-    }
-    os << ">";
-  } else {
-    assert(false && "unhandled IREE type");
-  }
+  addTypes<
+#define GET_TYPEDEF_LIST
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.cpp.inc"  // IWYU pragma: keep
+      >();
 }
 
 }  // namespace Util

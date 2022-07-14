@@ -43,32 +43,34 @@ iree_compiler_cc_library(
     name = "IR",
     srcs = [
         "VMDialect.cpp",
-        "VMEnums.cpp.inc",
-        "VMOpEncoder.cpp.inc",
         "VMOpFolders.cpp",
-        "VMOpInterface.cpp.inc",
         "VMOps.cpp",
-        "VMOps.cpp.inc",
-        "VMStructs.cpp.inc",
         "VMTypes.cpp",
     ],
     hdrs = [
         "VMDialect.h",
-        "VMEnums.h.inc",
         "VMFuncEncoder.h",
-        "VMOpInterface.h.inc",
         "VMOps.h",
-        "VMOps.h.inc",
-        "VMStructs.h.inc",
         "VMTraits.h",
         "VMTypes.h",
     ],
+    textual_hdrs = [
+        "VMAttrs.cpp.inc",
+        "VMAttrs.h.inc",
+        "VMEnums.cpp.inc",
+        "VMEnums.h.inc",
+        "VMOpEncoder.cpp.inc",
+        "VMOpInterfaces.cpp.inc",
+        "VMOpInterfaces.h.inc",
+        "VMOps.cpp.inc",
+        "VMOps.h.inc",
+    ],
     deps = [
+        ":VMAttrsGen",
         ":VMEnumsGen",
         ":VMOpEncoderGen",
-        ":VMOpInterfaceGen",
+        ":VMOpInterfacesGen",
         ":VMOpsGen",
-        ":VMStructsGen",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ControlFlowInterfaces",
@@ -79,6 +81,29 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
     ],
+)
+
+iree_gentbl_cc_library(
+    name = "VMAttrsGen",
+    tbl_outs = [
+        (
+            [
+                "--gen-attrdef-decls",
+                "--attrdefs-dialect=vm",
+            ],
+            "VMAttrs.h.inc",
+        ),
+        (
+            [
+                "--gen-attrdef-defs",
+                "--attrdefs-dialect=vm",
+            ],
+            "VMAttrs.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "VMBase.td",
+    deps = [":td_files"],
 )
 
 iree_gentbl_cc_library(
@@ -129,35 +154,18 @@ iree_gentbl_cc_library(
 )
 
 iree_gentbl_cc_library(
-    name = "VMOpInterfaceGen",
+    name = "VMOpInterfacesGen",
     tbl_outs = [
         (
             ["--gen-op-interface-decls"],
-            "VMOpInterface.h.inc",
+            "VMOpInterfaces.h.inc",
         ),
         (
             ["--gen-op-interface-defs"],
-            "VMOpInterface.cpp.inc",
+            "VMOpInterfaces.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "VMBase.td",
-    deps = [":td_files"],
-)
-
-iree_gentbl_cc_library(
-    name = "VMStructsGen",
-    tbl_outs = [
-        (
-            ["--gen-iree-struct-attr-decls"],
-            "VMStructs.h.inc",
-        ),
-        (
-            ["--gen-iree-struct-attr-defs"],
-            "VMStructs.cpp.inc",
-        ),
-    ],
-    tblgen = "//tools:iree-tblgen",
     td_file = "VMBase.td",
     deps = [":td_files"],
 )

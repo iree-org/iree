@@ -8,6 +8,7 @@
 #define IREE_DIALECT_MODULES_VMVX_OPS
 
 include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXBase.td"
+include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 

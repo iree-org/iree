@@ -15,30 +15,31 @@ iree_cc_library(
     IR
   HDRS
     "VMDialect.h"
-    "VMEnums.h.inc"
     "VMFuncEncoder.h"
-    "VMOpInterface.h.inc"
     "VMOps.h"
-    "VMOps.h.inc"
-    "VMStructs.h.inc"
     "VMTraits.h"
     "VMTypes.h"
+  TEXTUAL_HDRS
+    "VMAttrs.cpp.inc"
+    "VMAttrs.h.inc"
+    "VMEnums.cpp.inc"
+    "VMEnums.h.inc"
+    "VMOpEncoder.cpp.inc"
+    "VMOpInterfaces.cpp.inc"
+    "VMOpInterfaces.h.inc"
+    "VMOps.cpp.inc"
+    "VMOps.h.inc"
   SRCS
     "VMDialect.cpp"
-    "VMEnums.cpp.inc"
-    "VMOpEncoder.cpp.inc"
     "VMOpFolders.cpp"
-    "VMOpInterface.cpp.inc"
     "VMOps.cpp"
-    "VMOps.cpp.inc"
-    "VMStructs.cpp.inc"
     "VMTypes.cpp"
   DEPS
+    ::VMAttrsGen
     ::VMEnumsGen
     ::VMOpEncoderGen
-    ::VMOpInterfaceGen
+    ::VMOpInterfacesGen
     ::VMOpsGen
-    ::VMStructsGen
     LLVMSupport
     MLIRControlFlowInterfaces
     MLIRFuncDialect
@@ -49,6 +50,16 @@ iree_cc_library(
     MLIRTransformUtils
     iree::compiler::Dialect::Util::IR
   PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    VMAttrsGen
+  TD_FILE
+    "VMBase.td"
+  OUTS
+    --gen-attrdef-decls --attrdefs-dialect=vm VMAttrs.h.inc
+    --gen-attrdef-defs --attrdefs-dialect=vm VMAttrs.cpp.inc
 )
 
 iree_tablegen_library(
@@ -84,24 +95,12 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
-    VMOpInterfaceGen
+    VMOpInterfacesGen
   TD_FILE
     "VMBase.td"
   OUTS
-    --gen-op-interface-decls VMOpInterface.h.inc
-    --gen-op-interface-defs VMOpInterface.cpp.inc
-)
-
-iree_tablegen_library(
-  NAME
-    VMStructsGen
-  TD_FILE
-    "VMBase.td"
-  OUTS
-    --gen-iree-struct-attr-decls VMStructs.h.inc
-    --gen-iree-struct-attr-defs VMStructs.cpp.inc
-  TBLGEN
-    IREE
+    --gen-op-interface-decls VMOpInterfaces.h.inc
+    --gen-op-interface-defs VMOpInterfaces.cpp.inc
 )
 
 iree_tablegen_doc(

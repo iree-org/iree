@@ -25,6 +25,7 @@ td_library(
             "UtilBase.td",
             "UtilInterfaces.td",
             "UtilOps.td",
+            "UtilTypes.td",
         ],
         include = ["*.td"],
     ),
@@ -47,14 +48,12 @@ iree_compiler_cc_library(
         "UtilDialect.cpp",
         "UtilOpFolders.cpp",
         "UtilOps.cpp",
-        "UtilOps.cpp.inc",
         "UtilTypes.cpp",
     ],
     hdrs = [
         "ClosureOpUtils.h",
         "UtilDialect.h",
         "UtilOps.h",
-        "UtilOps.h.inc",
         "UtilTraits.h",
         "UtilTypes.h",
     ],
@@ -65,13 +64,18 @@ iree_compiler_cc_library(
         "UtilAttrInterfaces.h.inc",
         "UtilOpInterfaces.cpp.inc",
         "UtilOpInterfaces.h.inc",
+        "UtilOps.cpp.inc",
+        "UtilOps.h.inc",
         "UtilTypeInterfaces.cpp.inc",
         "UtilTypeInterfaces.h.inc",
+        "UtilTypes.cpp.inc",
+        "UtilTypes.h.inc",
     ],
     deps = [
         ":UtilAttrsGen",
         ":UtilInterfacesGen",
         ":UtilOpsGen",
+        ":UtilTypesGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ControlFlowDialect",
@@ -151,6 +155,23 @@ iree_gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "UtilOps.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "UtilTypesGen",
+    tbl_outs = [
+        (
+            ["--gen-typedef-decls"],
+            "UtilTypes.h.inc",
+        ),
+        (
+            ["--gen-typedef-defs"],
+            "UtilTypes.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "UtilTypes.td",
     deps = [":td_files"],
 )
 

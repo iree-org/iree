@@ -9,6 +9,7 @@
 
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
+include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
@@ -56,7 +57,7 @@ def Util_CmpEQOp : Util_PureOp<"cmp.eq", [
   let summary = [{compares two values for equality}];
   let description = [{
     Compares two operands for equality. This is intended for comparing IREE
-    reference types (like !util.byte_buffer) that cannot be used with std.cmpi.
+    reference types (like !util.buffer) that cannot be used with std.cmpi.
   }];
 
   let arguments = (ins
@@ -72,27 +73,6 @@ def Util_CmpEQOp : Util_PureOp<"cmp.eq", [
   }];
 
   let hasFolder = 1;
-}
-
-def Util_ByteBufferConstantOp : Util_PureOp<"byte_buffer.constant"> {
-  let summary = "constant host-side byte buffer";
-  let description = [{
-    Defines a compile-time byte buffer based on the given attribute value.
-    The attribute will be serialized into the canonical IREE format for the
-    chosen host target.
-  }];
-
-  let arguments = (ins
-    AnyAttr:$value,
-    OptionalAttr<I64Attr>:$alignment
-  );
-  let results = (outs
-    ByteBufferType:$result
-  );
-
-  let assemblyFormat = [{
-    attr-dict `:` type($result) `=` $value
-  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -186,10 +166,10 @@ def Util_RangeMinOp : Util_PureOp<"range.min", [
   }];
 
   let arguments = (ins
-    Variadic<Util_Offset>:$operands
+    Variadic<Util_Range>:$operands
   );
   let results = (outs
-    Util_Offset:$result
+    Util_Range:$result
   );
 
   let assemblyFormat = [{
@@ -212,10 +192,10 @@ def Util_RangeMaxOp : Util_PureOp<"range.max", [
   }];
 
   let arguments = (ins
-    Variadic<Util_Offset>:$operands
+    Variadic<Util_Range>:$operands
   );
   let results = (outs
-    Util_Offset:$result
+    Util_Range:$result
   );
 
   let assemblyFormat = [{
@@ -238,12 +218,12 @@ def Util_RangeExtentsOp : Util_PureOp<"range.extents", [
   }];
 
   let arguments = (ins
-    Variadic<Util_Offset>:$offsets,
-    Variadic<Util_Offset>:$lengths
+    Variadic<Util_Range>:$offsets,
+    Variadic<Util_Range>:$lengths
   );
   let results = (outs
-    Util_Offset:$min,
-    Util_Offset:$max
+    Util_Range:$min,
+    Util_Range:$max
   );
 
   let assemblyFormat = [{
@@ -514,7 +494,7 @@ def Util_GlobalAddressOp : Util_PureOp<"global.address", [
   );
 
   let assemblyFormat = [{
-    $global attr-dict `:` type($result)
+    $global attr-dict `:` qualified(type($result))
   }];
 
   let extraClassDeclaration = [{
@@ -571,7 +551,7 @@ def Util_GlobalLoadIndirectOp : Util_Op<"global.load.indirect"> {
   );
 
   let assemblyFormat = [{
-    $global attr-dict `:` type($global) `->` type($result)
+    $global attr-dict `:` qualified(type($global)) `->` type($result)
   }];
 
   let hasVerifier = 1;
@@ -616,7 +596,7 @@ def Util_GlobalStoreIndirectOp : Util_Op<"global.store.indirect"> {
   );
 
   let assemblyFormat = [{
-    $value `,` $global attr-dict `:` type($value) `->` type($global)
+    $value `,` $global attr-dict `:` type($value) `->` qualified(type($global))
   }];
 
   let hasVerifier = 1;
@@ -625,7 +605,7 @@ def Util_GlobalStoreIndirectOp : Util_Op<"global.store.indirect"> {
 }
 
 //===----------------------------------------------------------------------===//
-// Lists
+// !util.list<T>
 //===----------------------------------------------------------------------===//
 // NOTE: this type is mostly just a placeholder. Ideally we'd make this
 // immutable and have operations like util.list.append/concat/etc the returned
@@ -643,10 +623,10 @@ def Util_ListCreateOp : Util_PureOp<
     Optional<Index>:$initial_capacity
   );
   let results = (outs
-    Util_AnyList:$result
+    Util_AnyListType:$result
   );
 
-  let assemblyFormat = "($initial_capacity^)? attr-dict `:` type($result)";
+  let assemblyFormat = "($initial_capacity^)? attr-dict `:` qualified(type($result))";
 }
 
 def Util_ListSizeOp : Util_Op<"list.size", [MemoryEffects<[MemRead]>]> {
@@ -656,13 +636,13 @@ def Util_ListSizeOp : Util_Op<"list.size", [MemoryEffects<[MemRead]>]> {
   }];
 
   let arguments = (ins
-    Util_AnyList:$list
+    Util_AnyListType:$list
   );
   let results = (outs
     Index:$result
   );
 
-  let assemblyFormat = "operands attr-dict `:` type($list)";
+  let assemblyFormat = "operands attr-dict `:` qualified(type($list))";
 }
 
 def Util_ListResizeOp : Util_Op<"list.resize", [MemoryEffects<[MemWrite]>]> {
@@ -674,11 +654,11 @@ def Util_ListResizeOp : Util_Op<"list.resize", [MemoryEffects<[MemWrite]>]> {
   }];
 
   let arguments = (ins
-    Util_AnyList:$list,
+    Util_AnyListType:$list,
     Index:$new_size
   );
 
-  let assemblyFormat = "operands attr-dict `:` type($list)";
+  let assemblyFormat = "operands attr-dict `:` qualified(type($list))";
 }
 
 def Util_ListGetOp : Util_Op<"list.get", [MemoryEffects<[MemRead]>]> {
@@ -689,7 +669,7 @@ def Util_ListGetOp : Util_Op<"list.get", [MemoryEffects<[MemRead]>]> {
   }];
 
   let arguments = (ins
-    Util_AnyList:$list,
+    Util_AnyListType:$list,
     Index:$index
   );
   let results = (outs
@@ -708,7 +688,7 @@ def Util_ListSetOp : Util_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
   }];
 
   let arguments = (ins
-    Util_AnyList:$list,
+    Util_AnyListType:$list,
     Index:$index,
     AnyType:$value
   );
@@ -716,6 +696,31 @@ def Util_ListSetOp : Util_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
   let assemblyFormat = "$list `[` $index `]` `,` $value attr-dict `:` custom<ListTypeSet>(type($list), type($value))";
 
   let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// !util.buffer
+//===----------------------------------------------------------------------===//
+
+def Util_BufferConstantOp : Util_PureOp<"buffer.constant"> {
+  let summary = "constant host-side byte buffer";
+  let description = [{
+    Defines a compile-time byte buffer based on the given attribute value.
+    The attribute will be serialized into the canonical IREE format for the
+    chosen host target.
+  }];
+
+  let arguments = (ins
+    AnyAttr:$value,
+    OptionalAttr<I64Attr>:$alignment
+  );
+  let results = (outs
+    Util_BufferType:$result
+  );
+
+  let assemblyFormat = [{
+    attr-dict `:` type($result) `=` $value
+  }];
 }
 
 //===----------------------------------------------------------------------===//
