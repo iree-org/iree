@@ -2151,16 +2151,15 @@ static OpFoldResult foldCmpLTFOp(T op, ArrayRef<Attribute> operands) {
     // x < x = false
     return zeroOfType(op.getType());
   }
-  return constFoldFloatComparisonOp<FloatAttr>(
-      operands, [&](const APFloat &a, const APFloat &b) {
-        auto result = a.compare(b);
-        if (ordering == ORDERED) {
-          return result == APFloat::cmpLessThan;
-        } else {
-          return result == APFloat::cmpLessThan ||
-                 result == APFloat::cmpUnordered;
-        }
-      });
+  return constFoldFloatComparisonOp<FloatAttr>(operands, [&](const APFloat &a,
+                                                             const APFloat &b) {
+    auto result = a.compare(b);
+    if (ordering == ORDERED) {
+      return result == APFloat::cmpLessThan;
+    } else {
+      return result == APFloat::cmpLessThan || result == APFloat::cmpUnordered;
+    }
+  });
 }
 
 OpFoldResult CmpLTF32OOp::fold(ArrayRef<Attribute> operands) {
@@ -2289,17 +2288,16 @@ static OpFoldResult foldCmpGTEFOp(T op, ArrayRef<Attribute> operands) {
     // x >= x = true
     return oneOfType(op.getType());
   }
-  return constFoldFloatComparisonOp<FloatAttr>(
-      operands, [&](const APFloat &a, const APFloat &b) {
-        auto result = a.compare(b);
-        if (ordering == ORDERED) {
-          return result == APFloat::cmpGreaterThan ||
-                 result == APFloat::cmpEqual;
-        } else {
-          return result == APFloat::cmpGreaterThan ||
-                 result == APFloat::cmpEqual || result == APFloat::cmpUnordered;
-        }
-      });
+  return constFoldFloatComparisonOp<FloatAttr>(operands, [&](const APFloat &a,
+                                                             const APFloat &b) {
+    auto result = a.compare(b);
+    if (ordering == ORDERED) {
+      return result == APFloat::cmpGreaterThan || result == APFloat::cmpEqual;
+    } else {
+      return result == APFloat::cmpGreaterThan || result == APFloat::cmpEqual ||
+             result == APFloat::cmpUnordered;
+    }
+  });
 }
 
 OpFoldResult CmpGTEF32OOp::fold(ArrayRef<Attribute> operands) {
