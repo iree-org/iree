@@ -46,7 +46,7 @@ steps:
         build-targets/linux-cuda
     agents:
       - "gcp:machine-type=a2-highgpu-1g"
-      - "queue=benchmark-cuda-a100"
+      - "queue=benchmark-cuda"
     artifact_paths:
       - "benchmark-results-gcp-gpu-a100-${BUILDKITE_BUILD_NUMBER}.json"
     timeout_in_minutes: "10"
