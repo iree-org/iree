@@ -31,12 +31,17 @@ GITHUB_REGISTRATION_TOKEN="$(curl -sSfL "${GITHUB_TOKEN_PROXY_URL}/register" \
   | jq -r ".token"
 )"
 
-OS_ID="$(get_os_info ShortName)"
-OS_VERSION="$(get_os_info Version)"
-KERNEL_RELEASE="$(get_os_info KernelRelease)"
-HOSTNAME="$(get_os_info Hostname)"
-ARCH="$(get_os_info Architecture)"
-ARCH="${ARCH^^}"
+# For some reason, querying these at startup is unreliable. It seems like the
+# guestInventory attributes take a really long time to be populated.
+# OS_ID="$(get_os_info ShortName)"
+# OS_VERSION="$(get_os_info Version)"
+# KERNEL_RELEASE="$(get_os_info KernelRelease)"
+# HOSTNAME="$(get_os_info Hostname)"
+# ARCH="$(get_os_info Architecture)"
+# ARCH="${ARCH^^}"
+# if [[ "${ARCH}" == "X86_64" ]]; then
+#   ARCH="X64" # This is the nomenclature GitHub uses
+# fi
 
 kernel="$(uname -s)"
 
@@ -54,9 +59,6 @@ case "${kernel^^}" in
       ;;
 esac
 
-if [[ "${ARCH}" == "X86_64" ]]; then
-  ARCH="X64" # This is the nomenclature GitHub uses
-fi
 
 ZONE="$(get_metadata instance/zone | awk -F/ '{print $NF}')"
 CPU_PLATFORM="$(get_metadata instance/cpu-platform)"
@@ -68,19 +70,20 @@ RUNNER_CUSTOM_LABELS="$(get_attribute github-runner-labels)"
 
 declare -a RUNNER_LABELS_ARRAY=(
   "os-family=${OS_FAMILY}"
-  "arch=${ARCH}"
   # Also as just raw labels, to match GitHub default behavior
   "${OS_FAMILY}"
-  "${ARCH}"
   "hostname=${HOSTNAME}"
   "runner-group=${RUNNER_GROUP}"
   "trust=${RUNNER_TRUST}"
   "zone=${ZONE}"
   "cpu-platform=${CPU_PLATFORM}"
   "machine-type=${MACHINE_TYPE}"
-  "os=${OS_ID}"
-  "os-version=${OS_VERSION}"
-  "kernel-release=${KERNEL_RELEASE}"
+  # These attributes require guest attributes. See note above.
+  # "arch=${ARCH}"
+  # "${ARCH}"
+  # "os=${OS_ID}"
+  # "os-version=${OS_VERSION}"
+  # "kernel-release=${KERNEL_RELEASE}"
 )
 
 RUNNER_LABELS="$(IFS="," ; echo "${RUNNER_LABELS_ARRAY[*]}")"
