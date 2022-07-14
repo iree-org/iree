@@ -26,13 +26,13 @@ class ListCreateOpConversion
   LogicalResult matchAndRewrite(
       IREE::Util::ListCreateOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    Value initialCapacity = adaptor.initial_capacity();
+    Value initialCapacity = adaptor.getInitialCapacity();
     if (!initialCapacity) {
       initialCapacity = rewriter.create<IREE::VM::ConstI32Op>(
           srcOp.getLoc(), rewriter.getI32IntegerAttr(0));
     }
     rewriter.replaceOpWithNewOp<IREE::VM::ListAllocOp>(
-        srcOp, typeConverter->convertType(srcOp.result().getType()),
+        srcOp, typeConverter->convertType(srcOp.getResult().getType()),
         initialCapacity);
     return success();
   }
@@ -45,8 +45,8 @@ class ListSizeOpConversion
       IREE::Util::ListSizeOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::ListSizeOp>(
-        srcOp, typeConverter->convertType(srcOp.result().getType()),
-        adaptor.list());
+        srcOp, typeConverter->convertType(srcOp.getResult().getType()),
+        adaptor.getList());
     return success();
   }
 };
@@ -57,8 +57,8 @@ class ListResizeOpConversion
   LogicalResult matchAndRewrite(
       IREE::Util::ListResizeOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREE::VM::ListResizeOp>(srcOp, adaptor.list(),
-                                                        adaptor.new_size());
+    rewriter.replaceOpWithNewOp<IREE::VM::ListResizeOp>(
+        srcOp, adaptor.getList(), adaptor.getNewSize());
     return success();
   }
 };
@@ -68,22 +68,22 @@ class ListGetOpConversion : public OpConversionPattern<IREE::Util::ListGetOp> {
   LogicalResult matchAndRewrite(
       IREE::Util::ListGetOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto resultType = typeConverter->convertType(srcOp.result().getType());
+    auto resultType = typeConverter->convertType(srcOp.getResult().getType());
     if (resultType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListGetI32Op>(
-          srcOp, resultType, adaptor.list(), adaptor.index());
+          srcOp, resultType, adaptor.getList(), adaptor.getIndex());
     } else if (resultType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListGetI64Op>(
-          srcOp, resultType, adaptor.list(), adaptor.index());
+          srcOp, resultType, adaptor.getList(), adaptor.getIndex());
     } else if (resultType.isF32()) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListGetF32Op>(
-          srcOp, resultType, adaptor.list(), adaptor.index());
+          srcOp, resultType, adaptor.getList(), adaptor.getIndex());
     } else if (resultType.isF64()) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListGetF64Op>(
-          srcOp, resultType, adaptor.list(), adaptor.index());
+          srcOp, resultType, adaptor.getList(), adaptor.getIndex());
     } else if (!resultType.isIntOrIndexOrFloat()) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListGetRefOp>(
-          srcOp, resultType, adaptor.list(), adaptor.index());
+          srcOp, resultType, adaptor.getList(), adaptor.getIndex());
     } else {
       return srcOp.emitError() << "unsupported list element type in the VM";
     }
@@ -96,22 +96,22 @@ class ListSetOpConversion : public OpConversionPattern<IREE::Util::ListSetOp> {
   LogicalResult matchAndRewrite(
       IREE::Util::ListSetOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto valueType = adaptor.value().getType();
+    auto valueType = adaptor.getValue().getType();
     if (valueType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListSetI32Op>(
-          srcOp, adaptor.list(), adaptor.index(), adaptor.value());
+          srcOp, adaptor.getList(), adaptor.getIndex(), adaptor.getValue());
     } else if (valueType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListSetI64Op>(
-          srcOp, adaptor.list(), adaptor.index(), adaptor.value());
+          srcOp, adaptor.getList(), adaptor.getIndex(), adaptor.getValue());
     } else if (valueType.isF32()) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListSetF32Op>(
-          srcOp, adaptor.list(), adaptor.index(), adaptor.value());
+          srcOp, adaptor.getList(), adaptor.getIndex(), adaptor.getValue());
     } else if (valueType.isF64()) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListSetF64Op>(
-          srcOp, adaptor.list(), adaptor.index(), adaptor.value());
+          srcOp, adaptor.getList(), adaptor.getIndex(), adaptor.getValue());
     } else if (!valueType.isIntOrIndexOrFloat()) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListSetRefOp>(
-          srcOp, adaptor.list(), adaptor.index(), adaptor.value());
+          srcOp, adaptor.getList(), adaptor.getIndex(), adaptor.getValue());
     } else {
       return srcOp.emitError() << "unsupported list element type in the VM";
     }

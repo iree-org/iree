@@ -218,7 +218,7 @@ struct ConvertHALInterfaceBindingSubspanOp
                                op.getLoc(), bindingType, bindingsArg,
                                rewriter.createOrFold<arith::ConstantIndexOp>(
                                    op.getLoc(), op.binding().getZExtValue()))
-                           .result();
+                           .getResult();
     if (op.byte_offset() && !matchPattern(op.byte_offset(), m_Zero())) {
       auto memrefType = op.result().getType().cast<MemRefType>();
       Value elementCount;

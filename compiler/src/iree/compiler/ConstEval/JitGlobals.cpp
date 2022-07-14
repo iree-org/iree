@@ -38,8 +38,8 @@ struct ProgramExtractor {
   // Returns the created symbol name.
   StringAttr createAccessor(IREE::Util::GlobalOp globalOp) {
     Location loc = globalOp.getLoc();
-    std::string name = (llvm::Twine("get$") + globalOp.getSymbolName()).str();
-    Type globalType = globalOp.type();
+    std::string name = (llvm::Twine("get$") + globalOp.getSymName()).str();
+    Type globalType = globalOp.getType();
     auto funcType =
         builder.getType<FunctionType>(TypeRange{}, TypeRange{globalType});
     auto funcOp = func::FuncOp::create(loc, name, funcType);
@@ -171,14 +171,14 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
 
       // Only generate an accessor for types our runtime bridge knows how to
       // handle.
-      Type type = globalOp.type();
+      Type type = globalOp.getType();
       if (!CompiledBinary::isSupportedResultType(type)) {
         LLVM_DEBUG(dbgs() << "JitGlobals: unsupported global type " << type);
         continue;
       }
 
       StringAttr funcSymbol = extractor.createAccessor(globalOp);
-      uninitializedGlobals.emplace_back(funcSymbol, globalOp.sym_nameAttr());
+      uninitializedGlobals.emplace_back(funcSymbol, globalOp.getSymNameAttr());
     }
 
     // Early exit without compiling if no entry-points (this is not just an
@@ -220,7 +220,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
       }
 
       modified = true;
-      targetGlobal.setInitialValue(value);
+      targetGlobal.setInitialValueAttr(value);
     }
 
     // Delete any ops noted for pruning.

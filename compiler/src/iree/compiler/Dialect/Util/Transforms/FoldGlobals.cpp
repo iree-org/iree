@@ -72,11 +72,11 @@ struct GlobalTable {
     for (auto callableOp : moduleOp.getOps<CallableOpInterface>()) {
       callableOp.walk([&](Operation *op) {
         if (auto addressOp = dyn_cast<IREE::Util::GlobalAddressOp>(op)) {
-          globalMap[addressOp.global()].isIndirect = true;
+          globalMap[addressOp.getGlobal()].isIndirect = true;
         } else if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(op)) {
-          globalMap[loadOp.global()].loadOps.push_back(loadOp);
+          globalMap[loadOp.getGlobal()].loadOps.push_back(loadOp);
         } else if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOp>(op)) {
-          globalMap[storeOp.global()].storeOps.push_back(storeOp);
+          globalMap[storeOp.getGlobal()].storeOps.push_back(storeOp);
         }
       });
     }
@@ -140,10 +140,10 @@ static bool inlineConstantGlobalStores(GlobalTable &globalTable) {
     // must be uninitialized. A proper dataflow analysis would let us identify
     // the cases where there are loads before stores and the implicit 0 initial
     // value for uninitialized globals would be observable.
-    Attribute constantValue = global.op.initial_valueAttr();
+    Attribute constantValue = global.op.getInitialValueAttr();
     for (auto storeOp : global.storeOps) {
       Attribute valueAttr;
-      if (!matchPattern(storeOp.value(), m_Constant(&valueAttr))) {
+      if (!matchPattern(storeOp.getValue(), m_Constant(&valueAttr))) {
         constantValue = {};
         break;
       }
@@ -160,7 +160,7 @@ static bool inlineConstantGlobalStores(GlobalTable &globalTable) {
 
     // Propagate constant into the initial value. Note that there may have been
     // a previous initial value that is being replaced.
-    global.op.initial_valueAttr(constantValue);
+    global.op.setInitialValueAttr(constantValue);
 
     // Remove all of the stores.
     for (auto storeOp : global.storeOps) {
@@ -192,12 +192,12 @@ static bool renameChainedGlobals(GlobalTable &globalTable) {
     FlatSymbolRefAttr aliasName;
     for (auto storeOp : global.storeOps) {
       // Check to see if the stored value comes from another global.
-      auto *definingOp = storeOp.value().getDefiningOp();
+      auto *definingOp = storeOp.getValue().getDefiningOp();
       if (auto loadOp =
               dyn_cast_or_null<IREE::Util::GlobalLoadOp>(definingOp)) {
         if (!aliasName) {
-          aliasName = loadOp.globalAttr();
-        } else if (aliasName != loadOp.globalAttr()) {
+          aliasName = loadOp.getGlobalAttr();
+        } else if (aliasName != loadOp.getGlobalAttr()) {
           aliasName = {};
           break;
         }
@@ -211,7 +211,7 @@ static bool renameChainedGlobals(GlobalTable &globalTable) {
     // Replace all loads from the global with the aliased global.
     auto &aliasGlobal = globalTable.globalMap[aliasName.getValue()];
     for (auto loadOp : global.loadOps) {
-      loadOp.globalAttr(aliasName);
+      loadOp.setGlobalAttr(aliasName);
       aliasGlobal.loadOps.push_back(loadOp);
     }
     global.loadOps.clear();
@@ -241,7 +241,7 @@ static bool updateGlobalImmutability(GlobalTable &globalTable) {
     if (global.isIndirect) return GlobalAction::PRESERVE;
     if (global.op.isPublic()) return GlobalAction::PRESERVE;
     if (!global.storeOps.empty()) return GlobalAction::PRESERVE;
-    if (!global.op.isMutable()) return GlobalAction::PRESERVE;
+    if (!global.op.getIsMutable()) return GlobalAction::PRESERVE;
     global.op.removeIs_mutableAttr();
     return GlobalAction::UPDATE;
   });
@@ -269,11 +269,11 @@ static bool inlineConstantGlobalLoads(GlobalTable &globalTable) {
   return globalTable.forEach([&](Global &global) {
     if (global.isIndirect) return GlobalAction::PRESERVE;
     if (!global.storeOps.empty()) return GlobalAction::PRESERVE;
-    if (global.op.isMutable()) return GlobalAction::PRESERVE;
+    if (global.op.getIsMutable()) return GlobalAction::PRESERVE;
     if (global.op->hasAttr("noinline")) return GlobalAction::PRESERVE;
-    if (!global.op.initial_valueAttr()) return GlobalAction::PRESERVE;
+    if (!global.op.getInitialValueAttr()) return GlobalAction::PRESERVE;
 
-    if (global.op.type().isa<IREE::Util::ReferenceTypeInterface>()) {
+    if (global.op.getType().isa<IREE::Util::ReferenceTypeInterface>()) {
       // We only inline value types; reference types have meaning as globals.
       return GlobalAction::PRESERVE;
     }
@@ -282,8 +282,8 @@ static bool inlineConstantGlobalLoads(GlobalTable &globalTable) {
     for (auto loadOp : global.loadOps) {
       OpBuilder builder(loadOp);
       auto constantValue =
-          tryMaterializeConstant(loadOp.getLoc(), loadOp.result().getType(),
-                                 global.op.initial_valueAttr(), builder);
+          tryMaterializeConstant(loadOp.getLoc(), loadOp.getResult().getType(),
+                                 global.op.getInitialValueAttr(), builder);
       if (!constantValue) {
         // Failed to materialize the constant. This is going to fail for all the
         // others as well so we bail here. This may be intentional for example
@@ -325,12 +325,12 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
   for (auto globalIt : globalTable.globalMap) {
     auto &global = globalIt.getSecond();
     if (global.isIndirect || global.op.isPublic() ||
-        !global.op.initial_value().hasValue() || !global.storeOps.empty()) {
+        !global.op.getInitialValue().hasValue() || !global.storeOps.empty()) {
       // Not eligible for deduplication.
       continue;
     }
-    auto it =
-        leaderMap.insert({global.op.initial_valueAttr(), global.op.getName()});
+    auto it = leaderMap.insert(
+        {global.op.getInitialValueAttr(), global.op.getName()});
     if (it.second) {
       // Inserted new.
       ec.insert(global.op.getName());
@@ -361,13 +361,13 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
     baseGlobalOp->setLoc(fusedLoc);
 
     // Replace all other globals to point at the new one.
-    auto baseGlobalNameAttr = FlatSymbolRefAttr::get(
-        baseGlobalOp.getContext(), baseGlobalOp.getSymbolName());
+    auto baseGlobalNameAttr = FlatSymbolRefAttr::get(baseGlobalOp.getContext(),
+                                                     baseGlobalOp.getSymName());
     for (auto mi = ec.member_begin(it); mi != ec.member_end(); ++mi) {
       Global &global = globalTable.globalMap[*mi];
       if (global.op == baseGlobalOp) continue;
       for (auto loadOp : global.loadOps) {
-        loadOp.globalAttr(baseGlobalNameAttr);
+        loadOp.setGlobalAttr(baseGlobalNameAttr);
       }
       global.op.erase();
     }

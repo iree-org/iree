@@ -34,7 +34,7 @@ OpFoldResult CmpEQOp::fold(ArrayRef<Attribute> operands) {
   auto makeBool = [&](bool value) {
     return IntegerAttr::get(IntegerType::get(getContext(), 1), value ? 1 : 0);
   };
-  if (lhs() == rhs()) {
+  if (getLhs() == getRhs()) {
     // SSA values are exactly the same.
     return makeBool(true);
   } else if (operands[0] && operands[1] && operands[0] == operands[1]) {
@@ -92,12 +92,12 @@ struct ExpandSimpleRangeOp : public OpRewritePattern<RangeOpT> {
   using OpRewritePattern<RangeOpT>::OpRewritePattern;
   LogicalResult matchAndRewrite(RangeOpT op,
                                 PatternRewriter &rewriter) const override {
-    if (op.operands().size() == 1) {
-      rewriter.replaceOp(op, {op.operands().front()});
+    if (op.getOperands().size() == 1) {
+      rewriter.replaceOp(op, {op.getOperands().front()});
       return success();
-    } else if (op.operands().size() == 2) {
-      rewriter.replaceOpWithNewOp<StdOpT>(op, op.operands().front(),
-                                          op.operands().back());
+    } else if (op.getOperands().size() == 2) {
+      rewriter.replaceOpWithNewOp<StdOpT>(op, op.getOperands().front(),
+                                          op.getOperands().back());
       return success();
     }
     return failure();
@@ -117,7 +117,7 @@ struct SimplifyUniformRangeOp : public OpRewritePattern<OpT> {
                                 PatternRewriter &rewriter) const override {
     SetVector<Value> operands;
     int64_t constantValue = initialValue;
-    for (auto operand : op.operands()) {
+    for (auto operand : op.getOperands()) {
       APInt constantInt;
       if (matchPattern(operand, m_ConstantInt(&constantInt))) {
         // Constant value.
@@ -135,10 +135,10 @@ struct SimplifyUniformRangeOp : public OpRewritePattern<OpT> {
     if (constantValue != initialValue) {
       operands.insert(rewriter.create<arith::ConstantOp>(
           op.getLoc(),
-          rewriter.getIntegerAttr(op.result().getType(), constantValue),
-          op.result().getType()));
+          rewriter.getIntegerAttr(op.getResult().getType(), constantValue),
+          op.getResult().getType()));
     }
-    rewriter.replaceOpWithNewOp<OpT>(op, op.result().getType(),
+    rewriter.replaceOpWithNewOp<OpT>(op, op.getResult().getType(),
                                      operands.takeVector());
     return success();
   }
@@ -185,11 +185,11 @@ struct FoldConstantRanges : public OpRewritePattern<RangeExtentsOp> {
     // Build a constant range for all we find and preserve the dynamic pairs.
     SmallVector<Value> offsets;
     SmallVector<Value> lengths;
-    offsets.reserve(op.offsets().size());
-    lengths.reserve(op.lengths().size());
+    offsets.reserve(op.getOffsets().size());
+    lengths.reserve(op.getLengths().size());
     int64_t constantMin = INT64_MAX;
     int64_t constantMax = INT64_MIN;
-    for (auto range : llvm::zip(op.offsets(), op.lengths())) {
+    for (auto range : llvm::zip(op.getOffsets(), op.getLengths())) {
       auto offset = std::get<0>(range);
       auto length = std::get<1>(range);
       APInt rangeOffset, rangeLength;
@@ -205,29 +205,30 @@ struct FoldConstantRanges : public OpRewritePattern<RangeExtentsOp> {
         lengths.push_back(length);
       }
     }
-    if (offsets.size() == op.offsets().size()) return failure();
+    if (offsets.size() == op.getOffsets().size()) return failure();
 
     // Preserve dynamic ranges.
     Value min;
     Value max;
     if (!offsets.empty()) {
-      auto newOp =
-          rewriter.create<RangeExtentsOp>(op.getLoc(), op.min().getType(),
-                                          op.max().getType(), offsets, lengths);
-      min = newOp.min();
-      max = newOp.max();
+      auto newOp = rewriter.create<RangeExtentsOp>(
+          op.getLoc(), op.getMin().getType(), op.getMax().getType(), offsets,
+          lengths);
+      min = newOp.getMin();
+      max = newOp.getMax();
     }
 
     // Min/max with constant ranges. This allows for normal folding to happen
     // downstream of the op.
     auto constantMinOp = rewriter.create<arith::ConstantOp>(
-        op.getLoc(), rewriter.getIntegerAttr(op.min().getType(), constantMin),
-        op.min().getType());
+        op.getLoc(),
+        rewriter.getIntegerAttr(op.getMin().getType(), constantMin),
+        op.getMin().getType());
     auto constantMaxOp = rewriter.create<arith::ConstantOp>(
         op.getLoc(),
-        rewriter.getIntegerAttr(op.max().getType(),
+        rewriter.getIntegerAttr(op.getMax().getType(),
                                 constantMax - constantMin + 1),
-        op.max().getType());
+        op.getMax().getType());
     min = min ? rewriter.create<arith::MinUIOp>(op.getLoc(), min, constantMinOp)
                     .getResult()
               : constantMinOp.getResult();
@@ -246,22 +247,22 @@ struct ExpandSimpleRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
                                 PatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
     Value minValue, maxValue;
-    if (op.offsets().size() == 1) {
+    if (op.getOffsets().size() == 1) {
       // Single range folds to the min/max of that one range.
-      minValue = op.offsets().front();
-      maxValue = makeRangeEnd(loc, op.offsets().front(), op.lengths().front(),
-                              rewriter);
-    } else if (op.offsets().size() == 2) {
+      minValue = op.getOffsets().front();
+      maxValue = makeRangeEnd(loc, op.getOffsets().front(),
+                              op.getLengths().front(), rewriter);
+    } else if (op.getOffsets().size() == 2) {
       // Two ranges turn into min/max.
-      minValue = rewriter.create<arith::MinUIOp>(loc, op.offsets().front(),
-                                                 op.offsets().back());
+      minValue = rewriter.create<arith::MinUIOp>(loc, op.getOffsets().front(),
+                                                 op.getOffsets().back());
       auto one = rewriter.create<arith::ConstantOp>(
-          loc, rewriter.getIntegerAttr(op.min().getType(), 1),
-          op.min().getType());
-      auto endLhs = makeRangeEnd(loc, op.offsets().front(),
-                                 op.lengths().front(), one, rewriter);
-      auto endRhs = makeRangeEnd(loc, op.offsets().back(), op.lengths().back(),
-                                 one, rewriter);
+          loc, rewriter.getIntegerAttr(op.getMin().getType(), 1),
+          op.getMin().getType());
+      auto endLhs = makeRangeEnd(loc, op.getOffsets().front(),
+                                 op.getLengths().front(), one, rewriter);
+      auto endRhs = makeRangeEnd(loc, op.getOffsets().back(),
+                                 op.getLengths().back(), one, rewriter);
       maxValue = rewriter.create<arith::MaxUIOp>(loc, endLhs, endRhs);
     }
     if (!minValue || !maxValue) return failure();
@@ -278,10 +279,10 @@ struct DeduplicateRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
     // preserved.
     using Range = std::tuple<Value, Value>;
     SetVector<Range> ranges;
-    for (auto range : llvm::zip(op.offsets(), op.lengths())) {
+    for (auto range : llvm::zip(op.getOffsets(), op.getLengths())) {
       ranges.insert(range);
     }
-    if (ranges.size() == op.offsets().size()) return failure();
+    if (ranges.size() == op.getOffsets().size()) return failure();
 
     // Recreate with the deduplicated ranges.
     SmallVector<Value> offsets;
@@ -293,7 +294,7 @@ struct DeduplicateRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
       lengths.push_back(std::get<1>(range.value()));
     }
     rewriter.replaceOpWithNewOp<RangeExtentsOp>(
-        op, op.min().getType(), op.max().getType(), offsets, lengths);
+        op, op.getMin().getType(), op.getMax().getType(), offsets, lengths);
     return success();
   }
 };
@@ -335,12 +336,12 @@ static bool isAlignedTo(Value value, Value alignment) {
   // If the value is produced by an align op we can check that.
   if (auto sourceAlignOp = value.getDefiningOp<IREE::Util::AlignOp>()) {
     // Check for same exact alignment - even if dynamic.
-    if (sourceAlignOp.alignment() == alignment) return true;
+    if (sourceAlignOp.getAlignment() == alignment) return true;
 
     // If the alignments are constant we can compare them inline.
     APInt sourceAlignment;
     APInt selfAlignment;
-    if (matchPattern(sourceAlignOp.alignment(),
+    if (matchPattern(sourceAlignOp.getAlignment(),
                      m_ConstantInt(&sourceAlignment)) &&
         matchPattern(alignment, m_ConstantInt(&selfAlignment))) {
       if (sourceAlignment.uge(selfAlignment)) {
@@ -350,7 +351,7 @@ static bool isAlignedTo(Value value, Value alignment) {
 
     // Recurse and check the alignment on the input to the align; if it was
     // aligned earlier we can rely on that as align will never shrink a value.
-    return isAlignedTo(sourceAlignOp.value(), alignment);
+    return isAlignedTo(sourceAlignOp.getValue(), alignment);
   }
 
   // If we are sourced from add/mul we peephole check to see if what is being
@@ -384,7 +385,7 @@ static bool isAlignedTo(Value value, Value alignment) {
 OpFoldResult AlignOp::fold(ArrayRef<Attribute> operands) {
   // If aligning an already-aligned value then fold if this is provably a
   // no-op. We can check this for equality even with dynamic alignments.
-  if (isAlignedTo(value(), alignment())) return value();
+  if (isAlignedTo(getValue(), getAlignment())) return getValue();
   return {};
 }
 
@@ -399,7 +400,8 @@ struct ExpandUnfoldableConstantOp
   using OpRewritePattern<IREE::Util::UnfoldableConstantOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(UnfoldableConstantOp op,
                                 PatternRewriter &rewriter) const override {
-    auto stdConst = rewriter.create<arith::ConstantOp>(op.getLoc(), op.value());
+    auto stdConst =
+        rewriter.create<arith::ConstantOp>(op.getLoc(), op.getValue());
     rewriter.replaceOpWithNewOp<DoNotOptimizeOp>(op, stdConst.getResult());
     return success();
   }
@@ -424,8 +426,8 @@ struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
 
   LogicalResult matchAndRewrite(InitializerOp op,
                                 PatternRewriter &rewriter) const override {
-    if (op.body().getBlocks().size() != 1) return failure();
-    auto &block = op.body().front();
+    if (op.getBody().getBlocks().size() != 1) return failure();
+    auto &block = op.getBody().front();
     if (block.empty() || isa<InitializerReturnOp>(block.front())) {
       rewriter.eraseOp(op);
       return success();
@@ -446,13 +448,13 @@ struct InlineConstantGlobalInitializer
     SmallVector<Operation *> deadOps;
     op.walk([&](GlobalStoreOp storeOp) {
       Attribute valueAttr;
-      if (!matchPattern(storeOp.value(), m_Constant(&valueAttr))) return;
+      if (!matchPattern(storeOp.getValue(), m_Constant(&valueAttr))) return;
       auto globalOp =
           SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
-              storeOp->getParentOp(), storeOp.globalAttr());
+              storeOp->getParentOp(), storeOp.getGlobalAttr());
       rewriter.updateRootInPlace(globalOp, [&]() {
         if (valueAttr && !valueAttr.isa<UnitAttr>()) {
-          globalOp.initial_valueAttr(valueAttr);
+          globalOp.setInitialValueAttr(valueAttr);
         } else {
           globalOp.clearInitialValue();
         }
@@ -487,9 +489,9 @@ class PropagateGlobalLoadAddress
   LogicalResult matchAndRewrite(GlobalLoadIndirectOp op,
                                 PatternRewriter &rewriter) const override {
     if (auto addressOp =
-            dyn_cast_or_null<GlobalAddressOp>(op.global().getDefiningOp())) {
-      rewriter.replaceOpWithNewOp<GlobalLoadOp>(op, op.result().getType(),
-                                                addressOp.global());
+            dyn_cast_or_null<GlobalAddressOp>(op.getGlobal().getDefiningOp())) {
+      rewriter.replaceOpWithNewOp<GlobalLoadOp>(op, op.getResult().getType(),
+                                                addressOp.getGlobal());
       return success();
     }
     return failure();
@@ -515,8 +517,8 @@ struct EraseUnusedGlobalStoreOp : public OpRewritePattern<GlobalStoreOp> {
   LogicalResult matchAndRewrite(GlobalStoreOp op,
                                 PatternRewriter &rewriter) const override {
     if (auto loadOp =
-            dyn_cast_or_null<GlobalLoadOp>(op.value().getDefiningOp())) {
-      if (loadOp.global() == op.global()) {
+            dyn_cast_or_null<GlobalLoadOp>(op.getValue().getDefiningOp())) {
+      if (loadOp.getGlobal() == op.getGlobal()) {
         rewriter.eraseOp(op);
         return success();
       }
@@ -543,9 +545,9 @@ class PropagateGlobalStoreAddress
   LogicalResult matchAndRewrite(GlobalStoreIndirectOp op,
                                 PatternRewriter &rewriter) const override {
     if (auto addressOp =
-            dyn_cast_or_null<GlobalAddressOp>(op.global().getDefiningOp())) {
-      rewriter.replaceOpWithNewOp<GlobalStoreOp>(op, op.value(),
-                                                 addressOp.global());
+            dyn_cast_or_null<GlobalAddressOp>(op.getGlobal().getDefiningOp())) {
+      rewriter.replaceOpWithNewOp<GlobalStoreOp>(op, op.getValue(),
+                                                 addressOp.getGlobal());
       return success();
     }
     return failure();

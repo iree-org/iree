@@ -634,19 +634,19 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn) {
     // Indirect globals would require us to perform an analysis to first see if
     // we can make them direct or annotate the load/store sites with the
     // possible targets.
-    auto *globalInfo = queryGlobalInfoFrom(loadOp.global(), loadOp);
+    auto *globalInfo = queryGlobalInfoFrom(loadOp.getGlobal(), loadOp);
     if (!globalInfo || globalInfo->isIndirect) {
       LLVM_DEBUG({
         llvm::dbgs()
             << "  !! traversal incomplete due to unanalyzable indirect global @"
-            << loadOp.global() << ": ";
+            << loadOp.getGlobal() << ": ";
         loadOp.print(llvm::dbgs(), asmState);
         llvm::dbgs() << "\n";
       });
       return TraversalResult::INCOMPLETE;
     }
     LLVM_DEBUG(llvm::dbgs() << "  -> traversing into global stores to @"
-                            << loadOp.global() << ":\n");
+                            << loadOp.getGlobal() << ":\n");
     for (auto *user : globalInfo->uses) {
       auto storeOp = dyn_cast<IREE::Util::GlobalStoreOp>(user);
       if (!storeOp) continue;
@@ -655,7 +655,7 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn) {
         storeOp.print(llvm::dbgs(), asmState);
         llvm::dbgs() << "\n";
       });
-      worklist.insert(storeOp.value());
+      worklist.insert(storeOp.getValue());
     }
     return TraversalResult::COMPLETE;
   };
@@ -894,19 +894,19 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn) {
     // Indirect globals would require us to perform an analysis to first see if
     // we can make them direct or annotate the load/store sites with the
     // possible targets.
-    auto *globalInfo = queryGlobalInfoFrom(storeOp.global(), storeOp);
+    auto *globalInfo = queryGlobalInfoFrom(storeOp.getGlobal(), storeOp);
     if (!globalInfo || globalInfo->isIndirect) {
       LLVM_DEBUG({
         llvm::dbgs()
             << "  !! traversal incomplete due to unanalyzable indirect global @"
-            << storeOp.global() << ": ";
+            << storeOp.getGlobal() << ": ";
         storeOp.print(llvm::dbgs(), asmState);
         llvm::dbgs() << "\n";
       });
       return TraversalResult::INCOMPLETE;
     }
     LLVM_DEBUG(llvm::dbgs() << "  -> traversing into global loads from @"
-                            << storeOp.global() << ":\n");
+                            << storeOp.getGlobal() << ":\n");
     for (auto *user : globalInfo->uses) {
       auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(user);
       if (!loadOp) continue;
@@ -915,7 +915,7 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn) {
         loadOp.print(llvm::dbgs(), asmState);
         llvm::dbgs() << "\n";
       });
-      worklist.insert(loadOp.result());
+      worklist.insert(loadOp.getResult());
     }
     return TraversalResult::COMPLETE;
   };

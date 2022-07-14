@@ -22,12 +22,13 @@ struct InitializerOpConversion
       IREE::Util::InitializerOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto newOp = rewriter.create<IREE::VM::InitializerOp>(op.getLoc());
-    rewriter.cloneRegionBefore(op.body(), newOp.body(), newOp.body().begin());
+    rewriter.cloneRegionBefore(op.getBody(), newOp.getBody(),
+                               newOp.getBody().begin());
 
     // Tell the rewriter to convert the region signature.
     TypeConverter &typeConverter = *getTypeConverter();
     TypeConverter::SignatureConversion signatureConversion(0);
-    if (failed(rewriter.convertRegionTypes(&newOp.body(), typeConverter,
+    if (failed(rewriter.convertRegionTypes(&newOp.getBody(), typeConverter,
                                            &signatureConversion))) {
       return rewriter.notifyMatchFailure(op, "failed to convert region types");
     }
@@ -58,50 +59,52 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
       IREE::Util::GlobalOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     Operation *newOp = nullptr;
-    auto convertedType = typeConverter.convertType(op.type());
+    auto convertedType = typeConverter.convertType(op.getType());
     if (convertedType.isa<IREE::VM::RefType>() ||
         IREE::VM::RefType::isCompatible(convertedType)) {
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalRefOp>(
-          op, op.sym_name(), op.is_mutable(), convertedType, op.initial_value(),
-          llvm::to_vector<4>(op->getDialectAttrs()));
+          op, op.getSymName(), op.getIsMutable(), convertedType,
+          op.getInitialValue(), llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isInteger(32)) {
       llvm::Optional<Attribute> convertedValue = llvm::None;
-      if (op.initial_value().hasValue()) {
+      if (op.getInitialValue().hasValue()) {
         convertedValue = rewriter.getI32IntegerAttr(static_cast<int32_t>(
-            op.initial_value().getValue().cast<IntegerAttr>().getInt()));
+            op.getInitialValue().getValue().cast<IntegerAttr>().getInt()));
       }
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalI32Op>(
-          op, op.sym_name(), op.is_mutable(), convertedType, convertedValue,
+          op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
           llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isInteger(64)) {
       llvm::Optional<Attribute> convertedValue = llvm::None;
-      if (op.initial_value().hasValue()) {
+      if (op.getInitialValue().hasValue()) {
         convertedValue = rewriter.getI64IntegerAttr(
-            op.initial_value().getValue().cast<IntegerAttr>().getInt());
+            op.getInitialValue().getValue().cast<IntegerAttr>().getInt());
       }
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalI64Op>(
-          op, op.sym_name(), op.is_mutable(), convertedType, convertedValue,
+          op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
           llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isF32()) {
       llvm::Optional<Attribute> convertedValue = llvm::None;
-      if (op.initial_value().hasValue()) {
+      if (op.getInitialValue().hasValue()) {
         convertedValue = rewriter.getF32FloatAttr(
-            static_cast<float>(op.initial_value()
+            static_cast<float>(op.getInitialValue()
                                    .getValue()
                                    .cast<FloatAttr>()
                                    .getValueAsDouble()));
       }
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalF32Op>(
-          op, op.sym_name(), op.is_mutable(), convertedType, convertedValue,
+          op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
           llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isF64()) {
       llvm::Optional<Attribute> convertedValue = llvm::None;
-      if (op.initial_value().hasValue()) {
-        convertedValue = rewriter.getF64FloatAttr(
-            op.initial_value().getValue().cast<FloatAttr>().getValueAsDouble());
+      if (op.getInitialValue().hasValue()) {
+        convertedValue = rewriter.getF64FloatAttr(op.getInitialValue()
+                                                      .getValue()
+                                                      .cast<FloatAttr>()
+                                                      .getValueAsDouble());
       }
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalF64Op>(
-          op, op.sym_name(), op.is_mutable(), convertedType, convertedValue,
+          op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
           llvm::to_vector<4>(op->getDialectAttrs()));
     } else {
       return op.emitOpError("unsupported global type");
@@ -127,7 +130,7 @@ class GlobalAddressOpConversion
       IREE::Util::GlobalAddressOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::GlobalAddressOp>(
-        op, typeConverter.convertType(op.getType()), op.global());
+        op, typeConverter.convertType(op.getType()), op.getGlobal());
     return success();
   }
 
@@ -148,19 +151,19 @@ class GlobalLoadOpConversion
     auto convertedType = typeConverter.convertType(operandType);
     if (IREE::VM::RefType::isCompatible(operandType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadRefOp>(op, convertedType,
-                                                             op.global());
+                                                             op.getGlobal());
     } else if (convertedType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadI32Op>(op, convertedType,
-                                                             op.global());
+                                                             op.getGlobal());
     } else if (convertedType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadI64Op>(op, convertedType,
-                                                             op.global());
+                                                             op.getGlobal());
     } else if (convertedType.isF32()) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadF32Op>(op, convertedType,
-                                                             op.global());
+                                                             op.getGlobal());
     } else if (convertedType.isF64()) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadF64Op>(op, convertedType,
-                                                             op.global());
+                                                             op.getGlobal());
     } else {
       return rewriter.notifyMatchFailure(op, "unhandled global type");
     }
@@ -185,19 +188,19 @@ class GlobalLoadIndirectOpConversion
     auto convertedType = typeConverter.convertType(operandType);
     if (IREE::VM::RefType::isCompatible(operandType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectRefOp>(
-          op, convertedType, adaptor.global());
+          op, convertedType, adaptor.getGlobal());
     } else if (convertedType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectI32Op>(
-          op, convertedType, adaptor.global());
+          op, convertedType, adaptor.getGlobal());
     } else if (convertedType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectI64Op>(
-          op, convertedType, adaptor.global());
+          op, convertedType, adaptor.getGlobal());
     } else if (convertedType.isF32()) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectF32Op>(
-          op, convertedType, adaptor.global());
+          op, convertedType, adaptor.getGlobal());
     } else if (convertedType.isF64()) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectF64Op>(
-          op, convertedType, adaptor.global());
+          op, convertedType, adaptor.getGlobal());
     } else {
       return rewriter.notifyMatchFailure(op, "unhandled global type");
     }
@@ -217,22 +220,22 @@ class GlobalStoreOpConversion
   LogicalResult matchAndRewrite(
       IREE::Util::GlobalStoreOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto operandType = adaptor.value().getType();
+    auto operandType = adaptor.getValue().getType();
     if (operandType.isa<IREE::VM::RefType>()) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreRefOp>(
-          op, adaptor.value(), op.global());
+          op, adaptor.getValue(), op.getGlobal());
     } else if (operandType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreI32Op>(
-          op, adaptor.value(), op.global());
+          op, adaptor.getValue(), op.getGlobal());
     } else if (operandType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreI64Op>(
-          op, adaptor.value(), op.global());
+          op, adaptor.getValue(), op.getGlobal());
     } else if (operandType.isF32()) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreF32Op>(
-          op, adaptor.value(), op.global());
+          op, adaptor.getValue(), op.getGlobal());
     } else if (operandType.isF64()) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreF64Op>(
-          op, adaptor.value(), op.global());
+          op, adaptor.getValue(), op.getGlobal());
     } else {
       return rewriter.notifyMatchFailure(op, "unhandled global type");
     }
@@ -250,22 +253,22 @@ class GlobalStoreIndirectOpConversion
   LogicalResult matchAndRewrite(
       IREE::Util::GlobalStoreIndirectOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto operandType = adaptor.value().getType();
+    auto operandType = adaptor.getValue().getType();
     if (operandType.isa<IREE::VM::RefType>()) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreIndirectRefOp>(
-          op, adaptor.value(), adaptor.global());
+          op, adaptor.getValue(), adaptor.getGlobal());
     } else if (operandType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreIndirectI32Op>(
-          op, adaptor.value(), adaptor.global());
+          op, adaptor.getValue(), adaptor.getGlobal());
     } else if (operandType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreIndirectI64Op>(
-          op, adaptor.value(), adaptor.global());
+          op, adaptor.getValue(), adaptor.getGlobal());
     } else if (operandType.isF32()) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreIndirectF32Op>(
-          op, adaptor.value(), adaptor.global());
+          op, adaptor.getValue(), adaptor.getGlobal());
     } else if (operandType.isF64()) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreIndirectF64Op>(
-          op, adaptor.value(), adaptor.global());
+          op, adaptor.getValue(), adaptor.getGlobal());
     } else {
       return rewriter.notifyMatchFailure(op, "unhandled global type");
     }

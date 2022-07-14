@@ -106,12 +106,13 @@ class OutlineConstantsPass : public OutlineConstantsBase<OutlineConstantsPass> {
       OpBuilder builder(moduleOp.getContext());
       builder.setInsertionPoint(originalOp);
       auto loadOp = builder.create<IREE::Util::GlobalLoadOp>(
-          originalOp->getLoc(), globalOp.type(), SymbolRefAttr::get(globalOp));
+          originalOp->getLoc(), globalOp.getType(),
+          SymbolRefAttr::get(globalOp));
 
       Value replacement;
       if (auto constantOp = dyn_cast<arith::ConstantOp>(originalOp)) {
         // Directly replace constant with global constant value.
-        replacement = loadOp.result();
+        replacement = loadOp.getResult();
       } else {
         assert(false && "unhandled constant op type");
       }

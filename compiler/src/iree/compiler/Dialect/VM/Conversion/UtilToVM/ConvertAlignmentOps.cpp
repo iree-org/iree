@@ -31,10 +31,10 @@ void insertAlignOps(IREE::Util::AlignOp srcOp,
   auto oneConstant = rewriter.createOrFold<CONST_OP>(srcOp.getLoc(), 1);
   // (alignment - 1)
   auto alignmentValue = rewriter.createOrFold<SUB_OP>(
-      srcOp.getLoc(), integerType, adaptor.alignment(), oneConstant);
+      srcOp.getLoc(), integerType, adaptor.getAlignment(), oneConstant);
   // value + (alignment - 1)
   auto valueAddedValue = rewriter.createOrFold<ADD_OP>(
-      srcOp.getLoc(), integerType, adaptor.value(), alignmentValue);
+      srcOp.getLoc(), integerType, adaptor.getValue(), alignmentValue);
   // ~(alignment - 1)
   auto notAlignmentValue = rewriter.createOrFold<NOT_OP>(
       srcOp.getLoc(), integerType, alignmentValue);
@@ -49,7 +49,7 @@ struct AlignOpConversion : public OpConversionPattern<IREE::Util::AlignOp> {
   LogicalResult matchAndRewrite(
       IREE::Util::AlignOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    Type valueType = adaptor.value().getType();
+    Type valueType = adaptor.getValue().getType();
     if (valueType.isInteger(32)) {
       insertAlignOps<IREE::VM::ConstI32Op, IREE::VM::SubI32Op,
                      IREE::VM::AddI32Op, IREE::VM::NotI32Op,

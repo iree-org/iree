@@ -27,8 +27,8 @@ namespace Util {
 static DenseSet<StringRef> gatherImmutableGlobals(mlir::ModuleOp moduleOp) {
   DenseSet<StringRef> set;
   for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOp>()) {
-    if (!globalOp.is_mutable()) {
-      set.insert(globalOp.sym_name());
+    if (!globalOp.getIsMutable()) {
+      set.insert(globalOp.getSymName());
     }
   }
   return set;
@@ -49,13 +49,13 @@ static void hoistImmutableLoads(Region &region,
   for (auto &block : region) {
     auto ops = llvm::to_vector<8>(block.getOps<IREE::Util::GlobalLoadOp>());
     for (auto &op : ops) {
-      if (!immutableGlobals.contains(op.global())) continue;
-      auto globalRef = op.globalAttr().cast<Attribute>();
+      if (!immutableGlobals.contains(op.getGlobal())) continue;
+      auto globalRef = op.getGlobalAttr().cast<Attribute>();
       auto it = loadOps.find(globalRef);
       if (it == loadOps.end()) {
         // Move to entry block; even if it's already there (so loads are
         // hoisted at the same time).
-        LLVM_DEBUG(llvm::dbgs() << "moving immutable global " << op.global()
+        LLVM_DEBUG(llvm::dbgs() << "moving immutable global " << op.getGlobal()
                                 << " load to the entry block\n");
         if (lastEntryOp) {
           op->moveAfter(lastEntryOp);
@@ -66,7 +66,7 @@ static void hoistImmutableLoads(Region &region,
         lastEntryOp = op;
       } else {
         LLVM_DEBUG(llvm::dbgs()
-                   << "CSE'ing immutable global " << op.global() << "\n");
+                   << "CSE'ing immutable global " << op.getGlobal() << "\n");
         opReplacements.push_back({op, it->getSecond()});
       }
     }
@@ -152,13 +152,13 @@ static bool optimizeBuckets(
 
     if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(ops.front())) {
       // If the head op is a load we can move that to the top of the block.
-      LLVM_DEBUG(llvm::dbgs() << "moving mutable global " << loadOp.global()
+      LLVM_DEBUG(llvm::dbgs() << "moving mutable global " << loadOp.getGlobal()
                               << " load upward\n");
       moveOpUpInBlock(block, ops.front());
     }
     if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOp>(ops.back())) {
       // If the tail op is a store we can move that to the bottom of the block.
-      LLVM_DEBUG(llvm::dbgs() << "moving mutable global " << storeOp.global()
+      LLVM_DEBUG(llvm::dbgs() << "moving mutable global " << storeOp.getGlobal()
                               << " store downward\n");
       moveOpDownInBlock(block, ops.back());
     }
@@ -200,11 +200,11 @@ static bool rearrangeBlockGlobalAccesses(
   block.walk([&](Operation *op) {
     auto &buckets = sequencedBuckets.back();
     if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(op)) {
-      if (!immutableGlobals.contains(loadOp.global())) {
-        buckets[loadOp.global()].push_back(op);
+      if (!immutableGlobals.contains(loadOp.getGlobal())) {
+        buckets[loadOp.getGlobal()].push_back(op);
       }
     } else if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOp>(op)) {
-      buckets[storeOp.global()].push_back(op);
+      buckets[storeOp.getGlobal()].push_back(op);
     } else if (doesOpBlockMotion(op)) {
       // Split point - all accesses after this point must not assume anything
       // about accesses before it.

@@ -982,11 +982,11 @@ struct GlobalTimepointConversionPattern
   LogicalResult matchAndRewrite(
       IREE::Util::GlobalOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto initialValue = op.initial_value();
+    auto initialValue = op.getInitialValue();
     if (!initialValue.hasValue()) return failure();
     if (!initialValue->isa<IREE::Stream::TimepointAttr>()) return failure();
     rewriter.updateRootInPlace(
-        op, [&]() { op.initial_valueAttr(rewriter.getI64IntegerAttr(0)); });
+        op, [&]() { op.setInitialValueAttr(rewriter.getI64IntegerAttr(0)); });
     return success();
   }
 };

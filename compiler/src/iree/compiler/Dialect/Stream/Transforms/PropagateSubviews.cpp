@@ -63,7 +63,7 @@ static ExpandedGlobalMap expandResourceGlobals(Operation *rootOp) {
   // Gather all of the resource globals in the root.
   for (auto &region : rootOp->getRegions()) {
     for (auto globalOp : region.getOps<IREE::Util::GlobalOp>()) {
-      if (!globalOp.type().isa<IREE::Stream::ResourceType>()) continue;
+      if (!globalOp.getType().isa<IREE::Stream::ResourceType>()) continue;
       expandedGlobals[globalOp.getName()].resourceOp = globalOp;
     }
   }
@@ -279,29 +279,29 @@ static void expandGlobalLoadOp(IREE::Util::GlobalLoadOp op,
   OpBuilder builder(op);
   builder.setInsertionPointAfter(op);
   auto indexType = builder.getIndexType();
-  auto &expandedGlobal = globalMap[op.global()];
+  auto &expandedGlobal = globalMap[op.getGlobal()];
   Subview subview;
-  subview.resource = op.result();
+  subview.resource = op.getResult();
   subview.resourceSize =
       builder
           .create<IREE::Util::GlobalLoadOp>(
               op.getLoc(), indexType, expandedGlobal.resourceSizeOp.getName())
-          .result();
+          .getResult();
   subview.subviewOffset =
       builder
           .create<IREE::Util::GlobalLoadOp>(
               op.getLoc(), indexType, expandedGlobal.subviewOffsetOp.getName())
-          .result();
+          .getResult();
   subview.subviewLength =
       builder
           .create<IREE::Util::GlobalLoadOp>(
               op.getLoc(), indexType, expandedGlobal.subviewLengthOp.getName())
-          .result();
-  subviewMap[op.result()] = subview;
+          .getResult();
+  subviewMap[op.getResult()] = subview;
   auto subviewOp = builder.create<IREE::Stream::ResourceSubviewOp>(
       op.getLoc(), subview.resource, subview.resourceSize,
       subview.subviewOffset, subview.subviewLength);
-  op.result().replaceAllUsesExcept(subviewOp.result(), subviewOp);
+  op.getResult().replaceAllUsesExcept(subviewOp.result(), subviewOp);
 }
 
 // Moves resource subviews from global stores to loads.
@@ -323,8 +323,8 @@ static void expandGlobalStoreOp(IREE::Util::GlobalStoreOp op,
   OpBuilder builder(op);
   builder.setInsertionPointAfter(op);
   auto subview =
-      consumeSubview(op.getLoc(), op.value(), subviewMap, indexSet, builder);
-  auto &expandedGlobal = globalMap[op.global()];
+      consumeSubview(op.getLoc(), op.getValue(), subviewMap, indexSet, builder);
+  auto &expandedGlobal = globalMap[op.getGlobal()];
   builder.create<IREE::Util::GlobalStoreOp>(
       op.getLoc(), subview.resource, expandedGlobal.resourceOp.getName());
   builder.create<IREE::Util::GlobalStoreOp>(

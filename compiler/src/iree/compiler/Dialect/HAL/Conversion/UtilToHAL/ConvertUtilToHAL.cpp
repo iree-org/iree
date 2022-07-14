@@ -25,12 +25,12 @@ struct GlobalConversionPattern
   LogicalResult matchAndRewrite(
       IREE::Util::GlobalOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto newType = getTypeConverter()->convertType(op.type());
-    if (newType == op.type()) return failure();
+    auto newType = getTypeConverter()->convertType(op.getType());
+    if (newType == op.getType()) return failure();
     rewriter.updateRootInPlace(op, [&]() {
       // NOTE: the initial value may be invalid here! We rely on
       // dialect-specific conversions to handle it.
-      op.typeAttr(TypeAttr::get(newType));
+      op.setTypeAttr(TypeAttr::get(newType));
     });
     return success();
   }
@@ -44,9 +44,9 @@ void populateUtilToHALPatterns(MLIRContext *context,
                                RewritePatternSet &patterns) {
   conversionTarget.addDynamicallyLegalOp<IREE::Util::GlobalOp>(
       [&](IREE::Util::GlobalOp op) {
-        return typeConverter.isLegal(op.type()) &&
-               (!op.initial_value().hasValue() ||
-                typeConverter.isLegal(op.initial_valueAttr().getType()));
+        return typeConverter.isLegal(op.getType()) &&
+               (!op.getInitialValue().hasValue() ||
+                typeConverter.isLegal(op.getInitialValueAttr().getType()));
       });
   addGenericLegalOp<IREE::Util::GlobalLoadOp>(conversionTarget, typeConverter);
   addGenericLegalOp<IREE::Util::GlobalStoreOp>(conversionTarget, typeConverter);

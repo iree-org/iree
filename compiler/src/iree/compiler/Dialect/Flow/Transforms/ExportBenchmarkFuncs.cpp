@@ -78,7 +78,7 @@ static IREE::Util::GlobalOp createBufferLikeGlobalOp(
       loc, tensorType, zeroOp, /*result_dims=*/ValueRange{});
   // hal.tensor.export
   auto bufferExportOp = initializerBuilder.create<IREE::HAL::TensorExportOp>(
-      loc, globalOp.type(), splatOp.result());
+      loc, globalOp.getType(), splatOp.result());
   // util.do_not_optimize (try to prevent optimizations across the export)
   auto dnoOp = initializerBuilder.create<IREE::Util::DoNotOptimizeOp>(
       loc, bufferExportOp.target());

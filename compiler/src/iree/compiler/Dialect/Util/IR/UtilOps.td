@@ -357,7 +357,7 @@ def Util_InitializerOp : Util_Op<"initializer", [
   }];
 
   let arguments = (ins
-    TypeAttr:$function_type
+    TypeAttrOf<FunctionType>:$function_type
   );
 
   let regions = (region AnyRegion:$body);
@@ -375,12 +375,6 @@ def Util_InitializerOp : Util_Op<"initializer", [
     Block *addEntryBlock();
     Block *addBlock();
 
-    FunctionType getFunctionType() {
-      return getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName())
-          .getValue()
-          .cast<FunctionType>();
-    }
-
     /// Returns the argument types of this function.
     ArrayRef<Type> getArgumentTypes() { return {}; }
 
@@ -389,7 +383,7 @@ def Util_InitializerOp : Util_Op<"initializer", [
 
     LogicalResult verifyType() { return success(); }
 
-    Region *getCallableRegion() { return &body(); }
+    Region *getCallableRegion() { return &getBody(); }
     ArrayRef<Type> getCallableResults() { return {}; }
   }];
 
@@ -460,14 +454,7 @@ def Util_GlobalOp : Util_Op<"global", [
   ];
 
   let extraClassDeclaration = [{
-    StringRef getSymbolName() { return sym_name(); }
-
-    bool isMutable() { return is_mutable(); }
-    void makeMutable() { (*this)->setAttr("is_mutable", UnitAttr::get(getContext())); }
-
-    Attribute getInitialValueAttr() { return initial_valueAttr(); }
     void clearInitialValue() { (*this)->removeAttr("initial_value"); }
-    void setInitialValue(Attribute attr) { (*this)->setAttr("initial_value", attr); }
   }];
 
   let hasVerifier = 1;

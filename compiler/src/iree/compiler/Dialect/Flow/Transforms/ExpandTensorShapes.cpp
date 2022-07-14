@@ -67,7 +67,7 @@ static ExpandedGlobalMap expandGlobalTensorDims(Operation *rootOp) {
   // Gather all of the dynamically-shaped tensor globals in the root.
   for (auto &region : rootOp->getRegions()) {
     for (auto globalOp : region.getOps<IREE::Util::GlobalOp>()) {
-      if (isDynamicTensor(globalOp.type())) {
+      if (isDynamicTensor(globalOp.getType())) {
         expandedGlobals[globalOp.getName()].tensorOp = globalOp;
       }
     }
@@ -81,7 +81,7 @@ static ExpandedGlobalMap expandGlobalTensorDims(Operation *rootOp) {
     OpBuilder builder(global.tensorOp);
     builder.setInsertionPointAfter(global.tensorOp);
 
-    auto tensorType = global.tensorOp.type().cast<RankedTensorType>();
+    auto tensorType = global.tensorOp.getType().cast<RankedTensorType>();
     for (auto it : llvm::enumerate(tensorType.getShape())) {
       if (it.value() == ShapedType::kDynamicSize) {
         auto dimName =
@@ -259,22 +259,22 @@ static void expandGlobalLoadOp(IREE::Util::GlobalLoadOp op,
   OpBuilder builder(op);
   builder.setInsertionPointAfter(op);
   auto indexType = builder.getIndexType();
-  auto &expandedGlobal = globalMap[op.global()];
+  auto &expandedGlobal = globalMap[op.getGlobal()];
   ExpandedValue expandedValue;
-  expandedValue.tensor = op.result();
+  expandedValue.tensor = op.getResult();
   expandedValue.dynamicDims.reserve(expandedGlobal.dynamicDimOps.size());
   for (auto dimOp : expandedGlobal.dynamicDimOps) {
     expandedValue.dynamicDims.push_back(
         builder
             .create<IREE::Util::GlobalLoadOp>(op.getLoc(), indexType,
                                               dimOp.getName())
-            .result());
+            .getResult());
   }
-  tensorDimMap[op.result()] = expandedValue;
+  tensorDimMap[op.getResult()] = expandedValue;
   auto tieShapeOp = builder.create<IREE::Flow::TensorTieShapeOp>(
       op.getLoc(), expandedValue.tensor.getType(), expandedValue.tensor,
       expandedValue.dynamicDims);
-  op.result().replaceAllUsesExcept(tieShapeOp.result(), tieShapeOp);
+  op.getResult().replaceAllUsesExcept(tieShapeOp.getResult(), tieShapeOp);
 }
 
 // Moves tensor dims from global stores to loads.
@@ -293,9 +293,9 @@ static void expandGlobalStoreOp(IREE::Util::GlobalStoreOp op,
   if (!usesDynamicTensors(op)) return;
   OpBuilder builder(op);
   builder.setInsertionPointAfter(op);
-  auto expandedValue = consumeExpandedValue(op.getLoc(), op.value(),
+  auto expandedValue = consumeExpandedValue(op.getLoc(), op.getValue(),
                                             tensorDimMap, indexSet, builder);
-  auto &expandedGlobal = globalMap[op.global()];
+  auto &expandedGlobal = globalMap[op.getGlobal()];
   builder.create<IREE::Util::GlobalStoreOp>(op.getLoc(), expandedValue.tensor,
                                             expandedGlobal.tensorOp.getName());
   for (auto it :

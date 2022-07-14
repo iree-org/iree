@@ -153,7 +153,7 @@ static IREE::Util::GlobalOp appendGlobalBuffer(
   auto bufferUsage = IREE::HAL::BufferUsageBitfield::Transfer |
                      IREE::HAL::BufferUsageBitfield::DispatchStorage;
   auto allocateOp = initBuilder.create<IREE::HAL::AllocatorAllocateOp>(
-      loc, globalOp.type(), allocator, memoryTypes, bufferUsage,
+      loc, globalOp.getType(), allocator, memoryTypes, bufferUsage,
       indexSet.get(totalLength));
 
   initBuilder.create<IREE::Util::GlobalStoreOp>(loc, allocateOp.result(),
@@ -252,7 +252,7 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
   // Push descriptor sets.
   auto buffer =
       funcBuilder.create<IREE::Util::GlobalLoadOp>(loc, bufferGlobalOp)
-          .result();
+          .getResult();
   int64_t currentSet = -1;
   SmallVector<IREE::HAL::DescriptorSetBindingValue> bindingValues;
   auto flushSet = [&]() {
