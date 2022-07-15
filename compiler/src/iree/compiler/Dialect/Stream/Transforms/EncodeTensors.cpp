@@ -695,7 +695,7 @@ struct EncodeDispatchTensorStoreOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Flow::DispatchTensorStoreOp op,
                                 PatternRewriter &rewriter) const override {
-    auto sourceType = op.value().getType().cast<RankedTensorType>();
+    auto sourceType = op.getValue().getType().cast<RankedTensorType>();
 
     // Align the element type, if needed.
     auto alignedType = alignTensorType(sourceType);
@@ -707,10 +707,10 @@ struct EncodeDispatchTensorStoreOp
            "stores must extend");
 
     // Extend the sub-byte -> byte type; e.g. i1 -> i8.
-    auto extOp =
-        rewriter.create<arith::ExtUIOp>(op.getLoc(), alignedType, op.value());
+    auto extOp = rewriter.create<arith::ExtUIOp>(op.getLoc(), alignedType,
+                                                 op.getValue());
     rewriter.updateRootInPlace(
-        op, [&]() { op.valueMutable().assign(extOp.getResult()); });
+        op, [&]() { op.getValueMutable().assign(extOp.getResult()); });
     return success();
   }
 };

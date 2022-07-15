@@ -98,7 +98,7 @@ static LogicalResult analyseConstantOp(arith::ConstantOp constantOp,
 /// equivalence class as the source.
 static LogicalResult analyseInterfaceLoadTensorOp(
     IREE::Flow::DispatchTensorLoadOp loadOp, BufferizationPlan &plan) {
-  plan.unionSets(loadOp.getResult(), loadOp.source());
+  plan.unionSets(loadOp.getResult(), loadOp.getSource());
   return success();
 }
 
@@ -130,8 +130,8 @@ static OpType getEquivalentOpOfType(Value value, BufferizationPlan &plan) {
 /// `hal.interface.binding.subspan` op.'
 static bool canSetStoreValueAndTargetAsEquivalent(
     IREE::Flow::DispatchTensorStoreOp storeOp, BufferizationPlan &plan) {
-  Value value = storeOp.value();
-  Value target = storeOp.target();
+  Value value = storeOp.getValue();
+  Value target = storeOp.getTarget();
   auto targetInterfaceOp =
       getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(target, plan);
   assert(targetInterfaceOp);
@@ -163,8 +163,8 @@ static LogicalResult analyseInterfaceStoreTensorOp(
     IREE::Flow::DispatchTensorStoreOp storeOp, BufferizationPlan &plan) {
   // The value and target can be union-ed if the set the value is part of does
   // not contain any hal.interface.binding.subspan from a different binding.
-  Value value = storeOp.value();
-  Value target = storeOp.target();
+  Value value = storeOp.getValue();
+  Value target = storeOp.getTarget();
   if (!getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(target,
                                                                    plan)) {
     return storeOp.emitError(

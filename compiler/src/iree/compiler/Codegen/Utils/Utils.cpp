@@ -172,7 +172,7 @@ bool isReadOnly(Value v) {
           [&](auto op) { return isReadOnly(op.getSource()); })
       .Case<IREE::Flow::DispatchTensorLoadOp>(
           [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
-            return loadOp.source()
+            return loadOp.getSource()
                        .getType()
                        .cast<IREE::Flow::DispatchTensorType>()
                        .getAccess() == IREE::Flow::TensorAccess::ReadOnly;

@@ -193,8 +193,8 @@ void DispatchWorkgroupsOp::getCanonicalizationPatterns(
 //===----------------------------------------------------------------------===//
 
 OpFoldResult DispatchTieShapeOp::fold(ArrayRef<Attribute> operands) {
-  if (dynamic_dims().empty()) {
-    return operand();
+  if (getDynamicDims().empty()) {
+    return getOperand();
   }
   return {};
 }
@@ -232,8 +232,8 @@ struct ReuseDispatchTensorLoadShapeDims
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
-    return success(updateTensorOpDims(loadOp, loadOp.source(),
-                                      loadOp.source_dimsMutable()));
+    return success(updateTensorOpDims(loadOp, loadOp.getSource(),
+                                      loadOp.getSourceDimsMutable()));
   }
 };
 
@@ -253,7 +253,7 @@ struct ConvertDispatchInputLoadOfTensorToSubTensor
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
-    if (!loadOp.source().getType().isa<RankedTensorType>()) {
+    if (!loadOp.getSource().getType().isa<RankedTensorType>()) {
       return failure();
     }
     // If the offsets are empty rely on folding to take care of it.
@@ -262,7 +262,7 @@ struct ConvertDispatchInputLoadOfTensorToSubTensor
       return failure();
     }
     rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
-        loadOp, loadOp.source(), loadOp.getMixedOffsets(),
+        loadOp, loadOp.getSource(), loadOp.getMixedOffsets(),
         loadOp.getMixedSizes(), loadOp.getMixedStrides());
     return success();
   }
@@ -297,8 +297,8 @@ struct DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
     SmallVector<OpFoldResult> mixedStrides(op.getMixedStrides());
 
     // Determine which length-1 dimensions were collapsed.
-    auto sourceTy = op.source().getType().cast<DispatchTensorType>();
-    auto oldResultTy = op.result().getType().cast<RankedTensorType>();
+    auto sourceTy = op.getSource().getType().cast<DispatchTensorType>();
+    auto oldResultTy = op.getResult().getType().cast<RankedTensorType>();
     auto oldInferredResultTy =
         DispatchTensorLoadOp::inferResultType(sourceTy, mixedSizes);
     llvm::SmallVector<bool> dropDim(oldInferredResultTy.getRank(), true);
@@ -332,7 +332,7 @@ struct DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
 
     // We need to resolve the new inferred type with the specified type.
     auto newOp = rewriter.create<DispatchTensorLoadOp>(
-        op.getLoc(), resultTy, op.source(), op.source_dims(), mixedOffsets,
+        op.getLoc(), resultTy, op.getSource(), op.getSourceDims(), mixedOffsets,
         mixedSizes, mixedStrides);
     rewriter.replaceOpWithNewOp<tensor::CastOp>(op, op.getResult().getType(),
                                                 newOp.getResult());
@@ -356,10 +356,10 @@ void DispatchTensorLoadOp::getCanonicalizationPatterns(
 // verification. Fold such uses of the offsets, size and strides are emtpy.
 // i.e, flow.dispatch.input.load %v -> %v
 OpFoldResult DispatchTensorLoadOp::fold(ArrayRef<Attribute> operands) {
-  if (source().getType() && source().getType().isa<RankedTensorType>() &&
+  if (getSource().getType() && getSource().getType().isa<RankedTensorType>() &&
       getMixedOffsets().empty() && getMixedSizes().empty() &&
       getMixedStrides().empty()) {
-    return source();
+    return getSource();
   }
   return {};
 }
@@ -375,8 +375,8 @@ struct ReuseDispatchTensorStoreShapeDims
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
-    return success(updateTensorOpDims(storeOp, storeOp.target(),
-                                      storeOp.target_dimsMutable()));
+    return success(updateTensorOpDims(storeOp, storeOp.getTarget(),
+                                      storeOp.getTargetDimsMutable()));
   }
 };
 
@@ -385,12 +385,12 @@ struct FoldCastOpIntoDispatchStoreOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
-    if (!storeOp.value().getDefiningOp<tensor::CastOp>()) return failure();
-    auto parentOp = storeOp.value().getDefiningOp<tensor::CastOp>();
+    if (!storeOp.getValue().getDefiningOp<tensor::CastOp>()) return failure();
+    auto parentOp = storeOp.getValue().getDefiningOp<tensor::CastOp>();
     rewriter.replaceOpWithNewOp<DispatchTensorStoreOp>(
-        storeOp, parentOp.getSource(), storeOp.target(), storeOp.target_dims(),
-        storeOp.offsets(), storeOp.sizes(), storeOp.strides(),
-        storeOp.static_offsets(), storeOp.static_sizes(),
+        storeOp, parentOp.getSource(), storeOp.getTarget(),
+        storeOp.getTargetDims(), storeOp.offsets(), storeOp.sizes(),
+        storeOp.strides(), storeOp.static_offsets(), storeOp.static_sizes(),
         storeOp.static_strides());
     return success();
   }
@@ -458,7 +458,7 @@ static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
 OpFoldResult TensorConstantOp::fold(ArrayRef<Attribute> operands) {
   auto dynamicType = getType();
   if (dynamicType.getNumDynamicDims() == 0) {
-    return value();
+    return getValue();
   }
   return {};
 }
@@ -470,7 +470,7 @@ struct ExpandDynamicShapeConstant : public OpRewritePattern<TensorConstantOp> {
   LogicalResult matchAndRewrite(TensorConstantOp op,
                                 PatternRewriter &rewriter) const override {
     auto constantOp =
-        rewriter.create<arith::ConstantOp>(op.getLoc(), op.value());
+        rewriter.create<arith::ConstantOp>(op.getLoc(), op.getValue());
     auto dynamicType = op.getType();
     auto staticType = constantOp.getType().cast<ShapedType>();
     SmallVector<Value> dynamicDims;
@@ -497,8 +497,8 @@ void TensorConstantOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 OpFoldResult TensorTieShapeOp::fold(ArrayRef<Attribute> operands) {
-  if (dynamic_dims().empty()) {
-    return operand();
+  if (getDynamicDims().empty()) {
+    return getOperand();
   }
   return {};
 }
@@ -509,12 +509,12 @@ void TensorTieShapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 OpFoldResult TensorReshapeOp::fold(ArrayRef<Attribute> operands) {
-  auto sourceType = source().getType().cast<ShapedType>();
-  auto resultType = result().getType().cast<ShapedType>();
-  if (compareShapesEqual(sourceType, source_dims(), resultType,
-                         result_dims())) {
+  auto sourceType = getSource().getType().cast<ShapedType>();
+  auto resultType = getResult().getType().cast<ShapedType>();
+  if (compareShapesEqual(sourceType, getSourceDims(), resultType,
+                         getResultDims())) {
     // Shapes match and this is a no-op so just fold to the source.
-    return source();
+    return getSource();
   }
   return {};
 }
@@ -529,16 +529,16 @@ struct FlattenTensorReshapeChain : public OpRewritePattern<TensorReshapeOp> {
 
   LogicalResult matchAndRewrite(TensorReshapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
-    auto sourceOp =
-        dyn_cast_or_null<TensorReshapeOp>(reshapeOp.source().getDefiningOp());
+    auto sourceOp = dyn_cast_or_null<TensorReshapeOp>(
+        reshapeOp.getSource().getDefiningOp());
     if (!sourceOp) return failure();
 
     // We want the same result value/shape but to source from the ancestor. We
     // need to pull any dynamic dims from that as we don't care about the
     // intermediate reshapes.
     rewriter.replaceOpWithNewOp<TensorReshapeOp>(
-        reshapeOp, reshapeOp.result().getType(), sourceOp.source(),
-        sourceOp.source_dims(), reshapeOp.result_dims());
+        reshapeOp, reshapeOp.getResult().getType(), sourceOp.getSource(),
+        sourceOp.getSourceDims(), reshapeOp.getResultDims());
     return success();
   }
 };
@@ -551,11 +551,11 @@ struct FoldSplatLoadIntoPrimitive : public OpRewritePattern<TensorLoadOp> {
   LogicalResult matchAndRewrite(TensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
     auto sourceOp =
-        dyn_cast_or_null<TensorSplatOp>(loadOp.source().getDefiningOp());
+        dyn_cast_or_null<TensorSplatOp>(loadOp.getSource().getDefiningOp());
 
     if (!sourceOp) return failure();
 
-    rewriter.replaceOp(loadOp, sourceOp.value());
+    rewriter.replaceOp(loadOp, sourceOp.getValue());
     return success();
   }
 };
@@ -565,15 +565,15 @@ struct FoldSplatReshapeIntoSplat : public OpRewritePattern<TensorSplatOp> {
 
   LogicalResult matchAndRewrite(TensorSplatOp splatOp,
                                 PatternRewriter &rewriter) const override {
-    if (!splatOp.result().hasOneUse()) return failure();
+    if (!splatOp.getResult().hasOneUse()) return failure();
 
     auto reshapeOp = dyn_cast_or_null<TensorReshapeOp>(
-        splatOp.result().use_begin()->getOwner());
+        splatOp.getResult().use_begin()->getOwner());
     if (!reshapeOp) return failure();
 
     rewriter.replaceOpWithNewOp<TensorSplatOp>(
-        reshapeOp, reshapeOp.result().getType(), splatOp.value(),
-        reshapeOp.result_dims());
+        reshapeOp, reshapeOp.getResult().getType(), splatOp.getValue(),
+        reshapeOp.getResultDims());
     rewriter.eraseOp(splatOp);
 
     return success();
@@ -743,7 +743,7 @@ OpFoldResult TensorSliceOp::fold(ArrayRef<Attribute> operands) {
   if (llvm::count(operands, nullptr) == 0) {
     // Fully constant arguments so we can perform the slice here.
     auto tensor = operands[0].cast<ElementsAttr>();
-    int64_t rank = source().getType().cast<ShapedType>().getRank();
+    int64_t rank = getSource().getType().cast<ShapedType>().getRank();
     // start = operands[1:1+rank), and length = operands[1+rank:].
     auto start = llvm::to_vector<4>(llvm::map_range(
         operands.drop_front(1).drop_back(rank), [](Attribute value) {
@@ -826,11 +826,11 @@ OpFoldResult TensorUpdateOp::fold(ArrayRef<Attribute> operands) {
                         operands[targetIndex].cast<ElementsAttr>(), indices);
   } else {
     // Replace the entire tensor when the sizes match.
-    auto updateType = update().getType().cast<ShapedType>();
-    auto targetType = target().getType().cast<ShapedType>();
+    auto updateType = getUpdate().getType().cast<ShapedType>();
+    auto targetType = getTarget().getType().cast<ShapedType>();
     if (updateType.hasStaticShape() && targetType.hasStaticShape() &&
         updateType == targetType) {
-      return update();
+      return getUpdate();
     }
   }
   return {};
@@ -845,21 +845,23 @@ struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
 
   LogicalResult matchAndRewrite(TensorUpdateOp updateOp,
                                 PatternRewriter &rewriter) const override {
-    auto targetCastOp = updateOp.target().getDefiningOp<tensor::CastOp>();
-    auto updateCastOp = updateOp.update().getDefiningOp<tensor::CastOp>();
+    auto targetCastOp = updateOp.getTarget().getDefiningOp<tensor::CastOp>();
+    auto updateCastOp = updateOp.getUpdate().getDefiningOp<tensor::CastOp>();
     if (!targetCastOp && !updateCastOp) return failure();
-    auto target = (targetCastOp ? targetCastOp.getSource() : updateOp.target());
-    auto update = (updateCastOp ? updateCastOp.getSource() : updateOp.update());
+    auto target =
+        (targetCastOp ? targetCastOp.getSource() : updateOp.getTarget());
+    auto update =
+        (updateCastOp ? updateCastOp.getSource() : updateOp.getUpdate());
     auto newOp = rewriter.create<TensorUpdateOp>(
         updateOp.getLoc(), target.getType(), target,
-        refreshDimsOnTypeChange(updateOp, updateOp.target().getType(),
-                                target.getType(), updateOp.target_dims(),
+        refreshDimsOnTypeChange(updateOp, updateOp.getTarget().getType(),
+                                target.getType(), updateOp.getTargetDims(),
                                 rewriter),
-        updateOp.start_indices(), update,
-        refreshDimsOnTypeChange(updateOp, updateOp.update().getType(),
-                                update.getType(), updateOp.update_dims(),
+        updateOp.getStartIndices(), update,
+        refreshDimsOnTypeChange(updateOp, updateOp.getUpdate().getType(),
+                                update.getType(), updateOp.getUpdateDims(),
                                 rewriter),
-        updateOp.tied_operandsAttr());
+        updateOp.getTiedOperandsAttr());
     rewriter.replaceOpWithNewOp<tensor::CastOp>(
         updateOp, updateOp.getResult().getType(), newOp.getResult());
     return success();
@@ -871,9 +873,9 @@ struct ReplaceOpIfTensorUpdateOperandEmpty
   using OpRewritePattern<TensorUpdateOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorUpdateOp op,
                                 PatternRewriter &rewriter) const override {
-    auto operand = op.update();
+    auto operand = op.getUpdate();
     if (!isTensorOperandEmpty(operand)) return failure();
-    rewriter.replaceOp(op, op.target());
+    rewriter.replaceOp(op, op.getTarget());
     return success();
   }
 };

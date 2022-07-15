@@ -72,7 +72,7 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
       return failure();
 
     auto subspanOp =
-        loadOp.source()
+        loadOp.getSource()
             .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     if (!subspanOp) return failure();
     assert(subspanOp.dynamic_dims().empty());
@@ -90,7 +90,7 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
 
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
         reshapeOp, reshapeOp.getResultType(), newSubspanOp,
-        loadOp.source_dims());
+        loadOp.getSourceDims());
 
     return success();
   }

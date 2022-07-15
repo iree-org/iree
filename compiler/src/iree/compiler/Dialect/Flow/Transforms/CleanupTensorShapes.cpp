@@ -25,7 +25,7 @@ class CleanupTensorShapesPass
     getOperation()->walk(
         [&](Operation *op) {
           if (auto tieShapeOp = dyn_cast<IREE::Flow::TensorTieShapeOp>(op)) {
-            tieShapeOp.replaceAllUsesWith(tieShapeOp.operand());
+            tieShapeOp.replaceAllUsesWith(tieShapeOp.getOperand());
             tieShapeOp.erase();
           } else if (isa<tensor::DimOp>(op) || isa<tensor::RankOp>(op)) {
             op->emitOpError()
