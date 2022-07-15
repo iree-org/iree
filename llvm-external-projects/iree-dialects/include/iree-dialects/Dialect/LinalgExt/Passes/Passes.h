@@ -26,8 +26,10 @@ std::unique_ptr<OperationPass<>> createPadContractionToBlockSizePass();
 /// Function signature to control reduction splitting. This returns the split
 /// reduction ratio used to split the reduction dimension. The ratio is applied
 /// to the reduction dimension of TopK. If the ratio value is less or equal to 1
-/// then nothing will be done.
-using TopkSplitReductionControlFn = std::function<int64_t(int64_t splitReductionDepth)>;
+/// then nothing will be done. Input is the current depth of recursive split
+/// reduction, starting from 0 (first level).
+using TopkSplitReductionControlFn =
+    std::function<int64_t(int64_t splitReductionDepth)>;
 
 /// Patterns to apply `topk split reduction` pass.
 void populateTopkSplitReductionPattern(
@@ -39,8 +41,7 @@ void populateTopkSplitReductionPattern(
 std::unique_ptr<OperationPass<func::FuncOp>> createTopkSplitReductionPass();
 
 // Marker used as attribute the depth of the split reduction transformations.
-const StringLiteral kSplitReductionDepthMarker =
-    "__split_reduction_depth__";
+const StringLiteral kSplitReductionDepthMarker = "__split_reduction_depth__";
 
 void registerPasses();
 

@@ -103,14 +103,14 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
 
     LinalgExt::TopkSplitReductionControlFn splitReductionFn =
         [&](int64_t splitReductionDepth) -> int64_t {
-           SmallVector<int64_t, 4> reductionRatios(topkSplitReductionRatio.begin(),
-                                topkSplitReductionRatio.end());
-          if (splitReductionDepth >= reductionRatios.size()) {
-            return -1;
-          } else {
-            return reductionRatios[splitReductionDepth];
-          }
-        };
+      SmallVector<int64_t, 4> reductionRatios(topkSplitReductionRatio.begin(),
+                                              topkSplitReductionRatio.end());
+      if (splitReductionDepth >= reductionRatios.size()) {
+        return -1;
+      } else {
+        return reductionRatios[splitReductionDepth];
+      }
+    };
     LinalgExt::populateTopkSplitReductionPattern(
         patterns, splitReductionFn,
         mlir::linalg::LinalgTransformationFilter(
@@ -129,7 +129,8 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
     });
     funcOp->walk([&](LinalgExt::LinalgExtOp op) {
       op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
-      op->removeAttr(mlir::iree_compiler::IREE::LinalgExt::kSplitReductionDepthMarker);
+      op->removeAttr(
+          mlir::iree_compiler::IREE::LinalgExt::kSplitReductionDepthMarker);
     });
   }
 };
