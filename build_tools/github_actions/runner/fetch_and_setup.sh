@@ -7,8 +7,9 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # This script is actually part of the VM image and fetches the rest of the
-# configuration. Longer term, we may want to have an explicit deployment of new
-# scripts instead.
+# configuration. It is invoked on startup through a one-line startup script that
+# calls it. Longer term, we may want to have an explicit deployment of new
+# scripts instead of fetching them directly from HEAD.
 
 set -euo pipefail
 

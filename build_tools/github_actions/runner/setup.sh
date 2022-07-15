@@ -7,11 +7,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Sets up a GitHub actions runner VM. Requires custom attributes to indicate
-# configuration settings and that OS inventory management be set up to enable
-# querying host properties (see
-# https://cloud.google.com/compute/docs/instances/os-inventory-management).
-# It also still requires being passed a runner token (which will go away with
-# the introduction of a proxy service for obtaining registration tokens).
+# configuration settings and uses a proxy service to obtain runner registration
+# tokens (https://github.com/google-github-actions/github-runner-token-proxy).
 
 set -euo pipefail
 
@@ -31,6 +28,8 @@ GITHUB_REGISTRATION_TOKEN="$(curl -sSfL "${GITHUB_TOKEN_PROXY_URL}/register" \
   | jq -r ".token"
 )"
 
+# These use OS inventory management to fetch information about the VM operating
+# system (https://cloud.google.com/compute/docs/instances/os-inventory-management).
 # For some reason, querying these at startup is unreliable. It seems like the
 # guestInventory attributes take a really long time to be populated. For now,
 # anything in here we care about needs to be injected via the
@@ -102,7 +101,9 @@ declare -a args=(
 # I would love to discover another way to print an array while preserving quote
 # escaping. We're not just using `set -x` on the command itself because we don't
 # want to leak the token (even if it's immediately invalidated, still best not
-# to). `:` is the bash noop command that is equivalent to `true`.
+# to). `:` is the bash noop command that is equivalent to `true` so we are
+# "running" a command exclusively to print it using the shell's builtin
+# functionality.
 (set -x; : Running configuration with additional args: "${args[@]}")
 
 ./config.sh --token "${GITHUB_REGISTRATION_TOKEN}" "${args[@]}"
