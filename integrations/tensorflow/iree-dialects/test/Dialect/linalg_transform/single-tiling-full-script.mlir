@@ -29,7 +29,7 @@ transform.with_pdl_patterns {
   transform.structured.canonicalized_sequence %arg0 {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg1
-    %1, %loops:3 = transform.structured.tile %0 {sizes = [4, 4, 4]}
+    %1, %loops:3 = transform.structured.tile %0 [4, 4, 4]
     %2 = get_closest_isolated_parent %1
     transform.structured.vectorize %2 {vectorize_padding = true}
     bufferize

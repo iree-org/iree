@@ -23,7 +23,7 @@ module {
   // CHECK-SAME:      ins(%[[tA]], %[[tB]] : tensor<?x?xf32>, tensor<?x?xf32>)
   // CHECK-SAME:     outs(%[[tC]] : tensor<?x?xf32>) -> tensor<?x?xf32>
   // CHECK-NEXT:   scf.foreach_thread.perform_concurrently {
-  // CHECK-NEXT:     scf.foreach_thread.parallel_insert_slice %[[RES]] into %[[C]]{{.*}} :
+  // CHECK-NEXT:     tensor.parallel_insert_slice %[[RES]] into %[[C]]{{.*}} :
   // CHECK-SAME:       tensor<?x?xf32> into tensor<?x?xf32>
   // CHECK-NEXT:   }
   // CHECK-NEXT: } {thread_dim_mapping = [1, 0]}

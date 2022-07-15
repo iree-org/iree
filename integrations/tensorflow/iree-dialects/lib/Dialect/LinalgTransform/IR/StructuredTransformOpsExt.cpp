@@ -957,9 +957,10 @@ transform_ext::PrintOp::apply(mlir::transform::TransformResults &results,
     return DiagnosedSilenceableFailure::success();
   }
 
-  llvm::outs() << "[[[ IR printer: " << getName() << " single op ]]]\n";
+  llvm::outs() << "[[[ IR printer: " << getName() << " ]]]\n";
   ArrayRef<Operation *> targets = state.getPayloadOps(getTarget());
-  targets.front()->dump();
+  for (Operation *target : targets)
+    llvm::outs() << *target << "\n";
   return DiagnosedSilenceableFailure::success();
 }
 
