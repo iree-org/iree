@@ -76,7 +76,7 @@ struct WorkGroupSwizzlePass
     std::array<IREE::HAL::InterfaceWorkgroupIDOp, 2> oldWorkgroupIds;
     bool xFound = false, yFound = false;
     funcOp.walk([&](IREE::HAL::InterfaceWorkgroupIDOp idOp) {
-      unsigned index = idOp.dimension().getZExtValue();
+      unsigned index = idOp.getDimension().getZExtValue();
       if (index == 0) {
         oldWorkgroupIds[index] = idOp;
         xFound = true;

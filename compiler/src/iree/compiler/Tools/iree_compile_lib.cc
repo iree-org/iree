@@ -300,7 +300,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
                                              "the input executable";
         }
         auto binaryOp = binaryOps.front();
-        auto rawData = binaryOp.data().getRawData();
+        auto rawData = binaryOp.getData().getRawData();
         os.write(rawData.data(), rawData.size());
         return success();
         break;

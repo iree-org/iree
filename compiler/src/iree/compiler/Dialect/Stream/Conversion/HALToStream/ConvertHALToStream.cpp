@@ -28,8 +28,8 @@ struct ConvertTensorImportOp
   LogicalResult matchAndRewrite(
       IREE::HAL::TensorImportOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto sourceType = op.source().getType();
-    auto targetType = op.target_encoding();
+    auto sourceType = op.getSource().getType();
+    auto targetType = op.getTargetEncoding();
     if (!sourceType.isa<IREE::HAL::BufferType>() &&
         !sourceType.isa<IREE::HAL::BufferViewType>()) {
       return rewriter.notifyMatchFailure(op, "unsupported HAL cast conversion");
@@ -45,9 +45,9 @@ struct ConvertTensorImportOp
       if (auto tensorType = targetType.dyn_cast<RankedTensorType>()) {
         // TODO(benvanik): get a name for the tensor (argument name/etc).
         auto message = rewriter.getStringAttr("tensor");
-        if (failed(buildEncodingAssertions(op.getLoc(), adaptor.source(),
+        if (failed(buildEncodingAssertions(op.getLoc(), adaptor.getSource(),
                                            message, tensorType,
-                                           op.target_dims(), rewriter))) {
+                                           op.getTargetDims(), rewriter))) {
           return rewriter.notifyMatchFailure(op, "unsupported tensor type");
         }
       }
@@ -58,11 +58,11 @@ struct ConvertTensorImportOp
         IREE::Stream::Lifetime::External);
     auto resultSize = rewriter.createOrFold<IREE::Stream::TensorSizeOfOp>(
         op.getLoc(), rewriter.getIndexType(),
-        TypeAttr::get(op.target().getType()), adaptor.target_dims(),
+        TypeAttr::get(op.getTarget().getType()), adaptor.getTargetDims(),
         /*affinity=*/nullptr);
     auto newOp = rewriter.create<IREE::Stream::TensorImportOp>(
-        op.getLoc(), resultType, adaptor.source(), TypeAttr::get(targetType),
-        adaptor.target_dims(), resultSize,
+        op.getLoc(), resultType, adaptor.getSource(), TypeAttr::get(targetType),
+        adaptor.getTargetDims(), resultSize,
         /*affinity=*/nullptr);
 
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
@@ -131,33 +131,34 @@ struct ConvertTensorExportOp
   LogicalResult matchAndRewrite(
       IREE::HAL::TensorExportOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto sourceType = op.source_encoding();
-    auto targetType = op.target().getType();
+    auto sourceType = op.getSourceEncoding();
+    auto targetType = op.getTarget().getType();
     if (!targetType.isa<IREE::HAL::BufferType>() &&
         !targetType.isa<IREE::HAL::BufferViewType>()) {
       return rewriter.notifyMatchFailure(op, "unsupported HAL cast conversion");
     }
 
-    auto source = consumeTensorOperand(op.getLoc(), adaptor.source(), rewriter);
+    auto source =
+        consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
     auto externalType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::External);
-    auto exportSource = adaptor.source();
+    auto exportSource = adaptor.getSource();
     auto exportSize = source.resourceSize;
-    if (adaptor.target_storage()) {
+    if (adaptor.getTargetStorage()) {
       // Query the target storage buffer length; we will only populate up to
       // what is required for the output.
       auto storageSize =
           rewriter
               .create<IREE::HAL::BufferLengthOp>(
-                  op.getLoc(), rewriter.getIndexType(), op.target_storage())
-              .result();
+                  op.getLoc(), rewriter.getIndexType(), op.getTargetStorage())
+              .getResult();
 
       // Import the target storage as a resource that we can use as an update
       // target. We overwrite the contents and just cast the storage to the
       // target type so we know we can update it.
       auto importOp = rewriter.create<IREE::Stream::TensorImportOp>(
-          op.getLoc(), externalType, adaptor.target_storage(),
-          TypeAttr::get(sourceType), adaptor.source_dims(), storageSize,
+          op.getLoc(), externalType, adaptor.getTargetStorage(),
+          TypeAttr::get(sourceType), adaptor.getSourceDims(), storageSize,
           /*affinity=*/nullptr);
 
       // Copy the source value into the imported target storage.
@@ -189,7 +190,7 @@ struct ConvertTensorExportOp
     // Export (stream resource to buffer view).
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorExportOp>(
         op, targetType, exportSource, TypeAttr::get(sourceType),
-        adaptor.source_dims(), exportSize,
+        adaptor.getSourceDims(), exportSize,
         /*affinity=*/nullptr);
     return success();
   }
@@ -216,13 +217,13 @@ void populateHALToStreamConversionPatterns(MLIRContext *context,
 
   conversionTarget.addDynamicallyLegalOp<IREE::HAL::TensorImportOp>(
       [&](IREE::HAL::TensorImportOp op) {
-        return typeConverter.isLegal(op.source().getType()) &&
-               typeConverter.isLegal(op.target().getType());
+        return typeConverter.isLegal(op.getSource().getType()) &&
+               typeConverter.isLegal(op.getTarget().getType());
       });
   conversionTarget.addDynamicallyLegalOp<IREE::HAL::TensorExportOp>(
       [&](IREE::HAL::TensorExportOp op) {
-        return typeConverter.isLegal(op.source().getType()) &&
-               typeConverter.isLegal(op.target().getType());
+        return typeConverter.isLegal(op.getSource().getType()) &&
+               typeConverter.isLegal(op.getTarget().getType());
       });
 
   populateHALToStreamConversionPatterns(context, typeConverter, patterns);

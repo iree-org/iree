@@ -50,7 +50,7 @@ struct WorkgroupIdOpInterface
           WorkgroupIdOpInterface, IREE::HAL::InterfaceWorkgroupIDOp> {
   unsigned getDimIndex(Operation *op) const {
     return cast<IREE::HAL::InterfaceWorkgroupIDOp>(op)
-        .dimension()
+        .getDimension()
         .getZExtValue();
   }
 };
@@ -60,7 +60,7 @@ struct WorkgroupCountOpInterface
           WorkgroupCountOpInterface, IREE::HAL::InterfaceWorkgroupCountOp> {
   unsigned getDimIndex(Operation *op) const {
     return cast<IREE::HAL::InterfaceWorkgroupCountOp>(op)
-        .dimension()
+        .getDimension()
         .getZExtValue();
   }
 };
@@ -70,7 +70,7 @@ struct WorkgroupTileSizeOpInterface
           WorkgroupTileSizeOpInterface, IREE::HAL::InterfaceWorkgroupSizeOp> {
   unsigned getDimIndex(Operation *op) const {
     return cast<IREE::HAL::InterfaceWorkgroupSizeOp>(op)
-        .dimension()
+        .getDimension()
         .getZExtValue();
   }
 };

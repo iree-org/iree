@@ -33,15 +33,15 @@ class CommandBufferFillBufferOpConversion
     auto importType = importOp.getFunctionType();
 
     SmallVector<Value, 8> callOperands = {
-        adaptor.command_buffer(),
-        adaptor.target_buffer(),
-        castToImportType(adaptor.target_offset(), rewriter.getI64Type(),
+        adaptor.getCommandBuffer(),
+        adaptor.getTargetBuffer(),
+        castToImportType(adaptor.getTargetOffset(), rewriter.getI64Type(),
                          rewriter),
-        castToImportType(adaptor.length(), rewriter.getI64Type(), rewriter),
+        castToImportType(adaptor.getLength(), rewriter.getI64Type(), rewriter),
     };
 
     // Record the original pattern length then extend it to a 32 bit integer.
-    auto originalPatternType = op.pattern().getType();
+    auto originalPatternType = op.getPattern().getType();
     auto patternBitWidth = originalPatternType.getIntOrFloatBitWidth();
     // The pattern length (in bytes) will be used at runtime to issue the fill
     // command. While the pattern itself will be stored in a 32 bit integer,
@@ -51,7 +51,7 @@ class CommandBufferFillBufferOpConversion
         IREE::Util::getRoundedElementByteWidth(originalPatternType);
     auto patternLengthConst = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
         op.getLoc(), patternLengthBytes, 32);
-    Value pattern = op.pattern();
+    Value pattern = op.getPattern();
     if (patternBitWidth < 32) {
       pattern = rewriter.createOrFold<arith::ExtUIOp>(
           op.getLoc(), rewriter.getIntegerType(32), pattern);
@@ -89,23 +89,23 @@ class CommandBufferPushDescriptorSetOpConversion
     auto importType = importOp.getFunctionType();
 
     SmallVector<Value, 8> callOperands = {
-        adaptor.command_buffer(),
-        adaptor.executable_layout(),
-        adaptor.set(),
+        adaptor.getCommandBuffer(),
+        adaptor.getExecutableLayout(),
+        adaptor.getSet(),
     };
     SmallVector<int16_t, 5> segmentSizes = {
         /*command_buffer=*/-1,
         /*executable_layout=*/-1,
         /*set=*/-1,
         /*bindings=*/
-        static_cast<int16_t>(adaptor.binding_ordinals().size()),
+        static_cast<int16_t>(adaptor.getBindingOrdinals().size()),
     };
-    for (size_t i = 0; i < adaptor.binding_ordinals().size(); ++i) {
-      callOperands.push_back(adaptor.binding_ordinals()[i]);
-      callOperands.push_back(adaptor.binding_buffers()[i]);
-      callOperands.push_back(castToImportType(adaptor.binding_offsets()[i],
+    for (size_t i = 0; i < adaptor.getBindingOrdinals().size(); ++i) {
+      callOperands.push_back(adaptor.getBindingOrdinals()[i]);
+      callOperands.push_back(adaptor.getBindingBuffers()[i]);
+      callOperands.push_back(castToImportType(adaptor.getBindingOffsets()[i],
                                               rewriter.getI64Type(), rewriter));
-      callOperands.push_back(castToImportType(adaptor.binding_lengths()[i],
+      callOperands.push_back(castToImportType(adaptor.getBindingLengths()[i],
                                               rewriter.getI64Type(), rewriter));
     }
 

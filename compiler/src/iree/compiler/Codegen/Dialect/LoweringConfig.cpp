@@ -263,7 +263,7 @@ IREE::Codegen::TranslationInfoAttr getTranslationInfo(
 }
 
 SmallVector<int64_t> getWorkgroupSize(IREE::HAL::ExecutableExportOp exportOp) {
-  if (Optional<ArrayAttr> workgroupSizeAttrList = exportOp.workgroup_size()) {
+  if (Optional<ArrayAttr> workgroupSizeAttrList = exportOp.getWorkgroupSize()) {
     return getIntegerVals(*workgroupSizeAttrList);
   }
   return {};
@@ -277,7 +277,7 @@ void setTranslationInfo(IREE::HAL::ExecutableExportOp exportOp,
   if (!workgroupSize.empty()) {
     MLIRContext *context = exportOp->getContext();
     auto attrs = getIndexIntegerArrayAttr(context, workgroupSize);
-    exportOp.workgroup_sizeAttr(attrs);
+    exportOp.setWorkgroupSizeAttr(attrs);
   }
 }
 

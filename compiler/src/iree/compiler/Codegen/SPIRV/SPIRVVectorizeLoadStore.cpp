@@ -380,15 +380,15 @@ class ProcessInterfaceBindingSubspan final
     assert(memrefType.getRank() > 0 &&
            !ShapedType::isDynamic(memrefType.getShape().back()));
 
-    auto vecMemRef = getVectorizedMemRefType(rewriter, subspanOp.result());
+    auto vecMemRef = getVectorizedMemRefType(rewriter, subspanOp.getResult());
     if (!vecMemRef) {
       return rewriter.notifyMatchFailure(subspanOp,
                                          "cannot get vectorized memref type");
     }
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp, *vecMemRef, subspanOp.set(), subspanOp.binding(),
-        subspanOp.type(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
-        subspanOp.alignmentAttr());
+        subspanOp, *vecMemRef, subspanOp.getSet(), subspanOp.getBinding(),
+        subspanOp.getDescriptorType(), subspanOp.getByteOffset(),
+        subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr());
     return success();
   }
 };

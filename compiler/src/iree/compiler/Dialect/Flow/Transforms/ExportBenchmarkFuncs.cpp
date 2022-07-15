@@ -81,7 +81,7 @@ static IREE::Util::GlobalOp createBufferLikeGlobalOp(
       loc, globalOp.getType(), splatOp.getResult());
   // util.do_not_optimize (try to prevent optimizations across the export)
   auto dnoOp = initializerBuilder.create<IREE::Util::DoNotOptimizeOp>(
-      loc, bufferExportOp.target());
+      loc, bufferExportOp.getTarget());
   // util.global.store
   initializerBuilder.create<IREE::Util::GlobalStoreOp>(loc, dnoOp.getResult(0),
                                                        globalOp.getName());
@@ -115,7 +115,7 @@ static IREE::Util::GlobalOp createImportBufferViewGlobalOp(
   }
 
   // Extract the type, which must be a static tensor.
-  auto targetType = importOp.target().getType();
+  auto targetType = importOp.getTarget().getType();
   auto tensorType = targetType.dyn_cast<RankedTensorType>();
   if (!tensorType || !tensorType.hasStaticShape()) {
     mlir::emitError(loc) << "unsupported buffer view import tensor type on "
@@ -156,7 +156,7 @@ static IREE::Util::GlobalOp createExportBufferGlobalOp(std::string name,
   }
 
   // Extract the type, which must be a static tensor.
-  auto sourceType = exportOp.source_encoding();
+  auto sourceType = exportOp.getSourceEncoding();
   auto tensorType = sourceType.dyn_cast<RankedTensorType>();
   if (!tensorType || !tensorType.hasStaticShape()) {
     mlir::emitError(loc) << "unsupported buffer view export tensor type on "

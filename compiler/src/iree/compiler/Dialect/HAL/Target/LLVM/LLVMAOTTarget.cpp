@@ -201,7 +201,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
         sourceExecutableOps.front().getVisibility());
 
     // Add our hal.executable.variant with an empty module.
-    builder.setInsertionPointToStart(linkedExecutableOp.getBody());
+    builder.setInsertionPointToStart(&linkedExecutableOp.getBlock());
     auto linkedTargetOp = builder.create<IREE::HAL::ExecutableVariantOp>(
         moduleOp.getLoc(), sharedTargetAttr.getSymbolNameFragment(),
         sharedTargetAttr);
@@ -319,7 +319,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       // Optionally entry points may specify that they require workgroup local
       // memory. We fetch that value here and plumb it through so the runtime
       // knows how much memory to reserve and pass in.
-      int64_t localMemorySize = exportOp.workgroup_local_memory()
+      int64_t localMemorySize = exportOp.getWorkgroupLocalMemory()
                                     .getValueOr(APInt(64, 0))
                                     .getSExtValue();
 
@@ -519,7 +519,8 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     std::vector<uint8_t> libraryNameVector(libraryName.begin(),
                                            libraryName.end());
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.sym_name(), "static", libraryNameVector);
+        variantOp.getLoc(), variantOp.getSymName(), "static",
+        libraryNameVector);
 
     return success();
   }
@@ -567,9 +568,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
 
       // Add the binary to the parent hal.executable.
       auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-          variantOp.getLoc(), variantOp.sym_name(),
-          variantOp.target().getFormat(), bufferAttr);
-      binaryOp.mime_typeAttr(
+          variantOp.getLoc(), variantOp.getSymName(),
+          variantOp.getTarget().getFormat(), bufferAttr);
+      binaryOp.setMimeTypeAttr(
           executableBuilder.getStringAttr("application/x-elf"));
     } else {
       const char *mimeType = nullptr;
@@ -625,9 +626,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
 
       // Add the binary to the parent hal.executable.
       auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-          variantOp.getLoc(), variantOp.sym_name(),
-          variantOp.target().getFormat(), bufferAttr);
-      binaryOp.mime_typeAttr(executableBuilder.getStringAttr(mimeType));
+          variantOp.getLoc(), variantOp.getSymName(),
+          variantOp.getTarget().getFormat(), bufferAttr);
+      binaryOp.setMimeTypeAttr(executableBuilder.getStringAttr(mimeType));
     }
 
     return success();

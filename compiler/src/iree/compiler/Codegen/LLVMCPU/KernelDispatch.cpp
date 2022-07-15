@@ -83,7 +83,7 @@ static Optional<int64_t> getNativeVectorSizeInBytes(func::FuncOp entryPointFn) {
   auto variantOp =
       entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   if (!variantOp) return llvm::None;
-  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
+  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
   if (!targetAttr) return llvm::None;
   auto config = targetAttr.getConfiguration();
   if (!config) return llvm::None;

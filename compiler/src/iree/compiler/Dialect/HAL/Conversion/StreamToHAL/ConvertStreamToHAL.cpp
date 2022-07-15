@@ -26,14 +26,14 @@ namespace {
 static Value lookupDeviceFor(Operation *op, OpBuilder &builder) {
   // TODO(benvanik): make this do multi-device lookup and other fancy things.
   auto lookupOp = builder.create<IREE::HAL::ExSharedDeviceOp>(op->getLoc());
-  return lookupOp.result();
+  return lookupOp.getResult();
 }
 
 static Value lookupAllocatorFor(Operation *op, OpBuilder &builder) {
   auto device = lookupDeviceFor(op, builder);
   auto allocatorOp =
       builder.create<IREE::HAL::DeviceAllocatorOp>(op->getLoc(), device);
-  return allocatorOp.result();
+  return allocatorOp.getResult();
 }
 
 // Scans all of the stream.cmd.* ops in the region to derive a command category.
@@ -215,7 +215,7 @@ struct ResourceAllocOpPattern
       auto allocateOp = rewriter.create<IREE::HAL::AllocatorAllocateOp>(
           allocOp.getLoc(), bufferType, allocator, memoryTypes, bufferUsage,
           storageSize);
-      results.push_back(allocateOp.result());
+      results.push_back(allocateOp.getResult());
     }
 
     rewriter.replaceOp(allocOp, results);
@@ -252,7 +252,7 @@ struct ResourceAllocaOpPattern
         rewriter.create<arith::ConstantIntOp>(allocaOp.getLoc(), 0, 64)
             .getResult();
 
-    rewriter.replaceOp(allocaOp, {allocateOp.result(), resolvedTimepoint});
+    rewriter.replaceOp(allocaOp, {allocateOp.getResult(), resolvedTimepoint});
     return success();
   }
 };
@@ -668,13 +668,13 @@ struct CmdDispatchOpPattern
       auto exportOp = *exportIt;
 
       auto *region = switchRewriter.addConditionRegion(
-          variantOp.target().getMatchExpression());
+          variantOp.getTarget().getMatchExpression());
       auto &entryBlock = region->front();
       auto caseBuilder = OpBuilder::atBlockBegin(&entryBlock);
 
       // Record push constants and buffer bindings.
       recordParameters(loc, device, commandBuffer, dispatchOp, adaptor,
-                       exportOp.layout(), caseBuilder);
+                       exportOp.getLayout(), caseBuilder);
 
       // Dispatch with a target-specific workgroup count.
       auto exportSymRef =
@@ -705,7 +705,7 @@ struct CmdDispatchOpPattern
             .create<IREE::HAL::ExecutableLayoutLookupOp>(
                 loc, IREE::HAL::ExecutableLayoutType::get(loc.getContext()),
                 device, layoutAttr)
-            .result();
+            .getResult();
 
     // Push constant values.
     // TODO(#5322): symbolic push constant names on the hal.interface so we can
@@ -809,7 +809,7 @@ struct CmdExecuteOpPattern
             .create<IREE::HAL::CommandBufferCreateOp>(
                 loc, rewriter.getType<IREE::HAL::CommandBufferType>(), device,
                 modes, commandCategories)
-            .result();
+            .getResult();
     mapping->mapCommandBuffer(executeOp, commandBuffer);
 
     // Run through the execution region and serialize execution by inserting
@@ -904,7 +904,7 @@ struct TimepointImportOpPattern
     auto awaitOp = rewriter.create<IREE::HAL::SemaphoreAwaitOp>(
         importOp.getLoc(), rewriter.getI32Type(), operands[0], operands[1]);
     rewriter.create<IREE::Util::StatusCheckOkOp>(
-        importOp.getLoc(), awaitOp.status(),
+        importOp.getLoc(), awaitOp.getStatus(),
         "failed to wait on imported semaphore");
     rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(importOp, 0, 64);
     return success();

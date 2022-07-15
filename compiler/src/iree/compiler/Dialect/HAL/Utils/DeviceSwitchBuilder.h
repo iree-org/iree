@@ -123,7 +123,7 @@ class DeviceSwitchBuilder {
     SmallVector<Attribute, 4> conditionAttrs;
     llvm::SetVector<Value> capturedFromAbove;
     for (auto caseOp : caseOps_) {
-      conditionAttrs.push_back(caseOp.conditions().getValue()[0]);
+      conditionAttrs.push_back(caseOp.getConditions().getValue()[0]);
     }
     auto switchOp = builder_.create<IREE::HAL::DeviceSwitchOp>(
         loc_, resultTypes_, device_, conditionAttrs);
@@ -170,7 +170,7 @@ class DeviceSwitchRewriter {
     SmallVector<Attribute, 4> conditionAttrs;
     llvm::SetVector<Value> capturedFromAbove;
     for (auto caseOp : caseOps_) {
-      conditionAttrs.push_back(caseOp.conditions().getValue()[0]);
+      conditionAttrs.push_back(caseOp.getConditions().getValue()[0]);
     }
     auto switchOp = rewriter_.create<IREE::HAL::DeviceSwitchOp>(
         loc_, resultTypes_, device_, conditionAttrs);

@@ -163,7 +163,7 @@ class WrapEntryPointsPass
         auto argLoc = arg.value().getLoc();
         auto importOp = entryBuilder.create<IREE::HAL::TensorImportOp>(
             argLoc, oldType, arg.value());
-        arguments.push_back(importOp.target());
+        arguments.push_back(importOp.getTarget());
       } else {
         arguments.push_back(arg.value());
       }

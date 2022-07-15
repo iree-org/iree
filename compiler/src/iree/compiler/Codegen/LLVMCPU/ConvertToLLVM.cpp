@@ -741,7 +741,7 @@ class ConvertHALInterfaceWorkgroupIDOp : public ConvertToLLVMPattern {
     if (!llvmFuncOp) return failure();
     HALDispatchABI abi(llvmFuncOp, getTypeConverter());
     int32_t dim = (int32_t)cast<IREE::HAL::InterfaceWorkgroupIDOp>(op)
-                      .dimension()
+                      .getDimension()
                       .getZExtValue();
     auto resultType = typeConverter->convertType(op->getResult(0).getType());
     rewriter.replaceOp(
@@ -768,7 +768,7 @@ class ConvertHALInterfaceWorkgroupSizeOp : public ConvertToLLVMPattern {
     if (!llvmFuncOp) return failure();
     HALDispatchABI abi(llvmFuncOp, getTypeConverter());
     int32_t dim = (int32_t)cast<IREE::HAL::InterfaceWorkgroupSizeOp>(op)
-                      .dimension()
+                      .getDimension()
                       .getZExtValue();
     auto resultType = typeConverter->convertType(op->getResult(0).getType());
     rewriter.replaceOp(
@@ -795,7 +795,7 @@ class ConvertHALInterfaceWorkgroupCountOp : public ConvertToLLVMPattern {
     if (!llvmFuncOp) return failure();
     HALDispatchABI abi(llvmFuncOp, getTypeConverter());
     int32_t dim = (int32_t)cast<IREE::HAL::InterfaceWorkgroupCountOp>(op)
-                      .dimension()
+                      .getDimension()
                       .getZExtValue();
     auto resultType = typeConverter->convertType(op->getResult(0).getType());
     rewriter.replaceOp(
@@ -822,7 +822,7 @@ class ConvertHALInterfaceLoadConstant : public ConvertToLLVMPattern {
     if (!llvmFuncOp) return failure();
     HALDispatchABI abi(llvmFuncOp, getTypeConverter());
     auto loadConstantOp = cast<IREE::HAL::InterfaceConstantLoadOp>(op);
-    int64_t index = loadConstantOp.index().getZExtValue();
+    int64_t index = loadConstantOp.getIndex().getZExtValue();
     auto resultType = typeConverter->convertType(op->getResult(0).getType());
     rewriter.replaceOp(
         op, abi.loadPushConstant(op->getLoc(), index, resultType, rewriter));
@@ -856,9 +856,9 @@ class ConvertHALInterfaceBindingSubspanOp : public ConvertToLLVMPattern {
           "failed to convert interface.binding.subspan result to memref type");
     }
     auto memRefDesc =
-        abi.loadBinding(op->getLoc(), newOperands.bindingAttr().getInt(),
-                        newOperands.byte_offset(), memRefType,
-                        newOperands.dynamic_dims(), rewriter);
+        abi.loadBinding(op->getLoc(), newOperands.getBindingAttr().getInt(),
+                        newOperands.getByteOffset(), memRefType,
+                        newOperands.getDynamicDims(), rewriter);
     rewriter.replaceOp(op, {memRefDesc});
     return success();
   }
@@ -890,7 +890,7 @@ static std::string getStringAttrFromTargetAttr(ModuleOp module,
                                                StringRef attrName) {
   if (auto variantOp =
           module->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
-    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
+    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
     if (auto config = targetAttr.getConfiguration()) {
       if (auto attr = config.getAs<StringAttr>(attrName)) {
         return attr.getValue().str();

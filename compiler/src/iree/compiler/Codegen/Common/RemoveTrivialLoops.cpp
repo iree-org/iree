@@ -65,7 +65,7 @@ static Optional<std::pair<AffineExpr, AffineExpr>> getWorkgroupRange(
     OpBuilder builder(processorValue.getContext());
 
     // Can't infer the range when workroupCount is unknown.
-    unsigned index = idOp.dimension().getZExtValue();
+    unsigned index = idOp.getDimension().getZExtValue();
     if (!workgroupCount[index]) return llvm::None;
 
     AffineExpr zero = builder.getAffineConstantExpr(0);
@@ -77,7 +77,7 @@ static Optional<std::pair<AffineExpr, AffineExpr>> getWorkgroupRange(
     OpBuilder builder(processorValue.getContext());
 
     // Can't infer the range when workroupCount is unknown.
-    unsigned index = dimOp.dimension().getZExtValue();
+    unsigned index = dimOp.getDimension().getZExtValue();
     if (!workgroupCount[index]) return llvm::None;
 
     AffineExpr bound = builder.getAffineConstantExpr(workgroupCount[index]);

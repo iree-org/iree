@@ -142,8 +142,8 @@ static bool canSetStoreValueAndTargetAsEquivalent(
   if (auto valueInterfaceOp =
           getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(value,
                                                                       plan)) {
-    if (targetInterfaceOp.binding() != valueInterfaceOp.binding() ||
-        targetInterfaceOp.byte_offset() != valueInterfaceOp.byte_offset()) {
+    if (targetInterfaceOp.getBinding() != valueInterfaceOp.getBinding() ||
+        targetInterfaceOp.getByteOffset() != valueInterfaceOp.getByteOffset()) {
       // If the binding and offsets are different, map these to different
       // memrefs.
       return false;

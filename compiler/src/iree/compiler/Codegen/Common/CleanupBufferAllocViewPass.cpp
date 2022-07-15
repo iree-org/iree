@@ -75,7 +75,7 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
         loadOp.getSource()
             .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     if (!subspanOp) return failure();
-    assert(subspanOp.dynamic_dims().empty());
+    assert(subspanOp.getDynamicDims().empty());
 
     auto tensorAccess = subspanOp.getType()
                             .template cast<IREE::Flow::DispatchTensorType>()
@@ -84,9 +84,10 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
         tensorAccess, reshapeOp.getResultType());
 
     Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.set(),
-        subspanOp.binding(), subspanOp.type(), subspanOp.byte_offset(),
-        subspanOp.dynamic_dims(), subspanOp.alignmentAttr());
+        subspanOp.getLoc(), newSubspanType, subspanOp.getSet(),
+        subspanOp.getBinding(), subspanOp.getDescriptorType(),
+        subspanOp.getByteOffset(), subspanOp.getDynamicDims(),
+        subspanOp.getAlignmentAttr());
 
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
         reshapeOp, reshapeOp.getResultType(), newSubspanOp,

@@ -56,7 +56,7 @@ class BenchmarkBatchDispatchesPass
         // but it assumes that the command buffer has a linear dispatch
         // structure.
         builder.create<IREE::HAL::CommandBufferExecutionBarrierOp>(
-            op.getLoc(), op.command_buffer(),
+            op.getLoc(), op.getCommandBuffer(),
             IREE::HAL::ExecutionStageBitfield::CommandRetire |
                 IREE::HAL::ExecutionStageBitfield::Dispatch,
             IREE::HAL::ExecutionStageBitfield::CommandIssue |

@@ -50,9 +50,10 @@ class MemoizeDeviceQueriesPass
             moduleOp.getContext(),
             {
                 StringAttr::get(moduleOp.getContext(),
-                                queryOp.category() + queryOp.key()),
-                queryOp.default_value().hasValue() ? queryOp.default_valueAttr()
-                                                   : Attribute{},
+                                queryOp.getCategory() + queryOp.getKey()),
+                queryOp.getDefaultValue().hasValue()
+                    ? queryOp.getDefaultValueAttr()
+                    : Attribute{},
             });
         auto lookup = deviceQueryOps.try_emplace(
             fullKey, std::vector<IREE::HAL::DeviceQueryOp>{});
@@ -69,7 +70,7 @@ class MemoizeDeviceQueriesPass
     for (auto queryKey : llvm::enumerate(deviceQueryKeys)) {
       auto queryOps = deviceQueryOps[queryKey.value()];
       auto anyQueryOp = queryOps.front();
-      auto queryType = anyQueryOp.value().getType();
+      auto queryType = anyQueryOp.getValue().getType();
 
       // Merge all the locs as we are deduping the original query ops.
       auto fusedLoc =
@@ -96,12 +97,12 @@ class MemoizeDeviceQueriesPass
           funcBuilder.createOrFold<IREE::HAL::ExSharedDeviceOp>(fusedLoc);
       auto queryOp = funcBuilder.create<IREE::HAL::DeviceQueryOp>(
           fusedLoc, funcBuilder.getI1Type(), queryType, device,
-          anyQueryOp.categoryAttr(), anyQueryOp.keyAttr(),
-          anyQueryOp.default_valueAttr());
-      funcBuilder.create<IREE::Util::GlobalStoreOp>(fusedLoc, queryOp.ok(),
+          anyQueryOp.getCategoryAttr(), anyQueryOp.getKeyAttr(),
+          anyQueryOp.getDefaultValueAttr());
+      funcBuilder.create<IREE::Util::GlobalStoreOp>(fusedLoc, queryOp.getOk(),
                                                     okGlobalOp.getName());
-      funcBuilder.create<IREE::Util::GlobalStoreOp>(fusedLoc, queryOp.value(),
-                                                    valueGlobalOp.getName());
+      funcBuilder.create<IREE::Util::GlobalStoreOp>(
+          fusedLoc, queryOp.getValue(), valueGlobalOp.getName());
       funcBuilder.create<IREE::Util::InitializerReturnOp>(fusedLoc);
 
       for (auto queryOp : queryOps) {

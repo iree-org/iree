@@ -215,7 +215,7 @@ class CUDATargetBackend final : public TargetBackend {
     // Collect all the entry point names.
     llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps;
     for (auto op : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
-      exportOps[op.sym_name()] = op;
+      exportOps[op.getSymName()] = op;
     }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     std::vector<std::string> entryPointNames;
@@ -227,22 +227,21 @@ class CUDATargetBackend final : public TargetBackend {
       // setName will make sure the function name is unique.
       llvmFunc->setName(sanitizeNameForCuda(func.getName()));
       entryPointNames.emplace_back(llvmFunc->getName());
-      std::array<int32_t, 3> workgroup_size;
+      std::array<int32_t, 3> workgroupSize;
       uint32_t workgroupLocalMemory = 0;
       auto exportOp = exportOps[func.getName()];
-      if (auto workgroupLocalMemoryAttr = exportOp.workgroup_local_memory()) {
-        workgroupLocalMemory =
-            workgroupLocalMemoryAttr.getValue().getSExtValue();
+      if (auto workgroupLocalMemoryAttr = exportOp.getWorkgroupLocalMemory()) {
+        workgroupLocalMemory = workgroupLocalMemoryAttr->getSExtValue();
       }
-      if (Optional<ArrayAttr> workgroupSizeAttr = exportOp.workgroup_size()) {
+      if (Optional<ArrayAttr> workgroupSizeAttr = exportOp.getWorkgroupSize()) {
         for (auto it : llvm::enumerate(workgroupSizeAttr.getValue())) {
-          workgroup_size[it.index()] = it.value().cast<IntegerAttr>().getInt();
+          workgroupSize[it.index()] = it.value().cast<IntegerAttr>().getInt();
         }
       } else {
-        workgroup_size = {1, 1, 1};
+        workgroupSize = {1, 1, 1};
       }
       workgroupLocalMemories.push_back(workgroupLocalMemory);
-      workgroupSizes.push_back(workgroup_size);
+      workgroupSizes.push_back(workgroupSize);
       llvm::Metadata *llvmMetadata[] = {
           llvm::ValueAsMetadata::get(llvmFunc),
           llvm::MDString::get(llvmModule->getContext(), "kernel"),
@@ -315,10 +314,10 @@ class CUDATargetBackend final : public TargetBackend {
 
     // Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.sym_name(),
-        variantOp.target().getFormat(),
+        variantOp.getLoc(), variantOp.getSymName(),
+        variantOp.getTarget().getFormat(),
         builder.getBufferAttr(executableBuilder.getContext()));
-    binaryOp.mime_typeAttr(
+    binaryOp.setMimeTypeAttr(
         executableBuilder.getStringAttr("application/x-flatbuffers"));
 
     return success();

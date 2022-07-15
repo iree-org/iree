@@ -73,13 +73,13 @@ static Value findOrCreateSubspanBuffer(
         bufferSubspanOp.getResult().getType().dyn_cast<MemRefType>();
     if (!bufferMemrefType) continue;
 
-    if (bufferSubspanOp.set() != subspanOp.set() ||
-        bufferSubspanOp.binding() != subspanOp.binding() ||
-        bufferSubspanOp.type() != subspanOp.type() ||
-        bufferSubspanOp.byte_offset() != subspanOp.byte_offset() ||
-        !llvm::equal(bufferSubspanOp.dynamic_dims(),
-                     subspanOp.dynamic_dims()) ||
-        bufferSubspanOp.alignment() != subspanOp.alignment() ||
+    if (bufferSubspanOp.getSet() != subspanOp.getSet() ||
+        bufferSubspanOp.getBinding() != subspanOp.getBinding() ||
+        bufferSubspanOp.getDescriptorType() != subspanOp.getDescriptorType() ||
+        bufferSubspanOp.getByteOffset() != subspanOp.getByteOffset() ||
+        !llvm::equal(bufferSubspanOp.getDynamicDims(),
+                     subspanOp.getDynamicDims()) ||
+        bufferSubspanOp.getAlignment() != subspanOp.getAlignment() ||
         memRefType != bufferMemrefType)
       continue;
     return bufferSubspanOp.getResult();
@@ -90,12 +90,13 @@ static Value findOrCreateSubspanBuffer(
   b.setInsertionPoint(subspanOp);
   // Just change the result type of the InterfaceBindingSubspanOp.
   Value buffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
-      subspanOp->getLoc(), memRefType, subspanOp.set(), subspanOp.binding(),
-      subspanOp.type(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
-      subspanOp.alignmentAttr());
-  if (subspanOp.alignment()) {
-    b.create<memref::AssumeAlignmentOp>(subspanOp->getLoc(), buffer,
-                                        subspanOp.alignment()->getZExtValue());
+      subspanOp->getLoc(), memRefType, subspanOp.getSet(),
+      subspanOp.getBinding(), subspanOp.getDescriptorType(),
+      subspanOp.getByteOffset(), subspanOp.getDynamicDims(),
+      subspanOp.getAlignmentAttr());
+  if (subspanOp.getAlignment()) {
+    b.create<memref::AssumeAlignmentOp>(
+        subspanOp->getLoc(), buffer, subspanOp.getAlignment()->getZExtValue());
   }
   return buffer;
 }

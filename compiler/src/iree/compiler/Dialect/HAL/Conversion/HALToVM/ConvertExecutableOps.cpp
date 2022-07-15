@@ -79,10 +79,10 @@ IREE::VM::RodataOp createExecutableBinaryRodata(
       (executableOp.getName() + "_" + binaryOp.getName()).str();
   std::replace(rodataName.begin(), rodataName.end(), '-', '_');
   auto rodataOp = builder.create<IREE::VM::RodataOp>(
-      binaryOp.getLoc(), rodataName, binaryOp.data());
+      binaryOp.getLoc(), rodataName, binaryOp.getData());
   rodataOp.setPrivate();
-  if (binaryOp.mime_type().hasValue()) {
-    rodataOp.mime_typeAttr(binaryOp.mime_typeAttr());
+  if (binaryOp.getMimeType().hasValue()) {
+    rodataOp.mime_typeAttr(binaryOp.getMimeTypeAttr());
   }
 
   // TODO(benvanik): should these be page aligned? memcpy fastpath is fine for
@@ -126,11 +126,11 @@ class ExecutableCreateOpConversion
     // Materialize vm.rodata for the binary.
     auto executableBinaryOp =
         SymbolTable::lookupNearestSymbolFrom<IREE::HAL::ExecutableBinaryOp>(
-            createOp, createOp.executable_target());
+            createOp, createOp.getExecutableTarget());
     auto rodataOp = createExecutableBinaryRodata(executableBinaryOp, rewriter);
 
     auto executableFormatString = detail::rewriteAttrToOperands(
-        createOp.getLoc(), executableBinaryOp.formatAttr(),
+        createOp.getLoc(), executableBinaryOp.getFormatAttr(),
         importOp.getFunctionType().getInput(1), rewriter);
     assert(executableFormatString.hasValue() &&
            executableFormatString.getValue().size() == 1);
@@ -139,7 +139,7 @@ class ExecutableCreateOpConversion
 
     // Pack constants, if any.
     auto constantBuffer = createPackedConstantBuffer(
-        createOp.getLoc(), adaptor.constants(), rewriter);
+        createOp.getLoc(), adaptor.getConstants(), rewriter);
 
     SmallVector<int16_t, 5> segmentSizes = {
         /*device=*/-1,
@@ -147,15 +147,16 @@ class ExecutableCreateOpConversion
         /*executable_data=*/-1,
         /*constants=*/-1,
         /*executable_layouts=*/
-        static_cast<int16_t>(llvm::size(adaptor.layouts())),
+        static_cast<int16_t>(llvm::size(adaptor.getLayouts())),
     };
     SmallVector<Value, 8> callOperands = {
-        adaptor.device(),
+        adaptor.getDevice(),
         executableFormatString.getValue().front(),
         executableRodata,
         constantBuffer,
     };
-    callOperands.append(adaptor.layouts().begin(), adaptor.layouts().end());
+    callOperands.append(adaptor.getLayouts().begin(),
+                        adaptor.getLayouts().end());
 
     auto importType = importOp.getFunctionType();
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(
