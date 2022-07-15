@@ -39,17 +39,9 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_cuda-topk-split-reduction",
-    srcs = enforce_glob(
-        [
-            "top-k.mlir",
-        ],
-        include = ["*.mlir"],
-        exclude = [
-            "reverse.mlir",
-            "scan.mlir",
-            "sort.mlir",
-        ],
-    ),
+    srcs = [
+        "top-k.mlir",
+    ],
     compiler_flags = ["--iree-flow-topk-split-reduction=2"],
     driver = "cuda",
     tags = [
@@ -65,17 +57,9 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_cuda-topk-split-reduction-double",
-    srcs = enforce_glob(
-        [
-            "top-k.mlir",
-        ],
-        include = ["*.mlir"],
-        exclude = [
-            "reverse.mlir",
-            "scan.mlir",
-            "sort.mlir",
-        ],
-    ),
+    srcs = [
+        "top-k.mlir",
+    ],
     compiler_flags = ["--iree-flow-topk-split-reduction=3,2"],
     driver = "cuda",
     tags = [
