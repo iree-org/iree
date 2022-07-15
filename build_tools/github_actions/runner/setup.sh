@@ -32,7 +32,9 @@ GITHUB_REGISTRATION_TOKEN="$(curl -sSfL "${GITHUB_TOKEN_PROXY_URL}/register" \
 )"
 
 # For some reason, querying these at startup is unreliable. It seems like the
-# guestInventory attributes take a really long time to be populated.
+# guestInventory attributes take a really long time to be populated. For now,
+# anything in here we care about needs to be injected via the
+# `github-runner-labels` custom metadata attribute.
 # OS_ID="$(get_os_info ShortName)"
 # OS_VERSION="$(get_os_info Version)"
 # KERNEL_RELEASE="$(get_os_info KernelRelease)"
@@ -70,7 +72,7 @@ RUNNER_CUSTOM_LABELS="$(get_attribute github-runner-labels)"
 
 declare -a RUNNER_LABELS_ARRAY=(
   "os-family=${OS_FAMILY}"
-  # Also as just raw labels, to match GitHub default behavior
+  # Also as just a raw label, to match GitHub default behavior
   "${OS_FAMILY}"
   "hostname=${HOSTNAME}"
   "runner-group=${RUNNER_GROUP}"
