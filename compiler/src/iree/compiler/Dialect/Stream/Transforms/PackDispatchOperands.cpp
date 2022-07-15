@@ -79,7 +79,7 @@ static void updateDispatchOp(IREE::Stream::CmdDispatchOp dispatchOp,
 
   auto loc = dispatchOp.getLoc();
   SmallVector<Value> newOperands;
-  for (auto operand : dispatchOp.operands()) {
+  for (auto operand : dispatchOp.getUniformOperands()) {
     // NOTE: we do these in sequence so that we can reuse type expansion; we
     // want f64 to become i64 so that i64 can become i32+i32 etc.
 
@@ -138,7 +138,7 @@ static void updateDispatchOp(IREE::Stream::CmdDispatchOp dispatchOp,
       newOperands.push_back(operand);
     }
   }
-  dispatchOp.operandsMutable().assign(newOperands);
+  dispatchOp.getUniformOperandsMutable().assign(newOperands);
 }
 
 // Updates an exported function in a stream.executable to match the packing
@@ -339,7 +339,7 @@ class PackDispatchOperandsPass
     getOperation()->walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
       auto exportOp =
           symbolTable.lookupNearestSymbolFrom<IREE::Stream::ExecutableExportOp>(
-              dispatchOp, dispatchOp.entry_point());
+              dispatchOp, dispatchOp.getEntryPoint());
       updateDispatchOp(dispatchOp, exportOp);
       return WalkResult::advance();
     });

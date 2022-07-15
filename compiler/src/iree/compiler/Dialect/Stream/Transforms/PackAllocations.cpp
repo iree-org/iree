@@ -62,8 +62,8 @@ class PackAllocationsPass : public PackAllocationsBase<PackAllocationsPass> {
     // are mutually exclusive.
     parentOp.walk([&](IREE::Stream::ResourceAllocOp allocOp) {
       // If just one result then ignore (nothing to pack).
-      if (allocOp.results().size() == 1) return;
-      auto resourceType = allocOp.results().front().getType();
+      if (allocOp.getResults().size() == 1) return;
+      auto resourceType = allocOp.getResults().front().getType();
 
       // NOTE: this is risky: we are assuming right now that all of the
       // allocations will fit within the constraints of the system. This is not
@@ -73,7 +73,7 @@ class PackAllocationsPass : public PackAllocationsBase<PackAllocationsPass> {
       // things so long as we stay under UINT32_MAX boundaries.
 
       // All slices are 0-0 (overlapping).
-      size_t sliceCount = allocOp.results().size();
+      size_t sliceCount = allocOp.getResults().size();
       SmallVector<int64_t> lifetimeIntervals(sliceCount * 2, 0);
 
       OpBuilder builder(allocOp);
@@ -81,25 +81,25 @@ class PackAllocationsPass : public PackAllocationsBase<PackAllocationsPass> {
       SmallVector<Type> packedOffsetTypes(sliceCount, indexType);
       auto packOp = builder.create<IREE::Stream::ResourcePackOp>(
           allocOp.getLoc(), indexType, packedOffsetTypes, /*offset=*/nullptr,
-          builder.getIndexArrayAttr(lifetimeIntervals), allocOp.storage_sizes(),
-          allocOp.affinityAttr());
+          builder.getIndexArrayAttr(lifetimeIntervals),
+          allocOp.getStorageSizes(), allocOp.getAffinityAttr());
 
       // Change the alloc to build just a single resource.
       auto newOp = builder.create<IREE::Stream::ResourceAllocOp>(
-          allocOp.getLoc(), resourceType, packOp.total_length(),
-          allocOp.uninitializedAttr(), allocOp.affinityAttr());
-      auto slab = newOp.results().front();
-      auto slabSize = packOp.total_length();
+          allocOp.getLoc(), resourceType, packOp.getTotalLength(),
+          allocOp.getUninitializedAttr(), allocOp.getAffinityAttr());
+      auto slab = newOp.getResults().front();
+      auto slabSize = packOp.getTotalLength();
 
       // Replace all resources with subviews into the new slab.
-      for (auto it : llvm::zip(allocOp.results(), packOp.packed_offsets(),
-                               allocOp.storage_sizes())) {
+      for (auto it : llvm::zip(allocOp.getResults(), packOp.getPackedOffsets(),
+                               allocOp.getStorageSizes())) {
         auto originalValue = std::get<0>(it);
         auto subviewOffset = std::get<1>(it);
         auto subviewLength = std::get<2>(it);
         auto subviewOp = builder.create<IREE::Stream::ResourceSubviewOp>(
             allocOp.getLoc(), slab, slabSize, subviewOffset, subviewLength);
-        originalValue.replaceAllUsesWith(subviewOp.result());
+        originalValue.replaceAllUsesWith(subviewOp.getResult());
       }
 
       allocOp.erase();

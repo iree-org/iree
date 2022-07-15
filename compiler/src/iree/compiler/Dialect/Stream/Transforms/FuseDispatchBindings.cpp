@@ -39,13 +39,13 @@ struct BindingRange {
   BindingRange() = default;
   BindingRange(IREE::Stream::CmdDispatchOp dispatchOp, unsigned idx)
       : idx(idx),
-        access(dispatchOp.resource_accesses()[idx]
+        access(dispatchOp.getResourceAccesses()[idx]
                    .cast<IREE::Stream::ResourceAccessBitfieldAttr>()
                    .getValue()),
-        resource(dispatchOp.resources()[idx]),
-        resourceSize(dispatchOp.resource_sizes()[idx]),
-        offset(dispatchOp.resource_offsets()[idx]),
-        length(dispatchOp.resource_lengths()[idx]) {}
+        resource(dispatchOp.getResources()[idx]),
+        resourceSize(dispatchOp.getResourceSizes()[idx]),
+        offset(dispatchOp.getResourceOffsets()[idx]),
+        length(dispatchOp.getResourceLengths()[idx]) {}
 
   unsigned idx = 0;
   IREE::Stream::ResourceAccessBitfield access =
@@ -86,8 +86,8 @@ static SmallVector<Binding> findCorrelatedBindings(
   for (auto dispatchOp : dispatchOps) {
     llvm::EquivalenceClasses<unsigned> ec;
     DenseMap<Value, unsigned> leaders;
-    for (auto it : llvm::enumerate(llvm::zip(dispatchOp.resources(),
-                                             dispatchOp.resource_accesses()))) {
+    for (auto it : llvm::enumerate(llvm::zip(
+             dispatchOp.getResources(), dispatchOp.getResourceAccesses()))) {
       auto resource = std::get<0>(it.value());
 
       // If the resource is mutable and we were told not to alias mutable
@@ -215,8 +215,8 @@ static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
                 dyn_cast<IREE::Stream::BindingSubspanOp>(use.getOwner())) {
           OpBuilder builder(subspanOp);
           auto sum = builder.createOrFold<arith::AddIOp>(
-              newBindingArg.getLoc(), subspanOp.byte_offset(), offsetArg);
-          subspanOp.byte_offsetMutable().assign(sum);
+              newBindingArg.getLoc(), subspanOp.getByteOffset(), offsetArg);
+          subspanOp.getByteOffsetMutable().assign(sum);
         }
         use.set(newBindingArg);
       }
@@ -290,14 +290,15 @@ static void updateDispatchSite(IREE::Stream::CmdDispatchOp dispatchOp,
   }
 
   // Add the original operands that we push to the end.
-  newOperands.append(dispatchOp.operands().begin(),
-                     dispatchOp.operands().end());
+  newOperands.append(dispatchOp.getUniformOperands().begin(),
+                     dispatchOp.getUniformOperands().end());
 
   // Replace the old dispatch op with a new one.
   OpBuilder builder(dispatchOp);
   auto newOp = builder.create<IREE::Stream::CmdDispatchOp>(
-      dispatchOp.getLoc(), dispatchOp.workload(), dispatchOp.entry_pointAttr(),
-      newOperands, newResources, newResourceSizes, newOffsets, newLengths,
+      dispatchOp.getLoc(), dispatchOp.getWorkload(),
+      dispatchOp.getEntryPointAttr(), newOperands, newResources,
+      newResourceSizes, newOffsets, newLengths,
       builder.getArrayAttr(newAccesses));
   (void)newOp;
   LLVM_DEBUG({
@@ -315,12 +316,12 @@ static void fuseDispatchBindings(
     bool aliasMutableBindings, MemoizedCmdZeros &memoizedZeros) {
   if (dispatchOps.empty()) return;  // no-op if no dispatches
   auto anyDispatchOp = dispatchOps.front();
-  unsigned bindingCount = anyDispatchOp.resources().size();
+  unsigned bindingCount = anyDispatchOp.getResources().size();
 
   LLVM_DEBUG({
     AsmState asmState(executableOp->getParentOp());
-    llvm::dbgs() << "---- fuseDispatchBindings(@" << executableOp.sym_name()
-                 << "::" << exportOp.sym_name() << ") ----\n";
+    llvm::dbgs() << "---- fuseDispatchBindings(@" << executableOp.getSymName()
+                 << "::" << exportOp.getSymName() << ") ----\n";
     llvm::dbgs() << "using dispatches:\n";
     for (auto dispatchOp : dispatchOps) {
       dispatchOp.print(llvm::dbgs(), asmState);
@@ -388,7 +389,7 @@ static void fuseDispatchBindings(
   // can do it for everything.
 
   // Update the executable function to use the new bindings.
-  auto funcOp = exportOp.getFunctionRef();
+  auto funcOp = exportOp.lookupFunctionRef();
   assert(funcOp && "entry func not found");
   updateExecutableSignature(executableOp, exportOp, funcOp, bindings);
 
@@ -431,7 +432,7 @@ class FuseDispatchBindingsPass
         entryDispatchMap;
     getOperation()->walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
       auto exportOp = symbolTable.lookupNearestSymbolFrom(
-          dispatchOp, dispatchOp.entry_point());
+          dispatchOp, dispatchOp.getEntryPoint());
       entryDispatchMap[exportOp].push_back(dispatchOp);
     });
 

@@ -292,24 +292,28 @@ static UploadResult buildStagingUpload(
     // Map the source staging resource rodata.
     auto mapOp = builder.create<IREE::Stream::ResourceMapOp>(
         storageResource.loc, stagingType, storageBuffer, indexSet.get(0),
-        totalLength, constantsOp.affinityAttr());
+        totalLength, constantsOp.getAffinityAttr());
 
     // Allocate the resulting storage resource of the final resource type.
     auto allocOp = builder.create<IREE::Stream::ResourceAllocOp>(
-        storageResource.loc, resourceType, mapOp.result_size(),
-        /*uninitialized=*/builder.getUnitAttr(), constantsOp.affinityAttr());
+        storageResource.loc, resourceType, mapOp.getResultSize(),
+        /*uninitialized=*/builder.getUnitAttr(), constantsOp.getAffinityAttr());
 
     uploadResult.allocations.push_back({
-        allocOp.results().front(),
-        allocOp.storage_sizes().front(),
+        allocOp.getResults().front(),
+        allocOp.getStorageSizes().front(),
     });
 
     // Queue copy for processing below.
     Copy copy{
-        storageResource.loc,       mapOp.result(),
-        mapOp.result_size(),       indexSet.get(0),
-        allocOp.results().front(), allocOp.storage_sizes().front(),
-        indexSet.get(0),           totalLength,
+        storageResource.loc,
+        mapOp.getResult(),
+        mapOp.getResultSize(),
+        indexSet.get(0),
+        allocOp.getResults().front(),
+        allocOp.getStorageSizes().front(),
+        indexSet.get(0),
+        totalLength,
     };
     capturedResources.push_back(copy.source);
     capturedResourceSizes.push_back(copy.sourceSize);
@@ -322,15 +326,15 @@ static UploadResult buildStagingUpload(
   auto executeOp = builder.create<IREE::Stream::CmdExecuteOp>(
       constantsOp.getLoc(), /*awaitTimepoint=*/Value{}, capturedResources,
       capturedResourceSizes);
-  if (constantsOp.affinity().hasValue()) {
-    executeOp.affinityAttr(constantsOp.affinityAttr());
+  if (constantsOp.getAffinity().hasValue()) {
+    executeOp.setAffinityAttr(constantsOp.getAffinityAttr());
   }
-  uploadResult.timepoint = executeOp.result_timepoint();
+  uploadResult.timepoint = executeOp.getResultTimepoint();
 
   // Map captured resources into the execution region.
   BlockAndValueMapping mapping;
   auto *entryBlock = new Block();
-  executeOp.body().push_back(entryBlock);
+  executeOp.getBody().push_back(entryBlock);
   for (auto outerValue : capturedResources) {
     auto arg =
         entryBlock->addArgument(outerValue.getType(), outerValue.getLoc());
@@ -373,15 +377,15 @@ static UploadResult buildTryMapConstantResources(
     auto tryMapOp = builder.create<IREE::Stream::ResourceTryMapOp>(
         storageResource.loc, builder.getI1Type(), resourceType, storageBuffer,
         zero, indexSet.get(storageResource.totalSize),
-        constantsOp.affinityAttr());
+        constantsOp.getAffinityAttr());
     if (!ok) {
-      ok = tryMapOp.did_map();
+      ok = tryMapOp.getDidMap();
     } else {
       ok = builder.createOrFold<arith::AndIOp>(tryMapOp.getLoc(), ok,
-                                               tryMapOp.did_map());
+                                               tryMapOp.getDidMap());
     }
-    mappedResources.push_back(tryMapOp.result());
-    resultTypes.push_back(tryMapOp.result().getType());
+    mappedResources.push_back(tryMapOp.getResult());
+    resultTypes.push_back(tryMapOp.getResult().getType());
   }
 
   // If we are able to directly map the resources then we don't need to wait.
@@ -466,10 +470,10 @@ class PackConstantsPass : public PackConstantsBase<PackConstantsPass> {
 
       // Gather the slices produced by this constant pooling op.
       SmallVector<ConstantSlice> slices;
-      slices.reserve(constantsOp.results().size());
+      slices.reserve(constantsOp.getResults().size());
       for (auto it :
-           llvm::zip(constantsOp.results(), constantsOp.result_sizes(),
-                     constantsOp.values())) {
+           llvm::zip(constantsOp.getResults(), constantsOp.getResultSizes(),
+                     constantsOp.getValues())) {
         auto result = std::get<0>(it);
         auto resultSize = std::get<1>(it);
         auto value = std::get<2>(it);
@@ -488,7 +492,7 @@ class PackConstantsPass : public PackConstantsBase<PackConstantsPass> {
 
       OpBuilder builder(constantsOp);
       IndexSet indexSet(constantsOp.getLoc(), builder);
-      indexSet.populate(constantsOp.result_sizes());
+      indexSet.populate(constantsOp.getResultSizes());
 
       // Emit rodata storage for the constant values.
       // As our upload paths may vary this ensures that we are only emitting
@@ -506,7 +510,7 @@ class PackConstantsPass : public PackConstantsBase<PackConstantsPass> {
       // If this is producing constants (vs variables) we can try to go on a
       // fast-path where we directly map the constant memory. If producing
       // variables then we always need to stage and clone.
-      auto anyResult = constantsOp.results().front();
+      auto anyResult = constantsOp.getResults().front();
       auto resourceType =
           anyResult.getType().cast<IREE::Stream::ResourceType>();
       UploadResult uploadResult;
@@ -529,12 +533,13 @@ class PackConstantsPass : public PackConstantsBase<PackConstantsPass> {
           auto subviewOp = builder.create<IREE::Stream::ResourceSubviewOp>(
               loc, allocatedStorage.resource, allocatedStorage.resourceSize,
               indexSet.get(span.offset), span.slice.resultSize);
-          span.slice.result.replaceAllUsesWith(subviewOp.result());
+          span.slice.result.replaceAllUsesWith(subviewOp.getResult());
         }
       }
 
       // Join on storage timepoints for our transitive dependencies to await.
-      constantsOp.result_timepoint().replaceAllUsesWith(uploadResult.timepoint);
+      constantsOp.getResultTimepoint().replaceAllUsesWith(
+          uploadResult.timepoint);
 
       constantsOp.erase();
     });

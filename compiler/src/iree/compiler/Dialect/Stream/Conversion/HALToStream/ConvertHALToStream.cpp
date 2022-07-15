@@ -67,7 +67,7 @@ struct ConvertTensorImportOp
 
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncTransferOp>(
-        op, unknownType, newOp.result(), resultSize, resultSize,
+        op, unknownType, newOp.getResult(), resultSize, resultSize,
         /*source_affinity=*/nullptr,
         /*result_affinity=*/nullptr);
     return success();
@@ -163,16 +163,17 @@ struct ConvertTensorExportOp
       // Copy the source value into the imported target storage.
       auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
       auto updateOp = rewriter.create<IREE::Stream::AsyncUpdateOp>(
-          op.getLoc(), externalType, importOp.result(), importOp.result_size(),
-          zeroOffset, source.resourceSize, source.resource, source.resourceSize,
+          op.getLoc(), externalType, importOp.getResult(),
+          importOp.getResultSize(), zeroOffset, source.resourceSize,
+          source.resource, source.resourceSize,
           /*affinity=*/nullptr);
 
       // Export the updated resource.
       // NOTE: the buffer size wrapped in the buffer view is the full size of
       // the input buffer. This is so that we don't insert a data dependency on
       // sparse operations or data-dependent dynamic shape dimensions.
-      exportSource = updateOp.result();
-      exportSize = updateOp.target_size();
+      exportSource = updateOp.getResult();
+      exportSize = updateOp.getTargetSize();
     } else {
       // Exporting a produced value - transfer our source value to an externally
       // usable resource and directly export it. This will cause an allocation.

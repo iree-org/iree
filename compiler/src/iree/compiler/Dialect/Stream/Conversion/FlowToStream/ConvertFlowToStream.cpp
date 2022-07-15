@@ -197,7 +197,7 @@ struct ConvertTensorStoreOp
         adaptor.target_dims(), target.resourceSize, adaptor.indices(),
         adaptor.value());
 
-    Value newResult = newOp.result();
+    Value newResult = newOp.getResult();
     if (target.resource.getType() != stagingType) {
       newResult = rewriter.createOrFold<IREE::Stream::AsyncTransferOp>(
           op.getLoc(), target.resource.getType(), newResult,
@@ -354,7 +354,7 @@ static bool insertBindingOp(BlockArgument arg,
 
   auto subspanOp = builder.create<IREE::Stream::BindingSubspanOp>(
       arg.getLoc(), tensorType, arg, zero, dynamicDims);
-  arg.replaceAllUsesExcept(subspanOp.result(), subspanOp);
+  arg.replaceAllUsesExcept(subspanOp.getResult(), subspanOp);
 
   // If we needed to insert at a special point restore back to the original
   // insertion point to keep the ops ordered with arguments.
@@ -389,7 +389,7 @@ struct ConvertExecutableOp
         flowOp.getLoc(), flowOp.sym_name());
     streamOp.setVisibility(flowOp.getVisibility());
     streamOp->setDialectAttrs(flowOp->getDialectAttrs());
-    rewriter.setInsertionPointToStart(&streamOp.body().front());
+    rewriter.setInsertionPointToStart(&streamOp.getBody().front());
 
     // flow.executable.export -> stream.executable.export
     for (auto exportOp : flowOp.getOps<IREE::Flow::ExecutableExportOp>()) {
@@ -398,8 +398,9 @@ struct ConvertExecutableOp
       newOp->setDialectAttrs(exportOp->getDialectAttrs());
       if (!exportOp.workgroup_count().empty()) {
         mlir::BlockAndValueMapping mapper;
-        exportOp.workgroup_count().cloneInto(&newOp.workgroup_count(), mapper);
-        convertReturnOps(newOp.workgroup_count());
+        exportOp.workgroup_count().cloneInto(&newOp.getWorkgroupCount(),
+                                             mapper);
+        convertReturnOps(newOp.getWorkgroupCount());
       }
     }
 

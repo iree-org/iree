@@ -341,7 +341,7 @@ class ArgumentAnalysis {
     // Find all dispatches and bucket by their target entry point.
     rootOp->walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
       auto exportOp = explorer.getSymbolTables().lookupNearestSymbolFrom(
-          dispatchOp, dispatchOp.entry_point());
+          dispatchOp, dispatchOp.getEntryPoint());
       entryDispatchMap[exportOp].push_back(dispatchOp);
     });
   }
@@ -352,12 +352,12 @@ class ArgumentAnalysis {
     // Seed all dispatch arguments we want to analyze.
     for (auto it : entryDispatchMap) {
       for (auto dispatchOp : it.second) {
-        for (auto operand : dispatchOp.operands()) {
+        for (auto operand : dispatchOp.getUniformOperands()) {
           solver.getOrCreateElementFor<ValuePVS>(Position::forValue(operand));
           solver.getOrCreateElementFor<ValueAlignment>(
               Position::forValue(operand));
         }
-        for (auto resourceOffset : dispatchOp.resource_offsets()) {
+        for (auto resourceOffset : dispatchOp.getResourceOffsets()) {
           solver.getOrCreateElementFor<ValueAlignment>(
               Position::forValue(resourceOffset));
         }
@@ -399,7 +399,7 @@ class ArgumentAnalysis {
     DFX::PotentialConstantIntValuesState state;
     for (auto dispatchOp : getDispatchSites(exportOp)) {
       auto element = solver.lookupElementFor<ValuePVS>(
-          Position::forValue(dispatchOp.operands()[operandIdx]));
+          Position::forValue(dispatchOp.getUniformOperands()[operandIdx]));
       if (!element) {
         state.unionAssumedWithUndef();
         state.indicatePessimisticFixpoint();
@@ -417,7 +417,7 @@ class ArgumentAnalysis {
     llvm::MaybeAlign alignment;
     for (auto dispatchOp : getDispatchSites(exportOp)) {
       auto element = solver.lookupElementFor<ValueAlignment>(
-          Position::forValue(dispatchOp.operands()[operandIdx]));
+          Position::forValue(dispatchOp.getUniformOperands()[operandIdx]));
       if (!element || !element->isValidState()) return llvm::MaybeAlign();
       alignment = commonAlignment(alignment, element->getAssumedAlignment());
     }
@@ -434,7 +434,7 @@ class ArgumentAnalysis {
     llvm::MaybeAlign alignment;
     for (auto dispatchOp : getDispatchSites(exportOp)) {
       auto element = solver.lookupElementFor<ValueAlignment>(
-          Position::forValue(dispatchOp.resource_offsets()[resourceIdx]));
+          Position::forValue(dispatchOp.getResourceOffsets()[resourceIdx]));
       if (!element || !element->isValidState()) return llvm::MaybeAlign();
       alignment = commonAlignment(alignment, element->getAssumedAlignment());
     }
@@ -469,7 +469,7 @@ static void annotateExport(IREE::Stream::ExecutableOp executableOp,
 
   // Operands/resources on the func are in an arbitrary order; get maps that
   // lets us go from dispatch site operand/resource to function argument.
-  auto funcOp = exportOp.getFunctionRef();
+  auto funcOp = exportOp.lookupFunctionRef();
   auto operandToArgMap =
       IREE::Stream::CmdDispatchOp::makeOperandToArgMap(funcOp);
   auto resourceToArgMap =

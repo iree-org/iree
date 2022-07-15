@@ -199,7 +199,7 @@ struct ResourceAllocOpPattern
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
 
     SmallVector<Value> results;
-    for (auto it : llvm::zip(allocOp.results(), allocOp.storage_sizes())) {
+    for (auto it : llvm::zip(allocOp.getResults(), allocOp.getStorageSizes())) {
       auto resourceResult = std::get<0>(it);
       auto resourceType =
           resourceResult.getType().cast<IREE::Stream::ResourceType>();
@@ -245,7 +245,7 @@ struct ResourceAllocaOpPattern
 
     auto allocateOp = rewriter.create<IREE::HAL::AllocatorAllocateOp>(
         allocaOp.getLoc(), bufferType, allocator, memoryTypes, bufferUsage,
-        adaptor.storage_size());
+        adaptor.getStorageSize());
 
     // TODO(benvanik): stream ordered allocations.
     auto resolvedTimepoint =
@@ -279,7 +279,7 @@ struct ResourceSizeOpPattern
       IREE::Stream::ResourceSizeOp sizeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferLengthOp>(
-        sizeOp, rewriter.getIndexType(), adaptor.operand());
+        sizeOp, rewriter.getIndexType(), adaptor.getOperand());
     return success();
   }
 };
@@ -302,7 +302,8 @@ struct ResourceMapOpPattern
 
     rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorAllocateInitializedOp>(
         mapOp, bufferType, allocator, memoryTypes, bufferUsage,
-        adaptor.source(), adaptor.source_offset(), adaptor.result_size());
+        adaptor.getSource(), adaptor.getSourceOffset(),
+        adaptor.getResultSize());
     return success();
   }
 };
@@ -315,7 +316,7 @@ struct ResourceTryMapOpPattern
       ConversionPatternRewriter &rewriter) const override {
     auto allocator = lookupAllocatorFor(tryMapOp, rewriter);
     auto resourceType =
-        tryMapOp.result().getType().cast<IREE::Stream::ResourceType>();
+        tryMapOp.getResult().getType().cast<IREE::Stream::ResourceType>();
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
 
     auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
@@ -349,8 +350,8 @@ struct ResourceTryMapOpPattern
 
     rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorTryMapOp>(
         tryMapOp, rewriter.getI1Type(), bufferType, allocator, memoryTypes,
-        bufferUsage, adaptor.source(), adaptor.source_offset(),
-        adaptor.result_size());
+        bufferUsage, adaptor.getSource(), adaptor.getSourceOffset(),
+        adaptor.getResultSize());
     return success();
   }
 };
@@ -361,9 +362,10 @@ struct ResourceLoadOpPattern
   LogicalResult matchAndRewrite(
       IREE::Stream::ResourceLoadOp loadOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto loadType = getTypeConverter()->convertType(loadOp.result().getType());
+    auto loadType =
+        getTypeConverter()->convertType(loadOp.getResult().getType());
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferLoadOp>(
-        loadOp, loadType, adaptor.source(), adaptor.source_offset());
+        loadOp, loadType, adaptor.getSource(), adaptor.getSourceOffset());
     return success();
   }
 };
@@ -375,7 +377,8 @@ struct ResourceStoreOpPattern
       IREE::Stream::ResourceStoreOp storeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferStoreOp>(
-        storeOp, adaptor.value(), adaptor.target(), adaptor.target_offset());
+        storeOp, adaptor.getValue(), adaptor.getTarget(),
+        adaptor.getTargetOffset());
     return success();
   }
 };
@@ -390,8 +393,8 @@ struct ResourceSubviewOpPattern
     // NOTE: this aliases! We assume at this point all useful alias analysis
     // has been performed and it's fine to lose the tie information here.
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferSubspanOp>(
-        subviewOp, bufferType, adaptor.source(), adaptor.source_offset(),
-        adaptor.result_size());
+        subviewOp, bufferType, adaptor.getSource(), adaptor.getSourceOffset(),
+        adaptor.getResultSize());
     return success();
   }
 };
@@ -429,7 +432,7 @@ struct TensorImportBufferOpPattern
   LogicalResult matchAndRewrite(
       IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!importOp.source().getType().isa<IREE::HAL::BufferType>()) {
+    if (!importOp.getSource().getType().isa<IREE::HAL::BufferType>()) {
       return failure();
     }
 
@@ -437,16 +440,16 @@ struct TensorImportBufferOpPattern
     auto message = rewriter.getStringAttr("tensor");
 
     // Directly use the buffer.
-    auto buffer = adaptor.source();
+    auto buffer = adaptor.getSource();
     rewriter.replaceOp(importOp, buffer);
 
     // Assert the storage is compatible with our expected device and usage.
     auto targetAllocator = lookupAllocatorFor(importOp, rewriter);
     auto resourceType =
-        importOp.result().getType().cast<IREE::Stream::ResourceType>();
+        importOp.getResult().getType().cast<IREE::Stream::ResourceType>();
     if (failed(buildStorageAssertions(
-            importOp.getLoc(), adaptor.source(), message, targetAllocator,
-            adaptor.result_size(), resourceType, rewriter))) {
+            importOp.getLoc(), adaptor.getSource(), message, targetAllocator,
+            adaptor.getResultSize(), resourceType, rewriter))) {
       return failure();
     }
 
@@ -460,7 +463,7 @@ struct TensorImportBufferViewOpPattern
   LogicalResult matchAndRewrite(
       IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto sourceType = importOp.source().getType();
+    auto sourceType = importOp.getSource().getType();
     if (!sourceType.isa<IREE::HAL::BufferViewType>() &&
         !sourceType.isa<TensorType>()) {
       return failure();
@@ -471,7 +474,7 @@ struct TensorImportBufferViewOpPattern
     // TODO(benvanik): get a name for the tensor (argument name/etc).
     auto message = rewriter.getStringAttr("tensor");
 
-    auto bufferView = adaptor.source();
+    auto bufferView = adaptor.getSource();
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
     auto bufferOp = rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewBufferOp>(
         importOp, bufferType, bufferView);
@@ -479,9 +482,9 @@ struct TensorImportBufferViewOpPattern
     // Assert the storage is compatible with our expected device and usage.
     auto targetAllocator = lookupAllocatorFor(importOp, rewriter);
     auto resourceType =
-        importOp.result().getType().cast<IREE::Stream::ResourceType>();
-    if (failed(buildStorageAssertions(loc, bufferOp.result(), message,
-                                      targetAllocator, adaptor.result_size(),
+        importOp.getResult().getType().cast<IREE::Stream::ResourceType>();
+    if (failed(buildStorageAssertions(loc, bufferOp.getResult(), message,
+                                      targetAllocator, adaptor.getResultSize(),
                                       resourceType, rewriter))) {
       return failure();
     }
@@ -496,10 +499,10 @@ struct TensorExportBufferOpPattern
   LogicalResult matchAndRewrite(
       IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!exportOp.result().getType().isa<IREE::HAL::BufferType>()) {
+    if (!exportOp.getResult().getType().isa<IREE::HAL::BufferType>()) {
       return failure();
     }
-    rewriter.replaceOp(exportOp, adaptor.source());
+    rewriter.replaceOp(exportOp, adaptor.getSource());
     return success();
   }
 };
@@ -510,15 +513,15 @@ struct TensorExportBufferViewOpPattern
   LogicalResult matchAndRewrite(
       IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto targetType = exportOp.result().getType();
+    auto targetType = exportOp.getResult().getType();
     if (!targetType.isa<IREE::HAL::BufferViewType>() &&
         !targetType.isa<TensorType>()) {
       return failure();
     }
 
     auto loc = exportOp.getLoc();
-    auto tensorType = adaptor.source_encoding().cast<RankedTensorType>();
-    auto dynamicDims = adaptor.source_encoding_dims();
+    auto tensorType = adaptor.getSourceEncoding().cast<RankedTensorType>();
+    auto dynamicDims = adaptor.getSourceEncodingDims();
 
     // NOTE: we should have verified supported encodings/types at entry into the
     // HAL pipeline.
@@ -542,7 +545,7 @@ struct TensorExportBufferViewOpPattern
     }
 
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewCreateOp>(
-        exportOp, adaptor.source(), elementType.getValue(),
+        exportOp, adaptor.getSource(), elementType.getValue(),
         encodingType.getValue(), dims);
     return success();
   }
@@ -555,7 +558,7 @@ struct TensorTraceOpPattern
       IREE::Stream::TensorTraceOp traceOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewTraceOp>(
-        traceOp, traceOp.keyAttr(), adaptor.operands());
+        traceOp, traceOp.getKeyAttr(), adaptor.operands());
     return success();
   }
 };
@@ -604,8 +607,8 @@ struct CmdFillOpPattern
       ConversionPatternRewriter &rewriter) const override {
     auto commandBuffer = mapping->lookupCommandBufferFor(fillOp);
     rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferFillBufferOp>(
-        fillOp, commandBuffer, adaptor.target(), adaptor.target_offset(),
-        adaptor.target_length(), adaptor.value());
+        fillOp, commandBuffer, adaptor.getTarget(), adaptor.getTargetOffset(),
+        adaptor.getTargetLength(), adaptor.getValue());
     return success();
   }
 };
@@ -618,8 +621,8 @@ struct CmdCopyOpPattern
       ConversionPatternRewriter &rewriter) const override {
     auto commandBuffer = mapping->lookupCommandBufferFor(op);
     rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferCopyBufferOp>(
-        op, commandBuffer, adaptor.source(), adaptor.source_offset(),
-        adaptor.target(), adaptor.target_offset(), adaptor.length());
+        op, commandBuffer, adaptor.getSource(), adaptor.getSourceOffset(),
+        adaptor.getTarget(), adaptor.getTargetOffset(), adaptor.getLength());
     return success();
   }
 };
@@ -642,7 +645,7 @@ struct CmdDispatchOpPattern
     // Get the handle to the executable that is compatible with our device.
     auto executableOp =
         cast<IREE::HAL::ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
-            dispatchOp, dispatchOp.entry_point().getRootReference()));
+            dispatchOp, dispatchOp.getEntryPoint().getRootReference()));
     assert(executableOp && "dispatch target executable op not found");
 
     // Ask each target backend to record their dispatch logic.
@@ -655,12 +658,12 @@ struct CmdDispatchOpPattern
       auto exportIt =
           llvm::find_if(exportOps, [&](IREE::HAL::ExecutableExportOp op) {
             return op.getNameAttr() ==
-                   dispatchOp.entry_point().getLeafReference();
+                   dispatchOp.getEntryPoint().getLeafReference();
           });
       if (exportIt == exportOps.end()) {
         return variantOp.emitError()
                << "hal.executable.variant is missing the flow entry point for "
-               << dispatchOp.entry_point();
+               << dispatchOp.getEntryPoint();
       }
       auto exportOp = *exportIt;
 
@@ -679,7 +682,7 @@ struct CmdDispatchOpPattern
                              {SymbolRefAttr::get(exportOp->getParentOp()),
                               SymbolRefAttr::get(exportOp)});
       auto caseWorkgroupCount = exportOp.calculateWorkgroupCount(
-          loc, device, adaptor.workload(), caseBuilder);
+          loc, device, adaptor.getWorkload(), caseBuilder);
       caseBuilder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
           loc, commandBuffer, exportSymRef, caseWorkgroupCount[0],
           caseWorkgroupCount[1], caseWorkgroupCount[2]);
@@ -707,10 +710,10 @@ struct CmdDispatchOpPattern
     // Push constant values.
     // TODO(#5322): symbolic push constant names on the hal.interface so we can
     // sparsely pack these.
-    if (!adaptor.operands().empty()) {
+    if (!adaptor.getUniformOperands().empty()) {
       int pushConstantBase = 0;  // always 0 today
       SmallVector<Value> pushConstants;
-      for (auto operand : adaptor.operands()) {
+      for (auto operand : adaptor.getUniformOperands()) {
         assert(
             operand.getType().isInteger(32) &&
             "expected only i32 values after iree-hal-pack-dispatch-operands");
@@ -735,7 +738,7 @@ struct CmdDispatchOpPattern
           loc, commandBuffer, executableLayout, currentSet, bindings);
       bindings.clear();
     };
-    for (unsigned i = 0; i < adaptor.resources().size(); ++i) {
+    for (unsigned i = 0; i < adaptor.getResources().size(); ++i) {
       auto bindingAttr =
           bindingAttrs[i].cast<IREE::HAL::InterfaceBindingAttr>();
       int64_t set = bindingAttr.getSet();
@@ -744,9 +747,9 @@ struct CmdDispatchOpPattern
       IREE::HAL::DescriptorSetBindingValue binding;
       binding.ordinal =
           builder.create<arith::ConstantIndexOp>(loc, bindingAttr.getBinding());
-      binding.buffer = adaptor.resources()[i];
-      binding.byteOffset = adaptor.resource_offsets()[i];
-      binding.byteLength = adaptor.resource_lengths()[i];
+      binding.buffer = adaptor.getResources()[i];
+      binding.byteOffset = adaptor.getResourceOffsets()[i];
+      binding.byteLength = adaptor.getResourceLengths()[i];
       bindings.push_back(binding);
     }
     if (currentSet != -1) flushSet();
@@ -798,7 +801,7 @@ struct CmdExecuteOpPattern
     // Derive the command buffer type based on the kind of operations present.
     // This can help the submission get routed to appropriate hardware queues
     // (like dedicated DMA controllers).
-    auto commandCategories = deriveCommandCategories(executeOp.body());
+    auto commandCategories = deriveCommandCategories(executeOp.getBody());
 
     // Create a new command buffer for recording. If we were
     auto commandBuffer =
@@ -811,15 +814,15 @@ struct CmdExecuteOpPattern
 
     // Run through the execution region and serialize execution by inserting
     // barriers. Nested regions may elide barriers as needed.
-    auto &bodyBlock = executeOp.body().front();
+    auto &bodyBlock = executeOp.getBody().front();
     insertSerializationBarriers(loc, bodyBlock, commandBuffer,
                                 OpBuilder::atBlockBegin(&bodyBlock));
 
     // Begin/end recording and inline the execution region between them.
     auto endOp =
         rewriter.create<IREE::HAL::CommandBufferFinalizeOp>(loc, commandBuffer);
-    rewriter.mergeBlockBefore(&executeOp.body().front(), endOp,
-                              adaptor.operands());
+    rewriter.mergeBlockBefore(&executeOp.getBody().front(), endOp,
+                              adaptor.getResourceOperands());
 
     // TODO(benvanik): we should queue a submit here with the semaphore instead.
     rewriter.create<IREE::HAL::ExSubmitAndWaitOp>(loc, device, commandBuffer);
@@ -843,12 +846,12 @@ struct CmdSerialOpPattern
 
     // Run through the execution region and serialize execution by inserting
     // barriers. Nested regions may elide barriers as needed.
-    auto &bodyBlock = serialOp.body().front();
+    auto &bodyBlock = serialOp.getBody().front();
     insertSerializationBarriers(serialOp.getLoc(), bodyBlock, commandBuffer,
                                 OpBuilder::atBlockBegin(&bodyBlock));
 
     // Inline the serial execution region.
-    rewriter.mergeBlockBefore(&serialOp.body().front(), serialOp);
+    rewriter.mergeBlockBefore(&serialOp.getBody().front(), serialOp);
     rewriter.eraseOp(serialOp);
     return success();
   }
@@ -862,7 +865,7 @@ struct CmdConcurrentOpPattern
       ConversionPatternRewriter &rewriter) const override {
     // Inline the concurrent execution region.
     // TODO(benvanik): split barriers (event set/wait) when nesting.
-    rewriter.mergeBlockBefore(&concurrentOp.body().front(), concurrentOp);
+    rewriter.mergeBlockBefore(&concurrentOp.getBody().front(), concurrentOp);
     rewriter.eraseOp(concurrentOp);
     return success();
   }
@@ -958,7 +961,7 @@ struct TimepointAwaitOpPattern
       IREE::Stream::TimepointAwaitOp awaitOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): model timepoints as semaphores.
-    rewriter.replaceOp(awaitOp, adaptor.operands());
+    rewriter.replaceOp(awaitOp, adaptor.getResourceOperands());
     return success();
   }
 };

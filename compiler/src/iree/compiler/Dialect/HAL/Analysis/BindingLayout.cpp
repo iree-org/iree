@@ -47,7 +47,7 @@ static BindingLayoutAnalysis::ExportDispatchMap findAllDispatchSites(
   BindingLayoutAnalysis::ExportDispatchMap dispatchMap;
   rootOp->walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
     auto exportOp = symbolTable.lookupNearestSymbolFrom(
-        dispatchOp, dispatchOp.entry_pointAttr());
+        dispatchOp, dispatchOp.getEntryPointAttr());
     dispatchMap[exportOp].push_back(dispatchOp);
   });
   return dispatchMap;
@@ -57,7 +57,7 @@ static BindingLayoutAnalysis::ExportDispatchMap findAllDispatchSites(
 static ExecutableLayout deriveExportLayout(
     IREE::Stream::ExecutableExportOp exportOp,
     SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
-  auto funcOp = exportOp.getFunctionRef();
+  auto funcOp = exportOp.lookupFunctionRef();
   assert(funcOp && "export target not found");
 
   // TODO(#3502): a real derivation based on dispatch sites.
@@ -98,7 +98,7 @@ static ExecutableLayout deriveExportLayout(
   // just a temporary hack so ¯\_(ツ)_/¯.
   llvm::BitVector staticBindings(bindingCount, /*t=*/true);
   for (auto dispatchOp : dispatchOps) {
-    auto resourceOffsets = dispatchOp.resource_offsets();
+    auto resourceOffsets = dispatchOp.getResourceOffsets();
     for (unsigned i = 0; i < bindingCount; ++i) {
       if (!matchPattern(resourceOffsets[i], m_Zero())) staticBindings.reset(i);
     }
@@ -128,8 +128,8 @@ static ExecutableLayout deriveExportLayout(
 
   LLVM_DEBUG({
     auto executableOp = exportOp->getParentOfType<IREE::Stream::ExecutableOp>();
-    llvm::dbgs() << "deriveExportLayout(@" << executableOp.sym_name() << "::@"
-                 << exportOp.sym_name() << "):\n";
+    llvm::dbgs() << "deriveExportLayout(@" << executableOp.getSymName() << "::@"
+                 << exportOp.getSymName() << "):\n";
     executableLayout.print(llvm::dbgs());
   });
 

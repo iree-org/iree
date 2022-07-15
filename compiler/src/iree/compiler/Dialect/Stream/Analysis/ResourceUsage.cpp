@@ -279,70 +279,70 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
         .Case([&](IREE::Stream::ResourceStoreOp op) {
           removeAssumedBits(NOT_STAGING_WRITE);
           auto targetUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.target()),
+              *this, Position::forValue(op.getTarget()),
               DFX::Resolution::REQUIRED);
           getState() ^= targetUsage.getState();
         })
         .Case([&](IREE::Stream::TensorImportOp op) {
           removeAssumedBits(NOT_MUTATED | NOT_EXTERNAL);
           auto resultUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.result()),
+              *this, Position::forValue(op.getResult()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncConstantOp op) {
           removeAssumedBits(NOT_CONSTANT | NOT_TRANSFER_WRITE);
           auto resultUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.result()),
+              *this, Position::forValue(op.getResult()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncSplatOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
           auto resultUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.result()),
+              *this, Position::forValue(op.getResult()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncCloneOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
           auto sourceUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.source()),
+              *this, Position::forValue(op.getSource()),
               DFX::Resolution::OPTIONAL);
           getState() ^= sourceUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncSliceOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
           auto sourceUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.source()),
+              *this, Position::forValue(op.getSource()),
               DFX::Resolution::OPTIONAL);
           getState() ^= sourceUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncFillOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
           auto targetUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.target()),
+              *this, Position::forValue(op.getTarget()),
               DFX::Resolution::REQUIRED);
           getState() ^= targetUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncUpdateOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
           auto targetUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.target()),
+              *this, Position::forValue(op.getTarget()),
               DFX::Resolution::REQUIRED);
           getState() ^= targetUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncCopyOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
           auto targetUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.target()),
+              *this, Position::forValue(op.getTarget()),
               DFX::Resolution::REQUIRED);
           getState() ^= targetUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncTransferOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
           auto sourceUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.source()),
+              *this, Position::forValue(op.getSource()),
               DFX::Resolution::OPTIONAL);
           bool isSourceStaging = !(sourceUsage.isAssumed(NOT_STAGING_READ) &&
                                    sourceUsage.isAssumed(NOT_STAGING_WRITE));
@@ -374,7 +374,7 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
         .Case([&](IREE::Stream::AsyncStoreOp op) {
           removeAssumedBits(NOT_STAGING_WRITE);
           auto targetUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.target()),
+              *this, Position::forValue(op.getTarget()),
               DFX::Resolution::REQUIRED);
           getState() ^= targetUsage.getState();
         })
@@ -468,42 +468,42 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
         .Case([&](IREE::Stream::AsyncCloneOp op) {
           removeAssumedBits(NOT_TRANSFER_READ);
           auto resultUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.result()),
+              *this, Position::forValue(op.getResult()),
               DFX::Resolution::OPTIONAL);
           getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncSliceOp op) {
           removeAssumedBits(NOT_TRANSFER_READ);
           auto resultUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.result()),
+              *this, Position::forValue(op.getResult()),
               DFX::Resolution::OPTIONAL);
           getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncFillOp op) {
           removeAssumedBits(NOT_MUTATED | NOT_TRANSFER_WRITE);
           auto resultUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.result()),
+              *this, Position::forValue(op.getResult()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncUpdateOp op) {
-          if (value == op.update()) {
+          if (value == op.getUpdate()) {
             removeAssumedBits(NOT_TRANSFER_READ);
           } else {
             removeAssumedBits(NOT_MUTATED | NOT_TRANSFER_WRITE);
             auto resultUsage = solver.getElementFor<ValueResourceUsage>(
-                *this, Position::forValue(op.result()),
+                *this, Position::forValue(op.getResult()),
                 DFX::Resolution::REQUIRED);
             getState() ^= resultUsage.getState();
           }
         })
         .Case([&](IREE::Stream::AsyncCopyOp op) {
-          if (value == op.source()) {
+          if (value == op.getSource()) {
             removeAssumedBits(NOT_TRANSFER_READ);
           } else {
             removeAssumedBits(NOT_MUTATED | NOT_TRANSFER_WRITE);
             auto resultUsage = solver.getElementFor<ValueResourceUsage>(
-                *this, Position::forValue(op.result()),
+                *this, Position::forValue(op.getResult()),
                 DFX::Resolution::REQUIRED);
             getState() ^= resultUsage.getState();
           }
@@ -511,7 +511,7 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
         .Case([&](IREE::Stream::AsyncTransferOp op) {
           removeAssumedBits(NOT_TRANSFER_READ);
           auto resultUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.result()),
+              *this, Position::forValue(op.getResult()),
               DFX::Resolution::OPTIONAL);
           bool isSourceStaging =
               !(isAssumed(NOT_STAGING_READ) && isAssumed(NOT_STAGING_WRITE));
@@ -546,7 +546,7 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
         .Case([&](IREE::Stream::AsyncStoreOp op) {
           removeAssumedBits(NOT_MUTATED | NOT_STAGING_WRITE);
           auto resultUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.result()),
+              *this, Position::forValue(op.getResult()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })

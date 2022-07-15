@@ -48,7 +48,7 @@ static void deduplicateOperands(
     SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
   auto &entryBlock = funcOp.front();
   auto anyDispatchOp = dispatchOps.front();
-  unsigned operandCount = anyDispatchOp.operands().size();
+  unsigned operandCount = anyDispatchOp.getUniformOperands().size();
 
   // Build a map of operand indices to its base duplicate for each dispatch
   // site. Base/non-duplicated values will be identity.
@@ -58,7 +58,7 @@ static void deduplicateOperands(
   for (auto dispatchOp : llvm::enumerate(dispatchOps)) {
     auto &dupeIndexMap = dupeIndexMaps[dispatchOp.index()];
     dupeIndexMap.resize(operandCount, kUnassigned);
-    auto operands = dispatchOp.value().operands();
+    auto operands = dispatchOp.value().getUniformOperands();
     for (unsigned i = 0; i < operands.size(); ++i) {
       for (unsigned j = 0; j < i; ++j) {
         if (operands[j] == operands[i]) {
@@ -143,7 +143,7 @@ static void deduplicateOperands(
   for (auto idx : deadOperandsMap.set_bits()) deadOperands.push_back(idx);
   for (auto dispatchOp : dispatchOps) {
     for (auto idx : llvm::reverse(deadOperands)) {
-      dispatchOp.operandsMutable().erase(idx);
+      dispatchOp.getUniformOperandsMutable().erase(idx);
     }
   }
 
@@ -170,7 +170,7 @@ static void inlineUniformConstants(
     SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
   auto &entryBlock = funcOp.front();
   auto anyDispatchOp = dispatchOps.front();
-  unsigned operandCount = anyDispatchOp.operands().size();
+  unsigned operandCount = anyDispatchOp.getUniformOperands().size();
 
   // Find uniform constant values for each operand across all usages.
   SmallVector<Optional<APInt>> operandValues(operandCount);
@@ -179,7 +179,7 @@ static void inlineUniformConstants(
   for (auto dispatchOp : dispatchOps) {
     for (unsigned idx = 0; idx < operandCount; ++idx) {
       if (!uniformOperandMap.test(idx)) continue;
-      auto value = dispatchOp.operands()[idx];
+      auto value = dispatchOp.getUniformOperands()[idx];
       APInt intValue;
       if (!matchPattern(value, m_ConstantInt(&intValue))) {
         // Non-constant breaks the operand uniformity.
@@ -236,7 +236,7 @@ static void inlineUniformConstants(
   for (auto idx : uniformOperandMap.set_bits()) deadOperands.push_back(idx);
   for (auto dispatchOp : dispatchOps) {
     for (auto idx : llvm::reverse(deadOperands)) {
-      dispatchOp.operandsMutable().erase(idx);
+      dispatchOp.getUniformOperandsMutable().erase(idx);
     }
   }
 
@@ -268,7 +268,7 @@ class FoldUniformOperandsPass
         entryDispatchMap;
     getOperation()->walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
       auto exportOp = symbolTable.lookupNearestSymbolFrom(
-          dispatchOp, dispatchOp.entry_point());
+          dispatchOp, dispatchOp.getEntryPoint());
       entryDispatchMap[exportOp].push_back(dispatchOp);
     });
 
@@ -280,7 +280,7 @@ class FoldUniformOperandsPass
         auto &dispatchOps = entryDispatchMap[exportOp];
         if (dispatchOps.empty()) continue;  // no-op if no dispatches
 
-        auto funcOp = exportOp.getFunctionRef();
+        auto funcOp = exportOp.lookupFunctionRef();
 
         // Deduplicate operands that are correlated at all dispatch sites.
         // We do this first so that we know all constants passed in are unique

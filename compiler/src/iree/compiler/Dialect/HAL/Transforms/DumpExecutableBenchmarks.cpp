@@ -71,7 +71,7 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
       assert(bindingAttrs &&
              "interface materialization must annotate dispatch sites");
 
-      auto workloadValues = dispatchOp.workload();
+      auto workloadValues = dispatchOp.getWorkload();
       SmallVector<unsigned> workload;
       workload.reserve(workloadValues.size());
       for (auto workloadValue : workloadValues) {
@@ -84,7 +84,7 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
       }
 
       SmallVector<Binding> bindings;
-      for (auto it : llvm::zip(bindingAttrs, dispatchOp.resource_lengths())) {
+      for (auto it : llvm::zip(bindingAttrs, dispatchOp.getResourceLengths())) {
         auto bindingAttr =
             std::get<0>(it).cast<IREE::HAL::InterfaceBindingAttr>();
         APInt resourceLength;
@@ -98,7 +98,7 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
       }
 
       // Work around needing a mutable key for the set; C++ was a mistake.
-      auto &dispatchParamsSet = map[dispatchOp.entry_point()];
+      auto &dispatchParamsSet = map[dispatchOp.getEntryPoint()];
       DispatchParams *dispatchParams = nullptr;
       for (auto &it : dispatchParamsSet) {
         if (it.workload == workload) {

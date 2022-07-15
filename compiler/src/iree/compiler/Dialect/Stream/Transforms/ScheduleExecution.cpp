@@ -106,7 +106,7 @@ struct ExecutePartitionBuilder {
         operands, operandSizes, tiedOperands);
 
     // Add entry block and arguments.
-    auto &entryBlock = executeOp.body().emplaceBlock();
+    auto &entryBlock = executeOp.getBody().emplaceBlock();
     SmallVector<Location> operandLocs(operandTypes.size(), executeOp.getLoc());
     for (auto args : llvm::zip(
              operands, entryBlock.addArguments(operandTypes, operandLocs))) {
@@ -115,7 +115,7 @@ struct ExecutePartitionBuilder {
     builder = OpBuilder::atBlockBegin(&entryBlock);
 
     // Remap results for escaping outputs.
-    for (auto results : llvm::zip(partition->outs, executeOp.results())) {
+    for (auto results : llvm::zip(partition->outs, executeOp.getResults())) {
       parentMapping.map(std::get<0>(results), std::get<1>(results));
     }
   }
@@ -266,8 +266,8 @@ class ScheduleExecutionPass
         OpBuilder builder(executeOp);
         builder.setInsertionPointAfter(executeOp);
         for (auto it :
-             llvm::zip(partitionBuilder.partition->outs, executeOp.results(),
-                       executeOp.result_sizes())) {
+             llvm::zip(partitionBuilder.partition->outs, executeOp.getResults(),
+                       executeOp.getResultSizes())) {
           auto oldResult = std::get<0>(it);
           auto newResult = std::get<1>(it);
           auto newResultSize = std::get<2>(it);
@@ -278,12 +278,12 @@ class ScheduleExecutionPass
           // are used (including right into other execution regions).
           auto awaitOp = builder.create<IREE::Stream::TimepointAwaitOp>(
               executeOp.getLoc(), newResult, newResultSize,
-              executeOp.result_timepoint());
-          if (executeOp.affinity().hasValue()) {
-            awaitOp.affinityAttr(executeOp.affinityAttr());
+              executeOp.getResultTimepoint());
+          if (executeOp.getAffinity().hasValue()) {
+            awaitOp.setAffinityAttr(executeOp.getAffinityAttr());
           }
 
-          oldResult.replaceAllUsesWith(awaitOp.results().front());
+          oldResult.replaceAllUsesWith(awaitOp.getResults().front());
           deadOps.insert(oldResult.getDefiningOp());
         }
 

@@ -22,6 +22,7 @@ include "mlir/IR/SubElementInterfaces.td"
 def Stream_Dialect : Dialect {
   let name = "stream";
   let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+  let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 
   let summary = [{
     A dialect designed to model execution partitioning and scheduling.
@@ -104,6 +105,7 @@ def Stream_Dialect : Dialect {
     established in the IR it's possible to induce aliasing of resources without
     breaking execution correctness.
   }];
+
   let useDefaultTypePrinterParser = 1;
   let useDefaultAttributePrinterParser = 1;
 }

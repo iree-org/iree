@@ -56,8 +56,8 @@ static LogicalResult verifyDispatchWorkload(
     ValueRange workload) {
   // If the target has a workgroup count computation function we can verify that
   // the workload here matches what is expected.
-  if (!exportOp.workgroup_count().empty()) {
-    auto &workgroupCount = exportOp.workgroup_count();
+  if (!exportOp.getWorkgroupCount().empty()) {
+    auto &workgroupCount = exportOp.getWorkgroupCount();
     if (workgroupCount.getNumArguments() != workload.size()) {
       return op->emitOpError()
              << "workload mismatch; entry point expects "
@@ -165,11 +165,11 @@ static LogicalResult verifyEscapingResources(Region &region,
                                              ValueRange resultSizes) {
   // Ensure yielded resources match the signature.
   for (auto yieldOp : region.getOps<IREE::Stream::YieldOp>()) {
-    if (results.size() != yieldOp.operands().size()) {
+    if (results.size() != yieldOp.getResourceOperands().size()) {
       return yieldOp.emitOpError()
              << "yield result count mismatch with parent op";
     }
-    for (auto it : llvm::zip(results, yieldOp.operands())) {
+    for (auto it : llvm::zip(results, yieldOp.getResourceOperands())) {
       auto outerValue = std::get<0>(it);
       auto innerValue = std::get<1>(it);
       if (outerValue.getType() != innerValue.getType()) {
@@ -178,7 +178,7 @@ static LogicalResult verifyEscapingResources(Region &region,
                << " but got " << innerValue.getType();
       }
     }
-    for (auto it : llvm::zip(resultSizes, yieldOp.operand_sizes())) {
+    for (auto it : llvm::zip(resultSizes, yieldOp.getResourceOperandSizes())) {
       auto outerSize = std::get<0>(it);
       auto innerSize = std::get<1>(it);
       if (outerSize != innerSize) {
@@ -262,8 +262,8 @@ static void eraseStreamRegionResults(Region &region,
     if (!yieldOp) continue;
     llvm::SmallVector<Value, 4> newOperands;
     for (auto i : llvm::reverse(excludedResultIndices)) {
-      yieldOp.operandsMutable().erase(i);
-      yieldOp.operand_sizesMutable().erase(i);
+      yieldOp.getResourceOperandsMutable().erase(i);
+      yieldOp.getResourceOperandSizesMutable().erase(i);
     }
   }
 }
@@ -606,12 +606,12 @@ static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
 
 LogicalResult ResourceAllocOp::verify() {
   ResourceAllocOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.results(), op.storage_sizes()))) {
+  if (failed(verifyOpValueSizes(op, op.getResults(), op.getStorageSizes()))) {
     return failure();
   }
 
   // All allocated resources must have the same lifetime.
-  auto anyType = op.results().front().getType();
+  auto anyType = op.getResults().front().getType();
   for (auto type : op.getResultTypes()) {
     if (type != anyType) {
       return op.emitError()
@@ -628,7 +628,7 @@ LogicalResult ResourceAllocOp::verify() {
 
 LogicalResult ResourceMapOp::verify() {
   ResourceMapOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
     return failure();
   }
   return success();
@@ -640,7 +640,7 @@ LogicalResult ResourceMapOp::verify() {
 
 LogicalResult ResourceTryMapOp::verify() {
   ResourceTryMapOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
     return failure();
   }
   return success();
@@ -652,7 +652,7 @@ LogicalResult ResourceTryMapOp::verify() {
 
 LogicalResult ResourceLoadOp::verify() {
   ResourceLoadOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.source(), op.source_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
     return failure();
   }
   return success();
@@ -664,7 +664,7 @@ LogicalResult ResourceLoadOp::verify() {
 
 LogicalResult ResourceStoreOp::verify() {
   ResourceStoreOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.target(), op.target_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
     return failure();
   }
   return success();
@@ -689,20 +689,20 @@ void ResourcePackOp::getAsmResultNames(
 
 LogicalResult ResourcePackOp::verify() {
   ResourcePackOp op = *this;
-  size_t sliceCount = op.packed_offsets().size();
-  if (op.lifetime_intervals().size() != sliceCount * 2) {
+  size_t sliceCount = op.getPackedOffsets().size();
+  if (op.getLifetimeIntervals().size() != sliceCount * 2) {
     return op.emitOpError() << "requires a [start, end] range for each slice";
   }
-  if (op.dynamic_slice_sizes().size() != sliceCount) {
+  if (op.getDynamicSliceSizes().size() != sliceCount) {
     return op.emitOpError() << "requires a size for each slice";
   }
   return success();
 }
 
 SmallVector<ResourcePackOp::Slice> ResourcePackOp::getSlices() {
-  auto intervalPairs = lifetime_intervals().getValue();
-  auto sizes = dynamic_slice_sizes();
-  auto offsets = packed_offsets();
+  auto intervalPairs = getLifetimeIntervals().getValue();
+  auto sizes = getDynamicSliceSizes();
+  auto offsets = getPackedOffsets();
   SmallVector<ResourcePackOp::Slice> slices(offsets.size());
   for (size_t i = 0; i < offsets.size(); ++i) {
     int64_t start = intervalPairs[i * 2 + 0].cast<IntegerAttr>().getInt();
@@ -718,14 +718,14 @@ SmallVector<ResourcePackOp::Slice> ResourcePackOp::getSlices() {
 
 LogicalResult ResourceConstantsOp::verify() {
   ResourceConstantsOp op = *this;
-  size_t count = op.results().size();
-  if (op.result_sizes().size() != count || op.values().size() != count) {
+  size_t count = op.getResults().size();
+  if (op.getResultSizes().size() != count || op.getValues().size() != count) {
     return op.emitOpError() << "mismatched constant/result counts";
   }
 
   // All resources must have the same lifetime.
-  auto anyType = op.results().front().getType();
-  for (auto result : op.results()) {
+  auto anyType = op.getResults().front().getType();
+  for (auto result : op.getResults()) {
     if (result.getType() != anyType) {
       return op.emitError()
              << "all constant resources must have the same lifetime";
@@ -741,8 +741,8 @@ LogicalResult ResourceConstantsOp::verify() {
 
 LogicalResult ResourceSubviewOp::verify() {
   ResourceSubviewOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.source(), op.source_size())) ||
-      failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize())) ||
+      failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
     return failure();
   }
   return success();
@@ -750,10 +750,10 @@ LogicalResult ResourceSubviewOp::verify() {
 
 bool ResourceSubviewOp::isMetadata() { return true; }
 
-Value ResourceSubviewOp::getViewSource() { return source(); }
+Value ResourceSubviewOp::getViewSource() { return getSource(); }
 
 Value ResourceSubviewOp::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(source());
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
 ::llvm::Optional<unsigned> ResourceSubviewOp::getTiedResultOperandIndex(
@@ -793,16 +793,16 @@ IREE::Stream::ResourceSubviewOp ResourceSubviewOp::findSubviewOp(Value value) {
 
 LogicalResult TensorImportOp::verify() {
   TensorImportOp op = *this;
-  if (failed(verifyOpDynamicDims(op, op.result_encoding(),
-                                 op.result_encoding_dims())) ||
-      failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
+  if (failed(verifyOpDynamicDims(op, op.getResultEncoding(),
+                                 op.getResultEncodingDims())) ||
+      failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
     return failure();
   }
   return success();
 }
 
 Value TensorImportOp::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(source());
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
 ::llvm::Optional<unsigned> TensorImportOp::getTiedResultOperandIndex(
@@ -820,16 +820,16 @@ SmallVector<int64_t, 4> TensorImportOp::getTiedResultOperandIndices() {
 
 LogicalResult TensorExportOp::verify() {
   TensorExportOp op = *this;
-  if (failed(verifyOpDynamicDims(op, op.source_encoding(),
-                                 op.source_encoding_dims())) ||
-      failed(verifyOpValueSizes(op, op.source(), op.source_size()))) {
+  if (failed(verifyOpDynamicDims(op, op.getSourceEncoding(),
+                                 op.getSourceEncodingDims())) ||
+      failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
     return failure();
   }
   return success();
 }
 
 Value TensorExportOp::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(source());
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
 ::llvm::Optional<unsigned> TensorExportOp::getTiedResultOperandIndex(
@@ -847,7 +847,7 @@ SmallVector<int64_t, 4> TensorExportOp::getTiedResultOperandIndices() {
 
 LogicalResult TensorSizeOfOp::verify() {
   TensorSizeOfOp op = *this;
-  if (failed(verifyOpDynamicDims(op, op.encoding(), op.encoding_dims()))) {
+  if (failed(verifyOpDynamicDims(op, op.getEncoding(), op.getEncodingDims()))) {
     return failure();
   }
   return success();
@@ -858,13 +858,13 @@ LogicalResult TensorSizeOfOp::verify() {
 //===----------------------------------------------------------------------===//
 
 void TensorEmptyOp::getAsmResultNames(mlir::OpAsmSetValueNameFn setNameFn) {
-  setNameFn(result(), "empty");
+  setNameFn(getResult(), "empty");
 }
 
 LogicalResult TensorEmptyOp::verify() {
   TensorEmptyOp op = *this;
-  if (failed(verifyOpDynamicDims(op, op.result_encoding(),
-                                 op.result_encoding_dims()))) {
+  if (failed(verifyOpDynamicDims(op, op.getResultEncoding(),
+                                 op.getResultEncodingDims()))) {
     return failure();
   }
   return success();
@@ -875,13 +875,13 @@ LogicalResult TensorEmptyOp::verify() {
 //===----------------------------------------------------------------------===//
 
 void TensorConstantOp::getAsmResultNames(mlir::OpAsmSetValueNameFn setNameFn) {
-  setNameFn(result(), "cst");
+  setNameFn(getResult(), "cst");
 }
 
 LogicalResult TensorConstantOp::verify() {
   TensorConstantOp op = *this;
-  if (failed(verifyOpDynamicDims(op, op.result_encoding(),
-                                 op.result_encoding_dims()))) {
+  if (failed(verifyOpDynamicDims(op, op.getResultEncoding(),
+                                 op.getResultEncodingDims()))) {
     return failure();
   }
   return success();
@@ -893,9 +893,9 @@ LogicalResult TensorConstantOp::verify() {
 
 LogicalResult TensorSplatOp::verify() {
   TensorSplatOp op = *this;
-  if (failed(verifyOpDynamicDims(op, op.result_encoding(),
-                                 op.result_encoding_dims())) ||
-      failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
+  if (failed(verifyOpDynamicDims(op, op.getResultEncoding(),
+                                 op.getResultEncodingDims())) ||
+      failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
     return failure();
   }
   return success();
@@ -908,19 +908,19 @@ LogicalResult TensorSplatOp::verify() {
 LogicalResult TensorCloneOp::verify() {
   TensorCloneOp op = *this;
   // Clones can't change encodings but they can change shape information.
-  auto sourceEncoding = op.source_encoding().cast<RankedTensorType>();
-  auto resultEncoding = op.result_encoding().cast<RankedTensorType>();
+  auto sourceEncoding = op.getSourceEncoding().cast<RankedTensorType>();
+  auto resultEncoding = op.getResultEncoding().cast<RankedTensorType>();
   if (sourceEncoding.getEncoding() != resultEncoding.getEncoding()) {
     return op.emitOpError() << "clones changing tensor encoding from "
                             << sourceEncoding.getEncoding() << " to "
                             << resultEncoding.getEncoding() << "; not allowed";
   }
-  if (failed(verifyOpDynamicDims(op, op.source_encoding(),
-                                 op.source_encoding_dims())) ||
-      failed(verifyOpDynamicDims(op, op.result_encoding(),
-                                 op.result_encoding_dims())) ||
-      failed(verifyOpValueSizes(op, op.source(), op.source_size())) ||
-      failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
+  if (failed(verifyOpDynamicDims(op, op.getSourceEncoding(),
+                                 op.getSourceEncodingDims())) ||
+      failed(verifyOpDynamicDims(op, op.getResultEncoding(),
+                                 op.getResultEncodingDims())) ||
+      failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize())) ||
+      failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
     return failure();
   }
   return success();
@@ -932,17 +932,17 @@ LogicalResult TensorCloneOp::verify() {
 
 LogicalResult TensorSliceOp::verify() {
   TensorSliceOp op = *this;
-  if (failed(verifyOpDynamicDims(op, op.source_encoding(),
-                                 op.source_encoding_dims())) ||
-      failed(verifyOpDynamicDims(op, op.result_encoding(),
-                                 op.result_encoding_dims())) ||
-      failed(verifyOpValueSizes(op, op.source(), op.source_size())) ||
-      failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
+  if (failed(verifyOpDynamicDims(op, op.getSourceEncoding(),
+                                 op.getSourceEncodingDims())) ||
+      failed(verifyOpDynamicDims(op, op.getResultEncoding(),
+                                 op.getResultEncodingDims())) ||
+      failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize())) ||
+      failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
     return failure();
   }
-  auto sourceType = op.source_encoding().cast<ShapedType>();
-  if (op.start_indices().size() != sourceType.getRank() ||
-      op.lengths().size() != sourceType.getRank()) {
+  auto sourceType = op.getSourceEncoding().cast<ShapedType>();
+  if (op.getStartIndices().size() != sourceType.getRank() ||
+      op.getLengths().size() != sourceType.getRank()) {
     return op.emitOpError() << "start_indices/lengths rank mismatch";
   }
   return success();
@@ -954,19 +954,19 @@ LogicalResult TensorSliceOp::verify() {
 
 LogicalResult TensorUpdateOp::verify() {
   TensorUpdateOp op = *this;
-  if (failed(verifyOpDynamicDims(op, op.update_encoding(),
-                                 op.update_encoding_dims())) ||
-      failed(verifyOpDynamicDims(op, op.target_encoding(),
-                                 op.target_encoding_dims())) ||
-      failed(verifyOpValueSizes(op, op.update(), op.update_size())) ||
-      failed(verifyOpValueSizes(op, op.result(), op.target_size()))) {
+  if (failed(verifyOpDynamicDims(op, op.getUpdateEncoding(),
+                                 op.getUpdateEncodingDims())) ||
+      failed(verifyOpDynamicDims(op, op.getTargetEncoding(),
+                                 op.getTargetEncodingDims())) ||
+      failed(verifyOpValueSizes(op, op.getUpdate(), op.getUpdateSize())) ||
+      failed(verifyOpValueSizes(op, op.getResult(), op.getTargetSize()))) {
     return failure();
   }
   return success();
 }
 
 Value TensorUpdateOp::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(target());
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
 ::llvm::Optional<unsigned> TensorUpdateOp::getTiedResultOperandIndex(
@@ -984,16 +984,16 @@ SmallVector<int64_t, 4> TensorUpdateOp::getTiedResultOperandIndices() {
 
 LogicalResult TensorFillOp::verify() {
   TensorFillOp op = *this;
-  if (failed(verifyOpDynamicDims(op, op.target_encoding(),
-                                 op.target_encoding_dims())) ||
-      failed(verifyOpValueSizes(op, op.result(), op.target_size()))) {
+  if (failed(verifyOpDynamicDims(op, op.getTargetEncoding(),
+                                 op.getTargetEncodingDims())) ||
+      failed(verifyOpValueSizes(op, op.getResult(), op.getTargetSize()))) {
     return failure();
   }
   return success();
 }
 
 Value TensorFillOp::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(target());
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
 ::llvm::Optional<unsigned> TensorFillOp::getTiedResultOperandIndex(
@@ -1011,13 +1011,13 @@ SmallVector<int64_t, 4> TensorFillOp::getTiedResultOperandIndices() {
 
 LogicalResult TensorLoadOp::verify() {
   TensorLoadOp op = *this;
-  if (failed(verifyOpDynamicDims(op, op.source_encoding(),
-                                 op.source_encoding_dims())) ||
-      failed(verifyOpValueSizes(op, op.source(), op.source_size()))) {
+  if (failed(verifyOpDynamicDims(op, op.getSourceEncoding(),
+                                 op.getSourceEncodingDims())) ||
+      failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
     return failure();
   }
-  auto sourceType = op.source_encoding().cast<ShapedType>();
-  if (op.indices().size() != sourceType.getRank()) {
+  auto sourceType = op.getSourceEncoding().cast<ShapedType>();
+  if (op.getIndices().size() != sourceType.getRank()) {
     return op.emitOpError() << "indices rank mismatch";
   }
   return success();
@@ -1029,20 +1029,20 @@ LogicalResult TensorLoadOp::verify() {
 
 LogicalResult TensorStoreOp::verify() {
   TensorStoreOp op = *this;
-  if (failed(verifyOpDynamicDims(op, op.target_encoding(),
-                                 op.target_encoding_dims())) ||
-      failed(verifyOpValueSizes(op, op.target(), op.target_size()))) {
+  if (failed(verifyOpDynamicDims(op, op.getTargetEncoding(),
+                                 op.getTargetEncodingDims())) ||
+      failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
     return failure();
   }
-  auto targetType = op.target_encoding().cast<ShapedType>();
-  if (op.indices().size() != targetType.getRank()) {
+  auto targetType = op.getTargetEncoding().cast<ShapedType>();
+  if (op.getIndices().size() != targetType.getRank()) {
     return op.emitOpError() << "indices rank mismatch";
   }
   return success();
 }
 
 Value TensorStoreOp::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(target());
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
 ::llvm::Optional<unsigned> TensorStoreOp::getTiedResultOperandIndex(
@@ -1090,7 +1090,7 @@ static LogicalResult mergeBuiltinModuleSource(Location loc, StringRef fileName,
 
 LogicalResult BuiltinSplatI64Op::verify() {
   BuiltinSplatI64Op op = *this;
-  if (failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
     return failure();
   }
   return success();
@@ -1105,10 +1105,10 @@ LogicalResult BuiltinSplatI64Op::mergeBuiltinModule(Operation *targetOp,
 LogicalResult BuiltinSplatI64Op::convertBuiltinOp(OpBuilder &builder) {
   auto c8 = builder.createOrFold<arith::ConstantIndexOp>(getLoc(), 8);
   auto count =
-      builder.createOrFold<arith::DivUIOp>(getLoc(), result_size(), c8);
+      builder.createOrFold<arith::DivUIOp>(getLoc(), getResultSize(), c8);
   Value workload[] = {count};
   SmallVector<Value> operands = {
-      value(),
+      getValue(),
       count,
   };
   SmallVector<Value> operandSizes = {};
@@ -1116,10 +1116,10 @@ LogicalResult BuiltinSplatI64Op::convertBuiltinOp(OpBuilder &builder) {
       -1,
   };
   SmallVector<Value> resultSizes = {
-      result_size(),
+      getResultSize(),
   };
   SmallVector<Type> resultTypes{
-      result().getType(),
+      getResult().getType(),
   };
   auto dispatchOp = builder.create<IREE::Stream::AsyncDispatchOp>(
       getLoc(), resultTypes, workload,
@@ -1127,8 +1127,8 @@ LogicalResult BuiltinSplatI64Op::convertBuiltinOp(OpBuilder &builder) {
           builder.getStringAttr("__builtin_splat_i64"),
           FlatSymbolRefAttr::get(builder.getContext(), "__builtin_splat_i64")),
       operands, operandSizes, resultSizes,
-      builder.getIndexArrayAttr(tiedOperands), affinityAttr());
-  result().replaceAllUsesWith(dispatchOp.results().front());
+      builder.getIndexArrayAttr(tiedOperands), getAffinityAttr());
+  getResult().replaceAllUsesWith(dispatchOp.getResults().front());
   return success();
 }
 
@@ -1138,14 +1138,14 @@ LogicalResult BuiltinSplatI64Op::convertBuiltinOp(OpBuilder &builder) {
 
 LogicalResult BuiltinFillI64Op::verify() {
   BuiltinFillI64Op op = *this;
-  if (failed(verifyOpValueSizes(op, op.result(), op.target_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getResult(), op.getTargetSize()))) {
     return failure();
   }
   return success();
 }
 
 Value BuiltinFillI64Op::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(target());
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
 ::llvm::Optional<unsigned> BuiltinFillI64Op::getTiedResultOperandIndex(
@@ -1166,25 +1166,25 @@ LogicalResult BuiltinFillI64Op::mergeBuiltinModule(Operation *targetOp,
 LogicalResult BuiltinFillI64Op::convertBuiltinOp(OpBuilder &builder) {
   auto c8 = builder.createOrFold<arith::ConstantIndexOp>(getLoc(), 8);
   auto count =
-      builder.createOrFold<arith::DivUIOp>(getLoc(), target_length(), c8);
+      builder.createOrFold<arith::DivUIOp>(getLoc(), getTargetLength(), c8);
   Value workload[] = {count};
   SmallVector<Value> operands = {
-      target(),
-      value(),
-      target_offset(),
+      getTarget(),
+      getValue(),
+      getTargetOffset(),
       count,
   };
   SmallVector<Value> operandSizes = {
-      target_size(),
+      getTargetSize(),
   };
   SmallVector<int64_t> tiedOperands = {
       0,
   };
   SmallVector<Value> resultSizes = {
-      target_size(),
+      getTargetSize(),
   };
   SmallVector<Type> resultTypes{
-      result().getType(),
+      getResult().getType(),
   };
   auto dispatchOp = builder.create<IREE::Stream::AsyncDispatchOp>(
       getLoc(), resultTypes, workload,
@@ -1192,8 +1192,8 @@ LogicalResult BuiltinFillI64Op::convertBuiltinOp(OpBuilder &builder) {
           builder.getStringAttr("__builtin_fill_i64"),
           FlatSymbolRefAttr::get(builder.getContext(), "__builtin_fill_i64")),
       operands, operandSizes, resultSizes,
-      builder.getIndexArrayAttr(tiedOperands), affinityAttr());
-  result().replaceAllUsesWith(dispatchOp.results().front());
+      builder.getIndexArrayAttr(tiedOperands), getAffinityAttr());
+  getResult().replaceAllUsesWith(dispatchOp.getResults().front());
   return success();
 }
 
@@ -1212,12 +1212,12 @@ bool AsyncAllocaOp::preferCloneToConsumers() { return true; }
 bool AsyncConstantOp::isMetadata() { return true; }
 
 void AsyncConstantOp::getAsmResultNames(mlir::OpAsmSetValueNameFn setNameFn) {
-  setNameFn(result(), "cst");
+  setNameFn(getResult(), "cst");
 }
 
 LogicalResult AsyncConstantOp::verify() {
   AsyncConstantOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
     return failure();
   }
   return success();
@@ -1229,7 +1229,7 @@ LogicalResult AsyncConstantOp::verify() {
 
 LogicalResult AsyncSplatOp::verify() {
   AsyncSplatOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
     return failure();
   }
   return success();
@@ -1243,8 +1243,8 @@ bool AsyncSplatOp::preferCloneToConsumers() { return true; }
 
 LogicalResult AsyncCloneOp::verify() {
   AsyncCloneOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.source(), op.source_size())) ||
-      failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize())) ||
+      failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
     return failure();
   }
   return success();
@@ -1258,8 +1258,8 @@ bool AsyncCloneOp::preferCloneToConsumers() { return true; }
 
 LogicalResult AsyncSliceOp::verify() {
   AsyncSliceOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.source(), op.source_size())) ||
-      failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize())) ||
+      failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
     return failure();
   }
   return success();
@@ -1273,14 +1273,14 @@ bool AsyncSliceOp::isMetadata() { return true; }
 
 LogicalResult AsyncFillOp::verify() {
   AsyncFillOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.result(), op.target_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getResult(), op.getTargetSize()))) {
     return failure();
   }
   return success();
 }
 
 Value AsyncFillOp::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(target());
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
 ::llvm::Optional<unsigned> AsyncFillOp::getTiedResultOperandIndex(
@@ -1298,8 +1298,8 @@ SmallVector<int64_t, 4> AsyncFillOp::getTiedResultOperandIndices() {
 
 LogicalResult AsyncUpdateOp::verify() {
   AsyncUpdateOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.update(), op.update_size())) ||
-      failed(verifyOpValueSizes(op, op.result(), op.target_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getUpdate(), op.getUpdateSize())) ||
+      failed(verifyOpValueSizes(op, op.getResult(), op.getTargetSize()))) {
     return failure();
   }
   return success();
@@ -1308,7 +1308,7 @@ LogicalResult AsyncUpdateOp::verify() {
 bool AsyncUpdateOp::isMetadata() { return true; }
 
 Value AsyncUpdateOp::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(target());
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
 ::llvm::Optional<unsigned> AsyncUpdateOp::getTiedResultOperandIndex(
@@ -1326,22 +1326,22 @@ SmallVector<int64_t, 4> AsyncUpdateOp::getTiedResultOperandIndices() {
 
 LogicalResult AsyncCopyOp::verify() {
   AsyncCopyOp op = *this;
-  if (op.source() == op.target()) {
+  if (op.getSource() == op.getTarget()) {
     // If we want to perform memmove-like operations where it's safe to copy
     // overlapping ranges we'll need to emit some runtime checks. We can in
     // many cases statically detect a lack of overlap just based on symbolic
     // offset equality but that requires some analysis we don't have yet.
     return op.emitOpError() << "cannot copy within the same resource (yet)";
   }
-  if (failed(verifyOpValueSizes(op, op.source(), op.source_size())) ||
-      failed(verifyOpValueSizes(op, op.result(), op.target_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize())) ||
+      failed(verifyOpValueSizes(op, op.getResult(), op.getTargetSize()))) {
     return failure();
   }
   return success();
 }
 
 Value AsyncCopyOp::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(target());
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
 ::llvm::Optional<unsigned> AsyncCopyOp::getTiedResultOperandIndex(
@@ -1359,8 +1359,8 @@ SmallVector<int64_t, 4> AsyncCopyOp::getTiedResultOperandIndices() {
 
 LogicalResult AsyncTransferOp::verify() {
   AsyncTransferOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.source(), op.source_size())) ||
-      failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize())) ||
+      failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
     return failure();
   }
   return success();
@@ -1372,7 +1372,7 @@ LogicalResult AsyncTransferOp::verify() {
 
 LogicalResult AsyncLoadOp::verify() {
   AsyncLoadOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.source(), op.source_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
     return failure();
   }
   return success();
@@ -1384,14 +1384,14 @@ LogicalResult AsyncLoadOp::verify() {
 
 LogicalResult AsyncStoreOp::verify() {
   AsyncStoreOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.target(), op.target_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
     return failure();
   }
   return success();
 }
 
 Value AsyncStoreOp::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(target());
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
 ::llvm::Optional<unsigned> AsyncStoreOp::getTiedResultOperandIndex(
@@ -1409,8 +1409,9 @@ SmallVector<int64_t, 4> AsyncStoreOp::getTiedResultOperandIndices() {
 
 LogicalResult AsyncDispatchOp::verify() {
   AsyncDispatchOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.operands(), op.operand_sizes())) ||
-      failed(verifyOpValueSizes(op, op.results(), op.result_sizes()))) {
+  if (failed(verifyOpValueSizes(op, op.getResourceOperands(),
+                                op.getResourceOperandSizes())) ||
+      failed(verifyOpValueSizes(op, op.getResults(), op.getResultSizes()))) {
     return failure();
   }
   return success();
@@ -1421,7 +1422,7 @@ LogicalResult AsyncDispatchOp::verifySymbolUses(
   Operation *op = getOperation();
   auto exportOp =
       symbolTable.lookupNearestSymbolFrom<IREE::Stream::ExecutableExportOp>(
-          op, entry_point());
+          op, getEntryPoint());
   if (!exportOp) {
     // TODO(benvanik): there are a lot of tests that are assuming this is not
     // verified. We'll need to go add dummy executables for all of them. Today
@@ -1433,7 +1434,7 @@ LogicalResult AsyncDispatchOp::verifySymbolUses(
   }
 
   // Verify that the workload parameters captured match the target export.
-  if (failed(verifyDispatchWorkload(op, exportOp, workload()))) {
+  if (failed(verifyDispatchWorkload(op, exportOp, getWorkload()))) {
     return failure();
   }
 
@@ -1479,26 +1480,27 @@ void AsyncExecuteOp::build(OpBuilder &builder, OperationState &state,
 
 LogicalResult AsyncExecuteOp::verify() {
   AsyncExecuteOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.operands(), op.operand_sizes())) ||
-      failed(verifyOpValueSizes(op, op.results(), op.result_sizes()))) {
+  if (failed(verifyOpValueSizes(op, op.getResourceOperands(),
+                                op.getResourceOperandSizes())) ||
+      failed(verifyOpValueSizes(op, op.getResults(), op.getResultSizes()))) {
     return failure();
   }
-  if (failed(verifyAllResourcesCaptured(op.body())) ||
-      failed(verifyEscapingResources(op.body(), op.results(),
-                                     op.result_sizes()))) {
+  if (failed(verifyAllResourcesCaptured(op.getBody())) ||
+      failed(verifyEscapingResources(op.getBody(), op.getResults(),
+                                     op.getResultSizes()))) {
     return failure();
   }
   return success();
 }
 
 std::pair<unsigned, unsigned> AsyncExecuteOp::getTiedResultsIndexAndLength() {
-  return {0, results().size()};
+  return {0, getResults().size()};
 }
 
 OperandRange AsyncExecuteOp::getSuccessorEntryOperands(
     Optional<unsigned> index) {
   assert(index && index.getValue() == 0 && "invalid region index");
-  return operands();
+  return getResourceOperands();
 }
 
 void AsyncExecuteOp::getSuccessorRegions(
@@ -1508,30 +1510,30 @@ void AsyncExecuteOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (index.hasValue()) {
-    regions.push_back(RegionSuccessor(results()));
+    regions.push_back(RegionSuccessor(getResults()));
   } else {
-    regions.push_back(RegionSuccessor(&body(), body().getArguments()));
+    regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
   }
 }
 
 Operation::operand_range AsyncExecuteOp::getClosureOperands() {
-  return operands();
+  return getResourceOperands();
 }
 
 Operation::result_range AsyncExecuteOp::getClosureResults() {
-  return results();
+  return getResults();
 }
 
 bool AsyncExecuteOp::canClosureContainOp(Operation *op) { return false; }
 
 IREE::Util::ValueAccess AsyncExecuteOp::getOperandAccess(
     unsigned operandIndex) {
-  auto arg = body().getArgument(operandIndex);
+  auto arg = getBody().getArgument(operandIndex);
   return computeValueAccess(arg);
 }
 
 IREE::Util::ValueAccess AsyncExecuteOp::getResultAccess(unsigned resultIndex) {
-  auto yieldOp = cast<YieldOp>(body().getBlocks().front().getTerminator());
+  auto yieldOp = cast<YieldOp>(getBody().getBlocks().front().getTerminator());
   return computeValueAccess(yieldOp.getOperand(resultIndex));
 }
 
@@ -1539,11 +1541,11 @@ IREE::Util::ClosureOpInterface
 AsyncExecuteOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
-  auto newResultTypes = llvm::to_vector<4>(
-      llvm::map_range(results(), [](auto value) { return value.getType(); }));
-  auto newResultSizes = llvm::to_vector<4>(result_sizes());
-  auto newOperandsValues = llvm::to_vector<4>(operands());
-  auto newOperandSizes = llvm::to_vector<4>(operand_sizes());
+  auto newResultTypes = llvm::to_vector<4>(llvm::map_range(
+      getResults(), [](auto value) { return value.getType(); }));
+  auto newResultSizes = llvm::to_vector<4>(getResultSizes());
+  auto newOperandsValues = llvm::to_vector<4>(getResourceOperands());
+  auto newOperandSizes = llvm::to_vector<4>(getResourceOperandSizes());
   IREE::Util::excludeClosureOperandsAndResults(
       newOperandsValues, newOperandSizes, excludedOperandIndices,
       newResultTypes, newResultSizes, excludedResultIndices);
@@ -1556,7 +1558,7 @@ AsyncExecuteOp::cloneReplacementExcludingOperandsAndResults(
          "operands must be the first ODS group");
 
   auto newOp = rewriter.create<AsyncExecuteOp>(
-      getLoc(), newResultTypes, newResultSizes, await_timepoint(),
+      getLoc(), newResultTypes, newResultSizes, getAwaitTimepoint(),
       newOperandsValues, newOperandSizes, newTiedOperandIndices,
       getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
@@ -1595,13 +1597,14 @@ void AsyncConcurrentOp::build(OpBuilder &builder, OperationState &state,
 
 LogicalResult AsyncConcurrentOp::verify() {
   AsyncConcurrentOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.operands(), op.operand_sizes())) ||
-      failed(verifyOpValueSizes(op, op.results(), op.result_sizes()))) {
+  if (failed(verifyOpValueSizes(op, op.getResourceOperands(),
+                                op.getResourceOperandSizes())) ||
+      failed(verifyOpValueSizes(op, op.getResults(), op.getResultSizes()))) {
     return failure();
   }
-  if (failed(verifyAllResourcesCaptured(op.body())) ||
-      failed(verifyEscapingResources(op.body(), op.results(),
-                                     op.result_sizes()))) {
+  if (failed(verifyAllResourcesCaptured(op.getBody())) ||
+      failed(verifyEscapingResources(op.getBody(), op.getResults(),
+                                     op.getResultSizes()))) {
     return failure();
   }
   return success();
@@ -1610,7 +1613,7 @@ LogicalResult AsyncConcurrentOp::verify() {
 OperandRange AsyncConcurrentOp::getSuccessorEntryOperands(
     Optional<unsigned> index) {
   assert(index && index.getValue() == 0 && "invalid region index");
-  return operands();
+  return getResourceOperands();
 }
 
 void AsyncConcurrentOp::getSuccessorRegions(
@@ -1620,31 +1623,31 @@ void AsyncConcurrentOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (index.hasValue()) {
-    regions.push_back(RegionSuccessor(results()));
+    regions.push_back(RegionSuccessor(getResults()));
   } else {
-    regions.push_back(RegionSuccessor(&body(), body().getArguments()));
+    regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
   }
 }
 
 Operation::operand_range AsyncConcurrentOp::getClosureOperands() {
-  return operands();
+  return getResourceOperands();
 }
 
 Operation::result_range AsyncConcurrentOp::getClosureResults() {
-  return results();
+  return getResults();
 }
 
 bool AsyncConcurrentOp::canClosureContainOp(Operation *op) { return false; }
 
 IREE::Util::ValueAccess AsyncConcurrentOp::getOperandAccess(
     unsigned operandIndex) {
-  auto arg = body().getArgument(operandIndex);
+  auto arg = getBody().getArgument(operandIndex);
   return computeValueAccess(arg);
 }
 
 IREE::Util::ValueAccess AsyncConcurrentOp::getResultAccess(
     unsigned resultIndex) {
-  auto yieldOp = cast<YieldOp>(body().getBlocks().front().getTerminator());
+  auto yieldOp = cast<YieldOp>(getBody().getBlocks().front().getTerminator());
   return computeValueAccess(yieldOp.getOperand(resultIndex));
 }
 
@@ -1653,9 +1656,9 @@ AsyncConcurrentOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
   auto newResultTypes = llvm::to_vector<4>(getResultTypes());
-  auto newResultSizes = llvm::to_vector<4>(result_sizes());
-  auto newOperandsValues = llvm::to_vector<4>(operands());
-  auto newOperandSizes = llvm::to_vector<4>(operand_sizes());
+  auto newResultSizes = llvm::to_vector<4>(getResultSizes());
+  auto newOperandsValues = llvm::to_vector<4>(getResourceOperands());
+  auto newOperandSizes = llvm::to_vector<4>(getResourceOperandSizes());
   IREE::Util::excludeClosureOperandsAndResults(
       newOperandsValues, newOperandSizes, excludedOperandIndices,
       newResultTypes, newResultSizes, excludedResultIndices);
@@ -1683,7 +1686,7 @@ AsyncConcurrentOp::cloneReplacementExcludingOperandsAndResults(
 
 LogicalResult CmdFlushOp::verify() {
   CmdFlushOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.target(), op.target_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
     return failure();
   }
   return success();
@@ -1695,7 +1698,7 @@ LogicalResult CmdFlushOp::verify() {
 
 LogicalResult CmdInvalidateOp::verify() {
   CmdInvalidateOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.target(), op.target_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
     return failure();
   }
   return success();
@@ -1707,7 +1710,7 @@ LogicalResult CmdInvalidateOp::verify() {
 
 LogicalResult CmdDiscardOp::verify() {
   CmdDiscardOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.target(), op.target_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
     return failure();
   }
   return success();
@@ -1719,7 +1722,7 @@ LogicalResult CmdDiscardOp::verify() {
 
 LogicalResult CmdFillOp::verify() {
   CmdFillOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.target(), op.target_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
     return failure();
   }
   return success();
@@ -1731,8 +1734,8 @@ LogicalResult CmdFillOp::verify() {
 
 LogicalResult CmdCopyOp::verify() {
   CmdCopyOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.source(), op.source_size())) ||
-      failed(verifyOpValueSizes(op, op.target(), op.target_size()))) {
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize())) ||
+      failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
     return failure();
   }
   return success();
@@ -1744,11 +1747,11 @@ LogicalResult CmdCopyOp::verify() {
 
 LogicalResult CmdDispatchOp::verify() {
   CmdDispatchOp op = *this;
-  size_t resourceCount = op.resources().size();
-  if (op.resource_sizes().size() != resourceCount ||
-      op.resource_offsets().size() != resourceCount ||
-      op.resource_lengths().size() != resourceCount ||
-      op.resource_accesses().size() != resourceCount) {
+  size_t resourceCount = op.getResources().size();
+  if (op.getResourceSizes().size() != resourceCount ||
+      op.getResourceOffsets().size() != resourceCount ||
+      op.getResourceLengths().size() != resourceCount ||
+      op.getResourceAccesses().size() != resourceCount) {
     return op->emitOpError() << "dispatch with " << resourceCount
                              << " resources has mismatched associated ranges";
   }
@@ -1760,7 +1763,7 @@ LogicalResult CmdDispatchOp::verifySymbolUses(
   Operation *op = getOperation();
   auto exportOp =
       symbolTable.lookupNearestSymbolFrom<IREE::Stream::ExecutableExportOp>(
-          op, entry_point());
+          op, getEntryPoint());
   if (!exportOp) {
     // TODO(benvanik): there are a lot of tests that are assuming this is not
     // verified. We'll need to go add dummy executables for all of them. Today
@@ -1772,7 +1775,7 @@ LogicalResult CmdDispatchOp::verifySymbolUses(
   }
 
   // Verify that the workload parameters captured match the target export.
-  if (failed(verifyDispatchWorkload(op, exportOp, workload()))) {
+  if (failed(verifyDispatchWorkload(op, exportOp, getWorkload()))) {
     return failure();
   }
 
@@ -1949,13 +1952,14 @@ static LogicalResult verifyCmdOp(Operation *op) {
 
 LogicalResult CmdExecuteOp::verify() {
   CmdExecuteOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.operands(), op.operand_sizes()))) {
+  if (failed(verifyOpValueSizes(op, op.getResourceOperands(),
+                                op.getResourceOperandSizes()))) {
     return failure();
   }
-  if (failed(verifyAllResourcesCaptured(op.body()))) {
+  if (failed(verifyAllResourcesCaptured(op.getBody()))) {
     return failure();
   }
-  for (auto &nestedOp : op.body().front()) {
+  for (auto &nestedOp : op.getBody().front()) {
     if (failed(verifyCmdOp(&nestedOp))) return failure();
   }
   return success();
@@ -1963,7 +1967,7 @@ LogicalResult CmdExecuteOp::verify() {
 
 OperandRange CmdExecuteOp::getSuccessorEntryOperands(Optional<unsigned> index) {
   assert(index && index.getValue() == 0 && "invalid region index");
-  return operands();
+  return getResourceOperands();
 }
 
 void CmdExecuteOp::getSuccessorRegions(
@@ -1975,12 +1979,12 @@ void CmdExecuteOp::getSuccessorRegions(
   if (index.hasValue()) {
     regions.push_back(RegionSuccessor({}));
   } else {
-    regions.push_back(RegionSuccessor(&body(), body().getArguments()));
+    regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
   }
 }
 
 Operation::operand_range CmdExecuteOp::getClosureOperands() {
-  return operands();
+  return getResourceOperands();
 }
 
 Operation::result_range CmdExecuteOp::getClosureResults() {
@@ -1990,7 +1994,7 @@ Operation::result_range CmdExecuteOp::getClosureResults() {
 bool CmdExecuteOp::canClosureContainOp(Operation *op) { return false; }
 
 IREE::Util::ValueAccess CmdExecuteOp::getOperandAccess(unsigned operandIndex) {
-  auto arg = body().getArgument(operandIndex);
+  auto arg = getBody().getArgument(operandIndex);
   return computeValueAccess(arg);
 }
 
@@ -2004,13 +2008,13 @@ CmdExecuteOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
   SmallVector<Type, 4> newResultTypes;
   SmallVector<Value, 4> newResultSizes;
-  auto newOperandsValues = llvm::to_vector<4>(operands());
-  auto newOperandSizes = llvm::to_vector<4>(operand_sizes());
+  auto newOperandsValues = llvm::to_vector<4>(getResourceOperands());
+  auto newOperandSizes = llvm::to_vector<4>(getResourceOperandSizes());
   IREE::Util::excludeClosureOperandsAndResults(
       newOperandsValues, newOperandSizes, excludedOperandIndices,
       newResultTypes, newResultSizes, excludedResultIndices);
 
-  auto newOp = rewriter.create<CmdExecuteOp>(getLoc(), await_timepoint(),
+  auto newOp = rewriter.create<CmdExecuteOp>(getLoc(), getAwaitTimepoint(),
                                              newOperandsValues, newOperandSizes,
                                              getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
@@ -2025,7 +2029,7 @@ CmdExecuteOp::cloneReplacementExcludingOperandsAndResults(
 
 LogicalResult CmdSerialOp::verify() {
   CmdSerialOp op = *this;
-  for (auto &nestedOp : op.body().front()) {
+  for (auto &nestedOp : op.getBody().front()) {
     if (failed(verifyCmdOp(&nestedOp))) return failure();
   }
   return success();
@@ -2040,7 +2044,7 @@ void CmdSerialOp::getSuccessorRegions(
   if (index.hasValue()) {
     regions.push_back(RegionSuccessor({}));
   } else {
-    regions.push_back(RegionSuccessor(&body(), {}));
+    regions.push_back(RegionSuccessor(&getBody(), {}));
   }
 }
 
@@ -2050,7 +2054,7 @@ void CmdSerialOp::getSuccessorRegions(
 
 LogicalResult CmdConcurrentOp::verify() {
   CmdConcurrentOp op = *this;
-  for (auto &nestedOp : op.body().front()) {
+  for (auto &nestedOp : op.getBody().front()) {
     if (failed(verifyCmdOp(&nestedOp))) return failure();
   }
   return success();
@@ -2065,7 +2069,7 @@ void CmdConcurrentOp::getSuccessorRegions(
   if (index.hasValue()) {
     regions.push_back(RegionSuccessor({}));
   } else {
-    regions.push_back(RegionSuccessor(&body(), {}));
+    regions.push_back(RegionSuccessor(&getBody(), {}));
   }
 }
 
@@ -2105,8 +2109,10 @@ void TimepointAwaitOp::build(OpBuilder &builder, OperationState &state,
 
 LogicalResult TimepointAwaitOp::verify() {
   TimepointAwaitOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.operands(), op.operand_sizes())) ||
-      failed(verifyOpValueSizes(op, op.results(), op.operand_sizes()))) {
+  if (failed(verifyOpValueSizes(op, op.getResourceOperands(),
+                                op.getResourceOperandSizes())) ||
+      failed(verifyOpValueSizes(op, op.getResults(),
+                                op.getResourceOperandSizes()))) {
     return failure();
   }
   return success();
@@ -2118,7 +2124,8 @@ LogicalResult TimepointAwaitOp::verify() {
 }
 
 SmallVector<int64_t, 4> TimepointAwaitOp::getTiedResultOperandIndices() {
-  return llvm::to_vector<4>(llvm::seq<int64_t>(0, operands().size()));
+  return llvm::to_vector<4>(
+      llvm::seq<int64_t>(0, getResourceOperands().size()));
 }
 
 //===----------------------------------------------------------------------===//
@@ -2150,9 +2157,9 @@ void ExecutableExportOp::build(OpBuilder &builder, OperationState &state,
 
 LogicalResult ExecutableExportOp::verify() {
   // Workgroup count region is optional.
-  if (!workgroup_count().empty()) {
+  if (!getWorkgroupCount().empty()) {
     // Verify the return ops all provide XYZ values.
-    for (auto returnOp : workgroup_count().getOps<IREE::Stream::ReturnOp>()) {
+    for (auto returnOp : getWorkgroupCount().getOps<IREE::Stream::ReturnOp>()) {
       if (returnOp.getNumOperands() != 3 ||
           !llvm::all_of(returnOp.getOperandTypes(),
                         [](Type type) { return type.isIndex(); })) {
@@ -2164,12 +2171,12 @@ LogicalResult ExecutableExportOp::verify() {
   return success();
 }
 
-::mlir::func::FuncOp ExecutableExportOp::getFunctionRef() {
+::mlir::func::FuncOp ExecutableExportOp::lookupFunctionRef() {
   auto executableOp =
       this->getOperation()->getParentOfType<IREE::Stream::ExecutableOp>();
   if (!executableOp) return {};
   return executableOp.getInnerModule().lookupSymbol<::mlir::func::FuncOp>(
-      function_ref());
+      getFunctionRef());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2179,7 +2186,7 @@ LogicalResult ExecutableExportOp::verify() {
 LogicalResult BindingSubspanOp::verify() {
   BindingSubspanOp op = *this;
   if (auto shapedType = op.getType().dyn_cast<ShapedType>()) {
-    if (failed(verifyOpDynamicDims(op, shapedType, op.dynamic_dims()))) {
+    if (failed(verifyOpDynamicDims(op, shapedType, op.getDynamicDims()))) {
       return failure();
     }
   }
@@ -2202,7 +2209,7 @@ MutableOperandRange ReturnOp::getMutableSuccessorOperands(
 
 MutableOperandRange YieldOp::getMutableSuccessorOperands(
     Optional<unsigned> index) {
-  return operandsMutable();
+  return getResourceOperandsMutable();
 }
 
 }  // namespace Stream

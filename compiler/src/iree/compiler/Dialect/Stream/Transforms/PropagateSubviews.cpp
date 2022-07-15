@@ -161,10 +161,10 @@ static Subview consumeSubview(Location loc, Value value, SubviewMap &subviewMap,
   if (auto subviewOp = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
           value.getDefiningOp())) {
     Subview subview;
-    subview.resource = subviewOp.source();
-    subview.resourceSize = subviewOp.source_size();
-    subview.subviewOffset = subviewOp.source_offset();
-    subview.subviewLength = subviewOp.result_size();
+    subview.resource = subviewOp.getSource();
+    subview.resourceSize = subviewOp.getSourceSize();
+    subview.subviewOffset = subviewOp.getSourceOffset();
+    subview.subviewLength = subviewOp.getResultSize();
     return subview;
   } else {
     Subview subview;
@@ -237,7 +237,7 @@ static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
       auto subviewOp = builder.create<IREE::Stream::ResourceSubviewOp>(
           region.getLoc(), expansion.resource, expansion.resourceSize,
           expansion.subviewOffset, expansion.subviewLength);
-      expansion.resource.replaceAllUsesExcept(subviewOp.result(), subviewOp);
+      expansion.resource.replaceAllUsesExcept(subviewOp.getResult(), subviewOp);
     }
   }
 
@@ -301,7 +301,7 @@ static void expandGlobalLoadOp(IREE::Util::GlobalLoadOp op,
   auto subviewOp = builder.create<IREE::Stream::ResourceSubviewOp>(
       op.getLoc(), subview.resource, subview.resourceSize,
       subview.subviewOffset, subview.subviewLength);
-  op.getResult().replaceAllUsesExcept(subviewOp.result(), subviewOp);
+  op.getResult().replaceAllUsesExcept(subviewOp.getResult(), subviewOp);
 }
 
 // Moves resource subviews from global stores to loads.
@@ -416,7 +416,7 @@ static void expandCallOp(mlir::func::CallOp op, IndexSet &indexSet,
     auto subviewOp = builder.create<IREE::Stream::ResourceSubviewOp>(
         op.getLoc(), subview.resource, subview.resourceSize,
         subview.subviewOffset, subview.subviewLength);
-    oldResult.replaceAllUsesWith(subviewOp.result());
+    oldResult.replaceAllUsesWith(subviewOp.getResult());
   }
 
   op.erase();
