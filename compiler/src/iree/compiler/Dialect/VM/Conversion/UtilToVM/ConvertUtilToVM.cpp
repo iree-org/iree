@@ -83,11 +83,15 @@ struct BufferConstantOpConversion
   LogicalResult matchAndRewrite(
       IREE::Util::BufferConstantOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
+    auto alignmentAttr = op.getAlignmentAttr();
+    if (alignmentAttr) {
+      alignmentAttr = rewriter.getI64IntegerAttr(alignmentAttr.getInt());
+    }
     rewriter.replaceOpWithNewOp<IREE::VM::RodataInlineOp>(
         op,
         IREE::VM::RefType::get(
             IREE::VM::BufferType::get(rewriter.getContext())),
-        /*name=*/nullptr, op.getValue(), op.getAlignmentAttr());
+        /*name=*/nullptr, op.getValue(), alignmentAttr);
     return success();
   }
 };
