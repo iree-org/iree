@@ -26,6 +26,7 @@ iree_cc_library(
     "FuseGlobals.cpp"
     "HoistIntoGlobals.cpp"
     "Patterns.cpp"
+    "PropagateSubrange.cpp"
     "SimplifyGlobalAccesses.cpp"
     "StripDebugOps.cpp"
     "TestFloatRangeAnalysis.cpp"
@@ -44,6 +45,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::Analysis::Constant
     iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Utils
   PUBLIC
 )
 

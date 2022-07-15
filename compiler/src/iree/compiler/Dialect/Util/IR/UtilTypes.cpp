@@ -43,6 +43,14 @@ Value BufferType::inferSizeFromValue(Location loc, Value value,
       loc, builder.getIndexType(), value);
 }
 
+Value BufferType::createSubrangeOp(Location loc, Value resource,
+                                   Value resourceSize, Value subrangeOffset,
+                                   Value subrangeLength,
+                                   OpBuilder &builder) const {
+  return builder.create<IREE::Util::BufferSubspanOp>(
+      loc, resource, resourceSize, subrangeOffset, subrangeLength);
+}
+
 //===----------------------------------------------------------------------===//
 // !util.list<T>
 //===----------------------------------------------------------------------===//

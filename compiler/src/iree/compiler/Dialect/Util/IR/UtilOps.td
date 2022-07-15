@@ -817,8 +817,9 @@ def Util_BufferSliceOp : Util_PureOp<"buffer.slice", [
 def Util_BufferSubspanOp : Util_PureOp<"buffer.subspan", [
   AllTypesMatch<["source", "result"]>,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  Util_SizeAwareOp,
   DeclareOpInterfaceMethods<ViewLikeOpInterface>,
+  Util_SizeAwareOp,
+  Util_SubrangeOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResult",
     "getTiedResultOperandIndex",
@@ -850,6 +851,11 @@ def Util_BufferSubspanOp : Util_PureOp<"buffer.subspan", [
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return getSourceSize(); }
     Value getResultSize(unsigned idx) { return getResultSize(); }
+
+    Value getSubrangeResource() { return getSource(); }
+    Value getSubrangeResourceSize() { return getSourceSize(); }
+    Value getSubrangeOffset() { return getSourceOffset(); }
+    Value getSubrangeLength() { return getResultSize(); }
 
     // Walks up the use-def chain to find a subspan op that feeds into |value|.
     static IREE::Util::BufferSubspanOp findSubspanOp(Value value);

@@ -17,11 +17,14 @@ include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 def Util_BufferType : TypeDef<Util_Dialect, "Buffer", [
   Util_ReferenceType,
   Util_SizeAwareType,
-  DeclareTypeInterfaceMethods<Util_GlobalTypeInterface, [
+  DeclareTypeInterfaceMethods<Util_GlobalType, [
     "isAccessStorageCompatible",
   ]>,
   DeclareTypeInterfaceMethods<Util_InferTypeSize, [
     "inferSizeFromValue",
+  ]>,
+  DeclareTypeInterfaceMethods<Util_SubrangeType, [
+    "createSubrangeOp",
   ]>,
 ]> {
   let mnemonic = "buffer";

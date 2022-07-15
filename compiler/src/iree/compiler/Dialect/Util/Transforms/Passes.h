@@ -23,6 +23,7 @@ std::unique_ptr<OperationPass<void>> createFixedPointIteratorPass(
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldGlobalsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFuseGlobalsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createHoistIntoGlobalsPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateSubrangesPass();
 std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass();
 std::unique_ptr<OperationPass<void>> createStripDebugOpsPass();
 
@@ -45,6 +46,7 @@ inline void registerTransformPasses() {
   createFoldGlobalsPass();
   createFuseGlobalsPass();
   createHoistIntoGlobalsPass();
+  createPropagateSubrangesPass();
   createSimplifyGlobalAccessesPass();
   createStripDebugOpsPass();
 
