@@ -59,7 +59,7 @@ case "${kernel^^}" in
       ;;
 esac
 
-
+HOSTNAME="$(get_metadata instance/name)"
 ZONE="$(get_metadata instance/zone | awk -F/ '{print $NF}')"
 CPU_PLATFORM="$(get_metadata instance/cpu-platform)"
 MACHINE_TYPE="$(get_metadata instance/machine-type | awk -F/ '{print $NF}')"
