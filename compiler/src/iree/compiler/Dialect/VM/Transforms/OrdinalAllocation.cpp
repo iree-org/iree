@@ -94,7 +94,7 @@ class OrdinalAllocationPass
     }
 
     // Assign ordinal counts to module op.
-    getOperation().ordinal_countsAttr(OrdinalCountsAttr::get(
+    getOperation().setOrdinalCountsAttr(OrdinalCountsAttr::get(
         &getContext(), nextImportOrdinal, nextExportOrdinal, nextFuncOrdinal,
         globalBytes, nextGlobalRefOrdinal, nextRodataOrdinal, 0));
 
@@ -104,14 +104,15 @@ class OrdinalAllocationPass
     // ordinals we just assigned.
     SmallVector<Operation *, 32> deadOps;
     getOperation().walk([&](IREE::VM::GlobalAddressOp op) {
-      auto *globalOp = symbolTable.lookupNearestSymbolFrom(op, op.globalAttr());
+      auto *globalOp =
+          symbolTable.lookupNearestSymbolFrom(op, op.getGlobalAttr());
       assert(globalOp);
       auto ordinal = globalOp->getAttrOfType<IntegerAttr>("ordinal").getInt();
 
       OpBuilder builder(op);
       auto ordinalOp =
           builder.create<IREE::VM::ConstI32Op>(op.getLoc(), ordinal);
-      op.result().replaceAllUsesWith(ordinalOp);
+      op.getResult().replaceAllUsesWith(ordinalOp);
 
       deadOps.push_back(op);
     });

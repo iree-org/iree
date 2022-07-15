@@ -199,9 +199,9 @@ void replaceEntryPointUses(
     const DenseMap<Attribute, SymbolRefAttr> &replacements) {
   for (auto funcLikeOp : moduleOp.getOps<FunctionOpInterface>()) {
     funcLikeOp->walk([&](DispatchOp dispatchOp) {
-      auto it = replacements.find(dispatchOp.entry_point());
+      auto it = replacements.find(dispatchOp.getEntryPoint());
       if (it != replacements.end()) {
-        dispatchOp.entry_pointAttr(it->second.cast<SymbolRefAttr>());
+        dispatchOp.setEntryPointAttr(it->second.cast<SymbolRefAttr>());
       }
     });
   }
@@ -229,8 +229,8 @@ class DeduplicateExecutablesPass
 
       for (int j = 0; j < i; ++j) {
         auto referenceExecutableOp = executableOps[j];
-        if (!isStructurallyEquivalentTo(duplicateExecutableOp.body(),
-                                        referenceExecutableOp.body())) {
+        if (!isStructurallyEquivalentTo(duplicateExecutableOp.getBody(),
+                                        referenceExecutableOp.getBody())) {
           continue;
         }
 
@@ -245,11 +245,11 @@ class DeduplicateExecutablesPass
           auto oldSymbolRefAttr = SymbolRefAttr::get(
               builder.getContext(), duplicateExecutableOp.getName(),
               {SymbolRefAttr::get(builder.getContext(),
-                                  std::get<0>(exportOpPair).sym_name())});
+                                  std::get<0>(exportOpPair).getSymName())});
           auto newSymbolRefAttr = SymbolRefAttr::get(
               builder.getContext(), referenceExecutableOp.getName(),
               {SymbolRefAttr::get(builder.getContext(),
-                                  std::get<1>(exportOpPair).sym_name())});
+                                  std::get<1>(exportOpPair).getSymName())});
           entryPointRefReplacements[oldSymbolRefAttr] = newSymbolRefAttr;
         }
 

@@ -16,6 +16,10 @@ include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 def VM_Dialect : Dialect {
   let name = "vm";
   let cppNamespace = "::mlir::iree_compiler::IREE::VM";
+  // TODO(benvanik): change to kEmitAccessorPrefix_Prefixed once the op encoder
+  // tablegen goo supports it. Currently it requires accessors with the same
+  // name as the ODS fields.
+  let emitAccessorPrefix = kEmitAccessorPrefix_Both;
 
   let summary = [{
     A dialect representing operations against an abstract virtual machine.
@@ -215,11 +219,11 @@ def VM_GlobalOpInterface : OpInterface<"VMGlobalOp"> {
     }]>,
     InterfaceMethod<[{}], "StringRef", "getSymbolName", (ins)>,
     InterfaceMethod<[{}], "bool", "isMutable", (ins)>,
-    InterfaceMethod<[{}], "Optional<Attribute>", "getInitialValueAttr", (ins)>,
+    InterfaceMethod<[{}], "Optional<Attribute>", "getInitialValueUntyped", (ins)>,
     InterfaceMethod<[{}], "void", "setInitialValue", (ins "Attribute":$value)>,
-    InterfaceMethod<[{}], "Optional<IntegerAttr>", "getOrdinalAttr", (ins)>,
+    InterfaceMethod<[{}], "IntegerAttr", "getOrdinalAttr", (ins)>,
     InterfaceMethod<[{}], "int", "getOrdinal", (ins), [{
-      return $_self.getOrdinalAttr().getValue().template cast<IntegerAttr>().getInt();
+      return $_self.getOrdinalAttr().getInt();
     }]>,
     InterfaceMethod<[{}], "void", "makeMutable", (ins)>,
     InterfaceMethod<[{}], "void", "clearInitialValue", (ins)>,

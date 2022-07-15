@@ -56,7 +56,7 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
     /// this dispatch is just a copy dispatch.
     auto walkResult = funcOp.walk(
         [&](IREE::Flow::DispatchTensorStoreOp storeOp) -> WalkResult {
-          return success(isReadOnly(storeOp.value()));
+          return success(isReadOnly(storeOp.getValue()));
         });
     if (walkResult.wasInterrupted()) continue;
     // The function is just a copy.

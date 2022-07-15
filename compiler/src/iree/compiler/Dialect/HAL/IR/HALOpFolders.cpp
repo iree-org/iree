@@ -30,20 +30,20 @@ namespace HAL {
 //===----------------------------------------------------------------------===//
 
 OpFoldResult TensorImportOp::fold(ArrayRef<Attribute> operands) {
-  if (auto exportOp = source().getDefiningOp<TensorExportOp>()) {
-    if (exportOp.source().getType() == target().getType() &&
-        exportOp.source_encoding() == target_encoding()) {
-      return exportOp.source();
+  if (auto exportOp = getSource().getDefiningOp<TensorExportOp>()) {
+    if (exportOp.getSource().getType() == getTarget().getType() &&
+        exportOp.getSourceEncoding() == getTargetEncoding()) {
+      return exportOp.getSource();
     }
   }
   return {};
 }
 
 OpFoldResult TensorExportOp::fold(ArrayRef<Attribute> operands) {
-  if (auto importOp = source().getDefiningOp<TensorImportOp>()) {
-    if (importOp.source().getType() == target().getType() &&
-        importOp.target_encoding() == source_encoding()) {
-      return importOp.source();
+  if (auto importOp = getSource().getDefiningOp<TensorImportOp>()) {
+    if (importOp.getSource().getType() == getTarget().getType() &&
+        importOp.getTargetEncoding() == getSourceEncoding()) {
+      return importOp.getSource();
     }
   }
   return {};
@@ -63,8 +63,8 @@ struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
   LogicalResult matchAndRewrite(BufferViewBufferOp op,
                                 PatternRewriter &rewriter) const override {
     if (auto createOp = dyn_cast_or_null<BufferViewCreateOp>(
-            op.buffer_view().getDefiningOp())) {
-      rewriter.replaceOp(op, createOp.buffer());
+            op.getBufferView().getDefiningOp())) {
+      rewriter.replaceOp(op, createOp.getBuffer());
       return success();
     }
     return failure();
@@ -89,7 +89,7 @@ struct ExpandBufferViewDimsOp : public OpRewritePattern<BufferViewDimsOp> {
     SmallVector<Value, 4> newDimValues;
     for (unsigned i = 0; i < op.getNumResults(); ++i) {
       newDimValues.push_back(rewriter.createOrFold<BufferViewDimOp>(
-          op.getLoc(), rewriter.getIndexType(), op.buffer_view(),
+          op.getLoc(), rewriter.getIndexType(), op.getBufferView(),
           rewriter.getIndexAttr(i)));
     }
     rewriter.replaceOp(op, {newDimValues});
@@ -119,8 +119,8 @@ struct SkipCommandBufferDeviceOp
   LogicalResult matchAndRewrite(CommandBufferDeviceOp op,
                                 PatternRewriter &rewriter) const override {
     if (auto createOp = dyn_cast_or_null<CommandBufferCreateOp>(
-            op.command_buffer().getDefiningOp())) {
-      rewriter.replaceOp(op, createOp.device());
+            op.getCommandBuffer().getDefiningOp())) {
+      rewriter.replaceOp(op, createOp.getDevice());
       return success();
     }
     return failure();
@@ -146,20 +146,21 @@ struct FoldCommandBufferFillBufferSubspans
     auto ip = rewriter.saveInsertionPoint();
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
-    auto newTargetBuffer = op.target_buffer();
-    auto newTargetOffset = op.target_offset();
+    auto newTargetBuffer = op.getTargetBuffer();
+    auto newTargetOffset = op.getTargetOffset();
     if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
-            op.target_buffer().getDefiningOp())) {
-      newTargetBuffer = subspanOp.source_buffer();
+            op.getTargetBuffer().getDefiningOp())) {
+      newTargetBuffer = subspanOp.getSourceBuffer();
       newTargetOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
-          subspanOp.getLoc(), subspanOp.source_offset(), op.target_offset());
+          subspanOp.getLoc(), subspanOp.getSourceOffset(),
+          op.getTargetOffset());
       needsUpdate = true;
     }
     rewriter.restoreInsertionPoint(ip);
     if (!needsUpdate) return failure();
     rewriter.updateRootInPlace(op, [&]() {
-      op.target_bufferMutable().assign(newTargetBuffer);
-      op.target_offsetMutable().assign(newTargetOffset);
+      op.getTargetBufferMutable().assign(newTargetBuffer);
+      op.getTargetOffsetMutable().assign(newTargetOffset);
     });
     return success();
   }
@@ -184,31 +185,33 @@ struct FoldCommandBufferCopyBufferSubspans
     auto ip = rewriter.saveInsertionPoint();
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
-    auto newSourceBuffer = op.source_buffer();
-    auto newSourceOffset = op.source_offset();
+    auto newSourceBuffer = op.getSourceBuffer();
+    auto newSourceOffset = op.getSourceOffset();
     if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
-            op.source_buffer().getDefiningOp())) {
-      newSourceBuffer = subspanOp.source_buffer();
+            op.getSourceBuffer().getDefiningOp())) {
+      newSourceBuffer = subspanOp.getSourceBuffer();
       newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
-          subspanOp.getLoc(), subspanOp.source_offset(), op.source_offset());
+          subspanOp.getLoc(), subspanOp.getSourceOffset(),
+          op.getSourceOffset());
       needsUpdate = true;
     }
-    auto newTargetBuffer = op.target_buffer();
-    auto newTargetOffset = op.target_offset();
+    auto newTargetBuffer = op.getTargetBuffer();
+    auto newTargetOffset = op.getTargetOffset();
     if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
-            op.target_buffer().getDefiningOp())) {
-      newTargetBuffer = subspanOp.source_buffer();
+            op.getTargetBuffer().getDefiningOp())) {
+      newTargetBuffer = subspanOp.getSourceBuffer();
       newTargetOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
-          subspanOp.getLoc(), subspanOp.source_offset(), op.target_offset());
+          subspanOp.getLoc(), subspanOp.getSourceOffset(),
+          op.getTargetOffset());
       needsUpdate = true;
     }
     rewriter.restoreInsertionPoint(ip);
     if (!needsUpdate) return failure();
     rewriter.updateRootInPlace(op, [&]() {
-      op.source_bufferMutable().assign(newSourceBuffer);
-      op.source_offsetMutable().assign(newSourceOffset);
-      op.target_bufferMutable().assign(newTargetBuffer);
-      op.target_offsetMutable().assign(newTargetOffset);
+      op.getSourceBufferMutable().assign(newSourceBuffer);
+      op.getSourceOffsetMutable().assign(newSourceOffset);
+      op.getTargetBufferMutable().assign(newTargetBuffer);
+      op.getTargetOffsetMutable().assign(newTargetOffset);
     });
     return success();
   }
@@ -234,25 +237,25 @@ struct FoldCommandBufferPushDescriptorSetBufferSubspan
     auto ip = rewriter.saveInsertionPoint();
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
-    auto bindingBuffers = llvm::to_vector<4>(op.binding_buffers());
-    auto bindingOffsets = llvm::to_vector<4>(op.binding_offsets());
+    auto bindingBuffers = llvm::to_vector<4>(op.getBindingBuffers());
+    auto bindingOffsets = llvm::to_vector<4>(op.getBindingOffsets());
     for (size_t i = 0; i < bindingBuffers.size(); ++i) {
       auto *definingOp = bindingBuffers[i].getDefiningOp();
       if (!definingOp) continue;
       if (auto subspanOp = dyn_cast<BufferSubspanOp>(definingOp)) {
         needsUpdate = true;
-        bindingBuffers[i] = subspanOp.source_buffer();
+        bindingBuffers[i] = subspanOp.getSourceBuffer();
         bindingOffsets[i] = rewriter.createOrFold<mlir::arith::AddIOp>(
-            subspanOp.getLoc(), subspanOp.source_offset(), bindingOffsets[i]);
+            subspanOp.getLoc(), subspanOp.getSourceOffset(), bindingOffsets[i]);
       }
     }
     rewriter.restoreInsertionPoint(ip);
     if (!needsUpdate) return failure();
     rewriter.updateRootInPlace(op, [&]() {
-      auto mutableBindingBuffers = op.binding_buffersMutable();
+      auto mutableBindingBuffers = op.getBindingBuffersMutable();
       mutableBindingBuffers.clear();
       mutableBindingBuffers.append(bindingBuffers);
-      auto mutableBindingOffsets = op.binding_offsetsMutable();
+      auto mutableBindingOffsets = op.getBindingOffsetsMutable();
       mutableBindingOffsets.clear();
       mutableBindingOffsets.append(bindingOffsets);
     });
@@ -295,7 +298,8 @@ struct ElideEmptyFenceCreate : public OpRewritePattern<FenceCreateOp> {
   LogicalResult matchAndRewrite(FenceCreateOp op,
                                 PatternRewriter &rewriter) const override {
     if (op.getNumOperands() != 0) return failure();
-    rewriter.replaceOpWithNewOp<IREE::Util::NullOp>(op, op.result().getType());
+    rewriter.replaceOpWithNewOp<IREE::Util::NullOp>(op,
+                                                    op.getResult().getType());
     return success();
   }
 };
@@ -308,19 +312,21 @@ struct DeduplicateFenceCreateTimepoints
   LogicalResult matchAndRewrite(FenceCreateOp op,
                                 PatternRewriter &rewriter) const override {
     // Check to see if the fence is over a single (semaphore, value) timepoint.
-    if (op.semaphores().size() <= 1) return failure();  // just 0 or 1 timepoint
+    if (op.getSemaphores().size() <= 1) {
+      return failure();  // just 0 or 1 timepoint
+    }
 
     // Build a map of all timepoints keyed on semaphore.
     // This will implicitly deduplicate the semaphores and the values for each.
     llvm::MapVector<Value, SetVector<Value>> timepoints;
-    for (auto it : llvm::zip(op.semaphores(), op.min_values())) {
+    for (auto it : llvm::zip(op.getSemaphores(), op.getMinValues())) {
       auto semaphore = std::get<0>(it);
       auto minValue = std::get<1>(it);
       timepoints[semaphore].insert(minValue);
     }
 
     // Check for no-op when we don't deduplicate anything.
-    if (timepoints.size() == op.semaphores().size()) return failure();
+    if (timepoints.size() == op.getSemaphores().size()) return failure();
 
     // Build the timepoints.
     // A single semaphore may have multiple values and we need to take the max.
@@ -342,7 +348,7 @@ struct DeduplicateFenceCreateTimepoints
 
     // Build new op. The map/set vectors we used will ensure the relative order
     // of the timepoints matches the original.
-    rewriter.replaceOpWithNewOp<FenceCreateOp>(op, op.result().getType(),
+    rewriter.replaceOpWithNewOp<FenceCreateOp>(op, op.getResult().getType(),
                                                semaphores, minValues);
     return success();
   }
@@ -368,7 +374,8 @@ struct ElideEmptyFenceJoin : public OpRewritePattern<FenceJoinOp> {
   LogicalResult matchAndRewrite(FenceJoinOp op,
                                 PatternRewriter &rewriter) const override {
     if (op.getNumOperands() != 0) return failure();
-    rewriter.replaceOpWithNewOp<IREE::Util::NullOp>(op, op.result().getType());
+    rewriter.replaceOpWithNewOp<IREE::Util::NullOp>(op,
+                                                    op.getResult().getType());
     return success();
   }
 };
@@ -396,9 +403,9 @@ struct DeduplicateFenceJoinFences : public OpRewritePattern<FenceJoinOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(FenceJoinOp op,
                                 PatternRewriter &rewriter) const override {
-    auto newOperands = deduplicateFenceOperands(op.fences());
+    auto newOperands = deduplicateFenceOperands(op.getFences());
     if (!newOperands) return failure();
-    rewriter.replaceOpWithNewOp<FenceJoinOp>(op, op.result().getType(),
+    rewriter.replaceOpWithNewOp<FenceJoinOp>(op, op.getResult().getType(),
                                              newOperands.value());
     return success();
   }
@@ -423,7 +430,7 @@ struct ElideEmptyFenceAwait : public OpRewritePattern<FenceAwaitOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(FenceAwaitOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.fences().empty()) return failure();
+    if (!op.getFences().empty()) return failure();
     rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(op, /*ok=*/0, 32);
     return success();
   }
@@ -434,10 +441,11 @@ struct DeduplicateFenceAwaitFences : public OpRewritePattern<FenceAwaitOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(FenceAwaitOp op,
                                 PatternRewriter &rewriter) const override {
-    auto newOperands = deduplicateFenceOperands(op.fences());
+    auto newOperands = deduplicateFenceOperands(op.getFences());
     if (newOperands == None) return failure();
-    rewriter.replaceOpWithNewOp<FenceAwaitOp>(
-        op, op.status().getType(), op.timeout_millis(), newOperands.value());
+    rewriter.replaceOpWithNewOp<FenceAwaitOp>(op, op.getStatus().getType(),
+                                              op.getTimeoutMillis(),
+                                              newOperands.value());
     return success();
   }
 };

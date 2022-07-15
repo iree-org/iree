@@ -48,7 +48,7 @@ class DropEmptyModuleInitializersPass
     // Find all export ops so they are easier to remove.
     DenseMap<StringRef, IREE::VM::ExportOp> exportOps;
     for (auto exportOp : moduleOp.getOps<IREE::VM::ExportOp>()) {
-      exportOps[exportOp.export_name()] = exportOp;
+      exportOps[exportOp.getExportName()] = exportOp;
     }
 
     // Check @__init:

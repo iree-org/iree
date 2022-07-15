@@ -106,7 +106,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
 
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) { return {}; }
-    ValueRange getResultDynamicDims(unsigned idx) { return target_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getTargetDims(); }
   }];
 
   let hasVerifier = 1;
@@ -171,7 +171,7 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
   ];
 
   let extraClassDeclaration = [{
-    ValueRange getOperandDynamicDims(unsigned idx) { return source_dims(); }
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceDims(); }
     ValueRange getResultDynamicDims(unsigned idx) { return {}; }
   }];
 
@@ -1414,7 +1414,7 @@ def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
   }];
 
   let extraClassDeclaration = [{
-    Block& getBlock() { return body().front(); }
+    Block& getBlock() { return getBody().front(); }
 
     ::mlir::ModuleOp getInnerModule() {
       auto moduleOps = getBlock().getOps<::mlir::ModuleOp>();
@@ -1465,7 +1465,7 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
   ];
 
   let extraClassDeclaration = [{
-    Block& getBlock() { return body().front(); }
+    Block& getBlock() { return getBody().front(); }
   }];
 
   let hasVerifier = 1;
@@ -1532,8 +1532,8 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     static int64_t getNumWorkgroupDims() { return 3; }
 
     Block* getWorkgroupCountBody() {
-      if (workgroup_count().empty()) return nullptr;
-      return &workgroup_count().front();
+      if (getWorkgroupCount().empty()) return nullptr;
+      return &getWorkgroupCount().front();
     }
 
     // Calculates an XYZ workgroup count based on the given |workload|.
@@ -1581,7 +1581,7 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
   ];
 
   let extraClassDeclaration = [{
-    Block& getBlock() { return body().front(); }
+    Block& getBlock() { return getBody().front(); }
 
     ::mlir::ModuleOp getInnerModule() {
       auto moduleOps = getBlock().getOps<::mlir::ModuleOp>();
@@ -1873,7 +1873,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
   let arguments = (ins
     IndexAttr:$set,
     IndexAttr:$binding,
-    HAL_DescriptorTypeAttr:$type,
+    HAL_DescriptorTypeAttr:$descriptor_type,
     Optional<HAL_DeviceSize>:$byte_offset,
     HAL_ShapeDynamicDims:$dynamic_dims,
     OptionalAttr<IndexAttr>:$alignment
@@ -1885,7 +1885,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
   let assemblyFormat = [{
     `set` `(` $set `)`
     `binding` `(` $binding `)`
-    `type` `(` $type `)`
+    `type` `(` $descriptor_type `)`
     (`offset` `(` $byte_offset^ `)`)?
     (`alignment` `(` $alignment^ `)`)?
     attr-dict `:` type($result) (`{` $dynamic_dims^ `}`)?
@@ -1895,7 +1895,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
 
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
-    ValueRange getResultDynamicDims(unsigned idx) { return dynamic_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getDynamicDims(); }
 
     // Attempts to calculate an alignment of the final subspan offset in the
     // parent storage buffer. This is a combination of both the binding

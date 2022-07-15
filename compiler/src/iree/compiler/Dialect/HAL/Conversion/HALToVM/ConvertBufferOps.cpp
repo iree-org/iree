@@ -28,8 +28,8 @@ class BufferLoadOpConversion
       ConversionPatternRewriter &rewriter) const override {
     auto importType = importOp.getFunctionType();
 
-    auto originalType = op.result().getType();
-    auto targetType = typeConverter->convertType(op.result().getType());
+    auto originalType = op.getResult().getType();
+    auto targetType = typeConverter->convertType(originalType);
     int32_t validByteWidth =
         IREE::Util::getRoundedElementByteWidth(originalType);
 
@@ -38,7 +38,7 @@ class BufferLoadOpConversion
           op, "half-width floats not supported on the host (yet)");
     }
 
-    auto sourceOffset = castToImportType(adaptor.source_offset(),
+    auto sourceOffset = castToImportType(adaptor.getSourceOffset(),
                                          rewriter.getI64Type(), rewriter);
 
     // 32-bit values are loaded directly, 64-bit are combined from 32 | 32.
@@ -48,7 +48,7 @@ class BufferLoadOpConversion
           op.getLoc(), validByteWidth, 32);
       auto callOp = rewriter.create<IREE::VM::CallOp>(
           op.getLoc(), SymbolRefAttr::get(importOp), importType.getResults(),
-          ArrayRef<Value>{adaptor.source_buffer(), sourceOffset, byteWidth});
+          ArrayRef<Value>{adaptor.getSourceBuffer(), sourceOffset, byteWidth});
       copyImportAttrs(importOp, callOp);
       value = callOp.getResult(0);
     } else {
@@ -61,7 +61,7 @@ class BufferLoadOpConversion
           rewriter.create<IREE::VM::ConstI64Op>(op.getLoc(), 4));
       auto hiCallOp = rewriter.create<IREE::VM::CallOp>(
           op.getLoc(), SymbolRefAttr::get(importOp), importType.getResults(),
-          ArrayRef<Value>{adaptor.source_buffer(), hiOffset, halfByteWidth});
+          ArrayRef<Value>{adaptor.getSourceBuffer(), hiOffset, halfByteWidth});
       auto hi = rewriter.create<arith::ShLIOp>(
           op.getLoc(),
           rewriter.create<arith::ExtUIOp>(
@@ -72,7 +72,7 @@ class BufferLoadOpConversion
 
       auto loCallOp = rewriter.create<IREE::VM::CallOp>(
           op.getLoc(), SymbolRefAttr::get(importOp), importType.getResults(),
-          ArrayRef<Value>{adaptor.source_buffer(), sourceOffset,
+          ArrayRef<Value>{adaptor.getSourceBuffer(), sourceOffset,
                           halfByteWidth});
       auto lo = rewriter.create<arith::ExtUIOp>(
           op.getLoc(),
@@ -110,7 +110,7 @@ class BufferStoreOpConversion
       ConversionPatternRewriter &rewriter) const override {
     auto importType = importOp.getFunctionType();
 
-    auto elementType = op.value().getType();
+    auto elementType = op.getValue().getType();
     int32_t validByteWidth =
         IREE::Util::getRoundedElementByteWidth(elementType);
 
@@ -119,11 +119,11 @@ class BufferStoreOpConversion
           op, "half-width floats not supported on the host (yet)");
     }
 
-    auto targetOffset = castToImportType(adaptor.target_offset(),
+    auto targetOffset = castToImportType(adaptor.getTargetOffset(),
                                          rewriter.getI64Type(), rewriter);
 
     // f32 -> i32, etc
-    auto value = adaptor.value();
+    auto value = adaptor.getValue();
     if (elementType.isa<FloatType>()) {
       value = rewriter.createOrFold<arith::BitcastOp>(
           op.getLoc(),
@@ -137,7 +137,7 @@ class BufferStoreOpConversion
           op.getLoc(), validByteWidth, 32);
       auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
           op, SymbolRefAttr::get(importOp), importType.getResults(),
-          ArrayRef<Value>{value, adaptor.target_buffer(), targetOffset,
+          ArrayRef<Value>{value, adaptor.getTargetBuffer(), targetOffset,
                           byteWidth});
       copyImportAttrs(importOp, callOp);
     } else {
@@ -149,7 +149,7 @@ class BufferStoreOpConversion
       auto loOffset = targetOffset;
       auto loCallOp = rewriter.create<IREE::VM::CallOp>(
           op.getLoc(), SymbolRefAttr::get(importOp), importType.getResults(),
-          ArrayRef<Value>{lo, adaptor.target_buffer(), loOffset,
+          ArrayRef<Value>{lo, adaptor.getTargetBuffer(), loOffset,
                           halfByteWidth});
       copyImportAttrs(importOp, loCallOp);
 
@@ -163,7 +163,7 @@ class BufferStoreOpConversion
           rewriter.create<IREE::VM::ConstI64Op>(op.getLoc(), 4));
       auto hiCallOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
           op, SymbolRefAttr::get(importOp), importType.getResults(),
-          ArrayRef<Value>{hi, adaptor.target_buffer(), hiOffset,
+          ArrayRef<Value>{hi, adaptor.getTargetBuffer(), hiOffset,
                           halfByteWidth});
       copyImportAttrs(importOp, hiCallOp);
     }

@@ -54,13 +54,13 @@ class HoistInlinedRodataPass
       if (parentOp) {
         moduleBuilder.setInsertionPoint(parentOp);
       } else {
-        moduleBuilder.setInsertionPointToStart(moduleOp.getBody());
+        moduleBuilder.setInsertionPointToStart(&moduleOp.getBlock());
       }
       auto rodataOp = moduleBuilder.create<IREE::VM::RodataOp>(
           inlineOp.getLoc(), inferConstantName(parentOp, inlineOp),
-          inlineOp.value());
-      if (inlineOp.alignmentAttr()) {
-        rodataOp.alignmentAttr(inlineOp.alignmentAttr());
+          inlineOp.getValue());
+      if (auto alignmentAttr = inlineOp.getAlignmentAttr()) {
+        rodataOp.setAlignmentAttr(alignmentAttr);
       }
       moduleSymbolTable.insert(rodataOp);
       rodataOp.setPrivate();
@@ -80,8 +80,8 @@ class HoistInlinedRodataPass
 
   std::string inferConstantName(Operation *parentOp,
                                 IREE::VM::RodataInlineOp inlineOp) {
-    if (inlineOp.name().hasValue()) {
-      return inlineOp.name().getValue().str();
+    if (auto nameAttr = inlineOp.getNameAttr()) {
+      return nameAttr.str();
     }
     if (auto symbolOp = dyn_cast<SymbolOpInterface>(parentOp)) {
       return (symbolOp.getName() + "_const").str();
@@ -96,7 +96,7 @@ class HoistInlinedRodataPass
     OpBuilder builder(inlineOp);
     auto refOp =
         builder.create<IREE::VM::ConstRefRodataOp>(inlineOp.getLoc(), rodataOp);
-    inlineOp.replaceAllUsesWith(refOp.value());
+    inlineOp.replaceAllUsesWith(refOp.getValue());
     inlineOp.erase();
   }
 };

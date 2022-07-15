@@ -83,7 +83,7 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
   auto variantOp = moduleOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   if (variantOp != nullptr) {
     for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
-      exportOp->setAttr(exportOp.workgroup_local_memoryAttrName(),
+      exportOp->setAttr(exportOp.getWorkgroupLocalMemoryAttrName(),
                         builder.getIndexAttr(numberOfBytes));
     }
   }
@@ -192,7 +192,8 @@ static llvm::SmallDenseMap<SetBinding, size_t> getKernelArgMapping(
     Operation *funcOp) {
   llvm::SetVector<SetBinding> usedBindingSet;
   funcOp->walk([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-    usedBindingSet.insert(SetBinding(subspanOp.set(), subspanOp.binding()));
+    usedBindingSet.insert(
+        SetBinding(subspanOp.getSet(), subspanOp.getBinding()));
   });
   auto sparseBindings = usedBindingSet.takeVector();
   std::sort(sparseBindings.begin(), sparseBindings.end(),
@@ -233,15 +234,15 @@ class ConvertFunc : public ConvertToLLVMPattern {
       Type elType = memrefType.getElementType();
       auto llvmType =
           LLVM::LLVMPointerType::get(elType, memrefType.getMemorySpaceAsInt());
-      llvmInputTypes[argMapping[SetBinding(subspanOp.set(),
-                                           subspanOp.binding())]] = llvmType;
+      llvmInputTypes[argMapping[SetBinding(subspanOp.getSet(),
+                                           subspanOp.getBinding())]] = llvmType;
     });
     // As a convention with HAL, push constants are appended as kernel arguments
     // after all the binding inputs.
     uint64_t numConstants = 0;
     funcOp.walk([&](IREE::HAL::InterfaceConstantLoadOp constantOp) {
       numConstants =
-          std::max(constantOp.index().getZExtValue() + 1, numConstants);
+          std::max(constantOp.getIndex().getZExtValue() + 1, numConstants);
     });
     llvmInputTypes.resize(argMapping.size() + numConstants,
                           rewriter.getI32Type());
@@ -301,7 +302,7 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
     MemRefType memrefType =
         subspanOp.getResult().getType().dyn_cast<MemRefType>();
     mlir::BlockArgument llvmBufferArg = llvmFuncOp.getArgument(
-        argMapping[SetBinding(subspanOp.set(), subspanOp.binding())]);
+        argMapping[SetBinding(subspanOp.getSet(), subspanOp.getBinding())]);
     // As a convention with HAL all the kernel argument pointers are 16Bytes
     // aligned.
     llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
@@ -315,10 +316,10 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
                                        .cast<LLVM::LLVMPointerType>()
                                        .getAddressSpace()),
         llvmBufferArg);
-    if (adaptor.byte_offset()) {
+    if (adaptor.getByteOffset()) {
       llvmBufferBasei8Ptr = rewriter.create<LLVM::GEPOp>(
           loc, llvmBufferBasei8Ptr.getType(), llvmBufferBasei8Ptr,
-          adaptor.byte_offset());
+          adaptor.getByteOffset());
     }
     auto llvmPtrType = LLVM::LLVMPointerType::get(
         memrefType.getElementType(), memrefType.getMemorySpaceAsInt());
@@ -329,7 +330,7 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
           rewriter, loc, *getTypeConverter(), memrefType, llvmBufferBasePtr);
       rewriter.replaceOp(op, {desc});
     } else {
-      ValueRange dynamicDims = adaptor.dynamic_dims();
+      ValueRange dynamicDims = adaptor.getDynamicDims();
       assert(memrefType.getNumDynamicDims() == dynamicDims.size());
       int64_t rank = memrefType.getRank();
 
@@ -386,7 +387,7 @@ class ConvertIREEConstantOp : public ConvertToLLVMPattern {
     auto argMapping = getKernelArgMapping(llvmFuncOp);
     auto ireeConstantOp = cast<IREE::HAL::InterfaceConstantLoadOp>(op);
     mlir::BlockArgument llvmBufferArg = llvmFuncOp.getArgument(
-        argMapping.size() + ireeConstantOp.index().getZExtValue());
+        argMapping.size() + ireeConstantOp.getIndex().getZExtValue());
     assert(llvmBufferArg.getType().isInteger(32));
     Type dstType = getTypeConverter()->convertType(ireeConstantOp.getType());
     rewriter.replaceOpWithNewOp<LLVM::ZExtOp>(op, dstType, llvmBufferArg);
@@ -404,7 +405,7 @@ struct HALInterfaceWorkgroupOpsConverter final
   LogicalResult matchAndRewrite(
       InterfaceOpTy op, typename InterfaceOpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    int32_t index = static_cast<int32_t>(op.dimension().getSExtValue());
+    int32_t index = static_cast<int32_t>(op.getDimension().getSExtValue());
     std::array<gpu::Dimension, 3> dimAttr{gpu::Dimension::x, gpu::Dimension::y,
                                           gpu::Dimension::z};
     rewriter.replaceOpWithNewOp<NewOpTy>(op, op.getType(), dimAttr[index]);

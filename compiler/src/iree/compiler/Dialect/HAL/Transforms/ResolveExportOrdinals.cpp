@@ -21,7 +21,7 @@ class ResolveCommandBufferDispatchOrdinals
       IREE::HAL::CommandBufferDispatchSymbolOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::HAL::CommandBufferDispatchSymbolOp op,
                                 PatternRewriter &rewriter) const override {
-    auto symbol = SymbolTable::lookupNearestSymbolFrom(op, op.entry_point());
+    auto symbol = SymbolTable::lookupNearestSymbolFrom(op, op.getEntryPoint());
     assert(symbol && "missing ExecutableEntryPoint symbol");
     auto exportOp = cast<IREE::HAL::ExecutableExportOp>(symbol);
 
@@ -29,15 +29,15 @@ class ResolveCommandBufferDispatchOrdinals
     // exports nested reference.
     auto device = rewriter.createOrFold<IREE::HAL::CommandBufferDeviceOp>(
         op.getLoc(), IREE::HAL::DeviceType::get(rewriter.getContext()),
-        op.command_buffer());
+        op.getCommandBuffer());
     auto executableOp = dyn_cast<IREE::HAL::ExecutableOp>(
         exportOp->getParentOp()->getParentOp());
     auto executable = rewriter.createOrFold<IREE::HAL::ExecutableLookupOp>(
-        op.getLoc(), device, executableOp.sym_name());
+        op.getLoc(), device, executableOp.getSymName());
 
     rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferDispatchOp>(
-        op, op.command_buffer(), executable, exportOp.ordinalAttr(),
-        op.workgroup_x(), op.workgroup_y(), op.workgroup_z());
+        op, op.getCommandBuffer(), executable, exportOp.getOrdinalAttr(),
+        op.getWorkgroupX(), op.getWorkgroupY(), op.getWorkgroupZ());
     return success();
   }
 };
@@ -51,7 +51,7 @@ class ResolveCommandBufferDispatchIndirectOrdinals
   LogicalResult matchAndRewrite(
       IREE::HAL::CommandBufferDispatchIndirectSymbolOp op,
       PatternRewriter &rewriter) const override {
-    auto symbol = SymbolTable::lookupNearestSymbolFrom(op, op.entry_point());
+    auto symbol = SymbolTable::lookupNearestSymbolFrom(op, op.getEntryPoint());
     assert(symbol && "missing ExecutableEntryPoint symbol");
     auto exportOp = cast<IREE::HAL::ExecutableExportOp>(symbol);
 
@@ -59,15 +59,15 @@ class ResolveCommandBufferDispatchIndirectOrdinals
     // exports nested reference.
     auto device = rewriter.createOrFold<IREE::HAL::CommandBufferDeviceOp>(
         op.getLoc(), IREE::HAL::DeviceType::get(rewriter.getContext()),
-        op.command_buffer());
+        op.getCommandBuffer());
     auto executableOp = dyn_cast<IREE::HAL::ExecutableOp>(
         exportOp->getParentOp()->getParentOp());
     auto executable = rewriter.createOrFold<IREE::HAL::ExecutableLookupOp>(
-        op.getLoc(), device, executableOp.sym_name());
+        op.getLoc(), device, executableOp.getSymName());
 
     rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferDispatchIndirectOp>(
-        op, op.command_buffer(), executable, exportOp.ordinalAttr(),
-        op.workgroups_buffer(), op.workgroups_offset());
+        op, op.getCommandBuffer(), executable, exportOp.getOrdinalAttr(),
+        op.getWorkgroupsBuffer(), op.getWorkgroupsOffset());
     return success();
   }
 };

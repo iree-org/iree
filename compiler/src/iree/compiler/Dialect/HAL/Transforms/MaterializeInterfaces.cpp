@@ -161,7 +161,7 @@ static void convertBindingUsage(
         oldOp.getLoc(), oldOp.getType(), APInt(64, setLayoutAttr.getOrdinal()),
         APInt(64, bindingAttr.getOrdinal()), bindingAttr.getType(),
         oldOp.getByteOffset(), oldOp.getDynamicDims(), alignmentAttr);
-    oldOp.replaceAllUsesWith(newOp.result());
+    oldOp.replaceAllUsesWith(newOp.getResult());
     oldOp.erase();
   }
 }
@@ -262,12 +262,12 @@ static LogicalResult declareEntryPointOps(
       // Clone the workgroup count calculation function.
       if (!exportOp.getWorkgroupCount().empty()) {
         mlir::BlockAndValueMapping mapper;
-        exportOp.getWorkgroupCount().cloneInto(&newExportOp.workgroup_count(),
+        exportOp.getWorkgroupCount().cloneInto(&newExportOp.getWorkgroupCount(),
                                                mapper);
         // Insert the !hal.device argument.
         Type deviceType = targetBuilder.getType<IREE::HAL::DeviceType>();
-        newExportOp.workgroup_count().insertArgument(0u, deviceType,
-                                                     newExportOp.getLoc());
+        newExportOp.getWorkgroupCount().insertArgument(0u, deviceType,
+                                                       newExportOp.getLoc());
       }
 
       // Clone the updated interface-based function into the target.
@@ -308,7 +308,7 @@ struct ConvertDispatchWorkgroupInfoPattern final
   LogicalResult matchAndRewrite(SrcOp op,
                                 PatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<DstOp>(op, op.getResult().getType(),
-                                       op.dimensionAttr());
+                                       op.getDimensionAttr());
     return success();
   }
 };
@@ -325,10 +325,10 @@ struct InlineConstantWorkgroupSizePattern
         SymbolTable::lookupSymbolIn(variantOp, funcOp.getName()));
     assert(exportOp &&
            "must have an entry point corresponding to the parent func");
-    auto workgroupSizeAttr = exportOp.workgroup_sizeAttr();
+    auto workgroupSizeAttr = exportOp.getWorkgroupSizeAttr();
     if (!workgroupSizeAttr) return failure();
 
-    uint64_t dimIdx = sizeOp.dimension().getZExtValue();
+    uint64_t dimIdx = sizeOp.getDimension().getZExtValue();
     auto dimAttr = workgroupSizeAttr[dimIdx];
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(sizeOp, dimAttr,
                                                    rewriter.getIndexType());

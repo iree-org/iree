@@ -51,7 +51,7 @@ bool isAArch64(IREE::HAL::ExecutableVariantOp variantOp);
 bool isRISCV(IREE::HAL::ExecutableVariantOp variantOp);
 
 inline bool isVMVXBackend(IREE::HAL::ExecutableVariantOp variantOp) {
-  return variantOp.target().getBackend().getValue().startswith("vmvx");
+  return variantOp.getTarget().getBackend().getValue().startswith("vmvx");
 }
 
 /// Returns true if the 'variantOp' contains '+avx2' in its cpu features.

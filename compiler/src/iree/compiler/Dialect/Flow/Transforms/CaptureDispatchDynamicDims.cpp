@@ -37,11 +37,11 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   // eventually during canonicalization but it's messy.
   DenseMap<Value, Value> outerToInnerMap;
   unsigned argIdx = 0;
-  for (auto operand : dispatchOp.operands()) {
+  for (auto operand : dispatchOp.getArguments()) {
     auto arg = entryBlock->getArgument(argIdx++);
     outerToInnerMap[operand] = arg;
   }
-  for (auto result : dispatchOp.results()) {
+  for (auto result : dispatchOp.getResults()) {
     if (dispatchOp.getTiedResultOperand(result)) continue;  // ignored tied
     auto arg = entryBlock->getArgument(argIdx++);
     outerToInnerMap[result] = arg;
@@ -88,7 +88,7 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
         // Capture the dimension.
         auto arg = entryBlock->insertArgument(
             insertionPosition++, dynamicDim.getType(), dynamicDim.getLoc());
-        dispatchOp.operandsMutable().append(dynamicDim);
+        dispatchOp.getArgumentsMutable().append(dynamicDim);
         capturedDims.push_back(arg);
         outerToInnerMap[dynamicDim] = arg;
       }
@@ -97,14 +97,14 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
     // Insert a shape tie op into the region to associate the dims.
     auto tieOp = entryBuilder.create<IREE::Flow::DispatchTieShapeOp>(
         internalValue.getLoc(), tensorType, internalValue, capturedDims);
-    internalValue.replaceAllUsesExcept(tieOp.result(), tieOp);
+    internalValue.replaceAllUsesExcept(tieOp.getResult(), tieOp);
   };
 
   // Capture all required dimensions and add tie_shape ops.
-  for (auto operand : llvm::to_vector<4>(dispatchOp.operands())) {
+  for (auto operand : llvm::to_vector<4>(dispatchOp.getArguments())) {
     captureTensorDims(operand, outerToInnerMap[operand]);
   }
-  for (auto result : dispatchOp.results()) {
+  for (auto result : dispatchOp.getResults()) {
     if (dispatchOp.getTiedResultOperand(result)) continue;  // ignore tied
     captureTensorDims(result, outerToInnerMap[result]);
   }

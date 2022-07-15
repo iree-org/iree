@@ -431,7 +431,7 @@ Value DeviceMatchIDAttr::buildConditionExpression(Location loc, Value device,
       .create<IREE::HAL::DeviceQueryOp>(
           loc, i1Type, i1Type, device, builder.getStringAttr("hal.device.id"),
           getPattern(), builder.getZeroAttr(i1Type))
-      .value();
+      .getValue();
 }
 
 // static
@@ -459,7 +459,7 @@ Value DeviceMatchFeatureAttr::buildConditionExpression(
           loc, i1Type, i1Type, device,
           builder.getStringAttr("hal.device.feature"), getPattern(),
           builder.getZeroAttr(i1Type))
-      .value();
+      .getValue();
 }
 
 // static
@@ -487,7 +487,7 @@ Value DeviceMatchArchitectureAttr::buildConditionExpression(
           loc, i1Type, i1Type, device,
           builder.getStringAttr("hal.device.architecture"), getPattern(),
           builder.getZeroAttr(i1Type))
-      .value();
+      .getValue();
 }
 
 // static
@@ -515,7 +515,7 @@ Value DeviceMatchExecutableFormatAttr::buildConditionExpression(
           loc, i1Type, i1Type, device,
           builder.getStringAttr("hal.executable.format"), getPattern(),
           builder.getZeroAttr(i1Type))
-      .value();
+      .getValue();
 }
 
 //===----------------------------------------------------------------------===//

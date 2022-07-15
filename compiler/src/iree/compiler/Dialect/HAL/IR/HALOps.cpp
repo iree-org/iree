@@ -172,7 +172,7 @@ static void printTimepointList(OpAsmPrinter &p, Operation *op,
 
 void ExSharedDeviceOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "device");
+  setNameFn(getResult(), "device");
 }
 
 //===----------------------------------------------------------------------===//
@@ -228,7 +228,7 @@ void TensorImportOp::build(OpBuilder &builder, OperationState &result,
 }
 
 Value TensorImportOp::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(source());
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
 ::llvm::Optional<unsigned> TensorImportOp::getTiedResultOperandIndex(
@@ -288,12 +288,12 @@ static LogicalResult verifyTypeStorageCompatibility(Operation *op,
 
 LogicalResult TensorImportOp::verify() {
   TensorImportOp op = *this;
-  auto targetType = op.target().getType().cast<TensorType>();
-  if (targetType.getNumDynamicDims() != op.target_dims().size()) {
+  auto targetType = op.getTarget().getType().cast<TensorType>();
+  if (targetType.getNumDynamicDims() != op.getTargetDims().size()) {
     return op->emitOpError() << "number of target_dims must match number of "
                                 "dynamic dims in target type";
   }
-  return verifyTypeStorageCompatibility(op, op.target_encoding(), targetType);
+  return verifyTypeStorageCompatibility(op, op.getTargetEncoding(), targetType);
 }
 
 void TensorExportOp::build(OpBuilder &builder, OperationState &result,
@@ -305,7 +305,7 @@ void TensorExportOp::build(OpBuilder &builder, OperationState &result,
 }
 
 Value TensorExportOp::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(source());
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
 ::llvm::Optional<unsigned> TensorExportOp::getTiedResultOperandIndex(
@@ -319,13 +319,13 @@ SmallVector<int64_t, 4> TensorExportOp::getTiedResultOperandIndices() {
 
 LogicalResult TensorExportOp::verify() {
   TensorExportOp op = *this;
-  auto sourceType = op.source().getType().cast<TensorType>();
-  if (sourceType.getNumDynamicDims() != op.source_dims().size()) {
+  auto sourceType = op.getSource().getType().cast<TensorType>();
+  if (sourceType.getNumDynamicDims() != op.getSourceDims().size()) {
     return op->emitOpError() << "number of source_dims must match number of "
                                 "dynamic dims in source type";
   }
-  return verifyTypeStorageCompatibility(op, op.source_encoding(),
-                                        op.source().getType());
+  return verifyTypeStorageCompatibility(op, op.getSourceEncoding(),
+                                        op.getSource().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -334,12 +334,14 @@ LogicalResult TensorExportOp::verify() {
 
 void AllocatorAllocateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "buffer");
+  setNameFn(getResult(), "buffer");
 }
 
 Value AllocatorAllocateOp::getOperandSize(unsigned idx) { return {}; }
 
-Value AllocatorAllocateOp::getResultSize(unsigned idx) { return result_size(); }
+Value AllocatorAllocateOp::getResultSize(unsigned idx) {
+  return getResultSize();
+}
 
 //===----------------------------------------------------------------------===//
 // hal.allocator.allocate.initialized
@@ -347,7 +349,7 @@ Value AllocatorAllocateOp::getResultSize(unsigned idx) { return result_size(); }
 
 void AllocatorAllocateInitializedOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "mapped");
+  setNameFn(getResult(), "mapped");
 }
 
 Value AllocatorAllocateInitializedOp::getOperandSize(unsigned idx) {
@@ -355,7 +357,7 @@ Value AllocatorAllocateInitializedOp::getOperandSize(unsigned idx) {
 }
 
 Value AllocatorAllocateInitializedOp::getResultSize(unsigned idx) {
-  return length();
+  return getLength();
 }
 
 //===----------------------------------------------------------------------===//
@@ -364,13 +366,13 @@ Value AllocatorAllocateInitializedOp::getResultSize(unsigned idx) {
 
 void AllocatorTryMapOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(did_map(), "did_map");
-  setNameFn(result(), "mapped");
+  setNameFn(getDidMap(), "did_map");
+  setNameFn(getResult(), "mapped");
 }
 
 Value AllocatorTryMapOp::getOperandSize(unsigned idx) { return {}; }
 
-Value AllocatorTryMapOp::getResultSize(unsigned idx) { return length(); }
+Value AllocatorTryMapOp::getResultSize(unsigned idx) { return getLength(); }
 
 //===----------------------------------------------------------------------===//
 // hal.buffer.subspan
@@ -378,12 +380,12 @@ Value AllocatorTryMapOp::getResultSize(unsigned idx) { return length(); }
 
 void BufferSubspanOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "buffer");
+  setNameFn(getResult(), "buffer");
 }
 
-Value BufferSubspanOp::getOperandSize(unsigned idx) { return length(); }
+Value BufferSubspanOp::getOperandSize(unsigned idx) { return getLength(); }
 
-Value BufferSubspanOp::getResultSize(unsigned idx) { return length(); }
+Value BufferSubspanOp::getResultSize(unsigned idx) { return getLength(); }
 
 //===----------------------------------------------------------------------===//
 // hal.buffer.byte_length
@@ -391,7 +393,7 @@ Value BufferSubspanOp::getResultSize(unsigned idx) { return length(); }
 
 void BufferLengthOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "len");
+  setNameFn(getResult(), "len");
 }
 
 //===----------------------------------------------------------------------===//
@@ -419,7 +421,7 @@ void BufferViewCreateOp::build(OpBuilder &builder, OperationState &state,
 
 void BufferViewCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "view");
+  setNameFn(getResult(), "view");
 }
 
 //===----------------------------------------------------------------------===//
@@ -428,7 +430,7 @@ void BufferViewCreateOp::getAsmResultNames(
 
 void BufferViewBufferOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "buffer");
+  setNameFn(getResult(), "buffer");
 }
 
 //===----------------------------------------------------------------------===//
@@ -437,7 +439,7 @@ void BufferViewBufferOp::getAsmResultNames(
 
 void CommandBufferCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "cmd");
+  setNameFn(getResult(), "cmd");
 }
 
 //===----------------------------------------------------------------------===//
@@ -500,7 +502,7 @@ void DescriptorSetCreateOp::build(
 
 void DescriptorSetCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "descriptor_set");
+  setNameFn(getResult(), "descriptor_set");
 }
 
 //===----------------------------------------------------------------------===//
@@ -509,7 +511,7 @@ void DescriptorSetCreateOp::getAsmResultNames(
 
 void DescriptorSetLayoutCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "descriptor_set_layout");
+  setNameFn(getResult(), "descriptor_set_layout");
 }
 
 //===----------------------------------------------------------------------===//
@@ -518,7 +520,7 @@ void DescriptorSetLayoutCreateOp::getAsmResultNames(
 
 void DescriptorSetLayoutLookupOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "descriptor_set_layout");
+  setNameFn(getResult(), "descriptor_set_layout");
 }
 
 //===----------------------------------------------------------------------===//
@@ -527,7 +529,7 @@ void DescriptorSetLayoutLookupOp::getAsmResultNames(
 
 void DeviceAllocatorOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "allocator");
+  setNameFn(getResult(), "allocator");
 }
 
 //===----------------------------------------------------------------------===//
@@ -536,8 +538,8 @@ void DeviceAllocatorOp::getAsmResultNames(
 
 LogicalResult DeviceQueryOp::verify() {
   DeviceQueryOp op = *this;
-  if (op.default_value().hasValue()) {
-    if (op.default_value()->getType() != op.value().getType()) {
+  if (op.getDefaultValue().hasValue()) {
+    if (op.getDefaultValue()->getType() != op.getValue().getType()) {
       return op.emitOpError()
              << "type mismatch between result and default value";
     }
@@ -603,15 +605,15 @@ ParseResult DeviceSwitchOp::parse(OpAsmParser &parser, OperationState &result) {
 void DeviceSwitchOp::print(OpAsmPrinter &p) {
   Operation *op = getOperation();
   p << "<";
-  p.printOperand(device());
+  p.printOperand(getDevice());
   p << " : ";
-  p.printType(device().getType());
+  p.printType(getDevice().getType());
   p << ">";
   p.printOptionalArrowTypeList(getResultTypes());
   p << "\n";
   p.getStream().indent(4);
   interleave(
-      llvm::zip(conditions(), condition_regions()),
+      llvm::zip(getConditions(), getConditionRegions()),
       [&](std::tuple<Attribute, Region &> it) {
         auto &conditionAttr = std::get<0>(it);
         auto &conditionRegion = std::get<1>(it);
@@ -631,12 +633,12 @@ void DeviceSwitchOp::print(OpAsmPrinter &p) {
 
 LogicalResult DeviceSwitchOp::verify() {
   DeviceSwitchOp op = *this;
-  if (op.conditions().size() != op.condition_regions().size()) {
+  if (op.getConditions().size() != op.getConditionRegions().size()) {
     return op.emitOpError() << "requires conditions and regions be matched 1:1";
-  } else if (op.condition_regions().empty()) {
+  } else if (op.getConditionRegions().empty()) {
     return op.emitOpError() << "requires at least one condition";
   }
-  for (auto &region : op.condition_regions()) {
+  for (auto &region : op.getConditionRegions()) {
     for (auto &block : region) {
       if (auto returnOp =
               dyn_cast_or_null<IREE::HAL::ReturnOp>(block.getTerminator())) {
@@ -718,21 +720,21 @@ void ExecutableExportOp::print(OpAsmPrinter &p) {
   p << ' ';
   printSymbolVisibility(p, op, op->getAttrOfType<StringAttr>("sym_visibility"));
   p << ' ';
-  p.printSymbolName(sym_name());
-  if (ordinalAttr()) {
+  p.printSymbolName(getSymName());
+  if (getOrdinalAttr()) {
     p << " ordinal(";
-    p.printAttributeWithoutType(ordinalAttr());
+    p.printAttributeWithoutType(getOrdinalAttr());
     p << ")";
   }
   p << " layout(";
-  p.printAttribute(layout());
+  p.printAttribute(getLayout());
   p << ")";
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(),
       /*elidedAttrs=*/{"sym_name", "layout", "ordinal"});
-  if (workgroup_count().empty()) return;
+  if (getWorkgroupCount().empty()) return;
   p << " ";
-  p.printRegion(workgroup_count());
+  p.printRegion(getWorkgroupCount());
 }
 
 LogicalResult ExecutableExportOp::verify() {
@@ -741,7 +743,7 @@ LogicalResult ExecutableExportOp::verify() {
   // When there is no body, nothing to verify.
   if (!body) return success();
 
-  if (!llvm::hasSingleElement(workgroup_count())) {
+  if (!llvm::hasSingleElement(getWorkgroupCount())) {
     return op.emitOpError() << "expected a single region block";
   }
   bool validArguments = true;
@@ -925,7 +927,7 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
 
 void ExecutableCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), StringRef("exe"));
+  setNameFn(getResult(), StringRef("exe"));
 }
 
 //===----------------------------------------------------------------------===//
@@ -934,7 +936,7 @@ void ExecutableCreateOp::getAsmResultNames(
 
 void ExecutableLookupOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "exe");
+  setNameFn(getResult(), "exe");
 }
 
 //===----------------------------------------------------------------------===//
@@ -944,10 +946,10 @@ void ExecutableLookupOp::getAsmResultNames(
 LogicalResult InterfaceBindingSubspanOp::verify() {
   InterfaceBindingSubspanOp op = *this;
   if (ShapedType shapedType = op.getType().dyn_cast<ShapedType>()) {
-    if (shapedType.getNumDynamicDims() != op.dynamic_dims().size()) {
+    if (shapedType.getNumDynamicDims() != op.getDynamicDims().size()) {
       return op.emitOpError("result type ")
              << op.getType() << " has " << shapedType.getNumDynamicDims()
-             << " dynamic dimensions but " << op.dynamic_dims().size()
+             << " dynamic dimensions but " << op.getDynamicDims().size()
              << " associated dimension SSA values";
     }
   }
@@ -970,7 +972,7 @@ static llvm::Optional<APInt> lookupValueOrAlignment(Value value) {
   auto op = value.getDefiningOp();
   if (auto loadOp = dyn_cast_or_null<IREE::HAL::InterfaceConstantLoadOp>(op)) {
     // Push constants have an optional value alignment.
-    auto alignment = loadOp.alignment();
+    auto alignment = loadOp.getAlignment();
     if (alignment.hasValue()) return alignment;
   } else if (auto alignmentAttr =
                  op->getAttrOfType<IntegerAttr>("stream.alignment")) {
@@ -994,19 +996,19 @@ llvm::Align InterfaceBindingSubspanOp::calculateAlignment() {
   }
 
   // If the binding has no assigned alignment we fall back to natural alignment.
-  auto bindingAlignmentInt = alignment();
+  auto bindingAlignmentInt = getAlignment();
   if (!bindingAlignmentInt) return naturalAlignment;
   auto bindingAlignment =
       llvm::Align(bindingAlignmentInt.getValue().getZExtValue());
 
   // If there's no offset specified then we can use the binding alignment
   // directly.
-  if (!byte_offset()) return bindingAlignment;
+  if (!getByteOffset()) return bindingAlignment;
 
   // Try to get the alignment of the byte offset. If it's a constant then we can
   // find a common alignment between it and the base and otherwise we need to
   // try to infer the alignment from the IR - otherwise we fall back.
-  auto offsetOrAlignment = lookupValueOrAlignment(byte_offset());
+  auto offsetOrAlignment = lookupValueOrAlignment(getByteOffset());
   if (!offsetOrAlignment.hasValue()) return naturalAlignment;
 
   // Compute the common alignment between that of the binding base and that of
@@ -1037,20 +1039,20 @@ static void getAsmResultNamesForInterfaceWorkgroupOp(
 
 void InterfaceWorkgroupIDOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  getAsmResultNamesForInterfaceWorkgroupOp("workgroup_id_", dimension(),
-                                           result(), setNameFn);
+  getAsmResultNamesForInterfaceWorkgroupOp("workgroup_id_", getDimension(),
+                                           getResult(), setNameFn);
 }
 
 void InterfaceWorkgroupCountOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  getAsmResultNamesForInterfaceWorkgroupOp("workgroup_count_", dimension(),
-                                           result(), setNameFn);
+  getAsmResultNamesForInterfaceWorkgroupOp("workgroup_count_", getDimension(),
+                                           getResult(), setNameFn);
 }
 
 void InterfaceWorkgroupSizeOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  getAsmResultNamesForInterfaceWorkgroupOp("workgroup_size_", dimension(),
-                                           result(), setNameFn);
+  getAsmResultNamesForInterfaceWorkgroupOp("workgroup_size_", getDimension(),
+                                           getResult(), setNameFn);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1059,7 +1061,7 @@ void InterfaceWorkgroupSizeOp::getAsmResultNames(
 
 void ExecutableLayoutCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "executable_layout");
+  setNameFn(getResult(), "executable_layout");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1068,7 +1070,7 @@ void ExecutableLayoutCreateOp::getAsmResultNames(
 
 void ExecutableLayoutLookupOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "executable_layout");
+  setNameFn(getResult(), "executable_layout");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1077,17 +1079,17 @@ void ExecutableLayoutLookupOp::getAsmResultNames(
 
 void FenceCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "fence");
+  setNameFn(getResult(), "fence");
 }
 
 void FenceJoinOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "fence");
+  setNameFn(getResult(), "fence");
 }
 
 void FenceAwaitOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(status(), "status");
+  setNameFn(getStatus(), "status");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1096,17 +1098,17 @@ void FenceAwaitOp::getAsmResultNames(
 
 void SemaphoreCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "semaphore");
+  setNameFn(getResult(), "semaphore");
 }
 
 void SemaphoreQueryOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(status(), "status");
+  setNameFn(getStatus(), "status");
 }
 
 void SemaphoreAwaitOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(status(), "status");
+  setNameFn(getStatus(), "status");
 }
 
 }  // namespace HAL

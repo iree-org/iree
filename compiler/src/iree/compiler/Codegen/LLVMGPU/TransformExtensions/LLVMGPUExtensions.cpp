@@ -207,7 +207,7 @@ transform_dialect::ForeachThreadToGpuAndTranslationInfo::applyToOne(
 
   IREE::HAL::ExecutableExportOp exportOp;
   state.getTopLevel()->walk([&](IREE::HAL::ExecutableExportOp op) {
-    if (op.sym_name() == target.getName()) exportOp = op;
+    if (op.getSymName() == target.getName()) exportOp = op;
   });
   if (!exportOp) {
     state.getTopLevel()->emitOpError("no IREE::HAL::ExecutableExportOp found");
@@ -231,7 +231,7 @@ transform_dialect::ForeachThreadToGpuAndTranslationInfo::applyToOne(
 
   auto newAttr = rewriter.getIndexArrayAttr(workgroupSize);
   // TODO: should really be: exportOp.setWorkgroupSizeAttr(newAttr);
-  exportOp->setAttr(exportOp.workgroup_sizeAttrName(), newAttr);
+  exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
 
   results.assign({target});
   return DiagnosedSilenceableFailure(success());
@@ -343,7 +343,7 @@ static HAL::ExecutableExportOp getExecutableExportOpForFunc(
   if (!halExecutableVariantOp || !funcOp) return {};
   HAL::ExecutableExportOp exportOp;
   halExecutableVariantOp->walk([&](HAL::ExecutableExportOp op) {
-    if (op.sym_name() != funcOp.getName()) return WalkResult::advance();
+    if (op.getSymName() != funcOp.getName()) return WalkResult::advance();
     exportOp = op;
     return WalkResult::interrupt();
   });
@@ -375,7 +375,7 @@ transform_dialect::VectorWarpExecuteOnLane0Op::applyToOne(
            << "export op is missing --- the transform is not applied";
   }
 
-  Optional<ArrayAttr> maybeAttr = exportOp.workgroup_size();
+  Optional<ArrayAttr> maybeAttr = exportOp.getWorkgroupSize();
   // TODO: Pervasive 3 constant in IREE.
   if (!maybeAttr || maybeAttr->size() != 3) {
     // Return a silenceable failure and set the expected 1 result to nullptr.

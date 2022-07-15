@@ -25,7 +25,7 @@ class DeviceQueryIntCastOpConversion
       IREE::HAL::DeviceQueryOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // We only deal with in-dialect conversions to i32 in this pattern.
-    auto targetType = op.value().getType();
+    auto targetType = op.getValue().getType();
     if (targetType.isInteger(64)) return failure();
     if (!targetType.isIntOrIndex()) return failure();
 
@@ -36,9 +36,10 @@ class DeviceQueryIntCastOpConversion
     // canonicalizations (a select of i1 to i1 is easier to handle).
     auto queryOp = rewriter.create<IREE::HAL::DeviceQueryOp>(
         op.getLoc(), rewriter.getI1Type(), rewriter.getI64Type(),
-        adaptor.device(), op.categoryAttr(), op.keyAttr(), Attribute{});
-    auto ok = queryOp.ok();
-    auto value = queryOp.value();
+        adaptor.getDevice(), op.getCategoryAttr(), op.getKeyAttr(),
+        Attribute{});
+    auto ok = queryOp.getOk();
+    auto value = queryOp.getValue();
 
     // Truncate or extend based on the target type.
     if (targetType.isIndex()) {
@@ -59,14 +60,14 @@ class DeviceQueryIntCastOpConversion
       }
     }
 
-    if (op.default_value().hasValue()) {
+    if (op.getDefaultValue().hasValue()) {
       // Select the default value based on the converted type as that's the type
       // of the attribute we have is in. 'ok' result is set to true as we've
       // already handled the error case.
       value = rewriter.createOrFold<arith::SelectOp>(
           op.getLoc(), ok, value,
           rewriter.createOrFold<arith::ConstantOp>(op.getLoc(),
-                                                   op.default_valueAttr()));
+                                                   op.getDefaultValueAttr()));
       ok = rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), 1);
     }
 
@@ -88,17 +89,17 @@ class DeviceQueryI64OpConversion
   LogicalResult matchAndRewrite(
       IREE::HAL::DeviceQueryOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!op.value().getType().isInteger(64)) return failure();
+    if (!op.getValue().getType().isInteger(64)) return failure();
     auto results =
         rewriteToCall(op, adaptor, importOp, *getTypeConverter(), rewriter);
     if (!results.hasValue()) return failure();
     auto ok = results->front();
     auto value = results->back();
-    if (op.default_value().hasValue()) {
+    if (op.getDefaultValue().hasValue()) {
       value = rewriter.createOrFold<arith::SelectOp>(
           op.getLoc(), ok, value,
-          rewriter.createOrFold<IREE::VM::ConstI64Op>(op.getLoc(),
-                                                      op.default_valueAttr()));
+          rewriter.createOrFold<IREE::VM::ConstI64Op>(
+              op.getLoc(), op.getDefaultValueAttr()));
       ok = rewriter.createOrFold<IREE::VM::ConstI64Op>(op.getLoc(), 1);
     }
     rewriter.replaceOp(op, {ok, value});

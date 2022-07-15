@@ -83,7 +83,7 @@ class VMVXTargetBackend final : public TargetBackend {
         sourceExecutableOps.front().getVisibility());
 
     // Add our VMVX hal.executable.variant with an empty module.
-    builder.setInsertionPointToStart(linkedExecutableOp.getBody());
+    builder.setInsertionPointToStart(&linkedExecutableOp.getBlock());
     auto linkedTargetOp = builder.create<IREE::HAL::ExecutableVariantOp>(
         moduleOp.getLoc(), sharedTargetAttr.getSymbolNameFragment(),
         sharedTargetAttr);
@@ -114,7 +114,7 @@ class VMVXTargetBackend final : public TargetBackend {
       // Optionally entry points may specify that they require workgroup local
       // memory. We fetch that value here and plumb it through so the runtime
       // knows how much memory to reserve and pass in.
-      auto localMemorySizeAttr = exportOp.workgroup_local_memoryAttr();
+      auto localMemorySizeAttr = exportOp.getWorkgroupLocalMemoryAttr();
       if (localMemorySizeAttr) {
         funcOp.setReflectionAttr("local_memory", localMemorySizeAttr);
       }
@@ -145,8 +145,8 @@ class VMVXTargetBackend final : public TargetBackend {
     // NOTE: this snapshots the FlatBuffer builder data at the time it is called
     // and future changes to the target op will not be observed.
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.sym_name(),
-        variantOp.target().getFormat(), bufferAttr);
+        variantOp.getLoc(), variantOp.getSymName(),
+        variantOp.getTarget().getFormat(), bufferAttr);
 
     return success();
   }

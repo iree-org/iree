@@ -30,9 +30,9 @@ struct FenceCreateOpConversion
     SmallVector<Value, 8> callOperands;
     SmallVector<int16_t, 5> segmentSizes = {
         /*timepoints=*/
-        static_cast<int16_t>(adaptor.semaphores().size()),
+        static_cast<int16_t>(adaptor.getSemaphores().size()),
     };
-    for (auto it : llvm::zip(adaptor.semaphores(), adaptor.min_values())) {
+    for (auto it : llvm::zip(adaptor.getSemaphores(), adaptor.getMinValues())) {
       callOperands.push_back(std::get<0>(it));
       callOperands.push_back(std::get<1>(it));
     }

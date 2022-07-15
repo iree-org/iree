@@ -84,7 +84,7 @@ class SerializeTargetExecutablesPass
     auto variantOps = llvm::to_vector<4>(
         executableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>());
     for (auto variantOp : variantOps) {
-      if (variantOp.target().getBackend().getValue() != target) continue;
+      if (variantOp.getTarget().getBackend().getValue() != target) continue;
       OpBuilder executableBuilder(variantOp);
       // Ask the target backend to serialize the executable. Note that it
       // may create one or more hal.executable.binary ops in the case of

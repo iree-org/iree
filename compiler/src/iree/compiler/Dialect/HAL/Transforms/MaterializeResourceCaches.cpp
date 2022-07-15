@@ -55,7 +55,7 @@ class MaterializeResourceCachesPass
            executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
         for (auto exportOp :
              variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
-          defineExecutableLayoutOp(exportOp.getLoc(), exportOp.layout());
+          defineExecutableLayoutOp(exportOp.getLoc(), exportOp.getLayout());
         }
       }
     }
@@ -175,13 +175,13 @@ class MaterializeResourceCachesPass
   IREE::Util::GlobalOp defineExecutableOp(ExecutableOp executableOp) {
     auto loc = executableOp.getLoc();
     auto symbolName =
-        (StringRef("_executable_") + executableOp.sym_name()).str();
+        (StringRef("_executable_") + executableOp.getSymName()).str();
 
     auto executableType = ExecutableType::get(executableOp.getContext());
     auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
         loc, symbolName, /*isMutable=*/false, executableType);
     globalOp.setPrivate();
-    executableCache_.try_emplace(executableOp.sym_name(), globalOp);
+    executableCache_.try_emplace(executableOp.getSymName(), globalOp);
 
     auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
     OpBuilder blockBuilder =
@@ -198,7 +198,7 @@ class MaterializeResourceCachesPass
     for (auto executableVariantOp :
          executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
       auto *region = switchBuilder.addConditionRegion(
-          executableVariantOp.target().getMatchExpression());
+          executableVariantOp.getTarget().getMatchExpression());
       auto &entryBlock = region->front();
       auto caseBuilder = OpBuilder::atBlockBegin(&entryBlock);
 
@@ -207,8 +207,8 @@ class MaterializeResourceCachesPass
       SmallVector<Value, 8> executableLayoutValues;
       for (auto exportOp :
            executableVariantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
-        auto executableLayoutGlobalOp =
-            defineExecutableLayoutOp(executableOp.getLoc(), exportOp.layout());
+        auto executableLayoutGlobalOp = defineExecutableLayoutOp(
+            executableOp.getLoc(), exportOp.getLayout());
         executableLayoutValues.push_back(
             caseBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
                 loc, ExecutableLayoutType::get(loc.getContext()),
@@ -224,8 +224,8 @@ class MaterializeResourceCachesPass
       auto executableValue = caseBuilder.createOrFold<ExecutableCreateOp>(
           loc, ExecutableType::get(loc.getContext()), deviceValue,
           SymbolRefAttr::get(
-              executableOp.sym_nameAttr(),
-              {SymbolRefAttr::get(executableVariantOp.sym_nameAttr())}),
+              executableOp.getSymNameAttr(),
+              {SymbolRefAttr::get(executableVariantOp.getSymNameAttr())}),
           executableLayoutValues, constantValues);
 
       caseBuilder.create<IREE::HAL::ReturnOp>(loc, executableValue);
@@ -251,7 +251,7 @@ class MaterializeResourceCachesPass
       DescriptorSetLayoutLookupOp &lookupOp) {
     OpBuilder builder(lookupOp);
     auto globalOp =
-        defineDescriptorSetLayoutOp(lookupOp.getLoc(), lookupOp.bindings());
+        defineDescriptorSetLayoutOp(lookupOp.getLoc(), lookupOp.getBindings());
     auto loadOp = builder.create<IREE::Util::GlobalLoadOp>(
         lookupOp.getLoc(), DescriptorSetLayoutType::get(lookupOp.getContext()),
         globalOp.getSymName());
@@ -262,7 +262,7 @@ class MaterializeResourceCachesPass
   void replaceExecutableLayoutLookupOp(ExecutableLayoutLookupOp &lookupOp) {
     OpBuilder builder(lookupOp);
     auto globalOp =
-        defineExecutableLayoutOp(lookupOp.getLoc(), lookupOp.layout());
+        defineExecutableLayoutOp(lookupOp.getLoc(), lookupOp.getLayout());
     auto loadOp = builder.create<IREE::Util::GlobalLoadOp>(
         lookupOp.getLoc(), ExecutableLayoutType::get(lookupOp.getContext()),
         globalOp.getSymName());
@@ -272,7 +272,7 @@ class MaterializeResourceCachesPass
 
   void replaceExecutableLookupOp(ExecutableLookupOp &lookupOp) {
     OpBuilder builder(lookupOp);
-    auto executableIt = executableCache_.find(lookupOp.executable());
+    auto executableIt = executableCache_.find(lookupOp.getExecutable());
     assert(executableIt != executableCache_.end() &&
            "executable must have been cached");
     auto globalOp = executableIt->second;

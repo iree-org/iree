@@ -66,7 +66,7 @@ HALTypeConverter::HALTypeConverter(
       // and can't materialize one here - it's too late.
       if (auto bvbOp = dyn_cast_or_null<IREE::HAL::BufferViewBufferOp>(
               inputValue.getDefiningOp())) {
-        return bvbOp.buffer_view();
+        return bvbOp.getBufferView();
       }
       return nullptr;
     } else {

@@ -305,7 +305,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     // TODO(ravishankarm): Ideally this should be done using a pattern, but the
     // `workload_per_workgroup` usage here makes it hard. That is to be
     // deprecated. Rework this logic into a pattern when that is done.
-    Region &workgroupCountRegion = exportOp.workgroup_count();
+    Region &workgroupCountRegion = exportOp.getWorkgroupCount();
     if (!workgroupCountRegion.hasOneBlock()) {
       exportOp.emitOpError(
           "expected workgroup_count region to have a single block");

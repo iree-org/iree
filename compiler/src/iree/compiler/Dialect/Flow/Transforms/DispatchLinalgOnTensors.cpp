@@ -349,7 +349,7 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
       loc, workload, resultTypes, resultDynamicDims,
       /*operands=*/ArrayRef<Value>{}, /*operandDims=*/ArrayRef<Value>{},
       /*tiedOperands=*/ArrayRef<int64_t>{});
-  Region &region = dispatchOp.workgroup_body();
+  Region &region = dispatchOp.getWorkgroupBody();
   Block *block = &region.front();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToEnd(block);
@@ -399,11 +399,11 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
     }
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "After workgroup_body creation \n"
+  LLVM_DEBUG(llvm::dbgs() << "After getWorkgroupBody creation \n"
                           << *dispatchOp << "\n");
 
   // 4. Add a region for workgroup_count computation.
-  Region &workgroupCountRegion = dispatchOp.workgroup_count();
+  Region &workgroupCountRegion = dispatchOp.getWorkgroupCount();
   Block *body = rewriter.createBlock(&workgroupCountRegion);
   // Assuming that there is an insertion guard in place already, change the
   // insertion point to the body.
@@ -627,7 +627,7 @@ static BlockArgument getTiedOperandBlockArgument(BlockArgument resultArg) {
       (*resultArg.getUses().begin()).getOwner());
   if (!storeOp) return nullptr;
 
-  Operation *tieOp = storeOp.value().getDefiningOp();
+  Operation *tieOp = storeOp.getValue().getDefiningOp();
   if (!tieOp) return nullptr;
 
   // TODO(antiagainst): use TiedOpInterface here instead of hardcoding ops
@@ -640,16 +640,16 @@ static BlockArgument getTiedOperandBlockArgument(BlockArgument resultArg) {
                 insertOp.getDest()
                     .template getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
             if (!loadOp) return nullptr;
-            return loadOp.source().dyn_cast<BlockArgument>();
+            return loadOp.getSource().dyn_cast<BlockArgument>();
           })
           .Case<IREE::Flow::DispatchTensorLoadOp>(
               [&](auto loadOp) -> BlockArgument {
                 // Check that there is a single use and that the source is
                 // block argument. Single use can potentially be relaxed.
                 auto loadArg =
-                    loadOp.source().template dyn_cast<BlockArgument>();
+                    loadOp.getSource().template dyn_cast<BlockArgument>();
                 if (!loadArg || !loadArg.hasOneUse() ||
-                    loadArg.use_begin()->get() != storeOp.target()) {
+                    loadArg.use_begin()->get() != storeOp.getTarget()) {
                   return nullptr;
                 }
                 return loadArg;
@@ -658,13 +658,13 @@ static BlockArgument getTiedOperandBlockArgument(BlockArgument resultArg) {
                 IREE::LinalgExt::LinalgExtOp>([&](auto linalgLikeOp)
                                                   -> BlockArgument {
             unsigned resultIndex =
-                storeOp.value().cast<OpResult>().getResultNumber();
+                storeOp.getValue().cast<OpResult>().getResultNumber();
             auto loadOp =
                 linalgLikeOp.getOutputTensorOperands()[resultIndex]
                     ->get()
                     .template getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
             if (!loadOp) return nullptr;
-            return loadOp.source().template dyn_cast<BlockArgument>();
+            return loadOp.getSource().template dyn_cast<BlockArgument>();
           })
           .Default([&](Operation *) -> BlockArgument { return nullptr; });
 
@@ -727,7 +727,7 @@ static void tryToTieOperandsAndResults(
 static LogicalResult legalizeDispatchWorkgroupOperands(
     IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   Location loc = dispatchOp.getLoc();
-  Region &region = dispatchOp.workgroup_body();
+  Region &region = dispatchOp.getWorkgroupBody();
   Block &block = region.front();
   OpBuilder b = OpBuilder::atBlockBegin(&block);
 
@@ -744,7 +744,7 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
   std::pair<unsigned, unsigned> operandDimsIndexAndLength =
       dispatchOp.getODSOperandIndexAndLength(2);
   llvm::DenseMap<Value, BlockArgument> operandToBBArg;
-  for (auto operand : llvm::enumerate(dispatchOp.operands())) {
+  for (auto operand : llvm::enumerate(dispatchOp.getArguments())) {
     operandToBBArg[operand.value()] = block.getArgument(operand.index());
   }
 
@@ -828,7 +828,7 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
 
   // Update the `operand_segment_sizes`.
   auto operandSegmentSizes = dispatchOp->getAttrOfType<DenseIntElementsAttr>(
-      dispatchOp.operand_segment_sizesAttrName());
+      dispatchOp.getOperandSegmentSizesAttrName());
   auto newValues = llvm::to_vector<4>(llvm::map_range(
       operandSegmentSizes.getValues<APInt>(),
       [&](APInt val) -> int32_t { return val.getSExtValue(); }));
@@ -836,7 +836,7 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
   newValues[2] = numOperandDims;
   auto newAttr =
       DenseIntElementsAttr::get(operandSegmentSizes.getType(), newValues);
-  dispatchOp->setAttr(dispatchOp.operand_segment_sizesAttrName(), newAttr);
+  dispatchOp->setAttr(dispatchOp.getOperandSegmentSizesAttrName(), newAttr);
   return success();
 }
 

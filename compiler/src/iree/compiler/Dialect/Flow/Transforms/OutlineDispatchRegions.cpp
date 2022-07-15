@@ -70,9 +70,10 @@ static LogicalResult convertToDispatchOp(DispatchWorkgroupsOp regionOp,
   // Note that we copy the tied operand indices from the workgroups op - it
   // lines up 1:1 with the dispatch once we've outlined things.
   auto dispatchOp = builder.create<DispatchOp>(
-      regionOp.getLoc(), exportOp, regionOp.workload(),
-      regionOp.getResultTypes(), regionOp.result_dims(), regionOp.operands(),
-      regionOp.operand_dims(), regionOp.tied_operandsAttr());
+      regionOp.getLoc(), exportOp, regionOp.getWorkload(),
+      regionOp.getResultTypes(), regionOp.getResultDims(),
+      regionOp.getArguments(), regionOp.getArgumentDims(),
+      regionOp.getTiedOperandsAttr());
 
   // Replace uses of the existing results with the new results.
   for (int i = 0; i < regionOp.getNumResults(); ++i) {
@@ -118,7 +119,7 @@ static LogicalResult outlineDispatchWorkgroupsOp(
     std::string namePrefix, DispatchWorkgroupsOp regionOp) {
   // Convert the region to a free-floating function.
   auto workgroupFuncOp = createWorkgroupFunc(regionOp.getLoc(), namePrefix,
-                                             regionOp.workgroup_body());
+                                             regionOp.getWorkgroupBody());
   if (!workgroupFuncOp) {
     return failure();
   }
@@ -132,16 +133,16 @@ static LogicalResult outlineDispatchWorkgroupsOp(
   executableOp.setPrivate();
 
   // Add an export pointing at the entry point function.
-  OpBuilder builder(executableOp.body());
+  OpBuilder builder(executableOp.getBody());
   auto exportOp = builder.create<ExecutableExportOp>(
       regionOp.getLoc(), workgroupFuncOp.getName(),
       SymbolRefAttr::get(workgroupFuncOp));
-  if (!regionOp.workgroup_count().empty())
-    exportOp.workgroup_count().takeBody(regionOp.workgroup_count());
+  if (!regionOp.getWorkgroupCount().empty())
+    exportOp.getWorkgroupCount().takeBody(regionOp.getWorkgroupCount());
 
   // Move over the workgroup count region, if present.
-  if (!regionOp.workgroup_count().empty()) {
-    exportOp.workgroup_count().takeBody(regionOp.workgroup_count());
+  if (!regionOp.getWorkgroupCount().empty()) {
+    exportOp.getWorkgroupCount().takeBody(regionOp.getWorkgroupCount());
   }
 
   // Finally convert the dispatch region into a dispatch to the outlined func.

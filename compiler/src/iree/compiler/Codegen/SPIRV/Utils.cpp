@@ -28,7 +28,7 @@ const char *getSPIRVDistributeAttrName() { return "iree.spirv.distribute_dim"; }
 spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op) {
   auto variant = op->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   if (!variant) return nullptr;
-  IREE::HAL::ExecutableTargetAttr targetAttr = variant.target();
+  IREE::HAL::ExecutableTargetAttr targetAttr = variant.getTarget();
   if (!targetAttr) return nullptr;
   auto config = targetAttr.getConfiguration();
   if (!config) return nullptr;
