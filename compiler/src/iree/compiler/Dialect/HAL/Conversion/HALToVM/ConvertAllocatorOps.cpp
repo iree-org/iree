@@ -86,7 +86,7 @@ class AllocatorTryMapOpConversion
                              rewriter),
         });
     copyImportAttrs(importOp, callOp);
-    auto result = callOp.results().front();
+    auto result = callOp.getResults().front();
     auto didMap = rewriter.create<IREE::VM::CmpNZRefOp>(
         op.getLoc(), rewriter.getI32Type(), result);
     rewriter.replaceOp(op, {didMap, result});

@@ -65,8 +65,8 @@ struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(InitializerOp op,
                                 PatternRewriter &rewriter) const override {
-    if (op.body().getBlocks().size() != 1) return failure();
-    auto &block = op.body().front();
+    if (op.getBody().getBlocks().size() != 1) return failure();
+    auto &block = op.getBody().front();
     if (block.empty() || isa<ReturnOp>(block.front())) {
       rewriter.eraseOp(op);
       return success();
@@ -136,15 +136,16 @@ struct DropDefaultConstGlobalOpInitializer : public OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.initial_value().hasValue()) return failure();
-    if (auto value = op.initial_valueAttr().template dyn_cast<IntegerAttr>()) {
+    if (!op.getInitialValue().hasValue()) return failure();
+    if (auto value =
+            op.getInitialValueAttr().template dyn_cast<IntegerAttr>()) {
       if (value.getValue() != 0) return failure();
     } else if (auto value =
-                   op.initial_valueAttr().template dyn_cast<FloatAttr>()) {
+                   op.getInitialValueAttr().template dyn_cast<FloatAttr>()) {
       if (value.getValue().isNonZero()) return failure();
     }
-    rewriter.replaceOpWithNewOp<T>(op, op.sym_name(), op.is_mutable(),
-                                   op.type(),
+    rewriter.replaceOpWithNewOp<T>(op, op.getSymName(), op.getIsMutable(),
+                                   op.getType(),
                                    llvm::to_vector<4>(op->getDialectAttrs()));
     return success();
   }
@@ -189,10 +190,10 @@ struct InlineConstGlobalLoadIntegerOp : public OpRewritePattern<LOAD_OP> {
         op->template getParentOfType<VM::ModuleOp>()
             .template lookupSymbol<GLOBAL_OP>(globalAttr.getValue());
     if (!globalOp) return failure();
-    if (globalOp.is_mutable()) return failure();
-    if (globalOp.initial_value()) {
+    if (globalOp.getIsMutable()) return failure();
+    if (globalOp.getInitialValue()) {
       rewriter.replaceOpWithNewOp<CONST_OP>(
-          op, globalOp.initial_value().getValue());
+          op, globalOp.getInitialValue().getValue());
     } else {
       rewriter.replaceOpWithNewOp<CONST_ZERO_OP>(op);
     }
@@ -242,7 +243,7 @@ struct InlineConstGlobalLoadRefOp : public OpRewritePattern<GlobalLoadRefOp> {
         op->getParentOfType<VM::ModuleOp>().lookupSymbol<GlobalRefOp>(
             globalAttr.getValue());
     if (!globalOp) return failure();
-    if (globalOp.is_mutable()) return failure();
+    if (globalOp.getIsMutable()) return failure();
     rewriter.replaceOpWithNewOp<ConstRefZeroOp>(op, op.getType());
     return success();
   }
@@ -264,9 +265,9 @@ struct PropagateGlobalLoadAddress : public OpRewritePattern<INDIRECT> {
   LogicalResult matchAndRewrite(INDIRECT op,
                                 PatternRewriter &rewriter) const override {
     if (auto addressOp =
-            dyn_cast_or_null<GlobalAddressOp>(op.global().getDefiningOp())) {
-      rewriter.replaceOpWithNewOp<DIRECT>(op, op.value().getType(),
-                                          addressOp.global());
+            dyn_cast_or_null<GlobalAddressOp>(op.getGlobal().getDefiningOp())) {
+      rewriter.replaceOpWithNewOp<DIRECT>(op, op.getValue().getType(),
+                                          addressOp.getGlobal());
       return success();
     }
     return failure();
@@ -319,8 +320,9 @@ struct PropagateGlobalStoreAddress : public OpRewritePattern<INDIRECT> {
   LogicalResult matchAndRewrite(INDIRECT op,
                                 PatternRewriter &rewriter) const override {
     if (auto addressOp =
-            dyn_cast_or_null<GlobalAddressOp>(op.global().getDefiningOp())) {
-      rewriter.replaceOpWithNewOp<DIRECT>(op, op.value(), addressOp.global());
+            dyn_cast_or_null<GlobalAddressOp>(op.getGlobal().getDefiningOp())) {
+      rewriter.replaceOpWithNewOp<DIRECT>(op, op.getValue(),
+                                          addressOp.getGlobal());
       return success();
     }
     return failure();
@@ -376,7 +378,7 @@ struct FoldZeroConstPrimitive final : public OpRewritePattern<GeneralOp> {
 
   LogicalResult matchAndRewrite(GeneralOp constOp,
                                 PatternRewriter &rewriter) const override {
-    if (matchPattern(constOp.result(), m_Zero())) {
+    if (matchPattern(constOp.getResult(), m_Zero())) {
       rewriter.replaceOpWithNewOp<ZeroOp>(constOp);
       return success();
     }
@@ -386,28 +388,36 @@ struct FoldZeroConstPrimitive final : public OpRewritePattern<GeneralOp> {
 
 }  // namespace
 
-OpFoldResult ConstI32Op::fold(ArrayRef<Attribute> operands) { return value(); }
+OpFoldResult ConstI32Op::fold(ArrayRef<Attribute> operands) {
+  return getValue();
+}
 
 void ConstI32Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
   results.insert<FoldZeroConstPrimitive<ConstI32Op, ConstI32ZeroOp>>(context);
 }
 
-OpFoldResult ConstI64Op::fold(ArrayRef<Attribute> operands) { return value(); }
+OpFoldResult ConstI64Op::fold(ArrayRef<Attribute> operands) {
+  return getValue();
+}
 
 void ConstI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
   results.insert<FoldZeroConstPrimitive<ConstI64Op, ConstI64ZeroOp>>(context);
 }
 
-OpFoldResult ConstF32Op::fold(ArrayRef<Attribute> operands) { return value(); }
+OpFoldResult ConstF32Op::fold(ArrayRef<Attribute> operands) {
+  return getValue();
+}
 
 void ConstF32Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
   results.insert<FoldZeroConstPrimitive<ConstF32Op, ConstF32ZeroOp>>(context);
 }
 
-OpFoldResult ConstF64Op::fold(ArrayRef<Attribute> operands) { return value(); }
+OpFoldResult ConstF64Op::fold(ArrayRef<Attribute> operands) {
+  return getValue();
+}
 
 void ConstF64Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
@@ -445,15 +455,15 @@ OpFoldResult ConstRefZeroOp::fold(ArrayRef<Attribute> operands) {
 
 template <typename T>
 static OpFoldResult foldSelectOp(T op) {
-  if (matchPattern(op.condition(), m_Zero())) {
+  if (matchPattern(op.getCondition(), m_Zero())) {
     // 0 ? x : y = y
-    return op.false_value();
-  } else if (matchPattern(op.condition(), m_NonZero())) {
+    return op.getFalseValue();
+  } else if (matchPattern(op.getCondition(), m_NonZero())) {
     // !0 ? x : y = x
-    return op.true_value();
-  } else if (op.true_value() == op.false_value()) {
+    return op.getTrueValue();
+  } else if (op.getTrueValue() == op.getFalseValue()) {
     // c ? x : x = x
-    return op.true_value();
+    return op.getTrueValue();
   }
   return {};
 }
@@ -481,18 +491,18 @@ OpFoldResult SelectRefOp::fold(ArrayRef<Attribute> operands) {
 template <typename T>
 static OpFoldResult foldSwitchOp(T op) {
   APInt indexValue;
-  if (matchPattern(op.index(), m_ConstantInt(&indexValue))) {
+  if (matchPattern(op.getIndex(), m_ConstantInt(&indexValue))) {
     // Index is constant and we can resolve immediately.
     int64_t index = indexValue.getSExtValue();
-    if (index < 0 || index >= op.values().size()) {
-      return op.default_value();
+    if (index < 0 || index >= op.getValues().size()) {
+      return op.getDefaultValue();
     }
-    return op.values()[index];
+    return op.getValues()[index];
   }
 
   bool allValuesMatch = true;
-  for (auto value : op.values()) {
-    if (value != op.default_value()) {
+  for (auto value : op.getValues()) {
+    if (value != op.getDefaultValue()) {
       allValuesMatch = false;
       break;
     }
@@ -500,7 +510,7 @@ static OpFoldResult foldSwitchOp(T op) {
   if (allValuesMatch) {
     // All values (and the default) are the same so just return it regardless of
     // the provided index.
-    return op.default_value();
+    return op.getDefaultValue();
   }
 
   return {};
@@ -674,16 +684,16 @@ static Attribute constFoldTernaryOp(ArrayRef<Attribute> operands,
 template <class AttrElementT, typename ADD, typename SUB,
           class ElementValueT = typename AttrElementT::ValueType>
 static OpFoldResult foldAddOp(ADD op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.rhs(), m_Zero())) {
+  if (matchPattern(op.getRhs(), m_Zero())) {
     // x + 0 = x or 0 + y = y (commutative)
-    return op.lhs();
+    return op.getLhs();
   }
-  if (auto subOp = dyn_cast_or_null<SUB>(op.lhs().getDefiningOp())) {
-    if (subOp.lhs() == op.rhs()) return subOp.rhs();
-    if (subOp.rhs() == op.rhs()) return subOp.lhs();
-  } else if (auto subOp = dyn_cast_or_null<SUB>(op.rhs().getDefiningOp())) {
-    if (subOp.lhs() == op.lhs()) return subOp.rhs();
-    if (subOp.rhs() == op.lhs()) return subOp.lhs();
+  if (auto subOp = dyn_cast_or_null<SUB>(op.getLhs().getDefiningOp())) {
+    if (subOp.getLhs() == op.getRhs()) return subOp.getRhs();
+    if (subOp.getRhs() == op.getRhs()) return subOp.getLhs();
+  } else if (auto subOp = dyn_cast_or_null<SUB>(op.getRhs().getDefiningOp())) {
+    if (subOp.getLhs() == op.getLhs()) return subOp.getRhs();
+    if (subOp.getRhs() == op.getLhs()) return subOp.getLhs();
   }
   return constFoldBinaryOp<AttrElementT>(
       operands,
@@ -701,16 +711,16 @@ OpFoldResult AddI64Op::fold(ArrayRef<Attribute> operands) {
 template <class AttrElementT, typename SUB, typename ADD,
           class ElementValueT = typename AttrElementT::ValueType>
 static OpFoldResult foldSubOp(SUB op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.rhs(), m_Zero())) {
+  if (matchPattern(op.getRhs(), m_Zero())) {
     // x - 0 = x
-    return op.lhs();
+    return op.getLhs();
   }
-  if (auto addOp = dyn_cast_or_null<ADD>(op.lhs().getDefiningOp())) {
-    if (addOp.lhs() == op.rhs()) return addOp.rhs();
-    if (addOp.rhs() == op.rhs()) return addOp.lhs();
-  } else if (auto addOp = dyn_cast_or_null<ADD>(op.rhs().getDefiningOp())) {
-    if (addOp.lhs() == op.lhs()) return addOp.rhs();
-    if (addOp.rhs() == op.lhs()) return addOp.lhs();
+  if (auto addOp = dyn_cast_or_null<ADD>(op.getLhs().getDefiningOp())) {
+    if (addOp.getLhs() == op.getRhs()) return addOp.getRhs();
+    if (addOp.getRhs() == op.getRhs()) return addOp.getLhs();
+  } else if (auto addOp = dyn_cast_or_null<ADD>(op.getRhs().getDefiningOp())) {
+    if (addOp.getLhs() == op.getLhs()) return addOp.getRhs();
+    if (addOp.getRhs() == op.getLhs()) return addOp.getLhs();
   }
   return constFoldBinaryOp<AttrElementT>(
       operands,
@@ -728,12 +738,12 @@ OpFoldResult SubI64Op::fold(ArrayRef<Attribute> operands) {
 template <class AttrElementT, typename T,
           class ElementValueT = typename AttrElementT::ValueType>
 static OpFoldResult foldMulOp(T op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.rhs(), m_Zero())) {
+  if (matchPattern(op.getRhs(), m_Zero())) {
     // x * 0 = 0 or 0 * y = 0 (commutative)
     return zeroOfType(op.getType());
-  } else if (matchPattern(op.rhs(), m_One())) {
+  } else if (matchPattern(op.getRhs(), m_One())) {
     // x * 1 = x or 1 * y = y (commutative)
-    return op.lhs();
+    return op.getLhs();
   }
   return constFoldBinaryOp<AttrElementT>(
       operands,
@@ -748,16 +758,16 @@ struct FoldConstantMulOperand : public OpRewritePattern<T> {
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
     AttrElementT c1, c2;
-    if (!matchPattern(op.rhs(), m_Constant(&c1))) return failure();
-    if (auto mulOp = dyn_cast_or_null<T>(op.lhs().getDefiningOp())) {
-      if (matchPattern(mulOp.rhs(), m_Constant(&c2))) {
+    if (!matchPattern(op.getRhs(), m_Constant(&c1))) return failure();
+    if (auto mulOp = dyn_cast_or_null<T>(op.getLhs().getDefiningOp())) {
+      if (matchPattern(mulOp.getRhs(), m_Constant(&c2))) {
         auto c = rewriter.createOrFold<CONST_OP>(
             rewriter.getFusedLoc({mulOp.getLoc(), op.getLoc()}),
             constFoldBinaryOp<AttrElementT>(
                 {c1, c2}, [](const ElementValueT &a, const ElementValueT &b) {
                   return a * b;
                 }));
-        rewriter.replaceOpWithNewOp<T>(op, op.getType(), mulOp.lhs(), c);
+        rewriter.replaceOpWithNewOp<T>(op, op.getType(), mulOp.getLhs(), c);
         return success();
       }
     }
@@ -787,16 +797,16 @@ void MulI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
 
 template <typename T>
 static OpFoldResult foldDivSOp(T op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.rhs(), m_Zero())) {
+  if (matchPattern(op.getRhs(), m_Zero())) {
     // x / 0 = death
     op.emitOpError() << "is a divide by constant zero";
     return {};
-  } else if (matchPattern(op.lhs(), m_Zero())) {
+  } else if (matchPattern(op.getLhs(), m_Zero())) {
     // 0 / y = 0
     return zeroOfType(op.getType());
-  } else if (matchPattern(op.rhs(), m_One())) {
+  } else if (matchPattern(op.getRhs(), m_One())) {
     // x / 1 = x
-    return op.lhs();
+    return op.getLhs();
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [](const APInt &a, const APInt &b) { return a.sdiv(b); });
@@ -812,16 +822,16 @@ OpFoldResult DivI64SOp::fold(ArrayRef<Attribute> operands) {
 
 template <typename T>
 static OpFoldResult foldDivUOp(T op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.rhs(), m_Zero())) {
+  if (matchPattern(op.getRhs(), m_Zero())) {
     // x / 0 = death
     op.emitOpError() << "is a divide by constant zero";
     return {};
-  } else if (matchPattern(op.lhs(), m_Zero())) {
+  } else if (matchPattern(op.getLhs(), m_Zero())) {
     // 0 / y = 0
     return zeroOfType(op.getType());
-  } else if (matchPattern(op.rhs(), m_One())) {
+  } else if (matchPattern(op.getRhs(), m_One())) {
     // x / 1 = x
-    return op.lhs();
+    return op.getLhs();
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [](const APInt &a, const APInt &b) { return a.udiv(b); });
@@ -837,12 +847,12 @@ OpFoldResult DivI64UOp::fold(ArrayRef<Attribute> operands) {
 
 template <typename T>
 static OpFoldResult foldRemSOp(T op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.rhs(), m_Zero())) {
+  if (matchPattern(op.getRhs(), m_Zero())) {
     // x % 0 = death
     op.emitOpError() << "is a remainder by constant zero";
     return {};
-  } else if (matchPattern(op.lhs(), m_Zero()) ||
-             matchPattern(op.rhs(), m_One())) {
+  } else if (matchPattern(op.getLhs(), m_Zero()) ||
+             matchPattern(op.getRhs(), m_One())) {
     // x % 1 = 0
     // 0 % y = 0
     return zeroOfType(op.getType());
@@ -861,12 +871,12 @@ OpFoldResult RemI64SOp::fold(ArrayRef<Attribute> operands) {
 
 template <typename T>
 static OpFoldResult foldRemUOp(T op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.rhs(), m_Zero())) {
+  if (matchPattern(op.getRhs(), m_Zero())) {
     // x % 0 = death
     op.emitOpError() << "is a remainder by constant zero";
     return {};
-  } else if (matchPattern(op.lhs(), m_Zero()) ||
-             matchPattern(op.rhs(), m_One())) {
+  } else if (matchPattern(op.getLhs(), m_Zero()) ||
+             matchPattern(op.getRhs(), m_One())) {
     // x % 1 = 0
     // 0 % y = 0
     return zeroOfType(op.getType());
@@ -886,8 +896,8 @@ OpFoldResult RemI64UOp::fold(ArrayRef<Attribute> operands) {
 template <typename T>
 static OpFoldResult foldFMAOp(T op, ArrayRef<Attribute> operands) {
   // a * b + c
-  if (matchPattern(op.a(), m_Zero()) || matchPattern(op.b(), m_Zero())) {
-    return op.c();
+  if (matchPattern(op.getA(), m_Zero()) || matchPattern(op.getB(), m_Zero())) {
+    return op.getC();
   }
   return constFoldTernaryOp<IntegerAttr>(
       operands, [](const APInt &a, const APInt &b, const APInt &c) {
@@ -903,20 +913,20 @@ struct CanonicalizeFMA final : public OpRewritePattern<FMAOp> {
   LogicalResult matchAndRewrite(FMAOp fmaOp,
                                 PatternRewriter &rewriter) const override {
     // a * b + c
-    if (matchPattern(fmaOp.a(), m_One())) {
+    if (matchPattern(fmaOp.getA(), m_One())) {
       // 1 * b + c = b + c
-      rewriter.replaceOpWithNewOp<AddOp>(fmaOp, fmaOp.getType(), fmaOp.b(),
-                                         fmaOp.c());
+      rewriter.replaceOpWithNewOp<AddOp>(fmaOp, fmaOp.getType(), fmaOp.getB(),
+                                         fmaOp.getC());
       return success();
-    } else if (matchPattern(fmaOp.b(), m_One())) {
+    } else if (matchPattern(fmaOp.getB(), m_One())) {
       // a * 1 + c = a + c
-      rewriter.replaceOpWithNewOp<AddOp>(fmaOp, fmaOp.getType(), fmaOp.a(),
-                                         fmaOp.c());
+      rewriter.replaceOpWithNewOp<AddOp>(fmaOp, fmaOp.getType(), fmaOp.getA(),
+                                         fmaOp.getC());
       return success();
-    } else if (matchPattern(fmaOp.c(), m_Zero())) {
+    } else if (matchPattern(fmaOp.getC(), m_Zero())) {
       // a * b + 0 = a * b
-      rewriter.replaceOpWithNewOp<MulOp>(fmaOp, fmaOp.getType(), fmaOp.a(),
-                                         fmaOp.b());
+      rewriter.replaceOpWithNewOp<MulOp>(fmaOp, fmaOp.getType(), fmaOp.getA(),
+                                         fmaOp.getB());
       return success();
     }
     return failure();
@@ -993,16 +1003,16 @@ void MulF64Op::getCanonicalizationPatterns(RewritePatternSet &results,
 
 template <typename T>
 static OpFoldResult foldDivFOp(T op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.rhs(), m_Zero())) {
+  if (matchPattern(op.getRhs(), m_Zero())) {
     // x / 0 = death
     op.emitOpError() << "is a divide by constant zero";
     return {};
-  } else if (matchPattern(op.lhs(), m_Zero())) {
+  } else if (matchPattern(op.getLhs(), m_Zero())) {
     // 0 / y = 0
     return zeroOfType(op.getType());
-  } else if (matchPattern(op.rhs(), m_One())) {
+  } else if (matchPattern(op.getRhs(), m_One())) {
     // x / 1 = x
-    return op.lhs();
+    return op.getLhs();
   }
   return constFoldBinaryOp<FloatAttr>(
       operands, [](const APFloat &a, const APFloat &b) {
@@ -1022,12 +1032,12 @@ OpFoldResult DivF64Op::fold(ArrayRef<Attribute> operands) {
 
 template <typename T>
 static OpFoldResult foldRemFOp(T op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.rhs(), m_Zero())) {
+  if (matchPattern(op.getRhs(), m_Zero())) {
     // x % 0 = death
     op.emitOpError() << "is a remainder by constant zero";
     return {};
-  } else if (matchPattern(op.lhs(), m_Zero()) ||
-             matchPattern(op.rhs(), m_One())) {
+  } else if (matchPattern(op.getLhs(), m_Zero()) ||
+             matchPattern(op.getRhs(), m_One())) {
     // x % 1 = 0
     // 0 % y = 0
     return zeroOfType(op.getType());
@@ -1051,8 +1061,8 @@ OpFoldResult RemF64Op::fold(ArrayRef<Attribute> operands) {
 template <typename T>
 static OpFoldResult foldFMAFOp(T op, ArrayRef<Attribute> operands) {
   // a * b + c
-  if (matchPattern(op.a(), m_Zero()) || matchPattern(op.b(), m_Zero())) {
-    return op.c();
+  if (matchPattern(op.getA(), m_Zero()) || matchPattern(op.getB(), m_Zero())) {
+    return op.getC();
   }
   return constFoldTernaryOp<FloatAttr>(
       operands, [](const APFloat &a, const APFloat &b, const APFloat &c) {
@@ -1182,12 +1192,12 @@ OpFoldResult NotI64Op::fold(ArrayRef<Attribute> operands) {
 
 template <typename T>
 static OpFoldResult foldAndOp(T op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.rhs(), m_Zero())) {
+  if (matchPattern(op.getRhs(), m_Zero())) {
     // x & 0 = 0 or 0 & y = 0 (commutative)
     return zeroOfType(op.getType());
-  } else if (op.lhs() == op.rhs()) {
+  } else if (op.getLhs() == op.getRhs()) {
     // x & x = x
-    return op.lhs();
+    return op.getLhs();
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [](const APInt &a, const APInt &b) { return a & b; });
@@ -1203,12 +1213,12 @@ OpFoldResult AndI64Op::fold(ArrayRef<Attribute> operands) {
 
 template <typename T>
 static OpFoldResult foldOrOp(T op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.rhs(), m_Zero())) {
+  if (matchPattern(op.getRhs(), m_Zero())) {
     // x | 0 = x or 0 | y = y (commutative)
-    return op.lhs();
-  } else if (op.lhs() == op.rhs()) {
+    return op.getLhs();
+  } else if (op.getLhs() == op.getRhs()) {
     // x | x = x
-    return op.lhs();
+    return op.getLhs();
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [](const APInt &a, const APInt &b) { return a | b; });
@@ -1224,10 +1234,10 @@ OpFoldResult OrI64Op::fold(ArrayRef<Attribute> operands) {
 
 template <typename T>
 static OpFoldResult foldXorOp(T op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.rhs(), m_Zero())) {
+  if (matchPattern(op.getRhs(), m_Zero())) {
     // x ^ 0 = x or 0 ^ y = y (commutative)
-    return op.lhs();
-  } else if (op.lhs() == op.rhs()) {
+    return op.getLhs();
+  } else if (op.getLhs() == op.getRhs()) {
     // x ^ x = 0
     return zeroOfType(op.getType());
   }
@@ -1264,12 +1274,12 @@ OpFoldResult CtlzI64Op::fold(ArrayRef<Attribute> operands) {
 
 template <typename T>
 static OpFoldResult foldShlOp(T op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.operand(), m_Zero())) {
+  if (matchPattern(op.getOperand(), m_Zero())) {
     // 0 << y = 0
     return zeroOfType(op.getType());
-  } else if (matchPattern(op.amount(), m_Zero())) {
+  } else if (matchPattern(op.getAmount(), m_Zero())) {
     // x << 0 = x
-    return op.operand();
+    return op.getOperand();
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](const APInt &a, const APInt &b) { return a.shl(b); });
@@ -1285,12 +1295,12 @@ OpFoldResult ShlI64Op::fold(ArrayRef<Attribute> operands) {
 
 template <typename T>
 static OpFoldResult foldShrSOp(T op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.operand(), m_Zero())) {
+  if (matchPattern(op.getOperand(), m_Zero())) {
     // 0 >> y = 0
     return zeroOfType(op.getType());
-  } else if (matchPattern(op.amount(), m_Zero())) {
+  } else if (matchPattern(op.getAmount(), m_Zero())) {
     // x >> 0 = x
-    return op.operand();
+    return op.getOperand();
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](const APInt &a, const APInt &b) { return a.ashr(b); });
@@ -1306,12 +1316,12 @@ OpFoldResult ShrI64SOp::fold(ArrayRef<Attribute> operands) {
 
 template <typename T>
 static OpFoldResult foldShrUOp(T op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.operand(), m_Zero())) {
+  if (matchPattern(op.getOperand(), m_Zero())) {
     // 0 >> y = 0
     return zeroOfType(op.getType());
-  } else if (matchPattern(op.amount(), m_Zero())) {
+  } else if (matchPattern(op.getAmount(), m_Zero())) {
     // x >> 0 = x
-    return op.operand();
+    return op.getOperand();
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [&](const APInt &a, const APInt &b) { return a.lshr(b); });
@@ -1456,8 +1466,8 @@ struct PseudoIntegerConversionToSplitConversionOp
   LogicalResult matchAndRewrite(SRC_OP op,
                                 PatternRewriter &rewriter) const override {
     auto tmp = rewriter.createOrFold<OP_A>(
-        op.getLoc(), rewriter.getIntegerType(SZ_T), op.operand());
-    rewriter.replaceOpWithNewOp<OP_B>(op, op.result().getType(), tmp);
+        op.getLoc(), rewriter.getIntegerType(SZ_T), op.getOperand());
+    rewriter.replaceOpWithNewOp<OP_B>(op, op.getResult().getType(), tmp);
     return success();
   }
 };
@@ -1592,17 +1602,17 @@ struct SwapInvertedCmpOps : public OpRewritePattern<OP> {
                                 PatternRewriter &rewriter) const override {
     // We generate xor(cmp(...), 1) to flip conditions, so look for that pattern
     // so that we can do the swap here and remove the xor.
-    if (!op.result().hasOneUse()) {
+    if (!op.getResult().hasOneUse()) {
       // Can't change if there are multiple users.
       return failure();
     }
-    if (auto xorOp = dyn_cast_or_null<XorI32Op>(*op.result().user_begin())) {
+    if (auto xorOp = dyn_cast_or_null<XorI32Op>(*op.getResult().user_begin())) {
       Attribute rhs;
-      if (xorOp.lhs() == op.result() &&
-          matchPattern(xorOp.rhs(), m_Constant(&rhs)) &&
+      if (xorOp.getLhs() == op.getResult() &&
+          matchPattern(xorOp.getRhs(), m_Constant(&rhs)) &&
           rhs.cast<IntegerAttr>().getInt() == 1) {
         auto invValue = rewriter.createOrFold<INV>(
-            op.getLoc(), op.result().getType(), op.lhs(), op.rhs());
+            op.getLoc(), op.getResult().getType(), op.getLhs(), op.getRhs());
         rewriter.replaceOp(op, {invValue});
         rewriter.replaceOp(xorOp, {invValue});
         return success();
@@ -1616,7 +1626,7 @@ struct SwapInvertedCmpOps : public OpRewritePattern<OP> {
 
 template <typename T>
 static OpFoldResult foldCmpEQOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
+  if (op.getLhs() == op.getRhs()) {
     // x == x = true
     return oneOfType(op.getType());
   }
@@ -1644,7 +1654,7 @@ void CmpEQI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
 
 template <typename T>
 static OpFoldResult foldCmpNEOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
+  if (op.getLhs() == op.getRhs()) {
     // x != x = false
     return zeroOfType(op.getType());
   }
@@ -1668,8 +1678,8 @@ struct CmpNEZeroToCmpNZ : public OpRewritePattern<NE_OP> {
   using OpRewritePattern<NE_OP>::OpRewritePattern;
   LogicalResult matchAndRewrite(NE_OP op,
                                 PatternRewriter &rewriter) const override {
-    if (matchPattern(op.rhs(), m_Zero())) {
-      rewriter.replaceOpWithNewOp<NZ_OP>(op, op.getType(), op.lhs());
+    if (matchPattern(op.getRhs(), m_Zero())) {
+      rewriter.replaceOpWithNewOp<NZ_OP>(op, op.getType(), op.getLhs());
       return success();
     }
     return failure();
@@ -1692,7 +1702,7 @@ void CmpNEI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
 
 template <typename T>
 static OpFoldResult foldCmpLTSOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
+  if (op.getLhs() == op.getRhs()) {
     // x < x = false
     return zeroOfType(op.getType());
   }
@@ -1716,7 +1726,7 @@ void CmpLTI64SOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 template <typename T>
 static OpFoldResult foldCmpLTUOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
+  if (op.getLhs() == op.getRhs()) {
     // x < x = false
     return zeroOfType(op.getType());
   }
@@ -1747,8 +1757,8 @@ struct RewritePseudoCmpLTEToLT : public OpRewritePattern<T> {
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
     // !(lhs > rhs)
-    auto condValue =
-        rewriter.createOrFold<U>(op.getLoc(), op.getType(), op.rhs(), op.lhs());
+    auto condValue = rewriter.createOrFold<U>(op.getLoc(), op.getType(),
+                                              op.getRhs(), op.getLhs());
     rewriter.replaceOpWithNewOp<XorI32Op>(
         op, op.getType(), condValue,
         rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), 1));
@@ -1760,7 +1770,7 @@ struct RewritePseudoCmpLTEToLT : public OpRewritePattern<T> {
 
 template <typename T>
 static OpFoldResult foldCmpLTESOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
+  if (op.getLhs() == op.getRhs()) {
     // x <= x = true
     return oneOfType(op.getType());
   }
@@ -1790,7 +1800,7 @@ void CmpLTEI64SOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 template <typename T>
 static OpFoldResult foldCmpLTEUOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
+  if (op.getLhs() == op.getRhs()) {
     // x <= x = true
     return oneOfType(op.getType());
   }
@@ -1827,7 +1837,7 @@ struct RewritePseudoCmpGTToLT : public OpRewritePattern<T> {
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
     // rhs < lhs
-    rewriter.replaceOpWithNewOp<U>(op, op.getType(), op.rhs(), op.lhs());
+    rewriter.replaceOpWithNewOp<U>(op, op.getType(), op.getRhs(), op.getLhs());
     return success();
   }
 };
@@ -1836,7 +1846,7 @@ struct RewritePseudoCmpGTToLT : public OpRewritePattern<T> {
 
 template <typename T>
 static OpFoldResult foldCmpGTSOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
+  if (op.getLhs() == op.getRhs()) {
     // x > x = false
     return zeroOfType(op.getType());
   }
@@ -1866,7 +1876,7 @@ void CmpGTI64SOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 template <typename T>
 static OpFoldResult foldCmpGTUOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
+  if (op.getLhs() == op.getRhs()) {
     // x > x = false
     return zeroOfType(op.getType());
   }
@@ -1903,8 +1913,8 @@ struct RewritePseudoCmpGTEToLT : public OpRewritePattern<T> {
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
     // !(lhs < rhs)
-    auto condValue =
-        rewriter.createOrFold<U>(op.getLoc(), op.getType(), op.lhs(), op.rhs());
+    auto condValue = rewriter.createOrFold<U>(op.getLoc(), op.getType(),
+                                              op.getLhs(), op.getRhs());
     rewriter.replaceOpWithNewOp<XorI32Op>(
         op, op.getType(), condValue,
         rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), 1));
@@ -1916,7 +1926,7 @@ struct RewritePseudoCmpGTEToLT : public OpRewritePattern<T> {
 
 template <typename T>
 static OpFoldResult foldCmpGTESOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
+  if (op.getLhs() == op.getRhs()) {
     // x >= x = true
     return oneOfType(op.getType());
   }
@@ -1946,7 +1956,7 @@ void CmpGTEI64SOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 template <typename T>
 static OpFoldResult foldCmpGTEUOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
+  if (op.getLhs() == op.getRhs()) {
     // x >= x = true
     return oneOfType(op.getType());
   }
@@ -1995,7 +2005,7 @@ enum CmpFOrdering {
 
 template <CmpFOrdering ordering, typename T>
 static OpFoldResult foldCmpEQFOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
+  if (op.getLhs() == op.getRhs()) {
     // x == x = true
     return oneOfType(op.getType());
   }
@@ -2048,7 +2058,7 @@ void CmpEQF64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 template <CmpFOrdering ordering, typename T>
 static OpFoldResult foldCmpNEFOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
+  if (op.getLhs() == op.getRhs()) {
     // x != x = false
     return zeroOfType(op.getType());
   }
@@ -2101,7 +2111,7 @@ void CmpNEF64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 template <CmpFOrdering ordering, typename T>
 static OpFoldResult foldCmpLTFOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
+  if (op.getLhs() == op.getRhs()) {
     // x < x = false
     return zeroOfType(op.getType());
   }
@@ -2146,7 +2156,7 @@ void CmpLTF64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 template <CmpFOrdering ordering, typename T>
 static OpFoldResult foldCmpLTEFOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
+  if (op.getLhs() == op.getRhs()) {
     // x <= x = true
     return oneOfType(op.getType());
   }
@@ -2180,7 +2190,7 @@ OpFoldResult CmpLTEF64UOp::fold(ArrayRef<Attribute> operands) {
 
 template <CmpFOrdering ordering, typename T>
 static OpFoldResult foldCmpGTFOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
+  if (op.getLhs() == op.getRhs()) {
     // x > x = false
     return zeroOfType(op.getType());
   }
@@ -2238,7 +2248,7 @@ void CmpGTF64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 template <CmpFOrdering ordering, typename T>
 static OpFoldResult foldCmpGTEFOp(T op, ArrayRef<Attribute> operands) {
-  if (op.lhs() == op.rhs()) {
+  if (op.getLhs() == op.getRhs()) {
     // x >= x = true
     return oneOfType(op.getType());
   }
@@ -2302,7 +2312,7 @@ struct RewritePseudoCmpNZToNE : public OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<U>(op, op.getType(), op.operand(),
+    rewriter.replaceOpWithNewOp<U>(op, op.getType(), op.getOperand(),
                                    rewriter.create<CZ>(op.getLoc()));
     return success();
   }
@@ -2381,7 +2391,7 @@ OpFoldResult CmpNaNF64Op::fold(ArrayRef<Attribute> operands) {
 //===----------------------------------------------------------------------===//
 
 OpFoldResult CmpEQRefOp::fold(ArrayRef<Attribute> operands) {
-  if (lhs() == rhs()) {
+  if (getLhs() == getRhs()) {
     // x == x = true
     return oneOfType(getType());
   } else if (operands[0] && operands[1]) {
@@ -2399,9 +2409,9 @@ struct NullCheckCmpEQRefToCmpNZRef : public OpRewritePattern<CmpEQRefOp> {
   LogicalResult matchAndRewrite(CmpEQRefOp op,
                                 PatternRewriter &rewriter) const override {
     Attribute rhs;
-    if (matchPattern(op.rhs(), m_Constant(&rhs))) {
+    if (matchPattern(op.getRhs(), m_Constant(&rhs))) {
       auto cmpNz =
-          rewriter.create<CmpNZRefOp>(op.getLoc(), op.getType(), op.lhs());
+          rewriter.create<CmpNZRefOp>(op.getLoc(), op.getType(), op.getLhs());
       rewriter.replaceOpWithNewOp<XorI32Op>(
           op, op.getType(), cmpNz,
           rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), 1));
@@ -2419,7 +2429,7 @@ void CmpEQRefOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 OpFoldResult CmpNERefOp::fold(ArrayRef<Attribute> operands) {
-  if (lhs() == rhs()) {
+  if (getLhs() == getRhs()) {
     // x != x = false
     return zeroOfType(getType());
   }
@@ -2434,8 +2444,8 @@ struct NullCheckCmpNERefToCmpNZRef : public OpRewritePattern<CmpNERefOp> {
   LogicalResult matchAndRewrite(CmpNERefOp op,
                                 PatternRewriter &rewriter) const override {
     Attribute rhs;
-    if (matchPattern(op.rhs(), m_Constant(&rhs))) {
-      rewriter.replaceOpWithNewOp<CmpNZRefOp>(op, op.getType(), op.lhs());
+    if (matchPattern(op.getRhs(), m_Constant(&rhs))) {
+      rewriter.replaceOpWithNewOp<CmpNZRefOp>(op, op.getType(), op.getLhs());
       return success();
     }
     return failure();
@@ -2451,7 +2461,7 @@ void CmpNERefOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 OpFoldResult CmpNZRefOp::fold(ArrayRef<Attribute> operands) {
   Attribute operandValue;
-  if (matchPattern(operand(), m_Constant(&operandValue))) {
+  if (matchPattern(getOperand(), m_Constant(&operandValue))) {
     // x == null
     return zeroOfType(getType());
   }
@@ -2583,12 +2593,12 @@ struct SimplifyConstCondBranchPred : public OpRewritePattern<CondBranchOp> {
   using OpRewritePattern<CondBranchOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(CondBranchOp op,
                                 PatternRewriter &rewriter) const override {
-    if (matchPattern(op.condition(), m_NonZero())) {
+    if (matchPattern(op.getCondition(), m_NonZero())) {
       // True branch taken.
       rewriter.replaceOpWithNewOp<BranchOp>(op, op.getTrueDest(),
                                             op.getTrueOperands());
       return success();
-    } else if (matchPattern(op.condition(), m_Zero())) {
+    } else if (matchPattern(op.getCondition(), m_Zero())) {
       // False branch taken.
       rewriter.replaceOpWithNewOp<BranchOp>(op, op.getFalseDest(),
                                             op.getFalseOperands());
@@ -2634,10 +2644,10 @@ struct SwapInvertedCondBranchOpTargets : public OpRewritePattern<CondBranchOp> {
     // auto condValue = op.getCondition();
     // if (auto xorOp = dyn_cast_or_null<XorI32Op>(condValue.getDefiningOp())) {
     //   Attribute rhs;
-    //   if (matchPattern(xorOp.rhs(), m_Constant(&rhs)) &&
+    //   if (matchPattern(xorOp.getRhs(), m_Constant(&rhs)) &&
     //       rhs.cast<IntegerAttr>().getInt() == 1) {
     //     rewriter.replaceOpWithNewOp<CondBranchOp>(
-    //         op, xorOp.lhs(), op.getFalseDest(), op.getFalseOperands(),
+    //         op, xorOp.getLhs(), op.getFalseDest(), op.getFalseOperands(),
     //         op.getTrueDest(), op.getTrueOperands());
     //     return success();
     //   }
@@ -2672,7 +2682,7 @@ struct EraseUnusedCallOp : public OpRewritePattern<T> {
     }
 
     auto *calleeOp = SymbolTable::lookupSymbolIn(
-        op->template getParentOfType<ModuleOp>(), op.callee());
+        op->template getParentOfType<ModuleOp>(), op.getCallee());
 
     bool hasNoSideEffects = false;
     if (calleeOp->getAttr("nosideeffects")) {
@@ -2706,12 +2716,12 @@ struct ConvertNonVariadicToCallOp : public OpRewritePattern<CallVariadicOp> {
   LogicalResult matchAndRewrite(CallVariadicOp op,
                                 PatternRewriter &rewriter) const override {
     // If any segment size is != -1 (which indicates variadic) we bail.
-    for (const auto &segmentSize : op.segment_sizes()) {
+    for (const auto &segmentSize : op.getSegmentSizes()) {
       if (segmentSize.getSExtValue() != -1) {
         return failure();
       }
     }
-    rewriter.replaceOpWithNewOp<CallOp>(op, op.callee(),
+    rewriter.replaceOpWithNewOp<CallOp>(op, op.getCallee(),
                                         llvm::to_vector<4>(op.getResultTypes()),
                                         op.getOperands());
     return success();
@@ -2738,20 +2748,20 @@ struct RewriteCondFailToBranchFail : public OpRewritePattern<CondFailOp> {
     // Create the block with the vm.fail in it.
     // This is what we will branch to if the condition is true at runtime.
     auto *failBlock =
-        rewriter.createBlock(block, {op.status().getType()}, {op.getLoc()});
+        rewriter.createBlock(block, {op.getStatus().getType()}, {op.getLoc()});
     block->moveBefore(failBlock);
     rewriter.setInsertionPointToStart(failBlock);
     rewriter.create<FailOp>(
         op.getLoc(), failBlock->getArgument(0),
-        op.message().hasValue() ? op.message().getValue() : "");
+        op.getMessage().hasValue() ? op.getMessage().getValue() : "");
 
     // Replace the original cond_fail with our cond_branch, splitting the block
     // and continuing if the condition is not taken.
     auto *continueBlock = rewriter.splitBlock(
         block, op.getOperation()->getNextNode()->getIterator());
     rewriter.setInsertionPointToEnd(block);
-    rewriter.replaceOpWithNewOp<CondBranchOp>(op, op.condition(), failBlock,
-                                              ValueRange{op.status()},
+    rewriter.replaceOpWithNewOp<CondBranchOp>(op, op.getCondition(), failBlock,
+                                              ValueRange{op.getStatus()},
                                               continueBlock, ValueRange{});
 
     return success();
@@ -2806,7 +2816,7 @@ struct RewriteCheckToCondFail : public OpRewritePattern<CheckOp> {
     auto statusCode = rewriter.createOrFold<ConstI32Op>(
         op.getLoc(), /*IREE_STATUS_FAILED_PRECONDITION=*/9);
     rewriter.replaceOpWithNewOp<IREE::VM::CondFailOp>(op, condValue, statusCode,
-                                                      op.messageAttr());
+                                                      op.getMessageAttr());
     return success();
   }
 };
@@ -2842,8 +2852,8 @@ struct RequiredImportResolver : public OpRewritePattern<ImportResolvedOp> {
   LogicalResult matchAndRewrite(ImportResolvedOp op,
                                 PatternRewriter &rewriter) const override {
     auto importOp = SymbolTable::lookupNearestSymbolFrom<IREE::VM::ImportOp>(
-        op, op.importAttr());
-    if (!importOp || importOp.is_optional()) return failure();
+        op, op.getImportAttr());
+    if (!importOp || importOp.getIsOptional()) return failure();
     rewriter.replaceOpWithNewOp<IREE::VM::ConstI32Op>(op, 1);
     return success();
   }
@@ -2891,17 +2901,18 @@ struct SimplifyConstCondBreakPred : public OpRewritePattern<CondBreakOp> {
   LogicalResult matchAndRewrite(CondBreakOp op,
                                 PatternRewriter &rewriter) const override {
     IntegerAttr condValue;
-    if (!matchPattern(op.condition(), m_Constant(&condValue))) {
+    if (!matchPattern(op.getCondition(), m_Constant(&condValue))) {
       return failure();
     }
 
     if (condValue.getValue() != 0) {
       // True - always break (to the same destination).
-      rewriter.replaceOpWithNewOp<BreakOp>(op, op.getDest(), op.destOperands());
+      rewriter.replaceOpWithNewOp<BreakOp>(op, op.getDest(),
+                                           op.getDestOperands());
     } else {
       // False - skip the break.
       rewriter.replaceOpWithNewOp<BranchOp>(op, op.getDest(),
-                                            op.destOperands());
+                                            op.getDestOperands());
     }
     return success();
   }

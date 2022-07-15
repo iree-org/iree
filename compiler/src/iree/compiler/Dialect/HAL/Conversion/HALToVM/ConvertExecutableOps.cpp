@@ -82,12 +82,12 @@ IREE::VM::RodataOp createExecutableBinaryRodata(
       binaryOp.getLoc(), rodataName, binaryOp.getData());
   rodataOp.setPrivate();
   if (binaryOp.getMimeType().hasValue()) {
-    rodataOp.mime_typeAttr(binaryOp.getMimeTypeAttr());
+    rodataOp.setMimeTypeAttr(binaryOp.getMimeTypeAttr());
   }
 
   // TODO(benvanik): should these be page aligned? memcpy fastpath is fine for
   // now.
-  rodataOp.alignmentAttr(builder.getI64IntegerAttr(16));
+  rodataOp.setAlignmentAttr(builder.getI64IntegerAttr(16));
 
   builder.restoreInsertionPoint(insertPoint);
 

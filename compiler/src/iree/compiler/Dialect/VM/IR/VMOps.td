@@ -90,6 +90,7 @@ def VM_FuncOp : VM_Op<"func", [
   }];
 
   let arguments = (ins
+    TypeAttrOf<FunctionType>:$function_type,
     OptionalAttr<VM_Ordinal>:$ordinal,
     OptionalAttr<UnitAttr>:$noinline
   );
@@ -114,13 +115,6 @@ def VM_FuncOp : VM_Op<"func", [
       return &back();
     }
 
-    /// Returns the type of this function.
-    FunctionType getFunctionType() {
-      return getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName())
-          .getValue()
-          .cast<FunctionType>();
-    }
-
     /// Returns the argument types of this function.
     ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
 
@@ -132,7 +126,7 @@ def VM_FuncOp : VM_Op<"func", [
     /// getNumArguments hook not failing.
     LogicalResult verifyType();
 
-    Region *getCallableRegion() { return &body(); }
+    Region *getCallableRegion() { return &getBody(); }
     ArrayRef<Type> getCallableResults() {
       assert(!isExternal() && "invalid callable");
       return getFunctionType().getResults();
@@ -255,7 +249,7 @@ def VM_InitializerOp : VM_Op<"initializer", [
   }];
 
   let arguments = (ins
-    TypeAttr:$function_type
+    TypeAttrOf<FunctionType>:$function_type
   );
 
   let regions = (region AnyRegion:$body);
@@ -273,12 +267,6 @@ def VM_InitializerOp : VM_Op<"initializer", [
     Block *addEntryBlock();
     Block *addBlock();
 
-    FunctionType getFunctionType() {
-      return getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName())
-          .getValue()
-          .cast<FunctionType>();
-    }
-
     /// Returns the argument types of this function.
     ArrayRef<Type> getArgumentTypes() { return {}; }
 
@@ -287,7 +275,7 @@ def VM_InitializerOp : VM_Op<"initializer", [
 
     LogicalResult verifyType() { return success(); }
 
-    Region *getCallableRegion() { return &body(); }
+    Region *getCallableRegion() { return &getBody(); }
     ArrayRef<Type> getCallableResults() { return {}; }
   }];
 
@@ -355,14 +343,13 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<Trait> traits = []> :
   ];
 
   let extraClassDeclaration = [{
-    StringRef getSymbolName() { return sym_name(); }
-    Type getStorageType() { return type(); }
-    bool isMutable() { return is_mutable(); }
+    StringRef getSymbolName() { return getSymName(); }
+    Type getStorageType() { return getType(); }
+    bool isMutable() { return getIsMutable(); }
     void makeMutable() { (*this)->setAttr("is_mutable", UnitAttr::get(getContext())); }
-    Optional<Attribute> getInitialValueAttr() { return initial_valueAttr(); }
+    Optional<Attribute> getInitialValueUntyped() { return getInitialValueAttr(); }
     void setInitialValue(Attribute value) { (*this)->setAttr("initial_value", (value)); }
     void clearInitialValue() { (*this)->removeAttr("initial_value"); }
-    Optional<IntegerAttr> getOrdinalAttr() { return ordinalAttr(); }
     LogicalResult verify() { return verifyGlobalOp(getOperation()); }
   }];
 }
@@ -439,7 +426,9 @@ def VM_GlobalAddressOp : VM_PureOp<"global.address"> {
     AnyTypeOf<[VM_Ptr, Util_AnyPtrType]>:$result
   );
 
-  let assemblyFormat = "$global attr-dict `:` type($result)";
+  let assemblyFormat = [{
+    $global attr-dict `:` type($result)
+  }];
 
   let hasVerifier = 1;
 }
@@ -457,7 +446,9 @@ class VM_GlobalLoadOp<Type type, string mnemonic, list<Trait> traits = []> :
     type:$value
   );
 
-  let assemblyFormat = "$global attr-dict `:` type($value)";
+  let assemblyFormat = [{
+    $global attr-dict `:` type($value)
+  }];
 
   let extraClassDeclaration = [{
     LogicalResult verify() {
@@ -489,7 +480,9 @@ class VM_GlobalStoreOp<Type type, string mnemonic, list<Trait> traits = []> :
     VM_GlobalRefAttr:$global
   );
 
-  let assemblyFormat = "$value `,` $global attr-dict `:` type($value)";
+  let assemblyFormat = [{
+    $value `,` $global attr-dict `:` type($value)
+  }];
 
   let extraClassDeclaration = [{
     LogicalResult verify() {
@@ -524,7 +517,9 @@ class VM_GlobalLoadIndirectOp<Type type, string mnemonic,
     type:$value
   );
 
-  let assemblyFormat = "$global attr-dict `:` type($global) `->` type($value)";
+  let assemblyFormat = [{
+    $global attr-dict `:` type($global) `->` type($value)
+  }];
 }
 
 class VM_GlobalLoadIndirectPrimitiveOp<Type type, string mnemonic,
@@ -552,7 +547,9 @@ class VM_GlobalStoreIndirectOp<Type type, string mnemonic,
     AnyTypeOf<[VM_Ptr, Util_PtrOf<type>]>:$global
   );
 
-  let assemblyFormat = "$value `,` $global attr-dict `:` type($value) `->` type($global)";
+  let assemblyFormat = [{
+    $value `,` $global attr-dict `:` type($value) `->` type($global)
+  }];
 }
 
 class VM_GlobalStoreIndirectPrimitiveOp<Type type, string mnemonic,
@@ -795,7 +792,9 @@ class VM_ConstantPrimitiveOp<Type type, int width, string mnemonic,
     VM_EncResult<"result">,
   ];
 
-  let assemblyFormat = "$value attr-dict";
+  let assemblyFormat = [{
+    $value attr-dict
+  }];
 }
 
 def VM_ConstI32Op :
@@ -857,7 +856,9 @@ class VM_ConstantPrimitiveZeroOp<Type type, string mnemonic, VM_OPC opcode,
     type:$result
   );
 
-  let assemblyFormat = "attr-dict";
+  let assemblyFormat = [{
+    attr-dict
+  }];
 
   let encoding = [
     VM_EncOpcode<opcode>,
@@ -923,7 +924,9 @@ def VM_ConstRefZeroOp : VM_PureOp<"const.ref.zero", [
     VM_AnyRef:$result
   );
 
-  let assemblyFormat = "`:` type($result) attr-dict";
+  let assemblyFormat = [{
+    `:` type($result) attr-dict
+  }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_ConstRefZero>,
@@ -999,7 +1002,9 @@ def VM_ConstRefRodataOp : VM_PureOp<"const.ref.rodata", [
     VM_RefOf<VM_BufferType>:$value
   );
 
-  let assemblyFormat = "$rodata attr-dict `:` type($value)";
+  let assemblyFormat = [{
+    $rodata attr-dict `:` type($value)
+  }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_ConstRefRodata>,
@@ -1037,7 +1042,9 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
     VM_RefOf<VM_BufferType>:$result
   );
 
-  let assemblyFormat = "($name^)? attr-dict `:` type($result) `=` $value";
+  let assemblyFormat = [{
+    ($name^)? attr-dict `:` type($result) `=` $value
+  }];
 
   let builders = [
     OpBuilder<(ins "Type":$resultType, "Attribute":$value),
@@ -1069,7 +1076,9 @@ def VM_BufferAllocOp :
     VM_RefOf<VM_BufferType>:$result
   );
 
-  let assemblyFormat = "operands attr-dict `:` type($result)";
+  let assemblyFormat = [{
+    operands attr-dict `:` type($result)
+  }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_BufferAlloc>,
@@ -1423,7 +1432,9 @@ def VM_ListAllocOp :
     VM_AnyList:$result
   );
 
-  let assemblyFormat = "operands attr-dict `:` `(` type($initial_capacity) `)` `->` type($result)";
+  let assemblyFormat = [{
+    operands attr-dict `:` `(` type($initial_capacity) `)` `->` type($result)
+  }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_ListAlloc>,
@@ -1448,7 +1459,9 @@ def VM_ListReserveOp :
     VM_ListIndex:$minimum_capacity
   );
 
-  let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($minimum_capacity) `)`";
+  let assemblyFormat = [{
+    operands attr-dict `:` `(` type($list) `,` type($minimum_capacity) `)`
+  }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_ListReserve>,
@@ -1474,7 +1487,9 @@ def VM_ListSizeOp :
     VM_ListIndex:$result
   );
 
-  let assemblyFormat = "operands attr-dict `:` `(` type($list) `)` `->` type($result)";
+  let assemblyFormat = [{
+    operands attr-dict `:` `(` type($list) `)` `->` type($result)
+  }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_ListSize>,
@@ -1500,7 +1515,9 @@ def VM_ListResizeOp :
     VM_ListIndex:$new_size
   );
 
-  let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($new_size) `)`";
+  let assemblyFormat = [{
+    operands attr-dict `:` `(` type($list) `,` type($new_size) `)`
+  }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_ListResize>,
@@ -1528,7 +1545,9 @@ class VM_ListGetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
     type:$result
   );
 
-  let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($index) `)` `->` type($result)";
+  let assemblyFormat = [{
+    operands attr-dict `:` `(` type($list) `,` type($index) `)` `->` type($result)
+  }];
 
   let encoding = [
     VM_EncOpcode<opcode>,
@@ -1555,7 +1574,9 @@ class VM_ListSetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
     type:$value
   );
 
-  let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`";
+  let assemblyFormat = [{
+    operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`
+  }];
 
   let encoding = [
     VM_EncOpcode<opcode>,
@@ -1608,7 +1629,9 @@ def VM_ListGetRefOp :
     VM_AnyRef:$result
   );
 
-  let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($index) `)` `->` type($result)";
+  let assemblyFormat = [{
+    operands attr-dict `:` `(` type($list) `,` type($index) `)` `->` type($result)
+  }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_ListGetRef>,
@@ -1637,7 +1660,9 @@ def VM_ListSetRefOp :
     VM_AnyRef:$value
   );
 
-  let assemblyFormat = "operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`";
+  let assemblyFormat = [{
+    operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`
+  }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_ListSetRef>,
@@ -1681,7 +1706,9 @@ class VM_SelectPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
     type:$result
   );
 
-  let assemblyFormat = "operands attr-dict `:` type($result)";
+  let assemblyFormat = [{
+    operands attr-dict `:` type($result)
+  }];
 
   let encoding = [
     VM_EncOpcode<opcode>,
@@ -1734,7 +1761,9 @@ def VM_SelectRefOp : VM_PureOp<"select.ref", [
     VM_AnyRef:$result
   );
 
-  let assemblyFormat = "operands attr-dict `:` type($result)";
+  let assemblyFormat = [{
+    operands attr-dict `:` type($result)
+  }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_SelectRef>,
@@ -1907,7 +1936,9 @@ class VM_UnaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
     type:$result
   );
 
-  let assemblyFormat = "$operand attr-dict `:` type($result)";
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($result)
+  }];
 
   let encoding = [
     VM_EncOpcode<opcode>,
@@ -1930,7 +1961,9 @@ class VM_BinaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
     type:$result
   );
 
-  let assemblyFormat = "operands attr-dict `:` type($result)";
+  let assemblyFormat = [{
+    operands attr-dict `:` type($result)
+  }];
 
   let encoding = [
     VM_EncOpcode<opcode>,
@@ -1955,7 +1988,9 @@ class VM_TernaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
     type:$result
   );
 
-  let assemblyFormat = "operands attr-dict `:` type($result)";
+  let assemblyFormat = [{
+    operands attr-dict `:` type($result)
+  }];
 
   let encoding = [
     VM_EncOpcode<opcode>,
@@ -2433,7 +2468,9 @@ class VM_ShiftArithmeticOp<I type, string mnemonic, VM_OPC opcode,
     type:$result
   );
 
-  let assemblyFormat = "$operand `,` $amount attr-dict `:` type($operand)";
+  let assemblyFormat = [{
+    $operand `,` $amount attr-dict `:` type($operand)
+  }];
 
   let encoding = [
     VM_EncOpcode<opcode>,
@@ -2489,7 +2526,9 @@ class VM_ConversionOp<Type src_type, Type dst_type, string mnemonic,
     dst_type:$result
   );
 
-  let assemblyFormat = "$operand attr-dict `:` type($operand) `->` type($result)";
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `->` type($result)
+  }];
 
   let encoding = [
     VM_EncOpcode<opcode>,
@@ -2508,7 +2547,9 @@ class VM_ConversionPseudoOp<Type src_type, Type dst_type, string mnemonic,
     dst_type:$result
   );
 
-  let assemblyFormat = "$operand attr-dict `:` type($operand) `->` type($result)";
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `->` type($result)
+  }];
 
   let hasCanonicalizer = 1;
 }
@@ -2695,7 +2736,9 @@ class VM_UnaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
     VM_CondValue:$result
   );
 
-  let assemblyFormat = "$operand attr-dict `:` type($operand)";
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand)
+  }];
 
   let encoding = [
     VM_EncOpcode<opcode>,
@@ -2720,7 +2763,9 @@ class VM_UnaryComparisonPseudoOp<Type type, string mnemonic,
     VM_CondValue:$result
   );
 
-  let assemblyFormat = "operands attr-dict `:` type($operand)";
+  let assemblyFormat = [{
+    operands attr-dict `:` type($operand)
+  }];
 }
 
 class VM_BinaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
@@ -2741,7 +2786,9 @@ class VM_BinaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
     VM_CondValue:$result
   );
 
-  let assemblyFormat = "operands attr-dict `:` type($lhs)";
+  let assemblyFormat = [{
+    operands attr-dict `:` type($lhs)
+  }];
 
   let encoding = [
     VM_EncOpcode<opcode>,
@@ -2769,7 +2816,9 @@ class VM_BinaryComparisonPseudoOp<Type type, string mnemonic,
     VM_CondValue:$result
   );
 
-  let assemblyFormat = "operands attr-dict `:` type($lhs)";
+  let assemblyFormat = [{
+    operands attr-dict `:` type($lhs)
+  }];
 }
 
 def VM_CmpEQI32Op :
@@ -3318,7 +3367,6 @@ def VM_BranchOp : VM_Op<"br", [
   ];
 
   let extraClassDeclaration = [{
-    Block *getDest();
     void setDest(Block *block);
 
     /// Erase the operand at 'index' from the operand list.
@@ -3394,19 +3442,6 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
     /// These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
 
-    /// The condition operand is the first operand in the list.
-    Value getCondition() { return getOperand(0); }
-
-    /// Return the destination if the condition is true.
-    Block *getTrueDest() {
-      return getOperation()->getSuccessor(trueIndex);
-    }
-
-    /// Return the destination if the condition is false.
-    Block *getFalseDest() {
-      return getOperation()->getSuccessor(falseIndex);
-    }
-
     /// Accessors for operands to the 'true' destination.
     Value getTrueOperand(unsigned idx) {
       assert(idx < getNumTrueOperands());
@@ -3418,13 +3453,13 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
       setOperand(getTrueDestOperandIndex() + idx, value);
     }
 
-    operand_range getTrueOperands() { return trueDestOperands(); }
+    operand_range getTrueOperands() { return getTrueDestOperands(); }
 
     unsigned getNumTrueOperands()  { return getTrueOperands().size(); }
 
     /// Erase the operand at 'index' from the true operand list.
     void eraseTrueOperand(unsigned index)  {
-      trueDestOperandsMutable().erase(index);
+      getTrueDestOperandsMutable().erase(index);
     }
 
     /// Accessors for operands to the 'false' destination.
@@ -3437,13 +3472,13 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
       setOperand(getFalseDestOperandIndex() + idx, value);
     }
 
-    operand_range getFalseOperands() { return falseDestOperands(); }
+    operand_range getFalseOperands() { return getFalseDestOperands(); }
 
     unsigned getNumFalseOperands() { return getFalseOperands().size(); }
 
     /// Erase the operand at 'index' from the false operand list.
     void eraseFalseOperand(unsigned index) {
-      falseDestOperandsMutable().erase(index);
+      getFalseDestOperandsMutable().erase(index);
     }
 
   private:
@@ -3466,9 +3501,6 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
       CallOpInterface,
     ])> {
   let extraClassDeclaration = [{
-    // TODO(b/132296600): make tablegen follow the style guide.
-    StringRef getCallee() { return callee(); }
-
     // TODO(b/133879130): make tablegen support variadic operand accessors.
     /// Get the argument operands to the called function.
     operand_range getArgOperands() {
@@ -3528,7 +3560,8 @@ def VM_CallOp : VM_CallBaseOp<"call"> {
     OpBuilder<(ins "StringRef":$callee, "mlir::TypeRange":$resultTypes,
       CArg<"ValueRange", "{}">:$operands),
     [{
-      build($_builder, $_state, mlir::SymbolRefAttr::get($_builder.getContext(), callee),
+      build($_builder, $_state,
+            mlir::SymbolRefAttr::get($_builder.getContext(), callee),
             resultTypes, operands);
     }]>,
   ];
@@ -3611,7 +3644,9 @@ def VM_ReturnOp : VM_Op<"return", [
     Variadic<VM_AnyType>:$operands
   );
 
-  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
+  let assemblyFormat = [{
+    attr-dict ($operands^ `:` type($operands))?
+  }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_Return>,
@@ -3674,7 +3709,7 @@ def VM_FailOp : VM_Op<"fail", [
 
   let extraClassDeclaration = [{
     LogicalResult verify() {
-      return verifyFailOp(getOperation(), status());
+      return verifyFailOp(getOperation(), getStatus());
     }
   }];
 }
@@ -3728,7 +3763,7 @@ def VM_CondFailOp : VM_Op<"cond_fail", [
 
   let extraClassDeclaration = [{
     LogicalResult verify() {
-      return verifyFailOp(getOperation(), status());
+      return verifyFailOp(getOperation(), getStatus());
     }
   }];
 
@@ -3902,7 +3937,6 @@ def VM_YieldOp : VM_Op<"yield", [
   ];
 
   let extraClassDeclaration = [{
-    Block *getDest();
     void setDest(Block *block);
 
     /// Erase the operand at 'index' from the operand list.
@@ -4012,7 +4046,6 @@ def VM_BreakOp : VM_Op<"break", [
   ];
 
   let extraClassDeclaration = [{
-    Block *getDest();
     void setDest(Block *block);
 
     /// Erase the operand at 'index' from the operand list.
@@ -4068,7 +4101,6 @@ def VM_CondBreakOp : VM_Op<"cond_break", [
   ];
 
   let extraClassDeclaration = [{
-    Block *getDest();
     void setDest(Block *block);
 
     /// Erase the operand at 'index' from the operand list.

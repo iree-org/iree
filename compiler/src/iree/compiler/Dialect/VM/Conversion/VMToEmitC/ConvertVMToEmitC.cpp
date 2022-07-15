@@ -322,7 +322,7 @@ FailureOr<int64_t> calculateNumSpans(IREE::VM::CallVariadicOp &callOp) {
     return segmentSize.getSExtValue() != -1;
   };
 
-  DenseIntElementsAttr segmentSizes = callOp.segment_sizes();
+  DenseIntElementsAttr segmentSizes = callOp.getSegmentSizes();
   size_t numSegments = segmentSizes.size();
   size_t numVariadicSegments = llvm::count_if(segmentSizes, isVariadic);
 
@@ -676,7 +676,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
   auto loc = moduleOp.getLoc();
 
   OpBuilder builder(moduleOp);
-  builder.setInsertionPoint(moduleOp.getBody()->getTerminator());
+  builder.setInsertionPoint(moduleOp.getBlock().getTerminator());
 
   std::string moduleName{moduleOp.getName()};
 
@@ -800,7 +800,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     // Initialize buffers
     for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
-      auto ordinal = rodataOp.ordinal().getValue().getZExtValue();
+      auto ordinal = rodataOp.getOrdinal()->getZExtValue();
 
       std::string bufferName = moduleName + "_" + rodataOp.getName().str();
 
@@ -868,15 +868,13 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     }
 
     // Zero out refs from state struct.
-    auto ordinal_counts = moduleOp.ordinal_counts();
-
-    if (!ordinal_counts.hasValue()) {
+    auto ordinalCounts = moduleOp.getOrdinalCountsAttr();
+    if (!ordinalCounts) {
       return moduleOp.emitError()
              << "ordinal_counts attribute not found. The OrdinalAllocationPass "
                 "must be run before.";
     }
-
-    const int numGlobalRefs = ordinal_counts.getValue().getGlobalRefs();
+    const int numGlobalRefs = ordinalCounts.getGlobalRefs();
 
     if (numGlobalRefs > 0) {
       auto refs = emitc_builders::structPtrMember(
@@ -955,14 +953,13 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*operand=*/funcOp.getArgument(1));
 
     // Release refs from state struct.
-    auto ordinal_counts = moduleOp.ordinal_counts();
-
-    if (!ordinal_counts.hasValue()) {
+    auto ordinalCounts = moduleOp.getOrdinalCountsAttr();
+    if (!ordinalCounts) {
       return moduleOp.emitError()
              << "ordinal_counts attribute not found. The OrdinalAllocationPass "
                 "must be run before.";
     }
-    const int numGlobalRefs = ordinal_counts.getValue().getGlobalRefs();
+    const int numGlobalRefs = ordinalCounts.getGlobalRefs();
 
     if (numGlobalRefs > 0) {
       auto refs = emitc_builders::structPtrMember(
@@ -1430,7 +1427,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
     attachAttribute(newFuncOp, "emitc.static", UnitAttr::get(ctx));
     attachAttribute(newFuncOp, "vm.calling_convention",
                     funcOp.getOperation()->getAttr("vm.calling_convention"));
-    attachAttribute(newFuncOp, "vm.export_name", exportOp.export_nameAttr());
+    attachAttribute(newFuncOp, "vm.export_name", exportOp.getExportNameAttr());
 
     // Populate newly generated function.
     {
@@ -2622,7 +2619,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
     auto moduleOp =
         importOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
 
-    int importOrdinal = importOp.ordinal().getValue().getZExtValue();
+    int importOrdinal = importOp.getOrdinal()->getZExtValue();
 
     auto funcOp = op->getParentOfType<mlir::func::FuncOp>();
     BlockArgument stackArg = funcOp.getArgument(0);
@@ -2859,19 +2856,19 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
     }
 
     bool moveLhs = vmAnalysis.getValue().get().isLastValueUse(
-                       cmpOp.lhs(), cmpOp.getOperation()) &&
+                       cmpOp.getLhs(), cmpOp.getOperation()) &&
                    false;
     bool moveRhs = vmAnalysis.getValue().get().isLastValueUse(
-                       cmpOp.rhs(), cmpOp.getOperation()) &&
+                       cmpOp.getRhs(), cmpOp.getOperation()) &&
                    false;
 
-    Optional<Value> refLhs = typeConverter->materializeRef(cmpOp.lhs());
+    Optional<Value> refLhs = typeConverter->materializeRef(cmpOp.getLhs());
 
     if (!refLhs.hasValue()) {
       return cmpOp.emitError() << "local ref not found";
     }
 
-    Optional<Value> refRhs = typeConverter->materializeRef(cmpOp.rhs());
+    Optional<Value> refRhs = typeConverter->materializeRef(cmpOp.getRhs());
 
     if (!refRhs.hasValue()) {
       return cmpOp.emitError() << "local ref not found";
@@ -2923,10 +2920,10 @@ class CompareRefNotZeroOpConversion
     }
 
     bool move = vmAnalysis.getValue().get().isLastValueUse(
-                    cmpOp.operand(), cmpOp.getOperation()) &&
+                    cmpOp.getOperand(), cmpOp.getOperation()) &&
                 false;
 
-    Optional<Value> ref = typeConverter->materializeRef(cmpOp.operand());
+    Optional<Value> ref = typeConverter->materializeRef(cmpOp.getOperand());
 
     if (!ref.hasValue()) {
       return cmpOp.emitError() << "local ref not found";
@@ -2958,7 +2955,7 @@ class ConstOpConversion : public OpConversionPattern<ConstOpTy> {
       ConstOpTy constOp, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
     rewriter.replaceOpWithNewOp<emitc::ConstantOp>(constOp, constOp.getType(),
-                                                   constOp.value());
+                                                   constOp.getValue());
     return success();
   }
 };
@@ -3051,8 +3048,8 @@ class ConstRefRodataOpConversion
         emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, "iree_vm_buffer_t")),
         /*index=*/
-        rewriter.getUI32IntegerAttr(static_cast<uint32_t>(
-            rodataOp.ordinal().getValue().getZExtValue())),
+        rewriter.getUI32IntegerAttr(
+            static_cast<uint32_t>(rodataOp.getOrdinal()->getZExtValue())),
         /*operand=*/rodataBuffersPtr);
 
     auto typeIdOp = rewriter.create<emitc::CallOp>(
@@ -3117,7 +3114,7 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
     // If we don't have ref block arguments, we can convert the operation
     // directly.
     if (adaptor.getOperands().size() == nonRefOperands.size()) {
-      rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, op.dest(),
+      rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, op.getDest(),
                                                       op.getOperands());
       return success();
     }
@@ -3168,7 +3165,7 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
             /*operands=*/
             ArrayRef<Value>{operandRef.getValue(), blockArgRef.getValue()});
       }
-      rewriter.create<mlir::cf::BranchOp>(loc, op.dest(), nonRefOperands);
+      rewriter.create<mlir::cf::BranchOp>(loc, op.getDest(), nonRefOperands);
     }
 
     rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, destDispatch);
@@ -3231,7 +3228,7 @@ class CondBranchOpConversion
     Type boolType = rewriter.getI1Type();
 
     auto condition = rewriter.create<IREE::VM::CmpNZI32Op>(
-        loc, rewriter.getI32Type(), op.condition());
+        loc, rewriter.getI32Type(), op.getCondition());
     auto conditionI1 = rewriter.create<emitc::CastOp>(
         /*location=*/loc,
         /*type=*/boolType,
@@ -3241,8 +3238,8 @@ class CondBranchOpConversion
     // directly.
     if (adaptor.getOperands().size() == nonRefOperands.size()) {
       rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
-          op, conditionI1.getResult(), op.trueDest(), op.getTrueOperands(),
-          op.falseDest(), op.getFalseOperands());
+          op, conditionI1.getResult(), op.getTrueDest(), op.getTrueOperands(),
+          op.getFalseDest(), op.getFalseOperands());
       return success();
     }
 
@@ -3293,7 +3290,7 @@ class CondBranchOpConversion
             ArrayRef<Value>{operandRef.getValue(), blockArgRef.getValue()});
       }
       // Let the BranchOpConversion handle ref block arguments.
-      rewriter.create<IREE::VM::BranchOp>(loc, op.trueDest(),
+      rewriter.create<IREE::VM::BranchOp>(loc, op.getTrueDest(),
                                           op.getTrueOperands());
     }
 
@@ -3335,7 +3332,7 @@ class CondBranchOpConversion
             ArrayRef<Value>{operandRef.getValue(), blockArgRef.getValue()});
       }
       // Let the BranchOpConversion handle ref block arguments.
-      rewriter.create<IREE::VM::BranchOp>(loc, op.falseDest(),
+      rewriter.create<IREE::VM::BranchOp>(loc, op.getFalseDest(),
                                           op.getFalseOperands());
     }
 
@@ -3472,7 +3469,7 @@ class ImportResolvedOpConversion
 
     IREE::VM::ImportOp importOp =
         lookupSymbolRef<IREE::VM::ImportOp>(op.getOperation(), "import");
-    int importOrdinal = importOp.ordinal().getValue().getZExtValue();
+    int importOrdinal = importOp.getOrdinal()->getZExtValue();
 
     auto funcOp = op->getParentOfType<mlir::func::FuncOp>();
     BlockArgument stateArg = funcOp.getArgument(2);
@@ -3577,7 +3574,7 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
       releaseRefs(rewriter, loc, funcOp, *typeConverter);
 
       std::string message = std::string("\"") +
-                            op.message().getValueOr("").str() +
+                            op.getMessage().getValueOr("").str() +
                             std::string("\"");
 
       auto messageOp = rewriter.create<emitc::CallOp>(
@@ -3630,7 +3627,7 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
     auto condition = rewriter.create<emitc::CastOp>(
         /*location=*/loc,
         /*type=*/boolType,
-        /*operand=*/op.status());
+        /*operand=*/op.getStatus());
 
     rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
         op, condition.getResult(), failureBlock, passthroughBlock);
@@ -3681,7 +3678,7 @@ class GlobalLoadOpConversion : public OpConversionPattern<LoadOpTy> {
         rewriter.getArrayAttr(
             {rewriter.getIndexAttr(0),
              rewriter.getUI32IntegerAttr(static_cast<uint32_t>(
-                 globalOp.ordinal().getValue().getZExtValue()))}),
+                 globalOp.getOrdinal()->getZExtValue()))}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{rwDataPtr});
 
@@ -3724,7 +3721,7 @@ class GlobalLoadStoreRefOpConversion
       return op->emitError() << "Unable to find GlobalOp";
     }
 
-    auto globalOrdinal = globalOp.ordinal().getValue().getZExtValue();
+    auto globalOrdinal = globalOp.getOrdinal()->getZExtValue();
 
     auto funcOp = op->getParentOfType<mlir::func::FuncOp>();
     IREE::VM::EmitCTypeConverter *typeConverter =
@@ -3842,12 +3839,12 @@ class GlobalStoreOpConversion : public OpConversionPattern<StoreOpTy> {
         /*args=*/
         rewriter.getArrayAttr(
             {rewriter.getIndexAttr(0),
-             rewriter.getUI32IntegerAttr(static_cast<uint32_t>(
-                 globalOp.ordinal().getValue().getZExtValue())),
+             rewriter.getUI32IntegerAttr(
+                 static_cast<uint32_t>(globalOp.getOrdinal()->getZExtValue())),
              rewriter.getIndexAttr(1)}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{rwDataPtr, storeOp.value()});
+        ArrayRef<Value>{rwDataPtr, storeOp.getValue()});
 
     return success();
   }
@@ -4122,7 +4119,7 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
                         rewriter.getIndexAttr(2)}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{listDerefOp.getResult(0), getOp.index(),
+        ArrayRef<Value>{listDerefOp.getResult(0), getOp.getIndex(),
                         valuePtrOp.getResult()},
         /*typeConverter=*/*typeConverter);
 
@@ -4183,7 +4180,7 @@ class ListGetRefOpConversion
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{listDerefOp.getResult(0), getOp.index(),
+        ArrayRef<Value>{listDerefOp.getResult(0), getOp.getIndex(),
                         ref.getValue()},
         /*typeConverter=*/*typeConverter);
 
@@ -4325,7 +4322,7 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
         /*callee=*/StringAttr::get(ctx, valueConstructor.getValue()),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{setOp.value()});
+        /*operands=*/ArrayRef<Value>{setOp.getValue()});
 
     auto valuePtrOp = rewriter.create<emitc::ApplyOp>(
         /*location=*/loc,
@@ -4361,7 +4358,7 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{listDerefOp.getResult(0), setOp.index(),
+        ArrayRef<Value>{listDerefOp.getResult(0), setOp.getIndex(),
                         valuePtrOp.getResult()},
         /*typeConverter=*/*typeConverter);
 
@@ -4409,7 +4406,7 @@ class ListSetRefOpConversion
       return setOp.emitError() << "parent func op not found in cache.";
     }
     bool move = vmAnalysis.getValue().get().isLastValueUse(
-                    setOp.value(), setOp.getOperation()) &&
+                    setOp.getValue(), setOp.getOperation()) &&
                 false;
 
     StringRef callee =
@@ -4422,8 +4419,8 @@ class ListSetRefOpConversion
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{listDerefOp.getResult(0), setOp.index(),
-                        adaptor.getOperands()[2]},
+        ArrayRef<Value>{listDerefOp.getResult(0), setOp.getIndex(),
+                        adaptor.getValue()},
         /*typeConverter=*/*typeConverter);
 
     rewriter.eraseOp(setOp);
