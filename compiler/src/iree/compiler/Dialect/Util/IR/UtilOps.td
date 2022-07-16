@@ -793,17 +793,17 @@ def Util_BufferSliceOp : Util_PureOp<"buffer.slice", [
     Util_BufferType:$source,
     Util_Size:$source_size,
     Util_Offset:$source_offset,
-    Util_Size:$result_size
+    Util_Size:$result_size,
+    OptionalAttr<IndexAttr>:$alignment
   );
   let results = (outs
     Util_BufferType:$result
   );
 
   let assemblyFormat = [{
-    $source `[` $source_offset `]` `:`
+    $source `[` $source_offset `]` attr-dict `:`
     type($source) `` `{` $source_size `}` `->`
     type($result) `` `{` $result_size `}`
-    attr-dict-with-keyword
   }];
 
   let extraClassDeclaration = [{
