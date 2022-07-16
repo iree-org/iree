@@ -1559,3 +1559,39 @@ hal.executable private @matmul_interchange {
 //  CHECK-DAG:   %[[D1:.+]] = hal.interface.constant.load[1] : index
 //      CHECK:   scf.for %{{.+}} = %{{.+}} to %[[D1]] step %{{.+}} {
 //      CHECK:     scf.for %{{.+}} = %{{.+}} to %[[D0]] step %{{.+}} {
+
+// -----
+
+hal.executable private @no_compute {
+  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm", "embedded-elf-x86_64", {}> {
+    hal.executable.export public @no_compute ordinal(0) layout(#hal.executable.layout<push_constants = 5, sets = [<0, bindings = [<0, storage_buffer>, <1, storage_buffer>]>]>) attributes {translation_info = #iree_codegen.translation_info<CPUDefault>} {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @no_compute() {
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.constant.load[0] : i32
+        %1 = hal.interface.constant.load[1] : i32
+        %2 = hal.interface.constant.load[2] : i32
+        %3 = hal.interface.constant.load[3] : i32
+        %4 = hal.interface.constant.load[4] : i32
+        %5 = arith.index_cast %0 : i32 to index
+        %6 = arith.index_cast %1 : i32 to index
+        %7 = arith.index_cast %2 : i32 to index
+        %8 = arith.index_cast %3 : i32 to index
+        %9 = arith.index_cast %4 : i32 to index
+        %10 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<?x?x?xf32>{%5, %6, %7}
+        memref.assume_alignment %10, 64 : memref<?x?x?xf32>
+        %11 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<1x?x?xf32>{%8, %9}
+        memref.assume_alignment %11, 64 : memref<1x?x?xf32>
+        return
+      }
+    }
+  }
+}
+//      CHECK: hal.executable.export public @no_compute
+// CHECK-NEXT: ^bb0
+// CHECK-NEXT:   %[[C1:.+]] = arith.constant 1 : index
+// CHECK-NEXT:   hal.return %[[C1]], %[[C1]], %[[C1]]
