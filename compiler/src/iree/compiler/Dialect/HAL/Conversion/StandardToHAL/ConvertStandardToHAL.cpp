@@ -22,19 +22,12 @@ void populateStandardShapeToHALPatterns(MLIRContext *context,
                                         RewritePatternSet &patterns,
                                         TypeConverter &converter);
 
-void populateStandardStructuralToHALPatterns(MLIRContext *context,
-                                             ConversionTarget &conversionTarget,
-                                             RewritePatternSet &patterns,
-                                             TypeConverter &converter);
-
 void populateStandardToHALPatterns(MLIRContext *context,
                                    ConversionTarget &conversionTarget,
                                    TypeConverter &typeConverter,
                                    RewritePatternSet &patterns) {
   populateStandardShapeToHALPatterns(context, conversionTarget, patterns,
                                      typeConverter);
-  populateStandardStructuralToHALPatterns(context, conversionTarget, patterns,
-                                          typeConverter);
 }
 
 }  // namespace iree_compiler

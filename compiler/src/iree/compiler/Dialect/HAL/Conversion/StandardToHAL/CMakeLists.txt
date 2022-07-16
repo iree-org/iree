@@ -18,15 +18,12 @@ iree_cc_library(
   SRCS
     "ConvertShapeOps.cpp"
     "ConvertStandardToHAL.cpp"
-    "ConvertStructuralOps.cpp"
   DEPS
     LLVMSupport
     MLIRArithmeticDialect
-    MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR
     MLIRPass
-    MLIRSCFDialect
     MLIRShapeDialect
     MLIRTensorDialect
     MLIRTransforms

@@ -77,8 +77,6 @@ class ConvertToHALPass
 
     populateUtilToHALPatterns(context, conversionTarget, typeConverter,
                               patterns);
-    populateUtilConversionPatterns(context, conversionTarget, typeConverter,
-                                   patterns);
     populateStandardToHALPatterns(context, conversionTarget, typeConverter,
                                   patterns);
     populateStreamToHALPatterns(context, conversionTarget, typeConverter,

@@ -70,9 +70,9 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     conversionTarget.addLegalDialect<memref::MemRefDialect>();
     conversionTarget.addLegalOp<mlir::UnrealizedConversionCastOp>();
 
-    RewritePatternSet conversionPatterns(&getContext());
-    populateHALToVMVXPatterns(context, conversionPatterns, typeConverter);
-    populateStandardToVMVXPatterns(context, conversionPatterns, typeConverter);
+    RewritePatternSet patterns(&getContext());
+    populateHALToVMVXPatterns(context, patterns, typeConverter);
+    populateStandardToVMVXPatterns(context, patterns, typeConverter);
 
     // Use the default 64-bit lowering for TOSA's ApplyScale operator:
     //   This lowering widens integer types to 64-bit an performs the non-fused
@@ -82,10 +82,10 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     //
     // TODO(suderman): remove the TOSA layering violation and lower to standard/
     // math ops instead.
-    tosa::populateTosaRescaleToArithConversionPatterns(&conversionPatterns);
+    tosa::populateTosaRescaleToArithConversionPatterns(&patterns);
 
     if (failed(applyPartialConversion(getOperation(), conversionTarget,
-                                      std::move(conversionPatterns)))) {
+                                      std::move(patterns)))) {
       getOperation().emitError() << "conversion to the VMVX dialect failed";
       return signalPassFailure();
     }
