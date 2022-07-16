@@ -182,6 +182,7 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
     if (ifOps.empty()) {
       SmallVector<LoopTilingAndDistributionInfo> loopInfos;
       if (failed(getComputeOps(funcOp, computeOps, loopInfos))) {
+        funcOp.emitOpError("does not contain compute ops");
         return signalPassFailure();
       }
       while (computeOps.size() > 1) computeOps.erase(computeOps.begin());
@@ -221,7 +222,10 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       FailureOr<linalg::TileLoopNest> loopNest =
           linalg::tileConsumerAndFuseProducers(builder, consumerOp, tileSizes,
                                                identityLoopOrder, llvm::None);
-      if (failed(loopNest)) return signalPassFailure();
+      if (failed(loopNest)) {
+        consumerOp.emitOpError("failed tiling and fusing producers");
+        return signalPassFailure();
+      }
 
       consumerOp->replaceAllUsesWith(loopNest->getRootOpReplacementResults());
 
@@ -295,6 +299,7 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       populateTilingReductionPatterns(tilingPatterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp,
                                               std::move(tilingPatterns)))) {
+        funcOp.emitError("failed tiling reduction dimensions");
         return signalPassFailure();
       }
 
