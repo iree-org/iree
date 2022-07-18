@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
@@ -26,6 +27,32 @@ namespace VM {
 
 using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
 
+//===----------------------------------------------------------------------===//
+// Utilities
+//===----------------------------------------------------------------------===//
+
+static void addCleanupPatterns(OpPassManager &passManager) {
+  // TODO(benvanik): run in a fixed-point iteration pipeline.
+
+  // Standard MLIR cleanup.
+  passManager.addPass(mlir::createCanonicalizerPass());
+  passManager.addPass(mlir::createCSEPass());
+
+  // Simplify util.global accesses; this can help with data flow tracking as
+  // redundant store-loads are removed.
+  FunctionLikeNest(passManager)
+      .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
+
+  // Cleanup and canonicalization of util.global (and other util ops).
+  passManager.addPass(IREE::Util::createApplyPatternsPass());
+  passManager.addPass(IREE::Util::createFoldGlobalsPass());
+  passManager.addPass(IREE::Util::createFuseGlobalsPass());
+}
+
+//===----------------------------------------------------------------------===//
+// -iree-vm-transformation-pipeline
+//===----------------------------------------------------------------------===//
+
 void buildVMTransformPassPipeline(OpPassManager &passManager,
                                   TargetOptions targetOptions) {
   passManager.addNestedPass<mlir::func::FuncOp>(createLoopCoalescingPass());
@@ -35,9 +62,13 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
       .addPass(createLoopInvariantCodeMotionPass)
       .addPass(createConvertSCFToCFPass);
 
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
+  // Propagate buffer subranges throughout the program - this should remove any
+  // remaining subspans and give us a smaller surface area during conversion.
+  passManager.addPass(IREE::Util::createPropagateSubrangesPass());
+  addCleanupPatterns(passManager);
 
+  // Convert std/util/etc -> VM, along with any other dialects implementing the
+  // VM conversion dialect interface.
   passManager.addPass(createConversionPass(targetOptions));
 
   passManager.addNestedPass<IREE::VM::ModuleOp>(createHoistInlinedRodataPass());
