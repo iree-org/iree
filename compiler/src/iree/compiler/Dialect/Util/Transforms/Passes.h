@@ -34,7 +34,8 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF64ToF32Pass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteF16ToF32Pass();
 
 // Test passes.
-std::unique_ptr<OperationPass<void>> createTestFloatRangeAnalysis();
+std::unique_ptr<OperationPass<void>> createTestConversionPass();
+std::unique_ptr<OperationPass<void>> createTestFloatRangeAnalysisPass();
 
 // Register all Passes
 // TODO: Switch this directory to declarative registration.
@@ -55,7 +56,8 @@ inline void registerTransformPasses() {
   createDemoteF64ToF32Pass();
   createPromoteF16ToF32Pass();
 
-  createTestFloatRangeAnalysis();
+  createTestConversionPass();
+  createTestFloatRangeAnalysisPass();
 }
 
 }  // namespace Util

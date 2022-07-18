@@ -29,14 +29,19 @@ iree_cc_library(
     "PropagateSubrange.cpp"
     "SimplifyGlobalAccesses.cpp"
     "StripDebugOps.cpp"
+    "TestConversion.cpp"
     "TestFloatRangeAnalysis.cpp"
   DEPS
     LLVMSupport
+    MLIRAffineDialect
     MLIRAnalysis
     MLIRArithmeticDialect
+    MLIRArithmeticTransforms
     MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR
+    MLIRMathDialect
+    MLIRMemRefDialect
     MLIRPass
     MLIRSupport
     MLIRTransforms
@@ -44,6 +49,8 @@ iree_cc_library(
     iree::compiler::Dialect::Util::Analysis::Attributes
     iree::compiler::Dialect::Util::Analysis::Constant
     iree::compiler::Dialect::Util::Analysis::DFX
+    iree::compiler::Dialect::Util::Conversion
+    iree::compiler::Dialect::Util::Conversion::MemRefToUtil
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
   PUBLIC
