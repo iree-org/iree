@@ -9,6 +9,8 @@
 
 namespace mlir {
 class Operation;
+class DominanceInfo;
+class FunctionOpInterface;
 
 namespace iree_compiler {
 namespace IREE {
@@ -20,6 +22,9 @@ namespace Flow {
 /// Note: This function returns `false` for ops that should be tiled and fused
 /// into a dispatch region.
 bool isClonableIntoDispatchOp(Operation *op);
+
+unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
+                                DominanceInfo const &dominanceInfo);
 
 }  // namespace Flow
 }  // namespace IREE

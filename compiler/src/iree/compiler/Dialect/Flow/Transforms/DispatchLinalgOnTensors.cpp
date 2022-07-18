@@ -978,8 +978,8 @@ static void fuseRootsWithConsumers(MLIRContext *context,
 /// be marked to fuse with multiple root operations (i.e. replicated). For now a
 /// very simple heuristic is used below, but the mechanism should be general
 /// enough to capture any heuristic.
-static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
-                                       DominanceInfo const &dominanceInfo) {
+unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
+                                DominanceInfo const &dominanceInfo) {
   unsigned numRootOps = 0;
   MLIRContext *context = funcOp->getContext();
   OpBuilder builder(context);

@@ -9,6 +9,7 @@
 
 include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
+include "mlir/Dialect/Transform/IR/TransformEffects.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
@@ -48,5 +49,24 @@ def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.foreac
         ::mlir::transform::TransformState &state);
   }];
 }
- 
+
+def DecideFusionGroupsOp : Op<Transform_Dialect, "iree.decide_fusion_groups",
+    [MemoryEffectsOpInterface,
+     TransformOpInterface]> {
+  let description = [{
+    Decide fusion groups and annotate them in the IR as attributes.
+  }];
+
+  let arguments = (ins Arg<PDL_Operation, "", [TransformMappingRead]>:$target);
+  let results = (outs);
+
+  let assemblyFormat = "$target attr-dict";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure apply(
+        ::mlir::transform::TransformResults &transformResults, 
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 #endif // IREE_COMPILER_DIALECT_FLOW_TRANSFORMEXTENSIONS_FLOWEXTENSIONS

@@ -13,6 +13,8 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BlockAndValueMapping.h"
+#include "mlir/IR/Dominance.h"
+#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/Transforms/RegionUtils.h"
 
 using namespace mlir;
@@ -422,6 +424,30 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
   rewriter.replaceOp(foreachThreadOp, dispatchOp.getResults());
 
   return dispatchOp;
+}
+
+//===---------------------------------------------------------------------===//
+// DecideFusionGroupsOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform_dialect::DecideFusionGroupsOp::apply(
+    transform::TransformResults &transformResults,
+    transform::TransformState &state) {
+  ArrayRef<Operation *> payloadOps = state.getPayloadOps(getTarget());
+  if (payloadOps.size() != 1)
+    return DiagnosedSilenceableFailure(
+        this->emitOpError("requires exactly one target handle"));
+
+  auto funcOp = dyn_cast<FunctionOpInterface>(payloadOps.front());
+  if (!funcOp)
+    return DiagnosedSilenceableFailure(
+        this->emitOpError("requires a FunctionOpInterface"));
+
+  DominanceInfo domInfo;
+  (void)mlir::iree_compiler::IREE::Flow::decideFusableLinalgOps(funcOp,
+                                                                domInfo);
+
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
