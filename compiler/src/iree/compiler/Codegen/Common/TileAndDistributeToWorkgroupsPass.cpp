@@ -66,6 +66,19 @@ static FailureOr<unsigned> getNumWorkloadValues(
   return tilingRoot.getNumLoops();
 }
 
+/// Fallback lowering of `flow.dispatch.default_workgroup_count` to {1, 1, 1}.
+static LogicalResult lowerToUnitWorkgroupCount(
+    IREE::Flow::DispatchDefaultWorkgroupCountOp workgroupCountOp) {
+  OpBuilder builder(workgroupCountOp.getContext());
+  builder.setInsertionPoint(workgroupCountOp);
+  Value one =
+      builder.create<arith::ConstantIndexOp>(workgroupCountOp->getLoc(), 1);
+  SmallVector<Value> replacements(workgroupCountOp->getNumResults(), one);
+  workgroupCountOp->replaceAllUsesWith(replacements);
+  workgroupCountOp.erase();
+  return success();
+}
+
 /// Method to lower the `flow.dispatch.default_workgroup_count` op into the
 /// actual computation that returns the number of workgroups.
 static LogicalResult lowerDispatchDefaultWorkgroupCountOp(
@@ -78,17 +91,13 @@ static LogicalResult lowerDispatchDefaultWorkgroupCountOp(
   // Find the lowering configuration of the root operation.
   FailureOr<Operation *> rootOp = getRootOp(computeOps);
   if (failed(rootOp)) {
-    return workgroupCountOp.emitOpError(
-        "unable to find root op for defining workgroup count "
-        "region for export op");
+    return lowerToUnitWorkgroupCount(workgroupCountOp);
   }
 
   auto partitionableLoopInterface =
       dyn_cast<PartitionableLoopsInterface>(*rootOp);
   if (!partitionableLoopInterface) {
-    return rootOp.getValue()->emitOpError(
-        "expected root op to implement the partitionable loop interface to "
-        "help define the workgroup count");
+    return lowerToUnitWorkgroupCount(workgroupCountOp);
   }
 
   SmallVector<unsigned> partitionableLoops =
@@ -294,10 +303,6 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       // The entry point already has distribution to workgroups. Do nothing.
       continue;
     }
-    if (computeOps.empty()) {
-      // Ignore other operations.
-      continue;
-    }
 
     // Find the `flow.dispatch.default_workgroup_count` operation in the
     // `workgroup_count` region of `hal.executable.export`. Lower this to the
@@ -331,6 +336,9 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     if (failed(updateTranslationInfoAttr(exportOp, workloadPerWorkgroup))) {
       return signalPassFailure();
     }
+
+    // If there are no compute ops, nothing more to do.
+    if (computeOps.empty()) continue;
 
     // Add a marker to the last operation in the list.
     auto marker = StringAttr::get(context, "__workgroup_tiling__");

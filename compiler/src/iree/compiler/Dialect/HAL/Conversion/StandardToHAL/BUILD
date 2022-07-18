@@ -17,7 +17,6 @@ iree_compiler_cc_library(
     srcs = [
         "ConvertShapeOps.cpp",
         "ConvertStandardToHAL.cpp",
-        "ConvertStructuralOps.cpp",
     ],
     hdrs = [
         "ConvertStandardToHAL.h",
@@ -30,11 +29,9 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/Util/Conversion",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithmeticDialect",
-        "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:ShapeDialect",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",

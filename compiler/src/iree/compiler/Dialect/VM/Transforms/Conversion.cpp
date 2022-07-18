@@ -69,16 +69,16 @@ class ConversionPass
   explicit ConversionPass(TargetOptions targetOptions)
       : targetOptions_(targetOptions) {}
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Util::UtilDialect, IREE::VM::VMDialect,
-                    func::FuncDialect, mlir::arith::ArithmeticDialect,
-                    math::MathDialect, AffineDialect, memref::MemRefDialect>();
-  }
-
   StringRef getArgument() const override { return "iree-vm-conversion"; }
 
   StringRef getDescription() const override {
     return "Converts from various dialects to the VM dialect";
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::Util::UtilDialect, IREE::VM::VMDialect,
+                    func::FuncDialect, mlir::arith::ArithmeticDialect,
+                    math::MathDialect, AffineDialect, memref::MemRefDialect>();
   }
 
   void runOnOperation() override {
@@ -116,17 +116,17 @@ class ConversionPass
       }
     }
 
-    RewritePatternSet conversionPatterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     populateUtilConversionPatterns(context, conversionTarget, typeConverter,
-                                   conversionPatterns);
+                                   patterns);
     populateUtilToVMPatterns(context, conversionTarget, typeConverter,
-                             conversionPatterns);
-    arith::populateArithmeticExpandOpsPatterns(conversionPatterns);
-    populateStandardToVMPatterns(context, typeConverter, conversionPatterns);
-    populateMathToVMPatterns(context, typeConverter, conversionPatterns);
+                             patterns);
+    arith::populateArithmeticExpandOpsPatterns(patterns);
+    populateStandardToVMPatterns(context, typeConverter, patterns);
+    populateMathToVMPatterns(context, typeConverter, patterns);
     populateMemRefToVMPatterns(context, conversionTarget, typeConverter,
-                               conversionPatterns);
-    populateAffineToStdConversionPatterns(conversionPatterns);
+                               patterns);
+    populateAffineToStdConversionPatterns(patterns);
 
     conversionTarget
         .addIllegalDialect<func::FuncDialect, mlir::arith::ArithmeticDialect>();
@@ -138,11 +138,11 @@ class ConversionPass
     SymbolTable importSymbols(innerModuleOp);
     for (auto *dialectInterface : usedDialects) {
       dialectInterface->populateVMConversionPatterns(
-          importSymbols, conversionPatterns, conversionTarget, typeConverter);
+          importSymbols, patterns, conversionTarget, typeConverter);
     }
 
     if (failed(applyPartialConversion(outerModuleOp, conversionTarget,
-                                      std::move(conversionPatterns)))) {
+                                      std::move(patterns)))) {
       outerModuleOp.emitError() << "conversion to vm.module failed";
       return signalPassFailure();
     }

@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "alignment_folding.mlir"
     "alignment_ops.mlir"
     "attributes.mlir"
+    "buffer_folding.mlir"
     "buffer_ops.mlir"
     "global_folding.mlir"
     "global_ops.mlir"

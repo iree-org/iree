@@ -136,8 +136,6 @@ std::unique_ptr<InterfacePass<CallableOpInterface>> createPackConstantsPass();
 std::unique_ptr<InterfacePass<CallableOpInterface>> createPackAllocationsPass();
 std::unique_ptr<InterfacePass<CallableOpInterface>> createLayoutSlicesPass();
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateSubviewsPass();
-
 //===----------------------------------------------------------------------===//
 // Stream memoization
 //===----------------------------------------------------------------------===//

@@ -32,7 +32,6 @@ iree_compiler_cc_library(
         "PackDispatchOperands.cpp",
         "PassDetail.h",
         "Passes.cpp",
-        "PropagateSubviews.cpp",
         "PropagateTimepoints.cpp",
         "RefineUsage.cpp",
         "ScheduleAllocation.cpp",

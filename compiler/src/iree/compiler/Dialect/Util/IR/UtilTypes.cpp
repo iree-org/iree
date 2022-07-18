@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/BitVector.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -29,7 +30,29 @@ namespace IREE {
 namespace Util {
 
 //===----------------------------------------------------------------------===//
-// ListType
+// !util.buffer
+//===----------------------------------------------------------------------===//
+
+bool BufferType::isAccessStorageCompatible(Type accessType) const {
+  return accessType.isa<IREE::Util::BufferType>();
+}
+
+Value BufferType::inferSizeFromValue(Location loc, Value value,
+                                     OpBuilder &builder) const {
+  return builder.createOrFold<IREE::Util::BufferSizeOp>(
+      loc, builder.getIndexType(), value);
+}
+
+Value BufferType::createSubrangeOp(Location loc, Value resource,
+                                   Value resourceSize, Value subrangeOffset,
+                                   Value subrangeLength,
+                                   OpBuilder &builder) const {
+  return builder.create<IREE::Util::BufferSubspanOp>(
+      loc, resource, resourceSize, subrangeOffset, subrangeLength);
+}
+
+//===----------------------------------------------------------------------===//
+// !util.list<T>
 //===----------------------------------------------------------------------===//
 
 static LogicalResult parseListElementType(AsmParser &parser,
@@ -77,7 +100,7 @@ LogicalResult ListType::verify(function_ref<InFlightDiagnostic()> emitError,
 }
 
 //===----------------------------------------------------------------------===//
-// PtrType
+// !util.ptr<T>
 //===----------------------------------------------------------------------===//
 
 // static

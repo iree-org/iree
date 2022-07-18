@@ -1,4 +1,6 @@
-// RUN: iree-opt --split-input-file --iree-stream-propagate-subviews %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-util-propagate-subranges %s | FileCheck %s
+
+// NOTE: this only tests how the common pass handles !stream.resource types.
 
 // Tests that resource global loads also load all the subview params.
 //

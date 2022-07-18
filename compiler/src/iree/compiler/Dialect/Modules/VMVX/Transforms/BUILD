@@ -59,6 +59,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/Modules/VMVX/Conversion/StandardToVMVX",
         "//compiler/src/iree/compiler/Dialect/Modules/VMVX/IR",
         "//compiler/src/iree/compiler/Dialect/Modules/VMVX/IR:VMVXDialect",
+        "//compiler/src/iree/compiler/Dialect/Util/Conversion/MemRefToUtil",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/Util/Transforms",
         "//compiler/src/iree/compiler/Dialect/VM/IR",
