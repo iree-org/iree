@@ -4432,8 +4432,7 @@ class ListSetRefOpConversion
 
 void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                IREE::VM::EmitCTypeConverter &typeConverter,
-                               RewritePatternSet &patterns,
-                               SmallVector<std::string> &importShims) {
+                               RewritePatternSet &patterns) {
   auto context = patterns.getContext();
   populateUtilConversionPatterns(context, conversionTarget, typeConverter,
                                  patterns);
@@ -4447,7 +4446,6 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
   patterns.add<FailOpConversion>(typeConverter, context);
   patterns.add<FuncOpConversion>(typeConverter, context);
   patterns.add<ExportOpConversion>(typeConverter, context);
-  patterns.add<ImportOpConversion>(typeConverter, context, importShims);
   patterns.add<ReturnOpConversion>(typeConverter, context);
   patterns.add<ImportResolvedOpConversion>(typeConverter, context);
 
@@ -4836,8 +4834,39 @@ class ConvertVMToEmitCPass
     }
 
     SmallVector<std::string> importShims;
+
+    // The conversion of `call/call.variadic` ops on imported functions expects
+    // import ops to be rewritten to compiler generated shim functions. To
+    // ensure this we only rewrite `import` ops first.
+    auto rewriteImports = [&module, &importShims](MLIRContext &ctx) {
+      ConversionTarget target(ctx);
+      EmitCTypeConverter typeConverter;
+      RewritePatternSet patterns(&ctx);
+
+      target.addLegalDialect<mlir::func::FuncDialect, mlir::emitc::EmitCDialect,
+                             IREE::VM::VMDialect, IREE::Util::UtilDialect>();
+
+      // The import ops are currently needed to build the import array for the
+      // module descriptor. There is no way to generate this directly with the
+      // EmitC dialect at the moment.
+      target.addDynamicallyLegalOp<IREE::VM::ImportOp>(
+          [&importShims](IREE::VM::ImportOp op) {
+            auto key = makeImportCallingConventionString(op);
+            assert(key.hasValue());
+            return llvm::find(importShims, key) != std::end(importShims);
+          });
+
+      patterns.add<ImportOpConversion>(typeConverter, &ctx, importShims);
+
+      return applyFullConversion(module, target, std::move(patterns));
+    };
+
+    if (failed(rewriteImports(getContext()))) {
+      return signalPassFailure();
+    }
+
     RewritePatternSet patterns(&getContext());
-    populateVMToEmitCPatterns(target, typeConverter, patterns, importShims);
+    populateVMToEmitCPatterns(target, typeConverter, patterns);
 
     target.addLegalDialect<
         emitc::EmitCDialect, mlir::BuiltinDialect, mlir::cf::ControlFlowDialect,
@@ -4852,16 +4881,7 @@ class ConvertVMToEmitCPass
     // Structural ops
     target.addLegalOp<IREE::VM::ModuleOp>();
     target.addLegalOp<IREE::VM::ModuleTerminatorOp>();
-
-    // The import ops are currently needed to build the import array for the
-    // module descriptor. There is no way to generate this directly with the
-    // EmitC dialect at the moment.
-    target.addDynamicallyLegalOp<IREE::VM::ImportOp>(
-        [&importShims](IREE::VM::ImportOp op) {
-          auto key = makeImportCallingConventionString(op);
-          assert(key.hasValue());
-          return llvm::find(importShims, key) != std::end(importShims);
-        });
+    target.addLegalOp<IREE::VM::ImportOp>();
 
     // This op is needed in the printer to emit an array holding the data.
     target.addLegalOp<IREE::VM::RodataOp>();
