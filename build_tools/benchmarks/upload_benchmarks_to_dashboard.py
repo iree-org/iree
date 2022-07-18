@@ -155,7 +155,7 @@ def compose_build_payload(project_id: str,
 def compose_sample_payload(project_id: str,
                            series_id: str,
                            build_id: int,
-                           sample_value: int,
+                           sample_value: float,
                            override: bool = False) -> Dict[str, Any]:
   """Composes the payload dictionary for a sample."""
   return {
@@ -247,7 +247,7 @@ def add_new_iree_build(build_id: int,
 
 def add_new_sample(series_id: str,
                    build_id: int,
-                   sample_value: int,
+                   sample_value: float,
                    override: bool = False,
                    dry_run: bool = False,
                    verbose: bool = False):

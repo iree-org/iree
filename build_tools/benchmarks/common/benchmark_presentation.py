@@ -32,11 +32,11 @@ TOTAL_DISPATCH_SIZE_SERIES_SUFFIX = "compilation:module:component-size:total-dis
 @dataclass
 class AggregateBenchmarkLatency:
   """An object for describing aggregate latency numbers for a benchmark."""
-  mean_time: int
-  median_time: int
-  stddev_time: int
+  mean_time: float
+  median_time: float
+  stddev_time: float
   # The average latency time for the base commit to compare against.
-  base_mean_time: Optional[int] = None
+  base_mean_time: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -329,7 +329,7 @@ def _categorize_on_single_metric(
   return (regressed_map, improved_map, similar_map, raw_map)
 
 
-def _get_compare_text(current: int, base: Optional[int]) -> str:
+def _get_compare_text(current: float, base: Optional[float]) -> str:
   """Generates the text of comparison between current and base value. Returns
     the current value if the base value is None.
   """
@@ -339,7 +339,7 @@ def _get_compare_text(current: int, base: Optional[int]) -> str:
 
   ratio = abs(current - base) / base
   direction = "↑" if current > base else ("↓" if current < base else "")
-  return f"{current} (vs. {base}, {ratio:.2%}{direction})"
+  return f"{current:.2f} (vs. {base:.2f}, {ratio:.2%}{direction})"
 
 
 def _sort_benchmarks_and_get_table(benchmarks: Dict[str,
@@ -359,8 +359,9 @@ def _sort_benchmarks_and_get_table(benchmarks: Dict[str,
     ratio = abs(current - base) / base
     str_mean = _get_compare_text(current, base)
     clickable_name = _make_series_link(name)
-    sorted_rows.append((ratio, (clickable_name, str_mean, benchmark.median_time,
-                                benchmark.stddev_time)))
+    sorted_rows.append(
+        (ratio, (clickable_name, str_mean, f"{benchmark.median_time:.2f}",
+                 f"{benchmark.stddev_time:.2f}")))
   sorted_rows.sort(key=lambda row: row[0], reverse=True)
 
   return _add_header_and_get_markdown_table(
@@ -399,8 +400,9 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
     tables.append(_sort_benchmarks_and_get_table(similar, size_cut))
   if raw:
     tables.append(md.header("Raw Latencies", 3))
-    raw_list = [(_make_series_link(k), v.mean_time, v.median_time,
-                 v.stddev_time) for k, v in raw.items()]
+    raw_list = [(_make_series_link(k), f"{v.mean_time:.2f}",
+                 f"{v.median_time:.2f}", f"{v.stddev_time:.2f}")
+                for k, v in raw.items()]
     tables.append(
         _add_header_and_get_markdown_table(BENCHMARK_RESULTS_HEADERS,
                                            raw_list,

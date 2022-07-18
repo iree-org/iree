@@ -430,7 +430,7 @@ class BenchmarkResults(object):
       raise ValueError("Inconsistent pull request commit")
     self.benchmarks.extend(other.benchmarks)
 
-  def get_aggregate_time(self, benchmark_index: int, kind: str) -> int:
+  def get_aggregate_time(self, benchmark_index: int, kind: str) -> float:
     """Returns the Google Benchmark aggreate time for the given kind.
 
       Args:
@@ -443,7 +443,7 @@ class BenchmarkResults(object):
       if bench_case["name"].endswith(f"real_time_{kind}"):
         if bench_case["time_unit"] != "ms":
           raise ValueError(f"Expected ms as time unit")
-        time = int(round(bench_case["real_time"]))
+        time = bench_case["real_time"]
         break
     if time is None:
       raise ValueError(f"Cannot found real_time_{kind} in benchmark results")
