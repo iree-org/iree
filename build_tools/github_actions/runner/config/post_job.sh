@@ -8,4 +8,6 @@
 
 set -euo pipefail
 
-/home/runner/cleanup_workdir.sh
+SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
+
+"${SCRIPT_DIR}/cleanup_workdir.sh"

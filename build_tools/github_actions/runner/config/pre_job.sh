@@ -14,5 +14,5 @@ source "${SCRIPT_DIR}/functions.sh"
 
 RUNNER_GROUP="$(get_attribute github-runner-group)"
 
-"/home/runner/validate_trigger.${RUNNER_GROUP}.sh"
-/home/runner/chown_workdir.sh
+"${SCRIPT_DIR}/validate_trigger.${RUNNER_GROUP}.sh"
+"${SCRIPT_DIR}/chown_workdir.sh"
