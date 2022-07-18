@@ -113,6 +113,23 @@ tileInterfaceOpImpl(OpBuilder &builder, TiledOpInterface tilableOp,
       return static_cast<LogicalResult>(
           tilableOp.emitOpError("failed to get tiled implementation"));
     }
+    SmallVector<Value> results;
+    for (auto result : llvm::enumerate(ret.op->getResults())) {
+      SmallVector<OpFoldResult> resultOffsets, resultSizes;
+      if (failed(tilableOp.getResultTilePosition(builder, result.index(),
+                                                 offsets, tileSizes,
+                                                 resultOffsets, resultSizes))) {
+        SmallVector<OpFoldResult> resultStrides(resultOffsets.size(),
+                                                builder.getIndexAttr(1));
+        Value insertSlice = builder.create<tensor::InsertSliceOp>(
+            loc, ret.op->getResult(result.index()), outputs[result.index()],
+            resultOffsets, resultSizes, resultStrides);
+        results.push_back(insertSlice);
+      }
+    }
+    if (!results.empty()) {
+      builder.create<scf::YieldOp>(loc, results);
+    }
     return ret;
   }
 
