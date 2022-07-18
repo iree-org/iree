@@ -66,13 +66,11 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
 // the previous snapshot.
 static llvm::cl::opt<bool> enableVectorPadding(
     "iree-codegen-enable-vector-padding",
-    llvm::cl::desc("Enable padding for vectorization"),
-    llvm::cl::init(true));
+    llvm::cl::desc("Enable padding for vectorization"), llvm::cl::init(true));
 
 static llvm::cl::opt<bool> enableVectorPeeling(
     "iree-codegen-enable-vector-peeling",
-    llvm::cl::desc("Enable peeling for vectorization"),
-    llvm::cl::init(true));
+    llvm::cl::desc("Enable peeling for vectorization"), llvm::cl::init(true));
 
 llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName(
     "iree-codegen-llvmcpu-use-transform-dialect",
@@ -105,8 +103,7 @@ static bool isFullyDynamicOp(linalg::LinalgOp op) {
 
 /// Returns the vectorization pre-processing strategy (padding, peeling) for the
 /// given LinalgOp, depending on the op traits and the target architecture.
-static VectorPreProcStrategy getVectorPreProcStrategy(
-    linalg::LinalgOp op) {
+static VectorPreProcStrategy getVectorPreProcStrategy(linalg::LinalgOp op) {
   if (op.hasBufferSemantics()) {
     return VectorPreProcStrategy::None;
   }
@@ -119,7 +116,9 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
   auto variantOp = getExecutableVariantOp(op);
   assert(succeeded(variantOp) && "ExecutableVariantOp not found");
 
-  if ((isX86(*variantOp) || isRISCV(*variantOp)) && enableVectorPadding) {
+  if (isX86(*variantOp) && enableVectorPadding) {
+    // Padding is only enabled on x86. It leads to too much overhead on RISC-V
+    // and ARM.
     return VectorPreProcStrategy::Padding;
   }
 
