@@ -12,7 +12,7 @@ on: [pull_request]
 
 jobs:
   bazel_to_cmake:
-    runs-on: [self-hosted, hostname=github-runner-postsubmit-cpu-2022-07-18-1]
+    runs-on: [self-hosted, hostname=github-runner-postsubmit-cpu-2022-07-18-2]
     steps:
       - name: Checking out repository
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
