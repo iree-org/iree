@@ -25,22 +25,13 @@ jobs:
   tsan:
     uses: ./.github/workflows/tsan.yml
 
-  presubmit:
+  summary:
     runs-on: ubuntu-20.04
     needs: [build_runtime, test_runtime, tsan]
     if: always()
     steps:
-      - run: |
-          echo "### Summary of Presubmit results" >> "${GITHUB_STEP_SUMMARY}"
-          echo ""                                 >> "${GITHUB_STEP_SUMMARY}"
-          echo "| job | result |"                 >> "${GITHUB_STEP_SUMMARY}"
-          echo "| --- | --- |"                    >> "${GITHUB_STEP_SUMMARY}"
-
-          echo '${{ toJson(needs) }}' \
-            | jq --raw-output \
-                'to_entries | .[] | @text "| \(.key) | \(.value.result) |"' \
-            >> "${GITHUB_STEP_SUMMARY}"
-
+      - name: Getting combined job status
+        run: |
           echo '${{ toJson(needs) }}' \
             | jq --exit-status \
                 '[to_entries | .[] | select(.value.result != "success")] | length == 0'
