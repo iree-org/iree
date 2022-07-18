@@ -51,6 +51,7 @@ iree_cc_library(
     iree::compiler::Codegen::LLVMGPU
     iree::compiler::Codegen::SPIRV
     iree::compiler::Codegen::Sandbox
+    iree::compiler::Codegen::VMVX
   PUBLIC
 )
 

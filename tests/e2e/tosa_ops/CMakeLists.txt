@@ -115,6 +115,50 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_vmvx_vmvx_microkernels
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "arithmetic_right_shift.mlir"
+    "bitwise_and.mlir"
+    "bitwise_or.mlir"
+    "bitwise_xor.mlir"
+    "ceil.mlir"
+    "clamp.mlir"
+    "clz.mlir"
+    "const.mlir"
+    "exp.mlir"
+    "floor.mlir"
+    "if.mlir"
+    "log.mlir"
+    "logical_left_shift.mlir"
+    "logical_right_shift.mlir"
+    "matmul.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "mul.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "reciprocal.mlir"
+    "reduce.mlir"
+    "reluN.mlir"
+    "reshape.mlir"
+    "rsqrt.mlir"
+    "sigmoid.mlir"
+    "sub.mlir"
+    "tanh.mlir"
+    "transpose.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-sync"
+  COMPILER_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-vmvx-enable-microkernels"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_vulkan-spirv_vulkan
   SRCS
     "abs.mlir"

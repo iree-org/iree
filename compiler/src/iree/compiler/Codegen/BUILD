@@ -58,5 +58,6 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/LLVMGPU",
         "//compiler/src/iree/compiler/Codegen/SPIRV",
         "//compiler/src/iree/compiler/Codegen/Sandbox",
+        "//compiler/src/iree/compiler/Codegen/VMVX",
     ],
 )

@@ -101,6 +101,7 @@ iree_compiler_cc_library(
         "BufferizeCopyOnlyDispatchesPass.cpp",
         "CleanupBufferAllocViewPass.cpp",
         "ConvertToDestinationPassingStylePass.cpp",
+        "DecomposeLinalgGeneric.cpp",
         "DestructiveUpdateUtils.cpp",
         "FlattenMemRefSubspanPass.cpp",
         "FoldAffineMinInDistributedLoops.cpp",
