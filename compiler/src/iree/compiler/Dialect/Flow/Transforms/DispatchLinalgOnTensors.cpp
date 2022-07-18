@@ -978,8 +978,8 @@ static void fuseRootsWithConsumers(MLIRContext *context,
 /// be marked to fuse with multiple root operations (i.e. replicated). For now a
 /// very simple heuristic is used below, but the mechanism should be general
 /// enough to capture any heuristic.
-unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
-                                DominanceInfo const &dominanceInfo) {
+static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
+                                       DominanceInfo const &dominanceInfo) {
   unsigned numRootOps = 0;
   MLIRContext *context = funcOp->getContext();
   OpBuilder builder(context);
@@ -1045,6 +1045,30 @@ unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
   }
 
   return numRootOps;
+}
+
+FusionGroups decideFusionGroups(FunctionOpInterface funcOp,
+                                DominanceInfo const &dominanceInfo) {
+  unsigned numRoots = decideFusableLinalgOps(funcOp, dominanceInfo);
+  SmallVector<Operation *> roots(numRoots, nullptr);
+
+  funcOp.walk([&](Operation *op) {
+    if (hasRootOpAttribute(op)) {
+      roots[getRootNumber(op)] = op;
+      removeRootOpAttribute(op);
+    }
+  });
+
+  FusionGroups result;
+  funcOp.walk([&](Operation *op) {
+    if (hasFusionGroupsAttribute(op)) {
+      for (int64_t group : getFusionGroups(op))
+        result[roots[group]].insert(result[roots[group]].begin(), op);
+    }
+    removeFusionGroupsAttribute(op);
+  });
+
+  return result;
 }
 
 namespace {

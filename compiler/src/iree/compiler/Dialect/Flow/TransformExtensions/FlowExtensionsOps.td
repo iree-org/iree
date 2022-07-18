@@ -50,17 +50,36 @@ def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.foreac
   }];
 }
 
-def DecideFusionGroupsOp : Op<Transform_Dialect, "iree.decide_fusion_groups",
-    [MemoryEffectsOpInterface,
-     TransformOpInterface]> {
+def DecideFusionRootsOp : Op<Transform_Dialect, "iree.decide_fusion_roots",
+    [MemoryEffectsOpInterface, TransformOpInterface]> {
   let description = [{
-    Decide fusion groups and annotate them in the IR as attributes.
+    Decide fusion groups.
   }];
 
   let arguments = (ins Arg<PDL_Operation, "", [TransformMappingRead]>:$target);
-  let results = (outs);
+  let results = (outs Res<PDL_Operation, "",
+      [TransformMappingAlloc, TransformMappingWrite]>:$roots);
 
   let assemblyFormat = "$target attr-dict";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure apply(
+        ::mlir::transform::TransformResults &transformResults, 
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+def GetFusableProducersOp : Op<Transform_Dialect, "iree.get_fusable_producers",
+    [MemoryEffectsOpInterface, TransformOpInterface]> {
+  let description = [{
+    Get fusable producers.
+  }];
+
+  let arguments = (ins Arg<PDL_Operation, "", [TransformMappingRead]>:$root);
+  let results = (outs Res<PDL_Operation, "",
+      [TransformMappingAlloc, TransformMappingWrite]>:$producers);
+
+  let assemblyFormat = "$root attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(

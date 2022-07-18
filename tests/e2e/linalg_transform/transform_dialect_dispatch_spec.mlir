@@ -10,7 +10,7 @@ transform.with_pdl_patterns {
 
   transform.structured.canonicalized_sequence %arg0 {
   ^bb1(%arg1: !pdl.operation):
-    transform.iree.decide_fusion_groups %arg1
+    transform.iree.decide_fusion_roots %arg1
     transform.print %arg1 { name = "AFTER FUSION GROUPS!!!" }
 
     %0 = pdl_match @pdl_matmul_target in %arg1

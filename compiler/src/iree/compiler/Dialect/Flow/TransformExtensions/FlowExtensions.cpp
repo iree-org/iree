@@ -427,10 +427,22 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
 }
 
 //===---------------------------------------------------------------------===//
-// DecideFusionGroupsOp
+// DecideFusionRootsOp
 //===---------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure transform_dialect::DecideFusionGroupsOp::apply(
+namespace {
+class IREEFusionRoots : public transform::TransformState::Extension {
+ public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(IREEFusionRoots);
+
+  explicit IREEFusionRoots(transform::TransformState &state)
+      : transform::TransformState::Extension(state) {}
+
+  mlir::iree_compiler::IREE::Flow::FusionGroups fusionGroups;
+};
+}  // namespace
+
+DiagnosedSilenceableFailure transform_dialect::DecideFusionRootsOp::apply(
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
   ArrayRef<Operation *> payloadOps = state.getPayloadOps(getTarget());
@@ -443,9 +455,36 @@ DiagnosedSilenceableFailure transform_dialect::DecideFusionGroupsOp::apply(
     return DiagnosedSilenceableFailure(
         this->emitOpError("requires a FunctionOpInterface"));
 
+  auto &ext = state.addExtension<IREEFusionRoots>();
   DominanceInfo domInfo;
-  (void)mlir::iree_compiler::IREE::Flow::decideFusableLinalgOps(funcOp,
-                                                                domInfo);
+  ext.fusionGroups =
+      mlir::iree_compiler::IREE::Flow::decideFusionGroups(funcOp, domInfo);
+
+  SmallVector<Operation *> roots;
+  for (const auto &it : ext.fusionGroups) roots.push_back(std::get<0>(it));
+  transformResults.set(getRoots().cast<OpResult>(), roots);
+
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
+// GetFusableProducersOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform_dialect::GetFusableProducersOp::apply(
+    transform::TransformResults &transformResults,
+    transform::TransformState &state) {
+  ArrayRef<Operation *> payloadOps = state.getPayloadOps(getRoot());
+  if (payloadOps.size() != 1)
+    return DiagnosedSilenceableFailure(
+        this->emitOpError("requires exactly one target handle"));
+
+  auto *ext = state.getExtension<IREEFusionRoots>();
+  if (!ext)
+    return DiagnosedSilenceableFailure(
+        this->emitOpError("expected that IREEFusionRoots is available"));
+  transformResults.set(getProducers().cast<OpResult>(),
+                       ext->fusionGroups[payloadOps.front()]);
 
   return DiagnosedSilenceableFailure::success();
 }

@@ -7,10 +7,14 @@
 #ifndef IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_DISPATCHLINALGONTENSORS_H_
 #define IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_DISPATCHLINALGONTENSORS_H_
 
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallVector.h"
+
 namespace mlir {
 class Operation;
 class DominanceInfo;
 class FunctionOpInterface;
+class Operation;
 
 namespace iree_compiler {
 namespace IREE {
@@ -23,8 +27,11 @@ namespace Flow {
 /// into a dispatch region.
 bool isClonableIntoDispatchOp(Operation *op);
 
-unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
-                                DominanceInfo const &dominanceInfo);
+using FusionGroups =
+    llvm::DenseMap<Operation *, llvm::SmallVector<Operation *>>;
+
+FusionGroups decideFusionGroups(FunctionOpInterface funcOp,
+                                DominanceInfo const &domInfo);
 
 }  // namespace Flow
 }  // namespace IREE
