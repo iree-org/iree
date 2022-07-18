@@ -541,6 +541,7 @@ def Stream_ResourceSubviewOp : Stream_PureOp<"resource.subview", [
     "isMetadata",
   ]>,
   Util_SizeAwareOp,
+  Util_SubrangeOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResult",
     "getTiedResultOperandIndex",
@@ -572,6 +573,11 @@ def Stream_ResourceSubviewOp : Stream_PureOp<"resource.subview", [
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return getSourceSize(); }
     Value getResultSize(unsigned idx) { return getResultSize(); }
+
+    Value getSubrangeResource() { return getSource(); }
+    Value getSubrangeResourceSize() { return getSourceSize(); }
+    Value getSubrangeOffset() { return getSourceOffset(); }
+    Value getSubrangeLength() { return getResultSize(); }
 
     // Walks up the use-def chain to find a subview op that feeds into |value|.
     static IREE::Stream::ResourceSubviewOp findSubviewOp(Value value);

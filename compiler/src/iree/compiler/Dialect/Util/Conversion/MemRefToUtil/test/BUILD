@@ -1,4 +1,4 @@
-# Copyright 2019 The IREE Authors
+# Copyright 2022 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -17,21 +17,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "alignment_folding.mlir",
-            "alignment_ops.mlir",
-            "attributes.mlir",
-            "buffer_folding.mlir",
-            "buffer_ops.mlir",
-            "global_folding.mlir",
-            "global_ops.mlir",
-            "hint_folding.mlir",
-            "hint_ops.mlir",
-            "list_ops.mlir",
-            "numeric_ops.mlir",
-            "range_folding.mlir",
-            "range_ops.mlir",
-            "structural_folding.mlir",
-            "structural_ops.mlir",
+            "memref_ops.mlir",
         ],
         include = ["*.mlir"],
     ),

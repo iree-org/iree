@@ -58,6 +58,8 @@ void populateUtilToHALPatterns(MLIRContext *context,
 
   populateUtilConversionPatterns(context, conversionTarget, typeConverter,
                                  patterns);
+  populateGenericStructuralConversionPatterns(context, conversionTarget,
+                                              typeConverter, patterns);
 }
 
 }  // namespace iree_compiler

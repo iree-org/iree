@@ -66,7 +66,7 @@ class TestFloatRangeAnalysisPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<void>> createTestFloatRangeAnalysis() {
+std::unique_ptr<OperationPass<void>> createTestFloatRangeAnalysisPass() {
   return std::make_unique<TestFloatRangeAnalysisPass>();
 }
 

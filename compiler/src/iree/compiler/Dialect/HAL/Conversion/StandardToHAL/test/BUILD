@@ -18,7 +18,6 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "shape_ops.mlir",
-            "structural_ops.mlir",
         ],
         include = ["*.mlir"],
     ),

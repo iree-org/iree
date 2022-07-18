@@ -30,6 +30,7 @@ iree_compiler_cc_library(
     deps = [
         "//compiler/src/iree/compiler/Dialect/Util/Conversion",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/Transforms",
         "//compiler/src/iree/compiler/Dialect/VM/Conversion",
         "//compiler/src/iree/compiler/Dialect/VM/Conversion/MathToVM",
         "//compiler/src/iree/compiler/Dialect/VM/Conversion/MemRefToVM",

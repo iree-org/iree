@@ -187,7 +187,7 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   // Propagate subviews throughout the program to unify resource storage access.
   // After propagation many resource SSA values can be deduped or folded by the
   // cleanup patterns.
-  passManager.addPass(IREE::Stream::createPropagateSubviewsPass());
+  passManager.addPass(IREE::Util::createPropagateSubrangesPass());
   addCleanupPatterns(passManager);
 
   // TODO(benvanik): outline streams (ala dispatch regions). Note that we may

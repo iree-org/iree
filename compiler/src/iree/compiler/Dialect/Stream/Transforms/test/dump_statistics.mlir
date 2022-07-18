@@ -25,7 +25,7 @@ util.initializer {
   %c0 = arith.constant 0 : index
   %c192 = arith.constant 192 : index
   %0 = stream.timepoint.immediate => !stream.timepoint
-  %1 = util.buffer.constant {alignment = 32 : i64} : !util.buffer = #util.composite<192xi8, [
+  %1 = util.buffer.constant {alignment = 32 : index} : !util.buffer = #util.composite<192xi8, [
       dense<[5, 6, 7, 8]> : tensor<4xi32>,
       dense<0> : vector<16xi8>,
       dense<[5, 6, 3, 8]> : tensor<4xi32>,

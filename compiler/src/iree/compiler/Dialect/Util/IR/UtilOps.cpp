@@ -718,7 +718,7 @@ NumericOptionalNarrowOp::getIntegerRange() {
 }
 
 //===----------------------------------------------------------------------===//
-// Structural ops
+// util.initializer
 //===----------------------------------------------------------------------===//
 
 void InitializerOp::build(OpBuilder &builder, OperationState &result,
@@ -764,7 +764,7 @@ Block *InitializerOp::addBlock() {
 }
 
 //===----------------------------------------------------------------------===//
-// Globals
+// util.global
 //===----------------------------------------------------------------------===//
 
 // Returns true if the given |accessType| is compatible with the |globalType|.
@@ -950,7 +950,7 @@ LogicalResult GlobalStoreIndirectOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// Lists
+// !util.list<T>
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseListTypeGet(OpAsmParser &parser, Type &listType,
@@ -1046,6 +1046,101 @@ LogicalResult ListSetOp::verify() {
                            << " and cannot be mutated as " << valueType;
   }
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// !util.buffer
+//===----------------------------------------------------------------------===//
+
+void BufferConstantOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "buffer_cst");
+}
+
+LogicalResult BufferConstantOp::verify() {
+  if (!getValue().isa<IREE::Util::SerializableAttrInterface>()) {
+    return emitOpError("unsupported non-serializable constant attribute type");
+  }
+  if (auto minAlignmentAttr = getAlignmentAttr()) {
+    int64_t minAlignment = minAlignmentAttr.getInt();
+    if (minAlignment > 0 && !llvm::isPowerOf2_64(minAlignment)) {
+      return emitOpError("invalid alignment; must be a power of two");
+    }
+  }
+  return success();
+}
+
+void BufferAllocOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "buffer");
+}
+
+LogicalResult BufferAllocOp::verify() {
+  if (auto minAlignmentAttr = getAlignmentAttr()) {
+    int64_t minAlignment = minAlignmentAttr.getInt();
+    if (minAlignment > 0 && !llvm::isPowerOf2_64(minAlignment)) {
+      return emitOpError("invalid alignment; must be a power of two");
+    }
+  }
+  return success();
+}
+
+void BufferSliceOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "buffer");
+}
+
+void BufferSubspanOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "buffer_span");
+}
+
+Value BufferSubspanOp::getViewSource() { return getSource(); }
+
+Value BufferSubspanOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
+}
+
+::llvm::Optional<unsigned> BufferSubspanOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};  // source
+}
+
+SmallVector<int64_t, 4> BufferSubspanOp::getTiedResultOperandIndices() {
+  return {0};  // source
+}
+
+// static
+IREE::Util::BufferSubspanOp BufferSubspanOp::findSubspanOp(Value value) {
+  while (value) {
+    auto *definingOp = value.getDefiningOp();
+    if (!definingOp) {
+      // Defined as a block argument - stop walk.
+      break;
+    } else if (auto subviewOp =
+                   dyn_cast<IREE::Util::BufferSubspanOp>(definingOp)) {
+      // Found!
+      return subviewOp;
+    } else if (auto tiedOp =
+                   dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
+      // Continue walking up through the tied operand.
+      value = tiedOp.getTiedResultOperand(value);
+    } else {
+      break;
+    }
+  }
+  return {};
+}
+
+void BufferSizeOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "buffer_size");
+}
+
+void BufferStorageOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "buffer_storage");
+  setNameFn(getOffset(), "buffer_offset");
 }
 
 }  // namespace Util

@@ -16,14 +16,16 @@ include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 
 def Util_BufferType : TypeDef<Util_Dialect, "Buffer", [
   Util_ReferenceType,
-  // TODO(benvanik): make buffer size-aware.
-  // Util_SizeAwareType,
-  // DeclareTypeInterfaceMethods<Util_GlobalTypeInterface, [
-  //   "isAccessStorageCompatible",
-  // ]>,
-  // DeclareTypeInterfaceMethods<Util_InferTypeSize, [
-  //   "inferSizeFromValue",
-  // ]>,
+  Util_SizeAwareType,
+  DeclareTypeInterfaceMethods<Util_GlobalType, [
+    "isAccessStorageCompatible",
+  ]>,
+  DeclareTypeInterfaceMethods<Util_InferTypeSize, [
+    "inferSizeFromValue",
+  ]>,
+  DeclareTypeInterfaceMethods<Util_SubrangeType, [
+    "createSubrangeOp",
+  ]>,
 ]> {
   let mnemonic = "buffer";
 
@@ -31,8 +33,6 @@ def Util_BufferType : TypeDef<Util_Dialect, "Buffer", [
   let description = [{
     A reference counted byte buffer that models a pointer, offset, and length.
   }];
-
-  let parameters = (ins);
 
   let builders = [
     TypeBuilder<(ins), [{
@@ -48,9 +48,9 @@ def Util_BufferType : TypeDef<Util_Dialect, "Buffer", [
 def Util_ListType : TypeDef<Util_Dialect, "List"> {
   let mnemonic = "list";
 
-  let summary = [{a pointer-like reference}];
+  let summary = [{dense list container type}];
   let description = [{
-  // DO NOT SUBMIT
+    Typed container supporting variant storage.
   }];
 
   let parameters = (ins
@@ -101,7 +101,8 @@ def Util_PtrType : TypeDef<Util_Dialect, "Ptr"> {
 
   let summary = [{a pointer-like reference}];
   let description = [{
-  // DO NOT SUBMIT
+    A typed indirect reference to a value. These define a runtime addressable
+    value that is strongly referenced.
   }];
 
   let parameters = (ins

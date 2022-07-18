@@ -44,6 +44,7 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Dialect::Util::Conversion
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::Conversion::MathToVM
     iree::compiler::Dialect::VM::Conversion::MemRefToVM

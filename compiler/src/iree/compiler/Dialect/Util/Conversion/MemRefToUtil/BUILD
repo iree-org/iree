@@ -1,4 +1,4 @@
-# Copyright 2021 The IREE Authors
+# Copyright 2022 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -13,24 +13,21 @@ package(
 )
 
 iree_compiler_cc_library(
-    name = "UtilToVM",
+    name = "MemRefToUtil",
     srcs = [
-        "ConvertAlignmentOps.cpp",
-        "ConvertBufferOps.cpp",
-        "ConvertGlobalOps.cpp",
-        "ConvertListOps.cpp",
-        "ConvertStatusOps.cpp",
-        "ConvertUtilToVM.cpp",
+        "ConvertMemRefToUtil.cpp",
     ],
     hdrs = [
-        "ConvertUtilToVM.h",
+        "ConvertMemRefToUtil.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/Util/IR",
-        "//compiler/src/iree/compiler/Dialect/VM/Conversion",
-        "//compiler/src/iree/compiler/Dialect/VM/IR",
+        "@llvm-project//mlir:AffineDialect",
+        "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
