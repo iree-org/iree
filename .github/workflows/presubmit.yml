@@ -30,6 +30,9 @@ jobs:
     needs: [build_runtime, test_runtime, tsan]
     if: always()
     env:
+      # This has to be injected as an env variable. If the substitution is done
+      # within a step, its meaning changes to whether any previous step has
+      # failed.
       FAILURE: ${{ failure() }}
     steps:
       - name: Getting combined job status
