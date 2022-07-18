@@ -45,6 +45,11 @@ static llvm::cl::opt<bool> clEnableHoistPadding(
     "iree-llvmcpu-enable-hoist-padding",
     llvm::cl::desc("Flag to enable hoist padding"), llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnableMicrokernels(
+    "iree-vmvx-enable-microkernels",
+    llvm::cl::desc("Enables microkernel lowering for vmvx (experimental)"),
+    llvm::cl::init(false));
+
 // MLIR file containing a top-level module that specifies the transformations to
 // apply to form dispatch regions.
 // Defined externally in KernelDispatch.cpp to control the codegen pass
@@ -335,8 +340,23 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
 void addVMVXDefaultPassPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
 
+  // Tensor-level micro-kernel optimizations.
+  // Note that this must be done post-tiling because it changes the structure
+  // of the dispatch region such that tiling is not always possible.
+  if (clEnableMicrokernels) {
+    passManager.nest<ModuleOp>().nest<func::FuncOp>().addPass(
+        createDecomposeLinalgGenericPass());
+  }
+
+  // Lower to buffers.
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addBufferizePasses(nestedModulePM);
+
+  // Convert buffer-level microkernels.
+  if (clEnableMicrokernels) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createVMVXLowerLinalgMicrokernelsPass());
+  }
 }
 
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,

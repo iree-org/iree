@@ -27,6 +27,21 @@ def ConvertToDestinationPassingStyle :
   let constructor = "mlir::iree_compiler::createConvertToDestinationPassingStylePass()";
 }
 
+def DecomposeLinalgGeneric :
+    Pass<"iree-codegen-decompose-linalg-generic", ""> {
+  let summary = "Decomposes linalg generic ops into individual ops";
+  let description = [{
+    It is sometimes advantageous to operate on generic ops which contain
+    at most one non-yield body operation. This is most often the case when
+    needing to materialize individual ops (which some backends require).
+    Note that this is often an extreme pessimization unless if part of a
+    lowering flow which was designed for it.
+
+    Operates on tensor based linalg ops.
+  }];
+  let constructor = "mlir::iree_compiler::createDecomposeLinalgGenericPass()";
+}
+
 def FlattenMemRefSubspan :
   Pass<"iree-codegen-flatten-memref-subspan", "ModuleOp"> {
   let summary =
@@ -429,7 +444,18 @@ def SPIRVCreateFastSlowPath :
 }
 
 //------------------------------------------------------------------------------
-// Test passes
+// VMVX Passes
+//------------------------------------------------------------------------------
+
+def VMVXLowerLinalgMicrokernels :
+    Pass<"iree-vmvx-lower-linalg-microkernels", ""> {
+  let summary =
+      "Lowers linalg ops to the VMVX microkernel library";
+  let constructor = "mlir::iree_compiler::createVMVXLowerLinalgMicrokernelsPass()";
+}
+
+//------------------------------------------------------------------------------
+// Test Passes
 //------------------------------------------------------------------------------
 
 def TestLLVMGPUScalarizeMathOp :

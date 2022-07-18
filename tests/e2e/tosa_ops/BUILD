@@ -131,6 +131,72 @@ iree_check_single_backend_test_suite(
     target_backend = "vmvx",
 )
 
+VMVX_MICROKERNELS_SRCS = enforce_glob(
+    [
+        "abs.mlir",
+        "add.mlir",
+        "arithmetic_right_shift.mlir",
+        "bitwise_and.mlir",
+        "bitwise_or.mlir",
+        "bitwise_xor.mlir",
+        "ceil.mlir",
+        "clamp.mlir",
+        "clz.mlir",
+        "const.mlir",
+        "exp.mlir",
+        "floor.mlir",
+        "if.mlir",
+        "log.mlir",
+        "logical_left_shift.mlir",
+        "logical_right_shift.mlir",
+        "matmul.mlir",
+        "maximum.mlir",
+        "minimum.mlir",
+        "mul.mlir",
+        "negate.mlir",
+        "pad.mlir",
+        "reciprocal.mlir",
+        "reduce.mlir",
+        "reluN.mlir",
+        "reshape.mlir",
+        "rsqrt.mlir",
+        "sigmoid.mlir",
+        "sub.mlir",
+        "tanh.mlir",
+        "transpose.mlir",
+    ],
+    include = ["*.mlir"],
+    exclude = [
+        # Gather and table are failing on complicated buffer conversions that
+        # will shortly be fixed separately.
+        "gather.mlir",
+        "table.mlir",
+        # equal, greater_equal, select have (suspected) i1 problems which
+        # manifest at runtime.
+        "equal.mlir",
+        "greater.mlir",
+        "greater_equal.mlir",
+        "select.mlir",
+        # fully_connected and while are failing on unrealizable 0d memref
+        # conversions. The first is incidental to how the test is constructed.
+        "fully_connected.mlir",
+        "max_pool.mlir",
+        "while.mlir",
+    ],
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_vmvx_vmvx_microkernels",
+    srcs = VMVX_MICROKERNELS_SRCS,
+    compiler_flags = [
+        "--iree-input-type=tosa",
+        "--iree-vmvx-enable-microkernels",
+    ],
+    # Sync has more strict runtime error checking for mis-compiled programs.
+    driver = "local-sync",
+    target_backend = "vmvx",
+)
+
 VULKAN_SRCS = enforce_glob(
     [
         "abs.mlir",

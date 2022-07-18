@@ -114,6 +114,39 @@ vm.module @check_folds {
     // CHECK-NEXT: vm.fail %[[STATUS]], "expected eq"
   }
 
+  // CHECK-LABEL: @check_nearly_eq_f32
+  vm.func @check_nearly_eq_f32(%arg0 : f32, %arg1 : f32) {
+    // CHECK-NEXT:   %zero = vm.const.f32.zero
+    // CHECK-NEXT:   %c1 = vm.const.i32 1
+    // CHECK-NEXT:   [[THRESHOLD:%.+]] = vm.const.i32 100
+    // CHECK-NEXT:   %c9 = vm.const.i32 9
+    // CHECK-NEXT:   %0 = vm.cmp.lt.f32.o %arg0, %zero : f32
+    // CHECK-NEXT:   %1 = vm.xor.i32 %0, %c1 : i32
+    // CHECK-NEXT:   %2 = vm.cmp.lt.f32.o %arg1, %zero : f32
+    // CHECK-NEXT:   %3 = vm.xor.i32 %2, %c1 : i32
+    // CHECK-NEXT:   %ne = vm.cmp.ne.i32 %1, %3 : i32
+    // CHECK-NEXT:   vm.cond_br %ne, ^bb1, ^bb2
+    // CHECK-NEXT: ^bb1:  // pred: ^bb0
+    // CHECK-NEXT:   %4 = vm.cmp.eq.f32.o %arg0, %arg1 : f32
+    // CHECK-NEXT:   vm.br ^bb3(%4 : i32)
+    // CHECK-NEXT: ^bb2:  // pred: ^bb0
+    // CHECK-NEXT:   %5 = vm.bitcast.f32.i32 %arg0 : f32 -> i32
+    // CHECK-NEXT:   %6 = vm.bitcast.f32.i32 %arg1 : f32 -> i32
+    // CHECK-NEXT:   %7 = vm.sub.i32 %5, %6 : i32
+    // CHECK-NEXT:   %8 = vm.abs.i32 %7 : i32
+    // CHECK-NEXT:   %slt = vm.cmp.lt.i32.s %8, [[THRESHOLD]] : i32
+    // CHECK-NEXT:   vm.br ^bb3(%slt : i32)
+    // CHECK-NEXT: ^bb3(%9: i32):  // 2 preds: ^bb1, ^bb2
+    // CHECK-NEXT:   %10 = vm.xor.i32 %9, %c1 : i32
+    // CHECK-NEXT:   vm.cond_br %10, ^bb5(%c9 : i32), ^bb4
+    vm.check.nearly_eq %arg0, %arg1, "expected nearly eq" : f32
+    // CHECK-NEXT: ^bb4:
+    // CHECK-NEXT:   vm.return
+    vm.return
+    // CHECK-NEXT: ^bb5(%[[STATUS:.+]]: i32):
+    // CHECK-NEXT:   vm.fail %[[STATUS]], "expected nearly eq"
+  }
+
   // CHECK-LABEL: @check_nz_i32
   vm.func @check_nz_i32(%arg0 : i32) {
     // CHECK: %[[COND:.+]] = vm.cmp.nz.i32 %arg0 : i32

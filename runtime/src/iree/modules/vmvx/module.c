@@ -185,7 +185,7 @@ IREE_VMVX_ABI_FIXED_STRUCT(binary2d, rIIIrIIIrIIIII, {
 IREE_VMVX_ABI_DEFINE_SHIM(binary2d, v);
 
 //===----------------------------------------------------------------------===//
-// Exported function definitions
+// Exported add function definitions
 //===----------------------------------------------------------------------===//
 
 IREE_VMVX_ABI_EXPORT(iree_vmvx_add2d_f32, binary2d, v) {
@@ -224,6 +224,66 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_add2d_f32, binary2d, v) {
   return iree_ok_status();
 }
 
+//===----------------------------------------------------------------------===//
+// Exported copy function definitions
+//===----------------------------------------------------------------------===//
+
+IREE_VMVX_ABI_EXPORT(iree_vmvx_copy2d_x8, unary2d, v) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  MAP_BUFFER_2D_RO(in, int8_t,
+                   /*buffer_ref=*/args->in_ref,
+                   /*offset=*/args->in_offset,
+                   /*stride0=*/args->in_stride0,
+                   /*stride1=*/args->in_stride1,
+                   /*size0=*/args->size0,
+                   /*size1=*/args->size1);
+  MAP_BUFFER_2D_RW(out, int8_t,
+                   /*buffer_ref=*/args->out_ref,
+                   /*offset=*/args->out_offset,
+                   /*stride0=*/args->out_stride0,
+                   /*stride1=*/args->out_stride1,
+                   /*size0=*/args->size0,
+                   /*size1=*/args->size1);
+
+  for (iree_host_size_t j = 0; j < out_size0; ++j) {
+    for (iree_host_size_t i = 0; i < out_size1; ++i) {
+      out[j * out_stride0 + i * out_stride1] =
+          in[j * in_stride0 + i * in_stride1];
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+IREE_VMVX_ABI_EXPORT(iree_vmvx_copy2d_x16, unary2d, v) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  MAP_BUFFER_2D_RO(in, int16_t,
+                   /*buffer_ref=*/args->in_ref,
+                   /*offset=*/args->in_offset,
+                   /*stride0=*/args->in_stride0,
+                   /*stride1=*/args->in_stride1,
+                   /*size0=*/args->size0,
+                   /*size1=*/args->size1);
+  MAP_BUFFER_2D_RW(out, int16_t,
+                   /*buffer_ref=*/args->out_ref,
+                   /*offset=*/args->out_offset,
+                   /*stride0=*/args->out_stride0,
+                   /*stride1=*/args->out_stride1,
+                   /*size0=*/args->size0,
+                   /*size1=*/args->size1);
+
+  for (iree_host_size_t j = 0; j < out_size0; ++j) {
+    for (iree_host_size_t i = 0; i < out_size1; ++i) {
+      out[j * out_stride0 + i * out_stride1] =
+          in[j * in_stride0 + i * in_stride1];
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
 IREE_VMVX_ABI_EXPORT(iree_vmvx_copy2d_x32, unary2d, v) {
   IREE_TRACE_ZONE_BEGIN(z0);
   MAP_BUFFER_2D_RO(in, int32_t,
@@ -251,6 +311,38 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_copy2d_x32, unary2d, v) {
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
+
+IREE_VMVX_ABI_EXPORT(iree_vmvx_copy2d_x64, unary2d, v) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  MAP_BUFFER_2D_RO(in, int64_t,
+                   /*buffer_ref=*/args->in_ref,
+                   /*offset=*/args->in_offset,
+                   /*stride0=*/args->in_stride0,
+                   /*stride1=*/args->in_stride1,
+                   /*size0=*/args->size0,
+                   /*size1=*/args->size1);
+  MAP_BUFFER_2D_RW(out, int64_t,
+                   /*buffer_ref=*/args->out_ref,
+                   /*offset=*/args->out_offset,
+                   /*stride0=*/args->out_stride0,
+                   /*stride1=*/args->out_stride1,
+                   /*size0=*/args->size0,
+                   /*size1=*/args->size1);
+
+  for (iree_host_size_t j = 0; j < out_size0; ++j) {
+    for (iree_host_size_t i = 0; i < out_size1; ++i) {
+      out[j * out_stride0 + i * out_stride1] =
+          in[j * in_stride0 + i * in_stride1];
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+//===----------------------------------------------------------------------===//
+// Exported fill function definitions
+//===----------------------------------------------------------------------===//
 
 IREE_VMVX_ABI_FIXED_STRUCT(fill2d_x32, irIIII, {
   int32_t fill_value;
@@ -280,6 +372,10 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_fill2d_x32, fill2d_x32, v) {
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
+
+//===----------------------------------------------------------------------===//
+// Exported matmul function definitions
+//===----------------------------------------------------------------------===//
 
 IREE_VMVX_ABI_FIXED_STRUCT(matmul_f32, rIIrIIrIIIIIffi, {
   iree_vm_ref_t lhs_ref;

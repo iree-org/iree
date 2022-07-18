@@ -52,6 +52,10 @@ std::unique_ptr<OperationPass<func::FuncOp>> createCleanupBufferAllocViewPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createBufferizeCopyOnlyDispatchesPass();
 
+// Decomposes linalg generics on tensors into generics containing no more than
+// one op in the body.
+std::unique_ptr<Pass> createDecomposeLinalgGenericPass();
+
 /// Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets on
 /// subspan ops to the consumer load/store ops, in preparation for lowering to
 /// backends that require linearized access.
@@ -471,6 +475,14 @@ createSPIRVCreateFastSlowPathPass();
 /// size.
 /// TODO: Are both of these needed and does this one still work on HLO?
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm);
+
+//------------------------------------------------------------------------------
+// VMVX passes
+//------------------------------------------------------------------------------
+
+// Lowers high level library calls from named ops and generics. This operates
+// at the bufferized linalg level.
+std::unique_ptr<Pass> createVMVXLowerLinalgMicrokernelsPass();
 
 //------------------------------------------------------------------------------
 // Test passes
