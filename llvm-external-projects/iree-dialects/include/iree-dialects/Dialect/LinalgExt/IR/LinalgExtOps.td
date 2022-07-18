@@ -55,7 +55,8 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
 
 def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     [DeclareOpInterfaceMethods<TiledOpInterface,
-        ["getTiledImplementation", "generateScalarImplementation"]>]> {
+        ["generateScalarImplementation", "getResultTilePosition",
+         "getTiledImplementation"]>]> {
   let summary = "Scatter operator";
   let description = [{
     Based on XLA operation semantics, takes two `inputs` (`update` and
@@ -149,8 +150,8 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
 
 def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
     [DeclareOpInterfaceMethods<TiledOpInterface,
-        ["getPartitionableLoops", "generateScalarImplementation",
-         "getTiledImplementation"]>]> {
+        ["generateScalarImplementation", "getPartitionableLoops",
+         "getResultTilePosition", "getTiledImplementation"]>]> {
   let summary = "Sort operator";
   let description = [{
     Based on XLA operation semantics, sorts the given `operands` at the given
@@ -190,10 +191,8 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
 
 def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
   DeclareOpInterfaceMethods<TiledOpInterface,
-                            [
-                              "getPartitionableLoops", "getTiledImplementation",
-                              "generateScalarImplementation"
-                            ]>,
+      ["generateScalarImplementation", "getPartitionableLoops",
+       "getResultTilePosition", "getTiledImplementation"]>,
   DeclareOpInterfaceMethods<LinalgExtInterface>
 ]> {
   let summary = "Fft operator";
@@ -254,8 +253,8 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
 
 def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
     [DeclareOpInterfaceMethods<TiledOpInterface,
-      ["getPartitionableLoops", "generateScalarImplementation",
-       "getTiledImplementation"]>]> {
+      ["generateScalarImplementation", "getPartitionableLoops",
+       "getResultTilePosition", "getTiledImplementation"]>]> {
   let summary = "Scan operator";
   let description = [{
     Computes the inclusive/exclusive scan along a given dimension.
@@ -306,7 +305,8 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
 def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
   DeclareOpInterfaceMethods<
       TiledOpInterface,
-      ["generateScalarImplementation", "getTiledImplementation"]>,
+      ["generateScalarImplementation", "getResultTilePosition",
+       "getTiledImplementation"]>,
   DeclareOpInterfaceMethods<LinalgExtInterface>]> {
   let summary = "Reverse operator";
   let description = [{
@@ -355,7 +355,8 @@ def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
 def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TiledOpInterface,
-    ["generateScalarImplementation", "getPartitionableLoops", "getTiledImplementation"]>,
+    ["generateScalarImplementation", "getPartitionableLoops",
+     "getResultTilePosition", "getTiledImplementation"]>,
   SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
 ]>{
   let summary = "Top-K operator";
