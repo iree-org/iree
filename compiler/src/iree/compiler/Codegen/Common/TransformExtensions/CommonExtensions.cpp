@@ -73,6 +73,27 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
 }
 
 //===---------------------------------------------------------------------===//
+// ForeachOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform_dialect::ForeachOp::apply(
+    transform::TransformResults &results, transform::TransformState &state) {
+  ArrayRef<Operation *> payloadOps = state.getPayloadOps(getTarget());
+  for (Operation *op : payloadOps) {
+    auto scope = state.make_region_scope(getBody());
+    if (failed(state.mapBlockArguments(getBody().front().getArgument(0), {op})))
+      return DiagnosedSilenceableFailure::definiteFailure();
+
+    for (Operation &transform : getBody().front().without_terminator()) {
+      DiagnosedSilenceableFailure result = state.applyTransform(
+          cast<transform::TransformOpInterface>(transform));
+      if (!result.succeeded()) return result;
+    }
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
 // IREEBufferizeOp
 //===---------------------------------------------------------------------===//
 

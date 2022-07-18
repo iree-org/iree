@@ -9,6 +9,7 @@
 
 include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
+include "mlir/Dialect/Transform/IR/TransformEffects.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
@@ -74,8 +75,7 @@ def TileToForeachOp :
 
 def FuseIntoContainingOp :
     Op<Transform_Dialect, "fuse_into_containing_op",
-      [FunctionalStyleTransformOpTrait,
-       MemoryEffectsOpInterface,
+      [MemoryEffectsOpInterface,
        DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{Fuse a producer into a containing operation.}];
 
@@ -84,8 +84,8 @@ def FuseIntoContainingOp :
     compute the accessed producer slices on-the-fly.
     }];
 
-  let arguments = (ins PDL_Operation:$producer_op,
-                       PDL_Operation:$containing_op);
+  let arguments = (ins Arg<PDL_Operation, "", [TransformMappingRead, TransformMappingFree]>:$producer_op,
+                       Arg<PDL_Operation, "", [TransformMappingRead]>:$containing_op);
 
   let assemblyFormat = "$producer_op `into` $containing_op attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";

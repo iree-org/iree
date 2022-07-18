@@ -9,6 +9,7 @@
 
 include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
+include "mlir/Dialect/Transform/IR/TransformEffects.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/EnumAttr.td"
@@ -96,6 +97,31 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
+def ForeachOp : Op<Transform_Dialect, "iree.foreach",
+    [MemoryEffectsOpInterface, TransformOpInterface]> {
+  let description = [{
+    Execute the region for each payload op.
+
+    Inside of the region, the target can be referred to with the basic block
+    argument of the region. The basic block argument is mapped to exactly one
+    payload op.
+
+    No handles are consumed or produced.
+  }];
+
+  let arguments = (ins Arg<PDL_Operation, "", [TransformMappingRead]>:$target);
+  let results = (outs);
+  let regions = (region SizedRegion<1>:$body);
+  let assemblyFormat = "$target $body attr-dict";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure apply(
+        ::mlir::transform::TransformResults &transformResults, 
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 def MatchInterfaceEnum : I32EnumAttr<"MatchInterfaceEnum", "An interface to match",
     [
       I32EnumAttrCase<"LinalgOp", 0>,
@@ -139,6 +165,6 @@ def MatchOp : Op<Transform_Dialect, "iree.match",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
-}
+}  
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS
