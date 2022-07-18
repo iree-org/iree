@@ -26,13 +26,7 @@ cd "${HOME}"
 rm -rf config
 
 rm -rf /tmp/iree
-
-# TODO: replace with main repo
-# git clone https://github.com/iree-org/iree.git /tmp/iree
-git clone https://github.com/gmngeoffrey/iree.git /tmp/iree
-(cd /tmp/iree
-git fetch origin runner-setup
-git checkout runner-setup)
+git clone https://github.com/iree-org/iree.git /tmp/iree
 
 cp -r /tmp/iree/build_tools/github_actions/runner/config/ "${HOME}/config"
 
