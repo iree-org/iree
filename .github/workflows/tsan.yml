@@ -30,6 +30,8 @@ jobs:
       - cpu
       - os-family=Linux
     steps:
+      - name: "Fail"
+        run: exit 1
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
