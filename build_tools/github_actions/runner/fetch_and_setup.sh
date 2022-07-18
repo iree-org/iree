@@ -12,7 +12,6 @@
 # scripts instead of fetching them directly from HEAD.
 
 set -euo pipefail
-shopt -s extglob
 
 SCRIPT="$( readlink -f -- "$0"; )"
 SCRIPT_BASENAME="$(basename ${SCRIPT})"
@@ -24,18 +23,13 @@ if [[ "$(whoami)" != "runner" ]]; then
 fi
 
 cd "${HOME}"
-rm -rf -v !("actions-runner"|"${SCRIPT_BASENAME}")
+rm -rf config
 
-cd /tmp/
 rm -rf /tmp/iree
-git clone https://github.com/iree-org/iree.git
+git clone https://github.com/iree-org/iree.git /tmp/iree
 
-cd iree/build_tools/github_actions/runner/
-# Bash doesn't read the whole script into memory when executing, so if you
-# overwrite it during execution, madness ensues.
-cp -r !("${SCRIPT_BASENAME}") "${HOME}/"
+cp -r /tmp/iree/build_tools/github_actions/runner/config/ "${HOME}/config"
 
-cd "${HOME}"
 rm -rf /tmp/iree
 
-./setup.sh
+./config/setup.sh
