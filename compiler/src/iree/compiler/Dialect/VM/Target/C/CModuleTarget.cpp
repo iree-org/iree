@@ -68,7 +68,7 @@ static LogicalResult printRodataBuffers(IREE::VM::ModuleOp &moduleOp,
 
   for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
     auto value =
-        rodataOp.value().dyn_cast<IREE::Util::SerializableAttrInterface>();
+        rodataOp.getValue().dyn_cast<IREE::Util::SerializableAttrInterface>();
     assert(value && "expected a serializable rodata value");
     SmallVector<char> byteBuffer;
     if (failed(value.serializeToVector(llvm::support::endianness::little,
@@ -78,8 +78,8 @@ static LogicalResult printRodataBuffers(IREE::VM::ModuleOp &moduleOp,
 
     constexpr size_t kDefaultRodataAlignment = 16;
     size_t alignment =
-        rodataOp.alignment()
-            ? static_cast<size_t>(rodataOp.alignment().getValue())
+        rodataOp.getAlignment()
+            ? static_cast<size_t>(rodataOp.getAlignment().getValue())
             : 0;
     if (alignment == 0) alignment = kDefaultRodataAlignment;
 
@@ -115,7 +115,7 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
   // interior of structs (just VLA at the tail).
   auto countOrEmpty = [](uint32_t count) { return count ? count : 1; };
 
-  auto ordinalCounts = moduleOp.ordinal_counts().getValue();
+  auto ordinalCounts = moduleOp.getOrdinalCountsAttr();
   output << "iree_allocator_t allocator;\n";
   output << "uint8_t rwdata[" << countOrEmpty(ordinalCounts.getGlobalBytes())
          << "];\n";
@@ -202,13 +202,13 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   } else {
     // sort import ops by ordinal
     llvm::sort(importOps, [](auto &lhs, auto &rhs) {
-      return lhs.ordinal().getValue().getZExtValue() <
-             rhs.ordinal().getValue().getZExtValue();
+      return lhs.getOrdinal()->getZExtValue() <
+             rhs.getOrdinal()->getZExtValue();
     });
     for (auto importOp : importOps) {
       output << "{"
-             << (importOp.is_optional() ? "IREE_VM_NATIVE_IMPORT_OPTIONAL"
-                                        : "IREE_VM_NATIVE_IMPORT_REQUIRED")
+             << (importOp.getIsOptional() ? "IREE_VM_NATIVE_IMPORT_OPTIONAL"
+                                          : "IREE_VM_NATIVE_IMPORT_REQUIRED")
              << ", " << printStringView(importOp.getName()) << "},\n";
     }
   }

@@ -69,7 +69,7 @@ def Stream_ResourceAllocOp : Stream_PureOp<"resource.alloc", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return storage_sizes()[idx]; }
+    Value getResultSize(unsigned idx) { return getStorageSizes()[idx]; }
   }];
 
   let hasVerifier = 1;
@@ -121,7 +121,7 @@ def Stream_ResourceAllocaOp : Stream_PureOp<"resource.alloca", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return storage_size(); }
+    Value getResultSize(unsigned idx) { return getStorageSize(); }
   }];
 
   let hasCanonicalizer = 1;
@@ -168,7 +168,7 @@ def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
   }];
 
   let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return operand_size(); }
+    Value getOperandSize(unsigned idx) { return getOperandSize(); }
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
@@ -202,7 +202,7 @@ def Stream_ResourceSizeOp : Stream_PureOp<"resource.size", [
   }];
 
   let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return result(); }
+    Value getOperandSize(unsigned idx) { return getResult(); }
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
@@ -244,7 +244,7 @@ def Stream_ResourceMapOp : Stream_Op<"resource.map", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return result_size(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
   }];
 
   let hasVerifier = 1;
@@ -288,7 +288,7 @@ def Stream_ResourceTryMapOp : Stream_PureOp<"resource.try_map", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return result_size(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
   }];
 
   let hasVerifier = 1;
@@ -324,7 +324,7 @@ def Stream_ResourceLoadOp : Stream_Op<"resource.load", [
   }];
 
   let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return source_size(); }
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
@@ -360,7 +360,7 @@ def Stream_ResourceStoreOp : Stream_Op<"resource.store", [
   }];
 
   let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return target_size(); }
+    Value getOperandSize(unsigned idx) { return getTargetSize(); }
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
@@ -530,7 +530,7 @@ def Stream_ResourceConstantsOp : Stream_PureOp<"resource.constants", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return result_sizes()[idx]; }
+    Value getResultSize(unsigned idx) { return getResultSizes()[idx]; }
   }];
 }
 
@@ -570,8 +570,8 @@ def Stream_ResourceSubviewOp : Stream_PureOp<"resource.subview", [
   }];
 
   let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return source_size(); }
-    Value getResultSize(unsigned idx) { return result_size(); }
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
 
     // Walks up the use-def chain to find a subview op that feeds into |value|.
     static IREE::Stream::ResourceSubviewOp findSubviewOp(Value value);
@@ -629,9 +629,9 @@ def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
 
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
-    ValueRange getResultDynamicDims(unsigned idx) { return result_encoding_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultEncodingDims(); }
     Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return result_size(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
   }];
 
   let hasVerifier = 1;
@@ -681,9 +681,9 @@ def Stream_TensorExportOp : Stream_PureOp<"tensor.export", [
   }];
 
   let extraClassDeclaration = [{
-    ValueRange getOperandDynamicDims(unsigned idx) { return source_encoding_dims(); }
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceEncodingDims(); }
     ValueRange getResultDynamicDims(unsigned idx) { return ValueRange{}; }
-    Value getOperandSize(unsigned idx) { return source_size(); }
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
@@ -764,9 +764,9 @@ def Stream_TensorEmptyOp : Stream_PureOp<"tensor.empty", [
 
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
-    ValueRange getResultDynamicDims(unsigned idx) { return result_encoding_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultEncodingDims(); }
     Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return result_size(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
   }];
 
   let hasVerifier = 1;
@@ -807,7 +807,7 @@ def Stream_TensorConstantOp : Stream_PureOp<"tensor.constant", [
 
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
-    ValueRange getResultDynamicDims(unsigned idx) { return result_encoding_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultEncodingDims(); }
   }];
 
   let hasVerifier = 1;
@@ -851,9 +851,9 @@ def Stream_TensorSplatOp : Stream_PureOp<"tensor.splat", [
 
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
-    ValueRange getResultDynamicDims(unsigned idx) { return result_encoding_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultEncodingDims(); }
     Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return result_size(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
   }];
 
   let hasVerifier = 1;
@@ -903,10 +903,10 @@ def Stream_TensorCloneOp : Stream_PureOp<"tensor.clone", [
   }];
 
   let extraClassDeclaration = [{
-    ValueRange getOperandDynamicDims(unsigned idx) { return source_encoding_dims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return result_encoding_dims(); }
-    Value getOperandSize(unsigned idx) { return source_size(); }
-    Value getResultSize(unsigned idx) { return result_size(); }
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceEncodingDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultEncodingDims(); }
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
   }];
 
   let hasVerifier = 1;
@@ -959,10 +959,10 @@ def Stream_TensorSliceOp : Stream_PureOp<"tensor.slice", [
   }];
 
   let extraClassDeclaration = [{
-    ValueRange getOperandDynamicDims(unsigned idx) { return source_encoding_dims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return result_encoding_dims(); }
-    Value getOperandSize(unsigned idx) { return source_size(); }
-    Value getResultSize(unsigned idx) { return result_size(); }
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceEncodingDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultEncodingDims(); }
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
   }];
 
   let hasVerifier = 1;
@@ -1019,10 +1019,10 @@ def Stream_TensorFillOp : Stream_Op<"tensor.fill", [
   }];
 
   let extraClassDeclaration = [{
-    ValueRange getOperandDynamicDims(unsigned idx) { return target_encoding_dims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return target_encoding_dims(); }
-    Value getOperandSize(unsigned idx) { return target_size(); }
-    Value getResultSize(unsigned idx) { return target_size(); }
+    ValueRange getOperandDynamicDims(unsigned idx) { return getTargetEncodingDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getTargetEncodingDims(); }
+    Value getOperandSize(unsigned idx) { return getTargetSize(); }
+    Value getResultSize(unsigned idx) { return getTargetSize(); }
   }];
 
   let hasVerifier = 1;
@@ -1081,13 +1081,13 @@ def Stream_TensorUpdateOp : Stream_Op<"tensor.update", [
 
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) {
-      return idx == 0 ? target_encoding_dims() : update_encoding_dims();
+      return idx == 0 ? getTargetEncodingDims() : getUpdateEncodingDims();
     }
-    ValueRange getResultDynamicDims(unsigned idx) { return target_encoding_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getTargetEncodingDims(); }
     Value getOperandSize(unsigned idx) {
-      return idx == 0 ? target_size() : update_size();
+      return idx == 0 ? getTargetSize() : getUpdateSize();
     }
-    Value getResultSize(unsigned idx) { return target_size(); }
+    Value getResultSize(unsigned idx) { return getTargetSize(); }
   }];
 
   let hasVerifier = 1;
@@ -1129,9 +1129,9 @@ def Stream_TensorLoadOp : Stream_PureOp<"tensor.load", [
   }];
 
   let extraClassDeclaration = [{
-    ValueRange getOperandDynamicDims(unsigned idx) { return source_encoding_dims(); }
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceEncodingDims(); }
     ValueRange getResultDynamicDims(unsigned idx) { return ValueRange{}; }
-    Value getOperandSize(unsigned idx) { return source_size(); }
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
@@ -1181,10 +1181,10 @@ def Stream_TensorStoreOp : Stream_PureOp<"tensor.store", [
   }];
 
   let extraClassDeclaration = [{
-    ValueRange getOperandDynamicDims(unsigned idx) { return target_encoding_dims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return target_encoding_dims(); }
-    Value getOperandSize(unsigned idx) { return target_size(); }
-    Value getResultSize(unsigned idx) { return target_size(); }
+    ValueRange getOperandDynamicDims(unsigned idx) { return getTargetEncodingDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getTargetEncodingDims(); }
+    Value getOperandSize(unsigned idx) { return getTargetSize(); }
+    Value getResultSize(unsigned idx) { return getTargetSize(); }
   }];
 
   let hasVerifier = 1;
@@ -1250,7 +1250,7 @@ def Stream_BuiltinSplatI64Op : Stream_Op<"builtin.splat.i64", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return result_size(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
   }];
 
   let hasVerifier = 1;
@@ -1301,8 +1301,8 @@ def Stream_BuiltinFillI64Op : Stream_Op<"builtin.fill.i64", [
   }];
 
   let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return target_size(); }
-    Value getResultSize(unsigned idx) { return target_size(); }
+    Value getOperandSize(unsigned idx) { return getTargetSize(); }
+    Value getResultSize(unsigned idx) { return getTargetSize(); }
   }];
 
   let hasVerifier = 1;
@@ -1347,7 +1347,7 @@ def Stream_AsyncAllocaOp : Stream_PureOp<"async.alloca", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return storage_size(); }
+    Value getResultSize(unsigned idx) { return getStorageSize(); }
   }];
 
   let hasCanonicalizer = 1;
@@ -1387,7 +1387,7 @@ def Stream_AsyncConstantOp : Stream_PureOp<"async.constant", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return result_size(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
   }];
 
   let hasVerifier = 1;
@@ -1426,7 +1426,7 @@ def Stream_AsyncSplatOp : Stream_Op<"async.splat", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return result_size(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
   }];
 
   let hasVerifier = 1;
@@ -1467,8 +1467,8 @@ def Stream_AsyncCloneOp : Stream_Op<"async.clone", [
   }];
 
   let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return source_size(); }
-    Value getResultSize(unsigned idx) { return result_size(); }
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
   }];
 
   let hasVerifier = 1;
@@ -1513,8 +1513,8 @@ def Stream_AsyncSliceOp : Stream_PureOp<"async.slice", [
   }];
 
   let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return source_size(); }
-    Value getResultSize(unsigned idx) { return result_size(); }
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
   }];
 
   let hasVerifier = 1;
@@ -1566,8 +1566,8 @@ def Stream_AsyncFillOp : Stream_Op<"async.fill", [
   }];
 
   let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return target_size(); }
-    Value getResultSize(unsigned idx) { return target_size(); }
+    Value getOperandSize(unsigned idx) { return getTargetSize(); }
+    Value getResultSize(unsigned idx) { return getTargetSize(); }
   }];
 
   let hasVerifier = 1;
@@ -1620,9 +1620,9 @@ def Stream_AsyncUpdateOp : Stream_Op<"async.update", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) {
-      return idx == 0 ? target_size() : update_size();
+      return idx == 0 ? getTargetSize() : getUpdateSize();
     }
-    Value getResultSize(unsigned idx) { return target_size(); }
+    Value getResultSize(unsigned idx) { return getTargetSize(); }
   }];
 
   let hasVerifier = 1;
@@ -1681,9 +1681,9 @@ def Stream_AsyncCopyOp : Stream_Op<"async.copy", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) {
-      return idx == 0 ? target_size() : source_size();
+      return idx == 0 ? getTargetSize() : getSourceSize();
     }
-    Value getResultSize(unsigned idx) { return target_size(); }
+    Value getResultSize(unsigned idx) { return getTargetSize(); }
   }];
 
   let hasVerifier = 1;
@@ -1732,8 +1732,8 @@ def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
   }];
 
   let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return source_size(); }
-    Value getResultSize(unsigned idx) { return result_size(); }
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
   }];
 
   let hasVerifier = 1;
@@ -1769,7 +1769,7 @@ def Stream_AsyncLoadOp : Stream_PureOp<"async.load", [
   }];
 
   let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return source_size(); }
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
@@ -1814,8 +1814,8 @@ def Stream_AsyncStoreOp : Stream_PureOp<"async.store", [
   }];
 
   let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return target_size(); }
-    Value getResultSize(unsigned idx) { return target_size(); }
+    Value getOperandSize(unsigned idx) { return getTargetSize(); }
+    Value getResultSize(unsigned idx) { return getTargetSize(); }
   }];
 
   let hasVerifier = 1;
@@ -1847,8 +1847,8 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
     Variadic<AnyTypeOf<[
       Stream_AnyStreamResource,
       Stream_PrimitiveType,
-    ]>>:$operands,
-    Variadic<Stream_Size>:$operand_sizes,
+    ]>>:$resource_operands,
+    Variadic<Stream_Size>:$resource_operand_sizes,
     Variadic<Stream_Size>:$result_sizes,
     OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
     OptionalAttr<Stream_AffinityAttr>:$affinity
@@ -1861,19 +1861,19 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
     (`on` `(` $affinity^ `)`)?
     $entry_point
     (`[` $workload^ `]`)? ``
-    `(` $operands `)` attr-dict `:`
-    custom<ShapedFunctionType>(ref($operands),
-                               type($operands), $operand_sizes,
+    `(` $resource_operands `)` attr-dict `:`
+    custom<ShapedFunctionType>(ref($resource_operands),
+                               type($resource_operands), $resource_operand_sizes,
                                type($results), $result_sizes,
                                $tied_operands)
   }];
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) {
-      return findValueSizeInList(idx, getOperands(), operand_sizes());
+      return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
     Value getResultSize(unsigned idx) {
-      return findValueSizeInList(idx, getResults(), result_sizes());
+      return findValueSizeInList(idx, getResults(), getResultSizes());
     }
   }];
 
@@ -1922,8 +1922,8 @@ def Stream_AsyncExecuteOp : Stream_Op<"async.execute", [
     Variadic<AnyTypeOf<[
       Stream_AnyStreamResource,
       Stream_StagingResource,
-    ]>>:$operands,
-    Variadic<Stream_Size>:$operand_sizes,
+    ]>>:$resource_operands,
+    Variadic<Stream_Size>:$resource_operand_sizes,
     Variadic<Stream_Size>:$result_sizes,
     Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
@@ -1943,7 +1943,8 @@ def Stream_AsyncExecuteOp : Stream_Op<"async.execute", [
     (`on` `(` $affinity^ `)`)?
     (`await` `(` $await_timepoint^ `)` `=` `` `>`)?
     `with` ``
-    custom<ResourceRegion>($operands, type($operands), $operand_sizes,
+    custom<ResourceRegion>($resource_operands,
+                           type($resource_operands), $resource_operand_sizes,
                            type($results), $result_sizes,
                            $tied_operands, $body)
     `=` `` `>` type($result_timepoint)
@@ -1955,17 +1956,17 @@ def Stream_AsyncExecuteOp : Stream_Op<"async.execute", [
     OpBuilder<(ins
       "TypeRange":$resultTypes, "ValueRange":$resultSizes,
       "Value":$awaitTimepoint,
-      "ValueRange":$operands, "ValueRange":$operandSizes,
+      "ValueRange":$resourceOperands, "ValueRange":$resourceOperandSizes,
       "ArrayRef<int64_t>":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) {
-      return findValueSizeInList(idx, getOperands(), operand_sizes());
+      return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
     Value getResultSize(unsigned idx) {
-      return findValueSizeInList(idx, getResults(), result_sizes());
+      return findValueSizeInList(idx, getResults(), getResultSizes());
     }
   }];
 
@@ -2035,8 +2036,8 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
     Variadic<AnyTypeOf<[
       Stream_AnyStreamResource,
       Stream_StagingResource,
-    ]>>:$operands,
-    Variadic<Stream_Size>:$operand_sizes,
+    ]>>:$resource_operands,
+    Variadic<Stream_Size>:$resource_operand_sizes,
     Variadic<Stream_Size>:$result_sizes,
     OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
     OptionalAttr<Stream_AffinityAttr>:$affinity
@@ -2053,7 +2054,8 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
     `with` ``
-    custom<ResourceRegion>($operands, type($operands), $operand_sizes,
+    custom<ResourceRegion>($resource_operands,
+                           type($resource_operands), $resource_operand_sizes,
                            type($results), $result_sizes,
                            $tied_operands, $body)
     attr-dict-with-keyword
@@ -2063,17 +2065,17 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
   let builders = [
     OpBuilder<(ins
       "TypeRange":$resultTypes, "ValueRange":$resultSizes,
-      "ValueRange":$operands, "ValueRange":$operandSizes,
+      "ValueRange":$resourceOperands, "ValueRange":$resourceOperandSizes,
       "ArrayRef<int64_t>":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) {
-      return findValueSizeInList(idx, getOperands(), operand_sizes());
+      return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
     Value getResultSize(unsigned idx) {
-      return findValueSizeInList(idx, getResults(), result_sizes());
+      return findValueSizeInList(idx, getResults(), getResultSizes());
     }
   }];
 
@@ -2116,7 +2118,7 @@ def Stream_CmdFlushOp : Stream_Op<"cmd.flush", [
   }];
 
   let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return target_size(); }
+    Value getOperandSize(unsigned idx) { return getTargetSize(); }
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
@@ -2155,7 +2157,7 @@ def Stream_CmdInvalidateOp : Stream_Op<"cmd.invalidate", [
   }];
 
   let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return target_size(); }
+    Value getOperandSize(unsigned idx) { return getTargetSize(); }
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
@@ -2192,7 +2194,7 @@ def Stream_CmdDiscardOp : Stream_Op<"cmd.discard", [
   }];
 
   let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return target_size(); }
+    Value getOperandSize(unsigned idx) { return getTargetSize(); }
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
@@ -2231,7 +2233,7 @@ def Stream_CmdFillOp : Stream_Op<"cmd.fill", [
   }];
 
   let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return target_size(); }
+    Value getOperandSize(unsigned idx) { return getTargetSize(); }
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
@@ -2275,7 +2277,7 @@ def Stream_CmdCopyOp : Stream_Op<"cmd.copy", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) {
-      return idx == 0 ? source_size() : target_size();
+      return idx == 0 ? getSourceSize() : getTargetSize();
     }
     Value getResultSize(unsigned idx) { return {}; }
   }];
@@ -2303,7 +2305,7 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
   let arguments = (ins
     Variadic<Index>:$workload,
     SymbolRefAttr:$entry_point,
-    Variadic<Stream_PrimitiveType>:$operands,
+    Variadic<Stream_PrimitiveType>:$uniform_operands,
     Variadic<Stream_AnyStreamResource>:$resources,
     Variadic<Stream_Size>:$resource_sizes,
     Variadic<Stream_Offset>:$resource_offsets,
@@ -2315,7 +2317,7 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
   let assemblyFormat = [{
     $entry_point
     (`[` $workload^ `]`)? ``
-    (`(` $operands^ `:` type($operands) `)`)? `{`
+    (`(` $uniform_operands^ `:` type($uniform_operands) `)`)? `{`
     custom<DispatchResources>($resources, type($resources), $resource_sizes,
                               $resource_offsets, $resource_lengths,
                               $resource_accesses)
@@ -2327,7 +2329,7 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
     Value getOperandSize(unsigned idx) {
       return findValueSizeInList(
           idx - getODSOperandIndexAndLength(2).first,
-          resources(), resource_sizes());
+          getResources(), getResourceSizes());
     }
     Value getResultSize(unsigned idx) { return {}; }
 
@@ -2371,8 +2373,8 @@ def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
     Variadic<AnyTypeOf<[
       Stream_AnyStreamResource,
       Stream_StagingResource,
-    ]>>:$operands,
-    Variadic<Stream_Size>:$operand_sizes,
+    ]>>:$resource_operands,
+    Variadic<Stream_Size>:$resource_operand_sizes,
     Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
@@ -2386,7 +2388,8 @@ def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
     (`on` `(` $affinity^ `)`)?
     (`await` `(` $await_timepoint^ `)` `=` `` `>`)?
     `with` ``
-    custom<ExplicitResourceRegion>($operands, type($operands), $operand_sizes,
+    custom<ExplicitResourceRegion>($resource_operands,
+                                   type($resource_operands), $resource_operand_sizes,
                                    $body)
     `=` `` `>` type($result_timepoint)
     attr-dict-with-keyword
@@ -2396,13 +2399,13 @@ def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
   let builders = [
     OpBuilder<(ins
       "Value":$awaitTimepoint,
-      "ValueRange":$operands, "ValueRange":$operandSizes,
+      "ValueRange":$resourceOperands, "ValueRange":$resourceOperandSizes,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) {
-      return findValueSizeInList(idx, getOperands(), operand_sizes());
+      return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
     Value getResultSize(unsigned idx) {
       return {};
@@ -2682,8 +2685,8 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
     Variadic<AnyTypeOf<[
       Stream_AnyStreamResource,
       Stream_StagingResource,
-    ]>>:$operands,
-    Variadic<Stream_Size>:$operand_sizes,
+    ]>>:$resource_operands,
+    Variadic<Stream_Size>:$resource_operand_sizes,
     Stream_Timepoint:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
@@ -2697,25 +2700,26 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
     $await_timepoint `=` `` `>`
-    $operands `:`
-    custom<SizeAwareTypeList>(type($operands), type($results), $operand_sizes)
+    $resource_operands `:`
+    custom<SizeAwareTypeList>(type($resource_operands),
+                              type($results), $resource_operand_sizes)
     attr-dict-with-keyword
   }];
 
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins
-      "ValueRange":$operands, "ValueRange":$operandSizes,
+      "ValueRange":$resourceOperands, "ValueRange":$resourceOperandSizes,
       "Value":$await_timepoint,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) {
-      return operand_sizes()[idx];
+      return getResourceOperandSizes()[idx];
     }
     Value getResultSize(unsigned idx) {
-      return operand_sizes()[idx];
+      return getResourceOperandSizes()[idx];
     }
   }];
 
@@ -2762,7 +2766,7 @@ def Stream_ExecutableOp : Stream_Op<"executable", [
   ];
 
   let extraClassDeclaration = [{
-    Block& getBlock() { return body().front(); }
+    Block& getBlock() { return getBody().front(); }
     ::mlir::ModuleOp getInnerModule() {
       return *getBlock().getOps<::mlir::ModuleOp>().begin();
     }
@@ -2817,7 +2821,7 @@ def Stream_ExecutableExportOp : Stream_Op<"executable.export", [
   ];
 
   let extraClassDeclaration = [{
-    ::mlir::func::FuncOp getFunctionRef();
+    ::mlir::func::FuncOp lookupFunctionRef();
   }];
 
   let hasVerifier = 1;
@@ -2850,7 +2854,7 @@ def Stream_BindingSubspanOp : Stream_PureOp<"binding.subspan", [
 
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
-    ValueRange getResultDynamicDims(unsigned idx) { return dynamic_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getDynamicDims(); }
   }];
 }
 
@@ -2911,13 +2915,15 @@ def Stream_YieldOp : Stream_Op<"yield", [
     Variadic<AnyTypeOf<[
       Stream_AnyStreamResource,
       Stream_StagingResource,
-    ]>>:$operands,
-    Variadic<Index>:$operand_sizes
+    ]>>:$resource_operands,
+    Variadic<Index>:$resource_operand_sizes
   );
 
   let assemblyFormat = [{
     attr-dict
-    ($operands^ `:` custom<SizeAwareTypeList>(type($operands), $operand_sizes))?
+    ($resource_operands^ `:`
+        custom<SizeAwareTypeList>(type($resource_operands),
+                                  $resource_operand_sizes))?
   }];
 
   let builders = [
@@ -2929,7 +2935,7 @@ def Stream_YieldOp : Stream_Op<"yield", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) {
-      return findValueSizeInList(idx, getOperands(), operand_sizes());
+      return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
     Value getResultSize(unsigned idx) { return {}; }
   }];

@@ -298,17 +298,17 @@ class DumpDispatchGraphPass
                                AsmState &state) {
     printResultsAndName(os, op.getOperation(), state);
     os << " ";
-    op.source().printAsOperand(os, state);
-    os << " -> " << op.result().getType();
+    op.getSource().printAsOperand(os, state);
+    os << " -> " << op.getResult().getType();
     os << "\r";
   }
 
   void printDispatchTensorStore(raw_ostream &os, DispatchTensorStoreOp op,
                                 AsmState &state) {
     os << op->getName() << " ";
-    op.value().printAsOperand(os, state);
+    op.getValue().printAsOperand(os, state);
     os << ", ";
-    op.target().printAsOperand(os, state);
+    op.getTarget().printAsOperand(os, state);
     os << "\r";
   }
 
@@ -366,7 +366,7 @@ class DumpDispatchGraphPass
   void printDispatchBody(raw_ostream &os, DispatchOp &dispatchOp) {
     // Find the entry point function from the dispatch entry point symbol
     // attribute.
-    auto entryPoint = dispatchOp.entry_point();
+    auto entryPoint = dispatchOp.getEntryPoint();
     auto executableOp = cast<ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
         dispatchOp, entryPoint.getRootReference()));
     if (!executableOp) return;
@@ -431,13 +431,13 @@ class DumpDispatchGraphPass
         if (auto dispatch = dyn_cast<DispatchOp>(op)) {
           // print workload
           os << "[";
-          printOperands(os, dispatch.workload(), state);
+          printOperands(os, dispatch.getWorkload(), state);
           os << "]\n";
 
           // Print entry function name, if there is only one entry function,
           // then the name space and the entry function names are the same,
           // and we can just print the function name to save space.
-          auto entryPoint = dispatch.entry_point();
+          auto entryPoint = dispatch.getEntryPoint();
           auto rootName = entryPoint.getRootReference();
           auto leafName = entryPoint.getLeafReference();
           if (rootName == leafName) {
@@ -448,7 +448,7 @@ class DumpDispatchGraphPass
 
           // print entry function args
           os << "(";
-          printOperands(os, dispatch.operands(), state);
+          printOperands(os, dispatch.getArguments(), state);
           os << ")\n";
 
           printDispatchBody(os, dispatch);

@@ -62,7 +62,7 @@ std::array<int64_t, 3> getWorkgroupSize(mlir::func::FuncOp funcOp) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
       mlir::iree_compiler::getEntryPoint(funcOp);
   llvm::Optional<mlir::ArrayAttr> workgroupSizeAttr =
-      exportOp->workgroup_size();
+      exportOp->getWorkgroupSize();
   assert(workgroupSizeAttr.hasValue());
   for (auto it : llvm::enumerate(workgroupSizeAttr.getValue())) {
     workgroupSize[it.index()] =

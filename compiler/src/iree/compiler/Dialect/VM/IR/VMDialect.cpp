@@ -83,7 +83,7 @@ struct VMInlinerInterface : public DialectInlinerInterface {
     // Don't inline functions with the 'noinline' attribute.
     // Useful primarily for benchmarking.
     if (auto funcOp = dyn_cast<VM::FuncOp>(src->getParentOp())) {
-      if (funcOp.noinline()) {
+      if (funcOp.getNoinline()) {
         return false;
       }
     }

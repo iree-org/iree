@@ -85,7 +85,7 @@ spirv::GlobalVariableOp createResourceVariable(Location loc, Type type,
 /// Returns the (set, binding) pair for the given interface op.
 std::pair<int32_t, int32_t> getInterfaceSetAndBinding(
     IREE::HAL::InterfaceBindingSubspanOp op) {
-  return {op.set().getSExtValue(), op.binding().getSExtValue()};
+  return {op.getSet().getSExtValue(), op.getBinding().getSExtValue()};
 }
 
 /// Scans all hal.interface.binding.subspan ops in `module`, creates their
@@ -172,10 +172,10 @@ struct HALInterfaceLoadConstantConverter final
     auto exportOps =
         llvm::to_vector<1>(variantOp.getOps<IREE::HAL::ExecutableExportOp>());
     assert(exportOps.size() == 1);
-    auto layoutAttr = exportOps.front().layout();
+    auto layoutAttr = exportOps.front().getLayout();
 
     uint64_t elementCount = layoutAttr.getPushConstants();
-    unsigned index = loadOp.index().getZExtValue();
+    unsigned index = loadOp.getIndex().getZExtValue();
 
     // The following function generates SPIR-V ops with i32 types. So it does
     // type "conversion" (index -> i32) implicitly.
@@ -198,7 +198,7 @@ struct HALInterfaceWorkgroupIdAndCountConverter final
   LogicalResult matchAndRewrite(
       InterfaceOpTy op, typename InterfaceOpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    int32_t index = static_cast<int32_t>(op.dimension().getSExtValue());
+    int32_t index = static_cast<int32_t>(op.getDimension().getSExtValue());
     auto i32Type = rewriter.getIntegerType(32);
     Value spirvBuiltin =
         spirv::getBuiltinVariableValue(op, builtin, i32Type, rewriter);

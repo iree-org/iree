@@ -92,7 +92,7 @@ static LogicalResult verifyLoweringConfiguration(
 static LogicalResult verifyEntryPoint(
     ModuleOp moduleOp, IREE::Codegen::TranslationInfoAttr translationInfo,
     IREE::HAL::ExecutableExportOp exportOp) {
-  Optional<mlir::ArrayAttr> workgroupSizeAttr = exportOp.workgroup_size();
+  Optional<mlir::ArrayAttr> workgroupSizeAttr = exportOp.getWorkgroupSize();
 
   if (workgroupSizeAttr.hasValue()) {
     std::array<int64_t, 3> workgroupSizes;

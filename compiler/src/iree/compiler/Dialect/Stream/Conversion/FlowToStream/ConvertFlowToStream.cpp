@@ -44,13 +44,14 @@ struct ConvertTensorReshapeOp
       IREE::Flow::TensorReshapeOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
-    auto source = consumeTensorOperand(op.getLoc(), adaptor.source(), rewriter);
-    auto resultSize =
-        buildResultSizeOf(op.getLoc(), op.result(), op.result_dims(), rewriter);
+    auto source =
+        consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
+    auto resultSize = buildResultSizeOf(op.getLoc(), op.getResult(),
+                                        op.getResultDims(), rewriter);
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorCloneOp>(
-        op, unknownType, source.resource, op.source().getType(),
-        op.source_dims(), source.resourceSize, op.result().getType(),
-        adaptor.result_dims(), resultSize,
+        op, unknownType, source.resource, op.getSource().getType(),
+        op.getSourceDims(), source.resourceSize, op.getResult().getType(),
+        adaptor.getResultDims(), resultSize,
         /*affinity=*/nullptr);
     return success();
   }
@@ -63,10 +64,10 @@ struct ConvertTensorEmptyOp
       IREE::Flow::TensorEmptyOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     Type unknownType = IREE::Stream::ResourceType::get(getContext());
-    auto resultSize =
-        buildResultSizeOf(op.getLoc(), op.result(), op.result_dims(), rewriter);
+    auto resultSize = buildResultSizeOf(op.getLoc(), op.getResult(),
+                                        op.getResultDims(), rewriter);
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorEmptyOp>(
-        op, unknownType, op.result().getType(), adaptor.result_dims(),
+        op, unknownType, op.getResult().getType(), adaptor.getResultDims(),
         resultSize,
         /*affinity=*/nullptr);
     return success();
@@ -80,11 +81,11 @@ struct ConvertTensorSplatOp
       IREE::Flow::TensorSplatOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
-    auto resultSize =
-        buildResultSizeOf(op.getLoc(), op.result(), op.result_dims(), rewriter);
+    auto resultSize = buildResultSizeOf(op.getLoc(), op.getResult(),
+                                        op.getResultDims(), rewriter);
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorSplatOp>(
-        op, unknownType, adaptor.value(), op.result().getType(),
-        adaptor.result_dims(), resultSize,
+        op, unknownType, adaptor.getValue(), op.getResult().getType(),
+        adaptor.getResultDims(), resultSize,
         /*affinity=*/nullptr);
     return success();
   }
@@ -98,11 +99,11 @@ struct ConvertTensorCloneOp
       ConversionPatternRewriter &rewriter) const override {
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto operand =
-        consumeTensorOperand(op.getLoc(), adaptor.operand(), rewriter);
+        consumeTensorOperand(op.getLoc(), adaptor.getOperand(), rewriter);
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorCloneOp>(
-        op, unknownType, operand.resource, op.operand().getType(),
-        op.operand_dims(), operand.resourceSize, op.result().getType(),
-        adaptor.operand_dims(), operand.resourceSize,
+        op, unknownType, operand.resource, op.getOperand().getType(),
+        op.getArgumentDims(), operand.resourceSize, op.getResult().getType(),
+        adaptor.getArgumentDims(), operand.resourceSize,
         /*affinity=*/nullptr);
     return success();
   }
@@ -115,13 +116,14 @@ struct ConvertTensorSliceOp
       IREE::Flow::TensorSliceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
-    auto source = consumeTensorOperand(op.getLoc(), adaptor.source(), rewriter);
-    auto resultSize =
-        buildResultSizeOf(op.getLoc(), op.result(), op.result_dims(), rewriter);
+    auto source =
+        consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
+    auto resultSize = buildResultSizeOf(op.getLoc(), op.getResult(),
+                                        op.getResultDims(), rewriter);
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorSliceOp>(
-        op, unknownType, source.resource, op.source().getType(),
-        op.source_dims(), source.resourceSize, adaptor.start_indices(),
-        adaptor.lengths(), op.result().getType(), adaptor.result_dims(),
+        op, unknownType, source.resource, op.getSource().getType(),
+        op.getSourceDims(), source.resourceSize, adaptor.getStartIndices(),
+        adaptor.getLengths(), op.getResult().getType(), adaptor.getResultDims(),
         resultSize,
         /*affinity=*/nullptr);
     return success();
@@ -134,13 +136,15 @@ struct ConvertTensorUpdateOp
   LogicalResult matchAndRewrite(
       IREE::Flow::TensorUpdateOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto update = consumeTensorOperand(op.getLoc(), adaptor.update(), rewriter);
-    auto target = consumeTensorOperand(op.getLoc(), adaptor.target(), rewriter);
+    auto update =
+        consumeTensorOperand(op.getLoc(), adaptor.getUpdate(), rewriter);
+    auto target =
+        consumeTensorOperand(op.getLoc(), adaptor.getTarget(), rewriter);
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorUpdateOp>(
-        op, target.resource.getType(), target.resource, op.target().getType(),
-        adaptor.target_dims(), target.resourceSize, adaptor.start_indices(),
-        update.resource, op.update().getType(), op.update_dims(),
-        update.resourceSize,
+        op, target.resource.getType(), target.resource,
+        op.getTarget().getType(), adaptor.getTargetDims(), target.resourceSize,
+        adaptor.getStartIndices(), update.resource, op.getUpdate().getType(),
+        op.getUpdateDims(), update.resourceSize,
         /*affinity=*/nullptr);
     return success();
   }
@@ -152,8 +156,9 @@ struct ConvertTensorLoadOp
   LogicalResult matchAndRewrite(
       IREE::Flow::TensorLoadOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto resultType = getTypeConverter()->convertType(op.result().getType());
-    auto source = consumeTensorOperand(op.getLoc(), adaptor.source(), rewriter);
+    auto resultType = getTypeConverter()->convertType(op.getResult().getType());
+    auto source =
+        consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
 
     auto stagingType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::Staging);
@@ -167,8 +172,8 @@ struct ConvertTensorLoadOp
     }
 
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorLoadOp>(
-        op, resultType, loadSource, op.source().getType(), op.source_dims(),
-        source.resourceSize, adaptor.indices());
+        op, resultType, loadSource, op.getSource().getType(),
+        op.getSourceDims(), source.resourceSize, adaptor.getIndices());
     return success();
   }
 };
@@ -179,7 +184,8 @@ struct ConvertTensorStoreOp
   LogicalResult matchAndRewrite(
       IREE::Flow::TensorStoreOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto target = consumeTensorOperand(op.getLoc(), adaptor.target(), rewriter);
+    auto target =
+        consumeTensorOperand(op.getLoc(), adaptor.getTarget(), rewriter);
 
     auto stagingType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::Staging);
@@ -193,11 +199,11 @@ struct ConvertTensorStoreOp
     }
 
     auto newOp = rewriter.create<IREE::Stream::TensorStoreOp>(
-        op.getLoc(), storeTarget.getType(), storeTarget, op.target().getType(),
-        adaptor.target_dims(), target.resourceSize, adaptor.indices(),
-        adaptor.value());
+        op.getLoc(), storeTarget.getType(), storeTarget,
+        op.getTarget().getType(), adaptor.getTargetDims(), target.resourceSize,
+        adaptor.getIndices(), adaptor.getValue());
 
-    Value newResult = newOp.result();
+    Value newResult = newOp.getResult();
     if (target.resource.getType() != stagingType) {
       newResult = rewriter.createOrFold<IREE::Stream::AsyncTransferOp>(
           op.getLoc(), target.resource.getType(), newResult,
@@ -241,8 +247,8 @@ struct ConvertTensorTraceOp
           source.resourceSize,
           /*affinity=*/nullptr));
     }
-    rewriter.replaceOpWithNewOp<IREE::Stream::TensorTraceOp>(op, adaptor.key(),
-                                                             exportedTensors);
+    rewriter.replaceOpWithNewOp<IREE::Stream::TensorTraceOp>(
+        op, adaptor.getKey(), exportedTensors);
     return success();
   }
 };
@@ -256,7 +262,8 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
     SmallVector<Value> dispatchOperands;
     SmallVector<Value> dispatchOperandSizes;
     SmallVector<Value> operandSizes;
-    for (auto oldNewOperand : llvm::zip(op.operands(), adaptor.operands())) {
+    for (auto oldNewOperand :
+         llvm::zip(op.getArguments(), adaptor.getArguments())) {
       auto oldOperand = std::get<0>(oldNewOperand);
       auto newOperand = std::get<1>(oldNewOperand);
       if (oldOperand.getType().isa<ShapedType>()) {
@@ -276,7 +283,7 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
     SmallVector<Type> resultTypes;
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto tiedOperandBase = op.getTiedOperandsIndexAndLength().first;
-    for (auto result : llvm::enumerate(op.results())) {
+    for (auto result : llvm::enumerate(op.getResults())) {
       auto oldResultType = result.value().getType();
       if (!oldResultType.isa<ShapedType>()) {
         resultTypes.push_back(getTypeConverter()->convertType(oldResultType));
@@ -297,9 +304,9 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
     }
 
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncDispatchOp>(
-        op, resultTypes, adaptor.workload(), adaptor.entry_point(),
+        op, resultTypes, adaptor.getWorkload(), adaptor.getEntryPoint(),
         dispatchOperands, dispatchOperandSizes, resultSizes,
-        adaptor.tied_operandsAttr(),
+        adaptor.getTiedOperandsAttr(),
         /*affinity=*/nullptr);
     return success();
   }
@@ -335,7 +342,7 @@ static bool insertBindingOp(BlockArgument arg,
       // Found a tie shape op - we'll insert ourselves there.
       ip = builder.saveInsertionPoint();
       builder.setInsertionPoint(tieShapeOp);
-      dynamicDims = tieShapeOp.dynamic_dims();
+      dynamicDims = tieShapeOp.getDynamicDims();
     } else {
       // The issue here is that at this point we no longer have the information
       // we need to reconstitute the dimensions. We expect that whoever created
@@ -354,7 +361,7 @@ static bool insertBindingOp(BlockArgument arg,
 
   auto subspanOp = builder.create<IREE::Stream::BindingSubspanOp>(
       arg.getLoc(), tensorType, arg, zero, dynamicDims);
-  arg.replaceAllUsesExcept(subspanOp.result(), subspanOp);
+  arg.replaceAllUsesExcept(subspanOp.getResult(), subspanOp);
 
   // If we needed to insert at a special point restore back to the original
   // insertion point to keep the ops ordered with arguments.
@@ -386,20 +393,22 @@ struct ConvertExecutableOp
       ConversionPatternRewriter &rewriter) const override {
     // flow.executable -> stream.executable
     auto streamOp = rewriter.create<IREE::Stream::ExecutableOp>(
-        flowOp.getLoc(), flowOp.sym_name());
+        flowOp.getLoc(), flowOp.getSymName());
     streamOp.setVisibility(flowOp.getVisibility());
     streamOp->setDialectAttrs(flowOp->getDialectAttrs());
-    rewriter.setInsertionPointToStart(&streamOp.body().front());
+    rewriter.setInsertionPointToStart(&streamOp.getBody().front());
 
     // flow.executable.export -> stream.executable.export
     for (auto exportOp : flowOp.getOps<IREE::Flow::ExecutableExportOp>()) {
       auto newOp = rewriter.create<IREE::Stream::ExecutableExportOp>(
-          exportOp.getLoc(), exportOp.sym_name(), exportOp.function_refAttr());
+          exportOp.getLoc(), exportOp.getSymName(),
+          exportOp.getFunctionRefAttr());
       newOp->setDialectAttrs(exportOp->getDialectAttrs());
-      if (!exportOp.workgroup_count().empty()) {
+      if (!exportOp.getWorkgroupCount().empty()) {
         mlir::BlockAndValueMapping mapper;
-        exportOp.workgroup_count().cloneInto(&newOp.workgroup_count(), mapper);
-        convertReturnOps(newOp.workgroup_count());
+        exportOp.getWorkgroupCount().cloneInto(&newOp.getWorkgroupCount(),
+                                               mapper);
+        convertReturnOps(newOp.getWorkgroupCount());
       }
     }
 
@@ -440,7 +449,7 @@ struct ConvertExecutableOp
 
       // Strip any shape ties now that we've extracted the information.
       funcOp.walk([&](IREE::Flow::DispatchTieShapeOp tieOp) {
-        rewriter.replaceOp(tieOp, tieOp.operand());
+        rewriter.replaceOp(tieOp, tieOp.getOperand());
       });
 
       funcOp.setType(rewriter.getFunctionType(newTypes, {}));

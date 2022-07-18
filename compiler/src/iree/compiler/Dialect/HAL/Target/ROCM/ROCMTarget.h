@@ -19,7 +19,7 @@ namespace HAL {
 void registerROCMTargetBackends();
 
 // Links LLVM module to ROC Device Library Bit Code
-void LinkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
+void linkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
                           std::string bitCodeDir);
 
 // Compiles ISAToHsaco Code

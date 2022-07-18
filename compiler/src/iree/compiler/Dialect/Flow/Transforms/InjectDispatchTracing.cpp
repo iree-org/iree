@@ -37,9 +37,9 @@ class InjectDispatchTracingPass
     auto funcOp = getOperation();
     for (auto dispatchOp : funcOp.getBody().getOps<DispatchOp>()) {
       std::string entryPointName =
-          dispatchOp.entry_point().getRootReference().getValue().str();
+          dispatchOp.getEntryPoint().getRootReference().getValue().str();
       for (FlatSymbolRefAttr nestedRef :
-           dispatchOp.entry_point().getNestedReferences()) {
+           dispatchOp.getEntryPoint().getNestedReferences()) {
         entryPointName = (entryPointName + "::" + nestedRef.getValue()).str();
       }
 
@@ -48,14 +48,14 @@ class InjectDispatchTracingPass
       builder.create<TensorTraceOp>(
           dispatchOp.getLoc(),
           builder.getStringAttr(entryPointName + " inputs"),
-          filterTensorValues(dispatchOp.operands()));
+          filterTensorValues(dispatchOp.getArguments()));
 
       // Output tensors:
       builder.setInsertionPointAfter(dispatchOp);
       builder.create<TensorTraceOp>(
           dispatchOp.getLoc(),
           builder.getStringAttr(entryPointName + " outputs"),
-          filterTensorValues(dispatchOp.results()));
+          filterTensorValues(dispatchOp.getResults()));
     }
   }
 };

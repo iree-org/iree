@@ -111,8 +111,8 @@ static Value getTensorLoadOpForTensorStoreOp(
   loadSizes = cloneIndexValues(storeOp.getMixedSizes());
   loadStrides = cloneIndexValues(storeOp.getMixedStrides());
   Value tensorLoadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
-      storeOp.getLoc(), storeOp.value().getType().cast<RankedTensorType>(),
-      storeOp.target(), storeOp.target_dims(), loadOffsets, loadSizes,
+      storeOp.getLoc(), storeOp.getValue().getType().cast<RankedTensorType>(),
+      storeOp.getTarget(), storeOp.getTargetDims(), loadOffsets, loadSizes,
       loadStrides);
   return tensorLoadOp;
 }
@@ -227,7 +227,7 @@ static LogicalResult modifyResultToUseStoreBuffer(
 
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPointToStart(storeOp->getBlock());
-  if (auto sourceDefiningOp = storeOp.target().getDefiningOp()) {
+  if (auto sourceDefiningOp = storeOp.getTarget().getDefiningOp()) {
     if (sourceDefiningOp->getBlock() == storeOp->getBlock()) {
       b.setInsertionPointAfter(sourceDefiningOp);
     }

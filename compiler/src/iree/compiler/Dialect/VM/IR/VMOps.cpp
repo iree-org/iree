@@ -178,9 +178,9 @@ ParseResult ExportOp::parse(OpAsmParser &parser, OperationState &result) {
 void ExportOp::print(OpAsmPrinter &p) {
   Operation *op = getOperation();
   p << ' ';
-  p.printSymbolName(function_ref());
-  if (export_name() != function_ref()) {
-    p << " as(\"" << export_name() << "\")";
+  p.printSymbolName(getFunctionRef());
+  if (getExportName() != getFunctionRef()) {
+    p << " as(\"" << getExportName() << "\")";
   }
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(), /*elidedAttrs=*/{"function_ref", "export_name"});
@@ -204,8 +204,8 @@ void ExportOp::build(OpBuilder &builder, OperationState &result,
 LogicalResult ExportOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   Operation *op = getOperation();
   if (!symbolTable.lookupNearestSymbolFrom<IREE::VM::FuncOp>(
-          op, function_refAttr())) {
-    return op->emitError() << "vm.func op named '" << function_ref()
+          op, getFunctionRefAttr())) {
+    return op->emitError() << "vm.func op named '" << getFunctionRef()
                            << "' not found for export";
   }
   return success();
@@ -274,7 +274,7 @@ ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
 void ImportOp::print(OpAsmPrinter &p) {
   Operation *op = getOperation();
   p << ' ';
-  if (is_optional()) {
+  if (getIsOptional()) {
     p << "optional ";
   }
   p.printSymbolName(getName());
@@ -359,7 +359,7 @@ void InitializerOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDictWithKeyword(op->getAttrs(),
                                      /*elidedAttrs=*/{"function_type"});
   p << " ";
-  p.printRegion(body());
+  p.printRegion(getBody());
 }
 
 Block *InitializerOp::addEntryBlock() {
@@ -419,9 +419,10 @@ LogicalResult verifyGlobalOp(Operation *op) {
 
 LogicalResult GlobalAddressOp::verify() {
   Operation *op = getOperation();
-  auto *globalOp = op->getParentOfType<VM::ModuleOp>().lookupSymbol(global());
+  auto *globalOp =
+      op->getParentOfType<VM::ModuleOp>().lookupSymbol(getGlobal());
   if (!globalOp) {
-    return op->emitOpError() << "Undefined global: " << global();
+    return op->emitOpError() << "Undefined global: " << getGlobal();
   }
   return success();
 }
@@ -442,47 +443,47 @@ static void addMemoryEffectsForGlobal(
 
 void GlobalLoadI32Op::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalI32Op>(*this, globalAttr(), effects);
+  addMemoryEffectsForGlobal<GlobalI32Op>(*this, getGlobalAttr(), effects);
 }
 
 void GlobalLoadI32Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
-  setResultName(setNameFn, getResult(), global());
+  setResultName(setNameFn, getResult(), getGlobal());
 }
 
 void GlobalLoadI64Op::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalI64Op>(*this, globalAttr(), effects);
+  addMemoryEffectsForGlobal<GlobalI64Op>(*this, getGlobalAttr(), effects);
 }
 
 void GlobalLoadI64Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
-  setResultName(setNameFn, getResult(), global());
+  setResultName(setNameFn, getResult(), getGlobal());
 }
 
 void GlobalLoadF32Op::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalF32Op>(*this, globalAttr(), effects);
+  addMemoryEffectsForGlobal<GlobalF32Op>(*this, getGlobalAttr(), effects);
 }
 
 void GlobalLoadF32Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
-  setResultName(setNameFn, getResult(), global());
+  setResultName(setNameFn, getResult(), getGlobal());
 }
 
 void GlobalLoadF64Op::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalF64Op>(*this, globalAttr(), effects);
+  addMemoryEffectsForGlobal<GlobalF64Op>(*this, getGlobalAttr(), effects);
 }
 
 void GlobalLoadF64Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
-  setResultName(setNameFn, getResult(), global());
+  setResultName(setNameFn, getResult(), getGlobal());
 }
 
 void GlobalLoadRefOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalRefOp>(*this, globalAttr(), effects);
+  addMemoryEffectsForGlobal<GlobalRefOp>(*this, getGlobalAttr(), effects);
 }
 
 void GlobalLoadRefOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
-  setResultName(setNameFn, getResult(), global());
+  setResultName(setNameFn, getResult(), getGlobal());
 }
 
 LogicalResult verifyGlobalLoadOp(Operation *op) {
@@ -662,7 +663,8 @@ void ConstI32Op::build(OpBuilder &builder, OperationState &result,
 }
 
 void ConstI32Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
-  setResultIntegerName(setNameFn, getResult(), value().dyn_cast<IntegerAttr>());
+  setResultIntegerName(setNameFn, getResult(),
+                       getValue().dyn_cast<IntegerAttr>());
 }
 
 void ConstI32Op::build(OpBuilder &builder, OperationState &result,
@@ -693,7 +695,8 @@ void ConstI64Op::build(OpBuilder &builder, OperationState &result,
 }
 
 void ConstI64Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
-  setResultIntegerName(setNameFn, getResult(), value().dyn_cast<IntegerAttr>());
+  setResultIntegerName(setNameFn, getResult(),
+                       getValue().dyn_cast<IntegerAttr>());
 }
 
 // static
@@ -790,9 +793,10 @@ void RodataOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 
 LogicalResult ConstRefRodataOp::verify() {
   Operation *op = getOperation();
-  auto *rodataOp = op->getParentOfType<VM::ModuleOp>().lookupSymbol(rodata());
+  auto *rodataOp =
+      op->getParentOfType<VM::ModuleOp>().lookupSymbol(getRodata());
   if (!rodataOp) {
-    return op->emitOpError() << "Undefined rodata section: " << rodata();
+    return op->emitOpError() << "Undefined rodata section: " << getRodata();
   }
   return success();
 }
@@ -815,7 +819,7 @@ void ConstRefRodataOp::build(OpBuilder &builder, OperationState &result,
 }
 
 void ConstRefRodataOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
-  setResultName(setNameFn, getResult(), rodata());
+  setResultName(setNameFn, getResult(), getRodata());
 }
 
 //===----------------------------------------------------------------------===//
@@ -824,13 +828,13 @@ void ConstRefRodataOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
 
 LogicalResult ListGetRefOp::verify() {
   Operation *op = getOperation();
-  auto listType = list()
+  auto listType = getList()
                       .getType()
                       .cast<IREE::VM::RefType>()
                       .getObjectType()
                       .cast<IREE::VM::ListType>();
   auto elementType = listType.getElementType();
-  auto resultType = result().getType();
+  auto resultType = getResult().getType();
   if (!elementType.isa<IREE::VM::OpaqueType>()) {
     if (elementType.isa<IREE::VM::RefType>() !=
         resultType.isa<IREE::VM::RefType>()) {
@@ -852,13 +856,13 @@ LogicalResult ListGetRefOp::verify() {
 
 LogicalResult ListSetRefOp::verify() {
   Operation *op = getOperation();
-  auto listType = list()
+  auto listType = getList()
                       .getType()
                       .cast<IREE::VM::RefType>()
                       .getObjectType()
                       .cast<IREE::VM::ListType>();
   auto elementType = listType.getElementType();
-  auto valueType = value().getType();
+  auto valueType = getValue().getType();
   if (!elementType.isa<IREE::VM::OpaqueType>()) {
     if (elementType.isa<IREE::VM::RefType>() !=
         valueType.isa<IREE::VM::RefType>()) {
@@ -905,15 +909,15 @@ static ParseResult parseSwitchOp(OpAsmParser &parser, OperationState &result) {
 template <typename T>
 static void printSwitchOp(OpAsmPrinter &p, T &op) {
   p << " ";
-  p.printOperand(op.index());
+  p.printOperand(op.getIndex());
   p << "[";
-  p.printOperands(op.values());
+  p.printOperands(op.getValues());
   p << "]";
   p << " else ";
-  p.printOperand(op.default_value());
+  p.printOperand(op.getDefaultValue());
   p.printOptionalAttrDict(op->getAttrs());
   p << " : ";
-  p.printType(op.default_value().getType());
+  p.printType(op.getDefaultValue().getType());
 }
 
 ParseResult SwitchRefOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -1030,8 +1034,6 @@ void CmpNZRefOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
 // Control flow
 //===----------------------------------------------------------------------===//
 
-Block *BranchOp::getDest() { return getOperation()->getSuccessor(0); }
-
 void BranchOp::setDest(Block *block) {
   return getOperation()->setSuccessor(block, 0);
 }
@@ -1042,7 +1044,7 @@ void BranchOp::eraseOperand(unsigned index) {
 
 SuccessorOperands BranchOp::getSuccessorOperands(unsigned index) {
   assert(index == 0 && "invalid successor index");
-  return SuccessorOperands(destOperandsMutable());
+  return SuccessorOperands(getDestOperandsMutable());
 }
 
 void CallOp::getEffects(
@@ -1215,7 +1217,7 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
   p << ' ' << op->getAttr("callee") << '(';
   int operand = 0;
   llvm::interleaveComma(
-      llvm::zip(segment_sizes(), segment_types()), p,
+      llvm::zip(getSegmentSizes(), getSegmentTypes()), p,
       [&](std::tuple<APInt, Attribute> segmentSizeType) {
         int segmentSize = std::get<0>(segmentSizeType).getSExtValue();
         Type segmentType =
@@ -1253,7 +1255,7 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
                           });
   p << " : (";
   llvm::interleaveComma(
-      llvm::zip(segment_sizes(), segment_types()), p,
+      llvm::zip(getSegmentSizes(), getSegmentTypes()), p,
       [&](std::tuple<APInt, Attribute> segmentSizeType) {
         int segmentSize = std::get<0>(segmentSizeType).getSExtValue();
         Type segmentType =
@@ -1275,8 +1277,8 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
 
 SuccessorOperands CondBranchOp::getSuccessorOperands(unsigned index) {
   assert(index < getNumSuccessors() && "invalid successor index");
-  return index == trueIndex ? SuccessorOperands(trueDestOperandsMutable())
-                            : SuccessorOperands(falseDestOperandsMutable());
+  return index == trueIndex ? SuccessorOperands(getTrueDestOperandsMutable())
+                            : SuccessorOperands(getFalseDestOperandsMutable());
 }
 
 LogicalResult verifyFailOp(Operation *op, Value statusVal) {
@@ -1323,19 +1325,19 @@ ParseResult CondFailOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void CondFailOp::print(OpAsmPrinter &p) {
   p << ' ';
-  if (condition() != status()) {
-    p << condition() << ", ";
+  if (getCondition() != getStatus()) {
+    p << getCondition() << ", ";
   }
-  p << status();
-  if (message().hasValue()) {
-    p << ", \"" << message().getValue() << "\"";
+  p << getStatus();
+  if (auto messageAttr = getMessage()) {
+    p << ", \"" << messageAttr.getValue() << "\"";
   }
   p.printOptionalAttrDict(getOperation()->getAttrs(),
                           /*elidedAttrs=*/{"message"});
 }
 
 void ImportResolvedOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
-  std::string name = ("has_" + import()).str();
+  std::string name = ("has_" + getImport()).str();
   std::replace(name.begin(), name.end(), '.', '_');
   setResultName(setNameFn, getResult(), name);
 }
@@ -1343,8 +1345,6 @@ void ImportResolvedOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
 //===----------------------------------------------------------------------===//
 // Async/fiber ops
 //===----------------------------------------------------------------------===//
-
-Block *YieldOp::getDest() { return getOperation()->getSuccessor(0); }
 
 void YieldOp::setDest(Block *block) {
   return getOperation()->setSuccessor(block, 0);
@@ -1356,14 +1356,12 @@ void YieldOp::eraseOperand(unsigned index) {
 
 SuccessorOperands YieldOp::getSuccessorOperands(unsigned index) {
   assert(index == 0 && "invalid successor index");
-  return SuccessorOperands(destOperandsMutable());
+  return SuccessorOperands(getDestOperandsMutable());
 }
 
 //===----------------------------------------------------------------------===//
 // Debugging
 //===----------------------------------------------------------------------===//
-
-Block *BreakOp::getDest() { return getOperation()->getSuccessor(0); }
 
 void BreakOp::setDest(Block *block) {
   return getOperation()->setSuccessor(block, 0);
@@ -1375,10 +1373,8 @@ void BreakOp::eraseOperand(unsigned index) {
 
 SuccessorOperands BreakOp::getSuccessorOperands(unsigned index) {
   assert(index == 0 && "invalid successor index");
-  return SuccessorOperands(destOperandsMutable());
+  return SuccessorOperands(getDestOperandsMutable());
 }
-
-Block *CondBreakOp::getDest() { return getOperation()->getSuccessor(0); }
 
 void CondBreakOp::setDest(Block *block) {
   return getOperation()->setSuccessor(block, 0);
@@ -1390,7 +1386,7 @@ void CondBreakOp::eraseOperand(unsigned index) {
 
 SuccessorOperands CondBreakOp::getSuccessorOperands(unsigned index) {
   assert(index == 0 && "invalid successor index");
-  return SuccessorOperands(destOperandsMutable());
+  return SuccessorOperands(getDestOperandsMutable());
 }
 
 }  // namespace VM

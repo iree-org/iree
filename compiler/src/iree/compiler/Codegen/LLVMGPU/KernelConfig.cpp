@@ -80,7 +80,7 @@ static void getTensorCoreConfig(
 static std::string getTargetArch(func::FuncOp entryPoint) {
   if (auto variantOp =
           entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
-    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
+    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
     if (auto config = targetAttr.getConfiguration()) {
       if (auto attr = config.getAs<StringAttr>("target_arch")) {
         return attr.getValue().str();
@@ -93,7 +93,7 @@ static std::string getTargetArch(func::FuncOp entryPoint) {
 bool isCudaTarget(func::FuncOp entryPoint) {
   if (auto variantOp =
           entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
-    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
+    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
     if (auto backend = targetAttr.getBackend()) {
       return backend.getValue().str() == kCudaTarget;
     }

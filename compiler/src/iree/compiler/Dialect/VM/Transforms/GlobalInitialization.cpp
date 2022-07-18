@@ -69,7 +69,7 @@ static void exportFuncIfNeeded(IREE::VM::ModuleOp moduleOp,
                                IREE::VM::FuncOp funcOp) {
   // Check for an existing export.
   for (auto exportOp : moduleOp.getOps<IREE::VM::ExportOp>()) {
-    if (exportOp.export_name() == funcOp.getName()) {
+    if (exportOp.getExportName() == funcOp.getName()) {
       // Already has an export.
       return;
     }
@@ -247,7 +247,7 @@ class GlobalInitializationPass
   LogicalResult appendPrimitiveInitialization(VMGlobalOp globalOp,
                                               OpBuilder &builder) {
     auto initialValue =
-        globalOp.getInitialValueAttr().getValueOr<Attribute>({});
+        globalOp.getInitialValueUntyped().getValueOr<Attribute>({});
     Value value = {};
     if (initialValue) {
       LogicalResult constResult = success();
@@ -346,7 +346,7 @@ class GlobalInitializationPass
                                   InlinerInterface &inlinerInterface,
                                   OpBuilder &builder) {
     auto result = mlir::inlineRegion(
-        inlinerInterface, &initializerOp.body(), builder.getInsertionBlock(),
+        inlinerInterface, &initializerOp.getBody(), builder.getInsertionBlock(),
         builder.getInsertionPoint(),
         /*inlinedOperands=*/ValueRange{},
         /*resultsToReplace=*/ValueRange{}, /*inlineLoc=*/llvm::None,

@@ -81,7 +81,7 @@ static bool materializeOperandCOW(Location loc, OpOperand &operand,
   auto size = sizeAwareType.queryValueSize(loc, operand.get(), builder);
   auto cloneOp = builder.create<IREE::Stream::AsyncCloneOp>(
       loc, resourceType, operand.get(), size, size, affinity);
-  operand.set(cloneOp.result());
+  operand.set(cloneOp.getResult());
   return true;
 }
 

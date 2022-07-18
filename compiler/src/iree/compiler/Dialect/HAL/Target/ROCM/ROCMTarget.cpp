@@ -132,24 +132,24 @@ class ROCMTargetBackend final : public TargetBackend {
     // Collect all the entry point names.
     llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps;
     for (auto op : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
-      exportOps[op.sym_name()] = op;
+      exportOps[op.getSymName()] = op;
     }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
       int32_t flatWgSize = 1;
       auto *llvmFunc = llvmModule->getFunction(func.getName());
       if (llvmFunc->isDeclaration()) continue;
-      std::array<int32_t, 3> workgroup_size;
+      std::array<int32_t, 3> workgroupSize;
       auto exportOp = exportOps[func.getName()];
-      if (Optional<ArrayAttr> workgroupSizeAttr = exportOp.workgroup_size()) {
+      if (Optional<ArrayAttr> workgroupSizeAttr = exportOp.getWorkgroupSize()) {
         for (auto it : llvm::enumerate(workgroupSizeAttr.getValue())) {
-          workgroup_size[it.index()] = it.value().cast<IntegerAttr>().getInt();
+          workgroupSize[it.index()] = it.value().cast<IntegerAttr>().getInt();
           flatWgSize *= it.value().cast<IntegerAttr>().getInt();
         }
       } else {
-        workgroup_size = {1, 1, 1};
+        workgroupSize = {1, 1, 1};
       }
-      workgroupSizes.push_back(workgroup_size);
+      workgroupSizes.push_back(workgroupSize);
       // For GPU kernels,
       // 1. Insert AMDGPU_KERNEL calling convention.
       // 2. Insert amdgpu-flat-workgroup-size(1, 256) attribute.
@@ -184,7 +184,7 @@ class ROCMTargetBackend final : public TargetBackend {
 
     // Link module to Device Library
     if (clROCMLinkBC) {
-      LinkROCDLIfNecessary(llvmModule.get(), clROCMTargetChip,
+      linkROCDLIfNecessary(llvmModule.get(), clROCMTargetChip,
                            clROCMBitcodeDir);
     }
 
@@ -223,8 +223,8 @@ class ROCMTargetBackend final : public TargetBackend {
 
     // Add the binary data to the target executable.
     executableBuilder.create<iree_compiler::IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.sym_name(),
-        variantOp.target().getFormat(),
+        variantOp.getLoc(), variantOp.getSymName(),
+        variantOp.getTarget().getFormat(),
         builder.getBufferAttr(executableBuilder.getContext()));
 
     if (!options.dumpIntermediatesPath.empty()) {

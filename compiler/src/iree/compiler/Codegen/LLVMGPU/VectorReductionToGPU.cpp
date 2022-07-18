@@ -143,7 +143,7 @@ struct LLVMGPUReduceToGPUPass
     }
 
     auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
-        getEntryPoint(funcOp)->workgroup_size().getValue(),
+        getEntryPoint(funcOp)->getWorkgroupSize().getValue(),
         [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
     assert(workgroupSize[1] == 1 && workgroupSize[2] == 1);
     // 2. Create the warp op and move the function body into it.

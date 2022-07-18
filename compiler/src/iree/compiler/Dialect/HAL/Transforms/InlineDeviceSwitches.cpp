@@ -86,17 +86,18 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
   // Create the blocks we'll use for all our conditions so that we can
   // reference them when inserting the branch ops.
   SmallVector<Block *, 4> conditionMatchBlocks(
-      switchOp.condition_regions().size());
+      switchOp.getConditionRegions().size());
   SmallVector<Block *, 4> conditionFallthroughBlocks(
-      switchOp.condition_regions().size());
+      switchOp.getConditionRegions().size());
   for (int i = 0; i < conditionMatchBlocks.size(); ++i) {
     conditionMatchBlocks[i] = funcBuilder.createBlock(afterBlock);
     conditionFallthroughBlocks[i] = funcBuilder.createBlock(afterBlock);
   }
 
   funcBuilder.setInsertionPoint(beforeBlock, beforeBlock->end());
-  for (auto condition : llvm::enumerate(llvm::zip(
-           switchOp.conditions().getValue(), switchOp.condition_regions()))) {
+  for (auto condition :
+       llvm::enumerate(llvm::zip(switchOp.getConditions().getValue(),
+                                 switchOp.getConditionRegions()))) {
     auto conditionAttr =
         std::get<0>(condition.value()).cast<IREE::HAL::MatchAttrInterface>();
     auto &conditionRegion = std::get<1>(condition.value());
@@ -105,7 +106,7 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
     // block that will contain the inlined region or don't match and need to
     // fall through.
     auto isMatch = conditionAttr.buildConditionExpression(
-        switchOp.getLoc(), switchOp.device(), funcBuilder);
+        switchOp.getLoc(), switchOp.getDevice(), funcBuilder);
     auto *matchBlock = conditionMatchBlocks[condition.index()];
     auto *fallthroughBlock = conditionFallthroughBlocks[condition.index()];
     funcBuilder.create<cf::CondBranchOp>(switchOp.getLoc(), isMatch, matchBlock,

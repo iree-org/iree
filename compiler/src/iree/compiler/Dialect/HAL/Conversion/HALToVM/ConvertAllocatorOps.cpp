@@ -34,14 +34,16 @@ class AllocatorAllocateInitializedOpConversion
             getTypeConverter()->convertType(op.getType()),
         },
         ArrayRef<Value>{
-            adaptor.allocator(),
-            rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(),
-                                                        op.memory_typesAttr()),
-            rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(),
-                                                        op.buffer_usageAttr()),
-            adaptor.source(),
-            castToImportType(adaptor.offset(), rewriter.getI64Type(), rewriter),
-            castToImportType(adaptor.length(), rewriter.getI64Type(), rewriter),
+            adaptor.getAllocator(),
+            rewriter.createOrFold<IREE::VM::ConstI32Op>(
+                op.getLoc(), op.getMemoryTypesAttr()),
+            rewriter.createOrFold<IREE::VM::ConstI32Op>(
+                op.getLoc(), op.getBufferUsageAttr()),
+            adaptor.getSource(),
+            castToImportType(adaptor.getOffset(), rewriter.getI64Type(),
+                             rewriter),
+            castToImportType(adaptor.getLength(), rewriter.getI64Type(),
+                             rewriter),
         });
     copyImportAttrs(importOp, callOp);
     return success();
@@ -68,21 +70,23 @@ class AllocatorTryMapOpConversion
     auto callOp = rewriter.create<IREE::VM::CallOp>(
         op.getLoc(), importOp.getName(),
         ArrayRef<Type>{
-            getTypeConverter()->convertType(op.result().getType()),
+            getTypeConverter()->convertType(op.getResult().getType()),
         },
         ArrayRef<Value>{
-            adaptor.allocator(),
+            adaptor.getAllocator(),
             rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), /*try=*/1),
-            rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(),
-                                                        op.memory_typesAttr()),
-            rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(),
-                                                        op.buffer_usageAttr()),
-            adaptor.source(),
-            castToImportType(adaptor.offset(), rewriter.getI64Type(), rewriter),
-            castToImportType(adaptor.length(), rewriter.getI64Type(), rewriter),
+            rewriter.createOrFold<IREE::VM::ConstI32Op>(
+                op.getLoc(), op.getMemoryTypesAttr()),
+            rewriter.createOrFold<IREE::VM::ConstI32Op>(
+                op.getLoc(), op.getBufferUsageAttr()),
+            adaptor.getSource(),
+            castToImportType(adaptor.getOffset(), rewriter.getI64Type(),
+                             rewriter),
+            castToImportType(adaptor.getLength(), rewriter.getI64Type(),
+                             rewriter),
         });
     copyImportAttrs(importOp, callOp);
-    auto result = callOp.results().front();
+    auto result = callOp.getResults().front();
     auto didMap = rewriter.create<IREE::VM::CmpNZRefOp>(
         op.getLoc(), rewriter.getI32Type(), result);
     rewriter.replaceOp(op, {didMap, result});

@@ -26,7 +26,7 @@ LogicalResult InferCustomKernelsTargetInfoFromParent(
   if (!variantOp) {
     return failure();
   }
-  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
+  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
   if (!targetAttr) {
     return failure();
   }

@@ -71,7 +71,7 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
       assert(bindingAttrs &&
              "interface materialization must annotate dispatch sites");
 
-      auto workloadValues = dispatchOp.workload();
+      auto workloadValues = dispatchOp.getWorkload();
       SmallVector<unsigned> workload;
       workload.reserve(workloadValues.size());
       for (auto workloadValue : workloadValues) {
@@ -84,7 +84,7 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
       }
 
       SmallVector<Binding> bindings;
-      for (auto it : llvm::zip(bindingAttrs, dispatchOp.resource_lengths())) {
+      for (auto it : llvm::zip(bindingAttrs, dispatchOp.getResourceLengths())) {
         auto bindingAttr =
             std::get<0>(it).cast<IREE::HAL::InterfaceBindingAttr>();
         APInt resourceLength;
@@ -98,7 +98,7 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
       }
 
       // Work around needing a mutable key for the set; C++ was a mistake.
-      auto &dispatchParamsSet = map[dispatchOp.entry_point()];
+      auto &dispatchParamsSet = map[dispatchOp.getEntryPoint()];
       DispatchParams *dispatchParams = nullptr;
       for (auto &it : dispatchParamsSet) {
         if (it.workload == workload) {
@@ -147,7 +147,7 @@ static IREE::Util::GlobalOp appendGlobalBuffer(
   // TODO(benvanik): real device lookup.
   auto device = initBuilder.create<IREE::HAL::ExSharedDeviceOp>(loc);
   auto allocator =
-      initBuilder.create<IREE::HAL::DeviceAllocatorOp>(loc, device).result();
+      initBuilder.create<IREE::HAL::DeviceAllocatorOp>(loc, device).getResult();
 
   auto memoryTypes = IREE::HAL::MemoryTypeBitfield::DeviceLocal;
   auto bufferUsage = IREE::HAL::BufferUsageBitfield::Transfer |
@@ -156,7 +156,7 @@ static IREE::Util::GlobalOp appendGlobalBuffer(
       loc, globalOp.getType(), allocator, memoryTypes, bufferUsage,
       indexSet.get(totalLength));
 
-  initBuilder.create<IREE::Util::GlobalStoreOp>(loc, allocateOp.result(),
+  initBuilder.create<IREE::Util::GlobalStoreOp>(loc, allocateOp.getResult(),
                                                 globalOp.getNameAttr());
   initBuilder.create<IREE::Util::InitializerReturnOp>(loc);
 
@@ -225,16 +225,16 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
           .create<IREE::HAL::CommandBufferCreateOp>(
               loc, funcBuilder.getType<IREE::HAL::CommandBufferType>(), device,
               commandBufferModes, IREE::HAL::CommandCategoryBitfield::Dispatch)
-          .result();
+          .getResult();
 
   // Get the layout required to set up the dispatches.
-  auto layoutAttr = exportOp.layoutAttr();
+  auto layoutAttr = exportOp.getLayoutAttr();
   auto executableLayout =
       funcBuilder
           .create<IREE::HAL::ExecutableLayoutLookupOp>(
               loc, IREE::HAL::ExecutableLayoutType::get(loc.getContext()),
               device, layoutAttr)
-          .result();
+          .getResult();
 
   // Push constant values.
   // TODO(benvanik): use push constants the program used? can help with
@@ -343,7 +343,7 @@ static mlir::OwningOpRef<mlir::ModuleOp> buildBenchmarkModule(
       sourceExecutableOp.getLoc(), sourceExecutableOp.getName());
   executableOp.setVisibility(sourceExecutableOp.getVisibility());
   auto variantOp = cast<IREE::HAL::ExecutableVariantOp>(
-      OpBuilder::atBlockBegin(executableOp.getBody())
+      OpBuilder::atBlockBegin(&executableOp.getBlock())
           .clone(*sourceVariantOp.getOperation()));
 
   // Add functions to test each entry point with its various dispatch

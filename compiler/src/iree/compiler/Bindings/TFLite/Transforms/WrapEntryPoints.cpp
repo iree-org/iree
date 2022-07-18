@@ -229,7 +229,7 @@ class WrapEntryPointsPass
       auto castOp = recalculateBuilder.create<IREE::HAL::TensorImportOp>(
           loc, inputValue.getType(), inputPlaceholder, inputValue.getType(),
           dynamicDims);
-      inputValue.replaceAllUsesWith(castOp.target());
+      inputValue.replaceAllUsesWith(castOp.getTarget());
     }
     while (entryBlock.getNumArguments() > 0) {
       entryBlock.eraseArgument(entryBlock.getNumArguments() - 1);

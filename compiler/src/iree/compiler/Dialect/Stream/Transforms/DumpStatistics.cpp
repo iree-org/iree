@@ -79,9 +79,9 @@ struct UsageInfo {
     for (auto executeOp : executeOps) {
       executeOp.walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
         auto exportOp = cast<IREE::Stream::ExecutableExportOp>(
-            symbolTable.lookupSymbolIn(moduleOp, dispatchOp.entry_point()));
+            symbolTable.lookupSymbolIn(moduleOp, dispatchOp.getEntryPoint()));
         assert(exportOp && "missing executable/export");
-        auto funcOp = exportOp.getFunctionRef();
+        auto funcOp = exportOp.lookupFunctionRef();
         assert(funcOp && "missing exported function");
         exportDispatchOps[funcOp].push_back(dispatchOp);
       });
@@ -140,7 +140,7 @@ struct Statistics {
     submissionCount = usageInfo.executeOps.size();
     for (auto allocaOp : usageInfo.allocaOps) {
       APInt allocaSize;
-      if (matchPattern(allocaOp.storage_size(), m_ConstantInt(&allocaSize))) {
+      if (matchPattern(allocaOp.getStorageSize(), m_ConstantInt(&allocaSize))) {
         transientSize += allocaSize.getSExtValue();
       } else {
         transientSizeDynamic = true;
@@ -308,7 +308,7 @@ static void prettyPrintAllStreamInfo(const UsageInfo &usageInfo, bool verbose,
 static void prettyPrintExecutableExportInfo(
     const UsageInfo &usageInfo, IREE::Stream::ExecutableOp executableOp,
     IREE::Stream::ExecutableExportOp exportOp, llvm::raw_fd_ostream &os) {
-  auto funcOp = exportOp.getFunctionRef();
+  auto funcOp = exportOp.lookupFunctionRef();
   prettyPrintItemHeader(
       llvm::formatv("stream.executable.export @{0}::@{1}",
                     executableOp.getName(), exportOp.getName()),
@@ -417,28 +417,28 @@ static void dumpExecutionCSVTable(const UsageInfo &usageInfo,
     TypeSwitch<Operation *>(op)
         .Case<IREE::Stream::CmdSerialOp>([&](auto op) {
           ++depth;
-          for (auto &nestedOp : op.body().front()) dumpRow(&nestedOp);
+          for (auto &nestedOp : op.getBody().front()) dumpRow(&nestedOp);
           --depth;
         })
         .Case<IREE::Stream::CmdConcurrentOp>([&](auto op) {
           ++depth;
-          for (auto &nestedOp : op.body().front()) dumpRow(&nestedOp);
+          for (auto &nestedOp : op.getBody().front()) dumpRow(&nestedOp);
           --depth;
         })
         .Case<IREE::Stream::CmdFillOp>([&](auto op) {
           APInt length;
-          matchPattern(op.target_length(), m_ConstantInt(&length));
+          matchPattern(op.getTargetLength(), m_ConstantInt(&length));
           os << llvm::formatv(R"({0},"fill",,{1},,,,)", depth, length);
           os << "\n";
         })
         .Case<IREE::Stream::CmdCopyOp>([&](auto op) {
           APInt length;
-          matchPattern(op.length(), m_ConstantInt(&length));
+          matchPattern(op.getLength(), m_ConstantInt(&length));
           os << llvm::formatv(R"({0},"copy",,{1},,,,)", depth, length);
           os << "\n";
         })
         .Case<IREE::Stream::CmdDispatchOp>([&](auto op) {
-          auto workload = op.workload();
+          auto workload = op.getWorkload();
           SmallString<32> workloadStr;
           for (unsigned i = 0; i < workload.size(); ++i) {
             if (i > 0) workloadStr.append(";");
@@ -457,12 +457,13 @@ static void dumpExecutionCSVTable(const UsageInfo &usageInfo,
             }
           }
           os << llvm::formatv(R"({0},"dispatch","{1}",,{2},"{3}",{4},{5})",
-                              depth, op.entry_point(), workloadSum, workloadStr,
-                              op.operands().size(), op.resources().size());
+                              depth, op.getEntryPoint(), workloadSum,
+                              workloadStr, op.getUniformOperands().size(),
+                              op.getResources().size());
           os << "\n";
         });
   };
-  for (auto &op : executeOp.body().front()) {
+  for (auto &op : executeOp.getBody().front()) {
     dumpRow(&op);
   }
   os << "\n";

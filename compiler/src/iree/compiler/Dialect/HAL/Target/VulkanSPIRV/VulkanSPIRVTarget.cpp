@@ -291,10 +291,10 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
 
     // Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.sym_name(),
-        variantOp.target().getFormat(),
+        variantOp.getLoc(), variantOp.getSymName(),
+        variantOp.getTarget().getFormat(),
         builder.getBufferAttr(executableBuilder.getContext()));
-    binaryOp.mime_typeAttr(
+    binaryOp.setMimeTypeAttr(
         executableBuilder.getStringAttr("application/x-flatbuffers"));
 
     return success();

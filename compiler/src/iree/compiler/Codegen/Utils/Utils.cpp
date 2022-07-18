@@ -38,7 +38,7 @@ FailureOr<IREE::HAL::ExecutableExportOp> getEntryPoint(func::FuncOp funcOp) {
   if (!variantOp) return failure();
 
   for (auto op : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
-    if (op.sym_name() == funcOp.getName()) {
+    if (op.getSymName() == funcOp.getName()) {
       return op;
     }
   }
@@ -65,7 +65,7 @@ llvm::StringMap<IREE::HAL::ExecutableExportOp> getAllEntryPoints(
   auto variantOp = module->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps;
   for (auto op : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
-    exportOps[op.sym_name()] = op;
+    exportOps[op.getSymName()] = op;
   }
   return exportOps;
 }
@@ -74,7 +74,7 @@ llvm::StringMap<IREE::HAL::ExecutableExportOp> getAllEntryPoints(
 /// `variantOp`, in found.
 static Optional<StringAttr> getConfigStringAttr(
     IREE::HAL::ExecutableVariantOp variantOp, StringRef stringAttr) {
-  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
+  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
   if (!targetAttr) return llvm::None;
   auto config = targetAttr.getConfiguration();
   if (!config) return llvm::None;
@@ -172,7 +172,7 @@ bool isReadOnly(Value v) {
           [&](auto op) { return isReadOnly(op.getSource()); })
       .Case<IREE::Flow::DispatchTensorLoadOp>(
           [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
-            return loadOp.source()
+            return loadOp.getSource()
                        .getType()
                        .cast<IREE::Flow::DispatchTensorType>()
                        .getAccess() == IREE::Flow::TensorAccess::ReadOnly;

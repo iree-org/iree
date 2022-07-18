@@ -379,9 +379,9 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
   // TODO(benvanik): remove this carveout - could make clone not change type
   // and transfer be needed instead.
   auto sourceType =
-      cloneOp.source().getType().cast<IREE::Stream::ResourceType>();
+      cloneOp.getSource().getType().cast<IREE::Stream::ResourceType>();
   auto targetType =
-      cloneOp.result().getType().cast<IREE::Stream::ResourceType>();
+      cloneOp.getResult().getType().cast<IREE::Stream::ResourceType>();
   if (sourceType != targetType &&
       sourceType.getLifetime() == IREE::Stream::Lifetime::Constant) {
     LLVM_DEBUG(llvm::dbgs()
@@ -393,7 +393,7 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
   // to see if it's been classified as a last use/by-value move. If it isn't
   // then we cannot mutate it in-place as it could be used by the caller/another
   // branch and we need to respect the forking of the value.
-  if (auto arg = cloneOp.source().dyn_cast<BlockArgument>()) {
+  if (auto arg = cloneOp.getSource().dyn_cast<BlockArgument>()) {
     if (!analysis.isArgMoved(arg)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "  - clone source is a by-ref arg; cannot elide\n");
@@ -405,7 +405,7 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
 
   // If there's only one user of the source we know it's this clone and can
   // bypass all the more expensive liveness analysis.
-  if (cloneOp.source().hasOneUse()) {
+  if (cloneOp.getSource().hasOneUse()) {
     LLVM_DEBUG(llvm::dbgs()
                << "  + clone source SSA value has one use; can elide\n");
     return true;
@@ -413,7 +413,7 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
 
   // If this is the last user of the source SSA value then we can elide the
   // clone knowing that any mutations won't impact the source.
-  if (analysis.isLastUser(cloneOp.source(), cloneOp)) {
+  if (analysis.isLastUser(cloneOp.getSource(), cloneOp)) {
     LLVM_DEBUG(llvm::dbgs() << "  + clone source use is the last; can elide\n");
     return true;
   }
@@ -428,7 +428,7 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
 static bool tryElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
                             LastUseAnalysis &analysis) {
   if (!isSafeToElideCloneOp(cloneOp, analysis)) return false;
-  cloneOp.replaceAllUsesWith(cloneOp.source());
+  cloneOp.replaceAllUsesWith(cloneOp.getSource());
   cloneOp.erase();
   return true;
 }
@@ -442,7 +442,7 @@ static bool tryElideAsyncCopiesInRegion(Region &region,
     for (auto cloneOp : llvm::make_early_inc_range(
              block.getOps<IREE::Stream::AsyncCloneOp>())) {
       if (!isSafeToElideCloneOp(cloneOp, analysis)) continue;
-      cloneOp.replaceAllUsesWith(cloneOp.source());
+      cloneOp.replaceAllUsesWith(cloneOp.getSource());
       cloneOp.erase();
       didChange = true;
     }

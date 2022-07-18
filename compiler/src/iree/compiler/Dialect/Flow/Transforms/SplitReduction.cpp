@@ -28,9 +28,10 @@ static llvm::cl::opt<int64_t> splitReductionRatio(
     "iree-flow-split-matmul-reduction", llvm::cl::desc("split ratio"),
     llvm::cl::init(1));
 
-static llvm::cl::opt<int64_t> topkSplitReductionRatio(
-    "iree-flow-topk-split-reduction", llvm::cl::desc("split ratio"),
-    llvm::cl::init(1));
+static llvm::cl::list<int64_t> topkSplitReductionRatio(
+    "iree-flow-topk-split-reduction",
+    llvm::cl::desc("comma separated list of split ratios"),
+    llvm::cl::CommaSeparated);
 
 namespace {
 /// Pattern to wrap splitReduction transformation. This also propagates
@@ -81,7 +82,7 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
 
   void runOnOperation() override {
     if (splitReductionRatio.getValue() <= 1 &&
-        topkSplitReductionRatio.getValue() <= 1) {
+        topkSplitReductionRatio.empty()) {
       return;
     }
 
@@ -101,9 +102,15 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
             ArrayRef<StringAttr>{}, StringAttr::get(&getContext(), "SPLIT")));
 
     LinalgExt::TopkSplitReductionControlFn splitReductionFn =
-        [&](mlir::iree_compiler::IREE::LinalgExt::TopkOp topkOp) {
-          return topkSplitReductionRatio.getValue();
-        };
+        [&](int64_t splitReductionDepth) -> int64_t {
+      SmallVector<int64_t, 4> reductionRatios(topkSplitReductionRatio.begin(),
+                                              topkSplitReductionRatio.end());
+      if (splitReductionDepth >= reductionRatios.size()) {
+        return -1;
+      } else {
+        return reductionRatios[splitReductionDepth];
+      }
+    };
     LinalgExt::populateTopkSplitReductionPattern(
         patterns, splitReductionFn,
         mlir::linalg::LinalgTransformationFilter(
@@ -122,6 +129,8 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
     });
     funcOp->walk([&](LinalgExt::LinalgExtOp op) {
       op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+      op->removeAttr(
+          mlir::iree_compiler::IREE::LinalgExt::kSplitReductionDepthMarker);
     });
   }
 };

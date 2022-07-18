@@ -43,7 +43,7 @@ transform.with_pdl_patterns {
   transform.structured.canonicalized_sequence %arg0 {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg1
-    %1, %loops:3 = transform.structured.tile %0 {sizes = [4, 4, 4]}
+    %1, %loops:3 = transform.structured.tile %0 [4, 4, 4]
     print %1 {name = "Tiled"}
   }
 }

@@ -111,7 +111,7 @@ struct ConvertHALInterfaceWorkgroupIDOp
   LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceWorkgroupIDOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    uint64_t dim = op.dimension().getZExtValue();
+    uint64_t dim = op.getDimension().getZExtValue();
     if (dim >= 3) {
       return op.emitOpError() << "out of bounds workgroup ID dimension";
     }
@@ -132,7 +132,7 @@ struct ConvertHALInterfaceWorkgroupSizeOp
   LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceWorkgroupSizeOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    uint64_t dim = op.dimension().getZExtValue();
+    uint64_t dim = op.getDimension().getZExtValue();
     if (dim >= 3) {
       return op.emitOpError() << "out of bounds workgroup size dimension";
     }
@@ -153,7 +153,7 @@ struct ConvertHALInterfaceWorkgroupCountOp
   LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceWorkgroupCountOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    uint64_t dim = op.dimension().getZExtValue();
+    uint64_t dim = op.getDimension().getZExtValue();
     if (dim >= 3) {
       return op.emitOpError() << "out of bounds workgroup count dimension";
     }
@@ -180,10 +180,10 @@ struct ConvertHALInterfaceConstantLoadOp
     auto constantType =
         constantsArg.getType().cast<MemRefType>().getElementType();
 
-    auto resultType = getTypeConverter()->convertType(op.result().getType());
+    auto resultType = getTypeConverter()->convertType(op.getResult().getType());
 
     auto constantIndex = rewriter.createOrFold<arith::ConstantIndexOp>(
-        op.getLoc(), op.index().getZExtValue());
+        op.getLoc(), op.getIndex().getZExtValue());
     auto loadedValue = rewriter.createOrFold<memref::LoadOp>(
         op.getLoc(), constantType, constantsArg, ValueRange{constantIndex});
     rewriter.replaceOpWithNewOp<mlir::UnrealizedConversionCastOp>(
@@ -207,7 +207,7 @@ struct ConvertHALInterfaceBindingSubspanOp
 
     // TODO(benvanik): compact the indices - the bindings we have on the ABI
     // interface are dense.
-    if (op.set().getZExtValue() != 0) {
+    if (op.getSet().getZExtValue() != 0) {
       return op.emitOpError() << "sparse binding sets not yet implemented";
     }
 
@@ -217,13 +217,13 @@ struct ConvertHALInterfaceBindingSubspanOp
                            .create<IREE::Util::ListGetOp>(
                                op.getLoc(), bindingType, bindingsArg,
                                rewriter.createOrFold<arith::ConstantIndexOp>(
-                                   op.getLoc(), op.binding().getZExtValue()))
+                                   op.getLoc(), op.getBinding().getZExtValue()))
                            .getResult();
-    if (op.byte_offset() && !matchPattern(op.byte_offset(), m_Zero())) {
-      auto memrefType = op.result().getType().cast<MemRefType>();
+    if (op.getByteOffset() && !matchPattern(op.getByteOffset(), m_Zero())) {
+      auto memrefType = op.getResult().getType().cast<MemRefType>();
       Value elementCount;
       if (memrefType.isDynamicDim(0)) {
-        elementCount = op.dynamic_dims().front();
+        elementCount = op.getDynamicDims().front();
       } else {
         elementCount = rewriter.createOrFold<arith::ConstantIndexOp>(
             op.getLoc(), memrefType.getDimSize(0));
@@ -234,14 +234,14 @@ struct ConvertHALInterfaceBindingSubspanOp
               op.getLoc(), memrefType.getElementTypeBitWidth()),
           elementCount);
       memrefValue = rewriter.createOrFold<memref::SubViewOp>(
-          op.getLoc(), memrefValue, ArrayRef<OpFoldResult>{op.byte_offset()},
+          op.getLoc(), memrefValue, ArrayRef<OpFoldResult>{op.getByteOffset()},
           ArrayRef<OpFoldResult>{byteLength},
           ArrayRef<OpFoldResult>{rewriter.getIndexAttr(1)});
     }
     rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
         op,
         getTypeConverter()
-            ->convertType(op.result().getType())
+            ->convertType(op.getResult().getType())
             .cast<MemRefType>(),
         memrefValue);
     return success();

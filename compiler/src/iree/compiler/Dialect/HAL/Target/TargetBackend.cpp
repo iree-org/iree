@@ -171,9 +171,9 @@ static void replaceEntryPointUses(
     const DenseMap<Attribute, Attribute> &replacements) {
   for (auto funcLikeOp : moduleOp.getOps<FunctionOpInterface>()) {
     funcLikeOp.walk([&](IREE::HAL::CommandBufferDispatchSymbolOp dispatchOp) {
-      auto it = replacements.find(dispatchOp.entry_point());
+      auto it = replacements.find(dispatchOp.getEntryPoint());
       if (it != replacements.end()) {
-        dispatchOp.entry_pointAttr(it->second.cast<SymbolRefAttr>());
+        dispatchOp.setEntryPointAttr(it->second.cast<SymbolRefAttr>());
       }
     });
   }
@@ -190,7 +190,8 @@ LogicalResult TargetBackend::linkExecutablesInto(
   DenseMap<StringRef, Operation *> targetSymbolMap;
   DenseMap<Attribute, Attribute> exportRefReplacements;
 
-  auto linkedTargetBuilder = OpBuilder::atBlockBegin(linkedTargetOp.getBody());
+  auto linkedTargetBuilder =
+      OpBuilder::atBlockBegin(&linkedTargetOp.getBlock());
   auto linkedModuleOp = getInnerModuleFn(linkedTargetOp.getInnerModule());
 
   // Iterate over all source executable ops, linking as many as we can.
@@ -199,16 +200,16 @@ LogicalResult TargetBackend::linkExecutablesInto(
         sourceExecutableOp.getOps<IREE::HAL::ExecutableVariantOp>());
     for (auto variantOp : variantOps) {
       // Only process targets matching our pattern.
-      if (variantOp.target().getBackend().getValue() != name()) continue;
+      if (variantOp.getTarget().getBackend().getValue() != name()) continue;
 
       // Clone export ops and queue remapping ordinals and updating
       // symbol refs.
       for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
         auto newExportOp =
             linkedTargetBuilder.create<IREE::HAL::ExecutableExportOp>(
-                exportOp.getLoc(), exportOp.sym_nameAttr(),
+                exportOp.getLoc(), exportOp.getSymNameAttr(),
                 builder.getIndexAttr(nextEntryPointOrdinal++),
-                exportOp.layout(), ArrayAttr{}, IntegerAttr{});
+                exportOp.getLayout(), ArrayAttr{}, IntegerAttr{});
         newExportOp->setDialectAttrs(exportOp->getDialectAttrs());
 
         // Add to replacement table for fixing up dispatch calls referencing

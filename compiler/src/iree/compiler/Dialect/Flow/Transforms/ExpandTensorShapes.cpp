@@ -151,8 +151,8 @@ static ExpandedValue consumeExpandedValue(Location loc, Value value,
   if (auto tieShapeOp = dyn_cast_or_null<IREE::Flow::TensorTieShapeOp>(
           value.getDefiningOp())) {
     ExpandedValue expandedValue;
-    expandedValue.tensor = tieShapeOp.operand();
-    expandedValue.dynamicDims = llvm::to_vector(tieShapeOp.dynamic_dims());
+    expandedValue.tensor = tieShapeOp.getOperand();
+    expandedValue.dynamicDims = llvm::to_vector(tieShapeOp.getDynamicDims());
     return expandedValue;
   }
 
@@ -220,7 +220,7 @@ static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
       auto tieShapeOp = builder.create<IREE::Flow::TensorTieShapeOp>(
           region.getLoc(), expansion.tensor.getType(), expansion.tensor,
           expansion.dynamicDims);
-      expansion.tensor.replaceAllUsesExcept(tieShapeOp.result(), tieShapeOp);
+      expansion.tensor.replaceAllUsesExcept(tieShapeOp.getResult(), tieShapeOp);
     }
   }
 
@@ -376,7 +376,7 @@ static void expandCallOp(mlir::func::CallOp op, IndexSet &indexSet,
     auto tieShapeOp = builder.create<IREE::Flow::TensorTieShapeOp>(
         op.getLoc(), expandedValue.tensor.getType(), expandedValue.tensor,
         expandedValue.dynamicDims);
-    oldResult.replaceAllUsesExcept(tieShapeOp.result(), tieShapeOp);
+    oldResult.replaceAllUsesExcept(tieShapeOp.getResult(), tieShapeOp);
   }
 
   op.erase();
@@ -469,7 +469,7 @@ static void expandSelectOp(mlir::arith::SelectOp op, IndexSet &indexSet,
       selectOp.getLoc(), selectOp.getResult().getType(), selectOp.getResult(),
       selectedDims);
 
-  op.getResult().replaceAllUsesExcept(tieShapeOp.result(), tieShapeOp);
+  op.getResult().replaceAllUsesExcept(tieShapeOp.getResult(), tieShapeOp);
   op.erase();
 }
 

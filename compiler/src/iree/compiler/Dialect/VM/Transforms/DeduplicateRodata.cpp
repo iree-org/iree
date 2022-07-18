@@ -45,13 +45,13 @@ class DeduplicateRodataPass
     // Gather all rodata ops with the same value.
     DenseMap<RodataKey, SmallVector<IREE::VM::RodataOp>> bucketedOps;
     for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
-      if (rodataOp.ordinal().hasValue()) {
+      if (rodataOp.getOrdinal().hasValue()) {
         rodataOp.emitError() << "rodata op already has an ordinal assigned; "
                                 "cannot perform deduplication";
         return signalPassFailure();
       }
-      RodataKey key = std::make_tuple(rodataOp.mime_type().getValueOr(""),
-                                      rodataOp.value());
+      RodataKey key = std::make_tuple(rodataOp.getMimeType().getValueOr(""),
+                                      rodataOp.getValue());
       auto &bucketOps = bucketedOps[key];
       bucketOps.push_back(rodataOp);
     }
@@ -66,7 +66,7 @@ class DeduplicateRodataPass
       uint64_t alignment = 0;
       for (auto rodataOp : bucketOps) {
         locs.push_back(rodataOp.getLoc());
-        alignment = std::max(alignment, rodataOp.alignment().getValueOr(0));
+        alignment = std::max(alignment, rodataOp.getAlignment().getValueOr(0));
       }
       auto fusedLoc = FusedLoc::get(moduleOp.getContext(), locs);
 
@@ -75,7 +75,7 @@ class DeduplicateRodataPass
       bucketOps.erase(bucketOps.begin());
       baseOp->setLoc(fusedLoc);
       if (alignment != 0) {
-        baseOp.alignmentAttr(IntegerAttr::get(
+        baseOp.setAlignmentAttr(IntegerAttr::get(
             IntegerType::get(moduleOp.getContext(), 64), APInt(64, alignment)));
       }
 

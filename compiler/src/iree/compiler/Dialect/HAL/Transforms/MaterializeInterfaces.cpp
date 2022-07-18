@@ -160,8 +160,8 @@ static void convertBindingUsage(
     auto newOp = builder.create<IREE::HAL::InterfaceBindingSubspanOp>(
         oldOp.getLoc(), oldOp.getType(), APInt(64, setLayoutAttr.getOrdinal()),
         APInt(64, bindingAttr.getOrdinal()), bindingAttr.getType(),
-        oldOp.byte_offset(), oldOp.dynamic_dims(), alignmentAttr);
-    oldOp.replaceAllUsesWith(newOp.result());
+        oldOp.getByteOffset(), oldOp.getDynamicDims(), alignmentAttr);
+    oldOp.replaceAllUsesWith(newOp.getResult());
     oldOp.erase();
   }
 }
@@ -230,12 +230,12 @@ static LogicalResult declareEntryPointOps(
 
   // For each exported function create a HAL export decl and dispatch thunk.
   int nextOrdinal = 0;
-  for (auto exportOp :
-       sourceExecutableOp.body().getOps<IREE::Stream::ExecutableExportOp>()) {
+  for (auto exportOp : sourceExecutableOp.getBody()
+                           .getOps<IREE::Stream::ExecutableExportOp>()) {
     int ordinal = nextOrdinal++;
     auto sourceFuncOp =
         sourceExecutableOp.getInnerModule().lookupSymbol<mlir::func::FuncOp>(
-            exportOp.function_ref());
+            exportOp.getFunctionRef());
     if (failed(verifyEntryPointTypes(sourceFuncOp))) return failure();
 
     const auto &executableLayout = layoutAnalysis.getExecutableLayout(exportOp);
@@ -255,19 +255,19 @@ static LogicalResult declareEntryPointOps(
       OpBuilder targetBuilder(&variantOp.getBlock().front());
       auto newExportOp = targetBuilder.create<IREE::HAL::ExecutableExportOp>(
           exportOp.getLoc(),
-          targetBuilder.getStringAttr(exportOp.function_ref()),
+          targetBuilder.getStringAttr(exportOp.getFunctionRef()),
           targetBuilder.getIndexAttr(ordinal), layoutAttr, ArrayAttr{},
           IntegerAttr{});
 
       // Clone the workgroup count calculation function.
-      if (!exportOp.workgroup_count().empty()) {
+      if (!exportOp.getWorkgroupCount().empty()) {
         mlir::BlockAndValueMapping mapper;
-        exportOp.workgroup_count().cloneInto(&newExportOp.workgroup_count(),
-                                             mapper);
+        exportOp.getWorkgroupCount().cloneInto(&newExportOp.getWorkgroupCount(),
+                                               mapper);
         // Insert the !hal.device argument.
         Type deviceType = targetBuilder.getType<IREE::HAL::DeviceType>();
-        newExportOp.workgroup_count().insertArgument(0u, deviceType,
-                                                     newExportOp.getLoc());
+        newExportOp.getWorkgroupCount().insertArgument(0u, deviceType,
+                                                       newExportOp.getLoc());
       }
 
       // Clone the updated interface-based function into the target.
@@ -308,7 +308,7 @@ struct ConvertDispatchWorkgroupInfoPattern final
   LogicalResult matchAndRewrite(SrcOp op,
                                 PatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<DstOp>(op, op.getResult().getType(),
-                                       op.dimensionAttr());
+                                       op.getDimensionAttr());
     return success();
   }
 };
@@ -325,10 +325,10 @@ struct InlineConstantWorkgroupSizePattern
         SymbolTable::lookupSymbolIn(variantOp, funcOp.getName()));
     assert(exportOp &&
            "must have an entry point corresponding to the parent func");
-    auto workgroupSizeAttr = exportOp.workgroup_sizeAttr();
+    auto workgroupSizeAttr = exportOp.getWorkgroupSizeAttr();
     if (!workgroupSizeAttr) return failure();
 
-    uint64_t dimIdx = sizeOp.dimension().getZExtValue();
+    uint64_t dimIdx = sizeOp.getDimension().getZExtValue();
     auto dimAttr = workgroupSizeAttr[dimIdx];
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(sizeOp, dimAttr,
                                                    rewriter.getIndexType());

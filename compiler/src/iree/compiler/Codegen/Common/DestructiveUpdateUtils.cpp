@@ -234,7 +234,7 @@ static LogicalResult foldExtractSliceOp(OpBuilder &b,
     }
 
     replacement = b.create<IREE::Flow::DispatchTensorLoadOp>(
-        op.getLoc(), op.getType(), loadOp.source(), loadOp.source_dims(),
+        op.getLoc(), op.getType(), loadOp.getSource(), loadOp.getSourceDims(),
         offsets, sizes, strides);
   } else if (auto initTensorOp = dyn_cast<linalg::InitTensorOp>(sourceOp)) {
     replacement = b.create<linalg::InitTensorOp>(
@@ -286,8 +286,8 @@ static LogicalResult rewriteDestructiveUpdateInPlace(
       b.setInsertionPointAfter(linalgLikeOp);
 
       b.create<IREE::Flow::DispatchTensorStoreOp>(
-          linalgLikeOp.getLoc(), result, storeOp->target(),
-          storeOp->target_dims(), storeOp->getMixedOffsets(),
+          linalgLikeOp.getLoc(), result, storeOp->getTarget(),
+          storeOp->getTargetDims(), storeOp->getMixedOffsets(),
           storeOp->getMixedSizes(), storeOp->getMixedStrides());
     }
     return success();
@@ -334,8 +334,9 @@ LogicalResult rewriteDestructiveUpdateInPlace<tensor::InsertSliceOp>(
       }
 
       b.create<IREE::Flow::DispatchTensorStoreOp>(
-          insertSliceOp->getLoc(), insertSliceOp.getSource(), storeOp->target(),
-          storeOp->target_dims(), offsets, sizes, strides);
+          insertSliceOp->getLoc(), insertSliceOp.getSource(),
+          storeOp->getTarget(), storeOp->getTargetDims(), offsets, sizes,
+          strides);
     }
 
     return success();
@@ -391,11 +392,11 @@ LogicalResult rewriteLinalgDestructiveUpdates(func::FuncOp funcOp) {
   llvm::MapVector<Value, SpecialTerminatorOpCapture> destructiveUpdates;
   funcOp.walk([&](IREE::Flow::DispatchTensorStoreOp op) {
     SpecialTerminatorOpCapture capture;
-    capture.initValue = op.value();
+    capture.initValue = op.getValue();
     Value sourceValue = isADestructiveUpdatePattern(capture.initValue, capture);
     if (!sourceValue || capture.loops.empty()) return;
     capture.dest = op;
-    destructiveUpdates[op.value()] = capture;
+    destructiveUpdates[op.getValue()] = capture;
   });
 
   // Check if the other returns of the destructive update loops are also

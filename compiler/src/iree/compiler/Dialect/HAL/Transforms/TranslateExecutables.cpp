@@ -54,7 +54,7 @@ class TranslateTargetExecutableVariantsPass
 
   void runOnOperation() override {
     auto variantOp = getOperation();
-    if (variantOp.target().getBackend().getValue() != target) return;
+    if (variantOp.getTarget().getBackend().getValue() != target) return;
 
     auto targetBackend = getTargetBackend(target);
     if (!targetBackend) {
@@ -67,7 +67,7 @@ class TranslateTargetExecutableVariantsPass
     if (failed(runPipeline(passManager, variantOp))) {
       variantOp.emitError() << "failed to run translation of source "
                                "executable to target executable for backend "
-                            << variantOp.target();
+                            << variantOp.getTarget();
       return signalPassFailure();
     }
   }

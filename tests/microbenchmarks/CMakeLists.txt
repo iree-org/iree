@@ -6,6 +6,7 @@ iree_microbenchmark_suite(
   NAME
    "microbenchmark"
   SRCS
+    "dynamic_shape_vectorization.mlir"
     "linalg_mmt4d.mlir"
     "linalg_transpose.mlir"
     "mhlo_conv.mlir"

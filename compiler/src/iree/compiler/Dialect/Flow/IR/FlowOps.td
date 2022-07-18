@@ -71,8 +71,8 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
 
   let arguments = (ins
     Variadic<FLOW_Dim>:$workload,
-    Variadic<AnyType>:$operands,
-    FLOW_ShapeDynamicDims:$operand_dims,
+    Variadic<AnyType>:$arguments,
+    FLOW_ShapeDynamicDims:$argument_dims,
     FLOW_ShapeDynamicDims:$result_dims,
     OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
   );
@@ -87,14 +87,14 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
 
   let assemblyFormat = [{
     (`[` $workload^ `]`)? ``
-    `(` $operands `)` `:`
-    custom<ShapedFunctionType>(ref($operands),
-                               type($operands), $operand_dims,
+    `(` $arguments `)` `:`
+    custom<ShapedFunctionType>(ref($arguments),
+                               type($arguments), $argument_dims,
                                type($results), $result_dims,
                                $tied_operands)
     attr-dict-with-keyword
     `=` `\n` ` ` ` ` ` `
-    custom<DispatchWorkgroupBody>(ref(type($operands)),
+    custom<DispatchWorkgroupBody>(ref(type($arguments)),
                                   ref(type($results)),
                                   $workgroup_body)
     `` custom<DispatchWorkgroupsCountRegion>($workgroup_count)
@@ -105,7 +105,7 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     OpBuilder<(ins
       "ValueRange":$workload,
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
-      "ValueRange":$operands, "ValueRange":$operandDims,
+      "ValueRange":$arguments, "ValueRange":$argumentDims,
       "ArrayRef<int64_t>":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
@@ -115,18 +115,18 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
       return FunctionType::get(
           getContext(),
           llvm::to_vector<4>(llvm::map_range(
-              operands(), [](Value value) { return value.getType(); })),
+              getArguments(), [](Value value) { return value.getType(); })),
           getResultTypes());
     }
 
     /// Returns the index of the args() operand in the Operation operands list.
-    unsigned mapArgOperandToOpOperand(unsigned i) { return i + workload().size(); };
+    unsigned mapArgOperandToOpOperand(unsigned i) { return i + getWorkload().size(); };
 
     ValueRange getOperandDynamicDims(unsigned idx) {
-      return IREE::Util::findVariadicDynamicDims(idx - workload().size(), operands(), operand_dims());
+      return IREE::Util::findVariadicDynamicDims(idx - getWorkload().size(), getArguments(), getArgumentDims());
     }
     ValueRange getResultDynamicDims(unsigned idx) {
-      return IREE::Util::findVariadicDynamicDims(idx, results(), result_dims());
+      return IREE::Util::findVariadicDynamicDims(idx, getResults(), getResultDims());
     }
   }];
 
@@ -166,7 +166,7 @@ def FLOW_DispatchWorkgroupIDOp : FLOW_PureOp<"dispatch.workgroup.id", [
 
   let extraClassDeclaration = [{
     LogicalResult verify() {
-      return verifyDispatchWorkgroupInfoOp(getOperation(), dimension().getZExtValue());
+      return verifyDispatchWorkgroupInfoOp(getOperation(), getDimension().getZExtValue());
     }
   }];
 }
@@ -202,7 +202,7 @@ def FLOW_DispatchWorkgroupCountOp : FLOW_PureOp<"dispatch.workgroup.count", [
 
   let extraClassDeclaration = [{
     LogicalResult verify() {
-      return verifyDispatchWorkgroupInfoOp(getOperation(), dimension().getZExtValue());
+      return verifyDispatchWorkgroupInfoOp(getOperation(), getDimension().getZExtValue());
     }
   }];
 }
@@ -246,7 +246,7 @@ def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
 
   let extraClassDeclaration = [{
     LogicalResult verify() {
-      return verifyDispatchWorkgroupInfoOp(getOperation(), dimension().getZExtValue());
+      return verifyDispatchWorkgroupInfoOp(getOperation(), getDimension().getZExtValue());
     }
   }];
 }
@@ -277,8 +277,8 @@ def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape", [
   }];
 
   let extraClassDeclaration = [{
-    ValueRange getOperandDynamicDims(unsigned idx) { return dynamic_dims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return dynamic_dims(); }
+    ValueRange getOperandDynamicDims(unsigned idx) { return getDynamicDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getDynamicDims(); }
   }];
 
   let hasVerifier = 1;
@@ -354,13 +354,22 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     /// Return the expected rank of each of the `static_offsets`, `static_sizes`
     /// and `static_strides` attributes.
     std::array<unsigned, 3> getArrayAttrMaxRanks() {
-      unsigned sourceRank = source().getType().cast<DispatchTensorType>().asTensorType().getRank();
+      unsigned sourceRank = getSource().getType().cast<DispatchTensorType>().asTensorType().getRank();
       return {sourceRank, sourceRank, sourceRank};
     }
 
     /// Return the number of leading operands before the `offsets`, `sizes` and
     /// and `strides` operands.
     static unsigned getOffsetSizeAndStrideStartOperandIndex() { return 2; }
+
+    // Workaround for OffsetSizeAndStrideOpInterface being incompatible with
+    // prefixed accessors.
+    OperandRange offsets() { return getOffsets(); }
+    ArrayAttr static_offsets() { return getStaticOffsets(); }
+    OperandRange sizes() { return getSizes(); }
+    ArrayAttr static_sizes() { return getStaticSizes(); }
+    OperandRange strides() { return getStrides(); }
+    ArrayAttr static_strides() { return getStaticStrides(); }
 
     /// Returns the type of the result based on the sizes.
     static RankedTensorType inferResultType
@@ -373,11 +382,11 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
 
     /// Return the result type as a `RankedTensorType`.
     RankedTensorType getType() {
-      return result().getType().cast<RankedTensorType>();
+      return getResult().getType().cast<RankedTensorType>();
     }
 
-    ValueRange getOperandDynamicDims(unsigned idx) { return source_dims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return sizes(); }
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getSizes(); }
   }];
 
   let hasVerifier = 1;
@@ -444,7 +453,7 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
     /// Return the expected rank of each of the `static_offsets`, `static_sizes`
     /// and `static_strides` attributes.
     std::array<unsigned, 3> getArrayAttrMaxRanks() {
-      unsigned resultRank = target().getType().cast<DispatchTensorType>().asTensorType().getRank();
+      unsigned resultRank = getTarget().getType().cast<DispatchTensorType>().asTensorType().getRank();
       return {resultRank, resultRank, resultRank};
     }
 
@@ -452,8 +461,17 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
     /// and `strides` operands.
     static unsigned getOffsetSizeAndStrideStartOperandIndex() { return 3; }
 
+    // Workaround for OffsetSizeAndStrideOpInterface being incompatible with
+    // prefixed accessors.
+    OperandRange offsets() { return getOffsets(); }
+    ArrayAttr static_offsets() { return getStaticOffsets(); }
+    OperandRange sizes() { return getSizes(); }
+    ArrayAttr static_sizes() { return getStaticSizes(); }
+    OperandRange strides() { return getStrides(); }
+    ArrayAttr static_strides() { return getStaticStrides(); }
+
     ValueRange getOperandDynamicDims(unsigned idx) {
-      return idx == 0 ? sizes() : target_dims();
+      return idx == 0 ? getSizes() : getTargetDims();
     }
     ValueRange getResultDynamicDims(unsigned idx) { return {}; }
 
@@ -526,7 +544,7 @@ def FLOW_ExecutableOp : FLOW_Op<"executable", [
   ];
 
   let extraClassDeclaration = [{
-    Block& getBlock() { return body().front(); }
+    Block& getBlock() { return getBody().front(); }
 
     ::mlir::ModuleOp getInnerModule() {
       return *getBlock().getOps<::mlir::ModuleOp>().begin();
@@ -608,8 +626,8 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   let arguments = (ins
     Variadic<FLOW_Dim>:$workload,
     SymbolRefAttr:$entry_point,
-    Variadic<AnyType>:$operands,
-    FLOW_ShapeDynamicDims:$operand_dims,
+    Variadic<AnyType>:$arguments,
+    FLOW_ShapeDynamicDims:$argument_dims,
     FLOW_ShapeDynamicDims:$result_dims,
     OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
   );
@@ -622,18 +640,18 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
     OpBuilder<(ins
       "ExecutableExportOp":$entryPoint, "ValueRange":$workload,
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
-      "ValueRange":$operands, "ValueRange":$operandDims,
+      "ValueRange":$arguments, "ValueRange":$argumentDims,
       "ArrayAttr":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
     OpBuilder<(ins
       "ExecutableExportOp":$entryPoint, "ValueRange":$workload,
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
-      "ValueRange":$operands, "ValueRange":$operandDims,
+      "ValueRange":$arguments, "ValueRange":$argumentDims,
       "ArrayRef<int64_t>":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes),
       [{
         build($_builder, $_state, entryPoint, workload,
-              resultTypes, resultDims, operands, operandDims,
+              resultTypes, resultDims, arguments, argumentDims,
               $_builder.getIndexArrayAttr(tiedOperands),
               attributes);
       }]>
@@ -647,19 +665,19 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
     bool isTransfer() { return false; }
 
     ValueRange getOperandDynamicDims(unsigned idx) {
-      return IREE::Util::findVariadicDynamicDims(idx - workload().size(), operands(), operand_dims());
+      return IREE::Util::findVariadicDynamicDims(idx - getWorkload().size(), getArguments(), getArgumentDims());
     }
     ValueRange getResultDynamicDims(unsigned idx) {
-      return IREE::Util::findVariadicDynamicDims(idx, results(), result_dims());
+      return IREE::Util::findVariadicDynamicDims(idx, getResults(), getResultDims());
     }
   }];
 
   let assemblyFormat = [{
     $entry_point
     (`[` $workload^ `]`)? ``
-    `(` $operands `)` attr-dict `:`
-    custom<ShapedFunctionType>(ref($operands),
-                               type($operands), $operand_dims,
+    `(` $arguments `)` attr-dict `:`
+    custom<ShapedFunctionType>(ref($arguments),
+                               type($arguments), $argument_dims,
                                type($results), $result_dims,
                                $tied_operands)
   }];
@@ -721,8 +739,8 @@ def FLOW_TensorTieShapeOp : FLOW_PureOp<"tensor.tie_shape", [
   }];
 
   let extraClassDeclaration = [{
-    ValueRange getOperandDynamicDims(unsigned idx) { return dynamic_dims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return dynamic_dims(); }
+    ValueRange getOperandDynamicDims(unsigned idx) { return getDynamicDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getDynamicDims(); }
   }];
 
   let hasVerifier = 1;
@@ -779,8 +797,8 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
     // StreamableOpInterface:
     bool isTransfer() { return true; }
 
-    ValueRange getOperandDynamicDims(unsigned idx) { return source_dims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return result_dims(); }
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultDims(); }
   }];
 
   let hasVerifier = 1;
@@ -828,7 +846,7 @@ def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
   ];
 
   let extraClassDeclaration = [{
-    ValueRange getOperandDynamicDims(unsigned idx) { return source_dims(); }
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceDims(); }
     ValueRange getResultDynamicDims(unsigned idx) { return ValueRange{}; }
   }];
 
@@ -881,8 +899,8 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
   ];
 
   let extraClassDeclaration = [{
-    ValueRange getOperandDynamicDims(unsigned idx) { return target_dims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return target_dims(); }
+    ValueRange getOperandDynamicDims(unsigned idx) { return getTargetDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getTargetDims(); }
   }];
 
   let hasVerifier = 1;
@@ -915,7 +933,7 @@ def FLOW_TensorEmptyOp : FLOW_PureOp<"tensor.empty", [
     bool isTransfer() { return true; }
 
     ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
-    ValueRange getResultDynamicDims(unsigned idx) { return result_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultDims(); }
   }];
 
   let hasVerifier = 1;
@@ -952,7 +970,7 @@ def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
     bool isTransfer() { return true; }
 
     ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
-    ValueRange getResultDynamicDims(unsigned idx) { return result_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultDims(); }
   }];
 
   let hasVerifier = 1;
@@ -971,14 +989,14 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
 
   let arguments = (ins
     FLOW_Tensor:$operand,
-    FLOW_ShapeDynamicDims:$operand_dims
+    FLOW_ShapeDynamicDims:$argument_dims
   );
   let results = (outs
     FLOW_Tensor:$result
   );
 
   let assemblyFormat = [{
-    $operand `:` type($result) (`{` $operand_dims^ `}`)?
+    $operand `:` type($result) (`{` $argument_dims^ `}`)?
     attr-dict-with-keyword
   }];
 
@@ -996,8 +1014,8 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
     // StreamableOpInterface:
     bool isTransfer() { return true; }
 
-    ValueRange getOperandDynamicDims(unsigned idx) { return operand_dims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return operand_dims(); }
+    ValueRange getOperandDynamicDims(unsigned idx) { return getArgumentDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getArgumentDims(); }
   }];
 
   let hasVerifier = 1;
@@ -1039,8 +1057,8 @@ def FLOW_TensorSliceOp : FLOW_PureOp<"tensor.slice", [
     // StreamableOpInterface:
     bool isTransfer() { return true; }
 
-    ValueRange getOperandDynamicDims(unsigned idx) { return source_dims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return result_dims(); }
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultDims(); }
   }];
 
   let hasVerifier = 1;
@@ -1098,9 +1116,9 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
     bool isTransfer() { return true; }
 
     ValueRange getOperandDynamicDims(unsigned idx) {
-      return idx == 0 ? target_dims() : update_dims();
+      return idx == 0 ? getTargetDims() : getUpdateDims();
     }
-    ValueRange getResultDynamicDims(unsigned idx) { return target_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getTargetDims(); }
   }];
 
   let hasVerifier = 1;

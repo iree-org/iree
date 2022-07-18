@@ -51,7 +51,7 @@ static LogicalResult populateWorkgroupCountComputingRegion(
     Flow::DispatchWorkgroupsOp dispatchOp) {
   Location loc = foreachThreadOp.getLoc();
   OpBuilder::InsertionGuard g(rewriter);
-  Region &r = dispatchOp.workgroup_count();
+  Region &r = dispatchOp.getWorkgroupCount();
   assert(r.empty() && "expected block-less workgroup_count region");
   Block *block = rewriter.createBlock(&r);
   rewriter.setInsertionPointToStart(block);
@@ -275,7 +275,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
   //    dims) but unless proven wrong, the trailing indices convention is
   //    quite simpler to implement: if bugs surface, these should be fixed or
   //    a real convention + verification should be adopted on the op + builder.
-  Region &region = dispatchOp.workgroup_body();
+  Region &region = dispatchOp.getWorkgroupBody();
   Block *block = &region.front();
   {
     OpBuilder::InsertionGuard g(rewriter);

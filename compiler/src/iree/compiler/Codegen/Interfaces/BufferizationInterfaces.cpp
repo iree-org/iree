@@ -73,13 +73,13 @@ static Value findOrCreateSubspanBuffer(
         bufferSubspanOp.getResult().getType().dyn_cast<MemRefType>();
     if (!bufferMemrefType) continue;
 
-    if (bufferSubspanOp.set() != subspanOp.set() ||
-        bufferSubspanOp.binding() != subspanOp.binding() ||
-        bufferSubspanOp.type() != subspanOp.type() ||
-        bufferSubspanOp.byte_offset() != subspanOp.byte_offset() ||
-        !llvm::equal(bufferSubspanOp.dynamic_dims(),
-                     subspanOp.dynamic_dims()) ||
-        bufferSubspanOp.alignment() != subspanOp.alignment() ||
+    if (bufferSubspanOp.getSet() != subspanOp.getSet() ||
+        bufferSubspanOp.getBinding() != subspanOp.getBinding() ||
+        bufferSubspanOp.getDescriptorType() != subspanOp.getDescriptorType() ||
+        bufferSubspanOp.getByteOffset() != subspanOp.getByteOffset() ||
+        !llvm::equal(bufferSubspanOp.getDynamicDims(),
+                     subspanOp.getDynamicDims()) ||
+        bufferSubspanOp.getAlignment() != subspanOp.getAlignment() ||
         memRefType != bufferMemrefType)
       continue;
     return bufferSubspanOp.getResult();
@@ -90,12 +90,13 @@ static Value findOrCreateSubspanBuffer(
   b.setInsertionPoint(subspanOp);
   // Just change the result type of the InterfaceBindingSubspanOp.
   Value buffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
-      subspanOp->getLoc(), memRefType, subspanOp.set(), subspanOp.binding(),
-      subspanOp.type(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
-      subspanOp.alignmentAttr());
-  if (subspanOp.alignment()) {
-    b.create<memref::AssumeAlignmentOp>(subspanOp->getLoc(), buffer,
-                                        subspanOp.alignment()->getZExtValue());
+      subspanOp->getLoc(), memRefType, subspanOp.getSet(),
+      subspanOp.getBinding(), subspanOp.getDescriptorType(),
+      subspanOp.getByteOffset(), subspanOp.getDynamicDims(),
+      subspanOp.getAlignmentAttr());
+  if (subspanOp.getAlignment()) {
+    b.create<memref::AssumeAlignmentOp>(
+        subspanOp->getLoc(), buffer, subspanOp.getAlignment()->getZExtValue());
   }
   return buffer;
 }
@@ -124,7 +125,7 @@ struct DispatchTensorLoadOpInterface
                   const AnalysisState &state) const {
     auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
     auto shapedType =
-        loadOp.source().getType().dyn_cast<IREE::Flow::DispatchTensorType>();
+        loadOp.getSource().getType().dyn_cast<IREE::Flow::DispatchTensorType>();
     assert(shapedType && "unexpected source type");
     return shapedType.getAccess() != IREE::Flow::TensorAccess::ReadOnly;
   }
@@ -133,14 +134,15 @@ struct DispatchTensorLoadOpInterface
                           const BufferizationOptions &options) const {
     auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
     auto tensorSubspanOp =
-        loadOp.source().getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+        loadOp.getSource()
+            .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     assert(tensorSubspanOp && "expected that source is a SubspanOp");
     Value source = findOrCreateSubspanBuffer(rewriter, tensorSubspanOp);
 
     if (equalTensorShape(
             loadOp.getType(), loadOp.sizes(),
-            loadOp.source().getType().cast<IREE::Flow::DispatchTensorType>(),
-            loadOp.source_dims())) {
+            loadOp.getSource().getType().cast<IREE::Flow::DispatchTensorType>(),
+            loadOp.getSourceDims())) {
       // The entire tensor is loaded.
       replaceOpWithBufferizedValues(rewriter, op, source);
       return success();
@@ -182,18 +184,21 @@ struct DispatchTensorStoreOpInterface
                           const BufferizationOptions &options) const {
     auto storeOp = cast<IREE::Flow::DispatchTensorStoreOp>(op);
     auto tensorSubspanOp =
-        storeOp.target().getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+        storeOp.getTarget()
+            .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     assert(tensorSubspanOp && "expected that target is a SubspanOp");
     Value target = findOrCreateSubspanBuffer(rewriter, tensorSubspanOp);
 
-    if (!equalTensorShape(
-            storeOp.value().getType().cast<RankedTensorType>(), storeOp.sizes(),
-            storeOp.target().getType().cast<IREE::Flow::DispatchTensorType>(),
-            storeOp.target_dims())) {
+    if (!equalTensorShape(storeOp.getValue().getType().cast<RankedTensorType>(),
+                          storeOp.getSizes(),
+                          storeOp.getTarget()
+                              .getType()
+                              .cast<IREE::Flow::DispatchTensorType>(),
+                          storeOp.getTargetDims())) {
       // Writing to a part of the tensor.
       auto subviewMemRefType =
           memref::SubViewOp::inferRankReducedResultType(
-              storeOp.value().getType().cast<ShapedType>().getShape(),
+              storeOp.getValue().getType().cast<ShapedType>().getShape(),
               target.getType().cast<MemRefType>(), storeOp.getMixedOffsets(),
               storeOp.getMixedSizes(), storeOp.getMixedStrides())
               .cast<MemRefType>();
@@ -350,13 +355,13 @@ static bool isValueEquivalentToAnInplaceTensorLoadOp(
     const BufferizationAliasInfo &aliasInfo,
     IREE::Flow::DispatchTensorStoreOp storeOp) {
   bool foundOp = false;
-  aliasInfo.applyOnEquivalenceClass(storeOp.value(), [&](Value value) {
+  aliasInfo.applyOnEquivalenceClass(storeOp.getValue(), [&](Value value) {
     auto loadOp = value.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
     // TODO: Assert that offsets, sizes and strides are the same.
     if (loadOp &&
-        aliasInfo.areEquivalentBufferizedValues(loadOp.result(),
-                                                storeOp.value()) &&
-        loadOp.source() == storeOp.target()) {
+        aliasInfo.areEquivalentBufferizedValues(loadOp.getResult(),
+                                                storeOp.getValue()) &&
+        loadOp.getSource() == storeOp.getTarget()) {
       foundOp = true;
     }
   });
@@ -384,10 +389,11 @@ LogicalResult storeTensorOpAnchoredInitTensorEliminationStep(
         auto storeOp =
             cast<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
         auto loadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
-            loc, storeOp.value().getType().cast<RankedTensorType>(),
-            storeOp.target(), storeOp.target_dims(), storeOp.getMixedOffsets(),
-            storeOp.getMixedSizes(), storeOp.getMixedStrides());
-        return loadOp.result();
+            loc, storeOp.getValue().getType().cast<RankedTensorType>(),
+            storeOp.getTarget(), storeOp.getTargetDims(),
+            storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
+            storeOp.getMixedStrides());
+        return loadOp.getResult();
       });
 }
 

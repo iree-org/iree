@@ -216,17 +216,17 @@ struct FlattenBindingSubspan final
     if (!oldType || !oldType.getLayout().isIdentity()) return failure();
 
     Value dynamicDim = createTotalElementCountValue(
-        oldType, subspanOp.dynamic_dims(), subspanOp.getLoc(), rewriter);
+        oldType, subspanOp.getDynamicDims(), subspanOp.getLoc(), rewriter);
     Type newType = getTypeConverter()->convertType(oldType);
 
     auto newOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newType, subspanOp.set(), subspanOp.binding(),
-        subspanOp.type(), subspanOp.byte_offset(), dynamicDim,
-        subspanOp.alignmentAttr());
+        subspanOp.getLoc(), newType, subspanOp.getSet(), subspanOp.getBinding(),
+        subspanOp.getDescriptorType(), subspanOp.getByteOffset(), dynamicDim,
+        subspanOp.getAlignmentAttr());
     if (isRankOneMemRef(oldType)) {
       rewriter.replaceOpWithNewOp<memref::CastOp>(subspanOp, oldType, newOp);
     } else {
-      rewriter.replaceOp(subspanOp, newOp.result());
+      rewriter.replaceOp(subspanOp, newOp.getResult());
     }
     return success();
   }
@@ -516,8 +516,8 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
     if (!subspanOp) return failure();
 
     // If the subspan op has a zero byte offset then we are done.
-    if (!subspanOp.byte_offset() ||
-        matchPattern(subspanOp.byte_offset(), m_Zero())) {
+    if (!subspanOp.getByteOffset() ||
+        matchPattern(subspanOp.getByteOffset(), m_Zero())) {
       return failure();
     }
 
@@ -534,9 +534,9 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
     Value zero =
         rewriter.create<arith::ConstantIndexOp>(op.getMemref().getLoc(), 0);
     Value newSubspan = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        op.getMemref().getLoc(), subspanOp.getType(), subspanOp.set(),
-        subspanOp.binding(), subspanOp.type(), zero, subspanOp.dynamic_dims(),
-        subspanOp.alignmentAttr());
+        op.getMemref().getLoc(), subspanOp.getType(), subspanOp.getSet(),
+        subspanOp.getBinding(), subspanOp.getDescriptorType(), zero,
+        subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr());
     rewriter.restoreInsertionPoint(ip);
 
     MLIRContext *context = rewriter.getContext();
@@ -550,7 +550,7 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
     // We assume that upper layers guarantee the byte offset is perfectly
     // divisible by the element byte count so the content is well aligned.
     Value offset = rewriter.create<AffineApplyOp>(
-        op.getLoc(), divMap, ValueRange{subspanOp.byte_offset(), byteValue});
+        op.getLoc(), divMap, ValueRange{subspanOp.getByteOffset(), byteValue});
 
     // Get the new index by adding the old index with the offset.
     Value newIndex = rewriter.create<AffineApplyOp>(

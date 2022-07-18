@@ -123,7 +123,7 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
           op->getLoc(), newType, result, resultSize, resultSize,
           /*source_affinity=*/affinityAttr,
           /*target_affinity=*/affinityAttr);
-      result.replaceUsesWithIf(transferOp.result(), [&](OpOperand &operand) {
+      result.replaceUsesWithIf(transferOp.getResult(), [&](OpOperand &operand) {
         return operand.getOwner() != transferOp &&
                operand.getOwner() != resultSize.getDefiningOp();
       });
@@ -157,7 +157,7 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
           result.getLoc(), newType, result, resultSize, resultSize,
           /*source_affinity=*/affinityAttr,
           /*target_affinity=*/affinityAttr);
-      result.replaceAllUsesExcept(transferOp.result(), transferOp);
+      result.replaceAllUsesExcept(transferOp.getResult(), transferOp);
       return true;
     } else {
       // Directly overwrite the existing lifetime.

@@ -327,11 +327,11 @@ static LogicalResult buildFlatBufferModule(
   DebugDatabaseBuilder debugDatabase;
 
   SymbolTable symbolTable(moduleOp);
-  if (!moduleOp.ordinal_counts().hasValue()) {
+  OrdinalCountsAttr ordinalCounts = moduleOp.getOrdinalCountsAttr();
+  if (!ordinalCounts) {
     return moduleOp.emitError() << "ordinal_counts attribute not found. The "
                                    "OrdinalAllocationPass must be run before.";
   }
-  OrdinalCountsAttr ordinalCounts = moduleOp.ordinal_counts().getValue();
 
   // Find all structural ops in the module.
   std::vector<IREE::VM::ImportOp> importFuncOps;
@@ -343,11 +343,11 @@ static LogicalResult buildFlatBufferModule(
 
   for (auto &op : moduleOp.getBlock().getOperations()) {
     if (auto funcOp = dyn_cast<IREE::VM::FuncOp>(op)) {
-      internalFuncOps[funcOp.ordinal().getValue().getLimitedValue()] = funcOp;
+      internalFuncOps[funcOp.getOrdinal()->getLimitedValue()] = funcOp;
     } else if (auto exportOp = dyn_cast<IREE::VM::ExportOp>(op)) {
-      exportFuncOps[exportOp.ordinal().getValue().getLimitedValue()] = exportOp;
+      exportFuncOps[exportOp.getOrdinal()->getLimitedValue()] = exportOp;
     } else if (auto importOp = dyn_cast<IREE::VM::ImportOp>(op)) {
-      importFuncOps[importOp.ordinal().getValue().getLimitedValue()] = importOp;
+      importFuncOps[importOp.getOrdinal()->getLimitedValue()] = importOp;
     }
   }
 
@@ -417,7 +417,7 @@ static LogicalResult buildFlatBufferModule(
     flatbuffers_uint8_vec_ref_t embedded_ref = 0;
     if (!rodataRef.archiveFile.hasValue()) {
       embedded_ref = serializeEmbeddedData(
-          rodataRef.rodataOp.getLoc(), rodataRef.rodataOp.value(),
+          rodataRef.rodataOp.getLoc(), rodataRef.rodataOp.getValue(),
           rodataRef.alignment, rodataRef.totalSize, fbb);
     }
     iree_vm_RodataSegmentDef_start(fbb);
@@ -451,8 +451,8 @@ static LogicalResult buildFlatBufferModule(
         auto signatureRef =
             makeImportFunctionSignatureDef(importOp, typeOrdinalMap, fbb);
         iree_vm_ImportFlagBits_enum_t flags =
-            importOp.is_optional() ? iree_vm_ImportFlagBits_OPTIONAL
-                                   : iree_vm_ImportFlagBits_REQUIRED;
+            importOp.getIsOptional() ? iree_vm_ImportFlagBits_OPTIONAL
+                                     : iree_vm_ImportFlagBits_REQUIRED;
         iree_vm_ImportFunctionDef_start(fbb);
         iree_vm_ImportFunctionDef_full_name_add(fbb, fullNameRef);
         iree_vm_ImportFunctionDef_signature_add(fbb, signatureRef);
@@ -462,16 +462,16 @@ static LogicalResult buildFlatBufferModule(
 
   auto exportFuncRefs =
       llvm::to_vector<8>(llvm::map_range(exportFuncOps, [&](auto exportOp) {
-        auto localNameRef = fbb.createString(exportOp.export_name());
+        auto localNameRef = fbb.createString(exportOp.getExportName());
         auto funcOp =
-            symbolTable.lookup<IREE::VM::FuncOp>(exportOp.function_ref());
+            symbolTable.lookup<IREE::VM::FuncOp>(exportOp.getFunctionRef());
         auto signatureRef = makeExportFunctionSignatureDef(exportOp, funcOp,
                                                            typeOrdinalMap, fbb);
         iree_vm_ExportFunctionDef_start(fbb);
         iree_vm_ExportFunctionDef_local_name_add(fbb, localNameRef);
         iree_vm_ExportFunctionDef_signature_add(fbb, signatureRef);
         iree_vm_ExportFunctionDef_internal_ordinal_add(
-            fbb, funcOp.ordinal().getValue().getLimitedValue());
+            fbb, funcOp.getOrdinal()->getLimitedValue());
         return iree_vm_ExportFunctionDef_end(fbb);
       }));
 
@@ -504,7 +504,7 @@ static LogicalResult buildFlatBufferModule(
   }
 
   auto moduleNameRef = fbb.createString(
-      moduleOp.sym_name().empty() ? "module" : moduleOp.sym_name());
+      moduleOp.getSymName().empty() ? "module" : moduleOp.getSymName());
 
   iree_vm_BytecodeModuleDef_name_add(fbb, moduleNameRef);
   iree_vm_BytecodeModuleDef_types_add(fbb, typesRef);
@@ -591,15 +591,15 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
   // it's small (like strings) we can avoid the extra seeks and keep it more
   // local by embedding it in the FlatBuffer.
   std::vector<IREE::VM::RodataOp> rodataOps;
-  rodataOps.resize(moduleOp.ordinal_counts().getValue().getRodatas());
+  rodataOps.resize(moduleOp.getOrdinalCountsAttr().getRodatas());
   for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
-    rodataOps[rodataOp.ordinal().getValue().getLimitedValue()] = rodataOp;
+    rodataOps[rodataOp.getOrdinal()->getLimitedValue()] = rodataOp;
   }
   SmallVector<RodataRef> rodataRefs;
   rodataRefs.resize(rodataOps.size());
   for (auto &rodataOp : rodataOps) {
     auto rodataValue =
-        rodataOp.value().dyn_cast<IREE::Util::SerializableAttrInterface>();
+        rodataOp.getValue().dyn_cast<IREE::Util::SerializableAttrInterface>();
     assert(rodataValue && "expected a serializable rodata value");
 
     // Split large rodata out of the FlatBuffer to avoid going over 2GB.
@@ -607,18 +607,18 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
     // easier to work with as a user.
     uint64_t actualSize = rodataValue.getStorageSize();
     bool storeExternal =
-        archiveWriter->supportsFiles() &&
-        (rodataOp.mime_type().hasValue() || actualSize >= kMaxEmbeddedDataSize);
+        archiveWriter->supportsFiles() && (rodataOp.getMimeType().hasValue() ||
+                                           actualSize >= kMaxEmbeddedDataSize);
 
     RodataRef rodataRef;
     rodataRef.rodataOp = rodataOp;
-    rodataRef.alignment = rodataOp.alignment() ? rodataOp.alignment().getValue()
-                                               : kDefaultRodataAlignment;
+    rodataRef.alignment =
+        rodataOp.getAlignment().getValueOr(kDefaultRodataAlignment);
     rodataRef.totalSize = static_cast<uint64_t>(actualSize);
     if (storeExternal) {
       std::string fileName =
           (rodataOp.getName() +
-           mimeTypeToFileExtension(rodataOp.mime_type().getValueOr("")))
+           mimeTypeToFileExtension(rodataOp.getMimeType().getValueOr("")))
               .str();
       rodataRef.archiveFile = archiveWriter->declareFile(
           fileName, rodataRef.alignment, rodataRef.totalSize,
@@ -627,7 +627,7 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
                 llvm::support::endianness::little, os);
           });
     }
-    rodataRefs[rodataOp.ordinal().getValue().getLimitedValue()] = rodataRef;
+    rodataRefs[rodataOp.getOrdinal()->getLimitedValue()] = rodataRef;
   }
 
   // NOTE: we order things so that all of the metadata is close to the start of
