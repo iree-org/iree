@@ -589,6 +589,7 @@ static Attribute constFoldFloatUnaryOp(
 
 /// Performs const folding `calculate` with element-wise behavior on the two
 /// attributes in `operands` and returns the result if possible.
+/// Note: return type will match the operand types.
 template <class AttrElementT,
           class ElementValueT = typename AttrElementT::ValueType,
           class CalculationT =
@@ -1580,7 +1581,7 @@ template <class AttrElementT,
           class CalculationT = std::function<APInt(ElementValueT)>>
 static Attribute constFoldCmpOp(ArrayRef<Attribute> operands,
                                 const CalculationT &calculate) {
-  assert(operands.size() == 1 && "unary op takes one operand");
+  assert(operands.size() == 1 && "unary cmp op takes one operand");
   if (auto operand = operands[0].dyn_cast_or_null<AttrElementT>()) {
     auto boolType = IntegerType::get(operand.getContext(), 32);
     return IntegerAttr::get(boolType, calculate(operand.getValue()));
@@ -1998,6 +1999,51 @@ OpFoldResult CmpNZI64Op::fold(ArrayRef<Attribute> operands) {
 // Floating-point comparison
 //===----------------------------------------------------------------------===//
 
+/// Performs const folding `calculate` with element-wise behavior on the two
+/// attributes in `operands` and returns the integer result of the comparison
+/// if possible.
+template <class AttrElementT,
+          class ElementValueT = typename AttrElementT::ValueType,
+          class CalculationT =
+              std::function<ElementValueT(ElementValueT, ElementValueT)>>
+static Attribute constFoldFloatComparisonOp(ArrayRef<Attribute> operands,
+                                            const CalculationT &calculate) {
+  assert(operands.size() == 2 && "binary op takes two operands");
+
+  if (auto lhs = operands[0].dyn_cast_or_null<AttrElementT>()) {
+    auto rhs = operands[1].dyn_cast_or_null<AttrElementT>();
+    if (!rhs) return {};
+    return IntegerAttr::get(IntegerType::get(lhs.getContext(), 32),
+                            calculate(lhs.getValue(), rhs.getValue()));
+  } else if (auto lhs = operands[0].dyn_cast_or_null<SplatElementsAttr>()) {
+    // TODO(benvanik): handle splat/otherwise.
+    auto rhs = operands[1].dyn_cast_or_null<SplatElementsAttr>();
+    if (!rhs || lhs.getType() != rhs.getType()) return {};
+    auto elementResult = constFoldFloatComparisonOp<AttrElementT>(
+        {lhs.getSplatValue<Attribute>(), rhs.getSplatValue<Attribute>()},
+        calculate);
+    if (!elementResult) return {};
+    return DenseElementsAttr::get(IntegerType::get(lhs.getContext(), 32),
+                                  elementResult);
+  } else if (auto lhs = operands[0].dyn_cast_or_null<ElementsAttr>()) {
+    auto rhs = operands[1].dyn_cast_or_null<ElementsAttr>();
+    if (!rhs || lhs.getType() != rhs.getType()) return {};
+    auto lhsIt = lhs.getValues<AttrElementT>().begin();
+    auto rhsIt = rhs.getValues<AttrElementT>().begin();
+    SmallVector<Attribute, 4> resultAttrs(lhs.getNumElements());
+    for (int64_t i = 0; i < lhs.getNumElements(); ++i) {
+      resultAttrs[i] =
+          constFoldFloatComparisonOp<AttrElementT>({*lhsIt, *rhsIt}, calculate);
+      if (!resultAttrs[i]) return {};
+      ++lhsIt;
+      ++rhsIt;
+    }
+    return DenseElementsAttr::get(IntegerType::get(lhs.getContext(), 32),
+                                  resultAttrs);
+  }
+  return {};
+}
+
 enum CmpFOrdering {
   ORDERED = 0,
   UNORDERED = 1,
@@ -2009,7 +2055,7 @@ static OpFoldResult foldCmpEQFOp(T op, ArrayRef<Attribute> operands) {
     // x == x = true
     return oneOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr>(
+  return constFoldFloatComparisonOp<FloatAttr>(
       operands, [&](const APFloat &a, const APFloat &b) {
         auto result = a.compare(b);
         if (ordering == ORDERED) {
@@ -2062,7 +2108,7 @@ static OpFoldResult foldCmpNEFOp(T op, ArrayRef<Attribute> operands) {
     // x != x = false
     return zeroOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr>(
+  return constFoldFloatComparisonOp<FloatAttr>(
       operands, [&](const APFloat &a, const APFloat &b) {
         auto result = a.compare(b);
         if (ordering == ORDERED) {
@@ -2115,8 +2161,8 @@ static OpFoldResult foldCmpLTFOp(T op, ArrayRef<Attribute> operands) {
     // x < x = false
     return zeroOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr>(operands, [&](const APFloat &a,
-                                                    const APFloat &b) {
+  return constFoldFloatComparisonOp<FloatAttr>(operands, [&](const APFloat &a,
+                                                             const APFloat &b) {
     auto result = a.compare(b);
     if (ordering == ORDERED) {
       return result == APFloat::cmpLessThan;
@@ -2160,7 +2206,7 @@ static OpFoldResult foldCmpLTEFOp(T op, ArrayRef<Attribute> operands) {
     // x <= x = true
     return oneOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr>(
+  return constFoldFloatComparisonOp<FloatAttr>(
       operands, [&](const APFloat &a, const APFloat &b) {
         auto result = a.compare(b);
         if (ordering == ORDERED) {
@@ -2194,7 +2240,7 @@ static OpFoldResult foldCmpGTFOp(T op, ArrayRef<Attribute> operands) {
     // x > x = false
     return zeroOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr>(
+  return constFoldFloatComparisonOp<FloatAttr>(
       operands, [&](const APFloat &a, const APFloat &b) {
         auto result = a.compare(b);
         if (ordering == ORDERED) {
@@ -2252,8 +2298,8 @@ static OpFoldResult foldCmpGTEFOp(T op, ArrayRef<Attribute> operands) {
     // x >= x = true
     return oneOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr>(operands, [&](const APFloat &a,
-                                                    const APFloat &b) {
+  return constFoldFloatComparisonOp<FloatAttr>(operands, [&](const APFloat &a,
+                                                             const APFloat &b) {
     auto result = a.compare(b);
     if (ordering == ORDERED) {
       return result == APFloat::cmpGreaterThan || result == APFloat::cmpEqual;
