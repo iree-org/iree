@@ -28,13 +28,7 @@ rm -rf -v !("actions-runner"|"${SCRIPT_BASENAME}")
 
 cd /tmp/
 rm -rf /tmp/iree
-# TODO: replace with main repo
-# git clone https://github.com/iree-org/iree.git
-git clone https://github.com/gmngeoffrey/iree.git
-cd iree
-git fetch origin runner-setup
-git checkout runner-setup
-cd ..
+git clone https://github.com/iree-org/iree.git
 
 cd iree/build_tools/github_actions/runner/
 # Bash doesn't read the whole script into memory when executing, so if you
