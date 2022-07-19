@@ -45,8 +45,10 @@ static void iree_vm_context_destroy(iree_vm_context_t* context);
 // Allocates a process-unique ID for a context to use.
 static iree_vm_context_id_t iree_vm_context_allocate_id(void) {
   static iree_atomic_int32_t next_context_id = IREE_ATOMIC_VAR_INIT(1);
+  // relaxed because we only care about atomic increments, not ordering w.r.t.
+  // other memory accesses.
   uint32_t context_id = iree_atomic_fetch_add_int32(&next_context_id, 1,
-                                                    iree_memory_order_seq_cst);
+                                                    iree_memory_order_relaxed);
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FIBERS
   // This is what we pass to Tracy as the fiber name.
   // The string must remain live for the lifetime of the process.

@@ -147,6 +147,7 @@ iree_status_t iree_task_executor_create(
       worker_local_memory += worker_local_memory_size;
       if (!iree_status_is_ok(status)) break;
     }
+    // The masks are accessed with 'relaxed' order because they are just hints.
     iree_atomic_task_affinity_set_store(&executor->worker_suspend_mask,
                                         worker_suspend_mask,
                                         iree_memory_order_relaxed);
@@ -535,6 +536,7 @@ iree_task_t* iree_task_executor_try_steal_task(
     iree_task_queue_t* local_task_queue) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // The masks are accessed with 'relaxed' order because they are just hints.
   iree_task_affinity_set_t worker_live_mask =
       iree_atomic_task_affinity_set_load(&executor->worker_live_mask,
                                          iree_memory_order_relaxed);
