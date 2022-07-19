@@ -905,7 +905,9 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, IREE::LinalgExt::FftOp fftOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   unsigned numLoops = fftOp.getLoopIteratorTypes().size();
-  auto partitionedLoops = fftOp.getPartitionableLoops(kNumMaxParallelDims);
+  auto partitionedLoops =
+      cast<PartitionableLoopsInterface>(fftOp.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
   SmallVector<int64_t> workgroupTileSizes(numLoops, defaultWorkgroupTileSize);
   llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
                                                partitionedLoops.end());

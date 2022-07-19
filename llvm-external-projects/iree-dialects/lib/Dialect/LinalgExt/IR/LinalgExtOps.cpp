@@ -460,20 +460,6 @@ SmallVector<Range> SortOp::getIterationDomain(OpBuilder &builder) {
   return loopBounds;
 }
 
-SmallVector<unsigned>
-SortOp::getPartitionableLoops(unsigned maxNumParallelDims) {
-  auto range = llvm::seq<unsigned>(0, getOperandRank());
-  SmallVector<unsigned> partitionableLoops(range.begin(), range.end());
-  partitionableLoops.erase(std::next(partitionableLoops.begin(), dimension()));
-  if (partitionableLoops.size() > maxNumParallelDims) {
-    partitionableLoops.erase(
-        partitionableLoops.begin(),
-        std::next(partitionableLoops.begin(),
-                  partitionableLoops.size() - maxNumParallelDims));
-  }
-  return partitionableLoops;
-}
-
 Operation *SortOp::getTiledImplementation(OpBuilder &builder,
                                           ValueRange outputs,
                                           ArrayRef<OpFoldResult> offsets,
@@ -798,23 +784,6 @@ LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-SmallVector<unsigned>
-FftOp::getPartitionableLoops(unsigned maxNumParallelDims) {
-  auto range = llvm::seq<unsigned>(0, getOperandRank());
-  SmallVector<unsigned> partitionableLoops(range.begin(), range.end());
-  // Indices matter for coeff computation.
-  if (!hasCoeff()) {
-    partitionableLoops.pop_back();
-  }
-  if (partitionableLoops.size() > maxNumParallelDims) {
-    partitionableLoops.erase(
-        partitionableLoops.begin(),
-        std::next(partitionableLoops.begin(),
-                  partitionableLoops.size() - maxNumParallelDims));
-  }
-  return partitionableLoops;
-}
-
 Operation *FftOp::getTiledImplementation(OpBuilder &builder, ValueRange outputs,
                                          ArrayRef<OpFoldResult> offsets,
                                          ArrayRef<OpFoldResult> sizes,
@@ -935,14 +904,6 @@ SmallVector<StringRef> ScanOp::getLoopIteratorTypes() {
                                        getParallelIteratorTypeName());
   iteratorTypes[dimension()] = getReductionIteratorTypeName();
   return iteratorTypes;
-}
-
-SmallVector<unsigned>
-ScanOp::getPartitionableLoops(unsigned maxNumParallelDims) {
-  auto range = llvm::seq<unsigned>(0, getOperandRank());
-  SmallVector<unsigned> partitionableLoops(range.begin(), range.end());
-  partitionableLoops.erase(std::next(partitionableLoops.begin(), dimension()));
-  return partitionableLoops;
 }
 
 // Generates naive scalar implementation of scan for a given operator f.
@@ -1452,14 +1413,6 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
     b.create<scf::YieldOp>(loc, ValueRange{resultCarryValue, resultCarryIndex});
   }
   return success();
-}
-
-SmallVector<unsigned>
-TopkOp::getPartitionableLoops(unsigned maxNumParallelDims) {
-  auto partitionableLoops =
-      llvm::to_vector(llvm::seq<unsigned>(0, getInputRank()));
-  partitionableLoops.erase(std::next(partitionableLoops.begin(), dimension()));
-  return partitionableLoops;
 }
 
 Operation *TopkOp::getTiledImplementation(OpBuilder &builder,

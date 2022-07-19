@@ -150,8 +150,8 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
 
 def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
     [DeclareOpInterfaceMethods<TiledOpInterface,
-        ["generateScalarImplementation", "getPartitionableLoops",
-         "getResultTilePosition", "getTiledImplementation"]>]> {
+        ["generateScalarImplementation", "getResultTilePosition", 
+         "getTiledImplementation"]>]> {
   let summary = "Sort operator";
   let description = [{
     Based on XLA operation semantics, sorts the given `operands` at the given
@@ -191,10 +191,8 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
 
 def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
   DeclareOpInterfaceMethods<TiledOpInterface,
-      ["generateScalarImplementation", "getPartitionableLoops",
-       "getResultTilePosition", "getTiledImplementation"]>,
-  DeclareOpInterfaceMethods<LinalgExtInterface>
-]> {
+      ["generateScalarImplementation", "getResultTilePosition",
+       "getTiledImplementation"]>]> {
   let summary = "Fft operator";
   let description = [{
     Apply 1D FFT to innermost dim. This is an iterative FFT, not recurrsive.
@@ -253,8 +251,8 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
 
 def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
     [DeclareOpInterfaceMethods<TiledOpInterface,
-      ["generateScalarImplementation", "getPartitionableLoops",
-       "getResultTilePosition", "getTiledImplementation"]>]> {
+      ["generateScalarImplementation", "getResultTilePosition",
+       "getTiledImplementation"]>]> {
   let summary = "Scan operator";
   let description = [{
     Computes the inclusive/exclusive scan along a given dimension.
@@ -355,8 +353,8 @@ def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
 def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TiledOpInterface,
-    ["generateScalarImplementation", "getPartitionableLoops",
-     "getResultTilePosition", "getTiledImplementation"]>,
+    ["generateScalarImplementation", "getResultTilePosition",
+     "getTiledImplementation"]>,
   SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
 ]>{
   let summary = "Top-K operator";
