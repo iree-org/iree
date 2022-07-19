@@ -22,6 +22,7 @@ iree_cc_library(
     "DumpExecutableBenchmarks.cpp"
     "DumpExecutableSources.cpp"
     "ElideRedundantCommands.cpp"
+    "FixupLegacySync.cpp"
     "InlineDeviceSwitches.cpp"
     "LinkExecutables.cpp"
     "MaterializeInterfaces.cpp"

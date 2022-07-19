@@ -152,6 +152,10 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Materialize timelines for device queues.
   passManager.addPass(createMaterializeTimelinesPass());
 
+  // If any devices require the legacy synchronous execution behavior then
+  // make all async operations blocking.
+  passManager.addPass(createFixupLegacySyncPass());
+
   addCleanupPatterns(passManager);
 
   //----------------------------------------------------------------------------

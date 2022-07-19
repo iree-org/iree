@@ -566,6 +566,10 @@ def HAL_DeviceTargetAttr :
     // target device.
     Attribute getMatchExpression();
 
+    // Returns true if there's an attribute with the given name in the
+    // configuration dictionary.
+    bool hasConfigurationAttr(StringRef name);
+
     // Returns zero or more executable targets that this device supports.
     SmallVector<ExecutableTargetAttr, 4> getExecutableTargets();
 
