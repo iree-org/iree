@@ -18,12 +18,7 @@ set -o pipefail
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
-source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docker_common.sh"
-
-# Sets DOCKER_RUN_ARGS
-docker_setup
-
-docker run "${DOCKER_RUN_ARGS[@]?}" \
+"${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docker_run.sh" \
   gcr.io/iree-oss/frontends-swiftshader@sha256:41e516b8c1b432e3c02896c4bf4b7f06df6a67371aa167b88767b8d4d2018ea6 \
   build_tools/kokoro/gcp_ubuntu/cmake-bazel/linux/x86-swiftshader/build.sh
 
