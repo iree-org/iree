@@ -86,6 +86,14 @@ void populateMathToVMPatterns(MLIRContext *context,
                               TypeConverter &typeConverter,
                               RewritePatternSet &patterns) {
   patterns.insert<
+      UnaryArithmeticOpConversion<math::AbsOp, IREE::VM::AbsF32Op,
+                                  IREE::VM::AbsF64Op>,
+      UnaryArithmeticOpConversion<math::CeilOp, IREE::VM::CeilF32Op,
+                                  IREE::VM::CeilF64Op>,
+      UnaryArithmeticOpConversion<math::FloorOp, IREE::VM::FloorF32Op,
+                                  IREE::VM::FloorF64Op>,
+      UnaryArithmeticOpConversion<math::RoundOp, IREE::VM::RoundF32Op,
+                                  IREE::VM::RoundF64Op>,
       UnaryArithmeticOpConversion<math::AtanOp, IREE::VM::AtanF32Op,
                                   IREE::VM::AtanF64Op>,
       BinaryArithmeticOpConversion<math::Atan2Op, IREE::VM::Atan2F32Op,
@@ -94,8 +102,6 @@ void populateMathToVMPatterns(MLIRContext *context,
                                   IREE::VM::CosF64Op>,
       UnaryArithmeticOpConversion<math::SinOp, IREE::VM::SinF32Op,
                                   IREE::VM::SinF64Op>,
-      UnaryArithmeticOpConversion<math::CountLeadingZerosOp,
-                                  IREE::VM::CtlzI32Op, IREE::VM::CtlzI64Op>,
       UnaryArithmeticOpConversion<math::ExpOp, IREE::VM::ExpF32Op,
                                   IREE::VM::ExpF64Op>,
       UnaryArithmeticOpConversion<math::Exp2Op, IREE::VM::Exp2F32Op,
@@ -120,15 +126,9 @@ void populateMathToVMPatterns(MLIRContext *context,
                                   IREE::VM::TanhF64Op>,
       UnaryArithmeticOpConversion<math::ErfOp, IREE::VM::ErfF32Op,
                                   IREE::VM::ErfF64Op>,
-      UnaryArithmeticOpConversion<math::AbsOp, IREE::VM::AbsF32Op,
-                                  IREE::VM::AbsF64Op>,
-      UnaryArithmeticOpConversion<math::CeilOp, IREE::VM::CeilF32Op,
-                                  IREE::VM::CeilF64Op>,
-      UnaryArithmeticOpConversion<math::FloorOp, IREE::VM::FloorF32Op,
-                                  IREE::VM::FloorF64Op>,
-      UnaryArithmeticOpConversion<math::RoundOp, IREE::VM::RoundF32Op,
-                                  IREE::VM::RoundF64Op>>(typeConverter,
-                                                         context);
+      UnaryArithmeticOpConversion<math::CountLeadingZerosOp,
+                                  IREE::VM::CtlzI32Op, IREE::VM::CtlzI64Op>>(
+                                    typeConverter, context);
 }
 
 }  // namespace iree_compiler
