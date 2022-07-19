@@ -201,7 +201,8 @@ static void iree_hal_vulkan_native_semaphore_fail(
   iree_status_t old_status = iree_ok_status();
   if (!iree_atomic_compare_exchange_strong_intptr(
           &semaphore->failure_status, (intptr_t*)&old_status, (intptr_t)status,
-          iree_memory_order_seq_cst, iree_memory_order_seq_cst)) {
+          iree_memory_order_acq_rel,
+          iree_memory_order_relaxed /* old_status is unused */)) {
     // Previous status was not OK; drop our new status.
     IREE_IGNORE_ERROR(status);
     return;
