@@ -68,10 +68,11 @@ function docker_run() {
     # for two reasons:
     #   1. We probably don't want Docker to just write into the user's home
     #      directory when running locally.
-    #   2. When running with Kokoro, we mount a local scratch SSD to KOKORO_ROOT
-    #      whereas the home directory is on the persistent SSD boot disk. It
-    #      turns out that makes a huge difference in performance for Bazel
-    #      because it is IO bound at 64 cores..
+    #   2. This allows us to control the device the home directory is in. Bazel
+    #      tends to be IO bound at even moderate levels of CPU parallelism and
+    #      the difference between a persistent SSD and a local scratch SSD can
+    #      be huge. In particular, Kokoro has the home directory on the former
+    #      and the work directory on the latter.
     local fake_home_dir="${DOCKER_TMPDIR}/fake_home"
     mkdir -p "${fake_home_dir}"
 
