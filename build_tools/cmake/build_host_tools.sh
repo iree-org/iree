@@ -13,6 +13,7 @@
 set -xeuo pipefail
 
 BUILD_DIR="${1:-}"
+INSTALL_DIR="${INSTALL_DIR:-${BUILD_DIR}/install}"
 ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 
@@ -35,7 +36,7 @@ fi
 
 # Configure, build, install.
 "${CMAKE_BIN}" -G Ninja -B "${BUILD_DIR}" \
-  -DCMAKE_INSTALL_PREFIX="${BUILD_DIR}/install" \
+  -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
   -DIREE_ENABLE_LLD=ON \
   -DIREE_ENABLE_ASSERTIONS=ON \
   -DIREE_BUILD_COMPILER=ON \

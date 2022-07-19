@@ -7,7 +7,7 @@
 on:
   workflow_call:
     inputs:
-      host-binaries-archive:
+      host-binary-root:
         required: true
         type: string
 
@@ -28,6 +28,8 @@ jobs:
     env:
       BUILD_RISCV_DIR: "build-riscv-rv32-baremetal"
       RISCV_CONFIG: "rv32-baremetal"
+      HOST_BINARY_ARCHIVE: ${{ inputs.host-binary-root }}.tar
+      HOST_BINARY_ROOT: ${{ inputs.host-binary-root }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
@@ -36,18 +38,16 @@ jobs:
       - name: "Downloading host tools"
         uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
         with:
-          name: "${{ inputs.host-binaries-archive }}"
+          name: "${{ env.HOST_BINARY_ARCHIVE }}"
       - name: "Extracting host tools archive"
-        env:
-          HOST_BINARY_ROOT: "${RUNNER_TEMP}/host_tools"
         run: |
-          mkdir -p "${HOST_BINARY_ROOT}"
-          tar -xf ${{ inputs.host-binaries-archive }} "${HOST_BINARY_ROOT}"
+          tar -xf ${HOST_BINARY_ARCHIVE}
       - name: "Cross-compiling for riscv32"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "RISCV_CONFIG=${RISCV_CONFIG}" \
             --env "BUILD_RISCV_DIR=${BUILD_RISCV_DIR}" \
+            --env "IREE_HOST_BINARY_ROOT=${HOST_BINARY_ROOT}" \
             gcr.io/iree-oss/riscv@sha256:e566f054ff1b1d8be61459ce4789dd944b70e85c8939a4d3b7331ab519d8db4c \
             bash -c \
             "./build_tools/cmake/build_riscv.sh && build_tools/kokoro/gcp_ubuntu/cmake/baremetal/riscv32/test.sh"

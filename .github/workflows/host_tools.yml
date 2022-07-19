@@ -7,7 +7,7 @@
 on:
   workflow_call:
     inputs:
-      host-binaries-archive:
+      host-binary-root:
         required: true
         type: string
 
@@ -26,7 +26,8 @@ jobs:
       - cpu
       - os-family=Linux
     env:
-      BUILD_DIR: build-host
+      HOST_BINARY_ROOT: ${{ inputs.host-binary-root }}
+      HOST_BINARY_ARCHIVE: ${{ inputs.host-binary-root }}.tar
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
@@ -35,17 +36,17 @@ jobs:
       - name: "Building host tools"
         run: |
           ./build_tools/github_actions/docker_run.sh \
+            --env "INSTALL_DIR=${HOST_BINARY_ROOT}" \
             gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
-            ./build_tools/cmake/build_host_tools.sh \
-            "${BUILD_DIR}"
+            ./build_tools/cmake/build_host_tools.sh
       # Using a tar archive is necessary to preserve file permissions. See
       # https://github.com/actions/upload-artifact#maintaining-file-permissions-and-case-sensitive-files
       # The upload action already does its own gzip compression, so it's likely
       # unnecessary (and perhaps harmful) to do our own, though that hasn't been
       # investigated.
       - name: "Create install dir archive"
-        run: tar -cf "${{ inputs.host-binaries-archive }}" "${BUILD_DIR}/install"
+        run: tar -cf "${HOST_BINARY_ARCHIVE}" "${HOST_BINARY_ROOT}"
       - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8  # v3.1.0
         with:
-          name: "${{ inputs.host-binaries-archive }}"
-          path: "${{ inputs.host-binaries-archive }}"
+          name: "${{ env.HOST_BINARY_ARCHIVE }}"
+          path: "${{ env.HOST_BINARY_ARCHIVE }}"
