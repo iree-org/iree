@@ -11,9 +11,6 @@ on:
         required: true
         type: string
 
-env:
-  IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
-
 jobs:
   test_runtime:
     runs-on: ubuntu-20.04
@@ -30,11 +27,8 @@ jobs:
         run: tar -xf ${{ inputs.build-dir }}.tar ${{ inputs.build-dir }}
       - name: "Testing runtime"
         run: |
-          docker run --user="$(id -u):$(id -g)" \
-            --volume="$PWD:$IREE_DOCKER_WORKDIR" \
-            --workdir="$IREE_DOCKER_WORKDIR" \
+          ./build_tools/github_actions/docker_run.sh \
             --env IREE_VULKAN_DISABLE=1 \
-            --rm \
             gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
             ./build_tools/cmake/ctest_all.sh \
             "${{ inputs.build-dir }}"
