@@ -79,7 +79,8 @@ static void hoistImmutableLoads(Region &region,
 
 static bool doesOpBlockMotion(Operation *op) {
   return isa<mlir::CallOpInterface>(op) ||
-         op->hasTrait<OpTrait::IREE::Util::YieldPoint>();
+         op->hasTrait<OpTrait::IREE::Util::YieldPoint>() ||
+         op->hasTrait<OpTrait::IsTerminator>();
 }
 
 static void moveOpUpInBlock(Block &block, Operation *op) {
@@ -90,7 +91,7 @@ static void moveOpUpInBlock(Block &block, Operation *op) {
 }
 
 static void moveOpDownInBlock(Block &block, Operation *op) {
-  while (op->getNextNode() != block.getTerminator()) {
+  while (op->getNextNode()) {
     if (doesOpBlockMotion(op->getNextNode())) break;
     op->moveAfter(op->getNextNode());
   }

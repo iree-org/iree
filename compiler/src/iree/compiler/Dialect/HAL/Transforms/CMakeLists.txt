@@ -43,6 +43,7 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     MLIRSCFDialect
+    MLIRSCFToControlFlow
     MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
