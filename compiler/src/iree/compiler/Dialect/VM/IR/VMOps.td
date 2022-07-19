@@ -2263,6 +2263,13 @@ def VM_FloorF64Op :
   let hasFolder = 1;
 }
 
+def VM_RoundF32Op : VM_UnaryArithmeticOp<F32, "round.f32", VM_OPC_RoundF32, [VM_ExtF32]> {
+  let summary = [{rounds the value to the nearest integer away from zero}];
+}
+def VM_RoundF64Op : VM_UnaryArithmeticOp<F64, "round.f64", VM_OPC_RoundF64, [VM_ExtF64]> {
+  let summary = [{rounds the value to the nearest integer away from zero}];
+}
+
 //===----------------------------------------------------------------------===//
 // Floating-point math
 //===----------------------------------------------------------------------===//

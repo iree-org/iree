@@ -4591,6 +4591,8 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                                          "vm_ceil_f32");
   patterns.add<GenericOpConversion<IREE::VM::FloorF32Op>>(
       typeConverter, context, "vm_floor_f32");
+  patterns.add<GenericOpConversion<IREE::VM::RoundF32Op>>(
+      typeConverter, context, "vm_round_f32");
 
   patterns.add<GenericOpConversion<IREE::VM::AtanF32Op>>(typeConverter, context,
                                                          "vm_atan_f32");

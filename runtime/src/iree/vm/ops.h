@@ -294,6 +294,7 @@ static inline float vm_abs_f32(float operand) { return fabsf(operand); }
 static inline float vm_neg_f32(float operand) { return -operand; }
 static inline float vm_ceil_f32(float operand) { return ceilf(operand); }
 static inline float vm_floor_f32(float operand) { return floorf(operand); }
+static inline float vm_round_f32(float operand) { return roundf(operand); }
 
 static inline float vm_atan_f32(float operand) { return atanf(operand); }
 static inline float vm_atan2_f32(float y, float x) { return atan2f(y, x); }
