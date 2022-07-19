@@ -4,15 +4,13 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Functions for configuring docker. This file should be sourced, not executed.
+set -euo pipefail
 
-# Sets up files and environment to enable running all our Kokoro docker scripts.
+# Sets up files and environment to enable running scripts in docker.
 # In particular, does some shenanigans to enable running with the current user.
 # Some of this setup is only strictly necessary for Bazel, but it doesn't hurt
 # for anything else.
 # Requires that DOCKER_WORKDIR and DOCKER_TMPDIR have been set
-# Sets the environment variable DOCKER_RUN_ARGS to be used by subsequent
-# `docker run` invocations.
 function docker_run() {
     # Make the source repository available and launch containers in that
     # directory.
@@ -89,3 +87,5 @@ function docker_run() {
 
     docker run "${DOCKER_RUN_ARGS[@]}" "$@"
 }
+
+docker_run "$@"
