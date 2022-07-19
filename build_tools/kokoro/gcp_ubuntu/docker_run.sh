@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-export DOCKER_WORKDIR="${KOKORO_ARTIFACTS_DIR?}/github/iree"
-export DOCKER_TMPDIR="${KOKORO_ROOT?}"
+export DOCKER_WORKDIR="${KOKORO_ARTIFACTS_DIR}/github/iree"
+export DOCKER_TMPDIR="${KOKORO_ROOT}"
 
 "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/docker/docker_run.sh" "$@"
