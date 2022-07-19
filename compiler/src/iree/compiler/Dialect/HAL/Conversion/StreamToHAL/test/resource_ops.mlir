@@ -17,45 +17,57 @@ func.func @resourceAlloc(%arg0: index, %arg1: index) -> (!stream.resource<transi
 
 // -----
 
-// TODO(#9572): implement stream ordered allocations.
-
 // CHECK-LABEL: @resourceAlloca
-func.func @resourceAlloca(%arg0: index, %await_timepoint: !stream.timepoint) -> (!stream.resource<staging>, !stream.timepoint) {
-  // CHECK: %[[RET0:.+]] = hal.allocator.allocate
+// CHECK-SAME: (%[[SIZE:.+]]: index)
+func.func @resourceAlloca(%size: index) -> (!stream.resource<staging>, !stream.timepoint) {
+  // CHECK: %[[WAIT_FENCE:.+]] = util.null : !hal.fence
+  // CHECK: %[[SIGNAL_FENCE:.+]] = hal.timeline.advance
+  // CHECK: %[[RET0:.+]] = hal.device.queue.alloca
+  // CHECK-SAME: affinity(%c-1
+  // CHECK-SAME: wait(%[[WAIT_FENCE]])
+  // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
+  // CHECK-SAME: pool(%c0
   // CHECK-SAME: type("DeviceVisible|DeviceLocal")
   // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
-  // CHECK-SAME: : !hal.buffer{%arg0}
-  %0:2 = stream.resource.alloca uninitialized : !stream.resource<staging>{%arg0} => !stream.timepoint
-  // CHECK: %[[IMMEDIATE:.+]] = arith.constant 0 : i64
-  // CHECK: return %[[RET0]], %[[IMMEDIATE]]
+  // CHECK-SAME: : !hal.buffer{%[[SIZE]]}
+  %0:2 = stream.resource.alloca uninitialized : !stream.resource<staging>{%size} => !stream.timepoint
+  // CHECK: return %[[RET0]], %[[SIGNAL_FENCE]]
   return %0#0, %0#1 : !stream.resource<staging>, !stream.timepoint
 }
 
 // -----
-
-// TODO(#9572): implement stream ordered allocations.
 
 // CHECK-LABEL: @resourceAllocaAwait
-func.func @resourceAllocaAwait(%arg0: index, %await_timepoint: !stream.timepoint) -> (!stream.resource<staging>, !stream.timepoint) {
-  // CHECK: %[[RET0:.+]] = hal.allocator.allocate
+// CHECK-SAME: (%[[SIZE:.+]]: index, %[[WAIT_FENCE:.+]]: !hal.fence)
+func.func @resourceAllocaAwait(%size: index, %await_timepoint: !stream.timepoint) -> (!stream.resource<staging>, !stream.timepoint) {
+  // CHECK: %[[SIGNAL_FENCE:.+]] = hal.timeline.advance
+  // CHECK: %[[RET0:.+]] = hal.device.queue.alloca
+  // CHECK-SAME: affinity(%c-1
+  // CHECK-SAME: wait(%[[WAIT_FENCE]])
+  // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
+  // CHECK-SAME: pool(%c0
   // CHECK-SAME: type("DeviceVisible|DeviceLocal")
   // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
-  // CHECK-SAME: : !hal.buffer{%arg0}
-  %0:2 = stream.resource.alloca uninitialized await(%await_timepoint) => !stream.resource<staging>{%arg0} => !stream.timepoint
-  // CHECK: %[[IMMEDIATE:.+]] = arith.constant 0 : i64
-  // CHECK: return %[[RET0]], %[[IMMEDIATE]]
+  // CHECK-SAME: : !hal.buffer{%[[SIZE]]}
+  %0:2 = stream.resource.alloca uninitialized await(%await_timepoint) => !stream.resource<staging>{%size} => !stream.timepoint
+  // CHECK: return %[[RET0]], %[[SIGNAL_FENCE]]
   return %0#0, %0#1 : !stream.resource<staging>, !stream.timepoint
 }
 
 // -----
 
-// TODO(#9572): implement stream ordered allocations.
-
 // CHECK-LABEL: @resourceDealloca
-func.func @resourceDealloca(%arg0: index, %arg1: !stream.resource<staging>, %arg2: !stream.timepoint) -> !stream.timepoint {
-  %0 = stream.resource.dealloca %arg1 : !stream.resource<staging>{%arg0} => !stream.timepoint
-  // CHECK: %[[IMMEDIATE:.+]] = arith.constant 0 : i64
-  // CHECK: return %[[IMMEDIATE]]
+// CHECK-SAME: (%[[SIZE:.+]]: index, %[[RESOURCE:.+]]: !hal.buffer)
+func.func @resourceDealloca(%size: index, %resource: !stream.resource<staging>) -> !stream.timepoint {
+  // CHECK: %[[WAIT_FENCE:.+]] = util.null : !hal.fence
+  // CHECK: %[[SIGNAL_FENCE:.+]] = hal.timeline.advance
+  // CHECK: hal.device.queue.dealloca
+  // CHECK-SAME: affinity(%c-1
+  // CHECK-SAME: wait(%[[WAIT_FENCE]])
+  // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
+  // CHECK-SAME: buffer(%[[RESOURCE]] : !hal.buffer)
+  %0 = stream.resource.dealloca %resource : !stream.resource<staging>{%size} => !stream.timepoint
+  // CHECK: return %[[SIGNAL_FENCE]]
   return %0 : !stream.timepoint
 }
 
@@ -64,10 +76,16 @@ func.func @resourceDealloca(%arg0: index, %arg1: !stream.resource<staging>, %arg
 // TODO(#9572): implement stream ordered allocations.
 
 // CHECK-LABEL: @resourceDeallocaAwait
-func.func @resourceDeallocaAwait(%arg0: index, %arg1: !stream.resource<staging>, %arg2: !stream.timepoint) -> !stream.timepoint {
-  %0 = stream.resource.dealloca await(%arg2) => %arg1 : !stream.resource<staging>{%arg0} => !stream.timepoint
-  // CHECK: %[[IMMEDIATE:.+]] = arith.constant 0 : i64
-  // CHECK: return %[[IMMEDIATE]]
+// CHECK-SAME: (%[[SIZE:.+]]: index, %[[RESOURCE:.+]]: !hal.buffer, %[[WAIT_FENCE:.+]]: !hal.fence)
+func.func @resourceDeallocaAwait(%size: index, %resource: !stream.resource<staging>, %await_timepoint: !stream.timepoint) -> !stream.timepoint {
+  // CHECK: %[[SIGNAL_FENCE:.+]] = hal.timeline.advance
+  // CHECK: hal.device.queue.dealloca
+  // CHECK-SAME: affinity(%c-1
+  // CHECK-SAME: wait(%[[WAIT_FENCE]])
+  // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
+  // CHECK-SAME: buffer(%[[RESOURCE]] : !hal.buffer)
+  %0 = stream.resource.dealloca await(%await_timepoint) => %resource : !stream.resource<staging>{%size} => !stream.timepoint
+  // CHECK: return %[[SIGNAL_FENCE]]
   return %0 : !stream.timepoint
 }
 
