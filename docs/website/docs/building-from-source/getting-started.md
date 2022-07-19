@@ -76,7 +76,7 @@ Configure CMake:
 
     # Additional quality of life CMake flags:
     # Enable ccache:
-    #   -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+    #   -DIREE_ENABLE_CCACHE=ON
     ```
 
 === "Windows"
@@ -108,6 +108,12 @@ cmake --build ../iree-build/
 <!-- TODO(scotttodd): "at this point you can..." -->
 
 ### Running tests
+
+Build test dependencies:
+
+``` shell
+cmake --build ../iree-build --target iree-test-deps
+```
 
 Run all built tests through
 [CTest](https://gitlab.kitware.com/cmake/community/-/wikis/doc/ctest/Testing-With-CTest):

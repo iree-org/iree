@@ -87,6 +87,35 @@ vm.module @my_module {
 
 // -----
 
+// Test that the order of imports and calls doesn't matter.
+vm.module @my_module {
+  // CHECK: func.func @my_module_call_imported_fn
+  vm.func @call_imported_fn(%arg0 : i32) -> i32 {
+
+    // Lookup import from module struct.
+    // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.call "EMITC_STRUCT_PTR_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"imports">]}
+    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS]]) {args = [0 : index, 0 : ui32]}
+    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+
+    // Create a variable for the function result.
+    // CHECK-NEXT: %[[RESULT:.+]] = "emitc.variable"() {value = #emitc.opaque<"">} : () -> i32
+    // CHECK-NEXT: %[[RESPTR:.+]] = emitc.apply "&"(%[[RESULT]]) : (i32) -> !emitc.ptr<!emitc.opaque<"int32_t">>
+
+    // Call the function created by the vm.import conversion.
+    // CHECK-NEXT: %{{.+}} = call @my_module_call_[[IMPORTFN:[^\(]+]](%arg0, %[[IMPORT]], %arg3, %[[RESPTR]])
+    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>, i32, !emitc.ptr<!emitc.opaque<"int32_t">>)
+    // CHECK-SAME:     -> !emitc.opaque<"iree_status_t">
+    %0 = vm.call @imported_fn(%arg0) : (i32) -> i32
+    vm.return %0 : i32
+  }
+
+  // CHECK: func.func @my_module_call_[[IMPORTFN]]
+  vm.import @imported_fn(%arg0 : i32) -> i32
+}
+
+// -----
+
 // Test vm.call conversion on an internal function.
 vm.module @my_module {
   vm.func @internal_fn(%arg0 : i32) -> i32 {

@@ -15,8 +15,8 @@ import iree.compiler.tools
 
 SIMPLE_MUL_ASM = """
 func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
-    %0 = "mhlo.multiply"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
-    return %0 : tensor<4xf32>
+  %0 = arith.mulf %arg0, %arg1 : tensor<4xf32>
+  return %0 : tensor<4xf32>
 }
 """
 
@@ -35,7 +35,6 @@ class CompilerTest(unittest.TestCase):
   def testCompileStr(self):
     binary = iree.compiler.tools.compile_str(
         SIMPLE_MUL_ASM,
-        input_type="mhlo",
         target_backends=iree.compiler.tools.DEFAULT_TESTING_BACKENDS)
     logging.info("Flatbuffer size = %d", len(binary))
     self.assertTrue(binary)
@@ -45,7 +44,6 @@ class CompilerTest(unittest.TestCase):
   # specifically. See: https://github.com/iree-org/iree/issues/4439
   def testCompileStrLLVMAOT(self):
     binary = iree.compiler.tools.compile_str(SIMPLE_MUL_ASM,
-                                             input_type="mhlo",
                                              target_backends=["dylib-llvm-aot"])
     logging.info("Flatbuffer size = %d", len(binary))
     self.assertTrue(binary)
@@ -56,7 +54,6 @@ class CompilerTest(unittest.TestCase):
   def testCompileMultipleBackends(self):
     binary = iree.compiler.tools.compile_str(
         SIMPLE_MUL_ASM,
-        input_type="mhlo",
         target_backends=["dylib-llvm-aot", "vulkan-spirv"])
     logging.info("Flatbuffer size = %d", len(binary))
     self.assertTrue(binary)
@@ -68,7 +65,6 @@ class CompilerTest(unittest.TestCase):
         f.close()
         binary = iree.compiler.tools.compile_file(
             f.name,
-            input_type="mhlo",
             target_backends=iree.compiler.tools.DEFAULT_TESTING_BACKENDS)
       finally:
         os.remove(f.name)
@@ -81,7 +77,6 @@ class CompilerTest(unittest.TestCase):
         f.close()
         output = iree.compiler.tools.compile_str(
             SIMPLE_MUL_ASM,
-            input_type="mhlo",
             output_file=f.name,
             target_backends=iree.compiler.tools.DEFAULT_TESTING_BACKENDS)
         self.assertIsNone(output)
@@ -96,7 +91,6 @@ class CompilerTest(unittest.TestCase):
   def testOutputFbText(self):
     text = iree.compiler.tools.compile_str(
         SIMPLE_MUL_ASM,
-        input_type="mhlo",
         output_format=iree.compiler.tools.OutputFormat.FLATBUFFER_TEXT,
         target_backends=iree.compiler.tools.DEFAULT_TESTING_BACKENDS).decode(
             "utf-8")
@@ -119,7 +113,6 @@ class CompilerTest(unittest.TestCase):
         "FLATBUFFER_BINARY, FLATBUFFER_TEXT, MLIR_TEXT"):
       _ = iree.compiler.tools.compile_str(
           SIMPLE_MUL_ASM,
-          input_type="mhlo",
           output_format="foobar",
           target_backends=iree.compiler.tools.DEFAULT_TESTING_BACKENDS)
 
@@ -136,7 +129,6 @@ class CompilerTest(unittest.TestCase):
   def testOutputMlirText(self):
     text = iree.compiler.tools.compile_str(
         SIMPLE_MUL_ASM,
-        input_type="mhlo",
         output_format=iree.compiler.tools.OutputFormat.MLIR_TEXT,
         target_backends=iree.compiler.tools.DEFAULT_TESTING_BACKENDS).decode(
             "utf-8")
@@ -148,7 +140,6 @@ class CompilerTest(unittest.TestCase):
     with io.StringIO() as buf, contextlib.redirect_stderr(buf):
       iree.compiler.tools.compile_str(
           SIMPLE_MUL_ASM,
-          input_type="mhlo",
           extra_args=["--mlir-timing"],
           target_backends=iree.compiler.tools.DEFAULT_TESTING_BACKENDS)
       stderr = buf.getvalue()
@@ -157,7 +148,6 @@ class CompilerTest(unittest.TestCase):
   def testAllOptions(self):
     binary = iree.compiler.tools.compile_str(
         SIMPLE_MUL_ASM,
-        input_type="mhlo",
         optimize=False,
         strip_debug_ops=True,
         strip_source_map=True,
@@ -179,7 +169,6 @@ class CompilerTest(unittest.TestCase):
     with iree.compiler.tools.TempFileSaver(temp_dir.name):
       output = iree.compiler.tools.compile_str(
           SIMPLE_MUL_ASM,
-          input_type="mhlo",
           output_file=output_file.name,
           target_backends=iree.compiler.tools.DEFAULT_TESTING_BACKENDS)
       self.assertIsNone(output)
@@ -202,7 +191,6 @@ class CompilerTest(unittest.TestCase):
     with iree.compiler.tools.TempFileSaver(temp_dir.name):
       output = iree.compiler.tools.compile_str(
           SIMPLE_MUL_ASM,
-          input_type="mhlo",
           target_backends=iree.compiler.tools.DEFAULT_TESTING_BACKENDS)
       self.assertIsNotNone(output)
       self.assertGreater(len(output), 0)
@@ -226,7 +214,6 @@ class CompilerTest(unittest.TestCase):
     with iree.compiler.tools.TempFileSaver(temp_dir.name):
       output = iree.compiler.tools.compile_str(
           SIMPLE_MUL_ASM,
-          input_type="mhlo",
           target_backends=iree.compiler.tools.DEFAULT_TESTING_BACKENDS)
       self.assertIsNotNone(output)
       self.assertGreater(len(output), 0)

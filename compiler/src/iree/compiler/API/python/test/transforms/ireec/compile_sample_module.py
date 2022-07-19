@@ -5,7 +5,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import io
-import subprocess
 
 from iree.compiler import ir
 from iree.compiler import passmanager
@@ -33,16 +32,14 @@ with ir.Context() as ctx:
 
   input_module = ir.Module.parse(r"""
     builtin.module  {
-      func.func @fabs(%arg0: tensor<1x4xf32>, %arg1: tensor<4x1xf32>) -> tensor<4x4xf32> {
-        %0 = chlo.broadcast_add %arg0, %arg1 : (tensor<1x4xf32>, tensor<4x1xf32>) -> tensor<4x4xf32>
-        %1 = "mhlo.abs"(%0) : (tensor<4x4xf32>) -> tensor<4x4xf32>
-        return %1 : tensor<4x4xf32>
+      func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
+        %0 = arith.mulf %arg0, %arg1 : tensor<4xf32>
+        return %0 : tensor<4xf32>
       }
     }
   """)
 
-  options = ireec.CompilerOptions("--iree-hal-target-backends=cpu",
-                                  "--iree-input-type=mhlo")
+  options = ireec.CompilerOptions("--iree-hal-target-backends=cpu")
   print(options)
   pm = passmanager.PassManager()
   ireec.build_iree_vm_pass_pipeline(options, pm)
