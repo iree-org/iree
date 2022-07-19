@@ -6,9 +6,9 @@
 
 iree_cc_binary(
   NAME
-    compile-mhlo-test-binary
+    api-test-binary
   SRCS
-    "compile-mhlo-test-main.c"
+    "api-test-main.c"
   DEPS
     IREECompilerCAPILib
     MLIRCAPIIR
@@ -17,11 +17,11 @@ iree_cc_binary(
   EXCLUDE_FROM_ALL
 )
 
-add_dependencies(iree-test-deps "iree_compiler_API_test_compile-mhlo-test-binary")
+add_dependencies(iree-test-deps "iree_compiler_API_test_api-test-binary")
 
 iree_native_test(
   NAME
-    "compile-mhlo-test"
+    "api-test"
   SRC
-    ::compile-mhlo-test-binary
+    ::api-test-binary
 )

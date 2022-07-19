@@ -13,8 +13,8 @@ package(
 )
 
 cc_binary(
-    name = "compile-mhlo-test-binary",
-    srcs = ["compile-mhlo-test-main.c"],
+    name = "api-test-binary",
+    srcs = ["api-test-main.c"],
     deps = [
         "//compiler/src/iree/compiler/API:CAPI",
         "//runtime/src/iree/base",
@@ -24,6 +24,6 @@ cc_binary(
 )
 
 native_test(
-    name = "compile-mhlo-test",
-    src = ":compile-mhlo-test-binary",
+    name = "api-test",
+    src = ":api-test-binary",
 )
