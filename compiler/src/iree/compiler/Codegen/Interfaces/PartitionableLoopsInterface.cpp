@@ -115,13 +115,65 @@ struct TiledOpInterfacePartitionableLoops
     // `TiledOpInterface`. This needs to be further pruned to remove unit-dim
     // loops, but that needs the interface to return the static sizes of the
     // loops.
-    auto tiledOp = cast<IREE::LinalgExt::TiledOpInterface>(op);
-    return tiledOp.getPartitionableLoops(maxNumPartitionedLoops);
+    SmallVector<unsigned> partitionableLoops;
+    auto interfaceOp = cast<IREE::LinalgExt::TiledOpInterface>(op);
+    for (auto iteratorType :
+         llvm::enumerate(interfaceOp.getLoopIteratorTypes())) {
+      if (iteratorType.value() != getParallelIteratorTypeName()) {
+        break;
+      }
+      partitionableLoops.push_back(iteratorType.index());
+    }
+    if (partitionableLoops.size() > maxNumPartitionedLoops) {
+      partitionableLoops.erase(
+          partitionableLoops.begin(),
+          std::next(partitionableLoops.begin(),
+                    partitionableLoops.size() - maxNumPartitionedLoops));
+    }
+    return partitionableLoops;
   }
 
   llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
     auto tiledOp = cast<IREE::LinalgExt::TiledOpInterface>(op);
     return tiledOp.getLoopIteratorTypes();
+  }
+};
+
+/// External model implementation for all operations that implement the
+/// `TiledOpInterface`.
+struct FftOpPartitionableLoops
+    : public PartitionableLoopsInterface::ExternalModel<
+          FftOpPartitionableLoops, IREE::LinalgExt::FftOp> {
+  unsigned getNumLoops(Operation *op) const {
+    auto fftOp = cast<IREE::LinalgExt::FftOp>(op);
+    return fftOp.getLoopIteratorTypes().size();
+  }
+
+  llvm::SmallVector<unsigned> getPartitionableLoops(
+      Operation *op, unsigned maxNumPartitionedLoops) const {
+    // For now just return the loops that are returned by the
+    // `TiledOpInterface`. This needs to be further pruned to remove unit-dim
+    // loops, but that needs the interface to return the static sizes of the
+    // loops.
+    auto fftOp = cast<IREE::LinalgExt::FftOp>(op);
+    auto range = llvm::seq<unsigned>(0, fftOp.getOperandRank());
+    SmallVector<unsigned> partitionableLoops(range.begin(), range.end());
+    // Indices matter for coeff computation.
+    if (!fftOp.hasCoeff()) {
+      partitionableLoops.pop_back();
+    }
+    if (partitionableLoops.size() > maxNumPartitionedLoops) {
+      partitionableLoops.erase(
+          partitionableLoops.begin(),
+          std::next(partitionableLoops.begin(),
+                    partitionableLoops.size() - maxNumPartitionedLoops));
+    }
+    return partitionableLoops;
+  }
+
+  llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
+    auto fftOp = cast<IREE::LinalgExt::FftOp>(op);
+    return fftOp.getLoopIteratorTypes();
   }
 };
 
@@ -235,10 +287,11 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
 
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::LinalgExt::IREELinalgExtDialect *dialect) {
+        IREE::LinalgExt::FftOp::attachInterface<FftOpPartitionableLoops>(*ctx);
         registerInterfaceForTiledOpInterfaceOps<
-            IREE::LinalgExt::FftOp, IREE::LinalgExt::ReverseOp,
-            IREE::LinalgExt::ScanOp, IREE::LinalgExt::ScatterOp,
-            IREE::LinalgExt::SortOp, IREE::LinalgExt::TopkOp>(ctx);
+            IREE::LinalgExt::ReverseOp, IREE::LinalgExt::ScanOp,
+            IREE::LinalgExt::ScatterOp, IREE::LinalgExt::SortOp,
+            IREE::LinalgExt::TopkOp>(ctx);
       });
   registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
     tensor::ExtractSliceOp::attachInterface<TensorExtractOpPartitionableLoops>(

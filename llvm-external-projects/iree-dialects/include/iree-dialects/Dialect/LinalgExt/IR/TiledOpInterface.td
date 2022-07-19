@@ -55,34 +55,6 @@ def TiledOpInterface : OpInterface<"TiledOpInterface"> {
       >,
       InterfaceMethod<
         /*desc=*/[{
-          Return the loops that are to be distributed given the
-          maximum amount of logical processor dimensions available.
-        }],
-        /*retTy=*/"SmallVector<unsigned>",
-        /*methodName=*/"getPartitionableLoops",
-        /*args=*/(ins "unsigned ":$maxNumParallelDims),
-        /*methodBody=*/"",
-        /*defaultImplementation=*/[{
-           SmallVector<unsigned> partitionableLoops;
-           auto interfaceOp = cast<TiledOpInterface>($_op.getOperation());
-           for (auto iteratorType :
-               llvm::enumerate(interfaceOp.getLoopIteratorTypes())) {
-             if (iteratorType.value() != getParallelIteratorTypeName()) {
-               break;
-             }
-             partitionableLoops.push_back(iteratorType.index());
-           }
-           if (partitionableLoops.size() > maxNumParallelDims) {
-             partitionableLoops.erase(
-               partitionableLoops.begin(),
-               std::next(partitionableLoops.begin(),
-                   partitionableLoops.size() - maxNumParallelDims));
-           }
-           return partitionableLoops;
-        }]
-      >,
-      InterfaceMethod<
-        /*desc=*/[{
           Generates a tiled version of the operation given the tile
           size for the loops.
 
