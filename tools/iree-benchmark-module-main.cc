@@ -179,7 +179,7 @@ static std::pair<bool, benchmark::TimeUnit> FLAG_time_unit = {
     false, benchmark::kNanosecond};
 IREE_FLAG_CALLBACK(
     parse_time_unit, print_time_unit, &FLAG_time_unit, time_unit,
-    "The time unit to be printed in the results. Can be ms, us, or ns.");
+    "The time unit to be printed in the results. Can be 'ms', 'us', or 'ns'.");
 
 namespace iree {
 namespace {
