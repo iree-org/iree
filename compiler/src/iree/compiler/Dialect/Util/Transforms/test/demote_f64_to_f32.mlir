@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file -iree-util-demote-f64-to-f32 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-util-demote-f64-to-f32 %s | FileCheck %s
 
 // NOTE: for more comprehensive tests see demote_i64_to_i32.mlir.
 
@@ -39,19 +39,18 @@ func.func @simple_f64() -> (tensor<4xf64>) {
 // CHECK-NOT: f64
 // CHECK-LABEL: func.func @nested_region_f64()
 // CHECK-NOT: f64
-// CHECK: return %{{.*}} : tensor<4xf32>
+// CHECK: return %{{.*}} : tensor<?xf32>
 util.global private @"__global" = dense<[1.000000e+01, 5.000000e+00, 1.000000e+01, 5.000000e+00]> : tensor<4xf64>
-func.func @nested_region_f64() -> (tensor<4xf64>) {
+func.func @nested_region_f64() -> (tensor<?xf64>) {
   %0 = util.global.address @"__global" : !util.ptr<tensor<4xf64>>
   %1 = util.global.load.indirect %0 : !util.ptr<tensor<4xf64>> -> tensor<4xf64>
-  %2 = "mhlo.broadcast_in_dim"(%1) {broadcast_dimensions = dense<0> : tensor<1xi64>} : (tensor<4xf64>) -> tensor<4x4xf64>
-  %4 = mhlo.constant dense<0xFF800000> : tensor<f64>
-  %3 = "mhlo.reduce"(%2, %4) ( {
-  ^bb0(%arg3: tensor<f64>, %arg4: tensor<f64>):
-    %5393 = mhlo.maximum %arg3, %arg4 : tensor<f64>
-    "mhlo.return"(%5393) : (tensor<f64>) -> ()
-  }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<4x4xf64>, tensor<f64>) -> tensor<4xf64>
-  return %3 : tensor<4xf64>
+  %c4 = arith.constant 4 : index
+  %2 = tensor.generate %c4 {
+  ^bb0(%arg0: index) :
+    %element = tensor.extract %1[%arg0] : tensor<4xf64>
+    tensor.yield %element : f64
+  } : tensor<?xf64>
+  return %2 : tensor<?xf64>
 }
 
 // -----
