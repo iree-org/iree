@@ -700,7 +700,7 @@ def FLOW_TensorConstantOp : FLOW_Op<"tensor.constant"> {
 
     ```mlir
     %c = flow.tensor.constant tensor<2x2xf32> -> tensor<?x?xf32>
-    %res = "mhlo.abs"(%c) : (tensor<?x?xf32>) -> tensor<?x?xf32>
+    %res = math.abs %c : tensor<?x?xf32>
     ```
   }];
   let arguments = (ins ElementsAttr:$value);
