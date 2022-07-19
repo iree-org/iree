@@ -33,4 +33,4 @@ jobs:
       - name: Getting combined job status
         run: |
           echo '${{ toJson(needs.*.result) }}' \
-            | jq --exit-status 'all(.=="success")'
+            | jq --exit-status 'all(.=="success")' > /dev/null
