@@ -169,7 +169,7 @@ static void print_time_unit(iree_string_view_t flag_name, void* storage,
   fprintf(file, "--%.*s=\"%s\"\n", (int)flag_name.size, flag_name.data,
           unit_string.c_str());
 }
-// Time unit to printed. If the first field is false, each place will use its
+// Time unit to be printed. If the first field is false, each place will use its
 // default time unit.
 static std::pair<bool, benchmark::TimeUnit> FLAG_time_unit = {
     false, benchmark::kNanosecond};
