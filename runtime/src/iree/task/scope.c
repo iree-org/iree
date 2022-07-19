@@ -72,7 +72,7 @@ iree_task_dispatch_statistics_t iree_task_scope_consume_statistics(
 
 bool iree_task_scope_has_failed(iree_task_scope_t* scope) {
   return iree_atomic_load_intptr(&scope->permanent_status,
-                                 iree_memory_order_seq_cst) != 0;
+                                 iree_memory_order_acquire) != 0;
 }
 
 iree_status_t iree_task_scope_consume_status(iree_task_scope_t* scope) {
@@ -80,10 +80,16 @@ iree_status_t iree_task_scope_consume_status(iree_task_scope_t* scope) {
   iree_status_t new_status = iree_ok_status();
   while (!iree_atomic_compare_exchange_strong_intptr(
       &scope->permanent_status, (intptr_t*)&old_status, (intptr_t)new_status,
-      iree_memory_order_seq_cst, iree_memory_order_seq_cst)) {
+      iree_memory_order_acq_rel,
+      iree_memory_order_acquire /* old_status is actually used */)) {
     // Previous status was not OK; we have it now though and can try again.
     new_status = iree_status_from_code(iree_status_code(old_status));
   }
+  // If old_status is not iree_ok_status then it was obtained through the
+  // comparison-failed mode of the above compare_exchange, which loaded it with
+  // iree_memory_order_acquire. This guarantees that if we are returning a
+  // failure status to the caller then all past memory operations are already
+  // visible, such as any information attached to that failure status.
   return old_status;
 }
 
@@ -99,8 +105,8 @@ static void iree_task_scope_try_set_status(iree_task_scope_t* scope,
   iree_status_t old_status = iree_ok_status();
   if (!iree_atomic_compare_exchange_strong_intptr(
           &scope->permanent_status, (intptr_t*)&old_status,
-          (intptr_t)new_status, iree_memory_order_seq_cst,
-          iree_memory_order_seq_cst)) {
+          (intptr_t)new_status, iree_memory_order_acq_rel,
+          iree_memory_order_relaxed /* old_status is unused */)) {
     // Previous status was not OK; drop our new status.
     IREE_IGNORE_ERROR(new_status);
   }
@@ -120,6 +126,9 @@ void iree_task_scope_fail(iree_task_scope_t* scope, iree_status_t status) {
 
 void iree_task_scope_begin(iree_task_scope_t* scope) {
   iree_atomic_ref_count_inc(&scope->pending_submissions);
+  // relaxed because this 'begin' call will be paired with a 'end' call that
+  // will perform the release-store, and this value is only read by
+  // 'deinitialize'.
   iree_atomic_store_int32(&scope->pending_idle_notification_posts, 1,
                           iree_memory_order_relaxed);
 }
