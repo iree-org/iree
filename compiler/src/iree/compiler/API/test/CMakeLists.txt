@@ -4,6 +4,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+if(NOT IREE_BUILD_TESTS)
+  return()
+endif()
+
 iree_cc_binary(
   NAME
     api-test-binary
@@ -13,7 +17,6 @@ iree_cc_binary(
     IREECompilerCAPILib
     MLIRCAPIIR
     iree::base
-  TESTONLY
   EXCLUDE_FROM_ALL
 )
 
