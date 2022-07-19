@@ -14,13 +14,13 @@ package(
 
 cc_binary(
     name = "api-test-binary",
+    testonly = True,
     srcs = ["api-test-main.c"],
     deps = [
         "//compiler/src/iree/compiler/API:CAPI",
         "//runtime/src/iree/base",
         "@llvm-project//mlir:CAPIIR",
     ],
-    testonly = True,
 )
 
 native_test(
