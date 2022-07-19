@@ -325,6 +325,24 @@ func.func @expand_shape(%offset : index, %i0: index, %i1: index, %i2: index, %i3
 
 // -----
 
+func.func @expand_shape2(%offset : index, %i0: index, %i1: index) -> f32 {
+  %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<128xf32>
+  %expand = memref.expand_shape %subspan [[0, 1]] : memref<128xf32> into memref<1x128xf32>
+  %value = memref.load %expand[%i0, %i1] : memref<1x128xf32>
+  return %value : f32
+}
+
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 * 128 + s1 + s2 floordiv 4)>
+//      CHECK: func.func @expand_shape2
+// CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index)
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[SIZE:.+]] = arith.constant 128 : index
+//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%[[C0]]) : memref<?xf32>{%[[SIZE]]}
+//      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[OFFSET]]]
+//      CHECK:   memref.load %[[SUBSPAN]][%[[INDEX]]]
+
+// -----
+
 // An opaque consumer that already takes a collapsed, static 1d memref should
 // be able to do so (a memref cast is inserted to move between unknown and
 // known dim).
