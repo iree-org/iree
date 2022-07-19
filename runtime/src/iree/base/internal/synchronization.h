@@ -165,11 +165,13 @@ void iree_mutex_unlock(iree_mutex_t* mutex)
 // instead of per-manager and change from a single highly-contended lock to
 // thousands of almost completely uncontended slim locks.
 //
-// Though these locks support spinning they always have a fallback path that
-// ends up calling into the kernel to properly wait the thread. This is critical
-// to avoid pathological cases under contention and allowing for thread priority
-// inheritance when there are multiple threads competing that may otherwise be
-// scheduled in a potentially livelocking order.
+// Though these locks have lightweight return paths (using atomics ops, see
+// the below paragraph, with or without spinning), they always have a
+// heavyweight fallback path that ends up calling into the kernel to properly
+// let the thread wait. This is critical to avoid pathological cases under
+// contention and allowing for thread priority inheritance when there are
+// multiple threads competing that may otherwise be scheduled in a potentially
+// livelocking order.
 //
 // The "unfair" here comes from the fact that it's possible on certain platforms
 // for certain threads to never be able to acquire the lock in cases of
@@ -177,6 +179,68 @@ void iree_mutex_unlock(iree_mutex_t* mutex)
 // mitigated by ensuring only very small regions of code are guarded and that
 // there's enough work happening outside of the lock on any particular thread to
 // ensure that there's some chance of other threads being able to acquire it.
+//
+// Notes on weakly-ordered atomics (for the lightweight return paths)
+// ------------------------------------------------------------------
+//
+// The lightweight return paths (avoiding waiting in the kernel) are typically
+// implemented using acquire/release weakly-ordered atomics. When these code
+// paths are taken:
+//
+//   * iree_slim_mutex_lock is a read-modify-write operation on the
+//     mutex with memory_order_acquire.
+//   * iree_slim_mutex_unlock is a read-modify-write operation on the
+//     mutex with memory_order_release.
+//
+// This means the following guarantee for the caller of iree_slim_mutex_lock:
+//
+//   When iree_slim_mutex_lock returns on this thread T1 from having waited on
+//   another thread T2 calling iree_slim_mutex_unlock, all memory read and write
+//   operations performed on thread T2 prior to calling iree_slim_mutex_unlock
+//   are guaranteed to "happen-before" any subsequent memory read or write on
+//   thread T1.
+//
+// This is meant to be an implementation detail within the standard contract
+// for anything called a "mutex". The C++ standard is a good reference for what
+// it means to be a mutexin the context of the C11/C++11 memory model:
+// https://eel.is/c++draft/thread.mutex#requirements.mutex
+//
+// It is not trivial why the above-described memory orders happen to be
+// sufficient to meet these mutex requirements, so here is a FAQ:
+//
+// Q: Is it really OK with the memory model for mutex lock and unlock to be mere
+//    atomic operations, and wouldn't they at least need to have sequentially-
+//    consistent order?
+// A: https://eel.is/c++draft/thread.mutex.requirements.mutex.general  says:
+//      > The implementation provides lock and unlock operations, as described
+//      > below. For purposes of determining the existence of a data race, these
+//      > behave as atomic operations ([intro.multithread]). The lock and unlock
+//      > operations on a single mutex appears to occur in a single total order.
+//    Key here is "on a single mutex". There is no ordering requirement across
+//    operations on separate mutex objects. That is what sequentially-consistent
+//    atomics would be needed for. The only ordering requirement is among ops
+//    "on a single mutex" and that is what one can implement with careful use
+//    of acquire/release atomics.
+//
+// Q: Since iree_slim_mutex_{lock,unlock} are read-modify-write operations,
+//    shouldn't they have at least memory_order_acq_rel so that both the
+//    read and write aspects of each of them construct happens-before
+//    relationships with each other?
+// A: Separate answer regarting iree_slim_mutex_lock and iree_slim_mutex_unlock:
+//    * Why iree_slim_mutex_lock only needs acquire order, not release:
+//        When iree_slim_mutex_lock returns, the calling thread T1 holds the
+//        lock. A call to iree_slim_mutex_lock on another thread T2 can't return
+//        until thread T1 calls iree_slim_mutex_unlock, which already has
+//        memory_order_release.
+//    * Why iree_slim_mutex_unlock only needs release order, not acquire:
+//        By requirement of iree_slim_mutex_unlock, the calling thread had
+//        already called iree_slim_mutex_lock prior to calling
+//        iree_slim_mutex_unlock. Mutual exclusion implies that no other thread
+//        can have operated on this mutex object since that iree_slim_mutex_lock
+//        call on the calling thread.
+//
+// OS-specific implementation aspects (for the heavyweight return paths)
+// ---------------------------------------------------------------------
 //
 // MacOS/iOS: os_unfair_lock
 //   Spins and after a short backoff drops to a futex-like behavior of waiting
@@ -316,12 +380,9 @@ void iree_notification_deinitialize(iree_notification_t* notification);
 // check to see if they need to do any additional work.
 // To notify all potential waiters pass IREE_ALL_WAITERS.
 //
-// Acts as (at least) a memory_order_release barrier:
-//   A store operation with this memory order performs the release operation: no
-//   reads or writes in the current thread can be reordered after this store.
-//   All writes in the current thread are visible in other threads that acquire
-//   the same atomic variable and writes that carry a dependency into the atomic
-//   variable become visible in other threads that consume the same atomic.
+// Acts as (at least) a memory_order_release operation on the
+// notification object. See the comment on iree_notification_commit_wait, which
+// is the memory_order_acquire operation that is meant to pair with that.
 void iree_notification_post(iree_notification_t* notification, int32_t count);
 
 typedef uint32_t iree_wait_token_t;  // opaque
@@ -329,13 +390,9 @@ typedef uint32_t iree_wait_token_t;  // opaque
 // Prepares for a wait operation, returning a token that must be passed to
 // iree_notification_commit_wait to perform the actual wait.
 //
-// Acts as a memory_order_acq_rel barrier:
-//   A read-modify-write operation with this memory order is both an acquire
-//   operation and a release operation. No memory reads or writes in the current
-//   thread can be reordered before or after this store. All writes in other
-//   threads that release the same atomic variable are visible before the
-//   modification and the modification is visible in other threads that acquire
-//   the same atomic variable.
+// Acts as a memory_order_acq_rel read-modify-write operation on the
+// notification object. See the comment on iree_notification_commit_wait for a
+// general explanation of acquire/release semantics in this context.
 iree_wait_token_t iree_notification_prepare_wait(
     iree_notification_t* notification);
 
@@ -344,11 +401,14 @@ iree_wait_token_t iree_notification_prepare_wait(
 // is reached. Returns false if the deadline is reached before a notification is
 // posted.
 //
-// Acts as (at least) a memory_order_acquire barrier:
-//   A load operation with this memory order performs the acquire operation on
-//   the affected memory location: no reads or writes in the current thread can
-//   be reordered before this load. All writes in other threads that release the
-//   same atomic variable are visible in the current thread.
+// Acts as (at least) a memory_order_acquire operation on the notification
+// object. This is meant to be paired with iree_notification_post, which is a
+// memory_order_release operation. This means the following guarantee:
+// When iree_notification_commit_wait returns on this thread T1 from having
+// waited on another thread T2 calling iree_notification_post, all memory read
+// and write operations performed on thread T2 prior to calling
+// iree_notification_post are guaranteed to "happen-before" any subsequent
+// memory read or write on thread T1.
 bool iree_notification_commit_wait(iree_notification_t* notification,
                                    iree_wait_token_t wait_token,
                                    iree_time_t deadline_ns);
