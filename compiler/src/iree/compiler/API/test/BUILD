@@ -20,6 +20,7 @@ cc_binary(
         "//runtime/src/iree/base",
         "@llvm-project//mlir:CAPIIR",
     ],
+    testonly = True,
 )
 
 native_test(
