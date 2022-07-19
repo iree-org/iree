@@ -25,9 +25,18 @@ jobs:
   tsan:
     uses: ./.github/workflows/tsan.yml
 
+  host_tools:
+    uses: ./.github/workflows/host_tools.yml
+    with:
+      build-dir: build-host
+
   summary:
     runs-on: ubuntu-20.04
-    needs: [build_runtime, test_runtime, tsan]
+    needs:
+      - build_runtime
+      - host_tools
+      - test_runtime
+      - tsan
     if: always()
     steps:
       - name: Getting combined job status
