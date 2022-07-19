@@ -75,6 +75,10 @@
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/ref_cc.h"
 
+constexpr char kNanosecondsUnitString[] = "ns";
+constexpr char kMicrosecondsUnitString[] = "us";
+constexpr char kMillisecondsUnitString[] = "ms";
+
 IREE_FLAG(string, module_file, "-",
           "File containing the module to load that contains the entry "
           "function. Defaults to stdin.");
@@ -133,13 +137,13 @@ static iree_status_t parse_time_unit(iree_string_view_t flag_name,
                                      void* storage, iree_string_view_t value) {
   auto* unit = (std::pair<bool, benchmark::TimeUnit>*)storage;
   auto unit_string = std::string(value.data, value.size);
-  if (unit_string == "ms") {
+  if (unit_string == kMillisecondsUnitString) {
     *unit = {true, benchmark::kMillisecond};
     return iree_ok_status();
-  } else if (unit_string == "us") {
+  } else if (unit_string == kMicrosecondsUnitString) {
     *unit = {true, benchmark::kMicrosecond};
     return iree_ok_status();
-  } else if (unit_string == "ns") {
+  } else if (unit_string == kNanosecondsUnitString) {
     *unit = {true, benchmark::kNanosecond};
     return iree_ok_status();
   }
@@ -155,13 +159,13 @@ static void print_time_unit(iree_string_view_t flag_name, void* storage,
   std::string unit_string;
   switch (unit->second) {
     case benchmark::kMillisecond:
-      unit_string = "ms";
+      unit_string = kMillisecondsUnitString;
       break;
     case benchmark::kMicrosecond:
-      unit_string = "us";
+      unit_string = kMicrosecondsUnitString;
       break;
     case benchmark::kNanosecond:
-      unit_string = "ns";
+      unit_string = kNanosecondsUnitString;
       break;
     default:
       assert(false && "Unexpected time unit.");
