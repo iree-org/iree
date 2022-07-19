@@ -4,9 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Runs docker configured for usage with Kokoro, translating Kokoro-specific
-# environment variables into generic ones and then invoking `docker run` with
-# some arguments to make it behave itself.
+# Runs docker configured for usage with Kokoro, translating Kokoro environment
+# variables into generic ones and then invoking the generic docker_run script.
 
 set -euo pipefail
 
