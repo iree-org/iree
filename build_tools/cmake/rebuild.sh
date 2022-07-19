@@ -47,19 +47,20 @@ CMAKE_ARGS=(
   # get a reasonable mix of {builds with asserts, builds with other features
   # such as ASan but without asserts}.
   "-DIREE_ENABLE_ASSERTIONS=ON"
-
-  # Enable CUDA compiler and runtime builds unconditionally. Our CI images all
-  # have enough deps to at least build CUDA support and compile CUDA binaries
-  # (but not necessarily test on real hardware).
-  "-DIREE_HAL_DRIVER_CUDA=ON"
-  "-DIREE_TARGET_BACKEND_CUDA=ON"
 )
 
-"$CMAKE_BIN" "${CMAKE_ARGS[@]?}" "$@" ..
-echo "Building all"
-echo "------------"
-"$CMAKE_BIN" --build . -- -k 0
+if [[ -z "${IREE_CUDA_DISABLE_BUILD}" ]]; then
+  CMAKE_ARGS+=(
+    # Enable CUDA compiler and runtime builds unless disabled. Our CI images all
+    # have enough deps to at least build CUDA support and compile CUDA binaries.
+    "-DIREE_HAL_DRIVER_CUDA=ON"
+    "-DIREE_TARGET_BACKEND_CUDA=ON"
+  )
+fi
 
-echo "Building test deps"
-echo "------------------"
-"$CMAKE_BIN" --build . --target iree-test-deps -- -k 0
+"$CMAKE_BIN" "${CMAKE_ARGS[@]?}" "$@" ..
+
+TARGETS="all iree-test-deps"
+echo "Building targets: ${TARGETS}"
+echo "-------------------------------------------"
+"$CMAKE_BIN" --build . --target ${TARGETS} -- -k 0

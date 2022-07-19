@@ -48,25 +48,26 @@ CMAKE_ARGS=(
   # Don't build samples: they assume embedded-ELF so don't work with
   # IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER=ON.
   "-DIREE_BUILD_SAMPLES=OFF"
-
-  # Enable CUDA compiler and runtime builds unconditionally. Our CI images all
-  # have enough deps to at least build CUDA support and compile CUDA binaries.
-  # We will skip running GPU tests below but this still yields a bit more TSan
-  # coverage, at least in the compiler, and regarding the runtime it's at least
-  # checking that it builds with TSan.
-  "-DIREE_HAL_DRIVER_CUDA=ON"
-  "-DIREE_TARGET_BACKEND_CUDA=ON"
 )
+
+if [[ -z "${IREE_CUDA_DISABLE_BUILD}" ]]; then
+  CMAKE_ARGS+=(
+    # Enable CUDA compiler and runtime builds unless disabled. Our CI images all
+    # have enough deps to at least build CUDA support and compile CUDA binaries.
+    # We will skip running GPU tests below but this still yields a bit more TSan
+    # coverage, at least in the compiler, and regarding the runtime it's at
+    # least checking that it builds with TSan.
+    "-DIREE_HAL_DRIVER_CUDA=ON"
+    "-DIREE_TARGET_BACKEND_CUDA=ON"
+  )
+fi
 
 "${CMAKE_BIN}" -B "${BUILD_DIR}" "${CMAKE_ARGS[@]?}"
 
-echo "Building all"
-echo "------------"
-"$CMAKE_BIN" --build "${BUILD_DIR}" -- -k 0
-
-echo "Building test deps"
-echo "------------------"
-"$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
+TARGETS="all iree-test-deps"
+echo "Building targets: ${TARGETS}"
+echo "-------------------------------------------"
+"$CMAKE_BIN" --build "${BUILD_DIR}" --target ${TARGETS} -- -k 0
 
 # Disable actually running GPU tests. This tends to yield TSan reports that are
 # specific to one's particular GPU driver and therefore hard to reproduce across
