@@ -419,15 +419,13 @@ def HAL_WorkgroupSizeAttr : TypedArrayAttrBase<
   let constBuilderCall = "$_builder.getIndexArrayAttr($0)";
 }
 
-def HAL_CommandQueueAffinityAttr : SignlessIntElementsAttr<32> {
-  // TODO(b/143184519): add typeDescription support to other things.
-  // let description = [{
-  //   A bitmask defining which queues an operation is allowed to execute on.
-  //   The selection is wrapped to the total number of available queues, so 0b0101
-  //   would enable queues 0 and 2 if there were four queues or queue 0 if there
-  //   were two queues.
-  // }];
-}
+// A bitmask defining which queues an operation is allowed to execute on.
+// The selection is wrapped to the total number of available queues, so 0b0101
+// would enable queues 0 and 2 if there were four queues or queue 0 if there
+// were two queues.
+def HAL_DeviceQueueAffinity : TypeAlias<I64>;
+
+def HAL_DeviceQueuePool : TypeAlias<I64>;
 
 def HAL_DurationMillisAttr : SignlessIntElementsAttr<32> {
   // TODO(b/143184519): add typeDescription support to other things.

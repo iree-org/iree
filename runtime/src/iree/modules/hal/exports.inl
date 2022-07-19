@@ -62,6 +62,10 @@ EXPORT_FN("descriptor_set_layout.create", iree_hal_module_descriptor_set_layout_
 
 EXPORT_FN("device.allocator", iree_hal_module_device_allocator, r, r)
 EXPORT_FN("device.query.i64", iree_hal_module_device_query_i64, rrr, iI)
+EXPORT_FN("device.queue.alloca", iree_hal_module_device_queue_alloca, rIrriiiI, r)
+EXPORT_FN("device.queue.dealloca", iree_hal_module_device_queue_dealloca, rIrrr, v)
+EXPORT_FN("device.queue.execute", iree_hal_module_device_queue_execute, rIrrCrD, v)
+EXPORT_FN("device.queue.flush", iree_hal_module_device_queue_flush, rI, v)
 
 EXPORT_FN("ex.shared_device", iree_hal_module_ex_shared_device, v, r)
 EXPORT_FN("ex.submit_and_wait", iree_hal_module_ex_submit_and_wait, rr, v)

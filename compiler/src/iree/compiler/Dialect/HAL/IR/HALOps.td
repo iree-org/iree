@@ -1381,6 +1381,132 @@ def HAL_DeviceQueryOp :
   let hasVerifier = 1;
 }
 
+def HAL_DeviceQueueAllocaOp : HAL_Op<"device.queue.alloca", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+    DeclareOpInterfaceMethods<Util_SizeAwareOp>,
+  ]> {
+  let summary = [{allocates a queue-ordered transient buffer}];
+  let description = [{
+    Returns a queue-ordered transient buffer that will be available for use when
+    the signal fence is reached. The allocation will not be made until the
+    wait fence has been reached.
+
+    The size of the buffer returned may be larger than the requested size if the
+    allocator has specific alignment requirements or minimum allocation sizes.
+
+    The buffer handle will remain live so long as there are retainers but the
+    contents are undefined before the allocation signal fence has been signaled
+    and after the deallocation wait fence has been reached.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    HAL_DeviceQueueAffinity:$queue_affinity,
+    HAL_Fence:$wait_fence,
+    HAL_Fence:$signal_fence,
+    HAL_DeviceQueuePool:$pool,
+    HAL_MemoryTypeBitfieldAttr:$memory_types,
+    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    HAL_DeviceSize:$result_size
+  );
+  let results = (outs
+    HAL_Buffer:$result
+  );
+
+  // TODO(benvanik): change type/usage to ref params.
+  let assemblyFormat = [{
+    `<` $device `:` type($device) `>`
+    `affinity` `(` $queue_affinity `)`
+    `wait` `(` $wait_fence `)`
+    `signal` `(` $signal_fence `)`
+    `pool` `(` $pool `)`
+    `type` `(` $memory_types `)`
+    `usage` `(` $buffer_usage `)`
+    `:` custom<SizeAwareType>(type($result), $result_size)
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_DeviceQueueDeallocaOp : HAL_Op<"device.queue.dealloca"> {
+  let summary = [{deallocates a queue-ordered transient buffer}];
+  let description = [{
+    Deallocates a queue-ordered transient buffer.
+    The deallocation will not be made until the wait fence has been reached and
+    once the storage is available for reuse the signal fence will be signaled.
+
+    After deallocation the contents of the buffer may still be accessible but
+    will have undefined contents as other operations reuse the memory.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    HAL_DeviceQueueAffinity:$queue_affinity,
+    HAL_Fence:$wait_fence,
+    HAL_Fence:$signal_fence,
+    HAL_Buffer:$buffer
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    `<` $device `:` type($device) `>`
+    `affinity` `(` $queue_affinity `)`
+    `wait` `(` $wait_fence `)`
+    `signal` `(` $signal_fence `)`
+    `buffer` `(` $buffer `:` type($buffer) `)`
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_DeviceQueueExecuteOp : HAL_Op<"device.queue.execute"> {
+  let summary = [{enqueues command buffer execution}];
+  let description = [{
+    Executes one or more command buffers on a device queue.
+    The command buffers are executed in order as if they were recorded as one.
+    No commands will execute until the wait fence has been reached and the
+    signal fence will be signaled when all commands have completed.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    HAL_DeviceQueueAffinity:$queue_affinity,
+    HAL_Fence:$wait_fence,
+    HAL_Fence:$signal_fence,
+    Variadic<HAL_CommandBuffer>:$command_buffers
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    `<` $device `:` type($device) `>`
+    `affinity` `(` $queue_affinity `)`
+    `wait` `(` $wait_fence `)`
+    `signal` `(` $signal_fence `)`
+    (`commands` `(` `[` $command_buffers^ `]` `)`)?
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_DeviceQueueFlushOp : HAL_Op<"device.queue.flush"> {
+  let summary = [{flushes locally-pending submissions to the queue}];
+  let description = [{
+    Flushes any locally-pending submissions in the queue.
+    When submitting many queue operations this can be used to eagerly flush
+    earlier submissions while later ones are still being constructed.
+    This may be a no-op.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    HAL_DeviceQueueAffinity:$queue_affinity
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    `<` $device `:` type($device) `>`
+    `affinity` `(` $queue_affinity `)`
+    attr-dict-with-keyword
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // !hal.executable / iree_hal_executable_t
 //===----------------------------------------------------------------------===//

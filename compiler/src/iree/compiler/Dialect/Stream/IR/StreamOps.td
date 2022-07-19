@@ -2582,7 +2582,6 @@ def Stream_TimepointImmediateOp : Stream_PureOp<"timepoint.immediate", [
   let hasFolder = 1;
 }
 
-
 def Stream_TimepointImportOp : Stream_PureOp<"timepoint.import", [
   Stream_AffinityOp,
 ]> {

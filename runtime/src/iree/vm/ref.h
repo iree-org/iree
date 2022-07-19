@@ -286,9 +286,8 @@ struct ref_type_descriptor {
     return ref;                                                             \
   }                                                                         \
   IREE_API_EXPORT T* name##_deref(const iree_vm_ref_t ref) {                \
-    iree_status_t status = iree_vm_ref_check(ref, name##_descriptor.type);  \
-    if (IREE_UNLIKELY(!iree_status_is_ok(status))) {                        \
-      IREE_IGNORE_ERROR(status);                                            \
+    if (IREE_UNLIKELY(ref.type != ref.type) ||                              \
+        IREE_UNLIKELY(ref.type == IREE_VM_REF_TYPE_NULL)) {                 \
       return NULL;                                                          \
     }                                                                       \
     return (T*)ref.ptr;                                                     \
