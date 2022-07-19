@@ -13,76 +13,48 @@
 # Host binaries (e.g. compiler tools) will be built and installed in build-host/
 # RISCV binaries (e.g. tests) will be built in build-riscv/.
 
-set -x
-set -e
+set -xeuo pipefail
 
 ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 RISCV_CONFIG="${RISCV_CONFIG:-rv64}"
 RISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS:--O3}"
-
-"${CMAKE_BIN?}" --version
-ninja --version
-
-cd "${ROOT_DIR?}"
-
-# --------------------------------------------------------------------------- #
-# Build for the host.
-BUILD_HOST_DIR="${BUILD_HOST_DIR:-$ROOT_DIR/build-host}"
-if [[ -d "${BUILD_HOST_DIR?}" ]]; then
-  echo "build-host directory already exists. Will use cached results there."
-else
-  echo "build-host directory does not already exist. Creating a new one."
-  mkdir -p "${BUILD_HOST_DIR?}"
-fi
-
-# Configure, build, install.
-"${CMAKE_BIN?}" -G Ninja -B "${BUILD_HOST_DIR?}" \
-  -DCMAKE_INSTALL_PREFIX="${BUILD_HOST_DIR?}/install" \
-  -DCMAKE_C_COMPILER="${CC:-clang}" \
-  -DCMAKE_CXX_COMPILER="${CXX:-clang++}" \
-  -DIREE_ENABLE_ASSERTIONS=ON \
-  -DIREE_BUILD_COMPILER=ON \
-  -DIREE_BUILD_TESTS=OFF \
-  -DIREE_BUILD_SAMPLES=OFF \
-  "${ROOT_DIR?}"
-"${CMAKE_BIN?}" --build "${BUILD_HOST_DIR?}" --target install -- -k 0
-# --------------------------------------------------------------------------- #
-
+IREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT:-$(realpath ${BUILD_HOST_DIR}/install)}"
+BUILD_RISCV_DIR="${BUILD_RISCV_DIR:-$ROOT_DIR/build-riscv}"
 
 # --------------------------------------------------------------------------- #
 # Build for the target (riscv).
-BUILD_RISCV_DIR="${BUILD_RISCV_DIR:-$ROOT_DIR/build-riscv}"
-if [[ -d "${BUILD_RISCV_DIR?}" ]]; then
+if [[ -d "${BUILD_RISCV_DIR}" ]]; then
   echo "build-riscv directory already exists. Will use cached results there."
 else
   echo "build-riscv directory does not already exist. Creating a new one."
-  mkdir -p "${BUILD_RISCV_DIR?}"
+  mkdir -p "${BUILD_RISCV_DIR}"
 fi
 
-echo "Build riscv target with the config of ${RISCV_CONFIG?}"
+echo "Build riscv target with the config of ${RISCV_CONFIG}"
+TOOLCHAIN_FILE="$(realpath ${ROOT_DIR}/build_tools/cmake/riscv.toolchain.cmake)"
 declare -a args
 args=(
   "-G" "Ninja"
-  "-B" "${BUILD_RISCV_DIR?}"
-  -DCMAKE_TOOLCHAIN_FILE="$(realpath ${ROOT_DIR?}/build_tools/cmake/riscv.toolchain.cmake)"
-  -DIREE_HOST_BINARY_ROOT="$(realpath ${BUILD_HOST_DIR?}/install)"
-  -DRISCV_CPU="${RISCV_CONFIG?}"
-  -DRISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS?}"
+  "-B" "${BUILD_RISCV_DIR}"
+  -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN_FILE}"
+  -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}"
+  -DRISCV_CPU="${RISCV_CONFIG}"
+  -DRISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS}"
   -DIREE_ENABLE_ASSERTIONS=ON
   -DIREE_BUILD_COMPILER=OFF
   -DIREE_BUILD_SAMPLES=ON
 )
 
-if [[ "${RISCV_CONFIG?}" == "rv64" ]]; then
+if [[ "${RISCV_CONFIG}" == "rv64" ]]; then
   args+=(
-    -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV64_LINUX_TOOLCHAIN_ROOT?}"
+    -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}"
   )
-elif [[ "${RISCV_CONFIG?}" == "rv32-baremetal" ]]; then
+elif [[ "${RISCV_CONFIG}" == "rv32-baremetal" ]]; then
   args+=(
     # TODO(#6353): Off until tools/ are refactored to support threadless config.
     -DIREE_BUILD_TESTS=OFF
-    -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV32_NEWLIB_TOOLCHAIN_ROOT?}"
+    -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV32_NEWLIB_TOOLCHAIN_ROOT}"
   )
 else
   echo "riscv config not supported yet"
@@ -90,5 +62,5 @@ else
 fi
 
 args_str=$(IFS=' ' ; echo "${args[*]}")
-"${CMAKE_BIN?}" ${args_str} "${ROOT_DIR?}"
-"${CMAKE_BIN?}" --build "${BUILD_RISCV_DIR?}" -- -k 0
+"${CMAKE_BIN}" ${args_str} "${ROOT_DIR}"
+"${CMAKE_BIN}" --build "${BUILD_RISCV_DIR}" -- -k 0

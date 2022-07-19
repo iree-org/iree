@@ -12,7 +12,7 @@ on:
         type: string
 
 jobs:
-  host_tools:
+  riscv32:
     runs-on:
       # self-hosted has to be listed first. See
       # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
@@ -26,26 +26,28 @@ jobs:
       - cpu
       - os-family=Linux
     env:
-      BUILD_DIR: build-host
+      BUILD_RISCV_DIR: "build-riscv-rv32-baremetal"
+      RISCV_CONFIG: "rv32-baremetal"
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
           submodules: true
-      - name: "Building host tools"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
-            ./build_tools/cmake/build_host_tools.sh \
-            "${BUILD_DIR}"
-      # Using a tar archive is necessary to preserve file permissions. See
-      # https://github.com/actions/upload-artifact#maintaining-file-permissions-and-case-sensitive-files
-      # The upload action already does its own gzip compression, so it's likely
-      # unnecessary (and perhaps harmful) to do our own, though that hasn't been
-      # investigated.
-      - name: "Create install dir archive"
-        run: tar -cf "${{ inputs.host-binaries-archive }}" "${BUILD_DIR}/install"
-      - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8  # v3.1.0
+      - name: "Downloading host tools"
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
         with:
           name: "${{ inputs.host-binaries-archive }}"
-          path: "${{ inputs.host-binaries-archive }}"
+      - name: "Extracting host tools archive"
+        env:
+          HOST_BINARY_ROOT: "${RUNNER_TEMP}/host_tools"
+        run: |
+          mkdir -p "${HOST_BINARY_ROOT}"
+          tar -xf ${{ inputs.host-binaries-archive }} "${HOST_BINARY_ROOT}"
+      - name: "Cross-compiling for riscv32"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "RISCV_CONFIG=${RISCV_CONFIG}" \
+            --env "BUILD_RISCV_DIR=${BUILD_RISCV_DIR}" \
+            gcr.io/iree-oss/riscv@sha256:e566f054ff1b1d8be61459ce4789dd944b70e85c8939a4d3b7331ab519d8db4c \
+            bash -c \
+            "./build_tools/cmake/build_riscv.sh && build_tools/kokoro/gcp_ubuntu/cmake/baremetal/riscv32/test.sh"

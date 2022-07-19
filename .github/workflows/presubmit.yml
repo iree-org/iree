@@ -28,7 +28,13 @@ jobs:
   host_tools:
     uses: ./.github/workflows/host_tools.yml
     with:
-      build-dir: build-host
+      host-binaries-archive: host_tools.tar
+
+  riscv32:
+    needs: host_tools
+    uses: ./.github/workflows/riscv32.yml
+    with:
+      host-binaries-archive: ${{ needs.host_tools.host-binaries-archive }}
 
   summary:
     runs-on: ubuntu-20.04
@@ -37,6 +43,7 @@ jobs:
       - host_tools
       - test_runtime
       - tsan
+      - riscv32
     if: always()
     steps:
       - name: Getting combined job status

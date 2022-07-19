@@ -36,8 +36,6 @@ fi
 # Configure, build, install.
 "${CMAKE_BIN}" -G Ninja -B "${BUILD_DIR}" \
   -DCMAKE_INSTALL_PREFIX="${BUILD_DIR}/install" \
-  -DCMAKE_C_COMPILER="${CC:-clang}" \
-  -DCMAKE_CXX_COMPILER="${CXX:-clang++}" \
   -DIREE_ENABLE_LLD=ON \
   -DIREE_ENABLE_ASSERTIONS=ON \
   -DIREE_BUILD_COMPILER=ON \
