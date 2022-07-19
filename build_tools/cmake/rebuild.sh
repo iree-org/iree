@@ -13,6 +13,10 @@ set -e
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
 
+# Enable CUDA compiler and runtime builds unless disabled. Our CI images all
+# have enough deps to at least build CUDA support and compile CUDA binaries.
+export IREE_CUDA_BUILD=${IREE_CUDA_BUILD:-1}
+
 CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
 
 "$CMAKE_BIN" --version
@@ -49,10 +53,8 @@ CMAKE_ARGS=(
   "-DIREE_ENABLE_ASSERTIONS=ON"
 )
 
-if [[ -z "${IREE_CUDA_DISABLE_BUILD}" ]]; then
+if [[ "${IREE_CUDA_BUILD}" == 1 ]]; then
   CMAKE_ARGS+=(
-    # Enable CUDA compiler and runtime builds unless disabled. Our CI images all
-    # have enough deps to at least build CUDA support and compile CUDA binaries.
     "-DIREE_HAL_DRIVER_CUDA=ON"
     "-DIREE_TARGET_BACKEND_CUDA=ON"
   )

@@ -22,6 +22,13 @@ if [[ -z "${BUILD_DIR}" ]]; then
   BUILD_DIR="${IREE_TSAN_BUILD_DIR:-build-tsan}"
 fi
 
+# Enable CUDA compiler and runtime builds unless disabled. Our CI images all
+# have enough deps to at least build CUDA support and compile CUDA binaries.
+# We will skip running GPU tests below but this still yields a bit more TSan
+# coverage, at least in the compiler, and regarding the runtime it's at
+# least checking that it builds with TSan.
+export IREE_CUDA_BUILD=${IREE_CUDA_BUILD:-1}
+
 source "${SCRIPT_DIR}/setup_build.sh"
 
 CMAKE_ARGS=(
@@ -50,13 +57,8 @@ CMAKE_ARGS=(
   "-DIREE_BUILD_SAMPLES=OFF"
 )
 
-if [[ -z "${IREE_CUDA_DISABLE_BUILD}" ]]; then
+if [[ "${IREE_CUDA_BUILD}" == 1 ]]; then
   CMAKE_ARGS+=(
-    # Enable CUDA compiler and runtime builds unless disabled. Our CI images all
-    # have enough deps to at least build CUDA support and compile CUDA binaries.
-    # We will skip running GPU tests below but this still yields a bit more TSan
-    # coverage, at least in the compiler, and regarding the runtime it's at
-    # least checking that it builds with TSan.
     "-DIREE_HAL_DRIVER_CUDA=ON"
     "-DIREE_TARGET_BACKEND_CUDA=ON"
   )
