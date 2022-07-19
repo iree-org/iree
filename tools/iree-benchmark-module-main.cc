@@ -129,6 +129,54 @@ IREE_FLAG_CALLBACK(
     "Each occurrence of the flag indicates an input in the order they were\n"
     "specified on the command line.");
 
+static iree_status_t parse_time_unit(iree_string_view_t flag_name,
+                                     void* storage, iree_string_view_t value) {
+  auto* unit = (std::pair<bool, benchmark::TimeUnit>*)storage;
+  auto unit_string = std::string(value.data, value.size);
+  if (unit_string == "ms") {
+    *unit = {true, benchmark::kMillisecond};
+    return iree_ok_status();
+  } else if (unit_string == "us") {
+    *unit = {true, benchmark::kMicrosecond};
+    return iree_ok_status();
+  } else if (unit_string == "ns") {
+    *unit = {true, benchmark::kNanosecond};
+    return iree_ok_status();
+  }
+  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                          "unsupported time unit");
+}
+static void print_time_unit(iree_string_view_t flag_name, void* storage,
+                            FILE* file) {
+  auto* unit = (std::pair<bool, benchmark::TimeUnit>*)storage;
+  if (!unit->first) {
+    return;
+  }
+  std::string unit_string;
+  switch (unit->second) {
+    case benchmark::kMillisecond:
+      unit_string = "ms";
+      break;
+    case benchmark::kMicrosecond:
+      unit_string = "us";
+      break;
+    case benchmark::kNanosecond:
+      unit_string = "ns";
+      break;
+    default:
+      assert(false && "Unexpected time unit.");
+  }
+  fprintf(file, "--%.*s=\"%s\"\n", (int)flag_name.size, flag_name.data,
+          unit_string.c_str());
+}
+// Time unit to printed. If the first field is false, each place will use its
+// default time unit.
+static std::pair<bool, benchmark::TimeUnit> FLAG_time_unit = {
+    false, benchmark::kNanosecond};
+IREE_FLAG_CALLBACK(
+    parse_time_unit, print_time_unit, &FLAG_time_unit, time_unit,
+    "The time unit to be printed in the results. Can be ms, us, or ns.");
+
 namespace iree {
 namespace {
 
@@ -180,12 +228,8 @@ void RegisterGenericBenchmark(const std::string& function_name,
       // wall time to determine how many iterations to run. See
       // https://github.com/google/benchmark#cpu-timers,
       ->UseRealTime()
-      // Report timing in milliseconds, which is the general order of magnitude
-      // of model runs. The benchmark framework will print with precision
-      // between 0 and 3 places after the decimal while aiming for three
-      // significant digits. If we end up wanting precision beyond microseconds,
-      // we can make this setting configurable with a custom command line flag.
-      ->Unit(benchmark::kMillisecond);
+      ->Unit(FLAG_time_unit.first ? FLAG_time_unit.second
+                                  : benchmark::kMillisecond);
 }
 
 static void BenchmarkDispatchFunction(const std::string& benchmark_name,
@@ -239,12 +283,8 @@ void RegisterDispatchBenchmark(const std::string& function_name,
       // wall time to determine how many iterations to run. See
       // https://github.com/google/benchmark#cpu-timers,
       ->UseRealTime()
-      // Report timing in microseconds, which is the general order of magnitude
-      // of dispatches. The benchmark framework will print with precision
-      // between 0 and 3 places after the decimal while aiming for three
-      // significant digits. If we end up wanting precision beyond microseconds,
-      // we can make this setting configurable with a custom command line flag.
-      ->Unit(benchmark::kMicrosecond);
+      ->Unit(FLAG_time_unit.first ? FLAG_time_unit.second
+                                  : benchmark::kMicrosecond);
 }
 
 iree_status_t GetModuleContentsFromFlags(iree_file_contents_t** out_contents) {
