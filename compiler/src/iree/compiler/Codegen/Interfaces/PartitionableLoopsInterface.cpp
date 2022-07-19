@@ -177,6 +177,41 @@ struct FftOpPartitionableLoops
   }
 };
 
+template <typename OpTy>
+struct AllParallelAsPartitionableLoops
+    : public PartitionableLoopsInterface::ExternalModel<
+          AllParallelAsPartitionableLoops<OpTy>, OpTy> {
+  unsigned getNumLoops(Operation *op) const {
+    auto tiledOp = cast<IREE::LinalgExt::TiledOpInterface>(op);
+    return tiledOp.getLoopIteratorTypes().size();
+  }
+
+  llvm::SmallVector<unsigned> getPartitionableLoops(
+      Operation *op, unsigned maxNumPartitionedLoops) const {
+    SmallVector<unsigned> partitionableLoops;
+    auto interfaceOp = cast<IREE::LinalgExt::TiledOpInterface>(op);
+    for (auto iteratorType :
+         llvm::enumerate(interfaceOp.getLoopIteratorTypes())) {
+      if (iteratorType.value() != getParallelIteratorTypeName()) {
+        continue;
+      }
+      partitionableLoops.push_back(iteratorType.index());
+    }
+    if (partitionableLoops.size() > maxNumPartitionedLoops) {
+      partitionableLoops.erase(
+          partitionableLoops.begin(),
+          std::next(partitionableLoops.begin(),
+                    partitionableLoops.size() - maxNumPartitionedLoops));
+    }
+    return partitionableLoops;
+  }
+
+  llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
+    auto tiledOp = cast<IREE::LinalgExt::TiledOpInterface>(op);
+    return tiledOp.getLoopIteratorTypes();
+  }
+};
+
 /// Partitionable loop interface for `tensor.extract_slice` operation. Needed
 /// only to build the workload during dispatch region formation.
 /// TODO(ravishankarm): Drop this ExternalModel once the use of
@@ -285,14 +320,18 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
 
   registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
 
-  registry.addExtension(
-      +[](MLIRContext *ctx, IREE::LinalgExt::IREELinalgExtDialect *dialect) {
-        IREE::LinalgExt::FftOp::attachInterface<FftOpPartitionableLoops>(*ctx);
-        registerInterfaceForTiledOpInterfaceOps<
-            IREE::LinalgExt::ReverseOp, IREE::LinalgExt::ScanOp,
-            IREE::LinalgExt::ScatterOp, IREE::LinalgExt::SortOp,
-            IREE::LinalgExt::TopkOp>(ctx);
-      });
+  registry.addExtension(+[](MLIRContext *ctx,
+                            IREE::LinalgExt::IREELinalgExtDialect *dialect) {
+    IREE::LinalgExt::FftOp::attachInterface<FftOpPartitionableLoops>(*ctx);
+    IREE::LinalgExt::ScanOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::ScanOp>>(*ctx);
+    IREE::LinalgExt::SortOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::SortOp>>(*ctx);
+    IREE::LinalgExt::TopkOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::TopkOp>>(*ctx);
+    registerInterfaceForTiledOpInterfaceOps<IREE::LinalgExt::ReverseOp,
+                                            IREE::LinalgExt::ScatterOp>(ctx);
+  });
   registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
     tensor::ExtractSliceOp::attachInterface<TensorExtractOpPartitionableLoops>(
         *ctx);
