@@ -19,20 +19,34 @@
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::LinalgExt;
 
-FailureOr<SmallVector<TilingInterface>>
+FailureOr<SmallVector<Operation *>>
 mlir::iree_compiler::IREE::LinalgExt::LinalgExtFusionInContainingOpPattern::
-    returningMatchAndRewrite(TilingInterface producerOp,
+    returningMatchAndRewrite(Operation *producerOp,
                              PatternRewriter &rewriter) const {
   if (producerOp->getNumResults() != 1)
     return failure();
 
+  auto tiled = tileAndFuse(producerOp, rewriter);
+  if (succeeded(tiled))
+    return tiled;
+
+  return cloneAndFuse(producerOp, rewriter);
+}
+
+FailureOr<SmallVector<Operation *>>
+mlir::iree_compiler::IREE::LinalgExt::LinalgExtFusionInContainingOpPattern::
+    tileAndFuse(Operation *producerOp, RewriterBase &rewriter) const {
+  auto tileableProducer = dyn_cast<TilingInterface>(producerOp);
+  if (!tileableProducer)
+    return failure();
+
   // Search the producer slices accessed within the containing operation.
   SmallVector<tensor::ExtractSliceOp> sliceOps;
-  for (Operation *user : producerOp->getUsers()) {
+  for (Operation *user : tileableProducer->getUsers()) {
     auto sliceOp = dyn_cast<tensor::ExtractSliceOp>(user);
     if (!sliceOp)
       continue;
-    if (sliceOp->getParentOp() != containingOp)
+    if (!containingOp->isProperAncestor(sliceOp))
       continue;
     sliceOps.push_back(sliceOp);
   }
@@ -41,27 +55,51 @@ mlir::iree_compiler::IREE::LinalgExt::LinalgExtFusionInContainingOpPattern::
     return failure();
 
   SmallVector<Value> destinationOperands =
-      producerOp.getDestinationOperands(rewriter);
+      tileableProducer.getDestinationOperands(rewriter);
 
   // Try to fuse the producer in-place of the tensor::ExtractSliceOps.
-  SmallVector<TilingInterface> fusedOps;
+  SmallVector<Operation *> fusedOps;
   for (tensor::ExtractSliceOp sliceOp : sliceOps) {
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPoint(sliceOp);
 
     // Tile the producer.
-    FailureOr<Value> tiledProducer = producerOp.generateResultTileValue(
+    FailureOr<Value> tiledProducer = tileableProducer.generateResultTileValue(
         rewriter, /*resultNumber=*/0, destinationOperands,
         sliceOp.getMixedOffsets(), sliceOp.getMixedSizes(), true);
     if (failed(tiledProducer))
       return failure();
-    fusedOps.push_back(cast<TilingInterface>(tiledProducer->getDefiningOp()));
+    fusedOps.push_back(tiledProducer->getDefiningOp());
   }
 
   // Replace the tensor::ExtractSliceOps.
   for (const auto &en : enumerate(sliceOps))
     rewriter.replaceOp(en.value(), fusedOps[en.index()]->getResult(0));
   return fusedOps;
+}
+
+FailureOr<SmallVector<Operation *>>
+mlir::iree_compiler::IREE::LinalgExt::LinalgExtFusionInContainingOpPattern::
+    cloneAndFuse(Operation *producerOp, RewriterBase &rewriter) const {
+  OpBuilder::InsertionGuard guard(rewriter);
+  // TODO: Cannot call `containingOp.getRegion()` because function is not
+  // const.
+  rewriter.setInsertionPointToStart(
+      &containingOp->getRegion(0).getBlocks().front());
+  Operation *cloned = rewriter.clone(*producerOp);
+
+  for (OpResult result : producerOp->getOpResults()) {
+    for (OpOperand &use : result.getUses()) {
+      if (containingOp->isProperAncestor(use.getOwner())) {
+        rewriter.updateRootInPlace(use.getOwner(), [&] {
+          use.set(cloned->getOpResult(result.getResultNumber()));
+        });
+      }
+    }
+  }
+
+  SmallVector<Operation *> result(1, cloned);
+  return result;
 }
 
 FailureOr<FusionResult> LinalgExtFusionPattern::returningMatchAndRewrite(

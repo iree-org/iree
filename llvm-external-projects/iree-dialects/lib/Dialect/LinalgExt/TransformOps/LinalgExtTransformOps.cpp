@@ -150,19 +150,23 @@ LinalgExt::FuseIntoContainingOp::apply(transform::TransformResults &results,
   ArrayRef<Operation *> producerOps = state.getPayloadOps(getProducerOp());
   ArrayRef<Operation *> containingOps = state.getPayloadOps(getContainingOp());
   for (auto it : llvm::zip(producerOps, containingOps)) {
-    auto producerOp = dyn_cast<TilingInterface>(std::get<0>(it));
+    Operation *producerOp = std::get<0>(it);
     Operation *containingOp = std::get<1>(it);
-    if (!producerOp) {
-      std::get<0>(it)->emitError("Cannot fuse op: Not a tileable op");
+    auto foreachThreadOp = dyn_cast<scf::ForeachThreadOp>(containingOp);
+    if (!foreachThreadOp) {
+      containingOp->emitError("expected scf::ForeachThreadOp");
       return DiagnosedSilenceableFailure::definiteFailure();
     }
     LinalgExt::LinalgExtFusionInContainingOpPattern pattern(this->getContext(),
-                                                            containingOp);
+                                                            foreachThreadOp);
 
     // Apply the pattern.
     SimplePatternRewriter rewriter(producerOp);
-    if (failed(pattern.returningMatchAndRewrite(producerOp, rewriter)))
-      return DiagnosedSilenceableFailure::definiteFailure();
+    if (failed(pattern.returningMatchAndRewrite(producerOp, rewriter))) {
+      Diagnostic diag(producerOp->getLoc(), DiagnosticSeverity::Note);
+      diag << "could not fuse into containing op";
+      return DiagnosedSilenceableFailure::silenceableFailure(std::move(diag));
+    }
   }
   return DiagnosedSilenceableFailure::success();
 }

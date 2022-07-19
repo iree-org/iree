@@ -96,24 +96,32 @@ struct ForeachThreadOpToScfForRewriter
 };
 
 /// Pattern to fuse a tileable op into a containing op.
-struct LinalgExtFusionInContainingOpPattern
-    : public OpInterfaceRewritePattern<TilingInterface> {
+struct LinalgExtFusionInContainingOpPattern : public RewritePattern {
   LinalgExtFusionInContainingOpPattern(MLIRContext *context,
-                                       Operation *containingOp)
-      : OpInterfaceRewritePattern<TilingInterface>(context),
+                                       scf::ForeachThreadOp containingOp)
+      : RewritePattern(MatchAnyOpTypeTag(), /*benefit=*/1, context),
         containingOp(containingOp) {}
 
-  FailureOr<SmallVector<TilingInterface>>
-  returningMatchAndRewrite(TilingInterface producerOp,
+  FailureOr<SmallVector<Operation *>>
+  returningMatchAndRewrite(Operation *producerOp,
                            PatternRewriter &rewriter) const;
 
-  LogicalResult matchAndRewrite(TilingInterface producerOp,
+  LogicalResult matchAndRewrite(Operation *producerOp,
                                 PatternRewriter &rewriter) const override {
     return returningMatchAndRewrite(producerOp, rewriter);
   }
 
 private:
-  Operation *containingOp;
+  /// Tile and fuse the given producer op into `containingOp`. Returns failure
+  /// if the producer does not implement TilingInterface.
+  FailureOr<SmallVector<Operation *>> tileAndFuse(Operation *producerOp,
+                                                  RewriterBase &rewriter) const;
+
+  /// Clone and fuse the given producer op into `containingOp`.
+  FailureOr<SmallVector<Operation *>>
+  cloneAndFuse(Operation *producerOp, RewriterBase &rewriter) const;
+
+  scf::ForeachThreadOp containingOp;
 };
 
 struct FusionResult {

@@ -9,6 +9,7 @@
 
 include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
+include "mlir/Dialect/Transform/IR/TransformEffects.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
@@ -74,18 +75,37 @@ def TileToForeachOp :
 
 def FuseIntoContainingOp :
     Op<Transform_Dialect, "fuse_into_containing_op",
-      [FunctionalStyleTransformOpTrait,
-       MemoryEffectsOpInterface,
-       DeclareOpInterfaceMethods<TransformOpInterface>]> {
+      [DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{Fuse a producer into a containing operation.}];
 
   let summary = [{
-    Search the body of the containing operation for all producer uses and
-    compute the accessed producer slices on-the-fly.
-    }];
+    Fuse the `producer_op` into the `containing_op`. Only scf.foreach_thread
+    ops are currently supported as the containing op.
 
-  let arguments = (ins PDL_Operation:$producer_op,
-                       PDL_Operation:$containing_op);
+    The producer is typically a slice of a tileable op (i.e., implements
+    TilingInterface). In that case, this transform computes the accessed
+    producer slice inside of the containing op ("tile and fuse"). Otherwise,
+    the entire producer is cloned inside the containing op ("clone and fuse").
+
+    Producers and containing ops are matched pairwise when multiple payload ops
+    are provided (batched execution). The number of producers and containing
+    ops must be the same.
+
+    #### Return modes
+
+    This operation fails definitely when a containing op is not an
+    scf.foreach_thread op. If at least one producer could not be fused, this
+    operation fails silently.
+
+    This operation reads and frees the producer handle. It reads the containing
+    op handle.
+  }];
+
+  let arguments = (ins Arg<PDL_Operation, "",
+                           [TransformMappingRead,
+                            TransformMappingFree]>:$producer_op,
+                       Arg<PDL_Operation, "",
+                           [TransformMappingRead]>:$containing_op);
 
   let assemblyFormat = "$producer_op `into` $containing_op attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";

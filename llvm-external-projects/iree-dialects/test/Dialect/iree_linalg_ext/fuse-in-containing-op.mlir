@@ -52,6 +52,8 @@ module {
     ^bb1(%arg1: !pdl.operation):
       %0 = pdl_match @match_fill in %arg1
       %1 = pdl_match @match_foreach_thread in %arg1
+
+      // linalg.fill is tileable. The op is tiled and fused.
       fuse_into_containing_op %0 into %1
     }
   }
@@ -114,6 +116,64 @@ module {
     ^bb1(%arg1: !pdl.operation):
       %0 = pdl_match @match_fill in %arg1
       %1 = pdl_match @match_foreach_thread in %arg1
+
+      // linalg.fill is tileable. The op is tiled and fused.
+      fuse_into_containing_op %0 into %1
+    }
+  }
+}
+
+// -----
+
+#map0 = affine_map<()[s0] -> (64 ceildiv s0)>
+#map1 = affine_map<(d0)[s0] -> (d0 * s0)>
+#map2 = affine_map<(d0)[s0] -> (-(d0 * s0) + 64, s0)>
+
+module {
+  // CHECK-LABEL: func.func @fuse_untileable_op
+  //  CHECK-SAME:   %[[CHUNK_SIZE:[0-9a-z]+]]: index
+  //  CHECK-SAME:   %[[IN:[0-9a-z]+]]: tensor<64xf32>
+  //  CHECK-SAME:   %[[OUT:[0-9a-z]+]]: tensor<64xf32>
+  func.func @fuse_untileable_op(%arg0: index, %arg1: tensor<64xf32>, %arg2: tensor<64xf32>) -> tensor<64xf32> {
+    %0 = linalg.init_tensor [%arg0] : tensor<?xf32>
+    %1 = affine.apply #map0()[%arg0]
+
+    // CHECK: scf.foreach_thread {{.*}} {
+    %2 = scf.foreach_thread (%arg3) in (%1)  -> (tensor<64xf32>) {
+      // CHECK:    %[[INIT_TENSOR:.*]] = linalg.init_tensor
+      %3 = affine.apply #map1(%arg3)[%arg0]
+      %4 = affine.min #map2(%arg3)[%arg0]
+      %5 = tensor.extract_slice %arg2[%3] [%4] [1] : tensor<64xf32> to tensor<?xf32>
+
+      // CHECK:    %[[T2:.*]] = linalg.elemwise_unary ins(%[[INIT_TENSOR]]
+      %7 = linalg.elemwise_unary ins(%0 : tensor<?xf32>) outs(%5 : tensor<?xf32>) -> tensor<?xf32>
+      scf.foreach_thread.perform_concurrently {
+        tensor.parallel_insert_slice %7 into %arg2[%3] [%4] [1] : tensor<?xf32> into tensor<64xf32>
+      }
+    }
+    func.return %2 : tensor<64xf32>
+  }
+
+  transform.with_pdl_patterns {
+  ^bb0(%arg0: !pdl.operation):
+    pdl.pattern @match_init_tensor : benefit(1) {
+      %0 = operands
+      %1 = types
+      %2 = operation "linalg.init_tensor"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      rewrite %2 with "transform.dialect"
+    }
+    pdl.pattern @match_foreach_thread : benefit(1) {
+      %0 = operands
+      %1 = types
+      %2 = operation "scf.foreach_thread"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
+      rewrite %2 with "transform.dialect"
+    }
+    transform.structured.canonicalized_sequence %arg0 {
+    ^bb1(%arg1: !pdl.operation):
+      %0 = pdl_match @match_init_tensor in %arg1
+      %1 = pdl_match @match_foreach_thread in %arg1
+
+      // linalg.init_tensor is not tileable. The op is cloned and fused.
       fuse_into_containing_op %0 into %1
     }
   }
