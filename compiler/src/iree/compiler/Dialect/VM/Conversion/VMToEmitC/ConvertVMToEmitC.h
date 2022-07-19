@@ -17,8 +17,7 @@ namespace iree_compiler {
 
 void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                IREE::VM::EmitCTypeConverter &typeConverter,
-                               RewritePatternSet &patterns,
-                               SmallVector<std::string> &importShims);
+                               RewritePatternSet &patterns);
 
 namespace IREE {
 namespace VM {

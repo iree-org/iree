@@ -1804,20 +1804,14 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
   }
 };
 
-class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
+class ImportOpConverter {
  public:
-  using OpConversionPattern<IREE::VM::ImportOp>::OpConversionPattern;
+  ImportOpConverter(IREE::VM::EmitCTypeConverter &typeConverter,
+                    SmallVector<std::string> &importShims)
+      : typeConverter(typeConverter), importShims(importShims) {}
 
-  ImportOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                     SmallVector<std::string> &importShims)
-      : OpConversionPattern<IREE::VM::ImportOp>(typeConverter, context),
-        importShims(importShims) {}
-
- private:
-  LogicalResult matchAndRewrite(
-      IREE::VM::ImportOp importOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.startRootUpdate(importOp.getOperation());
+  LogicalResult operator()(IREE::VM::ImportOp importOp) const {
+    OpBuilder builder(importOp);
 
     auto key = makeImportCallingConventionString(importOp);
     if (!key.hasValue()) {
@@ -1827,33 +1821,29 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
 
     // The needed shim already exists.
     if (llvm::find(importShims, key) != std::end(importShims)) {
-      rewriter.finalizeRootUpdate(importOp.getOperation());
-
       return success();
     }
 
     if (importOp.isVariadic()) {
       if (failed(createVariadicImportShims(importOp.getFunctionType(), importOp,
-                                           rewriter))) {
+                                           builder))) {
         return failure();
       }
     } else {
       if (failed(createImportShim(importOp.getFunctionType(), importOp, -1,
-                                  rewriter))) {
+                                  builder))) {
         return failure();
       }
     }
-
-    rewriter.finalizeRootUpdate(importOp.getOperation());
 
     importShims.push_back(key.getValue());
     return success();
   }
 
-  //
-  LogicalResult createVariadicImportShims(
-      FunctionType functionType, IREE::VM::ImportOp &importOp,
-      ConversionPatternRewriter &rewriter) const {
+ private:
+  LogicalResult createVariadicImportShims(FunctionType functionType,
+                                          IREE::VM::ImportOp &importOp,
+                                          OpBuilder &builder) const {
     SetVector<size_t> arities;
 
     for (auto caller : getCallers(importOp)) {
@@ -1863,7 +1853,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
       }
       if (arities.insert(numSpans.getValue())) {
         if (failed(createImportShim(functionType, importOp, numSpans.getValue(),
-                                    rewriter))) {
+                                    builder))) {
           return failure();
         }
       }
@@ -1909,8 +1899,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
 
       mlir::func::FuncOp funcOp =
           cast<mlir::func::FuncOp>(failureBlock->getParentOp());
-      releaseRefs(builder, location, funcOp,
-                  *getTypeConverter<IREE::VM::EmitCTypeConverter>());
+      releaseRefs(builder, location, funcOp, typeConverter);
 
       auto statusOp = builder.create<emitc::CallOp>(
           /*location=*/location,
@@ -1933,7 +1922,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
 
   LogicalResult createImportShim(FunctionType functionType,
                                  IREE::VM::ImportOp &importOp, int64_t numSpans,
-                                 ConversionPatternRewriter &rewriter) const {
+                                 OpBuilder &builder) const {
     auto ctx = importOp.getContext();
     auto loc = importOp.getLoc();
 
@@ -1949,38 +1938,38 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
       return importOp.emitError() << "failed to build import shim name.";
     }
 
-    auto newFuncType = buildFuncType(functionType, numSpans, rewriter, loc);
+    auto newFuncType = buildFuncType(functionType, numSpans, builder, loc);
 
     if (failed(newFuncType)) {
       return importOp.emitError()
              << "Failed to build function type for wrapper";
     }
 
-    auto newFuncOp = rewriter.create<mlir::func::FuncOp>(
+    auto newFuncOp = builder.create<mlir::func::FuncOp>(
         loc, newFuncName.getValue(), newFuncType.getValue());
 
-    getTypeConverter<IREE::VM::EmitCTypeConverter>()->analysisCache.insert(
+    typeConverter.analysisCache.insert(
         std::make_pair(newFuncOp.getOperation(), VMAnalysis{}));
 
     attachAttribute(newFuncOp, "emitc.static", UnitAttr::get(ctx));
 
     // Populate newly generated function.
     {
-      OpBuilder::InsertionGuard guard(rewriter);
+      OpBuilder::InsertionGuard guard(builder);
       Block *block =
-          rewriter.createBlock(&newFuncOp.getBody(), newFuncOp.getBody().end());
+          builder.createBlock(&newFuncOp.getBody(), newFuncOp.getBody().end());
 
       for (Type type : newFuncOp.getFunctionType().getInputs()) {
         block->addArgument(type, loc);
       }
 
-      rewriter.setInsertionPointToStart(block);
+      builder.setInsertionPointToStart(block);
 
       auto argumentSize = buildSizeExpression(
-          flattenInputTypes(functionType.getInputs(), numSpans, rewriter),
-          rewriter, loc);
+          flattenInputTypes(functionType.getInputs(), numSpans, builder),
+          builder, loc);
       auto resultSize =
-          buildSizeExpression(functionType.getResults(), rewriter, loc);
+          buildSizeExpression(functionType.getResults(), builder, loc);
 
       if (failed(argumentSize) || failed(resultSize)) {
         return importOp.emitError()
@@ -1988,46 +1977,45 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
       }
 
       auto importArg = newFuncOp.getArgument(1);
-      failIfImportUnresolved(rewriter, loc, importArg);
+      failIfImportUnresolved(builder, loc, importArg);
 
       auto call =
           buildIreeVmFunctionCallStruct(importArg, argumentSize.getValue(),
-                                        resultSize.getValue(), rewriter, loc);
+                                        resultSize.getValue(), builder, loc);
 
       if (failed(call)) {
         return importOp.emitError() << "failed to create call struct";
       }
 
       if (failed(packArgumentBuffer(
-              flattenInputTypes(functionType.getInputs(), numSpans, rewriter),
-              newFuncOp, call.getValue(), rewriter, loc))) {
+              flattenInputTypes(functionType.getInputs(), numSpans, builder),
+              newFuncOp, call.getValue(), builder, loc))) {
         return importOp.emitError() << "failed to pack argument struct";
       }
 
       auto stackArg = newFuncOp.getArgument(0);
-      if (failed(createCall(call.getValue(), importArg, stackArg, rewriter,
-                            loc))) {
+      if (failed(
+              createCall(call.getValue(), importArg, stackArg, builder, loc))) {
         return importOp.emitError() << "failed to create call";
       }
 
       if (failed(unpackResultBuffer(functionType.getResults(), newFuncOp,
-                                    call.getValue(), rewriter, loc))) {
+                                    call.getValue(), builder, loc))) {
         return importOp.emitError() << "failed to unpack result struct";
       }
 
-      auto status = emitc_builders::ireeOkStatus(rewriter, loc);
+      auto status = emitc_builders::ireeOkStatus(builder, loc);
 
-      rewriter.create<mlir::func::ReturnOp>(loc, status);
+      builder.create<mlir::func::ReturnOp>(loc, status);
     }
 
     return success();
   }
 
   FailureOr<FunctionType> buildFuncType(FunctionType functionType,
-                                        int64_t numSpans,
-                                        ConversionPatternRewriter &rewriter,
+                                        int64_t numSpans, OpBuilder &builder,
                                         Location loc) const {
-    auto ctx = rewriter.getContext();
+    auto ctx = builder.getContext();
 
     Type stackType =
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_stack_t"));
@@ -2042,8 +2030,8 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
     // }
 
     for (Type type :
-         flattenInputTypes(functionType.getInputs(), numSpans, rewriter)) {
-      auto convertedType = getTypeConverter()->convertType(type);
+         flattenInputTypes(functionType.getInputs(), numSpans, builder)) {
+      auto convertedType = typeConverter.convertType(type);
       types.push_back(convertedType);
     }
 
@@ -2068,14 +2056,13 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
     return {result};
   }
 
-  FailureOr<Value> buildSizeExpression(ArrayRef<Type> types,
-                                       ConversionPatternRewriter &rewriter,
+  FailureOr<Value> buildSizeExpression(ArrayRef<Type> types, OpBuilder &builder,
                                        Location loc) const {
-    auto ctx = rewriter.getContext();
+    auto ctx = builder.getContext();
 
     Type hostSizeType = emitc::OpaqueType::get(ctx, "iree_host_size_t");
 
-    Value result = rewriter
+    Value result = builder
                        .create<emitc::ConstantOp>(
                            /*location=*/loc,
                            /*resultType=*/hostSizeType,
@@ -2083,7 +2070,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
                        .getResult();
 
     // TODO(simon-camp): Test if neccesary
-    Type dummyType = rewriter.getI32Type();
+    Type dummyType = builder.getI32Type();
     for (Type type : types.size() > 0 ? types : ArrayRef<Type>(dummyType)) {
       auto cType = getCType(type);
 
@@ -2092,10 +2079,10 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
         return failure();
       }
 
-      Value size = callSizeof(rewriter, loc,
+      Value size = callSizeof(builder, loc,
                               emitc::OpaqueAttr::get(ctx, cType.getValue()));
 
-      result = rewriter
+      result = builder
                    .create<emitc::CallOp>(
                        /*location=*/loc,
                        /*type=*/hostSizeType,
@@ -2109,13 +2096,15 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
     return {result};
   }
 
-  FailureOr<Value> buildIreeVmFunctionCallStruct(
-      Value import, Value argumentSize, Value resultSize,
-      ConversionPatternRewriter &rewriter, Location loc) const {
-    auto ctx = rewriter.getContext();
+  FailureOr<Value> buildIreeVmFunctionCallStruct(Value import,
+                                                 Value argumentSize,
+                                                 Value resultSize,
+                                                 OpBuilder &builder,
+                                                 Location loc) const {
+    auto ctx = builder.getContext();
 
     // iree_vm_function_call_t call;
-    auto call = rewriter
+    auto call = builder
                     .create<emitc::ConstantOp>(
                         /*location=*/loc,
                         /*resultType=*/
@@ -2125,7 +2114,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
 
     // importValue = *import;
     auto importValue =
-        rewriter
+        builder
             .create<emitc::ApplyOp>(
                 /*location=*/loc,
                 /*result=*/
@@ -2135,25 +2124,24 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
             .getResult();
 
     // call.function = *import;
-    emitc_builders::structMemberAssign(rewriter, loc,
+    emitc_builders::structMemberAssign(builder, loc,
                                        /*memberName=*/"function",
                                        /*operand=*/call,
                                        /*value=*/importValue);
 
-    allocateByteSpan(call, argumentSize, "arguments", rewriter, loc);
-    allocateByteSpan(call, resultSize, "results", rewriter, loc);
+    allocateByteSpan(call, argumentSize, "arguments", builder, loc);
+    allocateByteSpan(call, resultSize, "results", builder, loc);
 
     return {call};
   }
 
   Value allocateByteSpan(Value call, Value size, StringRef memberName,
-                         ConversionPatternRewriter &rewriter,
-                         Location loc) const {
-    auto ctx = rewriter.getContext();
+                         OpBuilder &builder, Location loc) const {
+    auto ctx = builder.getContext();
 
     // byteSpan = call.<memberName>;
     auto byteSpan =
-        rewriter
+        builder
             .create<emitc::CallOp>(
                 /*location=*/loc,
                 /*type=*/
@@ -2161,7 +2149,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
                     emitc::OpaqueType::get(ctx, "iree_byte_span_t")),
                 /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER_ADDRESS"),
                 /*args=*/
-                ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
+                ArrayAttr::get(ctx, {builder.getIndexAttr(0),
                                      emitc::OpaqueAttr::get(ctx, memberName)}),
                 /*templateArgs=*/ArrayAttr{},
                 /*operands=*/ArrayRef<Value>{call})
@@ -2169,7 +2157,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
 
     // void *byteSpan_data_void = iree_alloca(size);
     auto byteSpanDataVoid =
-        rewriter
+        builder
             .create<emitc::CallOp>(
                 /*location=*/loc,
                 /*type=*/
@@ -2181,8 +2169,8 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
             .getResult(0);
 
     // uint8_t *byteSpan_data = (uint8_t*)byteSpan_data_void;
-    Type bytePtr = emitc::PointerType::get(rewriter.getIntegerType(8, false));
-    auto byteSpanData = rewriter
+    Type bytePtr = emitc::PointerType::get(builder.getIntegerType(8, false));
+    auto byteSpanData = builder
                             .create<emitc::CastOp>(
                                 /*location=*/loc,
                                 /*type=*/bytePtr,
@@ -2190,26 +2178,26 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
                             .getResult();
 
     // byteSpan.data_length = SIZE;
-    emitc_builders::structPtrMemberAssign(rewriter, loc,
+    emitc_builders::structPtrMemberAssign(builder, loc,
                                           /*memberName=*/"data_length",
                                           /*operand=*/byteSpan,
                                           /*value=*/size);
 
     // byteSpan.data = byteSpan_data
-    emitc_builders::structPtrMemberAssign(rewriter, loc,
+    emitc_builders::structPtrMemberAssign(builder, loc,
                                           /*memberName=*/"data",
                                           /*operand=*/byteSpan,
                                           /*value=*/byteSpanData);
 
     // memset(byteSpanData, 0, SIZE);
-    rewriter.create<emitc::CallOp>(
+    builder.create<emitc::CallOp>(
         /*location=*/loc,
         /*type=*/TypeRange{},
         /*callee=*/StringAttr::get(ctx, "memset"),
         /*args=*/
         ArrayAttr::get(ctx,
-                       {rewriter.getIndexAttr(0), rewriter.getI32IntegerAttr(0),
-                        rewriter.getIndexAttr(1)}),
+                       {builder.getIndexAttr(0), builder.getI32IntegerAttr(0),
+                        builder.getIndexAttr(1)}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{byteSpanData, size});
 
@@ -2218,25 +2206,24 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
 
   LogicalResult packArgumentBuffer(ArrayRef<Type> inputTypes,
                                    mlir::func::FuncOp &funcOp, Value call,
-                                   ConversionPatternRewriter &rewriter,
-                                   Location loc) const {
+                                   OpBuilder &builder, Location loc) const {
     if (inputTypes.empty()) {
       return success();
     }
 
-    auto ctx = rewriter.getContext();
+    auto ctx = builder.getContext();
 
     size_t inputOffset = 2;
 
     Value arguments = emitc_builders::structMember(
-        rewriter, loc,
+        builder, loc,
         /*type=*/emitc::OpaqueType::get(ctx, "iree_byte_span_t"),
         /*memberName=*/"arguments",
         /*operand=*/call);
 
     Type bytePtrType =
-        emitc::PointerType::get(rewriter.getIntegerType(8, false));
-    Value uint8Ptr = emitc_builders::structMember(rewriter, loc,
+        emitc::PointerType::get(builder.getIntegerType(8, false));
+    Value uint8Ptr = emitc_builders::structMember(builder, loc,
                                                   /*type=*/bytePtrType,
                                                   /*memberName=*/"data",
                                                   /*operand=*/arguments);
@@ -2259,14 +2246,14 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
                                emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
         Type refPtrType = emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
-        Value refPtr = rewriter
+        Value refPtr = builder
                            .create<emitc::CastOp>(
                                /*location=*/loc,
                                /*type=*/refPtrType,
                                /*operand=*/uint8Ptr)
                            .getResult();
 
-        rewriter.create<emitc::CallOp>(
+        builder.create<emitc::CallOp>(
             /*location=*/loc,
             /*type=*/TypeRange{},
             /*callee=*/StringAttr::get(ctx, "iree_vm_ref_assign"),
@@ -2276,11 +2263,11 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
       } else {
         auto cPtrType = cType.getValue();
 
-        Value size = callSizeof(rewriter, loc,
+        Value size = callSizeof(builder, loc,
                                 emitc::OpaqueAttr::get(ctx, cType.getValue()));
 
         // memcpy(uint8Ptr, &arg, size);
-        Value argPtr = rewriter
+        Value argPtr = builder
                            .create<emitc::ApplyOp>(
                                /*location=*/loc,
                                /*result=*/
@@ -2289,7 +2276,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
                                /*applicableOperator=*/StringAttr::get(ctx, "&"),
                                /*operand=*/arg)
                            .getResult();
-        rewriter.create<emitc::CallOp>(
+        builder.create<emitc::CallOp>(
             /*location=*/loc,
             /*type=*/TypeRange{},
             /*callee=*/StringAttr::get(ctx, "memcpy"),
@@ -2300,10 +2287,10 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
 
       // Skip the addition in the last iteration.
       if (i < inputTypes.size() - 1) {
-        Value size = callSizeof(rewriter, loc,
+        Value size = callSizeof(builder, loc,
                                 emitc::OpaqueAttr::get(ctx, cType.getValue()));
 
-        uint8Ptr = rewriter
+        uint8Ptr = builder
                        .create<emitc::CallOp>(
                            /*location=*/loc,
                            /*type=*/bytePtrType,
@@ -2319,26 +2306,25 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
 
   LogicalResult unpackResultBuffer(ArrayRef<Type> resultTypes,
                                    mlir::func::FuncOp &funcOp, Value call,
-                                   ConversionPatternRewriter &rewriter,
-                                   Location loc) const {
+                                   OpBuilder &builder, Location loc) const {
     if (resultTypes.empty()) {
       return success();
     }
 
-    auto ctx = rewriter.getContext();
+    auto ctx = builder.getContext();
 
     // The last N arguments are the results.
     size_t resultOffset = funcOp.getNumArguments() - resultTypes.size();
 
     Value results = emitc_builders::structMember(
-        rewriter, loc,
+        builder, loc,
         /*type=*/emitc::OpaqueType::get(ctx, "iree_byte_span_t"),
         /*memberName=*/"results",
         /*operand=*/call);
 
     Type bytePtrType =
-        emitc::PointerType::get(rewriter.getIntegerType(8, false));
-    Value uint8Ptr = emitc_builders::structMember(rewriter, loc,
+        emitc::PointerType::get(builder.getIntegerType(8, false));
+    Value uint8Ptr = emitc_builders::structMember(builder, loc,
                                                   /*type=*/bytePtrType,
                                                   /*memberName=*/"data",
                                                   /*operand=*/results);
@@ -2360,14 +2346,14 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
                                emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
         Type refPtrType = emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
-        Value refPtr = rewriter
+        Value refPtr = builder
                            .create<emitc::CastOp>(
                                /*location=*/loc,
                                /*type=*/refPtrType,
                                /*operand=*/uint8Ptr)
                            .getResult();
 
-        rewriter.create<emitc::CallOp>(
+        builder.create<emitc::CallOp>(
             /*location=*/loc,
             /*type=*/TypeRange{},
             /*callee=*/StringAttr::get(ctx, "iree_vm_ref_move"),
@@ -2375,11 +2361,11 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
             /*templateArgs=*/ArrayAttr{},
             /*operands=*/ArrayRef<Value>{refPtr, arg});
       } else {
-        Value size = callSizeof(rewriter, loc,
+        Value size = callSizeof(builder, loc,
                                 emitc::OpaqueAttr::get(ctx, cType.getValue()));
 
         // memcpy(arg, uint8Ptr, size);
-        rewriter.create<emitc::CallOp>(
+        builder.create<emitc::CallOp>(
             /*location=*/loc,
             /*type=*/TypeRange{},
             /*callee=*/StringAttr::get(ctx, "memcpy"),
@@ -2390,10 +2376,10 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
 
       // Skip the addition in the last iteration.
       if (i < resultTypes.size() - 1) {
-        Value size = callSizeof(rewriter, loc,
+        Value size = callSizeof(builder, loc,
                                 emitc::OpaqueAttr::get(ctx, cType.getValue()));
 
-        uint8Ptr = rewriter
+        uint8Ptr = builder
                        .create<emitc::CallOp>(
                            /*location=*/loc,
                            /*type=*/bytePtrType,
@@ -2408,13 +2394,12 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
   }
 
   LogicalResult createCall(Value call, Value import, Value stack,
-                           ConversionPatternRewriter &rewriter,
-                           Location loc) const {
-    auto ctx = rewriter.getContext();
+                           OpBuilder &builder, Location loc) const {
+    auto ctx = builder.getContext();
 
     // iree_vm_execution_result_t result;
     auto executionResult =
-        rewriter
+        builder
             .create<emitc::VariableOp>(
                 /*location=*/loc,
                 /*resultType=*/
@@ -2423,7 +2408,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
             .getResult();
 
     // memset(&result, 0, sizeof(result));
-    if (failed(clearStruct(rewriter, executionResult))) {
+    if (failed(clearStruct(builder, executionResult))) {
       emitError(loc) << "failed to clear struct";
       return failure();
     }
@@ -2431,13 +2416,13 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
     // RETURN_IF_ERROR(import->module->begin_call(import->module, stack,
     // &call, &result));
     auto importModule = emitc_builders::structPtrMember(
-        rewriter, loc,
+        builder, loc,
         /*type=*/
         emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, "iree_vm_module_t")),
         /*memberName=*/"module",
         /*operand=*/import);
-    auto callPtr = rewriter
+    auto callPtr = builder
                        .create<emitc::ApplyOp>(
                            /*location=*/loc,
                            /*result=*/
@@ -2447,7 +2432,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
                            /*operand=*/call)
                        .getResult();
     auto executionResultPtr =
-        rewriter
+        builder
             .create<emitc::ApplyOp>(
                 /*location=*/loc,
                 /*result=*/
@@ -2458,32 +2443,31 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
             .getResult();
 
     returnIfError(
-        /*rewriter=*/rewriter,
+        /*rewriter=*/builder,
         /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER_CALL"),
         /*args=*/
         ArrayAttr::get(ctx,
                        {
-                           rewriter.getIndexAttr(0),
+                           builder.getIndexAttr(0),
                            emitc::OpaqueAttr::get(ctx, "begin_call"),
-                           rewriter.getIndexAttr(0),
-                           rewriter.getIndexAttr(1),
-                           rewriter.getIndexAttr(2),
-                           rewriter.getIndexAttr(3),
+                           builder.getIndexAttr(0),
+                           builder.getIndexAttr(1),
+                           builder.getIndexAttr(2),
+                           builder.getIndexAttr(3),
                        }),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
         ArrayRef<Value>{importModule, stack, callPtr, executionResultPtr},
-        /*typeConverter=*/*getTypeConverter<IREE::VM::EmitCTypeConverter>());
+        /*typeConverter=*/typeConverter);
 
     return success();
   }
 
   // A span count of -1 means a non variadic call
   // TODO(simon-camp): Passthrough the import op and use isFuncArgumentVariadic.
-  SmallVector<Type> flattenInputTypes(
-      ArrayRef<Type> types, int64_t numSpans,
-      ConversionPatternRewriter &rewriter) const {
+  SmallVector<Type> flattenInputTypes(ArrayRef<Type> types, int64_t numSpans,
+                                      OpBuilder &builder) const {
     SmallVector<Type> result;
 
     bool isVariadic = numSpans >= 0;
@@ -2497,7 +2481,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
       if (auto tupleType = type.dyn_cast<TupleType>()) {
         assert(numSpans >= 0);
 
-        result.push_back(rewriter.getI32Type());
+        result.push_back(builder.getI32Type());
 
         for (int64_t i = 0; i < numSpans; i++) {
           for (Type type_ : tupleType) {
@@ -2507,7 +2491,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
       } else if (isVariadic && isLastElement) {
         assert(numSpans >= 0);
 
-        result.push_back(rewriter.getI32Type());
+        result.push_back(builder.getI32Type());
 
         for (int64_t i = 0; i < numSpans; i++) {
           result.push_back(type);
@@ -2539,6 +2523,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
     return result;
   }
 
+  IREE::VM::EmitCTypeConverter &typeConverter;
   SmallVector<std::string> &importShims;
 };
 
@@ -4432,8 +4417,7 @@ class ListSetRefOpConversion
 
 void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                IREE::VM::EmitCTypeConverter &typeConverter,
-                               RewritePatternSet &patterns,
-                               SmallVector<std::string> &importShims) {
+                               RewritePatternSet &patterns) {
   auto context = patterns.getContext();
   populateUtilConversionPatterns(context, conversionTarget, typeConverter,
                                  patterns);
@@ -4447,7 +4431,6 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
   patterns.add<FailOpConversion>(typeConverter, context);
   patterns.add<FuncOpConversion>(typeConverter, context);
   patterns.add<ExportOpConversion>(typeConverter, context);
-  patterns.add<ImportOpConversion>(typeConverter, context, importShims);
   patterns.add<ReturnOpConversion>(typeConverter, context);
   patterns.add<ImportResolvedOpConversion>(typeConverter, context);
 
@@ -4836,8 +4819,19 @@ class ConvertVMToEmitCPass
     }
 
     SmallVector<std::string> importShims;
+
+    // The conversion of `call/call.variadic` ops on imported functions expects
+    // import ops to be rewritten to compiler generated shim functions. To
+    // ensure this we only rewrite `import` ops first.
+    ImportOpConverter importOpConverter(typeConverter, importShims);
+    for (auto importOp : module.getOps<IREE::VM::ImportOp>()) {
+      if (failed(importOpConverter(importOp))) {
+        return signalPassFailure();
+      }
+    }
+
     RewritePatternSet patterns(&getContext());
-    populateVMToEmitCPatterns(target, typeConverter, patterns, importShims);
+    populateVMToEmitCPatterns(target, typeConverter, patterns);
 
     target.addLegalDialect<
         emitc::EmitCDialect, mlir::BuiltinDialect, mlir::cf::ControlFlowDialect,
@@ -4852,16 +4846,7 @@ class ConvertVMToEmitCPass
     // Structural ops
     target.addLegalOp<IREE::VM::ModuleOp>();
     target.addLegalOp<IREE::VM::ModuleTerminatorOp>();
-
-    // The import ops are currently needed to build the import array for the
-    // module descriptor. There is no way to generate this directly with the
-    // EmitC dialect at the moment.
-    target.addDynamicallyLegalOp<IREE::VM::ImportOp>(
-        [&importShims](IREE::VM::ImportOp op) {
-          auto key = makeImportCallingConventionString(op);
-          assert(key.hasValue());
-          return llvm::find(importShims, key) != std::end(importShims);
-        });
+    target.addLegalOp<IREE::VM::ImportOp>();
 
     // This op is needed in the printer to emit an array holding the data.
     target.addLegalOp<IREE::VM::RodataOp>();
