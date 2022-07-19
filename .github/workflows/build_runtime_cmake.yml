@@ -11,9 +11,6 @@ on:
         required: true
         type: string
 
-env:
-  IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
-
 jobs:
   build_runtime:
     runs-on: ubuntu-20.04
@@ -24,10 +21,7 @@ jobs:
           submodules: true
       - name: "Building runtime"
         run: |
-          docker run --user="$(id -u):$(id -g)" \
-            --volume="$PWD:$IREE_DOCKER_WORKDIR" \
-            --workdir="$IREE_DOCKER_WORKDIR" \
-            --rm \
+          ./build_tools/github_actions/docker_run.sh \
             gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
             ./build_tools/cmake/build_runtime.sh \
             "${{ inputs.build-dir }}"
