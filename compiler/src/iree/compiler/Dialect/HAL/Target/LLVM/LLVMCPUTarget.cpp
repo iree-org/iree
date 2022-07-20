@@ -35,7 +35,7 @@
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 
-#define DEBUG_TYPE "iree-llvm-target"
+#define DEBUG_TYPE "iree-llvm-cpu-target"
 
 namespace mlir {
 namespace iree_compiler {
@@ -137,9 +137,9 @@ static LogicalResult linkBuiltinLibrary(
   return success();
 }
 
-class LLVMTargetBackend final : public TargetBackend {
+class LLVMCPUTargetBackend final : public TargetBackend {
  public:
-  explicit LLVMTargetBackend(LLVMTargetOptions options)
+  explicit LLVMCPUTargetBackend(LLVMTargetOptions options)
       : options_(std::move(options)) {
     initConfiguration();
   }
@@ -827,7 +827,7 @@ void registerLLVMCPUTargetBackends(
 #include "llvm/Config/Targets.def"
 
   auto backendFactory = [=]() {
-    return std::make_shared<LLVMTargetBackend>(queryOptions());
+    return std::make_shared<LLVMCPUTargetBackend>(queryOptions());
   };
 
   // Preferred name.
