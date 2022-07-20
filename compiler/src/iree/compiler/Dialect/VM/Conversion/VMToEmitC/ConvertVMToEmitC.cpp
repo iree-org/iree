@@ -1563,10 +1563,10 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
       return failure();
     }
 
-    auto generateStructBody = [&funcOp](
-                                  ArrayRef<Type> types,
-                                  StringRef prefix) -> FailureOr<std::string> {
-      std::string structBody;
+    auto generateStructFields = [&funcOp](ArrayRef<Type> types,
+                                          StringRef prefix)
+        -> FailureOr<SmallVector<emitc_builders::StructField>> {
+      SmallVector<emitc_builders::StructField> result;
 
       for (auto pair : llvm::enumerate(types)) {
         Optional<std::string> cType = getCType(pair.value());
@@ -1575,11 +1575,12 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
                                 "c type in argument struct declaration.";
           return failure();
         }
-        structBody += cType.getValue() + " " + prefix.str() +
-                      std::to_string(pair.index()) + ";";
+
+        auto fieldName = prefix.str() + std::to_string(pair.index());
+        result.push_back({cType.getValue(), fieldName});
       }
 
-      return structBody;
+      return result;
     };
 
     // TODO(simon-camp): Clean up; We generate calls to a macro that defines
@@ -1588,22 +1589,15 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
 
     // To prevent scoping issues we prefix the struct name with module and
     // function name.
-    auto typedefStruct = [&rewriter, &newFuncOp, &loc](std::string structName,
-                                                       std::string structBody) {
-      auto ctx = rewriter.getContext();
-
+    auto typedefStruct = [&rewriter, &newFuncOp, &loc](
+                             std::string structName,
+                             ArrayRef<emitc_builders::StructField> fields) {
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPoint(newFuncOp.getOperation());
 
-      rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/TypeRange{},
-          /*callee=*/StringAttr::get(ctx, "EMITC_TYPEDEF_STRUCT"),
-          /*args=*/
-          ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, structName),
-                               emitc::OpaqueAttr::get(ctx, structBody)}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{});
+      emitc_builders::structDefinition(/*builder=*/rewriter, /*location=*/loc,
+                                       /*structName=*/structName,
+                                       /*fields=*/fields);
     };
 
     FunctionType funcType = vmAnalysis.getValue().get().originalFunctionType;
@@ -1614,8 +1608,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
     const bool needArgumentStruct = funcType.getNumInputs() > 0;
 
     if (needArgumentStruct) {
-      FailureOr<std::string> structBody =
-          generateStructBody(funcType.getInputs(), "arg");
+      auto structBody = generateStructFields(funcType.getInputs(), "arg");
       if (failed(structBody)) {
         return failure();
       }
@@ -1628,8 +1621,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
     const bool needResultStruct = funcType.getNumResults() > 0;
 
     if (needResultStruct) {
-      FailureOr<std::string> structBody =
-          generateStructBody(funcType.getResults(), "res");
+      auto structBody = generateStructFields(funcType.getResults(), "res");
 
       if (failed(structBody)) {
         return failure();
@@ -4591,6 +4583,8 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                                          "vm_ceil_f32");
   patterns.add<GenericOpConversion<IREE::VM::FloorF32Op>>(
       typeConverter, context, "vm_floor_f32");
+  patterns.add<GenericOpConversion<IREE::VM::RoundF32Op>>(
+      typeConverter, context, "vm_round_f32");
 
   patterns.add<GenericOpConversion<IREE::VM::AtanF32Op>>(typeConverter, context,
                                                          "vm_atan_f32");

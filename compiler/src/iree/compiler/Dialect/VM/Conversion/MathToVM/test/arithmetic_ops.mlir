@@ -70,5 +70,17 @@ func.func @arithmetic_f32(%arg0: f32) -> f32 {
   // CHECK: vm.erf.f32
   %15 = math.erf %14 : f32
 
-  return %15 : f32
+  // CHECK: vm.abs.f32
+  %16 = math.abs %14 : f32
+
+  // CHECK: vm.ceil.f32
+  %17 = math.ceil %14 : f32
+
+  // CHECK: vm.floor.f32
+  %18 = math.floor %14 : f32
+
+  // CHECK: vm.round.f32
+  %19 = math.round %14 : f32
+
+  return %19 : f32
 }
