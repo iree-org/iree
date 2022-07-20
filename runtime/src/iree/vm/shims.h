@@ -138,6 +138,21 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_target2_t)(
         ref_type##_check_deref((args)->vla_field[i].r0, &(*(out_ptrs))[i]));  \
   }
 
+#define IREE_VM_ABI_VLA_STACK_DEREF_OR_NULL(                                  \
+    args, vla_count, vla_field, ref_type, max_count, out_count, out_ptrs)     \
+  *(out_count) = (args)->vla_count;                                           \
+  if (IREE_UNLIKELY((args)->vla_count > (max_count))) {                       \
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,                         \
+                            "count %u of " #ref_type " > %u",                 \
+                            (args)->vla_count, (uint32_t)(max_count));        \
+  }                                                                           \
+  *(out_ptrs) =                                                               \
+      (ref_type##_t**)iree_alloca((args)->vla_count * sizeof(ref_type##_t*)); \
+  for (iree_host_size_t i = 0; i < (args)->vla_count; ++i) {                  \
+    IREE_RETURN_IF_ERROR(ref_type##_check_deref_or_null(                      \
+        (args)->vla_field[i].r0, &(*(out_ptrs))[i]));                         \
+  }
+
 #define IREE_VM_ABI_VLA_HEAP_DEREF(args, vla_count, vla_field, ref_type,         \
                                    host_allocator, out_count, out_ptrs)          \
   *(out_count) = (args)->vla_count;                                              \

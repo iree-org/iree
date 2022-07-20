@@ -1081,8 +1081,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_fence_join,  //
                    CrD, r) {
   iree_host_size_t fence_count = 0;
   iree_hal_fence_t** fences = NULL;
-  IREE_VM_ABI_VLA_STACK_DEREF(args, a0_count, a0, iree_hal_fence, 32,
-                              &fence_count, &fences);
+  IREE_VM_ABI_VLA_STACK_DEREF_OR_NULL(args, a0_count, a0, iree_hal_fence, 32,
+                                      &fence_count, &fences);
 
   iree_hal_fence_t* fence = NULL;
   IREE_RETURN_IF_ERROR(
@@ -1241,8 +1241,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_fence_await,  //
     uint32_t timeout_millis = (uint32_t)args->i0;
     iree_host_size_t fence_count = 0;
     iree_hal_fence_t** fences = NULL;
-    IREE_VM_ABI_VLA_STACK_DEREF(args, a1_count, a1, iree_hal_fence, 32,
-                                &fence_count, &fences);
+    IREE_VM_ABI_VLA_STACK_DEREF_OR_NULL(args, a1_count, a1, iree_hal_fence, 32,
+                                        &fence_count, &fences);
 
     IREE_TRACE_ZONE_BEGIN(z0);
     zone_id = z0;
