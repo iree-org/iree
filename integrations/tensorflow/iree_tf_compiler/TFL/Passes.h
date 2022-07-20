@@ -27,6 +27,9 @@ void buildTFLImportPassPipeline(OpPassManager &pm);
 // IREE-specific passes for TFLite import
 //===----------------------------------------------------------------------===//
 
+// Converts TFLite's Conditional Ops
+std::unique_ptr<OperationPass<>> createConvertConditionalsPass();
+
 // Retain functions used by tfl.call_once to avoid removal.
 std::unique_ptr<OperationPass<ModuleOp>> createRetainCallOnceFuncsPass();
 

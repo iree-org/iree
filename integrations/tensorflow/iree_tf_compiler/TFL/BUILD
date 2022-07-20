@@ -36,6 +36,7 @@ cc_library(
         "RetainCallOnceFuncs.cpp",
         "StripMetadata.cpp",
         "VerifyFullyConverted.cpp",
+        "ConvertConditionals.cpp",  # scott
     ],
     hdrs = [
         "PassDetail.h",
