@@ -18,16 +18,16 @@ import time
 import urllib.request
 
 targets = {
-    'llvmaot': 'dylib-llvm-aot',
+    'llvmcpu': 'llvm-cpu',
     'vulkan': 'vulkan-spirv',
 }
 
 configs = {
-    'llvmaot': 'local-task',
+    'llvmcpu': 'local-task',
     'vulkan': 'vulkan',
 }
 
-absl.flags.DEFINE_string('target_backend', 'llvmaot', 'model path to execute')
+absl.flags.DEFINE_string('target_backend', 'llvmcpu', 'model path to execute')
 
 absl.flags.DEFINE_string(
     "artifacts_dir", None,

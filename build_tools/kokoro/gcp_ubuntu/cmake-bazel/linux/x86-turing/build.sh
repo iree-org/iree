@@ -82,7 +82,7 @@ source "${CMAKE_BUILD_DIR?}/.env" && export PYTHONPATH
 LIT_SCRIPT="$IREE_SRC_DIR/third_party/llvm-project/llvm/utils/lit/lit.py"
 if ! python3 "$LIT_SCRIPT" -v integrations/tensorflow/test \
    --max-time 1800 \
-   -D DISABLE_FEATURES=llvmaot \
+   -D DISABLE_FEATURES=llvmcpu \
    -D FEATURES=vulkan
 then
    tests_passed=false

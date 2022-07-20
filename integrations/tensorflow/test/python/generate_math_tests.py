@@ -189,7 +189,7 @@ COMPLEX_FUNCTIONS = [
 ]
 
 BACKENDS = [
-    ("llvmaot", "--target_backends=iree_llvmaot"),
+    ("llvmcpu", "--target_backends=iree_llvmcpu"),
     ("vulkan", "--target_backends=iree_vulkan"),
 ]
 
