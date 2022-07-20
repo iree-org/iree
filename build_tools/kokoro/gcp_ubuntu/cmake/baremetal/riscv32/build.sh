@@ -30,7 +30,7 @@ export BUILD_RISCV_DIR="${ROOT_DIR?}/build-riscv-rv32-baremetal"
 export RISCV_CONFIG="rv32-baremetal"
 
 echo "Cross-compiling with cmake"
-./build_tools/cmake/build_riscv.sh
+./build_tools/cmake/build_host_and_riscv.sh
 
 echo "Run sanity tests"
 ./build_tools/kokoro/gcp_ubuntu/cmake/baremetal/riscv32/test.sh
