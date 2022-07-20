@@ -72,6 +72,26 @@ void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
   }
 
   {
+    RewritePatternSet castAwayUnitDimPatterns(&getContext());
+    vector::populateCastAwayVectorLeadingOneDimPatterns(
+        castAwayUnitDimPatterns);
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(castAwayUnitDimPatterns)))) {
+      return signalPassFailure();
+    }
+
+    RewritePatternSet reductionToContractPatterns(&getContext());
+    vector::populateVectorReductionToContractPatterns(
+        reductionToContractPatterns);
+    vector::ExtractOp::getCanonicalizationPatterns(reductionToContractPatterns,
+                                                   context);
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(reductionToContractPatterns)))) {
+      return signalPassFailure();
+    }
+  }
+
+  {
     // Special-case vector.contract codegen paths. This needs to happen
     // just before the generic vector ops lowerings.
     CustomKernelsTargetInfo info;
