@@ -60,6 +60,7 @@ iree_compiler_cc_library(
     deps = [
         ":FlowExtensionsOpGen",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
+        "//compiler/src/iree/compiler/Dialect/Flow/Transforms",
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "@llvm-project//mlir:ArithmeticDialect",

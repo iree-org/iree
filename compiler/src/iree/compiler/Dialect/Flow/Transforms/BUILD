@@ -63,6 +63,7 @@ iree_compiler_cc_library(
         "VerifyInputLegality.cpp",
     ],
     hdrs = [
+        "DispatchLinalgOnTensors.h",
         "FusionUtils.h",
         "Passes.h",
         "Passes.h.inc",

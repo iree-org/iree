@@ -40,6 +40,7 @@ iree_cc_library(
     MLIRTransformDialect
     MLIRTransformUtils
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Flow::Transforms
   PUBLIC
 )
 

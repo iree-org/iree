@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Flow/Transforms/DispatchLinalgOnTensors.h"
+
 #include <deque>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -154,7 +156,7 @@ static bool isRootOp(Operation *op) {
 
 /// Operations that are cloned into dispatch regions formed with other
 /// operations as roots.
-static bool isClonableIntoDispatchOp(Operation *op) {
+bool isClonableIntoDispatchOp(Operation *op) {
   // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
   // trivially clonable too, but they cause problems
   // with bufferization. Make them clonable when fixed.
