@@ -58,7 +58,7 @@ to build IREE for your host platform and the
 Android. The LLVM (CPU) compiler backend is compiled in by default on all
 platforms.
 
-Ensure that the `IREE_TARGET_BACKEND_DYLIB_LLVM_AOT` CMake option is `ON` when
+Ensure that the `IREE_TARGET_BACKEND_LLVM_CPU` CMake option is `ON` when
 configuring for the host.
 
 !!! tip

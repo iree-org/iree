@@ -9,7 +9,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/FormatVariadic.h"
 
-#define DEBUG_TYPE "llvmaot-linker"
+#define DEBUG_TYPE "llvm-linker"
 
 namespace mlir {
 namespace iree_compiler {
@@ -45,7 +45,7 @@ class WasmLinkerTool : public LinkerTool {
     }
 
     // Allow overriding the automatic search with an environment variable.
-    char *linkerPath = std::getenv("IREE_LLVMAOT_WASM_LINKER_PATH");
+    char *linkerPath = std::getenv("IREE_LLVM_WASM_LINKER_PATH");
     if (linkerPath) {
       return std::string(linkerPath);
     }

@@ -127,7 +127,7 @@ cc_library(
     hdrs = ["init_targets.h"],
     local_defines = [
         # "IREE_HAVE_CUDA_TARGET",
-        "IREE_HAVE_LLVMAOT_TARGET",
+        "IREE_HAVE_LLVM_TARGET",
         "IREE_HAVE_METALSPIRV_TARGET",
         "IREE_HAVE_ROCM_TARGET",
         "IREE_HAVE_VMVX_TARGET",

@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMAOTTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTarget.h"
 
 #include <cstdlib>
 
@@ -35,7 +35,7 @@
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 
-#define DEBUG_TYPE "iree-llvmaot-target"
+#define DEBUG_TYPE "iree-llvm-target"
 
 namespace mlir {
 namespace iree_compiler {
@@ -137,9 +137,9 @@ static LogicalResult linkBuiltinLibrary(
   return success();
 }
 
-class LLVMAOTTargetBackend final : public TargetBackend {
+class LLVMTargetBackend final : public TargetBackend {
  public:
-  explicit LLVMAOTTargetBackend(LLVMTargetOptions options)
+  explicit LLVMTargetBackend(LLVMTargetOptions options)
       : options_(std::move(options)) {
     initConfiguration();
   }
@@ -777,7 +777,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
   } config_;
 };
 
-void registerLLVMAOTTargetBackends(
+void registerLLVMTargetBackends(
     std::function<LLVMTargetOptions()> queryOptions) {
   getLLVMTargetOptionsFromFlags();
 
@@ -827,17 +827,23 @@ void registerLLVMAOTTargetBackends(
 #include "llvm/Config/Targets.def"
 
   auto backendFactory = [=]() {
-    return std::make_shared<LLVMAOTTargetBackend>(queryOptions());
+    return std::make_shared<LLVMTargetBackend>(queryOptions());
   };
 
-  // #hal.device.target<"cpu", ...
-  static TargetBackendRegistration registration0("cpu", backendFactory);
-  // #hal.executable.target<"llvm", ...
-  static TargetBackendRegistration registration1("llvm", backendFactory);
+  // Preferred name.
+  // #hal.executable.target<"llvm-cpu", ...
+  static TargetBackendRegistration registration0("llvm-cpu", backendFactory);
 
+  // Abbreviated names.
+  // #hal.device.target<"cpu", ...
+  static TargetBackendRegistration registration1("cpu", backendFactory);
+  // #hal.executable.target<"llvm", ...
+  static TargetBackendRegistration registration2("llvm", backendFactory);
+
+  // Legacy names.
   // TODO(benvanik): remove legacy dylib name.
-  static TargetBackendRegistration registration2("dylib", backendFactory);
-  static TargetBackendRegistration registration3("dylib-llvm-aot",
+  static TargetBackendRegistration registration3("dylib", backendFactory);
+  static TargetBackendRegistration registration4("dylib-llvm-aot",
                                                  backendFactory);
 }
 
