@@ -101,6 +101,10 @@ createConvertToDestinationPassingStylePass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgToVectorVectorizeConvPass();
 
+/// Creates a pass to vectorize a very specific form of linalg.conv ops.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLinalgToVectorVectorizeMMT4dPass();
+
 /// Creates a pass to vectorize a very specific form of tensor.pad ops with
 /// control flows.
 std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
@@ -169,6 +173,10 @@ void populateFoldAffineMinInDistributedLoopsPatterns(
 /// Co is a multiple of 4, and filter shape must be 1x1x4xCo.
 void populateLinalgToVectorVectorizeConvPatterns(MLIRContext *context,
                                                  RewritePatternSet &patterns);
+
+/// Populates `patterns` to convert linalg.mmt4d to vector.contract.
+void populateLinalgToVectorVectorizeMMT4dPatterns(MLIRContext *context,
+                                                  RewritePatternSet &patterns);
 
 /// Populates `patterns` with patterns that vectorize tensor.pad with static
 /// result shape by generating control flows to guard against vector transfer

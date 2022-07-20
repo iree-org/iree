@@ -134,6 +134,13 @@ def LinalgToVectorVectorizeConv :
       "mlir::iree_compiler::createLinalgToVectorVectorizeConvPass()";
 }
 
+def LinalgToVectorVectorizeMMT4d :
+    Pass<"iree-codegen-vectorize-linalg-mmt4d", "func::FuncOp"> {
+  let summary = "Vectorize a very specific form of linalg.mmt4d";
+  let constructor =
+      "mlir::iree_compiler::createLinalgToVectorVectorizeMMT4dPass()";
+}
+
 def TensorToVectorVectorizePad :
     Pass<"iree-codegen-vectorize-tensor-pad", "func::FuncOp"> {
   let summary = "Vectorize a very specific form of tensor.pad with "
