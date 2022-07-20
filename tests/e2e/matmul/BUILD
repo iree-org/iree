@@ -241,7 +241,7 @@ iree_check_single_backend_test_suite(
 iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_f32_small_no_padding",
     compiler_flags = [
-        "--iree-codegen-disable-matmul-pad-pipeline",
+        "--iree-codegen-enable-vector-padding=false",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
