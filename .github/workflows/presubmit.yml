@@ -26,5 +26,5 @@ jobs:
         # Note that we're using the workflow file from the base branch (e.g.
         # 'main'), but telling the workflow to checkout code from the PR itself.
         # TODO: actually do this
-        ref: "${{ github.ref }}"
+        ref: "${{ github.event.pull_request.head.ref }}"
         inputs: '{"runner-group": "presubmit", "ref": "${{ github.head_ref }}" }'
