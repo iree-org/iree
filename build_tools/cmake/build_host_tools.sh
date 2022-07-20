@@ -35,7 +35,7 @@ mkdir -p "${INSTALL_DIR}"
 
 # Configure, build, install.
 "${CMAKE_BIN}" -G Ninja -B "${BUILD_DIR}" \
-  -DCMAKE_INSTALL_PREFIX="$(realpath {INSTALL_DIR})" \
+  -DCMAKE_INSTALL_PREFIX="$(realpath ${INSTALL_DIR})" \
   -DIREE_ENABLE_LLD=ON \
   -DIREE_ENABLE_ASSERTIONS=ON \
   -DIREE_BUILD_COMPILER=ON \
