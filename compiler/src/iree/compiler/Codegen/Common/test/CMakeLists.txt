@@ -38,7 +38,6 @@ iree_lit_test_suite(
     "transpose_canonicalization.mlir"
     "type_propagation.mlir"
     "vectorize_linalg_conv.mlir"
-    "vectorize_linalg_mmt4d.mlir"
   TOOLS
     FileCheck
     iree-opt
