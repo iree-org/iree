@@ -85,7 +85,7 @@ static Value groupReduction(Location loc, OpBuilder &builder, Value input,
 
 /// Hoist uniform operations as well as special hal operations that have side
 /// effect but are safe to move out of the warp single lane region.
-void static moveScalarAndBindingUniformCode(
+static void moveScalarAndBindingUniformCode(
     vector::WarpExecuteOnLane0Op warpOp) {
   /// Hoist ops without side effect as well as special binding ops.
   auto canBeHoisted = [](Operation *op,
