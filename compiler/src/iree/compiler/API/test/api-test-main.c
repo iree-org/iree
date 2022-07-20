@@ -3,8 +3,8 @@
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-// Simple unit test that demonstrates compiling from MHLO using the CAPI.
+
+// Simple unit test that demonstrates compiling using the CAPI.
 // There is room for improvement on the high level APIs, and if some of what
 // is here is extracted into new APIs, please simplify this test accordingly.
 //
@@ -28,7 +28,6 @@ static bool iree_compile_mlir_to_bytecode(iree_string_view_t mlir_source,
                                           iree_string_view_t target_backend,
                                           iree_string_builder_t* out_builder) {
   // TODO: support customizing compiling flags?
-  // TODO: support enabling different input dialects other than MHLO?
   // TODO: return IREE status with error information instead of a boolean?
   // TODO: only call registers once to speedup second calls?
   // TODO: cache MLIR context, pass manager to speedup second calls?
@@ -70,10 +69,9 @@ static bool iree_compile_mlir_to_bytecode(iree_string_view_t mlir_source,
 
   // Create compiler options.
   IreeCompilerOptions options = ireeCompilerOptionsCreate();
-  const char* compiler_flags[] = {iree_string_builder_buffer(&target_builder),
-                                  "--iree-input-type=mhlo"};
+  const char* compiler_flags[] = {iree_string_builder_buffer(&target_builder)};
   MlirLogicalResult status =
-      ireeCompilerOptionsSetFlags(options, 2, compiler_flags, /*onError=*/NULL,
+      ireeCompilerOptionsSetFlags(options, 1, compiler_flags, /*onError=*/NULL,
                                   /*userData=*/NULL);
   if (mlirLogicalResultIsFailure(status)) {
     ireeCompilerOptionsDestroy(options);
@@ -112,10 +110,8 @@ int main(int argc, char** argv) {
   // MLIR code that we will compile
   iree_string_view_t mlir_code = iree_make_cstring_view(
       "func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> "
-      "tensor<4xf32>\n"
-      "    {\n"
-      "  %0 = \"mhlo.multiply\"(%arg0, %arg1) : "
-      "(tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>\n"
+      "tensor<4xf32> {\n"
+      "  %0 = arith.mulf %arg0, %arg1 : tensor<4xf32>\n"
       "  return %0 : tensor<4xf32>\n"
       "}\n");
 
@@ -134,7 +130,7 @@ int main(int argc, char** argv) {
 
   // For testing purposes, just print the length vs the full contents.
   iree_string_view_t bytecode = iree_string_builder_view(&bytecode_builder);
-  printf("GENERATED VMFB SIZE: %d\n", (int)bytecode.size);
+  printf("Success! Generated vmfb size: %d\n", (int)bytecode.size);
 
   // Cleanups.
   iree_string_builder_deinitialize(&bytecode_builder);
