@@ -23,11 +23,11 @@ endif()
 iree_compiler_cc_library(
     name = "LLVM",
     srcs = [
-        "LLVMTarget.cpp",
+        "LLVMCPUTarget.cpp",
         "LibraryBuilder.cpp",
     ],
     hdrs = [
-        "LLVMTarget.h",
+        "LLVMCPUTarget.h",
         "LibraryBuilder.h",
     ],
     deps = [

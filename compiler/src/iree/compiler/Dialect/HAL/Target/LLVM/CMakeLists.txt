@@ -18,10 +18,10 @@ iree_cc_library(
   NAME
     LLVM
   HDRS
-    "LLVMTarget.h"
+    "LLVMCPUTarget.h"
     "LibraryBuilder.h"
   SRCS
-    "LLVMTarget.cpp"
+    "LLVMCPUTarget.cpp"
     "LibraryBuilder.cpp"
   DEPS
     ::LLVMIRPasses

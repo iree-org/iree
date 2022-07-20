@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMCPUTarget.h"
 
 #include <cstdlib>
 
@@ -777,7 +777,7 @@ class LLVMTargetBackend final : public TargetBackend {
   } config_;
 };
 
-void registerLLVMTargetBackends(
+void registerLLVMCPUTargetBackends(
     std::function<LLVMTargetOptions()> queryOptions) {
   getLLVMTargetOptionsFromFlags();
 
