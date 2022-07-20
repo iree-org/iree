@@ -39,7 +39,7 @@ iree_check_single_backend_test_suite(
     "bert_encoder_unrolled_fake_weights.mlir"
     "mobilenetv3_fake_weights.mlir"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   DRIVER
     "local-task"
   COMPILER_FLAGS

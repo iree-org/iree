@@ -86,7 +86,7 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
     ),
     driver = "local-task",
-    target_backend = "dylib-llvm-aot",
+    target_backend = "llvm-cpu",
 )
 
 iree_check_single_backend_test_suite(

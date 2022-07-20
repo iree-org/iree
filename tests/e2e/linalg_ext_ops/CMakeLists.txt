@@ -77,7 +77,7 @@ iree_check_single_backend_test_suite(
     "sort.mlir"
     "top-k.mlir"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   DRIVER
     "local-task"
 )

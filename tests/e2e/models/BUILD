@@ -55,7 +55,7 @@ iree_check_single_backend_test_suite(
     srcs = CHECK_FRAMEWORK_TESTS,
     compiler_flags = ["--iree-input-type=mhlo"],
     driver = "local-task",
-    target_backend = "dylib-llvm-aot",
+    target_backend = "llvm-cpu",
 )
 
 # TODO(#5880): VMVX is not yet fast enough to run the larger model tests.

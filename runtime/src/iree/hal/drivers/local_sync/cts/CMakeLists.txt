@@ -22,7 +22,7 @@ if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
     DRIVER_REGISTRATION_FN
       "iree_hal_local_sync_driver_module_register"
     COMPILER_TARGET_BACKEND
-      "dylib-llvm-aot"
+      "llvm-cpu"
     EXECUTABLE_FORMAT
       "${NATIVE_EXECUTABLE_FORMAT}"
     DEPS

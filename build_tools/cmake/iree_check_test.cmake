@@ -38,9 +38,9 @@ function(iree_bytecode_module_for_iree_check_test_and_friends)
   endif()
 
   if(_RULE_TARGET_CPU_FEATURES)
-    if(NOT _RULE_TARGET_BACKEND STREQUAL "dylib-llvm-aot")
+    if(NOT _RULE_TARGET_BACKEND STREQUAL "llvm-cpu")
       message(SEND_ERROR "TARGET_CPU_FEATURES should be empty when \
-TARGET_BACKEND is not dylib-llvm-aot. Actual values: \
+TARGET_BACKEND is not llvm-cpu. Actual values: \
 TARGET_CPU_FEATURES=${_RULE_TARGET_CPU_FEATURES}, \
 TARGET_BACKEND=${_RULE_TARGET_BACKEND}.")
     endif()
@@ -402,7 +402,7 @@ function(iree_check_test_suite)
   )
 
   if(NOT DEFINED _RULE_TARGET_BACKENDS AND NOT DEFINED _RULE_DRIVERS)
-    set(_RULE_TARGET_BACKENDS "vmvx" "vulkan-spirv" "dylib-llvm-aot")
+    set(_RULE_TARGET_BACKENDS "vmvx" "vulkan-spirv" "llvm-cpu")
     set(_RULE_DRIVERS "local-task" "vulkan" "local-task")
   endif()
 
@@ -418,7 +418,7 @@ function(iree_check_test_suite)
   foreach(_INDEX RANGE "${_MAX_INDEX}")
     list(GET _RULE_TARGET_BACKENDS ${_INDEX} _TARGET_BACKEND)
     list(GET _RULE_DRIVERS ${_INDEX} _DRIVER)
-    if(_TARGET_BACKEND STREQUAL "dylib-llvm-aot" AND _RULE_TARGET_CPU_FEATURES_VARIANTS)
+    if(_TARGET_BACKEND STREQUAL "llvm-cpu" AND _RULE_TARGET_CPU_FEATURES_VARIANTS)
       set(_TARGET_CPU_FEATURES_VARIANTS "${_RULE_TARGET_CPU_FEATURES_VARIANTS}")
     else()
       set(_TARGET_CPU_FEATURES_VARIANTS "default")

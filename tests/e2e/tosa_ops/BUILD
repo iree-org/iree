@@ -70,7 +70,7 @@ iree_check_single_backend_test_suite(
     srcs = LLVM_SRCS,
     compiler_flags = ["--iree-input-type=tosa"],
     driver = "local-task",
-    target_backend = "dylib-llvm-aot",
+    target_backend = "llvm-cpu",
 )
 
 VMVX_SRCS = enforce_glob(

@@ -47,7 +47,7 @@ iree_check_single_backend_test_suite(
     "lowering_config.mlir"
     "strided_slice.mlir"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   DRIVER
     "local-task"
   COMPILER_FLAGS
@@ -60,7 +60,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "linalg_quantized_matmul_vs_linalg_matmul.mlir"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   DRIVER
     "local-task"
   COMPILER_FLAGS
