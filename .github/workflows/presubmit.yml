@@ -8,46 +8,21 @@ name: Presubmit
 
 on:
   workflow_dispatch:
+  # pull_request_target:
+  # TODO: remove this
   pull_request:
 
 jobs:
-  build_runtime:
-    uses: ./.github/workflows/build_runtime_cmake.yml
-    with:
-      build-dir: build-runtime
-
-  test_runtime:
-    needs: build_runtime
-    uses: ./.github/workflows/test_runtime_cmake.yml
-    with:
-      build-dir: build-runtime
-
-  tsan:
-    uses: ./.github/workflows/tsan.yml
-
-  host_tools_assertions:
-    uses: ./.github/workflows/host_tools.yml
-    with:
-      host-binary-root: host-tools
-      enable-assertions: "ON"
-
-  riscv32:
-    needs: host_tools_assertions
-    uses: ./.github/workflows/riscv32.yml
-    with:
-      host-binary-root: host-tools
-
-  summary:
+  dispatch:
     runs-on: ubuntu-20.04
-    needs:
-      - build_runtime
-      - host_tools_assertions
-      - test_runtime
-      - tsan
-      - riscv32
-    if: always()
     steps:
-      - name: Getting combined job status
-        run: |
-          echo '${{ toJson(needs.*.result) }}' \
-            | jq --exit-status 'all(.=="success")' > /dev/null
+    - name: "Invoke workflow :: Build Native Release Packages"
+      uses: benc-uk/workflow-dispatch@4c044c1613fabbe5250deadc65452d54c4ad4fc7  # v1
+      with:
+        workflow: Everything
+        token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+        # Note that we're using the workflow file from the base branch (e.g.
+        # 'main'), but telling the workflow to checkout code from the PR itself.
+        # TODO: actually do this
+        ref: "${{ github.ref }}"
+        inputs: '{"runner-group": "presubmit", "ref": "${{ github.head_ref }}" }'

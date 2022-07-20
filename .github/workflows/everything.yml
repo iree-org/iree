@@ -1,0 +1,149 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: Everything
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner-group:
+        description: Runner group to use
+        required: true
+        type: choice
+        options:
+        - presubmit
+        - postsubmit
+      ref:
+        description: The reference of the commit to check out
+        required: false
+        default: ${{ github.ref }}
+        type: string
+
+
+
+env:
+  RUNTIME_BUILD_DIR: build-runtime
+  HOST_BINARY_ROOT_ASSERTIONS: host-tools-assertions
+  RUNNER_GROUP: ${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+
+jobs:
+  build_runtime:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        with:
+          submodules: true
+      - name: "Building runtime"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
+            ./build_tools/cmake/build_runtime.sh \
+            "${RUNTIME_BUILD_DIR}"
+      # Using a tar archive is necessary to preserve file permissions. See
+      # https://github.com/actions/upload-artifact#maintaining-file-permissions-and-case-sensitive-files
+      # The upload action already does its own gzip compression, so it's likely
+      # unnecessary (and perhaps harmful) to do our own, though that hasn't been
+      # investigated.
+      - name: "Create build dir archive"
+        run: tar -cf "${RUNTIME_BUILD_DIR}.tar" "${RUNTIME_BUILD_DIR}"
+      - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8  # v3.1.0
+        with:
+          name: ".tar"
+          path: "${{ env.RUNTIME_BUILD_DIR }}.tar"
+
+  test_runtime:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        with:
+          submodules: true
+      - name: "Downloading runtime build directory"
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
+        with:
+          name: "${{ env.RUNTIME_BUILD_DIR }}.tar"
+      - name: "Extract archive"
+        run: tar -xf "${RUNTIME_BUILD_DIR}".tar
+      - name: "Testing runtime"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env IREE_VULKAN_DISABLE=1 \
+            gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
+            ./build_tools/cmake/ctest_all.sh \
+            ""${RUNTIME_BUILD_DIR}""
+
+  tsan:
+    runs-on:
+      - self-hosted
+      - runner-group=${{ inputs.runner-group }}
+      - cpu
+      - os-family=Linux
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        with:
+          submodules: true
+      - name: "Building and testing with ThreadSanitizer"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
+            ./build_tools/cmake/build_and_test_tsan.sh
+
+
+  host_tools_assertions:
+    uses: ./.github/workflows/host_tools.yml
+    with:
+      host-binary-root: ${{ env.HOST_BINARY_ROOT_ASSERTIONS }}
+      enable-assertions: "ON"
+
+  riscv32:
+    runs-on:
+      - self-hosted
+      - runner-group=${{ inputs.runner-group }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_RISCV_DIR: "build-riscv-rv32-baremetal"
+      RISCV_CONFIG: "rv32-baremetal"
+      HOST_BINARY_ARCHIVE: ${{ inputs.host-binary-root }}.tar
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        with:
+          submodules: true
+      - name: "Downloading host tools"
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
+        with:
+          name: "${{ env.HOST_BINARY_ARCHIVE }}"
+      - name: "Extracting host tools archive"
+        run: |
+          tar -xvf ${HOST_BINARY_ARCHIVE}
+      - name: "Cross-compiling and testing riscv32"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "RISCV_CONFIG=${RISCV_CONFIG}" \
+            --env "BUILD_RISCV_DIR=${BUILD_RISCV_DIR}" \
+            --env "IREE_HOST_BINARY_ROOT=${HOST_BINARY_ROOT_ASSERTIONS}" \
+            gcr.io/iree-oss/riscv@sha256:e566f054ff1b1d8be61459ce4789dd944b70e85c8939a4d3b7331ab519d8db4c \
+            bash -c \
+            "./build_tools/cmake/build_riscv.sh && build_tools/kokoro/gcp_ubuntu/cmake/baremetal/riscv32/test.sh"
+
+
+  summary:
+    runs-on: ubuntu-20.04
+    needs:
+      - build_runtime
+      - host_tools_assertions
+      - test_runtime
+      - tsan
+      - riscv32
+    if: always()
+    steps:
+      - name: Getting combined job status
+        run: |
+          echo '${{ toJson(needs.*.result) }}' \
+            | jq --exit-status 'all(.=="success")' > /dev/null
