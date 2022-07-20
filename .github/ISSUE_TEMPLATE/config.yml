@@ -1,3 +1,4 @@
+blank_issues_enabled: false
 contact_links:
   - name: 📧 Send an email to our mailing list
     url: https://groups.google.com/forum/#!forum/iree-discuss
