@@ -16,10 +16,12 @@
 set -xeuo pipefail
 
 ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
+cd "${ROOT_DIR}"
+
 CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 RISCV_CONFIG="${RISCV_CONFIG:-rv64}"
 RISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS:--O3}"
-IREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT:-$(realpath ${BUILD_HOST_DIR}/install)}"
+IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT:-${BUILD_HOST_DIR}/install})"
 BUILD_RISCV_DIR="${BUILD_RISCV_DIR:-$ROOT_DIR/build-riscv}"
 
 # --------------------------------------------------------------------------- #
