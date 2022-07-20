@@ -322,7 +322,7 @@ iree_generated_trace_runner_test(
   DRIVERS
     "local-task"
   COMPILER_FLAGS
-    "--iree-codegen-disable-matmul-pad-pipeline"
+    "--iree-codegen-enable-vector-padding=false"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
