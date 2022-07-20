@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file -iree-util-demote-i64-to-i32 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-util-demote-i64-to-i32 %s | FileCheck %s
 
 // CHECK-LABEL: func.func @constant_i64
 // CHECK-SAME: () -> i32
@@ -57,37 +57,40 @@ func.func @args_tensor_i64(%arg0: tensor<4x4xi64>) -> tensor<4x4xi64> {
 
 // -----
 
-// CHECK-LABEL: func.func @mhlo_constant_i64
+// Return types should be converted for all operations, even those that the
+// core compiler is not directly aware of.
+
+// CHECK-LABEL: func.func @custom_constant_i64
 // CHECK-SAME: () -> tensor<1xi32>
-func.func @mhlo_constant_i64() -> tensor<1xi64> {
-  // CHECK-NEXT: mhlo.constant dense<123> : tensor<1xi32>
-  %c123 = mhlo.constant dense<123> : tensor<1xi64>
-  return %c123 : tensor<1xi64>
+func.func @custom_constant_i64() -> tensor<1xi64> {
+  // CHECK-NEXT: "custom.constant"() : () -> tensor<1xi32>
+  %c0 = "custom.constant"() : () -> tensor<1xi64>
+  return %c0 : tensor<1xi64>
 }
 
 // -----
 
-// CHECK-LABEL: func.func @mhlo_constant_ui64
+// CHECK-LABEL: func.func @custom_constant_ui64
 // CHECK-SAME: () -> tensor<1xui32>
-func.func @mhlo_constant_ui64() -> tensor<1xui64> {
-  // CHECK-NEXT: mhlo.constant dense<123> : tensor<1xui32>
-  %c123 = mhlo.constant dense<123> : tensor<1xui64>
-  return %c123 : tensor<1xui64>
+func.func @custom_constant_ui64() -> tensor<1xui64> {
+  // CHECK-NEXT: "custom.constant"() : () -> tensor<1xui32>
+  %c0 = "custom.constant"() : () -> tensor<1xui64>
+  return %c0 : tensor<1xui64>
 }
 
 // -----
 
-// CHECK-LABEL: func.func @mhlo_compare_i64
+// CHECK-LABEL: func.func @arith_cmpi_i64
 // CHECK-SAME: (%arg0: tensor<i32>, %arg1: tensor<i32>) -> (i1, tensor<i32>)
-func.func @mhlo_compare_i64(%arg0 : tensor<i64>, %arg1 : tensor<i64>) -> (i1, tensor<i64>) {
-  // CHECK-NEXT: %0 = "mhlo.compare"(%arg0, %arg1) {comparison_direction = #mhlo<comparison_direction LT>} : (tensor<i32>, tensor<i32>) -> tensor<i1>
+func.func @arith_cmpi_i64(%arg0 : tensor<i64>, %arg1 : tensor<i64>) -> (i1, tensor<i64>) {
+  // CHECK-NEXT: %0 = arith.cmpi slt, %arg0, %arg1 : tensor<i32>
   // CHECK-NEXT: %1 = tensor.extract %0[] : tensor<i1>
   // CHECK-NEXT: cf.cond_br %1, ^bb1(%1, %arg0 : i1, tensor<i32>), ^bb2(%1, %arg1 : i1, tensor<i32>)
   // CHECK-NEXT: ^bb1(%2: i1, %3: tensor<i32>): // pred: ^bb0
   // CHECK-NEXT: return %2, %3 : i1, tensor<i32>
   // CHECK-NEXT: ^bb2(%4: i1, %5: tensor<i32>): // pred: ^bb0
   // CHECK-NEXT: return %4, %5 : i1, tensor<i32>
-  %0 = "mhlo.compare"(%arg0, %arg1) {comparison_direction = #mhlo<comparison_direction LT>} : (tensor<i64>, tensor<i64>) -> tensor<i1>
+  %0 = arith.cmpi slt, %arg0, %arg1 : tensor<i64>
   %1 = tensor.extract %0[] : tensor<i1>
   cf.cond_br %1, ^bb1(%1, %arg0 : i1, tensor<i64>), ^bb2(%1, %arg1 : i1, tensor<i64>)
 ^bb1(%2 : i1, %3 : tensor<i64>):
@@ -145,7 +148,7 @@ func.func @linalg_non_structured_op(%arg0: tensor<9xi64>) -> tensor<1x9xi64> {
 util.global mutable @readwritevar = dense<0> : tensor<i64>
 func.func @foo(%arg0 : tensor<i64>) {
   %0 = util.global.load @readwritevar : tensor<i64>
-  %1 = chlo.broadcast_add %0, %arg0 : (tensor<i64>, tensor<i64>) -> tensor<i64>
+  %1 = arith.addi %0, %arg0 : tensor<i64>
   util.global.store %1, @readwritevar : tensor<i64>
   return
 }
@@ -180,29 +183,22 @@ func.func @simple_i64() -> (tensor<4xi64>) {
 
 // -----
 
-// CHECK: util.global {{.+}} : tensor<4xi32>
-util.global private @"__global" = dense<[1, 2, 3, 4]> : tensor<4xi64>
+// CHECK: util.global
+// CHECK-NOT: i64
 // CHECK-LABEL: func.func @nested_region_i64()
-func.func @nested_region_i64() -> (tensor<4xi64>) {
-  // CHECK-NEXT: util.global.address {{.+}} : !util.ptr<tensor<4xi32>>
+// CHECK-NOT: i64
+// CHECK: return %{{.*}} : tensor<?xi32>
+util.global private @"__global" = dense<[1, 2, 3, 4]> : tensor<4xi64>
+func.func @nested_region_i64() -> (tensor<?xi64>) {
   %0 = util.global.address @"__global" : !util.ptr<tensor<4xi64>>
-  // CHECK-NEXT: util.global.load.indirect {{.+}} : !util.ptr<tensor<4xi32>> -> tensor<4xi32>
   %1 = util.global.load.indirect %0 : !util.ptr<tensor<4xi64>> -> tensor<4xi64>
-  // CHECK-NEXT: "mhlo.broadcast_in_dim"({{.+}}) {broadcast_dimensions = dense<0> : tensor<1xi64>} : (tensor<4xi32>) -> tensor<4x4xi32>
-  %2 = "mhlo.broadcast_in_dim"(%1) {broadcast_dimensions = dense<0> : tensor<1xi64>} : (tensor<4xi64>) -> tensor<4x4xi64>
-  // CHECK-NEXT: mhlo.constant dense<123> : tensor<i32>
-  %4 = mhlo.constant dense<123> : tensor<i64>
-  // CHECK-NEXT: mhlo.reduce
-  %3 = mhlo.reduce(%2 init: %4) across dimensions = [1] : (tensor<4x4xi64>, tensor<i64>) -> tensor<4xi64>
-  // CHECK-NEXT: reducer(%[[A:.+]]: tensor<i32>, %[[B:.+]]: tensor<i32>)
-  reducer(%a: tensor<i64>, %b: tensor<i64>) {
-    // CHECK-NEXT: mhlo.maximum %[[A]], %[[B]] : tensor<i32>
-    %c = mhlo.maximum %a, %b : tensor<i64>
-    // CHECK-NEXT: "mhlo.return"{{.+}} (tensor<i32>)
-    "mhlo.return"(%c) : (tensor<i64>) -> ()
-  }
-  // CHECK: return %{{.*}} : tensor<4xi32>
-  return %3 : tensor<4xi64>
+  %c4 = arith.constant 4 : index
+  %2 = tensor.generate %c4 {
+  ^bb0(%arg0: index) :
+    %element = tensor.extract %1[%arg0] : tensor<4xi64>
+    tensor.yield %element : i64
+  } : tensor<?xi64>
+  return %2 : tensor<?xi64>
 }
 
 // -----
