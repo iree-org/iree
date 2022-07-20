@@ -33,12 +33,12 @@ declare -a test_env_args=(
   --test_env=IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE}"
 )
 
-if ! [[ -n IREE_LLVMAOT_SYSTEM_LINKER_PATH ]]; then
-  test_env_args+=(--action_env=IREE_LLVMAOT_SYSTEM_LINKER_PATH="${IREE_LLVMAOT_SYSTEM_LINKER_PATH}")
+if ! [[ -n IREE_LLVM_SYSTEM_LINKER_PATH ]]; then
+  test_env_args+=(--action_env=IREE_LLVM_SYSTEM_LINKER_PATH="${IREE_LLVM_SYSTEM_LINKER_PATH}")
 fi
 
-if ! [[ -n IREE_LLVMAOT_EMBEDDED_LINKER_PATH ]]; then
-  test_env_args+=(--action_env=IREE_LLVMAOT_EMBEDDED_LINKER_PATH="${IREE_LLVMAOT_EMBEDDED_LINKER_PATH}")
+if ! [[ -n IREE_LLVM_EMBEDDED_LINKER_PATH ]]; then
+  test_env_args+=(--action_env=IREE_LLVM_EMBEDDED_LINKER_PATH="${IREE_LLVM_EMBEDDED_LINKER_PATH}")
 fi
 
 declare -a default_build_tag_filters=("-nokokoro")

@@ -246,7 +246,7 @@ iree_check_single_backend_test_suite(
     ),
     compiler_flags = ["--iree-input-type=mhlo"],
     driver = "local-task",
-    target_backend = "dylib-llvm-aot",
+    target_backend = "llvm-cpu",
 )
 
 iree_check_single_backend_test_suite(
@@ -469,7 +469,7 @@ iree_check_single_backend_test_suite(
         "--iree-llvm-target-cpu-features=+atomics,+bulk-memory",  # required to use shared memory
     ],
     # driver = "wasm",  # No driver yet, only test compilation.
-    target_backend = "dylib-llvm-aot",
+    target_backend = "llvm-cpu",
 )
 
 # Check host features compilation (LLVM backend with host cpu features).
@@ -548,7 +548,7 @@ iree_check_single_backend_test_suite(
         "hostonly",
         "local",
     ],
-    target_backend = "dylib-llvm-aot",
+    target_backend = "llvm-cpu",
 )
 
 test_suite(

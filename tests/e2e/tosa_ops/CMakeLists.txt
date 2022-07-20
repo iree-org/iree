@@ -55,7 +55,7 @@ iree_check_single_backend_test_suite(
     "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   DRIVER
     "local-task"
   COMPILER_FLAGS

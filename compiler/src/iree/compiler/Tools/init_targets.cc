@@ -11,9 +11,9 @@
 #ifdef IREE_HAVE_CUDA_TARGET
 #include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
 #endif  // IREE_HAVE_CUDA_TARGET
-#ifdef IREE_HAVE_LLVMAOT_TARGET
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMAOTTarget.h"
-#endif  // IREE_HAVE_LLVMAOT_TARGET
+#ifdef IREE_HAVE_LLVM_CPU_TARGET
+#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMCPUTarget.h"
+#endif  // IREE_HAVE_LLVM_CPU_TARGET
 #ifdef IREE_HAVE_METALSPIRV_TARGET
 #include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/MetalSPIRVTarget.h"
 #endif  // IREE_HAVE_METALSPIRV_TARGET
@@ -43,10 +43,10 @@ void registerHALTargetBackends() {
 #ifdef IREE_HAVE_CUDA_TARGET
     IREE::HAL::registerCUDATargetBackends();
 #endif  // IREE_HAVE_CUDA_TARGET
-#ifdef IREE_HAVE_LLVMAOT_TARGET
-    IREE::HAL::registerLLVMAOTTargetBackends(
+#ifdef IREE_HAVE_LLVM_CPU_TARGET
+    IREE::HAL::registerLLVMCPUTargetBackends(
         []() { return IREE::HAL::getLLVMTargetOptionsFromFlags(); });
-#endif  // IREE_HAVE_LLVMAOT_TARGET
+#endif  // IREE_HAVE_LLVM_CPU_TARGET
 #ifdef IREE_HAVE_METALSPIRV_TARGET
     IREE::HAL::registerMetalSPIRVTargetBackends();
 #endif  // IREE_HAVE_METALSPIRV_TARGET

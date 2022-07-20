@@ -9,7 +9,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/FormatVariadic.h"
 
-#define DEBUG_TYPE "llvmaot-linker"
+#define DEBUG_TYPE "llvm-linker"
 
 namespace mlir {
 namespace iree_compiler {
