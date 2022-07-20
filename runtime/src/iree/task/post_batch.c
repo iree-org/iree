@@ -34,6 +34,7 @@ iree_host_size_t iree_task_post_batch_worker_count(
 
 static iree_host_size_t iree_task_post_batch_select_random_worker(
     iree_task_post_batch_t* post_batch, iree_task_affinity_set_t affinity_set) {
+  // The masks are accessed with 'relaxed' order because they are just hints.
   iree_task_affinity_set_t worker_live_mask =
       iree_atomic_task_affinity_set_load(
           &post_batch->executor->worker_live_mask, iree_memory_order_relaxed);
@@ -68,6 +69,7 @@ iree_host_size_t iree_task_post_batch_select_worker(
   // worker's queue to finish. Note that we only consider workers idle if we
   // ourselves in this batch haven't already queued work for them (as then they
   // aren't going to be idle).
+  // The masks are accessed with 'relaxed' order because they are just hints.
   iree_task_affinity_set_t worker_idle_mask =
       iree_atomic_task_affinity_set_load(
           &post_batch->executor->worker_idle_mask, iree_memory_order_relaxed);
@@ -103,6 +105,7 @@ static void iree_task_post_batch_wake_workers(
   // Wake workers that may be suspended. We fetch the set of workers we need to
   // wake (hopefully none in the common case) and mark that we've woken them so
   // that we don't double-resume.
+  // The masks are accessed with 'relaxed' order because they are just hints.
   iree_task_affinity_set_t resume_mask =
       iree_atomic_task_affinity_set_fetch_and(&executor->worker_suspend_mask,
                                               ~wake_mask,

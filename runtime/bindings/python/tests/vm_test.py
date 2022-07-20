@@ -22,7 +22,6 @@ def create_add_scalar_module():
         return %0 : i32
       }
       """,
-      input_type="mhlo",
       target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
   )
   m = iree.runtime.VmModule.from_flatbuffer(binary)
@@ -33,11 +32,10 @@ def create_simple_static_mul_module():
   binary = iree.compiler.compile_str(
       """
       func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
-          %0 = "mhlo.multiply"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
-          return %0 : tensor<4xf32>
+        %0 = arith.mulf %arg0, %arg1 : tensor<4xf32>
+        return %0 : tensor<4xf32>
       }
       """,
-      input_type="mhlo",
       target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
   )
   m = iree.runtime.VmModule.from_flatbuffer(binary)
@@ -45,17 +43,14 @@ def create_simple_static_mul_module():
 
 
 def create_simple_dynamic_abs_module():
-  # TODO(laurenzo): Compile for more backends as dynamic shapes come online.
-  target_backends = iree.compiler.DEFAULT_TESTING_BACKENDS
   binary = iree.compiler.compile_str(
       """
-      func.func @simple_mul(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {
-          %0 = "mhlo.abs"(%arg0) : (tensor<?x?xf32>) -> tensor<?x?xf32>
-          return %0 : tensor<?x?xf32>
+      func.func @dynamic_abs(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {
+        %0 = math.abs %arg0 : tensor<?x?xf32>
+        return %0 : tensor<?x?xf32>
       }
       """,
-      input_type="mhlo",
-      target_backends=target_backends,
+      target_backends=iree.compiler.DEFAULT_TESTING_BACKENDS,
   )
   m = iree.runtime.VmModule.from_flatbuffer(binary)
   return m
@@ -168,7 +163,7 @@ class VmTest(unittest.TestCase):
     m = create_simple_dynamic_abs_module()
     instance = iree.runtime.VmInstance()
     context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
-    f = m.lookup_function("simple_mul")
+    f = m.lookup_function("dynamic_abs")
     finv = iree.runtime.FunctionInvoker(context, self.device, f, tracer=None)
     arg0 = np.array([[-1., 2.], [3., -4.]], dtype=np.float32)
     result = finv(arg0)

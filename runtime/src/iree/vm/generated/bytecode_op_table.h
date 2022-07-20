@@ -578,7 +578,7 @@ typedef enum {
   IREE_VM_OP_EXT_F32_BufferLoadF32 = 0x33,
   IREE_VM_OP_EXT_F32_BufferStoreF32 = 0x34,
   IREE_VM_OP_EXT_F32_BufferFillF32 = 0x35,
-  IREE_VM_OP_EXT_F32_RSV_0x36,
+  IREE_VM_OP_EXT_F32_RoundF32 = 0x36,
   IREE_VM_OP_EXT_F32_RSV_0x37,
   IREE_VM_OP_EXT_F32_RSV_0x38,
   IREE_VM_OP_EXT_F32_RSV_0x39,
@@ -837,7 +837,7 @@ typedef enum {
     OPC(0x33, BufferLoadF32) \
     OPC(0x34, BufferStoreF32) \
     OPC(0x35, BufferFillF32) \
-    RSV(0x36) \
+    OPC(0x36, RoundF32) \
     RSV(0x37) \
     RSV(0x38) \
     RSV(0x39) \
@@ -1088,7 +1088,7 @@ typedef enum {
   IREE_VM_OP_EXT_F64_RsqrtF64 = 0x2C,
   IREE_VM_OP_EXT_F64_SqrtF64 = 0x2D,
   IREE_VM_OP_EXT_F64_TanhF64 = 0x2E,
-  IREE_VM_OP_EXT_F64_RSV_0x2F,
+  IREE_VM_OP_EXT_F64_ErfF64 = 0x2F,
   IREE_VM_OP_EXT_F64_CmpEQF64O = 0x30,
   IREE_VM_OP_EXT_F64_CmpEQF64U = 0x31,
   IREE_VM_OP_EXT_F64_CmpNEF64O = 0x32,
@@ -1101,7 +1101,7 @@ typedef enum {
   IREE_VM_OP_EXT_F64_BufferLoadF64 = 0x39,
   IREE_VM_OP_EXT_F64_BufferStoreF64 = 0x3A,
   IREE_VM_OP_EXT_F64_BufferFillF64 = 0x3B,
-  IREE_VM_OP_EXT_F64_RSV_0x3C,
+  IREE_VM_OP_EXT_F64_RoundF64 = 0x3C,
   IREE_VM_OP_EXT_F64_RSV_0x3D,
   IREE_VM_OP_EXT_F64_RSV_0x3E,
   IREE_VM_OP_EXT_F64_RSV_0x3F,
@@ -1347,7 +1347,7 @@ typedef enum {
     OPC(0x2C, RsqrtF64) \
     OPC(0x2D, SqrtF64) \
     OPC(0x2E, TanhF64) \
-    RSV(0x2F) \
+    OPC(0x2F, ErfF64) \
     OPC(0x30, CmpEQF64O) \
     OPC(0x31, CmpEQF64U) \
     OPC(0x32, CmpNEF64O) \
@@ -1360,7 +1360,7 @@ typedef enum {
     OPC(0x39, BufferLoadF64) \
     OPC(0x3A, BufferStoreF64) \
     OPC(0x3B, BufferFillF64) \
-    RSV(0x3C) \
+    OPC(0x3C, RoundF64) \
     RSV(0x3D) \
     RSV(0x3E) \
     RSV(0x3F) \

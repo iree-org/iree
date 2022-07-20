@@ -206,7 +206,7 @@ static iree_vm_invocation_id_t iree_vm_invoke_allocate_id(
     // TODO(benvanik): name it based on the function?
     static iree_atomic_int32_t next_invocation_id = IREE_ATOMIC_VAR_INIT(1);
     uint32_t invocation_id = iree_atomic_fetch_add_int32(
-        &next_invocation_id, 1, iree_memory_order_seq_cst);
+        &next_invocation_id, 1, iree_memory_order_relaxed);
     IREE_LEAK_CHECK_DISABLE_PUSH();
     char* name = (char*)malloc(32);
     snprintf(name, 32, "invoke-%04d", invocation_id - 1);

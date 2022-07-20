@@ -295,6 +295,7 @@ iree_check_single_backend_test_suite(
             "reverse.mlir",
             "rng_normal.mlir",
             "rng_uniform.mlir",
+            "round.mlir",
             "rsqrt.mlir",
             "scatter.mlir",
             "scatter_dynamic.mlir",
@@ -312,7 +313,6 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [
             "exponential_fp16.mlir",
-            "round.mlir",  # TODO(#7618): Fix and enable (math.copysign -> VM)
         ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],

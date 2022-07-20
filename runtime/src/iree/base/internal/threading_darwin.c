@@ -240,8 +240,8 @@ void iree_thread_resume(iree_thread_t* thread) {
   // debuggers/profilers that may be suspending threads for their own uses.
   int32_t expected = 1;
   if (iree_atomic_compare_exchange_strong_int32(
-          &thread->is_suspended, &expected, 0, iree_memory_order_seq_cst,
-          iree_memory_order_seq_cst)) {
+          &thread->is_suspended, &expected, 0, iree_memory_order_acq_rel,
+          iree_memory_order_relaxed /* expected is unused */)) {
     thread_resume(thread->mach_port);
   }
 

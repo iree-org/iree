@@ -18,17 +18,12 @@ set -o pipefail
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
-source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docker_common.sh"
-
 # Print NVIDIA GPU information inside the VM
 dmesg | grep NVRM
 dpkg -l | grep nvidia
 nvidia-smi || true
 
-# Sets DOCKER_RUN_ARGS
-docker_setup
-
-docker run "${DOCKER_RUN_ARGS[@]?}" \
+"${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docker_run.sh" \
   --gpus all \
   gcr.io/iree-oss/frontends-nvidia@sha256:311ae679618bd248692522ea243ff73c8205725c95b6d915dea3a74dca9929ed \
   build_tools/kokoro/gcp_ubuntu/cmake-bazel/linux/x86-turing/build.sh

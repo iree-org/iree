@@ -4,22 +4,19 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Functions for setting up Docker containers to run on Kokoro
+set -euo pipefail
 
-# Sets up files and environment to enable running all our Kokoro docker scripts.
+# Sets up files and environment to enable running scripts in docker.
 # In particular, does some shenanigans to enable running with the current user.
 # Some of this setup is only strictly necessary for Bazel, but it doesn't hurt
 # for anything else.
-# Requires that KOKORO_ROOT and KOKORO_ARTIFACTS_DIR have been set
-# Sets the environment variable DOCKER_RUN_ARGS to be used by subsequent
-# `docker run` invocations.
-function docker_setup() {
+# Requires that DOCKER_WORKDIR and DOCKER_TMPDIR have been set
+function docker_run() {
     # Make the source repository available and launch containers in that
     # directory.
-    local workdir="${KOKORO_ARTIFACTS_DIR?}/github/iree"
     DOCKER_RUN_ARGS=(
-      --volume="${workdir?}:${workdir?}"
-      --workdir="${workdir?}"
+      --volume="${DOCKER_WORKDIR}:${DOCKER_WORKDIR}"
+      --workdir="${DOCKER_WORKDIR}"
     )
 
     # Delete the container after the run is complete.
@@ -48,7 +45,7 @@ function docker_setup() {
     # such that they don't contain the information about normal users and we
     # want these scripts to be runnable locally for debugging.
     # Instead we dump the results of `getent` to some fake files.
-    local fake_etc_dir="${KOKORO_ROOT?}/fake_etc"
+    local fake_etc_dir="${DOCKER_TMPDIR}/fake_etc"
     mkdir -p "${fake_etc_dir?}"
 
     local fake_group="${fake_etc_dir?}/group"
@@ -71,11 +68,12 @@ function docker_setup() {
     # for two reasons:
     #   1. We probably don't want Docker to just write into the user's home
     #      directory when running locally.
-    #   2. When running with Kokoro, we mount a local scratch SSD to KOKORO_ROOT
-    #      whereas the home directory is on the persistent SSD boot disk. It
-    #      turns out that makes a huge difference in performance for Bazel
-    #      because it is IO bound at 64 cores..
-    local fake_home_dir="${KOKORO_ROOT?}/fake_home"
+    #   2. This allows us to control the device the home directory is in. Bazel
+    #      tends to be IO bound at even moderate levels of CPU parallelism and
+    #      the difference between a persistent SSD and a local scratch SSD can
+    #      be huge. In particular, Kokoro has the home directory on the former
+    #      and the work directory on the latter.
+    local fake_home_dir="${DOCKER_TMPDIR}/fake_home"
     mkdir -p "${fake_home_dir}"
 
     DOCKER_RUN_ARGS+=(
@@ -87,4 +85,8 @@ function docker_setup() {
     DOCKER_RUN_ARGS+=(
       --volume="${HOME?}/.config/gcloud:${HOME?}/.config/gcloud:ro"
     )
+
+    docker run "${DOCKER_RUN_ARGS[@]}" "$@"
 }
+
+docker_run "$@"
