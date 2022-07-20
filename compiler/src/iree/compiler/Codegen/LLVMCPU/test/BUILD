@@ -20,7 +20,6 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         # keep sorted
         [
-            "aarch64_dotprod_vector_lowering.mlir",
             "aarch64_vector_lowering.mlir",
             "apply_scale_lowering.mlir",
             "check_ir_before_llvm_conversion.mlir",
