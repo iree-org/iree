@@ -8,3 +8,6 @@ contact_links:
   - name: 💬 Join us on Discord
     url: https://discord.gg/26P4xW4
     about: For realtime communication with the team and collaborators
+  - name: If you know what you're doing (especially collaborators)
+    url: https://github.com/iree-org/iree/issues/new
+    about: 📄 Blank Issue
