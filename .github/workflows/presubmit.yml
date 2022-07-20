@@ -16,10 +16,12 @@ jobs:
   dispatch:
     runs-on: ubuntu-20.04
     steps:
-    - name: "Invoke workflow :: Build Native Release Packages"
+    - name: "Invoke workflow :: all the builds"
       uses: benc-uk/workflow-dispatch@4c044c1613fabbe5250deadc65452d54c4ad4fc7  # v1
       with:
-        workflow: Everything
+        # Hack attack. This has to be a workflow that *already* exists in the
+        # repository. I miss buildkite's "pipeline upload" :'-(
+        workflow: Buildifier
         token: ${{ secrets.WRITE_ACCESS_TOKEN }}
         # Note that we're using the workflow file from the base branch (e.g.
         # 'main'), but telling the workflow to checkout code from the PR itself.
