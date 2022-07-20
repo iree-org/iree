@@ -18,6 +18,7 @@ cd "${ROOT_DIR?}"
 BUILD_DIR="${1:-${IREE_HOST_BUILD_DIR:-build-host}}"
 INSTALL_DIR="$(realpath ${INSTALL_DIR:-${BUILD_DIR}/install})"
 CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
+IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-OFF}"
 
 "${CMAKE_BIN?}" --version
 ninja --version
