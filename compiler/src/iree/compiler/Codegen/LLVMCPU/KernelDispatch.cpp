@@ -116,7 +116,9 @@ static VectorPreProcStrategy getVectorPreProcStrategy(linalg::LinalgOp op) {
   auto variantOp = getExecutableVariantOp(op);
   assert(succeeded(variantOp) && "ExecutableVariantOp not found");
 
-  if ((isX86(*variantOp) || isRISCV(*variantOp)) && enableVectorPadding) {
+  if (isX86(*variantOp) && enableVectorPadding) {
+    // Padding is only enabled on x86. It leads to too much overhead on RISC-V
+    // and ARM.
     return VectorPreProcStrategy::Padding;
   }
 
