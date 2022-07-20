@@ -16,7 +16,7 @@ ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 cd "${ROOT_DIR?}"
 
 BUILD_DIR="${1:-${IREE_HOST_BUILD_DIR:-build-host}}"
-INSTALL_DIR="$(realpath ${INSTALL_DIR:-${BUILD_DIR}/install})"
+INSTALL_DIR="${INSTALL_DIR:-${BUILD_DIR}/install}"
 CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-OFF}"
 
@@ -31,9 +31,11 @@ else
   mkdir -p "${BUILD_DIR}"
 fi
 
+mkdir -p "${INSTALL_DIR}"
+
 # Configure, build, install.
 "${CMAKE_BIN}" -G Ninja -B "${BUILD_DIR}" \
-  -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
+  -DCMAKE_INSTALL_PREFIX="$(realpath {INSTALL_DIR})" \
   -DIREE_ENABLE_LLD=ON \
   -DIREE_ENABLE_ASSERTIONS=ON \
   -DIREE_BUILD_COMPILER=ON \
