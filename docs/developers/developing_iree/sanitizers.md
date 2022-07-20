@@ -42,7 +42,7 @@ To enable TSan, at the moment, the following 3 CMake options must be set:
 cmake \
   -DIREE_ENABLE_TSAN=ON \
   -DIREE_BYTECODE_MODULE_ENABLE_TSAN=ON \
-  -DIREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER=ON \
+  -DIREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON \
   -DIREE_BUILD_SAMPLES=OFF \
   ...
 ```
@@ -54,14 +54,14 @@ the IREE compiler: `--iree-llvm-sanitize=thread` and
 `--iree-llvm-link-embedded=false`.
 
 The CMake options `IREE_BYTECODE_MODULE_ENABLE_TSAN` and
-`IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER` ensure that the above flags are
+`IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` ensure that the above flags are
 passed to the IREE compiler when building modules used in tests, benchmarks,
 etc. (anything that internally uses the CMake `iree_bytecode_module` macro).
 
 The CMake option `IREE_BUILD_SAMPLES=OFF` is needed because samples [currently
 assume](https://github.com/iree-org/iree/pull/8893) that the embedded linker is
 used, so they are incompatible with
-`IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER=ON`.
+`IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON`.
 
 At the moment, CMake logic heavy-handedly enforces that whenever
 `IREE_ENABLE_TSAN` is set, these other two CMake variables are also set.

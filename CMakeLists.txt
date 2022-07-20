@@ -55,7 +55,7 @@ option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
 option(IREE_BUILD_TORCH_MLIR_SUPPORT "Builds support for compiling torch-mlir programs." ON)
 
-option(IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER "Use the system linker when generating IREE modules in tests/samples/benchmarks (useful for Tracy)." OFF)
+option(IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER "Use the system linker when generating IREE modules in tests/samples/benchmarks (useful for Tracy)." OFF)
 
 # Properties controlling version and naming of release artifacts.
 set(IREE_RELEASE_PACKAGE_SUFFIX "" CACHE STRING "Suffix to append to distributed package names")
@@ -120,7 +120,7 @@ endif()
 
 # If forcing system libraries (for TSAN/debugging tools/etc) then ensure the
 # system library loader is linked in.
-if(IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER)
+if(IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
   set(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT ON)
 endif()
 
@@ -234,10 +234,10 @@ if(NOT IREE_ENABLE_TSAN STREQUAL IREE_BYTECODE_MODULE_ENABLE_TSAN)
 endif()
 
 if(IREE_BYTECODE_MODULE_ENABLE_TSAN)
-  if(NOT IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER)
+  if(NOT IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
     message(SEND_ERROR
         "When IREE_BYTECODE_MODULE_ENABLE_TSAN is ON, "
-        "IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER must also be ON. "
+        "IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER must also be ON. "
         "TSAN instrumentation is not currently supported in embedded modules.")
   endif()
 endif()
