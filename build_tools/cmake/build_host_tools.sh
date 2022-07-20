@@ -12,16 +12,12 @@
 
 set -xeuo pipefail
 
-BUILD_DIR="${1:-}"
-INSTALL_DIR="${INSTALL_DIR:-${BUILD_DIR}/install}"
 ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
-CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
-
 cd "${ROOT_DIR?}"
 
-if [[ -z "${BUILD_DIR}" ]]; then
-  BUILD_DIR="${IREE_HOST_BUILD_DIR:-build-host}"
-fi
+BUILD_DIR="${1:-${IREE_HOST_BUILD_DIR:-build-host}}"
+INSTALL_DIR="$(realpath ${INSTALL_DIR:-${BUILD_DIR}/install})"
+CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 
 "${CMAKE_BIN?}" --version
 ninja --version

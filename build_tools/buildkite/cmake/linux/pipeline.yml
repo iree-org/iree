@@ -20,7 +20,7 @@ steps:
         --workdir="$$IREE_DOCKER_WORKDIR" \
         --rm \
         $${DOCKER_IMAGE} \
-        build_tools/cmake/build_host_install.sh
+        build_tools/cmake/build_host_tools.sh
       tar -czvf iree-host-tools-$${BUILDKITE_BUILD_NUMBER}.tgz build-host/install
     if: >
       build.pull_request.id == null ||
