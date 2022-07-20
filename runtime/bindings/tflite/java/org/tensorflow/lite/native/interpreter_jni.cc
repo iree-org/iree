@@ -6,7 +6,7 @@
 
 #include <jni.h>
 
-#include "iree/base/assert.h"
+#include "iree/base/api.h"
 
 // NOTE: we pull in our own copy here in case the tflite API changes upstream.
 #define TFL_COMPILE_LIBRARY 1
