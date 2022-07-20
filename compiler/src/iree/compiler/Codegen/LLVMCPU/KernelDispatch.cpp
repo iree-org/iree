@@ -68,6 +68,10 @@ static llvm::cl::opt<bool> disableMatmulPadPipeline(
     "iree-codegen-disable-matmul-pad-pipeline",
     llvm::cl::desc("disable padding options in Matmul codegen"),
     llvm::cl::init(false));
+static llvm::cl::opt<bool> enableTripleTilingPipeline(
+    "iree-llvmcpu-enable-triple-tiling-pipeline",
+    llvm::cl::desc("enable triple tiling expert for matmul kernels"),
+    llvm::cl::init(false));
 
 llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName(
     "iree-codegen-llvmcpu-use-transform-dialect",
@@ -539,42 +543,92 @@ static LogicalResult setMatmulPadRootConfig(
       DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert);
 }
 
-static LogicalResult setMatmulNoPadRootConfig(
-    func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
-    ArrayRef<int64_t> flowTileSizes, ArrayRef<int64_t> workgroupTileSizes,
-    int vectorSize) {
-  assert(flowTileSizes.size() == workgroupTileSizes.size());
-  int64_t numLoops = workgroupTileSizes.size();
+static bool isNoPadMultiTilingBeneficial(linalg::ContractionOpInterface op,
+                                         TileSizesListType tileSizes) {
+  auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
+  int numLoops = linalgOp.getNumLoops();
+  if (numLoops != 3) return false;
+
+  SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
+  if (llvm::any_of(shape,
+                   [](int64_t v) { return v == ShapedType::kDynamicSize; })) {
+    return false;
+  }
+
+  auto tryToFullyTile = [&](SmallVectorImpl<int64_t> &arr,
+                            ArrayRef<int64_t> tiles) -> bool {
+    for (int i = 0; i < numLoops; ++i) {
+      if (tiles[i] == 0) continue;
+      if (arr[i] % tiles[i] != 0) return false;
+      arr[i] = tiles[i];
+    }
+    return true;
+  };
+
+  for (auto sizes : tileSizes) {
+    if (!tryToFullyTile(shape, sizes)) return false;
+  }
+
+  return true;
+}
+
+static DispatchLoweringPassPipeline getNoPadMultiTilingExpert(
+    linalg::LinalgOp op, int numLevels) {
+  if (isPeelingBeneficial(op)) {
+    return DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert;
+  }
+  switch (numLevels) {
+    case (2):
+      return DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
+    case (3):
+      return DispatchLoweringPassPipeline::CPUTripleTilingExpert;
+    default:
+      return DispatchLoweringPassPipeline::CPUDefault;
+  }
+}
+
+static LogicalResult setMatmulNoPadRootConfig(func::FuncOp entryPointFn,
+                                              linalg::ContractionOpInterface op,
+                                              TileSizesListType tileSizes,
+                                              int vectorSize) {
+  auto numLevels = tileSizes.size();
+  SmallVector<int64_t> workgroupTileSizes = tileSizes.pop_back_val();
+
+  auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
+  SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
+  for (auto sizes : tileSizes) {
+    for (auto en : llvm::enumerate(sizes)) {
+      // Quantized cases are not fully evaluated yet, so it might go with NoPad
+      // approach.
+      int idx = en.index();
+      if (!en.value() || shape[idx] == ShapedType::kDynamicSize) continue;
+      assert(shape[idx] % en.value() == 0);
+      shape[idx] = en.value();
+    }
+  }
+
+  // TODO(hanchung): Create an addtional pass to handle such cases.
   // The tiling for parallel dims and reduction dims should be separated.
   SmallVector<int64_t> parallelTileSizes;
-  auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
-  auto shape = linalgOp.getStaticLoopRanges();
-  for (auto en : llvm::enumerate(flowTileSizes.drop_back())) {
-    parallelTileSizes.push_back(
-        getMaxTileSize(0, en.value() ? en.value() : shape[en.index()],
-                       workgroupTileSizes[en.index()], vectorSize));
+  for (auto en : llvm::enumerate(workgroupTileSizes)) {
+    int64_t sz = en.value();
+    if (sz) {
+      sz = getMaxTileSize(0, shape[en.index()], sz, vectorSize);
+    }
+    parallelTileSizes.push_back(sz);
   }
-  parallelTileSizes.push_back(0);
-
-  SmallVector<int64_t> reductionTileSizes(numLoops - 1, 0);
-  auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
-  int64_t K = lhsShapedType.getShape().back();
-  reductionTileSizes.push_back(
-      getMaxTileSize(0, K, workgroupTileSizes.back(), vectorSize));
-
+  SmallVector<int64_t> reductionTileSizes;
+  splitParallelAndReductionTiles(op.getOperation(), parallelTileSizes,
+                                 reductionTileSizes);
   setVectorSizesForDynamicShapes(op.getOperation(), parallelTileSizes,
                                  reductionTileSizes);
 
-  TileSizesListType tileSizes;
-  tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
-      isPeelingBeneficial(linalgOp)
-          ? DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert
-          : DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
+      getNoPadMultiTilingExpert(linalgOp, numLevels));
 }
 
 static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
@@ -719,12 +773,32 @@ static LogicalResult setRootConfig(
   if (isAArch64(*variantOp) && !isQuantized) {
     return setAArch64RootConfig(entryPointFn, contractionOp, flowTileSizes,
                                 workgroupTileSizes, vectorSize);
-  } else if (usePaddingPipeline) {
+  }
+
+  TileSizesListType tileSizes = {flowTileSizes, workgroupTileSizes};
+  if (disableMatmulPadPipeline) {
+    return setMatmulNoPadRootConfig(entryPointFn, contractionOp, tileSizes,
+                                    vectorSize);
+  }
+  if (isX86(*variantOp) || isRISCV(*variantOp)) {
+    // TODO(hanchung): We should make the tile sizes be related to memory
+    // hierarchy. They are derived from experiments for now.
+    if (enableTripleTilingPipeline) {
+      SmallVector<int64_t> l1TileSizes = {0, 0, 384};
+      TileSizesListType tripleTileSizes = {flowTileSizes, l1TileSizes,
+                                           workgroupTileSizes};
+      if (isNoPadMultiTilingBeneficial(contractionOp, tripleTileSizes)) {
+        return setMatmulNoPadRootConfig(entryPointFn, contractionOp,
+                                        tripleTileSizes, vectorSize);
+      }  // else fall back to the default configuration.
+    }
+  }
+  if (usePaddingPipeline) {
     return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
                                   workgroupTileSizes, vectorSize);
   }
-  return setMatmulNoPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
-                                  workgroupTileSizes, vectorSize);
+  return setMatmulNoPadRootConfig(entryPointFn, contractionOp, tileSizes,
+                                  vectorSize);
 }
 
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d root

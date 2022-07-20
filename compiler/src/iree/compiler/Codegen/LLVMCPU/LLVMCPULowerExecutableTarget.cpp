@@ -191,9 +191,10 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingExpert:
-            addDoubleTilingExpertPassPipeline(executableLoweringPipeline,
-                                              /*enablePeeling=*/false,
-                                              lowerToAVX2);
+            addMultiTilingExpertPassPipeline(
+                executableLoweringPipeline,
+                static_cast<int>(StrategyTilingLevel::NumStrategyTileLevels),
+                /*enablePeeling=*/false, lowerToAVX2);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingPadExpert:
@@ -201,9 +202,17 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingPeelingExpert:
-            addDoubleTilingExpertPassPipeline(executableLoweringPipeline,
-                                              /*enablePeeling=*/true,
-                                              lowerToAVX2);
+            addMultiTilingExpertPassPipeline(
+                executableLoweringPipeline,
+                static_cast<int>(StrategyTilingLevel::NumStrategyTileLevels),
+                /*enablePeeling=*/true, lowerToAVX2);
+            break;
+          case IREE::Codegen::DispatchLoweringPassPipeline::
+              CPUTripleTilingExpert:
+            addMultiTilingExpertPassPipeline(
+                executableLoweringPipeline,
+                static_cast<int>(TripleTilingLevel::NumTileLevels),
+                /*enablePeeling=*/false);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUConvTileAndDecomposeExpert:

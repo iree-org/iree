@@ -34,18 +34,34 @@ using namespace mlir::linalg;
 // IREE specific functions
 //===----------------------------------------------------------------------===//
 
+/// Returns the op that contains lowering config. Returns failure if there are
+/// multiple op having lowering config.
+static FailureOr<Operation *> getRootOp(func::FuncOp funcOp) {
+  Operation *rootOp = nullptr;
+  auto result = funcOp.walk([&](Operation *op) -> WalkResult {
+    if (!iree_compiler::getLoweringConfig(op)) return WalkResult::advance();
+    if (rootOp) {
+      return WalkResult::interrupt();
+    }
+    rootOp = op;
+    return WalkResult::advance();
+  });
+  if (!rootOp || result.wasInterrupted()) return failure();
+  return rootOp;
+}
+
 /// Default method to initialize the tiling options in IREE. These could be
 /// overriden by the command line options if specified. For now the sentinel
 /// -1 is used for avoiding querying the lowering config.
-static bool getTilingOptionsFromConfig(int64_t tilingLevel,
+static bool getTilingOptionsFromConfig(func::FuncOp funcOp, int64_t tilingLevel,
                                        LinalgTilingOptions &tilingOptions) {
   if (tilingLevel != -1) {
-    tilingOptions.setTileSizeComputationFunction(
-        [tilingLevel](OpBuilder &builder,
-                      Operation *operation) -> SmallVector<Value, 4> {
-          return ::mlir::iree_compiler::getTileSizes(builder, operation,
-                                                     tilingLevel);
-        });
+    FailureOr<Operation *> rootOp = getRootOp(funcOp);
+    if (failed(rootOp)) {
+      return false;
+    }
+    tilingOptions.setTileSizes(
+        mlir::iree_compiler ::getTileSizes(rootOp.getValue(), tilingLevel));
     return true;
   }
   return false;
@@ -56,19 +72,16 @@ static bool getTilingOptionsFromConfig(int64_t tilingLevel,
 static LogicalResult getPaddingAttrs(func::FuncOp funcOp,
                                      StringRef anchorOpName,
                                      SmallVectorImpl<Attribute> &attrs) {
-  SmallVector<Operation *> computeOps;
-  SmallVector<mlir::iree_compiler::LoopTilingAndDistributionInfo> tiledLoops;
-  if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
-    return failure();
-  }
   linalg::LinalgOp linalgOp;
-  for (auto op : computeOps) {
-    if (op->getName().getStringRef() != anchorOpName) continue;
-    if (!isa<linalg::LinalgOp>(op)) continue;
-    // if (linalgOp) return funcOp.emitOpError("have more than one anchor op");
-    if (linalgOp) return failure();
-    linalgOp = cast<linalg::LinalgOp>(op);
-  }
+  auto result = funcOp.walk([&](linalg::LinalgOp op) -> WalkResult {
+    if (op->getName().getStringRef() != anchorOpName)
+      return WalkResult::advance();
+    if (linalgOp) return WalkResult::interrupt();
+
+    linalgOp = op;
+    return WalkResult::advance();
+  });
+  if (result.wasInterrupted()) return failure();
   // No need to set padding attributes.
   if (!linalgOp) return success();
 
@@ -79,26 +92,6 @@ static LogicalResult getPaddingAttrs(func::FuncOp funcOp,
   }
 
   return success();
-}
-
-/// Returns the op that contains lowering config. Returns failure if there are
-/// multiple op having lowering config.
-static FailureOr<Operation *> getRootOp(func::FuncOp funcOp) {
-  SmallVector<Operation *> computeOps;
-  SmallVector<mlir::iree_compiler::LoopTilingAndDistributionInfo> tiledLoops;
-  if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
-    return failure();
-  }
-  Operation *rootOp = nullptr;
-  for (auto op : computeOps) {
-    if (!iree_compiler::getLoweringConfig(op)) continue;
-    if (rootOp) {
-      return LogicalResult(funcOp.emitOpError(
-          "unhandled multiple lowering configurations in compute ops"));
-    }
-    rootOp = op;
-  }
-  return rootOp;
 }
 
 static LogicalResult getPaddingDims(func::FuncOp funcOp,
@@ -372,7 +365,8 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
 
   // Set up tiling and vectorization options.
   LinalgTilingOptions tilingOptions;
-  bool doTiling = getTilingOptionsFromConfig(tilingLevel, tilingOptions);
+  bool doTiling =
+      getTilingOptionsFromConfig(funcOp, tilingLevel, tilingOptions);
   if (!tileSizes.empty()) {
     doTiling = true;
     tilingOptions = tilingOptions.setTileSizes(tileSizes);
@@ -417,13 +411,13 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
   // stages.
   LinalgPeelOptions peelingOptions;
   peelingOptions.loopsToPeelComputationFunction =
-      [&](OpBuilder &builder, Operation *op,
-          SmallVectorImpl<scf::ForOp> &loopsToPeel) {
-        if (!tilingOptions.tileSizeComputationFunction) return;
+      [](OpBuilder &builder, Operation *op,
+         SmallVectorImpl<scf::ForOp> &loopsToPeel) {
+        if (!iree_compiler::getLoweringConfig(op)) return;
+        auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+        if (!linalgOp) return;
 
-        auto maxNumLoopsToPeel =
-            tilingOptions.tileSizeComputationFunction(builder, op).size();
-
+        auto maxNumLoopsToPeel = linalgOp.getNumLoops();
         Operation *currentOp = op;
         for (int i = 0; i < maxNumLoopsToPeel; ++i) {
           currentOp = currentOp->getParentOfType<scf::ForOp>();
