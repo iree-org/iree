@@ -80,10 +80,13 @@ void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
       return signalPassFailure();
     }
 
-    RewritePatternSet fooPatterns(&getContext());
-    vector::populateVectorReductionToContractPatterns(fooPatterns);
-    vector::ExtractOp::getCanonicalizationPatterns(fooPatterns, context);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(fooPatterns)))) {
+    RewritePatternSet reductionToContractPatterns(&getContext());
+    vector::populateVectorReductionToContractPatterns(
+        reductionToContractPatterns);
+    vector::ExtractOp::getCanonicalizationPatterns(reductionToContractPatterns,
+                                                   context);
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(reductionToContractPatterns)))) {
       return signalPassFailure();
     }
   }
