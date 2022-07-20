@@ -1,0 +1,41 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# A single job does the build and the testing because a) no other job is likely
+# to need artifacts from the TSan build and b) the build directory here is huge
+# (5G).
+
+on:
+  workflow_call:
+
+env:
+  BUILD_DIR: "build-tsan"
+
+jobs:
+  tsan:
+    runs-on:
+      # self-hosted has to be listed first. See
+      # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
+      - self-hosted
+      # Have to do a weird hack to get a pseudo-ternary operator. See
+      # https://github.com/actions/runner/issues/409. Also note that
+      # `github.event_name` for workflow_call is the name of the calling event,
+      # which is poorly documented, but useful for us here. See
+      # https://github.com/github/docs/issues/16515
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - cpu
+      - os-family=Linux
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        with:
+          submodules: true
+      - name: "Building and testing with ThreadSanitizer"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
+            ./build_tools/cmake/build_and_test_tsan.sh \
+            "${BUILD_DIR}"

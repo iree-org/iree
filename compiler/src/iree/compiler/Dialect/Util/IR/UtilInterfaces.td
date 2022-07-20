@@ -590,7 +590,7 @@ def Util_ReferenceType : TypeInterface<"ReferenceTypeInterface"> {
 // IREE::Util::GlobalTypeInterface
 //===----------------------------------------------------------------------===//
 
-def Util_GlobalTypeInterface : TypeInterface<"GlobalTypeInterface"> {
+def Util_GlobalType : TypeInterface<"GlobalTypeInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
@@ -617,6 +617,85 @@ def Util_GlobalTypeInterface : TypeInterface<"GlobalTypeInterface"> {
         // Otherwise, the types must be the same.
         return $_type == accessType;
       }]
+    >,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
+// IREE::Util::Subrange*Interface
+//===----------------------------------------------------------------------===//
+
+def Util_SubrangeType : TypeInterface<"SubrangeTypeInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Interface used on size-aware types that can represent linear subranges as an
+    (offset, length).
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Creates an op returning an (offset, length) subrange of a resource.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"createSubrangeOp",
+      /*args=*/(ins
+        "Location":$loc,
+        "Value":$resource,
+        "Value":$resourceSize,
+        "Value":$subrangeOffset,
+        "Value":$subrangeLength,
+        "OpBuilder &":$builder
+      ),
+      /*methodBody=*/[{}]
+    >,
+  ];
+}
+
+def Util_SubrangeOp : OpInterface<"SubrangeOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    A size-aware operation taking a subrange on a resource.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the size-aware source resource the subrange is taken from.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getSubrangeResource",
+      /*args=*/(ins),
+      /*methodBody=*/[{}]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the total size of the source resource.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getSubrangeResourceSize",
+      /*args=*/(ins),
+      /*methodBody=*/[{}]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the offset of the taken subrange into the resource.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getSubrangeOffset",
+      /*args=*/(ins),
+      /*methodBody=*/[{}]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the length of the taken subrange.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getSubrangeLength",
+      /*args=*/(ins),
+      /*methodBody=*/[{}]
     >,
   ];
 }

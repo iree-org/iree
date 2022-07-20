@@ -28,6 +28,7 @@ iree_lit_test_suite(
             "hoist_into_globals.mlir",
             "hoist_into_globals_linalg.mlir",
             "promote_f16_to_f32.mlir",
+            "propagate_subranges.mlir",
             "simplify_global_accesses.mlir",
             "strip_debug_ops.mlir",
             "test_float_range_analysis.mlir",

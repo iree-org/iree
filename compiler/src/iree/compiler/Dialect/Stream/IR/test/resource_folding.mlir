@@ -172,8 +172,8 @@ func.func @FoldResourceSubviewOps(%arg0: !stream.resource<*>, %arg1: index) -> !
   %c500 = arith.constant 500 : index
   // CHECK: %[[RET:.+]] = stream.resource.subview %arg0[%c300] : !stream.resource<*>{%arg1} -> !stream.resource<*>{%c300}
   %0 = stream.resource.subview %arg0[%c100] : !stream.resource<*>{%arg1} -> !stream.resource<*>{%c500}
-  %1 = stream.resource.subview %0[%c100] : !stream.resource<*>{%arg1} -> !stream.resource<*>{%c400}
-  %2 = stream.resource.subview %1[%c100] : !stream.resource<*>{%arg1} -> !stream.resource<*>{%c300}
+  %1 = stream.resource.subview %0[%c100] : !stream.resource<*>{%c500} -> !stream.resource<*>{%c400}
+  %2 = stream.resource.subview %1[%c100] : !stream.resource<*>{%c400} -> !stream.resource<*>{%c300}
   // CHECK-NEXT: return %[[RET]]
   return %2 : !stream.resource<*>
 }

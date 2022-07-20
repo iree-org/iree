@@ -39,7 +39,7 @@ module {
   memref.global "private" constant @__constant : memref<2xf32> = dense<[0.0287729427, 0.0297581609]>
   // CHECK-LABEL: vm.func private @load_global
   // CHECK-SAME: (%[[IDX:.+]]: i32) -> f32 {
-  func.func @load_global(%idx: index) -> f32 {
+  func.func @load_global_1d(%idx: index) -> f32 {
     // CHECK-NEXT: %[[BUFFER:.+]] = vm.const.ref.rodata @__constant : !vm.buffer
     %0 = memref.get_global @__constant : memref<2xf32>
     // CHECK-NEXT: %[[C4:.+]] = vm.const.i32 4
@@ -47,6 +47,23 @@ module {
     // CHECK-NEXT: %[[OFFSET:.+]] = vm.ext.i32.i64.u %[[OFFSET_32]]
     // CHECK-NEXT: %[[VALUE:.+]] = vm.buffer.load.f32 %[[BUFFER]][%[[OFFSET]]] : !vm.buffer -> f32
     %1 = memref.load %0[%idx] : memref<2xf32>
+    // vm.return %[[VALUE]] : f32
+    return %1 : f32
+  }
+}
+
+// -----
+
+module {
+  // CHECK: vm.rodata private @__constant dense<0.0287729427> : tensor<f32>
+  memref.global "private" constant @__constant : memref<f32> = dense<0.0287729427>
+  // CHECK-LABEL: vm.func private @load_global
+  func.func @load_global_0d() -> f32 {
+    // CHECK-NEXT: %[[BUFFER:.+]] = vm.const.ref.rodata @__constant : !vm.buffer
+    %0 = memref.get_global @__constant : memref<f32>
+    // CHECK-NEXT: %[[OFFSET:.+]] = vm.const.i64.zero
+    // CHECK-NEXT: %[[VALUE:.+]] = vm.buffer.load.f32 %[[BUFFER]][%[[OFFSET]]] : !vm.buffer -> f32
+    %1 = memref.load %0[] : memref<f32>
     // vm.return %[[VALUE]] : f32
     return %1 : f32
   }

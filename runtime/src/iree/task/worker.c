@@ -282,6 +282,7 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
     // structures we use.
     iree_wait_token_t wait_token =
         iree_notification_prepare_wait(&worker->wake_notification);
+    // The masks are accessed with 'relaxed' order because they are just hints.
     iree_atomic_task_affinity_set_fetch_and(&worker->executor->worker_idle_mask,
                                             ~worker->worker_bit,
                                             iree_memory_order_relaxed);

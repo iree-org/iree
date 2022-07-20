@@ -17,7 +17,7 @@ func.func @resourceConstants() -> (!stream.resource<constant>, !stream.resource<
   %c8 = arith.constant 8 : index
 
   // Fetch the read-only host data containing the constants.
-  // CHECK: %[[RODATA:.+]] = util.buffer.constant {alignment = 64 : i64} : !util.buffer = #composite_of_128b
+  // CHECK: %[[RODATA:.+]] = util.buffer.constant {alignment = 64 : index} : !util.buffer = #composite_of_128b
   %0:3 = stream.resource.constants :
     !stream.resource<constant>{%c4} = dense<100> : tensor<1xi32>,
     !stream.resource<constant>{%c8} = dense<[101, 102]> : tensor<2xi32>
@@ -79,8 +79,8 @@ func.func @splitResourceConstants() -> (!stream.resource<constant>, !stream.reso
   %c4 = arith.constant 4 : index
   %c8 = arith.constant 8 : index
 
-  // CHECK: %[[RODATA0:.+]] = util.buffer.constant {alignment = 16 : i64} : !util.buffer = #composite_of_16b0
-  // CHECK: %[[RODATA1:.+]] = util.buffer.constant {alignment = 16 : i64} : !util.buffer = #composite_of_16b1
+  // CHECK: %[[RODATA0:.+]] = util.buffer.constant {alignment = 16 : index} : !util.buffer = #composite_of_16b0
+  // CHECK: %[[RODATA1:.+]] = util.buffer.constant {alignment = 16 : index} : !util.buffer = #composite_of_16b1
   %0:3 = stream.resource.constants :
     !stream.resource<constant>{%c4} = dense<100> : tensor<1xi32>,
     !stream.resource<constant>{%c8} = dense<[101, 102]> : tensor<2xi32>

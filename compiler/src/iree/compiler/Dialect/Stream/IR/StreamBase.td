@@ -303,7 +303,7 @@ def Stream_ResourceAccessArrayAttr :
 //===----------------------------------------------------------------------===//
 
 def Stream_Timepoint : TypeDef<Stream_Dialect, "Timepoint", [
-  Util_GlobalTypeInterface,
+  Util_GlobalType,
 ]> {
   let mnemonic = "timepoint";
 
@@ -376,11 +376,14 @@ def Stream_TransferType : AnyTypeOf<[
 def Stream_Resource : TypeDef<Stream_Dialect, "Resource", [
   Util_ReferenceType,
   Util_SizeAwareType,
-  DeclareTypeInterfaceMethods<Util_GlobalTypeInterface, [
+  DeclareTypeInterfaceMethods<Util_GlobalType, [
     "isAccessStorageCompatible",
   ]>,
   DeclareTypeInterfaceMethods<Util_InferTypeSize, [
     "inferSizeFromValue",
+  ]>,
+  DeclareTypeInterfaceMethods<Util_SubrangeType, [
+    "createSubrangeOp",
   ]>,
 ]> {
   let mnemonic = "resource";

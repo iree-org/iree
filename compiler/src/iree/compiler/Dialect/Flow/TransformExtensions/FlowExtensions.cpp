@@ -56,23 +56,21 @@ static LogicalResult populateWorkgroupCountComputingRegion(
   Block *block = rewriter.createBlock(&r);
   rewriter.setInsertionPointToStart(block);
 
-  // Resize to `3` to match IREE's assumptions.
-  SmallVector<Value> workgroupCount{foreachThreadOp.getNumThreads()};
-  workgroupCount.resize(3, rewriter.create<arith::ConstantIndexOp>(loc, 1));
-  auto returnOp = rewriter.create<Flow::ReturnOp>(loc, workgroupCount);
-
-  // Fill the region.
+  SmallVector<Value> results;
   // For now, this assumes that we only pull in constants.
   // TODO: Iteratively pull operations that are only consuming IndexType.
-  BlockAndValueMapping bvm;
-  for (auto v : foreachThreadOp.getNumThreads()) {
+  for (Value v : foreachThreadOp.getNumThreads()) {
     auto op = dyn_cast_or_null<arith::ConstantIndexOp>(v.getDefiningOp());
     if (!op) return failure();
-    rewriter.clone(*op, bvm);
+    results.push_back(
+        cast<arith::ConstantIndexOp>(rewriter.clone(*op)).getResult());
   }
-  rewriter.setInsertionPoint(returnOp);
-  rewriter.clone(*returnOp, bvm);
-  rewriter.eraseOp(returnOp);
+  // Resize to `3` to match IREE's assumptions.
+  for (unsigned i = results.size(); i < 3; ++i) {
+    results.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 1));
+  }
+  rewriter.create<Flow::ReturnOp>(loc, results);
+
   return success();
 }
 

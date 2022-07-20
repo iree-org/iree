@@ -17,6 +17,7 @@ include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Interfaces/ViewLikeInterface.td"
 
 //===----------------------------------------------------------------------===//
 // Op types
@@ -689,8 +690,10 @@ def Util_ListSetOp : Util_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
 // !util.buffer
 //===----------------------------------------------------------------------===//
 
-def Util_BufferConstantOp : Util_PureOp<"buffer.constant"> {
-  let summary = "constant host-side byte buffer";
+def Util_BufferConstantOp : Util_PureOp<"buffer.constant", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{constant host-side byte buffer}];
   let description = [{
     Defines a compile-time byte buffer based on the given attribute value.
     The attribute will be serialized into the canonical IREE format for the
@@ -699,15 +702,408 @@ def Util_BufferConstantOp : Util_PureOp<"buffer.constant"> {
 
   let arguments = (ins
     AnyAttr:$value,
-    OptionalAttr<I64Attr>:$alignment
+    OptionalAttr<IndexAttr>:$alignment
   );
   let results = (outs
     Util_BufferType:$result
   );
 
   let assemblyFormat = [{
-    attr-dict `:` type($result) `=` $value
+    attr-dict `:`
+    type($result)
+    `=` $value
   }];
+
+  let hasVerifier = 1;
+}
+
+def Util_BufferAllocOp : Util_PureOp<"buffer.alloc", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  MemoryEffects<[MemAlloc]>,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{allocates a buffer with undefined contents}];
+  let description = [{
+    Allocates a buffer with undefined contents. Consumers of the allocated
+    result must assume nothing of the contents.
+  }];
+
+  let arguments = (ins
+    Util_Size:$storage_size,
+    OptionalAttr<IndexAttr>:$alignment
+  );
+  let results = (outs
+    Util_BufferType:$result
+  );
+
+  let assemblyFormat = [{
+    `uninitialized`
+    attr-dict
+    `:`
+    type($result) `` `{` $storage_size `}`
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return {}; }
+    Value getResultSize(unsigned idx) { return getStorageSize(); }
+  }];
+
+  let hasVerifier = 1;
+  let hasCanonicalizer = 1;
+}
+
+def Util_BufferDeallocOp : Util_PureOp<"buffer.dealloc", [
+  MemoryEffects<[MemFree]>,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{deallocates a buffer}];
+  let description = [{
+    Hints that the buffer contents can be discarded. Buffers are reference
+    counted and other owners may keep it live beyond the dealloc.
+  }];
+
+  let arguments = (ins
+    Util_BufferType:$operand,
+    Util_Size:$operand_size
+  );
+
+  let assemblyFormat = [{
+    $operand `:` type($operand) `{` $operand_size `}`
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getOperandSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+}
+
+def Util_BufferSliceOp : Util_PureOp<"buffer.slice", [
+  AllTypesMatch<["source", "result"]>,
+  MemoryEffects<[MemAlloc, MemRead]>,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{clones a subregion of a buffer}];
+  let description = [{
+    Returns a copy of the contents from the source buffer.
+  }];
+
+  let arguments = (ins
+    Util_BufferType:$source,
+    Util_Size:$source_size,
+    Util_Offset:$source_offset,
+    Util_Size:$result_size,
+    OptionalAttr<IndexAttr>:$alignment
+  );
+  let results = (outs
+    Util_BufferType:$result
+  );
+
+  let assemblyFormat = [{
+    $source `[` $source_offset `]` attr-dict `:`
+    type($source) `` `{` $source_size `}` `->`
+    type($result) `` `{` $result_size `}`
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Util_BufferSubspanOp : Util_PureOp<"buffer.subspan", [
+  AllTypesMatch<["source", "result"]>,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  DeclareOpInterfaceMethods<ViewLikeOpInterface>,
+  Util_SizeAwareOp,
+  Util_SubrangeOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let summary = [{returns the buffer storage size in bytes}];
+  let description = [{
+    Returns the length of the buffer in bytes from its base offset.
+  }];
+
+  let arguments = (ins
+    Util_BufferType:$source,
+    Util_Size:$source_size,
+    Util_Offset:$source_offset,
+    Util_Size:$result_size
+  );
+  let results = (outs
+    Util_BufferType:$result
+  );
+
+  let assemblyFormat = [{
+    $source `[` $source_offset `]` `:`
+    type($source) `` `{` $source_size `}` `->`
+    type($result) `` `{` $result_size `}`
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
+
+    Value getSubrangeResource() { return getSource(); }
+    Value getSubrangeResourceSize() { return getSourceSize(); }
+    Value getSubrangeOffset() { return getSourceOffset(); }
+    Value getSubrangeLength() { return getResultSize(); }
+
+    // Walks up the use-def chain to find a subspan op that feeds into |value|.
+    static IREE::Util::BufferSubspanOp findSubspanOp(Value value);
+  }];
+
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def Util_BufferSizeOp : Util_PureOp<"buffer.size", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{returns the total buffer storage size in bytes}];
+  let description = [{
+    Returns the total length of the buffer in bytes from its base offset.
+  }];
+
+  let arguments = (ins
+    Util_BufferType:$operand
+  );
+  let results = (outs
+    Util_Size:$result
+  );
+
+  let assemblyFormat = [{
+    $operand
+    `:` type($operand)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getResult(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def Util_BufferStorageOp : Util_PureOp<"buffer.storage", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{returns the underlying buffer storage range}];
+  let description = [{
+    Returns the buffer storage as a memref that must be offset and restricted to
+    the returned range. The memref may be of any type and the user is
+    responsible for ensuring that the reinterpret_cast-like behavior makes sense
+    for the data they are accessing.
+  }];
+
+  let arguments = (ins
+    Util_BufferType:$operand,
+    Util_Size:$operand_size
+  );
+  let results = (outs
+    AnyMemRef:$result,
+    Util_Offset:$offset
+  );
+
+  let assemblyFormat = [{
+    $operand
+    `:` type($operand) `` `{` $operand_size `}` `->` `(` type($result) `,` type($offset) `)`
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getOperandSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Util_BufferCopyOp : Util_Op<"buffer.copy", [
+  MemoryEffects<[MemRead, MemWrite]>,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{copies a range of bytes between buffers}];
+  let description = [{
+    Copies a range of bytes as with memcpy (no overlapping).
+  }];
+
+  let arguments = (ins
+    Util_BufferType:$source,
+    Util_Size:$source_size,
+    Util_Offset:$source_offset,
+    Util_BufferType:$target,
+    Util_Size:$target_size,
+    Util_Offset:$target_offset,
+    Util_Size:$length
+  );
+
+  let assemblyFormat = [{
+    $source `[` $source_offset `]` `,`
+    $target `[` $target_offset `]` `,`
+    $length `:`
+    type($source) `` `{` $source_size `}` `->`
+    type($target) `` `{` $target_size `}`
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return idx == 0 ? getSourceSize() : getTargetSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Util_BufferCompareOp : Util_PureOp<"buffer.compare", [
+  MemoryEffects<[MemRead]>,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{compares a range of two buffers}];
+  let description = [{
+    Returns true if the two ranges are bitwise equivalent, somewhat like memcmp.
+  }];
+
+  let arguments = (ins
+    Util_BufferType:$lhs,
+    Util_Size:$lhs_size,
+    Util_Offset:$lhs_offset,
+    Util_BufferType:$rhs,
+    Util_Size:$rhs_size,
+    Util_Offset:$rhs_offset,
+    Util_Size:$length
+  );
+  let results = (outs
+    I1:$result
+  );
+
+  let assemblyFormat = [{
+    $lhs `[` $lhs_offset `]` `,`
+    $rhs `[` $rhs_offset `]` `,`
+    $length `:`
+    type($lhs) `` `{` $lhs_size `}` `,`
+    type($rhs) `` `{` $rhs_size `}`
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return idx == 0 ? getLhsSize() : getRhsSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Util_BufferFillOp : Util_Op<"buffer.fill", [
+  MemoryEffects<[MemWrite]>,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{fills a range of bytes with a value}];
+  let description = [{
+    Fills the contents of the buffer in the given byte range with a pattern.
+    The offset and length must match the natural alignment of the pattern type.
+  }];
+
+  let arguments = (ins
+    Util_FillPattern:$pattern,
+    Util_BufferType:$target,
+    Util_Size:$target_size,
+    Util_Offset:$target_offset,
+    Util_Size:$length
+  );
+
+  let assemblyFormat = [{
+    $pattern `,`
+    $target `[` $target_offset `for` $length `]` `:`
+    type($pattern) `->`
+    type($target) `` `{` $target_size `}`
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getTargetSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Util_BufferLoadOp : Util_Op<"buffer.load", [
+  MemoryEffects<[MemRead]>,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{loads a value from a buffer}];
+  let description = [{
+    Loads a value at a byte offset. Must be aligned to the natural size of the
+    result type.
+  }];
+
+  let arguments = (ins
+    Util_BufferType:$source,
+    Util_Size:$source_size,
+    Util_Offset:$source_offset
+  );
+  let results = (outs
+    Util_Primitive:$result
+  );
+
+  let assemblyFormat = [{
+    $source `[` $source_offset `]`
+    `:` type($source) `` `{` $source_size `}` `->` type($result)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def Util_BufferStoreOp : Util_Op<"buffer.store", [
+  MemoryEffects<[MemWrite]>,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{stores a value into a buffer}];
+  let description = [{
+    Stores a value at a byte offset. Must be aligned to the natural size of the
+    source type.
+  }];
+
+  let arguments = (ins
+    Util_Primitive:$source,
+    Util_BufferType:$target,
+    Util_Size:$target_size,
+    Util_Offset:$target_offset
+  );
+
+  let assemblyFormat = [{
+    $source `,`
+    $target `[` $target_offset `]`
+    `:` type($source) `->` type($target) `` `{` $target_size `}`
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getTargetSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+
+  let hasCanonicalizer = 1;
 }
 
 //===----------------------------------------------------------------------===//

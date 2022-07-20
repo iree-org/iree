@@ -20,6 +20,14 @@
 namespace mlir {
 namespace iree_compiler {
 
+void populateUtilAlignmentToVMPatterns(MLIRContext *context,
+                                       ConversionTarget &conversionTarget,
+                                       TypeConverter &typeConverter,
+                                       RewritePatternSet &patterns);
+void populateUtilBufferToVMPatterns(MLIRContext *context,
+                                    ConversionTarget &conversionTarget,
+                                    TypeConverter &typeConverter,
+                                    RewritePatternSet &patterns);
 void populateUtilGlobalToVMPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
                                     TypeConverter &typeConverter,
@@ -32,10 +40,6 @@ void populateUtilStatusToVMPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
                                     TypeConverter &typeConverter,
                                     RewritePatternSet &patterns);
-void populateUtilAlignmentToVMPatterns(MLIRContext *context,
-                                       ConversionTarget &conversionTarget,
-                                       TypeConverter &typeConverter,
-                                       RewritePatternSet &patterns);
 
 namespace {
 
@@ -74,25 +78,6 @@ struct CmpEQOpConversion : public OpConversionPattern<IREE::Util::CmpEQOp> {
 };
 
 //===----------------------------------------------------------------------===//
-// util.byte_buffer.*
-//===----------------------------------------------------------------------===//
-
-struct BufferConstantOpConversion
-    : public OpConversionPattern<IREE::Util::BufferConstantOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Util::BufferConstantOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREE::VM::RodataInlineOp>(
-        op,
-        IREE::VM::RefType::get(
-            IREE::VM::BufferType::get(rewriter.getContext())),
-        /*name=*/nullptr, op.getValue(), op.getAlignmentAttr());
-    return success();
-  }
-};
-
-//===----------------------------------------------------------------------===//
 // Compiler hints
 //===----------------------------------------------------------------------===//
 
@@ -120,23 +105,18 @@ void populateUtilToVMPatterns(MLIRContext *context,
                               RewritePatternSet &patterns) {
   patterns.insert<NullOpConversion>(typeConverter, context);
   patterns.insert<CmpEQOpConversion>(typeConverter, context);
-  patterns.insert<BufferConstantOpConversion>(typeConverter, context);
   patterns.insert<UnreachableOpConversion>(typeConverter, context);
 
-  typeConverter.addConversion(
-      [](IREE::Util::BufferType type) -> Optional<Type> {
-        return IREE::VM::RefType::get(
-            IREE::VM::BufferType::get(type.getContext()));
-      });
-
+  populateUtilAlignmentToVMPatterns(context, conversionTarget, typeConverter,
+                                    patterns);
+  populateUtilBufferToVMPatterns(context, conversionTarget, typeConverter,
+                                 patterns);
   populateUtilGlobalToVMPatterns(context, conversionTarget, typeConverter,
                                  patterns);
   populateUtilListToVMPatterns(context, conversionTarget, typeConverter,
                                patterns);
   populateUtilStatusToVMPatterns(context, conversionTarget, typeConverter,
                                  patterns);
-  populateUtilAlignmentToVMPatterns(context, conversionTarget, typeConverter,
-                                    patterns);
 }
 
 }  // namespace iree_compiler

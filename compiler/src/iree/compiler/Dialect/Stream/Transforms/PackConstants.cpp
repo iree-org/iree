@@ -502,8 +502,7 @@ class PackConstantsPass : public PackConstantsBase<PackConstantsPass> {
         auto rodataOp = builder.create<IREE::Util::BufferConstantOp>(
             storageResource.loc, builder.getType<IREE::Util::BufferType>(),
             storageResource.data,
-            builder.getI64IntegerAttr(
-                resourceConfig.getMinBufferOffsetAlignment()));
+            builder.getIndexAttr(resourceConfig.getMinBufferOffsetAlignment()));
         storageBuffers.push_back(rodataOp);
       }
 

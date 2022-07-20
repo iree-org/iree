@@ -472,7 +472,7 @@ struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
       rewriter.replaceOp(op, adaptor.getSrc());
       return success();
     } else if (isRankOneMemRef(neededResultType)) {
-      rewriter.replaceOpWithNewOp<memref::CastOp>(op, op.getResult().getType(),
+      rewriter.replaceOpWithNewOp<memref::CastOp>(op, neededResultType,
                                                   adaptor.getSrc());
       return success();
     }

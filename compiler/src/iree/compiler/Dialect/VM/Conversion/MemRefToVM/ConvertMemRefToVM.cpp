@@ -69,7 +69,7 @@ static Value getBufferOffset(Location loc, Value memrefValue,
   auto memrefType = memrefValue.getType().cast<ShapedType>();
   if (memrefType.getRank() == 0) {
     // Rank 0 buffers (like memref<i32>) have only a single valid offset at 0.
-    return rewriter.createOrFold<arith::ConstantIndexOp>(loc, 0);
+    return rewriter.createOrFold<arith::ConstantIntOp>(loc, 0, indexType);
   }
   assert(memrefType.getRank() == 1 && "memrefs should have been flattened");
 
@@ -141,8 +141,16 @@ struct ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
           allocaOp, "unable to create buffers for dynamic shapes");
     }
 
-    int64_t length = type.getSizeInBits();
-    length = llvm::divideCeil(length, 8);
+    // TODO: Support dynamic shapes.
+    Type elementType = getTypeConverter()->convertType(type.getElementType());
+    if (!elementType) {
+      return rewriter.notifyMatchFailure(allocaOp, "unsupported element type");
+    }
+    assert(elementType.isIntOrFloat() && "must be int or float");
+    int64_t length = IREE::Util::getRoundedElementByteWidth(elementType);
+    for (auto extent : type.getShape()) {
+      length *= extent;
+    }
 
     auto oldType = allocaOp.getType();
     auto newType = getTypeConverter()->convertType(oldType);
@@ -265,15 +273,6 @@ void populateMemRefToVMPatterns(MLIRContext *context,
     }
     return llvm::None;
   });
-
-  // Unranked memrefs are emitted for library call integration when we just
-  // need void* semantics. An unranked memref is basically just a (pointer,
-  // memory-space, element-type).
-  typeConverter.addConversion(
-      [&](UnrankedMemRefType type) -> llvm::Optional<Type> {
-        return IREE::VM::RefType::get(
-            IREE::VM::BufferType::get(type.getContext()));
-      });
 
   patterns
       .insert<FoldAsNoOp<bufferization::ToMemrefOp>,

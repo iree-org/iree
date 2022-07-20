@@ -408,16 +408,34 @@ void iree_slim_mutex_deinitialize(iree_slim_mutex_t* mutex) {
       iree_atomic_load_int32(&mutex->value, iree_memory_order_acquire) == 0);
 }
 
+// Helper to perform a compare_exchange operation on mutex->value, internally
+// used by iree_slim_mutex_try_lock and iree_slim_mutex_lock.
+static bool iree_slim_mutex_try_lock_compare_exchange(
+    iree_slim_mutex_t* mutex, int32_t* expected,
+    int32_t desired) IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+  // Refer to the iree_slim_mutex_t struct comment, "Notes on atomics",
+  // particularly regarding why the comparison-success case has 'acquire' order
+  // and not the perhaps more intuitive 'acq_rel'.
+  // The comparison-failure case has 'relaxed' order because in that case,
+  // we don't need ordering with other memory operations. Some callers won't use
+  // the 'expected' value loaded in that case at all, and some other callers
+  // will use it but won't rely on ordering w.r.t other memory operations.
+  // The choice of the 'weak' form of compare_exchange is because callers care
+  // more about efficiency in the uncontended case than we care about avoiding
+  // spurious failure. Also, some callers are calling this in a loop, where they
+  // would want the weak form anyway.
+  return iree_atomic_compare_exchange_weak_int32(
+      &mutex->value, expected, desired, iree_memory_order_acquire,
+      iree_memory_order_relaxed);
+}
+
 void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
     IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+  // Refer to the iree_slim_mutex_t struct comment, "Notes on atomics".
   // Try first to acquire the lock from an unlocked state.
-  // Note that the weak form can fail spuriously. That's fine, as the perf
-  // benefit in the uncontended cases is worth the additional loop below that
-  // will correctly handle any such failures in contended cases.
   int32_t value = 0;
-  if (iree_atomic_compare_exchange_weak_int32(
-          &mutex->value, &value, iree_slim_mutex_value(1),
-          iree_memory_order_acquire, iree_memory_order_relaxed)) {
+  if (iree_slim_mutex_try_lock_compare_exchange(mutex, &value,
+                                                iree_slim_mutex_value(1))) {
     // Successfully took the lock and there were no other waiters.
     return;
   }
@@ -426,6 +444,8 @@ void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
   // to wait for it to be available. Note that between the CAS above and this
   // the lock could have been made available and we want to ensure we don't
   // change the lock bit.
+  // This uses relaxed order because this is an internal intermediate step and
+  // we only need atomicity here.
   value =
       iree_atomic_fetch_add_int32(&mutex->value, 1, iree_memory_order_relaxed) +
       1;
@@ -433,9 +453,9 @@ void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
   while (true) {
     // While the lock is available: try to acquire it for this thread.
     while (!iree_slim_mutex_is_locked(value)) {
-      if (iree_atomic_compare_exchange_weak_int32(
-              &mutex->value, &value, iree_slim_mutex_value(value),
-              iree_memory_order_acquire, iree_memory_order_relaxed)) {
+      // See the above 'Explanation of memory orders' comment.
+      if (iree_slim_mutex_try_lock_compare_exchange(
+              mutex, &value, iree_slim_mutex_value(value))) {
         // Successfully took the lock.
         return;
       }
@@ -466,16 +486,16 @@ void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
 
 bool iree_slim_mutex_try_lock(iree_slim_mutex_t* mutex)
     IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+  // Refer to the iree_slim_mutex_t struct comment, "Notes on atomics".
   // Attempt to acquire the lock from an unlocked state.
-  // We don't care if this fails spuriously as that's the whole point of a try.
   int32_t value = 0;
-  return iree_atomic_compare_exchange_weak_int32(
-      &mutex->value, &value, iree_slim_mutex_value(1),
-      iree_memory_order_acquire, iree_memory_order_relaxed);
+  return iree_slim_mutex_try_lock_compare_exchange(mutex, &value,
+                                                   iree_slim_mutex_value(1));
 }
 
 void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex)
     IREE_DISABLE_THREAD_SAFETY_ANALYSIS {
+  // Refer to the iree_slim_mutex_t struct comment, "Notes on atomics".
   // Transition 1->0 (unlocking with no waiters) or 2->1 (with waiters).
   if (iree_atomic_fetch_sub_int32(&mutex->value, iree_slim_mutex_value(1),
                                   iree_memory_order_release) !=

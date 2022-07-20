@@ -11,21 +11,14 @@
 # Requires the environment variables KOKORO_ROOT and KOKORO_ARTIFACTS_DIR, which
 # are set by Kokoro.
 
-set -x
-set -e
-set -o pipefail
+set -xeuo pipefail
 
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
-source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docker_common.sh"
-
-# Sets DOCKER_RUN_ARGS
-docker_setup
-
 # Need to use frontends image (which also has Android toolchain) to build the
 # TFLite compiler for generating benchmarks.
-docker run "${DOCKER_RUN_ARGS[@]?}" \
+"${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docker_run.sh" \
   gcr.io/iree-oss/frontends@sha256:908d7e0ba3e3a6d448b3c07b39cc0f786a120dd2ced8653993f62fa933e882f7 \
   build_tools/kokoro/gcp_ubuntu/cmake/android/build.sh arm64-v8a
 

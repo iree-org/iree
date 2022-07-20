@@ -589,6 +589,7 @@ static Attribute constFoldFloatUnaryOp(
 
 /// Performs const folding `calculate` with element-wise behavior on the two
 /// attributes in `operands` and returns the result if possible.
+/// Note: return type will match the operand types.
 template <class AttrElementT,
           class ElementValueT = typename AttrElementT::ValueType,
           class CalculationT =
@@ -1580,7 +1581,7 @@ template <class AttrElementT,
           class CalculationT = std::function<APInt(ElementValueT)>>
 static Attribute constFoldCmpOp(ArrayRef<Attribute> operands,
                                 const CalculationT &calculate) {
-  assert(operands.size() == 1 && "unary op takes one operand");
+  assert(operands.size() == 1 && "unary cmp op takes one operand");
   if (auto operand = operands[0].dyn_cast_or_null<AttrElementT>()) {
     auto boolType = IntegerType::get(operand.getContext(), 32);
     return IntegerAttr::get(boolType, calculate(operand.getValue()));
@@ -1998,6 +1999,51 @@ OpFoldResult CmpNZI64Op::fold(ArrayRef<Attribute> operands) {
 // Floating-point comparison
 //===----------------------------------------------------------------------===//
 
+/// Performs const folding `calculate` with element-wise behavior on the two
+/// attributes in `operands` and returns the integer result of the comparison
+/// if possible.
+template <class AttrElementT,
+          class ElementValueT = typename AttrElementT::ValueType,
+          class CalculationT =
+              std::function<ElementValueT(ElementValueT, ElementValueT)>>
+static Attribute constFoldFloatComparisonOp(ArrayRef<Attribute> operands,
+                                            const CalculationT &calculate) {
+  assert(operands.size() == 2 && "binary op takes two operands");
+
+  if (auto lhs = operands[0].dyn_cast_or_null<AttrElementT>()) {
+    auto rhs = operands[1].dyn_cast_or_null<AttrElementT>();
+    if (!rhs) return {};
+    return IntegerAttr::get(IntegerType::get(lhs.getContext(), 32),
+                            calculate(lhs.getValue(), rhs.getValue()));
+  } else if (auto lhs = operands[0].dyn_cast_or_null<SplatElementsAttr>()) {
+    // TODO(benvanik): handle splat/otherwise.
+    auto rhs = operands[1].dyn_cast_or_null<SplatElementsAttr>();
+    if (!rhs || lhs.getType() != rhs.getType()) return {};
+    auto elementResult = constFoldFloatComparisonOp<AttrElementT>(
+        {lhs.getSplatValue<Attribute>(), rhs.getSplatValue<Attribute>()},
+        calculate);
+    if (!elementResult) return {};
+    return DenseElementsAttr::get(IntegerType::get(lhs.getContext(), 32),
+                                  elementResult);
+  } else if (auto lhs = operands[0].dyn_cast_or_null<ElementsAttr>()) {
+    auto rhs = operands[1].dyn_cast_or_null<ElementsAttr>();
+    if (!rhs || lhs.getType() != rhs.getType()) return {};
+    auto lhsIt = lhs.getValues<AttrElementT>().begin();
+    auto rhsIt = rhs.getValues<AttrElementT>().begin();
+    SmallVector<Attribute, 4> resultAttrs(lhs.getNumElements());
+    for (int64_t i = 0; i < lhs.getNumElements(); ++i) {
+      resultAttrs[i] =
+          constFoldFloatComparisonOp<AttrElementT>({*lhsIt, *rhsIt}, calculate);
+      if (!resultAttrs[i]) return {};
+      ++lhsIt;
+      ++rhsIt;
+    }
+    return DenseElementsAttr::get(IntegerType::get(lhs.getContext(), 32),
+                                  resultAttrs);
+  }
+  return {};
+}
+
 enum CmpFOrdering {
   ORDERED = 0,
   UNORDERED = 1,
@@ -2009,7 +2055,7 @@ static OpFoldResult foldCmpEQFOp(T op, ArrayRef<Attribute> operands) {
     // x == x = true
     return oneOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr>(
+  return constFoldFloatComparisonOp<FloatAttr>(
       operands, [&](const APFloat &a, const APFloat &b) {
         auto result = a.compare(b);
         if (ordering == ORDERED) {
@@ -2056,13 +2102,127 @@ void CmpEQF64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<SwapInvertedCmpOps<CmpEQF64UOp, CmpNEF64UOp>>(context);
 }
 
+namespace {
+
+/// Rewrites a vm.cmp.f*.near pseudo op to a ULP-based comparison.
+template <typename T, typename ConstFOp, typename ConstIOp, typename CmpGTEFOp,
+          typename CmpEQFOp, typename CmpLTIOp, typename BitcastFToIOp,
+          typename SubIOp, typename AbsIOp>
+struct RewritePseudoCmpNear : public OpRewritePattern<T> {
+  using OpRewritePattern<T>::OpRewritePattern;
+  LogicalResult matchAndRewrite(T op,
+                                PatternRewriter &rewriter) const override {
+    // Units in the Last Place (ULP) comparison algorithm from this reference:
+    // https://www.gamedeveloper.com/programming/in-depth-comparing-floating-point-numbers-2012-edition
+    // See also the C++ implementation in the constant folder below.
+
+    auto loc = op.getLoc();
+    Type i32Type = rewriter.getI32Type();
+
+    auto *originalBlock = rewriter.getInsertionBlock();
+    auto *continuationBlock = rewriter.splitBlock(
+        originalBlock, op.getOperation()->getNextNode()->getIterator());
+    auto comparisonResult = continuationBlock->addArgument(i32Type, loc);
+
+    // Compute `sign(lhs) != sign(rhs)` with `(lhs > 0) != (rhs > 0)`.
+    // TODO(scotttodd): replace with pseudo op for vm.sign.f32
+    //     * extract high bit: bitcastf32i32(lhs) >> 31
+    //     * xor high bits of lhs and rhs
+    auto zero = rewriter.createOrFold<ConstFOp>(loc, 0);
+    auto lhsPositive =
+        rewriter.createOrFold<CmpGTEFOp>(loc, i32Type, op.lhs(), zero);
+    auto rhsPositive =
+        rewriter.createOrFold<CmpGTEFOp>(loc, i32Type, op.rhs(), zero);
+    auto signsNotEqual = rewriter.createOrFold<IREE::VM::CmpNEI32Op>(
+        loc, i32Type, lhsPositive, rhsPositive);
+
+    // If signs differ, perform a direct comparison of `lhs == rhs`.
+    auto *directComparisonBlock = rewriter.createBlock(continuationBlock);
+    auto exactEqual =
+        rewriter.createOrFold<CmpEQFOp>(loc, i32Type, op.lhs(), op.rhs());
+    rewriter.createOrFold<IREE::VM::BranchOp>(loc, continuationBlock,
+                                              exactEqual);
+
+    // ...else, perform a full ULP-based comparison.
+    auto *ulpComparisonBlock = rewriter.createBlock(continuationBlock);
+    auto lhsInt = rewriter.createOrFold<BitcastFToIOp>(loc, i32Type, op.lhs());
+    auto rhsInt = rewriter.createOrFold<BitcastFToIOp>(loc, i32Type, op.rhs());
+    auto signedUlpsDiff =
+        rewriter.createOrFold<SubIOp>(loc, i32Type, lhsInt, rhsInt);
+    auto absUlpsDiff =
+        rewriter.createOrFold<AbsIOp>(loc, i32Type, signedUlpsDiff);
+    // The constant chosen here is arbitrary. Higher values increase the
+    // distance between arguments that is tolerated.
+    auto maxUlpsDiff = rewriter.createOrFold<ConstIOp>(loc, 100);
+    auto ulpCompare =
+        rewriter.createOrFold<CmpLTIOp>(loc, i32Type, absUlpsDiff, maxUlpsDiff);
+    rewriter.createOrFold<IREE::VM::BranchOp>(loc, continuationBlock,
+                                              ulpCompare);
+
+    // Go back up and insert the branch between comparison cases.
+    rewriter.setInsertionPointAfter(signsNotEqual.getDefiningOp());
+    rewriter.createOrFold<IREE::VM::CondBranchOp>(
+        loc, signsNotEqual, directComparisonBlock, ulpComparisonBlock);
+
+    rewriter.replaceOp(op, {comparisonResult});
+    return success();
+  }
+};
+
+}  // namespace
+
+template <typename T>
+static OpFoldResult foldCmpEQNearOp(T op, ArrayRef<Attribute> operands) {
+  if (op.lhs() == op.rhs()) {
+    // x ~ x = true
+    return oneOfType(op.getType());
+  }
+  return constFoldFloatComparisonOp<FloatAttr>(
+      operands, [&](const APFloat &a, const APFloat &b) {
+        // See the corresponding rewrite pattern above for references used here.
+        if (a.isNegative() != b.isNegative()) {
+          return a.compare(b) == APFloat::cmpEqual;
+        } else {
+          auto lhsInt = a.bitcastToAPInt();
+          auto rhsInt = b.bitcastToAPInt();
+          auto signedUlpsDiff = lhsInt - rhsInt;
+          auto absUlpsDiff = signedUlpsDiff.abs();
+          return absUlpsDiff.slt(100);
+        }
+      });
+}
+
+OpFoldResult CmpEQF32NearOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpEQNearOp(*this, operands);
+}
+
+OpFoldResult CmpEQF64NearOp::fold(ArrayRef<Attribute> operands) {
+  return foldCmpEQNearOp(*this, operands);
+}
+
+void CmpEQF32NearOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
+  results.insert<RewritePseudoCmpNear<CmpEQF32NearOp, ConstF32Op, ConstI32Op,
+                                      CmpGTEF32OOp, CmpEQF32OOp, CmpLTI32SOp,
+                                      BitcastF32I32Op, SubI32Op, AbsI32Op>>(
+      context);
+}
+
+void CmpEQF64NearOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
+  results.insert<RewritePseudoCmpNear<CmpEQF64NearOp, ConstF64Op, ConstI64Op,
+                                      CmpGTEF64OOp, CmpEQF64OOp, CmpLTI64SOp,
+                                      BitcastF64I64Op, SubI64Op, AbsI64Op>>(
+      context);
+}
+
 template <CmpFOrdering ordering, typename T>
 static OpFoldResult foldCmpNEFOp(T op, ArrayRef<Attribute> operands) {
   if (op.getLhs() == op.getRhs()) {
     // x != x = false
     return zeroOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr>(
+  return constFoldFloatComparisonOp<FloatAttr>(
       operands, [&](const APFloat &a, const APFloat &b) {
         auto result = a.compare(b);
         if (ordering == ORDERED) {
@@ -2115,8 +2275,8 @@ static OpFoldResult foldCmpLTFOp(T op, ArrayRef<Attribute> operands) {
     // x < x = false
     return zeroOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr>(operands, [&](const APFloat &a,
-                                                    const APFloat &b) {
+  return constFoldFloatComparisonOp<FloatAttr>(operands, [&](const APFloat &a,
+                                                             const APFloat &b) {
     auto result = a.compare(b);
     if (ordering == ORDERED) {
       return result == APFloat::cmpLessThan;
@@ -2160,7 +2320,7 @@ static OpFoldResult foldCmpLTEFOp(T op, ArrayRef<Attribute> operands) {
     // x <= x = true
     return oneOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr>(
+  return constFoldFloatComparisonOp<FloatAttr>(
       operands, [&](const APFloat &a, const APFloat &b) {
         auto result = a.compare(b);
         if (ordering == ORDERED) {
@@ -2194,7 +2354,7 @@ static OpFoldResult foldCmpGTFOp(T op, ArrayRef<Attribute> operands) {
     // x > x = false
     return zeroOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr>(
+  return constFoldFloatComparisonOp<FloatAttr>(
       operands, [&](const APFloat &a, const APFloat &b) {
         auto result = a.compare(b);
         if (ordering == ORDERED) {
@@ -2252,8 +2412,8 @@ static OpFoldResult foldCmpGTEFOp(T op, ArrayRef<Attribute> operands) {
     // x >= x = true
     return oneOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr>(operands, [&](const APFloat &a,
-                                                    const APFloat &b) {
+  return constFoldFloatComparisonOp<FloatAttr>(operands, [&](const APFloat &a,
+                                                             const APFloat &b) {
     auto result = a.compare(b);
     if (ordering == ORDERED) {
       return result == APFloat::cmpGreaterThan || result == APFloat::cmpEqual;
@@ -2841,6 +3001,14 @@ void CheckNZOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                             MLIRContext *context) {
   results.insert<RewriteCheckToCondFail<CheckNZOp, CmpNZI32Op, CmpNZI64Op,
                                         CmpNZF32OOp, CmpNZF64OOp, CmpNZRefOp>>(
+      context);
+}
+
+void CheckNearlyEQOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
+  results.insert<
+      RewriteCheckToCondFail<CheckNearlyEQOp, CmpEQI32Op, CmpEQI64Op,
+                             CmpEQF32NearOp, CmpEQF64NearOp, CmpEQRefOp>>(
       context);
 }
 

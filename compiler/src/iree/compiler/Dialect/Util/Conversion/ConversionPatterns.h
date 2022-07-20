@@ -60,6 +60,13 @@ void populateUtilConversionPatterns(MLIRContext *context,
                                     TypeConverter &typeConverter,
                                     RewritePatternSet &patterns);
 
+// Populates conversion patterns for generic structural ops (func, scf, etc).
+// The ops will be made dynamically legal based on whether all types can be
+// converted using the provided |typeConverter|.
+void populateGenericStructuralConversionPatterns(
+    MLIRContext *context, ConversionTarget &conversionTarget,
+    TypeConverter &typeConverter, RewritePatternSet &patterns);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

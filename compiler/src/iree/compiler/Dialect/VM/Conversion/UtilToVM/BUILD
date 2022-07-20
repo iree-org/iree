@@ -16,6 +16,7 @@ iree_compiler_cc_library(
     name = "UtilToVM",
     srcs = [
         "ConvertAlignmentOps.cpp",
+        "ConvertBufferOps.cpp",
         "ConvertGlobalOps.cpp",
         "ConvertListOps.cpp",
         "ConvertStatusOps.cpp",

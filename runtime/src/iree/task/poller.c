@@ -34,7 +34,7 @@ iree_status_t iree_task_poller_initialize(
   // check in enqueue to see if the wait thread needs to be resumed.
   // initial_state = IREE_TASK_POLLER_STATE_SUSPENDED;
   iree_atomic_store_int32(&out_poller->state, initial_state,
-                          iree_memory_order_seq_cst);
+                          iree_memory_order_release);
 
   // Acquire an event we can use to wake the wait thread from other threads.
   iree_status_t status = iree_event_pool_acquire(

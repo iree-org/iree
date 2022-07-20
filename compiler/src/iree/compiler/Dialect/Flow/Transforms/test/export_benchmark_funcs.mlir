@@ -1,50 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-mhlo-input-transformation-pipeline --iree-flow-transformation-pipeline --iree-flow-export-benchmark-funcs --verify-diagnostics %s | FileCheck %s
-
-module {
-  func.func @two_dispatch(%arg0: tensor<5x3xf32>, %arg1: tensor<3x5xf32>) -> (tensor<5x5xf32>, tensor<3x5xf32>) {
-    %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<5x3xf32>, tensor<3x5xf32>) -> tensor<5x5xf32>
-    %1 = "mhlo.dot"(%arg1, %0) : (tensor<3x5xf32>, tensor<5x5xf32>) -> tensor<3x5xf32>
-    return %0, %1 : tensor<5x5xf32>, tensor<3x5xf32>
-  }
-}
-
-//  CHECK-DAG: util.global private @[[GLOBAL_ARG0:.+]] {noinline} = dense<{{.*}}> : tensor<5x3xf32>
-//  CHECK-DAG: util.global private @[[GLOBAL_ARG1:.+]] {noinline} = dense<{{.*}}> : tensor<3x5xf32>
-
-//      CHECK: func.func @two_dispatch_benchmark()
-// CHECK-SAME: attributes {iree.abi.stub, iree.reflection = {iree.benchmark = "entry"}}
-//  CHECK-DAG:   %[[ARG0:.+]] = util.global.load @[[GLOBAL_ARG0]] : tensor<5x3xf32>
-//  CHECK-DAG:   %[[ARG1:.+]] = util.global.load @[[GLOBAL_ARG1]] : tensor<3x5xf32>
-//      CHECK:   %[[RET:.+]]:2 = call @two_dispatch(%[[ARG0]], %[[ARG1]])
-//  CHECK-DAG:   util.do_not_optimize(%[[RET]]#0) : tensor<5x5xf32>
-//  CHECK-DAG:   util.do_not_optimize(%[[RET]]#1) : tensor<3x5xf32>
-
-// -----
-
-func.func @while(%start: tensor<i32>, %bound: tensor<i32>) -> tensor<i32> {
-  cf.br ^bb1(%start : tensor<i32>)
-^bb1(%0: tensor<i32>):
-  %1 = "mhlo.compare"(%0, %bound) {comparison_direction = #mhlo<comparison_direction LT>} : (tensor<i32>, tensor<i32>) -> tensor<i1>
-  %2 = tensor.extract %1[] : tensor<i1>
-  cf.cond_br %2, ^bb2(%0 : tensor<i32>), ^bb3(%0 : tensor<i32>)
-^bb2(%3: tensor<i32>):
-  %4 = arith.addi %3, %3 : tensor<i32>
-  cf.br ^bb1(%4 : tensor<i32>)
-^bb3(%5: tensor<i32>):
-  return %5 : tensor<i32>
-}
-
-//     CHECK: util.global private @[[GLOBAL_ARG0:.+]] {noinline} = dense<0> : tensor<i32>
-//     CHECK: util.global private @[[GLOBAL_ARG1:.+]] {noinline} = dense<0> : tensor<i32>
-
-//     CHECK: func.func @while_benchmark()
-// CHECK-DAG:   %[[ARG0:.+]] = util.global.load @[[GLOBAL_ARG0]] : tensor<i32>
-// CHECK-DAG:   %[[ARG1:.+]] = util.global.load @[[GLOBAL_ARG1]] : tensor<i32>
-//     CHECK:   %[[RET0:.+]] = call @while(%[[ARG0]], %[[ARG1]])
-//     CHECK:   util.do_not_optimize(%[[RET0]]) : tensor<i32>
-//     CHECK:   return
-
-// -----
+// RUN: iree-opt --split-input-file --iree-flow-transformation-pipeline --iree-flow-export-benchmark-funcs --verify-diagnostics %s | FileCheck %s
 
 // Basic usage from the `--iree-native-bindings-support` flag.
 
@@ -66,6 +20,32 @@ func.func @simpleMul(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.b
 // CHECK-NEXT:   %[[RET0:.+]] = call @simpleMul(%[[ARG0]], %[[ARG1]])
 //      CHECK:   util.do_not_optimize(%[[RET0]]) : !hal.buffer_view
 //      CHECK:   return
+
+// -----
+
+// Ensures that functions with multiple blocks are handled correctly.
+
+func.func @while(%start: i32, %bound: i32) -> i32 {
+  cf.br ^bb1(%start : i32)
+^bb1(%0: i32):
+  %1 = arith.cmpi slt, %0, %bound : i32
+  cf.cond_br %1, ^bb2(%0 : i32), ^bb3(%0 : i32)
+^bb2(%3: i32):
+  %4 = arith.addi %3, %3 : i32
+  cf.br ^bb1(%4 : i32)
+^bb3(%5: i32):
+  return %5 : i32
+}
+
+//     CHECK: util.global private @[[GLOBAL_ARG0:.+]] {noinline} = 0 : i32
+//     CHECK: util.global private @[[GLOBAL_ARG1:.+]] {noinline} = 0 : i32
+
+//     CHECK: func.func @while_benchmark()
+// CHECK-DAG:   %[[ARG0:.+]] = util.global.load @[[GLOBAL_ARG0]] : i32
+// CHECK-DAG:   %[[ARG1:.+]] = util.global.load @[[GLOBAL_ARG1]] : i32
+//     CHECK:   %[[RET0:.+]] = call @while(%[[ARG0]], %[[ARG1]])
+//     CHECK:   util.do_not_optimize(%[[RET0]]) : i32
+//     CHECK:   return
 
 // -----
 

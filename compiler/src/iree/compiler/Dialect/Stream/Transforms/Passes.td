@@ -149,14 +149,6 @@ def LayoutSlices :
   }];
 }
 
-def PropagateSubviews :
-    Pass<"iree-stream-propagate-subviews", "mlir::ModuleOp"> {
-  let summary = "Propagates resource subviews throughout the whole program.";
-  let constructor = [{
-    mlir::iree_compiler::IREE::Stream::createPropagateSubviewsPass()
-  }];
-}
-
 //===----------------------------------------------------------------------===//
 // Stream memoization
 //===----------------------------------------------------------------------===//

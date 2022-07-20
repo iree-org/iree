@@ -54,8 +54,8 @@ def TopkSplitReduction:
   }];
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::createTopkSplitReductionPass()";
   let options = [
-    Option<"splitRatio", "split-ratio", "int", /*default=*/"1",
-           "Split reduction ratio">,
+    ListOption<"splitRatios", "split-ratios", "int",
+           "List of split reduction ratios">,
   ];
 }
 

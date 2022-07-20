@@ -2263,6 +2263,13 @@ def VM_FloorF64Op :
   let hasFolder = 1;
 }
 
+def VM_RoundF32Op : VM_UnaryArithmeticOp<F32, "round.f32", VM_OPC_RoundF32, [VM_ExtF32]> {
+  let summary = [{rounds the value to the nearest integer away from zero}];
+}
+def VM_RoundF64Op : VM_UnaryArithmeticOp<F64, "round.f64", VM_OPC_RoundF64, [VM_ExtF64]> {
+  let summary = [{rounds the value to the nearest integer away from zero}];
+}
+
 //===----------------------------------------------------------------------===//
 // Floating-point math
 //===----------------------------------------------------------------------===//
@@ -3063,6 +3070,22 @@ def VM_CmpEQF64UOp :
   let hasFolder = 1;
 }
 
+def VM_CmpEQF32NearOp :
+    VM_BinaryComparisonPseudoOp<F32, "cmp.eq.f32.near",
+                          [VM_ExtF32, Commutative]> {
+  let summary = [{near floating-point equality comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def VM_CmpEQF64NearOp :
+    VM_BinaryComparisonPseudoOp<F64, "cmp.eq.f64.near",
+                          [VM_ExtF64, Commutative]> {
+  let summary = [{near floating-point equality comparison operation}];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
 def VM_CmpNEF32OOp :
     VM_BinaryComparisonOp<F32, "cmp.ne.f32.o", VM_OPC_CmpNEF32O,
                           [VM_ExtF32, Commutative]> {
@@ -3840,6 +3863,10 @@ class VM_BinaryCheckOp<string mnemonic, list<Trait> traits = []> :
 }
 
 def VM_CheckEQOp : VM_BinaryCheckOp<"check.eq", [Commutative]> {
+  let hasCanonicalizer = 1;
+}
+
+def VM_CheckNearlyEQOp : VM_BinaryCheckOp<"check.nearly_eq", [Commutative]> {
   let hasCanonicalizer = 1;
 }
 
