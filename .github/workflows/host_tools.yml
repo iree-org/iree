@@ -18,7 +18,7 @@ on:
       host-binary-root:
         # Pass through the root directory as an output, so it's available to
         # dependent jobs.
-        value: ${{ inputs.host-binary-root || "SOMEHOW THIS IS EMPTY WTF" }}
+        value: ${{ inputs.host-binary-root || 'SOMEHOW THIS IS EMPTY WTF' }}
 
 jobs:
   host_tools:
