@@ -16,6 +16,8 @@ transform.with_pdl_patterns {
         transform.yield
       }
 
+      transform.print %foreach_op { name = "AFTER!!!" }
+
       // Rewrite scf.foreach_thread op to Flow dialect ops.
       %dispatch_op = transform.iree.foreach_thread_to_flow %foreach_op
       transform.yield

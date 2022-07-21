@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/DispatchLinalgOnTensors.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -91,17 +92,22 @@ static void rewriteParallelInsertSlices(
     auto parallelInsertOp = cast<tensor::ParallelInsertSliceOp>(&yieldingOp);
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(block.getTerminator());
-    auto dynamicDims = Util::findVariadicDynamicDims(
-        resultIndex, resultTensorOperands, resultTensorsDynamicDims);
+    // TODO: Dynamic dims and do not just increase resultIndex
+    ValueRange dynamicDims;
+    if (resultIndex < resultTensorOperands.size()) {
+      dynamicDims = Util::findVariadicDynamicDims(
+          resultIndex, resultTensorOperands, resultTensorsDynamicDims);
+    }
     // clang-format off
     rewriter.create<Flow::DispatchTensorStoreOp>(
         loc,
         parallelInsertOp.getSource(),
-        tensorToFlowBvm.lookup(resultTensorOperands[resultIndex++]),
+        tensorToFlowBvm.lookup(parallelInsertOp.getDest()),
         dynamicDims,
         parallelInsertOp.getMixedOffsets(),
         parallelInsertOp.getMixedSizes(),
         parallelInsertOp.getMixedStrides());
+    ++resultIndex;
     // clang-format on
     rewriter.eraseOp(parallelInsertOp);
   }
@@ -246,11 +252,15 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
   // The `dest` of the ParallelInsertSliceOp are tied to the results and carry
   // over to the Flow::DispatchWorkgroupsOp.
   // Use a SetVector to ensure tensor operand uniqueness.
-  llvm::SetVector<Value> resultTensorOperands, resultTensorsDynamicDims;
+  llvm::SetVector<Value> resultTensorOperands, elidedResultTensorOperands,
+      resultTensorsDynamicDims;
   for (const Operation &yieldingOp : performConcurrentlyOp.getYieldingOps()) {
     auto parallelInsertOp = cast<tensor::ParallelInsertSliceOp>(&yieldingOp);
     Value dest = parallelInsertOp.getDest();
-    bool inserted = resultTensorOperands.insert(dest);
+    auto &operandsSetVector = dest.getDefiningOp<linalg::InitTensorOp>()
+                                  ? elidedResultTensorOperands
+                                  : elidedResultTensorOperands;
+    bool inserted = operandsSetVector.insert(dest);
     if (!inserted) continue;
     auto dynamicDims =
         getIndicesOfDynamicDims(dest.getType().cast<ShapedType>());
@@ -258,8 +268,9 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
       resultTensorsDynamicDims.insert(
           rewriter.create<tensor::DimOp>(loc, dest, dim));
   }
-  assert(resultTensorOperands.size() == foreachThreadOp.getNumResults() &&
-         "Expected as many resultTensorOperands as results of foreachThreadOp");
+  assert(resultTensorOperands.size() + elidedResultTensorOperands.size() ==
+             foreachThreadOp.getNumResults() &&
+         "Expected as many result operands as non-elided results");
 
   // Step 2. Get values defined above and separate them between non-tensors,
   // tensors and introduce appropriate tensor dims.
@@ -294,6 +305,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
   int64_t sizeNonTensors = nonTensorOperands.size();
   int64_t sizeNonResultTensors = tensorOperands.size();
   int64_t sizeResultTensors = resultTensorOperands.size();
+  int64_t sizeElidedResultTensors = elidedResultTensorOperands.size();
   auto tiedOperandsSequence = llvm::seq<int64_t>(
       sizeNonTensors + sizeNonResultTensors,
       sizeNonTensors + sizeNonResultTensors + sizeResultTensors);
@@ -355,8 +367,9 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
       SmallVector<Location>(allTensorDynamicDims.size(), loc));
   SmallVector<Value> allOperands = nonDimOperands;
   llvm::append_range(allOperands, allTensorDynamicDims);
-  assert(block->getNumArguments() == allOperands.size() &&
-         "Expected as many bbArgs as operands");
+  assert(block->getNumArguments() ==
+             allOperands.size() + sizeElidedResultTensors &&
+         "Expected as many bbArgs as operands (apart from elided ones)");
 
   // Step 6. Move the body of foreachThreadOp to the dispatchOp.
   block->getOperations().splice(
@@ -369,7 +382,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
   // tensor. Save the tensor operand -> flow tensor bbArg mapping in
   // `tensorToFlowBvm`.
   BlockAndValueMapping bvm, tensorToFlowBvm;
-  bvm.map(allOperands, block->getArguments());
+  bvm.map(allOperands, block->getArguments().take_front(allOperands.size()));
   auto allTensorDimsBBArgs = block->getArguments().slice(
       nonDimOperands.size(), allTensorDynamicDims.size());
   for (auto en : llvm::enumerate(allTensorOperands)) {
@@ -386,6 +399,19 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
     // tensor -> flow.dispatch.tensor.load entry.
     tensorToFlowBvm.map(en.value(), bvm.lookup(en.value()));
     bvm.map(en.value(), loadOp.getResult());
+  }
+  for (int64_t i = 0; i < sizeElidedResultTensors; ++i) {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointToStart(block);
+    // TODO: Dynamic dims
+    Value elidedTensorOperand = elidedResultTensorOperands[i];
+    BlockArgument bbArg = block->getArgument(block->getNumArguments() -
+                                             sizeElidedResultTensors + i);
+    auto loadOp = rewriter.create<Flow::DispatchTensorLoadOp>(
+        loc, elidedTensorOperand.getType().cast<RankedTensorType>(), bbArg,
+        ValueRange());
+    tensorToFlowBvm.map(elidedTensorOperand, bbArg);
+    bvm.map(elidedTensorOperand, loadOp.getResult());
   }
 
   // Step 8. Plug dispatch workgroup id and count values into the bvm.
