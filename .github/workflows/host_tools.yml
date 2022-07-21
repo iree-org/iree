@@ -18,7 +18,7 @@ on:
       host-binary-root:
         # Pass through the root directory as an output, so it's available to
         # dependent jobs.
-        value: ${{ inputshost-binary-root }}
+        value: ${{ inputs.host-binary-root }}
 
 jobs:
   host_tools:

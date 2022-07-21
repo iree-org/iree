@@ -13,9 +13,6 @@ on:
     branches:
       - main
 
-env:
-  RUNTIME_BUILD_DIR: build-runtime
-
 jobs:
   build_runtime:
     runs-on: ubuntu-20.04
@@ -148,7 +145,6 @@ jobs:
             gcr.io/iree-oss/riscv@sha256:e566f054ff1b1d8be61459ce4789dd944b70e85c8939a4d3b7331ab519d8db4c \
             bash -c \
             "./build_tools/cmake/build_riscv.sh && build_tools/kokoro/gcp_ubuntu/cmake/baremetal/riscv32/test.sh"
-
 
   summary:
     runs-on: ubuntu-20.04
