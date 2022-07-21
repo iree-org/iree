@@ -23,6 +23,7 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
+    "DispatchLinalgOnTensors.h"
     "FusionUtils.h"
     "Passes.h"
     "Passes.h.inc"

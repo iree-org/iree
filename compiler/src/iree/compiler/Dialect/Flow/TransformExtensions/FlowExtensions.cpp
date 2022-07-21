@@ -8,6 +8,7 @@
 
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/DispatchLinalgOnTensors.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -139,8 +140,72 @@ static void rewriteExtractSlices(PatternRewriter &rewriter,
   });
 }
 
+static void cloneOpsIntoForeachThreadOp(RewriterBase &rewriter,
+                                        scf::ForeachThreadOp foreachThreadOp) {
+  // 1. Find all ops that should be cloned into the ForeachThreadOp.
+  llvm::SetVector<Value> valuesDefinedAbove;
+  mlir::getUsedValuesDefinedAbove(foreachThreadOp.getRegion(),
+                                  valuesDefinedAbove);
+  // Add all ops who's results are used inside the ForeachThreadOp to the
+  // worklist.
+  llvm::SetVector<Operation *> worklist;
+  for (Value v : valuesDefinedAbove)
+    if (Operation *op = v.getDefiningOp()) worklist.insert(op);
+  llvm::SmallVector<Operation *> opsToClone;
+  llvm::DenseSet<Operation *> visited;
+
+  // Process all ops in the worklist.
+  while (!worklist.empty()) {
+    Operation *op = worklist.pop_back_val();
+    if (visited.contains(op)) continue;
+    visited.insert(op);
+
+    // Do not clone ops that are not clonable.
+    if (!mlir::iree_compiler::IREE::Flow::isClonableIntoDispatchOp(op))
+      continue;
+
+    // Do not clone ParallelInsertSliceOp destinations.
+    bool isDestination =
+        any_of(foreachThreadOp.getTerminator().getYieldingOps(),
+               [&](Operation &insertOp) {
+                 return cast<tensor::ParallelInsertSliceOp>(&insertOp)
+                            .getDest()
+                            .getDefiningOp() == op;
+               });
+    if (isDestination) continue;
+
+    opsToClone.push_back(op);
+
+    // Add all operands to the worklist.
+    for (Value operand : op->getOperands()) {
+      Operation *operandOp = operand.getDefiningOp();
+      if (!operandOp) continue;
+      worklist.insert(operandOp);
+    }
+  }
+
+  // 2. Clone ops and replace their uses inside the ForeachThreadOp.
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointToStart(
+      &foreachThreadOp.getRegion().getBlocks().front());
+  for (Operation *op : llvm::reverse(opsToClone)) {
+    Operation *cloned = rewriter.clone(*op);
+    SmallVector<OpOperand *> uses;
+    for (OpOperand &use : op->getUses())
+      if (foreachThreadOp->isProperAncestor(use.getOwner()))
+        uses.push_back(&use);
+    for (OpOperand *use : uses) {
+      unsigned resultNum = use->get().cast<OpResult>().getResultNumber();
+      rewriter.updateRootInPlace(
+          use->getOwner(), [&]() { use->set(cloned->getOpResult(resultNum)); });
+    }
+  }
+}
+
 /// Rewrite a ForeachThreadOp into a Flow::DispatchWorkGroupsOp.
 /// This rewrite proceeds in a few steps:
+///   - Step 0: Clone certain ops into the ForeachThreadOp (as per IREE
+///     heuristic), so that they are part of the dispatch region.
 ///   - Step 1: Compute the result types and their result dynamic dim operands.
 ///     This first step takes advantage of the ops contained in the
 ///     ForeachThreadOp terminator and that are tied to the results.
@@ -164,6 +229,9 @@ static void rewriteExtractSlices(PatternRewriter &rewriter,
 FailureOr<Flow::DispatchWorkgroupsOp>
 rewriteForeachThreadToFlowDispatchWorkgroups(
     scf::ForeachThreadOp foreachThreadOp, PatternRewriter &rewriter) {
+  // Step 0: Clone ops into the ForeachThreadOp.
+  cloneOpsIntoForeachThreadOp(rewriter, foreachThreadOp);
+
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(foreachThreadOp);
 
@@ -198,7 +266,6 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
   llvm::SetVector<Value> valuesDefinedAbove;
   mlir::getUsedValuesDefinedAbove(foreachThreadOp.getRegion(),
                                   valuesDefinedAbove);
-  assert(!valuesDefinedAbove.empty() && "used values defined above is empty");
 
   SmallVector<Value> nonTensorOperands, tensorOperands, tensorDynamicDims;
   for (Value v : valuesDefinedAbove) {
