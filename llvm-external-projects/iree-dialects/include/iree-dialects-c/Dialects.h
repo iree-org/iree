@@ -9,6 +9,7 @@
 
 #include "mlir-c/IR.h"
 #include "mlir-c/Pass.h"
+#include "mlir-c/RegisterEverything.h"
 
 #ifdef __cplusplus
 extern "C" {

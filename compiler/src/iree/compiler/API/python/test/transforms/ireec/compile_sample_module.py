@@ -28,6 +28,8 @@ from iree.compiler.dialects import vector
 
 # Test the compiler API.
 with ir.Context() as ctx:
+  ireec.register_all_dialects(ctx)
+
   input_module = ir.Module.parse(r"""
     builtin.module  {
       func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
