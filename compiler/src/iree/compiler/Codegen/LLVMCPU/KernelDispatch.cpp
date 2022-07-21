@@ -623,26 +623,54 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
       DispatchLoweringPassPipeline::CPUAArchDoubleTilingExpert);
 }
 
-static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,
-                                                    linalg::LinalgOp op,
-                                                    int64_t vectorSize,
-                                                    bool isQuantized) {
+/// Returns default hard-coded workgroup sizes for a give target. No smartness
+/// should be introduced in this utility.
+static void getDefaultMatmulWorkgroupSizes(linalg::LinalgOp op,
+                                           SmallVectorImpl<int64_t> &sizes,
+                                           int64_t vectorSize) {
+  auto variantOp = getExecutableVariantOp(op);
+  if (isX86(*variantOp)) {
+    sizes.append({8, 32, 16});
+    return;
+  }
+
+  if (isRISCV(*variantOp)) {
+    // RISC-V natively supports scalar x vector operations so we don't have to
+    // vectorize dimension k. Vectorizing dimension k results in a vector load
+    // and a sequence of vrgather ops to implemement the broadcast explicitly.
+    // We should tile and/or unroll that dimension without vectorization, which
+    // is not possible right now.
+    sizes.append({8, 32, 1});
+    return;
+  }
+
+  // Fallback to use vectorSize for unknown arch.
+  sizes.append(3, vectorSize);
+  return;
+}
+
+/// Main utility to compute the workgroup (vectorization/unrolling) tile sizes.
+static SmallVector<int64_t> getMatmulWorkgroupSizes(
+    func::FuncOp entryPointFn, linalg::LinalgOp op,
+    int64_t vectorSize, bool isQuantized) {
   SmallVector<int64_t> matmulTileSizes;
   auto variantOp = getExecutableVariantOp(entryPointFn);
   assert(succeeded(variantOp) && "ExecutableVariantOp not found");
 
-  if (isX86(*variantOp) || isRISCV(*variantOp)) {
-    matmulTileSizes = {8, 32, 16};
-  } else if (isAArch64(*variantOp)) {
+  // Compute workgroup tile sizes using heuristics.
+  // TODO: if (isX86(*variantOp) || isRISCV(*variantOp)) {
+
+  if (isAArch64(*variantOp)) {
     if (isQuantized) {
       matmulTileSizes = {vectorSize, vectorSize * 4, vectorSize};
     } else {
       matmulTileSizes = {5 * vectorSize, vectorSize, vectorSize * 16};
     }
-  } else {
-    // Fallback to use vectorSize for unknown arch.
-    matmulTileSizes.append(3, vectorSize);
   }
+
+  // Get default hard-coded tile sizes if we couldn't compute anything better.
+  if (matmulTileSizes.empty())
+    getDefaultMatmulWorkgroupSizes(op, matmulTileSizes, vectorSize);
 
   SmallVector<int64_t> tileSizes;
   unsigned numLoops = op.getNumLoops();
