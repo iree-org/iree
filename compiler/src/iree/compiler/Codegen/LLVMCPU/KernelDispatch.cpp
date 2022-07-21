@@ -65,7 +65,6 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
 // TODO(hanchung): Remove the flag. This is the flag for fastly falling back to
 // the previous snapshot.
 
-
 static llvm::cl::opt<bool> enableVectorPadding(
     "iree-codegen-enable-vector-padding",
     llvm::cl::desc("Enable padding for vectorization"), llvm::cl::init(true));
