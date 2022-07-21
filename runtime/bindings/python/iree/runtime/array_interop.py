@@ -229,6 +229,7 @@ def asdevicearray(device: HalDevice,
 # this is a linear list for quick access to the most common. There may also
 # be a better way to do this.
 _DTYPE_TO_HAL_ELEMENT_TYPE = (
+    (np.float16, HalElementType.FLOAT_16),
     (np.float32, HalElementType.FLOAT_32),
     (np.float64, HalElementType.FLOAT_64),
     (np.float16, HalElementType.FLOAT_16),
