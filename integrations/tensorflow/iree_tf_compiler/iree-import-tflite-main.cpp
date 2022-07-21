@@ -93,12 +93,12 @@ int main(int argc, char **argv) {
   auto loc = mlir::FileLineColLoc::get(&context,
                                        inputFile->getBufferIdentifier(), 0, 0);
   OwningOpRef<mlir::ModuleOp> module;
-  auto contents = absl::string_view(
-    inputFile->getBufferStart(), inputFile->getBufferSize());
+  auto contents = absl::string_view(inputFile->getBufferStart(),
+                                    inputFile->getBufferSize());
   if ((contents.substr(4, 4) == "TFL3")) {
-    module = tflite::FlatBufferToMlir(
-        contents, &context, loc,
-        /*use_external_constant=*/false, inputArrays, outputArrays);
+    module = tflite::FlatBufferToMlir(contents, &context, loc,
+                                      /*use_external_constant=*/false,
+                                      inputArrays, outputArrays);
   } else {
     module = ModuleOp::create(mlir::UnknownLoc::get(&context));
     sourceMgr.AddNewSourceBuffer(MemoryBuffer::getMemBuffer(contents), SMLoc());
