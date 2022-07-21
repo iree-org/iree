@@ -171,7 +171,8 @@ def compile_str(input_bytes: bytes, **kwargs):
     A bytes-like object with the compiled output or None if output_file=
     was specified.
   """
-  input_bytes = input_bytes.encode("utf-8") if isinstance(input_bytes, str) else input_bytes
+  input_bytes = input_bytes.encode("utf-8") if isinstance(input_bytes,
+                                                          str) else input_bytes
   with TempFileSaver.implicit() as tfs:
     options = ImportOptions(**kwargs)
     import_cl = build_import_command_line("-", tfs, options)
@@ -190,4 +191,4 @@ def compile_str(input_bytes: bytes, **kwargs):
                              immediate_input=input_bytes)
     if options.output_file:
       return None
-    return result.decode("utf-8")
+    return result.decode("utf-8") if result is not None else result
