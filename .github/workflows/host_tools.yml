@@ -18,7 +18,7 @@ on:
       host-binary-root:
         # Pass through the root directory as an output, so it's available to
         # dependent jobs.
-        value: ${{ inputs.host-binary-root }}
+        value: ${{ inputs.host-binary-root || "SOMEHOW THIS IS EMPTY WTF" }}
 
 jobs:
   host_tools:
@@ -44,10 +44,11 @@ jobs:
           submodules: true
       - name: "Building host tools"
         run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "INSTALL_DIR=${HOST_BINARY_ROOT}" \
-            gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
-            ./build_tools/cmake/build_host_tools.sh
+          mkdir ${HOST_BINARY_ROOT}
+          # ./build_tools/github_actions/docker_run.sh \
+          #   --env "INSTALL_DIR=${HOST_BINARY_ROOT}" \
+          #   gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
+          #   ./build_tools/cmake/build_host_tools.sh
       # Using a tar archive is necessary to preserve file permissions. See
       # https://github.com/actions/upload-artifact#maintaining-file-permissions-and-case-sensitive-files
       # The upload action already does its own gzip compression, so it's likely
