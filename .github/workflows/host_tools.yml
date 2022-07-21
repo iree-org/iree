@@ -18,7 +18,7 @@ on:
       host-binary-root:
         # Pass through the root directory as an output, so it's available to
         # dependent jobs.
-        value: ${{ inputs.host-binary-root || 'SOMEHOW THIS IS EMPTY WTF' }}
+        value: ${{ jobs.host_tools.outputs.host-binary-root }}
 
 jobs:
   host_tools:
@@ -37,6 +37,8 @@ jobs:
     env:
       HOST_BINARY_ROOT: ${{ inputs.host-binary-root }}
       HOST_BINARY_ARCHIVE: ${{ inputs.host-binary-root }}.tar
+    outputs:
+      host-binary-root: ${{ inputs.host-binary-root }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
