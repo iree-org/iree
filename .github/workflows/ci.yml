@@ -104,6 +104,7 @@ jobs:
 
   riscv32:
     needs: host_tools_assertions
+    if: always() # this should not be required!
     runs-on:
       # self-hosted has to be listed first. See
       # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
