@@ -66,7 +66,6 @@ class ImportOptions(CompilerOptions):
   save_temp_tfl_input: Optional[str] = None
   save_temp_iree_input: Optional[str] = None
   input_type: Optional[str] = "tosa"
-  import_from_mlir: bool = False
 
 
 def build_import_command_line(input_path: str, tfs: TempFileSaver,
@@ -91,9 +90,6 @@ def build_import_command_line(input_path: str, tfs: TempFileSaver,
     output_file = tfs.alloc_optional("tflite-output.mlir",
                                      export_as=options.output_file)
     cl.append(f"-o={options.output_file}")
-
-  if options.import_from_mlir:
-    cl.append('-import-from-mlir')
 
   # Input arrays.
   if options.input_arrays:
