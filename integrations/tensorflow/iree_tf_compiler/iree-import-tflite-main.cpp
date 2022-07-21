@@ -17,6 +17,7 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
+#include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "tensorflow/compiler/mlir/lite/flatbuffer_import.h"
@@ -31,6 +32,9 @@ int main(int argc, char **argv) {
 
   static cl::opt<std::string> inputPath(
       cl::Positional, cl::desc("<TFLite FlatBuffer>"), cl::Required);
+  static cl::opt<bool> loadMlirFile(
+    "import-from-mlir",
+    cl::desc("Import should come from an mlir file"));
   static cl::opt<std::string> outputFilename("o", cl::desc("Output filename"),
                                              cl::value_desc("filename"),
                                              cl::init("-"));
@@ -91,15 +95,24 @@ int main(int argc, char **argv) {
                                         outputArrayFlag.end());
   auto loc = mlir::FileLineColLoc::get(&context,
                                        inputFile->getBufferIdentifier(), 0, 0);
-  OwningOpRef<mlir::ModuleOp> module = tflite::FlatBufferToMlir(
-      absl::string_view(inputFile->getBufferStart(),
-                        inputFile->getBufferSize()),
-      &context, loc,
-      /*use_external_constant=*/false, inputArrays, outputArrays);
-  if (!module) {
-    // Error should have emitted.
-    llvm::errs() << "Unable to import TFLite FlatBuffer to MLIR Module\n";
-    return 2;
+  OwningOpRef<mlir::ModuleOp> module;
+  if (loadMlirFile) {
+    module = ModuleOp::create(mlir::UnknownLoc::get(&context));
+    std::string errorMessage;
+    sourceMgr.AddNewSourceBuffer(std::move(inputFile), SMLoc());
+    module = parseSourceFile<ModuleOp>(sourceMgr, &context);
+    if (!module) return 2;
+  } else {
+    module = tflite::FlatBufferToMlir(
+        absl::string_view(inputFile->getBufferStart(),
+                          inputFile->getBufferSize()),
+        &context, loc,
+        /*use_external_constant=*/false, inputArrays, outputArrays);
+    if (!module) {
+      // Error should have emitted.
+      llvm::errs() << "Unable to import TFLite FlatBuffer to MLIR Module\n";
+      return 2;
+    }
   }
 
   // Save.

@@ -96,6 +96,7 @@ cc_binary(
         "//iree_tf_compiler/TFL",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TosaDialect",
