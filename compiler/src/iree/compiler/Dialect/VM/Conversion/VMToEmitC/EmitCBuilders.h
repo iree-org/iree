@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_EMITCBUILDERS_H_
 #define IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_EMITCBUILDERS_H_
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -18,8 +19,16 @@ namespace mlir {
 namespace iree_compiler {
 namespace emitc_builders {
 
+struct StructField {
+  std::string type;
+  std::string name;
+};
+
 Value arrayElementAddress(OpBuilder builder, Location location, Type type,
                           IntegerAttr index, Value operand);
+
+void structDefinition(OpBuilder builder, Location location,
+                      StringRef structName, ArrayRef<StructField> fields);
 
 Value structMember(OpBuilder builder, Location location, Type type,
                    StringRef memberName, Value operand);

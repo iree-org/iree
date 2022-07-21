@@ -46,7 +46,6 @@ iree_bytecode_module(
     src = "simple_embedding_test.mlir",
     c_identifier = "iree_samples_simple_embedding_test_module_vmvx",
     flags = [
-        "--iree-input-type=mhlo",
         "--iree-hal-target-backends=vmvx",
     ],
 )
@@ -66,7 +65,7 @@ endif()
 iree_cmake_extra_content(
     content = """
 if(IREE_HAL_DRIVER_LOCAL_SYNC AND IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF AND
-   (IREE_TARGET_BACKEND_DYLIB_LLVM_AOT OR DEFINED IREE_HOST_BINARY_ROOT))
+   (IREE_TARGET_BACKEND_LLVM_CPU OR DEFINED IREE_HOST_BINARY_ROOT))
 """,
     inline = True,
 )
@@ -99,7 +98,6 @@ iree_bytecode_module(
     src = "simple_embedding_test.mlir",
     c_identifier = "iree_samples_simple_embedding_test_module_dylib_x86_64",
     flags = [
-        "--iree-input-type=mhlo",
         "--iree-hal-target-backends=dylib-llvm-aot",
         "--iree-llvm-target-triple=x86_64-pc-linux-elf",
         "--iree-llvm-debug-symbols=false",
@@ -113,7 +111,6 @@ iree_bytecode_module(
     src = "simple_embedding_test.mlir",
     c_identifier = "iree_samples_simple_embedding_test_module_dylib_riscv_32",
     flags = [
-        "--iree-input-type=mhlo",
         "--iree-hal-target-backends=dylib-llvm-aot",
         "--iree-llvm-target-triple=riscv32-pc-linux-elf",
         "--iree-llvm-target-cpu=generic-rv32",
@@ -130,7 +127,6 @@ iree_bytecode_module(
     src = "simple_embedding_test.mlir",
     c_identifier = "iree_samples_simple_embedding_test_module_dylib_riscv_64",
     flags = [
-        "--iree-input-type=mhlo",
         "--iree-hal-target-backends=dylib-llvm-aot",
         "--iree-llvm-target-triple=riscv64-pc-linux-elf",
         "--iree-llvm-target-cpu=generic-rv64",
@@ -147,7 +143,6 @@ iree_bytecode_module(
     src = "simple_embedding_test.mlir",
     c_identifier = "iree_samples_simple_embedding_test_module_dylib_arm_32",
     flags = [
-        "--iree-input-type=mhlo",
         "--iree-hal-target-backends=dylib-llvm-aot",
         "--iree-llvm-target-triple=armv7a-pc-linux-elf",
         "--iree-llvm-target-float-abi=hard",
@@ -162,7 +157,6 @@ iree_bytecode_module(
     src = "simple_embedding_test.mlir",
     c_identifier = "iree_samples_simple_embedding_test_module_dylib_arm_64",
     flags = [
-        "--iree-input-type=mhlo",
         "--iree-hal-target-backends=dylib-llvm-aot",
         "--iree-llvm-target-triple=aarch64-pc-linux-elf",
         "--iree-llvm-debug-symbols=false",
@@ -249,7 +243,6 @@ iree_bytecode_module(
     src = "simple_embedding_test.mlir",
     c_identifier = "iree_samples_simple_embedding_test_module_vulkan",
     flags = [
-        "--iree-input-type=mhlo",
         "--iree-hal-target-backends=vulkan-spirv",
         "--iree-llvm-debug-symbols=false",
     ],
@@ -299,7 +292,6 @@ endif()
 #     src = "simple_embedding_test.mlir",
 #     c_identifier = "iree_samples_simple_embedding_test_module_cuda",
 #     flags = [
-#         "--iree-input-type=mhlo",
 #         "--iree-hal-target-backends=cuda",
 #         "--iree-llvm-debug-symbols=false",
 #     ],

@@ -28,7 +28,7 @@ py_binary(
         "--shapes=small",
     ],
     target_backends_and_drivers = [
-        ("dylib-llvm-aot", "local-task"),
+        ("llvm-cpu", "local-task"),
         ("vmvx", "local-task"),
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
@@ -49,7 +49,7 @@ py_binary(
         "--shapes=small",
     ],
     target_backends_and_drivers = [
-        ("dylib-llvm-aot", "local-task"),
+        ("llvm-cpu", "local-task"),
     ],
     target_cpu_features_variants = ["default"] +
                                    ([
@@ -73,7 +73,7 @@ py_binary(
         "--shapes=large",
     ],
     target_backends_and_drivers = [
-        ("dylib-llvm-aot", "local-task"),
+        ("llvm-cpu", "local-task"),
     ],
     target_cpu_features_variants = ["default"] +
                                    ([
@@ -101,7 +101,7 @@ py_binary(
         "--shapes=%s" % size,
     ],
     target_backends_and_drivers = [
-        ("dylib-llvm-aot", "local-task"),
+        ("llvm-cpu", "local-task"),
     ],
     target_cpu_features_variants = ["default"] +
                                    ([
@@ -188,7 +188,7 @@ py_binary(
     ],
     target_backends_and_drivers = [
         ("cuda", "cuda"),
-        ("dylib-llvm-aot", "local-task"),
+        ("llvm-cpu", "local-task"),
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
@@ -241,7 +241,7 @@ iree_check_single_backend_test_suite(
 iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_f32_small_no_padding",
     compiler_flags = [
-        "--iree-codegen-disable-matmul-pad-pipeline",
+        "--iree-codegen-enable-vector-padding=false",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -249,7 +249,7 @@ iree_generated_trace_runner_test(
         "--shapes=small",
     ],
     target_backends_and_drivers = [
-        ("dylib-llvm-aot", "local-task"),
+        ("llvm-cpu", "local-task"),
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
 )

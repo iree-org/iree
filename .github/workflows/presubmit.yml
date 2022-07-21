@@ -25,9 +25,26 @@ jobs:
   tsan:
     uses: ./.github/workflows/tsan.yml
 
+  host_tools_assertions:
+    uses: ./.github/workflows/host_tools.yml
+    with:
+      host-binary-root: host-tools
+      enable-assertions: "ON"
+
+  riscv32:
+    needs: host_tools_assertions
+    uses: ./.github/workflows/riscv32.yml
+    with:
+      host-binary-root: host-tools
+
   summary:
     runs-on: ubuntu-20.04
-    needs: [build_runtime, test_runtime, tsan]
+    needs:
+      - build_runtime
+      - host_tools_assertions
+      - test_runtime
+      - tsan
+      - riscv32
     if: always()
     steps:
       - name: Getting combined job status

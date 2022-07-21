@@ -64,10 +64,16 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
 
 // TODO(hanchung): Remove the flag. This is the flag for fastly falling back to
 // the previous snapshot.
-static llvm::cl::opt<bool> disableMatmulPadPipeline(
-    "iree-codegen-disable-matmul-pad-pipeline",
-    llvm::cl::desc("disable padding options in Matmul codegen"),
-    llvm::cl::init(false));
+
+
+static llvm::cl::opt<bool> enableVectorPadding(
+    "iree-codegen-enable-vector-padding",
+    llvm::cl::desc("Enable padding for vectorization"), llvm::cl::init(true));
+
+static llvm::cl::opt<bool> enableVectorPeeling(
+    "iree-codegen-enable-vector-peeling",
+    llvm::cl::desc("Enable peeling for vectorization"), llvm::cl::init(true));
+
 static llvm::cl::opt<bool> enableTripleTilingPipeline(
     "iree-llvmcpu-enable-triple-tiling-pipeline",
     llvm::cl::desc("enable triple tiling expert for matmul kernels"),
@@ -80,6 +86,57 @@ llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName(
     llvm::cl::init(""));
 
 using IREE::Codegen::DispatchLoweringPassPipeline;
+
+// Encodes the pre-processing strategy to be applied on a Linalg operation
+// before vectorization.
+enum class VectorPreProcStrategy {
+  // Pad vector dimensions of tensors so that they are multiple of the vector
+  // length.
+  Padding,
+  // Peel iterations from the vector dimensions so that they become multiple of
+  // the vector length.
+  Peeling,
+  // Do not apply any vectorization pre-processing transformation.
+  None
+};
+
+/// Returns true if all the input and output tensor operands of 'op' are fully
+/// dynamic.
+static bool isFullyDynamicOp(linalg::LinalgOp op) {
+  SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
+  return llvm::all_of(loopRanges,
+                      [](int64_t size) { return ShapedType::isDynamic(size); });
+}
+
+/// Returns the vectorization pre-processing strategy (padding, peeling) for the
+/// given LinalgOp, depending on the op traits and the target architecture.
+static VectorPreProcStrategy getVectorPreProcStrategy(linalg::LinalgOp op) {
+  if (op.hasBufferSemantics()) {
+    return VectorPreProcStrategy::None;
+  }
+
+  // TripleTilingPipeline is only for experimental for now. It's not mature
+  // enough to work well with other strategies.
+  if (enableTripleTilingPipeline) {
+    return VectorPreProcStrategy::None;
+  }
+
+  if (isFullyDynamicOp(op) && enableVectorPeeling) {
+    // Peeling is only enabled on fully dynamic shape ops for now.
+    return VectorPreProcStrategy::Peeling;
+  }
+
+  auto variantOp = getExecutableVariantOp(op);
+  assert(succeeded(variantOp) && "ExecutableVariantOp not found");
+
+  if (isX86(*variantOp) && enableVectorPadding) {
+    // Padding is only enabled on x86. It leads to too much overhead on RISC-V
+    // and ARM.
+    return VectorPreProcStrategy::Padding;
+  }
+
+  return VectorPreProcStrategy::None;
+}
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.variant
 /// op.
@@ -379,44 +436,6 @@ static void splitParallelAndReductionTiles(
   }
 }
 
-/// Returns true if all the input and output tensor operands of 'op' are fully
-/// dynamic.
-static bool isFullyDynamicOp(linalg::LinalgOp op) {
-  SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
-  return llvm::all_of(loopRanges,
-                      [](int64_t size) { return ShapedType::isDynamic(size); });
-}
-
-/// Returns true if peeling might be beneficial for this operation. Returns
-/// false if peeling should not be enabled for this operation.
-static bool isPeelingBeneficial(linalg::LinalgOp op) {
-  if (op.hasBufferSemantics()) {
-    return false;
-  }
-  if (isFullyDynamicOp(op)) {
-    return true;
-  }
-
-  return false;
-}
-
-/// Returns true if padding might be beneficial for this operation. Returns
-/// false if padding should not be enabled for this operation.
-static bool isPaddingBeneficial(linalg::LinalgOp op) {
-  if (op.hasBufferSemantics()) {
-    return false;
-  }
-
-  auto variantOp = getExecutableVariantOp(op);
-  assert(succeeded(variantOp) && "ExecutableVariantOp not found");
-
-  if (!isX86(*variantOp) && !isRISCV(*variantOp)) {
-    return false;
-  }
-
-  return !isPeelingBeneficial(op);
-}
-
 static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
                                     SmallVectorImpl<int64_t> &parallelSizes,
                                     SmallVectorImpl<int64_t> &reductionSizes) {
@@ -435,7 +454,8 @@ static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
 }
 
 static void setVectorSizesForDynamicShapes(
-    linalg::LinalgOp op, SmallVectorImpl<int64_t> &parallelSizes,
+    linalg::LinalgOp op, VectorPreProcStrategy vecPreProcStrategy,
+    SmallVectorImpl<int64_t> &parallelSizes,
     SmallVectorImpl<int64_t> &reductionSizes) {
   SmallVector<int64_t> origParallelSizes(parallelSizes.begin(),
                                          parallelSizes.end());
@@ -447,7 +467,8 @@ static void setVectorSizesForDynamicShapes(
   // lowest order parallel dimension for now to avoid peeling higher level
   // dimensions. If no parallel dimension is found to be vectorized, we try to
   // vectorize the lowest order reduction dimension.
-  if (!isFullyDynamicOp(op) || !isPeelingBeneficial(op)) {
+  if (!isFullyDynamicOp(op) ||
+      vecPreProcStrategy != VectorPreProcStrategy::Peeling) {
     return;
   }
 
@@ -543,6 +564,8 @@ static LogicalResult setMatmulPadRootConfig(
       DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert);
 }
 
+// Returns true if all the tiling sizes are divisible by the next level of
+// tile sizes.
 static bool isNoPadMultiTilingBeneficial(linalg::ContractionOpInterface op,
                                          TileSizesListType tileSizes) {
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
@@ -573,8 +596,8 @@ static bool isNoPadMultiTilingBeneficial(linalg::ContractionOpInterface op,
 }
 
 static DispatchLoweringPassPipeline getNoPadMultiTilingExpert(
-    linalg::LinalgOp op, int numLevels) {
-  if (isPeelingBeneficial(op)) {
+    VectorPreProcStrategy strategy, int numLevels) {
+  if (strategy == VectorPreProcStrategy::Peeling) {
     return DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert;
   }
   switch (numLevels) {
@@ -620,15 +643,16 @@ static LogicalResult setMatmulNoPadRootConfig(func::FuncOp entryPointFn,
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(op.getOperation(), parallelTileSizes,
                                  reductionTileSizes);
-  setVectorSizesForDynamicShapes(op.getOperation(), parallelTileSizes,
-                                 reductionTileSizes);
+  auto vecPreProcStrategy = getVectorPreProcStrategy(linalgOp);
+  setVectorSizesForDynamicShapes(op.getOperation(), vecPreProcStrategy,
+                                 parallelTileSizes, reductionTileSizes);
 
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
-      getNoPadMultiTilingExpert(linalgOp, numLevels));
+      getNoPadMultiTilingExpert(vecPreProcStrategy, numLevels));
 }
 
 static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
@@ -750,7 +774,7 @@ static LogicalResult setRootConfig(
   // scheduling, e.g., transform dialect.
   SmallVector<int64_t> flowTileSizes;
   bool usePaddingPipeline =
-      !disableMatmulPadPipeline && isPaddingBeneficial(linalgOp);
+      getVectorPreProcStrategy(linalgOp) == VectorPreProcStrategy::Padding;
   if (usePaddingPipeline) {
     // It's inspired from Sandbox configuration. Sandbox has
     // [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192 because
@@ -776,26 +800,20 @@ static LogicalResult setRootConfig(
   }
 
   TileSizesListType tileSizes = {flowTileSizes, workgroupTileSizes};
-  if (disableMatmulPadPipeline) {
-    return setMatmulNoPadRootConfig(entryPointFn, contractionOp, tileSizes,
-                                    vectorSize);
-  }
-  if (isX86(*variantOp) || isRISCV(*variantOp)) {
-    // TODO(hanchung): We should make the tile sizes be related to memory
-    // hierarchy. They are derived from experiments for now.
-    if (enableTripleTilingPipeline) {
-      SmallVector<int64_t> l1TileSizes = {0, 0, 384};
-      TileSizesListType tripleTileSizes = {flowTileSizes, l1TileSizes,
-                                           workgroupTileSizes};
-      if (isNoPadMultiTilingBeneficial(contractionOp, tripleTileSizes)) {
-        return setMatmulNoPadRootConfig(entryPointFn, contractionOp,
-                                        tripleTileSizes, vectorSize);
-      }  // else fall back to the default configuration.
-    }
-  }
   if (usePaddingPipeline) {
     return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
                                   workgroupTileSizes, vectorSize);
+  }
+  // TODO(hanchung): We should make the tile sizes be related to memory
+  // hierarchy. They are derived from experiments for now.
+  if (enableTripleTilingPipeline) {
+    SmallVector<int64_t> l1TileSizes = {0, 0, 384};
+    TileSizesListType tripleTileSizes = {flowTileSizes, l1TileSizes,
+                                         workgroupTileSizes};
+    if (isNoPadMultiTilingBeneficial(contractionOp, tripleTileSizes)) {
+      return setMatmulNoPadRootConfig(entryPointFn, contractionOp,
+                                      tripleTileSizes, vectorSize);
+    }  // else fall back to the default configuration.
   }
   return setMatmulNoPadRootConfig(entryPointFn, contractionOp, tileSizes,
                                   vectorSize);
@@ -960,8 +978,9 @@ static LogicalResult setDefaultGenericOpRootConfig(
   splitParallelAndReductionTiles(genericOp, parallelTileSizes,
                                  reductionTileSizes);
 
-  setVectorSizesForDynamicShapes(genericOp, parallelTileSizes,
-                                 reductionTileSizes);
+  auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
+  setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy,
+                                 parallelTileSizes, reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
@@ -972,7 +991,7 @@ static LogicalResult setDefaultGenericOpRootConfig(
   DispatchLoweringPassPipeline passPipeline;
   if (genericOp.hasTensorSemantics()) {
     passPipeline =
-        isPeelingBeneficial(genericOp)
+        vecPreProcStrategy == VectorPreProcStrategy::Peeling
             ? DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert
             : DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
   } else {

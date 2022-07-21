@@ -10,7 +10,7 @@
 # Prerequisites:
 #   * Environment must be configured for Emscripten
 #   * Host tools must be built (default at IREE_SOURCE_DIR/build-host/install).
-#     The build_tools/cmake/build_host_install.sh script can do this for you.
+#     The build_tools/cmake/build_host_tools.sh script can do this for you.
 #
 # Usage:
 #   build_tests.sh (optional install path) && serve_tests.sh

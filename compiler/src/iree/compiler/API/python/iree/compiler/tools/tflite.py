@@ -157,30 +157,34 @@ def compile_file(fb_path: str, **kwargs):
     return result
 
 
-def compile_str(fb_content: bytes, **kwargs):
+def compile_str(input_bytes: bytes, **kwargs):
   """Compiles in-memory TFLite FlatBuffer to an IREE binary.
 
   Args:
-    fb_content: Flatbuffer content as bytes.
+    input_bytes: Flatbuffer content as bytes or IR string.
     **kwargs: Keyword args corresponding to ImportOptions or CompilerOptions.
   Returns:
     A bytes-like object with the compiled output or None if output_file=
     was specified.
   """
+  input_bytes = input_bytes.encode("utf-8") if isinstance(input_bytes,
+                                                          str) else input_bytes
   with TempFileSaver.implicit() as tfs:
     options = ImportOptions(**kwargs)
     import_cl = build_import_command_line("-", tfs, options)
     if options.import_only:
       # One stage tool pipeline.
-      result = invoke_immediate(import_cl, immediate_input=fb_content)
+
+      result = invoke_immediate(import_cl, immediate_input=input_bytes)
       if options.output_file:
         return None
+      result = result.decode("utf-8")
       return result
 
     # Full compilation pipeline.
     compile_cl = build_compile_command_line("-", tfs, options)
     result = invoke_pipeline([import_cl, compile_cl],
-                             immediate_input=fb_content)
+                             immediate_input=input_bytes)
     if options.output_file:
       return None
-    return result
+    return result.decode("utf-8") if result is not None else result

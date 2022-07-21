@@ -11,7 +11,7 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Host.h"
 
-#define DEBUG_TYPE "llvmaot-linker"
+#define DEBUG_TYPE "llvm-linker"
 
 namespace mlir {
 namespace iree_compiler {
@@ -24,7 +24,7 @@ using llvm::Triple;
 //   https://developer.android.com/ndk/guides/other_build_systems
 //
 // If we want to support self-built variants we'll need an env var (or just make
-// the user set IREE_LLVMAOT_SYSTEM_LINKER_PATH).
+// the user set IREE_LLVM_SYSTEM_LINKER_PATH).
 static const char *getNDKHostPlatform() {
   auto hostTriple = Triple(llvm::sys::getProcessTriple());
   if (hostTriple.isOSLinux() && hostTriple.getArch() == Triple::x86_64) {

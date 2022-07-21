@@ -43,7 +43,7 @@ iree_check_single_backend_test_suite(
         ],
     ),
     driver = "local-task",
-    target_backend = "dylib-llvm-aot",
+    target_backend = "llvm-cpu",
 )
 
 iree_check_single_backend_test_suite(

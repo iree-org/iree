@@ -234,8 +234,6 @@ class BenchmarkDriver(object):
         available_drivers.append("local-sync")
       elif name == "IREE_HAL_DRIVER_LOCAL_TASK":
         available_drivers.append("local-task")
-      elif name == "IREE_HAL_DRIVER_EXPERIMENTAL_ROCM":
-        available_drivers.append("rocm")
       elif name == "IREE_HAL_DRIVER_VULKAN":
         available_drivers.append("vulkan")
       elif name == "IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF":

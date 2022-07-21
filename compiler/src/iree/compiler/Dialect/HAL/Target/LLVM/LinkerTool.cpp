@@ -9,7 +9,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Process.h"
 
-#define DEBUG_TYPE "llvmaot-linker"
+#define DEBUG_TYPE "llvm-linker"
 
 namespace mlir {
 namespace iree_compiler {
@@ -115,7 +115,7 @@ std::string LinkerTool::getSystemToolPath() const {
   }
 
   // Allow users to override the automatic search with an environment variable.
-  char *linkerPath = std::getenv("IREE_LLVMAOT_SYSTEM_LINKER_PATH");
+  char *linkerPath = std::getenv("IREE_LLVM_SYSTEM_LINKER_PATH");
   if (linkerPath) {
     return std::string(linkerPath);
   }

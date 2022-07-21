@@ -39,7 +39,6 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_vmvx"
   FLAGS
-    "--iree-input-type=mhlo"
     "--iree-hal-target-backends=vmvx"
   PUBLIC
 )
@@ -54,7 +53,7 @@ iree_native_test(
 endif()
 
 if(IREE_HAL_DRIVER_LOCAL_SYNC AND IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF AND
-   (IREE_TARGET_BACKEND_DYLIB_LLVM_AOT OR DEFINED IREE_HOST_BINARY_ROOT))
+   (IREE_TARGET_BACKEND_LLVM_CPU OR DEFINED IREE_HOST_BINARY_ROOT))
 
 iree_cc_binary(
   NAME
@@ -86,7 +85,6 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_dylib_x86_64"
   FLAGS
-    "--iree-input-type=mhlo"
     "--iree-hal-target-backends=dylib-llvm-aot"
     "--iree-llvm-target-triple=x86_64-pc-linux-elf"
     "--iree-llvm-debug-symbols=false"
@@ -103,7 +101,6 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_dylib_riscv_32"
   FLAGS
-    "--iree-input-type=mhlo"
     "--iree-hal-target-backends=dylib-llvm-aot"
     "--iree-llvm-target-triple=riscv32-pc-linux-elf"
     "--iree-llvm-target-cpu=generic-rv32"
@@ -123,7 +120,6 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_dylib_riscv_64"
   FLAGS
-    "--iree-input-type=mhlo"
     "--iree-hal-target-backends=dylib-llvm-aot"
     "--iree-llvm-target-triple=riscv64-pc-linux-elf"
     "--iree-llvm-target-cpu=generic-rv64"
@@ -143,7 +139,6 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_dylib_arm_32"
   FLAGS
-    "--iree-input-type=mhlo"
     "--iree-hal-target-backends=dylib-llvm-aot"
     "--iree-llvm-target-triple=armv7a-pc-linux-elf"
     "--iree-llvm-target-float-abi=hard"
@@ -161,7 +156,6 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_dylib_arm_64"
   FLAGS
-    "--iree-input-type=mhlo"
     "--iree-hal-target-backends=dylib-llvm-aot"
     "--iree-llvm-target-triple=aarch64-pc-linux-elf"
     "--iree-llvm-debug-symbols=false"
@@ -238,7 +232,6 @@ iree_bytecode_module(
   C_IDENTIFIER
     "iree_samples_simple_embedding_test_module_vulkan"
   FLAGS
-    "--iree-input-type=mhlo"
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-llvm-debug-symbols=false"
   PUBLIC

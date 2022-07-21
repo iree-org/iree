@@ -21,7 +21,7 @@ iree_generated_trace_runner_test(
   TRACE_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
-    "dylib-llvm-aot"
+    "llvm-cpu"
     "vmvx"
   DRIVERS
     "local-task"
@@ -39,7 +39,7 @@ iree_generated_trace_runner_test(
   TRACE_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
-    "dylib-llvm-aot"
+    "llvm-cpu"
     "vmvx"
   DRIVERS
     "local-task"
@@ -57,7 +57,7 @@ iree_generated_trace_runner_test(
   TRACE_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
-    "dylib-llvm-aot"
+    "llvm-cpu"
   DRIVERS
     "local-task"
   COMPILER_FLAGS
@@ -79,7 +79,7 @@ iree_generated_trace_runner_test(
   TRACE_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
-    "dylib-llvm-aot"
+    "llvm-cpu"
   DRIVERS
     "local-task"
   COMPILER_FLAGS
@@ -99,7 +99,7 @@ iree_generated_trace_runner_test(
   TRACE_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
-    "dylib-llvm-aot"
+    "llvm-cpu"
   DRIVERS
     "local-task"
   COMPILER_FLAGS
@@ -121,7 +121,7 @@ iree_generated_trace_runner_test(
   TRACE_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
-    "dylib-llvm-aot"
+    "llvm-cpu"
   DRIVERS
     "local-task"
   COMPILER_FLAGS
@@ -141,7 +141,7 @@ iree_generated_trace_runner_test(
   TRACE_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
-    "dylib-llvm-aot"
+    "llvm-cpu"
   DRIVERS
     "local-task"
   COMPILER_FLAGS
@@ -164,7 +164,7 @@ iree_generated_trace_runner_test(
   TRACE_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
-    "dylib-llvm-aot"
+    "llvm-cpu"
   DRIVERS
     "local-task"
   COMPILER_FLAGS
@@ -234,7 +234,7 @@ iree_generated_trace_runner_test(
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "cuda"
-    "dylib-llvm-aot"
+    "llvm-cpu"
   DRIVERS
     "cuda"
     "local-task"
@@ -318,11 +318,11 @@ iree_generated_trace_runner_test(
   TRACE_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
-    "dylib-llvm-aot"
+    "llvm-cpu"
   DRIVERS
     "local-task"
   COMPILER_FLAGS
-    "--iree-codegen-disable-matmul-pad-pipeline"
+    "--iree-codegen-enable-vector-padding=false"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -47,7 +47,7 @@ popd
 export PATH="${BAZEL_BINDIR?}/iree_tf_compiler:${PATH}"
 
 echo "Cross-compiling with cmake"
-./build_tools/cmake/build_riscv.sh
+./build_tools/cmake/build_host_and_riscv.sh
 
 echo "Run sanity tests"
 ./build_tools/kokoro/gcp_ubuntu/cmake/linux/riscv64/test.sh
