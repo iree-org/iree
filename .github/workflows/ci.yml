@@ -142,7 +142,7 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env "RISCV_CONFIG=${RISCV_CONFIG}" \
             --env "BUILD_RISCV_DIR=${BUILD_RISCV_DIR}" \
-            --env "IREE_HOST_BINARY_ROOT=${HOST_BINARY_ARCHIVE}" \
+            --env "IREE_HOST_BINARY_ROOT=${HOST_BINARY_ROOT}" \
             gcr.io/iree-oss/riscv@sha256:e566f054ff1b1d8be61459ce4789dd944b70e85c8939a4d3b7331ab519d8db4c \
             bash -c \
             "./build_tools/cmake/build_riscv.sh && build_tools/kokoro/gcp_ubuntu/cmake/baremetal/riscv32/test.sh"
