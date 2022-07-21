@@ -9,6 +9,12 @@
 
 include "mlir/Pass/PassBase.td"
 
+def ConvertTFLConditionals :
+    Pass<"iree-tflite-convert-conditionals", "mlir::ModuleOp"> {
+  let summary = "Converts TFLite conditionals to the TOSA dialect.";
+  let constructor = "mlir::iree_integrations::TFL::createConvertTFLConditionalsPass()";
+}
+
 def ConvertFunctionMetadata :
     Pass<"iree-tflite-convert-function-metadata", "mlir::func::FuncOp"> {
   let summary = "Converts TFLite attributes to IREE attributes on functions.";

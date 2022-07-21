@@ -49,6 +49,12 @@ void buildTFLImportPassPipeline(OpPassManager &pm) {
   pm.nest<func::FuncOp>().addPass(createConvertFunctionMetadataPass());
 
   //----------------------------------------------------------------------------
+  // Convert TFL conditionals to TOSA
+  //----------------------------------------------------------------------------
+
+  pm.addPass(createConvertTFLConditionalsPass());
+
+  //----------------------------------------------------------------------------
   // Convert all TFL ops to TOSA ops
   //----------------------------------------------------------------------------
 
