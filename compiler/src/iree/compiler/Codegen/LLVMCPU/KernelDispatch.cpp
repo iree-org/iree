@@ -650,9 +650,10 @@ static void getDefaultMatmulWorkgroupSizes(linalg::LinalgOp op,
 }
 
 /// Main utility to compute the workgroup (vectorization/unrolling) tile sizes.
-static SmallVector<int64_t> getMatmulWorkgroupSizes(
-    func::FuncOp entryPointFn, linalg::LinalgOp op,
-    int64_t vectorSize, bool isQuantized) {
+static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,
+                                                    linalg::LinalgOp op,
+                                                    int64_t vectorSize,
+                                                    bool isQuantized) {
   SmallVector<int64_t> matmulTileSizes;
   auto variantOp = getExecutableVariantOp(entryPointFn);
   assert(succeeded(variantOp) && "ExecutableVariantOp not found");
