@@ -33,8 +33,7 @@ int main(int argc, char **argv) {
   static cl::opt<std::string> inputPath(
       cl::Positional, cl::desc("<TFLite FlatBuffer>"), cl::Required);
   static cl::opt<bool> loadMlirFile(
-    "import-from-mlir",
-    cl::desc("Import should come from an mlir file"));
+      "import-from-mlir", cl::desc("Import should come from an mlir file"));
   static cl::opt<std::string> outputFilename("o", cl::desc("Output filename"),
                                              cl::value_desc("filename"),
                                              cl::init("-"));
