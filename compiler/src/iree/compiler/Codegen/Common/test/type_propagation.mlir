@@ -239,3 +239,61 @@ func.func @fill_op() {
 //  CHECK-SAME:       ins(%[[EXT_SCALAR]] :
 //  CHECK-SAME:       outs(%[[INIT]] :
 //       CHECK:   flow.dispatch.tensor.store %[[FILL]], %[[OUT]]
+
+// -----
+
+#map = affine_map<(d0) -> (d0)>
+func.func @constant_op() {
+  %a = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:4xi32>
+  %b = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:4xi32>
+  %c = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<writeonly:4xi32>
+  %at = flow.dispatch.tensor.load %a, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xi32> -> tensor<4xi32>
+  %bt = flow.dispatch.tensor.load %b, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xi32> -> tensor<4xi32>
+  %select = arith.constant dense<[true, false, true, false]> : tensor<4xi1>
+  %init = linalg.init_tensor [4] : tensor<4xi32>
+  %result = linalg.generic {
+      indexing_maps = [#map, #map, #map, #map],
+      iterator_types = ["parallel"]}
+      ins(%select, %at, %bt : tensor<4xi1>, tensor<4xi32>, tensor<4xi32>)
+      outs(%init : tensor<4xi32>) {
+    ^bb0(%b0 : i1, %b1 : i32, %b2 : i32, %b3 : i32) :
+      %0 = arith.select %b0, %b1, %b2 : i32
+      linalg.yield %0 : i32
+  } -> tensor<4xi32>
+  flow.dispatch.tensor.store %result, %c, offsets = [0], sizes = [4], strides = [1] : tensor<4xi32> -> !flow.dispatch.tensor<writeonly:4xi32>
+  return
+}
+// CHECK-LABEL: func.func @constant_op()
+//       CHECK:   %[[CONST:.+]] = arith.constant dense<[1, 0, 1, 0]> : tensor<4xi8>
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       ins(%[[CONST]]
+//  CHECK-NEXT:   ^bb0
+//  CHECK-SAME:       %[[B0:.+]]: i8
+//       CHECK:     %[[TRUNC:.+]] = arith.trunci %[[B0]] : i8 to i1
+//       CHECK:     arith.select %[[TRUNC]]
+
+// -----
+
+#map = affine_map<(d0) -> (d0)>
+func.func @constant_splat_op() {
+  %a = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:4xi32>
+  %b = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:4xi32>
+  %c = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<writeonly:4xi32>
+  %at = flow.dispatch.tensor.load %a, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xi32> -> tensor<4xi32>
+  %bt = flow.dispatch.tensor.load %b, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xi32> -> tensor<4xi32>
+  %select = arith.constant dense<true> : tensor<4xi1>
+  %init = linalg.init_tensor [4] : tensor<4xi32>
+  %result = linalg.generic {
+      indexing_maps = [#map, #map, #map, #map],
+      iterator_types = ["parallel"]}
+      ins(%select, %at, %bt : tensor<4xi1>, tensor<4xi32>, tensor<4xi32>)
+      outs(%init : tensor<4xi32>) {
+    ^bb0(%b0 : i1, %b1 : i32, %b2 : i32, %b3 : i32) :
+      %0 = arith.select %b0, %b1, %b2 : i32
+      linalg.yield %0 : i32
+  } -> tensor<4xi32>
+  flow.dispatch.tensor.store %result, %c, offsets = [0], sizes = [4], strides = [1] : tensor<4xi32> -> !flow.dispatch.tensor<writeonly:4xi32>
+  return
+}
+// CHECK-LABEL: func.func @constant_splat_op()
+//       CHECK:   arith.constant dense<1> : tensor<4xi8>

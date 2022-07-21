@@ -27,6 +27,7 @@ BACKEND_TESTS = [
     "dynamic_torch_index_select_negative.mlir",
     "dynamic_torch_index_select_scalar.mlir",
     "dynamic_torch_index_select_vector.mlir",
+    "i1_inlined_constant.mlir",
     "linalg_ops.mlir",
     "strided_slice.mlir",
 ]
