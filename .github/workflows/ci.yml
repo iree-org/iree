@@ -15,7 +15,6 @@ on:
 
 env:
   RUNTIME_BUILD_DIR: build-runtime
-  HOST_TOOLS_ASSERTIONS: host-tools-assertions
 
 jobs:
   build_runtime:
@@ -92,7 +91,15 @@ jobs:
   host_tools_assertions:
     uses: ./.github/workflows/host_tools.yml
     with:
-      host-binary-root: ${{ env.HOST_TOOLS_ASSERTIONS }}
+      # Note: must match directory used by dependent jobs. env context is not
+      # available in <job>.with (see
+      # https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability)
+      # and GitHub actions don't have variables or even support normal yaml
+      # anchors (they are specially disabled because...reasons?):
+      # See https://github.com/github-community/community/discussions/4501
+      # https://github.community/t/support-for-yaml-anchors/16128/92
+      # https://github.com/actions/runner/issues/1182
+      host-binary-root: host-tools-assertions
       enable-assertions: "ON"
 
   riscv32:
@@ -112,6 +119,7 @@ jobs:
     env:
       BUILD_RISCV_DIR: "build-riscv-rv32-baremetal"
       RISCV_CONFIG: "rv32-baremetal"
+      HOST_BINARY_ROOT: host-tools-assertions
       HOST_BINARY_ARCHIVE: ${{ env.HOST_TOOLS_ASSERTIONS }}.tar
     steps:
       - name: "Checking out repository"
