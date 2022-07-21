@@ -16,7 +16,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 
-BUILD_DIR="${1:${IREE_TSAN_BUILD_DIR:-build-tsan}}"
+BUILD_DIR="${1:-${IREE_TSAN_BUILD_DIR:-build-tsan}}"
 
 source "${SCRIPT_DIR}/setup_build.sh"
 
