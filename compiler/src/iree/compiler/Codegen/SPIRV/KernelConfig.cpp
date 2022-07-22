@@ -418,7 +418,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
       // Require all affine maps to be projected permutation so that we can
       // generate vector transfer ops.
       llvm::all_of(
-          linalgOp.getIndexingMaps(),
+          linalgOp.getIndexingMapsArray(),
           [](AffineMap map) { return map.isProjectedPermutation(); }) &&
       // TODO: Fix non-32-bit element type vectorization and remove this.
       llvm::all_of(linalgOp->getOperands(), has32BitElementType) &&
