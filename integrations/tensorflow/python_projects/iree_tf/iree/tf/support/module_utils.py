@@ -285,19 +285,48 @@ class _IreeFunctionWrapper(_FunctionWrapper):
   def __init__(self, context: iree.runtime.SystemContext, f):
     self._context = context
     self._f = f
+    self._inputs = None
+
+  def _get_function_inputs(self, args):
+    def flatten(entries):
+      if entries is None:
+        return []
+      if isinstance(entries, list) or isinstance(entries, tuple):
+        flattened = []
+        for entry in entries:
+          flattened = flattened + flatten(entry)
+        return flattened
+      if isinstance(entries, dict):
+        flattened = []
+        for entry in entries:
+          entry = entries[entry]
+          flattened = flattened + flatten(entry)
+        return flattened
+      return [entries]
+    args = flatten(args)
+
+    def convert(arr):
+      ty = [str(d) for d in arr.shape]
+      ty.append(str(arr.dtype).replace("int", "i").replace("float", "f").replace("bool", "i1"))
+      ty = "x".join(ty)
+      arr = np.asarray(arr).flatten()
+      if arr.size > 0 and np.all(flatten == arr[0]):
+        value = arr[0]
+      else:
+        value = " ".join([str(a) for a in arr])
+      return f"{ty}={value}"
+    return [convert(a) for a in args]
 
   def __call__(self, *args, **kwargs):
-    return self._f(*args, **kwargs)
+
+    self._inputs = self._get_function_inputs(args)
+    results = self._f(*args, **kwargs)
+    self._outputs = self._get_function_inputs(results)
+    return results
 
   def get_serialized_values(self) -> Tuple[Tuple[str], Tuple[str]]:
     """Get cxx serialized inputs and outputs for this function."""
-    if hasattr(self._f, "get_serialized_values"):
-      # TODO: The native ABI does not implement this, and if still needed,
-      # it should not be implemented this way (maybe a thread local trace
-      # listener).
-      return self._f.get_serialized_values()
-    else:
-      return ("",), ("",)
+    return self._inputs, self._outputs
 
 
 class IreeCompiledModule(CompiledModule):
