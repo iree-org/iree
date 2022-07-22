@@ -149,10 +149,6 @@ struct FftOpPartitionableLoops
 
   llvm::SmallVector<unsigned> getPartitionableLoops(
       Operation *op, unsigned maxNumPartitionedLoops) const {
-    // For now just return the loops that are returned by the
-    // `TiledOpInterface`. This needs to be further pruned to remove unit-dim
-    // loops, but that needs the interface to return the static sizes of the
-    // loops.
     auto fftOp = cast<IREE::LinalgExt::FftOp>(op);
     auto range = llvm::seq<unsigned>(0, fftOp.getOperandRank());
     SmallVector<unsigned> partitionableLoops(range.begin(), range.end());

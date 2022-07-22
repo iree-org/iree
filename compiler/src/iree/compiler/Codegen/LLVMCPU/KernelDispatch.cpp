@@ -1322,7 +1322,7 @@ static FailureOr<Operation *> getRootOperation(
       continue;
     }
 
-    if (auto tiledOpInterfaceOp = dyn_cast<TilingInterface>(op)) {
+    if (isa<TilingInterface>(op)) {
       // All other operations that implement this interface are root ops.
       if (failed(updateRootOperation(op))) return failure();
       continue;
