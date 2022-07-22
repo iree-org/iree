@@ -39,11 +39,11 @@ jobs:
       # unnecessary (and perhaps harmful) to do our own, though that hasn't been
       # investigated.
       - name: "Create build dir archive"
-        run: tar -cf ${BUILD_DIR}.tar ${BUILD_DIR}
+        run: tar -czf ${BUILD_DIR}.tar.gz ${BUILD_DIR}
       - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8  # v3.1.0
         with:
-          name: "${{ env.BUILD_DIR }}.tar"
-          path: "${{ env.BUILD_DIR }}.tar"
+          name: "${{ env.BUILD_DIR }}.tar.gz"
+          path: "${{ env.BUILD_DIR }}.tar.gz"
 
   test_runtime:
     needs: build_runtime
@@ -58,9 +58,9 @@ jobs:
       - name: "Downloading runtime build directory"
         uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
         with:
-          name: "${{ env.BUILD_DIR }}.tar"
+          name: "${{ env.BUILD_DIR }}.tar.gz"
       - name: "Extract archive"
-        run: tar -xf ${BUILD_DIR}.tar
+        run: tar -xzf ${BUILD_DIR}.tar.gz
       - name: "Testing runtime"
         run: |
           ./build_tools/github_actions/docker_run.sh \
@@ -108,11 +108,11 @@ jobs:
       # unnecessary (and perhaps harmful) to do our own, though that hasn't been
       # investigated.
       - name: "Create build dir archive"
-        run: tar -cf ${BUILD_DIR}.tar ${BUILD_DIR}
+        run: tar -czf ${BUILD_DIR}.tar.gz ${BUILD_DIR}
       - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8  # v3.1.0
         with:
-          name: "${{ env.BUILD_DIR }}.tar"
-          path: "${{ env.BUILD_DIR }}.tar"
+          name: "${{ env.BUILD_DIR }}.tar.gz"
+          path: "${{ env.BUILD_DIR }}.tar.gz"
 
   test_all:
     needs: build_all
@@ -141,9 +141,9 @@ jobs:
       - name: "Downloading build directory"
         uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
         with:
-          name: "${{ env.BUILD_DIR }}.tar"
+          name: "${{ env.BUILD_DIR }}.tar.gz"
       - name: "Extract archive"
-        run: tar -xf ${BUILD_DIR}.tar
+        run: tar -xzf ${BUILD_DIR}.tar.gz
       - name: "Testing all"
         run: |
           ./build_tools/github_actions/docker_run.sh \
@@ -184,9 +184,9 @@ jobs:
       - name: "Downloading build directory"
         uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
         with:
-          name: "${{ env.BUILD_DIR }}.tar"
+          name: "${{ env.BUILD_DIR }}.tar.gz"
       - name: "Extract archive"
-        run: tar -xf ${BUILD_DIR}.tar
+        run: tar -xzf ${BUILD_DIR}.tar.gz
       - name: "Testing with GPU"
         run: |
           ./build_tools/github_actions/docker_run.sh \
@@ -251,7 +251,7 @@ jobs:
       BUILD_RISCV_DIR: "build-riscv-rv32-baremetal"
       RISCV_CONFIG: "rv32-baremetal"
       HOST_BINARY_ROOT: ${{ needs.host_tools_assertions.outputs.host-binary-root }}
-      HOST_BINARY_ARCHIVE: ${{ needs.host_tools_assertions.outputs.host-binary-root }}.tar
+      HOST_BINARY_ARCHIVE: ${{ needs.host_tools_assertions.outputs.host-binary-root }}.tar.gz
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
@@ -263,7 +263,7 @@ jobs:
           name: "${{ env.HOST_BINARY_ARCHIVE }}"
       - name: "Extracting host tools archive"
         run: |
-          tar -xvf ${HOST_BINARY_ARCHIVE}
+          tar -xgvf ${HOST_BINARY_ARCHIVE}
       - name: "Cross-compiling and testing riscv32"
         run: |
           ./build_tools/github_actions/docker_run.sh \
