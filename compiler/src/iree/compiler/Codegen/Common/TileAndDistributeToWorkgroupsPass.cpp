@@ -379,17 +379,6 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
         return signalPassFailure();
       }
     }
-    // TODO(ravishankarm): For now add the Tiling patterns for LinalgExt ops
-    // separately. This all is to be cleaned up shortly.
-    {
-      RewritePatternSet patterns(context);
-      patterns.insert<IREE::LinalgExt::TilingInterfaceTilingPattern>(
-          context, linalgTilingOptions,
-          linalg::LinalgTransformationFilter(marker));
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After Tile + Distribute ---\n";

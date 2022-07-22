@@ -176,8 +176,8 @@ static void populateTilingToInvocationPatterns(
      // FFT doesn't support second level of tiling yet.
      return success(!isa<IREE::LinalgExt::FftOp>(op));
    }).setMatchByDefault();
-  patterns.insert<linalg::LinalgTilingPattern>(context, tilingOptions, f);
-  patterns.insert<IREE::LinalgExt::TilingInterfaceTilingPattern>(
+  patterns.insert<linalg::LinalgTilingPattern,
+                  IREE::LinalgExt::TilingInterfaceTilingPattern>(
       context, tilingOptions, f);
 }
 

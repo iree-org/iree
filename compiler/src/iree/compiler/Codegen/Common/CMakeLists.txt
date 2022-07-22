@@ -130,6 +130,7 @@ iree_cc_library(
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
+    MLIRTilingInterface
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorTransforms
