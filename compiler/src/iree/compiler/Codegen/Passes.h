@@ -273,9 +273,9 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize = {});
-void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
-                                       bool enablePeeling,
-                                       bool lowerToAVX2 = false);
+void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
+                                      int64_t numLevels, bool enablePeeling,
+                                      bool lowerToAVX2 = false);
 void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager);
 
 // Populates the passes needed to do tiling, decomposing, and vectorizing the

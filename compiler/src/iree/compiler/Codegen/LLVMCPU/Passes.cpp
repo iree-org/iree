@@ -359,31 +359,24 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager) {
   }
 }
 
-void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
-                                       bool enablePeeling, bool lowerToAVX2) {
+void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
+                                      int64_t numLevels, bool enablePeeling,
+                                      bool lowerToAVX2) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  // Run LinalgFusePass firstly in case that we have fill + matmul + generic
-  // ops. At this stage, we do not apply vectorization. The reduction dim won't
-  // get tiled if the case is matmul + generic op. In this case, we have to tile
-  // along reduction dim again, which needs them to be Linalg ops form.
   {
     LinalgFusePassOptions options;
-    options.tilingLevel =
-        static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
-    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+    for (int64_t i = 1; i < numLevels; ++i) {
+      options.tilingLevel = i;
+      nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
+    }
   }
 
-  // Add the sandbox single tiling expert to tile and vectorize.
   {
     LinalgSingleTilingExpertPassOptions options;
     options.peel = enablePeeling;
     options.vectorize = true;
-    options.tilingLevel =
-        static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
