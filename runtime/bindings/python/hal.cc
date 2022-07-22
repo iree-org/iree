@@ -286,6 +286,9 @@ py::object MapElementTypeToDType(iree_hal_element_type_t element_type) {
     case IREE_HAL_ELEMENT_TYPE_UINT_64:
       dtype_code = "L";
       break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
+      dtype_code = "e";
+      break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
       dtype_code = "f";
       break;
