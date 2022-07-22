@@ -69,6 +69,133 @@ jobs:
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
+  build_all:
+    runs-on:
+      # self-hosted has to be listed first. See
+      # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
+      - self-hosted
+      # Have to do a weird hack to get a pseudo-ternary operator. See
+      # https://github.com/actions/runner/issues/409. To make matters worse, we
+      # have to repeat this everywhere because GitHub actions don't have
+      # variables or even support normal yaml anchors (they are specially
+      # disabled because...reasons?):
+      # See https://github.com/github-community/community/discussions/4501
+      # https://github.community/t/support-for-yaml-anchors/16128/92
+      # https://github.com/actions/runner/issues/1182
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: full-build-dir
+    outputs:
+      # Pass through the build directory as output so it's available to
+      # dependent jobs.
+      build-dir: ${{ env.BUILD_DIR }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        with:
+          submodules: true
+      - name: "Building IREE"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
+            ./build_tools/cmake/clean_build.sh
+      # Using a tar archive is necessary to preserve file permissions. See
+      # https://github.com/actions/upload-artifact#maintaining-file-permissions-and-case-sensitive-files
+      # The upload action already does its own gzip compression, so it's likely
+      # unnecessary (and perhaps harmful) to do our own, though that hasn't been
+      # investigated.
+      - name: "Create build dir archive"
+        run: tar -cf ${BUILD_DIR}.tar ${BUILD_DIR}
+      - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8  # v3.1.0
+        with:
+          name: "${{ env.BUILD_DIR }}.tar"
+          path: "${{ env.BUILD_DIR }}.tar"
+
+  test_all:
+    needs: build_all
+    runs-on:
+      # self-hosted has to be listed first. See
+      # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
+      - self-hosted
+      # Have to do a weird hack to get a pseudo-ternary operator. See
+      # https://github.com/actions/runner/issues/409. To make matters worse, we
+      # have to repeat this everywhere because GitHub actions don't have
+      # variables or even support normal yaml anchors (they are specially
+      # disabled because...reasons?):
+      # See https://github.com/github-community/community/discussions/4501
+      # https://github.community/t/support-for-yaml-anchors/16128/92
+      # https://github.com/actions/runner/issues/1182
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        with:
+          submodules: true
+      - name: "Downloading build directory"
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
+        with:
+          name: "${{ env.BUILD_DIR }}.tar"
+      - name: "Extract archive"
+        run: tar -xf ${BUILD_DIR}.tar
+      - name: "Testing all"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env IREE_CUDA_DISABLE=1 \
+            gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
+            ./build_tools/cmake/ctest_all.sh \
+            "${BUILD_DIR}"
+
+  test_gpu:
+    needs: build_all
+    runs-on:
+      # self-hosted has to be listed first. See
+      # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
+      - self-hosted
+      # Have to do a weird hack to get a pseudo-ternary operator. See
+      # https://github.com/actions/runner/issues/409. To make matters worse, we
+      # have to repeat this everywhere because GitHub actions don't have
+      # variables or even support normal yaml anchors (they are specially
+      # disabled because...reasons?):
+      # See https://github.com/github-community/community/discussions/4501
+      # https://github.community/t/support-for-yaml-anchors/16128/92
+      # https://github.com/actions/runner/issues/1182
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - gpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+    steps:
+      - name: Querying GPU information
+        run: |
+          dmesg | grep NVRM
+          dpkg -l | grep nvidia
+          nvidia-smi || true
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        with:
+          submodules: true
+      - name: "Downloading build directory"
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
+        with:
+          name: "${{ env.BUILD_DIR }}.tar"
+      - name: "Extract archive"
+        run: tar -xf ${BUILD_DIR}.tar
+      - name: "Testing with GPU"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env IREE_VULKAN_F16_DISABLE=0 \
+            --env IREE_CUDA_DISABLE=0 \
+            --gpus all \
+            gcr.io/iree-oss/nvidia@sha256:8d7211e10199136482428b845b312169533f9119d2b9aeffb1ddd942b9e444a0 \
+            bash -c \
+            "dpkg -l | grep nvidia && nvidia-smi; ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh && ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}"
+
   tsan:
     runs-on:
       # self-hosted has to be listed first. See

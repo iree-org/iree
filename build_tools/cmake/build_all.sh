@@ -4,33 +4,30 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build the IREE project with CMake. Designed for CI, but can be run manually.
-# This uses previously cached build results and does not clear the build
-# directory. For a clean build, use build_tools/cmake/clean_build.sh
+# Build "all" of the IREE project. Designed for CI, but can be run locally.
 
-set -x
-set -e
+set -xeuo pipefail
 
-ROOT_DIR=$(git rev-parse --show-toplevel)
+ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
+cd "${ROOT_DIR}"
 
 CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-BUILD_DIR=
+BUILD_DIR="${BUILD_DIR:-$ROOT_DIR/build}"
+IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 
 "$CMAKE_BIN" --version
 ninja --version
 
-cd ${ROOT_DIR?}
-if [ -d "build" ]
-then
-  echo "Build directory already exists. Will use cached results there."
+if [[ -d "${BUILD_DIR}" ]]; then
+  echo "Build directory '${BUILD_DIR}' already exists. Will use cached results there."
 else
-  echo "Build directory does not already exist. Creating a new one."
-  mkdir build
+  echo "Build directory '${BUILD_DIR}' does not already exist. Creating a new one."
+  mkdir "${BUILD_DIR}"
 fi
-cd build
 
-CMAKE_ARGS=(
+declare -a CMAKE_ARGS=(
   "-G" "Ninja"
+  "-B" "${BUILD_DIR}"
   # Let's make linking fast
   "-DIREE_ENABLE_LLD=ON"
   "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
@@ -47,20 +44,21 @@ CMAKE_ARGS=(
   # e.g. ASan builds are not using this, so by enabling assertions here, we
   # get a reasonable mix of {builds with asserts, builds with other features
   # such as ASan but without asserts}.
-  "-DIREE_ENABLE_ASSERTIONS=ON"
+  "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
 
   # Enable CUDA compiler and runtime builds unconditionally. Our CI images all
   # have enough deps to at least build CUDA support and compile CUDA binaries
   # (but not necessarily test on real hardware).
   "-DIREE_HAL_DRIVER_CUDA=ON"
   "-DIREE_TARGET_BACKEND_CUDA=ON"
+  "${ROOT_DIR}"
 )
 
-"$CMAKE_BIN" "${CMAKE_ARGS[@]?}" ..
+"$CMAKE_BIN" "${CMAKE_ARGS[@]}"
 echo "Building all"
 echo "------------"
-"$CMAKE_BIN" --build . -- -k 0
+"$CMAKE_BIN" --build "${BUILD_DIR}" -- -k 0
 
 echo "Building test deps"
 echo "------------------"
-"$CMAKE_BIN" --build . --target iree-test-deps -- -k 0
+"$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
