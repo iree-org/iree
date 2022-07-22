@@ -179,7 +179,7 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
   unsigned numLoops = op.getNumLoops();
   SmallVector<int64_t> minTileSizes(numLoops, 1);
   auto inputOutputOpOperands = op.getInputAndOutputOperands();
-  for (auto map : llvm::enumerate(op.getIndexingMaps())) {
+  for (auto map : llvm::enumerate(op.getIndexingMapsArray())) {
     // Check the fastest varying dimension of the operand. Set the vector size
     // of the corresponding loop to the vector size.
     if (map.value().getNumResults() == 0) continue;
@@ -963,7 +963,7 @@ static bool isSupportedTransposeOp(linalg::GenericOp genericOp) {
   }
 
   // Check that the two indexing maps are a permutation of each other.
-  auto indexing_maps = genericOp.getIndexingMaps();
+  auto indexing_maps = genericOp.getIndexingMapsArray();
   return !indexing_maps[0].isEmpty() && !indexing_maps[1].isEmpty() &&
          ((indexing_maps[0].isIdentity() && !indexing_maps[1].isIdentity() &&
            indexing_maps[1].isPermutation()) ||

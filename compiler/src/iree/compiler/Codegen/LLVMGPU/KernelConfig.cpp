@@ -444,7 +444,7 @@ static LogicalResult setUserConfig(
 // function currently only support the case where all the dimensions are static
 // while we want to support dynamic shapes.
 static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
-  for (auto map : llvm::enumerate(op.getIndexingMaps())) {
+  for (auto map : llvm::enumerate(op.getIndexingMapsArray())) {
     for (auto dim : llvm::enumerate(map.value().getResults())) {
       auto expr = dim.value().dyn_cast<AffineDimExpr>();
       if (expr && expr.getPosition() == d) {

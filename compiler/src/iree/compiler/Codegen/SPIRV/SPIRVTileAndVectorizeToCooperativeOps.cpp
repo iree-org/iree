@@ -234,7 +234,7 @@ class CombineContractTranspose final
     SmallVector<AffineMap> newMaps;
     SmallVector<Value> newSources;
     for (auto source : llvm::enumerate(sources)) {
-      auto map = op.getIndexingMaps()[source.index()];
+      auto map = op.getIndexingMapsArray()[source.index()];
       auto tranposeOp = source.value().getDefiningOp<vector::TransposeOp>();
       if (!tranposeOp) {
         newSources.push_back(source.value());
