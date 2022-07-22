@@ -12,6 +12,8 @@ steps:
   - label: ":hammer_and_wrench: Build host tools"
     key: "build-host-tools"
     commands: |
+      git submodule sync
+      git submodule update --init --jobs 8 --depth 1
       docker run --user=$(id -u):$(id -g) \
         --volume="$${HOME?}:$${HOME?}" \
         --volume="/etc/passwd:/etc/passwd:ro" \
