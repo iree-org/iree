@@ -307,7 +307,7 @@ class _IreeFunctionWrapper(_FunctionWrapper):
 
     def convert(arr):
       ty = [str(d) for d in arr.shape]
-      dty = arr.dtype
+      dty = str(arr.dtype)
       dty = dty.replace("int", "i")
       dty = dty.replace("float", "f")
       dty = dty.replace("bool", "i1")
