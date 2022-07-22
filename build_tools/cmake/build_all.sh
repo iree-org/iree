@@ -12,7 +12,7 @@ ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 cd "${ROOT_DIR}"
 
 CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-BUILD_DIR="${BUILD_DIR:-$ROOT_DIR/build}"
+BUILD_DIR="${1:-${IREE_BUILD_DIR:-build}}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 
 "$CMAKE_BIN" --version

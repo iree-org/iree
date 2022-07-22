@@ -100,7 +100,8 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
-            ./build_tools/cmake/clean_build.sh
+            ./build_tools/cmake/clean_build.sh \
+            "${BUILD_DIR}"
       # Using a tar archive is necessary to preserve file permissions. See
       # https://github.com/actions/upload-artifact#maintaining-file-permissions-and-case-sensitive-files
       # The upload action already does its own gzip compression, so it's likely
