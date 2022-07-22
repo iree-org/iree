@@ -9,7 +9,6 @@
 
 include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtBase.td"
 include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtInterfaces.td"
-include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -54,8 +53,11 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
 //===----------------------------------------------------------------------===//
 
 def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
-    [DeclareOpInterfaceMethods<TiledOpInterface,
-        ["generateScalarImplementation", "getResultTilePosition",
+    [DeclareOpInterfaceMethods<TilingInterface,
+        ["generateScalarImplementation",
+         "getIterationDomain",
+         "getLoopIteratorTypes",
+         "getResultTilePosition",
          "getTiledImplementation"]>]> {
   let summary = "Scatter operator";
   let description = [{
@@ -149,8 +151,11 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
 }
 
 def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
-    [DeclareOpInterfaceMethods<TiledOpInterface,
-        ["generateScalarImplementation", "getResultTilePosition", 
+    [DeclareOpInterfaceMethods<TilingInterface,
+        ["generateScalarImplementation",
+         "getIterationDomain",
+         "getLoopIteratorTypes",
+         "getResultTilePosition", 
          "getTiledImplementation"]>]> {
   let summary = "Sort operator";
   let description = [{
@@ -190,8 +195,11 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
 }
 
 def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
-  DeclareOpInterfaceMethods<TiledOpInterface,
-      ["generateScalarImplementation", "getResultTilePosition",
+  DeclareOpInterfaceMethods<TilingInterface,
+      ["generateScalarImplementation",
+       "getIterationDomain",
+       "getLoopIteratorTypes",
+       "getResultTilePosition",
        "getTiledImplementation"]>]> {
   let summary = "Fft operator";
   let description = [{
@@ -250,8 +258,11 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
 }
 
 def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
-    [DeclareOpInterfaceMethods<TiledOpInterface,
-      ["generateScalarImplementation", "getResultTilePosition",
+    [DeclareOpInterfaceMethods<TilingInterface,
+      ["generateScalarImplementation",
+       "getIterationDomain",
+       "getLoopIteratorTypes",
+       "getResultTilePosition",
        "getTiledImplementation"]>]> {
   let summary = "Scan operator";
   let description = [{
@@ -302,8 +313,11 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
 
 def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
   DeclareOpInterfaceMethods<
-      TiledOpInterface,
-      ["generateScalarImplementation", "getResultTilePosition",
+      TilingInterface,
+      ["generateScalarImplementation",
+       "getIterationDomain",
+       "getLoopIteratorTypes",
+       "getResultTilePosition",
        "getTiledImplementation"]>,
   DeclareOpInterfaceMethods<LinalgExtInterface>]> {
   let summary = "Reverse operator";
@@ -352,8 +366,11 @@ def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
 
 def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   DeclareOpInterfaceMethods<LinalgExtInterface>,
-  DeclareOpInterfaceMethods<TiledOpInterface,
-    ["generateScalarImplementation", "getResultTilePosition",
+  DeclareOpInterfaceMethods<TilingInterface,
+    ["generateScalarImplementation",
+     "getIterationDomain",
+     "getLoopIteratorTypes",
+     "getResultTilePosition",
      "getTiledImplementation"]>,
   SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
 ]>{

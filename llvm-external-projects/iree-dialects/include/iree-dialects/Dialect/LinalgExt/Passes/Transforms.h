@@ -7,9 +7,9 @@
 #ifndef IREE_DIALECTS_DIALECT_LINALGEXT_PASSES_TRANSFORMS_H_
 #define IREE_DIALECTS_DIALECT_LINALGEXT_PASSES_TRANSFORMS_H_
 
-#include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Interfaces/TilingInterface.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -27,23 +27,23 @@ struct TiledOp {
 };
 
 /// Main entry point for tiling LinalgExtOps using TiledOpInterface.
-FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, TiledOpInterface tilableOp,
+FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, TilingInterface tilableOp,
                                    const linalg::LinalgTilingOptions &options);
 
 /// Base rewrite pattern to tile and distribute operations that implement the
 /// `TiledOpInterface`.
 /// Base pattern for tiling TiledOpInterfaceOps.
-struct TiledOpInterfaceBaseTilingPattern
-    : public OpInterfaceRewritePattern<TiledOpInterface> {
-  TiledOpInterfaceBaseTilingPattern(MLIRContext *context,
-                                    linalg::LinalgTilingOptions options,
-                                    linalg::LinalgTransformationFilter filter =
-                                        linalg::LinalgTransformationFilter(),
-                                    PatternBenefit benefit = 1)
+struct TilingInterfaceBaseTilingPattern
+    : public OpInterfaceRewritePattern<TilingInterface> {
+  TilingInterfaceBaseTilingPattern(MLIRContext *context,
+                                   linalg::LinalgTilingOptions options,
+                                   linalg::LinalgTransformationFilter filter =
+                                       linalg::LinalgTransformationFilter(),
+                                   PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern(context, benefit), filter(filter),
         options(options) {}
 
-  LogicalResult matchAndRewriteBase(TiledOpInterface tilableOp,
+  LogicalResult matchAndRewriteBase(TilingInterface tilableOp,
                                     PatternRewriter &rewriter,
                                     TiledOp &result) const;
 
@@ -54,35 +54,16 @@ private:
   linalg::LinalgTilingOptions options;
 };
 
-struct TiledOpInterfaceTilingPattern
-    : public TiledOpInterfaceBaseTilingPattern {
-  TiledOpInterfaceTilingPattern(MLIRContext *context,
-                                linalg::LinalgTilingOptions options,
-                                linalg::LinalgTransformationFilter filter =
-                                    linalg::LinalgTransformationFilter(),
-                                PatternBenefit benefit = 1)
-      : TiledOpInterfaceBaseTilingPattern(context, options, filter, benefit) {}
+struct TilingInterfaceTilingPattern : public TilingInterfaceBaseTilingPattern {
+  TilingInterfaceTilingPattern(MLIRContext *context,
+                               linalg::LinalgTilingOptions options,
+                               linalg::LinalgTransformationFilter filter =
+                                   linalg::LinalgTransformationFilter(),
+                               PatternBenefit benefit = 1)
+      : TilingInterfaceBaseTilingPattern(context, options, filter, benefit) {}
 
-  LogicalResult matchAndRewrite(TiledOpInterface tilableOp,
-                                PatternRewriter &rewriter) const override {
-    TiledOp tiledOp;
-    // Check for failure.
-    if (failed(TiledOpInterfaceBaseTilingPattern::matchAndRewriteBase(
-            tilableOp, rewriter, tiledOp))) {
-      return failure();
-    }
-    // Check for do-nothing case.
-    if (!tiledOp.op)
-      return failure();
-    if (tiledOp.op != tilableOp) {
-      if (tiledOp.results.empty()) {
-        rewriter.eraseOp(tilableOp);
-      } else {
-        rewriter.replaceOp(tilableOp, tiledOp.results);
-      }
-    }
-    return success();
-  }
+  LogicalResult matchAndRewrite(TilingInterface tilableOp,
+                                PatternRewriter &rewriter) const;
 };
 
 } // namespace LinalgExt

@@ -8,7 +8,6 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -105,7 +104,7 @@ struct OuterParallelAsPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
           OuterParallelAsPartitionableLoops<OpTy>, OpTy> {
   unsigned getNumLoops(Operation *op) const {
-    auto tiledOp = cast<IREE::LinalgExt::TiledOpInterface>(op);
+    auto tiledOp = cast<OpTy>(op);
     return tiledOp.getLoopIteratorTypes().size();
   }
 
@@ -116,7 +115,7 @@ struct OuterParallelAsPartitionableLoops
     // loops, but that needs the interface to return the static sizes of the
     // loops.
     SmallVector<unsigned> partitionableLoops;
-    auto interfaceOp = cast<IREE::LinalgExt::TiledOpInterface>(op);
+    auto interfaceOp = cast<OpTy>(op);
     for (auto iteratorType :
          llvm::enumerate(interfaceOp.getLoopIteratorTypes())) {
       if (iteratorType.value() != getParallelIteratorTypeName()) {
@@ -134,7 +133,7 @@ struct OuterParallelAsPartitionableLoops
   }
 
   llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
-    auto tiledOp = cast<IREE::LinalgExt::TiledOpInterface>(op);
+    auto tiledOp = cast<OpTy>(op);
     return tiledOp.getLoopIteratorTypes();
   }
 };
@@ -183,14 +182,14 @@ struct AllParallelAsPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
           AllParallelAsPartitionableLoops<OpTy>, OpTy> {
   unsigned getNumLoops(Operation *op) const {
-    auto tiledOp = cast<IREE::LinalgExt::TiledOpInterface>(op);
+    auto tiledOp = cast<OpTy>(op);
     return tiledOp.getLoopIteratorTypes().size();
   }
 
   llvm::SmallVector<unsigned> getPartitionableLoops(
       Operation *op, unsigned maxNumPartitionedLoops) const {
     SmallVector<unsigned> partitionableLoops;
-    auto interfaceOp = cast<IREE::LinalgExt::TiledOpInterface>(op);
+    auto interfaceOp = cast<OpTy>(op);
     for (auto iteratorType :
          llvm::enumerate(interfaceOp.getLoopIteratorTypes())) {
       if (iteratorType.value() != getParallelIteratorTypeName()) {
@@ -208,7 +207,7 @@ struct AllParallelAsPartitionableLoops
   }
 
   llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
-    auto tiledOp = cast<IREE::LinalgExt::TiledOpInterface>(op);
+    auto tiledOp = cast<OpTy>(op);
     return tiledOp.getLoopIteratorTypes();
   }
 };

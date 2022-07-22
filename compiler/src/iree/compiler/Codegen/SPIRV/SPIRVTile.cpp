@@ -193,14 +193,14 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       }
 
       for (Operation &op : llvm::reverse(*ifOps.front().thenBlock())) {
-        if (isa<linalg::LinalgOp, IREE::LinalgExt::TiledOpInterface>(op)) {
+        if (isa<linalg::LinalgOp, TilingInterface>(op)) {
           computeOps.push_back(&op);
           break;
         }
       }
       if (Block *elseBlock = ifOps.front().elseBlock()) {
         for (Operation &op : llvm::reverse(*elseBlock)) {
-          if (isa<linalg::LinalgOp, IREE::LinalgExt::TiledOpInterface>(op)) {
+          if (isa<linalg::LinalgOp, TilingInterface>(op)) {
             computeOps.push_back(&op);
             break;
           }

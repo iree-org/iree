@@ -97,7 +97,7 @@ static bool isUntiledLoop(OpFoldResult valueOrAttr) {
 ///   stack is used for distribution it is popped before processing the inner
 ///   loops.
 static FailureOr<TiledOp>
-tileInterfaceOpImpl(OpBuilder &builder, TiledOpInterface tilableOp,
+tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
                     ValueRange outputs, MutableArrayRef<OpFoldResult> tileSizes,
                     ArrayRef<StringRef> iteratorTypes,
                     ArrayRef<Range> loopBounds, unsigned loopDepth,
@@ -108,28 +108,32 @@ tileInterfaceOpImpl(OpBuilder &builder, TiledOpInterface tilableOp,
   // the op by invoking the TiledOpInterface methods.
   if (loopDepth == tileSizes.size()) {
     TiledOp ret;
-    ret.op = tilableOp.getTiledImplementation(builder, outputs, offsets,
-                                              tileSizes, ret.results);
-    if (!ret.op) {
+    SmallVector<Operation *> tiledOps = tilableOp.getTiledImplementation(
+        builder, outputs, offsets, tileSizes, /*tileDestOperands=*/true);
+    if (tiledOps.empty()) {
       return static_cast<LogicalResult>(
           tilableOp.emitOpError("failed to get tiled implementation"));
     }
-    SmallVector<Value> results;
+    assert(
+        tiledOps.size() == 1 &&
+        "expected only a single operation returned from tiling implementation");
+    ret.op = tiledOps[0];
     for (auto result : llvm::enumerate(ret.op->getResults())) {
+      if (!result.value().getType().isa<RankedTensorType>()) {
+        ret.results.push_back(result.value());
+        continue;
+      }
       SmallVector<OpFoldResult> resultOffsets, resultSizes;
-      if (failed(tilableOp.getResultTilePosition(builder, result.index(),
-                                                 offsets, tileSizes,
-                                                 resultOffsets, resultSizes))) {
+      if (succeeded(tilableOp.getResultTilePosition(
+              builder, result.index(), offsets, tileSizes, resultOffsets,
+              resultSizes))) {
         SmallVector<OpFoldResult> resultStrides(resultOffsets.size(),
                                                 builder.getIndexAttr(1));
         Value insertSlice = builder.create<tensor::InsertSliceOp>(
             loc, ret.op->getResult(result.index()), outputs[result.index()],
             resultOffsets, resultSizes, resultStrides);
-        results.push_back(insertSlice);
+        ret.results.push_back(insertSlice);
       }
-    }
-    if (!results.empty()) {
-      builder.create<scf::YieldOp>(loc, results);
     }
     return ret;
   }
@@ -200,7 +204,7 @@ tileInterfaceOpImpl(OpBuilder &builder, TiledOpInterface tilableOp,
   return innerReturnValue;
 }
 
-FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TiledOpInterface tilableOp,
+FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TilingInterface tilableOp,
                                    const linalg::LinalgTilingOptions &options) {
   SmallVector<Value> dest = tilableOp.getDestinationOperands(b);
   if (dest.empty()) {
@@ -257,9 +261,10 @@ FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TiledOpInterface tilableOp,
                              loopBounds, 0, offsets, distributionInfo);
 }
 
-LogicalResult TiledOpInterfaceBaseTilingPattern::matchAndRewriteBase(
-    TiledOpInterface tilableOp, PatternRewriter &rewriter,
-    TiledOp &result) const {
+LogicalResult
+TilingInterfaceBaseTilingPattern::matchAndRewriteBase(TilingInterface tilableOp,
+                                                      PatternRewriter &rewriter,
+                                                      TiledOp &result) const {
   if (failed(filter.checkAndNotify(rewriter, tilableOp))) {
     return failure();
   }
@@ -277,13 +282,42 @@ LogicalResult TiledOpInterfaceBaseTilingPattern::matchAndRewriteBase(
   return success();
 }
 
+LogicalResult
+TilingInterfaceTilingPattern::matchAndRewrite(TilingInterface tilableOp,
+                                              PatternRewriter &rewriter) const {
+  // `LinalgOp`s also implement the `TilingInterface`. Do not handle LinalgOps
+  // in this pattern. For now use these only for `LinalgExt` ops. This pattern
+  // is to be deprecated to use something that can handle all `TilingInterface`
+  // ops.
+  if (isa<linalg::LinalgOp>(tilableOp.getOperation())) {
+    return rewriter.notifyMatchFailure(tilableOp, "ignoring LinalgOps");
+  }
+  TiledOp tiledOp;
+  // Check for failure.
+  if (failed(TilingInterfaceBaseTilingPattern::matchAndRewriteBase(
+          tilableOp, rewriter, tiledOp))) {
+    return failure();
+  }
+  // Check for do-nothing case.
+  if (!tiledOp.op)
+    return failure();
+  if (tiledOp.op != tilableOp) {
+    if (tiledOp.results.empty()) {
+      rewriter.eraseOp(tilableOp);
+    } else {
+      rewriter.replaceOp(tilableOp, tiledOp.results);
+    }
+  }
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // Test pass for tiling Linalg Ext ops
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct TiledOpInterfaceTilingPass
-    : public TiledOpInterfaceTilingBase<TiledOpInterfaceTilingPass> {
+struct TilingInterfaceTilingPass
+    : public TilingInterfaceTilingBase<TilingInterfaceTilingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<
         AffineDialect, IREE::Input::IREEInputDialect, linalg::LinalgDialect,
@@ -300,28 +334,28 @@ static Value buildFlowWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
   return b.template create<OpTy>(b.getInsertionPoint()->getLoc(), dim);
 }
 
-void TiledOpInterfaceTilingPass::runOnOperation() {
+void TilingInterfaceTilingPass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
   MLIRContext *context = funcOp.getContext();
 
   RewritePatternSet patterns(context);
-  patterns.add<TiledOpInterfaceTilingPattern>(
+  patterns.add<TilingInterfaceTilingPattern>(
       context, linalg::LinalgTilingOptions().setTileSizes({10, 20}),
       linalg::LinalgTransformationFilter(
           StringAttr::get(context, "tiling_input"),
           StringAttr::get(context, "tiling_output")));
-  patterns.add<TiledOpInterfaceTilingPattern>(
+  patterns.add<TilingInterfaceTilingPattern>(
       context, linalg::LinalgTilingOptions().setTileSizes(ArrayRef<int64_t>{0}),
       linalg::LinalgTransformationFilter(
           StringAttr::get(context, "no_tiling_input"),
           StringAttr::get(context, "no_tiling_output")));
 
-  patterns.add<TiledOpInterfaceTilingPattern>(
+  patterns.add<TilingInterfaceTilingPattern>(
       context, linalg::LinalgTilingOptions().setTileSizes({0, 20}),
       linalg::LinalgTransformationFilter(
           StringAttr::get(context, "outer_reduce_input"),
           StringAttr::get(context, "outer_reduce_output")));
-  patterns.add<TiledOpInterfaceTilingPattern>(
+  patterns.add<TilingInterfaceTilingPattern>(
       context, linalg::LinalgTilingOptions().setTileSizes({10, 0, 0}),
       linalg::LinalgTransformationFilter(
           StringAttr::get(context, "inner_reduce_input"),
@@ -346,7 +380,7 @@ void TiledOpInterfaceTilingPass::runOnOperation() {
       DenseMap<StringRef,
                std::function<linalg::ProcInfo(OpBuilder &, Location)>>()};
 
-  patterns.add<TiledOpInterfaceTilingPattern>(
+  patterns.add<TilingInterfaceTilingPattern>(
       context,
       linalg::LinalgTilingOptions()
           .setTileSizes(ArrayRef<int64_t>{10, 0, 30})
@@ -355,21 +389,21 @@ void TiledOpInterfaceTilingPass::runOnOperation() {
           StringAttr::get(context, "distribute_input"),
           StringAttr::get(context, "distribute_output")));
 
-  patterns.add<TiledOpInterfaceTilingPattern>(
+  patterns.add<TilingInterfaceTilingPattern>(
       context,
       linalg::LinalgTilingOptions().setTileSizes(ArrayRef<int64_t>{32}),
       linalg::LinalgTransformationFilter(
           StringAttr::get(context, "tiling_1d_stage5_fft_input"),
           StringAttr::get(context, "tiling_1d_stage5_fft_output")));
 
-  patterns.add<TiledOpInterfaceTilingPattern>(
+  patterns.add<TilingInterfaceTilingPattern>(
       context,
       linalg::LinalgTilingOptions().setTileSizes(ArrayRef<int64_t>{10, 32}),
       linalg::LinalgTransformationFilter(
           StringAttr::get(context, "tiling_2d_stage5_fft_input"),
           StringAttr::get(context, "tiling_2d_stage5_fft_output")));
 
-  patterns.add<TiledOpInterfaceTilingPattern>(
+  patterns.add<TilingInterfaceTilingPattern>(
       context, linalg::LinalgTilingOptions().setTileSizes({0, 20}),
       linalg::LinalgTransformationFilter(
           StringAttr::get(context, "tiling_repeated_indices_scatter_input"),
@@ -381,6 +415,6 @@ void TiledOpInterfaceTilingPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-IREE::LinalgExt::createTiledOpInterfaceTilingPass() {
-  return std::make_unique<TiledOpInterfaceTilingPass>();
+IREE::LinalgExt::createTilingInterfaceTilingPass() {
+  return std::make_unique<TilingInterfaceTilingPass>();
 }

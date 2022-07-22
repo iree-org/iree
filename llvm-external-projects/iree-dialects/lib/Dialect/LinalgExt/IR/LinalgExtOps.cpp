@@ -246,11 +246,9 @@ SmallVector<Range> ScatterOp::getIterationDomain(OpBuilder &builder) {
   return ranges;
 }
 
-Operation *ScatterOp::getTiledImplementation(OpBuilder &builder,
-                                             ValueRange outputs,
-                                             ArrayRef<OpFoldResult> offsets,
-                                             ArrayRef<OpFoldResult> sizes,
-                                             SmallVectorImpl<Value> &results) {
+SmallVector<Operation *> ScatterOp::getTiledImplementation(
+    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, bool /*tileDestOperands*/) {
   assert(outputs.size() >= 1 && offsets.size() >= 1 && sizes.size() >= 1);
   Location loc = getLoc();
   auto zeroAttr = builder.getI64IntegerAttr(0);
@@ -281,7 +279,7 @@ Operation *ScatterOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<OpFoldResult> originalOffsets, originalSizes;
   if (failed(getResultTilePosition(builder, 0, offsets, sizes, originalOffsets,
                                    originalSizes))) {
-    return nullptr;
+    return {};
   }
   auto originalRank = getOriginalType().getRank();
   SmallVector<OpFoldResult> originalStrides(originalRank, oneAttr);
@@ -297,13 +295,7 @@ Operation *ScatterOp::getTiledImplementation(OpBuilder &builder,
       cast<LinalgExtOp>(getOperation())
           .clone(builder, loc, resultTypes,
                  ValueRange{tiledUpdate, tiledIndices, tiledOriginal});
-  for (auto result : llvm::enumerate(tiledScatterOp->getResults())) {
-    auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
-        loc, result.value(), outputs[0], originalOffsets, originalSizes,
-        originalStrides);
-    results.push_back(insertSliceOp.getResult());
-  }
-  return tiledScatterOp;
+  return {tiledScatterOp};
 }
 
 LogicalResult ScatterOp::getResultTilePosition(
@@ -460,11 +452,9 @@ SmallVector<Range> SortOp::getIterationDomain(OpBuilder &builder) {
   return loopBounds;
 }
 
-Operation *SortOp::getTiledImplementation(OpBuilder &builder,
-                                          ValueRange outputs,
-                                          ArrayRef<OpFoldResult> offsets,
-                                          ArrayRef<OpFoldResult> sizes,
-                                          SmallVectorImpl<Value> &results) {
+SmallVector<Operation *> SortOp::getTiledImplementation(
+    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, bool /*tileDestOperands*/) {
   assert(outputs.size() == this->outputs().size());
   int64_t rank = getOperandRank();
   assert(offsets.size() == static_cast<size_t>(rank) &&
@@ -485,12 +475,7 @@ Operation *SortOp::getTiledImplementation(OpBuilder &builder,
   }
   Operation *tiledSortOp = cast<LinalgExtOp>(getOperation())
                                .clone(builder, loc, resultTypes, tiledOperands);
-  for (auto result : llvm::enumerate(tiledSortOp->getResults())) {
-    auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
-        loc, result.value(), outputs[result.index()], offsets, sizes, strides);
-    results.push_back(insertSliceOp.getResult());
-  }
-  return tiledSortOp;
+  return {tiledSortOp};
 }
 
 LogicalResult SortOp::getResultTilePosition(
@@ -784,10 +769,9 @@ LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-Operation *FftOp::getTiledImplementation(OpBuilder &builder, ValueRange outputs,
-                                         ArrayRef<OpFoldResult> offsets,
-                                         ArrayRef<OpFoldResult> sizes,
-                                         SmallVectorImpl<Value> &results) {
+SmallVector<Operation *> FftOp::getTiledImplementation(
+    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, bool /*tileDestOperands*/) {
   int64_t rank = getOperandRank();
   SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
   Location loc = getLoc();
@@ -806,12 +790,7 @@ Operation *FftOp::getTiledImplementation(OpBuilder &builder, ValueRange outputs,
   }
   Operation *tiledFftOp = cast<LinalgExtOp>(getOperation())
                               .clone(builder, loc, resultTypes, tiledOperands);
-  for (auto result : llvm::enumerate(tiledFftOp->getResults())) {
-    auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
-        loc, result.value(), outputs[result.index()], offsets, sizes, strides);
-    results.push_back(insertSliceOp.getResult());
-  }
-  return tiledFftOp;
+  return {tiledFftOp};
 }
 
 LogicalResult FftOp::getResultTilePosition(
@@ -982,11 +961,9 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-Operation *ScanOp::getTiledImplementation(OpBuilder &builder,
-                                          ValueRange outputs,
-                                          ArrayRef<OpFoldResult> offsets,
-                                          ArrayRef<OpFoldResult> sizes,
-                                          SmallVectorImpl<Value> &results) {
+SmallVector<Operation *> ScanOp::getTiledImplementation(
+    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, bool /*tileDestOperands*/) {
   assert(outputs.size() == this->outputs().size());
   int64_t rank = getOperandRank();
   assert(offsets.size() == static_cast<size_t>(rank) &&
@@ -999,15 +976,13 @@ Operation *ScanOp::getTiledImplementation(OpBuilder &builder,
       getSlice(builder, getLoc(), input(), offsets, sizes, strides));
   tiledOperands.emplace_back(
       getSlice(builder, getLoc(), outputs[0], offsets, sizes, strides));
-  SmallVector<OpFoldResult> accumOffsets, accumSizes, accumStrides;
   if (rank > 1) {
-    for (int i = 0; i < rank; i++) {
-      if (i != dimension()) {
-        accumOffsets.push_back(offsets[i]);
-        accumSizes.push_back(sizes[i]);
-        accumStrides.push_back(strides[i]);
-      }
+    SmallVector<OpFoldResult> accumOffsets, accumSizes;
+    if (failed(getResultTilePosition(builder, 1, offsets, sizes, accumOffsets,
+                                     accumSizes))) {
+      return {};
     }
+    SmallVector<OpFoldResult> accumStrides(rank - 1, oneAttr);
     tiledOperands.emplace_back(getSlice(
         builder, getLoc(), outputs[1], accumOffsets, accumSizes, accumStrides));
   } else {
@@ -1022,26 +997,31 @@ Operation *ScanOp::getTiledImplementation(OpBuilder &builder,
 
   Operation *tiledScanOp = cast<LinalgExtOp>(getOperation())
                                .clone(builder, loc, resultTypes, tiledOperands);
-  for (auto result : llvm::enumerate(tiledScanOp->getResults())) {
-    if ((result.index() == resultTypes.size() - 1) && (rank > 1)) {
-      offsets = accumOffsets;
-      sizes = accumSizes;
-      strides = accumStrides;
-    }
-    auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
-        loc, result.value(), outputs[result.index()], offsets, sizes, strides);
-    results.push_back(insertSliceOp.getResult());
-  }
-  return tiledScanOp;
+  return {tiledScanOp};
 }
 
 LogicalResult ScanOp::getResultTilePosition(
     OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
-  resultOffsets.assign(offsets.begin(), offsets.end());
-  resultSizes.assign(sizes.begin(), sizes.end());
-  return success();
+  if (resultNumber == 0) {
+    resultOffsets.assign(offsets.begin(), offsets.end());
+    resultSizes.assign(sizes.begin(), sizes.end());
+    return success();
+  }
+  if (resultNumber == 1) {
+    int64_t rank = getOperandRank();
+    if (rank > 1) {
+      for (auto i : llvm::seq<int64_t>(0, rank)) {
+        if (i == dimension())
+          continue;
+        resultOffsets.push_back(offsets[i]);
+        resultSizes.push_back(sizes[i]);
+      }
+    }
+    return success();
+  }
+  return failure();
 }
 
 static LogicalResult foldMemRefCast(Operation *op) {
@@ -1142,18 +1122,16 @@ LogicalResult ReverseOp::generateScalarImplementation(OpBuilder &b,
   return success();
 }
 
-Operation *ReverseOp::getTiledImplementation(OpBuilder &builder,
-                                             ValueRange outputs,
-                                             ArrayRef<OpFoldResult> offsets,
-                                             ArrayRef<OpFoldResult> sizes,
-                                             SmallVectorImpl<Value> &results) {
+SmallVector<Operation *> ReverseOp::getTiledImplementation(
+    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, bool /*tileDestOperands*/) {
   int64_t rank = getOperandRank();
   SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
   Location loc = getLoc();
   SmallVector<OpFoldResult> mirrorOffsets, mirrorSizes;
   if (failed(getResultTilePosition(builder, 0, offsets, sizes, mirrorOffsets,
                                    mirrorSizes))) {
-    return nullptr;
+    return {};
   }
 
   SmallVector<Value> tiledOperands;
@@ -1173,13 +1151,7 @@ Operation *ReverseOp::getTiledImplementation(OpBuilder &builder,
   Operation *tiledRevOp = cast<LinalgExtOp>(getOperation())
                               .clone(builder, loc, resultTypes, tiledOperands);
 
-  for (auto result : llvm::enumerate(tiledRevOp->getResults())) {
-    auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
-        loc, result.value(), outputs[result.index()], mirrorOffsets, sizes,
-        strides);
-    results.push_back(insertSliceOp.getResult());
-  }
-  return tiledRevOp;
+  return {tiledRevOp};
 }
 
 LogicalResult ReverseOp::getResultTilePosition(
@@ -1415,11 +1387,9 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-Operation *TopkOp::getTiledImplementation(OpBuilder &builder,
-                                          ValueRange outputs,
-                                          ArrayRef<OpFoldResult> offsets,
-                                          ArrayRef<OpFoldResult> sizes,
-                                          SmallVectorImpl<Value> &results) {
+SmallVector<Operation *> TopkOp::getTiledImplementation(
+    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, bool /*tileDestOperands*/) {
   assert(outputs.size() == this->outputs().size());
   int64_t rank = getInputRank();
   assert(offsets.size() == static_cast<size_t>(rank) &&
@@ -1430,7 +1400,7 @@ Operation *TopkOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<OpFoldResult> outputOffsets, outputSizes;
   if (failed(getResultTilePosition(builder, 0, offsets, sizes, outputOffsets,
                                    outputSizes))) {
-    return nullptr;
+    return {};
   }
 
   SmallVector<Value> tiledOperands;
@@ -1458,14 +1428,7 @@ Operation *TopkOp::getTiledImplementation(OpBuilder &builder,
 
   Operation *tiledTopkOp = cast<LinalgExtOp>(getOperation())
                                .clone(builder, loc, resultTypes, tiledOperands);
-
-  for (auto result : llvm::enumerate(tiledTopkOp->getResults())) {
-    auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
-        loc, result.value(), outputs[result.index()], outputOffsets,
-        outputSizes, strides);
-    results.push_back(insertSliceOp.getResult());
-  }
-  return tiledTopkOp;
+  return {tiledTopkOp};
 }
 
 LogicalResult TopkOp::getResultTilePosition(
