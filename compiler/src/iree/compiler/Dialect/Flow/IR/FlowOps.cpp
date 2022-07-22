@@ -513,14 +513,14 @@ llvm::SmallBitVector DispatchTensorStoreOp::getDroppedDims() {
 
 void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
                                  ValueRange workload, TypeRange resultTypes,
-                                 ValueRange resultDims, ValueRange operands,
-                                 ValueRange operandDims,
+                                 ValueRange resultDims, ValueRange arguments,
+                                 ValueRange argumentDims,
                                  ArrayRef<int64_t> tiedOperands,
                                  ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);
   state.addOperands(workload);
-  state.addOperands(operands);
-  state.addOperands(operandDims);
+  state.addOperands(arguments);
+  state.addOperands(argumentDims);
   state.addOperands(resultDims);
   state.addAttributes(attributes);
   state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
@@ -530,8 +530,8 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
   state.addAttribute("operand_segment_sizes",
                      builder.getI32VectorAttr({
                          static_cast<int32_t>(workload.size()),
-                         static_cast<int32_t>(operands.size()),
-                         static_cast<int32_t>(operandDims.size()),
+                         static_cast<int32_t>(arguments.size()),
+                         static_cast<int32_t>(argumentDims.size()),
                          static_cast<int32_t>(resultDims.size()),
                      }));
 
@@ -543,7 +543,7 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
     builder.createBlock(workgroupBody);
   }
 
-  llvm::BitVector operandAliases(llvm::size(operands), false);
+  llvm::BitVector operandAliases(llvm::size(arguments), false);
   llvm::BitVector resultAliases(llvm::size(resultTypes), false);
   for (unsigned resultIndex = 0; resultIndex < tiedOperands.size();
        ++resultIndex) {
@@ -553,7 +553,7 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
       resultAliases[resultIndex] = true;
     }
   }
-  for (auto operand : llvm::enumerate(operands)) {
+  for (auto operand : llvm::enumerate(arguments)) {
     Type type = operand.value().getType();
     if (auto tensorType = type.dyn_cast<TensorType>()) {
       type = DispatchTensorType::get(operandAliases[operand.index()]
@@ -692,6 +692,35 @@ LogicalResult DispatchWorkgroupsOp::verify() {
   }
 
   return success();
+}
+
+BlockArgument DispatchWorkgroupsOp::getOutputBlockArgument(unsigned idx) {
+  if (!getTiedOperands().hasValue()) {
+    unsigned numInputs = getArguments().size();
+    return getWorkgroupBody().getArguments().drop_front(numInputs)[idx];
+  }
+
+  // Some outputs are tied to inputs and share their block arguments.
+  auto tiedOperands = getTiedOperands().getValue();
+  int64_t tiedOperand =
+      tiedOperands[idx].cast<IntegerAttr>().getValue().getSExtValue();
+  if (tiedOperand != IREE::Util::TiedOpInterface::kUntiedIndex)
+    // This output is tied to an input.
+    return getInputBlockArgument(tiedOperand);
+
+  unsigned nextOutArgIdx = getArguments().size();
+  for (unsigned i = 0; i < idx; ++i)
+    if (tiedOperands[i].cast<IntegerAttr>().getValue().getSExtValue() ==
+        IREE::Util::TiedOpInterface::kUntiedIndex)
+      nextOutArgIdx++;
+  return getWorkgroupBody().getArguments()[nextOutArgIdx];
+}
+
+SmallVector<BlockArgument> DispatchWorkgroupsOp::getOutputBlockArguments() {
+  SmallVector<BlockArgument> result;
+  for (unsigned i = 0; i < getNumResults(); ++i)
+    result.push_back(getOutputBlockArgument(i));
+  return result;
 }
 
 Operation::operand_range DispatchWorkgroupsOp::getClosureOperands() {

@@ -67,6 +67,28 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     computes the actual workgroup count based on target information. The
     workload is not limited to the 3D XYZ grid dispatch of the workgroup count
     and can contain any number of parameters used to compute it.
+
+    ```mlir
+    %r = flow.dispatch.workgroups[%c5, %c5](%0, %1)
+        : (tensor<5x5xf32>, tensor<5xf32>) -> tensor<5x5xf32> =
+              (%arg0: !flow.dispatch.tensor<readonly:5x5xf32>,
+               %arg1: !flow.dispatch.tensor<readonly:5xf32>,
+               %arg2: !flow.dispatch.tensor<writeonly:5x5xf32>) {
+      ...
+    }
+    ```
+
+    The number of results of the operation is equal to the number of results
+    in the type signature (`(tensor<5x5xf32>, tensor<5xf32>) -> tensor<5x5xf32>`).
+    Each tensor argument and result in the type signature has a corresponding
+    block argument of type `!flow.dispatch.tensor`. Furthermore, each argument
+    has a corresponding `arguments` operand.
+
+    There are no `arguments` operands for results, but a result can be tied an
+    argument by writing the argument operand's SSA value instead of its type:
+    E.g., in the above example, `-> %0` would tie the first argument to the
+    result. In that case, there would be no separate block argument for the
+    result.
   }];
 
   let arguments = (ins
@@ -125,9 +147,32 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     ValueRange getOperandDynamicDims(unsigned idx) {
       return IREE::Util::findVariadicDynamicDims(idx - getWorkload().size(), getArguments(), getArgumentDims());
     }
+
     ValueRange getResultDynamicDims(unsigned idx) {
       return IREE::Util::findVariadicDynamicDims(idx, getResults(), getResultDims());
     }
+
+    /// Returns the BlockArguments corresponding to the inputs in the type
+    /// signature.
+    Block::BlockArgListType getInputBlockArguments() {
+      return getWorkgroupBody().getArguments().take_front(getArguments().size());
+    }
+
+    /// Returns the BlockArgument corresponding to the idx-th input in the type
+    /// signature.
+    BlockArgument getInputBlockArgument(unsigned idx) {
+      return getWorkgroupBody().getArguments()[idx];
+    }
+
+    /// Returns the BlockArgument corresponding to the idx-th output in the
+    /// type signature. If the output is tied to an input, the returned value
+    /// is also an input BlockArgument.
+    BlockArgument getOutputBlockArgument(unsigned idx);
+
+    /// Returns the BlockArguments corresponding to the outputs in the type
+    /// signature. In case an output is tied to an input, the return list
+    /// overlaps with `getInputBlockArguments`.
+    SmallVector<BlockArgument> getOutputBlockArguments();
   }];
 
   let hasVerifier = 1;
