@@ -288,6 +288,7 @@ class _IreeFunctionWrapper(_FunctionWrapper):
     self._inputs = None
 
   def _get_function_inputs(self, args):
+
     def flatten(entries):
       if entries is None:
         return []
@@ -303,11 +304,14 @@ class _IreeFunctionWrapper(_FunctionWrapper):
           flattened = flattened + flatten(entry)
         return flattened
       return [entries]
-    args = flatten(args)
 
     def convert(arr):
       ty = [str(d) for d in arr.shape]
-      ty.append(str(arr.dtype).replace("int", "i").replace("float", "f").replace("bool", "i1"))
+      dty = arr.dtype
+      dty = dty.replace("int", "i")
+      dty = dty.replace("float", "f")
+      dty = dty.replace("bool", "i1")
+      ty.append(dty)
       ty = "x".join(ty)
       arr = np.asarray(arr).flatten()
       if arr.size > 0 and np.all(flatten == arr[0]):
@@ -315,6 +319,8 @@ class _IreeFunctionWrapper(_FunctionWrapper):
       else:
         value = " ".join([str(a) for a in arr])
       return f"{ty}={value}"
+
+    args = flatten(args)
     return [convert(a) for a in args]
 
   def __call__(self, *args, **kwargs):
