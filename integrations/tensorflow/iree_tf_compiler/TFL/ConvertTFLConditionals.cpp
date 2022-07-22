@@ -25,7 +25,7 @@ static void inlineWhileCase(Region &srcRegion, Region &dstRegion,
 
   auto yield = cast<mlir::TFL::YieldOp>(headBlock->getTerminator());  
   rewriter.setInsertionPoint(yield);
-  rewriter.create<mlir::tosa::YieldOp>(yield.getLoc(), yield.inputs());
+  rewriter.create<mlir::tosa::YieldOp>(yield.getLoc(), yield.operands());
   rewriter.eraseOp(yield);
 }
 
@@ -38,12 +38,12 @@ public:
   LogicalResult matchAndRewrite(mlir::TFL::WhileOp op,
                                 PatternRewriter &rewriter) const final {
     auto newWhile = rewriter.create<mlir::tosa::WhileOp>(
-        op.getLoc(), op.getResultTypes(), op.inputs());
-    rewriter.createBlock(&newWhile.getCond());
-    rewriter.createBlock(&newWhile.getBody());
+        op.getLoc(), op.getResultTypes(), op.input());
+    rewriter.createBlock(&newWhile.cond());
+    rewriter.createBlock(&newWhile.body());
 
-    inlineWhileCase(op.cond(), newWhile.getCond(), rewriter);
-    inlineWhileCase(op.body(), newWhile.getBody(), rewriter);
+    inlineWhileCase(op.cond(), newWhile.cond(), rewriter);
+    inlineWhileCase(op.body(), newWhile.body(), rewriter);
 
     rewriter.replaceOp(op, newWhile.getResults());
 
@@ -59,13 +59,13 @@ struct ConvertTFLConditionalsPass
   public:
     void runOnOperation() override {
       RewritePatternSet patterns(&getContext());
-      // ConversionTarget target(getContext());
-      // target.addIllegalOp<TFL::WhileOp>(); // TFL::IfOp, TFL::YieldOp,
-      // target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
+      ConversionTarget target(getContext());
+      target.addIllegalOp<mlir::TFL::WhileOp>(); // mlir::TFL::IfOp, mlir::TFL::YieldOp,
+      target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
 
       MLIRContext *context = &getContext();
 
-      auto *op = getOperation();
+      auto op = getOperation();
       patterns.add<WhileOpConverter>(context);
       if (failed(applyPartialConversion(op, target, std::move(patterns))))
         signalPassFailure();
@@ -74,7 +74,7 @@ struct ConvertTFLConditionalsPass
 
 } // anon namespace
 
-std::unique_ptr<OperationPass<>> createConvertTFLConditionalsPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createConvertTFLConditionalsPass() {
   return std::make_unique<ConvertTFLConditionalsPass>();
 }
 

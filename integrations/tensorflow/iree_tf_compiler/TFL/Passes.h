@@ -28,7 +28,7 @@ void buildTFLImportPassPipeline(OpPassManager &pm);
 //===----------------------------------------------------------------------===//
 
 // Converts TFLite's Conditional Ops
-std::unique_ptr<OperationPass<>> createConvertTFLConditionalsPass();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertTFLConditionalsPass();
 
 // Retain functions used by tfl.call_once to avoid removal.
 std::unique_ptr<OperationPass<ModuleOp>> createRetainCallOnceFuncsPass();
