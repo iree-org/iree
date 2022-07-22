@@ -95,12 +95,13 @@ static void rewriteParallelInsertSlices(
     rewriter.create<Flow::DispatchTensorStoreOp>(
         loc,
         parallelInsertOp.getSource(),
-        tensorToFlowBvm.lookup(resultTensorOperands[resultIndex++]),
+        tensorToFlowBvm.lookup(parallelInsertOp.getDest()),
         dynamicDims,
         parallelInsertOp.getMixedOffsets(),
         parallelInsertOp.getMixedSizes(),
         parallelInsertOp.getMixedStrides());
     // clang-format on
+    ++resultIndex;
     rewriter.eraseOp(parallelInsertOp);
   }
 }
@@ -367,6 +368,11 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
   // tensor. Save the tensor operand -> flow tensor bbArg mapping in
   // `tensorToFlowBvm`.
   BlockAndValueMapping bvm, tensorToFlowBvm;
+  auto flowBbArgs = block->getArguments().slice(
+      sizeNonTensors, sizeNonResultTensors + sizeResultTensors);
+  tensorToFlowBvm.map(allTensorOperands, flowBbArgs);
+  assert(allOperands.size() == block->getArguments().size() &&
+         "expected same number of operands and bbArgs");
   bvm.map(allOperands, block->getArguments());
   auto allTensorDimsBBArgs = block->getArguments().slice(
       nonDimOperands.size(), allTensorDynamicDims.size());
@@ -379,10 +385,9 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
         en.index(), allTensorOperands, allTensorDimsBBArgs);
     auto loadOp = rewriter.create<Flow::DispatchTensorLoadOp>(
         loc, en.value().getType().cast<RankedTensorType>(),
-        bvm.lookup(en.value()), dynamicDims);
+        tensorToFlowBvm.lookup(en.value()), dynamicDims);
     // Replace the tensor -> flow.dispatch.tensor entry by a
     // tensor -> flow.dispatch.tensor.load entry.
-    tensorToFlowBvm.map(en.value(), bvm.lookup(en.value()));
     bvm.map(en.value(), loadOp.getResult());
   }
 
