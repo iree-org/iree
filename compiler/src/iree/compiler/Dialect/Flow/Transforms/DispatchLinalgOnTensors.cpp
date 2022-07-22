@@ -39,6 +39,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeRange.h"
+#include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
@@ -150,8 +151,7 @@ static bool isRootOp(Operation *op) {
     }
     return !isa<linalg::FillOp>(op);
   }
-  return isa<IREE::LinalgExt::TiledOpInterface>(op) &&
-         !isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(op);
+  return isa<TilingInterface>(op);
 }
 
 /// Operations that are cloned into dispatch regions formed with other
@@ -200,23 +200,9 @@ static SmallVector<Range> getLoopRanges(T operation, Location loc,
                                         PatternRewriter &rewriter);
 
 template <>
-SmallVector<Range> getLoopRanges<linalg::LinalgOp>(linalg::LinalgOp linalgOp,
-                                                   Location loc,
-                                                   PatternRewriter &rewriter) {
-  SmallVector<Range> loopRanges = linalgOp.createLoopRanges(rewriter, loc);
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-  SmallVector<unsigned> reductionDims;
-  linalgOp.getReductionDims(reductionDims);
-  for (auto reductionDim : reductionDims) {
-    loopRanges[reductionDim].size = one;
-  }
-  return loopRanges;
-}
-
-template <>
-SmallVector<Range> getLoopRanges<IREE::LinalgExt::TiledOpInterface>(
-    IREE::LinalgExt::TiledOpInterface tilableOp, Location loc,
-    PatternRewriter &rewriter) {
+SmallVector<Range> getLoopRanges<TilingInterface>(TilingInterface tilableOp,
+                                                  Location loc,
+                                                  PatternRewriter &rewriter) {
   SmallVector<Range> loopRanges = tilableOp.getIterationDomain(rewriter);
   Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
   for (auto iteratorType : llvm::enumerate(tilableOp.getLoopIteratorTypes())) {
@@ -1176,9 +1162,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
     filterForComputeOps.setMatchByDefault();
     RewritePatternSet computeOpDispatchPatterns(context);
     computeOpDispatchPatterns.insert<
-        CreateDispatchRegionOp<linalg::LinalgOp, OpInterfaceRewritePattern>,
-        CreateDispatchRegionOp<IREE::LinalgExt::TiledOpInterface,
-                               OpInterfaceRewritePattern>,
+        CreateDispatchRegionOp<TilingInterface, OpInterfaceRewritePattern>,
         CreateDispatchRegionOp<tensor::InsertSliceOp, OpRewritePattern>>(
         context, filterForComputeOps);
     if (failed(createDispatchRegionsFromRootOps(

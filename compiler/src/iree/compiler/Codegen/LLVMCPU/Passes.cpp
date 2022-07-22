@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Passes.h"
 
-#include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"

@@ -15,10 +15,10 @@ def LinalgExtToLoops :
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::createLinalgExtToLoopsPass()";
 }
 
-def TiledOpInterfaceTiling :
+def TilingInterfaceTiling :
     Pass<"iree-linalg-ext-tile", "func::FuncOp"> {
   let summary = "Test pass for tiling using TiledOpInterface";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createTiledOpInterfaceTilingPass()";
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createTilingInterfaceTilingPass()";
 }
 
 def PadContractionToBlockSize :

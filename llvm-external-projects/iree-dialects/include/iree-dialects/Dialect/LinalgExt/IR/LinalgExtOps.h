@@ -8,7 +8,6 @@
 #define IREE_DIALECTS_DIALECT_LINALGEXT_IR_LINALGEXTOPS_H_
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
-#include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -16,6 +15,7 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "mlir/Interfaces/TilingInterface.h"
 
 namespace mlir {
 namespace iree_compiler {

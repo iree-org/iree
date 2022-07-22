@@ -369,13 +369,26 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
             .setLoopType(linalg::LinalgTilingLoopType::Loops)
             .setTileSizeComputationFunction(tileSizeFn);
 
-    RewritePatternSet patterns(context);
-    patterns.insert<TileAndDistributeLinalgOpsPattern,
-                    IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
-        context, linalgTilingOptions,
-        linalg::LinalgTransformationFilter(marker));
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      return signalPassFailure();
+    {
+      RewritePatternSet patterns(context);
+      patterns.insert<TileAndDistributeLinalgOpsPattern,
+                      IREE::LinalgExt::TilingInterfaceTilingPattern>(
+          context, linalgTilingOptions,
+          linalg::LinalgTransformationFilter(marker));
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+    // TODO(ravishankarm): For now add the Tiling patterns for LinalgExt ops
+    // separately. This all is to be cleaned up shortly.
+    {
+      RewritePatternSet patterns(context);
+      patterns.insert<IREE::LinalgExt::TilingInterfaceTilingPattern>(
+          context, linalgTilingOptions,
+          linalg::LinalgTransformationFilter(marker));
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({

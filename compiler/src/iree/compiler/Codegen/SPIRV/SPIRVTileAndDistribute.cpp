@@ -79,7 +79,7 @@ static void populateTilingToInvocationPatterns(RewritePatternSet &patterns) {
           .setMatchByDefault();
 
   patterns.add<linalg::LinalgTilingPattern>(context, tilingOptions, filter);
-  patterns.add<IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
+  patterns.add<IREE::LinalgExt::TilingInterfaceTilingPattern>(
       context, tilingOptions, filter);
 }
 
