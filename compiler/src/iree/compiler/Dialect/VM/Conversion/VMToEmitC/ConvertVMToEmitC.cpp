@@ -2550,8 +2550,6 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
               .getResult();
     }
 
-    // TODO(simon-camp): Insert numSpansOperand right before the varidic
-    // arguments start.
     for (auto pair : llvm::enumerate(operands)) {
       Value operand = pair.value();
       size_t index = pair.index();
@@ -2598,6 +2596,12 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
       } else {
         updatedOperands.push_back(operand);
       }
+    }
+
+    // If the variadic part of the arguments is repeated zero times, we need to
+    // add the span count argument to the end.
+    if (numSpansOperand && !llvm::count(updatedOperands, numSpansOperand)) {
+      updatedOperands.push_back(numSpansOperand);
     }
 
     // Create a variable for every result and a pointer to it as output
