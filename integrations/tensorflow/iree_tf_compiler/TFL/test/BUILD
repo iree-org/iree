@@ -23,6 +23,7 @@ iree_lit_test_suite(
             "retain_call_once_funcs.mlir",
             "strip_metadata.mlir",
             "verify_fully_converted.mlir",
+            "convert_conditionals.mlir",
         ],
         include = ["*.mlir"],
     ),
