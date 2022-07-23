@@ -37,7 +37,7 @@ static bool isRankZeroOrOneMemRef(Type type) {
 /// Returns the offset, in bytes, of an index within a linearized dense buffer.
 /// Expects that the |memrefValue| has been linearized already.
 static Value getBufferOffset(Location loc, Value memrefValue,
-                             ValueRange indices, Type elementType,
+                             ValueRange indices,
                              ConversionPatternRewriter &rewriter) {
   auto memrefType = memrefValue.getType().cast<ShapedType>();
   if (memrefType.getRank() == 0) {
@@ -46,7 +46,12 @@ static Value getBufferOffset(Location loc, Value memrefValue,
   }
   assert(memrefType.getRank() == 1 && "memrefs should have been flattened");
 
-  // Element type byte length as the base.
+  // Element type byte length as the base. Note that this is the unconverted
+  // element type. Since these are storage types within a buffer, they are
+  // not subject to general type conversion (i.e. a general type converter
+  // may elect to represent all i8 registers as i32, but this does not mean
+  // that all memrefs are widened from i8 to i32).
+  auto elementType = memrefType.getElementType();
   auto elementSize = rewriter.createOrFold<arith::ConstantIndexOp>(
       loc, IREE::Util::getRoundedElementByteWidth(elementType));
 
@@ -170,13 +175,10 @@ struct ConvertMemRefDimOp : public OpConversionPattern<memref::DimOp> {
       return rewriter.notifyMatchFailure(
           dimOp, "only rank-0 and rank-1 memrefs are supported; flatten first");
     }
-    auto newElementType = getTypeConverter()->convertType(
-        dimOp.getSource().getType().cast<MemRefType>().getElementType());
-    if (!newElementType) {
-      return rewriter.notifyMatchFailure(dimOp, "unsupported element type");
-    }
+    auto elementType =
+        dimOp.getSource().getType().cast<MemRefType>().getElementType();
     Value elementSize = rewriter.create<arith::ConstantIndexOp>(
-        dimOp.getLoc(), IREE::Util::getRoundedElementByteWidth(newElementType));
+        dimOp.getLoc(), IREE::Util::getRoundedElementByteWidth(elementType));
     Value bufferSize = rewriter.create<IREE::Util::BufferSizeOp>(
         dimOp.getLoc(), rewriter.getIndexType(), adaptor.getSource());
     rewriter.replaceOpWithNewOp<arith::FloorDivSIOp>(dimOp, bufferSize,
@@ -197,18 +199,25 @@ struct ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
     }
     auto oldType = loadOp.getResult().getType();
     auto newType = getTypeConverter()->convertType(oldType);
-    auto newElementType = getTypeConverter()->convertType(
-        loadOp.getMemRef().getType().cast<MemRefType>().getElementType());
-    if (!newElementType) {
-      return rewriter.notifyMatchFailure(loadOp, "unsupported element type");
-    }
     auto memRefSize = rewriter.createOrFold<IREE::Util::BufferSizeOp>(
         loadOp.getLoc(), rewriter.getIndexType(), adaptor.getMemref());
-    auto byteOffset =
-        getBufferOffset(loadOp.getLoc(), loadOp.getMemref(),
-                        loadOp.getIndices(), newElementType, rewriter);
-    rewriter.replaceOpWithNewOp<IREE::Util::BufferLoadOp>(
-        loadOp, newType, adaptor.getMemref(), memRefSize, byteOffset);
+    auto byteOffset = getBufferOffset(loadOp.getLoc(), loadOp.getMemref(),
+                                      loadOp.getIndices(), rewriter);
+    Value loaded = rewriter.create<IREE::Util::BufferLoadOp>(
+        loadOp.getLoc(), oldType, adaptor.getMemref(), memRefSize, byteOffset);
+    if (newType != oldType) {
+      // Since the BufferLoadOp semantics include its result type (i.e. a load
+      // of an i8 is different than a load of an i32), in the presence of type
+      // conversion, we must preserve the original type and emit an unrealized
+      // conversion cast for downstreams. In this case, further legalizations
+      // will be required to resolve it. This comes up in A->B->C lowerings
+      // where the BufferLoad is an intermediate stage.
+      loaded = rewriter
+                   .create<UnrealizedConversionCastOp>(loadOp.getLoc(), newType,
+                                                       loaded)
+                   .getResult(0);
+    }
+    rewriter.replaceOp(loadOp, loaded);
     return success();
   }
 };
@@ -223,19 +232,26 @@ struct ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
           storeOp,
           "only rank-0 and rank-1 memrefs are supported; flatten first");
     }
-    auto newElementType = getTypeConverter()->convertType(
-        storeOp.getMemRef().getType().cast<MemRefType>().getElementType());
-    if (!newElementType) {
-      return rewriter.notifyMatchFailure(storeOp, "unsupported element type");
-    }
     auto memRefSize = rewriter.createOrFold<IREE::Util::BufferSizeOp>(
         storeOp.getLoc(), rewriter.getIndexType(), adaptor.getMemref());
-    auto byteOffset =
-        getBufferOffset(storeOp.getLoc(), storeOp.getMemref(),
-                        storeOp.getIndices(), newElementType, rewriter);
+    auto byteOffset = getBufferOffset(storeOp.getLoc(), storeOp.getMemref(),
+                                      storeOp.getIndices(), rewriter);
+    Value newValue = adaptor.getValue();
+    if (newValue.getType() != storeOp.getValue().getType()) {
+      // In combination with type conversion, the elemental type may change,
+      // and this is load bearing with respect to buffer_store op semantics
+      // (i.e. storing of an i32 is different from an i8, even if the
+      // conversion target widens). Insert an unrealized conversion cast to
+      // preserve the original semantic. Presumably, something will clear this
+      // with additional lowering.
+      newValue =
+          rewriter
+              .create<UnrealizedConversionCastOp>(
+                  storeOp.getLoc(), storeOp.getValue().getType(), newValue)
+              .getResult(0);
+    }
     rewriter.replaceOpWithNewOp<IREE::Util::BufferStoreOp>(
-        storeOp, adaptor.getValue(), adaptor.getMemref(), memRefSize,
-        byteOffset);
+        storeOp, newValue, adaptor.getMemref(), memRefSize, byteOffset);
     return success();
   }
 };
@@ -245,22 +261,20 @@ struct ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
 void populateMemRefToUtilPatterns(MLIRContext *context,
                                   ConversionTarget &conversionTarget,
                                   TypeConverter &typeConverter,
-                                  RewritePatternSet &patterns) {
+                                  RewritePatternSet &patterns,
+                                  Type convertedBufferType) {
   conversionTarget.addIllegalDialect<memref::MemRefDialect>();
 
-  typeConverter.addConversion([&](MemRefType type) -> llvm::Optional<Type> {
-    if (isRankZeroOrOneMemRef(type)) {
-      return IREE::Util::BufferType::get(type.getContext());
-    }
-    return llvm::None;
-  });
-
-  // Unranked memrefs are emitted for library call integration when we just
-  // need void* semantics. An unranked memref is basically just a (pointer,
-  // memory-space, element-type).
   typeConverter.addConversion(
-      [&](UnrankedMemRefType type) -> llvm::Optional<Type> {
-        return IREE::Util::BufferType::get(type.getContext());
+      [convertedBufferType](MemRefType type) -> llvm::Optional<Type> {
+        if (isRankZeroOrOneMemRef(type)) {
+          if (convertedBufferType) {
+            return convertedBufferType;
+          } else {
+            return IREE::Util::BufferType::get(type.getContext());
+          }
+        }
+        return llvm::None;
       });
 
   patterns

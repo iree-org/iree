@@ -74,6 +74,8 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<IREE::VM::ModuleOp>(createHoistInlinedRodataPass());
   passManager.addNestedPass<IREE::VM::ModuleOp>(createDeduplicateRodataPass());
   passManager.addNestedPass<IREE::VM::ModuleOp>(
+      createSinkGlobalBufferLoadsPass());
+  passManager.addNestedPass<IREE::VM::ModuleOp>(
       createGlobalInitializationPass());
 
   passManager.addPass(createInlinerPass());
