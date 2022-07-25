@@ -145,6 +145,7 @@ VMVX_MICROKERNELS_SRCS = enforce_glob(
         "const.mlir",
         "exp.mlir",
         "floor.mlir",
+        "fully_connected.mlir",
         "if.mlir",
         "log.mlir",
         "logical_left_shift.mlir",
@@ -164,25 +165,16 @@ VMVX_MICROKERNELS_SRCS = enforce_glob(
         "sub.mlir",
         "tanh.mlir",
         "transpose.mlir",
-    ],
-    include = ["*.mlir"],
-    exclude = [
-        # Gather and table are failing on complicated buffer conversions that
-        # will shortly be fixed separately.
         "gather.mlir",
         "table.mlir",
-        # equal, greater_equal, select have (suspected) i1 problems which
-        # manifest at runtime.
         "equal.mlir",
         "greater.mlir",
         "greater_equal.mlir",
         "select.mlir",
-        # fully_connected and while are failing on unrealizable 0d memref
-        # conversions. The first is incidental to how the test is constructed.
-        "fully_connected.mlir",
         "max_pool.mlir",
         "while.mlir",
     ],
+    include = ["*.mlir"],
 )
 
 iree_check_single_backend_test_suite(
