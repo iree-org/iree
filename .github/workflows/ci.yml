@@ -86,10 +86,12 @@ jobs:
       - os-family=Linux
     env:
       BUILD_DIR: full-build-dir
+      BUILD_DIR_ARCHIVE: full-build-dir.tar.zst
     outputs:
       # Pass through the build directory as output so it's available to
       # dependent jobs.
       build-dir: ${{ env.BUILD_DIR }}
+      build-dir-archive: ${{ env.BUILD_DIR_ARCHIVE }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
@@ -101,17 +103,14 @@ jobs:
             gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
-      # Using a tar archive is necessary to preserve file permissions. See
-      # https://github.com/actions/upload-artifact#maintaining-file-permissions-and-case-sensitive-files
-      # The upload action already does its own gzip compression, so it's likely
-      # unnecessary (and perhaps harmful) to do our own, though that hasn't been
-      # investigated.
+      # We do our own maximally-parallel compression with zstd and exclude files
+      # unnecessary for testing.
       - name: "Create build dir archive"
-        run: tar -cf ${BUILD_DIR}.tar ${BUILD_DIR}
+        run: tar -X *.a -X *.o -c -I 'zstd -10 -T0' -f ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
       - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8  # v3.1.0
         with:
-          name: "${{ env.BUILD_DIR }}.tar"
-          path: "${{ env.BUILD_DIR }}.tar"
+          name: "${{ env.BUILD_DIR_ARCHIVE }}"
+          path: "${{ env.BUILD_DIR_ARCHIVE }}"
 
   test_all:
     needs: build_all
@@ -132,6 +131,7 @@ jobs:
       - os-family=Linux
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
@@ -140,9 +140,9 @@ jobs:
       - name: "Downloading build directory"
         uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
         with:
-          name: "${{ env.BUILD_DIR }}.tar"
+          name: "${{ env.BUILD_DIR_ARCHIVE }}"
       - name: "Extract archive"
-        run: tar -xf ${BUILD_DIR}.tar
+        run: tar -xf ${BUILD_DIR_ARCHIVE}
       - name: "Testing all"
         run: |
           ./build_tools/github_actions/docker_run.sh \
