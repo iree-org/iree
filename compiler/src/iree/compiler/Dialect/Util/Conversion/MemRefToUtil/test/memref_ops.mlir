@@ -1,28 +1,27 @@
-// RUN: iree-opt --split-input-file --iree-util-test-conversion --cse --canonicalize --verify-diagnostics %s | FileCheck %s
+// RUN: iree-opt --split-input-file \
+// RUN:   --pass-pipeline='iree-util-test-conversion{widen-integers}, cse, canonicalize' \
+// RUN:   --verify-diagnostics %s | FileCheck %s
 
+// -----
 // Must be rank-0 or rank-1.
-
-// expected-error @-5 {{conversion to util failed}}
-func.func @verify_invalid_rank_2(%buffer: memref<4x2xf32>, %idx: index) {
+// expected-error @-3 {{conversion to util failed}}
+func.func @verify_invalid_rank_2(%buffer: memref<4x2xf32>, %idx: index) -> f32{
   // expected-error @below {{failed to legalize operation 'memref.load'}}
-  memref.load %buffer[%idx, %idx] : memref<4x2xf32>
-  return
+  %0 = memref.load %buffer[%idx, %idx] : memref<4x2xf32>
+  return %0 : f32
 }
 
 // -----
-
 // Must have an identity map.
-
+// expected-error @-3 {{conversion to util failed}}
 #map = affine_map<(d0)[s0] -> (d0 * s0)>
-// expected-error @-6 {{conversion to util failed}}
-func.func @verify_invalid_non_identity_map(%buffer: memref<4xf32, #map>, %idx: index) {
+func.func @verify_invalid_non_identity_map(%buffer: memref<4xf32, #map>, %idx: index) -> f32 {
   // expected-error @below {{failed to legalize operation 'memref.load'}}
-  memref.load %buffer[%idx] : memref<4xf32, #map>
-  return
+  %0 = memref.load %buffer[%idx] : memref<4xf32, #map>
+  return %0 : f32
 }
 
 // -----
-
 // CHECK-LABEL: @assume_alignment
 func.func @assume_alignment(%buffer: memref<?xf32>) {
   // CHECK-NOT: assume_alignment
@@ -31,7 +30,6 @@ func.func @assume_alignment(%buffer: memref<?xf32>) {
 }
 
 // -----
-
 // CHECK-LABEL: @cast
 func.func @cast(%buffer: memref<?xf32>) -> memref<5xf32> {
   // CHECK-NOT: memref.cast
@@ -41,7 +39,6 @@ func.func @cast(%buffer: memref<?xf32>) -> memref<5xf32> {
 }
 
 // -----
-
 // CHECK-LABEL: @alloca() -> !util.buffer
 func.func @alloca() -> memref<16xi32> {
   // CHECK: %[[ALLOCATION_SIZE:.+]] = arith.constant 64 : index
@@ -52,7 +49,17 @@ func.func @alloca() -> memref<16xi32> {
 }
 
 // -----
+// CHECK-LABEL: @alloc_i16
+// CHECK-SAME: (%[[IDX0:.+]]: index) -> !util.buffer {
+func.func @alloc_i16(%idx0: index) -> memref<4xi16> {
+  // CHECK: %[[C8:.*]] = arith.constant 8 : index
+  // CHECK: %[[BUFFER:.*]] = util.buffer.alloc uninitialized : !util.buffer{%[[C8]]}
+  %0 = memref.alloca() : memref<4xi16>
+  // CHECK: return %[[BUFFER]]
+  return %0 : memref<4xi16>
+}
 
+// -----
 // CHECK-LABEL: @load_store_f32
 // CHECK-SAME: (%[[BUFFER:.+]]: !util.buffer, %[[IDX0:.+]]: index, %[[IDX1:.+]]: index) -> f32 {
 func.func @load_store_f32(%buffer: memref<?xf32>, %idx0: index, %idx1: index) -> f32 {
@@ -68,7 +75,6 @@ func.func @load_store_f32(%buffer: memref<?xf32>, %idx0: index, %idx1: index) ->
 }
 
 // -----
-
 // CHECK: util.global private @__constant_f32 : !util.buffer
 // CHECK: util.initializer {
 // CHECK:   %[[BUFFER:.+]] = util.buffer.constant : !util.buffer = dense<[0.0287729427, 0.0297581609]> : tensor<2xf32>
@@ -86,4 +92,34 @@ func.func @constant_global_f32(%idx: index) -> f32 {
   %1 = memref.load %0[%idx] : memref<2xf32>
   // CHECK: return %[[VALUE]] : f32
   return %1 : f32
+}
+
+// -----
+// CHECK-LABEL: @load_store_i16
+// CHECK-SAME: (%[[BUFFER:.+]]: !util.buffer, %[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[VALUE:.+]]: i32) -> i32 {
+func.func @load_store_i16(%buffer: memref<?xi16>, %idx0: index, %idx1: index, %value: i16) -> i16 {
+  // CHECK-DAG: %[[C2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[SZ:.*]] = util.buffer.size %[[BUFFER]]
+  // CHECK-DAG: %[[OFS0:.*]] = arith.muli %[[IDX0]], %[[C2]] : index
+  // CHECK-DAG: %[[UCST0:.*]] = builtin.unrealized_conversion_cast %[[VALUE]] : i32 to i16
+  // CHECK: util.buffer.store %[[UCST0]], %[[BUFFER]][%[[OFS0]]] : i16 -> !util.buffer{%[[SZ]]}
+  memref.store %value, %buffer[%idx0] : memref<?xi16>
+  // CHECK: %[[OFS1:.*]] = arith.muli %[[IDX1]], %[[C2]] : index
+  // CHECK: %[[LD:.*]] = util.buffer.load %[[BUFFER]][%[[OFS1]]] : !util.buffer{%[[SZ]]} -> i16
+  // CHECK: %[[UCST1:.*]] = builtin.unrealized_conversion_cast %[[LD]] : i16 to i32
+  %1 = memref.load %buffer[%idx1] : memref<?xi16>
+  // CHECK: return %[[UCST1]]
+  return %1 : i16
+}
+
+// -----
+// CHECK-LABEL: @dim_i16
+// CHECK-SAME: (%[[BUFFER:.+]]: !util.buffer, %[[IDX0:.+]]: index) -> index {
+func.func @dim_i16(%buffer: memref<?xi16>, %idx0: index) -> index {
+  // CHECK: %[[C2:.*]] = arith.constant 2 : index
+  // CHECK: %[[SZ:.*]] = util.buffer.size %[[BUFFER]] : !util.buffer
+  // CHECK: %[[DV:.*]] = arith.floordivsi %[[SZ]], %[[C2]] : index
+  %0 = memref.dim %buffer, %idx0 : memref<?xi16>
+  // CHECK: return %[[DV]]
+  return %0 : index
 }

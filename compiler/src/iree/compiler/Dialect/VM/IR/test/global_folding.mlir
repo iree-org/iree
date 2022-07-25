@@ -28,19 +28,6 @@ vm.module @global_i32_folds {
 
 // -----
 
-// CHECK-LABEL: @global_ref_folds_null
-vm.module @global_ref_folds_null {
-  // CHECK: vm.global.ref public mutable @g0 : !vm.ref<?>
-  vm.global.ref mutable @g0 : !vm.ref<?>
-  vm.initializer {
-    %null = vm.const.ref.zero : !vm.ref<?>
-    vm.global.store.ref %null, @g0 : !vm.ref<?>
-    vm.return
-  }
-}
-
-// -----
-
 // CHECK-LABEL: @global_load_i32_folds
 vm.module @global_load_i32_folds {
   vm.global.i32 @g0 = 123 : i32
@@ -60,30 +47,6 @@ vm.module @global_load_i32_folds {
     // CHECK-NEXT: vm.return %g1 : i32
     %g1 = vm.global.load.i32 @g1 : i32
     vm.return %g1 : i32
-  }
-}
-
-// -----
-
-// CHECK-LABEL: @global_load_ref_folds
-vm.module @global_load_ref_folds {
-  vm.global.ref @g0 : !vm.ref<?>
-  // CHECK-LABEL: @inline_const_null
-  vm.func @inline_const_null() -> !vm.ref<?> {
-    // CHECK-NEXT: %null = vm.const.ref.zero : !vm.ref<?>
-    // CHECK-NEXT: vm.return %null : !vm.ref<?>
-    %g0 = vm.global.load.ref @g0 : !vm.ref<?>
-    vm.return %g0 : !vm.ref<?>
-  }
-
-  vm.global.ref mutable @g1 : !vm.ref<?>
-  // CHECK-LABEL: @ignore_nonconst_value
-  vm.func @ignore_nonconst_value() -> !vm.ref<?> {
-    // NOTE: ensure we don't inline non-constant values.
-    // CHECK-NEXT: %g1 = vm.global.load.ref @g1 : !vm.ref<?>
-    // CHECK-NEXT: vm.return %g1 : !vm.ref<?>
-    %g1 = vm.global.load.ref @g1 : !vm.ref<?>
-    vm.return %g1 : !vm.ref<?>
   }
 }
 

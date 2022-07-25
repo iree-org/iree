@@ -233,31 +233,6 @@ void GlobalLoadF64Op::getCanonicalizationPatterns(RewritePatternSet &results,
 
 namespace {
 
-/// Inlines immutable global constants into their loads.
-struct InlineConstGlobalLoadRefOp : public OpRewritePattern<GlobalLoadRefOp> {
-  using OpRewritePattern<GlobalLoadRefOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(GlobalLoadRefOp op,
-                                PatternRewriter &rewriter) const override {
-    auto globalAttr = op->getAttrOfType<FlatSymbolRefAttr>("global");
-    auto globalOp =
-        op->getParentOfType<VM::ModuleOp>().lookupSymbol<GlobalRefOp>(
-            globalAttr.getValue());
-    if (!globalOp) return failure();
-    if (globalOp.getIsMutable()) return failure();
-    rewriter.replaceOpWithNewOp<ConstRefZeroOp>(op, op.getType());
-    return success();
-  }
-};
-
-}  // namespace
-
-void GlobalLoadRefOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                  MLIRContext *context) {
-  results.insert<InlineConstGlobalLoadRefOp>(context);
-}
-
-namespace {
-
 template <typename INDIRECT, typename DIRECT>
 struct PropagateGlobalLoadAddress : public OpRewritePattern<INDIRECT> {
   using OpRewritePattern<INDIRECT>::OpRewritePattern;

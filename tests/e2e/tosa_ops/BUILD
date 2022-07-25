@@ -143,13 +143,18 @@ VMVX_MICROKERNELS_SRCS = enforce_glob(
         "clamp.mlir",
         "clz.mlir",
         "const.mlir",
+        "equal.mlir",
         "exp.mlir",
         "floor.mlir",
+        "fully_connected.mlir",
+        "greater.mlir",
+        "greater_equal.mlir",
         "if.mlir",
         "log.mlir",
         "logical_left_shift.mlir",
         "logical_right_shift.mlir",
         "matmul.mlir",
+        "max_pool.mlir",
         "maximum.mlir",
         "minimum.mlir",
         "mul.mlir",
@@ -160,28 +165,18 @@ VMVX_MICROKERNELS_SRCS = enforce_glob(
         "reluN.mlir",
         "reshape.mlir",
         "rsqrt.mlir",
+        "select.mlir",
         "sigmoid.mlir",
         "sub.mlir",
         "tanh.mlir",
         "transpose.mlir",
+        "while.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
-        # Gather and table are failing on complicated buffer conversions that
-        # will shortly be fixed separately.
+        # Decompositions produce tensor<index> which is not handled properly.
         "gather.mlir",
         "table.mlir",
-        # equal, greater_equal, select have (suspected) i1 problems which
-        # manifest at runtime.
-        "equal.mlir",
-        "greater.mlir",
-        "greater_equal.mlir",
-        "select.mlir",
-        # fully_connected and while are failing on unrealizable 0d memref
-        # conversions. The first is incidental to how the test is constructed.
-        "fully_connected.mlir",
-        "max_pool.mlir",
-        "while.mlir",
     ],
 )
 
