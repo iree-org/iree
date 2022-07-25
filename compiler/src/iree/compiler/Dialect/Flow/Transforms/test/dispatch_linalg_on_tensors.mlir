@@ -362,7 +362,7 @@ func.func @keep_original_producer_uses(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>,
 //  CHECK-DAG: %[[D4:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //  CHECK-DAG: %[[D5:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //      CHECK: %[[origCC:.+]]:2 = flow.dispatch.workgroups[%[[D0]], %[[D1]], %[[C1]]]
-// CHECK-SAME:     (%[[ARG2]], %[[D2]], %[[D3]], %[[ARG0]], %[[D0]], %[[D4]], %[[ARG1]], %[[D5]], %[[D1]])
+// CHECK-SAME:     (%[[ARG2]], %[[D2]], %[[D3]], %[[ARG0]], %[[D0]], %[[D4]], %[[ARG1]], %[[D5]], %[[D1]]) : ({{.*}}) -> (%[[ARG2]]{{{.*}}}, tensor<?x?xf32>{{{.*}}})
 // CHECK-NEXT:   %[[ARG2_CAPTURE:.+]]: !flow.dispatch.tensor<readwrite:?x?xf32>
 // CHECK-SAME:   %[[RESULT_CAPTURE:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
 //      CHECK:   %[[LOAD:.+]] = flow.dispatch.tensor.load %[[ARG2_CAPTURE]]
@@ -370,8 +370,8 @@ func.func @keep_original_producer_uses(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>,
 // CHECK-SAME:     outs(%[[LOAD]] : tensor<?x?xf32>)
 //      CHECK:   %[[GEMM:.+]] = linalg.matmul
 // CHECK-SAME:     outs(%[[STOREVAL]] : tensor<?x?xf32>)
-//  CHECK-DAG:   flow.dispatch.tensor.store %[[STOREVAL]], %[[ARG2_CAPTURE]]
-//  CHECK-DAG:   flow.dispatch.tensor.store %[[GEMM]], %[[RESULT_CAPTURE]]
+//  CHECK-DAG:   flow.dispatch.tensor.store %[[STOREVAL]], %[[RESULT_CAPTURE]]
+//  CHECK-DAG:   flow.dispatch.tensor.store %[[GEMM]], %[[ARG2_CAPTURE]]
 //      CHECK: return %[[origCC]]#0, %[[origCC]]#1
 
 // -----

@@ -629,52 +629,18 @@ static BlockArgument getTiedOperandBlockArgument(BlockArgument resultArg) {
       (*resultArg.getUses().begin()).getOwner());
   if (!storeOp) return nullptr;
 
-  Operation *tieOp = storeOp.getValue().getDefiningOp();
+  // Check if that block argument is tied to another block argument.
+  auto tieOp = storeOp.getValue().getDefiningOp<Util::TiedOpInterface>();
   if (!tieOp) return nullptr;
+  auto tiedArg =
+      tieOp.getTiedResult(storeOp.getValue().cast<OpResult>().getResultNumber())
+          .dyn_cast_or_null<BlockArgument>();
+  if (!tiedArg) return nullptr;
+  assert(isa<IREE::Flow::DispatchWorkgroupsOp>(
+             tiedArg.getOwner()->getParentOp()) &&
+         "expected that BbArg belongs to DispatchWorkgroupsOp");
 
-  // TODO(antiagainst): use TiedOpInterface here instead of hardcoding ops
-  // when it's available in MLIR core in some form.
-  BlockArgument tiedArg =
-      TypeSwitch<Operation *, BlockArgument>(tieOp)
-          .Case<tensor::InsertSliceOp>([&](tensor::InsertSliceOp insertOp)
-                                           -> BlockArgument {
-            auto loadOp =
-                insertOp.getDest()
-                    .template getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
-            if (!loadOp) return nullptr;
-            return loadOp.getSource().dyn_cast<BlockArgument>();
-          })
-          .Case<IREE::Flow::DispatchTensorLoadOp>(
-              [&](auto loadOp) -> BlockArgument {
-                // Check that there is a single use and that the source is
-                // block argument. Single use can potentially be relaxed.
-                auto loadArg =
-                    loadOp.getSource().template dyn_cast<BlockArgument>();
-                if (!loadArg || !loadArg.hasOneUse() ||
-                    loadArg.use_begin()->get() != storeOp.getTarget()) {
-                  return nullptr;
-                }
-                return loadArg;
-              })
-          .Case<linalg::LinalgOp,
-                IREE::LinalgExt::LinalgExtOp>([&](auto linalgLikeOp)
-                                                  -> BlockArgument {
-            unsigned resultIndex =
-                storeOp.getValue().cast<OpResult>().getResultNumber();
-            auto loadOp =
-                linalgLikeOp.getOutputTensorOperands()[resultIndex]
-                    ->get()
-                    .template getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
-            if (!loadOp) return nullptr;
-            return loadOp.getSource().template dyn_cast<BlockArgument>();
-          })
-          .Default([&](Operation *) -> BlockArgument { return nullptr; });
-
-  if (!tiedArg) {
-    return nullptr;
-  }
-
-  // CHeck that the type of the tied argument candidate and type of the output
+  // Check that the type of the tied argument candidate and type of the output
   // match and that the tied argument is readonly.
   auto type = tiedArg.getType().dyn_cast<IREE::Flow::DispatchTensorType>();
   if (!type || type.getAccess() != IREE::Flow::TensorAccess::ReadOnly ||

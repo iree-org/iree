@@ -720,7 +720,9 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn) {
     auto resultValue = work.cast<OpResult>();
     LLVM_DEBUG(llvm::dbgs() << "  == emitting op "
                             << definingOp->getName().getStringRef() << "\n");
-    if (fn(resultValue).wasInterrupted()) break;
+    auto fnResult = fn(resultValue);
+    if (fnResult.wasInterrupted()) break;
+    if (fnResult.wasSkipped()) continue;
 
     // If the op is tied we may need to walk up to the operand the result is
     // tied to.

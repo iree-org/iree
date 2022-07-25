@@ -42,6 +42,24 @@ td_library(
 )
 
 iree_compiler_cc_library(
+    name = "ExternalModels",
+    srcs = [
+        "UtilExternalModels.cpp",
+    ],
+    hdrs = [
+        "UtilExternalModels.h",
+    ],
+    deps = [
+        ":IR",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:LinalgStructuredOpsIncGen",
+        "@llvm-project//mlir:TensorDialect",
+    ],
+)
+
+iree_compiler_cc_library(
     name = "IR",
     srcs = [
         "ClosureOpUtils.cpp",

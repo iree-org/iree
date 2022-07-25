@@ -29,6 +29,7 @@ cc_library(
         "//compiler/src/iree/compiler/Dialect/Stream/IR",
         "//compiler/src/iree/compiler/Dialect/Stream/Transforms",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR:ExternalModels",
         "//compiler/src/iree/compiler/Dialect/Util/Transforms",
         "//compiler/src/iree/compiler/Dialect/VM/Analysis",
         "//compiler/src/iree/compiler/Dialect/VM/Conversion/VMToEmitC",

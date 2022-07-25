@@ -290,6 +290,11 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
   AttrSizedOperandSegments,
   OffsetSizeAndStrideOpInterface,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+      "getTiedResult",
+      "getTiedResultOperandIndex",
+      "getTiedResultOperandIndices",
+  ]>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{loads a tensor from a dispatch input placeholder}];

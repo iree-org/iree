@@ -455,6 +455,19 @@ LogicalResult DispatchTensorLoadOp::reifyResultShapes(
   return success();
 }
 
+Value DispatchTensorLoadOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
+}
+
+::llvm::Optional<unsigned> DispatchTensorLoadOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};  // source
+}
+
+SmallVector<int64_t, 4> DispatchTensorLoadOp::getTiedResultOperandIndices() {
+  return {0};  // source
+}
+
 //===----------------------------------------------------------------------===//
 // flow.dispatch.tensor.store
 //===----------------------------------------------------------------------===//
