@@ -57,6 +57,16 @@ static llvm::cl::opt<bool> clEnableMicrokernels(
 extern llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName;
 
 //===---------------------------------------------------------------------===//
+// Default Linalg code generation options for CPU backend
+//===---------------------------------------------------------------------===//
+
+struct LinalgCPUVectorLoweringPassOptions : LinalgVectorLoweringPassOptions {
+  LinalgCPUVectorLoweringPassOptions() : LinalgVectorLoweringPassOptions() {
+    lowerVectorTransposeTo = "shuffle";
+  }
+};
+
+//===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
 //===---------------------------------------------------------------------===//
 
@@ -239,7 +249,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
   // Add the vector lowering expert.
   {
     OpPassManager &nestedFuncPassManager = nestedModulePM.nest<func::FuncOp>();
-    LinalgVectorLoweringPassOptions options;
+    LinalgCPUVectorLoweringPassOptions options;
     options.splitVectorTransfersTo = "linalg-copy";
     addLowerToVectorTransforms(nestedFuncPassManager, options);
   }
@@ -331,7 +341,7 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
   // Add the vector lowering expert.
   {
     OpPassManager &nestedFuncPassManager = nestedModulePM.nest<func::FuncOp>();
-    LinalgVectorLoweringPassOptions options;
+    LinalgCPUVectorLoweringPassOptions options;
     options.splitVectorTransfersTo = "linalg-copy";
     addLowerToVectorTransforms(nestedFuncPassManager, options);
   }
@@ -392,7 +402,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
   // Add the vector lowering expert.
   {
     OpPassManager &nestedFuncPassManager = nestedModulePM.nest<func::FuncOp>();
-    LinalgVectorLoweringPassOptions options;
+    LinalgCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
     addLowerToVectorTransforms(nestedFuncPassManager, options);
@@ -455,7 +465,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
   // Add the vector lowering expert.
   {
     OpPassManager &nestedFuncPassManager = nestedModulePM.nest<func::FuncOp>();
-    LinalgVectorLoweringPassOptions options;
+    LinalgCPUVectorLoweringPassOptions options;
     options.splitVectorTransfersTo = "shuffle";
     addLowerToVectorTransforms(nestedFuncPassManager, options);
   }
