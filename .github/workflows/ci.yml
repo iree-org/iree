@@ -35,9 +35,8 @@ jobs:
             "${BUILD_DIR}"
       # Using a tar archive is necessary to preserve file permissions. See
       # https://github.com/actions/upload-artifact#maintaining-file-permissions-and-case-sensitive-files
-      # The upload action already does its own gzip compression, so it's likely
-      # unnecessary (and perhaps harmful) to do our own, though that hasn't been
-      # investigated.
+      # The upload action already does its own gzip compression, so no need to
+      # do our own.
       - name: "Create build dir archive"
         run: tar -cf ${BUILD_DIR}.tar ${BUILD_DIR}
       - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8  # v3.1.0
