@@ -177,7 +177,8 @@ static int64_t getVectorSize(func::FuncOp entryPointFn, ShapedType shapedType) {
 // TODO(diegocaballero): Refactor this logic to a method that computes the final
 // tile sizes for vectorization/unrolling in one shot.
 static SmallVector<int64_t> getMinTilingSizesForEachDim(
-    func::FuncOp entryPointFn, linalg::LinalgOp op) {
+    func::FuncOp entryPointFn, linalg::LinalgOp op,
+    unsigned maxUnrollFactor = 8) {
   unsigned numLoops = op.getNumLoops();
   SmallVector<int64_t> minTileSizes(numLoops, 1);
   auto inputOutputOpOperands = op.getInputAndOutputOperands();
@@ -185,12 +186,6 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
     // Check the fastest varying dimension of the operand. Set the vector size
     // of the corresponding loop to the vector size.
     if (map.value().getNumResults() == 0) continue;
-    // Skip reduction output operand. Vectorization of reductions is driven by
-    // input tensors and considering the output's fastest varying dim leads to
-    // large unroll factors.
-    if (op.isOutputTensor(inputOutputOpOperands[map.index()]) &&
-        op.getNumReductionLoops() > 0)
-      continue;
     auto fastestVaryingDimExpr =
         map.value().getResults().back().dyn_cast<AffineDimExpr>();
     if (!fastestVaryingDimExpr) continue;
@@ -199,9 +194,16 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
     // If the indexing map has result it has to be a shaped type.
     auto operandType =
         inputOutputOpOperands[map.index()]->get().getType().cast<ShapedType>();
+    int64_t tileSize = getVectorSize(entryPointFn, operandType);
+    // Vectorization of reductions is driven by input tensors and considering
+    // the output's fastest varying dim leads to large unroll factors. We limit
+    // the tile size for this case to 'maxUnrollFactor'.
+    if (op.isOutputTensor(inputOutputOpOperands[map.index()]) &&
+        op.getNumReductionLoops() > 0)
+      tileSize = std::min<int64_t>(tileSize, maxUnrollFactor);
+
     minTileSizes[fastestVaryingDim] =
-        std::max<int64_t>(minTileSizes[fastestVaryingDim],
-                          getVectorSize(entryPointFn, operandType));
+        std::max<int64_t>(minTileSizes[fastestVaryingDim], tileSize);
   }
   return minTileSizes;
 }
