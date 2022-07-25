@@ -86,6 +86,7 @@ static void loopInvariantCodeMotion(func::FuncOp funcOp) {
 
 struct OptimizeVectorTransferPass
     : public OptimizeVectorTransferBase<OptimizeVectorTransferPass> {
+  OptimizeVectorTransferPass(bool flatten) : flatten(flatten) {}
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
     // Generate vector.shape_cast for dropping leading one dimensions in vector
@@ -122,7 +123,7 @@ struct OptimizeVectorTransferPass
     }
 
     // Second stage of patterns to flatten transfer ops.
-    {
+    if (flatten) {
       RewritePatternSet patterns(&getContext());
       mlir::vector::populateVectorTransferDropUnitDimsPatterns(patterns);
       mlir::vector::populateFlattenVectorTransferPatterns(patterns);
@@ -134,13 +135,26 @@ struct OptimizeVectorTransferPass
     // forwarding.
     eraseDeadAllocAndStores(funcOp);
   }
+  LogicalResult initializeOptions(StringRef options) override {
+    if (failed(Pass::initializeOptions(options))) {
+      return failure();
+    }
+    // `flatten` may have been set to `true` in the constructor already.
+    // The |= is so we preserve that rather than overwrite it with the default
+    // value `false` of `optionFlatten`.
+    flatten |= optionFlatten;
+    return success();
+  }
+
+ private:
+  bool flatten;
 };
 
 }  // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
-createOptimizeVectorTransferPass() {
-  return std::make_unique<OptimizeVectorTransferPass>();
+std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass(
+    bool flatten) {
+  return std::make_unique<OptimizeVectorTransferPass>(flatten);
 }
 
 }  // namespace iree_compiler

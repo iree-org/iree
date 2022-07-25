@@ -110,7 +110,8 @@ createLinalgToVectorVectorizeMMT4dPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
 
 /// Pass to optimize vector transfer_read and transfer_write.
-std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass(
+    bool flatten = false);
 
 /// Pass to test Partitionable loop interface
 std::unique_ptr<OperationPass<void>>
@@ -127,9 +128,6 @@ createRewriteLinalgDestructiveUpdatesPass();
 
 /// Pass to propagate type to avoid generating load/stores of illegal types.
 std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass();
-
-/// Pass to optimize vector transfer_read and transfer_write.
-std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass();
 
 /// Pass to convert math operations to their polynomial approximation.
 std::unique_ptr<OperationPass<>> createPolynomialApproximationPass();

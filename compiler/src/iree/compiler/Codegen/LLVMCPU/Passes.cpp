@@ -457,7 +457,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
+      createOptimizeVectorTransferPass(/*flatten=*/true));
 
   // Run IREE specific passes before vector lowering expert.
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -508,7 +508,7 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUAArch64VectorLoweringPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
+      createOptimizeVectorTransferPass(/*flatten=*/true));
 }
 
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
