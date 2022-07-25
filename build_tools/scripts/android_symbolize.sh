@@ -58,7 +58,7 @@ do
   then
     adb pull "$file" "$pulled_file" 1>/dev/null 2>/dev/null
   fi
-  llvm_symbolizer_output="$($ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-symbolizer -obj "$pulled_file" "$address")"
+  llvm_symbolizer_output="$($ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-symbolizer --obj "$pulled_file" "$address")"
   if [ -z "$llvm_symbolizer_output" ]
   then
     echo "$line"
