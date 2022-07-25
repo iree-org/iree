@@ -139,6 +139,9 @@ struct OptimizeVectorTransferPass
     if (failed(Pass::initializeOptions(options))) {
       return failure();
     }
+    // `flatten` may have been set to `true` in the constructor already.
+    // The |= is so we preserve that rather than overwrite it with the default
+    // value `false` of `optionFlatten`.
     flatten |= optionFlatten;
     return success();
   }
