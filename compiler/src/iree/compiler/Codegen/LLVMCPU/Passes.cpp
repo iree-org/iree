@@ -63,6 +63,7 @@ extern llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName;
 struct LinalgCPUVectorLoweringPassOptions : LinalgVectorLoweringPassOptions {
   LinalgCPUVectorLoweringPassOptions() : LinalgVectorLoweringPassOptions() {
     lowerVectorTransposeTo = "shuffle";
+    lowerVectorMultiReductionTo = "innerreduction";
   }
 };
 
