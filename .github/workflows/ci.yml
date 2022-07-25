@@ -88,7 +88,7 @@ jobs:
       - os-family=Linux
     env:
       BUILD_DIR: full-build-dir
-      BUILD_DIR_ARCHIVE: full-build-dir.tar.zst
+      BUILD_DIR_ARCHIVE: full-build-dir.tar.xz
     outputs:
       # Pass through the build directory as output so it's available to
       # dependent jobs.
@@ -107,8 +107,8 @@ jobs:
             "${BUILD_DIR}"
       # We do our own maximally-parallel compression with zstd and exclude files
       # unnecessary for testing.
-      - name: "Create build dir archive"
-        run: tar -X *.a -X *.o -c -I 'zstd -10 -T0' -f ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
+      - name: "Creating build dir archive"
+        run: tar -X '*.a' -X '*.o' -c -I 'xz -T0' -f ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
       - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8  # v3.1.0
         with:
           name: "${{ env.BUILD_DIR_ARCHIVE }}"
