@@ -15,6 +15,7 @@ on:
 
 jobs:
   build_runtime:
+    if: false
     runs-on: ubuntu-20.04
     env:
       BUILD_DIR: build-runtime
@@ -45,6 +46,7 @@ jobs:
           path: "${{ env.BUILD_DIR }}.tar"
 
   test_runtime:
+    if: false
     needs: build_runtime
     runs-on: ubuntu-20.04
     env:
@@ -153,6 +155,7 @@ jobs:
 
   test_gpu:
     needs: build_all
+    if: false
     runs-on:
       # self-hosted has to be listed first. See
       # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
@@ -197,6 +200,7 @@ jobs:
             "dpkg -l | grep nvidia && nvidia-smi; ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh && ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}"
 
   tsan:
+    if: false
     runs-on:
       # self-hosted has to be listed first. See
       # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
@@ -224,12 +228,14 @@ jobs:
             ./build_tools/cmake/build_and_test_tsan.sh
 
   host_tools_assertions:
+    if: false
     uses: ./.github/workflows/host_tools.yml
     with:
       host-binary-root: host-tools-assertions
       enable-assertions: "ON"
 
   riscv32:
+    if: false
     needs: host_tools_assertions
     runs-on:
       # self-hosted has to be listed first. See
