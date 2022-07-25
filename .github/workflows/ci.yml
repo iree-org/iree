@@ -108,7 +108,7 @@ jobs:
       # We do our own maximally-parallel compression with zstd and exclude files
       # unnecessary for testing.
       - name: "Creating build dir archive"
-        run: tar -X '*.a' -X '*.o' -c -I 'xz -T0' -f ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
+        run: tar --exclude '*.a' --exclude '*.o' -c -I 'xz -T0' -f ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
       - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8  # v3.1.0
         with:
           name: "${{ env.BUILD_DIR_ARCHIVE }}"
