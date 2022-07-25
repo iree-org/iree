@@ -151,7 +151,7 @@ struct OptimizeVectorTransferPass
 
 std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass(
     bool flatten) {
-  return std::make_unique<OptimizeVectorTransferPass>(flatten = false);
+  return std::make_unique<OptimizeVectorTransferPass>(flatten);
 }
 
 }  // namespace iree_compiler
