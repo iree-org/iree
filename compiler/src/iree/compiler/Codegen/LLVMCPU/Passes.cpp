@@ -66,7 +66,6 @@ struct LinalgCPUVectorLoweringPassOptions : LinalgVectorLoweringPassOptions {
   }
 };
 
-
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
 //===---------------------------------------------------------------------===//
