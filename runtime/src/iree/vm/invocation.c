@@ -453,7 +453,7 @@ IREE_API_EXPORT iree_status_t iree_vm_begin_invoke(
   // completes. A result of OK indicates successful completion while DEFERRED
   // indicates that the invocation needs to be resumed/waited again.
   state->status =
-      function.module->begin_call(function.module->self, stack, &call);
+      function.module->begin_call(function.module->self, stack, call);
 
   // The call may have yielded, either for cooperative scheduling purposes or
   // for a wait operation (in which case the top of the stack will have a wait

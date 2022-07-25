@@ -288,9 +288,8 @@ IREE_API_EXPORT iree_status_t iree_runtime_session_call_by_name(
 }
 
 IREE_API_EXPORT iree_status_t iree_runtime_session_call_direct(
-    iree_runtime_session_t* session, const iree_vm_function_call_t* call) {
+    iree_runtime_session_t* session, const iree_vm_function_call_t call) {
   IREE_ASSERT_ARGUMENT(session);
-  IREE_ASSERT_ARGUMENT(call);
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Allocate a VM stack on the host stack and initialize it.
@@ -300,8 +299,8 @@ IREE_API_EXPORT iree_status_t iree_runtime_session_call_direct(
                                   iree_runtime_session_host_allocator(session));
 
   // Issue the call.
-  iree_status_t status = call->function.module->begin_call(
-      call->function.module->self, stack, call);
+  iree_status_t status =
+      call.function.module->begin_call(call.function.module->self, stack, call);
 
   // Cleanup the stack.
   iree_vm_stack_deinitialize(stack);

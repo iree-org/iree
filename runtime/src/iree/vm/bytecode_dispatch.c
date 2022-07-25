@@ -484,8 +484,8 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
     iree_vm_stack_frame_t** out_caller_frame,
     iree_vm_registers_t* out_caller_registers) {
   // Call external function.
-  iree_status_t call_status = call.function.module->begin_call(
-      call.function.module->self, stack, &call);
+  iree_status_t call_status =
+      call.function.module->begin_call(call.function.module->self, stack, call);
   if (iree_status_is_deferred(call_status)) {
     return call_status;  // deferred for future resume
   } else if (IREE_UNLIKELY(!iree_status_is_ok(call_status))) {
@@ -655,7 +655,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
 iree_status_t iree_vm_bytecode_dispatch_begin(
     iree_vm_stack_t* stack, iree_vm_bytecode_module_t* module,
-    const iree_vm_function_call_t* call, iree_string_view_t cconv_arguments,
+    const iree_vm_function_call_t call, iree_string_view_t cconv_arguments,
     iree_string_view_t cconv_results) {
   // Enter function (as this is the initial call).
   // The callee's return will take care of storing the output registers when it
@@ -663,11 +663,11 @@ iree_status_t iree_vm_bytecode_dispatch_begin(
   iree_vm_stack_frame_t* current_frame = NULL;
   iree_vm_registers_t regs;
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_external_enter(
-      stack, call->function, cconv_arguments, call->arguments, cconv_results,
+      stack, call.function, cconv_arguments, call.arguments, cconv_results,
       &current_frame, &regs));
 
   return iree_vm_bytecode_dispatch(stack, module, current_frame, regs,
-                                   call->results);
+                                   call.results);
 }
 
 iree_status_t iree_vm_bytecode_dispatch_resume(

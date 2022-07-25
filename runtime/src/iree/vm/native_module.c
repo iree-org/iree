@@ -333,15 +333,14 @@ static iree_status_t iree_vm_native_module_issue_call(
 }
 
 static iree_status_t IREE_API_PTR iree_vm_native_module_begin_call(
-    void* self, iree_vm_stack_t* stack, const iree_vm_function_call_t* call) {
+    void* self, iree_vm_stack_t* stack, iree_vm_function_call_t call) {
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
-  if (IREE_UNLIKELY(call->function.linkage !=
-                    IREE_VM_FUNCTION_LINKAGE_EXPORT) ||
-      IREE_UNLIKELY(call->function.ordinal >=
+  if (IREE_UNLIKELY(call.function.linkage != IREE_VM_FUNCTION_LINKAGE_EXPORT) ||
+      IREE_UNLIKELY(call.function.ordinal >=
                     module->descriptor->export_count)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "function ordinal out of bounds: 0 < %u < %zu",
-                            call->function.ordinal,
+                            call.function.ordinal,
                             module->descriptor->export_count);
   }
   if (module->user_interface.begin_call) {
@@ -354,13 +353,13 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_begin_call(
 
   iree_vm_stack_frame_t* callee_frame = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_stack_function_enter(
-      stack, &call->function, IREE_VM_STACK_FRAME_NATIVE, frame_size,
+      stack, &call.function, IREE_VM_STACK_FRAME_NATIVE, frame_size,
       /*frame_cleanup_fn=*/NULL, &callee_frame));
 
   // Begin call with fresh callee frame.
   return iree_vm_native_module_issue_call(
       module, stack, callee_frame, IREE_VM_NATIVE_FUNCTION_CALL_BEGIN,
-      call->arguments, call->results);  // tail
+      call.arguments, call.results);  // tail
 }
 
 static iree_status_t IREE_API_PTR iree_vm_native_module_resume_call(

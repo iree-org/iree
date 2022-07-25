@@ -1024,7 +1024,7 @@ static iree_status_t IREE_API_PTR iree_vm_bytecode_module_notify(
 }
 
 static iree_status_t iree_vm_bytecode_module_begin_call(
-    void* self, iree_vm_stack_t* stack, const iree_vm_function_call_t* call) {
+    void* self, iree_vm_stack_t* stack, iree_vm_function_call_t call) {
   // NOTE: any work here adds directly to the invocation time. Avoid doing too
   // much work or touching too many unlikely-to-be-cached structures (such as
   // walking the FlatBuffer, which may cause page faults).
@@ -1035,13 +1035,10 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
   uint16_t internal_ordinal = 0;
   iree_vm_FunctionSignatureDef_table_t signature_def = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_map_internal_ordinal(
-      module, call->function, &internal_ordinal, &signature_def));
+      module, call.function, &internal_ordinal, &signature_def));
 
-  // TODO(benvanik): rework this call type to avoid the need to copy it while
-  // plumbing.
-  iree_vm_function_call_t internal_call = *call;
-  internal_call.function.linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
-  internal_call.function.ordinal = internal_ordinal;
+  call.function.linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
+  call.function.ordinal = internal_ordinal;
 
   // Grab calling convention string. This is not great as we are guaranteed to
   // have a bunch of cache misses, but without putting it on the descriptor
@@ -1068,8 +1065,8 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
 
   // Jump into the dispatch routine to execute bytecode until the function
   // either returns (synchronous) or yields (asynchronous).
-  return iree_vm_bytecode_dispatch_begin(
-      stack, module, &internal_call, cconv_arguments, cconv_results);  // tail
+  return iree_vm_bytecode_dispatch_begin(stack, module, call, cconv_arguments,
+                                         cconv_results);  // tail
 }
 
 static iree_status_t iree_vm_bytecode_module_resume_call(

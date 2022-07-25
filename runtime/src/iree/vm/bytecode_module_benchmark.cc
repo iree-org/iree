@@ -114,7 +114,7 @@ static iree_status_t RunFunction(benchmark::State& state,
       reinterpret_cast<int32_t*>(call.arguments.data)[i] = i32_args[i];
     }
     IREE_CHECK_OK(
-        bytecode_module->begin_call(bytecode_module->self, stack, &call));
+        bytecode_module->begin_call(bytecode_module->self, stack, call));
   }
   iree_vm_stack_deinitialize(stack);
 

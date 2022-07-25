@@ -420,7 +420,7 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   call.arguments = iree_make_byte_span(&call_args, sizeof(call_args));
   call.results = iree_make_byte_span(NULL, 0);
   iree_status_t status =
-      entry_fn.module->begin_call(entry_fn.module->self, stack, &call);
+      entry_fn.module->begin_call(entry_fn.module->self, stack, call);
 
   iree_vm_stack_deinitialize(stack);
 

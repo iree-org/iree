@@ -83,7 +83,7 @@ static iree_status_t iree_vm_context_run_function(
   }
 
   IREE_TRACE_FIBER_ENTER(context->context_id);
-  status = module->begin_call(module->self, stack, &call);
+  status = module->begin_call(module->self, stack, call);
   IREE_TRACE_FIBER_LEAVE();
   if (!iree_status_is_ok(status)) {
     status = IREE_VM_STACK_ANNOTATE_BACKTRACE_IF_ENABLED(stack, status);
@@ -548,7 +548,7 @@ static iree_status_t iree_vm_context_call_module_notify(
   }
 
   // Call the resolved function.
-  status = module->begin_call(module->self, stack, &call);
+  status = module->begin_call(module->self, stack, call);
   if (!iree_status_is_ok(status)) {
     status = IREE_VM_STACK_ANNOTATE_BACKTRACE_IF_ENABLED(stack, status);
   }

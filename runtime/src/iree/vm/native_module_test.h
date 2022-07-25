@@ -28,7 +28,7 @@ static iree_status_t call_import_i32_i32(iree_vm_stack_t* stack,
   call.function = *import;
   call.arguments = iree_make_byte_span(&arg0, sizeof(arg0));
   call.results = iree_make_byte_span(out_ret0, sizeof(*out_ret0));
-  return import->module->begin_call(import->module, stack, &call);
+  return import->module->begin_call(import->module, stack, call);
 }
 
 typedef iree_status_t (*call_i32_i32_t)(iree_vm_stack_t* stack,

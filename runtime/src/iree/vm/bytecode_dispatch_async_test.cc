@@ -82,7 +82,7 @@ TEST_F(VMBytecodeDispatchAsyncTest, YieldSequence) {
   call.results = iree_make_byte_span(&ret_value, sizeof(ret_value));
 
   // 0/3
-  ASSERT_THAT(function.module->begin_call(function.module->self, stack, &call),
+  ASSERT_THAT(function.module->begin_call(function.module->self, stack, call),
               StatusIs(StatusCode::kDeferred));
 
   // 1/3
@@ -138,7 +138,7 @@ TEST_F(VMBytecodeDispatchAsyncTest, YieldDivergent) {
 
   // arg0=0: result = %arg0 ? %arg1 : %arg2 => %arg2
   arg_values.arg0 = 0;
-  ASSERT_THAT(function.module->begin_call(function.module->self, stack, &call),
+  ASSERT_THAT(function.module->begin_call(function.module->self, stack, call),
               StatusIs(StatusCode::kDeferred));
   IREE_ASSERT_OK(
       function.module->resume_call(function.module->self, stack, call.results));
@@ -146,7 +146,7 @@ TEST_F(VMBytecodeDispatchAsyncTest, YieldDivergent) {
 
   // arg0=1: result = %arg0 ? %arg1 : %arg2 => %arg1
   arg_values.arg0 = 1;
-  ASSERT_THAT(function.module->begin_call(function.module->self, stack, &call),
+  ASSERT_THAT(function.module->begin_call(function.module->self, stack, call),
               StatusIs(StatusCode::kDeferred));
   IREE_ASSERT_OK(
       function.module->resume_call(function.module->self, stack, call.results));
