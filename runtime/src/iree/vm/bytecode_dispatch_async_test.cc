@@ -80,26 +80,24 @@ TEST_F(VMBytecodeDispatchAsyncTest, YieldSequence) {
   call.function = function;
   call.arguments = iree_make_byte_span(&arg_value, sizeof(arg_value));
   call.results = iree_make_byte_span(&ret_value, sizeof(ret_value));
-  iree_vm_execution_result_t result;
 
   // 0/3
-  ASSERT_THAT(
-      function.module->begin_call(function.module->self, stack, &call, &result),
-      StatusIs(StatusCode::kDeferred));
+  ASSERT_THAT(function.module->begin_call(function.module->self, stack, &call),
+              StatusIs(StatusCode::kDeferred));
 
   // 1/3
-  ASSERT_THAT(function.module->resume_call(function.module->self, stack,
-                                           call.results, &result),
-              StatusIs(StatusCode::kDeferred));
+  ASSERT_THAT(
+      function.module->resume_call(function.module->self, stack, call.results),
+      StatusIs(StatusCode::kDeferred));
 
   // 2/3
-  ASSERT_THAT(function.module->resume_call(function.module->self, stack,
-                                           call.results, &result),
-              StatusIs(StatusCode::kDeferred));
+  ASSERT_THAT(
+      function.module->resume_call(function.module->self, stack, call.results),
+      StatusIs(StatusCode::kDeferred));
 
   // 3/3
-  IREE_ASSERT_OK(function.module->resume_call(function.module->self, stack,
-                                              call.results, &result));
+  IREE_ASSERT_OK(
+      function.module->resume_call(function.module->self, stack, call.results));
 
   ASSERT_EQ(ret_value, arg_value + 3);
 
@@ -137,24 +135,21 @@ TEST_F(VMBytecodeDispatchAsyncTest, YieldDivergent) {
   call.function = function;
   call.arguments = iree_make_byte_span(&arg_values, sizeof(arg_values));
   call.results = iree_make_byte_span(&ret_value, sizeof(ret_value));
-  iree_vm_execution_result_t result;
 
   // arg0=0: result = %arg0 ? %arg1 : %arg2 => %arg2
   arg_values.arg0 = 0;
-  ASSERT_THAT(
-      function.module->begin_call(function.module->self, stack, &call, &result),
-      StatusIs(StatusCode::kDeferred));
-  IREE_ASSERT_OK(function.module->resume_call(function.module->self, stack,
-                                              call.results, &result));
+  ASSERT_THAT(function.module->begin_call(function.module->self, stack, &call),
+              StatusIs(StatusCode::kDeferred));
+  IREE_ASSERT_OK(
+      function.module->resume_call(function.module->self, stack, call.results));
   ASSERT_EQ(ret_value, arg_values.arg2);
 
   // arg0=1: result = %arg0 ? %arg1 : %arg2 => %arg1
   arg_values.arg0 = 1;
-  ASSERT_THAT(
-      function.module->begin_call(function.module->self, stack, &call, &result),
-      StatusIs(StatusCode::kDeferred));
-  IREE_ASSERT_OK(function.module->resume_call(function.module->self, stack,
-                                              call.results, &result));
+  ASSERT_THAT(function.module->begin_call(function.module->self, stack, &call),
+              StatusIs(StatusCode::kDeferred));
+  IREE_ASSERT_OK(
+      function.module->resume_call(function.module->self, stack, call.results));
   ASSERT_EQ(ret_value, arg_values.arg1);
 
   iree_vm_stack_deinitialize(stack);

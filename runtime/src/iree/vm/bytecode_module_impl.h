@@ -139,19 +139,17 @@ typedef struct iree_vm_bytecode_module_state_t {
 } iree_vm_bytecode_module_state_t;
 
 // Begins execution of the current frame and continues until either a yield or
-// return. |out_result| will contain the result status for continuation, if
-// needed.
+// return.
 iree_status_t iree_vm_bytecode_dispatch_begin(
     iree_vm_stack_t* stack, iree_vm_bytecode_module_t* module,
     const iree_vm_function_call_t* call, iree_string_view_t cconv_arguments,
-    iree_string_view_t cconv_results, iree_vm_execution_result_t* out_result);
+    iree_string_view_t cconv_results);
 
 // Resumes execution of an in-progress frame and continues until either a yield
-// or return. |out_result| will contain the result status for continuation, if
-// needed.
+// or return.
 iree_status_t iree_vm_bytecode_dispatch_resume(
     iree_vm_stack_t* stack, iree_vm_bytecode_module_t* module,
-    iree_byte_span_t call_results, iree_vm_execution_result_t* out_result);
+    iree_byte_span_t call_results);
 
 #ifdef __cplusplus
 }  // extern "C"

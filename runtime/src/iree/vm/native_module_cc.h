@@ -215,10 +215,7 @@ class NativeModule {
   }
 
   static iree_status_t ModuleBeginCall(void* self, iree_vm_stack_t* stack,
-                                       const iree_vm_function_call_t* call,
-                                       iree_vm_execution_result_t* out_result) {
-    IREE_ASSERT_ARGUMENT(out_result);
-    std::memset(out_result, 0, sizeof(*out_result));
+                                       const iree_vm_function_call_t* call) {
     auto* module = FromModulePointer(self);
     if (IREE_UNLIKELY(call->function.ordinal >=
                       module->dispatch_table_.size())) {
@@ -239,7 +236,7 @@ class NativeModule {
         /*frame_cleanup_fn=*/nullptr, &callee_frame));
 
     auto* state = FromStatePointer(callee_frame->module_state);
-    iree_status_t status = info.call(info.ptr, state, stack, call, out_result);
+    iree_status_t status = info.call(info.ptr, state, stack, call);
     if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
       status = iree_status_annotate_f(
           status, "while invoking C++ function %s.%.*s", module->name_,

@@ -1024,13 +1024,10 @@ static iree_status_t IREE_API_PTR iree_vm_bytecode_module_notify(
 }
 
 static iree_status_t iree_vm_bytecode_module_begin_call(
-    void* self, iree_vm_stack_t* stack, const iree_vm_function_call_t* call,
-    iree_vm_execution_result_t* out_result) {
+    void* self, iree_vm_stack_t* stack, const iree_vm_function_call_t* call) {
   // NOTE: any work here adds directly to the invocation time. Avoid doing too
   // much work or touching too many unlikely-to-be-cached structures (such as
   // walking the FlatBuffer, which may cause page faults).
-  IREE_ASSERT_ARGUMENT(out_result);
-  memset(out_result, 0, sizeof(iree_vm_execution_result_t));
 
   // Map the (potentially) export ordinal into the internal function ordinal in
   // the function descriptor table.
@@ -1071,21 +1068,15 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
 
   // Jump into the dispatch routine to execute bytecode until the function
   // either returns (synchronous) or yields (asynchronous).
-  return iree_vm_bytecode_dispatch_begin(stack, module, &internal_call,
-                                         cconv_arguments, cconv_results,
-                                         out_result);  // tail
+  return iree_vm_bytecode_dispatch_begin(
+      stack, module, &internal_call, cconv_arguments, cconv_results);  // tail
 }
 
 static iree_status_t iree_vm_bytecode_module_resume_call(
-    void* self, iree_vm_stack_t* stack, iree_byte_span_t call_results,
-    iree_vm_execution_result_t* out_result) {
-  IREE_ASSERT_ARGUMENT(out_result);
-  memset(out_result, 0, sizeof(iree_vm_execution_result_t));
-
+    void* self, iree_vm_stack_t* stack, iree_byte_span_t call_results) {
   // Resume the call by jumping back into the bytecode dispatch.
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
-  return iree_vm_bytecode_dispatch_resume(stack, module, call_results,
-                                          out_result);  // tail
+  return iree_vm_bytecode_dispatch_resume(stack, module, call_results);  // tail
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(

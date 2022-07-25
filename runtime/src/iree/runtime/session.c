@@ -300,9 +300,8 @@ IREE_API_EXPORT iree_status_t iree_runtime_session_call_direct(
                                   iree_runtime_session_host_allocator(session));
 
   // Issue the call.
-  iree_vm_execution_result_t result;
   iree_status_t status = call->function.module->begin_call(
-      call->function.module->self, stack, call, &result);
+      call->function.module->self, stack, call);
 
   // Cleanup the stack.
   iree_vm_stack_deinitialize(stack);

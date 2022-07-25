@@ -295,20 +295,16 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_notify(
 static iree_status_t iree_vm_native_module_issue_call(
     iree_vm_native_module_t* module, iree_vm_stack_t* stack,
     iree_vm_stack_frame_t* callee_frame, iree_vm_native_function_flags_t flags,
-    iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
-    iree_vm_execution_result_t* out_result) {
+    iree_byte_span_t args_storage, iree_byte_span_t rets_storage) {
   iree_vm_module_state_t* module_state = callee_frame->module_state;
-
-  IREE_ASSERT_ARGUMENT(out_result);
-  memset(out_result, 0, sizeof(iree_vm_execution_result_t));
 
   // Call the target function using the shim.
   const uint16_t function_ordinal = callee_frame->function.ordinal;
   const iree_vm_native_function_ptr_t* function_ptr =
       &module->descriptor->functions[function_ordinal];
-  iree_status_t status = function_ptr->shim(stack, flags, args_storage,
-                                            rets_storage, function_ptr->target,
-                                            module, module_state, out_result);
+  iree_status_t status =
+      function_ptr->shim(stack, flags, args_storage, rets_storage,
+                         function_ptr->target, module, module_state);
   if (iree_status_is_deferred(status)) {
     // Call deferred; bail and return to the scheduler.
     // Note that we preserve the stack.
@@ -337,8 +333,7 @@ static iree_status_t iree_vm_native_module_issue_call(
 }
 
 static iree_status_t IREE_API_PTR iree_vm_native_module_begin_call(
-    void* self, iree_vm_stack_t* stack, const iree_vm_function_call_t* call,
-    iree_vm_execution_result_t* out_result) {
+    void* self, iree_vm_stack_t* stack, const iree_vm_function_call_t* call) {
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
   if (IREE_UNLIKELY(call->function.linkage !=
                     IREE_VM_FUNCTION_LINKAGE_EXPORT) ||
@@ -350,8 +345,7 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_begin_call(
                             module->descriptor->export_count);
   }
   if (module->user_interface.begin_call) {
-    return module->user_interface.begin_call(module->self, stack, call,
-                                             out_result);
+    return module->user_interface.begin_call(module->self, stack, call);
   }
 
   // NOTE: VM stack is currently unused. We could stash things here for the
@@ -366,16 +360,15 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_begin_call(
   // Begin call with fresh callee frame.
   return iree_vm_native_module_issue_call(
       module, stack, callee_frame, IREE_VM_NATIVE_FUNCTION_CALL_BEGIN,
-      call->arguments, call->results, out_result);  // tail
+      call->arguments, call->results);  // tail
 }
 
 static iree_status_t IREE_API_PTR iree_vm_native_module_resume_call(
-    void* self, iree_vm_stack_t* stack, iree_byte_span_t call_results,
-    iree_vm_execution_result_t* out_result) {
+    void* self, iree_vm_stack_t* stack, iree_byte_span_t call_results) {
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
   if (module->user_interface.resume_call) {
-    return module->user_interface.resume_call(module->self, stack, call_results,
-                                              out_result);
+    return module->user_interface.resume_call(module->self, stack,
+                                              call_results);
   }
 
   // Resume call using existing top frame.
@@ -386,7 +379,7 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_resume_call(
   }
   return iree_vm_native_module_issue_call(
       module, stack, callee_frame, IREE_VM_NATIVE_FUNCTION_CALL_RESUME,
-      iree_byte_span_empty(), call_results, out_result);  // tail
+      iree_byte_span_empty(), call_results);  // tail
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_native_module_create(

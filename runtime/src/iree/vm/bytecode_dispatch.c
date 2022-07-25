@@ -482,11 +482,10 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
     iree_string_view_t cconv_results,
     const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
     iree_vm_stack_frame_t** out_caller_frame,
-    iree_vm_registers_t* out_caller_registers,
-    iree_vm_execution_result_t* out_result) {
+    iree_vm_registers_t* out_caller_registers) {
   // Call external function.
   iree_status_t call_status = call.function.module->begin_call(
-      call.function.module->self, stack, &call, out_result);
+      call.function.module->self, stack, &call);
   if (iree_status_is_deferred(call_status)) {
     return call_status;  // deferred for future resume
   } else if (IREE_UNLIKELY(!iree_status_is_ok(call_status))) {
@@ -577,8 +576,7 @@ static iree_status_t iree_vm_bytecode_call_import(
     const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
     const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
     iree_vm_stack_frame_t** out_caller_frame,
-    iree_vm_registers_t* out_caller_registers,
-    iree_vm_execution_result_t* out_result) {
+    iree_vm_registers_t* out_caller_registers) {
   // Prepare |call| by looking up the import information.
   const iree_vm_bytecode_import_t* import = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_verify_import(stack, module_state,
@@ -602,7 +600,7 @@ static iree_status_t iree_vm_bytecode_call_import(
   memset(call.results.data, 0, call.results.data_length);
   return iree_vm_bytecode_issue_import_call(stack, call, import->results,
                                             dst_reg_list, out_caller_frame,
-                                            out_caller_registers, out_result);
+                                            out_caller_registers);
 }
 
 // Calls a variadic imported function from another module.
@@ -615,8 +613,7 @@ static iree_status_t iree_vm_bytecode_call_import_variadic(
     const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
     const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
     iree_vm_stack_frame_t** out_caller_frame,
-    iree_vm_registers_t* out_caller_registers,
-    iree_vm_execution_result_t* out_result) {
+    iree_vm_registers_t* out_caller_registers) {
   // Prepare |call| by looking up the import information.
   const iree_vm_bytecode_import_t* import = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_verify_import(stack, module_state,
@@ -644,7 +641,7 @@ static iree_status_t iree_vm_bytecode_call_import_variadic(
   memset(call.results.data, 0, call.results.data_length);
   return iree_vm_bytecode_issue_import_call(stack, call, import->results,
                                             dst_reg_list, out_caller_frame,
-                                            out_caller_registers, out_result);
+                                            out_caller_registers);
 }
 
 //===----------------------------------------------------------------------===//
@@ -654,12 +651,12 @@ static iree_status_t iree_vm_bytecode_call_import_variadic(
 static iree_status_t iree_vm_bytecode_dispatch(
     iree_vm_stack_t* stack, iree_vm_bytecode_module_t* module,
     iree_vm_stack_frame_t* current_frame, iree_vm_registers_t regs,
-    iree_byte_span_t call_results, iree_vm_execution_result_t* out_result);
+    iree_byte_span_t call_results);
 
 iree_status_t iree_vm_bytecode_dispatch_begin(
     iree_vm_stack_t* stack, iree_vm_bytecode_module_t* module,
     const iree_vm_function_call_t* call, iree_string_view_t cconv_arguments,
-    iree_string_view_t cconv_results, iree_vm_execution_result_t* out_result) {
+    iree_string_view_t cconv_results) {
   // Enter function (as this is the initial call).
   // The callee's return will take care of storing the output registers when it
   // actually does return, either immediately or in the future via a resume.
@@ -670,12 +667,12 @@ iree_status_t iree_vm_bytecode_dispatch_begin(
       &current_frame, &regs));
 
   return iree_vm_bytecode_dispatch(stack, module, current_frame, regs,
-                                   call->results, out_result);
+                                   call->results);
 }
 
 iree_status_t iree_vm_bytecode_dispatch_resume(
     iree_vm_stack_t* stack, iree_vm_bytecode_module_t* module,
-    iree_byte_span_t call_results, iree_vm_execution_result_t* out_result) {
+    iree_byte_span_t call_results) {
   iree_vm_stack_frame_t* current_frame = iree_vm_stack_top(stack);
   if (IREE_UNLIKELY(!current_frame)) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
@@ -686,15 +683,13 @@ iree_status_t iree_vm_bytecode_dispatch_resume(
   // TODO(benvanik): assert the module is at the top of the frame? We should
   // only be coming in from a call based on the current frame.
   return iree_vm_bytecode_dispatch(stack, module, current_frame, regs,
-                                   call_results, out_result);
+                                   call_results);
 }
 
 static iree_status_t iree_vm_bytecode_dispatch(
     iree_vm_stack_t* stack, iree_vm_bytecode_module_t* module,
     iree_vm_stack_frame_t* current_frame, iree_vm_registers_t regs,
-    iree_byte_span_t call_results, iree_vm_execution_result_t* out_result) {
-  memset(out_result, 0, sizeof(*out_result));
-
+    iree_byte_span_t call_results) {
   // When required emit the dispatch tables here referencing the labels we are
   // defining below.
   DEFINE_DISPATCH_TABLES();
@@ -1703,7 +1698,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
         // Call import (and possible yield).
         IREE_RETURN_IF_ERROR(iree_vm_bytecode_call_import(
             stack, module_state, function_ordinal, regs, src_reg_list,
-            dst_reg_list, &current_frame, &regs, out_result));
+            dst_reg_list, &current_frame, &regs));
       } else {
         // Switch execution to the target function and continue running in the
         // bytecode dispatcher.
@@ -1742,7 +1737,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       // Call import (and possible yield).
       IREE_RETURN_IF_ERROR(iree_vm_bytecode_call_import_variadic(
           stack, module_state, function_ordinal, regs, segment_size_list,
-          src_reg_list, dst_reg_list, &current_frame, &regs, out_result));
+          src_reg_list, dst_reg_list, &current_frame, &regs));
     });
 
     DISPATCH_OP(CORE, Return, {

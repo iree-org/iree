@@ -39,7 +39,6 @@ enum {
   SHIM_ARGUMENT_RETS_STORAGE,
   SHIM_ARGUMENT_MODULE,
   SHIM_ARGUMENT_MODULE_STATE,
-  SHIM_ARGUMENT_EXECUTION_RESULT,
 };
 
 /// The EmitC dialect is currently missing operations to cleanly represent some
@@ -1319,17 +1318,14 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"));
     Type moduleStateType =
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"));
-    Type executionResultType = emitc::PointerType::get(
-        emitc::OpaqueType::get(ctx, "iree_vm_execution_result_t"));
 
     SmallVector<Type> inputTypes = {
-        stackType,            // SHIM_ARGUMENT_STACK
-        flagsType,            // SHIM_ARGUMENT_FLAGS
-        spanType,             // SHIM_ARGUMENT_ARGS_STORAGE
-        spanType,             // SHIM_ARGUMENT_RETS_STORAGE
-        moduleType,           // SHIM_ARGUMENT_MODULE
-        moduleStateType,      // SHIM_ARGUMENT_MODULE_STATE
-        executionResultType,  // SHIM_ARGUMENT_EXECUTION_RESULT
+        stackType,        // SHIM_ARGUMENT_STACK
+        flagsType,        // SHIM_ARGUMENT_FLAGS
+        spanType,         // SHIM_ARGUMENT_ARGS_STORAGE
+        spanType,         // SHIM_ARGUMENT_RETS_STORAGE
+        moduleType,       // SHIM_ARGUMENT_MODULE
+        moduleStateType,  // SHIM_ARGUMENT_MODULE_STATE
     };
 
     auto newFuncType = mlir::FunctionType::get(
@@ -1362,8 +1358,6 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
       block->addArgument(spanType, loc);         // SHIM_ARGUMENT_RETS_STORAGE
       block->addArgument(moduleType, loc);       // SHIM_ARGUMENT_MODULE
       block->addArgument(moduleStateType, loc);  // SHIM_ARGUMENT_MODULE_STATE
-      block->addArgument(executionResultType,
-                         loc);  // SHIM_ARGUMENT_EXECUTION_RESULT
 
       rewriter.setInsertionPointToStart(block);
 
@@ -2258,24 +2252,7 @@ class ImportOpConverter {
                            OpBuilder &builder, Location loc) const {
     auto ctx = builder.getContext();
 
-    // iree_vm_execution_result_t result;
-    auto executionResult =
-        builder
-            .create<emitc::VariableOp>(
-                /*location=*/loc,
-                /*resultType=*/
-                emitc::OpaqueType::get(ctx, "iree_vm_execution_result_t"),
-                /*value=*/emitc::OpaqueAttr::get(ctx, ""))
-            .getResult();
-
-    // memset(&result, 0, sizeof(result));
-    if (failed(clearStruct(builder, executionResult))) {
-      emitError(loc) << "failed to clear struct";
-      return failure();
-    }
-
-    // RETURN_IF_ERROR(import->module->begin_call(import->module, stack,
-    // &call, &result));
+    // RETURN_IF_ERROR(import->module->begin_call(import->module, stack, call));
     auto importModule = emitc_builders::structPtrMember(
         builder, loc,
         /*type=*/
@@ -2283,9 +2260,6 @@ class ImportOpConverter {
             emitc::OpaqueType::get(ctx, "iree_vm_module_t")),
         /*memberName=*/"module",
         /*operand=*/import);
-    auto callPtr = emitc_builders::addressOf(builder, loc, call);
-    auto executionResultPtr =
-        emitc_builders::addressOf(builder, loc, executionResult);
 
     returnIfError(
         /*rewriter=*/builder,
@@ -2299,11 +2273,10 @@ class ImportOpConverter {
                            builder.getIndexAttr(0),
                            builder.getIndexAttr(1),
                            builder.getIndexAttr(2),
-                           builder.getIndexAttr(3),
                        }),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{importModule, stack, callPtr, executionResultPtr},
+        ArrayRef<Value>{importModule, stack, call},
         /*typeConverter=*/typeConverter);
 
     return success();

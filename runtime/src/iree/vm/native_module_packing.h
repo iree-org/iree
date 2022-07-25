@@ -621,8 +621,7 @@ struct DispatchFunctor {
   using FnPtr = StatusOr<Results> (Owner::*)(Params...);
 
   static Status Call(void (Owner::*ptr)(), Owner* self, iree_vm_stack_t* stack,
-                     const iree_vm_function_call_t* call,
-                     iree_vm_execution_result_t* out_result) {
+                     const iree_vm_function_call_t* call) {
     // Marshal arguments into types/locals we can forward to the function.
     IREE_ASSIGN_OR_RETURN(
         auto params, impl::Unpacker::LoadSequence<Params...>(call->arguments));
@@ -653,8 +652,7 @@ struct DispatchFunctorVoid {
   using FnPtr = Status (Owner::*)(Params...);
 
   static Status Call(void (Owner::*ptr)(), Owner* self, iree_vm_stack_t* stack,
-                     const iree_vm_function_call_t* call,
-                     iree_vm_execution_result_t* out_result) {
+                     const iree_vm_function_call_t* call) {
     IREE_ASSIGN_OR_RETURN(
         auto params, impl::Unpacker::LoadSequence<Params...>(call->arguments));
     return ApplyFn(reinterpret_cast<FnPtr>(ptr), self, std::move(params),
@@ -677,8 +675,7 @@ struct NativeFunction {
   void (Owner::*const ptr)();
   Status (*const call)(void (Owner::*ptr)(), Owner* self,
                        iree_vm_stack_t* stack,
-                       const iree_vm_function_call_t* call,
-                       iree_vm_execution_result_t* out_result);
+                       const iree_vm_function_call_t* call);
 };
 
 template <typename Owner, typename Result, typename... Params>
