@@ -94,6 +94,9 @@ def OptimizeVectorTransfer :
   let summary =
       "Run optimization transformations on vector transfer operations";
   let constructor = "mlir::iree_compiler::createOptimizeVectorTransferPass()";
+  let options = [
+    Option<"optionFlatten", "flatten", "bool", "false", "Flatten the vector type of vector transfers where possible (contiguous row-major data).">
+  ];
 }
 
 
