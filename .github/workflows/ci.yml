@@ -179,7 +179,7 @@ jobs:
       # https://github.community/t/support-for-yaml-anchors/16128/92
       # https://github.com/actions/runner/issues/1182
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - cpu
+      - gpu
       - os-family=Linux
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
