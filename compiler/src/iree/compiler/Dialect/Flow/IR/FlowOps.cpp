@@ -695,22 +695,22 @@ LogicalResult DispatchWorkgroupsOp::verify() {
 }
 
 BlockArgument DispatchWorkgroupsOp::getOutputBlockArgument(unsigned idx) {
-  if (!getTiedOperands().hasValue()) {
+  Optional<ArrayAttr> tiedOperands = getTiedOperands();
+  if (!tiedOperands.hasValue() || tiedOperands->empty()) {
     unsigned numInputs = getArguments().size();
     return getWorkgroupBody().getArguments().drop_front(numInputs)[idx];
   }
 
   // Some outputs are tied to inputs and share their block arguments.
-  auto tiedOperands = getTiedOperands().getValue();
   int64_t tiedOperand =
-      tiedOperands[idx].cast<IntegerAttr>().getValue().getSExtValue();
+      (*tiedOperands)[idx].cast<IntegerAttr>().getValue().getSExtValue();
   if (tiedOperand != IREE::Util::TiedOpInterface::kUntiedIndex)
     // This output is tied to an input.
     return getInputBlockArgument(tiedOperand);
 
   unsigned nextOutArgIdx = getArguments().size();
   for (unsigned i = 0; i < idx; ++i)
-    if (tiedOperands[i].cast<IntegerAttr>().getValue().getSExtValue() ==
+    if ((*tiedOperands)[i].cast<IntegerAttr>().getValue().getSExtValue() ==
         IREE::Util::TiedOpInterface::kUntiedIndex)
       nextOutArgIdx++;
   return getWorkgroupBody().getArguments()[nextOutArgIdx];
