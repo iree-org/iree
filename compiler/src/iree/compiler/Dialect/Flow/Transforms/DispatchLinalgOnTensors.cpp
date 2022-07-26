@@ -195,69 +195,52 @@ bool isClonableIntoDispatchOp(Operation *op) {
 //===----------------------------------------------------------------------===//
 
 /// For a given operation returns the loop ranges needed to compute the op.
-template <typename T>
-static SmallVector<Range> getLoopRanges(T operation, Location loc,
-                                        PatternRewriter &rewriter);
-
-template <>
-SmallVector<Range> getLoopRanges<linalg::LinalgOp>(linalg::LinalgOp linalgOp,
-                                                   Location loc,
-                                                   PatternRewriter &rewriter) {
-  SmallVector<Range> loopRanges = linalgOp.createLoopRanges(rewriter, loc);
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-  SmallVector<unsigned> reductionDims;
-  linalgOp.getReductionDims(reductionDims);
-  for (auto reductionDim : reductionDims) {
-    loopRanges[reductionDim].size = one;
-  }
-  return loopRanges;
-}
-
-template <>
-SmallVector<Range> getLoopRanges<IREE::LinalgExt::TiledOpInterface>(
-    IREE::LinalgExt::TiledOpInterface tilableOp, Location loc,
-    PatternRewriter &rewriter) {
-  SmallVector<Range> loopRanges = tilableOp.getIterationDomain(rewriter);
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-  for (auto iteratorType : llvm::enumerate(tilableOp.getLoopIteratorTypes())) {
-    if (iteratorType.value() == getReductionIteratorTypeName()) {
-      loopRanges[iteratorType.index()].size = one;
-    }
-  }
-  return loopRanges;
-}
-
-template <>
-SmallVector<Range> getLoopRanges<tensor::InsertSliceOp>(
-    tensor::InsertSliceOp insertSliceOp, Location loc,
-    PatternRewriter &rewriter) {
+static SmallVector<Range> getLoopRanges(Operation *op, Location loc,
+                                        PatternRewriter &rewriter) {
+  SmallVector<Range> loopRanges;
   Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-  Value source = insertSliceOp.getSource();
-  SmallVector<Range> loopRanges(insertSliceOp.getSourceType().getRank(),
-                                Range{zero, one, one});
-  for (auto dim : llvm::seq<unsigned>(0, loopRanges.size())) {
-    loopRanges[dim].size = rewriter.create<tensor::DimOp>(loc, source, dim);
-  }
+  TypeSwitch<Operation *>(op)
+      .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
+        loopRanges = linalgOp.createLoopRanges(rewriter, loc);
+        SmallVector<unsigned> reductionDims;
+        linalgOp.getReductionDims(reductionDims);
+        for (auto reductionDim : reductionDims) {
+          loopRanges[reductionDim].size = one;
+        }
+      })
+      .Case<IREE::LinalgExt::TiledOpInterface>(
+          [&](IREE::LinalgExt::TiledOpInterface tilableOp) {
+            loopRanges = tilableOp.getIterationDomain(rewriter);
+            for (auto iteratorType :
+                 llvm::enumerate(tilableOp.getLoopIteratorTypes())) {
+              if (iteratorType.value() == getReductionIteratorTypeName()) {
+                loopRanges[iteratorType.index()].size = one;
+              }
+            }
+          })
+      .Case<tensor::InsertSliceOp>([&](tensor::InsertSliceOp insertSliceOp) {
+        Value source = insertSliceOp.getSource();
+        for (int64_t dim = 0; dim < insertSliceOp.getSourceType().getRank();
+             ++dim) {
+          Value size = rewriter.create<tensor::DimOp>(loc, source, dim);
+          loopRanges.push_back(Range{zero, size, one});
+        }
+      })
+      .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
+        ReifiedRankedShapedTypeDims resultDims;
+        (void)sliceOp.reifyResultShapes(rewriter, resultDims);
+        for (Value size : resultDims[0]) {
+          loopRanges.push_back(Range{zero, size, one});
+        }
+      })
+      .Default([&](Operation *op) { llvm_unreachable("unsupported op"); });
   return loopRanges;
-}
-
-template <>
-SmallVector<Range> getLoopRanges<tensor::ExtractSliceOp>(
-    tensor::ExtractSliceOp sliceOp, Location loc, PatternRewriter &rewriter) {
-  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-  ReifiedRankedShapedTypeDims resultDims;
-  (void)sliceOp.reifyResultShapes(rewriter, resultDims);
-  return llvm::to_vector(llvm::map_range(resultDims[0], [&](Value v) {
-    return Range{zero, v, one};
-  }));
 }
 
 /// Compute the workload to use for the workgroup based on the root op.
-template <typename OpTy>
 static SmallVector<Value> getWorkloadForRootOp(PatternRewriter &rewriter,
-                                               OpTy rootOp) {
+                                               Operation *rootOp) {
   // Compute workgroup count to use for the dispatch op. These are the ranges
   // of the outermost parallel loops that can be distributed.
   Location loc = rootOp->getLoc();
@@ -267,7 +250,7 @@ static SmallVector<Value> getWorkloadForRootOp(PatternRewriter &rewriter,
   AffineMap workload = AffineMap::get(0, 3, (s1 - s0).ceilDiv(s2));
   return llvm::to_vector(llvm::map_range(loopRanges, [&](Range r) -> Value {
     return rewriter.create<AffineApplyOp>(
-        rootOp.getLoc(), workload, ValueRange{r.offset, r.size, r.stride});
+        rootOp->getLoc(), workload, ValueRange{r.offset, r.size, r.stride});
   }));
 }
 
@@ -835,7 +818,7 @@ struct CreateDispatchRegionOp : Base<OpType> {
 
     // Get the workload to use for the dispatch.
     FailureOr<SmallVector<Value>> workload =
-        getWorkloadForRootOp(rewriter, rootOp);
+        getWorkloadForRootOp(rewriter, rootOp.getOperation());
     if (failed(workload)) {
       return failure();
     }
