@@ -697,7 +697,6 @@ static BlockArgument getTiedOperandBlockArgument(BlockArgument resultArg) {
 static void tryToTieOperandsAndResults(
     IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   Block *block = dispatchOp.getBody(0);
-  unsigned numOperands = dispatchOp.getODSOperandIndexAndLength(1).second;
 
   SmallVector<unsigned> eraseArguments;
   // Go over each result to tie operand when possible, by:
@@ -707,7 +706,7 @@ static void tryToTieOperandsAndResults(
   for (auto result : llvm::enumerate(dispatchOp.getResults())) {
     if (dispatchOp.getTiedResultOperand(result.value())) continue;
     BlockArgument outputArgument =
-        block->getArgument(numOperands + result.index());
+        dispatchOp.getOutputBlockArgument(result.index());
     BlockArgument tiedOperandArgument =
         getTiedOperandBlockArgument(outputArgument);
     if (!tiedOperandArgument) continue;
