@@ -28,12 +28,12 @@ func.func @pad_tensor(%source: tensor<1x?x?x3xf32>, %low1: index, %low2: index, 
 // CHECK:   %[[DIM2:.+]] = tensor.dim %[[SOURCE]], %[[I2]]
 // CHECK:   %[[UB2:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 + s1)>()[%[[LOW2]], %[[DIM2]]]
 
-// CHECK:   %[[GE:.+]] = arith.cmpi sge, %[[I0]], %[[LOW1]]
-// CHECK:   %[[LT:.+]] = arith.cmpi slt, %[[I0]], %[[UB1]]
-// CHECK:   %[[DIM1INDEX0INBOUND:.+]] = arith.andi %[[GE]], %[[LT]]
-// CHECK:   %[[GE:.+]] = arith.cmpi sge, %[[I0]], %[[LOW2]]
-// CHECK:   %[[LT:.+]] = arith.cmpi slt, %[[I0]], %[[UB2]]
-// CHECK:   %[[DIM2INDEX0INBOUND:.+]] = arith.andi %[[GE]], %[[LT]]
+// CHECK:   %[[LE:.+]] = arith.cmpi sle, %[[LOW1]], %[[I0]]
+// CHECK:   %[[GT:.+]] = arith.cmpi sgt, %[[UB1]], %[[I0]]
+// CHECK:   %[[DIM1INDEX0INBOUND:.+]] = arith.andi %[[LE]], %[[GT]]
+// CHECK:   %[[LE:.+]] = arith.cmpi sle, %[[LOW2]], %[[I0]]
+// CHECK:   %[[GT:.+]] = arith.cmpi sgt, %[[UB2]], %[[I0]]
+// CHECK:   %[[DIM2INDEX0INBOUND:.+]] = arith.andi %[[LE]], %[[GT]]
 // CHECK:   %[[AND0:.+]] = arith.andi %[[DIM1INDEX0INBOUND]], %[[DIM2INDEX0INBOUND]]
 // CHECK:   %[[DIM1INDEX0:.+]] = affine.apply affine_map<()[s0] -> (-s0)>()[%[[LOW1]]]
 // CHECK:   %[[DIM2INDEX0:.+]] = affine.apply affine_map<()[s0] -> (-s0)>()[%[[LOW2]]]
@@ -45,9 +45,9 @@ func.func @pad_tensor(%source: tensor<1x?x?x3xf32>, %low1: index, %low2: index, 
 // CHECK:   }
 // CHECK:   %[[INSERT0:.+]] = vector.insert_strided_slice %[[IF0]], %[[FULL]] {offsets = [0, 0, 0], strides = [1]} : vector<3xf32> into vector<2x2x3xf32>
 
-// CHECK:   %[[GE:.+]] = arith.cmpi sge, %[[I1]], %[[LOW2]]
-// CHECK:   %[[LT:.+]] = arith.cmpi slt, %[[I1]], %[[UB2]]
-// CHECK:   %[[DIM2INDEX1INBOUND:.+]] = arith.andi %[[GE]], %[[LT]]
+// CHECK:   %[[LE:.+]] = arith.cmpi sle, %[[LOW2]], %[[I1]]
+// CHECK:   %[[GT:.+]] = arith.cmpi sgt, %[[UB2]], %[[I1]]
+// CHECK:   %[[DIM2INDEX1INBOUND:.+]] = arith.andi %[[LE]], %[[GT]]
 // CHECK:   %[[AND1:.+]] = arith.andi %[[DIM1INDEX0INBOUND]], %[[DIM2INDEX1INBOUND]]
 // CHECK:   %[[DIM2INDEX1:.+]] = affine.apply affine_map<()[s0] -> (-s0 + 1)>()[%[[LOW2]]]
 // CHECK:   %[[IF1:.+]] = scf.if %[[AND1]] -> (vector<3xf32>) {
@@ -58,9 +58,9 @@ func.func @pad_tensor(%source: tensor<1x?x?x3xf32>, %low1: index, %low2: index, 
 // CHECK:   }
 // CHECK:   %[[INSERT1:.+]] = vector.insert_strided_slice %[[IF1]], %[[INSERT0]] {offsets = [0, 1, 0], strides = [1]} : vector<3xf32> into vector<2x2x3xf32>
 
-// CHECK:   %[[GE:.+]] = arith.cmpi sge, %[[I1]], %[[LOW1]]
-// CHECK:   %[[LT:.+]] = arith.cmpi slt, %[[I1]], %[[UB1]]
-// CHECK:   %[[DIM1INDEX1INBOUND:.+]] = arith.andi %[[GE]], %[[LT]]
+// CHECK:   %[[LE:.+]] = arith.cmpi sle, %[[LOW1]], %[[I1]]
+// CHECK:   %[[GT:.+]] = arith.cmpi sgt, %[[UB1]], %[[I1]]
+// CHECK:   %[[DIM1INDEX1INBOUND:.+]] = arith.andi %[[LE]], %[[GT]]
 // CHECK:   %[[AND2:.+]] = arith.andi %[[DIM1INDEX1INBOUND]], %[[DIM2INDEX0INBOUND]]
 // CHECK:   %[[DIM1INDEX1:.+]] = affine.apply affine_map<()[s0] -> (-s0 + 1)>()[%[[LOW1]]]
 // CHECK:   %[[IF2:.+]] = scf.if %[[AND2]] -> (vector<3xf32>) {
