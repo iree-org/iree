@@ -194,7 +194,7 @@ jobs:
         run: |
           sudo dmesg | grep NVRM
           dpkg -l | grep nvidia
-          nvidia-smi || true
+          nvidia-smi
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
@@ -214,7 +214,7 @@ jobs:
             --gpus all \
             gcr.io/iree-oss/nvidia@sha256:8d7211e10199136482428b845b312169533f9119d2b9aeffb1ddd942b9e444a0 \
             bash -c \
-            "dpkg -l | grep nvidia && nvidia-smi; ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh && ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}"
+            "dpkg -l | grep nvidia && nvidia-smi && ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh && ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}"
 
   tsan:
     runs-on:
