@@ -583,8 +583,6 @@ else()
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/lld/include>
       $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/lld/include>
 
-      # MHLO
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir-hlo/include>
     )
     # Avoid globally modifying paths by instead adding the include paths to the
     # rules that really should have them in the first place.
