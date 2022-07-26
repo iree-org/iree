@@ -89,13 +89,12 @@ jobs:
       - os-family=Linux
     env:
       BUILD_DIR: full-build-dir
-      BUILD_DIR_ARCHIVE: full-build-dir.tar.xz
     outputs:
       # Pass through the build directory as output so it's available to
       # dependent jobs.
       build-dir: ${{ env.BUILD_DIR }}
-      build-dir-archive: ${{ env.BUILD_DIR_ARCHIVE }}
-      gcs-artifact: ${{ env.BUCKET }}/${{ github.sha }}/${{ env.BUILD_DIR_ARCHIVE }}
+      build-dir-archive: ${{ steps.archive.outputs.build-dir-archive }}
+      gcs-artifact: ${{ steps.upload.outputs.gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
@@ -115,15 +114,22 @@ jobs:
       # *in parallel* and upload to GCS. This can be further optimized.
       # Especially decompression is still pretty slow. See #9881.
       - name: "Creating build dir archive"
+        id: archive
+        env:
+          BUILD_DIR_ARCHIVE: ${{ env.BUILD_DIR }}.tar.xz
         run: |
           tar --exclude '*.a' --exclude '*.o' \
             -I 'xz -3 -T0' \
             -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
+          echo "::set-output name=build-dir-archive::${BUILD_DIR_ARCHIVE}"
       - name: "Uploading build dir archive"
+        id: upload
+        env:
+          GCS_ARTIFACT: ${{ env.BUCKET }}/${{ github.sha }}/${{ steps.archive.outputs.build-dir-archive }}
+          BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
         run: |
-          gcloud alpha storage cp \
-            "${BUILD_DIR_ARCHIVE}" \
-            "${BUCKET}/${{ github.sha }}/${BUILD_DIR_ARCHIVE}"
+          gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${GCS_ARTIFACT}"
+          echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
 
 
   test_all:
