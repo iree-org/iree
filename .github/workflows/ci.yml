@@ -171,7 +171,7 @@ jobs:
     steps:
       - name: Querying GPU information
         run: |
-          dmesg | grep NVRM
+          sudo dmesg | grep NVRM
           dpkg -l | grep nvidia
           nvidia-smi || true
       - name: "Checking out repository"
