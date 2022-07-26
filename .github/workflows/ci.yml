@@ -13,6 +13,9 @@ on:
     branches:
       - main
 
+env:
+  BUCKET: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts
+
 jobs:
   build_runtime:
     runs-on: ubuntu-20.04
@@ -103,11 +106,22 @@ jobs:
             gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
+      # Tings get more complicated here than when we're just building the
+      # runtime. The build directory is way bigger. We're also using on our own
+      # runners on GCE. So uploading to GitHub actions artifact storage hosted
+      # on Azure is dirt slow. We drop static libraries and object files, which
+      # aren't needed for testing. Then we do some minimal compression locally
+      # *in parallel* and upload to GCS. This can be further optimized.
+      # Especially decompression is still pretty slow. See #9881.
       - name: "Creating build dir archive"
-        run: tar --exclude '*.a' --exclude '*.o' -I 'xz -3 -T0' -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
+        run: tar --exclude '*.a' --exclude '*.o' \
+          -I 'xz -3 -T0' \
+          -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
       - name: "Uploading build dir archive"
         run: |
-          gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "gs://iree-github-actions-presubmit-artifacts/${{ github.sha }}/${BUILD_DIR_ARCHIVE}"
+          gcloud alpha storage cp \
+            "${BUILD_DIR_ARCHIVE}" \
+            "${BUCKET}/${{ github.sha }}/${BUILD_DIR_ARCHIVE}"
 
 
   test_all:
@@ -137,7 +151,9 @@ jobs:
           submodules: true
       - name: "Downloading build dir archive"
         run: |
-          gcloud alpha storage cp "gs://iree-github-actions-presubmit-artifacts/${{ github.sha }}/${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_ARCHIVE}"
+          gcloud alpha storage cp \
+            "${BUCKET}/${{ github.sha }}/${BUILD_DIR_ARCHIVE}" \
+            "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting archive"
         run: tar -xf ${BUILD_DIR_ARCHIVE}
       - name: "Testing all"
@@ -180,7 +196,9 @@ jobs:
           submodules: true
       - name: "Downloading build dir archive"
         run: |
-          gcloud alpha storage cp "gs://iree-github-actions-presubmit-artifacts/${{ github.sha }}/${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_ARCHIVE}"
+          gcloud alpha storage cp \
+            "${BUCKET}/${{ github.sha }}/${BUILD_DIR_ARCHIVE}" \
+            "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting archive"
         run: tar -xf ${BUILD_DIR_ARCHIVE}
       - name: "Testing with GPU"
