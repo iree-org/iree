@@ -196,13 +196,13 @@ bool isClonableIntoDispatchOp(Operation *op) {
 
 /// For a given operation returns the loop ranges needed to compute the op.
 static SmallVector<Range> getLoopRanges(Operation *op, Location loc,
-                                        PatternRewriter &rewriter) {
+                                        OpBuilder &builder) {
   SmallVector<Range> loopRanges;
-  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   TypeSwitch<Operation *>(op)
       .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
-        loopRanges = linalgOp.createLoopRanges(rewriter, loc);
+        loopRanges = linalgOp.createLoopRanges(builder, loc);
         SmallVector<unsigned> reductionDims;
         linalgOp.getReductionDims(reductionDims);
         for (auto reductionDim : reductionDims) {
@@ -211,7 +211,7 @@ static SmallVector<Range> getLoopRanges(Operation *op, Location loc,
       })
       .Case<IREE::LinalgExt::TiledOpInterface>(
           [&](IREE::LinalgExt::TiledOpInterface tilableOp) {
-            loopRanges = tilableOp.getIterationDomain(rewriter);
+            loopRanges = tilableOp.getIterationDomain(builder);
             for (auto iteratorType :
                  llvm::enumerate(tilableOp.getLoopIteratorTypes())) {
               if (iteratorType.value() == getReductionIteratorTypeName()) {
@@ -223,13 +223,13 @@ static SmallVector<Range> getLoopRanges(Operation *op, Location loc,
         Value source = insertSliceOp.getSource();
         for (int64_t dim = 0; dim < insertSliceOp.getSourceType().getRank();
              ++dim) {
-          Value size = rewriter.create<tensor::DimOp>(loc, source, dim);
+          Value size = builder.create<tensor::DimOp>(loc, source, dim);
           loopRanges.push_back(Range{zero, size, one});
         }
       })
       .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
         ReifiedRankedShapedTypeDims resultDims;
-        (void)sliceOp.reifyResultShapes(rewriter, resultDims);
+        (void)sliceOp.reifyResultShapes(builder, resultDims);
         for (Value size : resultDims[0]) {
           loopRanges.push_back(Range{zero, size, one});
         }
@@ -239,17 +239,17 @@ static SmallVector<Range> getLoopRanges(Operation *op, Location loc,
 }
 
 /// Compute the workload to use for the workgroup based on the root op.
-static SmallVector<Value> getWorkloadForRootOp(PatternRewriter &rewriter,
+static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
                                                Operation *rootOp) {
   // Compute workgroup count to use for the dispatch op. These are the ranges
   // of the outermost parallel loops that can be distributed.
   Location loc = rootOp->getLoc();
-  SmallVector<Range> loopRanges = getLoopRanges(rootOp, loc, rewriter);
+  SmallVector<Range> loopRanges = getLoopRanges(rootOp, loc, builder);
   AffineExpr s0, s1, s2;
-  bindSymbols(rewriter.getContext(), s0, s1, s2);
+  bindSymbols(builder.getContext(), s0, s1, s2);
   AffineMap workload = AffineMap::get(0, 3, (s1 - s0).ceilDiv(s2));
   return llvm::to_vector(llvm::map_range(loopRanges, [&](Range r) -> Value {
-    return rewriter.create<AffineApplyOp>(
+    return builder.create<AffineApplyOp>(
         rootOp->getLoc(), workload, ValueRange{r.offset, r.size, r.stride});
   }));
 }
@@ -263,27 +263,23 @@ static SmallVector<Value> getWorkloadForRootOp(PatternRewriter &rewriter,
 /// append `resultDynamicDims` with values that represent the dynamic shapes of
 /// result values returned.
 static LogicalResult computeDispatchResultTypeAndDynamicDims(
-    PatternRewriter &rewriter, Operation *dispatchOp,
-    SmallVector<Type> &resultTypes, SmallVector<Value> &resultDynamicDims) {
+    OpBuilder &builder, Operation *dispatchOp, SmallVector<Type> &resultTypes,
+    SmallVector<Value> &resultDynamicDims) {
   auto currResultTypes = dispatchOp->getResultTypes();
   resultTypes.append(currResultTypes.begin(), currResultTypes.end());
   auto rankedShapedTypeOp =
       dyn_cast<ReifyRankedShapedTypeOpInterface>(dispatchOp);
   if (!rankedShapedTypeOp) {
-    return rewriter.notifyMatchFailure(
-        dispatchOp,
-        "expected op to implement the ReifyRankedShapedTypeOpInterface");
+    return failure();
   }
 
   // Get the values for the result dims.
   ReifiedRankedShapedTypeDims resultDims;
-  if (failed(rankedShapedTypeOp.reifyResultShapes(rewriter, resultDims))) {
-    return rewriter.notifyMatchFailure(dispatchOp,
-                                       "failed to reify shape of the result");
+  if (failed(rankedShapedTypeOp.reifyResultShapes(builder, resultDims))) {
+    return failure();
   }
   if (currResultTypes.size() != resultDims.size()) {
-    return rewriter.notifyMatchFailure(
-        dispatchOp, "expected as many result shapes as number of outputs");
+    return failure();
   }
   for (auto outputType : llvm::enumerate(currResultTypes)) {
     auto shapedOutputType = outputType.value().dyn_cast<ShapedType>();
@@ -309,8 +305,8 @@ static bool hasComputeUsesOutsideDispatch(
 /// Creates a flow.dispatch.workgroup op without arguments.
 /// All the necessary operands are transiently captured and rewritten late as
 /// operands. This greatly simplifies transformations into the resulting op.
-static FailureOr<SmallVector<Operation *>>
-buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
+static FailureOr<IREE::Flow::DispatchWorkgroupsOp>
+buildOperandLessFlowDispatchWorkgroupOp(RewriterBase &rewriter, Location loc,
                                         ArrayRef<Value> workload,
                                         ArrayRef<Operation *> dispatchOps) {
   SmallVector<Value> resultDynamicDims;
@@ -406,7 +402,7 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
 
   LLVM_DEBUG(llvm::dbgs() << "Created dispatchOp shell \n"
                           << *dispatchOp << "\n");
-  return clonedOps;
+  return dispatchOp;
 }
 
 /// Returns the list of operations that are to be cloned into the dispatch
@@ -592,7 +588,7 @@ static void getUsedValuesDefinedAboveAfterCloningOps(
 }
 
 //===---------------------------------------------------------------------===//
-// Methods to tie operands and results of a dispatch op.
+// Methods to create dispatch ops.
 //===---------------------------------------------------------------------===//
 
 /// Returns the tied operand for the given `resultArg`. Returns nullptr if error
@@ -790,59 +786,35 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
   return success();
 }
 
-//===----------------------------------------------------------------------===//
-// Pattern that create the dispatch region.
-//===----------------------------------------------------------------------===//
-
-namespace {
-template <typename OpType, template <typename> class Base>
-struct CreateDispatchRegionOp : Base<OpType> {
-  CreateDispatchRegionOp(MLIRContext *context,
-                         const linalg::LinalgTransformationFilter &filter,
-                         PatternBenefit benefit = 1)
-      : Base<OpType>(context, benefit), transformationFilter(filter) {}
-
-  LogicalResult matchAndRewrite(OpType rootOp,
-                                PatternRewriter &rewriter) const override {
-    // TODO(ravishankarm): It is getting strange to track when to apply this
-    // pattern and when not to. Need to revisit this, with dynamic shape cases
-    // in mind.
-    if (!hasComputeUsesOutsideDispatch(rootOp)) return failure();
-    if (rootOp->template getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
-      return failure();
-    }
-
-    if (failed(transformationFilter.checkAndNotify(rewriter, rootOp))) {
-      return failure();
-    }
+static SmallVector<IREE::Flow::DispatchWorkgroupsOp> createDispatchRegions(
+    Operation *op, std::function<bool(Operation *)> filter) {
+  IRRewriter rewriter(op->getContext());
+  SmallVector<IREE::Flow::DispatchWorkgroupsOp> dispatchRegionOps;
+  op->walk([&](Operation *rootOp) {
+    if (!hasComputeUsesOutsideDispatch(rootOp)) return WalkResult::advance();
+    if (rootOp->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>())
+      return WalkResult::advance();
+    if (!filter(rootOp)) return WalkResult::advance();
+    rewriter.setInsertionPoint(rootOp);
 
     // Get the workload to use for the dispatch.
     FailureOr<SmallVector<Value>> workload =
-        getWorkloadForRootOp(rewriter, rootOp.getOperation());
-    if (failed(workload)) {
-      return failure();
-    }
+        getWorkloadForRootOp(rewriter, rootOp);
+    if (failed(workload)) return WalkResult::advance();
 
     SmallVector<Operation *> dispatchOps =
         getOperationsToMoveIntoDispatch(rootOp);
     // Create a simple dispatch op with no operands, and not isolated from
     // above.
-    auto clonedOps = buildOperandLessFlowDispatchWorkgroupOp(
-        rewriter, rootOp.getLoc(), workload.getValue(), dispatchOps);
-    if (failed(clonedOps)) {
-      return failure();
-    }
+    auto dispatchRegionOp = buildOperandLessFlowDispatchWorkgroupOp(
+        rewriter, rootOp->getLoc(), workload.getValue(), dispatchOps);
+    if (failed(dispatchRegionOp)) return WalkResult::advance();
 
-    transformationFilter.replaceLinalgTransformationFilter(rewriter, rootOp);
-    transformationFilter.replaceLinalgTransformationFilter(
-        rewriter, clonedOps.getValue()[0]);
-    return success();
-  }
-
- private:
-  linalg::LinalgTransformationFilter transformationFilter;
-};
-}  // namespace
+    dispatchRegionOps.push_back(*dispatchRegionOp);
+    return WalkResult::advance();
+  });
+  return dispatchRegionOps;
+}
 
 //===----------------------------------------------------------------------===//
 // Heuristics for fusing dispatchble ops with root ops using tile + fuse.
@@ -1037,18 +1009,18 @@ struct ConvertToFlowPass : public ConvertToFlowBase<ConvertToFlowPass> {
 }  // namespace
 
 /// For all ops within `funcOp` tagged as root ops, create dispatch regions.
-LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp,
-                                               RewritePatternSet &&patterns) {
+LogicalResult createDispatchRegionsFromRootOps(
+    mlir::Operation *funcOp, std::function<bool(Operation *)> filter) {
   MLIRContext *context = funcOp->getContext();
 
   // Create the dispatch region, first without the isolate region from above
   // property.
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-    return failure();
-  }
+  SmallVector<IREE::Flow::DispatchWorkgroupsOp> dispatchRegionOps =
+      createDispatchRegions(funcOp, filter);
+  if (dispatchRegionOps.empty()) return success();
 
   // Run canonicalization patterns and pattern to resolve tensor.dim of result
-  // values into tensor.dim of its operands..
+  // values into tensor.dim of its operands.
   RewritePatternSet canonicalizationPatterns(context);
   memref::populateResolveRankedShapeTypeResultDimsPatterns(
       canonicalizationPatterns);
@@ -1119,19 +1091,12 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   });
 
   {
-    linalg::LinalgTransformationFilter filterForComputeOps(
-        [](Operation *op) { return success(hasRootOpAttribute(op)); }, {},
-        StringAttr::get(context, "indispatch"));
-    filterForComputeOps.setMatchByDefault();
-    RewritePatternSet computeOpDispatchPatterns(context);
-    computeOpDispatchPatterns.insert<
-        CreateDispatchRegionOp<linalg::LinalgOp, OpInterfaceRewritePattern>,
-        CreateDispatchRegionOp<IREE::LinalgExt::TiledOpInterface,
-                               OpInterfaceRewritePattern>,
-        CreateDispatchRegionOp<tensor::InsertSliceOp, OpRewritePattern>>(
-        context, filterForComputeOps);
-    if (failed(createDispatchRegionsFromRootOps(
-            funcOp, std::move(computeOpDispatchPatterns)))) {
+    auto filter = [](Operation *op) {
+      return hasRootOpAttribute(op) &&
+             isa<linalg::LinalgOp, IREE::LinalgExt::TiledOpInterface,
+                 tensor::InsertSliceOp>(op);
+    };
+    if (failed(createDispatchRegionsFromRootOps(funcOp, filter))) {
       return signalPassFailure();
     }
   }
@@ -1160,37 +1125,22 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   // Start with just moving the tensor.insert_slice into its dispatch.
   {
-    linalg::LinalgTransformationFilter filterForInsertSliceOps(
-        ArrayRef<StringAttr>{}, StringAttr::get(context, "indispatch"));
-    RewritePatternSet insertSliceOpDispatchPatterns(context);
-    insertSliceOpDispatchPatterns.insert<
-        CreateDispatchRegionOp<tensor::InsertSliceOp, OpRewritePattern>>(
-        context, filterForInsertSliceOps);
-    if (failed(createDispatchRegionsFromRootOps(
-            funcOp, std::move(insertSliceOpDispatchPatterns)))) {
+    auto filter = [](Operation *op) { return isa<tensor::InsertSliceOp>(op); };
+    if (failed(createDispatchRegionsFromRootOps(funcOp, filter)))
       return signalPassFailure();
-    }
   }
 
   // Now move all remaining ops that need to be cleaned up.
   {
-    linalg::LinalgTransformationFilter filterForCleanupOps(
-        ArrayRef<StringAttr>{}, StringAttr::get(context, "indispatch"));
-    RewritePatternSet cleanUpDispatchPatterns(context);
-    cleanUpDispatchPatterns.insert<
-        CreateDispatchRegionOp<tensor::ExtractSliceOp, OpRewritePattern>>(
-        context, filterForCleanupOps);
-    if (failed(createDispatchRegionsFromRootOps(
-            funcOp, std::move(cleanUpDispatchPatterns)))) {
+    auto filter = [](Operation *op) { return isa<tensor::ExtractSliceOp>(op); };
+    if (failed(createDispatchRegionsFromRootOps(funcOp, filter)))
       return signalPassFailure();
-    }
   }
 
   // Finally walk all the ops and remove the attributes
   funcOp.walk([](Operation *op) {
     removeFusionGroupsAttribute(op);
     removeRootOpAttribute(op);
-    op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
   });
 }
 
