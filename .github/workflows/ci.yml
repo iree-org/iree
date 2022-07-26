@@ -169,6 +169,53 @@ jobs:
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
+  test_gpu:
+    needs: build_all
+    runs-on:
+      # self-hosted has to be listed first. See
+      # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
+      - self-hosted
+      # Have to do a weird hack to get a pseudo-ternary operator. See
+      # https://github.com/actions/runner/issues/409. To make matters worse, we
+      # have to repeat this everywhere because GitHub actions don't have
+      # variables or even support normal yaml anchors (they are specially
+      # disabled because...reasons?):
+      # See https://github.com/github-community/community/discussions/4501
+      # https://github.community/t/support-for-yaml-anchors/16128/92
+      # https://github.com/actions/runner/issues/1182
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - gpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+    steps:
+      - name: Querying GPU information
+        run: |
+          sudo dmesg | grep NVRM
+          dpkg -l | grep nvidia
+          nvidia-smi || true
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        with:
+          submodules: true
+      - name: "Downloading build dir archive"
+        run: |
+          gcloud alpha storage cp \
+            "${BUCKET}/${{ github.sha }}/${BUILD_DIR_ARCHIVE}" \
+            "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting archive"
+        run: tar -xf ${BUILD_DIR_ARCHIVE}
+      - name: "Testing with GPU"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env IREE_VULKAN_F16_DISABLE=0 \
+            --env IREE_CUDA_DISABLE=0 \
+            --gpus all \
+            gcr.io/iree-oss/nvidia@sha256:8d7211e10199136482428b845b312169533f9119d2b9aeffb1ddd942b9e444a0 \
+            bash -c \
+            "dpkg -l | grep nvidia && nvidia-smi; ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh && ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}"
+
   tsan:
     runs-on:
       # self-hosted has to be listed first. See
@@ -253,6 +300,7 @@ jobs:
       - test_runtime
       - build_all
       - test_all
+      - test_gpu
       - host_tools_assertions
       - tsan
       - riscv32
