@@ -150,7 +150,11 @@ static inline uint64_t align(uint64_t value, const APInt &alignment) {
 //   getRoundedElementByteWidth(i32) = 4
 //   getRoundedElementByteWidth(bf16) = 2
 //   getRoundedElementByteWidth(i33) = 8
+//   getRoundedElementByteWidth(complex<f32>) = 8
 static inline int32_t getRoundedElementByteWidth(Type type) {
+  if (auto complexType = type.dyn_cast<ComplexType>()) {
+    return 2 * getRoundedElementByteWidth(complexType.getElementType());
+  }
   unsigned bitsUnaligned = type.getIntOrFloatBitWidth();
   assert(bitsUnaligned > 0 && "0-width types unsupported");
   // Round up to 8-bit aligned bytes.
