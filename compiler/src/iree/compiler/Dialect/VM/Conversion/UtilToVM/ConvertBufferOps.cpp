@@ -154,6 +154,11 @@ struct BufferFillOpConversion
       IREE::Util::BufferFillOp fillOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto oldType = fillOp.getPattern().getType();
+    auto newType = adaptor.getPattern().getType();
+    if (oldType.isa<IndexType>()) {
+      // Use the actual converted type for IndexType.
+      oldType = newType;
+    }
     auto byteOffset = castToI64(adaptor.getTargetOffset(), rewriter);
     auto byteLength = castToI64(adaptor.getLength(), rewriter);
     auto pattern = adaptor.getPattern();
@@ -196,6 +201,9 @@ struct BufferLoadOpConversion
       ConversionPatternRewriter &rewriter) const override {
     auto oldType = loadOp.getResult().getType();
     auto newType = getTypeConverter()->convertType(oldType);
+    if (oldType.isa<IndexType>()) {
+      oldType = newType;
+    }
     auto byteOffset = castToI64(adaptor.getSourceOffset(), rewriter);
     if (auto integerType = oldType.dyn_cast<IntegerType>()) {
       if (integerType.isInteger(1) || integerType.isInteger(8)) {
@@ -245,6 +253,10 @@ struct BufferStoreOpConversion
       IREE::Util::BufferStoreOp storeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto oldType = storeOp.getSource().getType();
+    auto newType = adaptor.getSource().getType();
+    if (oldType.isa<IndexType>()) {
+      oldType = newType;
+    }
     auto byteOffset = castToI64(adaptor.getTargetOffset(), rewriter);
     if (oldType.isInteger(1) || oldType.isInteger(8)) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreI8Op>(

@@ -391,6 +391,19 @@ OpFoldResult AlignOp::fold(ArrayRef<Attribute> operands) {
 }
 
 //===----------------------------------------------------------------------===//
+// util.sizeof
+//===----------------------------------------------------------------------===//
+
+OpFoldResult SizeOfOp::fold(ArrayRef<Attribute> operands) {
+  Type t = getSizedType();
+  if (t.isa<IntegerType>() || t.isa<FloatType>()) {
+    return IntegerAttr::get(IndexType::get(getContext()),
+                            getRoundedElementByteWidth(t));
+  }
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
 // Compiler hints
 //===----------------------------------------------------------------------===//
 

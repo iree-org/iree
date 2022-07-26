@@ -68,6 +68,34 @@ struct AlignOpConversion : public OpConversionPattern<IREE::Util::AlignOp> {
   }
 };
 
+//===----------------------------------------------------------------------===//
+// util.sizeof
+//===----------------------------------------------------------------------===//
+
+/// For a `sizeof index` operation, invokes the type converter to derive the
+/// concrete type for index and rewrites to that. This allows us to do late
+/// resolution of the size of the index type at the point of conversion to VM
+/// where it is known.
+struct FixateIndexSizeofConversion
+    : public OpConversionPattern<IREE::Util::SizeOfOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Util::SizeOfOp sizeofOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    Type sizedType = sizeofOp.getSizedType();
+    if (sizedType.isa<IndexType>()) {
+      Type converted = getTypeConverter()->convertType(sizedType);
+      if (converted) {
+        Value newSizeof = rewriter.createOrFold<IREE::Util::SizeOfOp>(
+            sizeofOp.getLoc(), converted);
+        rewriter.replaceOp(sizeofOp, newSizeof);
+        return success();
+      }
+    }
+    return failure();
+  }
+};
+
 }  // namespace
 
 void populateUtilAlignmentToVMPatterns(MLIRContext *context,
@@ -75,8 +103,10 @@ void populateUtilAlignmentToVMPatterns(MLIRContext *context,
                                        TypeConverter &typeConverter,
                                        RewritePatternSet &patterns) {
   conversionTarget.addIllegalOp<IREE::Util::AlignOp>();
+  conversionTarget.addIllegalOp<IREE::Util::SizeOfOp>();
 
-  patterns.insert<AlignOpConversion>(typeConverter, context);
+  patterns.insert<AlignOpConversion, FixateIndexSizeofConversion>(typeConverter,
+                                                                  context);
 }
 
 }  // namespace iree_compiler

@@ -91,3 +91,30 @@ func.func @foldAddAlignmentConstant(%lhs: index) -> index {
   // CHECK: return %[[SUM_ALIGNED]]
   return %result : index
 }
+
+// -----
+
+// CHECK-LABEL: @sizeofWholeInt
+func.func @sizeofWholeInt() -> index {
+  // CHECK: = arith.constant 4 : index
+  %0 = util.sizeof i32
+  return %0 : index
+}
+
+// -----
+
+// CHECK-LABEL: @sizeofSubByteInt
+func.func @sizeofSubByteInt() -> index {
+  // CHECK: = arith.constant 2 : index
+  %0 = util.sizeof i12
+  return %0 : index
+}
+
+// -----
+
+// CHECK-LABEL: @sizeofFloat
+func.func @sizeofFloat() -> index {
+  // CHECK: = arith.constant 4 : index
+  %0 = util.sizeof f32
+  return %0 : index
+}

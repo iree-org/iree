@@ -147,6 +147,7 @@ VMVX_MICROKERNELS_SRCS = enforce_glob(
         "exp.mlir",
         "floor.mlir",
         "fully_connected.mlir",
+        "gather.mlir",
         "greater.mlir",
         "greater_equal.mlir",
         "if.mlir",
@@ -168,16 +169,12 @@ VMVX_MICROKERNELS_SRCS = enforce_glob(
         "select.mlir",
         "sigmoid.mlir",
         "sub.mlir",
+        "table.mlir",
         "tanh.mlir",
         "transpose.mlir",
         "while.mlir",
     ],
     include = ["*.mlir"],
-    exclude = [
-        # Decompositions produce tensor<index> which is not handled properly.
-        "gather.mlir",
-        "table.mlir",
-    ],
 )
 
 iree_check_single_backend_test_suite(

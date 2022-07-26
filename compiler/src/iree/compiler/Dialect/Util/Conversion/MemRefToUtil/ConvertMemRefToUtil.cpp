@@ -52,8 +52,8 @@ static Value getBufferOffset(Location loc, Value memrefValue,
   // may elect to represent all i8 registers as i32, but this does not mean
   // that all memrefs are widened from i8 to i32).
   auto elementType = memrefType.getElementType();
-  auto elementSize = rewriter.createOrFold<arith::ConstantIndexOp>(
-      loc, IREE::Util::getRoundedElementByteWidth(elementType));
+  auto elementSize =
+      rewriter.createOrFold<IREE::Util::SizeOfOp>(loc, elementType);
 
   // Rank 1 memrefs are just offset by their element width by the offset.
   auto elementCount = indices.front();
@@ -155,11 +155,12 @@ struct ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
       return rewriter.notifyMatchFailure(
           allocaOp, "unable to create buffers for dynamic shapes");
     }
-    int64_t memRefLength =
-        type.getNumElements() *
-        IREE::Util::getRoundedElementByteWidth(type.getElementType());
-    Value allocationSize = rewriter.create<arith::ConstantIndexOp>(
-        allocaOp.getLoc(), memRefLength);
+    auto numElements = rewriter.create<arith::ConstantIndexOp>(
+        allocaOp.getLoc(), type.getNumElements());
+    auto elementSize = rewriter.createOrFold<IREE::Util::SizeOfOp>(
+        allocaOp.getLoc(), type.getElementType());
+    auto allocationSize = rewriter.createOrFold<arith::MulIOp>(
+        allocaOp.getLoc(), numElements, elementSize);
     rewriter.replaceOpWithNewOp<IREE::Util::BufferAllocOp>(
         allocaOp, rewriter.getType<IREE::Util::BufferType>(), allocationSize);
     return success();
@@ -177,8 +178,8 @@ struct ConvertMemRefDimOp : public OpConversionPattern<memref::DimOp> {
     }
     auto elementType =
         dimOp.getSource().getType().cast<MemRefType>().getElementType();
-    Value elementSize = rewriter.create<arith::ConstantIndexOp>(
-        dimOp.getLoc(), IREE::Util::getRoundedElementByteWidth(elementType));
+    Value elementSize = rewriter.createOrFold<IREE::Util::SizeOfOp>(
+        dimOp.getLoc(), elementType);
     Value bufferSize = rewriter.create<IREE::Util::BufferSizeOp>(
         dimOp.getLoc(), rewriter.getIndexType(), adaptor.getSource());
     rewriter.replaceOpWithNewOp<arith::FloorDivSIOp>(dimOp, bufferSize,
