@@ -15,7 +15,6 @@ on:
 
 jobs:
   build_runtime:
-    if: false
     runs-on: ubuntu-20.04
     env:
       BUILD_DIR: build-runtime
@@ -46,7 +45,6 @@ jobs:
           path: "${{ env.BUILD_DIR }}.tar"
 
   test_runtime:
-    if: false
     needs: build_runtime
     runs-on: ubuntu-20.04
     env:
@@ -60,7 +58,7 @@ jobs:
         uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
         with:
           name: "${{ env.BUILD_DIR }}.tar"
-      - name: "Extract archive"
+      - name: "Extracting archive"
         run: tar -xf ${BUILD_DIR}.tar
       - name: "Testing runtime"
         run: |
@@ -140,7 +138,7 @@ jobs:
       - name: "Downloading build dir archive"
         run: |
           gcloud alpha storage cp "gs://iree-github-actions-presubmit-artifacts/${{ github.sha }}/${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extract archive"
+      - name: "Extracting archive"
         run: tar -xf ${BUILD_DIR_ARCHIVE}
       - name: "Testing all"
         run: |
@@ -152,7 +150,6 @@ jobs:
 
   test_gpu:
     needs: build_all
-    if: false
     runs-on:
       # self-hosted has to be listed first. See
       # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
@@ -166,10 +163,11 @@ jobs:
       # https://github.community/t/support-for-yaml-anchors/16128/92
       # https://github.com/actions/runner/issues/1182
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - gpu
+      - cpu
       - os-family=Linux
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
     steps:
       - name: Querying GPU information
         run: |
@@ -180,12 +178,11 @@ jobs:
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
           submodules: true
-      - name: "Downloading build directory"
-        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
-        with:
-          name: "${{ env.BUILD_DIR }}.tar"
-      - name: "Extract archive"
-        run: tar -xf ${BUILD_DIR}.tar
+      - name: "Downloading build dir archive"
+        run: |
+          gcloud alpha storage cp "gs://iree-github-actions-presubmit-artifacts/${{ github.sha }}/${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting archive"
+        run: tar -xf ${BUILD_DIR_ARCHIVE}
       - name: "Testing with GPU"
         run: |
           ./build_tools/github_actions/docker_run.sh \
@@ -197,7 +194,6 @@ jobs:
             "dpkg -l | grep nvidia && nvidia-smi; ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh && ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}"
 
   tsan:
-    if: false
     runs-on:
       # self-hosted has to be listed first. See
       # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
@@ -225,14 +221,12 @@ jobs:
             ./build_tools/cmake/build_and_test_tsan.sh
 
   host_tools_assertions:
-    if: false
     uses: ./.github/workflows/host_tools.yml
     with:
       host-binary-root: host-tools-assertions
       enable-assertions: "ON"
 
   riscv32:
-    if: false
     needs: host_tools_assertions
     runs-on:
       # self-hosted has to be listed first. See
@@ -280,8 +274,11 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - build_runtime
-      - host_tools_assertions
       - test_runtime
+      - build_all
+      - test_all
+      - test_gpu
+      - host_tools_assertions
       - tsan
       - riscv32
     if: always()
