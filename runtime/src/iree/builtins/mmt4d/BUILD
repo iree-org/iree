@@ -1,4 +1,4 @@
-# Copyright 2021 The IREE Authors
+# Copyright 2022 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -13,20 +13,23 @@ package(
 )
 
 iree_runtime_cc_library(
-    name = "vmvx",
+    name = "mmt4d",
     srcs = [
-        "module.c",
+        "mmt4d_arm_64.c",
+        "mmt4d_generic.c",
     ],
     hdrs = [
-        "module.h",
+        "mmt4d.h",
+        "mmt4d_generic.h",
     ],
-    textual_hdrs = [
-        "exports.inl",
+    copts = [
+        # Placeholder for a real flag.
+        "-DIREE_MMT4D_PLATFORM_EXAMPLE_FLAG=1",
+    ],
+    defines = [
+        "IREE_HAVE_MMT4D_BUILTINS=1",
     ],
     deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base:tracing",
-        "//runtime/src/iree/builtins/mmt4d",
-        "//runtime/src/iree/vm",
+        "//runtime/src/iree/base:core_headers",
     ],
 )
