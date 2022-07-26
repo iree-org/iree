@@ -114,9 +114,10 @@ jobs:
       # *in parallel* and upload to GCS. This can be further optimized.
       # Especially decompression is still pretty slow. See #9881.
       - name: "Creating build dir archive"
-        run: tar --exclude '*.a' --exclude '*.o' \
-          -I 'xz -3 -T0' \
-          -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
+        run: |
+          tar --exclude '*.a' --exclude '*.o' \
+            -I 'xz -3 -T0' \
+            -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
       - name: "Uploading build dir archive"
         run: |
           gcloud alpha storage cp \
