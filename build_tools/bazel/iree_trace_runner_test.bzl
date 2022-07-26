@@ -229,8 +229,12 @@ def iree_generated_trace_runner_test(
             **kwargs
         )
         tests.append(suite_entry_name)
+
+    # This suffix avoids clashes when two test suites generate tests differing
+    # only in the target backend.
+    test_suite_name_suffix = "_".join([backend for (backend, driver) in target_backends_and_drivers])
     native.test_suite(
-        name = name,
+        name = name + test_suite_name_suffix,
         tests = tests,
         tags = tags,
         **kwargs
