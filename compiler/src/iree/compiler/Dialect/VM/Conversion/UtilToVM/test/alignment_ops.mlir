@@ -42,3 +42,13 @@ func.func @utilAlignInt64(%arg0 : i64, %arg1: i64) ->  (i64) {
   //CHECK-DAG: vm.return %3 : i64
   return %result : i64
 }
+
+// -----
+
+// CHECK-LABEL: @utilSizeOfIndex
+func.func @utilSizeOfIndex() ->  (index) {
+  // CHECK: %[[SIZEOF:.*]] = vm.const.i32 4
+  %0 = util.sizeof index
+  // CHECK: vm.return %[[SIZEOF]]
+  return %0 : index
+}

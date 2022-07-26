@@ -60,6 +60,19 @@ func.func @alloc_i16(%idx0: index) -> memref<4xi16> {
 }
 
 // -----
+// CHECK-LABEL: @alloc_index
+// CHECK-SAME: (%[[IDX0:.+]]: index) -> !util.buffer {
+func.func @alloc_index(%idx0: index) -> memref<4xindex> {
+  // CHECK-DAG: %[[C4:.*]] = arith.constant 4 : index
+  // CHECK-DAG: %[[SIZEOF:.*]] = util.sizeof index
+  // CHECK: %[[SZ:.*]] = arith.muli %[[SIZEOF]], %[[C4]]
+  // CHECK: %[[BUFFER:.*]] = util.buffer.alloc uninitialized : !util.buffer{%[[SZ]]}
+  %0 = memref.alloca() : memref<4xindex>
+  // CHECK: return %[[BUFFER]]
+  return %0 : memref<4xindex>
+}
+
+// -----
 // CHECK-LABEL: @load_store_f32
 // CHECK-SAME: (%[[BUFFER:.+]]: !util.buffer, %[[IDX0:.+]]: index, %[[IDX1:.+]]: index) -> f32 {
 func.func @load_store_f32(%buffer: memref<?xf32>, %idx0: index, %idx1: index) -> f32 {
@@ -113,6 +126,22 @@ func.func @load_store_i16(%buffer: memref<?xi16>, %idx0: index, %idx1: index, %v
 }
 
 // -----
+// CHECK-LABEL: @load_store_index
+// CHECK-SAME: (%[[BUFFER:.+]]: !util.buffer, %[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[VALUE:.+]]: index) -> index {
+func.func @load_store_index(%buffer: memref<?xindex>, %idx0: index, %idx1: index, %value: index) -> index {
+  // CHECK-DAG: %[[SIZEOF:.*]] = util.sizeof index
+  // CHECK-DAG: %[[SZ:.*]] = util.buffer.size %[[BUFFER]]
+  // CHECK-DAG: %[[OFS0:.*]] = arith.muli %[[SIZEOF]], %[[IDX0]] : index
+  // CHECK: util.buffer.store %[[VALUE]], %[[BUFFER]][%[[OFS0]]] : index -> !util.buffer{%[[SZ]]}
+  memref.store %value, %buffer[%idx0] : memref<?xindex>
+  // CHECK: %[[OFS1:.*]] = arith.muli %[[SIZEOF]], %[[IDX1]] : index
+  // CHECK: %[[LD:.*]] = util.buffer.load %[[BUFFER]][%[[OFS1]]] : !util.buffer{%[[SZ]]} -> index
+  %1 = memref.load %buffer[%idx1] : memref<?xindex>
+  // CHECK: return %[[LD]]
+  return %1 : index
+}
+
+// -----
 // CHECK-LABEL: @dim_i16
 // CHECK-SAME: (%[[BUFFER:.+]]: !util.buffer, %[[IDX0:.+]]: index) -> index {
 func.func @dim_i16(%buffer: memref<?xi16>, %idx0: index) -> index {
@@ -120,6 +149,18 @@ func.func @dim_i16(%buffer: memref<?xi16>, %idx0: index) -> index {
   // CHECK: %[[SZ:.*]] = util.buffer.size %[[BUFFER]] : !util.buffer
   // CHECK: %[[DV:.*]] = arith.floordivsi %[[SZ]], %[[C2]] : index
   %0 = memref.dim %buffer, %idx0 : memref<?xi16>
+  // CHECK: return %[[DV]]
+  return %0 : index
+}
+
+// -----
+// CHECK-LABEL: @dim_index
+// CHECK-SAME: (%[[BUFFER:.+]]: !util.buffer, %[[IDX0:.+]]: index) -> index {
+func.func @dim_index(%buffer: memref<?xindex>, %idx0: index) -> index {
+  // CHECK: %[[SIZEOF:.*]] = util.sizeof index
+  // CHECK: %[[SZ:.*]] = util.buffer.size %[[BUFFER]] : !util.buffer
+  // CHECK: %[[DV:.*]] = arith.floordivsi %[[SZ]], %[[SIZEOF]] : index
+  %0 = memref.dim %buffer, %idx0 : memref<?xindex>
   // CHECK: return %[[DV]]
   return %0 : index
 }

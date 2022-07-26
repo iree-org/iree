@@ -150,6 +150,18 @@ func.func @buffer_fill_i64(%arg0: !util.buffer, %arg1: index, %arg2: i64) {
 
 // -----
 
+// CHECK-LABEL: @buffer_fill_index
+func.func @buffer_fill_index(%arg0: !util.buffer, %arg1: index, %arg2: index) {
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  // CHECK-32: vm.buffer.fill.i32
+  // CHECK-64: vm.buffer.fill.i64
+  util.buffer.fill %arg2, %arg0[%c100 for %c200] : index -> !util.buffer{%arg1}
+  return
+}
+
+// -----
+
 // CHECK-LABEL: @buffer_load_i1
 func.func @buffer_load_i32(%arg0: !util.buffer, %arg1: index) -> i1 {
   %c100 = arith.constant 100 : index
@@ -189,6 +201,17 @@ func.func @buffer_load_i64(%arg0: !util.buffer, %arg1: index) -> i64 {
 
 // -----
 
+// CHECK-LABEL: @buffer_load_index
+func.func @buffer_load_index(%arg0: !util.buffer, %arg1: index) -> index {
+  %c100 = arith.constant 100 : index
+  // CHECK-32: vm.buffer.load.i32
+  // CHECK-64: vm.buffer.load.i64
+  %0 = util.buffer.load %arg0[%c100] : !util.buffer{%arg1} -> index
+  return %0 : index
+}
+
+// -----
+
 // CHECK-LABEL: @buffer_store_i1
 func.func @buffer_store_i1(%arg0: !util.buffer, %arg1: index, %arg2: i1) {
   %c100 = arith.constant 100 : index
@@ -220,5 +243,16 @@ func.func @buffer_store_i64(%arg0: !util.buffer, %arg1: index, %arg2: i64) {
   // CHECK-32: vm.buffer.store.i64 %arg2, %arg0[%[[C100]]] : i64 -> !vm.buffer
   // CHECK-64: vm.buffer.store.i64 %arg2, %arg0[%c100] : i64 -> !vm.buffer
   util.buffer.store %arg2, %arg0[%c100] : i64 -> !util.buffer{%arg1}
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @buffer_store_index
+func.func @buffer_store_index(%arg0: !util.buffer, %arg1: index, %arg2: index) {
+  %c100 = arith.constant 100 : index
+  // CHECK-32: vm.buffer.store.i32
+  // CHECK-64: vm.buffer.store.i64
+  util.buffer.store %arg2, %arg0[%c100] : index -> !util.buffer{%arg1}
   return
 }

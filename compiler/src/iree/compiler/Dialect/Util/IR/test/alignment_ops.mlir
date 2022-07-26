@@ -15,3 +15,12 @@ func.func @utilAlignInt(%arg0 : i32, %arg1: i32) {
   %result = util.align %arg0, %arg1 : i32
   return
 }
+
+// -----
+
+// CHECK-LABEL: @sizeofUnfoldable
+func.func @sizeofUnfoldable() -> index {
+  // CHECK: = util.sizeof index
+  %0 = util.sizeof index
+  return %0 : index
+}
