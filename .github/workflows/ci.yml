@@ -105,14 +105,12 @@ jobs:
             gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
-      # We do our own maximally-parallel compression with zstd and exclude files
-      # unnecessary for testing.
       - name: "Creating build dir archive"
-        run: tar --exclude '*.a' --exclude '*.o' -c -I 'xz -T0' -f ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
-      - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8  # v3.1.0
-        with:
-          name: "${{ env.BUILD_DIR_ARCHIVE }}"
-          path: "${{ env.BUILD_DIR_ARCHIVE }}"
+        run: tar --exclude '*.a' --exclude '*.o' -I 'xz -T0' -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
+      - name: "Uploading build dir archive"
+        run: |
+          gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "gs://iree-github-actions-presubmit-artifacts/${{ github.sha }}/${BUILD_DIR_ARCHIVE}"
+
 
   test_all:
     needs: build_all
@@ -139,17 +137,16 @@ jobs:
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
           submodules: true
-      - name: "Downloading build directory"
-        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
-        with:
-          name: "${{ env.BUILD_DIR_ARCHIVE }}"
+      - name: "Downloading build dir archive"
+        run: |
+          gcloud alpha storage cp "gs://iree-github-actions-presubmit-artifacts/${{ github.sha }}/${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extract archive"
         run: tar -xf ${BUILD_DIR_ARCHIVE}
       - name: "Testing all"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_CUDA_DISABLE=1 \
-            gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
+            gcr.io/iree-oss/swiftshader@sha256:542de3bac7f6173add3651f75c4c681f4a8e2d23815332dd82afe85c7d598445 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
