@@ -110,9 +110,9 @@ struct ConvertFuncOp : public OpConversionPattern<mlir::func::FuncOp> {
                                                newResultTypes));
     if (failed(rewriter.convertRegionTypes(&newFuncOp.getBody(), typeConverter,
                                            &newSignature))) {
-      return failure();
+      return rewriter.notifyMatchFailure(funcOp,
+                                         "failed to convert region types");
     }
-
     rewriter.eraseOp(funcOp);
     return success();
   }
