@@ -14,7 +14,6 @@ set -e
 ROOT_DIR=$(git rev-parse --show-toplevel)
 
 CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-BUILD_DIR=
 
 "$CMAKE_BIN" --version
 ninja --version
@@ -56,7 +55,7 @@ CMAKE_ARGS=(
   "-DIREE_TARGET_BACKEND_CUDA=ON"
 )
 
-"$CMAKE_BIN" "${CMAKE_ARGS[@]?}" ..
+"$CMAKE_BIN" "${CMAKE_ARGS[@]?}" "$@" ..
 echo "Building all"
 echo "------------"
 "$CMAKE_BIN" --build . -- -k 0
