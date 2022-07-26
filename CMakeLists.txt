@@ -555,7 +555,7 @@ else()
 
   # Extend module path to allow submodules to use LLVM and MLIR CMake modules.
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/mlir")
-  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/lib/cmake/llvm/")
+  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/llvm")
 
   # Add the bundled include directories for cmake files looking for them.
   list(APPEND LLVM_INCLUDE_DIRS
