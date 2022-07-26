@@ -189,6 +189,7 @@ jobs:
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
     steps:
       - name: Querying GPU information
         run: |
@@ -200,21 +201,19 @@ jobs:
         with:
           submodules: true
       - name: "Downloading build dir archive"
-        run: |
-          gcloud alpha storage cp \
-            "${BUCKET}/${{ github.sha }}/${BUILD_DIR_ARCHIVE}" \
-            "${BUILD_DIR_ARCHIVE}"
+        run: gcloud alpha storage cp "${GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting archive"
-        run: tar -xf ${BUILD_DIR_ARCHIVE}
+        run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Testing with GPU"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_VULKAN_F16_DISABLE=0 \
             --env IREE_CUDA_DISABLE=0 \
             --gpus all \
+            --env NVIDIA_DRIVER_CAPABILITIES=all \
             gcr.io/iree-oss/nvidia@sha256:8d7211e10199136482428b845b312169533f9119d2b9aeffb1ddd942b9e444a0 \
             bash -c \
-            "dpkg -l | grep nvidia && nvidia-smi && ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh && ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}"
+            "./build_tools/scripts/check_cuda.sh && ./build_tools/scripts/check_vulkan.sh && ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}"
 
   tsan:
     runs-on:
