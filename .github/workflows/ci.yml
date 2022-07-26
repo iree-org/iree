@@ -95,6 +95,7 @@ jobs:
       # dependent jobs.
       build-dir: ${{ env.BUILD_DIR }}
       build-dir-archive: ${{ env.BUILD_DIR_ARCHIVE }}
+      gcs-artifact: ${{ env.BUCKET }}/${{ github.sha }}/${{ env.BUILD_DIR_ARCHIVE }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
@@ -145,18 +146,16 @@ jobs:
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
           submodules: true
       - name: "Downloading build dir archive"
-        run: |
-          gcloud alpha storage cp \
-            "${BUCKET}/${{ github.sha }}/${BUILD_DIR_ARCHIVE}" \
-            "${BUILD_DIR_ARCHIVE}"
+        run: gcloud alpha storage cp "${GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting archive"
-        run: tar -xf ${BUILD_DIR_ARCHIVE}
+        run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Testing all"
         run: |
           ./build_tools/github_actions/docker_run.sh \
