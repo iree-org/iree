@@ -28,10 +28,7 @@ static iree_status_t call_import_i32_i32(iree_vm_stack_t* stack,
   call.function = *import;
   call.arguments = iree_make_byte_span(&arg0, sizeof(arg0));
   call.results = iree_make_byte_span(out_ret0, sizeof(*out_ret0));
-
-  iree_vm_execution_result_t result;
-  memset(&result, 0, sizeof(result));
-  return import->module->begin_call(import->module, stack, &call, &result);
+  return import->module->begin_call(import->module, stack, call);
 }
 
 typedef iree_status_t (*call_i32_i32_t)(iree_vm_stack_t* stack,
@@ -49,8 +46,7 @@ static iree_status_t call_shim_i32_i32(iree_vm_stack_t* stack,
                                        iree_byte_span_t args_storage,
                                        iree_byte_span_t rets_storage,
                                        call_i32_i32_t target_fn, void* module,
-                                       void* module_state,
-                                       iree_vm_execution_result_t* out_result) {
+                                       void* module_state) {
   // We can use structs to allow compiler-controlled indexing optimizations,
   // though this won't work for variadic cases.
   // TODO(benvanik): packed attributes.

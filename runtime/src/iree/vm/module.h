@@ -240,16 +240,6 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_compute_cconv_fragment_size(
     const iree_vm_register_list_t* segment_size_list,
     iree_host_size_t* out_required_size);
 
-// Results of an iree_vm_module_execute request.
-typedef struct iree_vm_execution_result_t {
-  // TODO(benvanik): yield information.
-  // Yield modes:
-  // - yield (yield instruction)
-  // - await (with 1+ wait handles)
-  // - break
-  int reserved;
-} iree_vm_execution_result_t;
-
 //===----------------------------------------------------------------------===//
 // Source locations
 //===----------------------------------------------------------------------===//
@@ -406,11 +396,9 @@ typedef struct iree_vm_module_t {
   //
   // Returns IREE_STATUS_DEFERRED if execution yielded and the call needs to be
   // resumed. Depending on the program it may be unsafe to begin any other calls
-  // without first completing prior ones. |out_result| will contain information
-  // for when to reschedule the call.
-  iree_status_t(IREE_API_PTR* begin_call)(
-      void* self, iree_vm_stack_t* stack, const iree_vm_function_call_t* call,
-      iree_vm_execution_result_t* out_result);
+  // without first completing prior ones.
+  iree_status_t(IREE_API_PTR* begin_call)(void* self, iree_vm_stack_t* stack,
+                                          iree_vm_function_call_t call);
 
   // Resumes execution of a previously-yielded call.
   //
@@ -419,11 +407,9 @@ typedef struct iree_vm_module_t {
   //
   // Returns IREE_STATUS_DEFERRED if execution yielded and the call needs to be
   // resumed. Depending on the program it may be unsafe to begin any other calls
-  // without first completing prior ones. |out_result| will contain information
-  // for when to reschedule the call.
-  iree_status_t(IREE_API_PTR* resume_call)(
-      void* self, iree_vm_stack_t* stack, iree_byte_span_t call_results,
-      iree_vm_execution_result_t* out_result);
+  // without first completing prior ones.
+  iree_status_t(IREE_API_PTR* resume_call)(void* self, iree_vm_stack_t* stack,
+                                           iree_byte_span_t call_results);
 } iree_vm_module_t;
 
 // Initializes the interface of a module handle.
