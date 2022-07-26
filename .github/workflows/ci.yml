@@ -106,7 +106,7 @@ jobs:
             gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
-      # Tings get more complicated here than when we're just building the
+      # Things get more complicated here than when we're just building the
       # runtime. The build directory is way bigger. We're also using on our own
       # runners on GCE. So uploading to GitHub actions artifact storage hosted
       # on Azure is dirt slow. We drop static libraries and object files, which
