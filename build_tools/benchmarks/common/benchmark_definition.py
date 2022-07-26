@@ -437,13 +437,16 @@ class BenchmarkResults(object):
       - benchmark_index: the benchmark's index.
       - kind: what kind of aggregate time to get; choices:
         'mean', 'median', 'stddev'.
+      Returns:
+        Time in nanoseconds.
       """
     time = None
     for bench_case in self.benchmarks[benchmark_index].results:
       if bench_case["name"].endswith(f"real_time_{kind}"):
         if bench_case["time_unit"] != "ms":
           raise ValueError(f"Expected ms as time unit")
-        time = int(round(bench_case["real_time"]))
+        # Convert into nanoseconds.
+        time = int(round(bench_case["real_time"] * 10**6))
         break
     if time is None:
       raise ValueError(f"Cannot found real_time_{kind} in benchmark results")
