@@ -78,6 +78,7 @@ option(IREE_BUILD_MICROBENCHMARKS "Builds IREE microbenchmark suites." OFF)
 #-------------------------------------------------------------------------------
 
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
+option(IREE_BUILD_EXPERIMENTAL_VMVX_MMT4D "Enables MMT4D methods in the VMVX module." OFF)
 option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
 
 #-------------------------------------------------------------------------------
