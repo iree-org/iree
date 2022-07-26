@@ -106,7 +106,7 @@ jobs:
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
       - name: "Creating build dir archive"
-        run: tar --exclude '*.a' --exclude '*.o' -I 'xz -T0' -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
+        run: tar --exclude '*.a' --exclude '*.o' -I 'xz -3 -T0' -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
       - name: "Uploading build dir archive"
         run: |
           gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "gs://iree-github-actions-presubmit-artifacts/${{ github.sha }}/${BUILD_DIR_ARCHIVE}"
