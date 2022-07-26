@@ -131,7 +131,6 @@ jobs:
           gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${GCS_ARTIFACT}"
           echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
 
-
   test_all:
     needs: build_all
     runs-on:
