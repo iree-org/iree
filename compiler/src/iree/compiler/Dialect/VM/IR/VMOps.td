@@ -3736,7 +3736,6 @@ def VM_FailOp : VM_Op<"fail", [
 }
 
 def VM_CondFailOp : VM_Op<"cond_fail", [
-    HasParent<"IREE::VM::FuncOp">,
     VM_PseudoOp,
   ]> {
   let summary = [{raises a global failure if the condition is true}];
