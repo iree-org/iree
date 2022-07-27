@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// A example of setting up the the dylib driver.
+// A example of setting up a local-task device with the embedded ELF loader.
 
 #include <stddef.h>
 
@@ -16,13 +16,13 @@
 #include "iree/task/api.h"
 
 // Compiled module embedded here to avoid file IO:
-#include "samples/simple_embedding/simple_embedding_test_bytecode_module_dylib_arm_64_c.h"
-#include "samples/simple_embedding/simple_embedding_test_bytecode_module_dylib_riscv_64_c.h"
-#include "samples/simple_embedding/simple_embedding_test_bytecode_module_dylib_x86_64_c.h"
+#include "samples/simple_embedding/simple_embedding_test_bytecode_module_cpu_arm_64_c.h"
+#include "samples/simple_embedding/simple_embedding_test_bytecode_module_cpu_riscv_64_c.h"
+#include "samples/simple_embedding/simple_embedding_test_bytecode_module_cpu_x86_64_c.h"
 
 iree_status_t create_sample_device(iree_allocator_t host_allocator,
                                    iree_hal_device_t** out_device) {
-  // Set paramters for the device created in the next step.
+  // Set parameters for the device created in the next step.
   iree_hal_task_device_params_t params;
   iree_hal_task_device_params_initialize(&params);
 
@@ -34,8 +34,9 @@ iree_status_t create_sample_device(iree_allocator_t host_allocator,
   iree_status_t status =
       iree_task_executor_create_from_flags(host_allocator, &executor);
 
+  iree_string_view_t identifier = iree_make_cstring_view("local-task");
+
   // Use the default host allocator for buffer allocations.
-  iree_string_view_t identifier = iree_make_cstring_view("dylib");
   iree_hal_allocator_t* device_allocator = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_allocator_create_heap(identifier, host_allocator,
@@ -59,13 +60,13 @@ iree_status_t create_sample_device(iree_allocator_t host_allocator,
 const iree_const_byte_span_t load_bytecode_module_data() {
 #if IREE_ARCH_X86_64
   const struct iree_file_toc_t* module_file_toc =
-      iree_samples_simple_embedding_test_module_dylib_x86_64_create();
+      iree_samples_simple_embedding_test_module_cpu_x86_64_create();
 #elif IREE_ARCH_RISCV_64
   const struct iree_file_toc_t* module_file_toc =
-      iree_samples_simple_embedding_test_module_dylib_riscv_64_create();
+      iree_samples_simple_embedding_test_module_cpu_riscv_64_create();
 #elif IREE_ARCH_ARM_64
   const struct iree_file_toc_t* module_file_toc =
-      iree_samples_simple_embedding_test_module_dylib_arm_64_create();
+      iree_samples_simple_embedding_test_module_cpu_arm_64_create();
 #else
 #error "Unsupported platform."
 #endif

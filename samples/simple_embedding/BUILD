@@ -77,11 +77,11 @@ cc_binary(
         "simple_embedding.c",
     ],
     deps = [
-        ":simple_embedding_test_bytecode_module_dylib_arm_32_c",
-        ":simple_embedding_test_bytecode_module_dylib_arm_64_c",
-        ":simple_embedding_test_bytecode_module_dylib_riscv_32_c",
-        ":simple_embedding_test_bytecode_module_dylib_riscv_64_c",
-        ":simple_embedding_test_bytecode_module_dylib_x86_64_c",
+        ":simple_embedding_test_bytecode_module_cpu_arm_32_c",
+        ":simple_embedding_test_bytecode_module_cpu_arm_64_c",
+        ":simple_embedding_test_bytecode_module_cpu_riscv_32_c",
+        ":simple_embedding_test_bytecode_module_cpu_riscv_64_c",
+        ":simple_embedding_test_bytecode_module_cpu_x86_64_c",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/local_sync:sync_driver",
@@ -94,11 +94,11 @@ cc_binary(
 )
 
 iree_bytecode_module(
-    name = "simple_embedding_test_bytecode_module_dylib_x86_64",
+    name = "simple_embedding_test_bytecode_module_cpu_x86_64",
     src = "simple_embedding_test.mlir",
-    c_identifier = "iree_samples_simple_embedding_test_module_dylib_x86_64",
+    c_identifier = "iree_samples_simple_embedding_test_module_cpu_x86_64",
     flags = [
-        "--iree-hal-target-backends=dylib-llvm-aot",
+        "--iree-hal-target-backends=llvm-cpu",
         "--iree-llvm-target-triple=x86_64-pc-linux-elf",
         "--iree-llvm-debug-symbols=false",
         "--iree-vm-bytecode-module-strip-source-map=true",
@@ -107,11 +107,11 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-    name = "simple_embedding_test_bytecode_module_dylib_riscv_32",
+    name = "simple_embedding_test_bytecode_module_cpu_riscv_32",
     src = "simple_embedding_test.mlir",
-    c_identifier = "iree_samples_simple_embedding_test_module_dylib_riscv_32",
+    c_identifier = "iree_samples_simple_embedding_test_module_cpu_riscv_32",
     flags = [
-        "--iree-hal-target-backends=dylib-llvm-aot",
+        "--iree-hal-target-backends=llvm-cpu",
         "--iree-llvm-target-triple=riscv32-pc-linux-elf",
         "--iree-llvm-target-cpu=generic-rv32",
         "--iree-llvm-target-cpu-features=+m,+f",
@@ -123,11 +123,11 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-    name = "simple_embedding_test_bytecode_module_dylib_riscv_64",
+    name = "simple_embedding_test_bytecode_module_cpu_riscv_64",
     src = "simple_embedding_test.mlir",
-    c_identifier = "iree_samples_simple_embedding_test_module_dylib_riscv_64",
+    c_identifier = "iree_samples_simple_embedding_test_module_cpu_riscv_64",
     flags = [
-        "--iree-hal-target-backends=dylib-llvm-aot",
+        "--iree-hal-target-backends=llvm-cpu",
         "--iree-llvm-target-triple=riscv64-pc-linux-elf",
         "--iree-llvm-target-cpu=generic-rv64",
         "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+c",
@@ -139,11 +139,11 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-    name = "simple_embedding_test_bytecode_module_dylib_arm_32",
+    name = "simple_embedding_test_bytecode_module_cpu_arm_32",
     src = "simple_embedding_test.mlir",
-    c_identifier = "iree_samples_simple_embedding_test_module_dylib_arm_32",
+    c_identifier = "iree_samples_simple_embedding_test_module_cpu_arm_32",
     flags = [
-        "--iree-hal-target-backends=dylib-llvm-aot",
+        "--iree-hal-target-backends=llvm-cpu",
         "--iree-llvm-target-triple=armv7a-pc-linux-elf",
         "--iree-llvm-target-float-abi=hard",
         "--iree-llvm-debug-symbols=false",
@@ -153,11 +153,11 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-    name = "simple_embedding_test_bytecode_module_dylib_arm_64",
+    name = "simple_embedding_test_bytecode_module_cpu_arm_64",
     src = "simple_embedding_test.mlir",
-    c_identifier = "iree_samples_simple_embedding_test_module_dylib_arm_64",
+    c_identifier = "iree_samples_simple_embedding_test_module_cpu_arm_64",
     flags = [
-        "--iree-hal-target-backends=dylib-llvm-aot",
+        "--iree-hal-target-backends=llvm-cpu",
         "--iree-llvm-target-triple=aarch64-pc-linux-elf",
         "--iree-llvm-debug-symbols=false",
         "--iree-vm-bytecode-module-strip-source-map=true",
@@ -178,15 +178,15 @@ if(IREE_HAL_DRIVER_LOCAL_TASK AND IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
 )
 
 cc_binary(
-    name = "simple_embedding_dylib",
+    name = "simple_embedding_embedded",
     srcs = [
-        "device_dylib.c",
+        "device_embedded.c",
         "simple_embedding.c",
     ],
     deps = [
-        ":simple_embedding_test_bytecode_module_dylib_arm_64_c",
-        ":simple_embedding_test_bytecode_module_dylib_riscv_64_c",
-        ":simple_embedding_test_bytecode_module_dylib_x86_64_c",
+        ":simple_embedding_test_bytecode_module_cpu_arm_64_c",
+        ":simple_embedding_test_bytecode_module_cpu_riscv_64_c",
+        ":simple_embedding_test_bytecode_module_cpu_x86_64_c",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/local_task:task_driver",
@@ -200,8 +200,8 @@ cc_binary(
 )
 
 native_test(
-    name = "simple_embedding_dylib_test",
-    src = ":simple_embedding_dylib",
+    name = "simple_embedding_embedded_test",
+    src = ":simple_embedding_embedded",
 )
 
 iree_cmake_extra_content(

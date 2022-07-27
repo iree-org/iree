@@ -31,13 +31,14 @@ model.
 _Note: run the following commands from IREE's github repo root._
 
 1. Configure CMake for building the static library then demo. You'll need to set
-the flags building samples, the compiler, and the `dylib-llvm-aot`
-driver/backend. See
-[here](https://iree-org.github.io/iree/building-from-source/getting-started/)
+the flags building samples, the compiler, the `llvm-cpu`
+compiler target backend, and the `local-sync` runtime HAL driver (see
+[the getting started guide](https://iree-org.github.io/iree/building-from-source/getting-started/)
 for general instructions on building using CMake):
 
   ```shell
   cmake -B ../iree-build/ \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo .
     -DIREE_BUILD_SAMPLES=ON \
     -DIREE_TARGET_BACKEND_DEFAULTS=OFF \
     -DIREE_TARGET_BACKEND_LLVM_CPU=ON \
@@ -45,7 +46,6 @@ for general instructions on building using CMake):
     -DIREE_HAL_DRIVER_LOCAL_SYNC=ON \
     -DIREE_HAL_EXECUTABLE_LOADER_DEFAULTS=OFF \
     -DIREE_BUILD_COMPILER=ON \
-    -DCMAKE_BUILD_TYPE=RelWithDebInfo .
   ```
 
 2. Build the `static_library_demo` CMake target to create the static demo. This
@@ -54,26 +54,26 @@ static library (`simple_mul.h` & `simple_mul.c`) as well as a bytecode module
 (`simple_mul.vmfb`) which are finally built into the demo binary:
 
   ```shell
-  cmake --build ../iree-build/ --target iree_samples_static_library_demo
+  cmake --build ../iree-build/ --target iree_samples_static_library_static_library_demo
   ```
 
 3. Run the sample binary:
 
   ```shell
-  ../iree-build/iree/samples/static_library/static_library_demo
+  ../iree-build/samples/static_library/static_library_demo
 
-  # Output: static_library_run passed
+  # Output: static_library_run_bytecode passed
   ```
 
 ### Changing compilation options
 
 The steps above build both the compiler for the host (machine doing the
 compiling) and the demo for the target using same options as the host machine.
-If you wish to target a different deployment other than the host, you'll need to
+If you wish to target a different platform other than the host, you'll need to
 compile the library and demo with different options.
 
 For example, see
-[documentation](https://iree-org.github.io/iree/building-from-source/android/)
+[this documentation](https://iree-org.github.io/iree/building-from-source/android/)
 on cross compiling on Android.
 
 Note: separating the target from the host will require modifying dependencies in

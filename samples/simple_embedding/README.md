@@ -3,63 +3,67 @@
 This sample shows how to run a simple pointwise array multiplication bytecode
 module on various HAL device targets with the minimum runtime overhead. Some of
 these devices are compatible with bare-metal system without threading or file IO
-supports.
+support.
 
-# Background
+## Background
 
 The main bytecode testing tool
-[iree-run-module](https://github.com/iree-org/iree/tree/main/tools/iree-run-module-main.cc)
+[iree-run-module](../../tools/iree-run-module-main.cc)
 requires a proper operating system support to set up the runtime environment to
 execute an IREE bytecode module. For embedded systems, the support such as file
 system or multi-thread asynchronous control may not be available. This sample
 demonstrates how to setup the simplest framework to load and run the IREE
 bytecode with various target backends.
 
-# Build instructions
+## Build instructions
 
-## CMake (native and cross compilation)
+### CMake (native and cross compilation)
 
 Set up the CMake configuration with `-DIREE_BUILD_SAMPLES=ON` (default on)
 
 Then run
 ```sh
-cmake --build <build dir> --target iree/samples/simple_embedding/all
+cmake --build <build dir> --target samples/simple_embedding/all
 ```
 
-## Bazel (host only)
+### Bazel (host only)
+
 ```sh
-bazel build iree/samples/simple_embedding:all
+bazel build samples/simple_embedding:all
 ```
 
 The resulting executables are listed as `simple_embedding_<HAL devices>`.
 
-# Code structure
+## Code structure
 
 The sample consists of three parts:
 
-## simple_embedding_test.mlir
+### simple_embedding_test.mlir
+
 The simple pointwise array multiplication op with the entry function called
 `simple_mul`, two <4xf32> inputs, and one <4xf32> output. The ML bytecode
-modules are automatically generated during the build time with the targed HAL
-device configurations from the host compiler `iree-tranlate`.
+modules are automatically generated during the build time with the target HAL
+device configurations from the host compiler `iree-compile`.
 
-## simple_embedding.c
+### simple_embedding.c
 
 The main function of the sample has the following steps:
-1. Create a VM instance.
-2. Create a HAL module based on the target device (see the next section).
-3. Load the bytecode module of the ML workload.
-4. Asssociate the HAL module with the bytecode module in the VM context.
-5. Prepare the function entry point and inputs.
-6. Invoke function.
-7. Retrieve function output.
 
-## device_*.c
+1. Create a VM instance
+2. Create a HAL module based on the target device (see the next section)
+3. Load the bytecode module of the ML workload
+4. Associate the HAL module with the bytecode module in the VM context
+5. Prepare the function entry point and inputs
+6. Invoke function
+7. Retrieve function output
 
-The HAL device for different target backends. The device is a `module_loader` +
-`executor` combination. For example,
-[device_embedded_sync.c](https://github.com/iree-org/iree/blob/main/iree/samples/simple_embedding/device_embedded_sync.c)
-uses the embedded library loader and the synchronous executor:
+### device_*.c
+
+The HAL device for different target backends. Devices are created using a
+specific executable loader and device constructor. For example,
+[device_embedded_sync.c](./device_embedded_sync.c) creates a "sync" device with
+the embedded ELF loader:
+
 ```c
 iree_hal_sync_device_params_t params;
 iree_hal_sync_device_params_initialize(&params);
@@ -68,41 +72,43 @@ iree_hal_executable_loader_t* loader = NULL;
       iree_hal_executable_import_provider_null(), iree_allocator_system(),
       &loader));
 
-iree_string_view_t identifier = iree_make_cstring_view("dylib");
+iree_string_view_t identifier = iree_make_cstring_view("local-sync");
 
 iree_status_t status =
     iree_hal_sync_device_create(identifier, &params, /*loader_count=*/1,
                                 &loader, iree_allocator_system(), device);
 ```
 
-Whereas for
-[device_dylib.c](https://github.com/iree-org/iree/blob/main/iree/samples/simple_embedding/device_dylib.c),
-the executor is replaced with the multi-thread ready asynchronous task executor:
+Whereas for [device_embedded.c](./device_embedded.c), the "sync device" is
+replaced with the multithreaded "task device", which uses a "task executor":
+
 ```c
 ...
 iree_task_executor_t* executor = NULL;
 iree_status_t status =
     iree_task_executor_create_from_flags(iree_allocator_system(), &executor);
 
-iree_string_view_t identifier = iree_make_cstring_view("dylib");
+iree_string_view_t identifier = iree_make_cstring_view("local-task");
 if (iree_status_is_ok(status)) {
   // Create the device.
   status = iree_hal_task_device_create(identifier, &params, executor,
-                                        /*loader_count=*/1, &loader,
-                                        iree_allocator_system(), device);
+                                       /*loader_count=*/1, &loader,
+                                       iree_allocator_system(), device);
 ```
 An example that utilizes a higher-level driver registry is in
-[device_vulkan.c](https://github.com/iree-org/iree/blob/main/iree/samples/simple_embedding/device_vulkan.c)
+[device_vulkan.c](./device_vulkan.c)
 
-### Load device-specific bytecode module
+#### Load device-specific bytecode module
+
 To avoid the file IO, the bytecode module is converted into a data stream
 (`module_data`) that's embedded in the executable. The same strategy can be
 applied to build applications for the embedded systems without a proper file IO.
 
-# Generic platform support
+## Generic platform support
+
 Some of the devices in this sample support a generic platform (or the
 machine mode without an operating system). For example, `device_vmvx_sync`
 should support any architecture that IREE supports, and `device_embedded_sync`
-should support any architecture that supports `dylib-llvm-aot` codegen target
+should support any architecture that supports `llvm-cpu` codegen target
 backend (may need to add the bytecode module data if it is not already in
-[device_embedded_sync.c](https://github.com/iree-org/iree/blob/main/iree/samples/simple_embedding/device_embedded_sync.c)).
+[device_embedded_sync.c](./device_embedded_sync.c)).
