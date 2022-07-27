@@ -7,6 +7,7 @@
 #include "iree/compiler/Utils/ModuleUtils.h"
 
 #include "llvm/Support/FormatVariadic.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/LLVM.h"

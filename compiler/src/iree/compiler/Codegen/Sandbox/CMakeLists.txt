@@ -48,12 +48,12 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineDialect
     MLIRArithmeticDialect
+    MLIRAsmParser
     MLIRControlFlowDialect
     MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRLinalgUtils
     MLIRMemRefDialect
-    MLIRParser
     MLIRPass
     MLIRSCFDialect
     MLIRSCFUtils
