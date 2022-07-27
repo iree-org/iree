@@ -41,10 +41,10 @@ iree_cc_library(
     ::VMOpInterfacesGen
     ::VMOpsGen
     LLVMSupport
+    MLIRAsmParser
     MLIRControlFlowInterfaces
     MLIRFuncDialect
     MLIRIR
-    MLIRParser
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTransformUtils

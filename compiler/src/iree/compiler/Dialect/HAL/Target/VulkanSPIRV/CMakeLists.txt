@@ -23,9 +23,9 @@ iree_cc_library(
     "VulkanSPIRVTarget.cpp"
   DEPS
     LLVMSupport
+    MLIRAsmParser
     MLIRGPUOps
     MLIRIR
-    MLIRParser
     MLIRSPIRVDialect
     MLIRSPIRVModuleCombiner
     MLIRSPIRVSerialization
