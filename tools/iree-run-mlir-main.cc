@@ -432,7 +432,7 @@ Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer,
   IREE_TRACE_SCOPE0("EvaluateFile");
 
   // TODO(benvanik): move to instance-based registration.
-  IREE_RETURN_IF_ERROR(iree_hal_module_register_types(),
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types(),
                        "Registering HAL types");
 
   iree_vm_instance_t* instance = nullptr;

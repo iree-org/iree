@@ -89,7 +89,7 @@ class ModuleLoader {
 };
 
 Status RunModule(const IreeModuleInvocation& invocation) {
-  IREE_RETURN_IF_ERROR(iree_hal_module_register_types(),
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types(),
                        "registering HAL types");
   iree_vm_instance_t* instance = nullptr;
   IREE_RETURN_IF_ERROR(

@@ -67,13 +67,31 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_library(
-    name = "local",
+    name = "executable_loader",
     srcs = [
         "executable_loader.c",
+        "local_executable.c",
+    ],
+    hdrs = [
+        "executable_loader.h",
+        "local_executable.h",
+    ],
+    deps = [
+        ":executable_environment",
+        ":executable_library",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "local",
+    srcs = [
         "inline_command_buffer.c",
         "local_descriptor_set.c",
         "local_descriptor_set_layout.c",
-        "local_executable.c",
         "local_executable_cache.c",
         "local_executable_layout.c",
     ],

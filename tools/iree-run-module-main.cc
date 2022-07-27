@@ -95,7 +95,7 @@ iree_status_t GetModuleContentsFromFlags(iree_file_contents_t** out_contents) {
 iree_status_t Run() {
   IREE_TRACE_SCOPE0("iree-run-module");
 
-  IREE_RETURN_IF_ERROR(iree_hal_module_register_types(),
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types(),
                        "registering HAL types");
   iree_vm_instance_t* instance = nullptr;
   IREE_RETURN_IF_ERROR(

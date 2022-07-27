@@ -10,110 +10,16 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <string.h>
 
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
+#include "iree/modules/hal/utils/buffer_diagnostics.h"
 #include "iree/vm/api.h"
 
 // Limit the number of bindings we pass down through the HAL. This can be tuned
 // in the future but right now guards the stack from blowing up during calls.
 #define IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT ((iree_host_size_t)32)
-
-//===----------------------------------------------------------------------===//
-// Type registration
-//===----------------------------------------------------------------------===//
-
-static iree_vm_ref_type_descriptor_t iree_hal_allocator_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_buffer_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_buffer_view_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_command_buffer_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_descriptor_set_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_descriptor_set_layout_descriptor =
-    {0};
-static iree_vm_ref_type_descriptor_t iree_hal_device_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_event_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_executable_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_executable_layout_descriptor = {
-    0};
-static iree_vm_ref_type_descriptor_t iree_hal_fence_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_semaphore_descriptor = {0};
-
-#define IREE_VM_REGISTER_HAL_C_TYPE(type, name, destroy_fn, descriptor)   \
-  descriptor.type_name = iree_make_cstring_view(name);                    \
-  descriptor.offsetof_counter = offsetof(iree_hal_resource_t, ref_count); \
-  descriptor.destroy = (iree_vm_ref_destroy_t)destroy_fn;                 \
-  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor));
-
-IREE_API_EXPORT iree_status_t iree_hal_module_register_types(void) {
-  static bool has_registered = false;
-  if (has_registered) return iree_ok_status();
-
-  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_allocator_t, "hal.allocator",
-                              iree_hal_allocator_destroy,
-                              iree_hal_allocator_descriptor);
-  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_buffer_t, "hal.buffer",
-                              iree_hal_buffer_recycle,
-                              iree_hal_buffer_descriptor);
-  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_buffer_view_t, "hal.buffer_view",
-                              iree_hal_buffer_view_destroy,
-                              iree_hal_buffer_view_descriptor);
-  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_command_buffer_t, "hal.command_buffer",
-                              iree_hal_command_buffer_destroy,
-                              iree_hal_command_buffer_descriptor);
-  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_descriptor_set_t, "hal.descriptor_set",
-                              iree_hal_descriptor_set_destroy,
-                              iree_hal_descriptor_set_descriptor);
-  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_descriptor_set_layout_t,
-                              "hal.descriptor_set_layout",
-                              iree_hal_descriptor_set_layout_destroy,
-                              iree_hal_descriptor_set_layout_descriptor);
-  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_device_t, "hal.device",
-                              iree_hal_device_destroy,
-                              iree_hal_device_descriptor);
-  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_event_t, "hal.event",
-                              iree_hal_event_destroy,
-                              iree_hal_event_descriptor);
-  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_executable_t, "hal.executable",
-                              iree_hal_executable_destroy,
-                              iree_hal_executable_descriptor);
-  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_executable_layout_t,
-                              "hal.executable_layout",
-                              iree_hal_executable_layout_destroy,
-                              iree_hal_executable_layout_descriptor);
-  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_fence_t, "hal.fence",
-                              iree_hal_fence_destroy,
-                              iree_hal_fence_descriptor);
-  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_semaphore_t, "hal.semaphore",
-                              iree_hal_semaphore_destroy,
-                              iree_hal_semaphore_descriptor);
-
-  has_registered = true;
-  return iree_ok_status();
-}
-
-//===----------------------------------------------------------------------===//
-// Type wrappers
-//===----------------------------------------------------------------------===//
-
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_allocator, iree_hal_allocator_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_buffer, iree_hal_buffer_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_buffer_view, iree_hal_buffer_view_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_command_buffer,
-                             iree_hal_command_buffer_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_descriptor_set,
-                             iree_hal_descriptor_set_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_descriptor_set_layout,
-                             iree_hal_descriptor_set_layout_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_device, iree_hal_device_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_event, iree_hal_event_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_executable, iree_hal_executable_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_executable_layout,
-                             iree_hal_executable_layout_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_fence, iree_hal_fence_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_semaphore, iree_hal_semaphore_t);
 
 //===----------------------------------------------------------------------===//
 // Module type definitions
@@ -432,94 +338,17 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_map_byte_buffer,  //
 IREE_VM_ABI_EXPORT(iree_hal_module_buffer_assert,  //
                    iree_hal_module_state_t,        //
                    rrrIii, v) {
-  iree_hal_buffer_t* buffer = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &buffer));
-  iree_vm_buffer_t* message = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r1, &message));
-  iree_string_view_t message_str IREE_ATTRIBUTE_UNUSED =
-      iree_vm_buffer_as_string(message);
-  iree_hal_allocator_t* allocator = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_check_deref(args->r2, &allocator));
-  iree_device_size_t minimum_length = iree_hal_cast_device_size(args->i3);
-  iree_hal_memory_type_t required_memory_types =
-      (iree_hal_memory_type_t)args->i4;
-  iree_hal_buffer_usage_t required_buffer_usage =
-      (iree_hal_buffer_usage_t)args->i5;
-
-  // Ensure we have enough bytes in the buffer for the encoding we have.
-  // Note that having more bytes is fine:
-  //   assert(expected_length <= actual_length);
-  iree_device_size_t actual_length = iree_hal_buffer_byte_length(buffer);
-  if (actual_length < minimum_length) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "%.*s buffer byte length %" PRIdsz
-                            " less than expected minimum %" PRIdsz,
-                            (int)message_str.size, message_str.data,
-                            actual_length, minimum_length);
-  }
+  IREE_RETURN_IF_ERROR(iree_hal_modules_buffer_assert(
+      args->r0, args->r1, iree_hal_cast_device_size(args->i3),
+      (iree_hal_memory_type_t)args->i4, (iree_hal_buffer_usage_t)args->i5));
 
   // TODO(benvanik): assert that the buffer view is accessible from the
   // target device. This needs some iree_hal_allocator_* methods for checking
   // whether the external buffer can be used. To start we just compare if the
   // allocators are identical.
-
-  // All memory type bits expected (indicating where the program intends to use
-  // the buffer data) must be set in the buffer while the buffer is allowed to
-  // have more bits.
-  iree_hal_memory_type_t actual_memory_type =
-      iree_hal_buffer_memory_type(buffer);
-  if (!iree_all_bits_set(actual_memory_type, required_memory_types)) {
-#if IREE_HAL_MODULE_STRING_UTIL_ENABLE
-    iree_bitfield_string_temp_t temp0, temp1;
-    iree_string_view_t actual_memory_type_str =
-        iree_hal_memory_type_format(actual_memory_type, &temp0);
-    iree_string_view_t expected_memory_type_str =
-        iree_hal_memory_type_format(required_memory_types, &temp1);
-    return iree_make_status(
-        IREE_STATUS_PERMISSION_DENIED,
-        "%.*s buffer memory type is not compatible; buffer has %.*s, operation "
-        "requires %.*s",
-        (int)message_str.size, message_str.data,
-        (int)actual_memory_type_str.size, actual_memory_type_str.data,
-        (int)expected_memory_type_str.size, expected_memory_type_str.data);
-#else
-    return iree_make_status(
-        IREE_STATUS_PERMISSION_DENIED,
-        "%.*s buffer memory type is not compatible; buffer has %08X, operation "
-        "requires %08X",
-        (int)message_str.size, message_str.data, actual_memory_type,
-        expected_memory_type);
-#endif  // IREE_HAL_MODULE_STRING_UTIL_ENABLE
-  }
-
-  // All usage bits expected (indicating what the program intends to use the
-  // buffer for) must be set in the buffer while the buffer is allowed to have
-  // more bits.
-  iree_hal_buffer_usage_t actual_buffer_usage =
-      iree_hal_buffer_allowed_usage(buffer);
-  if (!iree_all_bits_set(actual_buffer_usage, required_buffer_usage)) {
-#if IREE_HAL_MODULE_STRING_UTIL_ENABLE
-    iree_bitfield_string_temp_t temp0, temp1;
-    iree_string_view_t allowed_usage_str =
-        iree_hal_buffer_usage_format(actual_buffer_usage, &temp0);
-    iree_string_view_t required_usage_str =
-        iree_hal_buffer_usage_format(required_buffer_usage, &temp1);
-    return iree_make_status(
-        IREE_STATUS_PERMISSION_DENIED,
-        "%.*s requested usage was not specified when the buffer was allocated; "
-        "buffer allows %.*s, operation requires %.*s",
-        (int)message_str.size, message_str.data, (int)allowed_usage_str.size,
-        allowed_usage_str.data, (int)required_usage_str.size,
-        required_usage_str.data);
-#else
-    return iree_make_status(
-        IREE_STATUS_PERMISSION_DENIED,
-        "%.*s requested usage was not specified when the buffer was allocated; "
-        "buffer allows %08X, operation requires %08X",
-        (int)message_str.size, message_str.data, allowed_buffer_usage,
-        required_buffer_usage);
-#endif  // IREE_HAL_MODULE_STRING_UTIL_ENABLE
-  }
+  iree_hal_allocator_t* allocator = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_check_deref(args->r2, &allocator));
+  (void)allocator;
 
   return iree_ok_status();
 }
@@ -625,152 +454,18 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_create,  //
   return iree_ok_status();
 }
 
-// Returns true if the |expected_type| can be satisfied with |actual_type|.
-// This allows for basic type widening and bypassing instead of requiring an
-// exact match in all cases.
-static bool iree_hal_element_types_are_compatible(
-    iree_hal_element_type_t actual_type,
-    iree_hal_element_type_t expected_type) {
-  if (iree_hal_element_numerical_type_is_opaque(actual_type)) {
-    // If the provided type is opaque it can map to anything. This allows
-    // applications to bypass the checks when they are treating all the data as
-    // opaque, such as when carrying around buffer data in binary blobs.
-    return true;
-  }
-
-  if (iree_hal_element_numerical_type_is_integer(actual_type) &&
-      iree_hal_element_numerical_type_is_integer(expected_type) &&
-      iree_hal_element_bit_count(actual_type) ==
-          iree_hal_element_bit_count(expected_type)) {
-    // Integer types of the same bit width are allowed to be cast.
-    // This allows users or the compiler to treat data as signless while still
-    // allowing signedness. For example, tensor<1xi32> can successfully match
-    // a tensor<1xui32> expectation.
-    return true;
-  }
-
-  // Otherwise we require an exact match. This may be overly conservative but
-  // in most cases is a useful error message. Users can pass in OPAQUE types if
-  // hitting this to bypass.
-  return actual_type == expected_type;
-}
-
 IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_assert,  //
                    iree_hal_module_state_t,             //
                    rriiCID, v) {
-  iree_hal_buffer_view_t* buffer_view = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_view_check_deref(args->r0, &buffer_view));
-  iree_vm_buffer_t* message = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r1, &message));
-  iree_string_view_t message_str IREE_ATTRIBUTE_UNUSED =
-      iree_vm_buffer_as_string(message);
-  iree_hal_element_type_t expected_element_type =
-      (iree_hal_element_type_t)args->i2;
-  iree_hal_encoding_type_t expected_encoding_type =
-      (iree_hal_encoding_type_t)args->i3;
   iree_host_size_t expected_shape_rank = 0;
   iree_hal_dim_t* expected_shape_dims = NULL;
   // TODO(benvanik): avoid the cast/alloca if not required.
   IREE_VM_ABI_VLA_STACK_CAST(args, a4_count, a4, iree_hal_dim_t, 128,
                              &expected_shape_rank, &expected_shape_dims);
-
-  // Check encoding first; getting the encoding wrong is worse than the shape.
-  // If the actual encoding is opaque we allow it to pass through - this lets
-  // users override the assertion in the case where they are just passing data
-  // around and don't care about the contents.
-  iree_hal_encoding_type_t actual_encoding_type =
-      iree_hal_buffer_view_encoding_type(buffer_view);
-  if (actual_encoding_type != IREE_HAL_ENCODING_TYPE_OPAQUE &&
-      actual_encoding_type != expected_encoding_type) {
-    // TODO(benvanik): string formatting of encodings.
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "%.*s encoding mismatch; expected %08X but have %08X",
-        (int)message_str.size, message_str.data, expected_encoding_type,
-        actual_encoding_type);
-  }
-
-  // Element types determine the storage requirements.
-  // If the actual element type is opaque we allow it to pass through.
-  iree_hal_element_type_t actual_element_type =
-      iree_hal_buffer_view_element_type(buffer_view);
-  if (!iree_hal_element_types_are_compatible(actual_element_type,
-                                             expected_element_type)) {
-#if IREE_HAL_MODULE_STRING_UTIL_ENABLE
-    char actual_element_type_str[32];
-    iree_host_size_t actual_element_type_str_length = 0;
-    char expected_element_type_str[32];
-    iree_host_size_t expected_element_type_str_length = 0;
-    IREE_RETURN_IF_ERROR(iree_hal_format_element_type(
-        actual_element_type, sizeof(actual_element_type_str),
-        actual_element_type_str, &actual_element_type_str_length));
-    IREE_RETURN_IF_ERROR(iree_hal_format_element_type(
-        expected_element_type, sizeof(expected_element_type_str),
-        expected_element_type_str, &expected_element_type_str_length));
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "%.*s element type mismatch; expected %.*s (%08X) but have %.*s (%08X)",
-        (int)message_str.size, message_str.data,
-        (int)expected_element_type_str_length, expected_element_type_str,
-        expected_element_type, (int)actual_element_type_str_length,
-        actual_element_type_str, actual_element_type);
-#else
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "%.*s element type mismatch; expected %08X but have %08X",
-        (int)message_str.size, message_str.data, expected_element_type,
-        actual_element_type);
-#endif  // IREE_HAL_MODULE_STRING_UTIL_ENABLE
-  }
-
-  // Rank check before the individual shape dimensions.
-  iree_host_size_t actual_shape_rank =
-      iree_hal_buffer_view_shape_rank(buffer_view);
-  const iree_hal_dim_t* actual_shape_dims =
-      iree_hal_buffer_view_shape_dims(buffer_view);
-  iree_status_t shape_status = iree_ok_status();
-  if (actual_shape_rank != expected_shape_rank) {
-    shape_status = iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "%.*s shape rank mismatch; expected %" PRIhsz " but have %" PRIhsz,
-        (int)message_str.size, message_str.data, expected_shape_rank,
-        actual_shape_rank);
-  }
-  if (iree_status_is_ok(shape_status)) {
-    for (iree_host_size_t i = 0; i < actual_shape_rank; ++i) {
-      if (actual_shape_dims[i] == expected_shape_dims[i]) continue;
-      // Dimension mismatch.
-      shape_status =
-          iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                           "%.*s shape dimension %" PRIhsz
-                           " mismatch; expected %" PRIdim " but have %" PRIdim,
-                           (int)message_str.size, message_str.data, i,
-                           expected_shape_dims[i], actual_shape_dims[i]);
-      break;
-    }
-  }
-
-#if IREE_HAL_MODULE_STRING_UTIL_ENABLE
-  if (!iree_status_is_ok(shape_status)) {
-    char actual_shape_str[32];
-    iree_host_size_t actual_shape_str_length = 0;
-    char expected_shape_str[32];
-    iree_host_size_t expected_shape_str_length = 0;
-    IREE_RETURN_IF_ERROR(iree_hal_format_shape(
-        actual_shape_rank, actual_shape_dims, sizeof(actual_shape_str),
-        actual_shape_str, &actual_shape_str_length));
-    IREE_RETURN_IF_ERROR(iree_hal_format_shape(
-        expected_shape_rank, expected_shape_dims, sizeof(expected_shape_str),
-        expected_shape_str, &expected_shape_str_length));
-    shape_status = iree_status_annotate_f(
-        shape_status, "expected shape %.*s, actual shape %.*s",
-        (int)expected_shape_str_length, expected_shape_str,
-        (int)actual_shape_str_length, actual_shape_str);
-  }
-#endif  // IREE_HAL_MODULE_STRING_UTIL_ENABLE
-
-  return shape_status;
+  return iree_hal_modules_buffer_view_assert(
+      args->r0, args->r1, (iree_hal_element_type_t)args->i2,
+      (iree_hal_encoding_type_t)args->i3, expected_shape_rank,
+      expected_shape_dims);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_buffer,  //
@@ -828,47 +523,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_dim,  //
 IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_trace,  //
                    iree_hal_module_state_t,            //
                    rCrD, v) {
-#if IREE_HAL_MODULE_STRING_UTIL_ENABLE
-
-  iree_vm_buffer_t* key = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r0, &key));
-  iree_string_view_t key_str = iree_vm_buffer_as_string(key);
-
-  fprintf(stderr, "=== %.*s ===\n", (int)key_str.size, key_str.data);
-  for (iree_host_size_t i = 0; i < args->a1_count; ++i) {
-    iree_hal_buffer_view_t* buffer_view = NULL;
-    IREE_RETURN_IF_ERROR(
-        iree_hal_buffer_view_check_deref(args->a1[i].r0, &buffer_view));
-
-    // NOTE: this export is for debugging only and a no-op in min-size builds.
-    // We heap-alloc here because at the point this export is used performance
-    // is not a concern.
-
-    // Query total length (excluding NUL terminator).
-    iree_host_size_t result_length = 0;
-    iree_status_t status = iree_hal_buffer_view_format(buffer_view, SIZE_MAX, 0,
-                                                       NULL, &result_length);
-    if (!iree_status_is_out_of_range(status)) {
-      return status;
-    }
-    ++result_length;  // include NUL
-
-    // Allocate scratch heap memory to contain the result and format into it.
-    char* result_str = NULL;
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-        state->host_allocator, result_length, (void**)&result_str));
-    status = iree_hal_buffer_view_format(buffer_view, SIZE_MAX, result_length,
-                                         result_str, &result_length);
-    if (iree_status_is_ok(status)) {
-      fprintf(stderr, "%.*s\n", (int)result_length, result_str);
-    }
-    iree_allocator_free(state->host_allocator, result_str);
-    IREE_RETURN_IF_ERROR(status);
-  }
-  fprintf(stderr, "\n");
-
-#endif  // IREE_HAL_MODULE_STRING_UTIL_ENABLE
-  return iree_ok_status();
+  return iree_hal_modules_buffer_view_trace(args->r0, args->a1_count, args->a1,
+                                            state->host_allocator);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1811,29 +1467,4 @@ IREE_API_EXPORT iree_hal_device_t* iree_hal_module_state_device(
     iree_vm_module_state_t* module_state) {
   iree_hal_module_state_t* state = (iree_hal_module_state_t*)module_state;
   return state->shared_device;
-}
-
-//===--------------------------------------------------------------------===//
-// Utilities
-//===--------------------------------------------------------------------===//
-
-IREE_API_EXPORT iree_hal_buffer_view_t* iree_vm_list_get_buffer_view_assign(
-    const iree_vm_list_t* list, iree_host_size_t i) {
-  return (iree_hal_buffer_view_t*)iree_vm_list_get_ref_deref(
-      list, i, iree_hal_buffer_view_get_descriptor());
-}
-
-IREE_API_EXPORT iree_hal_buffer_view_t* iree_vm_list_get_buffer_view_retain(
-    const iree_vm_list_t* list, iree_host_size_t i) {
-  iree_hal_buffer_view_t* value = iree_vm_list_get_buffer_view_assign(list, i);
-  iree_hal_buffer_view_retain(value);
-  return value;
-}
-
-IREE_API_EXPORT iree_status_t iree_vm_list_set_buffer_view_retain(
-    iree_vm_list_t* list, iree_host_size_t i, iree_hal_buffer_view_t* value) {
-  iree_vm_ref_t value_ref;
-  IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(
-      value, iree_hal_buffer_view_type_id(), &value_ref));
-  return iree_vm_list_set_ref_retain(list, i, &value_ref);
 }

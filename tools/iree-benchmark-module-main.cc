@@ -354,7 +354,7 @@ class IREEBenchmark {
     IREE_RETURN_IF_ERROR(
         iree::GetModuleContentsFromFlags(&flatbuffer_contents));
 
-    IREE_RETURN_IF_ERROR(iree_hal_module_register_types());
+    IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types());
     IREE_RETURN_IF_ERROR(
         iree_vm_instance_create(iree_allocator_system(), &instance_));
 
