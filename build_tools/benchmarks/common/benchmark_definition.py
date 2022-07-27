@@ -138,6 +138,7 @@ def get_iree_benchmark_module_arguments(
     repetitions = 10
 
   cmd = [
+      "--time_unit=ns",
       "--benchmark_format=json",
       "--benchmark_out_format=json",
       f"--benchmark_out={results_filename}",
@@ -443,10 +444,9 @@ class BenchmarkResults(object):
     time = None
     for bench_case in self.benchmarks[benchmark_index].results:
       if bench_case["name"].endswith(f"real_time_{kind}"):
-        if bench_case["time_unit"] != "ms":
-          raise ValueError(f"Expected ms as time unit")
-        # Convert into nanoseconds.
-        time = int(round(bench_case["real_time"] * 10**6))
+        if bench_case["time_unit"] != "ns":
+          raise ValueError(f"Expected ns as time unit")
+        time = int(round(bench_case["real_time"]))
         break
     if time is None:
       raise ValueError(f"Cannot found real_time_{kind} in benchmark results")
