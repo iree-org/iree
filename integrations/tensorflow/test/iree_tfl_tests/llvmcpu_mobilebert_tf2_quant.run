@@ -1,0 +1,4 @@
+# REQUIRES: llvmcpu
+# REQUIRES: bugfix
+#           Numeric error (#9796)
+# RUN: %PYTHON -m iree_tfl_tests.mobilebert_tf2_quant_test --target_backend=llvmcpu --artifacts_dir=%t

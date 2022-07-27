@@ -84,7 +84,7 @@ include those relevant for benchmarking):
 
 # Example for MatrixOpsStaticModule:
 /tmp/iree/modules/MatrixOpsStaticModule
-  ├── iree_llvmaot
+  ├── iree_llvmcpu
   │   └── compiled.vmfb
   ├── iree_vmvx
   │   └──compiled.vmfb
