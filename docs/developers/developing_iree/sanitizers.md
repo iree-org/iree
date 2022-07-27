@@ -89,6 +89,16 @@ As of April 2022, all of IREE's tests succeeded with MSan on Linux/x86-64,
 provided that the `vulkan` driver was disabled (due to lack of MSan
 instrumentation in the NVIDIA Vulkan driver).
 
+### UBSan (UndefinedBehaviorSanitizer)
+
+Enabling UBSan in the IREE build is a simple matter of setting the
+`IREE_ENABLE_UBSAN` CMake option:
+
+```
+cmake -DIREE_ENABLE_UBSAN=ON ...
+```
+
+Note that both ASan and UBSan can be enabled in the same build.
 
 ## Symbolizing the reports
 
