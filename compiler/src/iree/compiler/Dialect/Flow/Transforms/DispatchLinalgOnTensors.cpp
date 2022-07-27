@@ -479,12 +479,14 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
   // results. Also compute the operations that form the leafs of the DAG of
   // operations in `ops`.
   for (auto op : ops) {
-    for (auto operand : op->getOperands()) {
-      auto definingOp = operand.getDefiningOp();
-      if (!definingOp || !opSet.count(definingOp)) continue;
-      insertAfterMap[definingOp].push_back(op);
-      if (leafOps.count(op)) leafOps.remove(op);
-    }
+    op->walk([&](Operation *opOrNestedOp) {
+      for (auto operand : opOrNestedOp->getOperands()) {
+        auto definingOp = operand.getDefiningOp();
+        if (!definingOp || !opSet.count(definingOp)) continue;
+        insertAfterMap[definingOp].push_back(op);
+        if (leafOps.count(op)) leafOps.remove(op);
+      }
+    });
   }
 
   // The leaves are at the head of the ordered list.
@@ -582,6 +584,23 @@ static void getUsedValuesDefinedAboveAfterCloningOps(
     }
     clonedOps.push_back(definingOp);
     worklist.append(definingOp->operand_begin(), definingOp->operand_end());
+    // Add operands of ops that are directly nested to the worklist if they are
+    // defined outside of the op.
+    for (Region &r : definingOp->getRegions()) {
+      for (Block &b : r.getBlocks()) {
+        for (Operation &op : b) {
+          for (Value v : op.getOperands()) {
+            if (auto bbArg = v.dyn_cast<BlockArgument>()) {
+              if (bbArg.getOwner()->getParentOp() != &op)
+                worklist.push_back(bbArg);
+            } else {
+              if (v.getDefiningOp()->getParentOp() != &op)
+                worklist.push_back(v);
+            }
+          }
+        }
+      }
+    }
   }
   // The cloned operations form a DAG. Return the cloned operations so the
   // leaves come first, and can be cloned in-order into the dispatch region.
