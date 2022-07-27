@@ -52,10 +52,10 @@ class CollectCompilationStatistics(unittest.TestCase):
 
     self.assertEqual(
         component_sizes,
-        ModuleComponentSizes(file_size=len(module_file_data),
-                             vm_component_size=4,
-                             const_component_size=3,
-                             total_dispatch_component_size=16))
+        ModuleComponentSizes(file_bytes=len(module_file_data),
+                             vm_component_bytes=4,
+                             const_component_bytes=3,
+                             total_dispatch_component_bytes=16))
 
   def test_get_module_component_info_unknown_components(self):
     module_file = BytesIO()

@@ -44,9 +44,9 @@ class CompilationMetrics:
   """An object for describing the summary of statistics and the reference."""
   compilation_info: CompilationInfo
   compilation_time_ms: int
-  total_dispatch_component_size: int
+  total_dispatch_component_bytes: int
   base_compilation_time_ms: Optional[int] = None
-  base_total_dispatch_component_size: Optional[int] = None
+  base_total_dispatch_component_bytes: Optional[int] = None
 
 
 T = TypeVar("T")
@@ -133,12 +133,12 @@ class TotalDispatchSizeToTable(MetricsToTableMapper[CompilationMetrics]):
   def update_base_value(self, compile_metrics: CompilationMetrics,
                         base_value: Any) -> CompilationMetrics:
     return dataclasses.replace(compile_metrics,
-                               base_total_dispatch_component_size=base_value)
+                               base_total_dispatch_component_bytes=base_value)
 
   def get_current_and_base_value(
       self, compile_metrics: CompilationMetrics) -> Tuple[int, Optional[int]]:
-    return (compile_metrics.total_dispatch_component_size,
-            compile_metrics.base_total_dispatch_component_size)
+    return (compile_metrics.total_dispatch_component_bytes,
+            compile_metrics.base_total_dispatch_component_bytes)
 
   def get_series_name(self, name: str) -> str:
     return f"{name} [{TOTAL_DISPATCH_SIZE_SERIES_SUFFIX}]"
@@ -239,8 +239,8 @@ def collect_all_compilation_metrics(
       compile_metrics[name] = CompilationMetrics(
           compilation_info=compile_stats.compilation_info,
           compilation_time_ms=compile_stats.compilation_time_ms,
-          total_dispatch_component_size=component_sizes.
-          total_dispatch_component_size)
+          total_dispatch_component_bytes=component_sizes.
+          total_dispatch_component_bytes)
 
   return compile_metrics
 
@@ -329,7 +329,9 @@ def _categorize_on_single_metric(
     elif similar_threshold.unit.value == metric_unit:
       ratio = abs(current - base)
     else:
-      raise ValueError(f"Mismatch between metric unit '{metric_unit}' and threshold unit '{similar_threshold.unit.value}'")
+      raise ValueError(
+          f"Mismatch between metric unit '{metric_unit}' and threshold unit '{similar_threshold.unit.value}'"
+      )
 
     if ratio <= similar_threshold.threshold:
       similar_map[name] = metrics_obj
@@ -351,7 +353,7 @@ def _get_compare_text(current: float, base: Optional[int]) -> str:
 
   ratio = abs(current - base) / base
   direction = "↑" if current > base else ("↓" if current < base else "")
-  return f"{current:.3f} (vs. {base:.3f}, {ratio:.2%}{direction})"
+  return f"{current:.3g} (vs. {base:.3g}, {ratio:.2%}{direction})"
 
 
 def _sort_benchmarks_and_get_table(benchmarks: Dict[str,
@@ -372,8 +374,8 @@ def _sort_benchmarks_and_get_table(benchmarks: Dict[str,
     str_mean = _get_compare_text(current, base)
     clickable_name = _make_series_link(name)
     sorted_rows.append(
-        (ratio, (clickable_name, str_mean, f"{benchmark.median_time / 1e6:.3f}",
-                 f"{benchmark.stddev_time / 1e6:.3f}")))
+        (ratio, (clickable_name, str_mean, f"{benchmark.median_time / 1e6:.3g}",
+                 f"{benchmark.stddev_time / 1e6:.3g}")))
   sorted_rows.sort(key=lambda row: row[0], reverse=True)
 
   return _add_header_and_get_markdown_table(
@@ -412,8 +414,8 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
     tables.append(_sort_benchmarks_and_get_table(similar, size_cut))
   if raw:
     tables.append(md.header("Raw Latencies", 3))
-    raw_list = [(_make_series_link(k), f"{v.mean_time / 1e6:.3f}",
-                 f"{v.median_time / 1e6:.3f}", f"{v.stddev_time / 1e6:.3f}")
+    raw_list = [(_make_series_link(k), f"{v.mean_time / 1e6:.3g}",
+                 f"{v.median_time / 1e6:.3g}", f"{v.stddev_time / 1e6:.3g}")
                 for k, v in raw.items()]
     tables.append(
         _add_header_and_get_markdown_table(BENCHMARK_RESULTS_HEADERS,

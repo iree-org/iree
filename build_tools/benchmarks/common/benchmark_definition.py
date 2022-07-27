@@ -492,14 +492,10 @@ class CompilationInfo(object):
 
 @dataclass(frozen=True)
 class ModuleComponentSizes(object):
-  # File size in bytes.
-  file_size: int
-  # VM component size in bytes.
-  vm_component_size: int
-  # Const component size in bytes.
-  const_component_size: int
-  # Total dispatch size in bytes.
-  total_dispatch_component_size: int
+  file_bytes: int
+  vm_component_bytes: int
+  const_component_bytes: int
+  total_dispatch_component_bytes: int
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
