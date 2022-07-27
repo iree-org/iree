@@ -85,7 +85,7 @@ iree_api_version_t actual_version;
 IREE_CHECK_OK(iree_api_version_check(IREE_API_VERSION_LATEST, &actual_version));
 
 // Modules with custom types must be statically registered before use.
-IREE_CHECK_OK(iree_hal_module_register_types());
+IREE_CHECK_OK(iree_hal_module_register_all_types());
 
 // Device drivers are managed through registries.
 // Applications may use multiple registries to more finely control driver

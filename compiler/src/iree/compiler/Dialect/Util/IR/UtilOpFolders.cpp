@@ -391,6 +391,19 @@ OpFoldResult AlignOp::fold(ArrayRef<Attribute> operands) {
 }
 
 //===----------------------------------------------------------------------===//
+// util.sizeof
+//===----------------------------------------------------------------------===//
+
+OpFoldResult SizeOfOp::fold(ArrayRef<Attribute> operands) {
+  Type t = getSizedType();
+  if (t.isa<IntegerType>() || t.isa<FloatType>()) {
+    return IntegerAttr::get(IndexType::get(getContext()),
+                            getRoundedElementByteWidth(t));
+  }
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
 // Compiler hints
 //===----------------------------------------------------------------------===//
 
@@ -694,13 +707,16 @@ void BufferSubspanOp::getCanonicalizationPatterns(RewritePatternSet &results,
 OpFoldResult BufferSizeOp::fold(ArrayRef<Attribute> operands) {
   // Try to find the size in the use-def chain.
   // If it's out of the local scope we'll need IPO to help out.
+  // During A->B->C dialect conversion, the type may not be legal so be
+  // defensive.
   auto operand = getOperand();
-  auto sizeAwareType =
-      operand.getType().cast<IREE::Util::SizeAwareTypeInterface>();
-  Operation *op = this->getOperation();
-  if (auto sizeValue = sizeAwareType.findSizeValue(operand, op->getBlock(),
-                                                   Block::iterator(op))) {
-    return sizeValue;
+  if (auto sizeAwareType =
+          operand.getType().dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
+    Operation *op = this->getOperation();
+    if (auto sizeValue = sizeAwareType.findSizeValue(operand, op->getBlock(),
+                                                     Block::iterator(op))) {
+      return sizeValue;
+    }
   }
 
   // If the source is a constant then we can calculate that immediately.

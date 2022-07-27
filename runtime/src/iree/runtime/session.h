@@ -217,7 +217,7 @@ IREE_API_EXPORT iree_status_t iree_runtime_session_call_by_name(
 //
 // See iree_vm_function_call_t for more information.
 IREE_API_EXPORT iree_status_t iree_runtime_session_call_direct(
-    iree_runtime_session_t* session, const iree_vm_function_call_t* call);
+    iree_runtime_session_t* session, const iree_vm_function_call_t call);
 
 #ifdef __cplusplus
 }  // extern "C"

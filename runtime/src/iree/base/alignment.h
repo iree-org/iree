@@ -10,6 +10,7 @@
 #ifndef IREE_BASE_ALIGNMENT_H_
 #define IREE_BASE_ALIGNMENT_H_
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -20,6 +21,27 @@
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+//==============================================================================
+// IREE_PTR_SIZE_*
+//==============================================================================
+
+// Verify that the pointer size of the machine matches the expectation that
+// uintptr_t can round-trip the value. This isn't a common issue unless the
+// toolchain is doing weird things.
+// See https://stackoverflow.com/q/51616057.
+static_assert(sizeof(void*) == sizeof(uintptr_t),
+              "can't determine pointer size");
+
+#if UINTPTR_MAX == 0xFFFFFFFF
+#define IREE_PTR_SIZE_32
+#define IREE_PTR_SIZE 4
+#elif UINTPTR_MAX == 0xFFFFFFFFFFFFFFFFu
+#define IREE_PTR_SIZE_64
+#define IREE_PTR_SIZE 8
+#else
+#error "can't determine pointer size"
 #endif
 
 //===----------------------------------------------------------------------===//

@@ -119,6 +119,73 @@ func.func private @callee(%arg0: !util.buffer, %arg1: !util.buffer) -> (!util.bu
 
 // -----
 
+// Tests that function calls within scf ops get expanded as expected.
+// This would also indicate that other constructs (global loads/etc) also get
+// expanded within the SCF regions.
+
+// CHECK-LABEL: @callerInSCF
+// CHECK-SAME: (%[[RESOURCE:.+]]: !util.buffer, %[[STORAGE_SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[LENGTH:.+]]: index, %[[COND:.+]]: i1)
+func.func @callerInSCF(%resource: !util.buffer, %cond: i1) {
+  // NOTE: there will be extra stuff here from the arg insertion. The call
+  // consumes the subranges and we expect the args to be passed directly.
+
+  // CHECK: scf.if %[[COND]]
+  scf.if %cond {
+    // CHECK: func.call @callee(%[[RESOURCE]], %[[STORAGE_SIZE]], %[[OFFSET]], %[[LENGTH]])
+    func.call @callee(%resource) : (!util.buffer) -> ()
+  }
+
+  return
+}
+
+func.func private @callee(%arg0: !util.buffer)
+
+// -----
+
+// Tests that existing subrange ops are used when propagating the ranges.
+// This commonly shows up when there's a function call that passes in a subrange
+// of a function argument: if we don't propagate the existing subranges then
+// we cannot remove the subranges.
+
+// CHECK-LABEL: @callerWithSubrange
+// CHECK-SAME: (%[[ARG_RESOURCE:.+]]: !util.buffer, %[[ARG_SIZE:.+]]: index, %[[ARG_OFFSET:.+]]: index, %[[ARG_LENGTH:.+]]: index)
+func.func @callerWithSubrange(%arg: !util.buffer) {
+  // NOTE: there will be extra stuff here from the arg insertion. The call
+  // consumes the subranges and we expect the args to be passed directly.
+
+  %arg_size = util.buffer.size %arg : !util.buffer
+  // CHECK-DAG: %[[ARG_LOCAL_OFFSET:.+]] = arith.constant 100
+  %arg_offset = arith.constant 100 : index
+  // CHECK-DAG: %[[ARG_LOCAL_LENGTH:.+]] = arith.constant 200
+  %arg_length = arith.constant 200 : index
+  // CHECK-DAG: %[[ARG_ADJUSTED_OFFSET:.+]] = arith.addi %[[ARG_OFFSET]], %[[ARG_LOCAL_OFFSET]]
+  %arg_subspan = util.buffer.subspan %arg[%arg_offset] : !util.buffer{%arg_size} -> !util.buffer{%arg_length}
+
+  // CHECK: %[[RET0:.+]]:4 = call @callee(%[[ARG_RESOURCE]], %[[ARG_SIZE]], %[[ARG_ADJUSTED_OFFSET]], %[[ARG_LOCAL_LENGTH]])
+  %ret0 = call @callee(%arg_subspan) : (!util.buffer) -> (!util.buffer)
+
+  %ret0_size = util.buffer.size %ret0 : !util.buffer
+  // CHECK-DAG: %[[RET0_LOCAL_OFFSET:.+]] = arith.constant 300
+  %ret0_offset = arith.constant 300 : index
+  // CHECK-DAG: %[[RET0_LOCAL_LENGTH:.+]] = arith.constant 400
+  %ret0_length = arith.constant 400 : index
+  // CHECK-DAG: %[[RET0_ADJUSTED_OFFSET:.+]] = arith.addi %[[RET0]]#2, %[[RET0_LOCAL_OFFSET]]
+  %ret0_subspan = util.buffer.subspan %ret0[%ret0_offset] : !util.buffer{%ret0_size} -> !util.buffer{%ret0_length}
+
+  // CHECK: %[[RET1:.+]]:4 = call @callee(%[[RET0]]#0, %[[RET0]]#1, %[[RET0_ADJUSTED_OFFSET]], %[[RET0_LOCAL_LENGTH]])
+  %ret1 = call @callee(%ret0_subspan) : (!util.buffer) -> (!util.buffer)
+  // CHECK: %[[RET1_SUBRANGE:.+]] = util.buffer.subspan %[[RET1]]#0[%[[RET1]]#2] : !util.buffer{%[[RET1]]#1} -> !util.buffer{%[[RET1]]#3}
+
+  // CHECK-NEXT: util.do_not_optimize(%[[RET1_SUBRANGE]]) : !util.buffer
+  util.do_not_optimize(%ret1) : !util.buffer
+
+  return
+}
+
+func.func private @callee(%arg0: !util.buffer) -> (!util.buffer)
+
+// -----
+
 // Tests that branch arguments are expanded into an explicit subrange of
 // (resource, size, offset, length).
 //

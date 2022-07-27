@@ -10,7 +10,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 
-#define DEBUG_TYPE "llvmaot-linker"
+#define DEBUG_TYPE "llvm-linker"
 
 namespace mlir {
 namespace iree_compiler {
@@ -50,7 +50,7 @@ class EmbeddedLinkerTool : public LinkerTool {
 
     // Fall back to check for setting the linker explicitly via environment
     // variables.
-    char *envVarPath = std::getenv("IREE_LLVMAOT_EMBEDDED_LINKER_PATH");
+    char *envVarPath = std::getenv("IREE_LLVM_EMBEDDED_LINKER_PATH");
     if (envVarPath && envVarPath[0] != '\0') return std::string(envVarPath);
 
     // No explicit linker specified, search the install or build dir.
@@ -69,10 +69,10 @@ class EmbeddedLinkerTool : public LinkerTool {
         << "error: required embedded linker tool (typically `lld`) not found "
            "after searching:\n"
            "  * --iree-llvm-embedded-linker-path= flag\n"
-           "  * IREE_LLVMAOT_EMBEDDED_LINKER_PATH environment variable\n"
+           "  * IREE_LLVM_EMBEDDED_LINKER_PATH environment variable\n"
            "  * common locations at relative file paths\n"
            "  * system PATH\n"
-           "Run with --debug-only=llvmaot-linker for search details\n";
+           "Run with --debug-only=llvm-linker for search details\n";
     return "";
   }
 

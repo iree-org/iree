@@ -70,3 +70,28 @@ func.func @conv(%input: tensor<1x225x225x3xf32>, %filter: tensor<3x3x3x32xf32>, 
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[CONV]], %[[INIT]] : tensor<1x112x112x32xf32>, tensor<1x112x112x32xf32>)
 //  CHECK-SAME:     outs(%[[FILL]] : tensor<1x112x112x32xf32>)
+
+// -----
+
+func.func @fft_cst_output(%arg0 : tensor<3x2190x1x512xf32>)
+    -> (tensor<3x2190x1x512xf32>, tensor<3x2190x1x512xf32>) {
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant dense<1.000000e+00> : tensor<1xf32>
+  %cst_0 = arith.constant dense<-0.000000e+00> : tensor<1xf32>
+  %cst_1 = arith.constant dense<0.000000e+00> : tensor<3x2190x1x512xf32>
+  %0:2 = iree_linalg_ext.fft
+      ins(%c1, %cst, %cst_0 : index, tensor<1xf32>, tensor<1xf32>)
+      outs(%arg0, %cst_1 : tensor<3x2190x1x512xf32>, tensor<3x2190x1x512xf32>)
+      : tensor<3x2190x1x512xf32>, tensor<3x2190x1x512xf32>
+  return %0#0, %0#1 : tensor<3x2190x1x512xf32>, tensor<3x2190x1x512xf32>
+}
+// CHECK-LABEL: func @fft_cst_output(
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<3x2190x1x512xf32>
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0.000000e+00 : f32
+//   CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor [3, 2190, 1, 512]
+//       CHECK:   %[[FILL:.+]] = linalg.fill
+//  CHECK-SAME:       ins(%[[C0]] : f32)
+//  CHECK-SAME:       outs(%[[INIT]] :
+//       CHECK:   %[[FFT:.+]]:2 = iree_linalg_ext.fft
+//  CHECK-SAME:       outs(%[[ARG0]], %[[FILL]] :
+//       CHECK:   return %[[FFT]]#0, %[[FFT]]#1

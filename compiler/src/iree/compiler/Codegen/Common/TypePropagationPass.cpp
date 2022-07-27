@@ -100,6 +100,46 @@ struct TypePropagationPattern : public OpConversionPattern<T> {
       : OpConversionPattern<T>(typeConverter, context, 100) {}
 };
 
+/// Type conversion for arith.constant operands.
+struct ConstantOpTypeConversion
+    : public TypePropagationPattern<arith::ConstantOp> {
+  using TypePropagationPattern<arith::ConstantOp>::TypePropagationPattern;
+
+  LogicalResult matchAndRewrite(
+      arith::ConstantOp constantOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const final {
+    auto attr = constantOp.getValue().cast<DenseElementsAttr>();
+    auto attrType = attr.getType().dyn_cast<ShapedType>();
+    if (!attrType) {
+      return rewriter.notifyMatchFailure(
+          constantOp, "expected attribute type to be shaped type");
+    }
+    Optional<Type> legalizedElementType =
+        getLegalizedElementType(attrType.getElementType());
+    if (!legalizedElementType) {
+      return rewriter.notifyMatchFailure(constantOp,
+                                         "cannot legalize elementType");
+    }
+    if (!legalizedElementType->isIntOrFloat()) {
+      return rewriter.notifyMatchFailure(
+          constantOp, "expected legalized type to be integer or float type");
+    }
+    SmallVector<APInt> legalizedValues;
+    unsigned numElements = attr.isSplat() ? 1 : attr.getNumElements();
+    legalizedValues.reserve(numElements);
+    unsigned bitWidth = legalizedElementType->getIntOrFloatBitWidth();
+    for (auto value : attr.getValues<APInt>()) {
+      legalizedValues.emplace_back(bitWidth, value.getZExtValue());
+    }
+    auto newAttrType = RankedTensorType::get(attrType.getShape(),
+                                             legalizedElementType.getValue());
+    auto newAttr = DenseElementsAttr::get(newAttrType, legalizedValues);
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(constantOp, newAttr,
+                                                   newAttrType);
+    return success();
+  }
+};
+
 /// Propagates the type for `linalg.generic` operation.
 /// - Convert operands whose type has changed.
 /// - Convert corresponding basic block argument type and introduce element
@@ -349,7 +389,7 @@ struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
 
     TypePropagationTypeConverter typeConverter;
     patterns
-        .insert<ForwardSourceType<arith::ExtUIOp>,
+        .insert<ConstantOpTypeConversion, ForwardSourceType<arith::ExtUIOp>,
                 ForwardSourceType<arith::TruncIOp>, GenericOpTypePropagation,
                 LinalgFillTypePropagation, LegalizeResultElementType>(
             typeConverter, context);

@@ -16,11 +16,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 
-BUILD_DIR="${1:-}"
-
-if [[ -z "${BUILD_DIR}" ]]; then
-  BUILD_DIR="${IREE_TSAN_BUILD_DIR:-build-tsan}"
-fi
+BUILD_DIR="${1:-${IREE_TSAN_BUILD_DIR:-build-tsan}}"
 
 source "${SCRIPT_DIR}/setup_build.sh"
 
@@ -43,10 +39,10 @@ CMAKE_ARGS=(
 
   # Link iree_bytecode_module's with system linker, not embedded-ELF linker.
   # Necessary with TSan.
-  "-DIREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER=ON"
+  "-DIREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON"
 
   # Don't build samples: they assume embedded-ELF so don't work with
-  # IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER=ON.
+  # IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON.
   "-DIREE_BUILD_SAMPLES=OFF"
 
   # Enable CUDA compiler and runtime builds unconditionally. Our CI images all

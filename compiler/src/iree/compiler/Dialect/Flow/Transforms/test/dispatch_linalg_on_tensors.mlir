@@ -362,7 +362,7 @@ func.func @keep_original_producer_uses(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>,
 //  CHECK-DAG: %[[D4:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //  CHECK-DAG: %[[D5:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //      CHECK: %[[origCC:.+]]:2 = flow.dispatch.workgroups[%[[D0]], %[[D1]], %[[C1]]]
-// CHECK-SAME:     (%[[ARG2]], %[[D2]], %[[D3]], %[[ARG0]], %[[D0]], %[[D4]], %[[ARG1]], %[[D5]], %[[D1]])
+// CHECK-SAME:     (%[[ARG2]], %[[D2]], %[[D3]], %[[ARG0]], %[[D0]], %[[D4]], %[[ARG1]], %[[D5]], %[[D1]]) : ({{.*}}) -> (%[[ARG2]]{{{.*}}}, tensor<?x?xf32>{{{.*}}})
 // CHECK-NEXT:   %[[ARG2_CAPTURE:.+]]: !flow.dispatch.tensor<readwrite:?x?xf32>
 // CHECK-SAME:   %[[RESULT_CAPTURE:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
 //      CHECK:   %[[LOAD:.+]] = flow.dispatch.tensor.load %[[ARG2_CAPTURE]]
@@ -370,8 +370,8 @@ func.func @keep_original_producer_uses(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>,
 // CHECK-SAME:     outs(%[[LOAD]] : tensor<?x?xf32>)
 //      CHECK:   %[[GEMM:.+]] = linalg.matmul
 // CHECK-SAME:     outs(%[[STOREVAL]] : tensor<?x?xf32>)
-//  CHECK-DAG:   flow.dispatch.tensor.store %[[STOREVAL]], %[[ARG2_CAPTURE]]
-//  CHECK-DAG:   flow.dispatch.tensor.store %[[GEMM]], %[[RESULT_CAPTURE]]
+//  CHECK-DAG:   flow.dispatch.tensor.store %[[STOREVAL]], %[[RESULT_CAPTURE]]
+//  CHECK-DAG:   flow.dispatch.tensor.store %[[GEMM]], %[[ARG2_CAPTURE]]
 //      CHECK: return %[[origCC]]#0, %[[origCC]]#1
 
 // -----
@@ -1444,3 +1444,26 @@ func.func @multi_use_producer_fusion(%arg0 : tensor<?x8xf32>, %arg1 : tensor<8x?
 //  CHECK-DAG:     flow.dispatch.tensor.store %[[GENERIC]], %[[RESULT0]]
 //  CHECK-DAG:     flow.dispatch.tensor.store %[[MATMUL]], %[[RESULT1]]
 //      CHECK:   return %[[DISPATCH]]#1, %[[DISPATCH]]#0
+
+// -----
+
+func.func @fft_cst_output(%arg0 : tensor<3x2190x1x512xf32>) -> (tensor<3x2190x1x512xf32>, tensor<3x2190x1x512xf32>) {
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant dense<1.000000e+00> : tensor<1xf32>
+  %cst_0 = arith.constant dense<-0.000000e+00> : tensor<1xf32>
+  %cst_1 = arith.constant dense<0.000000e+00> : tensor<3x2190x1x512xf32>
+  %0:2 = iree_linalg_ext.fft ins(%c1, %cst, %cst_0 : index, tensor<1xf32>, tensor<1xf32>)
+      outs(%arg0, %cst_1 : tensor<3x2190x1x512xf32>, tensor<3x2190x1x512xf32>) : tensor<3x2190x1x512xf32>, tensor<3x2190x1x512xf32>
+  return %0#0, %0#1 : tensor<3x2190x1x512xf32>, tensor<3x2190x1x512xf32>
+}
+//      CHECK: func @fft_cst_output
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<3x2190x1x512xf32>
+//      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
+// CHECK-SAME:       (%[[ARG0]]) : (tensor<3x2190x1x512xf32>) -> (%[[ARG0]], tensor<3x2190x1x512xf32>)
+// CHECK-NEXT:     %[[ARG1:.+]]: !flow.dispatch.tensor<readwrite
+// CHECK-SAME:     %[[ARG2:.+]]: !flow.dispatch.tensor<writeonly
+//      CHECK:       %[[OUT:.+]] = flow.dispatch.tensor.load %[[ARG1]]
+//      CHECK:       %[[FFT:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:           outs(%[[OUT]],
+//  CHECK-DAG:       flow.dispatch.tensor.store %[[FFT]]#0, %[[ARG1]]
+//  CHECK-DAG:       flow.dispatch.tensor.store %[[FFT]]#1, %[[ARG2]]

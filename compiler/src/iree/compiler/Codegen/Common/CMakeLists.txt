@@ -97,7 +97,6 @@ iree_cc_library(
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TypePropagationPass.cpp"
     "VectorizeConv.cpp"
-    "VectorizeMMT4d.cpp"
     "WorkGroupSwizzle.cpp"
   DEPS
     ::TransformDialectInterpreterPass

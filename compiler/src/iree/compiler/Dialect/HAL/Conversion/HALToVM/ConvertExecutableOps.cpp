@@ -128,14 +128,13 @@ class ExecutableCreateOpConversion
         SymbolTable::lookupNearestSymbolFrom<IREE::HAL::ExecutableBinaryOp>(
             createOp, createOp.getExecutableTarget());
     auto rodataOp = createExecutableBinaryRodata(executableBinaryOp, rewriter);
-
-    auto executableFormatString = detail::rewriteAttrToOperands(
-        createOp.getLoc(), executableBinaryOp.getFormatAttr(),
-        importOp.getFunctionType().getInput(1), rewriter);
-    assert(executableFormatString.hasValue() &&
-           executableFormatString.getValue().size() == 1);
     auto executableRodata = rewriter.createOrFold<IREE::VM::ConstRefRodataOp>(
         createOp.getLoc(), rodataOp);
+
+    // Get format string as a rodata blob.
+    auto executableFormatStr = createStringTableValue(
+        createOp.getLoc(), executableBinaryOp.getFormatAttr(),
+        importOp.getFunctionType().getInput(1), rewriter);
 
     // Pack constants, if any.
     auto constantBuffer = createPackedConstantBuffer(
@@ -151,7 +150,7 @@ class ExecutableCreateOpConversion
     };
     SmallVector<Value, 8> callOperands = {
         adaptor.getDevice(),
-        executableFormatString.getValue().front(),
+        executableFormatStr,
         executableRodata,
         constantBuffer,
     };

@@ -24,8 +24,21 @@ iree_runtime_cc_library(
         "exports.inl",
     ],
     deps = [
+        ":types",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/modules/hal/utils:buffer_diagnostics",
+        "//runtime/src/iree/vm",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "types",
+    srcs = ["types.c"],
+    hdrs = ["types.h"],
+    deps = [
+        "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/vm",
     ],

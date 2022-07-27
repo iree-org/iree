@@ -47,7 +47,7 @@ void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
   Optional<int64_t> numLoops;
   funcOp.walk([&](vector::ContractionOp op) {
     if (numLoops) return signalPassFailure();
-    numLoops = op.getIndexingMaps()[0].getNumDims();
+    numLoops = op.getIndexingMapsArray()[0].getNumDims();
   });
   // No vector.contract op to optimize.
   if (!numLoops) return;
@@ -69,6 +69,26 @@ void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
+  }
+
+  {
+    RewritePatternSet castAwayUnitDimPatterns(&getContext());
+    vector::populateCastAwayVectorLeadingOneDimPatterns(
+        castAwayUnitDimPatterns);
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(castAwayUnitDimPatterns)))) {
+      return signalPassFailure();
+    }
+
+    RewritePatternSet reductionToContractPatterns(&getContext());
+    vector::populateVectorReductionToContractPatterns(
+        reductionToContractPatterns);
+    vector::ExtractOp::getCanonicalizationPatterns(reductionToContractPatterns,
+                                                   context);
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(reductionToContractPatterns)))) {
+      return signalPassFailure();
+    }
   }
 
   {

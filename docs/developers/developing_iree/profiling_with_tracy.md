@@ -145,11 +145,11 @@ In your IREE device build directory, set the following CMake options:
 $ cmake \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DIREE_ENABLE_RUNTIME_TRACING=ON \
-  -DIREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER=ON \
+  -DIREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON \
   .
 ```
 
-The `IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER` option is only needed for
+The `IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` option is only needed for
 Tracy to see into IREE CPU codegen module code in any IREE benchmark or test
 that involves such modules. Its effect is to pass
 `--iree-llvm-link-embedded=false` to the compiler, so when you build CPU-codegen

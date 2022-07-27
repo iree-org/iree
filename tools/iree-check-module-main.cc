@@ -85,7 +85,7 @@ iree_status_t Run(std::string module_file_path, int* out_exit_code) {
   IREE_TRACE_SCOPE0("iree-check-module");
   *out_exit_code = 1;
 
-  IREE_RETURN_IF_ERROR(iree_hal_module_register_types(),
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types(),
                        "registering HAL types");
   iree_vm_instance_t* instance = nullptr;
   IREE_RETURN_IF_ERROR(

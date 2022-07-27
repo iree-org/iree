@@ -16,6 +16,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -163,6 +164,7 @@ static Subrange consumeSubrange(Location loc, Value value,
     subrange.resourceSize = subrangeOp.getSubrangeResourceSize();
     subrange.subrangeOffset = subrangeOp.getSubrangeOffset();
     subrange.subrangeLength = subrangeOp.getSubrangeLength();
+    subrangeMap[value] = subrange;
     return subrange;
   } else {
     Subrange subrange;
@@ -171,6 +173,7 @@ static Subrange consumeSubrange(Location loc, Value value,
         IREE::Util::SizeAwareTypeInterface::queryValueSize(loc, value, builder);
     subrange.subrangeOffset = indexSet.get(0);
     subrange.subrangeLength = subrange.resourceSize;
+    subrangeMap[value] = subrange;
     return subrange;
   }
 }
@@ -257,6 +260,43 @@ static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
       }
     }
   }
+}
+
+// Recursively expands all regions on the op.
+static void expandRegions(Operation *op, ExpandedGlobalMap &globalMap,
+                          IndexSet &indexSet, SubrangeMap subrangeMap) {
+  for (auto &region : op->getRegions()) {
+    expandRegion(region, globalMap, indexSet, subrangeMap);
+  }
+}
+
+// Updates the |subrangeMap| with the combined subrange of |op| and its source.
+static void updateSubrangeOp(IREE::Util::SubrangeOpInterface op,
+                             IndexSet &indexSet, SubrangeMap &subrangeMap) {
+  // Ignore ops that are already in the map (we likely inserted them ourselves
+  // earlier).
+  auto resultResource = op.getSubrangeResult();
+  if (!resultResource) return;
+  if (subrangeMap.count(resultResource)) return;
+
+  // Get the subrange of the source resource which we should have by way of the
+  // other insertions (func/block args, etc).
+  OpBuilder builder(op);
+  builder.setInsertionPointAfter(op);
+  auto sourceSubrange = consumeSubrange(op.getLoc(), op.getSubrangeResource(),
+                                        subrangeMap, indexSet, builder);
+  if (op.getSubrangeResource() == sourceSubrange.resource) return;
+
+  // Update the subrange in the map by adding the source offset and the local
+  // offset from the op. Future ops that consume subranges will reference back
+  // to the source with this subrange.
+  Subrange updatedSubrange;
+  updatedSubrange.resource = sourceSubrange.resource;
+  updatedSubrange.resourceSize = sourceSubrange.resourceSize;
+  updatedSubrange.subrangeOffset = builder.createOrFold<arith::AddIOp>(
+      op.getLoc(), sourceSubrange.subrangeOffset, op.getSubrangeOffset());
+  updatedSubrange.subrangeLength = op.getSubrangeLength();
+  subrangeMap[resultResource] = updatedSubrange;
 }
 
 // Moves resource subranges from global stores to loads.
@@ -475,25 +515,44 @@ static void expandCondBranchOp(mlir::cf::CondBranchOp op, IndexSet &indexSet,
 }
 
 // Recursively expands resources into (resource, size, offset, length) in |op|.
+// TODO(benvanik): make this a type switch.
 static void expandSubranges(Operation *op, ExpandedGlobalMap &globalMap,
                             IndexSet &indexSet, SubrangeMap &subrangeMap) {
-  if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(op)) {
-    expandGlobalLoadOp(loadOp, globalMap, indexSet, subrangeMap);
-  } else if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOp>(op)) {
-    expandGlobalStoreOp(storeOp, globalMap, indexSet, subrangeMap);
-  } else if (auto initializerOp = dyn_cast<IREE::Util::InitializerOp>(op)) {
-    expandInitializerOp(initializerOp, globalMap, indexSet, subrangeMap);
-  } else if (auto funcOp = dyn_cast<mlir::func::FuncOp>(op)) {
-    expandFuncOp(funcOp, globalMap, indexSet, subrangeMap);
-  } else if (auto callOp = dyn_cast<mlir::func::CallOp>(op)) {
-    expandCallOp(callOp, indexSet, subrangeMap);
-  } else if (auto returnOp = dyn_cast<mlir::func::ReturnOp>(op)) {
-    expandReturnOp(returnOp, indexSet, subrangeMap);
-  } else if (auto branchOp = dyn_cast<mlir::cf::BranchOp>(op)) {
-    expandBranchOp(branchOp, indexSet, subrangeMap);
-  } else if (auto condBranchOp = dyn_cast<mlir::cf::CondBranchOp>(op)) {
-    expandCondBranchOp(condBranchOp, indexSet, subrangeMap);
+  if (auto subrangeOp = dyn_cast<IREE::Util::SubrangeOpInterface>(op)) {
+    return updateSubrangeOp(subrangeOp, indexSet, subrangeMap);
   }
+
+  if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(op)) {
+    return expandGlobalLoadOp(loadOp, globalMap, indexSet, subrangeMap);
+  } else if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOp>(op)) {
+    return expandGlobalStoreOp(storeOp, globalMap, indexSet, subrangeMap);
+  } else if (auto initializerOp = dyn_cast<IREE::Util::InitializerOp>(op)) {
+    return expandInitializerOp(initializerOp, globalMap, indexSet, subrangeMap);
+  } else if (auto funcOp = dyn_cast<mlir::func::FuncOp>(op)) {
+    return expandFuncOp(funcOp, globalMap, indexSet, subrangeMap);
+  } else if (auto callOp = dyn_cast<mlir::func::CallOp>(op)) {
+    return expandCallOp(callOp, indexSet, subrangeMap);
+  } else if (auto returnOp = dyn_cast<mlir::func::ReturnOp>(op)) {
+    return expandReturnOp(returnOp, indexSet, subrangeMap);
+  } else if (auto branchOp = dyn_cast<mlir::cf::BranchOp>(op)) {
+    return expandBranchOp(branchOp, indexSet, subrangeMap);
+  } else if (auto condBranchOp = dyn_cast<mlir::cf::CondBranchOp>(op)) {
+    return expandCondBranchOp(condBranchOp, indexSet, subrangeMap);
+  }
+
+  // We could have a more generic thing here with RegionBranchOpInterface but
+  // not all ops can contain subrange ops and some are isolated from above.
+  // We could add an interface to ops we want to do this to, though, to at least
+  // allow dialects to plug in. For now we just need SCF so this is hardcoded.
+  if (auto ifOp = dyn_cast<mlir::scf::IfOp>(op)) {
+    return expandRegions(ifOp, globalMap, indexSet, subrangeMap);
+  } else if (auto forOp = dyn_cast<mlir::scf::ForOp>(op)) {
+    return expandRegions(forOp, globalMap, indexSet, subrangeMap);
+  } else if (auto whileOp = dyn_cast<mlir::scf::WhileOp>(op)) {
+    return expandRegions(whileOp, globalMap, indexSet, subrangeMap);
+  }
+  // TODO(benvanik): also handle scf.yield: today we don't propagate across
+  // return values.
 }
 
 //===----------------------------------------------------------------------===//
@@ -523,8 +582,9 @@ class PropagateSubrangesPass
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::arith::ArithmeticDialect>();
+    registry.insert<mlir::func::FuncDialect>();
+    registry.insert<mlir::scf::SCFDialect>();
     registry.insert<IREE::Util::UtilDialect>();
   }
 

@@ -59,14 +59,14 @@ Run the test suite with:
 ```
 pip install lit
 
-# Just runs the LLVM AOT tests by default:
+# Just run the default tests:
 lit -v test/
 
 # Can also run vulkan tests with:
 lit -v -D FEATURES=vulkan test/
 
-# Can disable the default LLVM AOT tests:
-lit -v -D DISABLE_FEATURES=llvmaot -D FEATURES=vulkan test/
+# Can disable the default LLVM CPU tests:
+lit -v -D DISABLE_FEATURES=llvmcpu -D FEATURES=vulkan test/
 
 # Individual test directories, files or globs can be run individually.
 lit -v $(find test -name '*softplus*')

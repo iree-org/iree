@@ -9,7 +9,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/FormatVariadic.h"
 
-#define DEBUG_TYPE "llvmaot-linker"
+#define DEBUG_TYPE "llvm-linker"
 
 namespace mlir {
 namespace iree_compiler {
@@ -166,8 +166,8 @@ class WindowsLinkerTool : public LinkerTool {
         "/out:" + artifacts.libraryFile.path,
     };
 
-    if (targetOptions.optLevel.getSpeedupLevel() >= 2 ||
-        targetOptions.optLevel.getSizeLevel() >= 2) {
+    if (targetOptions.optimizerOptLevel.getSpeedupLevel() >= 2 ||
+        targetOptions.optimizerOptLevel.getSizeLevel() >= 2) {
       // https://docs.microsoft.com/en-us/cpp/build/reference/opt-optimizations?view=vs-2019
       // Enable all the fancy optimizations.
       flags.push_back("/opt:ref,icf,lbr");
@@ -221,7 +221,7 @@ class WindowsLinkerTool : public LinkerTool {
     // We need to link against different libraries based on our configuration
     // matrix (dynamic/static and debug/release).
     int libIndex = 0;
-    if (targetOptions.optLevel.getSpeedupLevel() == 0) {
+    if (targetOptions.optimizerOptLevel.getSpeedupLevel() == 0) {
       libIndex += 0;  // debug
     } else {
       libIndex += 2;  // release

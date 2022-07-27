@@ -70,7 +70,7 @@ iree_check_single_backend_test_suite(
     srcs = LLVM_SRCS,
     compiler_flags = ["--iree-input-type=tosa"],
     driver = "local-task",
-    target_backend = "dylib-llvm-aot",
+    target_backend = "llvm-cpu",
 )
 
 VMVX_SRCS = enforce_glob(
@@ -143,13 +143,19 @@ VMVX_MICROKERNELS_SRCS = enforce_glob(
         "clamp.mlir",
         "clz.mlir",
         "const.mlir",
+        "equal.mlir",
         "exp.mlir",
         "floor.mlir",
+        "fully_connected.mlir",
+        "gather.mlir",
+        "greater.mlir",
+        "greater_equal.mlir",
         "if.mlir",
         "log.mlir",
         "logical_left_shift.mlir",
         "logical_right_shift.mlir",
         "matmul.mlir",
+        "max_pool.mlir",
         "maximum.mlir",
         "minimum.mlir",
         "mul.mlir",
@@ -160,29 +166,15 @@ VMVX_MICROKERNELS_SRCS = enforce_glob(
         "reluN.mlir",
         "reshape.mlir",
         "rsqrt.mlir",
+        "select.mlir",
         "sigmoid.mlir",
         "sub.mlir",
+        "table.mlir",
         "tanh.mlir",
         "transpose.mlir",
-    ],
-    include = ["*.mlir"],
-    exclude = [
-        # Gather and table are failing on complicated buffer conversions that
-        # will shortly be fixed separately.
-        "gather.mlir",
-        "table.mlir",
-        # equal, greater_equal, select have (suspected) i1 problems which
-        # manifest at runtime.
-        "equal.mlir",
-        "greater.mlir",
-        "greater_equal.mlir",
-        "select.mlir",
-        # fully_connected and while are failing on unrealizable 0d memref
-        # conversions. The first is incidental to how the test is constructed.
-        "fully_connected.mlir",
-        "max_pool.mlir",
         "while.mlir",
     ],
+    include = ["*.mlir"],
 )
 
 iree_check_single_backend_test_suite(

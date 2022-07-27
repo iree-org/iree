@@ -143,11 +143,14 @@ iree_status_t iree_hal_cuda_device_create(
                                     iree_hal_cuda_device_check_params(params));
   CUcontext context;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, CU_RESULT_TO_STATUS(syms, cuCtxCreate(&context, 0, device)));
+      z0,
+      CU_RESULT_TO_STATUS(syms, cuDevicePrimaryCtxRetain(&context, device)));
+  iree_status_t status = CU_RESULT_TO_STATUS(syms, cuCtxSetCurrent(context));
   CUstream stream;
-  iree_status_t status = CU_RESULT_TO_STATUS(
-      syms, cuStreamCreate(&stream, CU_STREAM_NON_BLOCKING));
-
+  if (iree_status_is_ok(status)) {
+    status = CU_RESULT_TO_STATUS(
+        syms, cuStreamCreate(&stream, CU_STREAM_NON_BLOCKING));
+  }
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_device_create_internal(driver, identifier, params,
                                                   device, stream, context, syms,
@@ -157,7 +160,7 @@ iree_status_t iree_hal_cuda_device_create(
     if (stream) {
       syms->cuStreamDestroy(stream);
     }
-    syms->cuCtxDestroy(context);
+    syms->cuDevicePrimaryCtxRelease(device);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -175,6 +178,9 @@ static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
                     cuStreamDestroy(device->stream));
 
   iree_arena_block_pool_deinitialize(&device->block_pool);
+
+  CUDA_IGNORE_ERROR(device->context_wrapper.syms,
+                    cuDevicePrimaryCtxRelease(device->device));
 
   // Finally, destroy the device.
   iree_hal_driver_release(device->driver);

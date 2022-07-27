@@ -897,10 +897,10 @@ class BackendInfo:
           "driver": "vulkan",
           "compiler_targets": ["vulkan-spirv"]
       },
-      "iree_llvmaot": {
+      "iree_llvmcpu": {
           "compiled_module_class": IreeCompiledModule,
           "driver": "local-task",
-          "compiler_targets": ["dylib-llvm-aot"]
+          "compiler_targets": ["llvm-cpu"]
       },
   }
 
@@ -909,13 +909,13 @@ class BackendInfo:
 
     Args:
       backend_name: a str specifying which backend to use. Should be one of
-        'tf', 'tflite', 'iree_vmvx', 'iree_vulkan', 'iree_llvmaot'.
+        'tf', 'tflite', 'iree_vmvx', 'iree_vulkan', 'iree_llvmcpu'.
       backend_id: an optional str specifying what name to use when saving
         compiled artifacts. Must satisfy `backend_id.startswith(backend_name)`.
 
     Raises:
       KeyError: if backend_name is not one of ['tf', 'tflite', 'iree_vmvx',
-        'iree_vulkan', 'iree_llvmaot'].
+        'iree_vulkan', 'iree_llvmcpu'].
       ValueError: if backend_id doesn't start with backend_name.
     """
     if backend_name not in self._name_to_info:

@@ -452,9 +452,8 @@ IREE_API_EXPORT iree_status_t iree_vm_begin_invoke(
   // Execute the target function until the first yield point is reached or it
   // completes. A result of OK indicates successful completion while DEFERRED
   // indicates that the invocation needs to be resumed/waited again.
-  iree_vm_execution_result_t result;
   state->status =
-      function.module->begin_call(function.module->self, stack, &call, &result);
+      function.module->begin_call(function.module->self, stack, call);
 
   // The call may have yielded, either for cooperative scheduling purposes or
   // for a wait operation (in which case the top of the stack will have a wait
@@ -504,9 +503,8 @@ iree_vm_resume_invoke(iree_vm_invoke_state_t* state) {
     // Call into the VM to resume the function. It may complete (returning OK),
     // defer to be waited/resumed later, or fail.
     iree_vm_function_t resume_function = resume_frame->function;
-    iree_vm_execution_result_t result;
     state->status = resume_function.module->resume_call(
-        resume_function.module->self, state->stack, state->results, &result);
+        resume_function.module->self, state->stack, state->results);
 
     // If the call yielded then return that so the user knows to resume again.
     if (iree_status_is_deferred(state->status)) {

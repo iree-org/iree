@@ -215,19 +215,16 @@ class NativeModule {
   }
 
   static iree_status_t ModuleBeginCall(void* self, iree_vm_stack_t* stack,
-                                       const iree_vm_function_call_t* call,
-                                       iree_vm_execution_result_t* out_result) {
-    IREE_ASSERT_ARGUMENT(out_result);
-    std::memset(out_result, 0, sizeof(*out_result));
+                                       iree_vm_function_call_t call) {
     auto* module = FromModulePointer(self);
-    if (IREE_UNLIKELY(call->function.ordinal >=
+    if (IREE_UNLIKELY(call.function.ordinal >=
                       module->dispatch_table_.size())) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "function ordinal out of bounds: 0 < %u < %zu",
-                              call->function.ordinal,
+                              call.function.ordinal,
                               module->dispatch_table_.size());
     }
-    const auto& info = module->dispatch_table_[call->function.ordinal];
+    const auto& info = module->dispatch_table_[call.function.ordinal];
 
     // NOTE: VM stack is currently unused. We could stash things here for the
     // debugger or use it for coroutine state.
@@ -235,11 +232,11 @@ class NativeModule {
 
     iree_vm_stack_frame_t* callee_frame = NULL;
     IREE_RETURN_IF_ERROR(iree_vm_stack_function_enter(
-        stack, &call->function, IREE_VM_STACK_FRAME_NATIVE, frame_size,
+        stack, &call.function, IREE_VM_STACK_FRAME_NATIVE, frame_size,
         /*frame_cleanup_fn=*/nullptr, &callee_frame));
 
     auto* state = FromStatePointer(callee_frame->module_state);
-    iree_status_t status = info.call(info.ptr, state, stack, call, out_result);
+    iree_status_t status = info.call(info.ptr, state, stack, call);
     if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
       status = iree_status_annotate_f(
           status, "while invoking C++ function %s.%.*s", module->name_,

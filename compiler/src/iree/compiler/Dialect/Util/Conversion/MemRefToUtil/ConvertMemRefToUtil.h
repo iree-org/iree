@@ -14,10 +14,14 @@ namespace mlir {
 namespace iree_compiler {
 
 // Appends memref dialect to vm dialect patterns to the given pattern list.
+// Because these patterns are often used in A->B->C lowerings, we allow the
+// final buffer type to be specialized (this must be the buffer type that
+// is valid in the 'C' dialect). If null, the a Util::BufferType is used.
 void populateMemRefToUtilPatterns(MLIRContext *context,
                                   ConversionTarget &conversionTarget,
                                   TypeConverter &typeConverter,
-                                  RewritePatternSet &patterns);
+                                  RewritePatternSet &patterns,
+                                  Type convertedBufferType = {});
 
 }  // namespace iree_compiler
 }  // namespace mlir

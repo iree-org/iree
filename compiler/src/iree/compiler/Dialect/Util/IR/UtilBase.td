@@ -37,7 +37,7 @@ def Util_Element : AnyTypeOf<[AnySignlessInteger, AnyFloat]>;
 def Util_Tensor : TensorOf<[Util_Element]>;
 def Util_Primitive : AnyTypeOf<[Index, AnyInteger, AnyFloat]>;
 
-def Util_FillPattern : AnyTypeOf<[AnyInteger, AnyFloat]>;
+def Util_FillPattern : AnyTypeOf<[AnyInteger, AnyFloat, Index]>;
 
 def Util_Offset : TypeAlias<Index>;
 def Util_Size : TypeAlias<Index>;

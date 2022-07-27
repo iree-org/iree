@@ -63,7 +63,7 @@ static bool isMatrixTimesMatrixTransposed(vector::ContractionOp contractionOp) {
   const int NIter = parallelIterators[1];
   const int KIter = reductionIterators[0];
   // Check that there are 3 indexing maps.
-  auto indexingMaps = contractionOp.getIndexingMaps();
+  auto indexingMaps = contractionOp.getIndexingMapsArray();
   if (indexingMaps.size() != 3) {
     return false;
   }

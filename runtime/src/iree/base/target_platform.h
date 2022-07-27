@@ -7,9 +7,6 @@
 #ifndef IREE_BASE_TARGET_PLATFORM_H_
 #define IREE_BASE_TARGET_PLATFORM_H_
 
-#include <assert.h>
-#include <stdint.h>
-
 // The build system defines one of the following top-level platforms and then
 // one platform+architecture pair for that platform.
 //
@@ -22,10 +19,6 @@
 // IREE_ARCH_WASM_64
 // IREE_ARCH_X86_32
 // IREE_ARCH_X86_64
-//
-// IREE_PTR_SIZE
-// IREE_PTR_SIZE_32
-// IREE_PTR_SIZE_64
 //
 // IREE_ENDIANNESS_LITTLE
 // IREE_ENDIANNESS_BIG
@@ -72,6 +65,14 @@
 #endif  // __arm64
 #endif  // ARM
 
+#if defined(__riscv) && (__riscv_xlen == 32)
+#define IREE_ARCH "riscv_32"
+#define IREE_ARCH_RISCV_32 1
+#elif defined(__riscv) && (__riscv_xlen == 64)
+#define IREE_ARCH "riscv_64"
+#define IREE_ARCH_RISCV_64 1
+#endif  // RISCV
+
 #if defined(__wasm32__)
 #define IREE_ARCH "wasm_32"
 #define IREE_ARCH_WASM_32 1
@@ -90,38 +91,12 @@
 #define IREE_ARCH_X86_64 1
 #endif  // X86
 
-#if defined(__riscv) && (__riscv_xlen == 32)
-#define IREE_ARCH "riscv_32"
-#define IREE_ARCH_RISCV_32 1
-#elif defined(__riscv) && (__riscv_xlen == 64)
-#define IREE_ARCH "riscv_64"
-#define IREE_ARCH_RISCV_64 1
-#endif
-
 #if !defined(IREE_ARCH_ARM_32) && !defined(IREE_ARCH_ARM_64) &&     \
     !defined(IREE_ARCH_RISCV_32) && !defined(IREE_ARCH_RISCV_64) && \
     !defined(IREE_ARCH_WASM_32) && !defined(IREE_ARCH_WASM_64) &&   \
     !defined(IREE_ARCH_X86_32) && !defined(IREE_ARCH_X86_64)
 #error Unknown architecture.
 #endif  // all archs
-
-//==============================================================================
-// IREE_PTR_SIZE_*
-//==============================================================================
-
-// See https://stackoverflow.com/q/51616057
-static_assert(sizeof(void*) == sizeof(uintptr_t),
-              "can't determine pointer size");
-
-#if UINTPTR_MAX == 0xFFFFFFFF
-#define IREE_PTR_SIZE_32
-#define IREE_PTR_SIZE 4
-#elif UINTPTR_MAX == 0xFFFFFFFFFFFFFFFFu
-#define IREE_PTR_SIZE_64
-#define IREE_PTR_SIZE 8
-#else
-#error "can't determine pointer size"
-#endif
 
 //==============================================================================
 // IREE_ENDIANNESS_*
@@ -237,6 +212,16 @@ static_assert(sizeof(void*) == sizeof(uintptr_t),
 #endif
 
 //==============================================================================
+// IREE_PLATFORM_*
+//==============================================================================
+
+// We allow IREE_PLATFORM_GENERIC to override all other platform detection
+// logic so that we can purposefully compile for bare-metal devices using a
+// target-specific toolchain (since most of our code should be using these
+// macros instead of raw compiler-provided ones).
+#if !defined(IREE_PLATFORM_GENERIC)
+
+//==============================================================================
 // IREE_PLATFORM_ANDROID
 //==============================================================================
 
@@ -318,5 +303,7 @@ static_assert(sizeof(void*) == sizeof(uintptr_t),
     !defined(IREE_PLATFORM_WINDOWS)
 #error Unknown platform.
 #endif  // all archs
+
+#endif  // !IREE_PLATFORM_GENERIC
 
 #endif  // IREE_BASE_TARGET_PLATFORM_H_

@@ -191,8 +191,11 @@ ChangeStatus FloatRangeValueElement::updateValue(Value value,
           auto inner = solver.getElementFor<FloatRangeValueElement>(
               *this, Position::forValue(loopBodyValue),
               DFX::Resolution::REQUIRED);
-
           newState ^= inner;
+          // Stop traversal if tied OpOperand is not used in the op body.
+          if (!linalgOp.payloadUsesValueFromOperand(
+                  linalgOp.getOutputOperand(result.getResultNumber())))
+            return WalkResult::skip();
           return WalkResult::advance();
         } else if (auto minfOp = dyn_cast<arith::MinFOp>(definingOp)) {
           auto lhs = solver.getElementFor<FloatRangeValueElement>(

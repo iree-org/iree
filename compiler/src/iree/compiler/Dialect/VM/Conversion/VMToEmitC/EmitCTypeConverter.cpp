@@ -65,6 +65,64 @@ EmitCTypeConverter::EmitCTypeConverter() {
   });
 }
 
+Type EmitCTypeConverter::convertTypeAsNonPointer(Type type) {
+  Type convertedType = convertType(type);
+
+  if (auto ptrType = convertedType.dyn_cast<emitc::PointerType>()) {
+    return ptrType.getPointee();
+  }
+
+  return convertedType;
+}
+
+Type EmitCTypeConverter::convertTypeAsPointer(Type type) {
+  return emitc::PointerType::get(convertTypeAsNonPointer(type));
+}
+
+emitc::OpaqueType EmitCTypeConverter::convertTypeAsCType(Type type) {
+  Type convertedType = convertTypeAsNonPointer(type);
+
+  if (auto oType = convertedType.dyn_cast<emitc::OpaqueType>()) {
+    return oType;
+  }
+
+  if (auto iType = type.dyn_cast<IntegerType>()) {
+    std::string typeLiteral;
+    switch (iType.getWidth()) {
+      case 32: {
+        typeLiteral = "int32_t";
+        break;
+      }
+      case 64: {
+        typeLiteral = "int64_t";
+        break;
+      }
+      default:
+        return {};
+    }
+    return emitc::OpaqueType::get(type.getContext(), typeLiteral);
+  }
+
+  if (auto fType = type.dyn_cast<FloatType>()) {
+    std::string typeLiteral;
+    switch (fType.getWidth()) {
+      case 32: {
+        typeLiteral = "float";
+        break;
+      }
+      case 64: {
+        typeLiteral = "double";
+        break;
+      }
+      default:
+        return {};
+    }
+    return emitc::OpaqueType::get(type.getContext(), typeLiteral);
+  }
+
+  return {};
+}
+
 FailureOr<std::reference_wrapper<VMAnalysis>>
 EmitCTypeConverter::lookupAnalysis(Operation *op) {
   auto ptr = analysisCache.find(op);

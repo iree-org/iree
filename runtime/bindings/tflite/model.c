@@ -17,7 +17,7 @@ static iree_status_t _TfLiteModelPrepareRuntime() {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_vm_register_builtin_types());
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_module_register_types());
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_module_register_all_types());
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();

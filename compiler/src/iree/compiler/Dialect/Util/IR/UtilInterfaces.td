@@ -317,7 +317,8 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
         auto resultIndex = result.cast<mlir::OpResult>().getResultNumber();
-        auto operandIndex = $_op.getTiedResultOperandIndex(resultIndex);
+        auto operandIndex = cast<TiedOpInterface>($_op.getOperation())
+            .getTiedResultOperandIndex(resultIndex);
         return operandIndex.hasValue() ?
             $_op.getOperand(operandIndex.getValue()) :
             nullptr;
@@ -694,6 +695,16 @@ def Util_SubrangeOp : OpInterface<"SubrangeOpInterface"> {
       }],
       /*retTy=*/"Value",
       /*methodName=*/"getSubrangeLength",
+      /*args=*/(ins),
+      /*methodBody=*/[{}]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the resulting subrange value if the op produces one.
+        Will be nullptr if the op is only consuming a subrange.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getSubrangeResult",
       /*args=*/(ins),
       /*methodBody=*/[{}]
     >,

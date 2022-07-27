@@ -1,0 +1,2 @@
+# REQUIRES: llvmcpu
+# RUN: %PYTHON -m iree_tf_tests.layers.layers_test --target_backends=iree_llvmcpu --dynamic_dims=true --training=false --test_default_kwargs_only=true --layer=Lambda --artifacts_dir=%t

@@ -24,6 +24,7 @@ iree_cc_library(
     "OrdinalAllocation.cpp"
     "Passes.cpp"
     "SinkDefiningOps.cpp"
+    "SinkGlobalBufferLoads.cpp"
   DEPS
     LLVMSupport
     MLIRAffineDialect
@@ -43,11 +44,11 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::Util::Conversion
+    iree::compiler::Dialect::Util::Conversion::MemRefToUtil
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::Conversion::MathToVM
-    iree::compiler::Dialect::VM::Conversion::MemRefToVM
     iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::Conversion::UtilToVM
     iree::compiler::Dialect::VM::IR

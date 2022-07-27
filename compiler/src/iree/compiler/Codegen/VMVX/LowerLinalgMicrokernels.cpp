@@ -101,21 +101,29 @@ struct StridedBufferDescriptor {
   /// with element-based addressing.
   Value castToLinear(Location loc, OpBuilder &builder) {
     BaseMemRefType sourceType = baseBuffer.getType().cast<MemRefType>();
-    if (sourceType.getRank() <= 1) return baseBuffer;
+    if (sourceType.getRank() == 1) return baseBuffer;
 
     // Insert the cast just after the original def to keep inner loops tidy.
     OpBuilder::InsertionGuard restoreIp(builder);
     Operation *def = baseBuffer.getDefiningOp();
     if (def) builder.setInsertionPointAfter(def);
 
-    // Collapse to 1D.
-    ReassociationIndices reassociation;
-    reassociation.resize(sourceType.getRank());
-    for (int i = 0; i < sourceType.getRank(); ++i) {
-      reassociation[i] = i;
+    if (sourceType.getRank() > 1) {
+      // Collapse to 1D.
+      ReassociationIndices reassociation;
+      reassociation.resize(sourceType.getRank());
+      for (int i = 0; i < sourceType.getRank(); ++i) {
+        reassociation[i] = i;
+      }
+      return builder.create<memref::CollapseShapeOp>(loc, baseBuffer,
+                                                     reassociation);
+    } else {
+      // Expand 0D to 1D.
+      // ReassociationIndices reassociation;
+      return builder.create<memref::ExpandShapeOp>(
+          loc, MemRefType::get({1}, sourceType.getElementType()), baseBuffer,
+          ArrayRef<ReassociationIndices>{});
     }
-    return builder.create<memref::CollapseShapeOp>(loc, baseBuffer,
-                                                   reassociation);
   }
 };
 
@@ -228,6 +236,8 @@ class StridedBufferAnalysis {
         rootDesc.offset = constant(0);
       } else {
         // Rank > 0.
+        OpBuilder::InsertionGuard restoreIp(builder);
+        builder.setInsertionPointAfterValue(identityRoot);
         // Initialize sizes.
         fillSize(rootDesc, identityRoot);
         // Strides.

@@ -15,6 +15,25 @@
 #include "iree/base/tracing.h"
 #include "iree/vm/api.h"
 
+// Today we optionally enable MMT4D based on build-time configuration.
+// Compiler code can be emitted using optional imports if we want to support
+// both generic matmul and mmt4d in the same module with optional runtime
+// support but the hope is that we settle on one or the other and
+// unconditionally use that. Until we're there this is kept optional so that we
+// can reduce binary size when MMT4D is known unused mostly as an example of
+// how this could be done for other libraries.
+//
+// Note that adding optional things to VMVX has other overheads (this file grows
+// infinitely large). For entire sets of microkernels with a larger surface area
+// we can move those into other entirely optional modules that can be passed in
+// by the user when creating the VMVX loader via the user_modules arg of
+// iree_hal_vmvx_module_loader_create. We expect here that MMT4D will be used
+// anywhere VMVX is and since it is defined in-tree that's a safer bet than
+// random external libraries.
+#if defined(IREE_HAVE_MMT4D_BUILTINS)
+#include "iree/builtins/mmt4d/mmt4d.h"
+#endif  // IREE_HAVE_MMT4D_BUILTINS
+
 //===----------------------------------------------------------------------===//
 // Module type definitions
 //===----------------------------------------------------------------------===//
@@ -445,6 +464,69 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_matmul_f32f32f32, matmul_f32, v) {
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
+
+//===----------------------------------------------------------------------===//
+// MMT4D
+//===----------------------------------------------------------------------===//
+
+#if defined(IREE_HAVE_MMT4D_BUILTINS)
+
+// NOTE: for demo purposes this reuses the matmul signature.
+IREE_VMVX_ABI_FIXED_STRUCT(mmt4d_f32, rIIrIIrIIIIIffi, {
+  iree_vm_ref_t lhs_ref;
+  int64_t lhs_offset;
+  int64_t lhs_row_stride;
+  iree_vm_ref_t rhs_ref;
+  int64_t rhs_offset;
+  int64_t rhs_row_stride;
+  iree_vm_ref_t out_ref;
+  int64_t out_offset;
+  int64_t out_row_stride;
+  int64_t m;
+  int64_t n;
+  int64_t k;
+  float alpha;
+  float beta;
+  int32_t flags;
+});
+IREE_VMVX_ABI_DEFINE_SHIM(mmt4d_f32, v);
+IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d_f32, v) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  MAP_BUFFER_2D_RO(lhs, float,
+                   /*buffer_ref=*/args->lhs_ref,
+                   /*offset=*/args->lhs_offset,
+                   /*stride0=*/args->lhs_row_stride,
+                   /*stride1=*/1,
+                   /*size0=*/args->m,
+                   /*size1=*/args->k);
+  MAP_BUFFER_2D_RO(rhs, float,
+                   /*buffer_ref=*/args->rhs_ref,
+                   /*offset=*/args->rhs_offset,
+                   /*stride0=*/args->rhs_row_stride,
+                   /*stride1=*/1,
+                   /*size0=*/args->k,
+                   /*size1=*/args->n);
+  MAP_BUFFER_2D_RW(out, float,
+                   /*buffer_ref=*/args->out_ref,
+                   /*offset=*/args->out_offset,
+                   /*stride0=*/args->out_row_stride,
+                   /*stride1=*/1,
+                   /*size0=*/args->m,
+                   /*size1=*/args->n);
+
+  // Example of using methods in the MMT4D library.
+  // Remove once any other method is available.
+  int ret = iree_mmt4d_example_matmul_f32(lhs, lhs_stride0, rhs, rhs_stride0,
+                                          out, out_stride0, args->m, args->n,
+                                          args->k, args->alpha, args->beta);
+
+  IREE_TRACE_ZONE_END(z0);
+  return ret == 0 ? iree_ok_status()
+                  : iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                     "unsupported mmt4d parameters");
+}
+
+#endif  // IREE_HAVE_MMT4D_BUILTINS
 
 //===----------------------------------------------------------------------===//
 // VM module interface implementation

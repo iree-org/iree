@@ -25,7 +25,7 @@ static iree_status_t native_import_module_add_1(
     iree_vm_stack_t* stack, iree_vm_native_function_flags_t flags,
     iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
     iree_vm_native_function_target_t target_fn, void* module,
-    void* module_state, iree_vm_execution_result_t* out_result) {
+    void* module_state) {
   // Add 1 to arg0 and return.
   int32_t arg0 = *reinterpret_cast<int32_t*>(args_storage.data);
   int32_t ret0 = arg0 + 1;
@@ -113,10 +113,8 @@ static iree_status_t RunFunction(benchmark::State& state,
     for (iree_host_size_t i = 0; i < i32_args.size(); ++i) {
       reinterpret_cast<int32_t*>(call.arguments.data)[i] = i32_args[i];
     }
-
-    iree_vm_execution_result_t result;
-    IREE_CHECK_OK(bytecode_module->begin_call(bytecode_module->self, stack,
-                                              &call, &result));
+    IREE_CHECK_OK(
+        bytecode_module->begin_call(bytecode_module->self, stack, call));
   }
   iree_vm_stack_deinitialize(stack);
 

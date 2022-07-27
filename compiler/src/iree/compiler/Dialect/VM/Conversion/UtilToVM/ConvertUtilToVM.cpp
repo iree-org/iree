@@ -53,7 +53,7 @@ struct NullOpConversion : public OpConversionPattern<IREE::Util::NullOp> {
       IREE::Util::NullOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::ConstRefZeroOp>(
-        op, IREE::VM::RefType::get(op.getType()));
+        op, getTypeConverter()->convertType(op.getType()));
     return success();
   }
 };

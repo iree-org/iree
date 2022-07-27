@@ -43,11 +43,12 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_negative.mlir"
     "dynamic_torch_index_select_scalar.mlir"
     "dynamic_torch_index_select_vector.mlir"
+    "i1_inlined_constant.mlir"
     "linalg_ops.mlir"
     "lowering_config.mlir"
     "strided_slice.mlir"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   DRIVER
     "local-task"
   COMPILER_FLAGS
@@ -60,7 +61,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "linalg_quantized_matmul_vs_linalg_matmul.mlir"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   DRIVER
     "local-task"
   COMPILER_FLAGS
@@ -79,6 +80,7 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_negative.mlir"
     "dynamic_torch_index_select_scalar.mlir"
     "dynamic_torch_index_select_vector.mlir"
+    "i1_inlined_constant.mlir"
     "linalg_ops.mlir"
     "strided_slice.mlir"
   TARGET_BACKEND
@@ -101,6 +103,7 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_negative.mlir"
     "dynamic_torch_index_select_scalar.mlir"
     "dynamic_torch_index_select_vector.mlir"
+    "i1_inlined_constant.mlir"
     "linalg_ops.mlir"
     "strided_slice.mlir"
   TARGET_BACKEND
@@ -123,6 +126,7 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_negative.mlir"
     "dynamic_torch_index_select_scalar.mlir"
     "dynamic_torch_index_select_vector.mlir"
+    "i1_inlined_constant.mlir"
     "large_reduction.mlir"
     "linalg_ops.mlir"
     "strided_slice.mlir"

@@ -17,6 +17,7 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
+#include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "tensorflow/compiler/mlir/lite/flatbuffer_import.h"
@@ -91,11 +92,19 @@ int main(int argc, char **argv) {
                                         outputArrayFlag.end());
   auto loc = mlir::FileLineColLoc::get(&context,
                                        inputFile->getBufferIdentifier(), 0, 0);
-  OwningOpRef<mlir::ModuleOp> module = tflite::FlatBufferToMlir(
-      absl::string_view(inputFile->getBufferStart(),
-                        inputFile->getBufferSize()),
-      &context, loc,
-      /*use_external_constant=*/false, inputArrays, outputArrays);
+  OwningOpRef<mlir::ModuleOp> module;
+  auto contents = absl::string_view(inputFile->getBufferStart(),
+                                    inputFile->getBufferSize());
+  if ((contents.substr(4, 4) == "TFL3")) {
+    module = tflite::FlatBufferToMlir(contents, &context, loc,
+                                      /*use_external_constant=*/false,
+                                      inputArrays, outputArrays);
+  } else {
+    module = ModuleOp::create(mlir::UnknownLoc::get(&context));
+    sourceMgr.AddNewSourceBuffer(MemoryBuffer::getMemBuffer(contents), SMLoc());
+    module = parseSourceFile<ModuleOp>(sourceMgr, &context);
+  }
+
   if (!module) {
     // Error should have emitted.
     llvm::errs() << "Unable to import TFLite FlatBuffer to MLIR Module\n";

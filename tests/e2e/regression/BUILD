@@ -27,6 +27,7 @@ BACKEND_TESTS = [
     "dynamic_torch_index_select_negative.mlir",
     "dynamic_torch_index_select_scalar.mlir",
     "dynamic_torch_index_select_vector.mlir",
+    "i1_inlined_constant.mlir",
     "linalg_ops.mlir",
     "strided_slice.mlir",
 ]
@@ -77,7 +78,7 @@ iree_check_single_backend_test_suite(
     ] + BACKEND_TESTS,
     compiler_flags = ["--iree-input-type=mhlo"],
     driver = "local-task",
-    target_backend = "dylib-llvm-aot",
+    target_backend = "llvm-cpu",
 )
 
 iree_check_single_backend_test_suite(
@@ -90,7 +91,7 @@ iree_check_single_backend_test_suite(
     ],
     compiler_flags = ["--iree-input-type=tosa"],
     driver = "local-task",
-    target_backend = "dylib-llvm-aot",
+    target_backend = "llvm-cpu",
 )
 
 iree_check_single_backend_test_suite(

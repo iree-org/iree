@@ -55,7 +55,7 @@ iree_check_single_backend_test_suite(
     "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   DRIVER
     "local-task"
   COMPILER_FLAGS
@@ -127,13 +127,19 @@ iree_check_single_backend_test_suite(
     "clamp.mlir"
     "clz.mlir"
     "const.mlir"
+    "equal.mlir"
     "exp.mlir"
     "floor.mlir"
+    "fully_connected.mlir"
+    "gather.mlir"
+    "greater.mlir"
+    "greater_equal.mlir"
     "if.mlir"
     "log.mlir"
     "logical_left_shift.mlir"
     "logical_right_shift.mlir"
     "matmul.mlir"
+    "max_pool.mlir"
     "maximum.mlir"
     "minimum.mlir"
     "mul.mlir"
@@ -144,10 +150,13 @@ iree_check_single_backend_test_suite(
     "reluN.mlir"
     "reshape.mlir"
     "rsqrt.mlir"
+    "select.mlir"
     "sigmoid.mlir"
     "sub.mlir"
+    "table.mlir"
     "tanh.mlir"
     "transpose.mlir"
+    "while.mlir"
   TARGET_BACKEND
     "vmvx"
   DRIVER

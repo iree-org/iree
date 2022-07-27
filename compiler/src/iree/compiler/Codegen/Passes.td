@@ -94,6 +94,9 @@ def OptimizeVectorTransfer :
   let summary =
       "Run optimization transformations on vector transfer operations";
   let constructor = "mlir::iree_compiler::createOptimizeVectorTransferPass()";
+  let options = [
+    Option<"optionFlatten", "flatten", "bool", "false", "Flatten the vector type of vector transfers where possible (contiguous row-major data).">
+  ];
 }
 
 
@@ -132,13 +135,6 @@ def LinalgToVectorVectorizeConv :
   let summary = "Vectorize a very specific form of linalg.conv";
   let constructor =
       "mlir::iree_compiler::createLinalgToVectorVectorizeConvPass()";
-}
-
-def LinalgToVectorVectorizeMMT4d :
-    Pass<"iree-codegen-vectorize-linalg-mmt4d", "func::FuncOp"> {
-  let summary = "Vectorize a very specific form of linalg.mmt4d";
-  let constructor =
-      "mlir::iree_compiler::createLinalgToVectorVectorizeMMT4dPass()";
 }
 
 def TensorToVectorVectorizePad :

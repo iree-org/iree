@@ -24,6 +24,10 @@ struct StructField {
   std::string name;
 };
 
+Value addressOf(OpBuilder builder, Location location, Value operand);
+
+Value contentsOf(OpBuilder builder, Location location, Value operand);
+
 Value arrayElementAddress(OpBuilder builder, Location location, Type type,
                           IntegerAttr index, Value operand);
 

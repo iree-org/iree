@@ -1,0 +1,264 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+env:
+  BUCKET: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts
+
+jobs:
+  build_runtime:
+    runs-on: ubuntu-20.04
+    env:
+      BUILD_DIR: build-runtime
+    outputs:
+      # Pass through the build directory as output so it's available to
+      # dependent jobs.
+      build-dir: ${{ env.BUILD_DIR }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        with:
+          submodules: true
+      - name: "Building runtime"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
+            ./build_tools/cmake/build_runtime.sh \
+            "${BUILD_DIR}"
+      # Using a tar archive is necessary to preserve file permissions. See
+      # https://github.com/actions/upload-artifact#maintaining-file-permissions-and-case-sensitive-files
+      # The upload action already does its own gzip compression, so no need to
+      # do our own.
+      - name: "Create build dir archive"
+        run: tar -cf ${BUILD_DIR}.tar ${BUILD_DIR}
+      - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8  # v3.1.0
+        with:
+          name: "${{ env.BUILD_DIR }}.tar"
+          path: "${{ env.BUILD_DIR }}.tar"
+
+  test_runtime:
+    needs: build_runtime
+    runs-on: ubuntu-20.04
+    env:
+      BUILD_DIR: ${{ needs.build_runtime.outputs.build-dir }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        with:
+          submodules: true
+      - name: "Downloading runtime build directory"
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
+        with:
+          name: "${{ env.BUILD_DIR }}.tar"
+      - name: "Extracting archive"
+        run: tar -xf ${BUILD_DIR}.tar
+      - name: "Testing runtime"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env IREE_VULKAN_DISABLE=1 \
+            gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
+            ./build_tools/cmake/ctest_all.sh \
+            "${BUILD_DIR}"
+
+  build_all:
+    runs-on:
+      # self-hosted has to be listed first. See
+      # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
+      - self-hosted
+      # Have to do a weird hack to get a pseudo-ternary operator. See
+      # https://github.com/actions/runner/issues/409. To make matters worse, we
+      # have to repeat this everywhere because GitHub actions don't have
+      # variables or even support normal yaml anchors (they are specially
+      # disabled because...reasons?):
+      # See https://github.com/github-community/community/discussions/4501
+      # https://github.community/t/support-for-yaml-anchors/16128/92
+      # https://github.com/actions/runner/issues/1182
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: full-build-dir
+    outputs:
+      # Pass through the build directory as output so it's available to
+      # dependent jobs.
+      build-dir: ${{ env.BUILD_DIR }}
+      build-dir-archive: ${{ steps.archive.outputs.build-dir-archive }}
+      gcs-artifact: ${{ steps.upload.outputs.gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        with:
+          submodules: true
+      - name: "Building IREE"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
+            ./build_tools/cmake/build_all.sh \
+            "${BUILD_DIR}"
+      # Things get more complicated here than when we're just building the
+      # runtime. The build directory is way bigger. We're also using on our own
+      # runners on GCE. So uploading to GitHub actions artifact storage hosted
+      # on Azure is dirt slow. We drop static libraries and object files, which
+      # aren't needed for testing. Then we do some minimal compression locally
+      # *in parallel* and upload to GCS. This can be further optimized.
+      # Especially decompression is still pretty slow. See #9881.
+      - name: "Creating build dir archive"
+        id: archive
+        env:
+          BUILD_DIR_ARCHIVE: ${{ env.BUILD_DIR }}.tar.xz
+        run: |
+          tar --exclude '*.a' --exclude '*.o' \
+            -I 'xz -3 -T0' \
+            -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
+          echo "::set-output name=build-dir-archive::${BUILD_DIR_ARCHIVE}"
+      - name: "Uploading build dir archive"
+        id: upload
+        env:
+          GCS_ARTIFACT: ${{ env.BUCKET }}/${{ github.sha }}/${{ steps.archive.outputs.build-dir-archive }}
+          BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
+        run: |
+          gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${GCS_ARTIFACT}"
+          echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
+
+  test_all:
+    needs: build_all
+    runs-on:
+      # self-hosted has to be listed first. See
+      # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
+      - self-hosted
+      # Have to do a weird hack to get a pseudo-ternary operator. See
+      # https://github.com/actions/runner/issues/409. To make matters worse, we
+      # have to repeat this everywhere because GitHub actions don't have
+      # variables or even support normal yaml anchors (they are specially
+      # disabled because...reasons?):
+      # See https://github.com/github-community/community/discussions/4501
+      # https://github.community/t/support-for-yaml-anchors/16128/92
+      # https://github.com/actions/runner/issues/1182
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        with:
+          submodules: true
+      - name: "Downloading build dir archive"
+        run: gcloud alpha storage cp "${GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}"
+      - name: "Testing all"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env IREE_CUDA_DISABLE=1 \
+            gcr.io/iree-oss/swiftshader@sha256:542de3bac7f6173add3651f75c4c681f4a8e2d23815332dd82afe85c7d598445 \
+            ./build_tools/cmake/ctest_all.sh \
+            "${BUILD_DIR}"
+
+  tsan:
+    runs-on:
+      # self-hosted has to be listed first. See
+      # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
+      - self-hosted
+      # Have to do a weird hack to get a pseudo-ternary operator. See
+      # https://github.com/actions/runner/issues/409. To make matters worse, we
+      # have to repeat this everywhere because GitHub actions don't have
+      # variables or even support normal yaml anchors (they are specially
+      # disabled because...reasons?):
+      # See https://github.com/github-community/community/discussions/4501
+      # https://github.community/t/support-for-yaml-anchors/16128/92
+      # https://github.com/actions/runner/issues/1182
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - cpu
+      - os-family=Linux
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        with:
+          submodules: true
+      - name: "Building and testing with ThreadSanitizer"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
+            ./build_tools/cmake/build_and_test_tsan.sh
+
+  host_tools_assertions:
+    uses: ./.github/workflows/host_tools.yml
+    with:
+      host-binary-root: host-tools-assertions
+      enable-assertions: "ON"
+
+  riscv32:
+    needs: host_tools_assertions
+    runs-on:
+      # self-hosted has to be listed first. See
+      # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
+      - self-hosted
+      # Have to do a weird hack to get a pseudo-ternary operator. See
+      # https://github.com/actions/runner/issues/409. To make matters worse, we
+      # have to repeat this everywhere because GitHub actions don't have
+      # variables or even support normal yaml anchors (they are specially
+      # disabled because...reasons?):
+      # See https://github.com/github-community/community/discussions/4501
+      # https://github.community/t/support-for-yaml-anchors/16128/92
+      # https://github.com/actions/runner/issues/1182
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_RISCV_DIR: "build-riscv-rv32-baremetal"
+      RISCV_CONFIG: "rv32-baremetal"
+      HOST_BINARY_ROOT: ${{ needs.host_tools_assertions.outputs.host-binary-root }}
+      HOST_BINARY_ARCHIVE: ${{ needs.host_tools_assertions.outputs.host-binary-root }}.tar
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        with:
+          submodules: true
+      - name: "Downloading host tools"
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
+        with:
+          name: "${{ env.HOST_BINARY_ARCHIVE }}"
+      - name: "Extracting host tools archive"
+        run: |
+          tar -xvf ${HOST_BINARY_ARCHIVE}
+      - name: "Cross-compiling and testing riscv32"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "RISCV_CONFIG=${RISCV_CONFIG}" \
+            --env "BUILD_RISCV_DIR=${BUILD_RISCV_DIR}" \
+            --env "IREE_HOST_BINARY_ROOT=${HOST_BINARY_ROOT}" \
+            gcr.io/iree-oss/riscv@sha256:e566f054ff1b1d8be61459ce4789dd944b70e85c8939a4d3b7331ab519d8db4c \
+            bash -c \
+            "./build_tools/cmake/build_riscv.sh && build_tools/kokoro/gcp_ubuntu/cmake/baremetal/riscv32/test.sh"
+
+  summary:
+    runs-on: ubuntu-20.04
+    needs:
+      - build_runtime
+      - test_runtime
+      - build_all
+      - test_all
+      - host_tools_assertions
+      - tsan
+      - riscv32
+    if: always()
+    steps:
+      - name: Getting combined job status
+        run: |
+          echo '${{ toJson(needs.*.result) }}' \
+            | jq --exit-status 'all(.=="success")' > /dev/null

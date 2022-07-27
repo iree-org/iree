@@ -40,11 +40,11 @@ class CompilerTest(unittest.TestCase):
     self.assertTrue(binary)
 
   # Compiling the string form means that the compiler does not have a valid
-  # source file name, which can cause issues on the AOT side. Verify
-  # specifically. See: https://github.com/iree-org/iree/issues/4439
-  def testCompileStrLLVMAOT(self):
+  # source file name, which can cause issues. Verify specifically.
+  # See: https://github.com/iree-org/iree/issues/4439
+  def testCompileStrLLVMCPU(self):
     binary = iree.compiler.tools.compile_str(SIMPLE_MUL_ASM,
-                                             target_backends=["dylib-llvm-aot"])
+                                             target_backends=["llvm-cpu"])
     logging.info("Flatbuffer size = %d", len(binary))
     self.assertTrue(binary)
 
@@ -53,8 +53,7 @@ class CompilerTest(unittest.TestCase):
   # See: https://github.com/iree-org/iree/issues/4436
   def testCompileMultipleBackends(self):
     binary = iree.compiler.tools.compile_str(
-        SIMPLE_MUL_ASM,
-        target_backends=["dylib-llvm-aot", "vulkan-spirv"])
+        SIMPLE_MUL_ASM, target_backends=["llvm-cpu", "vulkan-spirv"])
     logging.info("Flatbuffer size = %d", len(binary))
     self.assertTrue(binary)
 

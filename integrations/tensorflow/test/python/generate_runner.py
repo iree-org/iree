@@ -7,7 +7,7 @@
 # Generates a ".run" file in the corresponding test tree for a file under
 # this directory. This is a convenience for bootstrapping new test files.
 # Usage:
-#   python generate_runner.py llvmaot "--target_backends=iree_llvmaot" \
+#   python generate_runner.py llvmcpu "--target_backends=iree_llvmcpu" \
 #     iree_tf_tests/uncategorized/batch_norm_test.py[:batch_norm_alias]
 #
 # The first argument is the lit feature that this test is gated on and will

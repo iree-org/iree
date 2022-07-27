@@ -79,7 +79,7 @@ function(iree_bytecode_module)
     # Note: --iree-llvm-system-linker-path is left unspecified.
   endif()
 
-  if(IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER)
+  if(IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
     list(APPEND _ARGS "--iree-llvm-link-embedded=false")
   endif()
 

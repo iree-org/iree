@@ -697,8 +697,6 @@ def VM_GlobalLoadRefOp : VM_GlobalLoadOp<VM_AnyRef, "global.load.ref", [
     VM_EncTypeOf<"value">,
     VM_EncResult<"value">,
   ];
-
-  let hasCanonicalizer = 1;
 }
 
 def VM_GlobalStoreRefOp : VM_GlobalStoreOp<VM_AnyRef, "global.store.ref"> {
@@ -3738,7 +3736,6 @@ def VM_FailOp : VM_Op<"fail", [
 }
 
 def VM_CondFailOp : VM_Op<"cond_fail", [
-    HasParent<"IREE::VM::FuncOp">,
     VM_PseudoOp,
   ]> {
   let summary = [{raises a global failure if the condition is true}];

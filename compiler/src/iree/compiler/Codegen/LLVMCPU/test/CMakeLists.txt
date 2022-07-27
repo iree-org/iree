@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "aarch64_dotprod_vector_lowering.mlir"
     "aarch64_vector_lowering.mlir"
     "apply_scale_lowering.mlir"
     "check_ir_before_llvm_conversion.mlir"
@@ -33,6 +34,7 @@ iree_lit_test_suite(
     "test_config_mmt4d.mlir"
     "transform_dialect_bufferize.mlir"
     "transpose_avx2_lowering.mlir"
+    "triple_tiling_expert_pipeline.mlir"
     "unfused_fma.mlir"
     "vector_contract_to_arm_asm.mlir"
     "vector_contract_to_arm_intrinsics.mlir"

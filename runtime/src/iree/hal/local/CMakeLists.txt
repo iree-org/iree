@@ -71,6 +71,25 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    executable_loader
+  HDRS
+    "executable_loader.h"
+    "local_executable.h"
+  SRCS
+    "executable_loader.c"
+    "local_executable.c"
+  DEPS
+    ::executable_environment
+    ::executable_library
+    iree::base
+    iree::base::internal
+    iree::base::tracing
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     local
   HDRS
     "executable_loader.h"
@@ -81,11 +100,9 @@ iree_cc_library(
     "local_executable_cache.h"
     "local_executable_layout.h"
   SRCS
-    "executable_loader.c"
     "inline_command_buffer.c"
     "local_descriptor_set.c"
     "local_descriptor_set_layout.c"
-    "local_executable.c"
     "local_executable_cache.c"
     "local_executable_layout.c"
   DEPS

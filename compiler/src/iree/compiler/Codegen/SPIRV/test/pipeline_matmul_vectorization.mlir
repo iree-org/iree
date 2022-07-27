@@ -45,7 +45,7 @@ hal.executable private @fuse_and_vectorize_fill_matmul {
 //      CHECK-NOT:   spv.Load "StorageBuffer"
 //          CHECK:   spv.mlir.loop
 //  CHECK-COUNT-8:   spv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
-// CHECK-COUNT-16:   spv.GLSL.Fma %{{.*}}, %{{.*}} : vector<4xf32>
+// CHECK-COUNT-16:   spv.GL.Fma %{{.*}}, %{{.*}} : vector<4xf32>
 //  CHECK-COUNT-4:   spv.Store "StorageBuffer" %{{.*}}, %{{.*}} : vector<4xf32>
 
 // -----
@@ -105,7 +105,7 @@ hal.executable private @fuse_and_vectorize_matmul_add {
 //      CHECK-NOT:   spv.Load "StorageBuffer"
 //          CHECK:   spv.mlir.loop
 //  CHECK-COUNT-8:     spv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
-// CHECK-COUNT-16:     spv.GLSL.Fma %{{.*}}, %{{.*}} : vector<4xf32>
+// CHECK-COUNT-16:     spv.GL.Fma %{{.*}}, %{{.*}} : vector<4xf32>
 //          CHECK:   spv.mlir.merge
 //  CHECK-COUNT-4:   spv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
 //      CHECK-NOT:   spv.Load "StorageBuffer"

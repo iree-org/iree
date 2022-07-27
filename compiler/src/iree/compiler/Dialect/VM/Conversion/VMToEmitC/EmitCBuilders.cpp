@@ -13,6 +13,33 @@ namespace mlir {
 namespace iree_compiler {
 namespace emitc_builders {
 
+Value addressOf(OpBuilder builder, Location location, Value operand) {
+  auto ctx = builder.getContext();
+
+  return builder
+      .create<emitc::ApplyOp>(
+          /*location=*/location,
+          /*result=*/emitc::PointerType::get(operand.getType()),
+          /*applicableOperator=*/StringAttr::get(ctx, "&"),
+          /*operand=*/operand)
+      .getResult();
+}
+
+Value contentsOf(OpBuilder builder, Location location, Value operand) {
+  auto ctx = builder.getContext();
+
+  Type type = operand.getType();
+  assert(type.isa<emitc::PointerType>());
+
+  return builder
+      .create<emitc::ApplyOp>(
+          /*location=*/location,
+          /*result=*/type.cast<emitc::PointerType>().getPointee(),
+          /*applicableOperator=*/StringAttr::get(ctx, "*"),
+          /*operand=*/operand)
+      .getResult();
+}
+
 Value arrayElementAddress(OpBuilder builder, Location location, Type type,
                           IntegerAttr index, Value operand) {
   auto ctx = builder.getContext();

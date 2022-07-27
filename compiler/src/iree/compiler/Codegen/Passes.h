@@ -101,16 +101,13 @@ createConvertToDestinationPassingStylePass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgToVectorVectorizeConvPass();
 
-/// Creates a pass to vectorize a very specific form of linalg.conv ops.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLinalgToVectorVectorizeMMT4dPass();
-
 /// Creates a pass to vectorize a very specific form of tensor.pad ops with
 /// control flows.
 std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
 
 /// Pass to optimize vector transfer_read and transfer_write.
-std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass(
+    bool flatten = false);
 
 /// Pass to test Partitionable loop interface
 std::unique_ptr<OperationPass<void>>
@@ -127,9 +124,6 @@ createRewriteLinalgDestructiveUpdatesPass();
 
 /// Pass to propagate type to avoid generating load/stores of illegal types.
 std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass();
-
-/// Pass to optimize vector transfer_read and transfer_write.
-std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass();
 
 /// Pass to convert math operations to their polynomial approximation.
 std::unique_ptr<OperationPass<>> createPolynomialApproximationPass();
@@ -173,10 +167,6 @@ void populateFoldAffineMinInDistributedLoopsPatterns(
 /// Co is a multiple of 4, and filter shape must be 1x1x4xCo.
 void populateLinalgToVectorVectorizeConvPatterns(MLIRContext *context,
                                                  RewritePatternSet &patterns);
-
-/// Populates `patterns` to convert linalg.mmt4d to vector.contract.
-void populateLinalgToVectorVectorizeMMT4dPatterns(MLIRContext *context,
-                                                  RewritePatternSet &patterns);
 
 /// Populates `patterns` with patterns that vectorize tensor.pad with static
 /// result shape by generating control flows to guard against vector transfer
@@ -273,9 +263,9 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize = {});
-void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
-                                       bool enablePeeling,
-                                       bool lowerToAVX2 = false);
+void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
+                                      int64_t numLevels, bool enablePeeling,
+                                      bool lowerToAVX2 = false);
 void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager);
 
 // Populates the passes needed to do tiling, decomposing, and vectorizing the

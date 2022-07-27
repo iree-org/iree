@@ -27,21 +27,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-static llvm::CodeGenOpt::Level passBuilderOptLevelToCodeGenOptLevel(
-    const llvm::OptimizationLevel &level) {
-  switch (level.getSpeedupLevel()) {
-    case 0:
-      return llvm::CodeGenOpt::None;
-    case 1:
-      return llvm::CodeGenOpt::Less;
-    case 2:
-    default:
-      return llvm::CodeGenOpt::Default;
-    case 3:
-      return llvm::CodeGenOpt::Aggressive;
-  }
-}
-
 std::unique_ptr<llvm::TargetMachine> createTargetMachine(
     const LLVMTargetOptions &targetOptions) {
   std::string errorMessage;
@@ -52,7 +37,7 @@ std::unique_ptr<llvm::TargetMachine> createTargetMachine(
       targetOptions.targetTriple, targetOptions.targetCPU /* cpu e.g k8*/,
       targetOptions.targetCPUFeatures /* cpu features e.g avx512fma*/,
       targetOptions.options, llvm::Reloc::Model::PIC_, {},
-      passBuilderOptLevelToCodeGenOptLevel(targetOptions.optLevel),
+      targetOptions.codeGenOptLevel,
       /*JIT=*/false));
   return machine;
 }
@@ -107,11 +92,11 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
     } break;
   }
 
-  if (options.optLevel != llvm::OptimizationLevel::O0 ||
+  if (options.optimizerOptLevel != llvm::OptimizationLevel::O0 ||
       options.sanitizerKind != SanitizerKind::kNone) {
     llvm::ModulePassManager modulePassManager;
     modulePassManager =
-        passBuilder.buildPerModuleDefaultPipeline(options.optLevel);
+        passBuilder.buildPerModuleDefaultPipeline(options.optimizerOptLevel);
     modulePassManager.run(*module, moduleAnalysisManager);
   }
 

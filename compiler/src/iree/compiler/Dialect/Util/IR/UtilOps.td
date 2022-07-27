@@ -273,6 +273,33 @@ def Util_AlignOp : Util_PureOp<"align", [
   let hasFolder = 1;
 }
 
+def Util_SizeOfOp : Util_PureOp<"sizeof"> {
+  let summary = [{returns the size in bytes of a datatype}];
+  let description = [{
+    Most datatypes have a static size at all layers of the compilation stack.
+    However, those that only have a size for certain lowering flows can be
+    challenging. This op represents such sizes in a way that can be specialized
+    later.
+
+    Returns the size in bytes, rounded up to the next whole byte of the
+    specified type. This op will fold to a constant index value for IntegerType
+    and FloatType. All others are not folded.
+  }];
+
+  let arguments = (ins
+    TypeAttr:$sizedType
+  );
+  let results = (outs
+    Index:$size
+  );
+
+  let assemblyFormat = [{
+    $sizedType attr-dict-with-keyword
+  }];
+
+  let hasFolder = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Compiler hints
 //===----------------------------------------------------------------------===//
@@ -856,6 +883,7 @@ def Util_BufferSubspanOp : Util_PureOp<"buffer.subspan", [
     Value getSubrangeResourceSize() { return getSourceSize(); }
     Value getSubrangeOffset() { return getSourceOffset(); }
     Value getSubrangeLength() { return getResultSize(); }
+    Value getSubrangeResult() { return getResult(); }
 
     // Walks up the use-def chain to find a subspan op that feeds into |value|.
     static IREE::Util::BufferSubspanOp findSubspanOp(Value value);

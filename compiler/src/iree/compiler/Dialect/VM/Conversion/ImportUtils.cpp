@@ -140,16 +140,23 @@ static std::string makeSafeIdentifier(StringRef unsafeIdentifier) {
                       llvm::hash_value(unsafeIdentifier)));
 }
 
-// Creates a module-level vm.rodata containing the string contents and returns
-// the dereferenced byte buffer.
-static Value createStringTableValue(Location loc, StringAttr attrValue,
-                                    Type inputType,
-                                    ConversionPatternRewriter &rewriter) {
+size_t getSegmentSpanSize(Type spanType) {
+  if (auto tupleType = spanType.dyn_cast<TupleType>()) {
+    return tupleType.size();
+  } else {
+    return 1;
+  }
+}
+
+}  // namespace detail
+
+Value createStringTableValue(Location loc, StringAttr attrValue, Type inputType,
+                             OpBuilder &builder) {
   auto stringValue = attrValue.getValue();
 
   // Make an identifier-friendly version of the string so that the value is
   // more readable in IR (so "I'm some string" becomes "im_some_string", etc).
-  auto safeIdentifier = makeSafeIdentifier(stringValue);
+  auto safeIdentifier = detail::makeSafeIdentifier(stringValue);
 
   // Encode the string value bytes into an elements attr as UTF-8 bytes.
   SmallVector<APInt, 16> stringBytes(stringValue.size());
@@ -158,24 +165,18 @@ static Value createStringTableValue(Location loc, StringAttr attrValue,
   }
   auto utf8Bytes = DenseIntElementsAttr::get(
       VectorType::get({static_cast<int64_t>(stringBytes.size())},
-                      rewriter.getIntegerType(8)),
+                      builder.getIntegerType(8)),
       stringBytes);
 
   // Embed the UTF-8 bytes as a vm.rodata blob.
-  return rewriter.create<IREE::VM::RodataInlineOp>(
+  return builder.create<IREE::VM::RodataInlineOp>(
       loc,
-      IREE::VM::RefType::get(IREE::VM::BufferType::get(rewriter.getContext())),
-      rewriter.getStringAttr(safeIdentifier), utf8Bytes,
-      /*alignment=*/rewriter.getI64IntegerAttr(1));
+      IREE::VM::RefType::get(IREE::VM::BufferType::get(builder.getContext())),
+      builder.getStringAttr(safeIdentifier), utf8Bytes,
+      /*alignment=*/builder.getI64IntegerAttr(1));
 }
 
-size_t getSegmentSpanSize(Type spanType) {
-  if (auto tupleType = spanType.dyn_cast<TupleType>()) {
-    return tupleType.size();
-  } else {
-    return 1;
-  }
-}
+namespace detail {
 
 Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     Location loc, Attribute attrValue, Type inputType,

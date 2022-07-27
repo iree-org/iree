@@ -189,7 +189,7 @@ static void addSPIRVLoweringPasses(OpPassManager &pm) {
   spirvPM.addPass(spirv::createLowerABIAttributesPass());
   spirvPM.addPass(createCanonicalizerPass());
   spirvPM.addPass(createCSEPass());
-  spirvPM.addPass(spirv::createCanonicalizeGLSLPass());
+  spirvPM.addPass(spirv::createCanonicalizeGLPass());
   spirvPM.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 }
 

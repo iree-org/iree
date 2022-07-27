@@ -15,7 +15,6 @@
 #include "iree/hal/api.h"
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/local_executable.h"
-#include "iree/hal/local/local_executable_layout.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_static_executable_t
@@ -32,7 +31,7 @@ typedef struct iree_hal_static_executable_t {
     const iree_hal_executable_library_v0_t* v0;
   } library;
 
-  iree_hal_local_executable_layout_t* layouts[];
+  iree_hal_executable_layout_t* layouts[];
 } iree_hal_static_executable_t;
 
 static const iree_hal_local_executable_vtable_t

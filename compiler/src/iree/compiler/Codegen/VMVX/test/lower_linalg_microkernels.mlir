@@ -116,3 +116,21 @@ func.func @addf2d_rank_broadcast(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf3
   }
   func.return
 }
+
+// CHECK-LABEL: @addf0d
+//   CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
+//   CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
+//   CHECK-DAG: %[[C2:.*]] = arith.constant 2 : index
+//   CHECK-DAG: %[[ARG1_1D:.*]] = memref.expand_shape %arg1 [] : memref<f32> into memref<1xf32>
+//       CHECK: vmvx.add lhs(%[[ARG1_1D]] offset %[[C0]] strides[%[[C0]], %[[C0]]] : memref<1xf32>)
+//  CHECK-SAME: rhs(%arg0 offset %c0 strides[%[[C0]], %[[C1]]] : memref<2xf32>)
+//  CHECK-SAME: out(%arg0 offset %[[C0]] strides[%[[C0]], %[[C1]]] : memref<2xf32>) sizes(%[[C1]], %[[C2]]) : f32
+func.func @addf0d(%arg0 : memref<2xf32>, %arg1 : memref<f32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0) -> ()>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
+    ins(%arg1 : memref<f32>) outs(%arg0 : memref<2xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    %12 = arith.addf %arg2, %arg3 : f32
+    linalg.yield %12 : f32
+  }
+  func.return
+}

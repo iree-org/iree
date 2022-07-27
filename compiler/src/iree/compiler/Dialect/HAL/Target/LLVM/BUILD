@@ -14,7 +14,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT IREE_TARGET_BACKEND_DYLIB_LLVM_AOT AND NOT IREE_TARGET_BACKEND_WASM_LLVM_AOT)
+if(NOT IREE_TARGET_BACKEND_LLVM_CPU)
   return()
 endif()
 """,
@@ -23,11 +23,11 @@ endif()
 iree_compiler_cc_library(
     name = "LLVM",
     srcs = [
-        "LLVMAOTTarget.cpp",
+        "LLVMCPUTarget.cpp",
         "LibraryBuilder.cpp",
     ],
     hdrs = [
-        "LLVMAOTTarget.h",
+        "LLVMCPUTarget.h",
         "LibraryBuilder.h",
     ],
     deps = [

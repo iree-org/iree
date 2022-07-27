@@ -57,6 +57,17 @@ static llvm::cl::opt<bool> clEnableMicrokernels(
 extern llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName;
 
 //===---------------------------------------------------------------------===//
+// Default Linalg code generation options for CPU backend
+//===---------------------------------------------------------------------===//
+
+struct LinalgCPUVectorLoweringPassOptions : LinalgVectorLoweringPassOptions {
+  LinalgCPUVectorLoweringPassOptions() : LinalgVectorLoweringPassOptions() {
+    lowerVectorTransposeTo = "shuffle";
+    lowerVectorMultiReductionTo = "innerreduction";
+  }
+};
+
+//===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
 //===---------------------------------------------------------------------===//
 
@@ -239,7 +250,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
   // Add the vector lowering expert.
   {
     OpPassManager &nestedFuncPassManager = nestedModulePM.nest<func::FuncOp>();
-    LinalgVectorLoweringPassOptions options;
+    LinalgCPUVectorLoweringPassOptions options;
     options.splitVectorTransfersTo = "linalg-copy";
     addLowerToVectorTransforms(nestedFuncPassManager, options);
   }
@@ -331,7 +342,7 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
   // Add the vector lowering expert.
   {
     OpPassManager &nestedFuncPassManager = nestedModulePM.nest<func::FuncOp>();
-    LinalgVectorLoweringPassOptions options;
+    LinalgCPUVectorLoweringPassOptions options;
     options.splitVectorTransfersTo = "linalg-copy";
     addLowerToVectorTransforms(nestedFuncPassManager, options);
   }
@@ -359,31 +370,24 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager) {
   }
 }
 
-void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
-                                       bool enablePeeling, bool lowerToAVX2) {
+void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
+                                      int64_t numLevels, bool enablePeeling,
+                                      bool lowerToAVX2) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  // Run LinalgFusePass firstly in case that we have fill + matmul + generic
-  // ops. At this stage, we do not apply vectorization. The reduction dim won't
-  // get tiled if the case is matmul + generic op. In this case, we have to tile
-  // along reduction dim again, which needs them to be Linalg ops form.
   {
     LinalgFusePassOptions options;
-    options.tilingLevel =
-        static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
-    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+    for (int64_t i = 1; i < numLevels; ++i) {
+      options.tilingLevel = i;
+      nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
+    }
   }
 
-  // Add the sandbox single tiling expert to tile and vectorize.
   {
     LinalgSingleTilingExpertPassOptions options;
     options.peel = enablePeeling;
     options.vectorize = true;
-    options.tilingLevel =
-        static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -399,7 +403,7 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
   // Add the vector lowering expert.
   {
     OpPassManager &nestedFuncPassManager = nestedModulePM.nest<func::FuncOp>();
-    LinalgVectorLoweringPassOptions options;
+    LinalgCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
     addLowerToVectorTransforms(nestedFuncPassManager, options);
@@ -453,7 +457,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
+      createOptimizeVectorTransferPass(/*flatten=*/true));
 
   // Run IREE specific passes before vector lowering expert.
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -462,7 +466,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
   // Add the vector lowering expert.
   {
     OpPassManager &nestedFuncPassManager = nestedModulePM.nest<func::FuncOp>();
-    LinalgVectorLoweringPassOptions options;
+    LinalgCPUVectorLoweringPassOptions options;
     options.splitVectorTransfersTo = "shuffle";
     addLowerToVectorTransforms(nestedFuncPassManager, options);
   }
@@ -487,11 +491,6 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
         createLinalgSingleTilingExpertPass(options));
   }
 
-  // Apply op specific vectorization and then general vectorization.
-  // TODO(bjacob): Retire LinalgToVectorVectorizeMMT4d pass and use upstream
-  // vectorization patterns.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLinalgToVectorVectorizeMMT4dPass());
   {
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
@@ -504,7 +503,7 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUAArch64VectorLoweringPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
+      createOptimizeVectorTransferPass(/*flatten=*/true));
 }
 
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {

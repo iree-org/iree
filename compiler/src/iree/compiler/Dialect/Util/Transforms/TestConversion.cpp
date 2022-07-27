@@ -24,8 +24,10 @@ namespace Util {
 namespace {
 
 class TestConversionPass
-    : public PassWrapper<TestConversionPass, OperationPass<void>> {
+    : public PassWrapper<TestConversionPass, OperationPass<ModuleOp>> {
  public:
+  TestConversionPass() = default;
+  TestConversionPass(const TestConversionPass &) {}
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TestConversionPass)
 
   StringRef getArgument() const override { return "iree-util-test-conversion"; }
@@ -42,13 +44,23 @@ class TestConversionPass
 
   void runOnOperation() override {
     auto *context = &getContext();
-
     ConversionTarget conversionTarget(*context);
     conversionTarget.addLegalDialect<arith::ArithmeticDialect>();
     conversionTarget.addLegalDialect<IREE::Util::UtilDialect>();
+    conversionTarget.addLegalOp<UnrealizedConversionCastOp>();
 
     TypeConverter typeConverter;
     typeConverter.addConversion([](Type type) { return type; });
+    if (widenIntegers) {
+      // Promote all integers < 32bit to 32bit to test type conversion on
+      // for tests that are sensitive to that.
+      typeConverter.addConversion([](IntegerType type) {
+        if (type.getWidth() < 32) {
+          return IntegerType::get(type.getContext(), 32);
+        }
+        return type;
+      });
+    }
 
     RewritePatternSet patterns(&getContext());
     populateUtilConversionPatterns(context, conversionTarget, typeConverter,
@@ -64,11 +76,15 @@ class TestConversionPass
       return signalPassFailure();
     }
   }
+
+  Option<bool> widenIntegers{
+      *this, "widen-integers",
+      llvm::cl::desc("Tests type conversion by widening integers to i32")};
 };
 
 }  // namespace
 
-std::unique_ptr<OperationPass<void>> createTestConversionPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createTestConversionPass() {
   return std::make_unique<TestConversionPass>();
 }
 

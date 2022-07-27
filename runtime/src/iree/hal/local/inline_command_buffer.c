@@ -405,7 +405,8 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
   iree_hal_local_executable_layout_t* local_layout =
-      local_executable->executable_layouts[entry_point];
+      (iree_hal_local_executable_layout_t*)
+          local_executable->executable_layouts[entry_point];
   iree_host_size_t local_memory_size =
       local_executable->dispatch_attrs
           ? local_executable->dispatch_attrs[entry_point].local_memory_pages *
