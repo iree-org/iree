@@ -6,7 +6,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Checks that Cuda is working correctly and logs some useful information
+# Checks that CUDA is working correctly and logs some useful information
 
 set -x
 
