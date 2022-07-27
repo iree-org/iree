@@ -175,6 +175,7 @@ jobs:
             "${BUILD_DIR}"
 
   test_gpu:
+    if: github.event_name != 'pull_request'
     needs: build_all
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
@@ -286,4 +287,4 @@ jobs:
       - name: Getting combined job status
         run: |
           echo '${{ toJson(needs.*.result) }}' \
-            | jq --exit-status 'all(.=="success")' > /dev/null
+            | jq --exit-status 'all(.=="success" or .=="skipped")' > /dev/null
