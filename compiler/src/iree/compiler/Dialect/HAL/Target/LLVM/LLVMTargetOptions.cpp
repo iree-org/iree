@@ -47,10 +47,9 @@ LLVMTargetOptions getDefaultLLVMTargetOptions() {
     // LLVM SLP Auto vectorizer.
     targetOptions.pipelineTuningOptions.SLPVectorization = false;
 
-    // LLVM optimization levels.
+    // LLVM optimization level.
     // TODO(benvanik): add an option for this.
-    targetOptions.optimizerOptLevel = llvm::OptimizationLevel::O2;
-    targetOptions.codeGenOptLevel = llvm::CodeGenOpt::Aggressive;
+    targetOptions.optLevel = llvm::OptimizationLevel::O2;
     targetOptions.options.FloatABIType = llvm::FloatABI::Hard;
 
     // Force `-ffunction-sections` so we can strip unused code.

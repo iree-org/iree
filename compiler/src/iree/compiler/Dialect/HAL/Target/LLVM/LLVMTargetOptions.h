@@ -30,10 +30,7 @@ struct LLVMTargetOptions {
   std::string targetCPUFeatures;
 
   llvm::PipelineTuningOptions pipelineTuningOptions;
-  // Optimization level to be used by the LLVM optimizer (middle-end).
-  llvm::OptimizationLevel optimizerOptLevel;
-  // Optimization level to be used by the LLVM code generator (back-end).
-  llvm::CodeGenOpt::Level codeGenOptLevel;
+  llvm::OptimizationLevel optLevel;
   llvm::TargetOptions options;
 
   // Include debug information in output files (PDB, DWARF, etc).
