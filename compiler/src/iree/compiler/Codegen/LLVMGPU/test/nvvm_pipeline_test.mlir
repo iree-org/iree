@@ -852,7 +852,7 @@ hal.executable @mma_fused_fp16 {
 //     CHECK-LABEL: hal.executable public @pooling_dynamic
 //           CHECK:   hal.executable.variant public @cuda
 
-// // -----
+// -----
 
 #map0 = affine_map<()[s0, s1] -> (s0 * s1)>
 #map1 = affine_map<(d0)[s0] -> (s0, -d0 + 16384)>
@@ -906,3 +906,67 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:     nvvm.barrier0
 //         CHECK:     llvm.load {{.*}} : !llvm.ptr<vector<8xf32>, 3>
 //         CHECK:     "llvm.intr.vector.reduce.fadd"(%{{.*}}, %{{.*}}) {reassoc = false} : (f32, vector<8xf32>) -> f32
+
+// -----
+
+#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
+#map4 = affine_map<(d0, d1) -> (d0)>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable @warp_reduction_broadcast_dispatch {
+hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.export @warp_reduction_broadcast_dispatch layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+  builtin.module {
+    func.func @warp_reduction_broadcast_dispatch() {
+      %c0 = arith.constant 0 : index
+      %c1024 = arith.constant 1024 : index
+      %cst_0 = arith.constant 3.840000e+02 : f32
+      %cst = arith.constant 1.000000e+00 : f32
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:512x1024xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:512x1024xf32>
+      %5 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [512, 1024], strides = [1, 1]
+          : !flow.dispatch.tensor<readonly:512x1024xf32> -> tensor<512x1024xf32>
+      %8 = linalg.init_tensor [512] : tensor<512xf32>
+      %9 = linalg.fill ins(%cst : f32) outs(%8 : tensor<512xf32>) -> tensor<512xf32>
+      %10 = linalg.generic {
+          indexing_maps = [#map3, #map4], iterator_types = ["parallel", "reduction"]}
+          ins(%5 : tensor<512x1024xf32>) outs(%9 : tensor<512xf32>) {
+        ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
+          %11 = arith.addf %arg1, %arg2 : f32
+          linalg.yield %11 : f32
+        } -> tensor<512xf32>
+      %i = linalg.init_tensor [512, 1024] : tensor<512x1024xf32>
+      %11 = linalg.generic {
+        indexing_maps = [#map4, #map3], iterator_types = ["parallel", "parallel"]}
+        ins(%10 : tensor<512xf32>) outs(%i : tensor<512x1024xf32>) {
+          ^bb0(%arg0: f32, %arg1: f32):
+            %12 = arith.divf %arg0, %cst_0 : f32
+            linalg.yield %12 : f32
+          } -> tensor<512x1024xf32>
+      flow.dispatch.tensor.store %11, %1, offsets = [0, 0], sizes = [512, 1024], strides = [1, 1]
+          : tensor<512x1024xf32> -> !flow.dispatch.tensor<writeonly:512x1024xf32>
+      return
+    }
+  }
+}
+}
+
+// Check that we generate a group reduce fused with broadcast + elementwise.
+//   CHECK-LABEL: hal.executable public @warp_reduction_broadcast_dispatch
+//         CHECK:   hal.executable.variant public @cuda
+// CHECK-COUNT-5:     nvvm.shfl.sync  bfly
+//         CHECK:     llvm.store %{{.*}}, %{{.*}} : !llvm.ptr<f32, 3>
+//         CHECK:     nvvm.barrier0
+//         CHECK:     llvm.load {{.*}} : !llvm.ptr<vector<8xf32>, 3>
+//         CHECK:     "llvm.intr.vector.reduce.fadd"(%{{.*}}, %{{.*}}) {reassoc = false} : (f32, vector<8xf32>) -> f32
+//         CHECK:     llvm.fdiv %{{.*}}, %{{.*}}  : vector<4xf32>
+//         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : !llvm.ptr<vector<4xf32>>

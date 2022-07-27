@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
+#include "mlir/Transforms/SideEffectUtils.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -82,23 +83,40 @@ static Value groupReduction(Location loc, OpBuilder &builder, Value input,
   return laneVal;
 }
 
-/// Special case to hoist hal operations that have side effect but are safe to
-/// move out of the warp single lane region.
-static void hoistHalBindingOps(vector::WarpExecuteOnLane0Op warpOp) {
+/// Hoist uniform operations as well as special hal operations that have side
+/// effect but are safe to move out of the warp single lane region.
+static void moveScalarAndBindingUniformCode(
+    vector::WarpExecuteOnLane0Op warpOp) {
+  /// Hoist ops without side effect as well as special binding ops.
+  auto canBeHoisted = [](Operation *op,
+                         function_ref<bool(Value)> definedOutside) {
+    return llvm::all_of(op->getOperands(), definedOutside) &&
+           (isSideEffectFree(op) ||
+            isa<IREE::HAL::InterfaceBindingSubspanOp,
+                IREE::HAL::InterfaceConstantLoadOp, memref::AssumeAlignmentOp>(
+                op)) &&
+           op->getNumRegions() == 0;
+  };
   Block *body = warpOp.getBody();
 
   // Keep track of the ops we want to hoist.
   llvm::SmallSetVector<Operation *, 8> opsToMove;
 
+  // Helper to check if a value is or will be defined outside of the region.
+  auto isDefinedOutsideOfBody = [&](Value value) {
+    auto *definingOp = value.getDefiningOp();
+    return (definingOp && opsToMove.count(definingOp)) ||
+           warpOp.isDefinedOutsideOfRegion(value);
+  };
+
   // Do not use walk here, as we do not want to go into nested regions and hoist
   // operations from there.
   for (auto &op : body->without_terminator()) {
-    if (!isa<IREE::HAL::InterfaceBindingSubspanOp>(&op)) continue;
-    if (llvm::any_of(op.getOperands(), [&](Value operand) {
-          return !warpOp.isDefinedOutsideOfRegion(operand);
-        }))
-      continue;
-    opsToMove.insert(&op);
+    bool hasVectorResult = llvm::any_of(op.getResults(), [](Value result) {
+      return result.getType().isa<VectorType>();
+    });
+    if (!hasVectorResult && canBeHoisted(&op, isDefinedOutsideOfBody))
+      opsToMove.insert(&op);
   }
 
   // Move all the ops marked as uniform outside of the region.
@@ -166,9 +184,7 @@ struct LLVMGPUReduceToGPUPass
     builder.create<vector::YieldOp>(loc);
 
     // 3. Hoist the scalar code outside of the warp region.
-    vector::moveScalarUniformCode(warpOp);
-    hoistHalBindingOps(warpOp);
-    vector::moveScalarUniformCode(warpOp);
+    moveScalarAndBindingUniformCode(warpOp);
 
     // 4. Distribute transfer write operations.
     {
@@ -196,7 +212,7 @@ struct LLVMGPUReduceToGPUPass
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
-    // 4. Lower the remaining WarpExecuteOnLane0 ops.
+    // 5. Lower the remaining WarpExecuteOnLane0 ops.
     {
       RewritePatternSet patterns(ctx);
       vector::WarpExecuteOnLane0LoweringOptions options;
