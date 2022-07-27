@@ -1236,7 +1236,7 @@ through the Hardware Abstraction Layer (HAL) interface.</p>
 <span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_api_version_check</span><span class="p">(</span><span class="n">IREE_API_VERSION_LATEST</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">actual_version</span><span class="p">));</span><span class="w"></span>
 
 <span class="c1">// Modules with custom types must be statically registered before use.</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_module_register_types</span><span class="p">());</span><span class="w"></span>
+<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_module_register_all_types</span><span class="p">());</span><span class="w"></span>
 
 <span class="c1">// Device drivers are managed through registries.</span>
 <span class="c1">// Applications may use multiple registries to more finely control driver</span>
