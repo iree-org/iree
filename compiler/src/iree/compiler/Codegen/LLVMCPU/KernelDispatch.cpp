@@ -170,6 +170,49 @@ static int64_t getVectorSize(func::FuncOp entryPointFn, ShapedType shapedType) {
   return getVectorSize(entryPointFn, byteWidth);
 }
 
+struct LinalgOpTransposeInfo {
+  bool hasInputTranspose = false;
+  bool hasOutputTranspose = false;
+};
+
+// TODO(dcaballe):
+//   * Consider transpose + reductions.
+//   * Consider input and output transposes.
+static LinalgOpTransposeInfo getTransposeInfo(linalg::LinalgOp op) {
+  auto indexingMaps = op.getIndexingMapsArray();
+
+  if (op.getNumReductionLoops() > 0) return {};
+
+  if (llvm::any_of(indexingMaps,
+                   [](AffineMap map) { return !map.isProjectedPermutation(); })) {
+    llvm::outs() << "Not permutation: " << op << "\n";
+    return {};
+  }
+
+  // Multiple outputs are not supported yet.
+  if (op.getNumOutputs() != 1) {
+    llvm::outs() << "Multiple outputs: " << op << "\n";
+    return {};
+  }
+
+  // TODO: Revisit.
+  SmallVector<AffineMap> inputIndexingMaps;
+  AffineMap outputIndexingMap = op.getTiedIndexingMap(op.getOutputOperand(0));
+  for (OpOperand *operand : op.getInputOperands()) {
+    inputIndexingMaps.push_back(op.getTiedIndexingMap(operand));
+    llvm::outs() << "Input map: " << op.getTiedIndexingMap(operand) << "\n";
+  }
+  llvm::outs() << "Output map: " << outputIndexingMap << "\n";
+
+  // TODO: Refine.
+  bool isInputTransposed = !llvm::all_equal(inputIndexingMaps);
+  bool isOutputTransposed = !inputIndexingMaps.empty() && llvm::all_of(
+      inputIndexingMaps,
+      [&](AffineMap inputIdx) { return outputIndexingMap != inputIdx; });
+
+  return {isInputTransposed, isOutputTransposed};
+}
+
 /// Returns minimum tiling sizes for each dimension. One dimension is possible
 /// to access at different element types. It determines the tiling sizes by
 /// looking into all the operands.
@@ -181,6 +224,12 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
   unsigned numLoops = op.getNumLoops();
   SmallVector<int64_t> minTileSizes(numLoops, 1);
   auto inputOutputOpOperands = op.getInputAndOutputOperands();
+
+  // TODO(dcaballe): Move all these properties to LinalgOpInfo analysis.
+  bool isReduction = op.getNumReductionLoops() > 0;
+  // TODO(dcaballe): Improve isTranspose logic. It's currently too conservative.
+  LinalgOpTransposeInfo transposeInfo = getTransposeInfo(op);
+
   for (auto map : llvm::enumerate(op.getIndexingMapsArray())) {
     // Check the fastest varying dimension of the operand. Set the vector size
     // of the corresponding loop to the vector size.
@@ -197,13 +246,33 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
     // Vectorization of reductions is driven by input tensors and considering
     // the output's fastest varying dim leads to large unroll factors. We limit
     // the tile size for this case to 'maxUnrollFactor'.
-    if (op.isOutputTensor(inputOutputOpOperands[map.index()]) &&
-        op.getNumReductionLoops() > 0)
+    if (isReduction && op.isOutputTensor(inputOutputOpOperands[map.index()])) {
       tileSize = std::min<int64_t>(tileSize, maxUnrollFactor);
+    }
+
+    // TODO: Transpose.
+    if (transposeInfo.hasOutputTranspose &&
+        op.isOutputTensor(inputOutputOpOperands[map.index()])) {
+      llvm::outs() << "Output transpose detected\n";
+      tileSize = std::min<int64_t>(tileSize, maxUnrollFactor);
+    }
+
+    if (transposeInfo.hasInputTranspose &&
+        op.isInputTensor(inputOutputOpOperands[map.index()])) {
+      llvm::outs() << "Input transpose detected\n";
+      tileSize = std::min<int64_t>(tileSize, maxUnrollFactor);
+    }
 
     minTileSizes[fastestVaryingDim] =
         std::max<int64_t>(minTileSizes[fastestVaryingDim], tileSize);
   }
+
+  if (transposeInfo.hasInputTranspose || transposeInfo.hasOutputTranspose) {
+    llvm::outs() << "Min tile sizes for: " << op << "\n";
+    for (int64_t size : minTileSizes) llvm::outs() << size << " ";
+    llvm::outs() << "\n";
+  }
+
   return minTileSizes;
 }
 
