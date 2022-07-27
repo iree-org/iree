@@ -5,15 +5,15 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Enable input dialects based on options.
-set(IREE_INPUT_DIALECT_DEPS "")
-if(IREE_INPUT_DIALECTS_MHLO)
-  list(APPEND IREE_INPUT_DIALECT_DEPS iree::compiler::InputConversion::MHLO)
+set(IREE_INPUT_DEPS "")
+if(IREE_INPUT_MHLO)
+  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::MHLO)
 endif()
-if(IREE_INPUT_DIALECTS_TORCH)
-  list(APPEND IREE_INPUT_DIALECT_DEPS iree::compiler::InputConversion::TMTensor)
+if(IREE_INPUT_TORCH)
+  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TMTensor)
 endif()
-if(IREE_INPUT_DIALECTS_TOSA)
-  list(APPEND IREE_INPUT_DIALECT_DEPS iree::compiler::InputConversion::TOSA)
+if(IREE_INPUT_TOSA)
+  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TOSA)
 endif()
 
 iree_cc_library(
@@ -24,7 +24,7 @@ iree_cc_library(
   SRCS
     "Options.cpp"
   DEPS
-    ${IREE_INPUT_DIALECT_DEPS}
+    ${IREE_INPUT_DEPS}
     iree::compiler::Utils
   PUBLIC
 )
@@ -37,7 +37,7 @@ iree_cc_library(
   SRCS
     "Pipelines.cpp"
   DEPS
-    ${IREE_INPUT_DIALECT_DEPS}
+    ${IREE_INPUT_DEPS}
     ::Options
     LLVMSupport
     MLIRIR

@@ -39,21 +39,21 @@ if(IREE_TARGET_BACKEND_ROCM)
 endif()
 
 # Enable input dialects based on options.
-set(IREE_INPUT_DIALECT_DEPS "")
-if(IREE_INPUT_DIALECTS_MHLO)
-  list(APPEND IREE_INPUT_DIALECT_DEPS iree::compiler::InputConversion::MHLO)
-  list(APPEND IREE_INPUT_DIALECT_DEPS tensorflow::external_mhlo_includes)
-  list(APPEND IREE_INPUT_DIALECT_DEPS ChloDialect)
-  list(APPEND IREE_INPUT_DIALECT_DEPS MhloDialect)
+set(IREE_INPUT_DEPS "")
+if(IREE_INPUT_MHLO)
+  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::MHLO)
+  list(APPEND IREE_INPUT_DEPS tensorflow::external_mhlo_includes)
+  list(APPEND IREE_INPUT_DEPS ChloDialect)
+  list(APPEND IREE_INPUT_DEPS MhloDialect)
 endif()
-if(IREE_INPUT_DIALECTS_TORCH)
-  list(APPEND IREE_INPUT_DIALECT_DEPS iree::compiler::InputConversion::TMTensor)
-  list(APPEND IREE_INPUT_DIALECT_DEPS TorchMLIRTMTensorDialect)
+if(IREE_INPUT_TORCH)
+  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TMTensor)
+  list(APPEND IREE_INPUT_DEPS TorchMLIRTMTensorDialect)
 endif()
-if(IREE_INPUT_DIALECTS_TOSA)
-  list(APPEND IREE_INPUT_DIALECT_DEPS iree::compiler::InputConversion::TOSA)
-  list(APPEND IREE_INPUT_DIALECT_DEPS MLIRTosaDialect)
-  list(APPEND IREE_INPUT_DIALECT_DEPS MLIRTosaTransforms)
+if(IREE_INPUT_TOSA)
+  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TOSA)
+  list(APPEND IREE_INPUT_DEPS MLIRTosaDialect)
+  list(APPEND IREE_INPUT_DEPS MLIRTosaTransforms)
 endif()
 
 iree_cc_library(
@@ -66,7 +66,7 @@ iree_cc_library(
     "init_input_dialects.cc"
     "init_input_passes.cc"
   DEPS
-    ${IREE_INPUT_DIALECT_DEPS}
+    ${IREE_INPUT_DEPS}
     iree::compiler::InputConversion::Common
   PUBLIC
 )

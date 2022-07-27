@@ -209,18 +209,18 @@ cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler
 # Compiler Input Dialects
 #-------------------------------------------------------------------------------
 
-cmake_dependent_option(IREE_INPUT_DIALECTS_MHLO "Builds support for compiling MHLO programs" ON ${IREE_BUILD_COMPILER} OFF)
-cmake_dependent_option(IREE_INPUT_DIALECTS_TORCH "Builds support for compiling Torch MLIR programs" ON ${IREE_BUILD_COMPILER} OFF)
-cmake_dependent_option(IREE_INPUT_DIALECTS_TOSA "Builds support for compiling TOSA programs" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_INPUT_MHLO "Builds support for compiling MHLO programs" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_INPUT_TORCH "Builds support for compiling Torch MLIR programs" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_INPUT_TOSA "Builds support for compiling TOSA programs" ON ${IREE_BUILD_COMPILER} OFF)
 
 message(STATUS "IREE compiler input dialects:")
-if(IREE_INPUT_DIALECTS_MHLO)
+if(IREE_INPUT_MHLO)
   message(STATUS "  - MHLO")
 endif()
-if(IREE_INPUT_DIALECTS_TORCH)
+if(IREE_INPUT_TORCH)
   message(STATUS "  - Torch MLIR")
 endif()
-if(IREE_INPUT_DIALECTS_TOSA)
+if(IREE_INPUT_TOSA)
   message(STATUS "  - TOSA")
 endif()
 
@@ -569,7 +569,7 @@ else()
   # Add default external projects.
   iree_add_llvm_external_project(mlir-iree-dialects MLIR_IREE_DIALECTS ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
   iree_add_llvm_external_project(mlir-hlo MLIR_HLO ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-hlo)
-  if(IREE_INPUT_DIALECTS_TORCH)
+  if(IREE_INPUT_TORCH)
     iree_add_llvm_external_project(torch-mlir-dialects TORCH_MLIR_DIALECTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/torch-mlir-dialects)
   endif()
 

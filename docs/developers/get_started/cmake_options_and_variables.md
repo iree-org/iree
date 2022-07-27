@@ -74,7 +74,7 @@ Default setting for each `IREE_TARGET_BACKEND_*` option.
 
 Individual options enabling the build for each compiler target backend.
 
-#### `IREE_INPUT_DIALECTS_*`:BOOL
+#### `IREE_INPUT_*`:BOOL
 
 Individual options enabling each set of input dialects.
 

@@ -6,12 +6,12 @@
 
 add_subdirectory(Common)
 
-if(IREE_INPUT_DIALECTS_MHLO)
+if(IREE_INPUT_MHLO)
   add_subdirectory(MHLO)
 endif()
-if(IREE_INPUT_DIALECTS_TORCH)
+if(IREE_INPUT_TORCH)
   add_subdirectory(TMTensor)
 endif()
-if(IREE_INPUT_DIALECTS_TOSA)
+if(IREE_INPUT_TOSA)
   add_subdirectory(TOSA)
 endif()
