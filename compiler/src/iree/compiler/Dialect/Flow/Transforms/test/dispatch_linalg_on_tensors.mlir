@@ -1467,3 +1467,71 @@ func.func @fft_cst_output(%arg0 : tensor<3x2190x1x512xf32>) -> (tensor<3x2190x1x
 // CHECK-SAME:           outs(%[[OUT]],
 //  CHECK-DAG:       flow.dispatch.tensor.store %[[FFT]]#0, %[[ARG1]]
 //  CHECK-DAG:       flow.dispatch.tensor.store %[[FFT]]#1, %[[ARG2]]
+
+// -----
+
+func.func @clone_pad_op_cst(%B: tensor<?xf32>, %arg0 : tensor<?x?xf32>,
+                            %arg1 : index, %arg2 : index, %arg3 : index,
+                            %arg4 : index) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 6.4 : f32
+  %A = tensor.pad %arg0 low[%arg1, %arg2] high[%arg3, %arg4] {
+    ^bb0(%arg6 : index, %arg7 : index):
+      tensor.yield %cst : f32
+  } :  tensor<?x?xf32> to tensor<?x?xf32>
+  %d0 = tensor.dim %A, %c0 : tensor<?x?xf32>
+  %d1 = tensor.dim %A, %c1 : tensor<?x?xf32>
+  %0 = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
+  %1 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]}
+    ins (%A, %B: tensor<?x?xf32>, tensor<?xf32>)
+    outs (%0 : tensor<?x?xf32>) {
+      ^bb0(%arg6 : f32, %arg7 : f32, %arg8 : f32):
+        %2 = arith.addf %arg6, %arg7 : f32
+        linalg.yield %2 : f32
+    } -> tensor<?x?xf32>
+  return %1 : tensor<?x?xf32>
+}
+
+// CHECK: func @clone_pad_op_cst
+// CHECK:   flow.dispatch.workgroups
+// CHECK:     arith.constant 6.4
+// CHECK:     tensor.pad
+// CHECK:     linalg.generic
+
+// -----
+
+func.func @clone_pad_op_bbarg(%B: tensor<?xf32>, %arg0 : tensor<?x?xf32>,
+                              %arg1 : index, %arg2 : index, %arg3 : index,
+                              %arg4 : index, %arg5 : f32) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %A = tensor.pad %arg0 low[%arg1, %arg2] high[%arg3, %arg4] {
+    ^bb0(%arg6 : index, %arg7 : index):
+      tensor.yield %arg5 : f32
+  } :  tensor<?x?xf32> to tensor<?x?xf32>
+  %d0 = tensor.dim %A, %c0 : tensor<?x?xf32>
+  %d1 = tensor.dim %A, %c1 : tensor<?x?xf32>
+  %0 = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
+  %1 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]}
+    ins (%A, %B: tensor<?x?xf32>, tensor<?xf32>)
+    outs (%0 : tensor<?x?xf32>) {
+      ^bb0(%arg6 : f32, %arg7 : f32, %arg8 : f32):
+        %2 = arith.addf %arg6, %arg7 : f32
+        linalg.yield %2 : f32
+    } -> tensor<?x?xf32>
+  return %1 : tensor<?x?xf32>
+}
+
+// CHECK: func @clone_pad_op_bbarg
+// CHECK:   flow.dispatch.workgroups
+// CHECK:     tensor.pad
+// CHECK:     linalg.generic
