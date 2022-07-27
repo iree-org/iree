@@ -2,7 +2,7 @@ name: Schedule candidate release
 
 on:
   schedule:
-    - cron: '0 10 * * *'
+    - cron: "0 10 * * *"
 
   workflow_dispatch:
 
@@ -20,7 +20,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Checking out repository
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           ref: ${{ steps.last_green_commit.outputs.result }}
@@ -42,7 +42,7 @@ jobs:
 
       - name: Create Release
         id: create_release
-        uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e  # v1
+        uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1
         env:
           GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
@@ -54,7 +54,7 @@ jobs:
           prerelease: true
 
       - name: "Invoke workflow :: Build Native Release Packages"
-        uses: benc-uk/workflow-dispatch@4c044c1613fabbe5250deadc65452d54c4ad4fc7  # v1
+        uses: benc-uk/workflow-dispatch@4c044c1613fabbe5250deadc65452d54c4ad4fc7 # v1
         with:
           workflow: Build Native Release Packages
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}

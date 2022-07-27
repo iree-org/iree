@@ -10,10 +10,10 @@ theme:
   custom_dir: overrides
 
   features:
-    - navigation.instant  # Faster loading
+    - navigation.instant # Faster loading
 
     # TODO(scotttodd): join mkdocs-material insiders for this
-    - navigation.tracking  # Update URL in address bar with the active anchor
+    - navigation.tracking # Update URL in address bar with the active anchor
 
     # TODO(scotttodd): decide if we want this
     #     these move sections from the left nav to tabs below the header
@@ -21,11 +21,11 @@ theme:
     # - navigation.tabs.sticky  # insiders only
 
     # TODO(scotttodd): remove this if the number of pages grows too much
-    - navigation.sections  # Group sections without collapsible buttons
+    - navigation.sections # Group sections without collapsible buttons
 
-    - navigation.top  # Back to top button
+    - navigation.top # Back to top button
 
-    - navigation.indexes  # section names can link to index.md pages
+    - navigation.indexes # section names can link to index.md pages
 
   palette:
     # Light mode
@@ -47,7 +47,7 @@ theme:
 
 repo_url: https://github.com/iree-org/iree
 repo_name: iree-org/iree
-edit_uri: ""  # Omit edit button (linking to GitHub) from each document
+edit_uri: "" # Omit edit button (linking to GitHub) from each document
 
 extra:
   social:
@@ -60,7 +60,7 @@ extra:
     - icon: fontawesome/solid/users
       link: https://groups.google.com/forum/#!forum/iree-discuss
       name: IREE Discuss Google Group
-  generator: false  # TODO(scotttodd): join mkdocs-material insiders for this
+  generator: false # TODO(scotttodd): join mkdocs-material insiders for this
 
 extra_css:
   - assets/stylesheets/extra.css
@@ -87,44 +87,44 @@ markdown_extensions:
       custom_checkbox: true
   - tables
   - toc:
-      permalink: true  # TODO(scotttodd): icon: https://fonts.google.com/icons?selected=Material+Icons+Outlined:link
+      permalink: true # TODO(scotttodd): icon: https://fonts.google.com/icons?selected=Material+Icons+Outlined:link
 
 # Navigation with explicit ordering and nesting.
 # https://www.mkdocs.org/user-guide/configuration/#nav
 # Note: may include external links and titles are optional for internal links
 nav:
-  - Home: 'index.md'
-  - 'Getting Started':
-      - 'getting-started/index.md'
-      - TensorFlow: 'getting-started/tensorflow.md'
-      - TensorFlow Lite: 'getting-started/tflite.md'
-      - JAX: 'getting-started/jax.md'
-  - 'Deployment configurations':
-      - 'deployment-configurations/index.md'
-      - CPU: 'deployment-configurations/cpu.md'
-      - CPU - Bare-Metal: 'deployment-configurations/bare-metal.md'
-      - GPU - Vulkan: 'deployment-configurations/gpu-vulkan.md'
-      - GPU - CUDA/ROCm: 'deployment-configurations/gpu-cuda-rocm.md'
-  - 'Building from source':
-      - 'building-from-source/index.md'
-      - 'building-from-source/getting-started.md'
-      - 'building-from-source/python-bindings-and-importers.md'
-      - 'building-from-source/android.md'
-      - 'building-from-source/riscv.md'
-  - 'Bindings':
-      - 'bindings/index.md'
-      - C API: 'bindings/c-api.md'
-      - Python: 'bindings/python.md'
-      - TensorFlow Lite: 'bindings/tensorflow-lite.md'
-  - 'Extensions':
-      - 'extensions/index.md'
-  - 'Blog':
-      - 'blog/index.md'
-      - CUDA backend: 'blog/2021-10-15-cuda-backend.md'
-      - Work in progress on Matrix Multiplication on CPU: 'blog/2021-10-13-mmt4d.md'
-      - TFLite Support via TOSA: 'blog/2021-07-19-tflite-tosa.md'
-  - 'Reference':
-      - Glossary: 'reference/glossary.md'
-      - Optimization Options: 'reference/optimization-options.md'
-  - 'Community':
-      - 'community/index.md'
+  - Home: "index.md"
+  - "Getting Started":
+      - "getting-started/index.md"
+      - TensorFlow: "getting-started/tensorflow.md"
+      - TensorFlow Lite: "getting-started/tflite.md"
+      - JAX: "getting-started/jax.md"
+  - "Deployment configurations":
+      - "deployment-configurations/index.md"
+      - CPU: "deployment-configurations/cpu.md"
+      - CPU - Bare-Metal: "deployment-configurations/bare-metal.md"
+      - GPU - Vulkan: "deployment-configurations/gpu-vulkan.md"
+      - GPU - CUDA/ROCm: "deployment-configurations/gpu-cuda-rocm.md"
+  - "Building from source":
+      - "building-from-source/index.md"
+      - "building-from-source/getting-started.md"
+      - "building-from-source/python-bindings-and-importers.md"
+      - "building-from-source/android.md"
+      - "building-from-source/riscv.md"
+  - "Bindings":
+      - "bindings/index.md"
+      - C API: "bindings/c-api.md"
+      - Python: "bindings/python.md"
+      - TensorFlow Lite: "bindings/tensorflow-lite.md"
+  - "Extensions":
+      - "extensions/index.md"
+  - "Blog":
+      - "blog/index.md"
+      - CUDA backend: "blog/2021-10-15-cuda-backend.md"
+      - Work in progress on Matrix Multiplication on CPU: "blog/2021-10-13-mmt4d.md"
+      - TFLite Support via TOSA: "blog/2021-07-19-tflite-tosa.md"
+  - "Reference":
+      - Glossary: "reference/glossary.md"
+      - Optimization Options: "reference/optimization-options.md"
+  - "Community":
+      - "community/index.md"

@@ -27,8 +27,8 @@ steps:
     env:
       MUST_BOOTSTRAP: "false"
     commands: |
-        buildkite-agent pipeline upload --replace \
-          build_tools/buildkite/pipelines/fragment/bootstrap-trusted.yml
+      buildkite-agent pipeline upload --replace \
+        build_tools/buildkite/pipelines/fragment/bootstrap-trusted.yml
 
   - wait
 
@@ -39,8 +39,8 @@ steps:
     env:
       CONFIG_FETCH_REF: ${BUILDKITE_COMMIT}
     commands: |
-        buildkite-agent pipeline upload \
-          build_tools/buildkite/pipelines/trusted/${BUILDKITE_PIPELINE_SLUG}.yml
+      buildkite-agent pipeline upload \
+        build_tools/buildkite/pipelines/trusted/${BUILDKITE_PIPELINE_SLUG}.yml
 
   # If we're coming from a fork, pipelines will be checked out from the main
   # branch
@@ -55,5 +55,5 @@ steps:
     env:
       CONFIG_FETCH_REF: "main"
     commands: |
-        buildkite-agent pipeline upload \
-          build_tools/buildkite/pipelines/trusted/${BUILDKITE_PIPELINE_SLUG}.yml
+      buildkite-agent pipeline upload \
+        build_tools/buildkite/pipelines/trusted/${BUILDKITE_PIPELINE_SLUG}.yml

@@ -12,7 +12,7 @@ on:
         type: string
       enable-assertions:
         required: false
-        type: string  # Thanks CMake and Bash for not having proper booleans
+        type: string # Thanks CMake and Bash for not having proper booleans
         default: "OFF"
     outputs:
       host-binary-root:
@@ -50,7 +50,7 @@ jobs:
       host-binary-root: ${{ inputs.host-binary-root }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: "Building host tools"
@@ -65,7 +65,7 @@ jobs:
       # do our own.
       - name: "Creating host tools archive"
         run: tar -cvf "${HOST_BINARY_ARCHIVE}" "${HOST_BINARY_ROOT}"
-      - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8  # v3.1.0
+      - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
         with:
           name: "${{ env.HOST_BINARY_ARCHIVE }}"
           path: "${{ env.HOST_BINARY_ARCHIVE }}"
