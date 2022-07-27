@@ -25,7 +25,7 @@ from typing import Any, Dict, Optional
 
 from common.common_arguments import expand_and_check_file_paths
 from common.benchmark_presentation import COMPILATION_METRICS_TO_TABLE_MAPPERS, collect_all_compilation_metrics
-from common.benchmark_definition import (BenchmarkInfo, BenchmarkResults,
+from common.benchmark_definition import (BenchmarkResults,
                                          execute_cmd_and_get_output)
 from common.benchmark_thresholds import BENCHMARK_THRESHOLDS
 
@@ -253,7 +253,7 @@ def add_new_iree_build(build_id: int,
 
 def add_new_sample(series_id: str,
                    build_id: int,
-                   sample_unit: int,
+                   sample_unit: str,
                    sample_value: int,
                    override: bool = False,
                    dry_run: bool = False,
@@ -372,11 +372,7 @@ def main(args):
     for mapper in COMPILATION_METRICS_TO_TABLE_MAPPERS:
       sample_value, _ = mapper.get_current_and_base_value(compile_metrics)
       series_id = mapper.get_series_name(name)
-
-      if 'compilation-time' in series_id:
-        series_unit = "ms"
-      elif 'total-dispatch-size' in series_id:
-        series_unit = "bytes"
+      series_unit = mapper.get_unit()
 
       # Override by default to allow updates to the series.
       add_new_iree_series(series_id=series_id,
@@ -386,10 +382,9 @@ def main(args):
                           dry_run=args.dry_run,
                           verbose=args.verbose)
       add_new_sample(series_id=series_id,
-                     commit_count=commit_count,
+                     build_id=commit_count,
                      sample_unit=series_unit,
                      sample_value=sample_value,
-                     override=True,
                      dry_run=args.dry_run,
                      verbose=args.verbose)
 

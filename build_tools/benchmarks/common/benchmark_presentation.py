@@ -43,9 +43,9 @@ class AggregateBenchmarkLatency:
 class CompilationMetrics:
   """An object for describing the summary of statistics and the reference."""
   compilation_info: CompilationInfo
-  compilation_time: int
+  compilation_time_ms: int
   total_dispatch_component_size: int
-  base_compilation_time: Optional[int] = None
+  base_compilation_time_ms: Optional[int] = None
   base_total_dispatch_component_size: Optional[int] = None
 
 
@@ -75,6 +75,16 @@ class MetricsToTableMapper(ABC, Generic[T]):
     """Returns the dashboard series name."""
     raise NotImplementedError()
 
+  @abstractmethod
+  def get_unit(self) -> str:
+    """Returns the unit of the metric value."""
+    raise NotImplementedError()
+
+  @abstractmethod
+  def get_table_header(self) -> str:
+    """Returns the header of the table."""
+    raise NotImplementedError()
+
   @staticmethod
   @abstractmethod
   def get_metric_thresholds() -> Sequence[BenchmarkThreshold]:
@@ -83,11 +93,6 @@ class MetricsToTableMapper(ABC, Generic[T]):
   @staticmethod
   @abstractmethod
   def get_table_title() -> str:
-    raise NotImplementedError()
-
-  @staticmethod
-  @abstractmethod
-  def get_table_header() -> str:
     raise NotImplementedError()
 
 
@@ -97,15 +102,21 @@ class CompilationTimeToTable(MetricsToTableMapper[CompilationMetrics]):
   def update_base_value(self, compile_metrics: CompilationMetrics,
                         base_value: Any) -> CompilationMetrics:
     return dataclasses.replace(compile_metrics,
-                               base_compilation_time=base_value)
+                               base_compilation_time_ms=base_value)
 
   def get_current_and_base_value(
       self, compile_metrics: CompilationMetrics) -> Tuple[int, Optional[int]]:
-    return (compile_metrics.compilation_time,
-            compile_metrics.base_compilation_time)
+    return (compile_metrics.compilation_time_ms,
+            compile_metrics.base_compilation_time_ms)
 
   def get_series_name(self, name: str) -> str:
     return f"{name} [{COMPILATION_TIME_SERIES_SUFFIX}]"
+
+  def get_unit(self) -> str:
+    return "ms"
+
+  def get_table_header(self) -> str:
+    return f"Compilation Time ({self.get_unit()})"
 
   @staticmethod
   def get_metric_thresholds() -> Sequence[BenchmarkThreshold]:
@@ -114,10 +125,6 @@ class CompilationTimeToTable(MetricsToTableMapper[CompilationMetrics]):
   @staticmethod
   def get_table_title() -> str:
     return "Compilation Times"
-
-  @staticmethod
-  def get_table_header() -> str:
-    return "Compilation Time (ms)"
 
 
 class TotalDispatchSizeToTable(MetricsToTableMapper[CompilationMetrics]):
@@ -136,6 +143,12 @@ class TotalDispatchSizeToTable(MetricsToTableMapper[CompilationMetrics]):
   def get_series_name(self, name: str) -> str:
     return f"{name} [{TOTAL_DISPATCH_SIZE_SERIES_SUFFIX}]"
 
+  def get_unit(self) -> str:
+    return "bytes"
+
+  def get_table_header(self) -> str:
+    return f"Total Dispatch Size ({self.get_unit()})"
+
   @staticmethod
   def get_metric_thresholds() -> Sequence[BenchmarkThreshold]:
     return TOTAL_DISPATCH_SIZE_THRESHOLDS
@@ -143,10 +156,6 @@ class TotalDispatchSizeToTable(MetricsToTableMapper[CompilationMetrics]):
   @staticmethod
   def get_table_title() -> str:
     return "Total Dispatch Sizes"
-
-  @staticmethod
-  def get_table_header() -> str:
-    return "Total Dispatch Size (bytes)"
 
 
 COMPILATION_METRICS_TO_TABLE_MAPPERS: List[
@@ -229,7 +238,7 @@ def collect_all_compilation_metrics(
       name = str(compile_stats.compilation_info)
       compile_metrics[name] = CompilationMetrics(
           compilation_info=compile_stats.compilation_info,
-          compilation_time=compile_stats.compilation_time,
+          compilation_time_ms=compile_stats.compilation_time_ms,
           total_dispatch_component_size=component_sizes.
           total_dispatch_component_size)
 
@@ -284,6 +293,7 @@ def _categorize_on_single_metric(
     metrics_map: Dict[str, T],
     metric_func: GetMetricFunc,
     thresholds: Sequence[BenchmarkThreshold],
+    metric_unit: str,
 ) -> Tuple[Dict[str, T], Dict[str, T], Dict[str, T], Dict[str, T]]:
   """Categorize the metrics object into regressed, improved, similar, and the
     raw group (the group with no base to compare to).
@@ -316,8 +326,10 @@ def _categorize_on_single_metric(
 
     if similar_threshold.unit == ThresholdUnit.PERCENTAGE:
       ratio = abs(current - base) / base * 100
-    else:
+    elif similar_threshold.unit.value == metric_unit:
       ratio = abs(current - base)
+    else:
+      raise ValueError("Doesn't support mismatch threshold unit yet.")
 
     if ratio <= similar_threshold.threshold:
       similar_map[name] = metrics_obj
@@ -354,13 +366,14 @@ def _sort_benchmarks_and_get_table(benchmarks: Dict[str,
   """
   sorted_rows = []
   for name, benchmark in benchmarks.items():
-    current = benchmark.mean_time
-    base = benchmark.base_mean_time
+    current = benchmark.mean_time / 1e6
+    base = benchmark.base_mean_time / 1e6
     ratio = abs(current - base) / base
     str_mean = _get_compare_text(current, base)
     clickable_name = _make_series_link(name)
-    sorted_rows.append((ratio, (clickable_name, str_mean, benchmark.median_time,
-                                benchmark.stddev_time)))
+    sorted_rows.append(
+        (ratio, (clickable_name, str_mean, benchmark.median_time / 1e6,
+                 benchmark.stddev_time / 1e6)))
   sorted_rows.sort(key=lambda row: row[0], reverse=True)
 
   return _add_header_and_get_markdown_table(
@@ -384,7 +397,7 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
   """
   regressed, improved, similar, raw = _categorize_on_single_metric(
       benchmarks, lambda results: (results.mean_time, results.base_mean_time),
-      BENCHMARK_THRESHOLDS)
+      BENCHMARK_THRESHOLDS, "ns")
 
   tables = []
   if regressed:
@@ -399,8 +412,8 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
     tables.append(_sort_benchmarks_and_get_table(similar, size_cut))
   if raw:
     tables.append(md.header("Raw Latencies", 3))
-    raw_list = [(_make_series_link(k), v.mean_time, v.median_time,
-                 v.stddev_time) for k, v in raw.items()]
+    raw_list = [(_make_series_link(k), v.mean_time / 1e6, v.median_time / 1e6,
+                 v.stddev_time / 1e6) for k, v in raw.items()]
     tables.append(
         _add_header_and_get_markdown_table(BENCHMARK_RESULTS_HEADERS,
                                            raw_list,
@@ -457,7 +470,7 @@ def categorize_compilation_metrics_into_tables(
   for mapper in COMPILATION_METRICS_TO_TABLE_MAPPERS:
     regressed, improved, _, _ = _categorize_on_single_metric(
         compile_metrics_map, mapper.get_current_and_base_value,
-        mapper.get_metric_thresholds())
+        mapper.get_metric_thresholds(), mapper.get_unit())
 
     table_title = mapper.get_table_title()
     table_header = mapper.get_table_header()

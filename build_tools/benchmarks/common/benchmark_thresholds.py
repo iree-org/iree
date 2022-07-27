@@ -12,8 +12,8 @@ from enum import Enum
 
 
 class ThresholdUnit(Enum):
-  PERCENTAGE = 0  # Percentage
-  VALUE_MS = 1  # Absolute value in milliseconds
+  PERCENTAGE = "%"  # Percentage
+  VALUE_MS = "ms"  # Absolute value in milliseconds
 
 
 @dataclass

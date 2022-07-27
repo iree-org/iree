@@ -492,9 +492,13 @@ class CompilationInfo(object):
 
 @dataclass(frozen=True)
 class ModuleComponentSizes(object):
+  # File size in bytes.
   file_size: int
+  # VM component size in bytes.
   vm_component_size: int
+  # Const component size in bytes.
   const_component_size: int
+  # Total dispatch size in bytes.
   total_dispatch_component_size: int
 
   @staticmethod
@@ -508,7 +512,7 @@ class CompilationStatistics(object):
   # Module file and component sizes.
   module_component_sizes: ModuleComponentSizes
   # Module compilation time in ms.
-  compilation_time: int
+  compilation_time_ms: int
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
@@ -517,7 +521,7 @@ class CompilationStatistics(object):
             json_object["compilation_info"]),
         module_component_sizes=ModuleComponentSizes.from_json_object(
             json_object["module_component_sizes"]),
-        compilation_time=json_object["compilation_time"])
+        compilation_time_ms=json_object["compilation_time_ms"])
 
 
 @dataclass(frozen=True)

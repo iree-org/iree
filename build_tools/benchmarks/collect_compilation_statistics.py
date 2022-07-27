@@ -189,7 +189,7 @@ def main(args: argparse.Namespace):
       compilation_statistics = CompilationStatistics(
           compilation_info=compilation_info,
           module_component_sizes=module_component_sizes,
-          compilation_time=compilation_time)
+          compilation_time_ms=compilation_time)
       compilation_statistics_list.append(compilation_statistics)
 
   commit = get_git_commit_hash("HEAD")
