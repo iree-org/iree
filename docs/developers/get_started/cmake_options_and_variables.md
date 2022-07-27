@@ -109,6 +109,11 @@ the current build type is Debug and the compiler supports it.
 Enable [thread sanitizer](https://clang.llvm.org/docs/ThreadSanitizer.html) if
 the current build type is Debug and the compiler supports it.
 
+#### `IREE_ENABLE_UBSAN`:BOOL
+
+Enable [undefiend behavior sanitizer](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html)
+if the current build type is Debug and the compiler supports it.
+
 ## Cross-compilation
 
 When cross compiling (using a toolchain file like
