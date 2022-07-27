@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
@@ -111,6 +112,62 @@ struct DetachElementwisePattern
   }
 };
 
+/// Replace uses of splat constants as `outs` operands of `LinalgExt`
+/// operations. More canonical representation is to use a `init_tensor -> fill
+/// -> outs` operand sequence. Splat constants pulled in this way causes issues
+/// with allocations. Using `fill` will allow for fusing with the op just like
+/// fill -> linalg ops are fused. If not as a fallback they would be converted
+/// to a splat, but both without stack allocations.
+struct DetachSplatConstantOutsOperands
+    : public OpInterfaceRewritePattern<IREE::LinalgExt::LinalgExtOp> {
+  using OpInterfaceRewritePattern<
+      IREE::LinalgExt::LinalgExtOp>::OpInterfaceRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::LinalgExt::LinalgExtOp linalgExtOp,
+                                PatternRewriter &rewriter) const {
+    SmallVector<Value> newOutsOperands;
+    bool madeChanges = false;
+    for (auto outsOperandNum :
+         llvm::seq<unsigned>(0, linalgExtOp.getNumOutputs())) {
+      OpOperand *outOperand = linalgExtOp.getOutputOperand(outsOperandNum);
+      auto constOp = outOperand->get().getDefiningOp<arith::ConstantOp>();
+      if (!constOp) continue;
+
+      auto resultType =
+          constOp.getResult().getType().dyn_cast<RankedTensorType>();
+      if (!resultType || !resultType.getElementType().isIntOrFloat()) continue;
+
+      auto attr = constOp.getValue().dyn_cast<DenseElementsAttr>();
+      if (!attr || !attr.isSplat()) continue;
+
+      Location loc = constOp.getLoc();
+      Type elementType = resultType.getElementType();
+      Value initTensorOp = rewriter.create<linalg::InitTensorOp>(
+          loc, resultType.getShape(), elementType);
+      Attribute constValue;
+      if (elementType.isa<IntegerType>()) {
+        constValue =
+            rewriter.getIntegerAttr(elementType, attr.getSplatValue<APInt>());
+      } else {
+        constValue =
+            rewriter.getFloatAttr(elementType, attr.getSplatValue<APFloat>());
+      }
+      Value scalarConstantOp =
+          rewriter.create<arith::ConstantOp>(loc, elementType, constValue);
+
+      Value fillOp = rewriter
+                         .create<linalg::FillOp>(loc, resultType,
+                                                 scalarConstantOp, initTensorOp)
+                         .getResult(0);
+      rewriter.updateRootInPlace(linalgExtOp, [&]() {
+        linalgExtOp->setOperand(outOperand->getOperandNumber(), fillOp);
+      });
+      madeChanges = true;
+    }
+    return success(madeChanges);
+  };
+};
+
 struct DetachElementwiseFromNamedOpsPass
     : public DetachElementwiseFromNamedOpsBase<
           DetachElementwiseFromNamedOpsPass> {
@@ -121,7 +178,8 @@ struct DetachElementwiseFromNamedOpsPass
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns.add<DetachElementwisePattern>(&getContext());
+    patterns.add<DetachElementwisePattern, DetachSplatConstantOutsOperands>(
+        &getContext());
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
