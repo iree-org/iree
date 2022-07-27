@@ -1058,12 +1058,6 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp,
                                                RewritePatternSet &&patterns) {
   MLIRContext *context = funcOp->getContext();
 
-  // Create the dispatch region, first without the isolate region from above
-  // property.
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-    return failure();
-  }
-
   // Run canonicalization patterns and pattern to resolve tensor.dim of result
   // values into tensor.dim of its operands..
   RewritePatternSet canonicalizationPatterns(context);
@@ -1071,6 +1065,12 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp,
       canonicalizationPatterns);
   if (failed(applyPatternsAndFoldGreedily(
           funcOp, std::move(canonicalizationPatterns)))) {
+    return failure();
+  }
+
+  // Create the dispatch region, first without the isolate region from above
+  // property.
+  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return failure();
   }
 
