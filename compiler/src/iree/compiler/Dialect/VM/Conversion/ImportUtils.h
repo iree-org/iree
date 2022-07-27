@@ -37,6 +37,11 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     ConversionPatternRewriter &rewriter);
 }  // namespace detail
 
+// Creates a module-level vm.rodata containing the string contents and returns
+// the dereferenced byte buffer.
+Value createStringTableValue(Location loc, StringAttr attrValue, Type inputType,
+                             OpBuilder &builder);
+
 // Casts |value| to |targetType| ala static_cast for when the declared type
 // differs from the type provided by the input dialect.
 Value castToImportType(Value value, Type targetType,
