@@ -578,6 +578,7 @@ def Stream_ResourceSubviewOp : Stream_PureOp<"resource.subview", [
     Value getSubrangeResourceSize() { return getSourceSize(); }
     Value getSubrangeOffset() { return getSourceOffset(); }
     Value getSubrangeLength() { return getResultSize(); }
+    Value getSubrangeResult() { return getResult(); }
 
     // Walks up the use-def chain to find a subview op that feeds into |value|.
     static IREE::Stream::ResourceSubviewOp findSubviewOp(Value value);
