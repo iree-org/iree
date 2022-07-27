@@ -664,7 +664,6 @@ static void tryToTieOperandsAndResults(
     IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   Block *block = dispatchOp.getBody(0);
 
-  SmallVector<unsigned> eraseArguments;
   // Go over each result to tie operand when possible, by:
   // 1. Update the tied operand argument to take readwrite tensors.
   // 2. Erase the result argument.
@@ -682,11 +681,10 @@ static void tryToTieOperandsAndResults(
         IREE::Flow::TensorAccess::ReadWrite, oldType.getShape(),
         oldType.getElementType()));
     outputArgument.replaceAllUsesWith(tiedOperandArgument);
-    eraseArguments.push_back(outputArgument.getArgNumber());
+    block->eraseArgument(outputArgument.getArgNumber());
     dispatchOp.setTiedResultOperandIndex(result.index(),
                                          tiedOperandArgument.getArgNumber());
   }
-  block->eraseArguments(eraseArguments);
 }
 
 // After outlining in dispatch region we can rewrite the dispatch ops with
