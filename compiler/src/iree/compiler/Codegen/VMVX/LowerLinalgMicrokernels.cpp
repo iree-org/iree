@@ -236,6 +236,8 @@ class StridedBufferAnalysis {
         rootDesc.offset = constant(0);
       } else {
         // Rank > 0.
+        OpBuilder::InsertionGuard restoreIp(builder);
+        builder.setInsertionPointAfterValue(identityRoot);
         // Initialize sizes.
         fillSize(rootDesc, identityRoot);
         // Strides.
