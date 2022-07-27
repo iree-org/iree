@@ -95,7 +95,7 @@ iree_cc_library(
     iree::compiler::InputConversion::Common
     tensorflow::external_mhlo_includes
   DEFINES
-    "IREE_HAVE_MHLO_DIALECTS"
+    "IREE_HAVE_MHLO_INPUT"
   PUBLIC
 )
 

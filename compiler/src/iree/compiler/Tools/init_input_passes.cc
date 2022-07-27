@@ -8,17 +8,17 @@
 
 #include "iree/compiler/InputConversion/Common/Passes.h"
 
-#ifdef IREE_HAVE_MHLO_DIALECTS
+#ifdef IREE_HAVE_MHLO_INPUT
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
-#endif  // IREE_HAVE_MHLO_DIALECTS
-#ifdef IREE_HAVE_TORCH_DIALECTS
+#endif  // IREE_HAVE_MHLO_INPUT
+#ifdef IREE_HAVE_TORCH_INPUT
 #include "iree/compiler/InputConversion/TMTensor/Passes.h"
-#endif  // IREE_HAVE_TORCH_DIALECTS
-#ifdef IREE_HAVE_TOSA_DIALECTS
+#endif  // IREE_HAVE_TORCH_INPUT
+#ifdef IREE_HAVE_TOSA_INPUT
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Tosa/Transforms/Passes.h"
-#endif  // IREE_HAVE_TOSA_DIALECTS
+#endif  // IREE_HAVE_TOSA_INPUT
 
 namespace mlir {
 namespace iree_compiler {
@@ -26,18 +26,18 @@ namespace iree_compiler {
 void registerInputPasses() {
   registerCommonInputConversionPasses();
 
-#ifdef IREE_HAVE_MHLO_DIALECTS
+#ifdef IREE_HAVE_MHLO_INPUT
   MHLO::registerMHLOConversionPasses();
-#endif  // IREE_HAVE_MHLO_DIALECTS
-#ifdef IREE_HAVE_TORCH_DIALECTS
+#endif  // IREE_HAVE_MHLO_INPUT
+#ifdef IREE_HAVE_TORCH_INPUT
   TMTensor::registerTMTensorConversionPasses();
 #endif
-#ifdef IREE_HAVE_TOSA_DIALECTS
+#ifdef IREE_HAVE_TOSA_INPUT
   registerTOSAConversionPasses();
   registerTosaToArithPass();
   registerTosaToLinalgPass();
   registerTosaToTensorPass();
-#endif  // IREE_HAVE_TOSA_DIALECTS
+#endif  // IREE_HAVE_TOSA_INPUT
 }
 
 }  // namespace iree_compiler

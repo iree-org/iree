@@ -61,7 +61,7 @@ iree_compiler_cc_library(
         "Passes.h",
     ],
     defines = [
-        "IREE_HAVE_MHLO_DIALECTS",
+        "IREE_HAVE_MHLO_INPUT",
     ],
     deps = [
         ":PassHeaders",

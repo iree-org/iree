@@ -55,7 +55,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::InputConversion::Common
   DEFINES
-    "IREE_HAVE_TOSA_DIALECTS"
+    "IREE_HAVE_TOSA_INPUT"
   PUBLIC
 )
 

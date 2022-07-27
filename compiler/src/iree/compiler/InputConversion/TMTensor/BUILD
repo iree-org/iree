@@ -52,7 +52,7 @@ iree_compiler_cc_library(
         "Passes.h",
     ],
     defines = [
-        "IREE_HAVE_TORCH_DIALECTS",
+        "IREE_HAVE_TORCH_INPUT",
     ],
     deps = [
         ":PassHeaders",

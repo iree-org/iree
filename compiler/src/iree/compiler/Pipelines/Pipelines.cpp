@@ -15,15 +15,15 @@
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 
-#ifdef IREE_HAVE_MHLO_DIALECTS
+#ifdef IREE_HAVE_MHLO_INPUT
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
-#endif  // IREE_HAVE_MHLO_DIALECTS
-#ifdef IREE_HAVE_TORCH_DIALECTS
+#endif  // IREE_HAVE_MHLO_INPUT
+#ifdef IREE_HAVE_TORCH_INPUT
 #include "iree/compiler/InputConversion/TMTensor/Passes.h"
-#endif  // IREE_HAVE_TORCH_DIALECTS
-#ifdef IREE_HAVE_TOSA_DIALECTS
+#endif  // IREE_HAVE_TORCH_INPUT
+#ifdef IREE_HAVE_TOSA_INPUT
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
-#endif  // IREE_HAVE_TOSA_DIALECTS
+#endif  // IREE_HAVE_TOSA_INPUT
 
 namespace mlir {
 namespace iree_compiler {
@@ -42,7 +42,7 @@ void buildIREEVMTransformPassPipeline(
   switch (inputOptions.type) {
     case InputDialectOptions::Type::none:
       break;
-#ifdef IREE_HAVE_MHLO_DIALECTS
+#ifdef IREE_HAVE_MHLO_INPUT
     case InputDialectOptions::Type::mhlo:
       MHLO::buildMHLOInputConversionPassPipeline(passManager);
       break;
@@ -50,18 +50,18 @@ void buildIREEVMTransformPassPipeline(
       MHLO::buildXLACleanupPassPipeline(passManager);
       MHLO::buildMHLOInputConversionPassPipeline(passManager);
       break;
-#endif  // IREE_HAVE_MHLO_DIALECTS
-#ifdef IREE_HAVE_TORCH_DIALECTS
+#endif  // IREE_HAVE_MHLO_INPUT
+#ifdef IREE_HAVE_TORCH_INPUT
     case InputDialectOptions::Type::tm_tensor:
       passManager.addNestedPass<func::FuncOp>(
           TMTensor::createConvertTMTensorToLinalgExtPass());
       break;
-#endif  // IREE_HAVE_TORCH_DIALECTS
-#ifdef IREE_HAVE_TOSA_DIALECTS
+#endif  // IREE_HAVE_TORCH_INPUT
+#ifdef IREE_HAVE_TOSA_INPUT
     case InputDialectOptions::Type::tosa:
       buildTOSAInputConversionPassPipeline(passManager);
       break;
-#endif  // IREE_HAVE_TOSA_DIALECTS
+#endif  // IREE_HAVE_TOSA_INPUT
   }
 
   buildCommonInputConversionPassPipeline(passManager);

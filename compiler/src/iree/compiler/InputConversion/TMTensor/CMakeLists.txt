@@ -50,7 +50,7 @@ iree_cc_library(
     MLIRTransforms
     TorchMLIRTMTensorDialect
   DEFINES
-    "IREE_HAVE_TORCH_DIALECTS"
+    "IREE_HAVE_TORCH_INPUT"
   PUBLIC
 )
 
