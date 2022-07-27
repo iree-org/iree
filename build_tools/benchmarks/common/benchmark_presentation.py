@@ -329,7 +329,7 @@ def _categorize_on_single_metric(
     elif similar_threshold.unit.value == metric_unit:
       ratio = abs(current - base)
     else:
-      raise ValueError("Doesn't support mismatch threshold unit yet.")
+      raise ValueError(f"Mismatch between metric unit '{metric_unit}' and threshold unit '{similar_threshold.unit.value}'")
 
     if ratio <= similar_threshold.threshold:
       similar_map[name] = metrics_obj
