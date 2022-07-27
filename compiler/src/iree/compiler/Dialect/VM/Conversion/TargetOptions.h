@@ -30,7 +30,7 @@ struct TargetOptions {
   bool truncateUnsupportedFloats = true;
 
   // Prefer optimizations that reduce VM stack usage over performance.
-  bool optimizeForStackSize = true;
+  bool optimizeForStackSize = false;
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<TargetOptions>;

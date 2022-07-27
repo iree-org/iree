@@ -698,6 +698,16 @@ def Util_SubrangeOp : OpInterface<"SubrangeOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}]
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the resulting subrange value if the op produces one.
+        Will be nullptr if the op is only consuming a subrange.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getSubrangeResult",
+      /*args=*/(ins),
+      /*methodBody=*/[{}]
+    >,
   ];
 }
 

@@ -43,6 +43,7 @@ iree_cc_library(
     MLIRMathDialect
     MLIRMemRefDialect
     MLIRPass
+    MLIRSCFDialect
     MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::Util::Analysis

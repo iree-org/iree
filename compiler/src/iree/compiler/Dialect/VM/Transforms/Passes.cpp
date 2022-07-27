@@ -12,8 +12,10 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Utils/PassUtils.h"
+#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/Affine/Passes.h"
+#include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
@@ -55,12 +57,32 @@ static void addCleanupPatterns(OpPassManager &passManager) {
 
 void buildVMTransformPassPipeline(OpPassManager &passManager,
                                   TargetOptions targetOptions) {
-  passManager.addNestedPass<mlir::func::FuncOp>(createLoopCoalescingPass());
-  passManager.addNestedPass<mlir::func::FuncOp>(
-      createSCFForLoopCanonicalizationPass());
+  // HACK: we'd really prefer not to inline here but most of the subsequent
+  // passes are local only. We need to inline before we convert to the vm
+  // dialect as they all operate on our various input dialects. If we could
+  // control the inliner a bit more and not have it inline *everything* we could
+  // do a more conservative inlining here and then the final one after lowering
+  // to vm below.
+  passManager.addPass(mlir::createInlinerPass());
+  passManager.addPass(mlir::createSymbolDCEPass());
+
   FunctionLikeNest(passManager)
-      .addPass(createLoopInvariantCodeMotionPass)
-      .addPass(createConvertSCFToCFPass);
+      .addPass(mlir::createSCFForLoopCanonicalizationPass);
+
+  // This pass is sketchy as it can pessimizes tight loops due to affine
+  // treating all indices as signed and the unsigned conversion pass not being
+  // able to handle that. The scf.for canonicalization does a decent job of
+  // removing trivial loops above and this catches the rest. It inserts nasty
+  // rem/div ops that we can never safely remove inside of the hot inner loop
+  // and that sucks. We still have this here for now as the cost of the rem/div
+  // are less than the cost of an additional loop that this could remove.
+  passManager.addNestedPass<mlir::func::FuncOp>(createLoopCoalescingPass());
+
+  FunctionLikeNest(passManager)
+      .addPass(mlir::createLoopInvariantCodeMotionPass)
+      .addPass(mlir::createConvertSCFToCFPass)
+      .addPass(mlir::createLowerAffinePass)
+      .addPass(mlir::arith::createArithmeticUnsignedWhenEquivalentPass);
 
   // Propagate buffer subranges throughout the program - this should remove any
   // remaining subspans and give us a smaller surface area during conversion.
@@ -78,9 +100,17 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<IREE::VM::ModuleOp>(
       createGlobalInitializationPass());
 
-  passManager.addPass(createInlinerPass());
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
+  // Catch any inlining opportunities we created during lowering.
+  passManager.addPass(mlir::createInlinerPass());
+  passManager.addPass(mlir::createSymbolDCEPass());
+
+  // Ideally we'd run this as part of a fixed-point iteration: CSE may need the
+  // canonicalizer to remove ops in order to get the equivalences it needs to
+  // work while the canonicalizer may require CSE for patterns to kick in (like
+  // "fold cmp if lhs=%0 && rhs=%0").
+  passManager.addPass(mlir::createCanonicalizerPass());
+  passManager.addPass(mlir::createCSEPass());
+  passManager.addPass(mlir::createCanonicalizerPass());
 
   // Now that we've inlined/canonicalized/etc the initializers we can remove
   // them if they are empty to save a few bytes in the binary and avoid a
@@ -88,7 +118,6 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<IREE::VM::ModuleOp>(
       createDropEmptyModuleInitializersPass());
 
-  passManager.addPass(createSymbolDCEPass());
   if (targetOptions.optimizeForStackSize) {
     passManager.addNestedPass<IREE::VM::ModuleOp>(createSinkDefiningOpsPass());
   }

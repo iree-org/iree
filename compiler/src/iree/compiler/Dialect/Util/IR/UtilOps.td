@@ -883,6 +883,7 @@ def Util_BufferSubspanOp : Util_PureOp<"buffer.subspan", [
     Value getSubrangeResourceSize() { return getSourceSize(); }
     Value getSubrangeOffset() { return getSourceOffset(); }
     Value getSubrangeLength() { return getResultSize(); }
+    Value getSubrangeResult() { return getResult(); }
 
     // Walks up the use-def chain to find a subspan op that feeds into |value|.
     static IREE::Util::BufferSubspanOp findSubspanOp(Value value);

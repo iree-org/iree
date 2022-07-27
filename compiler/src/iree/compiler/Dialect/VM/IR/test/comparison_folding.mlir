@@ -192,6 +192,39 @@ vm.module @cmp_slt_i32_folds {
 
 // -----
 
+// CHECK-LABEL: @cmp_slt_i64_folds
+vm.module @cmp_slt_i64_folds {
+  // CHECK-LABEL: @always_eq
+  vm.func @always_eq(%arg0 : i64) -> i32 {
+    // CHECK: %zero = vm.const.i32.zero
+    // CHECK-NEXT: vm.return %zero : i32
+    %cmp = vm.cmp.lt.i64.s %arg0, %arg0 : i64
+    vm.return %cmp : i32
+  }
+
+  // CHECK-LABEL: @const_true
+  vm.func @const_true() -> i32 {
+    // CHECK: %c1 = vm.const.i32 1
+    // CHECK-NEXT: vm.return %c1 : i32
+    %c1 = vm.const.i64 -1
+    %c2 = vm.const.i64 2
+    %cmp = vm.cmp.lt.i64.s %c1, %c2 : i64
+    vm.return %cmp : i32
+  }
+
+  // CHECK-LABEL: @const_false
+  vm.func @const_false() -> i32 {
+    // CHECK: %zero = vm.const.i32.zero
+    // CHECK-NEXT: vm.return %zero : i32
+    %c1 = vm.const.i64 -1
+    %c2 = vm.const.i64 2
+    %cmp = vm.cmp.lt.i64.s %c2, %c1 : i64
+    vm.return %cmp : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @cmp_ult_i32_folds
 vm.module @cmp_ult_i32_folds {
   // CHECK-LABEL: @always_eq
