@@ -341,7 +341,7 @@ def _categorize_on_single_metric(
   return (regressed_map, improved_map, similar_map, raw_map)
 
 
-def _get_compare_text(current: int, base: Optional[int]) -> str:
+def _get_compare_text(current: float, base: Optional[int]) -> str:
   """Generates the text of comparison between current and base value. Returns
     the current value if the base value is None.
   """
