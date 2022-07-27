@@ -351,7 +351,7 @@ def _get_compare_text(current: float, base: Optional[int]) -> str:
 
   ratio = abs(current - base) / base
   direction = "↑" if current > base else ("↓" if current < base else "")
-  return f"{current} (vs. {base}, {ratio:.2%}{direction})"
+  return f"{current:.3f} (vs. {base:.3f}, {ratio:.2%}{direction})"
 
 
 def _sort_benchmarks_and_get_table(benchmarks: Dict[str,
@@ -372,8 +372,8 @@ def _sort_benchmarks_and_get_table(benchmarks: Dict[str,
     str_mean = _get_compare_text(current, base)
     clickable_name = _make_series_link(name)
     sorted_rows.append(
-        (ratio, (clickable_name, str_mean, benchmark.median_time / 1e6,
-                 benchmark.stddev_time / 1e6)))
+        (ratio, (clickable_name, str_mean, f"{benchmark.median_time / 1e6:.3f}",
+                 f"{benchmark.stddev_time / 1e6:.3f}")))
   sorted_rows.sort(key=lambda row: row[0], reverse=True)
 
   return _add_header_and_get_markdown_table(
@@ -412,8 +412,9 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
     tables.append(_sort_benchmarks_and_get_table(similar, size_cut))
   if raw:
     tables.append(md.header("Raw Latencies", 3))
-    raw_list = [(_make_series_link(k), v.mean_time / 1e6, v.median_time / 1e6,
-                 v.stddev_time / 1e6) for k, v in raw.items()]
+    raw_list = [(_make_series_link(k), f"{v.mean_time / 1e6:.3f}",
+                 f"{v.median_time / 1e6:.3f}", f"{v.stddev_time / 1e6:.3f}")
+                for k, v in raw.items()]
     tables.append(
         _add_header_and_get_markdown_table(BENCHMARK_RESULTS_HEADERS,
                                            raw_list,
