@@ -13,23 +13,18 @@
 #define IREE_COMPILER_TOOLS_INIT_DIALECTS_H_
 
 #include "iree/compiler/Tools/init_compiler_modules.h"
+#include "iree/compiler/Tools/init_input_dialects.h"
 #include "iree/compiler/Tools/init_iree_dialects.h"
 #include "iree/compiler/Tools/init_mlir_dialects.h"
-#ifdef IREE_HAVE_TORCH_MLIR_DIALECTS
-#include "iree/compiler/Tools/init_torch_mlir_dialects.h"
-#endif
-#include "iree/compiler/Tools/init_xla_dialects.h"
 
 namespace mlir {
 namespace iree_compiler {
 
 inline void registerAllDialects(DialectRegistry &registry) {
   registerMlirDialects(registry);
+  registerInputDialects(registry);
   registerIreeDialects(registry);
-#ifdef IREE_HAVE_TORCH_MLIR_DIALECTS
-  registerTorchMLIRDialects(registry);
-#endif
-  mlir::registerXLADialects(registry);
+
   mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
 }
 

@@ -25,12 +25,6 @@
 #include "iree/compiler/Dialect/VM/Analysis/TestPasses.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VMVX/Transforms/Passes.h"
-#include "iree/compiler/InputConversion/Common/Passes.h"
-#include "iree/compiler/InputConversion/MHLO/Passes.h"
-#ifdef IREE_HAVE_TORCH_MLIR_DIALECTS
-#include "iree/compiler/InputConversion/TMTensor/Passes.h"
-#endif  // IREE_HAVE_TORCH_MLIR_DIALECTS
-#include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
 
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
@@ -49,14 +43,7 @@ inline void registerAllIreePasses() {
   IREE::TFLite::registerPasses();
   IREE::TFLite::registerTransformPassPipeline();
 
-  registerCommonInputConversionPasses();
-  MHLO::registerMHLOConversionPasses();
-#ifdef IREE_HAVE_TORCH_MLIR_DIALECTS
-  TMTensor::registerTMTensorConversionPasses();
-#endif
-  registerTOSAConversionPasses();
   ConstEval::registerConstEvalPasses();
-
   IREE::Flow::registerFlowPasses();
   IREE::HAL::registerHALPasses();
   IREE::LinalgExt::registerPasses();

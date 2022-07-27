@@ -72,8 +72,6 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/VM/IR",
         "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",
         "//compiler/src/iree/compiler/Dialect/VM/Target/Bytecode",
-        "//compiler/src/iree/compiler/InputConversion/MHLO",
-        "//compiler/src/iree/compiler/InputConversion/TOSA",
         "//compiler/src/iree/compiler/Pipelines",
         "//compiler/src/iree/compiler/Tools:init_llvmir_translations",
         "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",

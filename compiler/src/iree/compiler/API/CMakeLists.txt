@@ -45,8 +45,6 @@ add_mlir_public_c_api_library(IREECompilerCAPILib
   LINK_LIBS PUBLIC
     MLIRIR
     iree::compiler::ConstEval
-    iree::compiler::InputConversion::MHLO::MHLO
-    iree::compiler::InputConversion::TOSA::TOSA
     iree::compiler::Dialect::VM::IR::IR
     iree::compiler::Dialect::VM::Target::init_targets
     iree::compiler::Pipelines
@@ -63,13 +61,6 @@ add_mlir_public_c_api_library(IREECompilerCAPILib
 
     ${_OPTIONAL_LINK_LIBS}
 )
-
-if(IREE_BUILD_TORCH_MLIR_SUPPORT)
-  target_compile_definitions(obj.IREECompilerCAPILib
-    PUBLIC
-    IREE_HAVE_TORCH_MLIR_DIALECTS
-  )
-endif()
 
 add_subdirectory(test)
 
