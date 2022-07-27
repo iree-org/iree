@@ -193,9 +193,8 @@ jobs:
     steps:
       - name: Querying GPU information
         run: |
-          sudo dmesg | grep NVRM
-          dpkg -l | grep nvidia
-          nvidia-smi
+          ./build_tools/scripts/check_cuda.sh
+          ./build_tools/scripts/check_vulkan.sh
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
