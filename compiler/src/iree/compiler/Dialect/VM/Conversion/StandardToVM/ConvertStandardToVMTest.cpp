@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
+#include "iree/compiler/Dialect/VM/IR/VMTypes.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
@@ -45,6 +46,12 @@ class ConvertStandardToVMTestPass
 
     IREE::VM::TypeConverter typeConverter(
         IREE::VM::TargetOptions::FromFlags::get());
+
+    typeConverter.addConversion(
+        [](IREE::Util::BufferType type) -> Optional<Type> {
+          return IREE::VM::RefType::get(
+              IREE::VM::BufferType::get(type.getContext()));
+        });
 
     RewritePatternSet patterns(&getContext());
     populateStandardToVMPatterns(&getContext(), typeConverter, patterns);

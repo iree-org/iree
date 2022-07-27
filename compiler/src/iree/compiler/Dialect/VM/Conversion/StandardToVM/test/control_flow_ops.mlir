@@ -74,40 +74,6 @@ module {
 }
 
 // -----
-// CHECK-LABEL: @t005_call
-module @t005_call {
-
-module {
-  func.func private @import_fn(%arg0 : i32) -> i32
-  // CHECK: vm.func private @my_fn
-  // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
-  func.func @my_fn(%arg0 : i32) -> (i32) {
-    // CHECK: vm.call @import_fn(%[[ARG0]]) : (i32) -> i32
-    %0 = call @import_fn(%arg0) : (i32) -> i32
-    return %0 : i32
-  }
-}
-
-}
-
-// -----
-// CHECK-LABEL: @t005_call_int_promotion
-module @t005_call_int_promotion {
-
-module {
-  func.func private @import_fn(%arg0 : i1) -> i1
-  // CHECK: vm.func private @my_fn
-  // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
-  func.func @my_fn(%arg0 : i1) -> (i1) {
-    // CHECK: vm.call @import_fn(%[[ARG0]]) : (i32) -> i32
-    %0 = call @import_fn(%arg0) : (i1) -> i1
-    return %0 : i1
-  }
-}
-
-}
-
-// -----
 // CHECK-LABEL: @t006_assert
 module @t006_assert {
 

@@ -222,7 +222,6 @@ def VM_ImportOp : VM_Op<"import", [
     /// Returns the result types of this function.
     ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
 
-
     /// Hook for OpTrait::FunctionLike, called after verifying that the 'type'
     /// attribute is present. This can check for preconditions of the
     /// getNumArguments hook not failing.
