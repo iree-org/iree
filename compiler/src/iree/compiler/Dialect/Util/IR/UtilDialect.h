@@ -1,4 +1,4 @@
-// Copyright 2019 The IREE Authors
+// Copyright 2022 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -35,8 +35,6 @@ class UtilDialect : public Dialect {
   void registerAttributes();
   void registerTypes();
 };
-
-void registerUtilExternalModels(DialectRegistry& registry);
 
 }  // namespace Util
 }  // namespace IREE
