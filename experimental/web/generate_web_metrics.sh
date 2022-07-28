@@ -130,7 +130,7 @@ function compile_program_wasm {
   # compile-time statistics that we can.
   "${IREE_COMPILE_PATH?}" "${INPUT_FILE}" \
     --iree-input-type=tosa \
-    --iree-hal-target-backends=llvm \
+    --iree-hal-target-backends=llvm-cpu \
     --iree-llvm-target-triple=wasm32-unknown-emscripten \
     --iree-hal-dump-executable-sources-to="${ARTIFACTS_DIR}" \
     --iree-hal-dump-executable-binaries-to="${ARTIFACTS_DIR}" \
@@ -164,7 +164,7 @@ function compile_program_native {
   # compile-time statistics that we can.
   "${IREE_COMPILE_PATH?}" "${INPUT_FILE}" \
     --iree-input-type=tosa \
-    --iree-hal-target-backends=llvm \
+    --iree-hal-target-backends=llvm-cpu \
     --iree-hal-dump-executable-sources-to="${ARTIFACTS_DIR}" \
     --iree-hal-dump-executable-binaries-to="${ARTIFACTS_DIR}" \
     --iree-scheduling-dump-statistics-format=csv \

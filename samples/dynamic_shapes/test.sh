@@ -27,7 +27,7 @@ cmake --build ${BUILD_DIR} --target iree-compile -- -k 0
 
 # 3. Compile `dynamic_shapes.mlir` using `iree-compile`.
 ${BUILD_DIR}/tools/iree-compile \
-  --iree-hal-target-backends=cpu \
+  --iree-hal-target-backends=llvm-cpu \
   --iree-input-type=mhlo \
   ${ARTIFACTS_DIR}/dynamic_shapes.mlir -o ${ARTIFACTS_DIR}/dynamic_shapes_cpu.vmfb
 

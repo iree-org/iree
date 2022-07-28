@@ -49,7 +49,7 @@ compile_sample() {
   echo "  Compiling '$1' sample..."
   ${COMPILE_TOOL?} $2 \
     --iree-input-type=mhlo \
-    --iree-hal-target-backends=llvm \
+    --iree-hal-target-backends=llvm-cpu \
     --iree-llvm-target-triple=wasm32-unknown-emscripten \
     --iree-llvm-target-cpu-features=+atomics,+bulk-memory,+simd128 \
     --o ${BINARY_DIR}/$1.vmfb
