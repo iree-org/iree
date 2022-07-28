@@ -7,8 +7,7 @@
 // CHECK-LABEL: @test_flex_ops
 func.func @test_flex_ops(%arg0: tensor<?x2x64xf32>, %arg1: tensor<1x1x64xf32>) -> tensor<*xf32> {
   // CHECK: %[[ADD:.+]] = "tosa.add"(%arg0, %arg1) : (tensor<?x2x64xf32>, tensor<1x1x64xf32>)
-  // CHECK: %[[CAST:.+]] = tensor.cast %[[ADD]]
-  // CHECK: return %[[CAST]]
+  // CHECK: return %[[ADD]] : tensor<?x2x64xf32>
   %0 = "tfl.custom"(%arg0, %arg1) {custom_code = "FlexAddV2", custom_option = opaque<"tfl", "0x054164645632002E120541646456321A001A002A070A01541202300132180A16726573696475616C5F626C6F636B5F2E5F302F616464000237311414042801"> : tensor<63xi8>} : (tensor<?x2x64xf32>, tensor<1x1x64xf32>) -> tensor<*xf32>
   return %0: tensor<*xf32>
 }
