@@ -145,7 +145,7 @@ with the additional command-line flags
 
 ```shell hl_lines="3 4 5 6 7 8"
 tools/iree-compile \
-  --iree-hal-target-backends=dylib-llvm-aot \
+  --iree-hal-target-backends=llvm-cpu \
   --iree-llvm-target-triple=riscv64 \
   --iree-llvm-target-cpu=generic-rv64 \
   --iree-llvm-target-abi=lp64d \

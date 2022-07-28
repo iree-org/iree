@@ -41,7 +41,7 @@ Note that the command can only be run under `integrations/tensorflow/test/python
 
 ```
 iree-compile \
-  --iree-hal-target-backends=dylib-llvm-aot \
+  --iree-hal-target-backends=llvm-cpu \
   --iree-input-type=mhlo \
   iree_input.mlir
 ```

@@ -29,7 +29,7 @@ The model can be compiled with the following command (assuming the path to
 ```shell
 iree-compile \
     --iree-stream-partitioning-favor=min-peak-memory \
-    --iree-hal-target-backends=dylib-llvm-aot \
+    --iree-hal-target-backends=llvm-cpu \
     --iree-llvm-target-triple=x86_64-pc-linux-elf \
     --iree-llvm-debug-symbols=false \
     samples/models/simple_abs.mlir \
@@ -42,8 +42,7 @@ In which
 *   `-iree-stream-partitioning-favor=min-peak-memory`: Optimize for minimum peak
     memory usage at the cost of concurrency - include when targeting
     single-threaded execution to reduce memory consumption.
-*   `iree-hal-target-backends=dylib-llvm-aot`: Build the model for the dynamic
-    library CPU HAL driver
+*   `iree-hal-target-backends=llvm-cpu`: Compile using the LLVM CPU target
 *   `iree-llvm-target-triple`: Use the `<arch>-pc-linux-elf` LLVM target triple
     so the artifact has a fixed ABI to be rendered by the
     [elf_module library](https://github.com/iree-org/iree/tree/main/iree/hal/local/elf)

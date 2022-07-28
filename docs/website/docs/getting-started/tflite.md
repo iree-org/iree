@@ -43,7 +43,7 @@ iree-import-tflite ${TFLITE_PATH} -o ${IMPORT_PATH}
 # Compile for the CPU backend
 iree-compile \
     --iree-input-type=tosa \
-    --iree-hal-target-backends=cpu \
+    --iree-hal-target-backends=llvm-cpu \
     ${IMPORT_PATH} \
     -o ${MODULE_PATH}
 ```
@@ -75,7 +75,7 @@ tfliteIR = "/".join([workdir, "tflite.mlir"])
 tosaIR = "/".join([workdir, "tosa.mlir"])
 bytecodeModule = "/".join([workdir, "iree.vmfb"])
 
-backends = ["dylib-llvm-aot"]
+backends = ["llvm-cpu"]
 config = "local-task"
 ```
 
@@ -103,7 +103,7 @@ iree_tflite_compile.compile_file(
   import_only=False)
 ```
 
-After compilation is completed we configure the VmModule using the dylib configuration and compiled
+After compilation is completed we configure the VmModule using the local-task configuration and compiled
 IREE module.
 
 ```python
