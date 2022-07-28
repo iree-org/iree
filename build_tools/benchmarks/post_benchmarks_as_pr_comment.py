@@ -93,7 +93,7 @@ def get_origin_tree_commit(distance: int, verbose: bool = False) -> str:
 
 def get_from_dashboard(url: str,
                        payload: Dict[str, Any],
-                       verbose: bool = False) -> Dict[str, int]:
+                       verbose: bool = False) -> Dict[str, Dict[str, Any]]:
   headers = {'Content-type': 'application/json'}
   data = json.dumps(payload)
 
@@ -113,13 +113,14 @@ def get_from_dashboard(url: str,
 
 
 def query_base_benchmark_results(commit,
-                                 verbose: bool = False) -> Dict[str, int]:
+                                 verbose: bool = False
+                                ) -> Dict[str, Dict[str, Any]]:
   """Queries the benchmark results for the given commit."""
   build_id = get_git_total_commit_count(commit, verbose)
 
   url = get_required_env_var('IREE_DASHBOARD_URL')
   payload = {'projectId': IREE_PROJECT_ID, 'buildId': build_id}
-  return get_from_dashboard(f'{url}/apis/getBuild', payload, verbose=verbose)
+  return get_from_dashboard(f'{url}/apis/v2/getBuild', payload, verbose=verbose)
 
 
 def get_benchmark_result_markdown(benchmark_files: Sequence[str],
@@ -166,15 +167,21 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
 
       # Update the aggregate benchmarks with base numbers.
       for bench in all_benchmarks:
-        all_benchmarks[bench].base_mean_time = base_benchmarks[bench]
+        base_benchmark = base_benchmarks[bench]
+        if base_benchmark["sampleUnit"] != "ns":
+          raise ValueError("Only support nanoseconds for latency sample.")
+        all_benchmarks[bench].base_mean_time = base_benchmark["sample"]
 
       # Update the compilation metrics with base numbers.
       for target_name, metrics in all_compilation_metrics.items():
         updated_metrics = metrics
         for mapper in COMPILATION_METRICS_TO_TABLE_MAPPERS:
           metric_key = mapper.get_series_name(target_name)
-          updated_metrics = mapper.update_base_value(
-              updated_metrics, base_benchmarks[metric_key])
+          base_benchmark = base_benchmarks[metric_key]
+          if base_benchmark["sampleUnit"] != mapper.get_unit():
+            raise ValueError("Unit of the queried sample is mismatched.")
+          updated_metrics = mapper.update_base_value(updated_metrics,
+                                                     base_benchmark["sample"])
         all_compilation_metrics[target_name] = updated_metrics
 
       commit_info = f"@ commit {pr_commit} (vs. base {base_commit})"

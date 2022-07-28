@@ -80,19 +80,19 @@ def parse_compilation_time_from_ninja_log(log: TextIO) -> Dict[str, int]:
 
 
 def get_module_component_info(module: BinaryIO,
-                              module_file_size: int) -> ModuleComponentSizes:
+                              module_file_bytes: int) -> ModuleComponentSizes:
   with zipfile.ZipFile(module) as module_zipfile:
     size_map = dict(
         (info.filename, info.file_size) for info in module_zipfile.infolist())
 
-  vm_component_size = size_map[VM_COMPONENT_NAME]
-  const_component_size = size_map[CONST_COMPONENT_NAME]
+  vm_component_bytes = size_map[VM_COMPONENT_NAME]
+  const_component_bytes = size_map[CONST_COMPONENT_NAME]
   identified_names = {VM_COMPONENT_NAME, CONST_COMPONENT_NAME}
-  total_dispatch_component_size = 0
+  total_dispatch_component_bytes = 0
   for filename, size in size_map.items():
     for pattern in DISPATCH_COMPONENT_PATTERNS:
       if re.match(pattern, filename):
-        total_dispatch_component_size += size
+        total_dispatch_component_bytes += size
         identified_names.add(filename)
         break
 
@@ -101,10 +101,10 @@ def get_module_component_info(module: BinaryIO,
         f"Unrecognized components in the module: {size_map.keys()}.")
 
   return ModuleComponentSizes(
-      file_size=module_file_size,
-      vm_component_size=vm_component_size,
-      const_component_size=const_component_size,
-      total_dispatch_component_size=total_dispatch_component_size)
+      file_bytes=module_file_bytes,
+      vm_component_bytes=vm_component_bytes,
+      const_component_bytes=const_component_bytes,
+      total_dispatch_component_bytes=total_dispatch_component_bytes)
 
 
 def get_module_path(flag_file: TextIO) -> Optional[str]:
@@ -179,7 +179,7 @@ def main(args: argparse.Namespace):
       if cmake_target is None:
         raise RuntimeError(
             f"Module path isn't a module cmake target: {module_path}")
-      compilation_time = target_build_time_map[cmake_target]
+      compilation_time_ms = target_build_time_map[cmake_target]
 
       compilation_info = CompilationInfo(model_name=benchmark_case.model_name,
                                          model_tags=benchmark_case.model_tags,
@@ -189,7 +189,7 @@ def main(args: argparse.Namespace):
       compilation_statistics = CompilationStatistics(
           compilation_info=compilation_info,
           module_component_sizes=module_component_sizes,
-          compilation_time=compilation_time)
+          compilation_time_ms=compilation_time_ms)
       compilation_statistics_list.append(compilation_statistics)
 
   commit = get_git_commit_hash("HEAD")

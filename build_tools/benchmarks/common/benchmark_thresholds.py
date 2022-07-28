@@ -12,8 +12,8 @@ from enum import Enum
 
 
 class ThresholdUnit(Enum):
-  PERCENTAGE = 0  # Percentage
-  VALUE_MS = 1  # Absolute value in milliseconds
+  PERCENTAGE = "%"  # Percentage
+  VALUE_NS = "ns"  # Absolute value in nanoseconds
 
 
 @dataclass
@@ -64,15 +64,15 @@ BENCHMARK_THRESHOLDS = [
 
     # Fluctuating benchmarks on GPUs.
     BenchmarkThreshold(
-        re.compile(r"^MobileNetV3Small.*full-inference.*GPU-Mali"), 2,
-        ThresholdUnit.VALUE_MS),
+        re.compile(r"^MobileNetV3Small.*full-inference.*GPU-Mali"), 2 * 10**6,
+        ThresholdUnit.VALUE_NS),
 
     # Benchmarks that complete around 10ms on GPUs; using percentage is not
     # suitable anymore.
-    BenchmarkThreshold(re.compile(r"^DeepLabV3.*GPU-Mali"), 1,
-                       ThresholdUnit.VALUE_MS),
-    BenchmarkThreshold(re.compile(r"^MobileNet.*GPU"), 1,
-                       ThresholdUnit.VALUE_MS),
+    BenchmarkThreshold(re.compile(r"^DeepLabV3.*GPU-Mali"), 1 * 10**6,
+                       ThresholdUnit.VALUE_NS),
+    BenchmarkThreshold(re.compile(r"^MobileNet.*GPU"), 1 * 10**6,
+                       ThresholdUnit.VALUE_NS),
 
     # Default threshold for all benchmarks: 5%.
     BenchmarkThreshold(re.compile(r".*"), 5, ThresholdUnit.PERCENTAGE),

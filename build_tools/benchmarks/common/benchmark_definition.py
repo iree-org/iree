@@ -138,6 +138,7 @@ def get_iree_benchmark_module_arguments(
     repetitions = 10
 
   cmd = [
+      "--time_unit=ns",
       "--benchmark_format=json",
       "--benchmark_out_format=json",
       f"--benchmark_out={results_filename}",
@@ -437,12 +438,14 @@ class BenchmarkResults(object):
       - benchmark_index: the benchmark's index.
       - kind: what kind of aggregate time to get; choices:
         'mean', 'median', 'stddev'.
+      Returns:
+        Time in nanoseconds.
       """
     time = None
     for bench_case in self.benchmarks[benchmark_index].results:
       if bench_case["name"].endswith(f"real_time_{kind}"):
-        if bench_case["time_unit"] != "ms":
-          raise ValueError(f"Expected ms as time unit")
+        if bench_case["time_unit"] != "ns":
+          raise ValueError(f"Expected ns as time unit")
         time = int(round(bench_case["real_time"]))
         break
     if time is None:
@@ -489,10 +492,10 @@ class CompilationInfo(object):
 
 @dataclass(frozen=True)
 class ModuleComponentSizes(object):
-  file_size: int
-  vm_component_size: int
-  const_component_size: int
-  total_dispatch_component_size: int
+  file_bytes: int
+  vm_component_bytes: int
+  const_component_bytes: int
+  total_dispatch_component_bytes: int
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
@@ -505,7 +508,7 @@ class CompilationStatistics(object):
   # Module file and component sizes.
   module_component_sizes: ModuleComponentSizes
   # Module compilation time in ms.
-  compilation_time: int
+  compilation_time_ms: int
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
@@ -514,7 +517,7 @@ class CompilationStatistics(object):
             json_object["compilation_info"]),
         module_component_sizes=ModuleComponentSizes.from_json_object(
             json_object["module_component_sizes"]),
-        compilation_time=json_object["compilation_time"])
+        compilation_time_ms=json_object["compilation_time_ms"])
 
 
 @dataclass(frozen=True)
