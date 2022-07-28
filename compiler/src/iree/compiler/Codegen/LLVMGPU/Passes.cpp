@@ -154,8 +154,10 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMGPUReduceSharedMemoryBankConflicts());
+  if (!llvmgpuUseMMASync) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMGPUReduceSharedMemoryBankConflicts());
+  }
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
   nestedModulePM.addNestedPass<func::FuncOp>(

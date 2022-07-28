@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
+#include "mlir/Dialect/NVGPU/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
@@ -98,6 +99,23 @@ static void createAsyncGroups(func::FuncOp funcOp) {
                                              nullptr);
     // Clean up old stores.
     for (vector::TransferWriteOp writeOp : group) writeOp.erase();
+  }
+}
+
+static void swizzleSharedMemory(func::FuncOp funcOp) {
+  SmallVector<memref::AllocOp> shmAllocOps;
+  funcOp->walk([&](memref::AllocOp allocOp) {
+    auto memrefType = allocOp.getMemref().getType().cast<MemRefType>();
+    // Only apply it to shared memory of input operands.
+    if (memrefType.getMemorySpaceAsInt() !=
+            gpu::GPUDialect::getWorkgroupAddressSpace() ||
+        memrefType.getRank() < 3)
+      return;
+    shmAllocOps.push_back(allocOp);
+  });
+  for (auto allocOp : shmAllocOps) {
+    (void)nvgpu::optimizeSharedMemoryReadsAndWrites(funcOp,
+                                                    allocOp.getMemref());
   }
 }
 
@@ -246,6 +264,10 @@ struct LLVMGPUVectorToGPUPass
     else
       convertVectorToMMAOps(funcOp);
     createAsyncGroups(funcOp);
+
+    if (llvmgpuUseMMASync) {
+      swizzleSharedMemory(funcOp);
+    }
   }
 };
 }  // namespace

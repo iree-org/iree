@@ -64,6 +64,7 @@ iree_cc_library(
     MLIRMemRefTransforms
     MLIRNVGPUDialect
     MLIRNVGPUToNVVM
+    MLIRNVGPUTransforms
     MLIRNVVMDialect
     MLIRPDLDialect
     MLIRPDLInterpDialect
