@@ -314,14 +314,15 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                       builder.getStringAttr(name));
   result.addAttribute("function_type", TypeAttr::get(type));
   result.attributes.append(attrs.begin(), attrs.end());
-  if (argAttrs.empty()) {
-    return;
+  if (!argAttrs.empty()) {
+    assert(type.getNumInputs() == argAttrs.size() &&
+           "expected as many argument attribute lists as arguments");
+    function_interface_impl::addArgAndResultAttrs(builder, result, argAttrs,
+                                                  /*resultAttrs=*/llvm::None);
   }
 
-  assert(type.getNumInputs() == argAttrs.size() &&
-         "expected as many argument attribute lists as arguments");
-  function_interface_impl::addArgAndResultAttrs(builder, result, argAttrs,
-                                                /*resultAttrs=*/llvm::None);
+  // No clue why this is required.
+  result.addRegion();
 }
 
 LogicalResult ImportOp::verifyType() {

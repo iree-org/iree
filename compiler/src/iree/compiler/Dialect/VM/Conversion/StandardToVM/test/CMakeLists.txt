@@ -20,7 +20,7 @@ iree_lit_test_suite(
     "const_ops.mlir"
     "control_flow_ops.mlir"
     "conversion_ops.mlir"
-    "func_attrs.mlir"
+    "func_ops.mlir"
     "nesting.mlir"
     "structural_ops.mlir"
   TOOLS
