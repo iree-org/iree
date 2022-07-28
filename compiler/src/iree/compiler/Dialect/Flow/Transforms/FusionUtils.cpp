@@ -133,8 +133,11 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
   // When we have static shapes, we do extra checks for the type. For dynamic
   // shape cases, we do not check the shape and do aggressive fusion with high
   // optimism, which is the default approach we are pursuing now.
-  bool hasStaticShape =
+  bool hasOnlyStaticShape =
       !producer.hasDynamicShape() && !consumer.hasDynamicShape();
+
+  // #9802: Vulkan codegen with dynamic shape is not supported yet.
+  if (!hasOnlyStaticShape) return false;
 
   // Check the input and output shapes are compatible. They are compatible when
   //   1. the shapes are identical, or
@@ -146,7 +149,7 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
     auto indexingMap = producer.getTiedIndexingMap(input);
     if (!indexingMap.isIdentity()) return false;
 
-    if (hasStaticShape &&
+    if (hasOnlyStaticShape &&
         producer.getInputOperand(0)->get().getType() != ewOutputType)
       return false;
   } else {
@@ -171,7 +174,7 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
 
     assert(otherInput);
 
-    if (hasStaticShape && (*fullInput)->get().getType() != ewOutputType)
+    if (hasOnlyStaticShape && (*fullInput)->get().getType() != ewOutputType)
       return false;
 
     auto otherIndexingMap = producer.getTiedIndexingMap(*otherInput);
