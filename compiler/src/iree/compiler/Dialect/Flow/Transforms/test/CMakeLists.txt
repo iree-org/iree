@@ -38,6 +38,7 @@ iree_lit_test_suite(
     "outline_dispatch_regions.mlir"
     "pad_linalg_ops.mlir"
     "pad_tensor_to_tensor.mlir"
+    "region_to_workgroups.mlir"
     "strip_and_splat_constant_variables.mlir"
     "strip_signedness.mlir"
     "transformation_pipeline.mlir"
