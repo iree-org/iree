@@ -472,3 +472,52 @@ hal.executable private @innermost_reduction {
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     lowering_config = #[[$CONFIG]]
+
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 2, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable @four_dim_elementwise {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spv.resource_limits<
+        max_compute_shared_memory_size = 32768,
+        max_compute_workgroup_invocations = 512,
+        max_compute_workgroup_size = [512, 512, 512],
+        subgroup_size = 16>>
+    }> {
+    hal.executable.export public @four_dim_elementwise ordinal(0) layout(#executable_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @four_dim_elementwise() {
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:128x8x256x4xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:128x256x4x8xf32>
+        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [128, 8, 256, 4], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:128x8x256x4xf32> -> tensor<128x8x256x4xf32>
+        %3 = linalg.init_tensor [128, 256, 4, 8] : tensor<128x256x4x8xf32>
+        %4 = linalg.generic {
+          indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d3, d1, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+          iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+        } ins(%2 : tensor<128x8x256x4xf32>) outs(%3 : tensor<128x256x4x8xf32>) {
+        ^bb0(%arg0: f32, %arg1: f32):
+          linalg.yield %arg0 : f32
+        } -> tensor<128x256x4x8xf32>
+        flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [128, 256, 4, 8], strides = [1, 1, 1, 1] : tensor<128x256x4x8xf32> -> !flow.dispatch.tensor<writeonly:128x256x4x8xf32>
+        return
+      }
+    }
+  }
+}
+
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 2, 4, 8], [0, 1, 1, 4], [4, 0, 0, 0]{{\]}}>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
+// CHECK-LABEL: hal.executable.export public @four_dim_elementwise
+//  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     lowering_config = #[[$CONFIG]]
