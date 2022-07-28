@@ -272,7 +272,12 @@ IREE_API_EXPORT bool iree_string_view_match_pattern(
 IREE_API_EXPORT iree_host_size_t iree_string_view_append_to_buffer(
     iree_string_view_t source_value, iree_string_view_t* target_value,
     char* buffer) {
-  memcpy(buffer, source_value.data, source_value.size);
+  // Do not copy zero-sized values to avoid passing NULLs to memcpy. The source
+  // and destination pointers are required to be valid and non-NULL by the C
+  // standard.
+  if (source_value.size > 0) {
+    memcpy(buffer, source_value.data, source_value.size);
+  }
   target_value->data = buffer;
   target_value->size = source_value.size;
   return source_value.size;
