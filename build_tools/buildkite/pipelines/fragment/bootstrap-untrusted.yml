@@ -10,7 +10,6 @@ agents:
   queue: "orchestration"
   security: "untrusted"
 
-
 steps:
   # Bootstrap the checked-in bootstrap pipeline. This replaces the rest of the
   # steps (which are waiting on this one).
@@ -25,12 +24,12 @@ steps:
     env:
       MUST_BOOTSTRAP: "false"
     commands: |
-        buildkite-agent pipeline upload --replace \
-          build_tools/buildkite/pipelines/fragment/bootstrap-untrusted.yml
+      buildkite-agent pipeline upload --replace \
+        build_tools/buildkite/pipelines/fragment/bootstrap-untrusted.yml
 
   - wait
 
   - label: ":pipeline: Uploading pipeline from '${BUILDKITE_COMMIT:0:7}'"
     commands: |
-        buildkite-agent pipeline upload \
-          build_tools/buildkite/pipelines/untrusted/${BUILDKITE_PIPELINE_SLUG}.yml
+      buildkite-agent pipeline upload \
+        build_tools/buildkite/pipelines/untrusted/${BUILDKITE_PIPELINE_SLUG}.yml

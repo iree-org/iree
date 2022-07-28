@@ -19,7 +19,6 @@ steps:
         "build-runtime-cmake-build-id" \
         "$(cat build.json | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")"
 
-
   # TODO: better emoji here
   - label: ":hammer_and_wrench: Test the runtime only"
     agents:

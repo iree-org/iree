@@ -50,7 +50,7 @@ jobs:
       build-dir: ${{ env.BUILD_DIR }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: "Building runtime"
@@ -65,7 +65,7 @@ jobs:
       # do our own.
       - name: "Create build dir archive"
         run: tar -cf ${BUILD_DIR}.tar ${BUILD_DIR}
-      - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8  # v3.1.0
+      - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
         with:
           name: "${{ env.BUILD_DIR }}.tar"
           path: "${{ env.BUILD_DIR }}.tar"
@@ -77,11 +77,11 @@ jobs:
       BUILD_DIR: ${{ needs.build_runtime.outputs.build-dir }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: "Downloading runtime build directory"
-        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
         with:
           name: "${{ env.BUILD_DIR }}.tar"
       - name: "Extracting archive"
@@ -111,7 +111,7 @@ jobs:
       gcs-artifact: ${{ steps.upload.outputs.gcs-artifact }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: "Building IREE"
@@ -159,7 +159,7 @@ jobs:
       GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: "Downloading build dir archive"
@@ -189,7 +189,7 @@ jobs:
       GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: Querying GPU information
@@ -221,7 +221,7 @@ jobs:
       - os-family=Linux
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: "Building and testing with ThreadSanitizer"
@@ -251,11 +251,11 @@ jobs:
       HOST_BINARY_ARCHIVE: ${{ needs.host_tools_assertions.outputs.host-binary-root }}.tar
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: "Downloading host tools"
-        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741  # v3.0.0
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
         with:
           name: "${{ env.HOST_BINARY_ARCHIVE }}"
       - name: "Extracting host tools archive"
