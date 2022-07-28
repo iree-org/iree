@@ -82,7 +82,7 @@ them.
 
     ```
     ../iree-build/tools/iree-compile \
-        --iree-hal-target-backends=cpu \
+        --iree-hal-target-backends=llvm-cpu \
         --iree-input-type=mhlo \
         dynamic_shapes.mlir -o dynamic_shapes_cpu.vmfb
     ```

@@ -75,7 +75,7 @@ iree_status_t Run() {
                                           iree_allocator_system(), &instance);
   }
 
-  // Create dylib device with static loader.
+  // Create local device with static loader.
   iree_hal_device_t* device = NULL;
   if (iree_status_is_ok(status)) {
     status = create_device_with_static_loader(iree_allocator_system(), &device);

@@ -51,7 +51,7 @@ INPUT_PATH="${ROOT_DIR?}/samples/models/mnist.mlir"
 echo "=== Compiling MLIR to static library output (.vmfb, .h, .o) ==="
 ${COMPILE_TOOL?} ${INPUT_PATH} \
   --iree-input-type=mhlo \
-  --iree-hal-target-backends=llvm \
+  --iree-hal-target-backends=llvm-cpu \
   --iree-llvm-target-triple=wasm32-unknown-unknown \
   --iree-llvm-target-cpu-features=+simd128 \
   --iree-llvm-link-static \

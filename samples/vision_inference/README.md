@@ -21,7 +21,7 @@ From this directory:
 iree-compile \
     ../models/mnist.mlir \
     --iree-input-type=mhlo \
-    --iree-hal-target-backends=cpu \
+    --iree-hal-target-backends=llvm-cpu \
     -o /tmp/mnist_cpu.vmfb
 
 # Convert the test image to the 1x28x28x1xf32 buffer format the program expects.

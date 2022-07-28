@@ -16,7 +16,7 @@ set(_COMPILE_TOOL_EXECUTABLE $<TARGET_FILE:iree-compile>)
 ## Example with VM bytecode module.
 # Setup args for iree-compile.
 set(_COMPILE_ARGS)
-list(APPEND _COMPILE_ARGS "--iree-hal-target-backends=dylib-llvm-aot")
+list(APPEND _COMPILE_ARGS "--iree-hal-target-backends=llvm-cpu")
 list(APPEND _COMPILE_ARGS "--iree-llvm-link-embedded=false")
 list(APPEND _COMPILE_ARGS "--iree-llvm-link-static")
 list(APPEND _COMPILE_ARGS "--iree-llvm-static-library-output-path=simple_mul.o")
@@ -102,7 +102,7 @@ endif()
 # Setup args for iree-compile.
 set(_COMPILE_ARGS)
 list(APPEND _COMPILE_ARGS "--iree-mlir-to-vm-c-module")
-list(APPEND _COMPILE_ARGS "--iree-hal-target-backends=dylib-llvm-aot")
+list(APPEND _COMPILE_ARGS "--iree-hal-target-backends=llvm-cpu")
 list(APPEND _COMPILE_ARGS "--iree-llvm-link-embedded=false")
 list(APPEND _COMPILE_ARGS "--iree-llvm-link-static")
 list(APPEND _COMPILE_ARGS "--iree-llvm-static-library-output-path=simple_mul_c_module.o")

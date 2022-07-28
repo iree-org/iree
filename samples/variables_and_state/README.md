@@ -92,7 +92,7 @@ and compile the imported `counter.mlir` file using `iree-compile`:
 
 ```
 ../iree-build/tools/iree-compile \
-    --iree-hal-target-backends=cpu \
+    --iree-hal-target-backends=llvm-cpu \
     --iree-input-type=mhlo \
     counter.mlir -o counter_cpu.vmfb
 ```
