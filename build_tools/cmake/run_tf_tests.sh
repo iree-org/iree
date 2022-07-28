@@ -12,6 +12,7 @@ ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 cd "${ROOT_DIR}"
 
 BUILD_DIR="$1"
+IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE:-0}"
 
 source "${BUILD_DIR}/.env" && export PYTHONPATH
 
