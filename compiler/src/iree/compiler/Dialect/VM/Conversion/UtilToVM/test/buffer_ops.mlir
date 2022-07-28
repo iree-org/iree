@@ -11,6 +11,16 @@ func.func @buffer_constant() -> !util.buffer {
 
 // -----
 
+// CHECK-LABEL: @buffer_constant_string
+func.func @buffer_constant_string() -> !util.buffer {
+  // CHECK-64: %[[BUFFER:.+]] = vm.rodata.inline : !vm.buffer = "hello"
+  %0 = util.buffer.constant : !util.buffer = "hello"
+  // CHECK-64: return %[[BUFFER]]
+  return %0 : !util.buffer
+}
+
+// -----
+
 // CHECK-LABEL: @buffer_alloc
 func.func @buffer_alloc(%arg0: index) -> !util.buffer {
   // CHECK-32: %[[SIZE_64:.+]] = vm.ext.i32.i64.u %arg0 : i32 -> i64
