@@ -1,0 +1,86 @@
+
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+
+# This part of the CI handles building native CI artifacts, allowing reuse of
+# the build workflow across configurations. This workflow is triggered by the
+# orchiestrating workflow in ci.yml.
+
+name: Build Native CI Artifacts
+
+on:
+  workflow_call:
+    inputs:
+      build-dir:
+        description: "Output directory for build artifacts"
+        required: true
+      bucket:
+        description: "Bucket to deposit artifacts"
+        required: true
+    outputs:
+      build-dir:
+        description: "Output directory for build artifacts"
+        value: ${{ jobs.build_all.outputs.build-dir }}
+      build-dir-archive:
+        description: "Archive of build artifacts"
+        value: ${{ jobs.build_all.outputs.build-dir-archive }}
+      gcs-artifact:
+        description: "GCS path of build artifact archive"
+        value: ${{ jobs.build_all.outputs.gcs-artifact }}
+
+jobs:
+  build_all:
+    runs-on:
+      # Hacks, and order matters. See the comment at the top of the file.
+      - self-hosted
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - cpu
+      - os-family=Linux
+    outputs:
+      # Pass through the build directory as output so it's available to
+      # dependent jobs.
+      build-dir: ${{ inputs.build-dir }}
+      build-dir-archive: ${{ steps.archive.outputs.build-dir-archive }}
+      gcs-artifact: ${{ steps.upload.outputs.gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        with:
+          submodules: true
+      - name: "Building IREE"
+        env:
+          BUILD_DIR: ${{ inputs.build-dir }}
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
+            ./build_tools/cmake/build_all.sh \
+           ${BUILD_DIR}
+      # Things get more complicated here than when we're just building the
+      # runtime. The build directory is way bigger. We're also using on our own
+      # runners on GCE. So uploading to GitHub actions artifact storage hosted
+      # on Azure is dirt slow. We drop static libraries and object files, which
+      # aren't needed for testing. Then we do some minimal compression locally
+      # *in parallel* and upload to GCS. This can be further optimized.
+      # Especially decompression is still pretty slow. See #9881.
+      - name: "Creating build dir archive"
+        id: archive
+        env:
+          BUILD_DIR: ${{ inputs.build-dir }}
+          BUILD_DIR_ARCHIVE: ${{ inputs.build-dir }}.tar.xz
+        run: |
+          tar --exclude '*.a' --exclude '*.o' \
+            -I 'xz -3 -T0' \
+            -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
+          echo "::set-output name=build-dir-archive::${BUILD_DIR_ARCHIVE}"
+      - name: "Uploading build dir archive"
+        id: upload
+        env:
+          GCS_ARTIFACT: ${{ inputs.bucket }}/${{ github.sha }}/${{ steps.archive.outputs.build-dir-archive }}
+          BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
+        run: |
+          gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${GCS_ARTIFACT}"
+          echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
