@@ -6,11 +6,12 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, Tuple, TypeVar
+from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, Tuple, TypeVar, Union
 import dataclasses
 import json
 import urllib.parse
 import markdown_strings as md
+import math
 
 from common.benchmark_definition import BenchmarkResults, CompilationInfo, CompilationResults
 from common.benchmark_thresholds import BENCHMARK_THRESHOLDS, COMPILATION_TIME_THRESHOLDS, TOTAL_DISPATCH_SIZE_THRESHOLDS, BenchmarkThreshold, ThresholdUnit
@@ -343,17 +344,23 @@ def _categorize_on_single_metric(
   return (regressed_map, improved_map, similar_map, raw_map)
 
 
+def _get_fixed_point_str(value: Union[int, float], digits=3) -> str:
+  if isinstance(value, int) or value.is_integer():
+    return str(math.floor(value))
+  return f"{{:.{digits}f}}".format(value)
+
+
 def _get_compare_text(current: float, base: Optional[int]) -> str:
   """Generates the text of comparison between current and base value. Returns
     the current value if the base value is None.
   """
   # If base is None, don't need to do compare.
   if base is None:
-    return f"{current}"
+    return f"{_get_fixed_point_str(current)}"
 
   ratio = abs(current - base) / base
   direction = "↑" if current > base else ("↓" if current < base else "")
-  return f"{current:.3g} (vs. {base:.3g}, {ratio:.2%}{direction})"
+  return f"{_get_fixed_point_str(current)} (vs. {_get_fixed_point_str(base)}, {ratio:.2%}{direction})"
 
 
 def _sort_benchmarks_and_get_table(benchmarks: Dict[str,
@@ -374,8 +381,9 @@ def _sort_benchmarks_and_get_table(benchmarks: Dict[str,
     str_mean = _get_compare_text(current, base)
     clickable_name = _make_series_link(name)
     sorted_rows.append(
-        (ratio, (clickable_name, str_mean, f"{benchmark.median_time / 1e6:.3g}",
-                 f"{benchmark.stddev_time / 1e6:.3g}")))
+        (ratio, (clickable_name, str_mean,
+                 f"{_get_fixed_point_str(benchmark.median_time / 1e6)}",
+                 f"{_get_fixed_point_str(benchmark.stddev_time / 1e6)}")))
   sorted_rows.sort(key=lambda row: row[0], reverse=True)
 
   return _add_header_and_get_markdown_table(
@@ -414,9 +422,12 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
     tables.append(_sort_benchmarks_and_get_table(similar, size_cut))
   if raw:
     tables.append(md.header("Raw Latencies", 3))
-    raw_list = [(_make_series_link(k), f"{v.mean_time / 1e6:.3g}",
-                 f"{v.median_time / 1e6:.3g}", f"{v.stddev_time / 1e6:.3g}")
-                for k, v in raw.items()]
+    raw_list = [
+        (_make_series_link(k), f"{_get_fixed_point_str(v.mean_time / 1e6)}",
+         f"{_get_fixed_point_str(v.median_time / 1e6)}",
+         f"{_get_fixed_point_str(v.stddev_time / 1e6)}")
+        for k, v in raw.items()
+    ]
     tables.append(
         _add_header_and_get_markdown_table(BENCHMARK_RESULTS_HEADERS,
                                            raw_list,
