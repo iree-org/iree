@@ -1048,7 +1048,8 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
     [{
       $_state.addTypes({resultType});
       $_state.addAttribute("value", value);
-    }]>
+    }]>,
+    OpBuilder<(ins "StringAttr":$value)>
   ];
 }
 
