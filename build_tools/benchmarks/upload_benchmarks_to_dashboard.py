@@ -24,7 +24,8 @@ import requests
 from typing import Any, Dict, Optional
 
 from common.common_arguments import expand_and_check_file_paths
-from common.benchmark_presentation import COMPILATION_METRICS_TO_TABLE_MAPPERS, collect_all_compilation_metrics
+from common.benchmark_presentation import (COMPILATION_METRICS_TO_TABLE_MAPPERS,
+                                           collect_all_compilation_metrics)
 from common.benchmark_definition import (BenchmarkResults,
                                          execute_cmd_and_get_output)
 from common.benchmark_thresholds import BENCHMARK_THRESHOLDS
@@ -36,7 +37,7 @@ THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 COMMON_DESCRIIPTION = """
 <br>
 For the graph, the x axis is the Git commit index, and the y axis is the
-measured latency in milliseconds.
+measured metrics. The unit for the numbers is shown in the "Unit" dropdown.
 <br>
 See <a href="https://github.com/iree-org/iree/tree/main/benchmarks/dashboard.md">
 https://github.com/iree-org/iree/tree/main/benchmarks/dashboard.md
