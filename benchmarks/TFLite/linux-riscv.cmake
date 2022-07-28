@@ -36,7 +36,7 @@ set(LINUX_RV32_GENERIC_CPU_COMPILATION_FLAGS
   "--riscv-v-fixed-length-vector-lmul-max=8"
 )
 
-# CPU, local-sync, RV64-Generic, full-inference
+# CPU, LLVM, local-sync, RV64-Generic, full-inference
 iree_benchmark_suite(
   GROUP_NAME
     "linux-riscv"
@@ -57,12 +57,12 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-cpu-sync"
+    "iree-llvm-cpu-sync"
   DRIVER
     "local-sync"
 )
 
-# CPU, local-sync, RV32-Generic, full-inference
+# CPU, LLVM, local-sync, RV32-Generic, full-inference
 # Note this target is for codegen only. Inference is only possible with
 # the cross-compiled runtime and an emulator.
 iree_benchmark_suite(
@@ -83,7 +83,7 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-cpu-sync"
+    "iree-llvm-cpu-sync"
   DRIVER
     "local-sync"
 )

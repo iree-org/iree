@@ -20,7 +20,7 @@ set(ANDROID_CPU_COMPILATION_FLAGS
   "--iree-input-type=tosa"
   "--iree-llvm-target-triple=aarch64-none-linux-android29")
 
-# CPU, local-sync, big/little-core, full-inference
+# CPU, LLVM, local-sync, big/little-core, full-inference
 iree_benchmark_suite(
   GROUP_NAME
     "android-arm64-v8a"
@@ -46,12 +46,12 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-cpu-sync"
+    "iree-llvm-cpu-sync"
   DRIVER
     "local-sync"
 )
 
-# CPU, local-task, 1 through 4 threads, big/little-core, full-inference.
+# CPU, LLVM, local-task, 1 through 4 threads, big/little-core, full-inference.
 iree_benchmark_suite(
   GROUP_NAME
     "android-arm64-v8a"
@@ -77,7 +77,7 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-cpu"
+    "iree-llvm-cpu"
   DRIVER
     "local-task"
   RUNTIME_FLAGS
@@ -110,7 +110,7 @@ iree_benchmark_suite(
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
 #   CONFIG
-#    "iree-cpu"
+#    "iree-llvm-cpu"
 #   DRIVER
 #     "local-task"
 #   RUNTIME_FLAGS
@@ -141,7 +141,7 @@ iree_benchmark_suite(
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
 #   CONFIG
-#    "iree-cpu"
+#    "iree-llvm-cpu"
 #   DRIVER
 #     "local-task"
 #   RUNTIME_FLAGS
@@ -173,7 +173,7 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-cpu"
+    "iree-llvm-cpu"
   DRIVER
     "local-task"
   RUNTIME_FLAGS
@@ -196,7 +196,7 @@ iree_benchmark_suite(
 #                                                                              #
 ################################################################################
 
-# CPU, local-sync, big/little-core, full-inference
+# CPU, LLVM, local-sync, big/little-core, full-inference
 # NOTE: this is not enabling any SIMD extension beyond baseline Aarch64.
 # At the moment we use that for fp32 models. We would change that when new
 # devices support relevant fp32 SIMD extensions beyond that (e.g. +f32mm).
@@ -225,12 +225,12 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-cpu-sync"
+    "iree-llvm-cpu-sync"
   DRIVER
     "local-sync"
 )
 
-# CPU, local-sync, big/little-core, full-inference, +dotprod
+# CPU, LLVM, local-sync, big/little-core, full-inference, +dotprod
 # NOTE: +dotprod is only relevant to int8, not fp32.
 # TODO: add a +i8mm variant, supported by new devices already. No rush: our i8mm
 # kernel is currently naive, not ready for benchmarking.
@@ -255,7 +255,7 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-cpu-sync"
+    "iree-llvm-cpu-sync"
   DRIVER
     "local-sync"
 )
@@ -263,7 +263,7 @@ iree_benchmark_suite(
 # TODO(#7792): Consider re-enabling little-core experimental-flags if we start
 # optimizing for little cores or we can just run them occasionally
 
-# CPU, local-task, 1 through 4 threads, big/little-core, full-inference.
+# CPU, LLVM, local-task, 1 through 4 threads, big/little-core, full-inference.
 # NOTE: this is not enabling any SIMD extension beyond baseline Aarch64.
 # At the moment we use that for fp32 models. We would change that when new
 # devices support relevant fp32 SIMD extensions beyond that (e.g. f32mm).
@@ -292,14 +292,14 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-cpu"
+    "iree-llvm-cpu"
   DRIVER
     "local-task"
   RUNTIME_FLAGS
     "--task_topology_group_count=1"
 )
 
-# CPU, local-task, 1 through 4 threads, big/little-core, full-inference, +dotprod
+# CPU, LLVM, local-task, 1 through 4 threads, big/little-core, full-inference, +dotprod
 # NOTE: +dotprod is only relevant to int8, not fp32.
 # TODO: add a +i8mm variant, supported by new devices already. No rush: our i8mm
 # kernel is currently naive, not ready for benchmarking.
@@ -324,7 +324,7 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-cpu"
+    "iree-llvm-cpu"
   DRIVER
     "local-task"
   RUNTIME_FLAGS
@@ -358,7 +358,7 @@ iree_benchmark_suite(
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
 #   CONFIG
-#    "iree-cpu"
+#    "iree-llvm-cpu"
 #   DRIVER
 #     "local-task"
 #   RUNTIME_FLAGS
@@ -390,14 +390,14 @@ iree_benchmark_suite(
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
 #   CONFIG
-#    "iree-cpu"
+#    "iree-llvm-cpu"
 #   DRIVER
 #     "local-task"
 #   RUNTIME_FLAGS
 #     "--task_topology_group_count=3"
 # )
 
-# CPU, local-task, 1 through 4 threads, big/little-core, full-inference.
+# CPU, LLVM, local-task, 1 through 4 threads, big/little-core, full-inference.
 # NOTE: this is not enabling any SIMD extension beyond baseline Aarch64.
 # At the moment we use that for fp32 models. We would change that when new
 # devices support relevant fp32 SIMD extensions beyond that (e.g. f32mm).
@@ -427,14 +427,14 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-cpu"
+    "iree-llvm-cpu"
   DRIVER
     "local-task"
   RUNTIME_FLAGS
     "--task_topology_group_count=4"
 )
 
-# CPU, local-sync, big/little-core, full-inference, +dotprod
+# CPU, LLVM, local-sync, big/little-core, full-inference, +dotprod
 # NOTE: +dotprod is only relevant to int8, not fp32.
 # TODO: add a +i8mm variant, supported by new devices already. No rush: our i8mm
 # kernel is currently naive, not ready for benchmarking.
@@ -460,7 +460,7 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-cpu"
+    "iree-llvm-cpu"
   DRIVER
     "local-task"
   RUNTIME_FLAGS

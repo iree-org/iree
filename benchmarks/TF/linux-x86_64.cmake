@@ -22,7 +22,7 @@ set(LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS
   "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
 )
 
-# CPU, local-sync, x86_64, full-inference
+# CPU, LLVM, local-sync, x86_64, full-inference
 iree_benchmark_suite(
   GROUP_NAME
     "linux-x86_64"
@@ -41,12 +41,12 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-cpu-sync"
+    "iree-llvm-cpu-sync"
   DRIVER
     "local-sync"
 )
 
-# CPU, local-task, 1 thread, x86_64, full-inference
+# CPU, LLVM, local-task, 1 thread, x86_64, full-inference
 iree_benchmark_suite(
   GROUP_NAME
     "linux-x86_64"
@@ -65,14 +65,14 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-cpu"
+    "iree-llvm-cpu"
   DRIVER
     "local-task"
   RUNTIME_FLAGS
     "--task_topology_group_count=1"
 )
 
-# CPU, local-task, 4 threads, x86_64, full-inference
+# CPU, LLVM, local-task, 4 threads, x86_64, full-inference
 iree_benchmark_suite(
   GROUP_NAME
     "linux-x86_64"
@@ -91,14 +91,14 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-cpu"
+    "iree-llvm-cpu"
   DRIVER
     "local-task"
   RUNTIME_FLAGS
     "--task_topology_group_count=4"
 )
 
-# CPU, local-task, 8 threads, x86_64, full-inference
+# CPU, LLVM, local-task, 8 threads, x86_64, full-inference
 iree_benchmark_suite(
   GROUP_NAME
     "linux-x86_64"
@@ -117,7 +117,7 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-cpu"
+    "iree-llvm-cpu"
   DRIVER
     "local-task"
   RUNTIME_FLAGS
