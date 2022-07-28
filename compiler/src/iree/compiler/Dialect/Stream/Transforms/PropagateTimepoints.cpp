@@ -213,7 +213,8 @@ static Value makeBlockArgResourceSize(Location loc, Value resourceValue,
 
 // Recursively expands resources into (timepoint, resource) pairs within the
 // given |region|. All branches, ops, and nested regions will be processed.
-static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
+static void expandRegion(Region &region, bool canModifyEntryBlock,
+                         ExpandedGlobalMap &globalMap,
                          BlockAndValueMapping resourceTimepointMap) {
   if (region.empty()) return;
 
@@ -221,6 +222,7 @@ static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
   auto timepointType = IREE::Stream::TimepointType::get(region.getContext());
   for (auto &block : region.getBlocks()) {
     if (!llvm::any_of(block.getArgumentTypes(), isResourceType)) continue;
+    if (block.isEntryBlock() && !canModifyEntryBlock) continue;
 
     // Insert and build a list of expanded (timepoint, resource) pairs.
     SmallVector<std::pair<Value, Value>> expansions;
@@ -348,7 +350,19 @@ static void expandGlobalStoreOp(IREE::Util::GlobalStoreOp op,
 static void expandInitializerOp(IREE::Util::InitializerOp op,
                                 ExpandedGlobalMap &globalMap,
                                 BlockAndValueMapping &resourceTimepointMap) {
-  expandRegion(op.getRegion(), globalMap, resourceTimepointMap);
+  expandRegion(op.getRegion(), /*canModifyEntryBlock=*/false, globalMap,
+               resourceTimepointMap);
+}
+
+// Returns true if |op| is either public and visible to external modules or
+// external and resolved later on. We can't modify their signatures.
+static bool isPublicOrExternal(CallableOpInterface callableOp) {
+  if (auto symbolOp = dyn_cast<SymbolOpInterface>(callableOp.getOperation())) {
+    if (symbolOp.isPublic()) return true;
+  }
+  auto *region = callableOp.getCallableRegion();
+  if (!region || region->empty()) return true;
+  return false;
 }
 
 // Inserts awaits on resource arguments.
@@ -365,14 +379,19 @@ static void expandInitializerOp(IREE::Util::InitializerOp op,
 //    %1 = stream.timepoint.await %t, %0
 static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
                          BlockAndValueMapping &resourceTimepointMap) {
-  auto oldType = op.getFunctionType();
-  auto inputTypes = expandTypes(oldType.getInputs());
-  auto resultTypes = expandTypes(oldType.getResults());
-  auto newType = FunctionType::get(op.getContext(), inputTypes, resultTypes);
-  if (newType != oldType) {
-    op.setType(newType);
+  // Ignore public/external function signatures but still convert regions.
+  bool canModifyEntryBlock = !isPublicOrExternal(op);
+  if (canModifyEntryBlock) {
+    auto oldType = op.getFunctionType();
+    auto inputTypes = expandTypes(oldType.getInputs());
+    auto resultTypes = expandTypes(oldType.getResults());
+    auto newType = FunctionType::get(op.getContext(), inputTypes, resultTypes);
+    if (newType != oldType) {
+      op.setType(newType);
+    }
   }
-  expandRegion(op.getRegion(), globalMap, resourceTimepointMap);
+  expandRegion(op.getRegion(), canModifyEntryBlock, globalMap,
+               resourceTimepointMap);
 }
 
 // Splits resource operands and results into (timepoint, resource).
@@ -391,6 +410,11 @@ static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
 static void expandCallOp(mlir::func::CallOp op,
                          BlockAndValueMapping &resourceTimepointMap) {
   if (!usesResources(op)) return;
+
+  // Ignore calls to public/external functions.
+  auto calleeOp = SymbolTable::lookupNearestSymbolFrom<CallableOpInterface>(
+      op, op.getCalleeAttr());
+  if (isPublicOrExternal(calleeOp)) return;
 
   // Build the new call op with expanded operands and results.
   OpBuilder builder(op);
@@ -438,6 +462,7 @@ static void expandCallOp(mlir::func::CallOp op,
 static void expandReturnOp(mlir::func::ReturnOp op,
                            BlockAndValueMapping &resourceTimepointMap) {
   if (!usesResources(op)) return;
+  if (isPublicOrExternal(op->getParentOfType<mlir::func::FuncOp>())) return;
   OpBuilder builder(op);
   auto operands =
       expandOperands(op.getLoc(), op.operands(), resourceTimepointMap, builder);

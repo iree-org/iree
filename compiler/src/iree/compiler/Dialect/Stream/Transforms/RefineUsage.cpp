@@ -210,6 +210,10 @@ struct ApplyFuncOp : public UsageRefinementPattern<mlir::func::FuncOp> {
   using UsageRefinementPattern<mlir::func::FuncOp>::UsageRefinementPattern;
   LogicalResult matchAndRewrite(mlir::func::FuncOp op,
                                 PatternRewriter &rewriter) const override {
+    if (op.isExternal()) {
+      return rewriter.notifyMatchFailure(op, "external funcs not supported");
+    }
+
     bool didChange = false;
 
     // Arguments:

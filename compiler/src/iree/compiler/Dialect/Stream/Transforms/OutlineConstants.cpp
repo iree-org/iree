@@ -46,7 +46,9 @@ struct ConstantDef {
 static SmallVector<ConstantDef> findConstantsInModule(mlir::ModuleOp moduleOp) {
   SmallVector<ConstantDef> results;
   for (auto callableOp : moduleOp.getOps<CallableOpInterface>()) {
-    for (auto &block : *callableOp.getCallableRegion()) {
+    auto *region = callableOp.getCallableRegion();
+    if (!region) continue;
+    for (auto &block : *region) {
       for (auto &op : block.getOperations()) {
         if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
           if (isOutlinableValue(constantOp.getValue())) {

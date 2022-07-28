@@ -181,6 +181,8 @@ def VM_ImportOp : VM_Op<"import", [
     OptionalAttr<UnitAttr>:$is_optional
   );
 
+  // Required because FunctionOpInterface and CallableOpInterface disagree with
+  // each other about the requirement for regions. We don't use this region.
   let regions = (region AnyRegion:$body);
 
   let skipDefaultBuilders = 1;

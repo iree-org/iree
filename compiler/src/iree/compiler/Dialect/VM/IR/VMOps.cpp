@@ -265,7 +265,6 @@ ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
   result.addAttribute(mlir::function_interface_impl::getTypeAttrName(),
                       TypeAttr::get(functionType));
 
-  // No clue why this is required.
   result.addRegion();
 
   return success();
@@ -321,7 +320,6 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                                                   /*resultAttrs=*/llvm::None);
   }
 
-  // No clue why this is required.
   result.addRegion();
 }
 

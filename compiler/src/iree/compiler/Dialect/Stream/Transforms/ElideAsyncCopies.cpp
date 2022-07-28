@@ -307,7 +307,9 @@ class LastUseAnalysis {
   LogicalResult run() {
     // Seed all block arguments throughout the program.
     for (auto callableOp : getTopLevelOps()) {
-      for (auto &block : *callableOp.getCallableRegion()) {
+      auto *region = callableOp.getCallableRegion();
+      if (!region) continue;
+      for (auto &block : *region) {
         for (auto arg : block.getArguments()) {
           if (arg.getType().isa<IREE::Stream::ResourceType>()) {
             solver.getOrCreateElementFor<ArgumentSemantics>(
@@ -499,9 +501,9 @@ class ElideAsyncCopiesPass : public ElideAsyncCopiesBase<ElideAsyncCopiesPass> {
       // If we can't elide any we'll consider the iteration complete and exit.
       bool didChange = false;
       for (auto callableOp : analysis.getTopLevelOps()) {
-        didChange = tryElideAsyncCopiesInRegion(*callableOp.getCallableRegion(),
-                                                analysis) ||
-                    didChange;
+        auto *region = callableOp.getCallableRegion();
+        if (!region) continue;
+        didChange = tryElideAsyncCopiesInRegion(*region, analysis) || didChange;
       }
       if (!didChange) break;
     }

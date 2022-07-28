@@ -384,6 +384,17 @@ static void expandInitializerOp(IREE::Util::InitializerOp op,
   expandRegion(op.getRegion(), globalMap, indexSet, subrangeMap);
 }
 
+// Returns true if |op| is either public and visible to external modules or
+// external and resolved later on. We can't modify their signatures.
+static bool isPublicOrExternal(CallableOpInterface callableOp) {
+  if (auto symbolOp = dyn_cast<SymbolOpInterface>(callableOp.getOperation())) {
+    if (symbolOp.isPublic()) return true;
+  }
+  auto *region = callableOp.getCallableRegion();
+  if (!region || region->empty()) return true;
+  return false;
+}
+
 // Inserts subranges on resource arguments.
 // Requires that the ExpandCallOp/ExpandReturnOp patterns handle migrating the
 // await.
@@ -398,12 +409,15 @@ static void expandInitializerOp(IREE::Util::InitializerOp op,
 //    %1 = stream.resource.subview %0[%o] : {%sz} -> {%l}
 static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
                          IndexSet &indexSet, SubrangeMap &subrangeMap) {
-  auto oldType = op.getFunctionType();
-  auto inputTypes = expandTypes(oldType.getInputs());
-  auto resultTypes = expandTypes(oldType.getResults());
-  auto newType = FunctionType::get(op.getContext(), inputTypes, resultTypes);
-  if (newType != oldType) {
-    op.setType(newType);
+  // Ignore public/external function signatures but still convert regions.
+  if (!isPublicOrExternal(op)) {
+    auto oldType = op.getFunctionType();
+    auto inputTypes = expandTypes(oldType.getInputs());
+    auto resultTypes = expandTypes(oldType.getResults());
+    auto newType = FunctionType::get(op.getContext(), inputTypes, resultTypes);
+    if (newType != oldType) {
+      op.setType(newType);
+    }
   }
   expandRegion(op.getRegion(), globalMap, indexSet, subrangeMap);
 }
@@ -425,6 +439,11 @@ static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
 static void expandCallOp(mlir::func::CallOp op, IndexSet &indexSet,
                          SubrangeMap &subrangeMap) {
   if (!usesResources(op)) return;
+
+  // Ignore calls to public/external functions.
+  auto calleeOp = SymbolTable::lookupNearestSymbolFrom<CallableOpInterface>(
+      op, op.getCalleeAttr());
+  if (isPublicOrExternal(calleeOp)) return;
 
   // Build the new call op with expanded operands and results.
   OpBuilder builder(op);
@@ -473,6 +492,7 @@ static void expandCallOp(mlir::func::CallOp op, IndexSet &indexSet,
 static void expandReturnOp(mlir::func::ReturnOp op, IndexSet &indexSet,
                            SubrangeMap &subrangeMap) {
   if (!usesResources(op)) return;
+  if (isPublicOrExternal(op->getParentOfType<mlir::func::FuncOp>())) return;
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.operands(), subrangeMap,
                                  indexSet, builder);
@@ -602,10 +622,9 @@ class PropagateSubrangesPass
       // NOTE: the callable may be empty (like when an extern) - we still want
       // to process it but don't need an IndexSet.
       auto *region = callableOp.getCallableRegion();
+      if (!region || region->empty()) continue;
       IndexSet indexSet(callableOp.getLoc(),
-                        !region || region->empty()
-                            ? OpBuilder(callableOp)
-                            : OpBuilder::atBlockBegin(&region->front()));
+                        OpBuilder::atBlockBegin(&region->front()));
       SubrangeMap subrangeMap;
       expandSubranges(callableOp, globalMap, indexSet, subrangeMap);
     }

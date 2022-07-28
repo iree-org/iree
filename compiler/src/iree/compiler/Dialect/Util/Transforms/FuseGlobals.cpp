@@ -129,7 +129,9 @@ class FuseGlobalsPass
     for (auto callableOp : moduleOp.getOps<CallableOpInterface>()) {
       LLVM_DEBUG(llvm::dbgs()
                  << "FuseGlobals: analyzing " << callableOp << ":\n");
-      for (auto &block : *callableOp.getCallableRegion()) {
+      auto *region = callableOp.getCallableRegion();
+      if (!region) continue;
+      for (auto &block : *region) {
         DenseMap<Value, SmallVector<IREE::Util::GlobalStoreOp>> valueStores;
         for (auto storeOp : block.getOps<IREE::Util::GlobalStoreOp>()) {
           auto &global = globalTable.globalMap[storeOp.getGlobal()];

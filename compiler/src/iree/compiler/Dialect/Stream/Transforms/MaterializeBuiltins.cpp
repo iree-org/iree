@@ -53,7 +53,9 @@ using BuiltinUsageMap =
 static BuiltinUsageMap findBuiltinOps(mlir::ModuleOp moduleOp) {
   BuiltinUsageMap results;
   for (auto callableOp : moduleOp.getOps<CallableOpInterface>()) {
-    for (auto &block : *callableOp.getCallableRegion()) {
+    auto *region = callableOp.getCallableRegion();
+    if (!region) continue;
+    for (auto &block : *region) {
       for (auto &op : block.getOperations()) {
         if (auto builtinOp = dyn_cast<IREE::Stream::BuiltinOpInterface>(op)) {
           auto name = builtinOp->getName();
