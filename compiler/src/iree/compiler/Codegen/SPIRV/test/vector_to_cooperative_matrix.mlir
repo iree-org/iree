@@ -141,7 +141,7 @@ hal.executable private @const_elementwise_ops  {
       // CHECK-LABEL: func.func @const_elementwise_ops
       func.func @const_elementwise_ops(%add_val: vector<16x16xf16>, %sub_val: vector<16x16xf16>, %div_val: vector<16x16xf16>) -> vector<16x16xf16> {
         // CHECK: %[[SPLAT:.+]] = spv.Constant 8.000000e+00 : f16
-        // CHECK: %[[CST:.+]] = spv.CompositeConstruct %[[SPLAT]] : !spv.coopmatrix<16x16xf16, Subgroup>
+        // CHECK: %[[CST:.+]] = spv.CompositeConstruct %[[SPLAT]] : (f16) -> !spv.coopmatrix<16x16xf16, Subgroup>
         %eight = arith.constant dense<8.0> : vector<16x16xf16>
         // CHECK: %{{.+}} = spv.FAdd %[[CST]], %{{.+}} : !spv.coopmatrix<16x16xf16, Subgroup>
         %add = arith.addf %eight, %add_val: vector<16x16xf16>
