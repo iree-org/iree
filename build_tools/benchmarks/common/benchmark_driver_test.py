@@ -77,14 +77,14 @@ class BenchmarkDriverTest(unittest.TestCase):
                           model_tags=[],
                           bench_mode=["1-thread", "full-inference"],
                           target_arch="CPU-ARM64-v8A",
-                          driver_info=IREE_DRIVERS_INFOS["iree-dylib"],
+                          driver_info=IREE_DRIVERS_INFOS["iree-cpu"],
                           benchmark_case_dir="case1",
                           benchmark_tool_name="tool")
     case2 = BenchmarkCase(model_name="DeepNetv2",
                           model_tags=["f32"],
                           bench_mode=["full-inference"],
                           target_arch="CPU-ARM64-v8A",
-                          driver_info=IREE_DRIVERS_INFOS["iree-dylib-sync"],
+                          driver_info=IREE_DRIVERS_INFOS["iree-cpu-sync"],
                           benchmark_case_dir="case2",
                           benchmark_tool_name="tool")
     self.benchmark_suite = BenchmarkSuite({
@@ -102,11 +102,11 @@ class BenchmarkDriverTest(unittest.TestCase):
     os.makedirs(os.path.join(self.tmp_dir.name, CAPTURES_REL_PATH))
     benchmark_filename = os.path.join(
         self.tmp_dir.name, BENCHMARK_RESULTS_REL_PATH,
-        "MobileNetv2 [fp32,imagenet] (TFLite) big-core,full-inference with IREE-Dylib @ Pixel-4 (CPU-ARMv8.2-A).json"
+        "MobileNetv2 [fp32,imagenet] (TFLite) big-core,full-inference with IREE-CPU @ Pixel-4 (CPU-ARMv8.2-A).json"
     )
     capture_filename = os.path.join(
         self.tmp_dir.name, CAPTURES_REL_PATH,
-        "MobileNetv2 [fp32,imagenet] (TFLite) big-core,full-inference with IREE-Dylib @ Pixel-4 (CPU-ARMv8.2-A).tracy"
+        "MobileNetv2 [fp32,imagenet] (TFLite) big-core,full-inference with IREE-CPU @ Pixel-4 (CPU-ARMv8.2-A).tracy"
     )
     with open(os.path.join(benchmark_filename), "w") as f:
       f.write("")
@@ -132,21 +132,21 @@ class BenchmarkDriverTest(unittest.TestCase):
     self.assertEqual(driver.get_benchmark_result_filenames(), [
         os.path.join(
             self.tmp_dir.name, BENCHMARK_RESULTS_REL_PATH,
-            "DeepNet (TFLite) 1-thread,full-inference with IREE-Dylib @ Unknown (CPU-ARMv8-A).json"
+            "DeepNet (TFLite) 1-thread,full-inference with IREE-CPU @ Unknown (CPU-ARMv8-A).json"
         ),
         os.path.join(
             self.tmp_dir.name, BENCHMARK_RESULTS_REL_PATH,
-            "DeepNetv2 [f32] (TFLite) full-inference with IREE-Dylib-Sync @ Unknown (CPU-ARMv8-A).json"
+            "DeepNetv2 [f32] (TFLite) full-inference with IREE-CPU-Sync @ Unknown (CPU-ARMv8-A).json"
         )
     ])
     self.assertEqual(driver.get_capture_filenames(), [
         os.path.join(
             self.tmp_dir.name, CAPTURES_REL_PATH,
-            "DeepNet (TFLite) 1-thread,full-inference with IREE-Dylib @ Unknown (CPU-ARMv8-A).tracy"
+            "DeepNet (TFLite) 1-thread,full-inference with IREE-CPU @ Unknown (CPU-ARMv8-A).tracy"
         ),
         os.path.join(
             self.tmp_dir.name, CAPTURES_REL_PATH,
-            "DeepNetv2 [f32] (TFLite) full-inference with IREE-Dylib-Sync @ Unknown (CPU-ARMv8-A).tracy"
+            "DeepNetv2 [f32] (TFLite) full-inference with IREE-CPU-Sync @ Unknown (CPU-ARMv8-A).tracy"
         )
     ])
     self.assertEqual(driver.get_benchmark_errors(), [])

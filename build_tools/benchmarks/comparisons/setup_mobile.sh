@@ -67,7 +67,7 @@ IREE_COMPILE_PATH="${SOURCE_DIR}/iree-build/tools/iree-compile"
 TFLITE_MODEL_DIR="${ROOT_DIR}/models/tflite"
 IREE_MODEL_DIR="${ROOT_DIR}/models/iree"
 mkdir -p "${IREE_MODEL_DIR}/vulkan"
-mkdir -p "${IREE_MODEL_DIR}/local-task"
+mkdir -p "${IREE_MODEL_DIR}/llvm-cpu"
 
 for i in $(ls ${ROOT_DIR}/models/tflite/); do
   MODEL_NAME=$(basename $i .tflite)
@@ -77,18 +77,18 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
   echo -e "\tCompiling ${MODEL_NAME}.vmfb for aarch64..."
   "${IREE_COMPILE_PATH}" \
     --iree-input-type=tosa \
-    --iree-hal-target-backends=dylib-llvm-aot \
+    --iree-hal-target-backends=llvm-cpu \
     --iree-llvm-target-triple=aarch64-none-linux-android29 \
     --iree-llvm-debug-symbols=false \
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \
     "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
-    --o "${IREE_MODEL_DIR}/local-task/${MODEL_NAME}.vmfb"
+    --o "${IREE_MODEL_DIR}/llvm-cpu/${MODEL_NAME}.vmfb"
 
   echo -e "\tCompiling ${MODEL_NAME}_mmt4d.vmfb for aarch64..."
   "${IREE_COMPILE_PATH}" \
     --iree-input-type=tosa \
-    --iree-hal-target-backends=dylib-llvm-aot \
+    --iree-hal-target-backends=llvm-cpu \
     --iree-llvm-target-triple=aarch64-none-linux-android29 \
     "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod" \
     --iree-llvm-target-cpu-features=+dotprod \
@@ -96,7 +96,7 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \
     "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
-    --o "${IREE_MODEL_DIR}/local-task/${MODEL_NAME}_mmt4d.vmfb"
+    --o "${IREE_MODEL_DIR}/llvm-cpu/${MODEL_NAME}_mmt4d.vmfb"
 
   if [[ "${GPU_TYPE}" = "mali" ]]; then
     echo -e "\tCompiling ${MODEL_NAME}.vmfb for vulkan mali..."
