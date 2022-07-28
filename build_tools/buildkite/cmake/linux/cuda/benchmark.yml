@@ -6,7 +6,7 @@
 
 steps:
   - label: ":hammer_and_wrench: Build linux-cuda benchmark tools"
-    key: "build-benchmark-tools"
+    key: "build-cuda-benchmark-tools"
     commands: |
       docker run --user=$(id -u):$(id -g) \
         --volume="$${HOME?}:$${HOME?}" \
@@ -25,10 +25,9 @@ steps:
     artifact_paths:
       - "iree-linux-cuda-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
 
-  - wait
-
   - label: ":stopwatch: Benchmark on Nvidia A100 (GCP-a2-highgpu-1g)"
-    key: "run-benchmark-gcp-gpu-a100"
+    key: "run-cuda-benchmark-gcp-gpu-a100"
+    depends_on: "build-cuda-benchmark-tools"
     commands: |
       git clean -fdx
       buildkite-agent artifact download \

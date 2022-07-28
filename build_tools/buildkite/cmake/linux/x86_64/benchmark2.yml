@@ -6,7 +6,7 @@
 
 steps:
   - label: ":hammer_and_wrench: Build linux-x86_64 benchmark tools"
-    key: "build-benchmark-tools"
+    key: "build-x86_64-benchmark-tools"
     commands: |
       docker run --user=$(id -u):$(id -g) \
         --volume="$${HOME?}:$${HOME?}" \
@@ -25,10 +25,9 @@ steps:
     artifact_paths:
       - "iree-linux-x86_64-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
 
-  - wait
-
   - label: ":stopwatch: Benchmark on Intel Cascade Lake CPU (GCP-c2-standard-16)"
-    key: "run-benchmark-gcp-cpu"
+    key: "run-x86_64-benchmark-gcp-cpu"
+    depends_on: "build-x86_64-benchmark-tools"
     commands: |
       git clean -fdx
       buildkite-agent artifact download \
