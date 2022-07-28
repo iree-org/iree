@@ -223,7 +223,7 @@ jobs:
             "${BUILD_DIR}"
 
   test_gpu:
-    if: github.event_name != 'pull_request'
+    # DO NOT SUBMIT. Restore this. if: github.event_name != 'pull_request'
     needs: build_all
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
