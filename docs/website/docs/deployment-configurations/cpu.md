@@ -88,7 +88,7 @@ system's `PATH`):
 
 ``` shell hl_lines="3"
 iree-compile \
-    --iree-hal-target-backends=cpu \
+    --iree-hal-target-backends=llvm-cpu \
     iree_input.mlir -o mobilenet_cpu.vmfb
 ```
 
