@@ -1145,7 +1145,7 @@ to retrieve the IREE compiler.</p>
 <code>iree-compile</code> is in your system's <code>PATH</code>):</p>
 <div class="highlight"><pre><span></span><code>iree-compile <span class="se">\</span>
     --iree-stream-partitioning-favor<span class="o">=</span>min-peak-memory <span class="se">\</span>
-    --iree-hal-target-backends<span class="o">=</span>dylib-llvm-aot <span class="se">\</span>
+    --iree-hal-target-backends<span class="o">=</span>llvm-cpu <span class="se">\</span>
     --iree-llvm-target-triple<span class="o">=</span>x86_64-pc-linux-elf <span class="se">\</span>
     --iree-llvm-debug-symbols<span class="o">=</span><span class="nb">false</span> <span class="se">\</span>
     samples/models/simple_abs.mlir <span class="se">\</span>
@@ -1156,8 +1156,7 @@ to retrieve the IREE compiler.</p>
 <li><code>-iree-stream-partitioning-favor=min-peak-memory</code>: Optimize for minimum peak
     memory usage at the cost of concurrency - include when targeting
     single-threaded execution to reduce memory consumption.</li>
-<li><code>iree-hal-target-backends=dylib-llvm-aot</code>: Build the model for the dynamic
-    library CPU HAL driver</li>
+<li><code>iree-hal-target-backends=llvm-cpu</code>: Compile using the LLVM CPU target</li>
 <li><code>iree-llvm-target-triple</code>: Use the <code>&lt;arch&gt;-pc-linux-elf</code> LLVM target triple
     so the artifact has a fixed ABI to be rendered by the
     <a href="https://github.com/iree-org/iree/tree/main/iree/hal/local/elf">elf_module library</a></li>

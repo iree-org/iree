@@ -1133,7 +1133,7 @@ iree-import-tflite <span class="si">${</span><span class="nv">TFLITE_PATH</span>
 <span class="c1"># Compile for the CPU backend</span>
 iree-compile <span class="se">\</span>
     --iree-input-type<span class="o">=</span>tosa <span class="se">\</span>
-    --iree-hal-target-backends<span class="o">=</span>cpu <span class="se">\</span>
+    --iree-hal-target-backends<span class="o">=</span>llvm-cpu <span class="se">\</span>
     <span class="si">${</span><span class="nv">IMPORT_PATH</span><span class="si">}</span> <span class="se">\</span>
     -o <span class="si">${</span><span class="nv">MODULE_PATH</span><span class="si">}</span>
 </code></pre></div>
@@ -1161,7 +1161,7 @@ to select alternative targets.</p>
 <span class="n">tosaIR</span> <span class="o">=</span> <span class="s2">&quot;/&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">workdir</span><span class="p">,</span> <span class="s2">&quot;tosa.mlir&quot;</span><span class="p">])</span>
 <span class="n">bytecodeModule</span> <span class="o">=</span> <span class="s2">&quot;/&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">workdir</span><span class="p">,</span> <span class="s2">&quot;iree.vmfb&quot;</span><span class="p">])</span>
 
-<span class="n">backends</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;dylib-llvm-aot&quot;</span><span class="p">]</span>
+<span class="n">backends</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;llvm-cpu&quot;</span><span class="p">]</span>
 <span class="n">config</span> <span class="o">=</span> <span class="s2">&quot;local-task&quot;</span>
 </code></pre></div>
 <p>The TFLite sample model and input are downloaded locally.</p>
@@ -1182,7 +1182,7 @@ of the model are saved for debugging purposes. This is optional and can be omitt
   <span class="n">target_backends</span><span class="o">=</span><span class="n">backends</span><span class="p">,</span>
   <span class="n">import_only</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 </code></pre></div>
-<p>After compilation is completed we configure the VmModule using the dylib configuration and compiled
+<p>After compilation is completed we configure the VmModule using the local-task configuration and compiled
 IREE module.</p>
 <div class="highlight"><pre><span></span><code><span class="n">config</span> <span class="o">=</span> <span class="n">iree_rt</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="s2">&quot;local-task&quot;</span><span class="p">)</span>
 <span class="n">context</span> <span class="o">=</span> <span class="n">iree_rt</span><span class="o">.</span><span class="n">SystemContext</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">)</span>
