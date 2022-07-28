@@ -29,7 +29,7 @@ __all__ = [
 # Default testing backend for invoking the compiler.
 # TODO: Remove these. In the absence of default profiles, though, it is better
 # to centralize.
-DEFAULT_TESTING_BACKENDS = ["dylib-llvm-aot"]
+DEFAULT_TESTING_BACKENDS = ["llvm-cpu"]
 DEFAULT_TESTING_DRIVER = "local-task"
 
 

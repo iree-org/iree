@@ -162,7 +162,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_dylib-llvm-aot_dylib
+    check_llvm-cpu_local-task
   SRCS
     "abs.mlir"
     "add.mlir"
@@ -230,7 +230,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_vmvx_vmvx
+    check_vmvx_local-task
   SRCS
     "abs.mlir"
     "add.mlir"
@@ -362,7 +362,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_wasm-llvm-aot
+    check_llvm-cpu-wasm
   SRCS
     "abs.mlir"
     "add.mlir"
@@ -430,7 +430,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_dylib-llvm-aot-host_dylib
+    check_llvm-cpu-host_local-task
   SRCS
     "abs.mlir"
     "add.mlir"

@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir --iree-hal-target-backends=dylib-llvm-aot --iree-llvm-link-embedded=true --iree-llvm-target-cpu-features='host' --iree-codegen-llvm-generic-ops-workgroup-size=2048 %s
+// RUN: iree-run-mlir --iree-hal-target-backends=llvm-cpu --iree-llvm-link-embedded=true --iree-llvm-target-cpu-features='host' --iree-codegen-llvm-generic-ops-workgroup-size=2048 %s
 
 //===----------------------------------------------------------------------===//
 // Dynamic shape micro-benchmarks.
@@ -74,4 +74,3 @@ func.func @dynamic_elw() -> tensor<?x?xf32> {
   } -> tensor<?x?xf32>
   return %gen : tensor<?x?xf32>
 }
-

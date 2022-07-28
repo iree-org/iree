@@ -156,7 +156,7 @@ namespace {
 // Returns a driver name capable of handling input from the given backend.
 std::string BackendToDriverName(std::string backend) {
   // TODO(#9336): remove this or allow override for external drivers.
-  if (backend == "vmvx" || backend == "dylib-llvm-aot") {
+  if (backend == "vmvx" || backend == "llvm-cpu") {
     return "local-task";
   }
   size_t dash = backend.find('-');

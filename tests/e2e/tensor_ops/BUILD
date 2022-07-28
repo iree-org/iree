@@ -30,7 +30,7 @@ iree_lit_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_dylib-llvm-aot_dylib",
+    name = "check_llvm-cpu_local-task",
     srcs = enforce_glob(
         # keep sorted
         [

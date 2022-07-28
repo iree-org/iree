@@ -32,7 +32,7 @@ iree_lit_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_regression_dylib-llvm-aot
+    check_regression_llvm-cpu
   SRCS
     "associative_reordering.mlir"
     "dynamic_abs.mlir"
@@ -57,7 +57,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_regression_tosa_dylib-llvm-aot
+    check_regression_tosa_llvm-cpu
   SRCS
     "linalg_quantized_matmul_vs_linalg_matmul.mlir"
   TARGET_BACKEND
