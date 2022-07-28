@@ -51,8 +51,8 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-        with:
-          submodules: true
+      - name: "Updating submodules"
+        run: build_tools/scripts/shallow_sync_submodules.sh
       - name: "Building runtime"
         run: |
           ./build_tools/github_actions/docker_run.sh \
@@ -110,8 +110,8 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-        with:
-          submodules: true
+      - name: "Updating submodules"
+        run: build_tools/scripts/shallow_sync_submodules.sh
       - name: "Building IREE"
         run: |
           ./build_tools/github_actions/docker_run.sh \
@@ -157,8 +157,8 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-        with:
-          submodules: true
+      - name: "Updating submodules"
+        run: build_tools/scripts/shallow_sync_submodules.sh
       - name: "Building TF binaries"
         id: build
         env:
@@ -204,8 +204,8 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-        with:
-          submodules: true
+      - name: "Updating submodules"
+        run: build_tools/scripts/shallow_sync_submodules.sh
       - name: "Downloading TF binaries archive"
         run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
@@ -299,8 +299,8 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-        with:
-          submodules: true
+      - name: "Updating submodules"
+        run: build_tools/scripts/shallow_sync_submodules.sh
       - name: "Building and testing with ThreadSanitizer"
         run: |
           ./build_tools/github_actions/docker_run.sh \
@@ -329,8 +329,8 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-        with:
-          submodules: true
+      - name: "Updating submodules"
+        run: build_tools/scripts/shallow_sync_submodules.sh
       - name: "Downloading host tools"
         uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
         with:
