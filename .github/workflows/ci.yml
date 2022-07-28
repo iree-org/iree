@@ -193,6 +193,7 @@ jobs:
         run: |
           gcloud alpha storage cp "${BINARIES_ARCHIVE}" "${GCS_ARTIFACT}"
           echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
+
   test_all:
     needs: build_all
     runs-on:
@@ -351,6 +352,61 @@ jobs:
             bash -c \
             "./build_tools/cmake/build_riscv.sh && build_tools/kokoro/gcp_ubuntu/cmake/baremetal/riscv32/test.sh"
 
+  riscv64:
+    needs: [build_all, host_tools_assertions, build_tf_integrations]
+    runs-on:
+      # Hacks, and order matters. See the comment at the top of the file.
+      - self-hosted
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_RISCV_DIR: "build-riscv-r64"
+      RISCV_CONFIG: "rv64"
+      HOST_BINARY_ROOT: ${{ needs.host_tools_assertions.outputs.host-binary-root }}
+      HOST_BINARY_ARCHIVE: ${{ needs.host_tools_assertions.outputs.host-binary-root }}.tar
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
+      TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
+      TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        with:
+          submodules: true
+      - name: "Downloading host tools"
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
+        with:
+          name: "${{ env.HOST_BINARY_ARCHIVE }}"
+      - name: "Extracting host tools archive"
+        run: |
+          tar -xvf ${HOST_BINARY_ARCHIVE}
+      - name: "Downloading TF binaries archive"
+        run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
+      - name: "Extracting TF binaries archive"
+        run: tar -xf "${TF_BINARIES_ARCHIVE}"
+        # FIXME: The riscv64 tests currently need the entire build dir archive
+        # just to get FileCheck from LLVM's bin directory. This is silly and we
+        # should make FileCheck available another way.
+      - name: "Downloading build dir archive"
+        run: gcloud alpha storage cp "${GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}"
+      - name: "Cross-compiling and testing riscv64"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "RISCV_CONFIG=${RISCV_CONFIG}" \
+            --env "BUILD_RISCV_DIR=${BUILD_RISCV_DIR}" \
+            --env "IREE_HOST_BINARY_ROOT=${HOST_BINARY_ROOT}" \
+            --env "IREE_IMPORT_TFLITE_BIN=${IREE_TF_BINARIES_DIR}/iree-import-tflite" \
+            --env "LLVM_BIN_DIR=${BUILD_DIR}/third_party/llvm-project/llvm/bin" \
+            gcr.io/iree-oss/riscv@sha256:e566f054ff1b1d8be61459ce4789dd944b70e85c8939a4d3b7331ab519d8db4c \
+            bash -c \
+              "./build_tools/cmake/build_riscv.sh && ./build_tools/kokoro/gcp_ubuntu/cmake/linux/riscv64/test.sh"
+
+
   summary:
     runs-on: ubuntu-20.04
     needs:
@@ -362,6 +418,7 @@ jobs:
       - host_tools_assertions
       - tsan
       - riscv32
+      - riscv64
     if: always()
     steps:
       - name: Getting combined job status

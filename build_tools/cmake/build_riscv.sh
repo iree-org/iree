@@ -21,7 +21,7 @@ cd "${ROOT_DIR}"
 CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 RISCV_CONFIG="${RISCV_CONFIG:-rv64}"
 RISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS:--O3}"
-IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT:-${BUILD_HOST_DIR}/install})"
+IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 BUILD_RISCV_DIR="${BUILD_RISCV_DIR:-$ROOT_DIR/build-riscv}"
 
 # --------------------------------------------------------------------------- #
@@ -45,6 +45,8 @@ args=(
   -DRISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS}"
   -DIREE_ENABLE_ASSERTIONS=ON
   -DIREE_BUILD_COMPILER=OFF
+  # CPU info doesn't work on RISCV
+  -DIREE_ENABLE_CPUINFO=OFF
   -DIREE_BUILD_SAMPLES=ON
 )
 
