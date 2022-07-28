@@ -27,7 +27,8 @@ steps:
     if: >
       build.pull_request.id == null ||
       build.pull_request.labels includes 'buildkite:benchmark-x86_64' ||
-      build.pull_request.labels includes 'buildkite:benchmark-riscv'
+      build.pull_request.labels includes 'buildkite:benchmark-riscv' ||
+      build.pull_request.labels includes 'buildkite:benchmark-cuda'
     agents:
       - "queue=build"
     artifact_paths:
@@ -66,7 +67,8 @@ steps:
     if: >
       build.pull_request.id == null ||
       build.pull_request.labels includes 'buildkite:benchmark-x86_64' ||
-      build.pull_request.labels includes 'buildkite:benchmark-riscv'
+      build.pull_request.labels includes 'buildkite:benchmark-riscv' ||
+      build.pull_request.labels includes 'buildkite:benchmark-cuda'
     agents:
       - "queue=build"
     artifact_paths:
@@ -82,6 +84,14 @@ steps:
     if: >
       build.pull_request.id == null ||
       build.pull_request.labels includes 'buildkite:benchmark-x86_64'
+
+  - label: ":arrow_forward: Execute linux-cuda benchmark pipeline"
+    commands: |
+      buildkite-agent pipeline upload \
+        build_tools/buildkite/cmake/linux/cuda/benchmark.yml
+    if: >
+      build.pull_request.id == null ||
+      build.pull_request.labels includes 'buildkite:benchmark-cuda'
 
   - label: ":recycle: Collect compilation statistics"
     key: "collect-compilation-statistics"
@@ -99,7 +109,8 @@ steps:
     if: >
       build.pull_request.id == null ||
       build.pull_request.labels includes 'buildkite:benchmark-x86_64' ||
-      build.pull_request.labels includes 'buildkite:benchmark-riscv'
+      build.pull_request.labels includes 'buildkite:benchmark-riscv' ||
+      build.pull_request.labels includes 'buildkite:benchmark-cuda'
     agents:
       - "queue=build"
     artifact_paths:
@@ -127,7 +138,8 @@ steps:
     if: >
       build.pull_request.id != null && (
         build.pull_request.labels includes 'buildkite:benchmark-x86_64' ||
-        build.pull_request.labels includes 'buildkite:benchmark-riscv'
+        build.pull_request.labels includes 'buildkite:benchmark-riscv' ||
+        build.pull_request.labels includes 'buildkite:benchmark-cuda'
       )
     agents:
       - "queue=report"

@@ -34,13 +34,24 @@ fi
 mkdir -p "${INSTALL_DIR}"
 
 # Configure, build, install.
-"${CMAKE_BIN}" -G Ninja -B "${BUILD_DIR}" \
-  -DCMAKE_INSTALL_PREFIX="$(realpath ${INSTALL_DIR})" \
-  -DIREE_ENABLE_LLD=ON \
-  -DIREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS}" \
-  -DIREE_BUILD_COMPILER=ON \
-  -DIREE_BUILD_TESTS=OFF \
-  -DIREE_BUILD_SAMPLES=OFF \
-  "${ROOT_DIR}"
+declare -a CMAKE_ARGS=(
+  "-G" "Ninja"
+  "-B" "${BUILD_DIR}"
+
+  "-DCMAKE_INSTALL_PREFIX=$(realpath ${INSTALL_DIR})"
+  "-DIREE_ENABLE_LLD=ON"
+  "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
+  "-DIREE_BUILD_COMPILER=ON"
+  "-DIREE_BUILD_TESTS=OFF"
+  "-DIREE_BUILD_SAMPLES=OFF"
+
+  # Enable CUDA compiler and runtime builds unconditionally. Our CI images all
+  # have enough deps to at least build CUDA support and compile CUDA binaries
+  # (but not necessarily test on real hardware).
+  "-DIREE_HAL_DRIVER_CUDA=ON"
+  "-DIREE_TARGET_BACKEND_CUDA=ON"
+)
+
+"${CMAKE_BIN}" "${CMAKE_ARGS[@]}"
 "${CMAKE_BIN}" --build "${BUILD_DIR}" --target install -- -k 0
 # --------------------------------------------------------------------------- #

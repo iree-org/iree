@@ -94,3 +94,28 @@ cd build-targets/linux-riscv
 
 "${CMAKE_BIN}" --build . --target iree-benchmark-suites-linux-riscv -- -k 0
 # --------------------------------------------------------------------------- #
+
+# --------------------------------------------------------------------------- #
+# Build for the target (linux-cuda).
+
+cd "${ROOT_DIR}"
+
+if [ -d "build-targets/linux-cuda" ]
+then
+  echo "linux-cuda directory already exists. Will use cached results there."
+else
+  echo "linux-cuda directory does not already exist. Creating a new one."
+  mkdir -p build-targets/linux-cuda
+fi
+cd build-targets/linux-cuda
+
+"${CMAKE_BIN}" -G Ninja ../.. \
+  -DIREE_HOST_BINARY_ROOT="${HOST_BINARY_ROOT}" \
+  -DIREE_BUILD_COMPILER=OFF \
+  -DIREE_BUILD_TESTS=OFF \
+  -DIREE_BUILD_SAMPLES=OFF \
+  -DIREE_BUILD_BENCHMARKS=ON \
+  -DIREE_ENABLE_COMPILATION_BENCHMARKS=ON
+
+"${CMAKE_BIN}" --build . --target iree-benchmark-suites-linux-cuda -- -k 0
+# --------------------------------------------------------------------------- #
