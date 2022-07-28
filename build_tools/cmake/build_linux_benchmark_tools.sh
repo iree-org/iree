@@ -33,53 +33,47 @@ cd "${ROOT_DIR}"
 
 # --------------------------------------------------------------------------- #
 # Build for the target (linux-x86_64).
-if [[ "${TARGETS}" == *"linux-x86_64"* ]] || [[ "${TARGETS}" == *"all"* ]]
-then
+if [[ "${TARGETS}" =~ linux-x86_64|all ]]; then
+  cd "${ROOT_DIR}"
 
-cd "${ROOT_DIR}"
+  if [ -d "build-targets/linux-x86_64" ]
+  then
+    echo "linux-x86_64 directory already exists. Will use cached results there."
+  else
+    echo "linux-x86_64 directory does not already exist. Creating a new one."
+    mkdir -p build-targets/linux-x86_64
+  fi
+  cd build-targets/linux-x86_64
 
-if [ -d "build-targets/linux-x86_64" ]
-then
-  echo "linux-x86_64 directory already exists. Will use cached results there."
-else
-  echo "linux-x86_64 directory does not already exist. Creating a new one."
-  mkdir -p build-targets/linux-x86_64
-fi
-cd build-targets/linux-x86_64
+  "${CMAKE_BIN}" -G Ninja ../.. \
+    -DIREE_BUILD_COMPILER=OFF \
+    -DIREE_BUILD_TESTS=OFF \
+    -DIREE_BUILD_SAMPLES=OFF
 
-"${CMAKE_BIN}" -G Ninja ../.. \
-  -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_BUILD_TESTS=OFF \
-  -DIREE_BUILD_SAMPLES=OFF
-
-"${CMAKE_BIN}" --build . --target iree-benchmark-module -- -k 0
-
+  "${CMAKE_BIN}" --build . --target iree-benchmark-module -- -k 0
 fi
 # --------------------------------------------------------------------------- #
 
 # --------------------------------------------------------------------------- #
 # Build for the target (linux-cuda).
-if [[ "${TARGETS}" == *"linux-cuda"* ]] || [[ "${TARGETS}" == *"all"* ]]
-then
+if [[ "${TARGETS}" =~ linux-cuda|all ]]; then
+  cd "${ROOT_DIR}"
 
-cd "${ROOT_DIR}"
+  if [ -d "build-targets/linux-cuda" ]
+  then
+    echo "linux-cuda directory already exists. Will use cached results there."
+  else
+    echo "linux-cuda directory does not already exist. Creating a new one."
+    mkdir -p build-targets/linux-cuda
+  fi
+  cd build-targets/linux-cuda
 
-if [ -d "build-targets/linux-cuda" ]
-then
-  echo "linux-cuda directory already exists. Will use cached results there."
-else
-  echo "linux-cuda directory does not already exist. Creating a new one."
-  mkdir -p build-targets/linux-cuda
-fi
-cd build-targets/linux-cuda
+  "${CMAKE_BIN}" -G Ninja ../.. \
+    -DIREE_BUILD_COMPILER=OFF \
+    -DIREE_BUILD_TESTS=OFF \
+    -DIREE_BUILD_SAMPLES=OFF \
+    -DIREE_HAL_DRIVER_CUDA=ON
 
-"${CMAKE_BIN}" -G Ninja ../.. \
-  -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_BUILD_TESTS=OFF \
-  -DIREE_BUILD_SAMPLES=OFF \
-  -DIREE_HAL_DRIVER_CUDA=ON
-
-"${CMAKE_BIN}" --build . --target iree-benchmark-module -- -k 0
-
+  "${CMAKE_BIN}" --build . --target iree-benchmark-module -- -k 0
 fi
 # --------------------------------------------------------------------------- #
