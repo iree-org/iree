@@ -80,14 +80,13 @@ class BenchmarkDriverTest(unittest.TestCase):
                           driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
                           benchmark_case_dir="case1",
                           benchmark_tool_name="tool")
-    case2 = BenchmarkCase(
-        model_name="DeepNetv2",
-        model_tags=["f32"],
-        bench_mode=["full-inference"],
-        target_arch="CPU-ARM64-v8A",
-        driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpum-cpu-sync"],
-        benchmark_case_dir="case2",
-        benchmark_tool_name="tool")
+    case2 = BenchmarkCase(model_name="DeepNetv2",
+                          model_tags=["f32"],
+                          bench_mode=["full-inference"],
+                          target_arch="CPU-ARM64-v8A",
+                          driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
+                          benchmark_case_dir="case2",
+                          benchmark_tool_name="tool")
     self.benchmark_suite = BenchmarkSuite({
         "suite/TFLite": [case1, case2],
     })
