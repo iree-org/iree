@@ -369,6 +369,42 @@ TEST(StringViewTest, ReplaceChar) {
   EXPECT_EQ(replace_char("axbxc", 'x', 'y'), "aybyc");
 }
 
+TEST(StringViewTest, AppendToBuffer) {
+  char buffer[6] = {0, 1, 2, 3, 4, 5};
+  iree_string_view_t source = iree_make_cstring_view("test");
+  iree_string_view_t target = {};
+  const iree_host_size_t size =
+      iree_string_view_append_to_buffer(source, &target, buffer);
+  EXPECT_EQ(size, source.size);
+  EXPECT_EQ(target.size, source.size);
+  EXPECT_EQ(target.data, buffer);
+  // Make sure we did not write past the source size.
+  EXPECT_THAT(buffer, ElementsAre('t', 'e', 's', 't', 4, 5));
+}
+
+TEST(StringViewTest, AppendToBufferEmptySource) {
+  char buffer[4] = {0, 1, 2, 3};
+  iree_string_view_t source = iree_make_string_view(nullptr, 0);
+  iree_string_view_t target = {};
+  const iree_host_size_t size =
+      iree_string_view_append_to_buffer(source, &target, buffer);
+  EXPECT_EQ(size, 0u);
+  EXPECT_EQ(target.size, 0u);
+  EXPECT_EQ(target.data, buffer);
+  // Make sure we did not write to the buffer.
+  EXPECT_THAT(buffer, ElementsAre(0, 1, 2, 3));
+}
+
+TEST(StringViewTest, AppendToBufferEmptySourceAndBuffer) {
+  iree_string_view_t source = iree_make_string_view(nullptr, 0);
+  iree_string_view_t target = {};
+  const iree_host_size_t size =
+      iree_string_view_append_to_buffer(source, &target, nullptr);
+  EXPECT_EQ(size, 0u);
+  EXPECT_EQ(target.size, 0u);
+  EXPECT_EQ(target.data, nullptr);
+}
+
 template <size_t N>
 static iree::StatusOr<std::array<uint8_t, N>> ParseHex(const char* value) {
   std::array<uint8_t, N> buffer;
