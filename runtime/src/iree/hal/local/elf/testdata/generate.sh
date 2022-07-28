@@ -38,7 +38,7 @@ function compile_and_extract_library() {
       ${TESTDATA}/elementwise_mul.mlir
       -o="${TESTDATA}/${so_name}"
 
-      --iree-hal-target-backends=dylib-llvm-aot
+      --iree-hal-target-backends=llvm-cpu
       --iree-llvm-debug-symbols=false
 
       "${compile_args[@]}"
