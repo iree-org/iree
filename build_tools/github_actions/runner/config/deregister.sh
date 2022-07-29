@@ -15,9 +15,12 @@ source "${SCRIPT_DIR}/functions.sh"
 
 TOKEN_PROXY_URL="$(get_attribute github-token-proxy-url)"
 RUNNER_SCOPE="$(get_attribute github-runner-scope)"
-GOOGLE_CLOUD_RUN_ID_TOKEN=$(curl -sSfL "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${TOKEN_PROXY_URL}"     --header "Metadata-Flavor: Google")
-REMOVE_TOKEN="$(curl -sSfL "${TOKEN_PROXY_URL}/remove"   --header "Authorization: Bearer ${GOOGLE_CLOUD_RUN_ID_TOKEN}"   --data-binary "{\"scope\": \"${RUNNER_SCOPE}\"}"   | jq -r ".token"
-)"
+GOOGLE_CLOUD_RUN_ID_TOKEN=$(curl -sSfL \
+"http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${TOKEN_PROXY_URL}" \
+--header "Metadata-Flavor: Google")
+REMOVE_TOKEN="$(curl -sSfL "${TOKEN_PROXY_URL}/remove" /
+--header "Authorization: Bearer ${GOOGLE_CLOUD_RUN_ID_TOKEN}" /
+--data-binary "{\"scope\": \"${RUNNER_SCOPE}\"}"   | jq -r ".token")"
 
 if [ -z "${REMOVE_TOKEN}" ]; then
   echo "failed to get remove runner token" >&2

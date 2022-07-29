@@ -5,9 +5,9 @@ After=network.target
 [Service]
 User=runner
 Group=runner
-ExecStart=/home/runner/config/start.sh
+ExecStart=/dev/shm/config/start.sh
 Restart=no
-WorkingDirectory=/home/runner/config
+WorkingDirectory=/dev/shm/config
 KillMode=process
 KillSignal=SIGTERM
 TimeoutStopSec=5min

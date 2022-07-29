@@ -6,9 +6,9 @@ Before=halt.target shutdown.target reboot.target
 [Service]
 User=runner
 Group=runner
-WorkingDirectory=/home/runner/config
+WorkingDirectory=/dev/shm/config
 Type=oneshot
-ExecStart=/home/runner/config/deregister.sh
+ExecStart=/dev/shm/config/deregister.sh
 RemainAfterExit=yes
 
 [Install]
