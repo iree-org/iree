@@ -530,15 +530,18 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   if (vectorizable) {
     // Try to tile all reductions by size 4 if possible. This gives us a chance
     // to perform vector4 load if an input has its innnermost dimension being
-    // reduction. It also avoidss generating too many instructions when
-    // unrolling vector later.
-    SmallVector<int64_t> reductionTileSizes(linalgOp.getNumLoops(), 0);
+    // reduction. It also avoids generating too many instructions when unrolling
+    // vector later. Similarly, also try to tile other untiled parallel
+    // dimensions by 4 to avoid instruction bloat.
+    SmallVector<int64_t> loopTileSizes(linalgOp.getNumLoops(), 0);
     for (const auto &it : llvm::enumerate(linalgOp.getIteratorTypes())) {
-      if (isReductionIterator(it.value()) && loopBounds[it.index()] % 4 == 0)
-        reductionTileSizes[it.index()] = 4;
+      auto i = it.index();
+      if (loopBounds[i] % 4 != 0) continue;
+      if (isReductionIterator(it.value()) || workgroupTileSizes[i] == 0)
+        loopTileSizes[it.index()] = 4;
     }
-    if (llvm::any_of(reductionTileSizes, [](int64_t s) { return s != 0; })) {
-      tileSizes.push_back(reductionTileSizes);
+    if (llvm::any_of(loopTileSizes, [](int64_t s) { return s != 0; })) {
+      tileSizes.push_back(loopTileSizes);
     }
   }
 
