@@ -96,9 +96,9 @@ jobs:
 
   build_all:
     uses: ./.github/workflows/ci_build_all.yml@main
-        with:
-          build-dir: 'full-build-dir'
-          bucket: ${{ env.BUCKET }}
+    with:
+      build-dir: 'full-build-dir'
+      bucket: ${{ env.BUCKET }}
 
   host_tools_assertions:
     uses: ./.github/workflows/host_tools.yml

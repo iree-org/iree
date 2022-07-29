@@ -1,15 +1,12 @@
-
 # Copyright 2022 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-
 # This part of the CI handles building native CI artifacts, allowing reuse of
 # the build workflow across configurations. This workflow is triggered by the
 # orchiestrating workflow in ci.yml.
-
 name: Build Native CI Artifacts
 
 on:
