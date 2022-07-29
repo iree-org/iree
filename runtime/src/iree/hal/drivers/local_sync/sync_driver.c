@@ -139,7 +139,7 @@ static iree_status_t iree_hal_sync_driver_create_device_by_path(
     const iree_string_pair_t* params, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
   if (!iree_string_view_is_empty(device_path)) {
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
                             "device paths not yet implemented");
   }
   return iree_hal_sync_driver_create_device_by_id(

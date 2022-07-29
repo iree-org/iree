@@ -242,15 +242,10 @@ py::object HalDriver::Create(const std::string& device_uri,
 
   // Create.
   iree_hal_driver_t* driver;
-  iree_status_t status = iree_hal_driver_registry_try_create(
-      iree_hal_driver_registry_default(), driver_name, iree_allocator_system(),
-      &driver);
-  if (iree_status_is_not_found(status)) {
-    std::string msg("Driver not found: ");
-    msg.append(driver_name.data, driver_name.size);
-    throw std::invalid_argument(std::move(msg));
-  }
-  CheckApiStatus(status, "Error creating driver");
+  CheckApiStatus(iree_hal_driver_registry_try_create(
+                     iree_hal_driver_registry_default(), driver_name,
+                     iree_allocator_system(), &driver),
+                 "Error creating driver");
 
   // Cache.
   py::object driver_obj = py::cast(HalDriver::StealFromRawPtr(driver));
@@ -320,15 +315,10 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id) {
 HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri) {
   iree_hal_device_t* device;
   iree_string_view_t device_uri_sv{device_uri.data(), device_uri.size()};
-  iree_status_t status = iree_hal_driver_create_device_by_uri(
-      raw_ptr(), device_uri_sv, iree_allocator_system(), &device);
-  if (iree_status_is_not_found(status) ||
-      iree_status_is_unimplemented(status)) {
-    std::string message("Device not found: ");
-    message.append(device_uri);
-    throw std::invalid_argument(std::move(message));
-  }
-  CheckApiStatus(status, "Error creating device");
+  CheckApiStatus(
+      iree_hal_driver_create_device_by_uri(raw_ptr(), device_uri_sv,
+                                           iree_allocator_system(), &device),
+      "Error creating device");
   return HalDevice::StealFromRawPtr(device);
 }
 
