@@ -11,14 +11,13 @@ import logging
 import os
 from threading import RLock
 
-from ._binding import _create_hal_driver, HalDevice, HalDriver
+from ._binding import get_cached_hal_driver, HalDevice, HalDriver
 
-_GLOBAL_DRIVERS = {}  # type: Dict[str, Union[HalDriver, Exception]]
-_GLOBAL_DEVICES_BY_NAME = {}  # type: Dict[str, Union[HalDevice, Exception]]
+_GLOBAL_DEVICES_BY_URI = {}  # type: Dict[str, Union[HalDevice, Exception]]
 
 _LOCK = RLock()
 
-DEFAULT_DRIVER_NAMES = "dylib,cuda,vulkan,vmvx"
+DEFAULT_DRIVER_NAMES = "local-task,cuda,vulkan"
 
 
 def query_available_drivers() -> Collection[str]:
@@ -26,90 +25,37 @@ def query_available_drivers() -> Collection[str]:
   return HalDriver.query()
 
 
-def get_driver(driver_name: str) -> HalDriver:
-  """Gets or creates a driver by name."""
-  with _LOCK:
-    existing = _GLOBAL_DRIVERS.get(driver_name)
-    if existing is not None:
-      if isinstance(existing, Exception):
-        raise existing
-      else:
-        return existing
-
-    available_names = query_available_drivers()
-    if driver_name not in available_names:
-      raise ValueError(
-          f"Driver '{driver_name}' is not compiled into this binary")
-
-    try:
-      driver = _create_hal_driver(driver_name)
-    except Exception as ex:
-      _GLOBAL_DRIVERS[driver_name] = ex
-      raise
-    _GLOBAL_DRIVERS[driver_name] = driver
-    return driver
+def get_driver(device_uri: str) -> HalDriver:
+  """Returns a HAL driver by device_uri (or driver name)."""
+  return get_cached_hal_driver(device_uri)
 
 
-def get_device_by_name(name_spec: str) -> HalDevice:
-  """Gets a cached device by name.
+def get_device(device_uri: str, cache: bool = True) -> HalDevice:
+  """Gets a cached device by URI.
 
   Args:
-    name_spec: The name of a driver or "{driver_name}:{index}" to create
-      a specific device. If the indexed form is not used, the driver
-      will be asked to create its default device.
+    device_uri: The URI of the device, either just a driver name for the
+      default or a fully qualified "driver://path?params".
+    cache: Whether to cache the device (default True).
   Returns:
     A HalDevice.
   """
   with _LOCK:
-    existing = _GLOBAL_DEVICES_BY_NAME.get(name_spec)
-    if existing is None:
-      # Not existing.
-      # Split into driver_name[:device_index]
-      try:
-        colon_pos = name_spec.index(":")
-      except ValueError:
-        driver_name = name_spec
-        device_index = None
-      else:
-        driver_name = name_spec[0:colon_pos]
-        device_index = name_spec[colon_pos + 1:]
-        try:
-          device_index = int(device_index)
-        except ValueError:
-          raise ValueError(f"Could not parse device name {name_spec}")
+    if cache:
+      existing = _GLOBAL_DEVICES_BY_URI.get(device_uri)
+      if existing is not None:
+        return existing
 
-      driver = get_driver(driver_name)
-      device_id = None
-      if device_index is not None:
-        device_infos = driver.query_available_devices()
-        if device_index >= len(device_infos):
-          raise ValueError(f"Device index {device_index} is out of range. "
-                           f"Found devices {device_infos}")
-        device_id, device_name = device_infos[0]
+    driver = get_driver(device_uri)
+    device = driver.create_device_by_uri(device_uri)
 
-      try:
-        if device_id is None:
-          logging.info("Creating default device for driver %s", driver_name)
-          device = driver.create_default_device()
-        else:
-          logging.info("Creating device %d (%s) for driver %s", device_id,
-                       device_name, driver_name)
-          device = driver.create_device(device_id)
-      except Exception as ex:
-        _GLOBAL_DEVICES_BY_NAME[name_spec] = ex
-        raise
-      else:
-        _GLOBAL_DEVICES_BY_NAME[name_spec] = device
-        return device
-
-    # Existing.
-    if isinstance(existing, Exception):
-      raise existing
-    return existing
+    if cache:
+      _GLOBAL_DEVICES_BY_URI[device_uri] = device
+    return device
 
 
-def get_first_device_by_name(
-    name_specs: Optional[Sequence[str]] = None) -> HalDevice:
+def get_first_device(device_uris: Optional[Sequence[str]] = None,
+                     cache: bool = True) -> HalDevice:
   """Gets the first valid (cached) device for a prioritized list of names.
 
   If no driver_names are given, and an environment variable of
@@ -120,27 +66,28 @@ def get_first_device_by_name(
   for any kind of multi-device setup.
 
   Args:
-    name_specs: Search list of device names to probe.
+    device_urs: Explicit list of device URIs to try.
+    cache: Whether to cache the device (default True).
   Returns:
     A HalDevice instance.
   """
   # Parse from environment or defaults if not explicitly provided.
-  if name_specs is None:
-    name_specs = os.environ.get("IREE_DEFAULT_DEVICE")
-    if name_specs is None:
-      name_specs = DEFAULT_DRIVER_NAMES
-    name_specs = [s.strip() for s in name_specs.split(",")]
+  if device_uris is None:
+    device_uris = os.environ.get("IREE_DEFAULT_DEVICE")
+    if device_uris is None:
+      device_uris = DEFAULT_DRIVER_NAMES
+    device_uris = [s.strip() for s in device_uris.split(",")]
 
   last_exception = None
-  for name_spec in name_specs:
+  for device_uri in device_uris:
     try:
-      return get_device_by_name(name_spec)
+      return get_device(device_uri, cache=cache)
     except ValueError:
       # Driver not known.
       continue
     except Exception as ex:
       # Failure to create driver.
-      logging.info(f"Failed to create device {name_spec}: {ex}")
+      logging.info(f"Failed to create device {device_uri}: {ex}")
       last_exception = ex
       continue
 
@@ -148,4 +95,4 @@ def get_first_device_by_name(
     raise RuntimeError("Could not create device. "
                        "Exception for last tried follows.") from last_exception
   else:
-    raise ValueError(f"No device found from list {name_specs}")
+    raise ValueError(f"No device found from list {device_uris}")

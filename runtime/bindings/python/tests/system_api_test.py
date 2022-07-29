@@ -43,8 +43,8 @@ class SystemApiTest(unittest.TestCase):
     config = iree.runtime.Config("nothere1,local-task")
 
   def test_multi_config_caches(self):
-    config1 = iree.runtime.Config("nothere1,dylib")
-    config2 = iree.runtime.Config("nothere1,dylib")
+    config1 = iree.runtime.Config("nothere1,local-sync")
+    config2 = iree.runtime.Config("nothere1,local-sync")
     self.assertIs(config1.device, config2.device)
 
   def test_empty_dynamic(self):

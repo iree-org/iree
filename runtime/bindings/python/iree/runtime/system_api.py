@@ -35,7 +35,7 @@ from typing import Any, List, Mapping, Optional, Sequence, Tuple, Union
 
 from . import _binding
 from .function import FunctionInvoker
-from .system_setup import get_first_device_by_name
+from .system_setup import get_first_device
 from . import tracing
 
 import numpy as np
@@ -68,7 +68,7 @@ class Config:
     if device is not None:
       self.device = device
     else:
-      self.device = get_first_device_by_name(
+      self.device = get_first_device(
           driver_name.split(",") if driver_name is not None else None)
 
     self.vm_instance = _binding.VmInstance()

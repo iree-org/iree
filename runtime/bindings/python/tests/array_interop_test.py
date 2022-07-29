@@ -16,7 +16,7 @@ class DeviceHalTest(unittest.TestCase):
 
   def setUp(self):
     super().setUp()
-    self.device = iree.runtime.get_device_by_name("local-task")
+    self.device = iree.runtime.get_device("local-task")
     self.allocator = self.device.allocator
     # Make sure device setup maintains proper references.
     gc.collect()

@@ -60,7 +60,7 @@ class VmTest(unittest.TestCase):
 
   @classmethod
   def setUp(self):
-    self.device = iree.runtime.get_device_by_name(
+    self.device = iree.runtime.get_device(
         iree.compiler.core.DEFAULT_TESTING_DRIVER)
     self.hal_module = iree.runtime.create_hal_module(self.device)
 

@@ -15,4 +15,5 @@ the way this trampoline functions.
 import sys
 
 from iree import _runtime
+
 sys.modules[__name__] = _runtime

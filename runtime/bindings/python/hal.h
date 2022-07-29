@@ -89,11 +89,13 @@ class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
 class HalDriver : public ApiRefCounted<HalDriver, iree_hal_driver_t> {
  public:
   static std::vector<std::string> Query();
-  static HalDriver Create(const std::string& driver_name);
+  static py::object Create(const std::string& device_uri,
+                           py::dict& driver_cache);
 
   py::list QueryAvailableDevices();
   HalDevice CreateDefaultDevice();
   HalDevice CreateDevice(iree_hal_device_id_t device_id);
+  HalDevice CreateDeviceByURI(std::string& device_uri);
 };
 
 class HalAllocator : public ApiRefCounted<HalAllocator, iree_hal_allocator_t> {
