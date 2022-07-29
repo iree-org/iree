@@ -250,7 +250,7 @@ class InvokeStatics {
 
           // Push the sub list.
           iree_vm_ref_t retained =
-              iree_vm_list_retain_ref(item_list.steal_raw_ptr());
+              iree_vm_list_move_ref(item_list.steal_raw_ptr());
           iree_vm_list_push_ref_move(list, &retained);
         };
       } else if (compound_type.equal(kSdictTag)) {
@@ -295,7 +295,7 @@ class InvokeStatics {
 
           // Push the sub list.
           iree_vm_ref_t retained =
-              iree_vm_list_retain_ref(item_list.steal_raw_ptr());
+              iree_vm_list_move_ref(item_list.steal_raw_ptr());
           iree_vm_list_push_ref_move(list, &retained);
         };
       } else {
@@ -452,8 +452,7 @@ class InvokeStatics {
         sub_packer(c, item_list.raw_ptr(), py_item);
       }
       // Push the sub list.
-      iree_vm_ref_t retained =
-          iree_vm_list_retain_ref(item_list.steal_raw_ptr());
+      iree_vm_ref_t retained = iree_vm_list_move_ref(item_list.steal_raw_ptr());
       iree_vm_list_push_ref_move(list, &retained);
     };
     AddPackCallback(py::type::of(py::list{}), sequence_callback);
@@ -482,8 +481,7 @@ class InvokeStatics {
         sub_packer(c, item_list.raw_ptr(), py_item);
       }
       // Push the sub list.
-      iree_vm_ref_t retained =
-          iree_vm_list_retain_ref(item_list.steal_raw_ptr());
+      iree_vm_ref_t retained = iree_vm_list_move_ref(item_list.steal_raw_ptr());
       iree_vm_list_push_ref_move(list, &retained);
     };
     AddPackCallback(py::type::of(py::dict{}), dict_callback);
