@@ -41,6 +41,7 @@ iree_cc_library(
     MLIRArmNeon2dToIntr
     MLIRArmNeonDialect
     MLIRBufferizationDialect
+    MLIRComplexToLLVM
     MLIRControlFlowToLLVM
     MLIRFuncDialect
     MLIRFuncToLLVM
