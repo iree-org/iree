@@ -130,10 +130,10 @@ jobs:
       - name: "Creating build dir archive"
         id: archive
         env:
-          BUILD_DIR_ARCHIVE: ${{ env.BUILD_DIR }}.tar.xz
+          BUILD_DIR_ARCHIVE: ${{ env.BUILD_DIR }}.tar.zst
         run: |
           tar --exclude '*.a' --exclude '*.o' \
-            -I 'xz -3 -T0' \
+            -I 'zstd -T0' \
             -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
           echo "::set-output name=build-dir-archive::${BUILD_DIR_ARCHIVE}"
       - name: "Uploading build dir archive"
