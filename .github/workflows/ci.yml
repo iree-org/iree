@@ -113,6 +113,14 @@ jobs:
       build-dir: 'full-build-dir'
       bucket: ${{ needs.env_setup.outputs.bucket }}
 
+  build_all_asan:
+    needs: [env_setup]
+    uses: ./.github/workflows/ci_build_all.yml
+    with:
+      build-dir: 'full-build-dir'
+      bucket: ${{ needs.env_setup.outputs.bucket }}
+      asan: "ON"
+
   host_tools_assertions:
     uses: ./.github/workflows/host_tools.yml
     with:

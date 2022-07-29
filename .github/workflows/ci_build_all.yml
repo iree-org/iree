@@ -20,6 +20,11 @@ on:
         description: "Bucket to deposit artifacts"
         required: true
         type: string
+      asan:
+        description: "CMake define"
+        required: false
+        type: string
+        default: "OFF"
     outputs:
       build-dir:
         description: "Output directory for build artifacts"
@@ -57,7 +62,7 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             gcr.io/iree-oss/base@sha256:9d742e01507c292def852cbfebfae71412cff94df0ab2619f61f9a5a2a98f651 \
             ./build_tools/cmake/build_all.sh \
-           ${BUILD_DIR}
+           ${BUILD_DIR} -DIREE_ENABLE_ASAN=${{ inputs.asan }}
       # Things get more complicated here than when we're just building the
       # runtime. The build directory is way bigger. We're also using on our own
       # runners on GCE. So uploading to GitHub actions artifact storage hosted

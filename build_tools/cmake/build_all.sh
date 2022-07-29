@@ -45,6 +45,9 @@ declare -a CMAKE_ARGS=(
   "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
   "-DIREE_ENABLE_CCACHE=${IREE_ENABLE_CCACHE}"
 
+  # Add all remaining args as build flags
+  ${@:2}
+
   # Enable CUDA compiler and runtime builds unconditionally. Our CI images all
   # have enough deps to at least build CUDA support and compile CUDA binaries
   # (but not necessarily test on real hardware).
