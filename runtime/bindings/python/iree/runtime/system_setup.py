@@ -66,7 +66,7 @@ def get_first_device(device_uris: Optional[Sequence[str]] = None,
   for any kind of multi-device setup.
 
   Args:
-    device_urs: Explicit list of device URIs to try.
+    device_uris: Explicit list of device URIs to try.
     cache: Whether to cache the device (default True).
   Returns:
     A HalDevice instance.
