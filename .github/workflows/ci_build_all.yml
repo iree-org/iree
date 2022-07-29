@@ -15,9 +15,11 @@ on:
       build-dir:
         description: "Output directory for build artifacts"
         required: true
+        type: string
       bucket:
         description: "Bucket to deposit artifacts"
         required: true
+        type: string
     outputs:
       build-dir:
         description: "Output directory for build artifacts"
