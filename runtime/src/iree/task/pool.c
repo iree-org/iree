@@ -90,6 +90,13 @@ static iree_status_t iree_task_pool_grow(iree_task_pool_t* pool,
   iree_task_t* tail = head;
   head->next_task = NULL;
   head->pool = pool;
+
+  // Work around a a loop vectorizer bug that causes memory corruption in this
+  // loop. Only Android NDK r25 is known to be affected. See
+  // https://github.com/iree-org/iree/issues/9953 for details.
+#if defined(__NDK_MAJOR__) && __NDK_MAJOR__ == 25
+#pragma clang loop unroll(disable) vectorize(disable)
+#endif
   for (iree_host_size_t i = 0; i < actual_capacity; ++i, p -= pool->task_size) {
     iree_task_t* task = (iree_task_t*)p;
     task->next_task = head;
