@@ -156,6 +156,10 @@ jobs:
         if: "matrix.build_package == 'py-compiler-pkg' && matrix.build_family == 'macos'"
         shell: bash
         run: |
+          # libzstd on GitHub Action bots is not compatible with MacOS universal.
+          # https://github.com/iree-org/iree/issues/9955
+          sudo rm -rf /usr/local/lib/libzstd.*.dylib
+
           packages="iree-compiler" \
           output_dir="$PWD/bindist" \
           ./main_checkout/build_tools/python_deploy/build_macos_packages.sh
