@@ -15,6 +15,11 @@ target_sources(${_NAME}
 
 set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "custom-module-run")
 
+# TODO(benvanik): make iree_status_annotate_f always available as a function
+# instead of defining it empty? otherwise optimized builds of the runtime won't
+# export it but external libraries may pull it in.
+target_compile_options(${_NAME} PRIVATE ${IREE_DEFAULT_COPTS})
+
 target_link_libraries(${_NAME}
   iree_base_base
   iree_base_cc
