@@ -6,6 +6,7 @@
 
 #include "./hal.h"
 
+#include "iree/base/internal/path.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "pybind11/numpy.h"
@@ -226,14 +227,47 @@ std::vector<std::string> HalDriver::Query() {
   return driver_names;
 }
 
-HalDriver HalDriver::Create(const std::string& driver_name) {
+py::object HalDriver::Create(const std::string& device_uri,
+                             py::dict& driver_cache) {
+  iree_string_view_t driver_name, device_path, params_str;
+  iree_string_view_t device_uri_sv{device_uri.data(), device_uri.size()};
+  iree_uri_split(device_uri_sv, &driver_name, &device_path, &params_str);
+
+  // Check cache.
+  py::str cache_key(driver_name.data, driver_name.size);
+  py::object cached = driver_cache.attr("get")(cache_key);
+  if (!cached.is_none()) {
+    return cached;
+  }
+
+  // Create.
   iree_hal_driver_t* driver;
   CheckApiStatus(iree_hal_driver_registry_try_create(
-                     iree_hal_driver_registry_default(),
-                     {driver_name.data(), driver_name.size()},
+                     iree_hal_driver_registry_default(), driver_name,
                      iree_allocator_system(), &driver),
                  "Error creating driver");
-  return HalDriver::StealFromRawPtr(driver);
+
+  // Cache.
+  py::object driver_obj = py::cast(HalDriver::StealFromRawPtr(driver));
+  driver_cache[cache_key] = driver_obj;
+  return driver_obj;
+}
+
+py::list HalDriver::QueryAvailableDevices() {
+  iree_hal_device_info_t* device_infos;
+  iree_host_size_t count;
+  CheckApiStatus(iree_hal_driver_query_available_devices(
+                     raw_ptr(), iree_allocator_system(), &count, &device_infos),
+                 "Error querying devices");
+  py::list results;
+  for (iree_host_size_t i = 0; i < count; ++i) {
+    results.append(py::make_tuple(
+        py::cast(device_infos[i].device_id),
+        py::str(device_infos[i].name.data, device_infos[i].name.size)));
+  }
+
+  iree_allocator_free(iree_allocator_system(), device_infos);
+  return results;
 }
 
 HalDevice HalDriver::CreateDefaultDevice() {
@@ -241,6 +275,50 @@ HalDevice HalDriver::CreateDefaultDevice() {
   CheckApiStatus(iree_hal_driver_create_default_device(
                      raw_ptr(), iree_allocator_system(), &device),
                  "Error creating default device");
+  return HalDevice::StealFromRawPtr(device);
+}
+
+HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id) {
+  // Since the device ids are supposed to be opaque, we need to verify
+  // them by querying available devices.
+  py::list available_devices = QueryAvailableDevices();
+  bool found = false;
+  py::object compare_device_id = py::cast(device_id);
+  for (auto record : available_devices) {
+    // Each record is a tuple of (device_id, name).
+    auto record_tuple = py::cast<py::tuple>(record);
+    py::object found_device_id = record_tuple[0];
+    if (found_device_id == compare_device_id) {
+      found = true;
+      break;
+    }
+  }
+
+  if (!found) {
+    std::string msg;
+    msg.append("Device id ");
+    msg.append(std::to_string(device_id));
+    msg.append(" not found. Available devices: ");
+    msg.append(py::repr(available_devices));
+    throw std::invalid_argument(std::move(msg));
+  }
+
+  std::vector<iree_string_pair_t> params;
+  iree_hal_device_t* device;
+  CheckApiStatus(iree_hal_driver_create_device_by_id(
+                     raw_ptr(), device_id, params.size(), &params.front(),
+                     iree_allocator_system(), &device),
+                 "Error creating default device");
+  return HalDevice::StealFromRawPtr(device);
+}
+
+HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri) {
+  iree_hal_device_t* device;
+  iree_string_view_t device_uri_sv{device_uri.data(), device_uri.size()};
+  CheckApiStatus(
+      iree_hal_driver_create_device_by_uri(raw_ptr(), device_uri_sv,
+                                           iree_allocator_system(), &device),
+      "Error creating device");
   return HalDevice::StealFromRawPtr(device);
 }
 
@@ -308,6 +386,8 @@ py::object MapElementTypeToDType(iree_hal_element_type_t element_type) {
 //------------------------------------------------------------------------------
 
 void SetupHalBindings(pybind11::module m) {
+  py::dict driver_cache;
+
   // Enums.
   py::enum_<enum iree_hal_memory_type_bits_t>(m, "MemoryType")
       .value("NONE", IREE_HAL_MEMORY_TYPE_NONE)
@@ -443,9 +523,29 @@ void SetupHalBindings(pybind11::module m) {
 
   py::class_<HalDriver>(m, "HalDriver")
       .def_static("query", &HalDriver::Query)
-      .def_static("create", &HalDriver::Create, py::arg("driver_name"))
       .def("create_default_device", &HalDriver::CreateDefaultDevice,
-           py::keep_alive<0, 1>());
+           py::keep_alive<0, 1>())
+      .def("create_device", &HalDriver::CreateDevice, py::keep_alive<0, 1>())
+      .def("create_device_by_uri", &HalDriver::CreateDeviceByURI,
+           py::keep_alive<0, 1>())
+      .def(
+          "create_device",
+          [](HalDriver& self, py::tuple device_info) -> HalDevice {
+            // Alias of create_device that takes a tuple as returned from
+            // query_available_devices for convenience.
+            auto device_id = py::cast<iree_hal_device_id_t>(device_info[0]);
+            return self.CreateDevice(device_id);
+          },
+          py::keep_alive<0, 1>())
+      .def("query_available_devices", &HalDriver::QueryAvailableDevices);
+
+  m.def(
+      "get_cached_hal_driver",
+      [driver_cache](std::string device_uri) {
+        return HalDriver::Create(device_uri,
+                                 const_cast<py::dict&>(driver_cache));
+      },
+      py::arg("device_uri"));
 
   py::class_<HalAllocator>(m, "HalAllocator")
       .def("trim",

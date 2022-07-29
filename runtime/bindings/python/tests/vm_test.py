@@ -59,14 +59,10 @@ def create_simple_dynamic_abs_module():
 class VmTest(unittest.TestCase):
 
   @classmethod
-  def setUpClass(cls):
-    super().setUpClass()
-    driver_names = iree.runtime.HalDriver.query()
-    logging.info("driver_names: %s", driver_names)
-    cls.driver = iree.runtime.HalDriver.create(
+  def setUp(self):
+    self.device = iree.runtime.get_device(
         iree.compiler.core.DEFAULT_TESTING_DRIVER)
-    cls.device = cls.driver.create_default_device()
-    cls.hal_module = iree.runtime.create_hal_module(cls.device)
+    self.hal_module = iree.runtime.create_hal_module(self.device)
 
   def test_variant_list(self):
     l = iree.runtime.VmVariantList(5)

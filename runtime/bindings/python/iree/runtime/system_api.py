@@ -35,15 +35,10 @@ from typing import Any, List, Mapping, Optional, Sequence, Tuple, Union
 
 from . import _binding
 from .function import FunctionInvoker
+from .system_setup import get_first_device
 from . import tracing
 
 import numpy as np
-
-# Environment key for a comma-delimitted list of drivers to try to load.
-PREFERRED_DRIVER_ENV_KEY = "IREE_DEFAULT_DRIVER"
-
-# Default value for IREE_DRIVER
-DEFAULT_IREE_DRIVER_VALUE = "local-task,vulkan"
 
 # Mapping from IREE target backends to their corresponding drivers.
 TARGET_BACKEND_TO_DRIVER = {
@@ -53,56 +48,9 @@ TARGET_BACKEND_TO_DRIVER = {
 }
 
 
-def _create_default_iree_driver(
-    driver_names: Optional[Sequence[str]] = None) -> _binding.HalDriver:
-  """Returns a default driver based on environment settings."""
-  # TODO(laurenzo): Ideally this should take a VmModule and join any explicitly
-  # provided driver list with environmental constraints and what the module
-  # was compiled for.
-  if driver_names is None:
-    # Read from environment.
-    driver_names = os.environ.get(PREFERRED_DRIVER_ENV_KEY)
-    if driver_names is None:
-      driver_names = DEFAULT_IREE_DRIVER_VALUE
-    driver_names = driver_names.split(",")
-  available_driver_names = _binding.HalDriver.query()
-  driver_exceptions = {}
-  for driver_name in driver_names:
-    if driver_name not in available_driver_names:
-      logging.error("Could not create driver %s (not registered)", driver_name)
-      continue
-    try:
-      driver = _binding.HalDriver.create(driver_name)
-    except Exception as ex:  # pylint: disable=broad-except
-      logging.exception("Could not create default driver %s", driver_name)
-      driver_exceptions[driver_name] = ex
-      continue
-
-    # Sanity check creation of the default device and skip the driver if
-    # this fails (this works around issues where the driver is present
-    # but there are no devices). This default initialization scheme needs
-    # to be improved.
-    try:
-      device = driver.create_default_device()
-    except Exception as ex:
-      logging.exception("Could not create default driver device %s",
-                        driver_name)
-      driver_exceptions[driver_name] = ex
-      continue
-
-    logging.debug("Created IREE driver %s: %r", driver_name, driver)
-    return driver
-
-  # All failed.
-  raise RuntimeError(
-      f"Could not create any requested driver {repr(driver_names)} (available="
-      f"{repr(available_driver_names)}) : {repr(driver_exceptions)}")
-
-
 class Config:
   """System configuration."""
 
-  driver: _binding.HalDriver
   device: _binding.HalDevice
   vm_instance: _binding.VmInstance
   default_vm_modules: Tuple[_binding.VmModule, ...]
@@ -110,11 +58,20 @@ class Config:
 
   def __init__(self,
                driver_name: Optional[str] = None,
+               *,
+               device: Optional[_binding.HalDevice] = None,
                tracer: Optional[tracing.Tracer] = None):
+    # Either use an explicit device or auto config based on driver names.
+    if device is not None and driver_name is not None:
+      raise ValueError(
+          "Either 'device' or 'driver_name' can be specified (not both)")
+    if device is not None:
+      self.device = device
+    else:
+      self.device = get_first_device(
+          driver_name.split(",") if driver_name is not None else None)
+
     self.vm_instance = _binding.VmInstance()
-    self.driver = _create_default_iree_driver(
-        driver_name.split(",") if driver_name is not None else None)
-    self.device = self.driver.create_default_device()
     hal_module = _binding.create_hal_module(self.device)
     self.default_vm_modules = (hal_module,)
     self.tracer = tracer or tracing.get_default_tracer()
@@ -123,16 +80,6 @@ class Config:
                    self.tracer.trace_path)
     else:
       self.tracer = None
-
-
-_global_config = None
-
-
-def _get_global_config():
-  global _global_config
-  if _global_config is None:
-    _global_config = Config()
-  return _global_config
 
 
 def _bool_to_int8(
@@ -245,8 +192,7 @@ class SystemContext:
   """Global system."""
 
   def __init__(self, vm_modules=None, config: Optional[Config] = None):
-    self._config = config if config is not None else _get_global_config()
-    logging.debug("SystemContext driver=%r", self._config.driver)
+    self._config = config if config is not None else Config()
     self._is_dynamic = vm_modules is None
     if self._is_dynamic:
       init_vm_modules = None

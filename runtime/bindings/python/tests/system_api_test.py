@@ -36,12 +36,16 @@ def create_simple_mul_module():
 class SystemApiTest(unittest.TestCase):
 
   def test_non_existing_driver(self):
-    with self.assertRaisesRegex(RuntimeError,
-                                "Could not create any requested driver"):
+    with self.assertRaisesRegex(ValueError, "No device found from list"):
       config = iree.runtime.Config("nothere1,nothere2")
 
   def test_subsequent_driver(self):
     config = iree.runtime.Config("nothere1,local-task")
+
+  def test_multi_config_caches(self):
+    config1 = iree.runtime.Config("nothere1,local-sync")
+    config2 = iree.runtime.Config("nothere1,local-sync")
+    self.assertIs(config1.device, config2.device)
 
   def test_empty_dynamic(self):
     ctx = iree.runtime.SystemContext()
@@ -133,6 +137,14 @@ class SystemApiTest(unittest.TestCase):
     results = arithmetic.simple_mul(arg0, arg1)
     print("SIMPLE_MUL RESULTS:", results)
     np.testing.assert_allclose(results, [4., 10., 18., 28.])
+
+  def test_load_multiple_modules(self):
+    # Doing default device configuration multiple times should be valid
+    # (if this were instantiating drivers multiple times, it can trigger
+    # a crash, depending on whether the driver supports multi-instantiation).
+    m = create_simple_mul_module()
+    m1 = iree.runtime.load_vm_module(m)
+    m2 = iree.runtime.load_vm_module(m)
 
 
 if __name__ == "__main__":

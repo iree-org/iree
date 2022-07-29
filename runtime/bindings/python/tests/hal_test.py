@@ -5,6 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import iree.runtime
+
+import gc
 import numpy as np
 import unittest
 
@@ -59,9 +61,9 @@ class DeviceHalTest(unittest.TestCase):
 
   def setUp(self):
     super().setUp()
-    self.driver = iree.runtime.HalDriver.create("local-task")
-    self.device = self.driver.create_default_device()
+    self.device = iree.runtime.get_device("local-task")
     self.allocator = self.device.allocator
+    gc.collect()
 
   def testTrim(self):
     self.allocator.trim()
