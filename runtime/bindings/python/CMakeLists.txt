@@ -34,6 +34,8 @@ iree_pyext_module(
     "invoke.cc"
     "hal.h"
     "hal.cc"
+    "py_module.h"
+    "py_module.cc"
     "status_utils.cc"
     "status_utils.h"
     "vm.h"
@@ -139,6 +141,13 @@ iree_py_test(
     hal_test
   SRCS
     "tests/hal_test.py"
+)
+
+iree_py_test(
+  NAME
+    py_module_test
+  SRCS
+    "tests/py_module_test.py"
 )
 
 iree_py_test(

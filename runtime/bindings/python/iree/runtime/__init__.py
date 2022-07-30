@@ -25,6 +25,7 @@ from ._binding import (
     HalElementType,
     MemoryAccess,
     MemoryType,
+    PyModuleInterface,
     Shape,
 )
 
