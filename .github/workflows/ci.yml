@@ -292,10 +292,8 @@ jobs:
       - name: "Extracting build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Running TF integrations tests"
-        # TODO(#9936): Enable Vulkan
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env IREE_VULKAN_DISABLE=1 \
             gcr.io/iree-oss/frontends-swiftshader@sha256:41e516b8c1b432e3c02896c4bf4b7f06df6a67371aa167b88767b8d4d2018ea6 \
             build_tools/cmake/run_tf_tests.sh \
             "${BUILD_DIR}"
