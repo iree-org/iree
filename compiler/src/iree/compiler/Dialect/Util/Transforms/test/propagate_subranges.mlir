@@ -11,7 +11,7 @@
 util.global private mutable @constantGlobal : !util.buffer
 
 // CHECK-LABEL: @globalLoad
-func.func @globalLoad() {
+func.func private @globalLoad() {
   // CHECK-NEXT: %[[RESOURCE:.+]] = util.global.load @constantGlobal : !util.buffer
   // CHECK-NEXT: %[[STORAGE_SIZE:.+]] = util.global.load @constantGlobal__storage_size : index
   // CHECK-NEXT: %[[OFFSET:.+]] = util.global.load @constantGlobal__offset : index
@@ -37,7 +37,7 @@ util.global private mutable @mutableGlobal : !util.buffer
 
 // CHECK-LABEL: @globalStore
 // CHECK-SAME: (%[[RESOURCE:.+]]: !util.buffer, %[[STORAGE_SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[LENGTH:.+]]: index)
-func.func @globalStore(%resource: !util.buffer) {
+func.func private @globalStore(%resource: !util.buffer) {
   // CHECK: util.global.store %[[RESOURCE]], @mutableGlobal : !util.buffer
   // CHECK: util.global.store %[[STORAGE_SIZE]], @mutableGlobal__storage_size : index
   // CHECK: util.global.store %[[OFFSET]], @mutableGlobal__offset : index
@@ -55,7 +55,7 @@ func.func @globalStore(%resource: !util.buffer) {
 
 // CHECK-LABEL: @funcArgs
 // CHECK-SAME: (%[[RESOURCE0:.+]]: !util.buffer, %[[STORAGE_SIZE0:.+]]: index, %[[OFFSET0:.+]]: index, %[[LENGTH0:.+]]: index, %[[RESOURCE1:.+]]: !util.buffer, %[[STORAGE_SIZE1:.+]]: index, %[[OFFSET1:.+]]: index, %[[LENGTH1:.+]]: index)
-func.func @funcArgs(%resource0: !util.buffer, %resource1: !util.buffer) {
+func.func private @funcArgs(%resource0: !util.buffer, %resource1: !util.buffer) {
   // CHECK-NEXT: %[[SUBRANGE0:.+]] = util.buffer.subspan %[[RESOURCE0]][%[[OFFSET0]]] : !util.buffer{%[[STORAGE_SIZE0]]} -> !util.buffer{%[[LENGTH0]]}
   // CHECK-NEXT: %[[SUBRANGE1:.+]] = util.buffer.subspan %[[RESOURCE1]][%[[OFFSET1]]] : !util.buffer{%[[STORAGE_SIZE1]]} -> !util.buffer{%[[LENGTH1]]}
 
@@ -76,7 +76,7 @@ func.func @funcArgs(%resource0: !util.buffer, %resource1: !util.buffer) {
 // CHECK-LABEL: @funcResults
 // CHECK-SAME: (%[[RESOURCE0:.+]]: !util.buffer, %[[STORAGE_SIZE0:.+]]: index, %[[OFFSET0:.+]]: index, %[[LENGTH0:.+]]: index, %[[RESOURCE1:.+]]: !util.buffer, %[[STORAGE_SIZE1:.+]]: index, %[[OFFSET1:.+]]: index, %[[LENGTH1:.+]]: index)
 // CHECK-SAME: -> (!util.buffer, index, index, index, !util.buffer, index, index, index)
-func.func @funcResults(%resource0: !util.buffer, %resource1: !util.buffer) -> (!util.buffer, !util.buffer) {
+func.func private @funcResults(%resource0: !util.buffer, %resource1: !util.buffer) -> (!util.buffer, !util.buffer) {
   // NOTE: there will be extra stuff here from the arg insertion. Since the
   // return should consume the subrange that was inserted we expect to directly
   // use the function arguments.
@@ -95,7 +95,7 @@ func.func @funcResults(%resource0: !util.buffer, %resource1: !util.buffer) -> (!
 
 // CHECK-LABEL: @caller
 // CHECK-SAME: (%[[RESOURCE0:.+]]: !util.buffer, %[[STORAGE_SIZE0:.+]]: index, %[[OFFSET0:.+]]: index, %[[LENGTH0:.+]]: index, %[[RESOURCE1:.+]]: !util.buffer, %[[STORAGE_SIZE1:.+]]: index, %[[OFFSET1:.+]]: index, %[[LENGTH1:.+]]: index)
-func.func @caller(%resource0: !util.buffer, %resource1: !util.buffer) {
+func.func private @caller(%resource0: !util.buffer, %resource1: !util.buffer) {
   // NOTE: there will be extra stuff here from the arg insertion. The call
   // consumes the subranges and we expect the args to be passed directly.
 
@@ -115,7 +115,9 @@ func.func @caller(%resource0: !util.buffer, %resource1: !util.buffer) {
   return
 }
 
-func.func private @callee(%arg0: !util.buffer, %arg1: !util.buffer) -> (!util.buffer, !util.buffer)
+func.func private @callee(%arg0: !util.buffer, %arg1: !util.buffer) -> (!util.buffer, !util.buffer) {
+  return %arg0, %arg1 : !util.buffer, !util.buffer
+}
 
 // -----
 
@@ -125,7 +127,7 @@ func.func private @callee(%arg0: !util.buffer, %arg1: !util.buffer) -> (!util.bu
 
 // CHECK-LABEL: @callerInSCF
 // CHECK-SAME: (%[[RESOURCE:.+]]: !util.buffer, %[[STORAGE_SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[LENGTH:.+]]: index, %[[COND:.+]]: i1)
-func.func @callerInSCF(%resource: !util.buffer, %cond: i1) {
+func.func private @callerInSCF(%resource: !util.buffer, %cond: i1) {
   // NOTE: there will be extra stuff here from the arg insertion. The call
   // consumes the subranges and we expect the args to be passed directly.
 
@@ -138,7 +140,9 @@ func.func @callerInSCF(%resource: !util.buffer, %cond: i1) {
   return
 }
 
-func.func private @callee(%arg0: !util.buffer)
+func.func private @callee(%arg0: !util.buffer) {
+  return
+}
 
 // -----
 
@@ -149,7 +153,7 @@ func.func private @callee(%arg0: !util.buffer)
 
 // CHECK-LABEL: @callerWithSubrange
 // CHECK-SAME: (%[[ARG_RESOURCE:.+]]: !util.buffer, %[[ARG_SIZE:.+]]: index, %[[ARG_OFFSET:.+]]: index, %[[ARG_LENGTH:.+]]: index)
-func.func @callerWithSubrange(%arg: !util.buffer) {
+func.func private @callerWithSubrange(%arg: !util.buffer) {
   // NOTE: there will be extra stuff here from the arg insertion. The call
   // consumes the subranges and we expect the args to be passed directly.
 
@@ -182,7 +186,9 @@ func.func @callerWithSubrange(%arg: !util.buffer) {
   return
 }
 
-func.func private @callee(%arg0: !util.buffer) -> (!util.buffer)
+func.func private @callee(%arg0: !util.buffer) -> !util.buffer {
+  return %arg0 : !util.buffer
+}
 
 // -----
 
@@ -193,7 +199,7 @@ func.func private @callee(%arg0: !util.buffer) -> (!util.buffer)
 
 // CHECK-LABEL: @br
 // CHECK-SAME: (%[[RESOURCE0:.+]]: !util.buffer, %[[STORAGE_SIZE0:.+]]: index, %[[OFFSET0:.+]]: index, %[[LENGTH0:.+]]: index, %[[RESOURCE1:.+]]: !util.buffer, %[[STORAGE_SIZE1:.+]]: index, %[[OFFSET1:.+]]: index, %[[LENGTH1:.+]]: index)
-func.func @br(%resource0: !util.buffer, %resource1: !util.buffer) {
+func.func private @br(%resource0: !util.buffer, %resource1: !util.buffer) {
   // NOTE: there will be extra stuff here from the arg insertion. The branch
   // consumes the unready resources and we expect the args to be passed directly
   // to the cf.br.

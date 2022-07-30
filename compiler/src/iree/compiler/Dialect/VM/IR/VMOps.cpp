@@ -265,7 +265,6 @@ ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
   result.addAttribute(mlir::function_interface_impl::getTypeAttrName(),
                       TypeAttr::get(functionType));
 
-  // No clue why this is required.
   result.addRegion();
 
   return success();
@@ -321,7 +320,6 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                                                   /*resultAttrs=*/llvm::None);
   }
 
-  // No clue why this is required.
   result.addRegion();
 }
 
@@ -821,6 +819,46 @@ void ConstRefRodataOp::build(OpBuilder &builder, OperationState &result,
 
 void ConstRefRodataOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
   setResultName(setNameFn, getResult(), getRodata());
+}
+
+// Makes a human-readable symbol name for the given string value.
+// This is not uniqued and may need uniquing before being added to the symbol
+// table.
+//
+// For example:
+//   'Some string!' -> '_utf8_some_string'
+//   'I'm a really long'... -> '_utf8_im_a_really_long'
+static std::string makeSafeIdentifier(StringRef unsafeIdentifier) {
+  std::string result = "_utf8_";
+  llvm::raw_string_ostream os(result);
+  bool lastUnderscore = true;
+  for (char c : unsafeIdentifier) {
+    if (!llvm::isPrint(c)) continue;
+    if (llvm::isAlnum(c)) {
+      os << llvm::toLower(c);
+      lastUnderscore = false;
+    } else if (!lastUnderscore) {
+      os << "_";
+      lastUnderscore = true;
+    }
+  }
+  std::string prefix = os.str().substr(0, 32);
+  if (!StringRef(prefix).endswith("_")) {
+    prefix += "_";
+  }
+  return prefix + llvm::utohexstr(static_cast<uint64_t>(
+                      llvm::hash_value(unsafeIdentifier)));
+}
+
+void RodataInlineOp::build(OpBuilder &builder, OperationState &result,
+                           StringAttr value) {
+  // Make an identifier-friendly version of the string so that the value is
+  // more readable in IR (so "I'm some string" becomes "im_some_string", etc).
+  auto safeIdentifier = makeSafeIdentifier(value.getValue());
+  build(builder, result,
+        IREE::VM::RefType::get(IREE::VM::BufferType::get(builder.getContext())),
+        builder.getStringAttr(safeIdentifier), value,
+        /*alignment=*/builder.getI64IntegerAttr(1));
 }
 
 //===----------------------------------------------------------------------===//

@@ -132,9 +132,8 @@ class ExecutableCreateOpConversion
         createOp.getLoc(), rodataOp);
 
     // Get format string as a rodata blob.
-    auto executableFormatStr = createStringTableValue(
-        createOp.getLoc(), executableBinaryOp.getFormatAttr(),
-        importOp.getFunctionType().getInput(1), rewriter);
+    auto executableFormatStr = rewriter.create<IREE::VM::RodataInlineOp>(
+        createOp.getLoc(), executableBinaryOp.getFormatAttr());
 
     // Pack constants, if any.
     auto constantBuffer = createPackedConstantBuffer(

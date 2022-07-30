@@ -9,6 +9,15 @@ func.func @buffer_constant() -> !util.buffer {
 
 // -----
 
+// CHECK-LABEL: @buffer_constant_string
+func.func @buffer_constant_string() -> !util.buffer {
+  // CHECK: = util.buffer.constant : !util.buffer = "hello"
+  %0 = util.buffer.constant : !util.buffer = "hello"
+  return %0 : !util.buffer
+}
+
+// -----
+
 // CHECK-LABEL: @buffer_alloc
 func.func @buffer_alloc(%arg0: index) -> !util.buffer {
   // CHECK: = util.buffer.alloc uninitialized {alignment = 16 : index} : !util.buffer{%arg0}

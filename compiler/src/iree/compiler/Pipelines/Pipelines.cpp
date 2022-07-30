@@ -105,9 +105,12 @@ void buildIREEVMTransformPassPipeline(
       (IREE::Stream::DumpOutputFormat)schedulingOptions.dumpStatisticsFormat;
   streamOptions.dumpStatisticsFile = schedulingOptions.dumpStatisticsFile;
 
+  // TODO(benvanik): only run these pipelines if there are tensors in the
+  // program that we need to convert.
   IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
   IREE::Stream::buildStreamTransformPassPipeline(passManager, streamOptions);
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
+
   IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
   passManager.addPass(IREE::Util::createDropCompilerHintsPass());
 }

@@ -13,7 +13,7 @@
 util.global private mutable @constantGlobal : !stream.resource<constant>
 
 // CHECK-LABEL: @globalLoad
-func.func @globalLoad() {
+func.func private @globalLoad() {
   // CHECK-NEXT: %[[RESOURCE:.+]] = util.global.load @constantGlobal : !stream.resource<constant>
   // CHECK-NEXT: %[[STORAGE_SIZE:.+]] = util.global.load @constantGlobal__storage_size : index
   // CHECK-NEXT: %[[OFFSET:.+]] = util.global.load @constantGlobal__offset : index
@@ -39,7 +39,7 @@ util.global private mutable @mutableGlobal : !stream.resource<variable>
 
 // CHECK-LABEL: @globalStore
 // CHECK-SAME: (%[[RESOURCE:.+]]: !stream.resource<variable>, %[[STORAGE_SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[LENGTH:.+]]: index)
-func.func @globalStore(%resource: !stream.resource<variable>) {
+func.func private @globalStore(%resource: !stream.resource<variable>) {
   // CHECK: util.global.store %[[RESOURCE]], @mutableGlobal : !stream.resource<variable>
   // CHECK: util.global.store %[[STORAGE_SIZE]], @mutableGlobal__storage_size : index
   // CHECK: util.global.store %[[OFFSET]], @mutableGlobal__offset : index
@@ -57,7 +57,7 @@ func.func @globalStore(%resource: !stream.resource<variable>) {
 
 // CHECK-LABEL: @funcArgs
 // CHECK-SAME: (%[[RESOURCE0:.+]]: !stream.resource<external>, %[[STORAGE_SIZE0:.+]]: index, %[[OFFSET0:.+]]: index, %[[LENGTH0:.+]]: index, %[[RESOURCE1:.+]]: !stream.resource<transient>, %[[STORAGE_SIZE1:.+]]: index, %[[OFFSET1:.+]]: index, %[[LENGTH1:.+]]: index)
-func.func @funcArgs(%resource0: !stream.resource<external>, %resource1: !stream.resource<transient>) {
+func.func private @funcArgs(%resource0: !stream.resource<external>, %resource1: !stream.resource<transient>) {
   // CHECK-NEXT: %[[SUBVIEW0:.+]] = stream.resource.subview %[[RESOURCE0]][%[[OFFSET0]]] : !stream.resource<external>{%[[STORAGE_SIZE0]]} -> !stream.resource<external>{%[[LENGTH0]]}
   // CHECK-NEXT: %[[SUBVIEW1:.+]] = stream.resource.subview %[[RESOURCE1]][%[[OFFSET1]]] : !stream.resource<transient>{%[[STORAGE_SIZE1]]} -> !stream.resource<transient>{%[[LENGTH1]]}
 
@@ -78,7 +78,7 @@ func.func @funcArgs(%resource0: !stream.resource<external>, %resource1: !stream.
 // CHECK-LABEL: @funcResults
 // CHECK-SAME: (%[[RESOURCE0:.+]]: !stream.resource<external>, %[[STORAGE_SIZE0:.+]]: index, %[[OFFSET0:.+]]: index, %[[LENGTH0:.+]]: index, %[[RESOURCE1:.+]]: !stream.resource<transient>, %[[STORAGE_SIZE1:.+]]: index, %[[OFFSET1:.+]]: index, %[[LENGTH1:.+]]: index)
 // CHECK-SAME: -> (!stream.resource<external>, index, index, index, !stream.resource<transient>, index, index, index)
-func.func @funcResults(%resource0: !stream.resource<external>, %resource1: !stream.resource<transient>) -> (!stream.resource<external>, !stream.resource<transient>) {
+func.func private @funcResults(%resource0: !stream.resource<external>, %resource1: !stream.resource<transient>) -> (!stream.resource<external>, !stream.resource<transient>) {
   // NOTE: there will be extra stuff here from the arg insertion. Since the
   // return should consume the subview that was inserted we expect to directly
   // use the function arguments.
@@ -97,7 +97,7 @@ func.func @funcResults(%resource0: !stream.resource<external>, %resource1: !stre
 
 // CHECK-LABEL: @caller
 // CHECK-SAME: (%[[RESOURCE0:.+]]: !stream.resource<external>, %[[STORAGE_SIZE0:.+]]: index, %[[OFFSET0:.+]]: index, %[[LENGTH0:.+]]: index, %[[RESOURCE1:.+]]: !stream.resource<transient>, %[[STORAGE_SIZE1:.+]]: index, %[[OFFSET1:.+]]: index, %[[LENGTH1:.+]]: index)
-func.func @caller(%resource0: !stream.resource<external>, %resource1: !stream.resource<transient>) {
+func.func private @caller(%resource0: !stream.resource<external>, %resource1: !stream.resource<transient>) {
   // NOTE: there will be extra stuff here from the arg insertion. The call
   // consumes the subviews and we expect the args to be passed directly.
 
@@ -117,7 +117,9 @@ func.func @caller(%resource0: !stream.resource<external>, %resource1: !stream.re
   return
 }
 
-func.func private @callee(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) -> (!stream.resource<external>, !stream.resource<transient>)
+func.func private @callee(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) -> (!stream.resource<external>, !stream.resource<transient>) {
+  return %arg0, %arg1 : !stream.resource<external>, !stream.resource<transient>
+}
 
 // -----
 
@@ -128,7 +130,7 @@ func.func private @callee(%arg0: !stream.resource<external>, %arg1: !stream.reso
 
 // CHECK-LABEL: @br
 // CHECK-SAME: (%[[RESOURCE0:.+]]: !stream.resource<external>, %[[STORAGE_SIZE0:.+]]: index, %[[OFFSET0:.+]]: index, %[[LENGTH0:.+]]: index, %[[RESOURCE1:.+]]: !stream.resource<transient>, %[[STORAGE_SIZE1:.+]]: index, %[[OFFSET1:.+]]: index, %[[LENGTH1:.+]]: index)
-func.func @br(%resource0: !stream.resource<external>, %resource1: !stream.resource<transient>) {
+func.func private @br(%resource0: !stream.resource<external>, %resource1: !stream.resource<transient>) {
   // NOTE: there will be extra stuff here from the arg insertion. The branch
   // consumes the unready resources and we expect the args to be passed directly
   // to the cf.br.

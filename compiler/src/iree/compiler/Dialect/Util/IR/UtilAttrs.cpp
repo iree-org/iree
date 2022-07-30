@@ -525,6 +525,42 @@ struct SerializableDenseElementsAttrModel
   }
 };
 
+// External interface applied to string attrs so that we can serialize them to
+// byte buffers. We don't include NUL terminators as it's 2022.
+struct SerializableStringAttrModel
+    : public SerializableAttrInterface::ExternalModel<
+          SerializableStringAttrModel, StringAttr> {
+  int64_t getStorageSize(Attribute baseAttr) const {
+    auto attr = baseAttr.cast<StringAttr>();
+    return attr.getValue().size();
+  }
+
+  LogicalResult serializeToVector(Attribute baseAttr,
+                                  llvm::support::endianness endian,
+                                  SmallVectorImpl<char> &buffer) const {
+    buffer.resize(getStorageSize(baseAttr));
+    return serializeToBuffer(baseAttr, endian, buffer);
+  }
+
+  LogicalResult serializeToBuffer(Attribute baseAttr,
+                                  llvm::support::endianness endian,
+                                  ArrayRef<char> buffer) const {
+    raw_inplace_ostream os(buffer);
+    return serializeToStream(baseAttr, endian, os);
+  }
+
+  LogicalResult serializeToStream(Attribute baseAttr,
+                                  llvm::support::endianness endian,
+                                  llvm::raw_ostream &os) const {
+    // NOTE: not all ostream implementations handle this but for buffering ones
+    // it can really help.
+    os.reserveExtraSpace(getStorageSize(baseAttr));
+    auto stringAttr = baseAttr.cast<StringAttr>();
+    os.write(stringAttr.data(), stringAttr.size());
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // IREE::Util::UtilDialect
 //===----------------------------------------------------------------------===//
@@ -546,6 +582,7 @@ void UtilDialect::registerAttributes() {
       *getContext());
   DenseFPElementsAttr::attachInterface<SerializableDenseElementsAttrModel>(
       *getContext());
+  StringAttr::attachInterface<SerializableStringAttrModel>(*getContext());
 }
 
 }  // namespace Util

@@ -70,7 +70,7 @@ func.func @wrappedAlready(%arg0: !hal.buffer_view) -> !hal.buffer_view attribute
 // Tests that a function calling an exported function is redirected to the
 // original unwrapped call.
 
-// CHECK: func.func @exportA(%arg0: !hal.buffer_view) -> !hal.buffer_view
+// CHECK-LABEL: func.func @exportA(%arg0: !hal.buffer_view) -> !hal.buffer_view
 // CHECK:   call @_exportA
 // CHECK: func.func private @_exportA(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32>
 // CHECK:   return %arg0
@@ -83,6 +83,30 @@ func.func @exportA(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 // CHECK: func.func private @_exportB(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32>
 // CHECK:   call @_exportA
 func.func @exportB(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
-    %0 = call @exportA(%arg0) : (tensor<?x?xi32>) -> tensor<?x?xi32>
-    return %0 : tensor<?x?xi32>
+  %0 = call @exportA(%arg0) : (tensor<?x?xi32>) -> tensor<?x?xi32>
+  return %0 : tensor<?x?xi32>
+}
+
+// -----
+
+// Tests that imported functions get converted to canonical ABI types and
+// wrapper functions are built to preserve internal behavior.
+
+// CHECK-LABEL: func.func private @import(!hal.buffer_view) -> !hal.buffer_view
+func.func private @import(tensor<?x2xi32>) -> tensor<2x?xi32>
+
+// CHECK: func.func private @_import(%[[ARG_TENSOR:.+]]: tensor<?x2xi32>) -> tensor<2x?xi32> {
+// CHECK:   %[[ARG_DIM:.+]] = tensor.dim %[[ARG_TENSOR]], %c0
+// CHECK:   %[[ARG_VIEW:.+]] = hal.tensor.export %[[ARG_TENSOR]] : tensor<?x2xi32>{%[[ARG_DIM]]} -> !hal.buffer_view
+// CHECK:   %[[RET_VIEW:.+]] = call @import(%[[ARG_VIEW]]) : (!hal.buffer_view) -> !hal.buffer_view
+// CHECK:   %[[RET_DIM:.+]] = hal.buffer_view.dim<%[[RET_VIEW]] : !hal.buffer_view>[1]
+// CHECK:   %[[RET_TENSOR:.+]] = hal.tensor.import %[[RET_VIEW]] : !hal.buffer_view -> tensor<2x?xi32>{%[[RET_DIM]]}
+// CHECK:   return %[[RET_TENSOR]]
+// CHECK: }
+
+// CHECK: func.func private @caller(%arg0: tensor
+func.func private @caller(%arg0: tensor<?x2xi32>) -> tensor<2x?xi32> {
+  // CHECK: call @_import(%arg0) : (tensor<?x2xi32>) -> tensor<2x?xi32>
+  %0 = call @import(%arg0) : (tensor<?x2xi32>) -> tensor<2x?xi32>
+  return %0 : tensor<2x?xi32>
 }

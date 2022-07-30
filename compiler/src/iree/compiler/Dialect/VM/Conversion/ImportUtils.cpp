@@ -111,35 +111,6 @@ void copyImportAttrs(IREE::VM::ImportOp importOp, Operation *callOp) {
 
 namespace detail {
 
-// Makes a human-readable symbol name for the given string value.
-// This is not uniqued and may need uniquing before being added to the symbol
-// table.
-//
-// For example:
-//   'Some string!' -> '_utf8_some_string'
-//   'I'm a really long'... -> '_utf8_im_a_really_long'
-static std::string makeSafeIdentifier(StringRef unsafeIdentifier) {
-  std::string result = "_utf8_";
-  llvm::raw_string_ostream os(result);
-  bool lastUnderscore = true;
-  for (char c : unsafeIdentifier) {
-    if (!llvm::isPrint(c)) continue;
-    if (llvm::isAlnum(c)) {
-      os << llvm::toLower(c);
-      lastUnderscore = false;
-    } else if (!lastUnderscore) {
-      os << "_";
-      lastUnderscore = true;
-    }
-  }
-  std::string prefix = os.str().substr(0, 32);
-  if (!StringRef(prefix).endswith("_")) {
-    prefix += "_";
-  }
-  return prefix + llvm::utohexstr(static_cast<uint64_t>(
-                      llvm::hash_value(unsafeIdentifier)));
-}
-
 size_t getSegmentSpanSize(Type spanType) {
   if (auto tupleType = spanType.dyn_cast<TupleType>()) {
     return tupleType.size();
@@ -147,36 +118,6 @@ size_t getSegmentSpanSize(Type spanType) {
     return 1;
   }
 }
-
-}  // namespace detail
-
-Value createStringTableValue(Location loc, StringAttr attrValue, Type inputType,
-                             OpBuilder &builder) {
-  auto stringValue = attrValue.getValue();
-
-  // Make an identifier-friendly version of the string so that the value is
-  // more readable in IR (so "I'm some string" becomes "im_some_string", etc).
-  auto safeIdentifier = detail::makeSafeIdentifier(stringValue);
-
-  // Encode the string value bytes into an elements attr as UTF-8 bytes.
-  SmallVector<APInt, 16> stringBytes(stringValue.size());
-  for (int i = 0; i < stringValue.size(); ++i) {
-    stringBytes[i] = APInt(8, stringValue[i]);
-  }
-  auto utf8Bytes = DenseIntElementsAttr::get(
-      VectorType::get({static_cast<int64_t>(stringBytes.size())},
-                      builder.getIntegerType(8)),
-      stringBytes);
-
-  // Embed the UTF-8 bytes as a vm.rodata blob.
-  return builder.create<IREE::VM::RodataInlineOp>(
-      loc,
-      IREE::VM::RefType::get(IREE::VM::BufferType::get(builder.getContext())),
-      builder.getStringAttr(safeIdentifier), utf8Bytes,
-      /*alignment=*/builder.getI64IntegerAttr(1));
-}
-
-namespace detail {
 
 Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     Location loc, Attribute attrValue, Type inputType,
@@ -209,7 +150,7 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     }
     return allValues;
   } else if (auto strAttr = attrValue.dyn_cast<StringAttr>()) {
-    return {{createStringTableValue(loc, strAttr, inputType, rewriter)}};
+    return {{rewriter.create<IREE::VM::RodataInlineOp>(loc, strAttr)}};
   }
 
   // This may be a custom dialect type. As we can't trivially access the storage
