@@ -24,6 +24,27 @@ class FLOW_PureOp<string mnemonic, list<Trait> traits = []> :
 // Partitioned regions
 //===----------------------------------------------------------------------===//
 
+def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
+    SingleBlockImplicitTerminator<"IREE::Flow::ReturnOp">]> {
+  let summary = [{a group of ops}];
+  let description = [{
+    This op is a container/grouping of ops. It represents a fusion group before
+    being lowered to a dispatch region. Ops are collected inside of the region
+    body of the op. Values from parent regions can be captured. Results are
+    yielded with a `return` terminator and returned from this op.
+
+    `dispatch.region` ops are lowered to `dispatch.workgroups` ops. Workgroups
+    isolated from above. `dispatch.region` ops are a more lightweight
+    abstraction for implementing fusion heuristics, i.e., the process of
+    deciding which ops should form a dispatch region.
+  }];
+
+  let results = (outs Variadic<AnyType>:$result);
+  let regions = (region AnyRegion:$body);
+  let assemblyFormat = "attr-dict `:` type($result) $body";
+  let hasVerifier = 1;
+}
+
 def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
   IsolatedFromAbove,
   AttrSizedOperandSegments,

@@ -272,6 +272,16 @@ static void printDispatchWorkgroupsCountRegion(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
+// flow.dispatch.region
+//===----------------------------------------------------------------------===//
+
+LogicalResult DispatchRegionOp::verify() {
+  if (!getBody().getArguments().empty())
+    return emitOpError() << "expected no block arguments";
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // flow.dispatch.tie_shape
 //===----------------------------------------------------------------------===//
 
