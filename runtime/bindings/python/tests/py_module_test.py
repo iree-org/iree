@@ -43,6 +43,29 @@ class PyModuleInterfaceTest(unittest.TestCase):
     gc.collect()
     self.assertTrue(iface.destroyed)
 
+  def testMultiModuleInstance(self):
+    calls = []
+
+    def ctor(iface):
+      calls.append(iface)
+      return None
+
+    iface = rt.PyModuleInterface("test1", ctor)
+    m = iface.create()
+    context1 = rt.VmContext(self._instance, modules=(m,))
+    self.assertTrue(iface.initialized)
+    context2 = rt.VmContext(self._instance, modules=(m,))
+    self.assertTrue(iface.initialized)
+    self.assertEqual(2, len(calls))
+
+    # Make sure no circular refs and that everything frees.
+    calls = None
+    context1 = None
+    m = None
+    context2 = None
+    gc.collect()
+    self.assertTrue(iface.destroyed)
+
   def testVoidFunctionExport(self):
     messages = []
 
