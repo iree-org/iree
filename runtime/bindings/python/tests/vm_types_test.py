@@ -76,6 +76,19 @@ class VmTypesTest(unittest.TestCase):
     with self.assertRaises(IndexError):
       lst1.get_as_list(1)
 
+  def test_vm_buffer(self):
+    b1 = rt.VmBuffer(10, mutable=True)
+    print(b1)
+    contents = memoryview(b1)
+    contents[0:] = b'0123456789'
+    self.assertEqual(bytes(b1), b'0123456789')
+
+  def test_vm_buffer_ro(self):
+    b1 = rt.VmBuffer(10, mutable=False)
+    contents = memoryview(b1)
+    with self.assertRaises(TypeError):
+      contents[0:] = b'0123456789'
+
 
 if __name__ == "__main__":
   logging.basicConfig(level=logging.DEBUG)

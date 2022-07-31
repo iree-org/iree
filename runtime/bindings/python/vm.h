@@ -26,6 +26,12 @@ class FunctionAbi;
 //------------------------------------------------------------------------------
 
 template <>
+struct ApiPtrAdapter<iree_vm_buffer_t> {
+  static void Retain(iree_vm_buffer_t* b) { iree_vm_buffer_retain(b); }
+  static void Release(iree_vm_buffer_t* b) { iree_vm_buffer_release(b); }
+};
+
+template <>
 struct ApiPtrAdapter<iree_vm_instance_t> {
   static void Retain(iree_vm_instance_t* b) { iree_vm_instance_retain(b); }
   static void Release(iree_vm_instance_t* b) { iree_vm_instance_release(b); }
@@ -66,6 +72,12 @@ struct ApiPtrAdapter<iree_vm_ref_t> {
   }
   static void Release(iree_vm_ref_t* b) { iree_vm_ref_release(b); }
 };
+
+//------------------------------------------------------------------------------
+// VmBuffer
+//------------------------------------------------------------------------------
+
+class VmBuffer : public ApiRefCounted<VmBuffer, iree_vm_buffer_t> {};
 
 //------------------------------------------------------------------------------
 // VmVariantList

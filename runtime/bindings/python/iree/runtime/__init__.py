@@ -33,6 +33,7 @@ from ._binding import (
 from ._binding import (
     create_hal_module,
     Linkage,
+    VmBuffer,
     VmVariantList,
     VmFunction,
     VmInstance,

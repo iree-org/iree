@@ -520,6 +520,43 @@ void SetupVmBindings(pybind11::module m) {
       .value("EXPORT", IREE_VM_FUNCTION_LINKAGE_EXPORT)
       .export_values();
 
+  auto vm_buffer = py::class_<VmBuffer>(m, "VmBuffer", py::buffer_protocol());
+  VmRef::BindRefProtocol(vm_buffer, iree_vm_buffer_type_id,
+                         iree_vm_buffer_retain_ref, iree_vm_buffer_deref,
+                         iree_vm_buffer_isa);
+  vm_buffer
+      .def(py::init([](iree_host_size_t length, bool is_mutable) {
+             iree_vm_buffer_access_t access = 0;
+             if (is_mutable) {
+               access |= IREE_VM_BUFFER_ACCESS_MUTABLE;
+             }
+             iree_vm_buffer_t* raw_buffer;
+             CheckApiStatus(
+                 iree_vm_buffer_create(access, length, iree_allocator_system(),
+                                       &raw_buffer),
+                 "Error creating buffer");
+             return VmBuffer::StealFromRawPtr(raw_buffer);
+           }),
+           py::arg("length"), py::arg("mutable") = true)
+      .def_buffer([](VmBuffer& self) -> py::buffer_info {
+        return py::buffer_info(
+            /*ptr=*/self.raw_ptr()->data.data,
+            /*itemsize=*/sizeof(uint8_t),
+            /*format=*/py::format_descriptor<uint8_t>::format(),
+            /*ndim=*/1,
+            /*shape=*/{self.raw_ptr()->data.data_length},
+            /*strides=*/{1},
+            /*readonly=*/
+            !(self.raw_ptr()->access & IREE_VM_BUFFER_ACCESS_MUTABLE));
+      })
+      .def("__repr__", [](VmBuffer& self) {
+        std::stringstream ss;
+        ss << "<VmBuffer size " << self.raw_ptr()->data.data_length << " at 0x"
+           << std::hex << reinterpret_cast<uintptr_t>(self.raw_ptr()->data.data)
+           << ">";
+        return ss.str();
+      });
+
   // Mutation and inspection of the variant list is mostly opaque to python.
   auto vm_list = py::class_<VmVariantList>(m, "VmVariantList");
   VmRef::BindRefProtocol(vm_list, iree_vm_list_type_id, iree_vm_list_retain_ref,
