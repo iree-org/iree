@@ -6,9 +6,11 @@
 
 #include "./hal.h"
 
+#include "./vm.h"
 #include "iree/base/internal/path.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
+#include "iree/modules/hal/module.h"
 #include "pybind11/numpy.h"
 
 namespace iree {
@@ -382,11 +384,29 @@ py::object MapElementTypeToDType(iree_hal_element_type_t element_type) {
 }  // namespace
 
 //------------------------------------------------------------------------------
+// HAL module
+//------------------------------------------------------------------------------
+
+VmModule CreateHalModule(HalDevice* device) {
+  iree_vm_module_t* module;
+  CheckApiStatus(
+      iree_hal_module_create(device->raw_ptr(), IREE_HAL_MODULE_FLAG_NONE,
+                             iree_allocator_system(), &module),
+      "Error creating hal module");
+  return VmModule::StealFromRawPtr(module);
+}
+
+//------------------------------------------------------------------------------
 // Bindings
 //------------------------------------------------------------------------------
 
 void SetupHalBindings(pybind11::module m) {
   py::dict driver_cache;
+
+  IREE_CHECK_OK(iree_hal_module_register_all_types());
+
+  // Built-in module creation.
+  m.def("create_hal_module", &CreateHalModule);
 
   // Enums.
   py::enum_<enum iree_hal_memory_type_bits_t>(m, "MemoryType")
@@ -606,8 +626,11 @@ void SetupHalBindings(pybind11::module m) {
            py::arg("element_size"), py::keep_alive<0, 1>())
       .def("__repr__", &HalBuffer::Repr);
 
-  py::class_<HalBufferView>(m, "HalBufferView")
-      .def("map", HalMappedMemory::Create, py::keep_alive<0, 1>())
+  auto hal_buffer_view = py::class_<HalBufferView>(m, "HalBufferView");
+  VmRef::BindRefProtocol(hal_buffer_view, iree_hal_buffer_view_type_id,
+                         iree_hal_buffer_view_retain_ref,
+                         iree_hal_buffer_view_deref, iree_hal_buffer_view_isa);
+  hal_buffer_view.def("map", HalMappedMemory::Create, py::keep_alive<0, 1>())
       .def_property_readonly(
           "shape",
           [](HalBufferView& self) {

@@ -21,6 +21,7 @@ from ._binding import (
     MemoryType,
     VmContext,
     VmFunction,
+    VmRef,
     VmVariantList,
 )
 
@@ -202,7 +203,7 @@ def _vm_to_ndarray(inv: Invocation, vm_list: VmVariantList, vm_index: int,
   # The descriptor for an ndarray is like:
   #   ["ndarray", "<dtype>", <rank>, <dim>...]
   #   ex: ['ndarray', 'i32', 1, 25948]
-  buffer_view = vm_list.get_as_buffer_view(vm_index)
+  buffer_view = vm_list.get_as_object(vm_index, HalBufferView)
   dtype_str = desc[1]
   try:
     dtype = ABI_TYPE_TO_DTYPE[dtype_str]
@@ -366,10 +367,12 @@ def _extract_vm_sequence_to_python(inv: Invocation, vm_list, descs):
       # Special case: Upgrade HalBufferView to a DeviceArray. We do that here
       # since this is higher level and it preserves layering. Note that
       # the reflection case also does this conversion.
-      if isinstance(converted, HalBufferView):
-        converted = DeviceArray(inv.device,
-                                converted,
-                                implicit_host_transfer=True)
+      if isinstance(converted, VmRef):
+        converted_buffer_view = converted.deref(HalBufferView, True)
+        if converted_buffer_view:
+          converted = DeviceArray(inv.device,
+                                  converted_buffer_view,
+                                  implicit_host_transfer=True)
     else:
       # Known type descriptor.
       vm_type = desc if isinstance(desc, str) else desc[0]
