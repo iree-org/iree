@@ -61,7 +61,7 @@ template <>
 struct ApiPtrAdapter<iree_vm_ref_t> {
   static void Retain(iree_vm_ref_t* b) {
     iree_vm_ref_t out_ref;
-    out_ref.ptr = nullptr;
+    std::memset(&out_ref, 0, sizeof(out_ref));
     iree_vm_ref_retain(b, &out_ref);
   }
   static void Release(iree_vm_ref_t* b) { iree_vm_ref_release(b); }
@@ -217,7 +217,9 @@ class VmRef {
 
   // Initializes a null ref.
   VmRef() { std::memset(&ref_, 0, sizeof(ref_)); }
-  VmRef(VmRef&& other) : ref_(other.ref_) { other.ref_.ptr = nullptr; }
+  VmRef(VmRef&& other) : ref_(other.ref_) {
+    std::memset(&other.ref_, 0, sizeof(other.ref_));
+  }
   VmRef(const VmRef&) = delete;
   VmRef& operator=(const VmRef&) = delete;
   ~VmRef() {
