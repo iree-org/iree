@@ -25,6 +25,7 @@ struct ApiPtrAdapter {};
 template <typename Self, typename T>
 class ApiRefCounted {
  public:
+  using RawPtrType = T*;
   ApiRefCounted() : instance_(nullptr) {}
   ApiRefCounted(ApiRefCounted& other) : instance_(other.instance_) { Retain(); }
   ApiRefCounted(ApiRefCounted&& other) : instance_(other.instance_) {

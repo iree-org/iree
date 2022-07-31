@@ -34,6 +34,8 @@ iree_pyext_module(
     "invoke.cc"
     "hal.h"
     "hal.cc"
+    "py_module.h"
+    "py_module.cc"
     "status_utils.cc"
     "status_utils.h"
     "vm.h"
@@ -143,6 +145,13 @@ iree_py_test(
 
 iree_py_test(
   NAME
+    py_module_test
+  SRCS
+    "tests/py_module_test.py"
+)
+
+iree_py_test(
+  NAME
     system_api_test
   SRCS
     "tests/system_api_test.py"
@@ -160,6 +169,13 @@ iree_py_test(
     vm_test
   SRCS
     "tests/vm_test.py"
+)
+
+iree_py_test(
+  NAME
+    vm_types_test
+  SRCS
+    "tests/vm_types_test.py"
 )
 
 # TODO: Enable this once the CI bots are updated to install the python3-venv

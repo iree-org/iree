@@ -175,6 +175,37 @@ std::optional<iree_vm_function_t> VmModule::LookupFunction(
 }
 
 //------------------------------------------------------------------------------
+// VmRef
+//------------------------------------------------------------------------------
+
+const char* const VmRef::kRefAttr = "__iree_vm_ref__";
+const char* const VmRef::kCastAttr = "__iree_vm_cast__";
+const char* const VmRef::kTypeIdAttr = "__iree_vm_type_id__";
+
+py::object VmRef::Deref(py::object ref_object_class) {
+  return ref_object_class.attr(kCastAttr)(*this);
+}
+
+bool VmRef::IsInstance(py::object ref_object_class) {
+  auto type_id =
+      py::cast<iree_vm_ref_type_t>(ref_object_class.attr(kTypeIdAttr)());
+  return type_id == ref_.type;
+}
+
+std::string VmRef::ToString() {
+  if (!ref_.ptr) {
+    return "<VmRef NULL>";
+  }
+  iree_string_view_t type_name = iree_vm_ref_type_name(ref_.type);
+  std::stringstream ss;
+  ss << "<VmRef ";
+  ss.write(type_name.data, type_name.size);
+  ss << " at " << std::hex << "0x" << reinterpret_cast<uintptr_t>(ref_.ptr)
+     << ">";
+  return ss.str();
+}
+
+//------------------------------------------------------------------------------
 // VmVariantList
 //------------------------------------------------------------------------------
 
@@ -213,7 +244,7 @@ py::object VmVariantList::GetAsList(int index) {
   CheckApiStatus(iree_vm_list_check_deref(ref, &sub_list),
                  "Could not deref list (wrong type?)");
   iree_vm_list_retain(sub_list);
-  return py::cast(VmVariantList(sub_list));
+  return py::cast(VmVariantList::StealFromRawPtr(sub_list));
 }
 
 py::object VmVariantList::GetVariant(int index) {
@@ -297,7 +328,7 @@ py::object VmVariantList::GetAsSerializedTraceValue(int index) {
       CheckApiStatus(iree_vm_list_check_deref(v.ref, &sub_list),
                      "Could not deref list (wrong type?)");
       iree_vm_list_retain(sub_list);
-      VmVariantList sub_list_object(sub_list);
+      VmVariantList sub_list_object = VmVariantList::StealFromRawPtr(sub_list);
       for (int i = 0, e = sub_list_object.size(); i < e; ++i) {
         items.append(sub_list_object.GetAsSerializedTraceValue(i));
       }
@@ -496,7 +527,11 @@ void SetupVmBindings(pybind11::module m) {
       .export_values();
 
   // Mutation and inspection of the variant list is mostly opaque to python.
-  py::class_<VmVariantList>(m, "VmVariantList")
+  auto vm_list = py::class_<VmVariantList>(m, "VmVariantList");
+  VmRef::BindRefProtocol(vm_list, iree_vm_list_type_id, iree_vm_list_retain_ref,
+                         iree_vm_list_check_deref);
+  vm_list
+      // User Methods.
       .def(py::init(&VmVariantList::Create))
       .def_property_readonly("size", &VmVariantList::size)
       .def("__len__", &VmVariantList::size)
@@ -612,6 +647,16 @@ void SetupVmBindings(pybind11::module m) {
         repr.append(">");
         return repr;
       });
+
+  py::class_<VmRef>(m, "VmRef")
+      .def("isinstance", &VmRef::IsInstance)
+      .def("deref", &VmRef::Deref)
+      .def("__repr__", &VmRef::ToString)
+      .def("__eq__",
+           [](VmRef& self, VmRef& other) {
+             return self.ref().ptr == other.ref().ptr;
+           })
+      .def("__eq__", [](VmRef& self, py::object& other) { return false; });
 }
 
 }  // namespace python
