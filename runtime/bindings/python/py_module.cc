@@ -345,7 +345,17 @@ class PyModuleInterface {
               py::cast(*reinterpret_cast<double *>(packed_arguments)));
           packed_arguments += sizeof(double);
           break;
-        // TODO: Refs (need a generic Python ref wrapper).
+        case IREE_VM_CCONV_TYPE_REF: {
+          iree_vm_ref_t ref =
+              *reinterpret_cast<iree_vm_ref_t *>(packed_arguments);
+          // Since the Python level VmRef can escape, it needs its own ref
+          // count.
+          VmRef py_ref;
+          iree_vm_ref_retain(&ref, &py_ref.ref());
+          arguments.append(py::cast(py_ref, py::return_value_policy::move));
+          packed_arguments += sizeof(iree_vm_ref_t);
+          break;
+        }
         // TODO: Variadic segments.
         default:
           return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -385,6 +395,14 @@ class PyModuleInterface {
           *reinterpret_cast<double *>(packed_results) = py::cast<double>(value);
           packed_results += sizeof(double);
           break;
+        case IREE_VM_CCONV_TYPE_REF: {
+          iree_vm_ref_t *result_ref =
+              reinterpret_cast<iree_vm_ref_t *>(packed_results);
+          VmRef *py_ref = py::cast<VmRef *>(value);
+          iree_vm_ref_retain(&py_ref->ref(), result_ref);
+          packed_results += sizeof(iree_vm_ref_t);
+          break;
+        }
         // TODO: Refs (need a generic Python ref wrapper).
         // TODO: Variadic segments.
         default:

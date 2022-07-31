@@ -171,6 +171,13 @@ iree_py_test(
     "tests/vm_test.py"
 )
 
+iree_py_test(
+  NAME
+    vm_types_test
+  SRCS
+    "tests/vm_types_test.py"
+)
+
 # TODO: Enable this once the CI bots are updated to install the python3-venv
 # apt package. https://github.com/iree-org/iree/issues/9080
 # iree_py_test(

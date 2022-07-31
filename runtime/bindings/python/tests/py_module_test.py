@@ -240,6 +240,65 @@ class PyModuleInterfaceTest(unittest.TestCase):
     gc.collect()
     self.assertTrue(iface.destroyed)
 
+  def testRefArguments(self):
+    values = []
+
+    class Methods:
+
+      def __init__(self, iface):
+        pass
+
+      def do_it(self, a, b):
+        values.append((a.deref(rt.VmVariantList), b.deref(rt.VmVariantList)))
+
+    iface = rt.PyModuleInterface("test1", Methods)
+    iface.export("do_it", "0rr", Methods.do_it)
+    m = iface.create()
+    context = rt.VmContext(self._instance, modules=(m,))
+
+    # These lists just happen to be reference objects we know how to
+    # create.
+    arg0 = rt.VmVariantList(1)
+    arg0.push_int(42)
+    arg1 = rt.VmVariantList(1)
+    arg1.push_int(84)
+
+    args = rt.VmVariantList(2)
+    args.push_list(arg0)
+    args.push_list(arg1)
+    results = rt.VmVariantList(2)
+    context.invoke(m.lookup_function("do_it"), args, results)
+    print("REF VALUES:", values)
+    self.assertEqual(repr(values),
+                     "[(<VmVariantList(1): [42]>, <VmVariantList(1): [84]>)]")
+
+  def testRefResults(self):
+
+    class Methods:
+
+      def __init__(self, iface):
+        pass
+
+      def do_it(self):
+        # These lists just happen to be reference objects we know how to
+        # create.
+        r0 = rt.VmVariantList(1)
+        r0.push_int(42)
+        r1 = rt.VmVariantList(1)
+        r1.push_int(84)
+        return r0.ref, r1.ref
+
+    iface = rt.PyModuleInterface("test1", Methods)
+    iface.export("do_it", "0v_rr", Methods.do_it)
+    m = iface.create()
+    context = rt.VmContext(self._instance, modules=(m,))
+
+    args = rt.VmVariantList(0)
+    results = rt.VmVariantList(2)
+    context.invoke(m.lookup_function("do_it"), args, results)
+    print("REF RESULTS:", results)
+    self.assertEqual(repr(results), "<VmVariantList(2): [List[42], List[84]]>")
+
 
 if __name__ == "__main__":
   unittest.main()
