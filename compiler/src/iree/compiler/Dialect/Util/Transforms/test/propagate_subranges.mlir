@@ -85,6 +85,18 @@ func.func private @funcResults(%resource0: !util.buffer, %resource1: !util.buffe
   return %resource0, %resource1 : !util.buffer, !util.buffer
 }
 
+
+// -----
+
+// Tests that exported functions don't have their signature changed.
+
+// CHECK-LABEL: @publicFuncSignature
+// CHECK-SAME: (%[[RESOURCE:.+]]: !util.buffer) -> !util.buffer
+func.func @publicFuncSignature(%resource: !util.buffer) -> !util.buffer {
+  // CHECK-NEXT: return %[[RESOURCE]] : !util.buffer
+  return %resource : !util.buffer
+}
+
 // -----
 
 // Tests that function calls have their args and results expanded into
