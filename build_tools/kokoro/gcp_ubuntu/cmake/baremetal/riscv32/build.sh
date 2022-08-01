@@ -33,4 +33,4 @@ echo "Cross-compiling with cmake"
 ./build_tools/cmake/build_host_and_riscv.sh
 
 echo "Run sanity tests"
-./build_tools/kokoro/gcp_ubuntu/cmake/baremetal/riscv32/test.sh
+./tests/riscv32/smoke.sh
