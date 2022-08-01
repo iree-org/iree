@@ -8,7 +8,6 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -98,14 +97,14 @@ struct Mmt4DOpPartitionableLoops
   }
 };
 
-/// External model implementation for all operations that implement the
-/// `TiledOpInterface`.
+/// External model implementation for all operations to make only
+/// the outer parallel loops as partitionable.
 template <typename OpTy>
-struct TiledOpInterfacePartitionableLoops
+struct OuterParallelAsPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
-          TiledOpInterfacePartitionableLoops<OpTy>, OpTy> {
+          OuterParallelAsPartitionableLoops<OpTy>, OpTy> {
   unsigned getNumLoops(Operation *op) const {
-    auto tiledOp = cast<IREE::LinalgExt::TiledOpInterface>(op);
+    auto tiledOp = cast<OpTy>(op);
     return tiledOp.getLoopIteratorTypes().size();
   }
 
@@ -115,73 +114,97 @@ struct TiledOpInterfacePartitionableLoops
     // `TiledOpInterface`. This needs to be further pruned to remove unit-dim
     // loops, but that needs the interface to return the static sizes of the
     // loops.
-    auto tiledOp = cast<IREE::LinalgExt::TiledOpInterface>(op);
-    return tiledOp.getPartitionableLoops(maxNumPartitionedLoops);
+    SmallVector<unsigned> partitionableLoops;
+    auto interfaceOp = cast<OpTy>(op);
+    for (auto iteratorType :
+         llvm::enumerate(interfaceOp.getLoopIteratorTypes())) {
+      if (iteratorType.value() != getParallelIteratorTypeName()) {
+        break;
+      }
+      partitionableLoops.push_back(iteratorType.index());
+    }
+    if (partitionableLoops.size() > maxNumPartitionedLoops) {
+      partitionableLoops.erase(
+          partitionableLoops.begin(),
+          std::next(partitionableLoops.begin(),
+                    partitionableLoops.size() - maxNumPartitionedLoops));
+    }
+    return partitionableLoops;
   }
 
   llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
-    auto tiledOp = cast<IREE::LinalgExt::TiledOpInterface>(op);
+    auto tiledOp = cast<OpTy>(op);
     return tiledOp.getLoopIteratorTypes();
   }
 };
 
-/// Partitionable loop interface for `tensor.extract_slice` operation. Needed
-/// only to build the workload during dispatch region formation.
-/// TODO(ravishankarm): Drop this ExternalModel once the use of
-/// PartitionableLoopsInterface is dropped from Flow.
-struct TensorExtractOpPartitionableLoops
+/// External model implementation for specifying partitionable loops of FftOp.
+struct FftOpPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
-          TensorExtractOpPartitionableLoops, tensor::ExtractSliceOp> {
+          FftOpPartitionableLoops, IREE::LinalgExt::FftOp> {
   unsigned getNumLoops(Operation *op) const {
-    return cast<tensor::ExtractSliceOp>(op).getType().getRank();
+    auto fftOp = cast<IREE::LinalgExt::FftOp>(op);
+    return fftOp.getLoopIteratorTypes().size();
   }
 
   llvm::SmallVector<unsigned> getPartitionableLoops(
       Operation *op, unsigned maxNumPartitionedLoops) const {
-    auto sliceOp = cast<tensor::ExtractSliceOp>(op);
-    auto partitionableLoops =
-        llvm::to_vector(llvm::seq<unsigned>(0, sliceOp.getType().getRank()));
+    auto fftOp = cast<IREE::LinalgExt::FftOp>(op);
+    auto range = llvm::seq<unsigned>(0, fftOp.getOperandRank());
+    SmallVector<unsigned> partitionableLoops(range.begin(), range.end());
+    // Indices matter for coeff computation.
+    if (!fftOp.hasCoeff()) {
+      partitionableLoops.pop_back();
+    }
     if (partitionableLoops.size() > maxNumPartitionedLoops) {
-      return llvm::to_vector(ArrayRef<unsigned>(partitionableLoops)
-                                 .take_back(maxNumPartitionedLoops));
+      partitionableLoops.erase(
+          partitionableLoops.begin(),
+          std::next(partitionableLoops.begin(),
+                    partitionableLoops.size() - maxNumPartitionedLoops));
     }
     return partitionableLoops;
   }
 
   llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
-    auto sliceOp = cast<tensor::ExtractSliceOp>(op);
-    return llvm::SmallVector<StringRef>(sliceOp.getType().getRank(),
-                                        getParallelIteratorTypeName());
+    auto fftOp = cast<IREE::LinalgExt::FftOp>(op);
+    return fftOp.getLoopIteratorTypes();
   }
 };
 
-/// Partitionable loop interface for `tensor.insert_slice` operation. Needed
-/// only to build the workload during dispatch region formation.
-/// TODO(ravishankarm): Drop this ExternalModel once the use of
-/// PartitionableLoopsInterface is dropped from Flow.
-struct TensorInsertOpPartitionableLoops
+/// External model implementation for making all parallel loops as
+/// partitionable.
+template <typename OpTy>
+struct AllParallelAsPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
-          TensorInsertOpPartitionableLoops, tensor::InsertSliceOp> {
+          AllParallelAsPartitionableLoops<OpTy>, OpTy> {
   unsigned getNumLoops(Operation *op) const {
-    return cast<tensor::InsertSliceOp>(op).getSourceType().getRank();
+    auto tiledOp = cast<OpTy>(op);
+    return tiledOp.getLoopIteratorTypes().size();
   }
 
   llvm::SmallVector<unsigned> getPartitionableLoops(
       Operation *op, unsigned maxNumPartitionedLoops) const {
-    auto sliceOp = cast<tensor::InsertSliceOp>(op);
-    auto partitionableLoops = llvm::to_vector(
-        llvm::seq<unsigned>(0, sliceOp.getSourceType().getRank()));
+    SmallVector<unsigned> partitionableLoops;
+    auto interfaceOp = cast<OpTy>(op);
+    for (auto iteratorType :
+         llvm::enumerate(interfaceOp.getLoopIteratorTypes())) {
+      if (iteratorType.value() != getParallelIteratorTypeName()) {
+        continue;
+      }
+      partitionableLoops.push_back(iteratorType.index());
+    }
     if (partitionableLoops.size() > maxNumPartitionedLoops) {
-      return llvm::to_vector(ArrayRef<unsigned>(partitionableLoops)
-                                 .take_back(maxNumPartitionedLoops));
+      partitionableLoops.erase(
+          partitionableLoops.begin(),
+          std::next(partitionableLoops.begin(),
+                    partitionableLoops.size() - maxNumPartitionedLoops));
     }
     return partitionableLoops;
   }
 
   llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
-    auto sliceOp = cast<tensor::InsertSliceOp>(op);
-    return llvm::SmallVector<StringRef>(sliceOp.getType().getRank(),
-                                        getParallelIteratorTypeName());
+    auto tiledOp = cast<OpTy>(op);
+    return tiledOp.getLoopIteratorTypes();
   }
 };
 
@@ -207,20 +230,6 @@ static void registerInterfaceForLinalgOps(MLIRContext *ctx) {
   registerInterfaceForLinalgOps<OpTy2, More...>(ctx);
 }
 
-/// Registers the `TiledOpInterfacePartitionableLoops` model for operations.
-template <typename OpTy>
-static void registerInterfaceForTiledOpInterfaceOps(MLIRContext *ctx) {
-  OpTy ::template attachInterface<TiledOpInterfacePartitionableLoops<OpTy>>(
-      *ctx);
-}
-
-/// Registers the external models for all TiledOpInterface operations.
-template <typename OpTy1, typename OpTy2, typename... More>
-static void registerInterfaceForTiledOpInterfaceOps(MLIRContext *ctx) {
-  registerInterfaceForTiledOpInterfaceOps<OpTy1>(ctx);
-  registerInterfaceForTiledOpInterfaceOps<OpTy2, More...>(ctx);
-}
-
 void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   registry.insert<linalg::LinalgDialect>();
 
@@ -233,18 +242,19 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
 
   registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
 
-  registry.addExtension(
-      +[](MLIRContext *ctx, IREE::LinalgExt::IREELinalgExtDialect *dialect) {
-        registerInterfaceForTiledOpInterfaceOps<
-            IREE::LinalgExt::FftOp, IREE::LinalgExt::ReverseOp,
-            IREE::LinalgExt::ScanOp, IREE::LinalgExt::ScatterOp,
-            IREE::LinalgExt::SortOp, IREE::LinalgExt::TopkOp>(ctx);
-      });
-  registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
-    tensor::ExtractSliceOp::attachInterface<TensorExtractOpPartitionableLoops>(
-        *ctx);
-    tensor::InsertSliceOp::attachInterface<TensorInsertOpPartitionableLoops>(
-        *ctx);
+  registry.addExtension(+[](MLIRContext *ctx,
+                            IREE::LinalgExt::IREELinalgExtDialect *dialect) {
+    IREE::LinalgExt::FftOp::attachInterface<FftOpPartitionableLoops>(*ctx);
+    IREE::LinalgExt::ScanOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::ScanOp>>(*ctx);
+    IREE::LinalgExt::SortOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::SortOp>>(*ctx);
+    IREE::LinalgExt::TopkOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::TopkOp>>(*ctx);
+    IREE::LinalgExt::ReverseOp::attachInterface<
+        OuterParallelAsPartitionableLoops<IREE::LinalgExt::ReverseOp>>(*ctx);
+    IREE::LinalgExt::ScatterOp::attachInterface<
+        OuterParallelAsPartitionableLoops<IREE::LinalgExt::ScatterOp>>(*ctx);
   });
 }
 

@@ -14,7 +14,6 @@
 
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
@@ -52,7 +51,6 @@ inline void registerIreeDialects(DialectRegistry &registry) {
   // clang-format on
 
   // External models.
-  IREE::LinalgExt::registerTiledOpInterfaceExternalModels(registry);
   IREE::Util::registerUtilExternalModels(registry);
   registerCodegenInterfaces(registry);
 }

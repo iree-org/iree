@@ -905,7 +905,9 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, IREE::LinalgExt::FftOp fftOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   unsigned numLoops = fftOp.getLoopIteratorTypes().size();
-  auto partitionedLoops = fftOp.getPartitionableLoops(kNumMaxParallelDims);
+  auto partitionedLoops =
+      cast<PartitionableLoopsInterface>(fftOp.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
   SmallVector<int64_t> workgroupTileSizes(numLoops, defaultWorkgroupTileSize);
   llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
                                                partitionedLoops.end());
@@ -1216,21 +1218,20 @@ static LogicalResult setRootConfig(
 /// Set the default configuration for operations that implement the
 /// `TiledOpInterface`.
 static LogicalResult setRootConfig(
-    func::FuncOp entryPointFn,
-    IREE::LinalgExt::TiledOpInterface tiledOpInterfaceOp,
+    func::FuncOp entryPointFn, TilingInterface tilingInterfaceOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDefault) {
-  if (getLoweringConfig(tiledOpInterfaceOp)) return success();
+  if (getLoweringConfig(tilingInterfaceOp)) return success();
 
   auto partitionableLoopOp =
-      cast<PartitionableLoopsInterface>(tiledOpInterfaceOp.getOperation());
+      cast<PartitionableLoopsInterface>(tilingInterfaceOp.getOperation());
 
   // TODO(hanchung): Implement getStaticLoopRanges method for TiledOpInterface.
-  OpBuilder builder(tiledOpInterfaceOp.getContext());
-  builder.setInsertionPoint(tiledOpInterfaceOp);
+  OpBuilder builder(tilingInterfaceOp.getContext());
+  builder.setInsertionPoint(tilingInterfaceOp);
   SmallVector<Range> iterationDomain =
-      tiledOpInterfaceOp.getIterationDomain(builder);
+      tilingInterfaceOp.getIterationDomain(builder);
   auto getStaticValue = [](OpFoldResult ofr) -> int64_t {
     Optional<int64_t> intVal = getConstantIntValue(ofr);
     if (!intVal) return ShapedType::kDynamicSize;
@@ -1264,10 +1265,12 @@ static LogicalResult setRootConfigImpl(
         .Case<linalg::ContractionOpInterface>([&](auto op) {
           return setRootConfig(entryPointFn, op, tiledLoops);
         })
-        .Case<linalg::LinalgOp, IREE::LinalgExt::TiledOpInterface>(
-            [&](auto op) {
-              return setRootConfig(entryPointFn, op, tiledLoops);
-            })
+        .Case<linalg::LinalgOp>([&](auto op) {
+          return setRootConfig(entryPointFn, op, tiledLoops);
+        })
+        .Case<TilingInterface>([&](auto op) {
+          return setRootConfig(entryPointFn, op, tiledLoops);
+        })
         .Default([&](Operation *op) { return success(); });
   };
   return setRootConfigFn(op);
@@ -1283,11 +1286,14 @@ static LogicalResult setVMVXRootConfigImpl(
   // Redirect to individual operations.
   auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
-        .Case<linalg::LinalgOp, IREE::LinalgExt::TiledOpInterface>(
-            [&](auto op) {
-              return setRootConfig(entryPointFn, op, tiledLoops,
-                                   DispatchLoweringPassPipeline::VMVXDefault);
-            })
+        .Case<linalg::LinalgOp>([&](auto op) {
+          return setRootConfig(entryPointFn, op, tiledLoops,
+                               DispatchLoweringPassPipeline::VMVXDefault);
+        })
+        .Case<TilingInterface>([&](auto op) {
+          return setRootConfig(entryPointFn, op, tiledLoops,
+                               DispatchLoweringPassPipeline::VMVXDefault);
+        })
         .Default([&](Operation *op) { return success(); });
   };
   return setRootConfigFn(op);
@@ -1316,16 +1322,7 @@ static FailureOr<Operation *> getRootOperation(
       continue;
     }
 
-    if (auto tiledOpInterfaceOp =
-            dyn_cast<IREE::LinalgExt::TiledOpInterface>(op)) {
-      // TODO(ravishankarm): For now
-      // `tensor.extract_slice`/`tensor.insert_slice` implement the
-      // `tiledInterfaceOp`. With tile + distribute moved out of Flow
-      // dialect, this doesnt work anymore. Remove this when the external
-      // model implementation of
-      // `tensor.extract_slice`/`tensor.insert_slice` are dropped.
-      if (isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(op)) continue;
-
+    if (isa<TilingInterface>(op)) {
       // All other operations that implement this interface are root ops.
       if (failed(updateRootOperation(op))) return failure();
       continue;

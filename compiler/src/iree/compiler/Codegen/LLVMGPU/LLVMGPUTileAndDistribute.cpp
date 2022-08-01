@@ -177,7 +177,7 @@ static void populateTilingToInvocationPatterns(
      return success(!isa<IREE::LinalgExt::FftOp>(op));
    }).setMatchByDefault();
   patterns.insert<linalg::LinalgTilingPattern,
-                  IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
+                  IREE::LinalgExt::TilingInterfaceTilingPattern>(
       context, tilingOptions, f);
 }
 

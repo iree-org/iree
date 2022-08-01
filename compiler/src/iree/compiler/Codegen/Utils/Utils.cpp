@@ -23,6 +23,7 @@
 #include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Interfaces/TilingInterface.h"
 
 #define DEBUG_TYPE "iree-codegen-utils"
 
@@ -574,7 +575,7 @@ LogicalResult getComputeOps(
   if (failed(getFilteredOps(
           funcOp,
           [](Operation *op) {
-            return isa<linalg::LinalgOp, IREE::LinalgExt::TiledOpInterface>(op);
+            return isa<linalg::LinalgOp, TilingInterface>(op);
           },
           computeOps, tiledLoops))) {
     return failure();
