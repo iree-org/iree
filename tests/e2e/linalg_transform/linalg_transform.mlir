@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir %s --iree-hal-target-backends=dylib-llvm-aot \
+// RUN: iree-run-mlir %s --iree-hal-target-backends=llvm-cpu \
 /// Specify the dispatch region formation with the transform dialect.
 // RUN:   --iree-flow-dispatch-use-transform-dialect=%p/transform_dialect_dispatch_spec.mlir \
 /// Specify the codegen strategy with the transform dialect.

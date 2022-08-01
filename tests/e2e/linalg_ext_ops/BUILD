@@ -74,7 +74,7 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_dylib-llvm-aot_dylib",
+    name = "check_llvm-cpu_local-task",
     srcs = enforce_glob(
         # keep sorted
         [
@@ -90,7 +90,7 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_vmvx_vmvx",
+    name = "check_vmvx_local-task",
     srcs = enforce_glob(
         # keep sorted
         [
@@ -131,8 +131,8 @@ test_suite(
     name = "check",
     tests = [
         ":check_cuda",
-        ":check_dylib-llvm-aot_dylib",
-        ":check_vmvx_vmvx",
+        ":check_llvm-cpu_local-task",
+        ":check_vmvx_local-task",
         ":check_vulkan-spirv_vulkan",
     ],
 )

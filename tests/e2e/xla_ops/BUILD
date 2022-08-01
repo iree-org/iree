@@ -181,7 +181,7 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_dylib-llvm-aot_dylib",
+    name = "check_llvm-cpu_local-task",
     srcs = enforce_glob(
         # keep sorted
         [
@@ -250,7 +250,7 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_vmvx_vmvx",
+    name = "check_vmvx_local-task",
     srcs = enforce_glob(
         # keep sorted
         [
@@ -400,7 +400,7 @@ iree_check_single_backend_test_suite(
 # Hopefully at some point we can build WebAssembly execution testing into our
 # infrastructure and this will no longer bend our testing definitions as much.
 iree_check_single_backend_test_suite(
-    name = "check_wasm-llvm-aot",
+    name = "check_llvm-cpu-wasm",
     srcs = enforce_glob(
         # keep sorted
         [
@@ -474,7 +474,7 @@ iree_check_single_backend_test_suite(
 
 # Check host features compilation (LLVM backend with host cpu features).
 iree_check_single_backend_test_suite(
-    name = "check_dylib-llvm-aot-host_dylib",
+    name = "check_llvm-cpu-host_local-task",
     srcs = enforce_glob(
         # keep sorted
         [
@@ -554,9 +554,9 @@ iree_check_single_backend_test_suite(
 test_suite(
     name = "check",
     tests = [
-        ":check_dylib-llvm-aot-host_dylib",
-        ":check_dylib-llvm-aot_dylib",
-        ":check_vmvx_vmvx",
+        ":check_llvm-cpu-host_local-task",
+        ":check_llvm-cpu_local-task",
+        ":check_vmvx_local-task",
         ":check_vulkan-spirv_vulkan",
     ],
 )

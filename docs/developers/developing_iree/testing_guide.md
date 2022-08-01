@@ -219,13 +219,13 @@ drivers).
 With CMake, run this from the build directory:
 
 ```shell
-$ ctest -R tests/e2e/xla_ops/check_vmvx_vmvx_floor.mlir
+$ ctest -R tests/e2e/xla_ops/check_vmvx_local-task_floor.mlir
 ```
 
 With Bazel, run this from the repo root:
 
 ```shell
-$ bazel test tests/e2e/xla_ops:check_vmvx_vmvx_floor.mlir
+$ bazel test tests/e2e/xla_ops:check_vmvx_local-task_floor.mlir
 ```
 
 ### Setting test environments
@@ -322,7 +322,7 @@ A single `.mlir` source file can be turned into a test target with the
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_test")
 
 iree_check_test(
-    name = "check_vmvx_vmvx_floor.mlir",
+    name = "check_vmvx_local-task_floor.mlir",
     src = "floor.mlir",
     driver = "local-task",
     target_backend = "vmvx",
@@ -341,7 +341,7 @@ pair:
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
 iree_check_single_backend_test_suite(
-    name = "check_vmvx_vmvx",
+    name = "check_vmvx_local-task",
     srcs = glob(["*.mlir"]),
     driver = "local-task",
     target_backend = "vmvx",
@@ -351,7 +351,7 @@ iree_check_single_backend_test_suite(
 This will generate a separate test target for each file in `srcs` with a name
 following the convention above as well as a Bazel
 [test_suite](https://docs.bazel.build/versions/master/be/general.html#test_suite)
-called "check_vmvx_vmvx" that will run all the generated tests.
+called "check_vmvx_local-task" that will run all the generated tests.
 
 You can also generate suites across multiple pairs:
 

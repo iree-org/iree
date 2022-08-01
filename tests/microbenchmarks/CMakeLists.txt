@@ -14,7 +14,7 @@ iree_microbenchmark_suite(
     "mhlo_dot_general.mlir"
     "mhlo_fft_abs.mlir"
   FLAGS
-    "--iree-hal-target-backends=dylib-llvm-aot"
+    "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
     "--iree-llvm-target-cpu-features=host"
 )

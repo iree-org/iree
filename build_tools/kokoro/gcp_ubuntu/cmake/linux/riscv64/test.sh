@@ -15,14 +15,14 @@ set -x
 export PS4='[$(date -u "+%T %Z")] '
 
 # Environment variable used by the emulator and iree-compile for the
-# dylib-llvm-aot bytecode codegen.
+# llvm-cpu bytecode codegen.
 export RISCV_TOOLCHAIN_ROOT=${RISCV_RV64_LINUX_TOOLCHAIN_ROOT?}
 
 
-function generate_dylib_vmfb {
+function generate_llvm_cpu_vmfb {
   local target="${1}"; shift
   local compile_args=(
-    --iree-hal-target-backends=dylib-llvm-aot
+    --iree-hal-target-backends=llvm-cpu
     --iree-llvm-embedded-linker-path=${BUILD_HOST_DIR?}/install/bin/lld
     --iree-llvm-target-triple=riscv64
     --iree-llvm-target-cpu=generic-rv64
@@ -55,17 +55,17 @@ function generate_dylib_vmfb {
   "${BUILD_HOST_DIR?}/install/bin/iree-compile" "${compile_args[@]}" "$@"
 }
 
-generate_dylib_vmfb mhlo \
+generate_llvm_cpu_vmfb mhlo \
   "${ROOT_DIR?}/tools/test/iree-run-module.mlir" \
   -o "${BUILD_RISCV_DIR?}/iree-run-module-llvm_aot.vmfb"
 
 wget -P "${BUILD_RISCV_DIR?}/" https://github.com/tensorflow/tflite-micro/raw/aeac6f39e5c7475cea20c54e86d41e3a38312546/tensorflow/lite/micro/models/person_detect.tflite
 
-generate_dylib_vmfb tosa \
+generate_llvm_cpu_vmfb tosa \
   "${BUILD_RISCV_DIR?}/person_detect.tflite" \
   -o "${BUILD_RISCV_DIR?}/person_detect.vmfb"
 
-generate_dylib_vmfb tosa-rvv \
+generate_llvm_cpu_vmfb tosa-rvv \
   "${BUILD_RISCV_DIR?}/person_detect.tflite" \
   -o "${BUILD_RISCV_DIR?}/person_detect_rvv.vmfb"
 

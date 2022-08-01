@@ -42,7 +42,7 @@ import numpy as np
 
 # Mapping from IREE target backends to their corresponding drivers.
 TARGET_BACKEND_TO_DRIVER = {
-    "dylib-llvm-aot": "local-task",
+    "llvm-cpu": "local-task",
     "vmvx": "local-task",
     "vulkan-spirv": "vulkan",
 }

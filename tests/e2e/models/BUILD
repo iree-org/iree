@@ -51,7 +51,7 @@ iree_lit_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_dylib-llvm-aot_dylib",
+    name = "check_llvm-cpu_local-task",
     srcs = CHECK_FRAMEWORK_TESTS,
     compiler_flags = ["--iree-input-type=mhlo"],
     driver = "local-task",
@@ -60,7 +60,7 @@ iree_check_single_backend_test_suite(
 
 # TODO(#5880): VMVX is not yet fast enough to run the larger model tests.
 # iree_check_single_backend_test_suite(
-#     name = "check_vmvx_vmvx",
+#     name = "check_vmvx_local-task",
 #     srcs = CHECK_FRAMEWORK_TESTS,
 #     driver = "local-task",
 #     target_backend = "vmvx",

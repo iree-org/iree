@@ -66,7 +66,7 @@ LLVM_SRCS = enforce_glob(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_dylib-llvm-aot_dylib",
+    name = "check_llvm-cpu_local-task",
     srcs = LLVM_SRCS,
     compiler_flags = ["--iree-input-type=tosa"],
     driver = "local-task",
@@ -122,7 +122,7 @@ VMVX_SRCS = enforce_glob(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_vmvx_vmvx",
+    name = "check_vmvx_local-task",
     srcs = VMVX_SRCS,
     compiler_flags = [
         "--iree-input-type=tosa",
@@ -178,7 +178,7 @@ VMVX_MICROKERNELS_SRCS = enforce_glob(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_vmvx_vmvx_microkernels",
+    name = "check_vmvx_local-sync_microkernels",
     srcs = VMVX_MICROKERNELS_SRCS,
     compiler_flags = [
         "--iree-input-type=tosa",
@@ -246,8 +246,8 @@ iree_check_single_backend_test_suite(
 test_suite(
     name = "check",
     tests = [
-        ":check_dylib-llvm-aot_dylib",
-        ":check_vmvx_vmvx",
+        ":check_llvm-cpu_local-task",
+        ":check_vmvx_local-task",
         ":check_vulkan-spirv_vulkan",
     ],
 )

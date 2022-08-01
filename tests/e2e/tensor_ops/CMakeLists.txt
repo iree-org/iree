@@ -26,7 +26,7 @@ iree_lit_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_dylib-llvm-aot_dylib
+    check_llvm-cpu_local-task
   SRCS
     "extract_slice.mlir"
     "tensor_insert_slice.mlir"

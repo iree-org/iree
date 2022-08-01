@@ -38,10 +38,10 @@ class CompilerTest(unittest.TestCase):
                      "<CompilerOptions:['--iree-input-type=mhlo']>")
 
   def testListOption(self):
-    options = ireec.CompilerOptions("--iree-hal-target-backends=cpu,vmvx")
+    options = ireec.CompilerOptions("--iree-hal-target-backends=llvm-cpu,vmvx")
     self.assertEqual(
         repr(options),
-        "<CompilerOptions:['--iree-hal-target-backends=cpu,vmvx']>")
+        "<CompilerOptions:['--iree-hal-target-backends=llvm-cpu,vmvx']>")
     print(options)
 
   def testMultipleOptions(self):

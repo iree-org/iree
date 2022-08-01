@@ -12,7 +12,7 @@ iree_add_all_subdirs()
 
 iree_check_single_backend_test_suite(
   NAME
-    check_dylib-llvm-aot_dylib
+    check_llvm-cpu_local-task
   SRCS
     "abs.mlir"
     "add.mlir"
@@ -64,7 +64,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_vmvx_vmvx
+    check_vmvx_local-task
   SRCS
     "abs.mlir"
     "add.mlir"
@@ -115,7 +115,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_vmvx_vmvx_microkernels
+    check_vmvx_local-sync_microkernels
   SRCS
     "abs.mlir"
     "add.mlir"

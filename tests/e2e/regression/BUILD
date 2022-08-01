@@ -71,7 +71,7 @@ iree_lit_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_regression_dylib-llvm-aot",
+    name = "check_regression_llvm-cpu",
     srcs = [
         "associative_reordering.mlir",
         "lowering_config.mlir",
@@ -82,7 +82,7 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_regression_tosa_dylib-llvm-aot",
+    name = "check_regression_tosa_llvm-cpu",
     srcs = [
         # --iree-input-type=tosa is interesting for this test because
         # it includes the --iree-linalg-quantized-matmul-to-matmul pass,
