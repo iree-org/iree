@@ -13,7 +13,7 @@
 #
 # The desired build directory can be passed as
 # the first argument. Otherwise, it uses the environment variable
-# IREE_TSAN_BUILD_DIR, defaulting to "build-tsan". Designed for CI, but
+# IREE_ASAN_BUILD_DIR, defaulting to "build-asan". Designed for CI, but
 # can be run manually. This reuses the build directory if it already exists.
 #
 # Build and test the project with CMake with ASan enabled and using
